@@ -499,7 +499,7 @@ if __name__ == "__main__":
         return data_dict
         
     # metrics, optimizer, dataloader
-    accelerator = Accelerator(gradient_accumulation_step=args.gradient_accumulation_step)
+    accelerator = Accelerator(gradient_accumulation_steps=args.gradient_accumulation_step)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
     
     if args.problem_type == "single_label_classification":
@@ -517,29 +517,29 @@ if __name__ == "__main__":
     
     if args.batch_token is not None:
         train_loader = DataLoader(
-            train_dataset, num_worker=args.num_worker, collate_fn=collate_fn,
+            train_dataset, num_workers=args.num_worker, collate_fn=collate_fn,
             batch_sampler=BatchSampler(train_token_num, args.batch_token)
             )
         val_loader = DataLoader(
-            val_dataset, num_worker=args.num_worker, collate_fn=collate_fn,
+            val_dataset, num_workers=args.num_worker, collate_fn=collate_fn,
             batch_sampler=BatchSampler(val_token_num, args.batch_token, False)
             )
         test_loader = DataLoader(
-            test_dataset, num_worker=args.num_worker, collate_fn=collate_fn,
+            test_dataset, num_workers=args.num_worker, collate_fn=collate_fn,
             batch_sampler=BatchSampler(test_token_num, args.batch_token, False)
             )
     elif args.batch_size is not None:
         train_loader = DataLoader(
             train_dataset, batch_size=args.batch_size, shuffle=True, 
-            num_worker=args.num_worker, collate_fn=collate_fn
+            num_workers=args.num_worker, collate_fn=collate_fn
             )
         val_loader = DataLoader(
             val_dataset, batch_size=args.batch_size, shuffle=False, 
-            num_worker=args.num_worker, collate_fn=collate_fn
+            num_workers=args.num_worker, collate_fn=collate_fn
             )
         test_loader = DataLoader(
             test_dataset, batch_size=args.batch_size, shuffle=False, 
-            num_worker=args.num_worker, collate_fn=collate_fn
+            num_workers=args.num_worker, collate_fn=collate_fn
             )
     
     model, optimizer, train_loader, val_loader, test_loader = accelerator.prepare(
