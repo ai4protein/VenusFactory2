@@ -1,0 +1,9 @@
+{
+    "dataset": "tyang816/DeepLocBinary_AlphaFold2",
+    "pdb_type": "AlphaFold2",
+    "num_labels": 10,
+    "problem_type": "single_label_classification",
+    "metrics": "accuracy",
+    "monitor": "accuracy",
+    "normalize": "None"
+}

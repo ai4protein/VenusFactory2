@@ -1,0 +1,9 @@
+{
+    "dataset": "tyang816/FLIP_AAV_seven-vs-rest",
+    "pdb_type": "None",
+    "num_labels": 1,
+    "problem_type": "regression",
+    "metrics": "spearman_corr",
+    "monitor": "spearman_corr",
+    "normalize": "min_max"
+}
