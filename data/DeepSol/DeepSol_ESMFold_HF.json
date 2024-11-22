@@ -1,7 +1,7 @@
 {
     "dataset": "tyang816/DeepSol_ESMFold",
     "pdb_type": "ESMFold",
-    "num_labels": 2,
+    "num_label": 2,
     "problem_type": "single_label_classification",
     "metrics": "accuracy",
     "monitor": "accuracy",

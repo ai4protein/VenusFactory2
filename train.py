@@ -32,63 +32,6 @@ logging.set_verbosity_error()
 warnings.filterwarnings("ignore")
 
 
-# DATASET_TO_NUM_LABELS = {
-#     "DeepLocBinary": 2, "DeepLocMulti": 10, 
-#     "DeepSol": 2, "DeepSoluE": 2,
-#     "MetalIonBinding": 2, "Thermostability": 1,
-#     "EC": 585,
-#     "BP": 1943, "CC": 320, "MF": 489,
-# }
-# DATASET_TO_TASK = {
-#     "DeepLocBinary": "single_label_classification", 
-#     "DeepLocMulti": "single_label_classification",
-#     "DeepSol": "single_label_classification", 
-#     "DeepSoluE": "single_label_classification",
-#     "MetalIonBinding": "single_label_classification", 
-#     "Thermostability": "regression",
-#     "EC": "multi_label_classification",
-#     "BP": "multi_label_classification",
-#     "CC": "multi_label_classification",
-#     "MF": "multi_label_classification",
-# }
-# # valid and test metrics
-# DATASET_TO_METRICS = {
-#     "DeepLocBinary": ("accuracy", Accuracy(task="multiclass", num_classes=DATASET_TO_NUM_LABELS["DeepLocBinary"])),
-#     "DeepLocMulti": ("accuracy", Accuracy(task="multiclass", num_classes=DATASET_TO_NUM_LABELS["DeepLocMulti"])),
-#     "DeepSol": ("accuracy", Accuracy(task="multiclass", num_classes=DATASET_TO_NUM_LABELS["DeepSol"])),
-#     "DeepSoluE": ("accuracy", Accuracy(task="multiclass", num_classes=DATASET_TO_NUM_LABELS["DeepSoluE"])),
-#     "MetalIonBinding": ("accuracy", Accuracy(task="multiclass", num_classes=DATASET_TO_NUM_LABELS["MetalIonBinding"])),
-#     "Thermostability": ("spearman_corr", SpearmanCorrCoef()),
-#     "EC": ("f1_max", MultilabelF1Max(num_labels=DATASET_TO_NUM_LABELS["EC"])),
-#     "BP": ("f1_max", MultilabelF1Max(num_labels=DATASET_TO_NUM_LABELS["BP"])),
-#     "CC": ("f1_max", MultilabelF1Max(num_labels=DATASET_TO_NUM_LABELS["CC"])),
-#     "MF": ("f1_max", MultilabelF1Max(num_labels=DATASET_TO_NUM_LABELS["MF"])),
-# }
-# DATASET_TO_MONITOR = {
-#     "DeepLocBinary": "accuracy",
-#     "DeepLocMulti": "accuracy",
-#     "DeepSol": "accuracy",
-#     "DeepSoluE": "accuracy",
-#     "MetalIonBinding": "accuracy",
-#     "Thermostability": "spearman_corr",
-#     "EC": "f1_max",
-#     "BP": "f1_max",
-#     "CC": "f1_max",
-#     "MF": "f1_max",
-# }
-# DATASET_TO_NORMALIZE = {
-#     "DeepLocBinary": None,
-#     "DeepLocMulti": None,
-#     "DeepSol": None,
-#     "DeepSoluE": None,
-#     "MetalIonBinding": None,
-#     "Thermostability": "min_max",
-#     "EC": None,
-#     "BP": None,
-#     "CC": None,
-#     "MF": None,
-# }
-
 def min_max_normalize_dataset(train_dataset, val_dataset, test_dataset):
     labels = [e["label"] for e in train_dataset]
     min_label, max_label = min(labels), max(labels)
@@ -107,7 +50,7 @@ def train(args, model, plm_model, accelerator, metrics_dict, train_loader, val_l
     val_loss_list, val_metric_list = [], []
     path = os.path.join(args.ckpt_dir, args.model_name)
     global_steps = 0
-    for epoch in range(args.max_train_epochs):
+    for epoch in range(args.train_epoch):
         print(f"---------- Epoch {epoch} ----------")
         # train
         model.train()
@@ -119,7 +62,7 @@ def train(args, model, plm_model, accelerator, metrics_dict, train_loader, val_l
                     batch[k] = v.to(device)
                 label = batch["label"]
                 logits = model(plm_model, batch)
-                if args.problem_type == 'regression' and args.num_labels == 1:
+                if args.problem_type == 'regression' and args.num_label == 1:
                     loss = loss_fn(logits.squeeze(), label.squeeze())
                 elif args.problem_type == 'multi_label_classification':
                     loss = loss_fn(logits, label.float())
@@ -205,7 +148,7 @@ def eval_loop(args, model, plm_model, metrics_dict, dataloader, loss_fn, device=
         label = batch["label"]
         logits = model(plm_model, batch)
         for metric_name, metric in metrics_dict.items():
-            if args.problem_type == 'regression' and args.num_labels == 1:
+            if args.problem_type == 'regression' and args.num_label == 1:
                 loss = loss_fn(logits.squeeze(), label.squeeze())
                 metric(logits.squeeze(), label.squeeze())
             elif args.problem_type == 'multi_label_classification':
@@ -230,16 +173,16 @@ if __name__ == "__main__":
 
     # model params
     parser.add_argument('--hidden_size', type=int, default=None, help='embedding hidden size of the model')
-    parser.add_argument('--num_attention_heads', type=int, default=8, help='number of attention heads')
-    parser.add_argument('--attention_probs_dropout_prob', type=float, default=0, help='attention probs dropout prob')
+    parser.add_argument('--num_attention_head', type=int, default=8, help='number of attention heads')
+    parser.add_argument('--attention_probs_dropout', type=float, default=0, help='attention probs dropout prob')
     parser.add_argument('--plm_model', type=str, default='facebook/esm2_t33_650M_UR50D', help='esm model name')
-    parser.add_argument('--pooling_method', type=str, default='attention1d', help='pooling method')
-    parser.add_argument('--pooling_dropout', type=float, default=0.25, help='pooling dropout')
+    parser.add_argument('--pooling_method', type=str, default='mean', help='pooling method')
+    parser.add_argument('--pooling_dropout', type=float, default=0.1, help='pooling dropout')
     
     # dataset
     parser.add_argument('--dataset', type=str, default=None, help='dataset name')
     parser.add_argument('--dataset_config', type=str, default=None, help='config of dataset')
-    parser.add_argument('--num_labels', type=int, default=None, help='number of labels')
+    parser.add_argument('--num_label', type=int, default=None, help='number of labels')
     parser.add_argument('--problem_type', type=str, default=None, help='problem type')
     parser.add_argument('--pdb_type', type=str, default=None, help='pdb type')
     parser.add_argument('--train_file', type=str, default=None, help='train file')
@@ -251,14 +194,15 @@ if __name__ == "__main__":
     parser.add_argument('--seed', type=int, default=3407, help='random seed')
     parser.add_argument("--lr", type=float, default=1e-3, help="learning rate")
     parser.add_argument('--num_workers', type=int, default=4, help='number of workers')
-    parser.add_argument('--batch_size', type=int, default=4, help='batch size')
-    parser.add_argument('--gradient_accumulation_steps', type=int, default=1, help='gradient accumulation steps')
-    parser.add_argument('--max_batch_token', type=int, default=10000, help='max number of token per batch')
-    parser.add_argument('--max_train_epochs', type=int, default=20, help='training epochs')
+    parser.add_argument('--batch_size', type=int, default=None, help='batch size')
+    parser.add_argument('--gradient_accumulation_step', type=int, default=1, help='gradient accumulation steps')
+    parser.add_argument('--batch_token', type=int, default=None, help='max number of token per batch')
+    parser.add_argument('--train_epoch', type=int, default=20, help='training epochs')
     parser.add_argument('--max_seq_len', type=int, default=None, help='max sequence length')
     parser.add_argument('--patience', type=int, default=5, help='patience for early stopping')
     parser.add_argument('--monitor', type=str, default=None, help='monitor metric')
-    parser.add_argument('--structure_seqs', type=str, default=None, help='structure token')
+    parser.add_argument('--monitor_strategy', type=str, default=None, help='monitor strategy')
+    parser.add_argument('--structure_seq', type=str, default=None, help='structure token')
     parser.add_argument('--loss_fn', type=str, default='cross_entropy', choices=['cross_entropy', 'focal_loss'], help='loss function')
     
     # save model
@@ -274,10 +218,14 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     
+    # check args
+    if args.batch_size is None and args.batch_token is None:
+        raise ValueError("batch_size or batch_token must be provided")
+    
     set_seed(args.seed)
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    if args.structure_seqs is not None:
-        args.structure_seqs = args.structure_seqs.split(',')
+    if args.structure_seq is not None:
+        args.structure_seq = args.structure_seq.split(',')
         
     dataset_config = json.loads(open(args.dataset_config).read())
     if args.dataset is None:
@@ -293,53 +241,62 @@ if __name__ == "__main__":
     if args.test_file is None:
         if dataset_config.get('test_file'):
             args.test_file = dataset_config['test_file']
-    if args.num_labels is None:
-        args.num_labels = dataset_config['num_labels']
+    if args.num_label is None:
+        args.num_label = dataset_config['num_label']
     if args.problem_type is None:
         args.problem_type = dataset_config['problem_type']
     if args.monitor is None:
         args.monitor = dataset_config['monitor']
     
     metrics_dict = {}
+    metrics_monitor_strategy_dict = {}
     if args.metrics is None:
         args.metrics = dataset_config['metrics']
         if args.metrics != 'None':
             args.metrics = args.metrics.split(',')
             for m in args.metrics:
                 if m == 'accuracy':
-                    if args.num_labels == 2:
+                    if args.num_label == 2:
                         metrics_dict[m] = BinaryAccuracy()
                     else:
-                        metrics_dict[m] = Accuracy(task="multiclass", num_classes=args.num_labels)
+                        metrics_dict[m] = Accuracy(task="multiclass", num_classes=args.num_label)
+                    metrics_monitor_strategy_dict[m] = 'max'
                 elif m == 'recall':
-                    if args.num_labels == 2:
+                    if args.num_label == 2:
                         metrics_dict[m] = BinaryRecall()
                     else:
-                        metrics_dict[m] = Recall(task="multiclass", num_classes=args.num_labels)
+                        metrics_dict[m] = Recall(task="multiclass", num_classes=args.num_label)
+                    metrics_monitor_strategy_dict[m] = 'max'
                 elif m == 'precision':
-                    if args.num_labels == 2:
+                    if args.num_label == 2:
                         metrics_dict[m] = BinaryPrecision()
                     else:
-                        metrics_dict[m] = Precision(task="multiclass", num_classes=args.num_labels)
+                        metrics_dict[m] = Precision(task="multiclass", num_classes=args.num_label)
+                    metrics_monitor_strategy_dict[m] = 'max'
                 elif m == 'f1':
-                    if args.num_labels == 2:
+                    if args.num_label == 2:
                         metrics_dict[m] = BinaryF1Score()
                     else:
-                        metrics_dict[m] = F1Score(task="multiclass", num_classes=args.num_labels)
+                        metrics_dict[m] = F1Score(task="multiclass", num_classes=args.num_label)
+                    metrics_monitor_strategy_dict[m] = 'max'
                 elif m == 'mcc':
-                    if args.num_labels == 2:
+                    if args.num_label == 2:
                         metrics_dict[m] = BinaryMatthewsCorrCoef()
                     else:
-                        metrics_dict[m] = MatthewsCorrCoef(task="multiclass", num_classes=args.num_labels)
+                        metrics_dict[m] = MatthewsCorrCoef(task="multiclass", num_classes=args.num_label)
+                    metrics_monitor_strategy_dict[m] = 'max'
                 elif m == 'auc':
-                    if args.num_labels == 2:
+                    if args.num_label == 2:
                         metrics_dict[m] = BinaryAUROC()
                     else:
-                        metrics_dict[m] = AUROC(task="multiclass", num_classes=args.num_labels)
+                        metrics_dict[m] = AUROC(task="multiclass", num_classes=args.num_label)
+                    metrics_monitor_strategy_dict[m] = 'max'
                 elif m == 'f1_max':
-                    metrics_dict[m] = MultilabelF1Max(num_labels=args.num_labels)
+                    metrics_dict[m] = MultilabelF1Max(num_label=args.num_label)
+                    metrics_monitor_strategy_dict[m] = 'max'
                 elif m == 'spearman_corr':
                     metrics_dict[m] = SpearmanCorrCoef()
+                    metrics_monitor_strategy_dict[m] = 'max'
                 else:
                     raise ValueError(f"Invalid metric: {m}")
             for metric_name, metric in metrics_dict.items():
@@ -384,13 +341,13 @@ if __name__ == "__main__":
         plm_model = T5EncoderModel.from_pretrained(args.plm_model).to(device).eval()
         args.hidden_size = plm_model.config.d_model
     
-    if args.structure_seqs is not None:
-        if 'esm3_structure_seq' in args.structure_seqs: 
+    if args.structure_seq is not None:
+        if 'esm3_structure_seq' in args.structure_seq: 
             args.vocab_size = max(plm_model.config.vocab_size, 4100)
         else:
             args.vocab_size = plm_model.config.vocab_size
     else:
-        args.structure_seqs = []
+        args.structure_seq = []
     
     # load adapter model
     model = AdapterModel(args)
@@ -409,17 +366,17 @@ if __name__ == "__main__":
         if args.problem_type == 'multi_label_classification':
             label_list = data['label'].split(',')
             data['label'] = [int(l) for l in label_list]
-            binary_list = [0] * args.num_labels
+            binary_list = [0] * args.num_label
             for index in data['label']:
                 binary_list[index] = 1
             data['label'] = binary_list
         
-        if 'esm3_structure_seq' in args.structure_seqs:
+        if 'esm3_structure_seq' in args.structure_seq:
             data["esm3_structure_seq"] = eval(data["esm3_structure_seq"])
         
         if args.max_seq_len is not None:
             data["aa_seq"] = data["aa_seq"][:args.max_seq_len]
-            for seq in args.structure_seqs:
+            for seq in args.structure_seq:
                 data[seq] = data[seq][:args.max_seq_len]
             token_num = min(len(data["aa_seq"]), args.max_seq_len)
         else:
@@ -468,56 +425,56 @@ if __name__ == "__main__":
     
     def collate_fn(examples):
         aa_seqs, labels = [], []
-        if 'foldseek_seq' in args.structure_seqs:
+        if 'foldseek_seq' in args.structure_seq:
             foldseek_seqs = []
-        if 'ss8_seq' in args.structure_seqs:
+        if 'ss8_seq' in args.structure_seq:
             ss8_seqs = []
-        if 'esm3_structure_seq' in args.structure_seqs:
-            esm3_structure_seqs = []
+        if 'esm3_structure_seq' in args.structure_seq:
+            esm3_structure_seq = []
             
         for e in examples:
             aa_seq = e["aa_seq"]
-            if 'foldseek_seq' in args.structure_seqs:
+            if 'foldseek_seq' in args.structure_seq:
                 foldseek_seq = e["foldseek_seq"]
-            if 'ss8_seq' in args.structure_seqs:
+            if 'ss8_seq' in args.structure_seq:
                 ss8_seq = e["ss8_seq"]
             
             if 'prot_bert' in args.plm_model or "prot_t5" in args.plm_model:
                 aa_seq = " ".join(list(aa_seq))
                 aa_seq = re.sub(r"[UZOB]", "X", aa_seq)
-                if 'foldseek_seq' in args.structure_seqs:
+                if 'foldseek_seq' in args.structure_seq:
                     foldseek_seq = " ".join(list(foldseek_seq))
-                if 'ss8_seq' in args.structure_seqs:
+                if 'ss8_seq' in args.structure_seq:
                     ss8_seq = " ".join(list(ss8_seq))
             elif 'ankh' in args.plm_model:
                 aa_seq = list(aa_seq)
-                if 'foldseek_seq' in args.structure_seqs:
+                if 'foldseek_seq' in args.structure_seq:
                     foldseek_seq = list(foldseek_seq)
-                if 'ss8_seq' in args.structure_seqs:
+                if 'ss8_seq' in args.structure_seq:
                     ss8_seq = list(ss8_seq)
             
             aa_seqs.append(aa_seq)
-            if 'foldseek_seq' in args.structure_seqs:
+            if 'foldseek_seq' in args.structure_seq:
                 foldseek_seqs.append(foldseek_seq)
-            if 'ss8_seq' in args.structure_seqs:
+            if 'ss8_seq' in args.structure_seq:
                 ss8_seqs.append(ss8_seq)
-            if 'esm3_structure_seq' in args.structure_seqs:
+            if 'esm3_structure_seq' in args.structure_seq:
                 esm3_structure_seq = [VQVAE_SPECIAL_TOKENS["BOS"]] + e["esm3_structure_seq"] + [VQVAE_SPECIAL_TOKENS["EOS"]]
-                esm3_structure_seqs.append(torch.tensor(esm3_structure_seq))
+                esm3_structure_seq.append(torch.tensor(esm3_structure_seq))
             
             labels.append(e["label"])
         
         if 'ankh' in args.plm_model:
             aa_inputs = tokenizer.batch_encode_plus(aa_seqs, add_special_tokens=True, padding=True, is_split_into_words=True, return_tensors="pt")
-            if 'foldseek_seq' in args.structure_seqs:
+            if 'foldseek_seq' in args.structure_seq:
                 foldseek_input_ids = tokenizer.batch_encode_plus(foldseek_seqs, add_special_tokens=True, padding=True, is_split_into_words=True, return_tensors="pt")["input_ids"]
-            if 'ss8_seq' in args.structure_seqs:
+            if 'ss8_seq' in args.structure_seq:
                 ss8_input_ids = tokenizer.batch_encode_plus(ss8_seqs, add_special_tokens=True, padding=True, is_split_into_words=True, return_tensors="pt")["input_ids"]
         else:
             aa_inputs = tokenizer(aa_seqs, return_tensors="pt", padding=True, truncation=True)
-            if 'foldseek_seq' in args.structure_seqs:
+            if 'foldseek_seq' in args.structure_seq:
                 foldseek_input_ids = tokenizer(foldseek_seqs, return_tensors="pt", padding=True, truncation=True)["input_ids"]
-            if 'ss8_seq' in args.structure_seqs:
+            if 'ss8_seq' in args.structure_seq:
                 ss8_input_ids = tokenizer(ss8_seqs, return_tensors="pt", padding=True, truncation=True)["input_ids"]
         
         aa_input_ids = aa_inputs["input_ids"]
@@ -529,20 +486,20 @@ if __name__ == "__main__":
             labels = torch.as_tensor(labels, dtype=torch.long)
         
         data_dict = {"aa_input_ids": aa_input_ids, "attention_mask": attention_mask, "label": labels}
-        if 'foldseek_seq' in args.structure_seqs:
+        if 'foldseek_seq' in args.structure_seq:
             data_dict["foldseek_input_ids"] = foldseek_input_ids
-        if 'ss8_seq' in args.structure_seqs:
+        if 'ss8_seq' in args.structure_seq:
             data_dict["ss8_input_ids"] = ss8_input_ids
-        if 'esm3_structure_seq' in args.structure_seqs:
+        if 'esm3_structure_seq' in args.structure_seq:
             # pad the list of esm3_structure_seq and convert to tensor
             esm3_structure_input_ids = torch.nn.utils.rnn.pad_sequence(
-                esm3_structure_seqs, batch_first=True, padding_value=VQVAE_SPECIAL_TOKENS["PAD"]
+                esm3_structure_seq, batch_first=True, padding_value=VQVAE_SPECIAL_TOKENS["PAD"]
                 )
             data_dict["esm3_structure_input_ids"] = esm3_structure_input_ids
         return data_dict
         
     # metrics, optimizer, dataloader
-    accelerator = Accelerator(gradient_accumulation_steps=args.gradient_accumulation_steps)
+    accelerator = Accelerator(gradient_accumulation_step=args.gradient_accumulation_step)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
     
     if args.problem_type == "single_label_classification":
@@ -550,26 +507,40 @@ if __name__ == "__main__":
             loss_fn = nn.CrossEntropyLoss()
         elif args.loss_fn == "focal_loss":
             train_labels = [e["label"] for e in train_dataset]
-            alpha = [len(train_labels) / train_labels.count(i) for i in range(args.num_labels)]
+            alpha = [len(train_labels) / train_labels.count(i) for i in range(args.num_label)]
             print(">>> alpha: ", alpha)
-            loss_fn = MultiClassFocalLossWithAlpha(num_classes=args.num_labels, alpha=alpha, device=device)
+            loss_fn = MultiClassFocalLossWithAlpha(num_classes=args.num_label, alpha=alpha, device=device)
     elif args.problem_type == "regression":
         loss_fn = nn.MSELoss()
     elif args.problem_type == "multi_label_classification":
         loss_fn = nn.BCEWithLogitsLoss()
     
-    train_loader = DataLoader(
-        train_dataset, num_workers=args.num_workers, collate_fn=collate_fn,
-        batch_sampler=BatchSampler(train_token_num, args.max_batch_token)
-        )
-    val_loader = DataLoader(
-        val_dataset, num_workers=args.num_workers, collate_fn=collate_fn,
-        batch_sampler=BatchSampler(val_token_num, args.max_batch_token, False)
-        )
-    test_loader = DataLoader(
-        test_dataset, num_workers=args.num_workers, collate_fn=collate_fn,
-        batch_sampler=BatchSampler(test_token_num, args.max_batch_token, False)
-        )
+    if args.batch_token is not None:
+        train_loader = DataLoader(
+            train_dataset, num_workers=args.num_workers, collate_fn=collate_fn,
+            batch_sampler=BatchSampler(train_token_num, args.batch_token)
+            )
+        val_loader = DataLoader(
+            val_dataset, num_workers=args.num_workers, collate_fn=collate_fn,
+            batch_sampler=BatchSampler(val_token_num, args.batch_token, False)
+            )
+        test_loader = DataLoader(
+            test_dataset, num_workers=args.num_workers, collate_fn=collate_fn,
+            batch_sampler=BatchSampler(test_token_num, args.batch_token, False)
+            )
+    elif args.batch_size is not None:
+        train_loader = DataLoader(
+            train_dataset, batch_size=args.batch_size, shuffle=True, 
+            num_workers=args.num_workers, collate_fn=collate_fn
+            )
+        val_loader = DataLoader(
+            val_dataset, batch_size=args.batch_size, shuffle=False, 
+            num_workers=args.num_workers, collate_fn=collate_fn
+            )
+        test_loader = DataLoader(
+            test_dataset, batch_size=args.batch_size, shuffle=False, 
+            num_workers=args.num_workers, collate_fn=collate_fn
+            )
     
     model, optimizer, train_loader, val_loader, test_loader = accelerator.prepare(
         model, optimizer, train_loader, val_loader, test_loader

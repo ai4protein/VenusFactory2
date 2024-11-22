@@ -1,7 +1,7 @@
 {
     "dataset": "tyang816/DeepLocMulti_ESMFold",
     "pdb_type": "ESMFold",
-    "num_labels": 10,
+    "num_label": 10,
     "problem_type": "single_label_classification",
     "metrics": "accuracy",
     "monitor": "accuracy",
