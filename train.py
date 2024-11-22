@@ -193,7 +193,7 @@ if __name__ == "__main__":
     # train model
     parser.add_argument('--seed', type=int, default=3407, help='random seed')
     parser.add_argument("--lr", type=float, default=1e-3, help="learning rate")
-    parser.add_argument('--num_workers', type=int, default=4, help='number of workers')
+    parser.add_argument('--num_worker', type=int, default=4, help='number of workers')
     parser.add_argument('--batch_size', type=int, default=None, help='batch size')
     parser.add_argument('--gradient_accumulation_step', type=int, default=1, help='gradient accumulation steps')
     parser.add_argument('--batch_token', type=int, default=None, help='max number of token per batch')
@@ -517,29 +517,29 @@ if __name__ == "__main__":
     
     if args.batch_token is not None:
         train_loader = DataLoader(
-            train_dataset, num_workers=args.num_workers, collate_fn=collate_fn,
+            train_dataset, num_worker=args.num_worker, collate_fn=collate_fn,
             batch_sampler=BatchSampler(train_token_num, args.batch_token)
             )
         val_loader = DataLoader(
-            val_dataset, num_workers=args.num_workers, collate_fn=collate_fn,
+            val_dataset, num_worker=args.num_worker, collate_fn=collate_fn,
             batch_sampler=BatchSampler(val_token_num, args.batch_token, False)
             )
         test_loader = DataLoader(
-            test_dataset, num_workers=args.num_workers, collate_fn=collate_fn,
+            test_dataset, num_worker=args.num_worker, collate_fn=collate_fn,
             batch_sampler=BatchSampler(test_token_num, args.batch_token, False)
             )
     elif args.batch_size is not None:
         train_loader = DataLoader(
             train_dataset, batch_size=args.batch_size, shuffle=True, 
-            num_workers=args.num_workers, collate_fn=collate_fn
+            num_worker=args.num_worker, collate_fn=collate_fn
             )
         val_loader = DataLoader(
             val_dataset, batch_size=args.batch_size, shuffle=False, 
-            num_workers=args.num_workers, collate_fn=collate_fn
+            num_worker=args.num_worker, collate_fn=collate_fn
             )
         test_loader = DataLoader(
             test_dataset, batch_size=args.batch_size, shuffle=False, 
-            num_workers=args.num_workers, collate_fn=collate_fn
+            num_worker=args.num_worker, collate_fn=collate_fn
             )
     
     model, optimizer, train_loader, val_loader, test_loader = accelerator.prepare(

@@ -36,7 +36,7 @@ def evaluate(model, plm_model, metrics, dataloader, loss_fn, device=None):
         pred_labels.extend(logits.argmax(dim=1).cpu().numpy())
         
         for metric_name, metric in metrics_dict.items():
-            if args.problem_type == 'regression' and args.num_labels == 1:
+            if args.problem_type == 'regression' and args.num_label == 1:
                 loss = loss_fn(logits.squeeze(), label.squeeze())
                 metric(logits.squeeze(), label.squeeze())
             elif args.problem_type == 'multi_label_classification':
@@ -61,10 +61,10 @@ if __name__ == '__main__':
 
     # model params
     parser.add_argument('--hidden_size', type=int, default=None, help='embedding hidden size of the model')
-    parser.add_argument('--num_attention_heads', type=int, default=8, help='number of attention heads')
+    parser.add_argument('--num_attention_head', type=int, default=8, help='number of attention heads')
     parser.add_argument('--attention_probs_dropout_prob', type=float, default=0, help='attention probs dropout prob')
     parser.add_argument('--plm_model', type=str, default='facebook/esm2_t33_650M_UR50D', help='esm model name')
-    parser.add_argument('--num_labels', type=int, default=2, help='number of labels')
+    parser.add_argument('--num_label', type=int, default=2, help='number of labels')
     parser.add_argument('--pooling_method', type=str, default='attention1d', help='pooling method')
     parser.add_argument('--pooling_dropout', type=float, default=0.25, help='pooling dropout')
     
@@ -74,9 +74,9 @@ if __name__ == '__main__':
     parser.add_argument('--test_file', type=str, default=None, help='test file')
     parser.add_argument('--test_result_dir', type=str, default=None, help='test result directory')
     parser.add_argument('--metrics', type=str, default=None, help='computation metrics')
-    parser.add_argument('--num_workers', type=int, default=4, help='number of workers')
+    parser.add_argument('--num_worker', type=int, default=4, help='number of workers')
     parser.add_argument('--max_seq_len', type=int, default=None, help='max sequence length')
-    parser.add_argument('--max_batch_token', type=int, default=10000, help='max number of token per batch')
+    parser.add_argument('--batch_token', type=int, default=10000, help='max number of token per batch')
     parser.add_argument('--use_foldseek', action='store_true', help='use foldseek')
     parser.add_argument('--use_ss8', action='store_true', help='use ss8')
     
@@ -112,37 +112,37 @@ if __name__ == '__main__':
     args.metrics = args.metrics.split(',')
     for m in args.metrics:
         if m == 'accuracy':
-            if args.num_labels == 2:
+            if args.num_label == 2:
                 metrics_dict[m] = BinaryAccuracy()
             else:
-                metrics_dict[m] = Accuracy(task="multiclass", num_classes=args.num_labels)
+                metrics_dict[m] = Accuracy(task="multiclass", num_classes=args.num_label)
         elif m == 'recall':
-            if args.num_labels == 2:
+            if args.num_label == 2:
                 metrics_dict[m] = BinaryRecall()
             else:
-                metrics_dict[m] = Recall(task="multiclass", num_classes=args.num_labels)
+                metrics_dict[m] = Recall(task="multiclass", num_classes=args.num_label)
         elif m == 'precision':
-            if args.num_labels == 2:
+            if args.num_label == 2:
                 metrics_dict[m] = BinaryPrecision()
             else:
-                metrics_dict[m] = Precision(task="multiclass", num_classes=args.num_labels)
+                metrics_dict[m] = Precision(task="multiclass", num_classes=args.num_label)
         elif m == 'f1':
-            if args.num_labels == 2:
+            if args.num_label == 2:
                 metrics_dict[m] = BinaryF1Score()
             else:
-                metrics_dict[m] = F1Score(task="multiclass", num_classes=args.num_labels)
+                metrics_dict[m] = F1Score(task="multiclass", num_classes=args.num_label)
         elif m == 'mcc':
-            if args.num_labels == 2:
+            if args.num_label == 2:
                 metrics_dict[m] = BinaryMatthewsCorrCoef()
             else:
-                metrics_dict[m] = MatthewsCorrCoef(task="multiclass", num_classes=args.num_labels)
+                metrics_dict[m] = MatthewsCorrCoef(task="multiclass", num_classes=args.num_label)
         elif m == 'auc':
-            if args.num_labels == 2:
+            if args.num_label == 2:
                 metrics_dict[m] = BinaryAUROC()
             else:
-                metrics_dict[m] = AUROC(task="multiclass", num_classes=args.num_labels)
+                metrics_dict[m] = AUROC(task="multiclass", num_classes=args.num_label)
         elif m == 'f1_max':
-            metrics_dict[m] = MultilabelF1Max(num_labels=args.num_labels)
+            metrics_dict[m] = MultilabelF1Max(num_label=args.num_label)
         elif m == 'spearman_corr':
             metrics_dict[m] = SpearmanCorrCoef()
         else:
@@ -235,7 +235,7 @@ if __name__ == '__main__':
         if args.problem_type == 'multi_label_classification':
             label_list = data['label'].split(',')
             data['label'] = [int(l) for l in label_list]
-            binary_list = [0] * args.num_labels
+            binary_list = [0] * args.num_label
             for index in data['label']:
                 binary_list[index] = 1
             data['label'] = binary_list
@@ -282,8 +282,8 @@ if __name__ == '__main__':
     
         
     test_loader = DataLoader(
-        test_dataset, num_workers=args.num_workers, collate_fn=collate_fn,
-        batch_sampler=BatchSampler(test_token_num, args.max_batch_token, False)
+        test_dataset, num_worker=args.num_worker, collate_fn=collate_fn,
+        batch_sampler=BatchSampler(test_token_num, args.batch_token, False)
         )
 
     print("---------- Start Eval ----------")

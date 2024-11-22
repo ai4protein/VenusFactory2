@@ -55,7 +55,7 @@ if __name__ == '__main__':
     parser.add_argument('--pdb_file', type=str, help='pdb file')
     
     # multi processing
-    parser.add_argument('--num_workers', type=int, default=4, help='number of workers')
+    parser.add_argument('--num_worker', type=int, default=4, help='number of workers')
     
     # index pdb for large scale inference
     parser.add_argument("--pdb_index_file", default=None, type=str, help="pdb index file")
@@ -85,7 +85,7 @@ if __name__ == '__main__':
             pdb_files = sorted([os.path.join(args.pdb_dir, p) for p in os.listdir(args.pdb_dir)])
             
         results, error_pdbs, error_messages = [], [], []
-        with ThreadPoolExecutor(max_workers=args.num_workers) as executor:
+        with ThreadPoolExecutor(max_workers=args.num_worker) as executor:
             futures = [executor.submit(generate_feature, pdb_file) for pdb_file in pdb_files]
 
             with tqdm(total=len(pdb_files), desc="Processing pdb") as progress:
