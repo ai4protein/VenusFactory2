@@ -1,1 +1,1 @@
-# Protein-Factory
+# ProtFactory
