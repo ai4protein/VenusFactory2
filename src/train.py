@@ -206,7 +206,7 @@ if __name__ == "__main__":
     parser.add_argument('--batch_size', type=int, default=None, help='batch size')
     parser.add_argument('--batch_token', type=int, default=None, help='max number of token per batch')
     parser.add_argument('--train_epoch', type=int, default=100, help='training epochs')
-    parser.add_argument('--max_seq_len', type=int, default=None, help='max sequence length')
+    parser.add_argument('--max_seq_len', type=int, default=-1, help='max sequence length')
     parser.add_argument('--gradient_accumulation_step', type=int, default=1, help='gradient accumulation steps')
     parser.add_argument('--max_grad_norm', type=float, default=None, help='max gradient norm')
     parser.add_argument('--patience', type=int, default=10, help='patience for early stopping')
@@ -259,73 +259,64 @@ if __name__ == "__main__":
     if args.monitor is None:
         args.monitor = dataset_config['monitor']
     
-    # Define metrics
+    # Initialize metrics based on problem type
     metrics_dict = {}
     metrics_monitor_strategy_dict = {}
     
-    if args.metrics is None:
-        args.metrics = dataset_config['metrics']
-        if args.metrics == 'None':
-            raise ValueError("metrics must be provided")
-            
-        args.metrics = args.metrics.split(',')
-        
-        # Define metric configurations
-        metric_configs = {
-            'accuracy': {
-                'binary': BinaryAccuracy,
-                'multi': lambda: Accuracy(task="multiclass", num_classes=args.num_label),
-                'strategy': 'max'
-            },
-            'recall': {
-                'binary': BinaryRecall,
-                'multi': lambda: Recall(task="multiclass", num_classes=args.num_label),
-                'strategy': 'max'
-            },
-            'precision': {
-                'binary': BinaryPrecision,
-                'multi': lambda: Precision(task="multiclass", num_classes=args.num_label),
-                'strategy': 'max'
-            },
-            'f1': {
-                'binary': BinaryF1Score,
-                'multi': lambda: F1Score(task="multiclass", num_classes=args.num_label),
-                'strategy': 'max'
-            },
-            'mcc': {
-                'binary': BinaryMatthewsCorrCoef,
-                'multi': lambda: MatthewsCorrCoef(task="multiclass", num_classes=args.num_label),
-                'strategy': 'max'
-            },
-            'auc': {
-                'binary': BinaryAUROC,
-                'multi': lambda: AUROC(task="multiclass", num_classes=args.num_label),
-                'strategy': 'max'
-            },
-            'f1_max': {
-                'any': lambda: MultilabelF1Max(num_label=args.num_label),
-                'strategy': 'max'
-            },
-            'spearman_corr': {
-                'any': SpearmanCorrCoef,
-                'strategy': 'max'
-            }
-        }
-
-        # Initialize metrics based on configurations
-        for metric_name in args.metrics:
-            if metric_name not in metric_configs:
-                raise ValueError(f"Invalid metric: {metric_name}")
-                
-            config = metric_configs[metric_name]
-            if 'any' in config:
-                metrics_dict[metric_name] = config['any']()
-            else:
-                metrics_dict[metric_name] = (config['binary'] if args.num_label == 2 
-                                           else config['multi']())
-            
-            metrics_monitor_strategy_dict[metric_name] = config['strategy']
-            metrics_dict[metric_name].to(device)
+    if args.metrics is not None:
+        metrics_list = args.metrics.split(',')
+        for metric_name in metrics_list:
+            if args.problem_type == 'regression':
+                if metric_name == 'spearman':
+                    metrics_dict[metric_name] = SpearmanCorrCoef().to(device)
+                    metrics_monitor_strategy_dict[metric_name] = 'max'
+            elif args.problem_type == 'single_label_classification':
+                if metric_name == 'accuracy':
+                    metrics_dict[metric_name] = Accuracy(task='multiclass', num_classes=args.num_label).to(device)
+                    metrics_monitor_strategy_dict[metric_name] = 'max'
+                elif metric_name == 'recall':
+                    metrics_dict[metric_name] = Recall(task='multiclass', num_classes=args.num_label).to(device)
+                    metrics_monitor_strategy_dict[metric_name] = 'max'
+                elif metric_name == 'precision':
+                    metrics_dict[metric_name] = Precision(task='multiclass', num_classes=args.num_label).to(device)
+                    metrics_monitor_strategy_dict[metric_name] = 'max'
+                elif metric_name == 'f1':
+                    metrics_dict[metric_name] = F1Score(task='multiclass', num_classes=args.num_label).to(device)
+                    metrics_monitor_strategy_dict[metric_name] = 'max'
+                elif metric_name == 'mcc':
+                    metrics_dict[metric_name] = MatthewsCorrCoef(task='multiclass', num_classes=args.num_label).to(device)
+                    metrics_monitor_strategy_dict[metric_name] = 'max'
+                elif metric_name == 'auroc':
+                    metrics_dict[metric_name] = AUROC(task='multiclass', num_classes=args.num_label).to(device)
+                    metrics_monitor_strategy_dict[metric_name] = 'max'
+            elif args.problem_type == 'binary_classification':
+                if metric_name == 'accuracy':
+                    metrics_dict[metric_name] = BinaryAccuracy().to(device)
+                    metrics_monitor_strategy_dict[metric_name] = 'max'
+                elif metric_name == 'recall':
+                    metrics_dict[metric_name] = BinaryRecall().to(device)
+                    metrics_monitor_strategy_dict[metric_name] = 'max'
+                elif metric_name == 'precision':
+                    metrics_dict[metric_name] = BinaryPrecision().to(device)
+                    metrics_monitor_strategy_dict[metric_name] = 'max'
+                elif metric_name == 'f1':
+                    metrics_dict[metric_name] = BinaryF1Score().to(device)
+                    metrics_monitor_strategy_dict[metric_name] = 'max'
+                elif metric_name == 'mcc':
+                    metrics_dict[metric_name] = BinaryMatthewsCorrCoef().to(device)
+                    metrics_monitor_strategy_dict[metric_name] = 'max'
+                elif metric_name == 'auroc':
+                    metrics_dict[metric_name] = BinaryAUROC().to(device)
+                    metrics_monitor_strategy_dict[metric_name] = 'max'
+            elif args.problem_type == 'multi_label_classification':
+                if metric_name == 'f1_max':
+                    metrics_dict[metric_name] = MultilabelF1Max().to(device)
+                    metrics_monitor_strategy_dict[metric_name] = 'max'
+    
+    # Add loss to metrics if it's the monitor metric
+    if args.monitor == 'loss':
+        metrics_dict['loss'] = 'loss'
+        metrics_monitor_strategy_dict['loss'] = 'min'
         
     
     # create checkpoint directory
@@ -401,7 +392,7 @@ if __name__ == "__main__":
         if 'esm3_structure_seq' in args.structure_seq:
             data["esm3_structure_seq"] = eval(data["esm3_structure_seq"])
         
-        if args.max_seq_len is not None:
+        if args.max_seq_len > 0:
             data["aa_seq"] = data["aa_seq"][:args.max_seq_len]
             for seq in args.structure_seq:
                 data[seq] = data[seq][:args.max_seq_len]
@@ -541,31 +532,6 @@ if __name__ == "__main__":
             )
 
         return data_dict
-        
-    # Initialize accelerator and optimizer
-    accelerator = Accelerator(gradient_accumulation_steps=args.gradient_accumulation_step)
-    optimizer = torch.optim.AdamW(model.parameters(), learning_rate=args.learning_rate)
-
-    # Calculate training steps and warmup steps
-    num_training_steps = len(train_dataset) * args.train_epoch // args.batch_size
-    if args.warmup_step == 0:
-        args.warmup_step = num_training_steps // 10
-    num_warmup_steps = args.warmup_step
-
-    # Configure learning rate scheduler
-    scheduler_config = {
-        'linear': lambda step: min(step / num_warmup_steps, 1.0),
-        'cosine': lambda step: 0.5 * (1 + math.cos(step / num_training_steps * math.pi)),
-        'step': lambda step: 1.0
-    }
-
-    if args.scheduler not in scheduler_config:
-        raise ValueError(f"Unsupported scheduler type: {args.scheduler}")
-
-    scheduler = torch.optim.lr_scheduler.LambdaLR(
-        optimizer, 
-        scheduler_config[args.scheduler]
-    )
     
     # Configure loss function based on problem type and loss function choice
     loss_fn_config = {
@@ -627,9 +593,39 @@ if __name__ == "__main__":
         val_loader = DataLoader(val_dataset, shuffle=False, **batch_params) 
         test_loader = DataLoader(test_dataset, shuffle=False, **batch_params)
     
-    model, optimizer, train_loader, val_loader, test_loader = accelerator.prepare(
-        model, optimizer, train_loader, val_loader, test_loader
-    )
+    # Initialize accelerator and optimizer
+    accelerator = Accelerator(gradient_accumulation_steps=args.gradient_accumulation_step)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
+
+    # Calculate training steps and warmup steps
+    num_training_steps = len(train_dataset) * args.train_epoch // args.batch_size
+    if args.warmup_step == 0:
+        args.warmup_step = num_training_steps // 10
+    num_warmup_steps = args.warmup_step
+
+    if args.scheduler is not None:
+        # Configure learning rate scheduler
+        scheduler_config = {
+            'linear': lambda step: min(step / num_warmup_steps, 1.0),
+            'cosine': lambda step: 0.5 * (1 + math.cos(step / num_training_steps * math.pi)),
+            'step': lambda step: 1.0
+        }
+
+        if args.scheduler not in scheduler_config:
+            raise ValueError(f"Unsupported scheduler type: {args.scheduler}")
+
+        scheduler = torch.optim.lr_scheduler.LambdaLR(
+            optimizer, 
+            scheduler_config[args.scheduler]
+        )
+    
+        model, optimizer, train_loader, val_loader, test_loader = accelerator.prepare(
+            model, optimizer, train_loader, val_loader, test_loader, scheduler
+        )
+    else:
+        model, optimizer, train_loader, val_loader, test_loader = accelerator.prepare(
+            model, optimizer, train_loader, val_loader, test_loader
+        )
     
     print("---------- Start Training ----------")
     train(
