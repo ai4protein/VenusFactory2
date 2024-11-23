@@ -61,7 +61,7 @@ def train(args, model, plm_model, accelerator, metrics_dict, metrics_monitor_str
                 epoch_train_loss += loss.item() * len(label)                
                 global_steps += 1
                 accelerator.backward(loss)
-                if args.max_grad_norm is not None:
+                if args.max_grad_norm != -1:
                     torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=args.max_grad_norm)
                 optimizer.step()
                 optimizer.zero_grad()
@@ -154,16 +154,24 @@ def eval_loop(args, model, plm_model, metrics_dict, dataloader, loss_fn, device=
             batch[k] = v.to(device)
         label = batch["label"]
         logits = model(plm_model, batch)
+
+        # Calculate loss first, outside of metrics loop
+        if args.problem_type == 'regression' and args.num_label == 1:
+            loss = loss_fn(logits.squeeze(), label.squeeze())
+        elif args.problem_type == 'multi_label_classification':
+            loss = loss_fn(logits, label.float())
+        else:
+            loss = loss_fn(logits, label)
+
+        # Update metrics if any exist
         for metric_name, metric in metrics_dict.items():
             if args.problem_type == 'regression' and args.num_label == 1:
-                loss = loss_fn(logits.squeeze(), label.squeeze())
                 metric(logits.squeeze(), label.squeeze())
             elif args.problem_type == 'multi_label_classification':
-                loss = loss_fn(logits, label.float())
                 metric(logits, label)
             else:
-                loss = loss_fn(logits, label)
                 metric(torch.argmax(logits, 1), label)
+
         total_loss += loss.item() * len(label)
         epoch_iterator.set_postfix(eval_loss=loss.item())
     
@@ -208,7 +216,7 @@ if __name__ == "__main__":
     parser.add_argument('--train_epoch', type=int, default=100, help='training epochs')
     parser.add_argument('--max_seq_len', type=int, default=-1, help='max sequence length')
     parser.add_argument('--gradient_accumulation_step', type=int, default=1, help='gradient accumulation steps')
-    parser.add_argument('--max_grad_norm', type=float, default=None, help='max gradient norm')
+    parser.add_argument('--max_grad_norm', type=float, default=-1, help='max gradient norm')
     parser.add_argument('--patience', type=int, default=10, help='patience for early stopping')
     parser.add_argument('--monitor', type=str, default=None, help='monitor metric')
     parser.add_argument('--monitor_strategy', type=str, default=None, choices=['max', 'min'], help='monitor strategy')
@@ -235,8 +243,6 @@ if __name__ == "__main__":
     
     set_seed(args.seed)
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    if args.structure_seq is not None:
-        args.structure_seq = args.structure_seq.split(',')
         
     dataset_config = json.loads(open(args.dataset_config).read())
     if args.dataset is None:
@@ -258,60 +264,62 @@ if __name__ == "__main__":
         args.problem_type = dataset_config['problem_type']
     if args.monitor is None:
         args.monitor = dataset_config['monitor']
-    
+    if args.metrics is None:
+        args.metrics = dataset_config['metrics'].split(',')
+        if args.metrics == ['None']:
+            args.metrics = ['loss']
+            warnings.warn("No metrics provided, using default metrics: loss")
+
     # Initialize metrics based on problem type
     metrics_dict = {}
     metrics_monitor_strategy_dict = {}
-    
-    if args.metrics is not None:
-        metrics_list = args.metrics.split(',')
-        for metric_name in metrics_list:
-            if args.problem_type == 'regression':
-                if metric_name == 'spearman':
-                    metrics_dict[metric_name] = SpearmanCorrCoef().to(device)
-                    metrics_monitor_strategy_dict[metric_name] = 'max'
-            elif args.problem_type == 'single_label_classification':
-                if metric_name == 'accuracy':
-                    metrics_dict[metric_name] = Accuracy(task='multiclass', num_classes=args.num_label).to(device)
-                    metrics_monitor_strategy_dict[metric_name] = 'max'
-                elif metric_name == 'recall':
-                    metrics_dict[metric_name] = Recall(task='multiclass', num_classes=args.num_label).to(device)
-                    metrics_monitor_strategy_dict[metric_name] = 'max'
-                elif metric_name == 'precision':
-                    metrics_dict[metric_name] = Precision(task='multiclass', num_classes=args.num_label).to(device)
-                    metrics_monitor_strategy_dict[metric_name] = 'max'
-                elif metric_name == 'f1':
-                    metrics_dict[metric_name] = F1Score(task='multiclass', num_classes=args.num_label).to(device)
-                    metrics_monitor_strategy_dict[metric_name] = 'max'
-                elif metric_name == 'mcc':
-                    metrics_dict[metric_name] = MatthewsCorrCoef(task='multiclass', num_classes=args.num_label).to(device)
-                    metrics_monitor_strategy_dict[metric_name] = 'max'
-                elif metric_name == 'auroc':
-                    metrics_dict[metric_name] = AUROC(task='multiclass', num_classes=args.num_label).to(device)
-                    metrics_monitor_strategy_dict[metric_name] = 'max'
-            elif args.problem_type == 'binary_classification':
-                if metric_name == 'accuracy':
-                    metrics_dict[metric_name] = BinaryAccuracy().to(device)
-                    metrics_monitor_strategy_dict[metric_name] = 'max'
-                elif metric_name == 'recall':
-                    metrics_dict[metric_name] = BinaryRecall().to(device)
-                    metrics_monitor_strategy_dict[metric_name] = 'max'
-                elif metric_name == 'precision':
-                    metrics_dict[metric_name] = BinaryPrecision().to(device)
-                    metrics_monitor_strategy_dict[metric_name] = 'max'
-                elif metric_name == 'f1':
-                    metrics_dict[metric_name] = BinaryF1Score().to(device)
-                    metrics_monitor_strategy_dict[metric_name] = 'max'
-                elif metric_name == 'mcc':
-                    metrics_dict[metric_name] = BinaryMatthewsCorrCoef().to(device)
-                    metrics_monitor_strategy_dict[metric_name] = 'max'
-                elif metric_name == 'auroc':
-                    metrics_dict[metric_name] = BinaryAUROC().to(device)
-                    metrics_monitor_strategy_dict[metric_name] = 'max'
-            elif args.problem_type == 'multi_label_classification':
-                if metric_name == 'f1_max':
-                    metrics_dict[metric_name] = MultilabelF1Max().to(device)
-                    metrics_monitor_strategy_dict[metric_name] = 'max'
+    for metric_name in args.metrics:
+        if args.problem_type == 'regression':
+            if metric_name == 'spearman':
+                metrics_dict[metric_name] = SpearmanCorrCoef().to(device)
+                metrics_monitor_strategy_dict[metric_name] = 'max'
+        elif args.problem_type == 'single_label_classification':
+            if metric_name == 'accuracy':
+                metrics_dict[metric_name] = Accuracy(task='multiclass', num_classes=args.num_label).to(device)
+                metrics_monitor_strategy_dict[metric_name] = 'max'
+            elif metric_name == 'recall':
+                metrics_dict[metric_name] = Recall(task='multiclass', num_classes=args.num_label).to(device)
+                metrics_monitor_strategy_dict[metric_name] = 'max'
+            elif metric_name == 'precision':
+                metrics_dict[metric_name] = Precision(task='multiclass', num_classes=args.num_label).to(device)
+                metrics_monitor_strategy_dict[metric_name] = 'max'
+            elif metric_name == 'f1':
+                metrics_dict[metric_name] = F1Score(task='multiclass', num_classes=args.num_label).to(device)
+                metrics_monitor_strategy_dict[metric_name] = 'max'
+            elif metric_name == 'mcc':
+                metrics_dict[metric_name] = MatthewsCorrCoef(task='multiclass', num_classes=args.num_label).to(device)
+                metrics_monitor_strategy_dict[metric_name] = 'max'
+            elif metric_name == 'auroc':
+                metrics_dict[metric_name] = AUROC(task='multiclass', num_classes=args.num_label).to(device)
+                metrics_monitor_strategy_dict[metric_name] = 'max'
+        elif args.problem_type == 'binary_classification':
+            if metric_name == 'accuracy':
+                metrics_dict[metric_name] = BinaryAccuracy().to(device)
+                metrics_monitor_strategy_dict[metric_name] = 'max'
+            elif metric_name == 'recall':
+                metrics_dict[metric_name] = BinaryRecall().to(device)
+                metrics_monitor_strategy_dict[metric_name] = 'max'
+            elif metric_name == 'precision':
+                metrics_dict[metric_name] = BinaryPrecision().to(device)
+                metrics_monitor_strategy_dict[metric_name] = 'max'
+            elif metric_name == 'f1':
+                metrics_dict[metric_name] = BinaryF1Score().to(device)
+                metrics_monitor_strategy_dict[metric_name] = 'max'
+            elif metric_name == 'mcc':
+                metrics_dict[metric_name] = BinaryMatthewsCorrCoef().to(device)
+                metrics_monitor_strategy_dict[metric_name] = 'max'
+            elif metric_name == 'auroc':
+                metrics_dict[metric_name] = BinaryAUROC().to(device)
+                metrics_monitor_strategy_dict[metric_name] = 'max'
+        elif args.problem_type == 'multi_label_classification':
+            if metric_name == 'f1_max':
+                metrics_dict[metric_name] = MultilabelF1Max().to(device)
+                metrics_monitor_strategy_dict[metric_name] = 'max'
     
     # Add loss to metrics if it's the monitor metric
     if args.monitor == 'loss':
@@ -358,8 +366,11 @@ if __name__ == "__main__":
         args.hidden_size = plm_model.config.d_model
     
     if args.train_method == 'ses-adapter':
-        if args.structure_seq is None:
+        if args.structure_seq is not None:
+            args.structure_seq = args.structure_seq.split(',')
+        else:
             raise ValueError("structure_seq must be provided for ses-adapter")
+        
         if 'esm3_structure_seq' in args.structure_seq: 
             args.vocab_size = max(plm_model.config.vocab_size, 4100)
         else:
