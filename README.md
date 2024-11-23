@@ -10,8 +10,8 @@ Recent News:
 - [Supported Models](#-supported-models)
 - [Supported Training Approaches](#-supported-training-approaches)
 - [Supported Datasets](#-supported-datasets)
-- [Supported Metrics](#supported-metrics)
-- [Citation](#citation)
+- [Supported Metrics](#-supported-metrics)
+- [Citation](#-citation)
 
 ## 📑 Features
 
@@ -70,7 +70,6 @@ Recent News:
 - [MetalIonBinding_ESMFold](https://huggingface.co/datasets/tyang816/MetalIonBinding_ESMFold) | protein-wise | single_label_classification
 - [MetalIonBinding_AlphaFold2](https://huggingface.co/datasets/tyang816/MetalIonBinding_AlphaFold2) | protein-wise | single_label_classification
 - [Thermostability_ESMFold](https://huggingface.co/datasets/tyang816/Thermostability_ESMFold) | protein-wise | regression
-- [MetalIonBinding_AlphaFold2](https://huggingface.co/datasets/tyang816/MetalIonBinding_AlphaFold2) | protein-wise | regression
 
 > [!TIP]
 > Only structural sequences are different for the same dataset, for example, ``DeepLocBinary_ESMFold`` and ``DeepLocBinary_AlphaFold2`` share the same amino acid sequences, this means if you only want to use the ``aa_seqs``, both are ok! 
@@ -106,3 +105,7 @@ Please cite our work if you have used our code or data.
 ```
 
 ```
+
+## 🎊 Acknowledgement
+
+Thanks the support of [Liang's Lab](https://ins.sjtu.edu.cn/people/lhong/index.html).
