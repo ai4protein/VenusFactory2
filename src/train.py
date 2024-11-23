@@ -8,6 +8,7 @@ import wandb
 import random
 import json
 import re
+import math
 from torch import nn
 from tqdm import tqdm
 from torch.utils.data import DataLoader
@@ -25,6 +26,7 @@ from utils.data_utils import BatchSampler
 from models.adapter import AdapterModel
 from utils.metrics import MultilabelF1Max
 from utils.loss_fn import MultiClassFocalLossWithAlpha
+from utils.norm import min_max_normalize_dataset
 from data.get_esm3_structure_seq import VQVAE_SPECIAL_TOKENS
 
 # ignore warning information
@@ -32,20 +34,8 @@ logging.set_verbosity_error()
 warnings.filterwarnings("ignore")
 
 
-def min_max_normalize_dataset(train_dataset, val_dataset, test_dataset):
-    labels = [e["label"] for e in train_dataset]
-    min_label, max_label = min(labels), max(labels)
-    for e in train_dataset:
-        e["label"] = (e["label"] - min_label) / (max_label - min_label)
-    for e in val_dataset:
-        e["label"] = (e["label"] - min_label) / (max_label - min_label)
-    for e in test_dataset:
-        e["label"] = (e["label"] - min_label) / (max_label - min_label)
-    return train_dataset, val_dataset, test_dataset
-
-
-def train(args, model, plm_model, accelerator, metrics_dict, train_loader, val_loader, test_loader, 
-          loss_fn, optimizer, device):
+def train(args, model, plm_model, accelerator, metrics_dict, metrics_monitor_strategy_dict,
+          train_loader, val_loader, test_loader, loss_fn, optimizer, device):
     best_val_loss, best_val_metric_score = float("inf"), -float("inf")
     val_loss_list, val_metric_list = [], []
     path = os.path.join(args.output_dir, args.output_model_name)
@@ -71,6 +61,8 @@ def train(args, model, plm_model, accelerator, metrics_dict, train_loader, val_l
                 epoch_train_loss += loss.item() * len(label)                
                 global_steps += 1
                 accelerator.backward(loss)
+                if args.max_grad_norm is not None:
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=args.max_grad_norm)
                 optimizer.step()
                 optimizer.zero_grad()
                 epoch_iterator.set_postfix(train_loss=loss.item())
@@ -95,31 +87,46 @@ def train(args, model, plm_model, accelerator, metrics_dict, train_loader, val_l
                 wandb.log(val_log)
             print(f'EPOCH {epoch} VAL loss: {val_loss:.4f} {args.monitor}: {val_metric_score:.4f}')
     
-        # early stopping
+        # Early stopping and model checkpoint saving
+        def save_best_model():
+            torch.save(model.state_dict(), path)
+            print(f'>>> BEST at epoch {epoch}')
+            if args.monitor == 'loss':
+                print(f'>>> Loss: {best_val_loss:.4f}')
+            else:
+                print(f'>>> Loss: {val_loss:.4f}, {args.monitor}: {best_val_metric_score:.4f}')
+            for metric_name, metric_score in val_metric_dict.items():
+                print(f'>>> {metric_name}: {metric_score:.4f}')
+            print(f'>>> Model saved to {path}')
+
+        def check_early_stopping(metric_list, get_best_value):
+            best_epoch = metric_list.index(get_best_value(metric_list))
+            epochs_without_improvement = len(metric_list) - best_epoch
+            if epochs_without_improvement > args.patience:
+                print(f'>>> Early stopping at epoch {epoch}')
+                return True
+            return False
+
         if args.monitor == "loss":
             if val_loss < best_val_loss:
                 best_val_loss = val_loss
-                torch.save(model.state_dict(), path)
-                print(f'>>> BEST at epcoh {epoch}, loss: {best_val_loss:.4f}')
-                for metric_name, metric_score in val_metric_dict.items():
-                    print(f'>>> {metric_name}: {metric_score:.4f}')
-                print(f'>>> Save model to {path}')
+                save_best_model()
             
-            if len(val_loss_list) - val_loss_list.index(min(val_loss_list)) > args.patience:
-                print(f'>>> Early stopping at epoch {epoch}')
+            if check_early_stopping(val_loss_list, min):
                 break
+
         else:
-            if val_metric_score > best_val_metric_score:
+            monitor_strategy = metrics_monitor_strategy_dict[args.monitor]
+            is_better = (lambda x, y: x > y) if monitor_strategy == 'max' else (lambda x, y: x < y)
+            get_best = max if monitor_strategy == 'max' else min
+
+            if is_better(val_metric_score, best_val_metric_score):
                 best_val_metric_score = val_metric_score
-                torch.save(model.state_dict(), path)
-                print(f'>>> BEST at epcoh {epoch}, loss: {val_loss:.4f} {args.monitor}: {best_val_metric_score:.4f}')
-                for metric_name, metric_score in val_metric_dict.items():
-                    print(f'>>> {metric_name}: {metric_score:.4f}')
-                print(f'>>> Save model to {path}')
-            
-            if len(val_metric_list) - val_metric_list.index(max(val_metric_list)) > args.patience:
-                print(f'>>> Early stopping at epoch {epoch}')
+                save_best_model()
+
+            if check_early_stopping(val_metric_list, get_best):
                 break
+
     
     print(f"TESTING: loading from {path}")
     model.load_state_dict(torch.load(path))
@@ -193,16 +200,20 @@ if __name__ == "__main__":
     # train model
     parser.add_argument('--seed', type=int, default=3407, help='random seed')
     parser.add_argument("--learning_rate", type=float, default=1e-3, help="learning rate")
+    parser.add_argument('--scheduler', type=str, default=None, choices=['linear', 'cosine', 'step'], help='scheduler')
+    parser.add_argument('--warmup_step', type=int, default=0, help='warmup steps')
     parser.add_argument('--num_worker', type=int, default=4, help='number of workers')
     parser.add_argument('--batch_size', type=int, default=None, help='batch size')
-    parser.add_argument('--gradient_accumulation_step', type=int, default=1, help='gradient accumulation steps')
     parser.add_argument('--batch_token', type=int, default=None, help='max number of token per batch')
     parser.add_argument('--train_epoch', type=int, default=100, help='training epochs')
     parser.add_argument('--max_seq_len', type=int, default=None, help='max sequence length')
+    parser.add_argument('--gradient_accumulation_step', type=int, default=1, help='gradient accumulation steps')
+    parser.add_argument('--max_grad_norm', type=float, default=None, help='max gradient norm')
     parser.add_argument('--patience', type=int, default=10, help='patience for early stopping')
     parser.add_argument('--monitor', type=str, default=None, help='monitor metric')
-    parser.add_argument('--monitor_strategy', type=str, default=None, help='monitor strategy')
-    parser.add_argument('--structure_seq', type=str, default=None, help='structure token')
+    parser.add_argument('--monitor_strategy', type=str, default=None, choices=['max', 'min'], help='monitor strategy')
+    parser.add_argument('--train_method', type=str, default='full', choices=['full', 'freeze', 'lora', 'ses-adapter'], help='training method')
+    parser.add_argument('--structure_seq', type=str, default=None, help='structure token for ses-adapter')
     parser.add_argument('--loss_fn', type=str, default='cross_entropy', choices=['cross_entropy', 'focal_loss'], help='loss function')
     
     # save model
@@ -213,7 +224,7 @@ if __name__ == "__main__":
     # wandb log
     parser.add_argument('--wandb', action='store_true', help='use wandb to log')
     parser.add_argument('--wandb_entity', type=str, default=None, help='wandb entity')
-    parser.add_argument('--wandb_project', type=str, default='SES-Adapter')
+    parser.add_argument('--wandb_project', type=str, default='ProFactory')
     parser.add_argument('--wandb_run_name', type=str, default=None)
     
     args = parser.parse_args()
@@ -248,59 +259,73 @@ if __name__ == "__main__":
     if args.monitor is None:
         args.monitor = dataset_config['monitor']
     
+    # Define metrics
     metrics_dict = {}
     metrics_monitor_strategy_dict = {}
+    
     if args.metrics is None:
         args.metrics = dataset_config['metrics']
-        if args.metrics != 'None':
-            args.metrics = args.metrics.split(',')
-            for m in args.metrics:
-                if m == 'accuracy':
-                    if args.num_label == 2:
-                        metrics_dict[m] = BinaryAccuracy()
-                    else:
-                        metrics_dict[m] = Accuracy(task="multiclass", num_classes=args.num_label)
-                    metrics_monitor_strategy_dict[m] = 'max'
-                elif m == 'recall':
-                    if args.num_label == 2:
-                        metrics_dict[m] = BinaryRecall()
-                    else:
-                        metrics_dict[m] = Recall(task="multiclass", num_classes=args.num_label)
-                    metrics_monitor_strategy_dict[m] = 'max'
-                elif m == 'precision':
-                    if args.num_label == 2:
-                        metrics_dict[m] = BinaryPrecision()
-                    else:
-                        metrics_dict[m] = Precision(task="multiclass", num_classes=args.num_label)
-                    metrics_monitor_strategy_dict[m] = 'max'
-                elif m == 'f1':
-                    if args.num_label == 2:
-                        metrics_dict[m] = BinaryF1Score()
-                    else:
-                        metrics_dict[m] = F1Score(task="multiclass", num_classes=args.num_label)
-                    metrics_monitor_strategy_dict[m] = 'max'
-                elif m == 'mcc':
-                    if args.num_label == 2:
-                        metrics_dict[m] = BinaryMatthewsCorrCoef()
-                    else:
-                        metrics_dict[m] = MatthewsCorrCoef(task="multiclass", num_classes=args.num_label)
-                    metrics_monitor_strategy_dict[m] = 'max'
-                elif m == 'auc':
-                    if args.num_label == 2:
-                        metrics_dict[m] = BinaryAUROC()
-                    else:
-                        metrics_dict[m] = AUROC(task="multiclass", num_classes=args.num_label)
-                    metrics_monitor_strategy_dict[m] = 'max'
-                elif m == 'f1_max':
-                    metrics_dict[m] = MultilabelF1Max(num_label=args.num_label)
-                    metrics_monitor_strategy_dict[m] = 'max'
-                elif m == 'spearman_corr':
-                    metrics_dict[m] = SpearmanCorrCoef()
-                    metrics_monitor_strategy_dict[m] = 'max'
-                else:
-                    raise ValueError(f"Invalid metric: {m}")
-            for metric_name, metric in metrics_dict.items():
-                metric.to(device)            
+        if args.metrics == 'None':
+            raise ValueError("metrics must be provided")
+            
+        args.metrics = args.metrics.split(',')
+        
+        # Define metric configurations
+        metric_configs = {
+            'accuracy': {
+                'binary': BinaryAccuracy,
+                'multi': lambda: Accuracy(task="multiclass", num_classes=args.num_label),
+                'strategy': 'max'
+            },
+            'recall': {
+                'binary': BinaryRecall,
+                'multi': lambda: Recall(task="multiclass", num_classes=args.num_label),
+                'strategy': 'max'
+            },
+            'precision': {
+                'binary': BinaryPrecision,
+                'multi': lambda: Precision(task="multiclass", num_classes=args.num_label),
+                'strategy': 'max'
+            },
+            'f1': {
+                'binary': BinaryF1Score,
+                'multi': lambda: F1Score(task="multiclass", num_classes=args.num_label),
+                'strategy': 'max'
+            },
+            'mcc': {
+                'binary': BinaryMatthewsCorrCoef,
+                'multi': lambda: MatthewsCorrCoef(task="multiclass", num_classes=args.num_label),
+                'strategy': 'max'
+            },
+            'auc': {
+                'binary': BinaryAUROC,
+                'multi': lambda: AUROC(task="multiclass", num_classes=args.num_label),
+                'strategy': 'max'
+            },
+            'f1_max': {
+                'any': lambda: MultilabelF1Max(num_label=args.num_label),
+                'strategy': 'max'
+            },
+            'spearman_corr': {
+                'any': SpearmanCorrCoef,
+                'strategy': 'max'
+            }
+        }
+
+        # Initialize metrics based on configurations
+        for metric_name in args.metrics:
+            if metric_name not in metric_configs:
+                raise ValueError(f"Invalid metric: {metric_name}")
+                
+            config = metric_configs[metric_name]
+            if 'any' in config:
+                metrics_dict[metric_name] = config['any']()
+            else:
+                metrics_dict[metric_name] = (config['binary'] if args.num_label == 2 
+                                           else config['multi']())
+            
+            metrics_monitor_strategy_dict[metric_name] = config['strategy']
+            metrics_dict[metric_name].to(device)
         
     
     # create checkpoint directory
@@ -314,7 +339,7 @@ if __name__ == "__main__":
     # init wandb
     if args.wandb:
         if args.wandb_run_name is None:
-            args.wandb_run_name = f"Adapter-{args.dataset}"
+            args.wandb_run_name = f"ProFactory-{args.dataset}"
         if args.output_model_name is None:
             args.output_model_name = f"{args.wandb_run_name}.pt"
         
@@ -341,7 +366,9 @@ if __name__ == "__main__":
         plm_model = T5EncoderModel.from_pretrained(args.plm_model).to(device).eval()
         args.hidden_size = plm_model.config.d_model
     
-    if args.structure_seq is not None:
+    if args.train_method == 'ses-adapter':
+        if args.structure_seq is None:
+            raise ValueError("structure_seq must be provided for ses-adapter")
         if 'esm3_structure_seq' in args.structure_seq: 
             args.vocab_size = max(plm_model.config.vocab_size, 4100)
         else:
@@ -424,130 +451,191 @@ if __name__ == "__main__":
         print(">>> ", train_dataset[i])
     
     def collate_fn(examples):
+        # Initialize lists to store sequences and labels
         aa_seqs, labels = [], []
-        if 'foldseek_seq' in args.structure_seq:
-            foldseek_seqs = []
-        if 'ss8_seq' in args.structure_seq:
-            ss8_seqs = []
-        if 'esm3_structure_seq' in args.structure_seq:
-            esm3_structure_seq = []
-            
+        structure_seqs = {
+            'foldseek_seq': [] if 'foldseek_seq' in args.structure_seq else None,
+            'ss8_seq': [] if 'ss8_seq' in args.structure_seq else None,
+            'esm3_structure_seq': [] if 'esm3_structure_seq' in args.structure_seq else None
+        }
+
+        # Process each example
         for e in examples:
+            # Process amino acid sequence
             aa_seq = e["aa_seq"]
-            if 'foldseek_seq' in args.structure_seq:
-                foldseek_seq = e["foldseek_seq"]
-            if 'ss8_seq' in args.structure_seq:
-                ss8_seq = e["ss8_seq"]
             
+            # Process structure sequences if needed
+            if structure_seqs['foldseek_seq'] is not None:
+                foldseek_seq = e["foldseek_seq"]
+            if structure_seqs['ss8_seq'] is not None:
+                ss8_seq = e["ss8_seq"]
+
+            # Format sequences based on model type
             if 'prot_bert' in args.plm_model or "prot_t5" in args.plm_model:
                 aa_seq = " ".join(list(aa_seq))
                 aa_seq = re.sub(r"[UZOB]", "X", aa_seq)
-                if 'foldseek_seq' in args.structure_seq:
+                if structure_seqs['foldseek_seq'] is not None:
                     foldseek_seq = " ".join(list(foldseek_seq))
-                if 'ss8_seq' in args.structure_seq:
+                if structure_seqs['ss8_seq'] is not None:
                     ss8_seq = " ".join(list(ss8_seq))
             elif 'ankh' in args.plm_model:
                 aa_seq = list(aa_seq)
-                if 'foldseek_seq' in args.structure_seq:
+                if structure_seqs['foldseek_seq'] is not None:
                     foldseek_seq = list(foldseek_seq)
-                if 'ss8_seq' in args.structure_seq:
+                if structure_seqs['ss8_seq'] is not None:
                     ss8_seq = list(ss8_seq)
-            
+
+            # Append sequences to lists
             aa_seqs.append(aa_seq)
-            if 'foldseek_seq' in args.structure_seq:
-                foldseek_seqs.append(foldseek_seq)
-            if 'ss8_seq' in args.structure_seq:
-                ss8_seqs.append(ss8_seq)
-            if 'esm3_structure_seq' in args.structure_seq:
-                esm3_structure_seq = [VQVAE_SPECIAL_TOKENS["BOS"]] + e["esm3_structure_seq"] + [VQVAE_SPECIAL_TOKENS["EOS"]]
-                esm3_structure_seq.append(torch.tensor(esm3_structure_seq))
+            if structure_seqs['foldseek_seq'] is not None:
+                structure_seqs['foldseek_seq'].append(foldseek_seq)
+            if structure_seqs['ss8_seq'] is not None:
+                structure_seqs['ss8_seq'].append(ss8_seq)
+            if structure_seqs['esm3_structure_seq'] is not None:
+                esm3_seq = [VQVAE_SPECIAL_TOKENS["BOS"]] + e["esm3_structure_seq"] + [VQVAE_SPECIAL_TOKENS["EOS"]]
+                structure_seqs['esm3_structure_seq'].append(torch.tensor(esm3_seq))
             
             labels.append(e["label"])
-        
+
+        # Tokenize sequences
         if 'ankh' in args.plm_model:
-            aa_inputs = tokenizer.batch_encode_plus(aa_seqs, add_special_tokens=True, padding=True, is_split_into_words=True, return_tensors="pt")
-            if 'foldseek_seq' in args.structure_seq:
-                foldseek_input_ids = tokenizer.batch_encode_plus(foldseek_seqs, add_special_tokens=True, padding=True, is_split_into_words=True, return_tensors="pt")["input_ids"]
-            if 'ss8_seq' in args.structure_seq:
-                ss8_input_ids = tokenizer.batch_encode_plus(ss8_seqs, add_special_tokens=True, padding=True, is_split_into_words=True, return_tensors="pt")["input_ids"]
+            aa_inputs = tokenizer.batch_encode_plus(
+                aa_seqs, add_special_tokens=True, padding=True, is_split_into_words=True,return_tensors="pt"
+            )
+            if structure_seqs['foldseek_seq'] is not None:
+                foldseek_input_ids = tokenizer.batch_encode_plus(
+                    structure_seqs['foldseek_seq'], add_special_tokens=True, padding=True, is_split_into_words=True, return_tensors="pt"
+                )["input_ids"]
+            if structure_seqs['ss8_seq'] is not None:
+                ss8_input_ids = tokenizer.batch_encode_plus(
+                    structure_seqs['ss8_seq'], add_special_tokens=True, padding=True, is_split_into_words=True, return_tensors="pt"
+                )["input_ids"]
         else:
             aa_inputs = tokenizer(aa_seqs, return_tensors="pt", padding=True, truncation=True)
-            if 'foldseek_seq' in args.structure_seq:
-                foldseek_input_ids = tokenizer(foldseek_seqs, return_tensors="pt", padding=True, truncation=True)["input_ids"]
-            if 'ss8_seq' in args.structure_seq:
-                ss8_input_ids = tokenizer(ss8_seqs, return_tensors="pt", padding=True, truncation=True)["input_ids"]
-        
-        aa_input_ids = aa_inputs["input_ids"]
-        attention_mask = aa_inputs["attention_mask"]
-        
-        if args.problem_type == 'regression':
-            labels = torch.as_tensor(labels, dtype=torch.float)
-        else:
-            labels = torch.as_tensor(labels, dtype=torch.long)
-        
-        data_dict = {"aa_input_ids": aa_input_ids, "attention_mask": attention_mask, "label": labels}
-        if 'foldseek_seq' in args.structure_seq:
+            if structure_seqs['foldseek_seq'] is not None:
+                foldseek_input_ids = tokenizer(
+                    structure_seqs['foldseek_seq'], return_tensors="pt", padding=True, truncation=True
+                )["input_ids"]
+            if structure_seqs['ss8_seq'] is not None:
+                ss8_input_ids = tokenizer(
+                    structure_seqs['ss8_seq'], return_tensors="pt", padding=True, truncation=True
+                )["input_ids"]
+
+        # Prepare output dictionary
+        data_dict = {
+            "aa_input_ids": aa_inputs["input_ids"],
+            "attention_mask": aa_inputs["attention_mask"],
+            "label": torch.as_tensor(labels, dtype=torch.float if args.problem_type == 'regression' else torch.long)
+        }
+
+        # Add structure sequences if needed
+        if structure_seqs['foldseek_seq'] is not None:
             data_dict["foldseek_input_ids"] = foldseek_input_ids
-        if 'ss8_seq' in args.structure_seq:
+        if structure_seqs['ss8_seq'] is not None:
             data_dict["ss8_input_ids"] = ss8_input_ids
-        if 'esm3_structure_seq' in args.structure_seq:
-            # pad the list of esm3_structure_seq and convert to tensor
-            esm3_structure_input_ids = torch.nn.utils.rnn.pad_sequence(
-                esm3_structure_seq, batch_first=True, padding_value=VQVAE_SPECIAL_TOKENS["PAD"]
-                )
-            data_dict["esm3_structure_input_ids"] = esm3_structure_input_ids
+        if structure_seqs['esm3_structure_seq'] is not None:
+            data_dict["esm3_structure_input_ids"] = torch.nn.utils.rnn.pad_sequence(
+                structure_seqs['esm3_structure_seq'],
+                batch_first=True,
+                padding_value=VQVAE_SPECIAL_TOKENS["PAD"]
+            )
+
         return data_dict
         
-    # metrics, optimizer, dataloader
+    # Initialize accelerator and optimizer
     accelerator = Accelerator(gradient_accumulation_steps=args.gradient_accumulation_step)
     optimizer = torch.optim.AdamW(model.parameters(), learning_rate=args.learning_rate)
+
+    # Calculate training steps and warmup steps
+    num_training_steps = len(train_dataset) * args.train_epoch // args.batch_size
+    if args.warmup_step == 0:
+        args.warmup_step = num_training_steps // 10
+    num_warmup_steps = args.warmup_step
+
+    # Configure learning rate scheduler
+    scheduler_config = {
+        'linear': lambda step: min(step / num_warmup_steps, 1.0),
+        'cosine': lambda step: 0.5 * (1 + math.cos(step / num_training_steps * math.pi)),
+        'step': lambda step: 1.0
+    }
+
+    if args.scheduler not in scheduler_config:
+        raise ValueError(f"Unsupported scheduler type: {args.scheduler}")
+
+    scheduler = torch.optim.lr_scheduler.LambdaLR(
+        optimizer, 
+        scheduler_config[args.scheduler]
+    )
     
-    if args.problem_type == "single_label_classification":
-        if args.loss_fn == "cross_entropy":
-            loss_fn = nn.CrossEntropyLoss()
-        elif args.loss_fn == "focal_loss":
-            train_labels = [e["label"] for e in train_dataset]
-            alpha = [len(train_labels) / train_labels.count(i) for i in range(args.num_label)]
-            print(">>> alpha: ", alpha)
-            loss_fn = MultiClassFocalLossWithAlpha(num_classes=args.num_label, alpha=alpha, device=device)
-    elif args.problem_type == "regression":
-        loss_fn = nn.MSELoss()
-    elif args.problem_type == "multi_label_classification":
-        loss_fn = nn.BCEWithLogitsLoss()
+    # Configure loss function based on problem type and loss function choice
+    loss_fn_config = {
+        "single_label_classification": {
+            "cross_entropy": lambda: nn.CrossEntropyLoss(),
+            "focal_loss": lambda: MultiClassFocalLossWithAlpha(
+                num_classes=args.num_label,
+                alpha=[len(train_dataset) / sum(1 for e in train_dataset if e["label"] == i) 
+                       for i in range(args.num_label)],
+                device=device
+            )
+        },
+        "regression": {
+            "default": lambda: nn.MSELoss()
+        },
+        "multi_label_classification": {
+            "default": lambda: nn.BCEWithLogitsLoss()
+        }
+    }
+
+    if args.problem_type not in loss_fn_config:
+        raise ValueError(f"Unsupported problem type: {args.problem_type}")
+
+    loss_config = loss_fn_config[args.problem_type]
+    loss_key = args.loss_fn if args.problem_type == "single_label_classification" else "default"
+
+    if loss_key not in loss_config:
+        raise ValueError(f"Unsupported loss function: {loss_key}")
+
+    loss_fn = loss_config[loss_key]()
     
+    if args.loss_fn == "focal_loss":
+        print(">>> alpha: ", loss_fn.alpha.tolist())
+    
+    # Common DataLoader parameters
+    dataloader_params = {
+        'num_workers': args.num_worker,
+        'collate_fn': collate_fn
+    }
+
     if args.batch_token is not None:
-        train_loader = DataLoader(
-            train_dataset, num_workers=args.num_worker, collate_fn=collate_fn,
-            batch_sampler=BatchSampler(train_token_num, args.batch_token)
-            )
-        val_loader = DataLoader(
-            val_dataset, num_workers=args.num_worker, collate_fn=collate_fn,
-            batch_sampler=BatchSampler(val_token_num, args.batch_token, False)
-            )
-        test_loader = DataLoader(
-            test_dataset, num_workers=args.num_worker, collate_fn=collate_fn,
-            batch_sampler=BatchSampler(test_token_num, args.batch_token, False)
-            )
-    elif args.batch_size is not None:
-        train_loader = DataLoader(
-            train_dataset, batch_size=args.batch_size, shuffle=True, 
-            num_workers=args.num_worker, collate_fn=collate_fn
-            )
-        val_loader = DataLoader(
-            val_dataset, batch_size=args.batch_size, shuffle=False, 
-            num_workers=args.num_worker, collate_fn=collate_fn
-            )
-        test_loader = DataLoader(
-            test_dataset, batch_size=args.batch_size, shuffle=False, 
-            num_workers=args.num_worker, collate_fn=collate_fn
-            )
+        # Use BatchSampler for token-based batching
+        train_sampler = BatchSampler(train_token_num, args.batch_token)
+        val_sampler = BatchSampler(val_token_num, args.batch_token, shuffle=False)
+        test_sampler = BatchSampler(test_token_num, args.batch_token, shuffle=False)
+
+        train_loader = DataLoader(train_dataset, batch_sampler=train_sampler, **dataloader_params)
+        val_loader = DataLoader(val_dataset, batch_sampler=val_sampler, **dataloader_params)
+        test_loader = DataLoader(test_dataset, batch_sampler=test_sampler, **dataloader_params)
+
+    else:
+        # Use batch_size based loading
+        batch_params = {
+            'batch_size': args.batch_size,
+            **dataloader_params
+        }
+
+        train_loader = DataLoader(train_dataset, shuffle=True, **batch_params)
+        val_loader = DataLoader(val_dataset, shuffle=False, **batch_params) 
+        test_loader = DataLoader(test_dataset, shuffle=False, **batch_params)
     
     model, optimizer, train_loader, val_loader, test_loader = accelerator.prepare(
         model, optimizer, train_loader, val_loader, test_loader
     )
     
     print("---------- Start Training ----------")
-    train(args, model, plm_model, accelerator, metrics_dict, train_loader, val_loader, test_loader, loss_fn, optimizer, device)
+    train(
+        args, model, plm_model, accelerator, metrics_dict, metrics_monitor_strategy_dict, 
+        train_loader, val_loader, test_loader, loss_fn, optimizer, device
+    )
     
     if args.wandb:
         wandb.finish()

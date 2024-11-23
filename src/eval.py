@@ -108,47 +108,58 @@ if __name__ == '__main__':
         args.hidden_size = plm_model.config.d_model
     args.vocab_size = plm_model.config.vocab_size
     
+    # Define metric configurations
+    metric_configs = {
+        'accuracy': {
+            'binary': BinaryAccuracy,
+            'multi': lambda: Accuracy(task="multiclass", num_classes=args.num_label)
+        },
+        'recall': {
+            'binary': BinaryRecall,
+            'multi': lambda: Recall(task="multiclass", num_classes=args.num_label)
+        },
+        'precision': {
+            'binary': BinaryPrecision,
+            'multi': lambda: Precision(task="multiclass", num_classes=args.num_label)
+        },
+        'f1': {
+            'binary': BinaryF1Score,
+            'multi': lambda: F1Score(task="multiclass", num_classes=args.num_label)
+        },
+        'mcc': {
+            'binary': BinaryMatthewsCorrCoef,
+            'multi': lambda: MatthewsCorrCoef(task="multiclass", num_classes=args.num_label)
+        },
+        'auc': {
+            'binary': BinaryAUROC,
+            'multi': lambda: AUROC(task="multiclass", num_classes=args.num_label)
+        },
+        'f1_max': {
+            'any': lambda: MultilabelF1Max(num_label=args.num_label)
+        },
+        'spearman_corr': {
+            'any': SpearmanCorrCoef
+        }
+    }
+
+    # Initialize metrics dictionary
     metrics_dict = {}
     args.metrics = args.metrics.split(',')
-    for m in args.metrics:
-        if m == 'accuracy':
-            if args.num_label == 2:
-                metrics_dict[m] = BinaryAccuracy()
-            else:
-                metrics_dict[m] = Accuracy(task="multiclass", num_classes=args.num_label)
-        elif m == 'recall':
-            if args.num_label == 2:
-                metrics_dict[m] = BinaryRecall()
-            else:
-                metrics_dict[m] = Recall(task="multiclass", num_classes=args.num_label)
-        elif m == 'precision':
-            if args.num_label == 2:
-                metrics_dict[m] = BinaryPrecision()
-            else:
-                metrics_dict[m] = Precision(task="multiclass", num_classes=args.num_label)
-        elif m == 'f1':
-            if args.num_label == 2:
-                metrics_dict[m] = BinaryF1Score()
-            else:
-                metrics_dict[m] = F1Score(task="multiclass", num_classes=args.num_label)
-        elif m == 'mcc':
-            if args.num_label == 2:
-                metrics_dict[m] = BinaryMatthewsCorrCoef()
-            else:
-                metrics_dict[m] = MatthewsCorrCoef(task="multiclass", num_classes=args.num_label)
-        elif m == 'auc':
-            if args.num_label == 2:
-                metrics_dict[m] = BinaryAUROC()
-            else:
-                metrics_dict[m] = AUROC(task="multiclass", num_classes=args.num_label)
-        elif m == 'f1_max':
-            metrics_dict[m] = MultilabelF1Max(num_label=args.num_label)
-        elif m == 'spearman_corr':
-            metrics_dict[m] = SpearmanCorrCoef()
+
+    # Create metrics based on configurations
+    for metric_name in args.metrics:
+        if metric_name not in metric_configs:
+            raise ValueError(f"Invalid metric: {metric_name}")
+            
+        config = metric_configs[metric_name]
+        if 'any' in config:
+            metrics_dict[metric_name] = config['any']()
         else:
-            raise ValueError(f"Invalid metric: {m}")
-    for metric_name, metric in metrics_dict.items():
-        metric.to(device)     
+            metrics_dict[metric_name] = (config['binary']() if args.num_label == 2 
+                                       else config['multi']())
+        
+        # Move metric to device
+        metrics_dict[metric_name].to(device)
     
     
     # load adapter model
