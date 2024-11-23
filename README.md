@@ -15,6 +15,12 @@ Recent News:
 
 ## 📑 Features
 
+- **Vaious protein langugae models**: ESM2, ESM-b, ESM-1v, ProtBert, ProtT5, Ankh, etc
+- **Comprehensive supervised datasets**: Localization, Fitness, Solubility, Stability, etc
+- **Easy and quick data collector**: AlphaFold2 Database, RCSB, InterPro, Uniprot, etc
+- **Experiment moitors**: Wandb, Local
+- **Friendly interface**: Gradio UI
+
 ## 🧬 Supported Models
 
 | Model                                                        | Model size              | Template                        |
@@ -71,7 +77,7 @@ Recent News:
 
 </details>
 
-<details><summary>Pre-training datasets (amino acid sequences)</summary>
+<details><summary>Supervised fine-tuning datasets (amino acid sequences)</summary>
 
 - FLIP_AAV |  protein-site | regression
     - [FLIP_AAV_one-vs-rest](https://huggingface.co/datasets/tyang816/FLIP_AAV_one-vs-rest), [FLIP_AAV_two-vs-rest](https://huggingface.co/datasets/tyang816/FLIP_AAV_two-vs-rest), [FLIP_AAV_mut-des](https://huggingface.co/datasets/tyang816/FLIP_AAV_mut-des), [FLIP_AAV_des-mut](https://huggingface.co/datasets/tyang816/FLIP_AAV_des-mut), [FLIP_AAV_seven-vs-rest](https://huggingface.co/datasets/tyang816/FLIP_AAV_seven-vs-rest), [FLIP_AAV_low-vs-high](https://huggingface.co/datasets/tyang816/FLIP_AAV_low-vs-high), [ FLIP_AAV_sampled](https://huggingface.co/datasets/tyang816/FLIP_AAV_sampled)
