@@ -164,3 +164,4 @@ data/*.ipynb
 wandb/
 ckpt/debug/
 script_dev/
+.gradio/
