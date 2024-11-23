@@ -81,9 +81,9 @@ if __name__ == '__main__':
     parser.add_argument('--use_ss8', action='store_true', help='use ss8')
     
     # model path
-    parser.add_argument('--model_name', type=str, default=None, help='model name')
-    parser.add_argument('--ckpt_root', default="result", help='root directory to save trained models')
-    parser.add_argument('--ckpt_dir', default=None, help='directory to save trained models')
+    parser.add_argument('--output_model_name', type=str, default=None, help='model name')
+    parser.add_argument('--output_root', default="result", help='root directory to save trained models')
+    parser.add_argument('--output_dir', default=None, help='directory to save trained models')
     
     args = parser.parse_args()
     
@@ -154,7 +154,7 @@ if __name__ == '__main__':
     # load adapter model
     print("---------- Load Model ----------")
     model = AdapterModel(args)
-    model_path = f"{args.ckpt_root}/{args.ckpt_dir}/{args.model_name}"
+    model_path = f"{args.output_root}/{args.output_dir}/{args.output_model_name}"
     model.load_state_dict(torch.load(model_path))
     model.to(device).eval()
 

@@ -48,7 +48,7 @@ def train(args, model, plm_model, accelerator, metrics_dict, train_loader, val_l
           loss_fn, optimizer, device):
     best_val_loss, best_val_metric_score = float("inf"), -float("inf")
     val_loss_list, val_metric_list = [], []
-    path = os.path.join(args.ckpt_dir, args.model_name)
+    path = os.path.join(args.output_dir, args.output_model_name)
     global_steps = 0
     for epoch in range(args.train_epoch):
         print(f"---------- Epoch {epoch} ----------")
@@ -206,9 +206,9 @@ if __name__ == "__main__":
     parser.add_argument('--loss_fn', type=str, default='cross_entropy', choices=['cross_entropy', 'focal_loss'], help='loss function')
     
     # save model
-    parser.add_argument('--model_name', type=str, default=None, help='model name')
-    parser.add_argument('--ckpt_root', default="ckpt", help='root directory to save trained models')
-    parser.add_argument('--ckpt_dir', default=None, help='directory to save trained models')
+    parser.add_argument('--output_model_name', type=str, default=None, help='model name')
+    parser.add_argument('--output_root', default="ckpt", help='root directory to save trained models')
+    parser.add_argument('--output_dir', default=None, help='directory to save trained models')
     
     # wandb log
     parser.add_argument('--wandb', action='store_true', help='use wandb to log')
@@ -304,19 +304,19 @@ if __name__ == "__main__":
         
     
     # create checkpoint directory
-    if args.ckpt_dir is None:
+    if args.output_dir is None:
         current_date = strftime("%Y%m%d", localtime())
-        args.ckpt_dir = os.path.join(args.ckpt_root, current_date)
+        args.output_dir = os.path.join(args.output_root, current_date)
     else:
-        args.ckpt_dir = os.path.join(args.ckpt_root, args.ckpt_dir)
-    os.makedirs(args.ckpt_dir, exist_ok=True)
+        args.output_dir = os.path.join(args.output_root, args.output_dir)
+    os.makedirs(args.output_dir, exist_ok=True)
     
     # init wandb
     if args.wandb:
         if args.wandb_run_name is None:
             args.wandb_run_name = f"Adapter-{args.dataset}"
-        if args.model_name is None:
-            args.model_name = f"{args.wandb_run_name}.pt"
+        if args.output_model_name is None:
+            args.output_model_name = f"{args.wandb_run_name}.pt"
         
         wandb.init(
             project=args.wandb_project, name=args.wandb_run_name, 

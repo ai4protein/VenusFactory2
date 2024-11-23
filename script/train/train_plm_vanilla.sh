@@ -18,8 +18,8 @@ python src/train.py \
     --learning_rate $lr \
     --gradient_accumulation_step 1 \
     --batch_token 10000 \
-    --ckpt_dir debug/$dataset/$plm_model \
-    --model_name af2_lr"$lr"_bt10k.pt
+    --output_dir debug/$dataset/$plm_model \
+    --output_model_name af2_lr"$lr"_bt10k.pt
 
 # train with batch_size
 dataset=DeepLocBinary
@@ -33,5 +33,5 @@ python src/train.py \
     --gradient_accumulation_step 8 \
     --batch_size 12 \
     --max_seq_len 1024 \
-    --ckpt_dir debug/$dataset/$plm_model \
-    --model_name af2_lr"$lr"_bs12_ga8.pt
+    --output_dir debug/$dataset/$plm_model \
+    --output_model_name af2_lr"$lr"_bs12_ga8.pt

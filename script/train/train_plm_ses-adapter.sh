@@ -19,6 +19,6 @@ python src/train.py \
     --batch_token 60000 \
     --patience 3 \
     --structure_seq foldseek_seq,ss8_seq \
-    --ckpt_root result \
-    --ckpt_dir debug/$dataset/$plm_model \
-    --model_name "$pdb_type"_"$lr".pt
+    --output_root result \
+    --output_dir debug/$dataset/$plm_model \
+    --output_model_name "$pdb_type"_"$lr".pt
