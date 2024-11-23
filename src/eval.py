@@ -15,9 +15,9 @@ from transformers import T5Tokenizer, T5EncoderModel, AutoTokenizer
 from transformers import logging
 from datasets import load_dataset
 from torch.utils.data import DataLoader
-from src.utils.data_utils import BatchSampler
-from src.utils.metrics import MultilabelF1Max
-from src.models.adapter import AdapterModel
+from utils.data_utils import BatchSampler
+from utils.metrics import MultilabelF1Max
+from models.adapter import AdapterModel
 
 # ignore warning information
 logging.set_verbosity_error()

@@ -11,10 +11,10 @@ dataset=DeepLocBinary
 pdb_type=AlphaFold2
 plm_model=esm2_t30_150M_UR50D
 lr=5e-4
-python train.py \
+python src/train.py \
     --plm_model facebook/$plm_model \
     --dataset_config data/$dataset/"$dataset"_"$pdb_type"_HF.json \
-    --lr $lr \
+    --learning_rate $lr \
     --train_epoch 50 \
     --batch_token 60000 \
     --patience 3 \

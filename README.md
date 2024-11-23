@@ -11,7 +11,10 @@ Recent News:
 - [Supported Training Approaches](#-supported-training-approaches)
 - [Supported Datasets](#-supported-datasets)
 - [Supported Metrics](#-supported-metrics)
+- [Reuirement](#-reuirement)
+- [Get Started](#-get-started)
 - [Citation](#-citation)
+- [Acknowledgement](#-acknowledgement)
 
 ## 📑 Features
 
@@ -21,7 +24,7 @@ Recent News:
 - **Experiment moitors**: Wandb, Local
 - **Friendly interface**: Gradio UI
 
-## 🧬 Supported Models
+## 🤖 Supported Models
 
 | Model                                                        | Model size              | Template                        |
 | ------------------------------------------------------------ | ----------------------- | ------------------------------- |
@@ -38,8 +41,8 @@ Recent News:
 
 | Approach               | Full-tuning | Freeze-tuning      | LoRA               | SES-Adapter        |
 | ---------------------- | ----------- | ------------------ | ------------------ | ------------------ |
-| Pre-Training           | ❎           | ❎                  | ❎                  | ❎                  |
-| Supervised Fine-Tuning | ❎           | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| Pre-Training           | ❎          | ❎                | ❎                 | ❎                |
+| Supervised Fine-Tuning | ❎          | ✅                | ✅                 | ✅                |
 
 ## 📚 Supported Datasets
 
@@ -97,6 +100,26 @@ Recent News:
 | auc           | AUROC            | single_label_classification/ multi_label_classification |
 | f1_max        | F1ScoreMax       | multi_label_classification                              |
 | spearman_corr | SpearmanCorrCoef | regression                                              |
+
+## ✈️ Reuirement
+
+### Conda Enviroment
+
+Please make sure you have installed **[Anaconda3](https://www.anaconda.com/download)** or **[Miniconda3](https://docs.conda.io/projects/miniconda/en/latest/)**.
+
+### Hardware
+
+We recommend a **24GB** RTX 3090 or better, but it mainly depends on which PLM you choose.
+
+## 🧬 Get Started
+
+### Installation
+
+
+
+### Quick Start
+
+
 
 ## 🙌 Citation
 

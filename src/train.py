@@ -21,11 +21,11 @@ from time import strftime, localtime
 from datasets import load_dataset
 from transformers import EsmTokenizer, EsmModel, BertModel, BertTokenizer
 from transformers import T5Tokenizer, T5EncoderModel, AutoTokenizer
-from src.utils.data_utils import BatchSampler
-from src.models.adapter import AdapterModel
-from src.utils.metrics import MultilabelF1Max
-from src.utils.loss_fn import MultiClassFocalLossWithAlpha
-from src.data.get_esm3_structure_seq import VQVAE_SPECIAL_TOKENS
+from utils.data_utils import BatchSampler
+from models.adapter import AdapterModel
+from utils.metrics import MultilabelF1Max
+from utils.loss_fn import MultiClassFocalLossWithAlpha
+from data.get_esm3_structure_seq import VQVAE_SPECIAL_TOKENS
 
 # ignore warning information
 logging.set_verbosity_error()
@@ -192,14 +192,14 @@ if __name__ == "__main__":
     
     # train model
     parser.add_argument('--seed', type=int, default=3407, help='random seed')
-    parser.add_argument("--lr", type=float, default=1e-3, help="learning rate")
+    parser.add_argument("--learning_rate", type=float, default=1e-3, help="learning rate")
     parser.add_argument('--num_worker', type=int, default=4, help='number of workers')
     parser.add_argument('--batch_size', type=int, default=None, help='batch size')
     parser.add_argument('--gradient_accumulation_step', type=int, default=1, help='gradient accumulation steps')
     parser.add_argument('--batch_token', type=int, default=None, help='max number of token per batch')
-    parser.add_argument('--train_epoch', type=int, default=20, help='training epochs')
+    parser.add_argument('--train_epoch', type=int, default=100, help='training epochs')
     parser.add_argument('--max_seq_len', type=int, default=None, help='max sequence length')
-    parser.add_argument('--patience', type=int, default=5, help='patience for early stopping')
+    parser.add_argument('--patience', type=int, default=10, help='patience for early stopping')
     parser.add_argument('--monitor', type=str, default=None, help='monitor metric')
     parser.add_argument('--monitor_strategy', type=str, default=None, help='monitor strategy')
     parser.add_argument('--structure_seq', type=str, default=None, help='structure token')
@@ -500,7 +500,7 @@ if __name__ == "__main__":
         
     # metrics, optimizer, dataloader
     accelerator = Accelerator(gradient_accumulation_steps=args.gradient_accumulation_step)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
+    optimizer = torch.optim.AdamW(model.parameters(), learning_rate=args.learning_rate)
     
     if args.problem_type == "single_label_classification":
         if args.loss_fn == "cross_entropy":
