@@ -165,3 +165,4 @@ wandb/
 ckpt/
 script_dev/
 .gradio/
+configs/

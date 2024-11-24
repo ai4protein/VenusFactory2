@@ -150,6 +150,150 @@ def create_ui():
     global monitor
     monitor = TrainingMonitor()
 
+    def preview_command(
+        model_name,
+        dataset_config,
+        training_method,
+        batch_mode,
+        size_value,
+        token_value,
+        learning_rate,
+        num_epochs,
+        max_seq_len,
+        gradient_accumulation_steps,
+        warmup_steps,
+        scheduler_type,
+        loss_function,
+        output_model_name,
+        save_dir,
+        wandb_logging,
+        wandb_project,
+        wandb_entity,
+        patience,
+        num_worker,
+        max_grad_norm
+    ):
+        # build command dictionary
+        args_dict = {
+            "plm_model": plm_models[model_name],
+            "dataset_config": dataset_configs[dataset_config],
+            "train_method": training_method,
+            "learning_rate": learning_rate,
+            "train_epoch": num_epochs,
+            "max_seq_len": max_seq_len,
+            "gradient_accumulation_step": gradient_accumulation_steps,
+            "warmup_step": warmup_steps,
+            "scheduler": scheduler_type,
+            "loss_fn": loss_function,
+            "output_model_name": output_model_name,
+            "output_dir": save_dir,
+            "patience": patience,
+            "num_worker": num_worker,
+            "max_grad_norm": max_grad_norm
+        }
+
+        # add batch related parameters
+        mode = "size" if batch_mode == "Batch Size Mode" else "token"
+        value = size_value if mode == "size" else token_value
+        if mode == "size":
+            args_dict["batch_size"] = value
+        else:
+            args_dict["batch_token"] = value
+
+        # add wandb related parameters
+        if wandb_logging:
+            args_dict["wandb"] = True
+            if wandb_project:
+                args_dict["wandb_project"] = wandb_project
+            if wandb_entity:
+                args_dict["wandb_entity"] = wandb_entity
+
+        # build command
+        cmd = [sys.executable, "src/train.py"]
+        for k, v in args_dict.items():
+            if v is True:
+                cmd.append(f"--{k}")
+            elif v is not False and v is not None:
+                cmd.append(f"--{k}")
+                cmd.append(str(v))
+
+        # build final command
+        final_cmd = ""
+        for i, part in enumerate(cmd):
+            if i > 0:  # Skip first element (python path)
+                if part.startswith("--"):
+                    final_cmd += "\n\t" + part
+                else:
+                    # add '\' at end of part if not the last one
+                    final_cmd += " " + part + (" \\" if i != len(cmd) - 1 else "")
+            else:
+                final_cmd += part
+
+        return gr.update(value=final_cmd, visible=True)
+    
+    def save_arguments(
+        save_path,
+        model_name,
+        dataset_config,
+        training_method,
+        batch_mode,
+        size_value,
+        token_value,
+        learning_rate,
+        num_epochs,
+        max_seq_len,
+        gradient_accumulation_steps,
+        warmup_steps,
+        scheduler_type,
+        loss_function,
+        output_model_name,
+        save_dir,
+        wandb_logging,
+        wandb_project,
+        wandb_entity,
+        patience,
+        num_worker,
+        max_grad_norm
+    ):
+        if not save_path:
+            return gr.update(value="Please enter a save path!", visible=True)
+            
+        # build arguments dictionary
+        args_dict = {
+            "model_name": model_name,
+            "dataset_config": dataset_config,
+            "training_method": training_method,
+            "batch_mode": batch_mode,
+            "batch_value": size_value if batch_mode == "Batch Size Mode" else token_value,
+            "learning_rate": learning_rate,
+            "num_epochs": num_epochs,
+            "max_seq_len": max_seq_len,
+            "gradient_accumulation_steps": gradient_accumulation_steps,
+            "warmup_steps": warmup_steps,
+            "scheduler_type": scheduler_type,
+            "loss_function": loss_function,
+            "output_model_name": output_model_name,
+            "save_dir": save_dir,
+            "wandb_logging": wandb_logging,
+            "wandb_project": wandb_project,
+            "wandb_entity": wandb_entity,
+            "patience": patience,
+            "num_worker": num_worker,
+            "max_grad_norm": max_grad_norm
+        }
+
+        try:
+            # ensure directory exists
+            save_path = os.path.join('configs', save_path)
+            os.makedirs(os.path.dirname(save_path), exist_ok=True)
+            # save arguments to json file
+            with open(save_path, 'w') as f:
+                json.dump(args_dict, f, indent=4)
+            return gr.update(value=f"Arguments saved to {save_path}", visible=True)
+        except Exception as e:
+            return gr.update(value=f"Error saving arguments: {str(e)}", visible=True)
+
+    
     def update_output():
         if monitor.is_training:
             messages = monitor.get_messages()
@@ -164,49 +308,51 @@ def create_ui():
             with gr.Tab("Training"):
                 # Model and Dataset Selection
                 gr.Markdown("### Model and Dataset Configuration")
-                with gr.Row():
-                    with gr.Column():
-                        model_name = gr.Dropdown(
-                            choices=list(plm_models.keys()),
-                            label="Protein Language Model",
-                            value=list(plm_models.keys())[0]
-                        )
-                    
-                    with gr.Column():
-                        dataset_config = gr.Dropdown(
-                            choices=list(dataset_configs.keys()),
-                            label="Dataset Configuration",
-                            value=list(dataset_configs.keys())[0]
-                        )
+                with gr.Group():
+                    with gr.Row():
+                        with gr.Column():
+                            model_name = gr.Dropdown(
+                                choices=list(plm_models.keys()),
+                                label="Protein Language Model",
+                                value=list(plm_models.keys())[0]
+                            )
+                        
+                        with gr.Column():
+                            dataset_config = gr.Dropdown(
+                                choices=list(dataset_configs.keys()),
+                                label="Dataset Configuration",
+                                value=list(dataset_configs.keys())[0]
+                            )
 
                 # Batch Processing Configuration
                 gr.Markdown("### Batch Processing Configuration")
-                with gr.Row():
-                    with gr.Column(scale=1):
-                        batch_mode = gr.Radio(
-                            choices=["Batch Size Mode", "Batch Token Mode"],
-                            label="Batch Processing Mode",
-                            value="Batch Size Mode"
-                        )
-                    
-                    with gr.Column(scale=2):
-                        batch_size = gr.Slider(
-                            minimum=1,
-                            maximum=128,
-                            value=16,
-                            step=1,
-                            label="Batch Size",
-                            visible=True
-                        )
+                with gr.Group():
+                    with gr.Row(equal_height=True):
+                        with gr.Column(scale=1):
+                            batch_mode = gr.Radio(
+                                choices=["Batch Size Mode", "Batch Token Mode"],
+                                label="Batch Processing Mode",
+                                value="Batch Size Mode"
+                            )
                         
-                        batch_token = gr.Slider(
-                            minimum=1000,
-                            maximum=50000,
-                            value=10000,
-                            step=1000,
-                            label="Tokens per Batch",
-                            visible=False
-                        )
+                        with gr.Column(scale=2):
+                            batch_size = gr.Slider(
+                                minimum=1,
+                                maximum=128,
+                                value=16,
+                                step=1,
+                                label="Batch Size",
+                                visible=True
+                            )
+                            
+                            batch_token = gr.Slider(
+                                minimum=1000,
+                                maximum=50000,
+                                value=10000,
+                                step=1000,
+                                label="Tokens per Batch",
+                                visible=False
+                            )
 
                 def update_batch_inputs(mode):
                     return {
@@ -223,69 +369,70 @@ def create_ui():
 
                 # Training Parameters
                 gr.Markdown("### Training Parameters (-1 for unlimited)")
-                # First row: Basic training parameters
-                with gr.Row(equal_height=True, variant="compact"):
-                    with gr.Column(scale=1, min_width=150):
-                        training_method = gr.Dropdown(
-                            choices=["full", "freeze", "lora", "ses-adapter"],
-                            label="Training Method",
-                            value="freeze"
-                        )
-                    with gr.Column(scale=1, min_width=150):
-                        loss_function = gr.Dropdown(
-                            choices=["cross_entropy", "focal_loss"],
-                            label="Loss Function",
-                            value="cross_entropy"
-                        )
-                    with gr.Column(scale=1, min_width=150):
-                        learning_rate = gr.Slider(
-                            minimum=1e-6, maximum=1e-2, value=5e-4, step=1e-6,
-                            label="Learning Rate"
-                        )
-                    with gr.Column(scale=1, min_width=150):
-                        num_epochs = gr.Slider(
-                            minimum=1, maximum=200, value=100, step=1,
-                            label="Number of Epochs"
-                        )
-                    with gr.Column(scale=1, min_width=150):
-                        patience = gr.Slider(
-                            minimum=1, maximum=50, value=10, step=1,
-                            label="Early Stopping Patience"
-                        )
-                    with gr.Column(scale=1, min_width=150):
-                        max_seq_len = gr.Slider(
-                            minimum=-1, maximum=2048, value=None, step=32,
-                            label="Max Sequence Length"
-                        )
+                with gr.Group():
+                    # First row: Basic training parameters
+                    with gr.Row(equal_height=True):
+                        with gr.Column(scale=1, min_width=150):
+                            training_method = gr.Dropdown(
+                                choices=["full", "freeze", "lora", "ses-adapter"],
+                                label="Training Method",
+                                value="freeze"
+                            )
+                        with gr.Column(scale=1, min_width=150):
+                            loss_function = gr.Dropdown(
+                                choices=["cross_entropy", "focal_loss"],
+                                label="Loss Function",
+                                value="cross_entropy"
+                            )
+                        with gr.Column(scale=1, min_width=150):
+                            learning_rate = gr.Slider(
+                                minimum=1e-8, maximum=1e-2, value=5e-4, step=1e-6,
+                                label="Learning Rate"
+                            )
+                        with gr.Column(scale=1, min_width=150):
+                            num_epochs = gr.Slider(
+                                minimum=1, maximum=200, value=100, step=1,
+                                label="Number of Epochs"
+                            )
+                        with gr.Column(scale=1, min_width=150):
+                            patience = gr.Slider(
+                                minimum=1, maximum=50, value=10, step=1,
+                                label="Early Stopping Patience"
+                            )
+                        with gr.Column(scale=1, min_width=150):
+                            max_seq_len = gr.Slider(
+                                minimum=-1, maximum=2048, value=None, step=32,
+                                label="Max Sequence Length"
+                            )
 
-                # Second row: Advanced training parameters
-                with gr.Row(equal_height=True, variant="compact"):
-                    with gr.Column(scale=1, min_width=150):
-                        scheduler_type = gr.Dropdown(
-                            choices=["linear", "cosine", "step", None],
-                            label="Scheduler Type",
-                            value=None
-                        )
-                    with gr.Column(scale=1, min_width=150):
-                        warmup_steps = gr.Slider(
-                            minimum=0, maximum=1000, value=0, step=10,
-                            label="Warmup Steps"
-                        )
-                    with gr.Column(scale=1, min_width=150):
-                        gradient_accumulation_steps = gr.Slider(
-                            minimum=1, maximum=32, value=1, step=1,
-                            label="Gradient Accumulation Steps"
-                        )
-                    with gr.Column(scale=1, min_width=150):
-                        max_grad_norm = gr.Slider(
-                            minimum=0.1, maximum=10.0, value=-1, step=0.1,
-                            label="Max Gradient Norm"
-                        )
-                    with gr.Column(scale=1, min_width=150):
-                        num_worker = gr.Slider(
-                            minimum=0, maximum=16, value=4, step=1,
-                            label="Number of Workers"
-                        )
+                    # Second row: Advanced training parameters
+                    with gr.Row(equal_height=True):
+                        with gr.Column(scale=1, min_width=150):
+                            scheduler_type = gr.Dropdown(
+                                choices=["linear", "cosine", "step", None],
+                                label="Scheduler Type",
+                                value=None
+                            )
+                        with gr.Column(scale=1, min_width=150):
+                            warmup_steps = gr.Slider(
+                                minimum=0, maximum=1000, value=0, step=10,
+                                label="Warmup Steps"
+                            )
+                        with gr.Column(scale=1, min_width=150):
+                            gradient_accumulation_steps = gr.Slider(
+                                minimum=1, maximum=32, value=1, step=1,
+                                label="Gradient Accumulation Steps"
+                            )
+                        with gr.Column(scale=1, min_width=150):
+                            max_grad_norm = gr.Slider(
+                                minimum=0.1, maximum=10.0, value=-1, step=0.1,
+                                label="Max Gradient Norm"
+                            )
+                        with gr.Column(scale=1, min_width=150):
+                            num_worker = gr.Slider(
+                                minimum=0, maximum=16, value=4, step=1,
+                                label="Number of Workers"
+                            )
                         
                 # Output and Logging Settings
                 gr.Markdown("### Output and Logging Settings")
@@ -329,9 +476,103 @@ def create_ui():
                     load_args_button = gr.Button("Load Arguments")
                     train_button = gr.Button("Start", variant="primary")
                     refresh_button = gr.Button("Refresh", variant="secondary")
+                
+                # 创建保存参数的组件组
+                with gr.Group(visible=False) as save_group:
+                    with gr.Row(equal_height=True):
+                        save_path = gr.Textbox(
+                            label="Save Path",
+                            placeholder="Enter path to save arguments (e.g., configs/my_args.json)",
+                            lines=1,
+                            scale=3
+                        )
+                        save_confirm = gr.Button("Save", variant="primary", scale=1)
                     
+                    save_status = gr.Textbox(
+                        label="Status",
+                        interactive=False,
+                        visible=False
+                    )
+                
+                command_preview = gr.Textbox(
+                    label="Preview Command",
+                    lines=3,
+                    visible=False,
+                    interactive=False
+                )
+                
                 output_text = gr.Textbox(label="Training Status", lines=10)
                 progress_bar = gr.HTML(visible=True)
+
+                # 绑定预览按钮事件
+                preview_button.click(
+                    fn=preview_command,
+                    inputs=[
+                        model_name,
+                        dataset_config,
+                        training_method,
+                        batch_mode,
+                        batch_size,
+                        batch_token,
+                        learning_rate,
+                        num_epochs,
+                        max_seq_len,
+                        gradient_accumulation_steps,
+                        warmup_steps,
+                        scheduler_type,
+                        loss_function,
+                        output_model_name,
+                        save_dir,
+                        wandb_logging,
+                        wandb_project,
+                        wandb_entity,
+                        patience,
+                        num_worker,
+                        max_grad_norm
+                    ],
+                    outputs=[command_preview]
+                )
+
+                # 点击Save Arguments按钮显示保存组件
+                save_args_button.click(
+                    fn=lambda: gr.update(visible=True),
+                    inputs=None,
+                    outputs=save_group
+                )
+
+                # 点击Save确认按钮保存参数
+                save_confirm.click(
+                    fn=save_arguments,
+                    inputs=[
+                        save_path,
+                        model_name,
+                        dataset_config,
+                        training_method,
+                        batch_mode,
+                        batch_size,
+                        batch_token,
+                        learning_rate,
+                        num_epochs,
+                        max_seq_len,
+                        gradient_accumulation_steps,
+                        warmup_steps,
+                        scheduler_type,
+                        loss_function,
+                        output_model_name,
+                        save_dir,
+                        wandb_logging,
+                        wandb_project,
+                        wandb_entity,
+                        patience,
+                        num_worker,
+                        max_grad_norm
+                    ],
+                    outputs=[save_status]
+                ).then(
+                    fn=lambda: gr.update(visible=True),
+                    inputs=None,
+                    outputs=save_status
+                )
 
                 def update_wandb_visibility(checkbox):
                     return {
