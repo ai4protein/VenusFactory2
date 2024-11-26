@@ -131,15 +131,15 @@ class AdapterModel(nn.Module):
         self.layer_norm = nn.LayerNorm(config.hidden_size)
         
         if config.pooling_method == 'attention1d':
-            self.classifier = Attention1dPoolingHead(config.hidden_size, config.num_label, config.pooling_dropout)
+            self.classifier = Attention1dPoolingHead(config.hidden_size, config.num_labels, config.pooling_dropout)
         elif config.pooling_method == 'mean':
             if "PPI" in config.dataset:
                 self.pooling = MeanPooling()
-                self.projection = MeanPoolingProjection(config.hidden_size, config.num_label, config.pooling_dropout)
+                self.projection = MeanPoolingProjection(config.hidden_size, config.num_labels, config.pooling_dropout)
             else:
-                self.classifier = MeanPoolingHead(config.hidden_size, config.num_label, config.pooling_dropout)
+                self.classifier = MeanPoolingHead(config.hidden_size, config.num_labels, config.pooling_dropout)
         elif config.pooling_method == 'light_attention':
-            self.classifier = LightAttentionPoolingHead(config.hidden_size, config.num_label, config.pooling_dropout)
+            self.classifier = LightAttentionPoolingHead(config.hidden_size, config.num_labels, config.pooling_dropout)
         else:
             raise ValueError(f"classifier method {config.pooling_method} not supported")
     

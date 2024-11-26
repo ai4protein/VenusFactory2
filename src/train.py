@@ -25,7 +25,7 @@ from transformers import T5Tokenizer, T5EncoderModel, AutoTokenizer
 from utils.data_utils import BatchSampler
 from models.adapter import AdapterModel
 from utils.metrics import MultilabelF1Max
-from utils.loss_fn import MultiClassFocalLossWithAlpha
+from utils.loss_function import MultiClassFocalLossWithAlpha
 from utils.norm import min_max_normalize_dataset
 from data.get_esm3_structure_seq import VQVAE_SPECIAL_TOKENS
 
@@ -35,12 +35,12 @@ warnings.filterwarnings("ignore")
 
 
 def train(args, model, plm_model, accelerator, metrics_dict, metrics_monitor_strategy_dict,
-          train_loader, val_loader, test_loader, loss_fn, optimizer, device):
+          train_loader, val_loader, test_loader, loss_function, optimizer, device):
     best_val_loss, best_val_metric_score = float("inf"), -float("inf")
     val_loss_list, val_metric_list = [], []
     path = os.path.join(args.output_dir, args.output_model_name)
     global_steps = 0
-    for epoch in range(args.train_epoch):
+    for epoch in range(args.num_epochs):
         print(f"---------- Epoch {epoch} ----------")
         # train
         model.train()
@@ -52,12 +52,12 @@ def train(args, model, plm_model, accelerator, metrics_dict, metrics_monitor_str
                     batch[k] = v.to(device)
                 label = batch["label"]
                 logits = model(plm_model, batch)
-                if args.problem_type == 'regression' and args.num_label == 1:
-                    loss = loss_fn(logits.squeeze(), label.squeeze())
+                if args.problem_type == 'regression' and args.num_labels == 1:
+                    loss = loss_function(logits.squeeze(), label.squeeze())
                 elif args.problem_type == 'multi_label_classification':
-                    loss = loss_fn(logits, label.float())
+                    loss = loss_function(logits, label.float())
                 else:
-                    loss = loss_fn(logits, label)
+                    loss = loss_function(logits, label)
                 epoch_train_loss += loss.item() * len(label)                
                 global_steps += 1
                 accelerator.backward(loss)
@@ -75,7 +75,7 @@ def train(args, model, plm_model, accelerator, metrics_dict, metrics_monitor_str
         # eval every epoch
         model.eval()
         with torch.no_grad():
-            val_loss, val_metric_dict = eval_loop(args, model, plm_model, metrics_dict, val_loader, loss_fn, device)
+            val_loss, val_metric_dict = eval_loop(args, model, plm_model, metrics_dict, val_loader, loss_function, device)
             val_metric_score = val_metric_dict[args.monitor]
             val_metric_list.append(val_metric_score)
             val_loss_list.append(val_loss)
@@ -132,7 +132,7 @@ def train(args, model, plm_model, accelerator, metrics_dict, metrics_monitor_str
     model.load_state_dict(torch.load(path))
     model.eval()
     with torch.no_grad():
-        test_loss, test_metric_dict = eval_loop(args, model, plm_model, metrics_dict, test_loader, loss_fn, device)
+        test_loss, test_metric_dict = eval_loop(args, model, plm_model, metrics_dict, test_loader, loss_function, device)
         test_metric_score = test_metric_dict[args.monitor]
         
         if args.wandb:
@@ -145,7 +145,7 @@ def train(args, model, plm_model, accelerator, metrics_dict, metrics_monitor_str
             print(f'>>> {metric_name}: {metric_score:.4f}')
 
 
-def eval_loop(args, model, plm_model, metrics_dict, dataloader, loss_fn, device=None):
+def eval_loop(args, model, plm_model, metrics_dict, dataloader, loss_function, device=None):
     total_loss = 0
     epoch_iterator = tqdm(dataloader)
     
@@ -156,16 +156,16 @@ def eval_loop(args, model, plm_model, metrics_dict, dataloader, loss_fn, device=
         logits = model(plm_model, batch)
 
         # Calculate loss first, outside of metrics loop
-        if args.problem_type == 'regression' and args.num_label == 1:
-            loss = loss_fn(logits.squeeze(), label.squeeze())
+        if args.problem_type == 'regression' and args.num_labels == 1:
+            loss = loss_function(logits.squeeze(), label.squeeze())
         elif args.problem_type == 'multi_label_classification':
-            loss = loss_fn(logits, label.float())
+            loss = loss_function(logits, label.float())
         else:
-            loss = loss_fn(logits, label)
+            loss = loss_function(logits, label)
 
         # Update metrics if any exist
         for metric_name, metric in metrics_dict.items():
-            if args.problem_type == 'regression' and args.num_label == 1:
+            if args.problem_type == 'regression' and args.num_labels == 1:
                 metric(logits.squeeze(), label.squeeze())
             elif args.problem_type == 'multi_label_classification':
                 metric(logits, label)
@@ -197,7 +197,7 @@ if __name__ == "__main__":
     # dataset
     parser.add_argument('--dataset', type=str, default=None, help='dataset name')
     parser.add_argument('--dataset_config', type=str, default=None, help='config of dataset')
-    parser.add_argument('--num_label', type=int, default=None, help='number of labels')
+    parser.add_argument('--num_labels', type=int, default=None, help='number of labels')
     parser.add_argument('--problem_type', type=str, default=None, help='problem type')
     parser.add_argument('--pdb_type', type=str, default=None, help='pdb type')
     parser.add_argument('--train_file', type=str, default=None, help='train file')
@@ -209,20 +209,20 @@ if __name__ == "__main__":
     parser.add_argument('--seed', type=int, default=3407, help='random seed')
     parser.add_argument("--learning_rate", type=float, default=1e-3, help="learning rate")
     parser.add_argument('--scheduler', type=str, default=None, choices=['linear', 'cosine', 'step'], help='scheduler')
-    parser.add_argument('--warmup_step', type=int, default=0, help='warmup steps')
-    parser.add_argument('--num_worker', type=int, default=4, help='number of workers')
+    parser.add_argument('--warmup_steps', type=int, default=0, help='warmup steps')
+    parser.add_argument('--num_workers', type=int, default=4, help='number of workers')
     parser.add_argument('--batch_size', type=int, default=None, help='batch size')
     parser.add_argument('--batch_token', type=int, default=None, help='max number of token per batch')
-    parser.add_argument('--train_epoch', type=int, default=100, help='training epochs')
+    parser.add_argument('--num_epochs', type=int, default=100, help='training epochs')
     parser.add_argument('--max_seq_len', type=int, default=-1, help='max sequence length')
-    parser.add_argument('--gradient_accumulation_step', type=int, default=1, help='gradient accumulation steps')
+    parser.add_argument('--gradient_accumulation_steps', type=int, default=1, help='gradient accumulation steps')
     parser.add_argument('--max_grad_norm', type=float, default=-1, help='max gradient norm')
     parser.add_argument('--patience', type=int, default=10, help='patience for early stopping')
     parser.add_argument('--monitor', type=str, default=None, help='monitor metric')
     parser.add_argument('--monitor_strategy', type=str, default=None, choices=['max', 'min'], help='monitor strategy')
-    parser.add_argument('--train_method', type=str, default='full', choices=['full', 'freeze', 'lora', 'ses-adapter'], help='training method')
+    parser.add_argument('--training_method', type=str, default='full', choices=['full', 'freeze', 'lora', 'ses-adapter'], help='training method')
     parser.add_argument('--structure_seq', type=str, default=None, help='structure token for ses-adapter')
-    parser.add_argument('--loss_fn', type=str, default='cross_entropy', choices=['cross_entropy', 'focal_loss'], help='loss function')
+    parser.add_argument('--loss_function', type=str, default='cross_entropy', choices=['cross_entropy', 'focal_loss'], help='loss function')
     
     # save model
     parser.add_argument('--output_model_name', type=str, default=None, help='model name')
@@ -258,8 +258,8 @@ if __name__ == "__main__":
     if args.test_file is None:
         if dataset_config.get('test_file'):
             args.test_file = dataset_config['test_file']
-    if args.num_label is None:
-        args.num_label = dataset_config['num_label']
+    if args.num_labels is None:
+        args.num_labels = dataset_config['num_labels']
     if args.problem_type is None:
         args.problem_type = dataset_config['problem_type']
     if args.monitor is None:
@@ -280,22 +280,22 @@ if __name__ == "__main__":
                 metrics_monitor_strategy_dict[metric_name] = 'max'
         elif args.problem_type == 'single_label_classification':
             if metric_name == 'accuracy':
-                metrics_dict[metric_name] = Accuracy(task='multiclass', num_classes=args.num_label).to(device)
+                metrics_dict[metric_name] = Accuracy(task='multiclass', num_classes=args.num_labels).to(device)
                 metrics_monitor_strategy_dict[metric_name] = 'max'
             elif metric_name == 'recall':
-                metrics_dict[metric_name] = Recall(task='multiclass', num_classes=args.num_label).to(device)
+                metrics_dict[metric_name] = Recall(task='multiclass', num_classes=args.num_labels).to(device)
                 metrics_monitor_strategy_dict[metric_name] = 'max'
             elif metric_name == 'precision':
-                metrics_dict[metric_name] = Precision(task='multiclass', num_classes=args.num_label).to(device)
+                metrics_dict[metric_name] = Precision(task='multiclass', num_classes=args.num_labels).to(device)
                 metrics_monitor_strategy_dict[metric_name] = 'max'
             elif metric_name == 'f1':
-                metrics_dict[metric_name] = F1Score(task='multiclass', num_classes=args.num_label).to(device)
+                metrics_dict[metric_name] = F1Score(task='multiclass', num_classes=args.num_labels).to(device)
                 metrics_monitor_strategy_dict[metric_name] = 'max'
             elif metric_name == 'mcc':
-                metrics_dict[metric_name] = MatthewsCorrCoef(task='multiclass', num_classes=args.num_label).to(device)
+                metrics_dict[metric_name] = MatthewsCorrCoef(task='multiclass', num_classes=args.num_labels).to(device)
                 metrics_monitor_strategy_dict[metric_name] = 'max'
             elif metric_name == 'auroc':
-                metrics_dict[metric_name] = AUROC(task='multiclass', num_classes=args.num_label).to(device)
+                metrics_dict[metric_name] = AUROC(task='multiclass', num_classes=args.num_labels).to(device)
                 metrics_monitor_strategy_dict[metric_name] = 'max'
         elif args.problem_type == 'binary_classification':
             if metric_name == 'accuracy':
@@ -365,7 +365,7 @@ if __name__ == "__main__":
         plm_model = T5EncoderModel.from_pretrained(args.plm_model).to(device).eval()
         args.hidden_size = plm_model.config.d_model
     
-    if args.train_method == 'ses-adapter':
+    if args.training_method == 'ses-adapter':
         if args.structure_seq is not None:
             args.structure_seq = args.structure_seq.split(',')
         else:
@@ -395,7 +395,7 @@ if __name__ == "__main__":
         if args.problem_type == 'multi_label_classification':
             label_list = data['label'].split(',')
             data['label'] = [int(l) for l in label_list]
-            binary_list = [0] * args.num_label
+            binary_list = [0] * args.num_labels
             for index in data['label']:
                 binary_list[index] = 1
             data['label'] = binary_list
@@ -549,9 +549,9 @@ if __name__ == "__main__":
         "single_label_classification": {
             "cross_entropy": lambda: nn.CrossEntropyLoss(),
             "focal_loss": lambda: MultiClassFocalLossWithAlpha(
-                num_classes=args.num_label,
+                num_classes=args.num_labels,
                 alpha=[len(train_dataset) / sum(1 for e in train_dataset if e["label"] == i) 
-                       for i in range(args.num_label)],
+                       for i in range(args.num_labels)],
                 device=device
             )
         },
@@ -567,19 +567,19 @@ if __name__ == "__main__":
         raise ValueError(f"Unsupported problem type: {args.problem_type}")
 
     loss_config = loss_fn_config[args.problem_type]
-    loss_key = args.loss_fn if args.problem_type == "single_label_classification" else "default"
+    loss_key = args.loss_function if args.problem_type == "single_label_classification" else "default"
 
     if loss_key not in loss_config:
         raise ValueError(f"Unsupported loss function: {loss_key}")
 
-    loss_fn = loss_config[loss_key]()
+    loss_function = loss_config[loss_key]()
     
-    if args.loss_fn == "focal_loss":
-        print(">>> alpha: ", loss_fn.alpha.tolist())
+    if args.loss_function == "focal_loss":
+        print(">>> alpha: ", loss_function.alpha.tolist())
     
     # Common DataLoader parameters
     dataloader_params = {
-        'num_workers': args.num_worker,
+        'num_workers': args.num_workers,
         'collate_fn': collate_fn
     }
 
@@ -605,14 +605,14 @@ if __name__ == "__main__":
         test_loader = DataLoader(test_dataset, shuffle=False, **batch_params)
     
     # Initialize accelerator and optimizer
-    accelerator = Accelerator(gradient_accumulation_steps=args.gradient_accumulation_step)
+    accelerator = Accelerator(gradient_accumulation_steps=args.gradient_accumulation_steps)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
 
     # Calculate training steps and warmup steps
-    num_training_steps = len(train_dataset) * args.train_epoch // args.batch_size
-    if args.warmup_step == 0:
-        args.warmup_step = num_training_steps // 10
-    num_warmup_steps = args.warmup_step
+    num_training_steps = len(train_dataset) * args.num_epochs // args.batch_size
+    if args.warmup_steps == 0:
+        args.warmup_steps = num_training_steps // 10
+    num_warmup_steps = args.warmup_steps
 
     if args.scheduler is not None:
         # Configure learning rate scheduler
@@ -641,7 +641,7 @@ if __name__ == "__main__":
     print("---------- Start Training ----------")
     train(
         args, model, plm_model, accelerator, metrics_dict, metrics_monitor_strategy_dict, 
-        train_loader, val_loader, test_loader, loss_fn, optimizer, device
+        train_loader, val_loader, test_loader, loss_function, optimizer, device
     )
     
     if args.wandb:

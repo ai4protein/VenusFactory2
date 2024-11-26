@@ -1,7 +1,7 @@
 {
     "dataset": "tyang816/FLIP_AAV_mut-des",
     "pdb_type": "None",
-    "num_label": 1,
+    "num_labels": 1,
     "problem_type": "regression",
     "metrics": "spearman_corr",
     "monitor": "spearman_corr",

@@ -1,7 +1,7 @@
 {
     "dataset": "tyang816/Thermostability_AlphaFold2",
     "pdb_type": "AlphaFold2",
-    "num_label": 1,
+    "num_labels": 1,
     "problem_type": "regression",
     "metrics": "spearman_corr",
     "monitor": "spearman_corr",

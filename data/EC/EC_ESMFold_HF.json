@@ -1,7 +1,7 @@
 {
     "dataset": "tyang816/EC_ESMFold",
     "pdb_type": "ESMFold",
-    "num_label": 585,
+    "num_labels": 585,
     "problem_type": "multi_label_classification",
     "metrics": "f1_max",
     "monitor": "f1_max",

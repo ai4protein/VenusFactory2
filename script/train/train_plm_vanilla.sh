@@ -16,7 +16,7 @@ python src/train.py \
     --plm_model facebook/$plm_model \
     --dataset_config data/$dataset/"$dataset"_"$pdb_type"_HF.json \
     --learning_rate $lr \
-    --gradient_accumulation_step 1 \
+    --gradient_accumulation_steps 1 \
     --batch_token 10000 \
     --output_dir debug/$dataset/$plm_model \
     --output_model_name af2_lr"$lr"_bt10k.pt
@@ -30,7 +30,7 @@ python src/train.py \
     --plm_model facebook/$plm_model \
     --dataset_config data/$dataset/"$dataset"_"$pdb_type"_HF.json \
     --learning_rate $lr \
-    --gradient_accumulation_step 8 \
+    --gradient_accumulation_steps 8 \
     --batch_size 12 \
     --max_seq_len 1024 \
     --output_dir debug/$dataset/$plm_model \

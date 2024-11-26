@@ -12,7 +12,7 @@ Each dataset is configured using a JSON file with the following structure:
 |-------|-------------|----------------|
 | `dataset` | HuggingFace dataset path | `"tyang816/DeepLocMulti_ESMFold"` |
 | `pdb_type` | Type of protein structure prediction | `"ESMFold"`, `"AlphaFold2"` |
-| `num_label` | Number of classification labels | `10` |
+| `num_labels` | Number of classification labels | `10` |
 | `problem_type` | Type of machine learning problem | `"single_label_classification"` |
 | `metrics` | Evaluation metric | `"accuracy"` |
 | `monitor` | Metric to monitor during training | `"accuracy"` |

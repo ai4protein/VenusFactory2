@@ -23,7 +23,7 @@ from models.adapter import AdapterModel
 logging.set_verbosity_error()
 warnings.filterwarnings("ignore")
 
-def evaluate(model, plm_model, metrics, dataloader, loss_fn, device=None):
+def evaluate(model, plm_model, metrics, dataloader, loss_function, device=None):
     total_loss = 0
     epoch_iterator = tqdm(dataloader)
     pred_labels = []
@@ -36,14 +36,14 @@ def evaluate(model, plm_model, metrics, dataloader, loss_fn, device=None):
         pred_labels.extend(logits.argmax(dim=1).cpu().numpy())
         
         for metric_name, metric in metrics_dict.items():
-            if args.problem_type == 'regression' and args.num_label == 1:
-                loss = loss_fn(logits.squeeze(), label.squeeze())
+            if args.problem_type == 'regression' and args.num_labels == 1:
+                loss = loss_function(logits.squeeze(), label.squeeze())
                 metric(logits.squeeze(), label.squeeze())
             elif args.problem_type == 'multi_label_classification':
-                loss = loss_fn(logits, label.float())
+                loss = loss_function(logits, label.float())
                 metric(logits, label)
             else:
-                loss = loss_fn(logits, label)
+                loss = loss_function(logits, label)
                 metric(torch.argmax(logits, 1), label)
                 
         total_loss += loss.item() * len(label)
@@ -64,7 +64,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_attention_head', type=int, default=8, help='number of attention heads')
     parser.add_argument('--attention_probs_dropout_prob', type=float, default=0, help='attention probs dropout prob')
     parser.add_argument('--plm_model', type=str, default='facebook/esm2_t33_650M_UR50D', help='esm model name')
-    parser.add_argument('--num_label', type=int, default=2, help='number of labels')
+    parser.add_argument('--num_labels', type=int, default=2, help='number of labels')
     parser.add_argument('--pooling_method', type=str, default='attention1d', help='pooling method')
     parser.add_argument('--pooling_dropout', type=float, default=0.25, help='pooling dropout')
     
@@ -74,7 +74,7 @@ if __name__ == '__main__':
     parser.add_argument('--test_file', type=str, default=None, help='test file')
     parser.add_argument('--test_result_dir', type=str, default=None, help='test result directory')
     parser.add_argument('--metrics', type=str, default=None, help='computation metrics')
-    parser.add_argument('--num_worker', type=int, default=4, help='number of workers')
+    parser.add_argument('--num_workers', type=int, default=4, help='number of workers')
     parser.add_argument('--max_seq_len', type=int, default=None, help='max sequence length')
     parser.add_argument('--batch_token', type=int, default=10000, help='max number of token per batch')
     parser.add_argument('--use_foldseek', action='store_true', help='use foldseek')
@@ -112,30 +112,30 @@ if __name__ == '__main__':
     metric_configs = {
         'accuracy': {
             'binary': BinaryAccuracy,
-            'multi': lambda: Accuracy(task="multiclass", num_classes=args.num_label)
+            'multi': lambda: Accuracy(task="multiclass", num_classes=args.num_labels)
         },
         'recall': {
             'binary': BinaryRecall,
-            'multi': lambda: Recall(task="multiclass", num_classes=args.num_label)
+            'multi': lambda: Recall(task="multiclass", num_classes=args.num_labels)
         },
         'precision': {
             'binary': BinaryPrecision,
-            'multi': lambda: Precision(task="multiclass", num_classes=args.num_label)
+            'multi': lambda: Precision(task="multiclass", num_classes=args.num_labels)
         },
         'f1': {
             'binary': BinaryF1Score,
-            'multi': lambda: F1Score(task="multiclass", num_classes=args.num_label)
+            'multi': lambda: F1Score(task="multiclass", num_classes=args.num_labels)
         },
         'mcc': {
             'binary': BinaryMatthewsCorrCoef,
-            'multi': lambda: MatthewsCorrCoef(task="multiclass", num_classes=args.num_label)
+            'multi': lambda: MatthewsCorrCoef(task="multiclass", num_classes=args.num_labels)
         },
         'auc': {
             'binary': BinaryAUROC,
-            'multi': lambda: AUROC(task="multiclass", num_classes=args.num_label)
+            'multi': lambda: AUROC(task="multiclass", num_classes=args.num_labels)
         },
         'f1_max': {
-            'any': lambda: MultilabelF1Max(num_label=args.num_label)
+            'any': lambda: MultilabelF1Max(num_labels=args.num_labels)
         },
         'spearman_corr': {
             'any': SpearmanCorrCoef
@@ -155,7 +155,7 @@ if __name__ == '__main__':
         if 'any' in config:
             metrics_dict[metric_name] = config['any']()
         else:
-            metrics_dict[metric_name] = (config['binary']() if args.num_label == 2 
+            metrics_dict[metric_name] = (config['binary']() if args.num_labels == 2 
                                        else config['multi']())
         
         # Move metric to device
@@ -240,13 +240,13 @@ if __name__ == '__main__':
             data_dict["ss8_input_ids"] = ss8_input_ids
         return data_dict
         
-    loss_fn = nn.CrossEntropyLoss()
+    loss_function = nn.CrossEntropyLoss()
     
     def process_data_line(data):
         if args.problem_type == 'multi_label_classification':
             label_list = data['label'].split(',')
             data['label'] = [int(l) for l in label_list]
-            binary_list = [0] * args.num_label
+            binary_list = [0] * args.num_labels
             for index in data['label']:
                 binary_list[index] = 1
             data['label'] = binary_list
@@ -293,13 +293,13 @@ if __name__ == '__main__':
     
         
     test_loader = DataLoader(
-        test_dataset, num_worker=args.num_worker, collate_fn=collate_fn,
+        test_dataset, num_workers=args.num_workers, collate_fn=collate_fn,
         batch_sampler=BatchSampler(test_token_num, args.batch_token, False)
         )
 
     print("---------- Start Eval ----------")
     with torch.no_grad():
-        metric, pred_labels = evaluate(model, plm_model, metrics_dict, test_loader, loss_fn, device)
+        metric, pred_labels = evaluate(model, plm_model, metrics_dict, test_loader, loss_function, device)
         if args.test_result_dir:
             pd.DataFrame(metric).to_csv(f"{args.test_result_dir}/test_metrics.csv", index=False)
             test_result_df["pred_label"] = pred_labels

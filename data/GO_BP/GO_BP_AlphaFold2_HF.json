@@ -1,7 +1,7 @@
 {
     "dataset": "tyang816/GO_BP_AlphaFold2",
     "pdb_type": "AlphaFold2",
-    "num_label": 1943,
+    "num_labels": 1943,
     "problem_type": "multi_label_classification",
     "metrics": "f1_max",
     "monitor": "f1_max",

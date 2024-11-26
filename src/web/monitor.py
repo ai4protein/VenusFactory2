@@ -15,7 +15,7 @@ class TrainingMonitor:
     def start_training(self, args_dict):
         self.is_training = True
         self.current_epoch = 0
-        self.total_epochs = int(args_dict.get("train_epoch", 0))
+        self.total_epochs = int(args_dict.get("num_epochs", 0))
         thread = Thread(target=self._run_training, args=(args_dict,))
         thread.start()
         return thread
