@@ -3,19 +3,26 @@ import json
 import sys
 import gradio as gr
 
-def preview_command(args_dict, cmd_list):
-    # build final command
-    final_cmd = ""
-    for i, part in enumerate(cmd_list):
-        if i > 0:  # Skip first element (python path)
-            if part.startswith("--"):
-                final_cmd += "\n\t" + part
+def preview_command(args, constant):
+    # 构建命令字符串
+    cmd = [sys.executable, "src/train.py"]  # 开始用 python 路径
+    
+    for k, v in args.items():
+        if v is not None:
+            if k == "plm_model":
+                v = constant["plm_models"][v]
+            elif k == "dataset_config":
+                v = constant["dataset_configs"][v]
+            if isinstance(v, bool):
+                if v:  # 对于布尔值，只在True时添加参数名
+                    cmd.append(f"--{k}")
             else:
-                # add '\' at end of part if not the last one
-                final_cmd += " " + part + (" \\" if i != len(cmd_list) - 1 else "")
-        else:
-            final_cmd += part
-    return gr.update(value=final_cmd, visible=True)
+                cmd.append(f"--{k}")
+                cmd.append(str(v))
+    
+    # 将命令列表转换为字符串，每个部分用空格连接
+    return " ".join(cmd)
+
 
 def save_arguments(save_path, args_dict):
     if not save_path:

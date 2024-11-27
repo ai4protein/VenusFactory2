@@ -13,7 +13,7 @@ def create_train_tab(monitor, constant):
         with gr.Group():
             with gr.Row():
                 with gr.Column():
-                    model_name = gr.Dropdown(
+                    plm_model = gr.Dropdown(
                         choices=list(plm_models.keys()),
                         label="Protein Language Model",
                         value=list(plm_models.keys())[0]
@@ -131,7 +131,7 @@ def create_train_tab(monitor, constant):
                         label="Max Gradient Norm (-1 for no clipping)"
                     )
                 with gr.Column(scale=1, min_width=150):
-                    num_worker = gr.Slider(
+                    num_workers = gr.Slider(
                         minimum=0, maximum=16, value=4, step=1,
                         label="Number of Workers"
                     )
@@ -140,7 +140,7 @@ def create_train_tab(monitor, constant):
         gr.Markdown("### Output and Logging Settings")
         with gr.Row():
             with gr.Column():
-                save_dir = gr.Textbox(
+                output_dir = gr.Textbox(
                     label="Save Directory",
                     value="ckpt",
                     placeholder="Path to save training results"
@@ -180,14 +180,15 @@ def create_train_tab(monitor, constant):
         
         # Save arguments components
         with gr.Group(visible=False) as save_group:
-            with gr.Row(equal_height=True):
-                save_path = gr.Textbox(
-                    label="Save Path",
-                    placeholder="Enter path to save arguments (e.g., configs/my_args.json)",
-                    lines=1,
-                    scale=3
-                )
-                save_confirm = gr.Button("Save", variant="primary", scale=1)
+            with gr.Row():
+                with gr.Column(scale=4):
+                    save_path = gr.Textbox(
+                        label="Save Path",
+                        placeholder="Enter path to save arguments (e.g., configs/my_args.json)",
+                        lines=1
+                    )
+                with gr.Column(scale=1, min_width=100):
+                    save_confirm = gr.Button("Save", variant="primary", size="sm")
             
             save_status = gr.Textbox(
                 label="Status",
@@ -207,7 +208,7 @@ def create_train_tab(monitor, constant):
 
         # Training function
         def train_model(
-            model_name,
+            plm_model,
             dataset_config,
             training_method,
             batch_mode,
@@ -220,31 +221,31 @@ def create_train_tab(monitor, constant):
             scheduler_type,
             loss_function,
             output_model_name,
-            save_dir,
+            output_dir,
             wandb_logging,
             wandb_project,
             wandb_entity,
             patience,
-            num_worker,
+            num_workers,
             max_grad_norm
         ):
             if monitor.is_training:
                 return "Training is already in progress!"
 
             args_dict = {
-                "plm_model": plm_models[model_name],
+                "plm_model": plm_models[plm_model],
                 "dataset_config": dataset_configs[dataset_config],
-                "train_method": training_method,
+                "training_method": training_method,
                 "learning_rate": learning_rate,
-                "train_epoch": num_epochs,
-                "gradient_accumulation_step": gradient_accumulation_steps,
-                "warmup_step": warmup_steps,
+                "num_epochs": num_epochs,
+                "gradient_accumulation_steps": gradient_accumulation_steps,
+                "warmup_steps": warmup_steps,
                 "scheduler": scheduler_type,
-                "loss_fn": loss_function,
+                "loss_function": loss_function,
                 "output_model_name": output_model_name,
-                "output_dir": save_dir,
+                "output_dir": output_dir,
                 "patience": patience,
-                "num_worker": num_worker,
+                "num_workers": num_workers,
                 "max_grad_norm": max_grad_norm
             }
 
@@ -271,11 +272,14 @@ def create_train_tab(monitor, constant):
             # 如果已经显示，则隐藏
             if command_preview.visible:
                 return gr.update(visible=False)
+            
             # 否则显示预览
-            args = get_current_args()
-            cmd_list = build_command_list(args)
-            preview_text = preview_command(args, cmd_list)
-            return gr.update(value=preview_text, visible=True)
+            args = get_current_args()            
+            preview_text = preview_command(args, constant)
+            
+            # 格式化显示
+            formatted_preview = preview_text
+            return gr.update(value=formatted_preview, visible=True)
 
 
         def handle_save():
@@ -296,7 +300,7 @@ def create_train_tab(monitor, constant):
 
         def get_current_args():
             return_dict = {
-                "model_name": model_name.value,
+                "plm_model": plm_model.value,
                 "dataset_config": dataset_config.value,
                 "training_method": training_method.value,
                 "learning_rate": learning_rate.value,
@@ -307,12 +311,12 @@ def create_train_tab(monitor, constant):
                 "scheduler_type": scheduler_type.value,
                 "loss_function": loss_function.value,
                 "output_model_name": output_model_name.value,
-                "save_dir": save_dir.value,
+                "output_dir": output_dir.value,
                 "wandb_logging": wandb_logging.value,
                 "wandb_project": wandb_project.value,
                 "wandb_entity": wandb_entity.value,
                 "patience": patience.value,
-                "num_worker": num_worker.value,
+                "num_workers": num_workers.value,
                 "max_grad_norm": max_grad_norm.value
             }
             if batch_mode.value == "Batch Size Mode":
@@ -334,7 +338,7 @@ def create_train_tab(monitor, constant):
             "train_button": train_button,
             "train_fn": train_model,
             "components": {
-                "model_name": model_name,
+                "plm_model": plm_model,
                 "dataset_config": dataset_config,
                 "training_method": training_method,
                 "batch_mode": batch_mode,
@@ -348,12 +352,12 @@ def create_train_tab(monitor, constant):
                 "scheduler_type": scheduler_type,
                 "loss_function": loss_function,
                 "output_model_name": output_model_name,
-                "save_dir": save_dir,
+                "output_dir": output_dir,
                 "wandb_logging": wandb_logging,
                 "wandb_project": wandb_project,
                 "wandb_entity": wandb_entity,
                 "patience": patience,
-                "num_worker": num_worker,
+                "num_workers": num_workers,
                 "max_grad_norm": max_grad_norm
             }
         }
