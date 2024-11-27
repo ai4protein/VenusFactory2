@@ -1,6 +1,6 @@
 import gradio as gr
 
-def create_eval_tab(constant):
+def create_inference_tab(constant):
     dataset_configs = constant["dataset_configs"]
 
     def evaluate_model(model_path, dataset, batch_size):

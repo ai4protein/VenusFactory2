@@ -3,16 +3,12 @@ import json
 import sys
 import gradio as gr
 
-def preview_command(args, constant):
+def preview_command(args):
     # 构建命令字符串
     cmd = [sys.executable, "src/train.py"]  # 开始用 python 路径
     
     for k, v in args.items():
         if v is not None:
-            if k == "plm_model":
-                v = constant["plm_models"][v]
-            elif k == "dataset_config":
-                v = constant["dataset_configs"][v]
             if isinstance(v, bool):
                 if v:  # 对于布尔值，只在True时添加参数名
                     cmd.append(f"--{k}")

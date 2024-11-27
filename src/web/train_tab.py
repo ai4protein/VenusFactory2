@@ -2,6 +2,84 @@ import os
 import json
 import gradio as gr
 from .utils import preview_command, save_arguments, build_command_list
+from dataclasses import dataclass
+from typing import Any, Dict, Union, Optional
+
+@dataclass
+class TrainingArgs:
+    def __init__(self, args: list, plm_models: dict, dataset_configs: dict):
+        # 基础参数
+        self.plm_model = plm_models[args[0]]
+        self.dataset_config = dataset_configs[args[1]]
+        self.training_method = args[2]
+        self.pooling_method = args[3]
+        
+        # 批处理参数
+        self.batch_mode = args[4]
+        if self.batch_mode == "Batch Size Mode":
+            self.batch_size = args[5]
+        else:
+            self.batch_token = args[6]
+        
+        # 训练参数
+        self.learning_rate = args[7]
+        self.num_epochs = args[8]
+        self.max_seq_len = args[9]
+        self.gradient_accumulation_steps = args[10]
+        self.warmup_steps = args[11]
+        self.scheduler = args[12]
+        self.loss_function = args[13]
+        
+        # 输出参数
+        self.output_model_name = args[14]
+        self.output_dir = args[15]
+        
+        # Wandb参数
+        self.wandb_enabled = args[16]
+        if self.wandb_enabled:
+            self.wandb_project = args[17]
+            self.wandb_entity = args[18]
+        
+        # 其他参数
+        self.patience = args[19]
+        self.num_workers = args[20]
+        self.max_grad_norm = args[21]
+
+    def to_dict(self) -> Dict[str, Any]:
+        args_dict = {
+            "plm_model": self.plm_model,
+            "dataset_config": self.dataset_config,
+            "training_method": self.training_method,
+            "pooling_method": self.pooling_method,
+            "learning_rate": self.learning_rate,
+            "num_epochs": self.num_epochs,
+            "max_seq_len": self.max_seq_len,
+            "gradient_accumulation_steps": self.gradient_accumulation_steps,
+            "warmup_steps": self.warmup_steps,
+            "scheduler": self.scheduler,
+            "loss_function": self.loss_function,
+            "output_model_name": self.output_model_name,
+            "output_dir": self.output_dir,
+            "patience": self.patience,
+            "num_workers": self.num_workers,
+            "max_grad_norm": self.max_grad_norm
+        }
+
+        # 添加批处理参数
+        if self.batch_mode == "Batch Size Mode":
+            args_dict["batch_size"] = self.batch_size
+        else:
+            args_dict["batch_token"] = self.batch_token
+
+        # 添加wandb参数
+        if self.wandb_enabled:
+            args_dict["wandb"] = True
+            if self.wandb_project:
+                args_dict["wandb_project"] = self.wandb_project
+            if self.wandb_entity:
+                args_dict["wandb_entity"] = self.wandb_entity
+
+        return args_dict
 
 def create_train_tab(monitor, constant):
     plm_models = constant["plm_models"]
@@ -110,6 +188,13 @@ def create_train_tab(monitor, constant):
             # Second row: Advanced training parameters
             with gr.Row(equal_height=True):
                 with gr.Column(scale=1, min_width=150):
+                    pooling_method = gr.Dropdown(
+                        choices=["mean", "attention1d", "light_attention"],
+                        label="Pooling Method",
+                        value="mean"
+                    )
+                
+                with gr.Column(scale=1, min_width=150):
                     scheduler_type = gr.Dropdown(
                         choices=["linear", "cosine", "step", None],
                         label="Scheduler Type",
@@ -174,45 +259,152 @@ def create_train_tab(monitor, constant):
         gr.Markdown("### Training Control")
         with gr.Row():
             preview_button = gr.Button("Preview Command")
-            save_args_button = gr.Button("Save Arguments")
             load_args_button = gr.Button("Load Arguments")
+            abort_button = gr.Button("Abort", variant="stop")
             train_button = gr.Button("Start", variant="primary")
         
-        # Save arguments components
-        with gr.Group(visible=False) as save_group:
-            with gr.Row():
-                with gr.Column(scale=4):
-                    save_path = gr.Textbox(
-                        label="Save Path",
-                        placeholder="Enter path to save arguments (e.g., configs/my_args.json)",
-                        lines=1
-                    )
-                with gr.Column(scale=1, min_width=100):
-                    save_confirm = gr.Button("Save", variant="primary", size="sm")
-            
-            save_status = gr.Textbox(
-                label="Status",
-                interactive=False,
-                visible=False
-            )
-        
-        command_preview = gr.Textbox(
-            label="Preview Command",
-            lines=3,
-            visible=False,
-            interactive=False
+        command_preview = gr.Code(
+            label="Command Preview",
+            language="shell",
+            interactive=False,
+            visible=False
         )
         
-        output_text = gr.Textbox(label="Training Status", lines=10)
-        progress_bar = gr.HTML(visible=True)
+        # Training Status and Plot, same height
+        with gr.Row(equal_height=True):
+            # left: training status
+            with gr.Column(scale=3):
+                output_text = gr.Textbox(
+                    label="Training Status",
+                    interactive=False,
+                    elem_id="training-status-box",
+                    show_copy_button=True,
+                    value=monitor.get_messages() or "Click Start to begin training!"
+                )
 
-        # Training function
-        def train_model(
+            # right: training plot
+            with gr.Column(scale=1):
+                plot_output = gr.Plot(
+                    label="Training Progress",
+                    elem_id="training-plot",
+                    value=monitor.get_plot() if monitor.train_losses else None
+                )
+
+        # 添加一个隐藏的更新按钮
+        update_trigger = gr.Button("Update", visible=False)
+
+        def update_status():
+            return (
+                monitor.get_messages() or "Click Start to begin training!",
+                monitor.get_plot() if monitor.train_losses else None
+            )
+
+        # 绑定更新函数到隐藏按钮
+        update_trigger.click(
+            fn=update_status,
+            outputs=[output_text, plot_output]
+        )
+
+        # 添加自动刷新的JavaScript代码
+        gr.HTML("""
+            <script>
+                function setupAutoRefresh() {
+                    const updateInterval = setInterval(function() {
+                        const updateButton = document.querySelector('button[value="Update"]');
+                        if (updateButton && updateButton.click) {
+                            updateButton.click();
+                        }
+                    }, 1000);  // 每秒更新一次
+                }
+
+                // 确保在页面完全加载后再设置自动刷新
+                if (document.readyState === 'complete') {
+                    setupAutoRefresh();
+                } else {
+                    window.addEventListener('load', setupAutoRefresh);
+                }
+            </script>
+        """)
+
+        # CSS styles for scrollbar and layout
+        gr.HTML("""
+            <style>
+                /* 设置文本框容器和文本区域的高度 */
+                #training-status-box {
+                    height: 300px !important;
+                }
+                
+                #training-status-box textarea {
+                    height: 90% !important;  /* 填充整个容器高度 */
+                    overflow-y: auto;
+                    scrollbar-width: thin;
+                    scrollbar-color: #888888 #f0f0f0;
+                    min-height: 250px;
+                }
+                
+                #training-status-box textarea::-webkit-scrollbar {
+                    width: 8px;
+                }
+                
+                #training-status-box textarea::-webkit-scrollbar-track {
+                    background: #f0f0f0;
+                    border-radius: 4px;
+                }
+                
+                #training-status-box textarea::-webkit-scrollbar-thumb {
+                    background: #888888;
+                    border-radius: 4px;
+                }
+                
+                #training-status-box textarea::-webkit-scrollbar-thumb:hover {
+                    background: #555555;
+                }
+
+                #training-plot {
+                    height: 300px;  /* 与文本框相同高度 */
+                }
+            </style>
+        """)
+
+        # define all processing functions
+        def handle_preview(*args):
+            if command_preview.visible:
+                return gr.update(visible=False)
+            
+            training_args = TrainingArgs(args, plm_models, dataset_configs)
+            preview_text = preview_command(training_args.to_dict())
+            return gr.update(value=preview_text, visible=True)
+
+        def handle_train(*args):
+            if monitor.is_training:
+                return "Training is already in progress!"
+            
+            training_args = TrainingArgs(args, plm_models, dataset_configs)
+            monitor.start_training(training_args.to_dict())
+            return "Training started! Please wait for updates..."
+
+        def handle_load_args(*args):
+            pass
+        
+        def handle_abort():
+            monitor.abort_training()
+            return "Training aborted!"
+
+        def update_wandb_visibility(checkbox):
+            return {
+                wandb_project: gr.update(visible=checkbox),
+                wandb_entity: gr.update(visible=checkbox)
+            }
+
+        # define all input components
+        input_components = [
             plm_model,
-            dataset_config,
+            dataset_config, 
             training_method,
+            pooling_method,
             batch_mode,
-            batch_value,
+            batch_size,
+            batch_token,
             learning_rate,
             num_epochs,
             max_seq_len,
@@ -228,119 +420,43 @@ def create_train_tab(monitor, constant):
             patience,
             num_workers,
             max_grad_norm
-        ):
-            if monitor.is_training:
-                return "Training is already in progress!"
+        ]
 
-            args_dict = {
-                "plm_model": plm_models[plm_model],
-                "dataset_config": dataset_configs[dataset_config],
-                "training_method": training_method,
-                "learning_rate": learning_rate,
-                "num_epochs": num_epochs,
-                "gradient_accumulation_steps": gradient_accumulation_steps,
-                "warmup_steps": warmup_steps,
-                "scheduler": scheduler_type,
-                "loss_function": loss_function,
-                "output_model_name": output_model_name,
-                "output_dir": output_dir,
-                "patience": patience,
-                "num_workers": num_workers,
-                "max_grad_norm": max_grad_norm
-            }
-
-            if batch_mode == "size":
-                args_dict["batch_size"] = batch_value
-            elif batch_mode == "token":
-                args_dict["batch_token"] = batch_value
-
-            if max_seq_len is not None and max_seq_len > 0:
-                args_dict["max_seq_len"] = max_seq_len
-            
-            if wandb_logging:
-                args_dict["wandb"] = True
-                if wandb_project:
-                    args_dict["wandb_project"] = wandb_project
-                if wandb_entity:
-                    args_dict["wandb_entity"] = wandb_entity
-
-            monitor.start_training(args_dict)
-            return "Training started! Please wait for updates..."
-
-        # Event handlers
-        def handle_preview():
-            # 如果已经显示，则隐藏
-            if command_preview.visible:
-                return gr.update(visible=False)
-            
-            # 否则显示预览
-            args = get_current_args()            
-            preview_text = preview_command(args, constant)
-            
-            # 格式化显示
-            formatted_preview = preview_text
-            return gr.update(value=formatted_preview, visible=True)
-
-
-        def handle_save():
-            args = get_current_args()
-            save_result = save_arguments(save_path.value, args)
-            # 保存后隐藏保存组件和状态
-            return [
-                save_result,
-                gr.update(visible=False)  # 隐藏save_group
-            ]
+        # bind preview and train buttons
+        preview_button.click(
+            fn=handle_preview,
+            inputs=input_components,
+            outputs=[command_preview]
+        )
         
+        train_button.click(
+            fn=handle_train, 
+            inputs=input_components,
+            outputs=[output_text]
+        )
+
+        # bind abort button
+        abort_button.click(
+            fn=handle_abort,
+            outputs=[output_text]
+        )
         
-        def update_wandb_visibility(checkbox):
-            return {
-                wandb_project: gr.update(visible=checkbox),
-                wandb_entity: gr.update(visible=checkbox)
-            }
+        wandb_logging.change(
+            fn=update_wandb_visibility,
+            inputs=[wandb_logging],
+            outputs=[wandb_project, wandb_entity]
+        )
 
-        def get_current_args():
-            return_dict = {
-                "plm_model": plm_model.value,
-                "dataset_config": dataset_config.value,
-                "training_method": training_method.value,
-                "learning_rate": learning_rate.value,
-                "num_epochs": num_epochs.value,
-                "max_seq_len": max_seq_len.value,
-                "gradient_accumulation_steps": gradient_accumulation_steps.value,
-                "warmup_steps": warmup_steps.value,
-                "scheduler_type": scheduler_type.value,
-                "loss_function": loss_function.value,
-                "output_model_name": output_model_name.value,
-                "output_dir": output_dir.value,
-                "wandb_logging": wandb_logging.value,
-                "wandb_project": wandb_project.value,
-                "wandb_entity": wandb_entity.value,
-                "patience": patience.value,
-                "num_workers": num_workers.value,
-                "max_grad_norm": max_grad_norm.value
-            }
-            if batch_mode.value == "Batch Size Mode":
-                return_dict["batch_size"] = batch_size.value
-            else:
-                return_dict["batch_token"] = batch_token.value
-            return return_dict
-
-        # Bind events
-        preview_button.click(fn=handle_preview, outputs=[command_preview])
-        save_args_button.click(fn=lambda: gr.update(visible=True), outputs=save_group)
-        save_confirm.click(fn=handle_save, outputs=[save_status])
-        wandb_logging.change(fn=update_wandb_visibility, inputs=[wandb_logging], outputs=[wandb_project, wandb_entity])
 
         # Return components that need to be accessed from outside
         return {
             "output_text": output_text,
-            "progress_bar": progress_bar,
             "train_button": train_button,
-            "train_fn": train_model,
             "components": {
                 "plm_model": plm_model,
                 "dataset_config": dataset_config,
                 "training_method": training_method,
+                "pooling_method": pooling_method,
                 "batch_mode": batch_mode,
                 "batch_size": batch_size,
                 "batch_token": batch_token,
