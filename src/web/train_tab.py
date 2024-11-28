@@ -279,31 +279,15 @@ def create_train_tab(monitor, constant):
                     interactive=False,
                     elem_id="training-status-box",
                     show_copy_button=True,
-                    value=monitor.get_messages() or "Click Start to begin training!"
                 )
 
-            # right: training plot
+            # right: training plot  
             with gr.Column(scale=1):
                 plot_output = gr.Plot(
                     label="Training Progress",
                     elem_id="training-plot",
-                    value=monitor.get_plot() if monitor.train_losses else None
                 )
 
-        # 添加一个隐藏的更新按钮
-        update_trigger = gr.Button("Update", visible=False)
-
-        def update_status():
-            return (
-                monitor.get_messages() or "Click Start to begin training!",
-                monitor.get_plot() if monitor.train_losses else None
-            )
-
-        # 绑定更新函数到隐藏按钮
-        update_trigger.click(
-            fn=update_status,
-            outputs=[output_text, plot_output]
-        )
 
         # 添加自动刷新的JavaScript代码
         gr.HTML("""
@@ -451,6 +435,7 @@ def create_train_tab(monitor, constant):
         # Return components that need to be accessed from outside
         return {
             "output_text": output_text,
+            "plot_output": plot_output,
             "train_button": train_button,
             "components": {
                 "plm_model": plm_model,

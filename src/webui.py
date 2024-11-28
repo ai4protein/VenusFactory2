@@ -13,6 +13,14 @@ def create_ui():
     monitor = TrainingMonitor()
     constant = load_constant()
     
+    def update_output():
+        if monitor.is_training:
+            messages = monitor.get_messages()
+            plot = monitor.get_plot()
+            return messages, plot
+        else:
+            return "Click Start to begin training!", None
+    
     with gr.Blocks() as demo:
         gr.Markdown("# ProFactory")
         
@@ -20,6 +28,14 @@ def create_ui():
         train_components = create_train_tab(monitor, constant)
         inference_components = create_inference_tab(constant)
         
+        demo.load(
+            fn=update_output,
+            inputs=None,
+            outputs=[
+                train_components["output_text"], 
+                train_components["plot_output"]
+            ]
+        )
 
     return demo
 
