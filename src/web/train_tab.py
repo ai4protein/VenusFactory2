@@ -259,16 +259,18 @@ def create_train_tab(monitor, constant):
         gr.Markdown("### Training Control")
         with gr.Row():
             preview_button = gr.Button("Preview Command")
-            load_args_button = gr.Button("Load Arguments")
+            refresh_button = gr.Button("Refresh",  elem_id="refresh-btn")
             abort_button = gr.Button("Abort", variant="stop")
             train_button = gr.Button("Start", variant="primary")
         
-        command_preview = gr.Code(
-            label="Command Preview",
-            language="shell",
-            interactive=False,
-            visible=False
-        )
+        
+        with gr.Row():
+            command_preview = gr.Code(
+                label="Command Preview",
+                language="shell",
+                interactive=False,
+                visible=False
+            )
         
         # Training Status and Plot, same height
         with gr.Row(equal_height=True):
@@ -288,27 +290,6 @@ def create_train_tab(monitor, constant):
                     elem_id="training-plot",
                 )
 
-
-        # 添加自动刷新的JavaScript代码
-        gr.HTML("""
-            <script>
-                function setupAutoRefresh() {
-                    const updateInterval = setInterval(function() {
-                        const updateButton = document.querySelector('button[value="Update"]');
-                        if (updateButton && updateButton.click) {
-                            updateButton.click();
-                        }
-                    }, 1000);  // 每秒更新一次
-                }
-
-                // 确保在页面完全加载后再设置自动刷新
-                if (document.readyState === 'complete') {
-                    setupAutoRefresh();
-                } else {
-                    window.addEventListener('load', setupAutoRefresh);
-                }
-            </script>
-        """)
 
         # CSS styles for scrollbar and layout
         gr.HTML("""
@@ -367,8 +348,15 @@ def create_train_tab(monitor, constant):
             monitor.start_training(training_args.to_dict())
             return "Training started! Please wait for updates..."
 
-        def handle_load_args(*args):
-            pass
+        
+        def handle_refresh():
+            if monitor.is_training:
+                messages = monitor.get_messages()
+                plot = monitor.get_plot()
+                return messages, plot
+            else:
+                return "Click Start to begin training!", None
+        
         
         def handle_abort():
             monitor.abort_training()
@@ -411,6 +399,11 @@ def create_train_tab(monitor, constant):
             fn=handle_preview,
             inputs=input_components,
             outputs=[command_preview]
+        )
+        
+        refresh_button.click(
+            fn=handle_refresh,
+            outputs=[output_text, plot_output]
         )
         
         train_button.click(

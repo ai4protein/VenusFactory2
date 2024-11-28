@@ -36,7 +36,7 @@ def create_ui():
                 train_components["plot_output"]
             ]
         )
-
+        
     return demo
 
 if __name__ == "__main__":

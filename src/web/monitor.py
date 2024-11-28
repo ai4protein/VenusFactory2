@@ -124,14 +124,16 @@ class TrainingMonitor:
                     color='#2196F3',  # 使用蓝色
                     marker='o',
                     markersize=4,
-                    linewidth=2)
+                    linewidth=2,
+                    drawstyle='default')
         if self.val_losses:
             plt.plot(self.epochs[:len(self.val_losses)], self.val_losses,
                     label='Val Loss', 
                     color='#F44336',  # 使用红色
                     marker='s',
                     markersize=4,
-                    linewidth=2)
+                    linewidth=2,
+                    drawstyle='default')
         
         plt.xlabel('Epoch', fontsize=10)
         plt.ylabel('Loss', fontsize=10)
