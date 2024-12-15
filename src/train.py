@@ -184,6 +184,7 @@ def eval_loop(args, model, plm_model, metrics_dict, dataloader, loss_function, d
 
 
 if __name__ == "__main__":
+    print("0")
     parser = argparse.ArgumentParser()
 
     # model params
@@ -236,7 +237,7 @@ if __name__ == "__main__":
     parser.add_argument('--wandb_run_name', type=str, default=None)
     
     args = parser.parse_args()
-    
+    print("0")
     # check args
     if args.batch_size is None and args.batch_token is None:
         raise ValueError("batch_size or batch_token must be provided")
@@ -326,7 +327,7 @@ if __name__ == "__main__":
         metrics_dict['loss'] = 'loss'
         metrics_monitor_strategy_dict['loss'] = 'min'
         
-    
+    print("1")
     # create checkpoint directory
     if args.output_dir is None:
         current_date = strftime("%Y%m%d", localtime())
@@ -377,7 +378,7 @@ if __name__ == "__main__":
             args.vocab_size = plm_model.config.vocab_size
     else:
         args.structure_seq = []
-    
+    print("2")
     # load adapter model
     model = AdapterModel(args)
     model.to(device)
@@ -422,7 +423,7 @@ if __name__ == "__main__":
             token_nums.append(token_num)
         return dataset, token_nums
 
-    if args.train_file is not None and args.train_file[:-4] == 'json':
+    if args.train_file is not None and args.train_file[-4:] == 'json':
         train_dataset, train_token_num = process_dataset_from_json(args.train_file)
         val_dataset, val_token_num = process_dataset_from_json(args.valid_file)
         test_dataset, test_token_num = process_dataset_from_json(args.test_file)
@@ -447,9 +448,9 @@ if __name__ == "__main__":
     print(">>> trainset: ", len(train_dataset))
     print(">>> valset: ", len(val_dataset))
     print(">>> testset: ", len(test_dataset))
-    print("---------- Smple 3 data point from trainset ----------")
+    print("---------- Sample 3 data point from trainset ----------")
     
-    for i in random.sample(range(len(train_dataset)), 2):
+    for i in random.sample(range(len(train_dataset)), 3):
         print(">>> ", train_dataset[i])
     
     def collate_fn(examples):
