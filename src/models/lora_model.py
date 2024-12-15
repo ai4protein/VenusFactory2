@@ -1,5 +1,5 @@
 """
-实现直接使用peft 库中的lora 方式进行微调模型
+use LoRA finetuning model
 """
 
 from peft import LoraConfig, get_peft_model, PeftModel
