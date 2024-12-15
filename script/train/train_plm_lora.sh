@@ -17,7 +17,7 @@ pdb_type=ESMFold
 pooling_head=mean
 plm_model=esm2_650m
 lr=5e-4
-CUDA_VISIBLE_DEVICES=0 python lora_train.py \
+python src/lora_train.py \
     --plm_model ckpt/$plm_model \
     --num_attention_heads 8 \
     --pooling_method $pooling_head \
