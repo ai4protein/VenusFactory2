@@ -33,9 +33,7 @@ def get_plm_model(plm_model):
 
 class Model(nn.Module):
     """
-    使用peft 库中的lora 方式进行微调模型
-    分为encoder 和 pooling head 两部分
-    lora 方式只对encoder 部分进行微调
+    finetuning encoder
     """
 
     def __init__(self, config) -> None:
@@ -43,7 +41,7 @@ class Model(nn.Module):
         self.config = config
 
         self.plm_model = get_plm_model(config.plm_model)
-        # print("当前模型 ", self.plm_model)
+        # print("self.plm_model ", self.plm_model)
         if "esm" in config.plm_model:
             config.hidden_size = self.plm_model.config.hidden_size
         elif "bert" in config.plm_model:
@@ -86,7 +84,7 @@ class Model(nn.Module):
                 target_modules=target_modules,
             )
         else:
-            # 冻结encoder
+            # freeze encoder
             for param in self.plm_model.parameters():
                 param.requires_grad = False
 
@@ -98,44 +96,37 @@ class Model(nn.Module):
         logits = self.classifier(embeds, attention_mask)
         return logits
 
-    def save_model(self, save_path):
-        """保存模型的 LoRA 参数和分类器参数"""
-        os.makedirs(save_path, exist_ok=True)
+    # def save_model(self, save_path):
+    #     """save LoRA and model params"""
+    #     os.makedirs(save_path, exist_ok=True)
 
-        # 保存 LoRA 参数
-        self.plm_model.save_pretrained(os.path.join(save_path, "lora_weights"))
+    #     self.plm_model.save_pretrained(os.path.join(save_path, "lora_weights"))
 
-        # 保存 classifier 参数
-        classifier_path = os.path.join(save_path, "classifier.pt")
-        if hasattr(self, "classifier"):
-            torch.save(self.classifier.state_dict(), classifier_path)
-        else:
-            # 处理使用 PPI 数据集的情况
-            pooling_path = os.path.join(save_path, "pooling.pt")
-            projection_path = os.path.join(save_path, "projection.pt")
-            torch.save(self.pooling.state_dict(), pooling_path)
-            torch.save(self.projection.state_dict(), projection_path)
+    #     classifier_path = os.path.join(save_path, "classifier.pt")
+    #     if hasattr(self, "classifier"):
+    #         torch.save(self.classifier.state_dict(), classifier_path)
+    #     else:
+    #         pooling_path = os.path.join(save_path, "pooling.pt")
+    #         projection_path = os.path.join(save_path, "projection.pt")
+    #         torch.save(self.pooling.state_dict(), pooling_path)
+    #         torch.save(self.projection.state_dict(), projection_path)
 
-    @classmethod
-    def load_model(cls, config, load_path):
-        """加载保存的模型参数"""
-        # 初始化模型
-        model = cls(config)
+    # @classmethod
+    # def load_model(cls, config, load_path):
+    #     """load model params"""
+    #     model = cls(config)
 
-        # 加载 LoRA 参数
-        model.plm_model = PeftModel.from_pretrained(
-            model.plm_model, os.path.join(load_path, "lora_weights")
-        )
+    #     model.plm_model = PeftModel.from_pretrained(
+    #         model.plm_model, os.path.join(load_path, "lora_weights")
+    #     )
+        
+    #     if hasattr(model, "classifier"):
+    #         classifier_path = os.path.join(load_path, "classifier.pt")
+    #         model.classifier.load_state_dict(torch.load(classifier_path))
+    #     else:
+    #         pooling_path = os.path.join(load_path, "pooling.pt")
+    #         projection_path = os.path.join(load_path, "projection.pt")
+    #         model.pooling.load_state_dict(torch.load(pooling_path))
+    #         model.projection.load_state_dict(torch.load(projection_path))
 
-        # 加载分类器参数  lora 的基础模型参数需要时事先加载好
-        if hasattr(model, "classifier"):
-            classifier_path = os.path.join(load_path, "classifier.pt")
-            model.classifier.load_state_dict(torch.load(classifier_path))
-        else:
-            # 处理使用 PPI 数据集的情况
-            pooling_path = os.path.join(load_path, "pooling.pt")
-            projection_path = os.path.join(load_path, "projection.pt")
-            model.pooling.load_state_dict(torch.load(pooling_path))
-            model.projection.load_state_dict(torch.load(projection_path))
-
-        return model
+    #     return model
