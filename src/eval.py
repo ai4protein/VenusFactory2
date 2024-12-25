@@ -1,3 +1,6 @@
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 import argparse
 import torch
 import re
@@ -65,7 +68,7 @@ if __name__ == '__main__':
     parser.add_argument('--attention_probs_dropout_prob', type=float, default=0, help='attention probs dropout prob')
     parser.add_argument('--plm_model', type=str, default='facebook/esm2_t33_650M_UR50D', help='esm model name')
     parser.add_argument('--num_labels', type=int, default=2, help='number of labels')
-    parser.add_argument('--pooling_method', type=str, default='attention1d', help='pooling method')
+    parser.add_argument('--pooling_method', type=str, default='mean', help='pooling method')
     parser.add_argument('--pooling_dropout', type=float, default=0.25, help='pooling dropout')
     
     # dataset
@@ -87,7 +90,7 @@ if __name__ == '__main__':
     parser.add_argument('--output_root', default="result", help='root directory to save trained models')
     parser.add_argument('--output_dir', default=None, help='directory to save trained models')
     parser.add_argument('--model_path', default=None, help='model path directly')
-    
+    parser.add_argument('--structure_seq', type=str, default=None, help='structure sequence')
     args = parser.parse_args()
     
     device = "cuda" if torch.cuda.is_available() else "cpu"

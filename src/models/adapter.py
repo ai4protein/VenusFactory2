@@ -3,8 +3,8 @@ import gc
 import torch.nn as nn
 import torch.nn.functional as F
 from typing import Tuple
-from src.models.pooling import Attention1dPoolingHead, MeanPoolingHead, LightAttentionPoolingHead
-from src.models.pooling import MeanPooling, MeanPoolingProjection
+from .pooling import Attention1dPoolingHead, MeanPoolingHead, LightAttentionPoolingHead
+from .pooling import MeanPooling, MeanPoolingProjection
 
 def rotate_half(x):
     x1, x2 = x.chunk(2, dim=-1)

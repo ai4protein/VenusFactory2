@@ -6,14 +6,15 @@ import sys
 from functools import partial
 
 def create_inference_tab(constant):
+    plm_models = constant["plm_models"]
     dataset_configs = constant["dataset_configs"]
     is_evaluating = False
-
+    plm_models = constant["plm_models"]
     def format_metrics(metrics):
         """Format metrics dictionary into a readable string."""
         return "\n".join([f"{k}: {v:.4f}" for k, v in metrics.items()])
 
-    def evaluate_model(plm_model, model_path, dataset, batch_size, progress=gr.Progress()):
+    def evaluate_model(plm_model, model_path, dataset, batch_size, eval_structure_seq, pooling_method, progress=gr.Progress()):
         nonlocal is_evaluating
         
         if is_evaluating:
@@ -45,17 +46,19 @@ def create_inference_tab(constant):
             # Prepare command
             cmd = [sys.executable, "src/eval.py"]
             args_dict = {
+                "model_path": model_path,
                 "test_file": dataset_config["dataset"],
-                "pdb_type": dataset_config["pdb_type"],
                 "problem_type": dataset_config["problem_type"],
                 "num_labels": dataset_config["num_labels"],
                 "metrics": dataset_config["metrics"],
                 "batch_size": batch_size,
-                "test_file": config_path,
-                "plm_model": plm_model,
+                "plm_model": plm_models[plm_model],
                 "test_result_dir": test_result_dir,
+                "structure_seq": eval_structure_seq,
+                "dataset": dataset,
+                "pooling_method": pooling_method
             }
-
+            
             for k, v in args_dict.items():
                 if v is True:
                     cmd.append(f"--{k}")
@@ -65,8 +68,17 @@ def create_inference_tab(constant):
 
             yield "Running evaluation..."
             progress(0.3)
-            
-            result = subprocess.run(cmd, capture_output=True, text=True)
+            # 获取当前脚本所在目录
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            progress(0.4)
+            # 获取 ProFactory 根目录，假设它在当前目录的上一级
+            pro_factory_dir = os.path.abspath(os.path.join(current_dir, '..', '..'))
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                cwd=pro_factory_dir
+            )
             progress(0.7)
             yield "Processing results..."
 
@@ -85,7 +97,7 @@ def create_inference_tab(constant):
                 yield f"Evaluation completed successfully!\n\nMetrics:\n{format_metrics(metrics)}"
             else:
                 is_evaluating = False
-                yield f"Evaluation failed:\n{result.stderr}"
+                yield f"Evaluation failed:\n{result.stderr}\n{result.stdout}"
 
         except Exception as e:
             is_evaluating = False
@@ -104,21 +116,37 @@ def create_inference_tab(constant):
                     label="Evaluation Dataset"
                 )
             with gr.Column():
-                eval_batch_size = gr.Slider(
-                    minimum=1,
-                    maximum=128,
-                    value=32,
-                    step=1,
-                    label="Evaluation Batch Size"
+                with gr.Row():
+                    eval_batch_size = gr.Slider(
+                        minimum=1,
+                        maximum=128,
+                        value=32,
+                        step=1,
+                        label="Evaluation Batch Size"
+                    )
+                with gr.Row():
+                    # 默认foldseek_seq,ss8_seq
+                    eval_structure_seq = gr.Textbox(label="Structure Sequence", placeholder="foldseek_seq,ss8_seq")
+        with gr.Row():
+            with gr.Column():
+                eval_plm_model = gr.Dropdown(
+                    choices=list(plm_models.keys()),
+                    label="Protein Language Model",
                 )
-                
+            with gr.Column():
+                eval_pooling_method = gr.Dropdown(
+                    choices=["mean", "attention1d", "light_attention"],
+                    label="Pooling Method",
+                )
+            
+
         eval_button = gr.Button("Start Evaluation")
         eval_output = gr.Textbox(label="Evaluation Results", lines=10)
 
         # Bind evaluation event
         eval_button.click(
             fn=evaluate_model,
-            inputs=[eval_model_path, eval_dataset, eval_batch_size],
+            inputs=[eval_plm_model, eval_model_path, eval_dataset, eval_batch_size, eval_structure_seq, eval_pooling_method],
             outputs=eval_output,
             queue=True  # Enable queuing for generators
         )

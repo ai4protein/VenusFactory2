@@ -44,11 +44,13 @@ class TrainingArgs:
         self.patience = args[19]
         self.num_workers = args[20]
         self.max_grad_norm = args[21]
+        self.structure_seq = args[22]
 
     def to_dict(self) -> Dict[str, Any]:
         args_dict = {
             "plm_model": self.plm_model,
             "dataset_config": self.dataset_config,
+            "structure_seq": self.structure_seq,
             "training_method": self.training_method,
             "pooling_method": self.pooling_method,
             "learning_rate": self.learning_rate,
@@ -103,6 +105,8 @@ def create_train_tab(monitor, constant):
                         label="Dataset Configuration",
                         value=list(dataset_configs.keys())[0]
                     )
+            with gr.Row():
+                structure_seq = gr.Textbox(label="Structure Sequence", placeholder="foldseek_seq,ss8_seq", value="foldseek_seq,ss8_seq")
 
         # Batch Processing Configuration
         gr.Markdown("### Batch Processing Configuration")
@@ -391,7 +395,8 @@ def create_train_tab(monitor, constant):
             wandb_entity,
             patience,
             num_workers,
-            max_grad_norm
+            max_grad_norm,
+            structure_seq
         ]
 
         # bind preview and train buttons
@@ -452,6 +457,7 @@ def create_train_tab(monitor, constant):
                 "wandb_entity": wandb_entity,
                 "patience": patience,
                 "num_workers": num_workers,
-                "max_grad_norm": max_grad_norm
+                "max_grad_norm": max_grad_norm,
+                "structure_seq": structure_seq
             }
         }

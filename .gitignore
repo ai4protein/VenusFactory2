@@ -166,3 +166,4 @@ ckpt/
 script_dev/
 .gradio/
 configs/
+result/
