@@ -51,6 +51,7 @@
         "MetalIonBinding_AlphaFold2": "data/MetalIonBinding/MetalIonBinding_AlphaFold2_HF.json",
         "MetalIonBinding_ESMFold": "data/MetalIonBinding/MetalIonBinding_ESMFold_HF",
         "Thermostability_AlphaFold2": "data/Thermostability/Thermostability_AlphaFold2_HF.json",
-        "Thermostability_ESMFold": "data/Thermostability/Thermostability_ESMFold_HF.json"
+        "Thermostability_ESMFold": "data/Thermostability/Thermostability_ESMFold_HF.json",
+        "PaCRISPR": "data/PaCRISPR/PaCRISPR.json"
     }
 }
