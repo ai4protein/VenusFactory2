@@ -1,3 +1,6 @@
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 import argparse
 import torch
 import re
@@ -65,17 +68,19 @@ if __name__ == '__main__':
     parser.add_argument('--attention_probs_dropout_prob', type=float, default=0, help='attention probs dropout prob')
     parser.add_argument('--plm_model', type=str, default='facebook/esm2_t33_650M_UR50D', help='esm model name')
     parser.add_argument('--num_labels', type=int, default=2, help='number of labels')
-    parser.add_argument('--pooling_method', type=str, default='attention1d', help='pooling method')
+    parser.add_argument('--pooling_method', type=str, default='mean', help='pooling method')
     parser.add_argument('--pooling_dropout', type=float, default=0.25, help='pooling dropout')
     
     # dataset
     parser.add_argument('--dataset', type=str, default=None, help='dataset name')
     parser.add_argument('--problem_type', type=str, default=None, help='problem type')
     parser.add_argument('--test_file', type=str, default=None, help='test file')
+    parser.add_argument('--split', type=str, default=None, help='split name in Huggingface')
     parser.add_argument('--test_result_dir', type=str, default=None, help='test result directory')
     parser.add_argument('--metrics', type=str, default=None, help='computation metrics')
     parser.add_argument('--num_workers', type=int, default=4, help='number of workers')
     parser.add_argument('--max_seq_len', type=int, default=None, help='max sequence length')
+    parser.add_argument('--batch_size', type=int, default=None, help='batch size for fixed batch size')
     parser.add_argument('--batch_token', type=int, default=10000, help='max number of token per batch')
     parser.add_argument('--use_foldseek', action='store_true', help='use foldseek')
     parser.add_argument('--use_ss8', action='store_true', help='use ss8')
@@ -84,7 +89,8 @@ if __name__ == '__main__':
     parser.add_argument('--output_model_name', type=str, default=None, help='model name')
     parser.add_argument('--output_root', default="result", help='root directory to save trained models')
     parser.add_argument('--output_dir', default=None, help='directory to save trained models')
-    
+    parser.add_argument('--model_path', default=None, help='model path directly')
+    parser.add_argument('--structure_seq', type=str, default=None, help='structure sequence')
     args = parser.parse_args()
     
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -165,7 +171,10 @@ if __name__ == '__main__':
     # load adapter model
     print("---------- Load Model ----------")
     model = AdapterModel(args)
-    model_path = f"{args.output_root}/{args.output_dir}/{args.output_model_name}"
+    if args.model_path is not None:
+        model_path = args.model_path
+    else:
+        model_path = f"{args.output_root}/{args.output_dir}/{args.output_model_name}"
     model.load_state_dict(torch.load(model_path))
     model.to(device).eval()
 
@@ -177,7 +186,7 @@ if __name__ == '__main__':
         else:
             return "Number of parameter: %.2fM" % (num_M)
     print(param_num(model))
-     
+    
     def collate_fn(examples):
         aa_seqs, labels = [], []
         if args.use_foldseek:
@@ -288,13 +297,43 @@ if __name__ == '__main__':
         test_dataset, test_token_num = process_dataset_from_list(load_dataset("csv", data_files=args.test_file)['train'])
         if args.test_result_dir:
             test_result_df = pd.read_csv(args.test_file)
+    elif '/' in args.test_file:  # Huggingface dataset (only csv now)
+        raw_dataset = load_dataset(args.test_file)
+        # 如果指定了split，优先使用指定的split
+        if args.split and args.split in raw_dataset:
+            split = args.split
+        elif 'test' in raw_dataset:
+            split = 'test'
+        elif 'validation' in raw_dataset:
+            split = 'validation'
+        elif 'train' in raw_dataset:
+            split = 'train'
+        else:
+            split = list(raw_dataset.keys())[0]
+        
+        test_dataset, test_token_num = process_dataset_from_list(raw_dataset[split])
+        if args.test_result_dir:
+            test_result_df = pd.DataFrame(raw_dataset[split])
     else:
         raise ValueError("Invalid file format")
     
-        
-    test_loader = DataLoader(
-        test_dataset, num_workers=args.num_workers, collate_fn=collate_fn,
-        batch_sampler=BatchSampler(test_token_num, args.batch_token, False)
+    
+    if args.batch_size is None:
+        if args.batch_token is None:
+            raise ValueError("batch_size or batch_token must be specified")
+        test_loader = DataLoader(
+            test_dataset, 
+            num_workers=args.num_workers, 
+            collate_fn=collate_fn,
+            batch_sampler=BatchSampler(test_token_num, args.batch_token, False)
+        )
+    else:
+        test_loader = DataLoader(
+            test_dataset,
+            batch_size=args.batch_size,
+            num_workers=args.num_workers,
+            collate_fn=collate_fn,
+            shuffle=False
         )
 
     print("---------- Start Eval ----------")
