@@ -167,3 +167,9 @@ script_dev/
 .gradio/
 configs/
 result/
+
+# ignore all files in src/data/weight except .keep
+src/data/weight/
+!src/data/weight/.keep
+
+tmp_db/

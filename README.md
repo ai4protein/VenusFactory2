@@ -1,8 +1,8 @@
-![# ProFactory](img/banner.png)
+![# VenusFactory](img/banner.png)
 
 Recent News:
 
-- Welcome to ProFactory!
+- Welcome to VenusFactory!
 
 ## ✏️ Table of Contents
 
