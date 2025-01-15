@@ -33,6 +33,7 @@ if __name__ == "__main__":
     parser.add_argument("--pdb_file", type=str, default=None)
     parser.add_argument("--out_dir", type=str, default='dataset/sesadapter/DeepET')
     parser.add_argument("--merge_into", type=str, default='csv', choices=['json', 'csv'])
+    parser.add_argument("--save_intermediate", action='store_true')
     args = parser.parse_args()
 
     device = "cuda:0"
@@ -73,4 +74,12 @@ if __name__ == "__main__":
             # merge the three dataframes by the 'name' column
             df = pd.merge(ss_df, fs_df, on='name', how='inner')
             df = pd.merge(df, esm3_df, on='name', how='inner')
+            # sort by name
+            df = df.sort_values(by='name')
             df.to_csv(os.path.join(args.out_dir, f"{dir_name}.csv"), index=False)
+            
+            if not args.save_intermediate:
+                # remove intermediate files
+                os.remove(ss_json)
+                os.remove(esm3_json)
+                os.remove(fs_json)

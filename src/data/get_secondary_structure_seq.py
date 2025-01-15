@@ -4,6 +4,7 @@ sys.path.append(os.getcwd())
 import argparse
 import json
 import pandas as pd
+import biotite.structure.io as bsio
 from tqdm import tqdm
 from Bio import PDB
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -34,6 +35,10 @@ def get_secondary_structure_seq(pdb_file):
     except Exception as e:
         return pdb_file, e
 
+    # get pLDDT from pdb file
+    struct = bsio.load_structure(pdb_file, extra_fields=["b_factor"])
+    plddt = struct.b_factor.mean()
+    
     sec_structure_str_8 = ''.join(sec_structures)
     sec_structure_str_8 = sec_structure_str_8.replace('-', 'L')
     if len(aa_seq) != len(sec_structure_str_8):
@@ -42,11 +47,11 @@ def get_secondary_structure_seq(pdb_file):
     sec_structure_str_3 = ''.join([ss_alphabet_dic[ss] for ss in sec_structures])
     
     final_dict = {}
-    final_dict["name"] = pdb_file.split('/')[-1]
+    final_dict["name"] = pdb_file.split('/')[-1].split('.')[0]
     final_dict["aa_seq"] = aa_seq
     final_dict["ss8_seq"] = sec_structure_str_8
     final_dict["ss3_seq"] = sec_structure_str_3
-
+    final_dict["plddt"] = plddt
     return final_dict, None
 
 if __name__ == '__main__':

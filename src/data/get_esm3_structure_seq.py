@@ -41,7 +41,6 @@ def get_esm3_structure_seq(pdb_file, encoder, device="cuda:0"):
 
     # By Default, ProteinChain takes first one
     chain = ProteinChain.from_pdb(pdb_file, chain_id=chain_ids[0])
-    sequence = chain.sequence
 
     # Encoder
     coords, plddt, residue_index = chain.to_structure_encoder_inputs()
@@ -50,7 +49,7 @@ def get_esm3_structure_seq(pdb_file, encoder, device="cuda:0"):
     residue_index = residue_index.to(device)
     _, structure_tokens = encoder.encode(coords, residue_index=residue_index)
     
-    result = {'name': pdb_file.split('/')[-1], 'aa_seq':sequence, 'esm3_structure_seq':structure_tokens.cpu().numpy().tolist()[0]}
+    result = {'name': pdb_file.split('/')[-1].split('.')[0], 'esm3_structure_seq':structure_tokens.cpu().numpy().tolist()[0]}
     return result
 
 if __name__ == "__main__":

@@ -21,7 +21,7 @@ def get_foldseek_structure_seq(pdb_dir, rm_tmp=True):
             if line.startswith(">"):
                 name = line.split()[0][1:]
                 seq = next(f).strip()
-                results.append({"name":name+'.pdb', "foldseek_seq":seq})
+                results.append({"name":name.split('.')[0], "foldseek_seq":seq})
     
     if rm_tmp:
         os.system("rm -rf tmp_db")
