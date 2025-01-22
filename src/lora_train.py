@@ -41,7 +41,7 @@ from transformers import T5Tokenizer, T5EncoderModel, AutoTokenizer
 from src.utils.data_utils import BatchSampler
 from src.models.adapter import AdapterModel
 from src.utils.metrics import MultilabelF1Max
-from src.utils.loss_fn import MultiClassFocalLossWithAlpha
+from src.utils.loss_function import MultiClassFocalLossWithAlpha
 
 # from src.data.get_esm3_structure_seq import VQVAE_SPECIAL_TOKENS
 from src.models.lora_model import Model
@@ -50,63 +50,6 @@ from src.models.lora_model import Model
 logging.set_verbosity_error()
 warnings.filterwarnings("ignore")
 os.environ["CUDA_LAUNCH_BLOCKING"] = "1"
-
-# DATASET_TO_NUM_LABELS = {
-#     "DeepLocBinary": 2, "DeepLocMulti": 10,
-#     "DeepSol": 2, "DeepSoluE": 2,
-#     "MetalIonBinding": 2, "Thermostability": 1,
-#     "EC": 585,
-#     "BP": 1943, "CC": 320, "MF": 489,
-# }
-# DATASET_TO_TASK = {
-#     "DeepLocBinary": "single_label_classification",
-#     "DeepLocMulti": "single_label_classification",
-#     "DeepSol": "single_label_classification",
-#     "DeepSoluE": "single_label_classification",
-#     "MetalIonBinding": "single_label_classification",
-#     "Thermostability": "regression",
-#     "EC": "multi_label_classification",
-#     "BP": "multi_label_classification",
-#     "CC": "multi_label_classification",
-#     "MF": "multi_label_classification",
-# }
-# # valid and test metrics
-# DATASET_TO_METRICS = {
-#     "DeepLocBinary": ("accuracy", Accuracy(task="multiclass", num_classes=DATASET_TO_NUM_LABELS["DeepLocBinary"])),
-#     "DeepLocMulti": ("accuracy", Accuracy(task="multiclass", num_classes=DATASET_TO_NUM_LABELS["DeepLocMulti"])),
-#     "DeepSol": ("accuracy", Accuracy(task="multiclass", num_classes=DATASET_TO_NUM_LABELS["DeepSol"])),
-#     "DeepSoluE": ("accuracy", Accuracy(task="multiclass", num_classes=DATASET_TO_NUM_LABELS["DeepSoluE"])),
-#     "MetalIonBinding": ("accuracy", Accuracy(task="multiclass", num_classes=DATASET_TO_NUM_LABELS["MetalIonBinding"])),
-#     "Thermostability": ("spearman_corr", SpearmanCorrCoef()),
-#     "EC": ("f1_max", MultilabelF1Max(num_labels=DATASET_TO_NUM_LABELS["EC"])),
-#     "BP": ("f1_max", MultilabelF1Max(num_labels=DATASET_TO_NUM_LABELS["BP"])),
-#     "CC": ("f1_max", MultilabelF1Max(num_labels=DATASET_TO_NUM_LABELS["CC"])),
-#     "MF": ("f1_max", MultilabelF1Max(num_labels=DATASET_TO_NUM_LABELS["MF"])),
-# }
-# DATASET_TO_MONITOR = {
-#     "DeepLocBinary": "accuracy",
-#     "DeepLocMulti": "accuracy",
-#     "DeepSol": "accuracy",
-#     "DeepSoluE": "accuracy",
-#     "MetalIonBinding": "accuracy",
-#     "Thermostability": "spearman_corr",
-#     "EC": "f1_max",
-#     "BP": "f1_max",
-#     "CC": "f1_max",
-#     "MF": "f1_max",
-# }
-# DATASET_TO_NORMALIZE = {
-#     "DeepLocBinary": None,
-#     "DeepLocMulti": None,
-#     "DeepSol": None,
-#     "DeepSoluE": None,
-#     "MetalIonBinding": None,
-#     "Thermostability": "min_max",
-#     "EC": None,
-#     "BP": None,
-#     "CC": None,
-#     "MF": None,
-# }
 
 
 def min_max_normalize_dataset(train_dataset, val_dataset, test_dataset):
@@ -121,18 +64,9 @@ def min_max_normalize_dataset(train_dataset, val_dataset, test_dataset):
     return train_dataset, val_dataset, test_dataset
 
 
-def train(
-    args,
-    model,
-    accelerator,
-    metrics_dict,
-    train_loader,
-    val_loader,
-    test_loader,
-    loss_fn,
-    optimizer,
-    device,
-):
+def train(args, model, accelerator, metrics_dict, 
+          train_loader, val_loader, test_loader, loss_fn, 
+          optimizer, device):
     best_val_loss, best_val_metric_score = float("inf"), -float("inf")
     val_loss_list, val_metric_list = [], []
     path = os.path.join(args.ckpt_dir, args.model_name)

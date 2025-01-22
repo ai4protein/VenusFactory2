@@ -1,5 +1,4 @@
 import torch
-import esm
 import os
 import gc
 import argparse

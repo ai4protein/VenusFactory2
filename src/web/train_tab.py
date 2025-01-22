@@ -106,7 +106,13 @@ def create_train_tab(monitor, constant):
                         value=list(dataset_configs.keys())[0]
                     )
             with gr.Row():
-                structure_seq = gr.Textbox(label="Structure Sequence", placeholder="foldseek_seq,ss8_seq", value="foldseek_seq,ss8_seq")
+                with gr.Column():
+                    structure_seq = gr.Textbox(
+                        label="Structure Sequence", 
+                        placeholder="foldseek_seq,ss8_seq", 
+                        value="foldseek_seq,ss8_seq",
+                        visible=False
+                    )
 
         # Batch Processing Configuration
         gr.Markdown("### Batch Processing Configuration")
@@ -188,6 +194,18 @@ def create_train_tab(monitor, constant):
                         minimum=-1, maximum=2048, value=None, step=32,
                         label="Max Sequence Length (-1 for unlimited)"
                     )
+            
+            def update_training_method(method):
+                return {
+                    structure_seq: gr.update(visible=method == "ses-adapter")
+                }
+
+            # 添加training_method的change事件
+            training_method.change(
+                fn=update_training_method,
+                inputs=[training_method],
+                outputs=[structure_seq]
+            )
 
             # Second row: Advanced training parameters
             with gr.Row(equal_height=True):
