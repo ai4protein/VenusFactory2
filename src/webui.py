@@ -22,7 +22,7 @@ def create_ui():
             return "Click Start to begin training!", None
     
     with gr.Blocks() as demo:
-        gr.Markdown("# ProFactory")
+        gr.Markdown("# VenusFactory")
         
         # Create tabs
         train_components = create_train_tab(monitor, constant)

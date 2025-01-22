@@ -233,7 +233,7 @@ if __name__ == "__main__":
     # wandb log
     parser.add_argument('--wandb', action='store_true', help='use wandb to log')
     parser.add_argument('--wandb_entity', type=str, default=None, help='wandb entity')
-    parser.add_argument('--wandb_project', type=str, default='ProFactory')
+    parser.add_argument('--wandb_project', type=str, default='VenusFactory')
     parser.add_argument('--wandb_run_name', type=str, default=None)
     
     args = parser.parse_args()
@@ -339,7 +339,7 @@ if __name__ == "__main__":
     # init wandb
     if args.wandb:
         if args.wandb_run_name is None:
-            args.wandb_run_name = f"ProFactory-{args.dataset}"
+            args.wandb_run_name = f"VenusFactory-{args.dataset}"
         if args.output_model_name is None:
             args.output_model_name = f"{args.wandb_run_name}.pt"
         

@@ -71,7 +71,7 @@ def create_inference_tab(constant):
             # 获取当前脚本所在目录
             current_dir = os.path.dirname(os.path.abspath(__file__))
             progress(0.4)
-            # 获取 ProFactory 根目录，假设它在当前目录的上一级
+            # 获取 VenusFactory 根目录，假设它在当前目录的上一级
             pro_factory_dir = os.path.abspath(os.path.join(current_dir, '..', '..'))
             result = subprocess.run(
                 cmd,
