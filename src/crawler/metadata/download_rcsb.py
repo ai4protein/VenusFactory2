@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 def get_metadata_from_rcsb(pdb):
-    template_file_path = "src/crawler/metadata/rcsb_query_template.txt"
+    template_file_path = "download/rcsb_query_template.txt"
     with open(template_file_path, 'r') as file:
         query_template = file.read()
     
