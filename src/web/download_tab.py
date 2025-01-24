@@ -183,7 +183,7 @@ def create_download_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         
         
         def load_help_text():
-            help_path = os.path.join(os.path.dirname(__file__), "download_help.md")
+            help_path = os.path.join("download", "README.md")
             with open(help_path, 'r') as f:
                 return f.read()
         
