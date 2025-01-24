@@ -4,6 +4,7 @@ import gradio as gr
 from web.monitor import TrainingMonitor
 from web.train_tab import create_train_tab
 from web.eval_tab import create_inference_tab
+from web.download_tab import create_download_tab
 
 def load_constant():
     """Load constant values from config files"""
@@ -25,8 +26,10 @@ def create_ui():
         gr.Markdown("# VenusFactory")
         
         # Create tabs
-        train_components = create_train_tab(monitor, constant)
-        inference_components = create_inference_tab(constant)
+        with gr.Tabs():
+            train_components = create_train_tab(monitor, constant)
+            inference_components = create_inference_tab(constant)
+            download_components = create_download_tab(constant)
         
         demo.load(
             fn=update_output,

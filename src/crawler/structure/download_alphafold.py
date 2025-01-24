@@ -41,43 +41,55 @@ def download(pdb, outdir):
     return message
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Download files from RCSB.')
-    parser.add_argument('-f', '--uniprot_id_file', type=str, required=True, help='Input file containing a list of PDB ids')
+    parser = argparse.ArgumentParser(description='Download files from AlphaFold.')
+    parser.add_argument('-i', '--uniprot_id', help='Single UniProt ID to download')
+    parser.add_argument('-f', '--uniprot_id_file', type=str, help='Input file containing a list of UniProt ids')
     parser.add_argument('-o', '--out_dir', type=str, default='.', help='Output directory')
     parser.add_argument('-e', '--error_file', type=str, default=None, help='File to store names of proteins that failed to download')
-    parser.add_argument('-i', '--index_level', type=int, default=0, help='Build an index of the downloaded files')
+    parser.add_argument('-l', '--index_level', type=int, default=0, help='Build an index of the downloaded files')
     parser.add_argument('-n', '--num_workers', type=int, default=12, help='Number of workers to use for downloading')
     args = parser.parse_args()
+
+    if not args.uniprot_id and not args.uniprot_id_file:
+        print("Error: Must provide either uniprot_id or uniprot_id_file")
+        exit(1)
 
     BASE_URL = "https://alphafold.ebi.ac.uk/files/AF-"
     error_proteins = []
     error_messages = []
 
-    pdbs = open(args.uniprot_id_file, 'r').read().splitlines()
-    
-    def download_pdb(pdb, args):
+    def download_af_structure(uniprot_id, args):
         out_dir = args.out_dir
         for index in range(args.index_level):
-            index_dir_name = "".join(list(pdb)[:index + 1])
+            index_dir_name = "".join(list(uniprot_id)[:index + 1])
             out_dir = os.path.join(out_dir, index_dir_name)
         os.makedirs(out_dir, exist_ok=True)
-        message = download(pdb, out_dir)
-        return pdb, message
-    
-    
-    with ThreadPoolExecutor(max_workers=args.num_workers) as executor:
-        future_to_pdb = {executor.submit(download_pdb, pdb, args): pdb for pdb in pdbs}
+        message = download(uniprot_id, out_dir)
+        return uniprot_id, message
 
-        with tqdm(total=len(pdbs), desc="Downloading Files") as bar:
-            for future in as_completed(future_to_pdb):
-                pdb, message = future.result()
-                bar.set_description(message)
-                if "failed" in message:
-                    error_proteins.append(pdb)
-                    error_messages.append(message)
-                bar.update(1)
+    if args.uniprot_id:
+        uniprot_id, message = download_af_structure(args.uniprot_id, args)
+        print(message)
+        if "failed" in message:
+            error_proteins.append(uniprot_id)
+            error_messages.append(message)
+    
+    elif args.uniprot_id_file:
+        pdbs = open(args.uniprot_id_file, 'r').read().splitlines()
+        
+        with ThreadPoolExecutor(max_workers=args.num_workers) as executor:
+            future_to_pdb = {executor.submit(download_af_structure, pdb, args): pdb for pdb in pdbs}
 
-    if args.error_file:
+            with tqdm(total=len(pdbs), desc="Downloading Files") as bar:
+                for future in as_completed(future_to_pdb):
+                    pdb, message = future.result()
+                    bar.set_description(message)
+                    if "failed" in message:
+                        error_proteins.append(pdb)
+                        error_messages.append(message)
+                    bar.update(1)
+
+    if args.error_file and error_proteins:
         error_dict = {"protein": error_proteins, "error": error_messages}
         error_dir = os.path.dirname(args.error_file)
         os.makedirs(error_dir, exist_ok=True)
