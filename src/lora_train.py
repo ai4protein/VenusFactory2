@@ -39,7 +39,7 @@ from datasets import load_dataset
 from transformers import EsmTokenizer, EsmModel, BertModel, BertTokenizer
 from transformers import T5Tokenizer, T5EncoderModel, AutoTokenizer
 from src.utils.data_utils import BatchSampler
-from src.models.adapter import AdapterModel
+from models.adapter_mdoel import AdapterModel
 from src.utils.metrics import MultilabelF1Max
 from src.utils.loss_function import MultiClassFocalLossWithAlpha
 

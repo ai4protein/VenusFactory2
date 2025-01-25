@@ -20,7 +20,7 @@ from datasets import load_dataset
 from torch.utils.data import DataLoader
 from utils.data_utils import BatchSampler
 from utils.metrics import MultilabelF1Max
-from models.adapter import AdapterModel
+from models.adapter_mdoel import AdapterModel
 
 # ignore warning information
 logging.set_verbosity_error()
