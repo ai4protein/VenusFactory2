@@ -18,8 +18,22 @@ class Trainer:
         # Setup metrics
         self.metrics_dict, self.metrics_monitor_strategy_dict = setup_metrics(args)
         
-        # Setup optimizer
-        self.optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
+        # Setup optimizer with different learning rates
+        if self.args.training_method == 'full':
+            # Use a smaller learning rate for PLM
+            optimizer_grouped_parameters = [
+                {
+                    "params": self.model.parameters(),
+                    "lr": args.learning_rate
+                },
+                {
+                    "params": self.plm_model.parameters(),
+                    "lr": args.learning_rate
+                }
+            ]
+            self.optimizer = torch.optim.AdamW(optimizer_grouped_parameters)
+        else:
+            self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=args.learning_rate)
         
         # Setup accelerator
         self.accelerator = Accelerator(gradient_accumulation_steps=args.gradient_accumulation_steps)
@@ -31,7 +45,12 @@ class Trainer:
         self.loss_fn = self._setup_loss_function()
         
         # Prepare for distributed training
-        self.model, self.optimizer = self.accelerator.prepare(self.model, self.optimizer)
+        if self.args.training_method == 'full':
+            self.model, self.plm_model, self.optimizer = self.accelerator.prepare(
+                self.model, self.plm_model, self.optimizer
+            )
+        else:
+            self.model, self.optimizer = self.accelerator.prepare(self.model, self.optimizer)
         if self.scheduler:
             self.scheduler = self.accelerator.prepare(self.scheduler)
             
@@ -77,10 +96,16 @@ class Trainer:
         epoch_iterator = tqdm(train_loader, desc="Training")
         
         for batch in epoch_iterator:
-            with self.accelerator.accumulate(self.model):
-                loss = self._training_step(batch)
-                total_loss += loss.item() * len(batch["label"])
-                epoch_iterator.set_postfix(train_loss=loss.item())
+            if self.args.training_method == 'full':
+                with self.accelerator.accumulate(self.model, self.plm_model):
+                    loss = self._training_step(batch)
+                    total_loss += loss.item() * len(batch["label"])
+                    epoch_iterator.set_postfix(train_loss=loss.item())
+            else:
+                with self.accelerator.accumulate(self.model):
+                    loss = self._training_step(batch)
+                    total_loss += loss.item() * len(batch["label"])
+                    epoch_iterator.set_postfix(train_loss=loss.item())
                 
         return total_loss / len(train_loader.dataset)
     

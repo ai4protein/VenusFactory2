@@ -143,9 +143,13 @@ class AdapterModel(nn.Module):
         else:
             raise ValueError(f"classifier method {config.pooling_method} not supported")
     
-    @torch.no_grad()
     def plm_embedding(self, plm_model, aa_seq, attention_mask):
-        outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask)
+        if self.training and hasattr(self, 'config') and self.config.training_method == 'full':
+            outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask)
+        else:
+            with torch.no_grad():
+                outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask)
+        
         seq_embeds = outputs.last_hidden_state
         gc.collect()
         torch.cuda.empty_cache()
