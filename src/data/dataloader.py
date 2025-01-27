@@ -4,7 +4,7 @@ import datasets
 from torch.utils.data import DataLoader
 from .collator import Collator
 from .batch_sampler import BatchSampler
-from .norm import min_max_normalize_dataset
+from .norm import normalize_dataset
 from torch.utils.data import Dataset
 from typing import Dict, Any, List, Union
 import pandas as pd
@@ -16,8 +16,8 @@ def prepare_dataloaders(args):
     val_dataset = ProteinDataset(datasets.load_dataset(args.dataset)['validation'], args)
     test_dataset = ProteinDataset(datasets.load_dataset(args.dataset)['test'], args)
     
-    if args.normalize == 'min_max':
-        train_dataset, val_dataset, test_dataset = min_max_normalize_dataset(train_dataset, val_dataset, test_dataset)
+    if args.normalize is not None:
+        train_dataset, val_dataset, test_dataset = normalize_dataset(train_dataset, val_dataset, test_dataset, args.normalize)
     
     collator = Collator(
         tokenizer=args.tokenizer,
@@ -30,7 +30,10 @@ def prepare_dataloaders(args):
     # Common dataloader parameters
     dataloader_params = {
         'num_workers': args.num_workers,
-        'collate_fn': collator
+        'collate_fn': collator,
+        'pin_memory': True,
+        'persistent_workers': True if args.num_workers > 0 else False,
+        'prefetch_factor': 2,
     }
     
     # Create dataloaders based on batching strategy
