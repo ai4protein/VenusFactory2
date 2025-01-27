@@ -93,21 +93,49 @@ class Trainer:
             self.plm_model.train()
             
         total_loss = 0
+        total_samples = 0
         epoch_iterator = tqdm(train_loader, desc="Training")
         
         for batch in epoch_iterator:
-            if self.args.training_method == 'full':
-                with self.accelerator.accumulate(self.model, self.plm_model):
-                    loss = self._training_step(batch)
-                    total_loss += loss.item() * len(batch["label"])
-                    epoch_iterator.set_postfix(train_loss=loss.item())
-            else:
-                with self.accelerator.accumulate(self.model):
-                    loss = self._training_step(batch)
-                    total_loss += loss.item() * len(batch["label"])
-                    epoch_iterator.set_postfix(train_loss=loss.item())
+            # choose models to accumulate
+            models_to_accumulate = [self.model, self.plm_model] if self.args.training_method == 'full' else [self.model]
+            
+            with self.accelerator.accumulate(*models_to_accumulate):
+                # Forward and backward
+                loss = self._training_step(batch)
+                self.accelerator.backward(loss)
+                    
+                # Update statistics
+                batch_size = batch["label"].size(0)
+                total_loss += loss.item() * batch_size
+                total_samples += batch_size
                 
-        return total_loss / len(train_loader.dataset)
+                # Gradient clipping if needed
+                if self.args.max_grad_norm > 0:
+                    params_to_clip = (
+                        list(self.model.parameters()) + list(self.plm_model.parameters())
+                        if self.args.training_method == 'full'
+                        else self.model.parameters()
+                    )
+                    self.accelerator.clip_grad_norm_(params_to_clip, self.args.max_grad_norm)
+                
+                # Optimization step
+                self.optimizer.step()
+                if self.scheduler:
+                    self.scheduler.step()
+                self.optimizer.zero_grad()
+                
+                # Logging
+                self.global_steps += 1
+                self._log_training_step(loss)
+                
+                # Update progress bar
+                epoch_iterator.set_postfix(
+                    train_loss=loss.item(),
+                    grad_step=self.global_steps // self.args.gradient_accumulation_steps
+                )
+        
+        return total_loss / total_samples
     
     def _training_step(self, batch):
         # Move batch to device
@@ -116,32 +144,6 @@ class Trainer:
         # Forward pass
         logits = self.model(self.plm_model, batch)
         loss = self._compute_loss(logits, batch["label"])
-        
-        # Backward pass
-        self.accelerator.backward(loss)
-        
-        # Gradient clipping
-        if self.args.max_grad_norm > 0:
-            if self.args.training_method == 'full':
-                torch.nn.utils.clip_grad_norm_(
-                    list(self.model.parameters()) + list(self.plm_model.parameters()),
-                    self.args.max_grad_norm
-                )
-            else:
-                torch.nn.utils.clip_grad_norm_(
-                    self.model.parameters(),
-                    self.args.max_grad_norm
-                )
-        
-        # Optimization step
-        self.optimizer.step()
-        if self.scheduler:
-            self.scheduler.step()
-        self.optimizer.zero_grad()
-        
-        # Update global steps and log
-        self.global_steps += 1
-        self._log_training_step(loss)
         
         return loss
     
@@ -311,7 +313,7 @@ class Trainer:
         
         # Save model if improved
         if should_save:
-            self.logger.info(f"Saving model with best {self.args.monitor}: {monitor_value:.4f}")
+            self.logger.info(f"Saving model with best val {self.args.monitor}: {monitor_value:.4f}")
             save_path = os.path.join(self.args.output_dir, self.args.output_model_name)
             self._save_model(save_path)
 
