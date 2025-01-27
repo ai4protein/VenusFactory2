@@ -97,7 +97,7 @@ Recent News:
 
 ## 📈 Supported Metrics
 
-| Metric Name   | Full Name        | Problem Type                                            |
+| Name          | Torchmetrics     | Problem Type                                            |
 | ------------- | ---------------- | ------------------------------------------------------- |
 | accuracy      | Accuracy         | single_label_classification/ multi_label_classification |
 | recall        | Recall           | single_label_classification/ multi_label_classification |
@@ -107,6 +107,7 @@ Recent News:
 | auc           | AUROC            | single_label_classification/ multi_label_classification |
 | f1_max        | F1ScoreMax       | multi_label_classification                              |
 | spearman_corr | SpearmanCorrCoef | regression                                              |
+| mse           | MeanSquaredError | regression                                              |
 
 ## ✈️ Reuirement
 

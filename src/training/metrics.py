@@ -1,7 +1,7 @@
 import torch
 from torchmetrics.classification import Accuracy, Recall, Precision, MatthewsCorrCoef, AUROC, F1Score, MatthewsCorrCoef
 from torchmetrics.classification import BinaryAccuracy, BinaryRecall, BinaryAUROC, BinaryF1Score, BinaryPrecision, BinaryMatthewsCorrCoef, BinaryF1Score
-from torchmetrics.regression import SpearmanCorrCoef
+from torchmetrics.regression import SpearmanCorrCoef, MeanSquaredError
 from torchmetrics.classification import MultilabelAveragePrecision
 
 
@@ -88,6 +88,10 @@ def _setup_regression_metrics(metric_name, device):
         'spearman': {
             'metric': SpearmanCorrCoef().to(device),
             'strategy': 'max'
+        },
+        'mse': {
+            'metric': MeanSquaredError().to(device),
+            'strategy': 'min'
         }
     }
     return metrics_config.get(metric_name)
