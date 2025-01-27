@@ -9,7 +9,7 @@ from torch.utils.data import Dataset
 from typing import Dict, Any, List, Union
 import pandas as pd
 
-def prepare_dataloaders(args):
+def prepare_dataloaders(args, tokenizer):
     """Prepare train, validation and test dataloaders."""
     # Process datasets
     train_dataset = ProteinDataset(datasets.load_dataset(args.dataset)['train'], args)
@@ -20,7 +20,7 @@ def prepare_dataloaders(args):
         train_dataset, val_dataset, test_dataset = normalize_dataset(train_dataset, val_dataset, test_dataset, args.normalize)
     
     collator = Collator(
-        tokenizer=args.tokenizer,
+        tokenizer=tokenizer,
         max_length=args.max_seq_len if args.max_seq_len > 0 else None,
         structure_seq=args.structure_seq,
         problem_type=args.problem_type,

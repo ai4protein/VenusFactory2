@@ -121,7 +121,8 @@ def process_dataset_config(args: argparse.Namespace):
     
     # Update args with dataset config values if not already set
     for key in ['dataset', 'pdb_type', 'train_file', 'valid_file', 'test_file',
-                'num_labels', 'problem_type', 'monitor', 'metrics', 'normalize']:
+                'num_labels', 'problem_type', 'monitor', 'monitor_strategy', 
+                'metrics', 'normalize']:
         if getattr(args, key) is None and key in config:
             setattr(args, key, config[key])
     

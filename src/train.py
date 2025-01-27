@@ -27,11 +27,9 @@ def main():
     # Initialize models and tokenizer
     model, plm_model, tokenizer = create_models(args)
     print_model_parameters(model, plm_model, logger)
-    # Store tokenizer in args for use in data loading
-    args.tokenizer = tokenizer
     
     # Prepare data with tokenizer
-    train_loader, val_loader, test_loader = prepare_dataloaders(args)
+    train_loader, val_loader, test_loader = prepare_dataloaders(args, tokenizer)
     
     # Create trainer
     trainer = Trainer(args, model, plm_model, logger)

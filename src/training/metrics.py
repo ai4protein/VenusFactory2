@@ -74,7 +74,6 @@ def setup_metrics(args):
             
         if metric_config:
             metrics_dict[metric_name] = metric_config['metric']
-            metrics_monitor_strategy_dict[metric_name] = metric_config['strategy']
     
     # Add loss to metrics if it's the monitor metric
     if args.monitor == 'loss':
@@ -87,11 +86,9 @@ def _setup_regression_metrics(metric_name, device):
     metrics_config = {
         'spearman': {
             'metric': SpearmanCorrCoef().to(device),
-            'strategy': 'max'
         },
         'mse': {
             'metric': MeanSquaredError().to(device),
-            'strategy': 'min'
         }
     }
     return metrics_config.get(metric_name)
@@ -100,27 +97,21 @@ def _setup_multiclass_metrics(metric_name, num_classes, device):
     metrics_config = {
         'accuracy': {
             'metric': Accuracy(task='multiclass', num_classes=num_classes).to(device),
-            'strategy': 'max'
         },
         'recall': {
             'metric': Recall(task='multiclass', num_classes=num_classes).to(device),
-            'strategy': 'max'
         },
         'precision': {
             'metric': Precision(task='multiclass', num_classes=num_classes).to(device),
-            'strategy': 'max'
         },
         'f1': {
             'metric': F1Score(task='multiclass', num_classes=num_classes).to(device),
-            'strategy': 'max'
         },
         'mcc': {
             'metric': MatthewsCorrCoef(task='multiclass', num_classes=num_classes).to(device),
-            'strategy': 'max'
         },
         'auroc': {
             'metric': AUROC(task='multiclass', num_classes=num_classes).to(device),
-            'strategy': 'max'
         }
     }
     return metrics_config.get(metric_name)
@@ -129,27 +120,21 @@ def _setup_binary_metrics(metric_name, device):
     metrics_config = {
         'accuracy': {
             'metric': BinaryAccuracy().to(device),
-            'strategy': 'max'
         },
         'recall': {
             'metric': BinaryRecall().to(device),
-            'strategy': 'max'
         },
         'precision': {
             'metric': BinaryPrecision().to(device),
-            'strategy': 'max'
         },
         'f1': {
             'metric': BinaryF1Score().to(device),
-            'strategy': 'max'
         },
         'mcc': {
             'metric': BinaryMatthewsCorrCoef().to(device),
-            'strategy': 'max'
         },
         'auroc': {
             'metric': BinaryAUROC().to(device),
-            'strategy': 'max'
         }
     }
     return metrics_config.get(metric_name)
@@ -158,7 +143,6 @@ def _setup_multilabel_metrics(metric_name, device):
     metrics_config = {
         'f1_max': {
             'metric': MultilabelF1Max().to(device),
-            'strategy': 'max'
         }
     }
     return metrics_config.get(metric_name) 

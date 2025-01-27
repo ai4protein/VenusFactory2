@@ -1,4 +1,5 @@
 import os
+import json
 import torch
 from tqdm import tqdm
 from accelerate import Accelerator
@@ -59,6 +60,10 @@ class Trainer:
         self.best_val_metric_score = -float("inf")
         self.global_steps = 0
         self.early_stop_counter = 0
+        
+        # Save args
+        with open(os.path.join(self.args.output_dir, f'{self.args.output_model_name.split(".")[0]}.json'), 'w') as f:
+            json.dump(self.args.__dict__, f)
         
     def _setup_loss_function(self):
         if self.args.problem_type == 'regression':
