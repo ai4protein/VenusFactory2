@@ -58,7 +58,6 @@ class MultilabelF1Max(MultilabelAveragePrecision):
 def setup_metrics(args):
     """Setup metrics based on problem type and specified metrics list."""
     metrics_dict = {}
-    metrics_monitor_strategy_dict = {}
     device = "cuda" if torch.cuda.is_available() else "cpu"
     
     for metric_name in args.metrics:
@@ -78,9 +77,8 @@ def setup_metrics(args):
     # Add loss to metrics if it's the monitor metric
     if args.monitor == 'loss':
         metrics_dict['loss'] = 'loss'
-        metrics_monitor_strategy_dict['loss'] = 'min'
         
-    return metrics_dict, metrics_monitor_strategy_dict
+    return metrics_dict
 
 def _setup_regression_metrics(metric_name, device):
     metrics_config = {

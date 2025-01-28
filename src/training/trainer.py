@@ -17,7 +17,7 @@ class Trainer:
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         
         # Setup metrics
-        self.metrics_dict, self.metrics_monitor_strategy_dict = setup_metrics(args)
+        self.metrics_dict = setup_metrics(args)
         
         # Setup optimizer with different learning rates
         if self.args.training_method == 'full':
@@ -57,7 +57,10 @@ class Trainer:
             
         # Training state
         self.best_val_loss = float("inf")
-        self.best_val_metric_score = -float("inf")
+        if self.args.monitor_strategy == 'min':
+            self.best_val_metric_score = float("inf")
+        else:
+            self.best_val_metric_score = -float("inf")
         self.global_steps = 0
         self.early_stop_counter = 0
         
@@ -218,9 +221,9 @@ class Trainer:
         
         # Log results
         self.logger.info("Test Results:")
-        self.logger.info(f"Loss: {test_loss:.4f}")
+        self.logger.info(f"Test Loss: {test_loss:.4f}")
         for name, value in test_metrics.items():
-            self.logger.info(f"{name}: {value:.4f}")
+            self.logger.info(f"Test {name}: {value:.4f}")
             
         if self.args.wandb:
             wandb.log({f"test/{k}": v for k, v in test_metrics.items()})
@@ -263,11 +266,11 @@ class Trainer:
     def _load_best_model(self):
         path = os.path.join(self.args.output_dir, self.args.output_model_name)
         if self.args.training_method == 'full':
-            checkpoint = torch.load(path)
+            checkpoint = torch.load(path, weights_only=True)
             self.model.load_state_dict(checkpoint['model_state_dict'])
             self.plm_model.load_state_dict(checkpoint['plm_state_dict'])
         else:
-            self.model.load_state_dict(torch.load(path))
+            self.model.load_state_dict(torch.load(path, weights_only=True))
     
     def _handle_validation_results(self, epoch: int, val_loss: float, val_metrics: dict):
         """
@@ -297,11 +300,8 @@ class Trainer:
         if self.args.monitor != 'loss' and self.args.monitor in val_metrics:
             monitor_value = val_metrics[self.args.monitor]
         
-        # Get the strategy (min or max) for the monitored metric
-        strategy = self.metrics_monitor_strategy_dict.get(self.args.monitor, 'min')
-        
         # Check if current result is better
-        if strategy == 'min':
+        if self.args.monitor_strategy == 'min':
             if monitor_value < self.best_val_metric_score:
                 should_save = True
                 self.best_val_metric_score = monitor_value
