@@ -63,8 +63,6 @@ class Collator:
         if 'prot_bert' in self.plm_model or "prot_t5" in self.plm_model:
             seq = " ".join(list(seq))
             seq = re.sub(r"[UZOB]", "X", seq)
-        elif 'ankh' in self.plm_model:
-            seq = list(seq)
         return seq
 
     def process_esm3_structure_seq(self, seq: List[int]) -> torch.Tensor:

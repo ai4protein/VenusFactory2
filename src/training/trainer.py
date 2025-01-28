@@ -93,6 +93,7 @@ class Trainer:
             
             # Early stopping check
             if self._check_early_stopping():
+                self.logger.info(f"Early stop at Epoch {epoch}")
                 break
                 
     def _train_epoch(self, train_loader):
@@ -198,17 +199,6 @@ class Trainer:
         # Compute final metrics
         metrics_results = {name: metric.compute().item() 
                           for name, metric in self.metrics_dict.items()}
-        
-        # Log validation results
-        self.logger.info(f"Validation Loss: {avg_loss:.4f}")
-        for name, value in metrics_results.items():
-            self.logger.info(f"Validation {name}: {value:.4f}")
-        
-        if self.args.wandb:
-            wandb.log({
-                "val/loss": avg_loss,
-                **{f"val/{k}": v for k, v in metrics_results.items()}
-            }, step=self.global_steps)
         
         return avg_loss, metrics_results
     
