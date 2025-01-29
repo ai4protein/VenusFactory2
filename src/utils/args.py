@@ -80,7 +80,7 @@ def add_training_args(parser: argparse.ArgumentParser):
     train_group.add_argument('--max_grad_norm', type=float, default=-1)
     train_group.add_argument('--patience', type=int, default=10)
     train_group.add_argument('--monitor', type=str)
-    train_group.add_argument('--monitor_strategy', default='max', type=str, choices=['max', 'min'])
+    train_group.add_argument('--monitor_strategy', type=str, choices=['max', 'min'])
     train_group.add_argument('--training_method', type=str, default='freeze',
                             choices=['full', 'freeze', 'lora', 'ses-adapter'])
     train_group.add_argument('--structure_seq', type=str, default='')
