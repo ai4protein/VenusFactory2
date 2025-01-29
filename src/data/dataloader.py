@@ -19,6 +19,9 @@ def prepare_dataloaders(args, tokenizer, logger):
     test_dataset = datasets.load_dataset(args.dataset)['test']
     test_dataset_token_lengths = [len(item['aa_seq']) for item in test_dataset]
     
+    if args.normalize is not None:
+        train_dataset, val_dataset, test_dataset = normalize_dataset(train_dataset, val_dataset, test_dataset, args.normalize)
+    
     # log dataset info
     logger.info("Dataset Statistics:")
     logger.info("------------------------")
@@ -33,9 +36,6 @@ def prepare_dataloaders(args, tokenizer, logger):
     logger.info(f"  Train data point 2: {train_dataset[1]}")
     logger.info(f"  Train data point 3: {train_dataset[2]}")
     logger.info("------------------------")
-    
-    if args.normalize is not None:
-        train_dataset, val_dataset, test_dataset = normalize_dataset(train_dataset, val_dataset, test_dataset, args.normalize)
     
     collator = Collator(
         tokenizer=tokenizer,

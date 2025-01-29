@@ -82,7 +82,7 @@ def setup_metrics(args):
 
 def _setup_regression_metrics(metric_name, device):
     metrics_config = {
-        'spearman': {
+        'spearman_corr': {
             'metric': SpearmanCorrCoef().to(device),
         },
         'mse': {
