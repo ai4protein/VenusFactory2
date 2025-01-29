@@ -4,9 +4,10 @@ sys.path.append(os.getcwd())
 import argparse
 import json
 import pandas as pd
+import biotite.structure.io as bsio
 from tqdm import tqdm
 from Bio import PDB
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from src.utils.data_utils import extract_seq_from_pdb
 
 
@@ -18,7 +19,7 @@ ss_alphabet_dic = {
     "P": "C"
 }
 
-def generate_feature(pdb_file):
+def get_secondary_structure_seq(pdb_file):
     try:
         # extract amino acid sequence
         aa_seq = extract_seq_from_pdb(pdb_file)
@@ -33,7 +34,7 @@ def generate_feature(pdb_file):
     
     except Exception as e:
         return pdb_file, e
-
+    
     sec_structure_str_8 = ''.join(sec_structures)
     sec_structure_str_8 = sec_structure_str_8.replace('-', 'L')
     if len(aa_seq) != len(sec_structure_str_8):
@@ -41,14 +42,14 @@ def generate_feature(pdb_file):
     
     sec_structure_str_3 = ''.join([ss_alphabet_dic[ss] for ss in sec_structures])
     
-    final_feature = {}
-    final_feature["name"] = pdb_file.split('/')[-1]
-    final_feature["aa_seq"] = aa_seq
-    final_feature["ss8_seq"] = sec_structure_str_8
-    final_feature["ss3_seq"] = sec_structure_str_3
+    final_dict = {}
+    final_dict["name"] = pdb_file.split('/')[-1].split('.')[0]
+    final_dict["aa_seq"] = aa_seq
+    final_dict["ss8_seq"] = sec_structure_str_8
+    final_dict["ss3_seq"] = sec_structure_str_3
+    
+    return final_dict, None
 
-    return final_feature, None
-            
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--pdb_dir', type=str, help='pdb dir')
@@ -86,7 +87,7 @@ if __name__ == '__main__':
             
         results, error_pdbs, error_messages = [], [], []
         with ThreadPoolExecutor(max_workers=args.num_workers) as executor:
-            futures = [executor.submit(generate_feature, pdb_file) for pdb_file in pdb_files]
+            futures = [executor.submit(get_secondary_structure_seq, pdb_file) for pdb_file in pdb_files]
 
             with tqdm(total=len(pdb_files), desc="Processing pdb") as progress:
                 for future in as_completed(futures):
@@ -111,7 +112,7 @@ if __name__ == '__main__':
             f.write("\n".join([json.dumps(r) for r in results]))
     
     elif args.pdb_file is not None:
-        result, message = generate_feature(args.pdb_file)
+        result, message = get_secondary_structure_seq(args.pdb_file)
         with open(args.out_file, "w") as f:
             json.dump(result, f)
     

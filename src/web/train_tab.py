@@ -1,9 +1,11 @@
 import os
 import json
 import gradio as gr
-from .utils import preview_command, save_arguments, build_command_list
+
 from dataclasses import dataclass
 from typing import Any, Dict, Union, Optional
+from .utils.command import preview_command, save_arguments, build_command_list
+from .utils.monitor import TrainingMonitor
 
 @dataclass
 class TrainingArgs:
@@ -28,23 +30,22 @@ class TrainingArgs:
         self.gradient_accumulation_steps = args[10]
         self.warmup_steps = args[11]
         self.scheduler = args[12]
-        self.loss_function = args[13]
-        
+
         # 输出参数
-        self.output_model_name = args[14]
-        self.output_dir = args[15]
+        self.output_model_name = args[13]
+        self.output_dir = args[14]
         
         # Wandb参数
-        self.wandb_enabled = args[16]
+        self.wandb_enabled = args[15]
         if self.wandb_enabled:
-            self.wandb_project = args[17]
-            self.wandb_entity = args[18]
+            self.wandb_project = args[16]
+            self.wandb_entity = args[17]
         
         # 其他参数
-        self.patience = args[19]
-        self.num_workers = args[20]
-        self.max_grad_norm = args[21]
-        self.structure_seq = args[22]
+        self.patience = args[18]
+        self.num_workers = args[19]
+        self.max_grad_norm = args[20]
+        self.structure_seq = args[21]
 
     def to_dict(self) -> Dict[str, Any]:
         args_dict = {
@@ -59,7 +60,6 @@ class TrainingArgs:
             "gradient_accumulation_steps": self.gradient_accumulation_steps,
             "warmup_steps": self.warmup_steps,
             "scheduler": self.scheduler,
-            "loss_function": self.loss_function,
             "output_model_name": self.output_model_name,
             "output_dir": self.output_dir,
             "patience": self.patience,
@@ -83,7 +83,10 @@ class TrainingArgs:
 
         return args_dict
 
-def create_train_tab(monitor, constant):
+def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
+    # Create training monitor
+    monitor = TrainingMonitor()
+    
     plm_models = constant["plm_models"]
     dataset_configs = constant["dataset_configs"]
 
@@ -106,7 +109,13 @@ def create_train_tab(monitor, constant):
                         value=list(dataset_configs.keys())[0]
                     )
             with gr.Row():
-                structure_seq = gr.Textbox(label="Structure Sequence", placeholder="foldseek_seq,ss8_seq", value="foldseek_seq,ss8_seq")
+                with gr.Column():
+                    structure_seq = gr.Textbox(
+                        label="Structure Sequence", 
+                        placeholder="foldseek_seq,ss8_seq", 
+                        value="foldseek_seq,ss8_seq",
+                        visible=False
+                    )
 
         # Batch Processing Configuration
         gr.Markdown("### Batch Processing Configuration")
@@ -163,12 +172,6 @@ def create_train_tab(monitor, constant):
                         value="freeze"
                     )
                 with gr.Column(scale=1, min_width=150):
-                    loss_function = gr.Dropdown(
-                        choices=["cross_entropy", "focal_loss"],
-                        label="Loss Function",
-                        value="cross_entropy"
-                    )
-                with gr.Column(scale=1, min_width=150):
                     learning_rate = gr.Slider(
                         minimum=1e-8, maximum=1e-2, value=5e-4, step=1e-6,
                         label="Learning Rate"
@@ -188,6 +191,18 @@ def create_train_tab(monitor, constant):
                         minimum=-1, maximum=2048, value=None, step=32,
                         label="Max Sequence Length (-1 for unlimited)"
                     )
+            
+            def update_training_method(method):
+                return {
+                    structure_seq: gr.update(visible=method == "ses-adapter")
+                }
+
+            # 添加training_method的change事件
+            training_method.change(
+                fn=update_training_method,
+                inputs=[training_method],
+                outputs=[structure_seq]
+            )
 
             # Second row: Advanced training parameters
             with gr.Row(equal_height=True):
@@ -349,14 +364,30 @@ def create_train_tab(monitor, constant):
                 return "Training is already in progress!"
             
             training_args = TrainingArgs(args, plm_models, dataset_configs)
-            monitor.start_training(training_args.to_dict())
+            args_dict = training_args.to_dict()
+            
+            # Save arguments to file
+            save_arguments(args_dict, args_dict['output_dir'])
+            
+            # Start training
+            monitor.start_training(args_dict)
             return "Training started! Please wait for updates..."
 
         
         def handle_refresh():
+            """Refresh training status and plots."""
             if monitor.is_training:
                 messages = monitor.get_messages()
                 plot = monitor.get_plot()
+                
+                # 格式化最新的验证指标
+                if monitor.val_metrics:
+                    metrics_msg = "\nLatest Validation Metrics:\n"
+                    metrics_msg += f"Loss: {monitor.val_losses[-1]:.4f}\n"
+                    for metric_name, values in monitor.val_metrics.items():
+                        metrics_msg += f"{metric_name}: {values[-1]:.4f}\n"
+                    messages += metrics_msg
+                
                 return messages, plot
             else:
                 return "Click Start to begin training!", None
@@ -387,7 +418,6 @@ def create_train_tab(monitor, constant):
             gradient_accumulation_steps,
             warmup_steps,
             scheduler_type,
-            loss_function,
             output_model_name,
             output_dir,
             wandb_logging,
@@ -435,6 +465,7 @@ def create_train_tab(monitor, constant):
             "output_text": output_text,
             "plot_output": plot_output,
             "train_button": train_button,
+            "monitor": monitor,
             "components": {
                 "plm_model": plm_model,
                 "dataset_config": dataset_config,
@@ -449,7 +480,6 @@ def create_train_tab(monitor, constant):
                 "gradient_accumulation_steps": gradient_accumulation_steps,
                 "warmup_steps": warmup_steps,
                 "scheduler_type": scheduler_type,
-                "loss_function": loss_function,
                 "output_model_name": output_model_name,
                 "output_dir": output_dir,
                 "wandb_logging": wandb_logging,

@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
 def get_metadata_from_rcsb(pdb):
-    template_file_path = "src/metadata/rcsb_query_template.txt"
+    template_file_path = "download/rcsb_query_template.txt"
     with open(template_file_path, 'r') as file:
         query_template = file.read()
     
@@ -31,9 +31,25 @@ def get_metadata_from_rcsb(pdb):
     return result, message
 
 
+def download_single_pdb(pdb_id, out_dir):
+    os.makedirs(out_dir, exist_ok=True)
+    output_file = os.path.join(out_dir, f"{pdb_id}.json")
+    
+    if os.path.exists(output_file):
+        return f"Skipping {pdb_id}, already exists"
+        
+    result, message = get_metadata_from_rcsb(pdb_id)
+    if result is None:
+        return message
+        
+    with open(output_file, 'w') as f:
+        json.dump(result, f)
+    return message
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--pdb_file", type=str, default=None)
+    parser.add_argument("--pdb_id_file", type=str, default=None)
     parser.add_argument("--pdb_id", type=str, default=None)
     parser.add_argument("--error_file", type=str, default=None)
     parser.add_argument("--out_dir", type=str, required=True)
@@ -41,13 +57,17 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     
+    if not args.pdb_id and not args.pdb_id_file:
+        print("Error: Must provide either pdb_id or pdb_id_file")
+        exit(1)
+    
     os.makedirs(args.out_dir, exist_ok=True)
     downloaded_pdbs = [p[:4] for p in os.listdir(args.out_dir)]
     error_proteins = []
     error_messages = []
     
-    if args.pdb_file:
-        pdbs = open(args.pdb_file, 'r').read().splitlines()
+    if args.pdb_id_file:
+        pdbs = open(args.pdb_id_file, 'r').read().splitlines()
         
         def download_pdb_metadata(pdb_id, downloaded_pdbs, args):
             if pdb_id in downloaded_pdbs:
@@ -72,12 +92,14 @@ if __name__ == "__main__":
                     bar.update(1)
         
     elif args.pdb_id:
-        get_metadata_from_rcsb(args.pdb_id, args.out_dir)
+        message = download_single_pdb(args.pdb_id, args.out_dir)
+        print(message)
+        if "failed" in message:
+            error_proteins.append(args.pdb_id)
+            error_messages.append(message)
     
-    if error_proteins:
+    if error_proteins and args.error_file:
         error_dict = {"protein": error_proteins, "error": error_messages}
         error_file_dir = os.path.dirname(args.error_file)
         os.makedirs(error_file_dir, exist_ok=True)
         pd.DataFrame(error_dict).to_csv(args.error_file, index=False)
-    else:
-        print(f"error file {error_proteins}")

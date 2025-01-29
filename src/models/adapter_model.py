@@ -152,18 +152,18 @@ class AdapterModel(nn.Module):
         return seq_embeds
     
     def forward(self, plm_model, batch):
-        aa_seq, attention_mask = batch['aa_input_ids'], batch['attention_mask']
+        aa_seq, attention_mask = batch['aa_seq_input_ids'], batch['aa_seq_attention_mask']
         seq_embeds = self.plm_embedding(plm_model, aa_seq, attention_mask)
 
         if 'foldseek_seq' in self.config.structure_seq:
-            foldseek_seq = batch['foldseek_input_ids']
+            foldseek_seq = batch['foldseek_seq_input_ids']
             foldseek_embeds = self.foldseek_embedding(foldseek_seq)
             foldseek_embeds = self.cross_attention_foldseek(foldseek_embeds, seq_embeds, seq_embeds, attention_mask)
             embeds = seq_embeds + foldseek_embeds
             embeds = self.layer_norm(embeds)
         
         if 'ss8_seq' in self.config.structure_seq:
-            ss_seq = batch['ss8_input_ids']
+            ss_seq = batch['ss8_seq_input_ids']
             ss_embeds = self.ss_embedding(ss_seq)
             
             if 'foldseek_seq' in self.config.structure_seq:
@@ -177,7 +177,7 @@ class AdapterModel(nn.Module):
             embeds = self.layer_norm(embeds)
         
         if 'esm3_structure_seq' in self.config.structure_seq:
-            esm3_structure_seq = batch['esm3_structure_input_ids']
+            esm3_structure_seq = batch['esm3_structure_seq_input_ids']
             esm3_structure_embeds = self.esm3_structure_embedding(esm3_structure_seq)
             
             if 'foldseek_seq' in self.config.structure_seq:

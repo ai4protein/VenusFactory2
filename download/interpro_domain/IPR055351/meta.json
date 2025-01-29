@@ -1,0 +1,1 @@
+{"metadata": {"accession": "IPR055351", "name": "Urocanase", "source_database": "interpro", "type": "family", "integrated": null, "member_databases": {"hamap": {"MF_00577": "Urocanate hydratase [hutU]"}}, "go_terms": [{"identifier": "GO:0016153", "name": "urocanate hydratase activity", "category": {"code": "F", "name": "molecular_function"}}]}, "num_proteins": 169}
