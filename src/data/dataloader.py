@@ -42,7 +42,8 @@ def prepare_dataloaders(args, tokenizer, logger):
         max_length=args.max_seq_len if args.max_seq_len > 0 else None,
         structure_seq=args.structure_seq,
         problem_type=args.problem_type,
-        plm_model=args.plm_model
+        plm_model=args.plm_model,
+        num_labels=args.num_labels
     )
     
     # Common dataloader parameters

@@ -69,7 +69,7 @@ def setup_metrics(args):
             else:
                 metric_config = _setup_multiclass_metrics(metric_name, args.num_labels, device)            
         elif args.problem_type == 'multi_label_classification':
-            metric_config = _setup_multilabel_metrics(metric_name, device)
+            metric_config = _setup_multilabel_metrics(metric_name, args.num_labels, device)
             
         if metric_config:
             metrics_dict[metric_name] = metric_config['metric']
@@ -137,10 +137,10 @@ def _setup_binary_metrics(metric_name, device):
     }
     return metrics_config.get(metric_name)
 
-def _setup_multilabel_metrics(metric_name, device):
+def _setup_multilabel_metrics(metric_name, num_labels, device):
     metrics_config = {
         'f1_max': {
-            'metric': MultilabelF1Max().to(device),
+            'metric': MultilabelF1Max(num_labels=num_labels).to(device),
         }
     }
     return metrics_config.get(metric_name) 

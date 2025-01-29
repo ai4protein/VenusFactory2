@@ -21,6 +21,7 @@ class Collator:
     structure_seq: List[str] = None
     problem_type: str = 'classification'
     plm_model: str = None
+    num_labels: int = None
 
     def __call__(self, examples: List[Dict[str, Any]]) -> Dict[str, torch.Tensor]:
         """Collate function for batching examples."""
@@ -44,6 +45,13 @@ class Collator:
                     processed_seq = self.process_sequence(e[seq_type])
                 structure_seqs[seq_type].append(processed_seq)
             
+            if self.problem_type == 'multi_label_classification':
+                label_list = e['label'].split(',')
+                e['label'] = [int(l) for l in label_list]
+                binary_list = [0] * self.num_labels
+                for index in e['label']:
+                    binary_list[index] = 1
+                e['label'] = binary_list
             # Process labels
             labels.append(e["label"])
 
