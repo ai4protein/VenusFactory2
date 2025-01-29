@@ -77,6 +77,7 @@ def print_model_parameters(model: nn.Module, plm_model: PreTrainedModel, logger=
     
     # Prepare output strings
     output = [
+        "------------------------",
         "Model Parameters Statistics:",
         "------------------------",
         f"Adapter Model:",
