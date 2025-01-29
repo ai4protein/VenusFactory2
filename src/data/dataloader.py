@@ -9,7 +9,7 @@ from torch.utils.data import Dataset
 from typing import Dict, Any, List, Union
 import pandas as pd
 
-def prepare_dataloaders(args, tokenizer):
+def prepare_dataloaders(args, tokenizer, logger):
     """Prepare train, validation and test dataloaders."""
     # Process datasets
     train_dataset = datasets.load_dataset(args.dataset)['train']
@@ -18,6 +18,21 @@ def prepare_dataloaders(args, tokenizer):
     val_dataset_token_lengths = [len(item['aa_seq']) for item in val_dataset]
     test_dataset = datasets.load_dataset(args.dataset)['test']
     test_dataset_token_lengths = [len(item['aa_seq']) for item in test_dataset]
+    
+    # log dataset info
+    logger.info("Dataset Statistics:")
+    logger.info("------------------------")
+    logger.info(f"Dataset: {args.dataset}")
+    logger.info(f"  Number of train samples: {len(train_dataset)}")
+    logger.info(f"  Number of val samples: {len(val_dataset)}")
+    logger.info(f"  Number of test samples: {len(test_dataset)}")
+    
+    # log 3 data points from train_dataset
+    logger.info("Sample 3 data points from train dataset:")
+    logger.info(f"  Train data point 1: {train_dataset[0]}")
+    logger.info(f"  Train data point 2: {train_dataset[1]}")
+    logger.info(f"  Train data point 3: {train_dataset[2]}")
+    logger.info("------------------------")
     
     if args.normalize is not None:
         train_dataset, val_dataset, test_dataset = normalize_dataset(train_dataset, val_dataset, test_dataset, args.normalize)

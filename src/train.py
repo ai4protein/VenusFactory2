@@ -29,7 +29,7 @@ def main():
     print_model_parameters(model, plm_model, logger)
     
     # Prepare data with tokenizer
-    train_loader, val_loader, test_loader = prepare_dataloaders(args, tokenizer)
+    train_loader, val_loader, test_loader = prepare_dataloaders(args, tokenizer, logger)
     
     # Create trainer
     trainer = Trainer(args, model, plm_model, logger)
