@@ -1,0 +1,9 @@
+{
+    "dataset": "tyang816/eSOL",
+    "num_labels": 1,
+    "problem_type": "regression",
+    "metrics": "mse,spearman_corr",
+    "monitor": "mse",
+    "monitor_strategy": "min",
+    "normalize": "standard"
+}

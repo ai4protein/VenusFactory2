@@ -1,0 +1,9 @@
+{
+    "dataset": "tyang816/Thermostability",
+    "num_labels": 1,
+    "problem_type": "regression",
+    "metrics": "spearman_corr",
+    "monitor": "spearman_corr",
+    "monitor_strategy": "max",
+    "normalize": "min_max"
+}
