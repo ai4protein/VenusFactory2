@@ -1,6 +1,7 @@
 import os
 import json
 import torch
+import torch.nn.functional as F
 from tqdm import tqdm
 from accelerate import Accelerator
 from .scheduler import create_scheduler
@@ -229,13 +230,24 @@ class Trainer:
     
     def _update_metrics(self, logits, labels):
         """Update metrics with current batch predictions."""
-        for metric in self.metrics_dict.values():
+        for metric_name, metric in self.metrics_dict.items():
             if self.args.problem_type == 'regression' and self.args.num_labels == 1:
-                metric(logits.squeeze(), labels.squeeze())
-            elif self.args.problem_type == 'multi_label_classification':
+                logits = logits.view(-1, 1)
+                labels = labels.view(-1, 1)
                 metric(logits, labels)
+            elif self.args.problem_type == 'multi_label_classification':
+                metric(torch.sigmoid(logits), labels)
             else:
-                metric(torch.argmax(logits, 1), labels)
+                if self.args.num_labels == 2:
+                    if metric_name == 'auroc':
+                        metric(torch.sigmoid(logits[:, 1]), labels)
+                    else:
+                        metric(torch.argmax(logits, 1), labels)
+                else:
+                    if metric_name == 'auroc':
+                        metric(F.softmax(logits, dim=1), labels)
+                    else:
+                        metric(torch.argmax(logits, 1), labels)
     
     def _log_training_step(self, loss):
         if self.args.wandb:
