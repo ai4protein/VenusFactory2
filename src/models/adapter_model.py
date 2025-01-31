@@ -61,22 +61,22 @@ class RotaryEmbedding(nn.Module):
 
 
 class CrossModalAttention(nn.Module):
-    def __init__(self, config):
+    def __init__(self, args):
         super().__init__()
-        self.attention_head_size = config.hidden_size // config.num_attention_head
+        self.attention_head_size = args.hidden_size // args.num_attention_head
         assert (
-            self.attention_head_size * config.num_attention_head == config.hidden_size
+            self.attention_head_size * args.num_attention_head == args.hidden_size
         ), "Embed size needs to be divisible by num heads"
-        self.num_attention_head = config.num_attention_head
-        self.hidden_size = config.hidden_size
+        self.num_attention_head = args.num_attention_head
+        self.hidden_size = args.hidden_size
         
-        self.query_proj = nn.Linear(config.hidden_size, config.hidden_size)
-        self.key_proj = nn.Linear(config.hidden_size, config.hidden_size)
-        self.value_proj = nn.Linear(config.hidden_size, config.hidden_size)
+        self.query_proj = nn.Linear(args.hidden_size, args.hidden_size)
+        self.key_proj = nn.Linear(args.hidden_size, args.hidden_size)
+        self.value_proj = nn.Linear(args.hidden_size, args.hidden_size)
         
-        self.dropout = nn.Dropout(config.attention_probs_dropout)
+        self.dropout = nn.Dropout(args.attention_probs_dropout)
         
-        self.out_proj = nn.Linear(config.hidden_size, config.hidden_size)
+        self.out_proj = nn.Linear(args.hidden_size, args.hidden_size)
         self.rotary_embeddings = RotaryEmbedding(dim=self.attention_head_size)
 
     def transpose_for_scores(self, x: torch.Tensor) -> torch.Tensor:
@@ -114,37 +114,37 @@ class CrossModalAttention(nn.Module):
         return outputs
 
 class AdapterModel(nn.Module):
-    def __init__(self, config):
+    def __init__(self, args):
         super().__init__()
-        self.config = config
+        self.args = args
         
-        if 'foldseek_seq' in config.structure_seq:
-            self.foldseek_embedding = nn.Embedding(config.vocab_size, config.hidden_size)
-            self.cross_attention_foldseek = CrossModalAttention(config)
-        if 'ss8_seq' in config.structure_seq:
-            self.ss_embedding = nn.Embedding(config.vocab_size, config.hidden_size)
-            self.cross_attention_ss = CrossModalAttention(config)
-        if 'esm3_structure_seq' in config.structure_seq:
-            self.esm3_structure_embedding = nn.Embedding(config.vocab_size, config.hidden_size)
-            self.cross_attention_esm3_structure = CrossModalAttention(config)
+        if 'foldseek_seq' in args.structure_seq:
+            self.foldseek_embedding = nn.Embedding(args.vocab_size, args.hidden_size)
+            self.cross_attention_foldseek = CrossModalAttention(args)
+        if 'ss8_seq' in args.structure_seq:
+            self.ss_embedding = nn.Embedding(args.vocab_size, args.hidden_size)
+            self.cross_attention_ss = CrossModalAttention(args)
+        if 'esm3_structure_seq' in args.structure_seq:
+            self.esm3_structure_embedding = nn.Embedding(args.vocab_size, args.hidden_size)
+            self.cross_attention_esm3_structure = CrossModalAttention(args)
         
-        self.layer_norm = nn.LayerNorm(config.hidden_size)
+        self.layer_norm = nn.LayerNorm(args.hidden_size)
         
-        if config.pooling_method == 'attention1d':
-            self.classifier = Attention1dPoolingHead(config.hidden_size, config.num_labels, config.pooling_dropout)
-        elif config.pooling_method == 'mean':
-            if "PPI" in config.dataset:
+        if args.pooling_method == 'attention1d':
+            self.classifier = Attention1dPoolingHead(args.hidden_size, args.num_labels, args.pooling_dropout)
+        elif args.pooling_method == 'mean':
+            if "PPI" in args.dataset:
                 self.pooling = MeanPooling()
-                self.projection = MeanPoolingProjection(config.hidden_size, config.num_labels, config.pooling_dropout)
+                self.projection = MeanPoolingProjection(args.hidden_size, args.num_labels, args.pooling_dropout)
             else:
-                self.classifier = MeanPoolingHead(config.hidden_size, config.num_labels, config.pooling_dropout)
-        elif config.pooling_method == 'light_attention':
-            self.classifier = LightAttentionPoolingHead(config.hidden_size, config.num_labels, config.pooling_dropout)
+                self.classifier = MeanPoolingHead(args.hidden_size, args.num_labels, args.pooling_dropout)
+        elif args.pooling_method == 'light_attention':
+            self.classifier = LightAttentionPoolingHead(args.hidden_size, args.num_labels, args.pooling_dropout)
         else:
-            raise ValueError(f"classifier method {config.pooling_method} not supported")
+            raise ValueError(f"classifier method {args.pooling_method} not supported")
     
     def plm_embedding(self, plm_model, aa_seq, attention_mask):
-        if self.training and hasattr(self, 'config') and self.config.training_method == 'full':
+        if self.training and hasattr(self, 'args') and self.args.training_method == 'full':
             outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask)
         else:
             with torch.no_grad():
@@ -159,18 +159,18 @@ class AdapterModel(nn.Module):
         aa_seq, attention_mask = batch['aa_seq_input_ids'], batch['aa_seq_attention_mask']
         seq_embeds = self.plm_embedding(plm_model, aa_seq, attention_mask)
 
-        if 'foldseek_seq' in self.config.structure_seq:
+        if 'foldseek_seq' in self.args.structure_seq:
             foldseek_seq = batch['foldseek_seq_input_ids']
             foldseek_embeds = self.foldseek_embedding(foldseek_seq)
             foldseek_embeds = self.cross_attention_foldseek(foldseek_embeds, seq_embeds, seq_embeds, attention_mask)
             embeds = seq_embeds + foldseek_embeds
             embeds = self.layer_norm(embeds)
         
-        if 'ss8_seq' in self.config.structure_seq:
+        if 'ss8_seq' in self.args.structure_seq:
             ss_seq = batch['ss8_seq_input_ids']
             ss_embeds = self.ss_embedding(ss_seq)
             
-            if 'foldseek_seq' in self.config.structure_seq:
+            if 'foldseek_seq' in self.args.structure_seq:
                 # cross attention with foldseek
                 ss_embeds = self.cross_attention_ss(ss_embeds, embeds, embeds, attention_mask)
                 embeds = ss_embeds + embeds
@@ -180,15 +180,15 @@ class AdapterModel(nn.Module):
                 embeds = ss_embeds + seq_embeds
             embeds = self.layer_norm(embeds)
         
-        if 'esm3_structure_seq' in self.config.structure_seq:
+        if 'esm3_structure_seq' in self.args.structure_seq:
             esm3_structure_seq = batch['esm3_structure_seq_input_ids']
             esm3_structure_embeds = self.esm3_structure_embedding(esm3_structure_seq)
             
-            if 'foldseek_seq' in self.config.structure_seq:
+            if 'foldseek_seq' in self.args.structure_seq:
                 # cross attention with foldseek
                 esm3_structure_embeds = self.cross_attention_esm3_structure(esm3_structure_embeds, embeds, embeds, attention_mask)
                 embeds = esm3_structure_embeds + embeds
-            elif 'ss8_seq' in self.config.structure_seq:
+            elif 'ss8_seq' in self.args.structure_seq:
                 # cross attention with ss8
                 esm3_structure_embeds = self.cross_attention_esm3_structure(esm3_structure_embeds, ss_embeds, ss_embeds, attention_mask)
                 embeds = esm3_structure_embeds + ss_embeds
@@ -198,7 +198,7 @@ class AdapterModel(nn.Module):
                 embeds = esm3_structure_embeds + seq_embeds
             embeds = self.layer_norm(embeds)
         
-        if self.config.structure_seq:
+        if self.args.structure_seq:
             logits = self.classifier(embeds, attention_mask)
         else:
             logits = self.classifier(seq_embeds, attention_mask)            
