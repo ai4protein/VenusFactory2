@@ -1,6 +1,5 @@
 {
     "dataset": "tyang816/TAPE_Stability",
-    "pdb_type": "None",
     "num_labels": 1,
     "problem_type": "regression",
     "metrics": "spearman_corr",
