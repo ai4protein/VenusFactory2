@@ -47,6 +47,12 @@ class TrainingArgs:
         self.max_grad_norm = args[20]
         self.structure_seq = args[21]
 
+        # LoRA参数
+        self.lora_r = args[22]
+        self.lora_alpha = args[23]
+        self.lora_dropout = args[24]
+        self.lora_target_modules = [m.strip() for m in args[25].split(",")] if args[25] else []
+
     def to_dict(self) -> Dict[str, Any]:
         args_dict = {
             "plm_model": self.plm_model,
@@ -66,6 +72,15 @@ class TrainingArgs:
             "num_workers": self.num_workers,
             "max_grad_norm": self.max_grad_norm
         }
+
+        # 添加LoRA参数
+        if self.training_method == "plm-lora":
+            args_dict.update({
+                "lora_r": self.lora_r,
+                "lora_alpha": self.lora_alpha,
+                "lora_dropout": self.lora_dropout,
+                "lora_target_modules": self.lora_target_modules
+            })
 
         # 添加批处理参数
         if self.batch_mode == "Batch Size Mode":
@@ -115,6 +130,40 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         placeholder="foldseek_seq,ss8_seq", 
                         value="foldseek_seq,ss8_seq",
                         visible=False
+                    )
+
+            # ! add for plm-lora
+            with gr.Row(visible=False) as lora_params_row:
+                # gr.Markdown("#### LoRA Parameters")
+                with gr.Column():
+                    lora_r = gr.Number(
+                        value=8,
+                        label="LoRA Rank",
+                        precision=0,
+                        minimum=1,
+                        maximum=128,
+                    )
+                with gr.Column():
+                    lora_alpha = gr.Number(
+                        value=32,
+                        label="LoRA Alpha",
+                        precision=0,
+                        minimum=1,
+                        maximum=128
+                    )
+                with gr.Column():
+                    lora_dropout = gr.Number(
+                        value=0.1,
+                        label="LoRA Dropout",
+                        minimum=0.0,
+                        maximum=1.0
+                    )
+                with gr.Column():
+                    lora_target_modules = gr.Textbox(
+                        value="query,key,value",
+                        label="LoRA Target Modules",
+                        placeholder="Comma-separated list of target modules",
+                        # info="LoRA will be applied to these modules"
                     )
 
         # Batch Processing Configuration
@@ -167,7 +216,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             with gr.Row(equal_height=True):
                 with gr.Column(scale=1, min_width=150):
                     training_method = gr.Dropdown(
-                        choices=["full", "freeze", "lora", "ses-adapter"],
+                        choices=["full", "freeze", "lora", "ses-adapter", "plm-lora"],
                         label="Training Method",
                         value="freeze"
                     )
@@ -194,14 +243,15 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             
             def update_training_method(method):
                 return {
-                    structure_seq: gr.update(visible=method == "ses-adapter")
+                    structure_seq: gr.update(visible=method == "ses-adapter"),
+                    lora_params_row: gr.update(visible=method == "plm-lora")
                 }
 
             # 添加training_method的change事件
             training_method.change(
                 fn=update_training_method,
                 inputs=[training_method],
-                outputs=[structure_seq]
+                outputs=[structure_seq, lora_params_row]
             )
 
             # Second row: Advanced training parameters
@@ -426,7 +476,11 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             patience,
             num_workers,
             max_grad_norm,
-            structure_seq
+            structure_seq,
+            lora_r,
+            lora_alpha,
+            lora_dropout,
+            lora_target_modules,
         ]
 
         # bind preview and train buttons
@@ -488,6 +542,10 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 "patience": patience,
                 "num_workers": num_workers,
                 "max_grad_norm": max_grad_norm,
-                "structure_seq": structure_seq
+                "structure_seq": structure_seq,
+                "lora_r": lora_r,
+                "lora_alpha": lora_alpha,
+                "lora_dropout": lora_dropout,
+                "lora_target_modules": lora_target_modules,
             }
         }
