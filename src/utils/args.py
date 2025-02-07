@@ -82,7 +82,16 @@ def add_training_args(parser: argparse.ArgumentParser):
     train_group.add_argument('--monitor', type=str)
     train_group.add_argument('--monitor_strategy', type=str, choices=['max', 'min'])
     train_group.add_argument('--training_method', type=str, default='freeze',
-                            choices=['full', 'freeze', 'lora', 'ses-adapter'])
+                            choices=['full', 'freeze', 'lora', 'ses-adapter', 'plm-lora'])
+    parser.add_argument("--lora_r", type=int, default=8, help="lora r")
+    parser.add_argument("--lora_alpha", type=int, default=32, help="lora_alpha")
+    parser.add_argument("--lora_dropout", type=float, default=0.1, help="lora_dropout")
+    parser.add_argument(
+        "--lora_target_modules",
+        nargs="+",
+        default=["query", "key", "value"],
+        help="lora target module",
+    )
     train_group.add_argument('--structure_seq', type=str, default='')
 
 def add_output_args(parser: argparse.ArgumentParser):
