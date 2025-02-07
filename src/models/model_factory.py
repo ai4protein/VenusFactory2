@@ -3,9 +3,10 @@ from transformers import (
     EsmTokenizer, EsmModel,
     BertTokenizer, BertModel,
     T5Tokenizer, T5EncoderModel,
-    AutoTokenizer
+    AutoTokenizer, PreTrainedModel,
 )
 from .adapter_model import AdapterModel
+from .lora_model import LoraModel
 
 def create_models(args):
     """Create and initialize models and tokenizer."""
@@ -35,6 +36,25 @@ def create_models(args):
     
     return model, plm_model, tokenizer
 
+def creat_lora_model(args):
+    tokenizer, plm_model = create_plm_and_tokenizer(args)
+    # Update hidden size based on PLM
+    args.hidden_size = get_hidden_size(plm_model, args.plm_model)
+
+    # create lora model
+    model = LoraModel(args=args)
+    # Handle PLM parameters based on training method
+    if args.training_method != "full":
+        freeze_plm_parameters(plm_model)
+    if args.training_method in ["lora", "plm-lora"]:
+        setup_lora_plm(plm_model, args)
+    print(" Using plm lora ")
+    # Move models to device
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model = model.to(device)
+    plm_model = plm_model.to(device)
+    return model, plm_model, tokenizer
+
 def freeze_plm_parameters(plm_model):
     """Freeze all parameters in the pre-trained language model."""
     for param in plm_model.parameters():
@@ -45,16 +65,24 @@ def setup_lora_plm(plm_model, args):
     """Setup LoRA for pre-trained language model."""
     # Import LoRA configurations
     from peft import get_peft_config, get_peft_model, LoraConfig, TaskType
-    
+
+    if not isinstance(plm_model, PreTrainedModel):
+        raise TypeError("based_model must be a PreTrainedModel instance")
+
+    # validate lora_target_modules exist in model
+    available_modules = [name for name, _ in plm_model.named_modules()]
+    for module in args.lora_target_modules:
+        if not any(module in name for name in available_modules):
+            raise ValueError(f"Target module {module} not found in model")
     # Configure LoRA
     peft_config = LoraConfig(
         task_type=TaskType.FEATURE_EXTRACTION,
         inference_mode=False,
         r=args.lora_r,
         lora_alpha=args.lora_alpha,
-        lora_dropout=args.lora_dropout
+        lora_dropout=args.lora_dropout,
+        target_modules=args.lora_target_modules,
     )
-    
     # Apply LoRA to model
     plm_model = get_peft_model(plm_model, peft_config)
     plm_model.print_trainable_parameters()
