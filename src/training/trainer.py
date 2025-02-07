@@ -34,6 +34,18 @@ class Trainer:
                 }
             ]
             self.optimizer = torch.optim.AdamW(optimizer_grouped_parameters)
+        elif self.args.training_method == "plm-lora":
+            optimizer_grouped_parameters = [
+                {
+                    "params": self.model.parameters(),
+                    "lr": args.learning_rate                    
+                },
+                {
+                    "params": [param for param in self.plm_model.parameters() if param.requires_grad],
+                    "lr": args.learning_rate
+                }
+            ]
+            self.optimizer = torch.optim.AdamW(optimizer_grouped_parameters)
         else:
             self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=args.learning_rate)
         
@@ -47,7 +59,7 @@ class Trainer:
         self.loss_fn = self._setup_loss_function()
         
         # Prepare for distributed training
-        if self.args.training_method == 'full':
+        if self.args.training_method in ['full', 'plm-lora']:
             self.model, self.plm_model, self.optimizer = self.accelerator.prepare(
                 self.model, self.plm_model, self.optimizer
             )
@@ -99,7 +111,7 @@ class Trainer:
                 
     def _train_epoch(self, train_loader):
         self.model.train()
-        if self.args.training_method == 'full':
+        if self.args.training_method in  ['full', 'plm-lora']:
             self.plm_model.train()
             
         total_loss = 0
@@ -108,7 +120,7 @@ class Trainer:
         
         for batch in epoch_iterator:
             # choose models to accumulate
-            models_to_accumulate = [self.model, self.plm_model] if self.args.training_method == 'full' else [self.model]
+            models_to_accumulate = [self.model, self.plm_model] if self.args.training_method in  ['full', 'plm-lora'] else [self.model]
             
             with self.accelerator.accumulate(*models_to_accumulate):
                 # Forward and backward
@@ -124,7 +136,7 @@ class Trainer:
                 if self.args.max_grad_norm > 0:
                     params_to_clip = (
                         list(self.model.parameters()) + list(self.plm_model.parameters())
-                        if self.args.training_method == 'full'
+                        if self.args.training_method in  ['full', 'plm-lora']
                         else self.model.parameters()
                     )
                     self.accelerator.clip_grad_norm_(params_to_clip, self.args.max_grad_norm)
@@ -168,7 +180,7 @@ class Trainer:
             tuple: (validation_loss, validation_metrics)
         """
         self.model.eval()
-        if self.args.training_method == 'full':
+        if self.args.training_method in  ['full', 'plm-lora']:
             self.plm_model.eval()
             
         total_loss = 0
@@ -256,23 +268,62 @@ class Trainer:
                 "train/learning_rate": self.optimizer.param_groups[0]['lr']
             }, step=self.global_steps)
     
+    # def _save_model(self, path):
+    #     if self.args.training_method in ['full', 'plm-lora']:
+    #         torch.save({
+    #             'model_state_dict': self.model.state_dict(),
+    #             'plm_state_dict': self.plm_model.state_dict()
+    #         }, path)
+    #     else:
+    #         torch.save(self.model.state_dict(), path)
+    
+    # def _load_best_model(self):
+    #     path = os.path.join(self.args.output_dir, self.args.output_model_name)
+    #     if self.args.training_method in ['full', 'plm-lora']:
+    #         checkpoint = torch.load(path, weights_only=True)
+    #         self.model.load_state_dict(checkpoint['model_state_dict'])
+    #         self.plm_model.load_state_dict(checkpoint['plm_state_dict'])
+    #     else:
+    #         self.model.load_state_dict(torch.load(path, weights_only=True))      
     def _save_model(self, path):
         if self.args.training_method == 'full':
+            model_state = {k: v.cpu() for k, v in self.model.state_dict().items()}
+            plm_state = {k: v.cpu() for k, v in self.plm_model.state_dict().items()}
             torch.save({
-                'model_state_dict': self.model.state_dict(),
-                'plm_state_dict': self.plm_model.state_dict()
+                'model_state_dict': model_state,
+                'plm_state_dict': plm_state
             }, path)
+        elif self.args.training_method in ['lora', 'plm-lora']:
+            model_state = {k: v.cpu() for k, v in self.model.state_dict().items()}
+            plm_state = {k: v.cpu() for k, v in self.plm_model.state_dict().items()}
+            if hasattr(self.plm_model, 'peft_config'):
+                lora_config = self.plm_model.peft_config
+            else:
+                raise ValueError("plm_model do not use peft lora, please check it.")
+            try:
+                torch.save({
+                    'model_state_dict': model_state,
+                    'plm_state_dict': plm_state,
+                    "lora_config": lora_config
+                }, path)
+            except Exception as e:
+                raise ValueError(f"lora model save error: {str(e)}")
         else:
-            torch.save(self.model.state_dict(), path)
-    
+            model_state = {k: v.cpu() for k, v in self.model.state_dict().items()}
+            torch.save(model_state, path)
+
     def _load_best_model(self):
         path = os.path.join(self.args.output_dir, self.args.output_model_name)
-        if self.args.training_method == 'full':
-            checkpoint = torch.load(path, weights_only=True)
+        if self.args.training_method in ['full', 'lora', 'plm-lora']:
+            checkpoint = torch.load(path, map_location="cpu")
             self.model.load_state_dict(checkpoint['model_state_dict'])
             self.plm_model.load_state_dict(checkpoint['plm_state_dict'])
+            self.model.to(self.device)
+            self.plm_model.to(self.device)
         else:
-            self.model.load_state_dict(torch.load(path, weights_only=True))
+            checkpoint = torch.load(path, map_location="cpu")
+            self.model.load_state_dict(checkpoint)
+            self.model.to(self.device)
     
     def _handle_validation_results(self, epoch: int, val_loss: float, val_metrics: dict):
         """
