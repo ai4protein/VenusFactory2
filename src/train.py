@@ -25,10 +25,10 @@ def main():
     os.makedirs(args.output_dir, exist_ok=True)
     
     # Initialize models and tokenizer
-    if args.training_method == "ses-adapter":
-        model, plm_model, tokenizer = create_models(args)
-    elif args.training_method == "plm-lora":
+    if args.training_method == "plm-lora":
         model, plm_model, tokenizer = creat_lora_model(args)
+    else:
+        model, plm_model, tokenizer = create_models(args)
     print_model_parameters(model, plm_model, logger)
     
     # Prepare data with tokenizer
