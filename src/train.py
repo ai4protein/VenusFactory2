@@ -4,7 +4,7 @@ import wandb
 from utils.args import parse_args
 from utils.logger import setup_logging, print_model_parameters
 from data.dataloader import prepare_dataloaders
-from models.model_factory import create_models
+from models.model_factory import create_models, creat_lora_model
 from training.trainer import Trainer
 
 def main():
@@ -25,13 +25,14 @@ def main():
     os.makedirs(args.output_dir, exist_ok=True)
     
     # Initialize models and tokenizer
-    model, plm_model, tokenizer = create_models(args)
+    if args.training_method == "plm-lora":
+        model, plm_model, tokenizer = creat_lora_model(args)
+    else:
+        model, plm_model, tokenizer = create_models(args)
     print_model_parameters(model, plm_model, logger)
-    # Store tokenizer in args for use in data loading
-    args.tokenizer = tokenizer
     
     # Prepare data with tokenizer
-    train_loader, val_loader, test_loader = prepare_dataloaders(args)
+    train_loader, val_loader, test_loader = prepare_dataloaders(args, tokenizer, logger)
     
     # Create trainer
     trainer = Trainer(args, model, plm_model, logger)

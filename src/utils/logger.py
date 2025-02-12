@@ -23,7 +23,7 @@ def setup_logging(args: Dict[str, Any]) -> logging.Logger:
     logger.addHandler(console_handler)
     
     # File handler
-    log_file = os.path.join(args.output_dir, 'training.log')
+    log_file = os.path.join(args.output_dir, f'{args.output_model_name.split(".")[0]}_training.log')
     file_handler = logging.FileHandler(log_file)
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(formatter)
@@ -77,6 +77,7 @@ def print_model_parameters(model: nn.Module, plm_model: PreTrainedModel, logger=
     
     # Prepare output strings
     output = [
+        "------------------------",
         "Model Parameters Statistics:",
         "------------------------",
         f"Adapter Model:",

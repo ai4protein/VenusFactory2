@@ -173,3 +173,4 @@ src/data/weight/
 !src/data/weight/.keep
 
 tmp_db/
+log/

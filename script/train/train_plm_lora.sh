@@ -1,38 +1,30 @@
 ### Dataset
-# ESMFold & AlphaFold2: DeepLocBinary DeepLocMulti MetalIonBinding EC Thermostability
-# ESMFold: DeepSol DeepSoluE
-# No structure: FLIP_AAV FLIP_GB1
-
 ### Protein Language Model (PLM)
 # facebook: esm2_t30_150M_UR50D esm2_t33_650M_UR50D esm2_t36_3B_UR50D
 # rostLab: prot_bert prot_bert_bfd prot_t5_xl_uniref50 prot_t5_xl_bfd ankh-base ankh-large
 
 # ESM model target_modules name: query key value
-# T5_base model target_modules name: q k v
-# Bert_base model target_modules name: query key value
+# Bert_base(prot_bert) model target_modules name: query key value
+# T5_base(ankh, t5) model target_modules name: q k v
 
-
-dataset=DeepLocBinary
+# if need to use HF mirror
+# export HF_ENDPOINT=https://hf-mirror.com
+dataset=GO_BP
 pdb_type=ESMFold
 pooling_head=mean
-plm_model=esm2_650m
+plm_source=facebook
+plm_model=esm2_t33_650M_UR50D
 lr=5e-4
-python src/lora_train.py \
-    --plm_model ckpt/$plm_model \
-    --num_attention_heads 8 \
-    --pooling_method $pooling_head \
-    --pooling_dropout 0.1 \
-    --dataset_config dataset/$dataset/"$dataset"_"$pdb_type".json \
-    --lr $lr \
-    --num_workers 4 \
+training_method=plm-lora
+python src/train.py \
+    --plm_model $plm_source/$plm_model \
+    --dataset_config data/$dataset/"$dataset"_"$pdb_type"_HF.json \
+    --learning_rate $lr \
     --gradient_accumulation_steps 8 \
-    --max_train_epochs 100 \
-    --max_batch_token 2000 \
+    --num_epochs 100 \
+    --batch_token 2000 \
     --patience 10 \
-    --structure_seqs foldseek_seq,ss8_seq \
-    --ckpt_root result \
-    --ckpt_dir adapter_debug_lora/$plm_model/$dataset \
-    --model_name "$pdb_type"_"$pooling_head"_"$plm_model"_"$lr".pt \
-    --use_lora \
+    --output_dir debug/$dataset/$plm_model \
+    --output_model_name "$training_method"_"$pdb_type"_lr"$lr"_bt2k_ga8.pt \
+    --training_method $training_method \
     --lora_target_modules query key value
-    

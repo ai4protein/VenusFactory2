@@ -5,6 +5,7 @@ sys.path.append(os.getcwd())
 import json
 import argparse
 import numpy as np
+import biotite.structure.io as bsio
 from tqdm import tqdm
 from biotite.structure.io.pdb import PDBFile
 from esm.utils.structure.protein_chain import ProteinChain
@@ -45,7 +46,8 @@ def get_esm3_structure_seq(pdb_file, encoder, device="cuda:0"):
     # Encoder
     coords, plddt, residue_index = chain.to_structure_encoder_inputs()
     coords = coords.to(device)
-    plddt = float(plddt.cpu().numpy())
+    struct = bsio.load_structure(pdb_file, extra_fields=["b_factor"])
+    plddt = struct.b_factor.mean()
     residue_index = residue_index.to(device)
     _, structure_tokens = encoder.encode(coords, residue_index=residue_index)
     
