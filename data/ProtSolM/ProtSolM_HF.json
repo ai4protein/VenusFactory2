@@ -1,0 +1,8 @@
+{
+    "dataset": "tyang816/ProtSolM",
+    "num_labels": 2,
+    "problem_type": "single_label_classification",
+    "metrics": "accuracy,mcc,f1,precision,recall,auroc",
+    "monitor": "accuracy",
+    "monitor_strategy": "max"
+}

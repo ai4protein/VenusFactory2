@@ -1,5 +1,7 @@
 import os
+import json
 import torch
+import torch.nn.functional as F
 from tqdm import tqdm
 from accelerate import Accelerator
 from .scheduler import create_scheduler
@@ -16,10 +18,36 @@ class Trainer:
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         
         # Setup metrics
-        self.metrics_dict, self.metrics_monitor_strategy_dict = setup_metrics(args)
+        self.metrics_dict = setup_metrics(args)
         
-        # Setup optimizer
-        self.optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
+        # Setup optimizer with different learning rates
+        if self.args.training_method == 'full':
+            # Use a smaller learning rate for PLM
+            optimizer_grouped_parameters = [
+                {
+                    "params": self.model.parameters(),
+                    "lr": args.learning_rate
+                },
+                {
+                    "params": self.plm_model.parameters(),
+                    "lr": args.learning_rate
+                }
+            ]
+            self.optimizer = torch.optim.AdamW(optimizer_grouped_parameters)
+        elif self.args.training_method == "plm-lora":
+            optimizer_grouped_parameters = [
+                {
+                    "params": self.model.parameters(),
+                    "lr": args.learning_rate                    
+                },
+                {
+                    "params": [param for param in self.plm_model.parameters() if param.requires_grad],
+                    "lr": args.learning_rate
+                }
+            ]
+            self.optimizer = torch.optim.AdamW(optimizer_grouped_parameters)
+        else:
+            self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=args.learning_rate)
         
         # Setup accelerator
         self.accelerator = Accelerator(gradient_accumulation_steps=args.gradient_accumulation_steps)
@@ -31,15 +59,27 @@ class Trainer:
         self.loss_fn = self._setup_loss_function()
         
         # Prepare for distributed training
-        self.model, self.optimizer = self.accelerator.prepare(self.model, self.optimizer)
+        if self.args.training_method in ['full', 'plm-lora']:
+            self.model, self.plm_model, self.optimizer = self.accelerator.prepare(
+                self.model, self.plm_model, self.optimizer
+            )
+        else:
+            self.model, self.optimizer = self.accelerator.prepare(self.model, self.optimizer)
         if self.scheduler:
             self.scheduler = self.accelerator.prepare(self.scheduler)
             
         # Training state
         self.best_val_loss = float("inf")
-        self.best_val_metric_score = -float("inf")
+        if self.args.monitor_strategy == 'min':
+            self.best_val_metric_score = float("inf")
+        else:
+            self.best_val_metric_score = -float("inf")
         self.global_steps = 0
         self.early_stop_counter = 0
+        
+        # Save args
+        with open(os.path.join(self.args.output_dir, f'{self.args.output_model_name.split(".")[0]}.json'), 'w') as f:
+            json.dump(self.args.__dict__, f)
         
     def _setup_loss_function(self):
         if self.args.problem_type == 'regression':
@@ -66,23 +106,58 @@ class Trainer:
             
             # Early stopping check
             if self._check_early_stopping():
+                self.logger.info(f"Early stop at Epoch {epoch}")
                 break
                 
     def _train_epoch(self, train_loader):
         self.model.train()
-        if self.args.training_method == 'full':
+        if self.args.training_method in  ['full', 'plm-lora']:
             self.plm_model.train()
             
         total_loss = 0
+        total_samples = 0
         epoch_iterator = tqdm(train_loader, desc="Training")
         
         for batch in epoch_iterator:
-            with self.accelerator.accumulate(self.model):
+            # choose models to accumulate
+            models_to_accumulate = [self.model, self.plm_model] if self.args.training_method in  ['full', 'plm-lora'] else [self.model]
+            
+            with self.accelerator.accumulate(*models_to_accumulate):
+                # Forward and backward
                 loss = self._training_step(batch)
-                total_loss += loss.item() * len(batch["label"])
-                epoch_iterator.set_postfix(train_loss=loss.item())
+                self.accelerator.backward(loss)
+                    
+                # Update statistics
+                batch_size = batch["label"].size(0)
+                total_loss += loss.item() * batch_size
+                total_samples += batch_size
                 
-        return total_loss / len(train_loader.dataset)
+                # Gradient clipping if needed
+                if self.args.max_grad_norm > 0:
+                    params_to_clip = (
+                        list(self.model.parameters()) + list(self.plm_model.parameters())
+                        if self.args.training_method in  ['full', 'plm-lora']
+                        else self.model.parameters()
+                    )
+                    self.accelerator.clip_grad_norm_(params_to_clip, self.args.max_grad_norm)
+                
+                # Optimization step
+                self.optimizer.step()
+                if self.scheduler:
+                    self.scheduler.step()
+                self.optimizer.zero_grad()
+                
+                # Logging
+                self.global_steps += 1
+                self._log_training_step(loss)
+                
+                # Update progress bar
+                epoch_iterator.set_postfix(
+                    train_loss=loss.item(),
+                    grad_step=self.global_steps // self.args.gradient_accumulation_steps
+                )
+        
+        return total_loss / total_samples
     
     def _training_step(self, batch):
         # Move batch to device
@@ -91,32 +166,6 @@ class Trainer:
         # Forward pass
         logits = self.model(self.plm_model, batch)
         loss = self._compute_loss(logits, batch["label"])
-        
-        # Backward pass
-        self.accelerator.backward(loss)
-        
-        # Gradient clipping
-        if self.args.max_grad_norm > 0:
-            if self.args.training_method == 'full':
-                torch.nn.utils.clip_grad_norm_(
-                    list(self.model.parameters()) + list(self.plm_model.parameters()),
-                    self.args.max_grad_norm
-                )
-            else:
-                torch.nn.utils.clip_grad_norm_(
-                    self.model.parameters(),
-                    self.args.max_grad_norm
-                )
-        
-        # Optimization step
-        self.optimizer.step()
-        if self.scheduler:
-            self.scheduler.step()
-        self.optimizer.zero_grad()
-        
-        # Update global steps and log
-        self.global_steps += 1
-        self._log_training_step(loss)
         
         return loss
     
@@ -131,7 +180,7 @@ class Trainer:
             tuple: (validation_loss, validation_metrics)
         """
         self.model.eval()
-        if self.args.training_method == 'full':
+        if self.args.training_method in  ['full', 'plm-lora']:
             self.plm_model.eval()
             
         total_loss = 0
@@ -164,17 +213,6 @@ class Trainer:
         metrics_results = {name: metric.compute().item() 
                           for name, metric in self.metrics_dict.items()}
         
-        # Log validation results
-        self.logger.info(f"Validation Loss: {avg_loss:.4f}")
-        for name, value in metrics_results.items():
-            self.logger.info(f"Validation {name}: {value:.4f}")
-        
-        if self.args.wandb:
-            wandb.log({
-                "val/loss": avg_loss,
-                **{f"val/{k}": v for k, v in metrics_results.items()}
-            }, step=self.global_steps)
-        
         return avg_loss, metrics_results
     
     def test(self, test_loader):
@@ -186,9 +224,9 @@ class Trainer:
         
         # Log results
         self.logger.info("Test Results:")
-        self.logger.info(f"Loss: {test_loss:.4f}")
+        self.logger.info(f"Test Loss: {test_loss:.4f}")
         for name, value in test_metrics.items():
-            self.logger.info(f"{name}: {value:.4f}")
+            self.logger.info(f"Test {name}: {value:.4f}")
             
         if self.args.wandb:
             wandb.log({f"test/{k}": v for k, v in test_metrics.items()})
@@ -204,13 +242,24 @@ class Trainer:
     
     def _update_metrics(self, logits, labels):
         """Update metrics with current batch predictions."""
-        for metric in self.metrics_dict.values():
+        for metric_name, metric in self.metrics_dict.items():
             if self.args.problem_type == 'regression' and self.args.num_labels == 1:
-                metric(logits.squeeze(), labels.squeeze())
-            elif self.args.problem_type == 'multi_label_classification':
+                logits = logits.view(-1, 1)
+                labels = labels.view(-1, 1)
                 metric(logits, labels)
+            elif self.args.problem_type == 'multi_label_classification':
+                metric(torch.sigmoid(logits), labels)
             else:
-                metric(torch.argmax(logits, 1), labels)
+                if self.args.num_labels == 2:
+                    if metric_name == 'auroc':
+                        metric(torch.sigmoid(logits[:, 1]), labels)
+                    else:
+                        metric(torch.argmax(logits, 1), labels)
+                else:
+                    if metric_name == 'auroc':
+                        metric(F.softmax(logits, dim=1), labels)
+                    else:
+                        metric(torch.argmax(logits, 1), labels)
     
     def _log_training_step(self, loss):
         if self.args.wandb:
@@ -219,23 +268,62 @@ class Trainer:
                 "train/learning_rate": self.optimizer.param_groups[0]['lr']
             }, step=self.global_steps)
     
+    # def _save_model(self, path):
+    #     if self.args.training_method in ['full', 'plm-lora']:
+    #         torch.save({
+    #             'model_state_dict': self.model.state_dict(),
+    #             'plm_state_dict': self.plm_model.state_dict()
+    #         }, path)
+    #     else:
+    #         torch.save(self.model.state_dict(), path)
+    
+    # def _load_best_model(self):
+    #     path = os.path.join(self.args.output_dir, self.args.output_model_name)
+    #     if self.args.training_method in ['full', 'plm-lora']:
+    #         checkpoint = torch.load(path, weights_only=True)
+    #         self.model.load_state_dict(checkpoint['model_state_dict'])
+    #         self.plm_model.load_state_dict(checkpoint['plm_state_dict'])
+    #     else:
+    #         self.model.load_state_dict(torch.load(path, weights_only=True))      
     def _save_model(self, path):
         if self.args.training_method == 'full':
+            model_state = {k: v.cpu() for k, v in self.model.state_dict().items()}
+            plm_state = {k: v.cpu() for k, v in self.plm_model.state_dict().items()}
             torch.save({
-                'model_state_dict': self.model.state_dict(),
-                'plm_state_dict': self.plm_model.state_dict()
+                'model_state_dict': model_state,
+                'plm_state_dict': plm_state
             }, path)
+        elif self.args.training_method in ['lora', 'plm-lora']:
+            model_state = {k: v.cpu() for k, v in self.model.state_dict().items()}
+            plm_state = {k: v.cpu() for k, v in self.plm_model.state_dict().items()}
+            if hasattr(self.plm_model, 'peft_config'):
+                lora_config = self.plm_model.peft_config
+            else:
+                raise ValueError("plm_model do not use peft lora, please check it.")
+            try:
+                torch.save({
+                    'model_state_dict': model_state,
+                    'plm_state_dict': plm_state,
+                    "lora_config": lora_config
+                }, path)
+            except Exception as e:
+                raise ValueError(f"lora model save error: {str(e)}")
         else:
-            torch.save(self.model.state_dict(), path)
-    
+            model_state = {k: v.cpu() for k, v in self.model.state_dict().items()}
+            torch.save(model_state, path)
+
     def _load_best_model(self):
         path = os.path.join(self.args.output_dir, self.args.output_model_name)
-        if self.args.training_method == 'full':
-            checkpoint = torch.load(path)
+        if self.args.training_method in ['full', 'lora', 'plm-lora']:
+            checkpoint = torch.load(path, map_location="cpu")
             self.model.load_state_dict(checkpoint['model_state_dict'])
             self.plm_model.load_state_dict(checkpoint['plm_state_dict'])
+            self.model.to(self.device)
+            self.plm_model.to(self.device)
         else:
-            self.model.load_state_dict(torch.load(path))
+            checkpoint = torch.load(path, map_location="cpu")
+            self.model.load_state_dict(checkpoint)
+            self.model.to(self.device)
     
     def _handle_validation_results(self, epoch: int, val_loss: float, val_metrics: dict):
         """
@@ -265,11 +353,8 @@ class Trainer:
         if self.args.monitor != 'loss' and self.args.monitor in val_metrics:
             monitor_value = val_metrics[self.args.monitor]
         
-        # Get the strategy (min or max) for the monitored metric
-        strategy = self.metrics_monitor_strategy_dict.get(self.args.monitor, 'min')
-        
         # Check if current result is better
-        if strategy == 'min':
+        if self.args.monitor_strategy == 'min':
             if monitor_value < self.best_val_metric_score:
                 should_save = True
                 self.best_val_metric_score = monitor_value
@@ -286,7 +371,7 @@ class Trainer:
         
         # Save model if improved
         if should_save:
-            self.logger.info(f"Saving model with best {self.args.monitor}: {monitor_value:.4f}")
+            self.logger.info(f"Saving model with best val {self.args.monitor}: {monitor_value:.4f}")
             save_path = os.path.join(self.args.output_dir, self.args.output_model_name)
             self._save_model(save_path)
 

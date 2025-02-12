@@ -1,0 +1,10 @@
+{
+    "dataset": "tyang816/eSOL_AlphaFold2",
+    "pdb_type": "AlphaFold2",
+    "num_labels": 1,
+    "problem_type": "regression",
+    "metrics": "mse,spearman_corr",
+    "monitor": "mse",
+    "monitor_strategy": "min",
+    "normalize": "standard"
+}

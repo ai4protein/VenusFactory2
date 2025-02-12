@@ -37,8 +37,8 @@ Recent News:
 | [IgBert_unpaired](https://huggingface.co/Exscientia/IgBert_unpaired) | 420M                    | Exscientia/IgBert_unpaired           |
 | [ProtT5-Uniref50](https://huggingface.co/Rostlab/prot_t5_xl_uniref50) | 3B/11B                  | Rostlab/prot_t5_xl_uniref50     |
 | [ProtT5-BFD100](https://huggingface.co/Rostlab/prot_t5_xl_bfd) | 3B/11B                  | Rostlab/prot_t5_xl_bfd          |
-| [Exscientia/IgT5](https://huggingface.co/Exscientia/IgT5) | 3B                  | Exscientia/IgT5          |
-| [Exscientia/IgT5_unpaired](https://huggingface.co/Exscientia/IgT5_unpaired) | 3B                  | Exscientia/IgT5_unpaired          |
+| [IgT5](https://huggingface.co/Exscientia/IgT5) | 3B                  | Exscientia/IgT5          |
+| [IgT5_unpaired](https://huggingface.co/Exscientia/IgT5_unpaired) | 3B                  | Exscientia/IgT5_unpaired          |
 | [Ankh](https://huggingface.co/ElnaggarLab/ankh-base)         | 450M/1.2B               | ElnaggarLab/ankh-base           |
 
 ## 🔬 Supported Training Approaches
@@ -46,7 +46,7 @@ Recent News:
 | Approach               | Full-tuning | Freeze-tuning      | LoRA               | SES-Adapter        |
 | ---------------------- | ----------- | ------------------ | ------------------ | ------------------ |
 | Pre-Training           | ❎          | ❎                | ❎                 | ❎                |
-| Supervised Fine-Tuning | ❎          | ✅                | ✅                 | ✅                |
+| Supervised Fine-Tuning | ✅          | ✅                | ✅                 | ✅                |
 
 ## 📚 Supported Datasets
 
@@ -59,23 +59,28 @@ Recent News:
 
 <details><summary>Supervised fine-tuning datasets (amino acid sequences/ foldseek sequences/ ss8 sequences)</summary>
 
-- [DeepLocBinary_ESMFold](https://huggingface.co/datasets/tyang816/DeepLocBinary_ESMFold) | protein-wise | single_label_classification
 - [DeepLocBinary_AlphaFold2](https://huggingface.co/datasets/tyang816/DeepLocBinary_AlphaFold2) | protein-wise | single_label_classification
-- [DeepLocMulti_ESMFold](https://huggingface.co/datasets/tyang816/DeepLocMulti_ESMFold) | protein-wise | single_label_classification
+- [DeepLocBinary_ESMFold](https://huggingface.co/datasets/tyang816/DeepLocBinary_ESMFold) | protein-wise | single_label_classification
 - [DeepLocMulti_AlphaFold2](https://huggingface.co/datasets/tyang816/DeepLocMulti_AlphaFold2) | protein-wise | single_label_classification
+- [DeepLocMulti_ESMFold](https://huggingface.co/datasets/tyang816/DeepLocMulti_ESMFold) | protein-wise | single_label_classification
 - [DeepSol_ESMFold](https://huggingface.co/datasets/tyang816/DeepSol_ESMFold) | protein-wise | single_label_classification
 - [DeepSoluE_ESMFold](https://huggingface.co/datasets/tyang816/DeepSoluE_ESMFold) | protein-wise | single_label_classification
 - [ProtSolM_ESMFold](https://huggingface.co/datasets/tyang816/ProtSolM_ESMFold) | protein-wise | single_label_classification
-- [EC_ESMFold](https://huggingface.co/datasets/tyang816/EC_ESMFold) | protein-wise | multi_label_classification
+- [eSOL_AlphaFold2](https://huggingface.co/datasets/tyang816/eSOL_AlphaFold2) | protein-wise | regression
+- [eSOL_ESMFold](https://huggingface.co/datasets/tyang816/eSOL_ESMFold) | protein-wise | regression
+- [DeepET_Topt_AlphaFold2](https://huggingface.co/datasets/tyang816/DeepET_Topt_AlphaFold2) | protein-wise | regression
+- [DeepET_Topt_ESMFold](https://huggingface.co/datasets/tyang816/DeepET_Topt_ESMFold) | protein-wise | regression
 - [EC_AlphaFold2](https://huggingface.co/datasets/tyang816/EC_AlphaFold2) | protein-wise | multi_label_classification
-- [GO_BP_ESMFold](https://huggingface.co/datasets/tyang816/GO_BP_ESMFold) | protein-wise | multi_label_classification
+- [EC_ESMFold](https://huggingface.co/datasets/tyang816/EC_ESMFold) | protein-wise | multi_label_classification
 - [GO_BP_AlphaFold2](https://huggingface.co/datasets/tyang816/GO_BP_AlphaFold2) | protein-wise | multi_label_classification
-- [GO_CC_ESMFold](https://huggingface.co/datasets/tyang816/GO_CC_ESMFold) | protein-wise | multi_label_classification
+- [GO_BP_ESMFold](https://huggingface.co/datasets/tyang816/GO_BP_ESMFold) | protein-wise | multi_label_classification
 - [GO_CC_AlphaFold2](https://huggingface.co/datasets/tyang816/GO_CC_AlphaFold2) | protein-wise | multi_label_classification
-- [GO_MF_ESMFold](https://huggingface.co/datasets/tyang816/GO_MF_ESMFold) | protein-wise | multi_label_classification
+- [GO_CC_ESMFold](https://huggingface.co/datasets/tyang816/GO_CC_ESMFold) | protein-wise | multi_label_classification
 - [GO_MF_AlphaFold2](https://huggingface.co/datasets/tyang816/GO_MF_AlphaFold2) | protein-wise | multi_label_classification
-- [MetalIonBinding_ESMFold](https://huggingface.co/datasets/tyang816/MetalIonBinding_ESMFold) | protein-wise | single_label_classification
+- [GO_MF_ESMFold](https://huggingface.co/datasets/tyang816/GO_MF_ESMFold) | protein-wise | multi_label_classification
 - [MetalIonBinding_AlphaFold2](https://huggingface.co/datasets/tyang816/MetalIonBinding_AlphaFold2) | protein-wise | single_label_classification
+- [MetalIonBinding_ESMFold](https://huggingface.co/datasets/tyang816/MetalIonBinding_ESMFold) | protein-wise | single_label_classification
+- [Thermostability_AlphaFold2](https://huggingface.co/datasets/tyang816/Thermostability_ESMFold) | protein-wise | regression
 - [Thermostability_ESMFold](https://huggingface.co/datasets/tyang816/Thermostability_ESMFold) | protein-wise | regression
 
 > ✨ Only structural sequences are different for the same dataset, for example, ``DeepLocBinary_ESMFold`` and ``DeepLocBinary_AlphaFold2`` share the same amino acid sequences, this means if you only want to use the ``aa_seqs``, both are ok! 
@@ -97,7 +102,7 @@ Recent News:
 
 ## 📈 Supported Metrics
 
-| Metric Name   | Full Name        | Problem Type                                            |
+| Name          | Torchmetrics     | Problem Type                                            |
 | ------------- | ---------------- | ------------------------------------------------------- |
 | accuracy      | Accuracy         | single_label_classification/ multi_label_classification |
 | recall        | Recall           | single_label_classification/ multi_label_classification |
@@ -107,6 +112,7 @@ Recent News:
 | auc           | AUROC            | single_label_classification/ multi_label_classification |
 | f1_max        | F1ScoreMax       | multi_label_classification                              |
 | spearman_corr | SpearmanCorrCoef | regression                                              |
+| mse           | MeanSquaredError | regression                                              |
 
 ## ✈️ Reuirement
 
