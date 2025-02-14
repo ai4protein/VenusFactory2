@@ -8,6 +8,8 @@ from .scheduler import create_scheduler
 from .metrics import setup_metrics
 from .loss_function import MultiClassFocalLossWithAlpha
 import wandb
+from models.model_factory import create_plm_and_tokenizer
+from peft import PeftModel
 
 class Trainer:
     def __init__(self, args, model, plm_model, logger):
@@ -34,7 +36,7 @@ class Trainer:
                 }
             ]
             self.optimizer = torch.optim.AdamW(optimizer_grouped_parameters)
-        elif self.args.training_method == "plm-lora":
+        elif self.args.training_method in ["plm-lora", "plm-qlora"]:
             optimizer_grouped_parameters = [
                 {
                     "params": self.model.parameters(),
@@ -113,7 +115,6 @@ class Trainer:
         self.model.train()
         if self.args.training_method in  ['full', 'plm-lora']:
             self.plm_model.train()
-            
         total_loss = 0
         total_samples = 0
         epoch_iterator = tqdm(train_loader, desc="Training")
@@ -308,6 +309,13 @@ class Trainer:
                 }, path)
             except Exception as e:
                 raise ValueError(f"lora model save error: {str(e)}")
+        elif self.args.training_method == "plm-qlora":
+            plm_qlora_path = path.replace('.pt', '_qlora')
+            # save plm model lora weights
+            self.plm_model.save_pretrained(plm_qlora_path)
+            # save model state dict
+            model_state = {k: v.cpu() for k, v in self.model.state_dict().items()}
+            torch.save(model_state, path)
         else:
             model_state = {k: v.cpu() for k, v in self.model.state_dict().items()}
             torch.save(model_state, path)
@@ -318,6 +326,17 @@ class Trainer:
             checkpoint = torch.load(path, map_location="cpu")
             self.model.load_state_dict(checkpoint['model_state_dict'])
             self.plm_model.load_state_dict(checkpoint['plm_state_dict'])
+            self.model.to(self.device)
+            self.plm_model.to(self.device)
+        elif self.args.training_method == "plm-qlora":
+            # load model state dict
+            checkpoint = torch.load(path, map_location="cpu")
+            self.model.load_state_dict(checkpoint)
+            plm_qlora_path = path.replace('.pt', '_qlora')
+            # reload plm model and apply qlora weights
+            _, self.plm_model = create_plm_and_tokenizer(self.args)
+            self.plm_model = PeftModel.from_pretrained(self.plm_model, plm_qlora_path)
+            self.plm_model = self.plm_model.merge_and_unload()
             self.model.to(self.device)
             self.plm_model.to(self.device)
         else:
