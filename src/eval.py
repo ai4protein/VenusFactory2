@@ -18,9 +18,9 @@ from transformers import T5Tokenizer, T5EncoderModel, AutoTokenizer
 from transformers import logging
 from datasets import load_dataset
 from torch.utils.data import DataLoader
-from utils.data_utils import BatchSampler
-from utils.metrics import MultilabelF1Max
-from models.adapter_mdoel import AdapterModel
+from data.batch_sampler import BatchSampler
+from training.metrics import MultilabelF1Max
+from models.adapter_model import AdapterModel
 
 # ignore warning information
 logging.set_verbosity_error()
@@ -28,10 +28,12 @@ warnings.filterwarnings("ignore")
 
 def evaluate(model, plm_model, metrics, dataloader, loss_function, device=None):
     total_loss = 0
+    total_samples = len(dataloader.dataset)
+    print(f"Total samples: {total_samples}")
     epoch_iterator = tqdm(dataloader)
     pred_labels = []
     
-    for batch in epoch_iterator:
+    for i, batch in enumerate(epoch_iterator, 1):
         for k, v in batch.items():
             batch[k] = v.to(device)
         label = batch["label"]
@@ -65,7 +67,7 @@ if __name__ == '__main__':
     # model params
     parser.add_argument('--hidden_size', type=int, default=None, help='embedding hidden size of the model')
     parser.add_argument('--num_attention_head', type=int, default=8, help='number of attention heads')
-    parser.add_argument('--attention_probs_dropout_prob', type=float, default=0, help='attention probs dropout prob')
+    parser.add_argument('--attention_probs_dropout', type=float, default=0, help='attention probs dropout prob')
     parser.add_argument('--plm_model', type=str, default='facebook/esm2_t33_650M_UR50D', help='esm model name')
     parser.add_argument('--num_labels', type=int, default=2, help='number of labels')
     parser.add_argument('--pooling_method', type=str, default='mean', help='pooling method')
@@ -136,7 +138,7 @@ if __name__ == '__main__':
             'binary': BinaryMatthewsCorrCoef,
             'multi': lambda: MatthewsCorrCoef(task="multiclass", num_classes=args.num_labels)
         },
-        'auc': {
+        'auroc': {
             'binary': BinaryAUROC,
             'multi': lambda: AUROC(task="multiclass", num_classes=args.num_labels)
         },
@@ -242,7 +244,11 @@ if __name__ == '__main__':
         else:
             labels = torch.as_tensor(labels, dtype=torch.long)
         
-        data_dict = {"aa_input_ids": aa_input_ids, "attention_mask": attention_mask, "label": labels}
+        data_dict = {
+            "aa_seq_input_ids": aa_input_ids,
+            "aa_seq_attention_mask": attention_mask,
+            "label": labels
+        }
         if args.use_foldseek:
             data_dict["foldseek_input_ids"] = foldseek_input_ids
         if args.use_ss8:
@@ -299,7 +305,7 @@ if __name__ == '__main__':
             test_result_df = pd.read_csv(args.test_file)
     elif '/' in args.test_file:  # Huggingface dataset (only csv now)
         raw_dataset = load_dataset(args.test_file)
-        # 如果指定了split，优先使用指定的split
+        # Using the chosen split first.
         if args.split and args.split in raw_dataset:
             split = args.split
         elif 'test' in raw_dataset:
