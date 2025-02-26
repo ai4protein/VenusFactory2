@@ -219,8 +219,11 @@ class Trainer:
         # Load best model
         self._load_best_model()
         
-        # Run evaluation
-        test_loss, test_metrics = self._validate(test_loader)
+        # Add a clear signal that testing is starting
+        self.logger.info("---------- Starting Test Phase ----------")
+        
+        # Run evaluation with a custom testing function instead of reusing _validate
+        test_loss, test_metrics = self._test_evaluate(test_loader)
         
         # Log results
         self.logger.info("Test Results:")
@@ -231,6 +234,48 @@ class Trainer:
         if self.args.wandb:
             wandb.log({f"test/{k}": v for k, v in test_metrics.items()})
             wandb.log({"test/loss": test_loss})
+    
+    def _test_evaluate(self, test_loader):
+        """
+        Dedicated evaluation function for test phase with proper labeling.
+        This is almost identical to _validate but with "Testing" progress bar.
+        """
+        self.model.eval()
+        if self.args.training_method in ['full', 'plm-lora']:
+            self.plm_model.eval()
+            
+        total_loss = 0
+        total_samples = 0
+        
+        # Reset all metrics at the start of testing
+        for metric in self.metrics_dict.values():
+            metric.reset()
+        
+        with torch.no_grad():
+            # Note the desc is "Testing" instead of "Validating"
+            for batch in tqdm(test_loader, desc="Testing"):
+                batch = {k: v.to(self.device) for k, v in batch.items()}
+                
+                # Forward pass
+                logits = self.model(self.plm_model, batch)
+                loss = self._compute_loss(logits, batch["label"])
+                
+                # Update loss statistics
+                batch_size = len(batch["label"])
+                total_loss += loss.item() * batch_size
+                total_samples += batch_size
+                
+                # Update metrics
+                self._update_metrics(logits, batch["label"])
+        
+        # Compute average loss
+        avg_loss = total_loss / total_samples
+        
+        # Compute final metrics
+        metrics_results = {name: metric.compute().item() 
+                          for name, metric in self.metrics_dict.items()}
+        
+        return avg_loss, metrics_results
     
     def _compute_loss(self, logits, labels):
         if self.args.problem_type == 'regression' and self.args.num_labels == 1:

@@ -34,9 +34,19 @@ def evaluate(model, plm_model, metrics, dataloader, loss_function, device=None):
     pred_labels = []
     
     for i, batch in enumerate(epoch_iterator, 1):
+        # 添加调试信息，打印每个batch的键和shape
+        print(f"\n处理批次 {i}:")
+        for k, v in batch.items():
+            print(f"  键: {k}, 形状: {v.shape}")
+            
         for k, v in batch.items():
             batch[k] = v.to(device)
         label = batch["label"]
+        
+        # 在调用模型前添加调试信息
+        print(f"将批次传递给模型，使用structure_seq: {args.structure_seq}")
+        print(f"使用foldseek: {args.use_foldseek}, 使用ss8: {args.use_ss8}")
+        
         logits = model(plm_model, batch)
         pred_labels.extend(logits.argmax(dim=1).cpu().numpy())
         
@@ -92,8 +102,17 @@ if __name__ == '__main__':
     parser.add_argument('--output_root', default="result", help='root directory to save trained models')
     parser.add_argument('--output_dir', default=None, help='directory to save trained models')
     parser.add_argument('--model_path', default=None, help='model path directly')
-    parser.add_argument('--structure_seq', type=str, default=None, help='structure sequence')
+    parser.add_argument('--structure_seq', type=str, default="", help='structure sequence')
+    parser.add_argument('--training_method', type=str, default="freeze", help='training method')
     args = parser.parse_args()
+    
+    # 自动设置结构序列标志
+    if 'foldseek_seq' in args.structure_seq:
+        args.use_foldseek = True
+        print("Enabled foldseek_seq based on structure_seq parameter")
+    if 'ss8_seq' in args.structure_seq:
+        args.use_ss8 = True
+        print("Enabled ss8_seq based on structure_seq parameter")
     
     device = "cuda" if torch.cuda.is_available() else "cpu"
     os.makedirs(args.test_result_dir, exist_ok=True)
@@ -172,6 +191,18 @@ if __name__ == '__main__':
     
     # load adapter model
     print("---------- Load Model ----------")
+    if args.structure_seq is None:
+        args.structure_seq = ""
+        print("Warning: structure_seq was None, setting to empty string")
+
+    # 添加调试信息
+    print(f"Training method: {args.training_method}")
+    print(f"Structure sequence: {args.structure_seq}")
+    print(f"Use foldseek: {args.use_foldseek}")
+    print(f"Use ss8: {args.use_ss8}")
+    print(f"Problem type: {args.problem_type}")
+    print(f"Number of labels: {args.num_labels}")
+    
     model = AdapterModel(args)
     if args.model_path is not None:
         model_path = args.model_path
@@ -250,9 +281,13 @@ if __name__ == '__main__':
             "label": labels
         }
         if args.use_foldseek:
-            data_dict["foldseek_input_ids"] = foldseek_input_ids
+            data_dict["foldseek_seq_input_ids"] = foldseek_input_ids
         if args.use_ss8:
-            data_dict["ss8_input_ids"] = ss8_input_ids
+            data_dict["ss8_seq_input_ids"] = ss8_input_ids
+        
+        # 添加调试信息
+        print("生成的批次包含以下键：", data_dict.keys())
+        
         return data_dict
         
     loss_function = nn.CrossEntropyLoss()
