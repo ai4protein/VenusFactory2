@@ -13,6 +13,10 @@ def build_command_list(args: Dict[str, Any]) -> list:
         if isinstance(value, bool):
             if value:
                 cmd.append(f"--{key}")
+        elif key == "lora_target_modules":
+            if value:
+                cmd.append(f"--{key}")
+                cmd.extend(value)
         else:
             cmd.extend([f"--{key}", str(value)])
     
