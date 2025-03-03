@@ -8,7 +8,7 @@
 # T5_base(ankh, t5) model target_modules name: q k v
 
 # if need to use HF mirror
-# export HF_ENDPOINT=https://hf-mirror.com
+export HF_ENDPOINT=https://hf-mirror.com
 dataset=GO_BP
 pdb_type=ESMFold
 pooling_head=mean
@@ -22,9 +22,9 @@ python src/train.py \
     --learning_rate $lr \
     --gradient_accumulation_steps 8 \
     --num_epochs 100 \
-    --batch_token 2000 \
+    --batch_token 12000 \
     --patience 10 \
     --output_dir debug/$dataset/$plm_model \
-    --output_model_name "$training_method"_"$pdb_type"_lr"$lr"_bt2k_ga8.pt \
+    --output_model_name "$training_method"_"$pdb_type"_lr"$lr"_bt12k_ga8.pt \
     --training_method $training_method \
     --lora_target_modules query key value
