@@ -51,7 +51,7 @@ class TrainingArgs:
         self.lora_r = args[22]
         self.lora_alpha = args[23]
         self.lora_dropout = args[24]
-        self.lora_target_modules = [m.strip() for m in args[25].split(",")] if args[25] else []
+        self.lora_target_modules = args[25].strip().split(",") if args[25] else ["query", "key", "value"]
 
     def to_dict(self) -> Dict[str, Any]:
         args_dict = {
@@ -74,7 +74,7 @@ class TrainingArgs:
         }
 
         # 添加LoRA参数
-        if self.training_method == "plm-lora":
+        if self.training_method in ["plm-lora", "plm-qlora"]:
             args_dict.update({
                 "lora_r": self.lora_r,
                 "lora_alpha": self.lora_alpha,
@@ -216,7 +216,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             with gr.Row(equal_height=True):
                 with gr.Column(scale=1, min_width=150):
                     training_method = gr.Dropdown(
-                        choices=["full", "freeze", "lora", "ses-adapter", "plm-lora"],
+                        choices=["full", "freeze", "lora", "ses-adapter", "plm-lora", "plm-qlora"],
                         label="Training Method",
                         value="freeze"
                     )
@@ -240,18 +240,26 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         minimum=-1, maximum=2048, value=None, step=32,
                         label="Max Sequence Length (-1 for unlimited)"
                     )
-            
-            def update_training_method(method):
-                return {
-                    structure_seq: gr.update(visible=method == "ses-adapter"),
-                    lora_params_row: gr.update(visible=method == "plm-lora")
-                }
 
-            # 添加training_method的change事件
+            def update_structure_seq(method):
+                return {
+                    structure_seq: gr.update(visible=method == "ses-adapter")
+                }
+            # 修改update_lora_params函数
+            def update_lora_params_row(method):
+                """更新lora参数的显示状态"""
+                is_visible = method in ["plm-lora", "plm-qlora"]
+                return gr.update(visible=is_visible)
+
             training_method.change(
-                fn=update_training_method,
+                fn=update_structure_seq,
                 inputs=[training_method],
-                outputs=[structure_seq, lora_params_row]
+                outputs=[structure_seq]
+            )
+            training_method.change(
+                fn=update_lora_params_row,
+                inputs=[training_method],
+                outputs=[lora_params_row]
             )
 
             # Second row: Advanced training parameters
