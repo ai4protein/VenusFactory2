@@ -1,4 +1,5 @@
 import os
+os.environ["HF_ENDPOINT"]="https://hf-mirror.com"
 import json
 import wandb
 from utils.args import parse_args
