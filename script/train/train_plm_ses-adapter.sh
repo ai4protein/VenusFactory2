@@ -6,7 +6,7 @@
 ### Protein Language Model (PLM)
 # facebook: esm2_t30_150M_UR50D esm2_t33_650M_UR50D esm2_t36_3B_UR50D
 # RostLab: prot_bert prot_bert_bfd prot_t5_xl_uniref50 prot_t5_xl_bfd ankh-base ankh-large
-
+export HF_ENDPOINT=https://hf-mirror.com
 dataset=DeepLocBinary
 pdb_type=AlphaFold2
 plm_source=facebook
