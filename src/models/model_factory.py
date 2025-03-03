@@ -45,7 +45,6 @@ def create_lora_model(args):
     # Enable gradient checkpointing
     plm_model.gradient_checkpointing_enable()
     plm_model=setup_lora_plm(plm_model, args)
-    print(" Using plm lora ")
     return model, plm_model, tokenizer
 
 def create_qlora_model(args):
@@ -58,7 +57,6 @@ def create_qlora_model(args):
     plm_model.gradient_checkpointing_enable()
     plm_model = prepare_model_for_kbit_training(plm_model)
     plm_model=setup_lora_plm(plm_model, args)
-    print(" Using plm qlora ")
     return model, plm_model, tokenizer
 
 def lora_factory(args):
