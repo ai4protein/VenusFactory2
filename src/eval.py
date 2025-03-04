@@ -112,7 +112,7 @@ if __name__ == '__main__':
         tokenizer = AutoTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
         plm_model = T5EncoderModel.from_pretrained(args.plm_model).to(device).eval()
         args.hidden_size = plm_model.config.d_model
-    elif "prosst" in args.plm_model:
+    elif "ProSST" in args.plm_model:
         tokenizer = AutoTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
         plm_model = AutoModelForMaskedLM.from_pretrained(args.plm_model).to(device).eval()
         args.hidden_size = plm_model.config.hidden_size
