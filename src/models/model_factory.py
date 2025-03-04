@@ -4,6 +4,7 @@ from transformers import (
     BertTokenizer, BertModel,
     T5Tokenizer, T5EncoderModel,
     AutoTokenizer, PreTrainedModel,
+    AutoModelForMaskedLM
 )
 from peft import prepare_model_for_kbit_training
 from .adapter_model import AdapterModel
@@ -145,6 +146,12 @@ def create_plm_and_tokenizer(args, qlora_config=None):
             plm_model = T5EncoderModel.from_pretrained(args.plm_model, quantization_config=qlora_config)
         else:
             plm_model = T5EncoderModel.from_pretrained(args.plm_model)
+    elif "ProSST" in args.plm_model:
+        tokenizer = AutoTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
+        if qlora_config:
+            plm_model = AutoModelForMaskedLM.from_pretrained(args.plm_model, quantization_config=qlora_config)
+        else:
+            plm_model = AutoModelForMaskedLM.from_pretrained(args.plm_model)
     else:
         raise ValueError(f"Unsupported model type: {args.plm_model}")
 
@@ -161,6 +168,8 @@ def get_hidden_size(plm_model, model_type):
         return plm_model.config.hidden_size
     elif "prot_t5" in model_type or "ankh" in model_type:
         return plm_model.config.d_model
+    elif "ProSST" in model_type:
+        return plm_model.config.hidden_size
     else:
         raise ValueError(f"Unsupported model type: {model_type}")
 

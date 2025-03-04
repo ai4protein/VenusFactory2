@@ -26,7 +26,7 @@ class Collator:
     def __call__(self, examples: List[Dict[str, Any]]) -> Dict[str, torch.Tensor]:
         """Collate function for batching examples."""
         # Initialize lists to store sequences and labels
-        aa_seqs, labels = [], []
+        aa_seqs, labels, str_tokens = [], [], []
         structure_seqs = {
             seq_type: [] for seq_type in (self.structure_seq or [])
         }
@@ -36,6 +36,8 @@ class Collator:
             # Process sequences
             aa_seq = self.process_sequence(e["aa_seq"])
             aa_seqs.append(aa_seq)
+            stru_token = self.process_stru_tokens(e["prosst_stru_token"])
+            str_tokens.append(stru_token)
             
             # Process structure sequences if needed
             for seq_type in structure_seqs:
@@ -56,7 +58,7 @@ class Collator:
             labels.append(e["label"])
 
         # Tokenize sequences
-        batch = self.tokenize_sequences(aa_seqs, structure_seqs)
+        batch = self.tokenize_sequences(aa_seqs, structure_seqs, str_tokens)
         
         # Add labels to batch
         batch["label"] = torch.as_tensor(
@@ -77,10 +79,21 @@ class Collator:
         """Process ESM3 structure sequence."""
         return torch.tensor([VQVAE_SPECIAL_TOKENS["BOS"]] + seq + [VQVAE_SPECIAL_TOKENS["EOS"]])
 
+    def process_stru_tokens(self, seq:List[int]) -> torch.Tensor:
+        """Process ProSST structure token."""
+        if isinstance(seq, str):
+            seq_clean = seq.strip("[]").replace(" ","")
+            tokens = list(map(int, seq_clean.split(','))) if seq_clean else []
+        elif isinstance(seq, (list, tuple)):
+            tokens = [int(x) for x in seq]
+        stru_tokens = [int(num) for num in tokens]
+        return torch.tensor(stru_tokens)
+    
     def tokenize_sequences(
         self,
         aa_seqs: List[str],
-        structure_seqs: Dict[str, List[str]]
+        structure_seqs: Dict[str, List[str]],
+        str_tokens: List[str]
     ) -> Dict[str, torch.Tensor]:
         """Tokenize all sequences."""
         # Process amino acid sequences
@@ -92,9 +105,17 @@ class Collator:
             return_tensors="pt"
         )
         
+        aa_max_length = len(aa_encodings["input_ids"][0])
+        padded_tokens = []
+        for tokens in str_tokens:
+            struct_sequence =  [int(num) for num in tokens]
+            padded_tokens.append(struct_sequence + [0] * (aa_max_length - len(struct_sequence) - 2))
+
+
         batch = {
             "aa_seq_input_ids": aa_encodings["input_ids"],
-            "aa_seq_attention_mask": aa_encodings["attention_mask"]
+            "aa_seq_attention_mask": aa_encodings["attention_mask"],
+            "aa_seq_stru_tokens": torch.tensor(padded_tokens, dtype=torch.long)
         }
         
         # Process structure sequences if provided
