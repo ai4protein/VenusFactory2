@@ -143,17 +143,18 @@ class AdapterModel(nn.Module):
         else:
             raise ValueError(f"classifier method {args.pooling_method} not supported")
     
-    def plm_embedding(self, plm_model, aa_seq, attention_mask, stru_tokens):
+    def plm_embedding(self, plm_model, aa_seq, attention_mask, structure_tokens):
         if "ProSST" in self.args.plm_model:
-            outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask, ss_input_ids=stru_tokens, output_hidden_states=True)
+            outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask, ss_input_ids=structure_tokens, output_hidden_states=True)
+        elif "Prime" in self.args.plm_model:
+            outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask, output_hidden_states=True)
         elif self.training and hasattr(self, 'args') and self.args.training_method == 'full':
             outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask)
         else:
             with torch.no_grad():
                 outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask)
-        
-        if "ProSST" in self.args.plm_model:
-            seq_embeds = outputs.hidden_state[-1]
+        if "ProSST" in self.args.plm_model or "Prime" in self.args.plm_model:
+            seq_embeds = outputs.hidden_states[-1]
         else:
             seq_embeds = outputs.last_hidden_state
         gc.collect()
