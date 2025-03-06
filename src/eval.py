@@ -285,8 +285,6 @@ if __name__ == '__main__':
         if args.use_ss8:
             data_dict["ss8_seq_input_ids"] = ss8_input_ids
         
-        # 添加调试信息
-        print("生成的批次包含以下键：", data_dict.keys())
         
         return data_dict
         

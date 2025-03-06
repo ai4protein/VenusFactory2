@@ -3,7 +3,7 @@
     "pdb_type": "",
     "num_labels": 2,
     "problem_type": "single_label_classification",
-    "metrics": "accuracy",
+    "metrics": "accuracy,mcc,f1,precision,recall,auroc",
     "monitor": "accuracy",
-    "normalize": "None"
+    "monitor_strategy": "max"
 }

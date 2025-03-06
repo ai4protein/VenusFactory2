@@ -9,6 +9,10 @@ import re
 import time
 from typing import Dict, Any, Optional
 from .command import build_command_list
+import logging
+import json
+import io
+import base64
 
 class TrainingMonitor:
     def __init__(self):
@@ -68,13 +72,15 @@ class TrainingMonitor:
             # Test result patterns - improved to match log format exactly
             'test_header': r'Test Results:',
             'test_phase_start': r'---------- Starting Test Phase ----------',
-            # Fix parsing for metrics like f1
-            'test_metric': r'Test\s+([a-zA-Z0-9_\-]+(?:\s[a-zA-Z0-9_\-]+)*):?\s*([\d.]+)',
-            # Add pattern for matching common metrics
-            'test_common_metrics': r'Test\s+((?:f1|accuracy|precision|recall|auroc|mcc)):\s*([\d.]+)',
-            # Specific pattern for test loss that matches "Test Loss: 0.3370" format
+            # 修改测试指标模式，使其更加通用
+            'test_metric': r'Test\s+([a-zA-Z0-9_\-]+):\s+([\d.]+)',
+            # 添加特定的f1指标模式
+            'test_f1': r'Test\s+f1:\s+([\d.]+)',
+            # 其他常见指标模式
+            'test_common_metrics': r'Test\s+((?:accuracy|precision|recall|auroc|mcc)):\s*([\d.]+)',
+            # 特定的loss模式
             'test_loss': r'Test\s+Loss:\s*([\d.]+)',
-            # Alternative format pattern
+            # 替代格式模式
             'test_alt_format': r'([a-zA-Z0-9_\-]+(?:\s[a-zA-Z0-9_\-]+)*)\s+on\s+test:\s*([\d.]+)',
             
             # Model parameter statistics
@@ -117,22 +123,26 @@ class TrainingMonitor:
         process.stdout.close()
         
     def start_training(self, args: Dict[str, Any]):
-        """Start training process with given arguments."""
+        """Start training process."""
         if self.is_training:
+            self.message_queue.put("Training already in progress")
             return
-            
+        
         self.is_training = True
         self.stop_thread = False
         self._reset_tracking()
-        self._reset_stats()  # Ensure stats are reset
+        self._reset_stats()
         self.error_message = None
         
-        # Extract total epochs from training parameters and save to current_progress
+        # Store total epochs for progress calculation
         self.current_progress['total_epochs'] = args.get('num_epochs', 100)
         
         try:
             # Build command
             cmd = build_command_list(args)
+            
+            # Log command
+            self.message_queue.put(f"Starting training with command: {' '.join(cmd)}")
             
             # Start process
             self.process = subprocess.Popen(
@@ -141,14 +151,13 @@ class TrainingMonitor:
                 stderr=subprocess.STDOUT,
                 text=True,
                 bufsize=1,
-                universal_newlines=True,
-                preexec_fn=os.setsid
+                universal_newlines=True
             )
             
-            # Start output processing thread
+            # Start thread to process output
             self.training_thread = threading.Thread(
-                    target=self._process_output,
-                    args=(self.process,)
+                target=self._process_output,
+                args=(self.process,)
             )
             self.training_thread.daemon = True
             self.training_thread.start()
@@ -157,24 +166,32 @@ class TrainingMonitor:
             self.error_message = f"Error starting training: {str(e)}"
             self.is_training = False
             self.message_queue.put(f"ERROR: {self.error_message}")
-    
+            
     def abort_training(self):
-        """Abort current training process."""
+        """Abort the training process."""
         if self.process:
+            # 保存当前的完成状态
+            was_completed = self.current_progress.get('is_completed', False)
+            
+            # 终止进程
             try:
-                self.stop_thread = True
                 os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
-                self.process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                try:
-                    os.killpg(os.getpgid(self.process.pid), signal.SIGKILL)
-                except:
-                    pass
-            finally:
-                self.is_training = False
-                self.process = None
-                self._reset_stats()  # Ensure all stats are reset on termination
-            self.message_queue.put("Training aborted by user.")
+            except:
+                self.process.terminate()
+            
+            self.is_training = False
+            
+            # 如果之前不是完成状态，则不设置为完成
+            if not was_completed:
+                self.current_progress['is_completed'] = False
+        
+        # 返回重置后的状态
+        return {
+            'progress_status': "Training aborted by user.",
+            'best_model': "Training aborted by user.",
+            'test_results': "",
+            'plot': None
+        }
     
     def get_messages(self) -> str:
         """Get all messages from queue."""
@@ -192,147 +209,218 @@ class TrainingMonitor:
             
         return message_text
     
-    def get_plot(self):
+    def get_loss_plot(self):
         """
-        Generate a plot showing training and validation losses.
+        Generate a static plot showing training and validation loss.
         
         Returns:
-            matplotlib Figure object, or None if insufficient data
+            matplotlib Figure object for display in gr.Plot
         """
         # Return None if insufficient data
         if not self.epochs or (not self.train_losses and not self.val_losses):
             return None
         
-        # Ensure training losses array matches epochs array length
-        if len(self.train_losses) < len(self.epochs):
-            while len(self.train_losses) < len(self.epochs):
-                self.train_losses.append(None)
-        
-        # Create new plot with improved style
-        plt.close('all')  # Close previous plots
         try:
-            plt.style.use('seaborn-v0_8-whitegrid')  # Use seaborn style for better visuals
-        except:
-            try:
-                plt.style.use('seaborn-whitegrid')
-            except:
-                pass
-        
-        fig, ax = plt.subplots(figsize=(10, 6), dpi=100)
-        
-        # Set background color for better visibility
-        ax.set_facecolor('#f8f9fa')
-        fig.patch.set_facecolor('white')
-        
-        # Initialize variables
-        x_train, y_train = [], []
-        x_val, y_val = [], []
-        val_loss_to_epoch = {}  # Initialize here to fix reference error
-        
-        # Process training loss data
-        if self.train_losses:
-            for i, (ep, loss) in enumerate(zip(self.epochs, self.train_losses)):
-                if loss is not None:
-                    x_train.append(ep)
-                    y_train.append(loss)
+            import matplotlib.pyplot as plt
+            import matplotlib
             
-            if x_train:
-                ax.plot(x_train, y_train, 
-                        label='Training Loss',
-                        color='#1f77b4',  # Modern blue color
-                        marker='o',
-                        markersize=5,
-                        linewidth=2.5,
-                        alpha=0.9,
-                        zorder=3)
-        
-        # Process validation loss data
-        if self.val_losses:
-            # Ensure val_losses array is properly sized
-            while len(self.val_losses) < len(self.epochs):
-                self.val_losses.append(None)
-                
-            for i, ep in enumerate(self.epochs):
-                if i < len(self.val_losses) and self.val_losses[i] is not None:
-                    x_val.append(ep)
-                    y_val.append(self.val_losses[i])
-                    val_loss_to_epoch[ep] = self.val_losses[i]
+            # 设置科研风格的matplotlib样式
+            plt.style.use('seaborn-v0_8-whitegrid')
+            matplotlib.rcParams.update({
+                'font.family': 'sans-serif',
+                'font.sans-serif': ['Arial', 'DejaVu Sans', 'Liberation Sans', 'Bitstream Vera Sans', 'sans-serif'],
+                'font.size': 12,
+                'axes.labelsize': 14,
+                'axes.titlesize': 16,
+                'xtick.labelsize': 12,
+                'ytick.labelsize': 12,
+                'legend.fontsize': 12,
+                'figure.titlesize': 18,
+                'figure.figsize': (8, 6),
+                'figure.dpi': 150,
+                'axes.grid': True,
+                'grid.alpha': 0.3,
+                'axes.axisbelow': True,
+                'axes.edgecolor': '#888888',
+                'axes.linewidth': 1.5,
+                'axes.spines.top': False,
+                'axes.spines.right': False,
+            })
             
-            if x_val:
-                ax.plot(x_val, y_val, 
-                        label='Validation Loss',
-                        color='#ff7f0e',  # Modern orange color
-                        marker='s',
-                        markersize=5,
-                        linewidth=2.5,
-                        alpha=0.9,
-                        zorder=4)
-        
-        # Set plot title and labels with improved styling
-        ax.set_title('Training and Validation Loss', fontsize=16, fontweight='bold', pad=20)
-        ax.set_xlabel('Epoch', fontsize=12, fontweight='bold')
-        ax.set_ylabel('Loss', fontsize=12, fontweight='bold')
-        
-        # Improve grid appearance
-        ax.grid(True, linestyle='--', alpha=0.7, zorder=0)
-        
-        # Improve tick labels
-        ax.tick_params(axis='both', which='major', labelsize=10)
-        
-        # Improve legend
-        leg = ax.legend(loc='upper right', fontsize=11, frameon=True, fancybox=True, 
-                       framealpha=0.9, edgecolor='gray')
-        leg.get_frame().set_linewidth(1.0)
-        
-        # Set y-axis to start from 0 if all values are positive
-        if self.train_losses and self.val_losses:
-            all_losses = [l for l in self.train_losses + self.val_losses if l is not None]
-            if all_losses and min(all_losses) >= 0:
-                y_min = 0
-                y_max = max(all_losses) * 1.1  # Add 10% padding at the top
-                ax.set_ylim(y_min, y_max)
-        
-        # Mark best model position (if available)
-        best_epoch = self.current_progress.get('best_epoch', 0)
-        best_metric_name = self.current_progress.get('best_metric_name', '')
-        best_metric_value = self.current_progress.get('best_metric_value', 0.0)
-        
-        # Only mark best model if validation loss and best epoch are valid
-        if best_epoch > 0 and val_loss_to_epoch and best_epoch in val_loss_to_epoch:
-            best_y = val_loss_to_epoch[best_epoch]
-            ax.scatter([best_epoch], [best_y], color='#d62728', s=120, zorder=5, 
-                      marker='*', edgecolor='white', linewidth=1.5)
+            # 创建图表
+            fig, ax = plt.subplots(figsize=(8, 6))
             
-            # Add an annotation for the best model
-            label_text = f'Best Model\n{best_metric_name}: {best_metric_value:.4f}'
-            ax.annotate(label_text, 
-                       xy=(best_epoch, best_y),
-                       xytext=(10, -20),
-                       textcoords='offset points',
-                       color='#d62728',
-                       fontsize=10,
-                       fontweight='bold',
-                       arrowprops=dict(arrowstyle='->',
-                                      connectionstyle='arc3,rad=.2',
-                                      color='#d62728'))
+            # 绘制训练损失
+            if self.train_losses:
+                valid_indices = [i for i, loss in enumerate(self.train_losses) if loss is not None]
+                if valid_indices:  # 确保有有效数据
+                    valid_epochs = [self.epochs[i] for i in valid_indices]
+                    valid_losses = [self.train_losses[i] for i in valid_indices]
+                    ax.plot(valid_epochs, valid_losses, 'o-', label='Train Loss', 
+                            color='#1f77b4', linewidth=2, markersize=6, markeredgecolor='white', 
+                            markeredgewidth=1.5)
+            
+            # 绘制验证损失
+            if self.val_losses:
+                valid_indices = [i for i, loss in enumerate(self.val_losses) if loss is not None]
+                if valid_indices:  # 确保有有效数据
+                    valid_epochs = [self.epochs[i] for i in valid_indices]
+                    valid_losses = [self.val_losses[i] for i in valid_indices]
+                    ax.plot(valid_epochs, valid_losses, 'o-', label='Val Loss', 
+                            color='#ff7f0e', linewidth=2, markersize=6, markeredgecolor='white', 
+                            markeredgewidth=1.5)
+            
+            # 设置损失图表属性
+            ax.set_title('Training and Validation Loss', fontweight='bold', pad=15)
+            ax.set_xlabel('Epoch', fontweight='bold')
+            ax.set_ylabel('Loss', fontweight='bold')
+            
+            # 确保有图例数据后再添加图例
+            handles, labels = ax.get_legend_handles_labels()
+            if handles:
+                ax.legend(loc='upper right', frameon=True, fancybox=True, 
+                          framealpha=0.9, edgecolor='gray', facecolor='white')
+            
+            # 设置x轴刻度为整数
+            ax.xaxis.set_major_locator(matplotlib.ticker.MaxNLocator(integer=True))
+            
+            # 如果所有损失值都是正数，则y轴从0开始
+            if self.train_losses and self.val_losses:
+                all_losses = [l for l in self.train_losses + self.val_losses if l is not None]
+                if all_losses and min(all_losses) >= 0:
+                    ax.set_ylim(bottom=0)
+            
+            # 调整布局
+            plt.tight_layout()
+            
+            return fig
+        except Exception as e:
+            # 如果出现任何错误，记录错误并返回None
+            error_message = f"Error generating loss plot: {str(e)}"
+            print(error_message)
+            return None
+    
+    def get_metrics_plot(self):
+        """
+        Generate a static plot showing validation metrics.
         
-        # Remove top and right spines for cleaner look
-        ax.spines['right'].set_visible(False)
-        ax.spines['top'].set_visible(False)
-        ax.spines['left'].set_linewidth(1.5)
-        ax.spines['bottom'].set_linewidth(1.5)
+        Returns:
+            matplotlib Figure object for display in gr.Plot
+        """
+        # Return None if insufficient data
+        if not self.epochs or not self.val_metrics:
+            return None
         
-        # Add light horizontal lines to improve readability
-        if self.train_losses or self.val_losses:
-            ax.yaxis.grid(True, linestyle='-', alpha=0.1, color='gray')
+        try:
+            import matplotlib.pyplot as plt
+            import matplotlib
+            
+            # 设置科研风格的matplotlib样式
+            plt.style.use('seaborn-v0_8-whitegrid')
+            matplotlib.rcParams.update({
+                'font.family': 'sans-serif',
+                'font.sans-serif': ['Arial', 'DejaVu Sans', 'Liberation Sans', 'Bitstream Vera Sans', 'sans-serif'],
+                'font.size': 12,
+                'axes.labelsize': 14,
+                'axes.titlesize': 16,
+                'xtick.labelsize': 12,
+                'ytick.labelsize': 12,
+                'legend.fontsize': 12,
+                'figure.titlesize': 18,
+                'figure.figsize': (8, 6),
+                'figure.dpi': 150,
+                'axes.grid': True,
+                'grid.alpha': 0.3,
+                'axes.axisbelow': True,
+                'axes.edgecolor': '#888888',
+                'axes.linewidth': 1.5,
+                'axes.spines.top': False,
+                'axes.spines.right': False,
+            })
+            
+            # 创建图表
+            fig, ax = plt.subplots(figsize=(8, 6))
+            
+            # 绘制验证指标图表
+            colors = ['#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf']
+            
+            # 检查是否有任何指标有有效数据
+            has_valid_data = False
+            
+            # 为每个指标绘制一条线
+            for i, (metric_name, values) in enumerate(self.val_metrics.items()):
+                if values:
+                    valid_indices = [i for i, val in enumerate(values) if val is not None]
+                    if valid_indices:  # 确保有有效数据
+                        has_valid_data = True
+                        valid_epochs = [self.epochs[i] for i in valid_indices]
+                        valid_values = [values[i] for i in valid_indices]
+                        ax.plot(valid_epochs, valid_values, 'o-', 
+                                label=f'{metric_name.capitalize()}', 
+                                color=colors[i % len(colors)], 
+                                linewidth=2, 
+                                markersize=6,
+                                markeredgecolor='white', 
+                                markeredgewidth=1.5)
+            
+            # 如果没有有效数据，返回None
+            if not has_valid_data:
+                plt.close(fig)
+                return None
+            
+            # 设置验证指标图表属性
+            ax.set_title('Validation Metrics', fontweight='bold', pad=15)
+            ax.set_xlabel('Epoch', fontweight='bold')
+            ax.set_ylabel('Value', fontweight='bold')
+            
+            handles, labels = ax.get_legend_handles_labels()
+            if handles:
+                ax.legend(loc='lower right', frameon=True, fancybox=True, 
+                          framealpha=0.9, edgecolor='gray', facecolor='white')
+            
+            ax.xaxis.set_major_locator(matplotlib.ticker.MaxNLocator(integer=True))
+            
+            ax.set_ylim(0, 1.05)
+            
+            # # 标记最佳模型位置
+            # best_epoch = self.current_progress.get('best_epoch', 0)
+            # best_metric_name = self.current_progress.get('best_metric_name', '')
+            # best_metric_value = self.current_progress.get('best_metric_value', 0.0)
+            
+            # # if best_epoch > 0 and best_metric_name in self.val_metrics:
+            # #     metric_values = self.val_metrics[best_metric_name]
+            # #     if best_epoch <= len(metric_values) and metric_values[best_epoch-1] is not None:
+            # #         best_y = metric_values[best_epoch-1]
+            # #         ax.scatter([best_epoch], [best_y], color='red', s=120, zorder=5, 
+            # #                   marker='*', edgecolor='white', linewidth=1.5)
+            # #         ax.annotate(f'Best: {best_metric_value:.4f}', 
+            # #                     xy=(best_epoch, best_y),
+            # #                     xytext=(10, -15),
+            # #                     textcoords='offset points',
+            # #                     color='red',
+            # #                     fontsize=12,
+            # #                     fontweight='bold',
+            # #                     arrowprops=dict(arrowstyle='->',
+            # #                                   connectionstyle='arc3,rad=.2',
+            # #                                   color='red'))
+            
+            plt.tight_layout()
+            
+            return fig
+        except Exception as e:
+            # 如果出现任何错误，记录错误并返回None
+            error_message = f"Error generating metrics plot: {str(e)}"
+            print(error_message)
+            return None
+    
+    def get_plot(self):
+        """
+        Legacy function for compatibility.
         
-        # Ensure the x-axis shows integer epochs
-        ax.xaxis.set_major_locator(plt.MaxNLocator(integer=True))
-        
-        # Tight layout to optimize use of space
-        fig.tight_layout(pad=3.0)
-        
-        return fig
+        Returns:
+            None (use get_loss_plot and get_metrics_plot instead)
+        """
+        return None
     
     def get_progress(self) -> Dict[str, Any]:
         """Return current progress information."""
@@ -373,7 +461,6 @@ class TrainingMonitor:
                 self.current_progress['stage'] = 'Testing'
                 return
                 
-            # Parse test results - handle log lines with timestamps and INFO prefixes
             # Extract the actual content part of the log line if it contains timestamp and INFO
             log_content = line
             log_match = re.search(r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} - [a-zA-Z]+ - INFO - (.*)', line)
@@ -383,60 +470,57 @@ class TrainingMonitor:
             if self.parsing_test_results:
                 collected_new_metric = False
                 
-                # Try to match test loss value
+                # 尝试匹配测试损失值
                 test_loss_match = re.search(self.patterns['test_loss'], log_content)
                 if test_loss_match:
                     loss_value = float(test_loss_match.group(1))
                     self.test_results['loss'] = loss_value
                     collected_new_metric = True
+                    if self.debug_progress:
+                        print(f"Matched test loss: {loss_value}")
                 
-                # First try to match common metrics (f1, accuracy, etc.)
-                if not test_loss_match:
+                # 特别处理f1指标
+                test_f1_match = re.search(self.patterns['test_f1'], log_content)
+                if test_f1_match and not test_loss_match:
+                    f1_value = float(test_f1_match.group(1))
+                    self.test_results['f1'] = f1_value
+                    collected_new_metric = True
+                    if self.debug_progress:
+                        print(f"Matched test f1: {f1_value}")
+                
+                # 尝试匹配常见指标
+                if not test_loss_match and not test_f1_match:
                     common_metric_match = re.search(self.patterns['test_common_metrics'], log_content)
                     if common_metric_match:
                         metric_name, metric_value = common_metric_match.groups()
                         metric_name = metric_name.strip().lower()
                         try:
-                            self.test_results[metric_name] = float(metric_value)
+                            value = float(metric_value)
+                            self.test_results[metric_name] = value
                             collected_new_metric = True
+                            if self.debug_progress:
+                                print(f"Matched common test metric: {metric_name} = {value}")
                         except ValueError:
                             if self.debug_progress:
                                 print(f"Failed to parse value for common metric {metric_name}: {metric_value}")
                 
-                # Match other test metrics - Fix parsing for metrics like f1
-                if not test_loss_match and not (locals().get('common_metric_match')):  # Avoid duplicate matching
+                # 尝试匹配其他测试指标
+                if not test_loss_match and not test_f1_match and not (locals().get('common_metric_match')):
                     test_metric_match = re.search(self.patterns['test_metric'], log_content)
                     if test_metric_match:
                         metric_name, metric_value = test_metric_match.groups()
                         metric_name = metric_name.strip().lower()
-                        
-                        # Special handling for f1 metric to ensure correct parsing
-                        if metric_name == "f" and metric_value.startswith("1"):
-                            # Fix the case where f1 is incorrectly split
-                            metric_name = "f1"
-                            metric_value = metric_value[1:].strip()  # Remove the leading "1"
-                        
                         try:
-                            self.test_results[metric_name] = float(metric_value)
+                            value = float(metric_value)
+                            self.test_results[metric_name] = value
                             collected_new_metric = True
+                            if self.debug_progress:
+                                print(f"Matched test metric: {metric_name} = {value}")
                         except ValueError:
                             if self.debug_progress:
                                 print(f"Failed to parse value for metric {metric_name}: {metric_value}")
                 
-                # Try to match alternative format
-                if not test_loss_match and not test_metric_match:
-                    alt_format_match = re.search(self.patterns['test_alt_format'], log_content)
-                    if alt_format_match:
-                        metric_name, metric_value = alt_format_match.groups()
-                        metric_name = metric_name.strip().lower()
-                        try:
-                            self.test_results[metric_name] = float(metric_value)
-                            collected_new_metric = True
-                        except ValueError:
-                            if self.debug_progress:
-                                print(f"Failed to parse value for alt metric {metric_name}: {metric_value}")
-                
-                # If we collected a new metric, update the display
+                # 如果收集到新指标，更新显示
                 if collected_new_metric:
                     self._update_test_results_display()
                 
@@ -644,24 +728,67 @@ class TrainingMonitor:
                 self.val_metrics[metric_name][idx] = float(metric_value)
                 return
             
+            # 首先检查原始行是否包含"Saving model with best val"
+            if "Saving model with best val" in line:
+                # 直接从原始行提取信息，避免依赖正则表达式
+                try:
+                    # 尝试直接解析行内容
+                    parts = line.split("Saving model with best val ")[1].split(": ")
+                    if len(parts) == 2:
+                        metric_name = parts[0].strip().lower()
+                        metric_value = float(parts[1].strip())
+                        
+                        # 更新Best Performance信息
+                        self.current_progress['best_metric_name'] = metric_name
+                        self.current_progress['best_metric_value'] = metric_value
+                        self.current_progress['best_epoch'] = self.current_epoch
+                        
+                        # 如果是accuracy指标，同时更新best_accuracy
+                        if metric_name == 'accuracy':
+                            self.current_progress['best_accuracy'] = metric_value
+                        
+                        # 记录调试信息
+                        print(f"Best model updated - Metric: {metric_name}, Value: {metric_value}, Epoch: {self.current_epoch}")
+                        
+                        # 将最佳模型信息添加到消息队列，确保UI能够显示
+                        best_model_msg = f"Best model saved at epoch {self.current_epoch} with {metric_name}: {metric_value:.4f}"
+                        self.message_queue.put(best_model_msg)
+                        
+                        return
+                except Exception as e:
+                    print(f"Error parsing best model info: {e}, line: {line}")
+            
+            # 如果直接解析失败，尝试使用正则表达式
             # Match best model save info: e.g., "Saving model with best val accuracy: 0.9088"
-            best_save_match = re.search(self.patterns['best_save'], line)
+            best_save_match = re.search(self.patterns['best_save'], log_content)
             if best_save_match:
                 metric_name, metric_value = best_save_match.groups()
                 metric_name = metric_name.strip().lower()
                 metric_value = float(metric_value)
                 
+                # 更新Best Performance信息
                 self.current_progress['best_metric_name'] = metric_name
                 self.current_progress['best_metric_value'] = metric_value
                 self.current_progress['best_epoch'] = self.current_epoch
                 
-                # If accuracy metric
+                # 如果是accuracy指标，同时更新best_accuracy
                 if metric_name == 'accuracy':
                     self.current_progress['best_accuracy'] = metric_value
                 
-                if self.debug_progress:
-                    print(f"Best model updated - Metric: {metric_name}, Value: {metric_value}, Epoch: {self.current_epoch}")
+                # 记录调试信息
+                print(f"Best model updated (regex) - Metric: {metric_name}, Value: {metric_value}, Epoch: {self.current_epoch}")
+                
+                # 将最佳模型信息添加到消息队列，确保UI能够显示
+                best_model_msg = f"Best model saved at epoch {self.current_epoch} with {metric_name}: {metric_value:.4f}"
+                self.message_queue.put(best_model_msg)
+                
                 return
+                
+            # 检查进程是否已经结束
+            if self.process and self.process.poll() is not None:
+                self.is_training = False
+                self.current_progress['is_completed'] = True
+                print("Training process has completed. Setting is_completed flag.")
                 
         except Exception as e:
             # Don't raise exception to avoid interrupting the processing thread
@@ -672,12 +799,55 @@ class TrainingMonitor:
                 print(f"Line content: {line}")
     
     def _reset_tracking(self):
-        """Reset metrics tracking."""
+        """重置所有跟踪状态"""
+        # 重置指标跟踪
         self.train_losses = []
         self.val_losses = []
         self.val_metrics = {}
         self.epochs = []
         self.current_epoch = 0
+        
+        # 重置测试结果
+        self.test_results = {}
+        self.parsing_test_results = False
+        self.test_results_html = ""
+        
+        # 重置进度信息
+        self.current_progress = {
+            'stage': 'Waiting',
+            'progress': '',
+            'epoch': 0,
+            'current': 0,
+            'total': 100,
+            'total_epochs': 0,
+            'val_accuracy': 0.0,
+            'best_accuracy': 0.0,
+            'best_epoch': 0,
+            'best_metric_name': 'accuracy',
+            'best_metric_value': 0.0,
+            'progress_detail': '',
+            'elapsed_time': '',
+            'remaining_time': '',
+            'it_per_sec': 0.0,
+            'grad_step': 0,
+            'loss': 0.0,
+            'test_metrics': {},
+            'test_progress': 0.0,
+            'test_results_html': ''
+        }
+        
+        # 重置统计信息
+        self.current_stats = {}
+        self.parsing_stats = False
+        self.current_model = None
+        self.skipped_first_separator = False
+        
+        # 重置缓存的统计信息
+        if hasattr(self, 'last_stats'):
+            self.last_stats = {}
+        
+        # 重置错误信息
+        self.error_message = None
 
     def get_stats(self) -> Dict:
         """Get collected statistics."""
@@ -819,6 +989,12 @@ class TrainingMonitor:
         
         # Add text results to message queue
         self.message_queue.put(text_results)
+        
+        # Generate CSV content for download
+        csv_content = "Metric,Value\n"
+        for metric_name, metric_value in sorted_metrics:
+            csv_content += f"{metric_name},{metric_value:.6f}\n"
+        self.current_progress['test_results_csv'] = csv_content
 
     def _process_test_progress(self, line: str):
         """Process test progress from output lines during testing phase."""
@@ -865,3 +1041,12 @@ class TrainingMonitor:
             else:
                 return ''
         return ''
+
+    def check_process_status(self):
+        """Check if the training process has completed."""
+        if self.process and self.process.poll() is not None:
+            self.is_training = False
+            self.current_progress['is_completed'] = True
+            print("Training process has completed. Setting is_completed flag.")
+            return True
+        return False

@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import re
 from datasets import load_dataset
 
-def create_inference_tab(constant):
+def create_eval_tab(constant):
     plm_models = constant["plm_models"]
     dataset_configs = constant["dataset_configs"]
     is_evaluating = False
@@ -23,36 +23,64 @@ def create_inference_tab(constant):
     plm_models = constant["plm_models"]
 
     def format_metrics(metrics_file):
-        """将指标转换成表格式的HTML以便于显示"""
+        """Convert metrics to HTML table format for display"""
         try:
             df = pd.read_csv(metrics_file)
             metrics_dict = df.iloc[0].to_dict()
             
-            # 创建HTML表格
+            # 定义指标优先级顺序
+            priority_metrics = {
+                "accuracy": 1,
+                "mcc": 2,
+                "f1": 3,
+                "precision": 4,
+                "recall": 5,
+                "auroc": 6,
+                "f1max": 7,
+                "spearman_corr": 8,
+                "mse": 9
+            }
+            
+            # 按优先级排序指标
+            def get_priority(item):
+                key = item[0].lower()
+                return priority_metrics.get(key, 100)  # 未知指标放在最后
+            
+            sorted_metrics = sorted(metrics_dict.items(), key=get_priority)
+            
+            # 创建HTML表格 - 使用与train_tab完全相同的样式
             html = """
-            <div style="margin: 20px 0;">
-                <table style="width: 100%; border-collapse: collapse; margin: 0 auto; background-color: white;">
-                    <tr>
-                        <th style="padding: 8px; font-size: 16px; border: 1px solid #ddd; background-color: #e0e0e0; font-weight: bold; border-bottom: 1px solid #ccc;">Metric</th>
-                        <th style="padding: 8px; font-size: 16px; border: 1px solid #ddd; background-color: #e0e0e0; font-weight: bold; border-bottom: 1px solid #ccc;">Value</th>
-                    </tr>
+            <div style="margin-top: 10px; margin-bottom: 20px;">
+                <table style="width: 30%; border-collapse: collapse; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin: 0 auto;">
+                    <thead>
+                        <tr>
+                            <th style="padding: 10px 15px; text-align: left; background-color: #f5f5f5; font-weight: 600; border-bottom: 1px solid #ddd; color: #333; width: 50%;">Metric</th>
+                            <th style="padding: 10px 15px; text-align: right; background-color: #f5f5f5; font-weight: 600; border-bottom: 1px solid #ddd; color: #333; width: 50%;">Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
             """
             
-            # 添加每个指标
-            for key, value in metrics_dict.items():
+            # 添加每个指标行
+            for i, (key, value) in enumerate(sorted_metrics):
+                # 设置交替行的背景色
+                bg_color = "#f9f9f9" if i % 2 == 1 else "white"
+                
+                # 格式化值
                 if isinstance(value, (int, float)):
                     value_str = f"{value:.4f}" if isinstance(value, float) else str(value)
                 else:
                     value_str = str(value)
                 
                 html += f"""
-                    <tr>
-                        <td style="padding: 8px; font-size: 14px; border: 1px solid #ddd;">{key}</td>
-                        <td style="padding: 8px; font-size: 14px; border: 1px solid #ddd;">{value_str}</td>
-                    </tr>
+                        <tr style="background-color: {bg_color};">
+                            <td style="padding: 8px 15px; border-bottom: 1px solid #eee; font-weight: 500;">{key}</td>
+                            <td style="padding: 8px 15px; border-bottom: 1px solid #eee; text-align: right; font-family: monospace; font-size: 14px;">{value_str}</td>
+                        </tr>
                 """
             
             html += """
+                    </tbody>
                 </table>
             </div>
             """
@@ -78,7 +106,7 @@ def create_inference_tab(constant):
         nonlocal is_evaluating, current_process, stop_thread
         
         if is_evaluating:
-            return "Evaluation is already in progress. Please wait..."
+            return "Evaluation is already in progress. Please wait...", gr.update(visible=False)
         
         is_evaluating = True
         stop_thread = False
@@ -95,7 +123,7 @@ def create_inference_tab(constant):
             "lines": []
         }
         
-        yield generate_progress_bar(progress_info)
+        yield generate_progress_bar(progress_info), gr.update(visible=False)
         
         try:
             # Validate inputs
@@ -105,7 +133,7 @@ def create_inference_tab(constant):
                 <div style="padding: 10px; background-color: #ffebee; border-radius: 5px; margin-bottom: 10px;">
                     <p style="margin: 0; color: #c62828; font-weight: bold;">Error: Invalid model path</p>
                 </div>
-                """
+                """, gr.update(visible=False)
                 return
             
             if is_custom_dataset == "Use Custom Dataset":
@@ -119,7 +147,7 @@ def create_inference_tab(constant):
                     <div style="padding: 10px; background-color: #ffebee; border-radius: 5px; margin-bottom: 10px;">
                         <p style="margin: 0; color: #c62828; font-weight: bold;">Error: Invalid dataset selection</p>
                     </div>
-                    """
+                    """, gr.update(visible=False)
                     return
                 config_path = dataset_configs[dataset]
                 with open(config_path, 'r') as f:
@@ -191,6 +219,8 @@ def create_inference_tab(constant):
             sample_pattern = r"Total samples: (\d+)"
             progress_pattern = r"(\d+)/(\d+)"
             
+            last_update_time = time.time()
+            
             while current_process.poll() is None:
                 try:
                     new_lines = []
@@ -224,25 +254,28 @@ def create_inference_tab(constant):
                         except queue.Empty:
                             break
                     
-                    # Update time information
+                    # 无论是否有新行，都更新时间信息
                     elapsed = time.time() - start_time
                     hours, remainder = divmod(int(elapsed), 3600)
                     minutes, seconds = divmod(remainder, 60)
                     progress_info["elapsed_time"] = f"{hours:02}:{minutes:02}:{seconds:02}"
                     
-                    if lines_processed > 0:
+                    # 即使没有新行，也定期更新进度条（每0.5秒）
+                    current_time = time.time()
+                    if lines_processed > 0 or (current_time - last_update_time) >= 0.5:
                         # Generate progress bar HTML
                         progress_html = generate_progress_bar(progress_info)
                         # Only show progress bar, removing scrolling message output
-                        yield f"{progress_html}"
+                        yield f"{progress_html}", gr.update(visible=False)
+                        last_update_time = current_time
                     
-                    time.sleep(0.2)
+                    time.sleep(0.1)  # 减少循环间隔，使更新更频繁
                 except Exception as e:
                     yield f"""
                     <div style="padding: 10px; background-color: #ffebee; border-radius: 5px; margin-bottom: 10px;">
                         <p style="margin: 0; color: #c62828;">Error reading output: {str(e)}</p>
                     </div>
-                    """
+                    """, gr.update(visible=False)
             
             if current_process.returncode == 0:
                 # Load and format results
@@ -263,17 +296,18 @@ def create_inference_tab(constant):
                         <p><b>Evaluation dataset:</b> {dataset_display_name}</p>
                         <p><b>Total samples:</b> {progress_info.get('total_samples', 0)}</p>
                     </div>
-                    <div style="margin-top: 20px; font-weight: bold; font-size: 18px;">Evaluation Results:</div>
+                    <div style="margin-top: 20px; font-weight: bold; font-size: 18px; text-align: center;">Evaluation Results</div>
                     {metrics_html}
                     """
                     
-                    yield summary_html
+                    # 设置下载按钮可见并指向结果文件
+                    yield summary_html, gr.update(value=result_file, visible=True)
                 else:
                     yield """
                     <div style="padding: 10px; background-color: #fff8e1; border-radius: 5px; margin-bottom: 10px;">
                         <p style="margin: 0; color: #f57f17; font-weight: bold;">Evaluation completed, but metrics file not found.</p>
                     </div>
-                    """
+                    """, gr.update(visible=False)
             else:
                 stderr_output = current_process.stderr.read() if current_process.stderr else "No error information available"
                 yield f"""
@@ -281,7 +315,7 @@ def create_inference_tab(constant):
                     <p style="margin: 0; color: #c62828; font-weight: bold;">Evaluation failed:</p>
                     <pre style="margin: 5px 0 0; white-space: pre-wrap;">{stderr_output}</pre>
                 </div>
-                """
+                """, gr.update(visible=False)
 
         except Exception as e:
             yield f"""
@@ -289,7 +323,7 @@ def create_inference_tab(constant):
                 <p style="margin: 0; color: #c62828; font-weight: bold;">Error during evaluation process:</p>
                 <pre style="margin: 5px 0 0; white-space: pre-wrap;">{str(e)}</pre>
             </div>
-            """
+            """, gr.update(visible=False)
         finally:
             if current_process:
                 stop_thread = True
@@ -304,45 +338,44 @@ def create_inference_tab(constant):
         total = progress_info.get("total", 0)
         total_samples = progress_info.get("total_samples", 0)
         
-        # Ensure progress is between 0-100
+        # 确保进度在0-100之间
         progress = max(0, min(100, progress))
         
-        # Create progress bar style
-        progress_bar = "█" * int(progress // 5) + "░" * (20 - int(progress // 5))
-        
-        # Prepare details
+        # 准备详细信息
         details = []
         if total_samples > 0:
             details.append(f"Total samples: {total_samples}")
         if current > 0 and total > 0:
             details.append(f"Current progress: {current}/{total}")
         
-        # Calculate evaluation time (if available)
+        # 计算评估时间（如果有）
         elapsed_time = progress_info.get("elapsed_time", "")
         if elapsed_time:
             details.append(f"Elapsed time: {elapsed_time}")
         
         details_text = ", ".join(details)
         
+        # 创建更现代化的进度条
         html = f"""
-        <div style="background-color: #f5f5f5; border-radius: 8px; padding: 15px; margin-bottom: 10px;">
-            <div style="margin-bottom: 10px;">
-                <span style="font-weight: bold; font-size: 16px;">Evaluation status: </span>
-                <span style="color: #1976d2; font-size: 16px;">{stage}</span>
+        <div style="background-color: #f8f9fa; border-radius: 10px; padding: 20px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                <div>
+                    <span style="font-weight: 600; font-size: 16px;">Evaluation Status: </span>
+                    <span style="color: #1976d2; font-weight: 500; font-size: 16px;">{stage}</span>
+                </div>
+                <div>
+                    <span style="font-weight: 600; color: #333;">{progress:.1f}%</span>
+                </div>
             </div>
             
-            <div style="margin-bottom: 5px;">
-                <span style="font-weight: bold;">Details: </span>
-                <span>{details_text}</span>
+            <div style="margin-bottom: 15px; background-color: #e9ecef; height: 10px; border-radius: 5px; overflow: hidden;">
+                <div style="background-color: #4285f4; width: {progress}%; height: 100%; border-radius: 5px; transition: width 0.3s ease;"></div>
             </div>
             
-            <div style="margin-bottom: 5px;">
-                <span style="font-weight: bold;">Progress: </span>
-                <span>{progress:.1f}%</span>
-            </div>
-            
-            <div style="font-family: monospace; font-size: 16px; margin-bottom: 10px;">
-                |{progress_bar}| 
+            <div style="display: flex; flex-wrap: wrap; gap: 10px; font-size: 14px; color: #555;">
+                {f'<div style="background-color: #e3f2fd; padding: 5px 10px; border-radius: 4px;"><span style="font-weight: 500;">Total samples:</span> {total_samples}</div>' if total_samples > 0 else ''}
+                {f'<div style="background-color: #e8f5e9; padding: 5px 10px; border-radius: 4px;"><span style="font-weight: 500;">Progress:</span> {current}/{total}</div>' if current > 0 and total > 0 else ''}
+                {f'<div style="background-color: #fff8e1; padding: 5px 10px; border-radius: 4px;"><span style="font-weight: 500;">Time:</span> {elapsed_time}</div>' if elapsed_time else ''}
             </div>
         </div>
         """
@@ -361,7 +394,7 @@ def create_inference_tab(constant):
                 <div style="padding: 10px; background-color: #e8f5e9; border-radius: 5px;">
                     <p style="margin: 0; color: #2e7d32; font-weight: bold;">Evaluation successfully terminated!</p>
                 </div>
-                """
+                """, gr.update(visible=False)
             except subprocess.TimeoutExpired:
                 try:
                     os.killpg(os.getpgid(current_process.pid), signal.SIGKILL)
@@ -369,432 +402,535 @@ def create_inference_tab(constant):
                     <div style="padding: 10px; background-color: #fff8e1; border-radius: 5px;">
                         <p style="margin: 0; color: #f57f17; font-weight: bold;">Evaluation forcefully terminated!</p>
                     </div>
-                    """
+                    """, gr.update(visible=False)
                 except Exception as e:
                     return f"""
                     <div style="padding: 10px; background-color: #ffebee; border-radius: 5px;">
                         <p style="margin: 0; color: #c62828; font-weight: bold;">Failed to terminate evaluation: {str(e)}</p>
                     </div>
-                    """
+                    """, gr.update(visible=False)
             except Exception as e:
                 return f"""
                 <div style="padding: 10px; background-color: #ffebee; border-radius: 5px;">
                     <p style="margin: 0; color: #c62828; font-weight: bold;">Failed to terminate evaluation: {str(e)}</p>
                 </div>
-                """
+                """, gr.update(visible=False)
         return """
         <div style="padding: 10px; background-color: #f5f5f5; border-radius: 5px;">
             <p style="margin: 0;">No evaluation in progress to terminate.</p>
         </div>
-        """
+        """, gr.update(visible=False)
 
-    with gr.Tab("Inference"):
+    with gr.Tab("Evaluation"):
 
-        with gr.Row():
-            with gr.Column():
-                gr.Markdown("## Evaluate & Predict")
+        gr.Markdown("### Model and Dataset Configuration")
 
-        # 评估选项卡
-        with gr.Tab("Evaluation"):
-            gr.Markdown("### Model and Dataset Configuration")
-
-            # 原评估界面组件
-            with gr.Group():
-                with gr.Row():
-                    eval_model_path = gr.Textbox(
-                        label="Model Path",
-                        placeholder="Path to the trained model"
-                    )
-                    eval_plm_model = gr.Dropdown(
-                        choices=list(plm_models.keys()),
-                        label="Protein Language Model"
-                    )
-
-                with gr.Row():
-                        training_method = gr.Dropdown(
-                            choices=["full", "freeze", "ses-adapter", "plm-lora"],
-                            label="Training Method",
-                            value="freeze"
-                        )
-                        eval_pooling_method = gr.Dropdown(
-                            choices=["mean", "attention1d", "light_attention"],
-                            label="Pooling Method",
-                            value="mean"
-                        )
-
-                with gr.Row():
-                    is_custom_dataset = gr.Radio(
-                        choices=["Use Custom Dataset", "Use Pre-defined Dataset"],
-                        label="Dataset Selection",
-                        value="Use Pre-defined Dataset"
-                    )
-                    eval_dataset_defined = gr.Dropdown(
-                        choices=list(dataset_configs.keys()),
-                        label="Evaluation Dataset",
-                        visible=True
-                    )
-                    eval_dataset_custom = gr.Textbox(
-                        label="Custom Dataset Path",
-                        placeholder="Huggingface Dataset eg: user/dataset",
-                        visible=False
-                    )
-                
-                # 添加数据集预览功能
-                with gr.Row():
-                    preview_button = gr.Button("Preview Dataset", variant="primary")
-                
-                with gr.Row():
-                    dataset_stats_md = gr.Markdown("")  # Initial empty
-                
-                with gr.Row():
-                    preview_table = gr.Dataframe(
-                        headers=["Name", "Sequence", "Label"],  # More friendly default header
-                        value=[["No dataset selected", "-", "-"]],  # More friendly default value
-                        label="Sample Data Points",
-                        wrap=True,
-                        interactive=False,  # Only allow copy, not edit
-                        row_count=3,
-                        elem_classes=["preview-table"]  # 添加CSS类以便应用样式
-                    )
-                
-                # 添加CSS样式
-                gr.HTML("""
-                <style>
-                    /* 表格内容应用白色背景，与train_tab保持一致 */
-                    .preview-table table {
-                        background-color: white !important;
-                    }
-                    .preview-table .gr-block.gr-box {
-                        background-color: white !important;
-                    }
-                    .preview-table .gr-input-label {
-                        background-color: white !important;
-                    }
-                    /* 确保预览区域背景为白色 */
-                    .preview-table {
-                        background-color: white !important;
-                    }
-                    /* 表格外观美化 */
-                    .preview-table table {
-                        margin-top: 10px;
-                        border-radius: 8px;
-                        overflow: hidden;
-                    }
-                    /* 强化表头样式 */
-                    .preview-table th {
-                        background-color: #e0e0e0 !important;
-                        font-weight: bold !important;
-                        padding: 8px !important;
-                        border-bottom: 1px solid #ccc !important;
-                    }
-                </style>
-                """, visible=True)
-                
-                ### These are settings for custom dataset. ###
-                with gr.Row(visible=True) as custom_dataset_row:
-                    with gr.Column(scale=1):
-                        problem_type = gr.Dropdown(
-                            choices=["single_label_classification", "multi_label_classification", "regression"],
-                            label="Problem Type",
-                            value="single_label_classification",
-                            interactive=False
-                        )
-                    with gr.Column(scale=1):
-                        num_labels = gr.Number(
-                            value=2,
-                            label="Number of Labels",
-                            interactive=False
-                        )
-                    with gr.Column(scale=1):
-                        metrics = gr.Textbox(
-                            label="Metrics",
-                            placeholder="accuracy,recall,precision,f1,mcc,auroc,f1max,spearman_corr,mse",
-                            value="accuracy,mcc,f1,precision,recall,auroc",
-                            interactive=False
-                        )
-                
-                # 添加数据集预览函数
-                def update_dataset_preview(dataset_type=None, defined_dataset=None, custom_dataset=None):
-                    """更新数据集预览内容"""
-                    # 根据选择确定使用哪种数据集
-                    if dataset_type == "Use Custom Dataset" and custom_dataset:
-                        try:
-                            # 尝试加载自定义数据集
-                            dataset = load_dataset(custom_dataset)
-                            stats_html = f"""
-                            <div style="text-align: center; margin: 20px 0;">
-                                <h2 style="font-size: 24px; margin-bottom: 20px;">{custom_dataset}</h2>
-                                <table style="width: 100%; border-collapse: collapse; margin: 0 auto;">
-                                    <tr>
-                                        <th style="padding: 8px; font-size: 18px; border: 1px solid #ddd; background-color: #e0e0e0; font-weight: bold; border-bottom: 1px solid #ccc;">Train Samples</th>
-                                        <th style="padding: 8px; font-size: 18px; border: 1px solid #ddd; background-color: #e0e0e0; font-weight: bold; border-bottom: 1px solid #ccc;">Val Samples</th>
-                                        <th style="padding: 8px; font-size: 18px; border: 1px solid #ddd; background-color: #e0e0e0; font-weight: bold; border-bottom: 1px solid #ccc;">Test Samples</th>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 15px; font-size: 18px; border: 1px solid #ddd; text-align: center;">{len(dataset["train"]) if "train" in dataset else 0}</td>
-                                        <td style="padding: 15px; font-size: 18px; border: 1px solid #ddd; text-align: center;">{len(dataset["validation"]) if "validation" in dataset else 0}</td>
-                                        <td style="padding: 15px; font-size: 18px; border: 1px solid #ddd; text-align: center;">{len(dataset["test"]) if "test" in dataset else 0}</td>
-                                    </tr>
-                                </table>
-                            </div>
-                            """
-                            
-                            # 获取样本数据点
-                            split = "train" if "train" in dataset else list(dataset.keys())[0]
-                            samples = dataset[split].select(range(min(3, len(dataset[split]))))
-                            if len(samples) == 0:
-                                return "Dataset is empty", gr.update(value=[["No data available", "-", "-"]], headers=["Name", "Sequence", "Label"])
-                            
-                            # 获取数据集中实际存在的字段
-                            available_fields = list(samples[0].keys())
-                            
-                            # 构建样本数据
-                            sample_data = []
-                            for sample in samples:
-                                sample_dict = {}
-                                for field in available_fields:
-                                    # 保留完整序列
-                                    sample_dict[field] = str(sample[field])
-                                sample_data.append(sample_dict)
-                            
-                            df = pd.DataFrame(sample_data)
-                            return stats_html, gr.update(value=df.values.tolist(), headers=df.columns.tolist())
-                        except Exception as e:
-                            return f"Error loading custom dataset: {str(e)}", gr.update(value=[["Error", str(e), "-"]], headers=["Name", "Sequence", "Label"])
-                    
-                    # 使用预定义数据集
-                    elif dataset_type == "Use Pre-defined Dataset" and defined_dataset:
-                        try:
-                            config_path = dataset_configs[defined_dataset]
-                            with open(config_path, 'r') as f:
-                                config = json.load(f)
-                            
-                            # 加载数据集统计信息
-                            dataset = load_dataset(config["dataset"])
-                            stats_html = f"""
-                            <div style="text-align: center; margin: 20px 0;">
-                                <h2 style="font-size: 24px; margin-bottom: 20px;">{config["dataset"]}</h2>
-                                <table style="width: 100%; border-collapse: collapse; margin: 0 auto;">
-                                    <tr>
-                                        <th style="padding: 8px; font-size: 18px; border: 1px solid #ddd; background-color: #e0e0e0; font-weight: bold; border-bottom: 1px solid #ccc;">Train Samples</th>
-                                        <th style="padding: 8px; font-size: 18px; border: 1px solid #ddd; background-color: #e0e0e0; font-weight: bold; border-bottom: 1px solid #ccc;">Val Samples</th>
-                                        <th style="padding: 8px; font-size: 18px; border: 1px solid #ddd; background-color: #e0e0e0; font-weight: bold; border-bottom: 1px solid #ccc;">Test Samples</th>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 15px; font-size: 18px; border: 1px solid #ddd; text-align: center;">{len(dataset["train"]) if "train" in dataset else 0}</td>
-                                        <td style="padding: 15px; font-size: 18px; border: 1px solid #ddd; text-align: center;">{len(dataset["validation"]) if "validation" in dataset else 0}</td>
-                                        <td style="padding: 15px; font-size: 18px; border: 1px solid #ddd; text-align: center;">{len(dataset["test"]) if "test" in dataset else 0}</td>
-                                    </tr>
-                                </table>
-                            </div>
-                            """
-                            
-                            # 获取样本数据点和可用字段
-                            samples = dataset["train"].select(range(min(3, len(dataset["train"]))))
-                            if len(samples) == 0:
-                                return "Dataset is empty", gr.update(value=[["No data available", "-", "-"]], headers=["Name", "Sequence", "Label"])
-                            
-                            # 获取数据集中实际存在的字段
-                            available_fields = list(samples[0].keys())
-                            
-                            # 构建样本数据
-                            sample_data = []
-                            for sample in samples:
-                                sample_dict = {}
-                                for field in available_fields:
-                                    # 保留完整序列
-                                    sample_dict[field] = str(sample[field])
-                                sample_data.append(sample_dict)
-                            
-                            df = pd.DataFrame(sample_data)
-                            return stats_html, gr.update(value=df.values.tolist(), headers=df.columns.tolist())
-                        except Exception as e:
-                            return f"Error loading dataset: {str(e)}", gr.update(value=[["Error", str(e), "-"]], headers=["Name", "Sequence", "Label"])
-                    
-                    # 如果未提供有效的数据集信息
-                    return "", gr.update(value=[["No dataset selected", "-", "-"]], headers=["Name", "Sequence", "Label"])
-                
-                # 预览按钮点击事件
-                preview_button.click(
-                    fn=update_dataset_preview,
-                    inputs=[is_custom_dataset, eval_dataset_defined, eval_dataset_custom],
-                    outputs=[dataset_stats_md, preview_table]
+        # Original evaluation interface components
+        with gr.Group():
+            with gr.Row():
+                eval_model_path = gr.Textbox(
+                    label="Model Path",
+                    placeholder="Path to the trained model"
                 )
-
-                def update_dataset_settings(choice, dataset_name=None):
-                    if choice == "Use Pre-defined Dataset":
-                        # 从dataset_config加载配置
-                        if dataset_name and dataset_name in dataset_configs:
-                            with open(dataset_configs[dataset_name], 'r') as f:
-                                config = json.load(f)
-                            return [
-                                gr.update(visible=True),  # eval_dataset_defined
-                                gr.update(visible=False), # eval_dataset_custom
-                                gr.update(value=config.get("problem_type", ""), interactive=False),
-                                gr.update(value=config.get("num_labels", 1), interactive=False),
-                                gr.update(value=config.get("metrics", ""), interactive=False)
-                            ]
-                    else:
-                        # 自定义数据集设置
-                        return [
-                            gr.update(visible=False),  # eval_dataset_defined
-                            gr.update(visible=True),   # eval_dataset_custom
-                            gr.update(value="", interactive=True),
-                            gr.update(value=2, interactive=True),
-                            gr.update(value="", interactive=True)
-                        ]
-                
-                is_custom_dataset.change(
-                    fn=update_dataset_settings,
-                    inputs=[is_custom_dataset, eval_dataset_defined],
-                    outputs=[eval_dataset_defined, eval_dataset_custom, 
-                            problem_type, num_labels, metrics]
+                eval_plm_model = gr.Dropdown(
+                    choices=list(plm_models.keys()),
+                    label="Protein Language Model"
                 )
-
-                eval_dataset_defined.change(
-                    fn=lambda x: update_dataset_settings("Use Pre-defined Dataset", x),
-                    inputs=[eval_dataset_defined],
-                    outputs=[eval_dataset_defined, eval_dataset_custom, 
-                            problem_type, num_labels, metrics]
-                )
-
-
-
-                ### These are settings for different training methods. ###
-
-                # for ses-adapter
-                with gr.Row(visible=False) as structure_seq_row:
-                    eval_structure_seq = gr.Textbox(label="Structure Sequence", placeholder="foldseek_seq,ss8_seq", value="foldseek_seq,ss8_seq")
-
-                # for plm-lora
-                with gr.Row(visible=False) as lora_params_row:
-                    # gr.Markdown("#### LoRA Parameters")
-                    with gr.Column():
-                        lora_r = gr.Number(
-                            value=8,
-                            label="LoRA Rank",
-                            precision=0,
-                            minimum=1,
-                            maximum=128,
-                        )
-                    with gr.Column():
-                        lora_alpha = gr.Number(
-                            value=32,
-                            label="LoRA Alpha",
-                            precision=0,
-                            minimum=1,
-                            maximum=128
-                        )
-                    with gr.Column():
-                        lora_dropout = gr.Number(
-                            value=0.1,
-                            label="LoRA Dropout",
-                            minimum=0.0,
-                            maximum=1.0
-                        )
-                    with gr.Column():
-                        lora_target_modules = gr.Textbox(
-                            value="query,key,value",
-                            label="LoRA Target Modules",
-                            placeholder="Comma-separated list of target modules",
-                            # info="LoRA will be applied to these modules"
-                        )
-                            
-            def update_training_method(method):
-                return {
-                    structure_seq_row: gr.update(visible=method == "ses-adapter"),
-                    lora_params_row: gr.update(visible=method == "plm-lora")
-                }
-
-            training_method.change(
-                fn=update_training_method,
-                inputs=[training_method],
-                outputs=[structure_seq_row, lora_params_row]
-            )
-
-
-            gr.Markdown("### Batch Processing Configuration")
-            with gr.Group():
-                with gr.Row(equal_height=True):
-                    with gr.Column(scale=1):
-                        batch_mode = gr.Radio(
-                            choices=["Batch Size Mode", "Batch Token Mode"],
-                            label="Batch Processing Mode",
-                            value="Batch Size Mode"
-                        )
-                    
-                    with gr.Column(scale=2):
-                        batch_size = gr.Slider(
-                            minimum=1,
-                            maximum=128,
-                            value=16,
-                            step=1,
-                            label="Batch Size",
-                            visible=True
-                        )
-                        
-                        batch_token = gr.Slider(
-                            minimum=1000,
-                            maximum=50000,
-                            value=10000,
-                            step=1000,
-                            label="Tokens per Batch",
-                            visible=False
-                        )
-
-            def update_batch_inputs(mode):
-                return {
-                    batch_size: gr.update(visible=mode == "Batch Size Mode"),
-                    batch_token: gr.update(visible=mode == "Batch Token Mode")
-                }
-                
-            # Update visibility when mode changes
-            batch_mode.change(
-                fn=update_batch_inputs,
-                inputs=[batch_mode],
-                outputs=[batch_size, batch_token]
-            )
 
             with gr.Row():
-                eval_button = gr.Button("Start Evaluation", variant="primary")
-                abort_button = gr.Button("Abort", variant="stop")
+                    training_method = gr.Dropdown(
+                        choices=["full", "freeze", "ses-adapter", "plm-lora"],
+                        label="Training Method",
+                        value="freeze"
+                    )
+                    eval_pooling_method = gr.Dropdown(
+                        choices=["mean", "attention1d", "light_attention"],
+                        label="Pooling Method",
+                        value="mean"
+                    )
+
+            with gr.Row():
+                is_custom_dataset = gr.Radio(
+                    choices=["Use Custom Dataset", "Use Pre-defined Dataset"],
+                    label="Dataset Selection",
+                    value="Use Pre-defined Dataset"
+                )
+                eval_dataset_defined = gr.Dropdown(
+                    choices=list(dataset_configs.keys()),
+                    label="Evaluation Dataset",
+                    visible=True
+                )
+                eval_dataset_custom = gr.Textbox(
+                    label="Custom Dataset Path",
+                    placeholder="Huggingface Dataset eg: user/dataset",
+                    visible=False
+                )
             
-            # 使用HTML组件替代简单的Textbox，以支持更丰富的显示效果
-            eval_output = gr.HTML(
-                value="<div style='padding: 15px; background-color: #f5f5f5; border-radius: 5px;'><p style='margin: 0;'>点击「Start Evaluation」按钮开始评估模型</p></div>",
-                label="Evaluation Status & Results"
-            )
+            # Add dataset preview functionality
+            with gr.Row():
+                preview_button = gr.Button("Preview Dataset", variant="primary")
             
-            # Connect buttons to functions
-            eval_button.click(
-                fn=evaluate_model,
-                inputs=[
-                    eval_plm_model,
-                    eval_model_path,
-                    training_method,
-                    is_custom_dataset,
-                    eval_dataset_defined,
-                    eval_dataset_custom,
-                    problem_type,
-                    num_labels,
-                    metrics,
-                    batch_mode,
-                    batch_size,
-                    batch_token,
-                    eval_structure_seq,
-                    eval_pooling_method
-                ],
-                outputs=eval_output
-            )
-            abort_button.click(
-                fn=handle_abort,
-                inputs=[],
-                outputs=eval_output
-            )
-            return {
-                "eval_button": eval_button,
-                "eval_output": eval_output
-            }
+            # 将数据统计和表格都放入折叠面板
+            with gr.Row():
+                with gr.Accordion("Dataset Preview", open=False) as preview_accordion:
+                    # 数据统计区域
+                    with gr.Row():
+                        dataset_stats_md = gr.HTML("", elem_classes=["dataset-stats"])
+                    
+                    # 表格区域
+                    with gr.Row():
+                        preview_table = gr.Dataframe(
+                            headers=["Name", "Sequence", "Label"],
+                            value=[["No dataset selected", "-", "-"]],
+                            wrap=True,
+                            interactive=False,
+                            row_count=3,
+                            elem_classes=["preview-table"]
+                        )
+
+            # Add CSS styles
+            gr.HTML("""
+            <style>
+                /* 数据统计样式 */
+                .dataset-stats {
+                    margin: 0 0 15px 0;
+                    padding: 0;
+                }
                 
-        with gr.Tab("Prediction"):
-            pass
+                .dataset-stats table {
+                    width: 100%;
+                    border-collapse: collapse;
+                    font-size: 0.9em;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+                    border-radius: 8px;
+                    overflow: hidden;
+                    table-layout: fixed;
+                }
+                
+                .dataset-stats th {
+                    background-color: #e0e0e0;
+                    font-weight: bold;
+                    padding: 6px 10px;
+                    text-align: center;
+                    border: 1px solid #ddd;
+                    font-size: 0.95em;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    min-width: 120px;
+                }
+                
+                .dataset-stats td {
+                    padding: 6px 10px;
+                    text-align: center;
+                    border: 1px solid #ddd;
+                }
+                
+                .dataset-stats h2 {
+                    font-size: 1.1em;
+                    margin: 0 0 10px 0;
+                    text-align: center;
+                }
+                
+                /* 表格样式 */
+                .preview-table table {
+                    background-color: white !important;
+                    font-size: 0.9em !important;
+                    width: 100%;
+                    table-layout: fixed !important;
+                }
+                
+                .preview-table .gr-block.gr-box {
+                    background-color: transparent !important;
+                }
+                
+                .preview-table .gr-input-label {
+                    background-color: transparent !important;
+                }
+
+                /* 表格外观增强 */
+                .preview-table table {
+                    margin-top: 0;
+                    border-radius: 8px;
+                    overflow: hidden;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+                }
+                
+                /* 表头样式 */
+                .preview-table th {
+                    background-color: #e0e0e0 !important;
+                    font-weight: bold !important;
+                    padding: 6px !important;
+                    border-bottom: 1px solid #ccc !important;
+                    font-size: 0.95em !important;
+                    text-align: center !important;
+                    white-space: nowrap !important;
+                    min-width: 120px !important;
+                }
+                
+                /* 单元格样式 */
+                .preview-table td {
+                    padding: 4px 6px !important;
+                    max-width: 300px !important;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                    text-align: left !important;
+                }
+                
+                /* 悬停效果 */
+                .preview-table tr:hover {
+                    background-color: #f0f0f0 !important;
+                }
+                
+                /* 折叠面板样式 */
+                .gr-accordion {
+                    border: 1px solid #e0e0e0;
+                    border-radius: 8px;
+                    overflow: hidden;
+                    margin-bottom: 15px;
+                }
+                
+                /* 折叠面板标题样式 */
+                .gr-accordion .label-wrap {
+                    background-color: #f5f5f5;
+                    padding: 8px 15px;
+                    font-weight: bold;
+                }
+                
+                .preview-button {
+                    height: 86px !important;
+                }
+            </style>
+            """, visible=True)
+            
+            ### These are settings for custom dataset. ###
+            with gr.Row(visible=True) as custom_dataset_row:
+                with gr.Column(scale=1):
+                    problem_type = gr.Dropdown(
+                        choices=["single_label_classification", "multi_label_classification", "regression"],
+                        label="Problem Type",
+                        value="single_label_classification",
+                        interactive=False
+                    )
+                with gr.Column(scale=1):
+                    num_labels = gr.Number(
+                        value=2,
+                        label="Number of Labels",
+                        interactive=False
+                    )
+                with gr.Column(scale=1):
+                    metrics = gr.Textbox(
+                        label="Metrics",
+                        placeholder="accuracy,recall,precision,f1,mcc,auroc,f1max,spearman_corr,mse",
+                        value="accuracy,mcc,f1,precision,recall,auroc",
+                        interactive=False
+                    )
+            
+            # Add dataset preview function
+            def update_dataset_preview(dataset_type=None, defined_dataset=None, custom_dataset=None):
+                """Update dataset preview content"""
+                # Determine which dataset to use based on selection
+                if dataset_type == "Use Custom Dataset" and custom_dataset:
+                    try:
+                        # Try to load custom dataset
+                        dataset = load_dataset(custom_dataset)
+                        stats_html = f"""
+                        <div style="text-align: center; margin: 20px 0;">
+                        <table style="width: 100%; border-collapse: collapse; margin: 0 auto;">
+                            <tr>
+                                <th style="padding: 8px; font-size: 14px; border: 1px solid #ddd; background-color: #e0e0e0; font-weight: bold; border-bottom: 1px solid #ccc; text-align: center;">Dataset</th>
+                                <th style="padding: 8px; font-size: 14px; border: 1px solid #ddd; background-color: #e0e0e0; font-weight: bold; border-bottom: 1px solid #ccc; text-align: center;">Train Samples</th>
+                                <th style="padding: 8px; font-size: 14px; border: 1px solid #ddd; background-color: #e0e0e0; font-weight: bold; border-bottom: 1px solid #ccc; text-align: center;">Val Samples</th>
+                                <th style="padding: 8px; font-size: 14px; border: 1px solid #ddd; background-color: #e0e0e0; font-weight: bold; border-bottom: 1px solid #ccc; text-align: center;">Test Samples</th>
+                            </tr>
+                            <tr>
+                                <td style="padding: 15px; font-size: 14px; border: 1px solid #ddd; text-align: center;">{custom_dataset}</td>
+                                <td style="padding: 15px; font-size: 14px; border: 1px solid #ddd; text-align: center;">{len(dataset["train"]) if "train" in dataset else 0}</td>
+                                <td style="padding: 15px; font-size: 14px; border: 1px solid #ddd; text-align: center;">{len(dataset["validation"]) if "validation" in dataset else 0}</td>
+                                <td style="padding: 15px; font-size: 14px; border: 1px solid #ddd; text-align: center;">{len(dataset["test"]) if "test" in dataset else 0}</td>
+                            </tr>
+                        </table>
+                    </div>
+                        """
+                        
+                        # Get sample data points
+                        split = "train" if "train" in dataset else list(dataset.keys())[0]
+                        samples = dataset[split].select(range(min(3, len(dataset[split]))))
+                        if len(samples) == 0:
+                            return gr.update(value=stats_html), gr.update(value=[["No data available", "-", "-"]], headers=["Name", "Sequence", "Label"]), gr.update(open=True)
+                        
+                        # Get fields actually present in the dataset
+                        available_fields = list(samples[0].keys())
+                        
+                        # Build sample data
+                        sample_data = []
+                        for sample in samples:
+                            sample_dict = {}
+                            for field in available_fields:
+                                # Keep full sequence
+                                sample_dict[field] = str(sample[field])
+                            sample_data.append(sample_dict)
+                        
+                        df = pd.DataFrame(sample_data)
+                        return gr.update(value=stats_html), gr.update(value=df.values.tolist(), headers=df.columns.tolist()), gr.update(open=True)
+                    except Exception as e:
+                        error_html = f"""
+                        <div>
+                            <h2>Error loading dataset</h2>
+                            <p style="color: #c62828;">{str(e)}</p>
+                        </div>
+                        """
+                        return gr.update(value=error_html), gr.update(value=[["Error", str(e), "-"]], headers=["Name", "Sequence", "Label"]), gr.update(open=True)
+                
+                # Use predefined dataset
+                elif dataset_type == "Use Pre-defined Dataset" and defined_dataset:
+                    try:
+                        config_path = dataset_configs[defined_dataset]
+                        with open(config_path, 'r') as f:
+                            config = json.load(f)
+                        
+                        # Load dataset statistics
+                        dataset = load_dataset(config["dataset"])
+                        stats_html = f"""
+                        <div style="text-align: center; margin: 20px 0;">
+                            <table style="width: 100%; border-collapse: collapse; margin: 0 auto;">
+                                <tr>
+                                    <th style="padding: 8px; font-size: 14px; border: 1px solid #ddd; background-color: #e0e0e0; font-weight: bold; border-bottom: 1px solid #ccc; text-align: center;">Dataset</th>
+                                    <th style="padding: 8px; font-size: 14px; border: 1px solid #ddd; background-color: #e0e0e0; font-weight: bold; border-bottom: 1px solid #ccc; text-align: center;">Train Samples</th>
+                                    <th style="padding: 8px; font-size: 14px; border: 1px solid #ddd; background-color: #e0e0e0; font-weight: bold; border-bottom: 1px solid #ccc; text-align: center;">Val Samples</th>
+                                    <th style="padding: 8px; font-size: 14px; border: 1px solid #ddd; background-color: #e0e0e0; font-weight: bold; border-bottom: 1px solid #ccc; text-align: center;">Test Samples</th>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 15px; font-size: 14px; border: 1px solid #ddd; text-align: center;">{config["dataset"]}</td>
+                                    <td style="padding: 15px; font-size: 14px; border: 1px solid #ddd; text-align: center;">{len(dataset["train"]) if "train" in dataset else 0}</td>
+                                    <td style="padding: 15px; font-size: 14px; border: 1px solid #ddd; text-align: center;">{len(dataset["validation"]) if "validation" in dataset else 0}</td>
+                                    <td style="padding: 15px; font-size: 14px; border: 1px solid #ddd; text-align: center;">{len(dataset["test"]) if "test" in dataset else 0}</td>
+                                </tr>
+                            </table>
+                        </div>
+                        """
+                        
+                        # Get sample data points and available fields
+                        samples = dataset["train"].select(range(min(3, len(dataset["train"]))))
+                        if len(samples) == 0:
+                            return gr.update(value=stats_html), gr.update(value=[["No data available", "-", "-"]], headers=["Name", "Sequence", "Label"]), gr.update(open=True)
+                        
+                        # Get fields actually present in the dataset
+                        available_fields = list(samples[0].keys())
+                        
+                        # Build sample data
+                        sample_data = []
+                        for sample in samples:
+                            sample_dict = {}
+                            for field in available_fields:
+                                # Keep full sequence
+                                sample_dict[field] = str(sample[field])
+                            sample_data.append(sample_dict)
+                        
+                        df = pd.DataFrame(sample_data)
+                        return gr.update(value=stats_html), gr.update(value=df.values.tolist(), headers=df.columns.tolist()), gr.update(open=True)
+                    except Exception as e:
+                        error_html = f"""
+                        <div>
+                            <h2>Error loading dataset</h2>
+                            <p style="color: #c62828;">{str(e)}</p>
+                        </div>
+                        """
+                        return gr.update(value=error_html), gr.update(value=[["Error", str(e), "-"]], headers=["Name", "Sequence", "Label"]), gr.update(open=True)
+                
+                # If no valid dataset information provided
+                return gr.update(value=""), gr.update(value=[["No dataset selected", "-", "-"]], headers=["Name", "Sequence", "Label"]), gr.update(open=True)
+            
+            # Preview button click event
+            preview_button.click(
+                fn=update_dataset_preview,
+                inputs=[is_custom_dataset, eval_dataset_defined, eval_dataset_custom],
+                outputs=[dataset_stats_md, preview_table, preview_accordion]
+            )
+
+            def update_dataset_settings(choice, dataset_name=None):
+                if choice == "Use Pre-defined Dataset":
+                    # Load configuration from dataset_config
+                    if dataset_name and dataset_name in dataset_configs:
+                        with open(dataset_configs[dataset_name], 'r') as f:
+                            config = json.load(f)
+                        return [
+                            gr.update(visible=True),  # eval_dataset_defined
+                            gr.update(visible=False), # eval_dataset_custom
+                            gr.update(value=config.get("problem_type", ""), interactive=False),
+                            gr.update(value=config.get("num_labels", 1), interactive=False),
+                            gr.update(value=config.get("metrics", ""), interactive=False)
+                        ]
+                else:
+                    # Custom dataset settings
+                    return [
+                        gr.update(visible=False),  # eval_dataset_defined
+                        gr.update(visible=True),   # eval_dataset_custom
+                        gr.update(value="", interactive=True),
+                        gr.update(value=2, interactive=True),
+                        gr.update(value="", interactive=True)
+                    ]
+            
+            is_custom_dataset.change(
+                fn=update_dataset_settings,
+                inputs=[is_custom_dataset, eval_dataset_defined],
+                outputs=[eval_dataset_defined, eval_dataset_custom, 
+                        problem_type, num_labels, metrics]
+            )
+
+            eval_dataset_defined.change(
+                fn=lambda x: update_dataset_settings("Use Pre-defined Dataset", x),
+                inputs=[eval_dataset_defined],
+                outputs=[eval_dataset_defined, eval_dataset_custom, 
+                        problem_type, num_labels, metrics]
+            )
+
+            ### These are settings for different training methods. ###
+
+            # for ses-adapter
+            with gr.Row(visible=False) as structure_seq_row:
+                eval_structure_seq = gr.Textbox(label="Structure Sequence", placeholder="foldseek_seq,ss8_seq", value="foldseek_seq,ss8_seq")
+
+            # for plm-lora
+            with gr.Row(visible=False) as lora_params_row:
+                # gr.Markdown("#### LoRA Parameters")
+                with gr.Column():
+                    lora_r = gr.Number(
+                        value=8,
+                        label="LoRA Rank",
+                        precision=0,
+                        minimum=1,
+                        maximum=128,
+                    )
+                with gr.Column():
+                    lora_alpha = gr.Number(
+                        value=32,
+                        label="LoRA Alpha",
+                        precision=0,
+                        minimum=1,
+                        maximum=128
+                    )
+                with gr.Column():
+                    lora_dropout = gr.Number(
+                        value=0.1,
+                        label="LoRA Dropout",
+                        minimum=0.0,
+                        maximum=1.0
+                    )
+                with gr.Column():
+                    lora_target_modules = gr.Textbox(
+                        value="query,key,value",
+                        label="LoRA Target Modules",
+                        placeholder="Comma-separated list of target modules",
+                        # info="LoRA will be applied to these modules"
+                    )
+                        
+        def update_training_method(method):
+            return {
+                structure_seq_row: gr.update(visible=method == "ses-adapter"),
+                lora_params_row: gr.update(visible=method == "plm-lora")
+            }
+
+        training_method.change(
+            fn=update_training_method,
+            inputs=[training_method],
+            outputs=[structure_seq_row, lora_params_row]
+        )
+
+
+        gr.Markdown("### Batch Processing Configuration")
+        with gr.Group():
+            with gr.Row(equal_height=True):
+                with gr.Column(scale=1):
+                    batch_mode = gr.Radio(
+                        choices=["Batch Size Mode", "Batch Token Mode"],
+                        label="Batch Processing Mode",
+                        value="Batch Size Mode"
+                    )
+                
+                with gr.Column(scale=2):
+                    batch_size = gr.Slider(
+                        minimum=1,
+                        maximum=128,
+                        value=16,
+                        step=1,
+                        label="Batch Size",
+                        visible=True
+                    )
+                    
+                    batch_token = gr.Slider(
+                        minimum=1000,
+                        maximum=50000,
+                        value=10000,
+                        step=1000,
+                        label="Tokens per Batch",
+                        visible=False
+                    )
+
+        def update_batch_inputs(mode):
+            return {
+                batch_size: gr.update(visible=mode == "Batch Size Mode"),
+                batch_token: gr.update(visible=mode == "Batch Token Mode")
+            }
+            
+        # Update visibility when mode changes
+        batch_mode.change(
+            fn=update_batch_inputs,
+            inputs=[batch_mode],
+            outputs=[batch_size, batch_token]
+        )
+
+        with gr.Row():
+            eval_button = gr.Button("Start Evaluation", variant="primary")
+            abort_button = gr.Button("Abort", variant="stop")
+        
+        # 使用HTML组件替代简单的Textbox，以支持更丰富的显示效果
+        eval_output = gr.HTML(
+            value="<div style='padding: 15px; background-color: #f5f5f5; border-radius: 5px;'><p style='margin: 0;'>Click the 「Start Evaluation」 button to begin model evaluation</p></div>",
+            label="Evaluation Status & Results"
+        )
+
+        with gr.Row():
+            with gr.Column(scale=4):
+                pass
+            with gr.Column(scale=1):  # 限制列的最大宽度
+                download_csv_btn = gr.DownloadButton(
+                    "Download CSV", 
+                    visible=False,
+                    size="lg"
+                )
+            # 添加一个空列来占据剩余空间
+            with gr.Column(scale=4):
+                pass
+        
+        # Connect buttons to functions
+        eval_button.click(
+            fn=evaluate_model,
+            inputs=[
+                eval_plm_model,
+                eval_model_path,
+                training_method,
+                is_custom_dataset,
+                eval_dataset_defined,
+                eval_dataset_custom,
+                problem_type,
+                num_labels,
+                metrics,
+                batch_mode,
+                batch_size,
+                batch_token,
+                eval_structure_seq,
+                eval_pooling_method
+            ],
+            outputs=[eval_output, download_csv_btn]
+        )
+        abort_button.click(
+            fn=handle_abort,
+            inputs=[],
+            outputs=[eval_output, download_csv_btn]
+        )
+
+    return {
+        "eval_button": eval_button,
+        "eval_output": eval_output
+    }

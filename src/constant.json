@@ -53,6 +53,7 @@
         "Thermostability_AlphaFold2": "data/Thermostability/Thermostability_AlphaFold2_HF.json",
         "Thermostability_ESMFold": "data/Thermostability/Thermostability_ESMFold_HF.json",
         "TAPE_Fluorescence": "data/TAPE_Fluorescence/TAPE_Fluorescence_HF.json",
-        "TAPE_Stability": "data/TAPE_Stability/TAPE_Stability_HF.json"
+        "TAPE_Stability": "data/TAPE_Stability/TAPE_Stability_HF.json",
+        "PaCRISPR": "data/PaCRISPR/PaCRISPR_HF.json"
     }
 }
