@@ -16,7 +16,7 @@ from torchmetrics.classification import Accuracy, Recall, Precision, MatthewsCor
 from torchmetrics.classification import BinaryAccuracy, BinaryRecall, BinaryAUROC, BinaryF1Score, BinaryPrecision, BinaryMatthewsCorrCoef, BinaryF1Score
 from torchmetrics.regression import SpearmanCorrCoef
 from transformers import EsmTokenizer, EsmModel, BertModel, BertTokenizer
-from transformers import T5Tokenizer, T5EncoderModel, AutoTokenizer
+from transformers import T5Tokenizer, T5EncoderModel, AutoTokenizer, AutoModelForMaskedLM
 from transformers import logging
 from datasets import load_dataset
 from torch.utils.data import DataLoader
@@ -123,6 +123,10 @@ if __name__ == '__main__':
         tokenizer = AutoTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
         plm_model = T5EncoderModel.from_pretrained(args.plm_model)
         args.hidden_size = plm_model.config.d_model
+    elif "ProSST" in args.plm_model:
+        tokenizer = AutoTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
+        plm_model = AutoModelForMaskedLM.from_pretrained(args.plm_model).to(device).eval()
+        args.hidden_size = plm_model.config.hidden_size
     args.vocab_size = plm_model.config.vocab_size
     
     # Define metric configurations

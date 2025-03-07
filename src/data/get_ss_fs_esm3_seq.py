@@ -8,6 +8,7 @@ from esm.models.vqvae import StructureTokenEncoder
 from get_esm3_structure_seq import get_esm3_structure_seq
 from get_foldseek_structure_seq import get_foldseek_structure_seq
 from get_secondary_structure_seq import get_secondary_structure_seq
+from get_prosst_str_token import get_prosst_token
 
 # ignore the warning
 import warnings
@@ -61,19 +62,25 @@ if __name__ == "__main__":
         fs_results = get_foldseek_structure_seq(args.pdb_dir)
         with open(os.path.join(args.out_dir, f"{dir_name}_fs.json"), "w") as f:
             f.write("\n".join([json.dumps(r) for r in fs_results]))
-    
+        prosst_tokens = get_prosst_token(args.pdb_dir)
+        with open(os.path.join(args.out_dir, f"{dir_name}_prosst.json"), "r") as f:
+            f.write("\n".join([json.dumps(r) for r in prosst_tokens]))
+
         if args.merge_into == 'csv':
             # read json files and merge to a single csv according to the same 'name' column
             ss_json = os.path.join(args.out_dir, f"{dir_name}_ss.json")
             esm3_json = os.path.join(args.out_dir, f"{dir_name}_esm3.json")
             fs_json = os.path.join(args.out_dir, f"{dir_name}_fs.json")
+            prosst_json = os.path.join(args.out_dir, f"{dir_name}_prosst.json")
             # load json line files
             ss_df = pd.read_json(ss_json, lines=True)
             esm3_df = pd.read_json(esm3_json, lines=True)
             fs_df = pd.read_json(fs_json, lines=True)
+            prosst_json = os.path_join(prosst_json, lines=True)
             # merge the three dataframes by the 'name' column
             df = pd.merge(ss_df, fs_df, on='name', how='inner')
             df = pd.merge(df, esm3_df, on='name', how='inner')
+            df = pd.merge(df, prosst_json, on='name', how='inner')
             # sort by name
             df = df.sort_values(by='name')
             df.to_csv(os.path.join(args.out_dir, f"{dir_name}.csv"), index=False)
@@ -83,3 +90,4 @@ if __name__ == "__main__":
                 os.remove(ss_json)
                 os.remove(esm3_json)
                 os.remove(fs_json)
+                os.remove(prosst_json)

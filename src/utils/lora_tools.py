@@ -1,5 +1,5 @@
 import torch
-from transformers import AutoTokenizer, EsmModel, T5Tokenizer, T5EncoderModel, BertModel
+from transformers import AutoTokenizer, EsmModel, T5Tokenizer, T5EncoderModel, BertModel, AutoModelForMaskedLM
 from transformers import BertTokenizer, EsmTokenizer, T5Tokenizer
 from peft import LoraConfig, get_peft_model, PeftModel, PeftConfig
 from typing import List, Dict, Any, Tuple
@@ -50,6 +50,8 @@ def load_eval_base_model(plm_model):
         base_model = T5EncoderModel.from_pretrained(plm_model).to(device)
     elif "ankh" in plm_model:
         base_model = T5EncoderModel.from_pretrained(plm_model).to(device)
+    elif "ProSST" in plm_model:
+        base_model = AutoModelForMaskedLM.from_pretrained(plm_model).to(device)    
 
     return base_model
 

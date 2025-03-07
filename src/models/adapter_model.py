@@ -143,21 +143,27 @@ class AdapterModel(nn.Module):
         else:
             raise ValueError(f"classifier method {args.pooling_method} not supported")
     
-    def plm_embedding(self, plm_model, aa_seq, attention_mask):
-        if self.training and hasattr(self, 'args') and self.args.training_method == 'full':
+    def plm_embedding(self, plm_model, aa_seq, attention_mask, structure_tokens):
+        if "ProSST" in self.args.plm_model:
+            outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask, ss_input_ids=structure_tokens, output_hidden_states=True)
+        elif "Prime" in self.args.plm_model:
+            outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask, output_hidden_states=True)
+        elif self.training and hasattr(self, 'args') and self.args.training_method == 'full':
             outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask)
         else:
             with torch.no_grad():
                 outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask)
-        
-        seq_embeds = outputs.last_hidden_state
+        if "ProSST" in self.args.plm_model or "Prime" in self.args.plm_model:
+            seq_embeds = outputs.hidden_states[-1]
+        else:
+            seq_embeds = outputs.last_hidden_state
         gc.collect()
         torch.cuda.empty_cache()
         return seq_embeds
     
     def forward(self, plm_model, batch):
-        aa_seq, attention_mask = batch['aa_seq_input_ids'], batch['aa_seq_attention_mask']
-        seq_embeds = self.plm_embedding(plm_model, aa_seq, attention_mask)
+        aa_seq, attention_mask, stru_tokens = batch['aa_seq_input_ids'], batch['aa_seq_attention_mask'], batch['aa_seq_stru_tokens']
+        seq_embeds = self.plm_embedding(plm_model, aa_seq, attention_mask, stru_tokens)
 
         if 'foldseek_seq' in self.args.structure_seq:
             foldseek_seq = batch['foldseek_seq_input_ids']
