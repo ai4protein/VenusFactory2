@@ -125,7 +125,7 @@ if __name__ == '__main__':
         args.hidden_size = plm_model.config.d_model
     elif "ProSST" in args.plm_model:
         tokenizer = AutoTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
-        plm_model = AutoModelForMaskedLM.from_pretrained(args.plm_model).to(device).eval()
+        plm_model = AutoModelForMaskedLM.from_pretrained(args.plm_model)
         args.hidden_size = plm_model.config.hidden_size
     args.vocab_size = plm_model.config.vocab_size
     
