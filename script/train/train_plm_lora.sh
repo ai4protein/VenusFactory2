@@ -8,7 +8,7 @@
 # T5_base(ankh, t5) model target_modules name: q k v
 
 # if need to use HF mirror
-# export HF_ENDPOINT=https://hf-mirror.com
+export HF_ENDPOINT=https://hf-mirror.com
 dataset=GO_BP
 pdb_type=ESMFold
 pooling_head=mean

@@ -15,7 +15,7 @@ pooling_head=mean
 plm_source=facebook
 plm_model=esm2_t33_650M_UR50D
 lr=5e-4
-training_method=plm-plora
+training_method=plm-qlora
 python src/train.py \
     --plm_model $plm_source/$plm_model \
     --dataset_config data/$dataset/"$dataset"_"$pdb_type"_HF.json \

@@ -14,7 +14,7 @@ def create_inference_tab(constant):
         """Format metrics dictionary into a readable string."""
         return "\n".join([f"{k}: {v:.4f}" for k, v in metrics.items()])
 
-    def evaluate_model(plm_model, model_path, dataset, batch_size, eval_structure_seq, pooling_method, progress=gr.Progress()):
+    def evaluate_model(eval_method, plm_model, model_path, dataset, batch_size, eval_structure_seq, pooling_method, progress=gr.Progress()):
         nonlocal is_evaluating
         
         if is_evaluating:
@@ -46,6 +46,7 @@ def create_inference_tab(constant):
             # Prepare command
             cmd = [sys.executable, "src/eval.py"]
             args_dict = {
+                "eval_method": eval_method,
                 "model_path": model_path,
                 "test_file": dataset_config["dataset"],
                 "problem_type": dataset_config["problem_type"],
@@ -107,6 +108,11 @@ def create_inference_tab(constant):
         gr.Markdown("## Model Evaluation")
         with gr.Row():
             with gr.Column():
+                eval_method = gr.Dropdown(
+                        choices=["full", "freeze", "lora", "ses-adapter", "plm-lora", "plm-qlora"],
+                        label="evaluation Method",
+                        value="freeze"
+                    )
                 eval_model_path = gr.Textbox(
                     label="Model Path",
                     placeholder="Path to the trained model"
@@ -146,7 +152,7 @@ def create_inference_tab(constant):
         # Bind evaluation event
         eval_button.click(
             fn=evaluate_model,
-            inputs=[eval_plm_model, eval_model_path, eval_dataset, eval_batch_size, eval_structure_seq, eval_pooling_method],
+            inputs=[eval_method, eval_plm_model, eval_model_path, eval_dataset, eval_batch_size, eval_structure_seq, eval_pooling_method],
             outputs=eval_output,
             queue=True  # Enable queuing for generators
         )
