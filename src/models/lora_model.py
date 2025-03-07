@@ -43,7 +43,7 @@ class LoraModel(nn.Module):
         if (
             self.training
             and hasattr(self, "args")
-            and self.args.training_method in ["full", "lora", "plm-lora"]
+            and self.args.training_method in ["full", "plm-lora", "plm-qlora"]
         ):
             if "ProSST" in self.args.plm_model:
                 outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask, ss_input_ids=stru_token, output_hidden_states=True)
@@ -52,10 +52,7 @@ class LoraModel(nn.Module):
         else:
             with torch.no_grad():
                 outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask)
-        if "ProSST" in self.args.plm_model:
-            seq_embeds = outputs.hidden_states[-1]
-        else:
-            seq_embeds = outputs.last_hidden_state
+        seq_embeds = outputs.last_hidden_state
         gc.collect()
         torch.cuda.empty_cache()
         return seq_embeds
@@ -69,38 +66,3 @@ class LoraModel(nn.Module):
         seq_embeds = self.plm_embedding(plm_model, aa_seq, attention_mask, stru_token)
         logits = self.classifier(seq_embeds, attention_mask)
         return logits
-
-    # def save_model(self, save_path):
-    #     """save LoRA and model params"""
-    #     os.makedirs(save_path, exist_ok=True)
-
-    #     self.plm_model.save_pretrained(os.path.join(save_path, "lora_weights"))
-
-    #     classifier_path = os.path.join(save_path, "classifier.pt")
-    #     if hasattr(self, "classifier"):
-    #         torch.save(self.classifier.state_dict(), classifier_path)
-    #     else:
-    #         pooling_path = os.path.join(save_path, "pooling.pt")
-    #         projection_path = os.path.join(save_path, "projection.pt")
-    #         torch.save(self.pooling.state_dict(), pooling_path)
-    #         torch.save(self.projection.state_dict(), projection_path)
-
-    # @classmethod
-    # def load_model(cls, config, load_path):
-    #     """load model params"""
-    #     model = cls(config)
-
-    #     model.plm_model = PeftModel.from_pretrained(
-    #         model.plm_model, os.path.join(load_path, "lora_weights")
-    #     )
-
-    #     if hasattr(model, "classifier"):
-    #         classifier_path = os.path.join(load_path, "classifier.pt")
-    #         model.classifier.load_state_dict(torch.load(classifier_path))
-    #     else:
-    #         pooling_path = os.path.join(load_path, "pooling.pt")
-    #         projection_path = os.path.join(load_path, "projection.pt")
-    #         model.pooling.load_state_dict(torch.load(pooling_path))
-    #         model.projection.load_state_dict(torch.load(projection_path))
-
-    #     return model
