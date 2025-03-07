@@ -159,9 +159,6 @@ def create_plm_and_tokenizer(args, qlora_config=None):
 
     else:
         raise ValueError(f"Unsupported model type: {args.plm_model}")
-
-    if qlora_config:
-        plm_model.quantization_config = qlora_config
     
     return tokenizer, plm_model
 
