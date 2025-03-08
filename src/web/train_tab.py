@@ -69,17 +69,18 @@ class TrainingArgs:
             self.wandb_project = args[21]
             self.wandb_entity = args[22]
         
-        # Other parameters
-        self.patience = args[23]
-        self.num_workers = args[24]
-        self.max_grad_norm = args[25]
-        self.structure_seq = args[26]
 
-        # LoRA parameters
-        self.lora_r = args[27]
-        self.lora_alpha = args[28]
-        self.lora_dropout = args[29]
-        self.lora_target_modules = [m.strip() for m in args[30].split(",")] if args[30] else []
+        # 其他参数
+        self.patience = args[18]
+        self.num_workers = args[19]
+        self.max_grad_norm = args[20]
+        self.structure_seq = args[21]
+
+        # LoRA参数
+        self.lora_r = args[22]
+        self.lora_alpha = args[23]
+        self.lora_dropout = args[24]
+        self.lora_target_modules = args[25].strip().split(",") if args[25] else ["query", "key", "value"]
 
     def to_dict(self) -> Dict[str, Any]:
         args_dict = {
@@ -100,6 +101,7 @@ class TrainingArgs:
             "structure_seq": self.structure_seq
         }
 
+
         # 添加数据集相关参数
         if self.dataset_selection == "Use Pre-defined Dataset":
             args_dict["dataset_config"] = self.dataset_config
@@ -110,7 +112,7 @@ class TrainingArgs:
             args_dict["metrics"] = self.metrics
 
         # Add LoRA parameters
-        if self.training_method == "plm-lora":
+        if self.training_method in ["plm-lora", "plm-qlora"]:
             args_dict.update({
                 "lora_r": self.lora_r,
                 "lora_alpha": self.lora_alpha,
@@ -439,7 +441,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             with gr.Row(equal_height=True):
                 with gr.Column(scale=1, min_width=150):
                     training_method = gr.Dropdown(
-                        choices=["full", "freeze", "ses-adapter", "plm-lora"],
+                        choices=["full", "freeze", "lora", "ses-adapter", "plm-lora", "plm-qlora"],
                         label="Training Method",
                         value="freeze"
                     )
@@ -463,18 +465,27 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         minimum=-1, maximum=2048, value=None, step=32,
                         label="Max Sequence Length (-1 for unlimited)"
                     )
-            
-            def update_training_method(method):
+
+            def update_structure_seq(method):
                 return {
-                    structure_seq: gr.update(visible=method == "ses-adapter"),
-                    lora_params_row: gr.update(visible=method == "plm-lora")
+                    structure_seq: gr.update(visible=method == "ses-adapter")
                 }
+            # 修改update_lora_params函数
+            def update_lora_params_row(method):
+                """更新lora参数的显示状态"""
+                is_visible = method in ["plm-lora", "plm-qlora"]
+                return gr.update(visible=is_visible)
 
             # Add training_method change event
             training_method.change(
-                fn=update_training_method,
+                fn=update_structure_seq,
                 inputs=[training_method],
-                outputs=[structure_seq, lora_params_row]
+                outputs=[structure_seq]
+            )
+            training_method.change(
+                fn=update_lora_params_row,
+                inputs=[training_method],
+                outputs=[lora_params_row]
             )
 
             # Second row: Advanced training parameters

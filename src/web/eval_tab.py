@@ -22,88 +22,9 @@ def create_eval_tab(constant):
     stop_thread = False
     plm_models = constant["plm_models"]
 
-    def format_metrics(metrics_file):
-        """Convert metrics to HTML table format for display"""
-        try:
-            df = pd.read_csv(metrics_file)
-            metrics_dict = df.iloc[0].to_dict()
-            
-            # 定义指标优先级顺序
-            priority_metrics = {
-                "accuracy": 1,
-                "mcc": 2,
-                "f1": 3,
-                "precision": 4,
-                "recall": 5,
-                "auroc": 6,
-                "f1max": 7,
-                "spearman_corr": 8,
-                "mse": 9
-            }
-            
-            # 按优先级排序指标
-            def get_priority(item):
-                key = item[0].lower()
-                return priority_metrics.get(key, 100)  # 未知指标放在最后
-            
-            sorted_metrics = sorted(metrics_dict.items(), key=get_priority)
-            
-            # 创建HTML表格 - 使用与train_tab完全相同的样式
-            html = """
-            <div style="margin-top: 10px; margin-bottom: 20px;">
-                <table style="width: 30%; border-collapse: collapse; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin: 0 auto;">
-                    <thead>
-                        <tr>
-                            <th style="padding: 10px 15px; text-align: left; background-color: #f5f5f5; font-weight: 600; border-bottom: 1px solid #ddd; color: #333; width: 50%;">Metric</th>
-                            <th style="padding: 10px 15px; text-align: right; background-color: #f5f5f5; font-weight: 600; border-bottom: 1px solid #ddd; color: #333; width: 50%;">Value</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            """
-            
-            # 添加每个指标行
-            for i, (key, value) in enumerate(sorted_metrics):
-                # 设置交替行的背景色
-                bg_color = "#f9f9f9" if i % 2 == 1 else "white"
-                
-                # 格式化值
-                if isinstance(value, (int, float)):
-                    value_str = f"{value:.4f}" if isinstance(value, float) else str(value)
-                else:
-                    value_str = str(value)
-                
-                html += f"""
-                        <tr style="background-color: {bg_color};">
-                            <td style="padding: 8px 15px; border-bottom: 1px solid #eee; font-weight: 500;">{key}</td>
-                            <td style="padding: 8px 15px; border-bottom: 1px solid #eee; text-align: right; font-family: monospace; font-size: 14px;">{value_str}</td>
-                        </tr>
-                """
-            
-            html += """
-                    </tbody>
-                </table>
-            </div>
-            """
-            
-            return html
-                
-        except Exception as e:
-            return f"Error formatting metrics: {str(e)}"
 
-    def process_output(process, queue):
-        nonlocal stop_thread
-        while True:
-            if stop_thread:
-                break
-            output = process.stdout.readline()
-            if output == '' and process.poll() is not None:
-                break
-            if output:
-                queue.put(output.strip())
-        process.stdout.close()
-
-    def evaluate_model(plm_model, model_path, training_method, is_custom_dataset, dataset_defined, dateset_custom, problem_type, num_labels, metrics, batch_mode, batch_size, batch_token, eval_structure_seq, pooling_method):
-        nonlocal is_evaluating, current_process, stop_thread
+    def evaluate_model(eval_method, plm_model, model_path, dataset, batch_size, eval_structure_seq, pooling_method, progress=gr.Progress()):
+        nonlocal is_evaluating
         
         if is_evaluating:
             return "Evaluation is already in progress. Please wait...", gr.update(visible=False)
@@ -162,6 +83,7 @@ def create_eval_tab(constant):
             # Prepare command
             cmd = [sys.executable, "src/eval.py"]
             args_dict = {
+                "eval_method": eval_method,
                 "model_path": model_path,
                 "test_file": test_file,
                 "problem_type": problem_type,
@@ -423,11 +345,14 @@ def create_eval_tab(constant):
 
     with gr.Tab("Evaluation"):
 
-        gr.Markdown("### Model and Dataset Configuration")
-
-        # Original evaluation interface components
-        with gr.Group():
-            with gr.Row():
+        gr.Markdown("## Model Evaluation")
+        with gr.Row():
+            with gr.Column():
+                eval_method = gr.Dropdown(
+                        choices=["full", "freeze", "lora", "ses-adapter", "plm-lora", "plm-qlora"],
+                        label="evaluation Method",
+                        value="freeze"
+                    )
                 eval_model_path = gr.Textbox(
                     label="Model Path",
                     placeholder="Path to the trained model"
@@ -906,28 +831,9 @@ def create_eval_tab(constant):
         # Connect buttons to functions
         eval_button.click(
             fn=evaluate_model,
-            inputs=[
-                eval_plm_model,
-                eval_model_path,
-                training_method,
-                is_custom_dataset,
-                eval_dataset_defined,
-                eval_dataset_custom,
-                problem_type,
-                num_labels,
-                metrics,
-                batch_mode,
-                batch_size,
-                batch_token,
-                eval_structure_seq,
-                eval_pooling_method
-            ],
-            outputs=[eval_output, download_csv_btn]
-        )
-        abort_button.click(
-            fn=handle_abort,
-            inputs=[],
-            outputs=[eval_output, download_csv_btn]
+            inputs=[eval_method, eval_plm_model, eval_model_path, eval_dataset, eval_batch_size, eval_structure_seq, eval_pooling_method],
+            outputs=eval_output,
+            queue=True  # Enable queuing for generators
         )
 
     return {

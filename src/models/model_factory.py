@@ -4,7 +4,9 @@ from transformers import (
     BertTokenizer, BertModel,
     T5Tokenizer, T5EncoderModel,
     AutoTokenizer, PreTrainedModel,
+    AutoModelForMaskedLM, AutoModel
 )
+from peft import prepare_model_for_kbit_training
 from .adapter_model import AdapterModel
 from .lora_model import LoraModel
 
@@ -27,7 +29,7 @@ def create_models(args):
     if args.training_method != 'full':
         freeze_plm_parameters(plm_model)
     if args.training_method == 'lora':
-        setup_lora_plm(plm_model, args)
+        plm_model=setup_lora_plm(plm_model, args)
     
     # Move models to device
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -36,19 +38,35 @@ def create_models(args):
     
     return model, plm_model, tokenizer
 
-def creat_lora_model(args):
+def create_lora_model(args):
     tokenizer, plm_model = create_plm_and_tokenizer(args)
     # Update hidden size based on PLM
     args.hidden_size = get_hidden_size(plm_model, args.plm_model)
-
-    # create lora model
     model = LoraModel(args=args)
-    # Handle PLM parameters based on training method
-    if args.training_method != "full":
-        freeze_plm_parameters(plm_model)
-    if args.training_method in ["lora", "plm-lora"]:
-        setup_lora_plm(plm_model, args)
-    print(" Using plm lora ")
+    # Enable gradient checkpointing
+    plm_model.gradient_checkpointing_enable()
+    plm_model=setup_lora_plm(plm_model, args)
+    return model, plm_model, tokenizer
+
+def create_qlora_model(args):
+    qlora_config = setup_quantization_config()
+    tokenizer, plm_model = create_plm_and_tokenizer(args, qlora_config=qlora_config)
+    # Update hidden size based on PLM
+    args.hidden_size = get_hidden_size(plm_model, args.plm_model)
+    model = LoraModel(args=args)
+    # Enable gradient checkpointing
+    plm_model.gradient_checkpointing_enable()
+    plm_model = prepare_model_for_kbit_training(plm_model)
+    plm_model=setup_lora_plm(plm_model, args)
+    return model, plm_model, tokenizer
+
+def lora_factory(args):
+    if args.training_method in "plm-lora":
+        model, plm_model, tokenizer = create_lora_model(args)
+    elif args.training_method == "plm-qlora":
+        model, plm_model, tokenizer = create_qlora_model(args)
+    else:
+        raise ValueError(f"Unsupported lora training method: {args.training_method}")
     # Move models to device
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model = model.to(device)
@@ -60,6 +78,18 @@ def freeze_plm_parameters(plm_model):
     for param in plm_model.parameters():
         param.requires_grad = False
     plm_model.eval()  # Set to evaluation mode
+
+def setup_quantization_config():
+    """Setup quantization configuration."""
+    from transformers import BitsAndBytesConfig
+    # https://huggingface.co/docs/peft/v0.14.0/en/developer_guides/quantization#quantize-a-model
+    qlora_config = BitsAndBytesConfig(
+        load_in_4bit=True,
+        bnb_4bit_use_double_quant=True,
+        bnb_4bit_quant_type="nf4",
+        bnb_4bit_compute_dtype=torch.bfloat16
+    )
+    return qlora_config
 
 def setup_lora_plm(plm_model, args):
     """Setup LoRA for pre-trained language model."""
@@ -86,21 +116,47 @@ def setup_lora_plm(plm_model, args):
     # Apply LoRA to model
     plm_model = get_peft_model(plm_model, peft_config)
     plm_model.print_trainable_parameters()
+    return plm_model
 
-def create_plm_and_tokenizer(args):
+def create_plm_and_tokenizer(args, qlora_config=None):
     """Create pre-trained language model and tokenizer based on model type."""
     if "esm" in args.plm_model:
         tokenizer = EsmTokenizer.from_pretrained(args.plm_model)
-        plm_model = EsmModel.from_pretrained(args.plm_model)
+        if qlora_config: 
+            plm_model = EsmModel.from_pretrained(args.plm_model, quantization_config=qlora_config) 
+        else:
+            plm_model = EsmModel.from_pretrained(args.plm_model)
     elif "bert" in args.plm_model:
         tokenizer = BertTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
-        plm_model = BertModel.from_pretrained(args.plm_model)
+        if qlora_config:
+            plm_model = BertModel.from_pretrained(args.plm_model, quantization_config=qlora_config)
+        else:
+            plm_model = BertModel.from_pretrained(args.plm_model)
     elif "prot_t5" in args.plm_model:
         tokenizer = T5Tokenizer.from_pretrained(args.plm_model, do_lower_case=False)
-        plm_model = T5EncoderModel.from_pretrained(args.plm_model)
+        if qlora_config:
+            plm_model = T5EncoderModel.from_pretrained(args.plm_model, quantization_config=qlora_config)
+        else:
+            plm_model = T5EncoderModel.from_pretrained(args.plm_model)
     elif "ankh" in args.plm_model:
         tokenizer = AutoTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
-        plm_model = T5EncoderModel.from_pretrained(args.plm_model)
+        if qlora_config:
+            plm_model = T5EncoderModel.from_pretrained(args.plm_model, quantization_config=qlora_config)
+        else:
+            plm_model = T5EncoderModel.from_pretrained(args.plm_model)
+    elif "ProSST" in args.plm_model:
+        tokenizer = AutoTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
+        if qlora_config:
+            plm_model = AutoModelForMaskedLM.from_pretrained(args.plm_model, quantization_config=qlora_config)
+        else:
+            plm_model = AutoModelForMaskedLM.from_pretrained(args.plm_model)
+    elif "Prime" in args.plm_model:
+        tokenizer = AutoTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
+        if qlora_config:
+            plm_model = AutoModel.from_pretrained(args.plm_model, trust_remote_code=True, quantization_config=qlora_config)
+        else:
+            plm_model = AutoModel.from_pretrained(args.plm_model, trust_remote_code=True)
+
     else:
         raise ValueError(f"Unsupported model type: {args.plm_model}")
     
@@ -114,6 +170,8 @@ def get_hidden_size(plm_model, model_type):
         return plm_model.config.hidden_size
     elif "prot_t5" in model_type or "ankh" in model_type:
         return plm_model.config.d_model
+    elif "ProSST" in model_type:
+        return plm_model.config.hidden_size
     else:
         raise ValueError(f"Unsupported model type: {model_type}")
 

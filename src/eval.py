@@ -1,5 +1,7 @@
 import sys
 import os
+
+os.environ["HF_ENDPOINT"]="https://hf-mirror.com"
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 import argparse
 import torch
@@ -14,13 +16,21 @@ from torchmetrics.classification import Accuracy, Recall, Precision, MatthewsCor
 from torchmetrics.classification import BinaryAccuracy, BinaryRecall, BinaryAUROC, BinaryF1Score, BinaryPrecision, BinaryMatthewsCorrCoef, BinaryF1Score
 from torchmetrics.regression import SpearmanCorrCoef
 from transformers import EsmTokenizer, EsmModel, BertModel, BertTokenizer
-from transformers import T5Tokenizer, T5EncoderModel, AutoTokenizer
+from transformers import T5Tokenizer, T5EncoderModel, AutoTokenizer, AutoModelForMaskedLM
 from transformers import logging
 from datasets import load_dataset
 from torch.utils.data import DataLoader
+# from utils.data_utils import BatchSampler
+# from utils.metrics import MultilabelF1Max
+# from models.adapter_mdoel import AdapterModel
 from data.batch_sampler import BatchSampler
 from training.metrics import MultilabelF1Max
 from models.adapter_model import AdapterModel
+from models.lora_model import LoraModel
+from peft import PeftModel
+from typing import Dict, Any, Union, Tuple
+from data.dataloader import prepare_dataloaders
+from datetime import datetime
 
 # ignore warning information
 logging.set_verbosity_error()
@@ -75,6 +85,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     # model params
+    parser.add_argument('--eval_method', type=str, default=None, help='evaluation method')
     parser.add_argument('--hidden_size', type=int, default=None, help='embedding hidden size of the model')
     parser.add_argument('--num_attention_head', type=int, default=8, help='number of attention heads')
     parser.add_argument('--attention_probs_dropout', type=float, default=0, help='attention probs dropout prob')
@@ -119,20 +130,24 @@ if __name__ == '__main__':
     # build tokenizer and protein language model
     if "esm" in args.plm_model:
         tokenizer = EsmTokenizer.from_pretrained(args.plm_model)
-        plm_model = EsmModel.from_pretrained(args.plm_model).to(device).eval()
+        plm_model = EsmModel.from_pretrained(args.plm_model)
         args.hidden_size = plm_model.config.hidden_size
     elif "bert" in args.plm_model:
         tokenizer = BertTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
-        plm_model = BertModel.from_pretrained(args.plm_model).to(device).eval()
+        plm_model = BertModel.from_pretrained(args.plm_model)
         args.hidden_size = plm_model.config.hidden_size
     elif "prot_t5" in args.plm_model:
         tokenizer = T5Tokenizer.from_pretrained(args.plm_model, do_lower_case=False)
-        plm_model = T5EncoderModel.from_pretrained(args.plm_model).to(device).eval()
+        plm_model = T5EncoderModel.from_pretrained(args.plm_model)
         args.hidden_size = plm_model.config.d_model
     elif "ankh" in args.plm_model:
         tokenizer = AutoTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
-        plm_model = T5EncoderModel.from_pretrained(args.plm_model).to(device).eval()
+        plm_model = T5EncoderModel.from_pretrained(args.plm_model)
         args.hidden_size = plm_model.config.d_model
+    elif "ProSST" in args.plm_model:
+        tokenizer = AutoTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
+        plm_model = AutoModelForMaskedLM.from_pretrained(args.plm_model)
+        args.hidden_size = plm_model.config.hidden_size
     args.vocab_size = plm_model.config.vocab_size
     
     # Define metric configurations
@@ -187,29 +202,37 @@ if __name__ == '__main__':
         
         # Move metric to device
         metrics_dict[metric_name].to(device)
-    
+
     
     # load adapter model
     print("---------- Load Model ----------")
-    if args.structure_seq is None:
-        args.structure_seq = ""
-        print("Warning: structure_seq was None, setting to empty string")
+    # model = AdapterModel(args)
+    # if args.model_path is not None:
+    #     model_path = args.model_path
+    # else:
+    #     model_path = f"{args.output_root}/{args.output_dir}/{args.output_model_name}"
+    if args.eval_method == "ses-adapter":
+        model = AdapterModel(args)
+    # ! lora/ qlora
+    elif args.eval_method in ["plm-lora", "plm-qlora"]:
+        model = LoraModel(args)
 
-    # 添加调试信息
-    print(f"Training method: {args.training_method}")
-    print(f"Structure sequence: {args.structure_seq}")
-    print(f"Use foldseek: {args.use_foldseek}")
-    print(f"Use ss8: {args.use_ss8}")
-    print(f"Problem type: {args.problem_type}")
-    print(f"Number of labels: {args.num_labels}")
-    
-    model = AdapterModel(args)
     if args.model_path is not None:
         model_path = args.model_path
     else:
         model_path = f"{args.output_root}/{args.output_dir}/{args.output_model_name}"
     model.load_state_dict(torch.load(model_path))
     model.to(device).eval()
+    # ! lora/ qlora
+    if args.eval_method == 'plm-lora':
+        lora_path = model_path.replace(".pt", "_lora")
+        plm_model = PeftModel.from_pretrained(plm_model,lora_path)
+        plm_model = plm_model.merge_and_unload()
+    elif args.eval_method == 'plm-qlora':
+        lora_path = model_path.replace(".pt", "_qlora")
+        plm_model = PeftModel.from_pretrained(plm_model,lora_path)
+        plm_model = plm_model.merge_and_unload()
+    plm_model.to(device).eval()  
 
     def param_num(model):
         total = sum([param.numel() for param in model.parameters() if param.requires_grad])

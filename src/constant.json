@@ -19,7 +19,9 @@
         "ProtT5-xxl-uniref50": "Rostlab/prot_t5_xxl_uniref50",
         "ProtT5-xxl-bfd": "Rostlab/prot_t5_xxl_bfd",
         "Ankh-base": "ElnaggarLab/ankh-base",
-        "Ankh-large": "ElnaggarLab/ankh-large"
+        "Ankh-large": "ElnaggarLab/ankh-large",
+        "ProSST": "AI4Protein/ProSST-2048",
+        "ProPrime": "AI4Protein/Prime_690M"
     },
     "dataset_configs": {
         "DeepLocBinary_AlphaFold2": "data/DeepLocBinary/DeepLocBinary_AlphaFold2_HF.json",
