@@ -48,7 +48,6 @@ def create_eval_tab(constant):
             
             sorted_metrics = sorted(metrics_dict.items(), key=get_priority)
             
-            # 创建HTML表格 - 使用与train_tab完全相同的样式
             html = """
             <div style="margin-top: 10px; margin-bottom: 20px;">
                 <table style="width: 30%; border-collapse: collapse; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin: 0 auto;">
@@ -172,7 +171,6 @@ def create_eval_tab(constant):
                 "test_result_dir": test_result_dir,
                 "dataset": dataset_display_name,
                 "pooling_method": pooling_method,
-                "eval_method": eval_method
             }
             if batch_mode == "Batch Size Mode":
                 args_dict["batch_size"] = batch_size
@@ -186,12 +184,6 @@ def create_eval_tab(constant):
                     args_dict["use_foldseek"] = True
                 if "ss8_seq" in eval_structure_seq:
                     args_dict["use_ss8"] = True
-            elif eval_method == "plm-lora":
-                args_dict["lora_rank"] = lora_r
-                args_dict["lora_alpha"] = lora_alpha
-                args_dict["lora_dropout"] = lora_dropout
-                args_dict["lora_target_modules"] = lora_target_modules
-                args_dict["structure_seq"] = ""
             else:
                 args_dict["structure_seq"] = ""
             
@@ -231,7 +223,7 @@ def create_eval_tab(constant):
                             line = output_queue.get_nowait()
                             new_lines.append(line)
                             progress_info["lines"].append(line)
-                            
+                            # print(line)
                             # Parse total samples
                             if "Total samples" in line:
                                 match = re.search(sample_pattern, line)
@@ -790,52 +782,21 @@ def create_eval_tab(constant):
 
             # for ses-adapter
             with gr.Row(visible=False) as structure_seq_row:
-                eval_structure_seq = gr.Textbox(label="Structure Sequence", placeholder="foldseek_seq,ss8_seq", value="foldseek_seq,ss8_seq")
-
-            # for plm-lora
-            with gr.Row(visible=False) as lora_params_row:
-                # gr.Markdown("#### LoRA Parameters")
-                with gr.Column():
-                    lora_r = gr.Number(
-                        value=8,
-                        label="LoRA Rank",
-                        precision=0,
-                        minimum=1,
-                        maximum=128,
-                    )
-                with gr.Column():
-                    lora_alpha = gr.Number(
-                        value=32,
-                        label="LoRA Alpha",
-                        precision=0,
-                        minimum=1,
-                        maximum=128
-                    )
-                with gr.Column():
-                    lora_dropout = gr.Number(
-                        value=0.1,
-                        label="LoRA Dropout",
-                        minimum=0.0,
-                        maximum=1.0
-                    )
-                with gr.Column():
-                    lora_target_modules = gr.Textbox(
-                        value="query,key,value",
-                        label="LoRA Target Modules",
-                        placeholder="Comma-separated list of target modules",
-                        # info="LoRA will be applied to these modules"
-                    )
+                eval_structure_seq = gr.CheckboxGroup(
+                    label="Structure Sequence",
+                    choices=["foldseek_seq", "ss8_seq"],
+                    value=["foldseek_seq", "ss8_seq"]
+                )
                         
         def update_training_method(method):
             return {
-                structure_seq_row: gr.update(visible=method == "ses-adapter"),
-                lora_params_row: gr.update(visible=method == "plm-lora")
+                structure_seq_row: gr.update(visible=method == "ses-adapter")
             }
 
         eval_method.change(
             fn=update_training_method,
             inputs=[eval_method],
-            outputs=[structure_seq_row, lora_params_row]
+            outputs=[structure_seq_row]
         )
 
 
