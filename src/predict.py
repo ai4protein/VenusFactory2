@@ -15,9 +15,10 @@ from pathlib import Path
 from transformers import EsmTokenizer, EsmModel, BertModel, BertTokenizer
 from transformers import T5Tokenizer, T5EncoderModel, AutoTokenizer, AutoModel
 from transformers import logging
-
+from peft import PeftModel
 # Import project modules
 from models.adapter_model import AdapterModel
+from models.lora_model import LoraModel
 from models.pooling import MeanPooling, Attention1dPoolingHead, LightAttentionPoolingHead
 
 # Ignore warning information
@@ -28,6 +29,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Predict protein function for a single sequence")
     
     # Model parameters
+    parser.add_argument('--eval_method', type=str, default="freeze", choices=["freeze", "plm-lora", "plm-qlora", "ses-adapter"], help="Evaluation method")
     parser.add_argument('--model_path', type=str, required=True, help="Path to the trained model")
     parser.add_argument('--plm_model', type=str, required=True, help="Pretrained language model name or path")
     parser.add_argument('--pooling_method', type=str, default="mean", choices=["mean", "attention1d", "light_attention"], help="Pooling method")
@@ -94,23 +96,23 @@ def load_model_and_tokenizer(args):
     # Build tokenizer and protein language model
     if "esm" in args.plm_model:
         tokenizer = EsmTokenizer.from_pretrained(args.plm_model)
-        plm_model = EsmModel.from_pretrained(args.plm_model).to(device).eval()
+        plm_model = EsmModel.from_pretrained(args.plm_model)
         args.hidden_size = plm_model.config.hidden_size
     elif "bert" in args.plm_model:
         tokenizer = BertTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
-        plm_model = BertModel.from_pretrained(args.plm_model).to(device).eval()
+        plm_model = BertModel.from_pretrained(args.plm_model)
         args.hidden_size = plm_model.config.hidden_size
     elif "prot_t5" in args.plm_model:
         tokenizer = T5Tokenizer.from_pretrained(args.plm_model, do_lower_case=False)
-        plm_model = T5EncoderModel.from_pretrained(args.plm_model).to(device).eval()
+        plm_model = T5EncoderModel.from_pretrained(args.plm_model)
         args.hidden_size = plm_model.config.d_model
     elif "ankh" in args.plm_model:
         tokenizer = AutoTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
-        plm_model = T5EncoderModel.from_pretrained(args.plm_model).to(device).eval()
+        plm_model = T5EncoderModel.from_pretrained(args.plm_model)
         args.hidden_size = plm_model.config.d_model
     else:
         tokenizer = AutoTokenizer.from_pretrained(args.plm_model)
-        plm_model = AutoModel.from_pretrained(args.plm_model).to(device).eval()
+        plm_model = AutoModel.from_pretrained(args.plm_model)
         args.hidden_size = plm_model.config.hidden_size
     
     args.vocab_size = plm_model.config.vocab_size
@@ -138,7 +140,7 @@ def load_model_and_tokenizer(args):
     if structure_seq_list and not args.structure_seq:
         args.structure_seq = ",".join(structure_seq_list)
     
-    print(f"Training method: freeze")  # Default for prediction
+    print(f"Training method: {args.eval_method}")  # Default for prediction
     print(f"Structure sequence: {args.structure_seq}")
     print(f"Use foldseek: {args.use_foldseek}")
     print(f"Use ss8: {args.use_ss8}")
@@ -148,10 +150,29 @@ def load_model_and_tokenizer(args):
     
     # Create and load model
     try:
-        model = AdapterModel(args)
-        model.load_state_dict(torch.load(args.model_path, map_location=device))
+        if args.eval_method in ["ses-adapter", "freeze"]:
+            model = AdapterModel(args)
+        # ! lora/ qlora
+        elif args.eval_method in ["plm-lora", "plm-qlora"]:
+            model = LoraModel(args)
+        if args.model_path is not None:
+            model_path = args.model_path
+        else:
+            model_path = f"{args.output_root}/{args.output_dir}/{args.output_model_name}"
+        model.load_state_dict(torch.load(model_path))
         model.to(device).eval()
+        # ! lora/ qlora
+        if args.eval_method == 'plm-lora':
+            lora_path = model_path.replace(".pt", "_lora")
+            plm_model = PeftModel.from_pretrained(plm_model,lora_path)
+            plm_model = plm_model.merge_and_unload()
+        elif args.eval_method == 'plm-qlora':
+            lora_path = model_path.replace(".pt", "_qlora")
+            plm_model = PeftModel.from_pretrained(plm_model,lora_path)
+            plm_model = plm_model.merge_and_unload()
+        plm_model.to(device).eval()  
         return model, plm_model, tokenizer, device
+    
     except Exception as e:
         print(f"Error: {str(e)}")
         raise
@@ -217,6 +238,30 @@ def process_sequences(args, tokenizer, plm_model_name):
         "aa_seq_input_ids": aa_inputs["input_ids"],
         "aa_seq_attention_mask": aa_inputs["attention_mask"],
     }
+    
+    # 只有 ProSST 模型需要结构标记
+    if "ProSST" in plm_model_name and hasattr(args, 'prosst_stru_token') and args.prosst_stru_token:
+        try:
+            # 处理 ProSST 结构标记
+            if isinstance(args.prosst_stru_token, str):
+                seq_clean = args.prosst_stru_token.strip("[]").replace(" ","")
+                tokens = list(map(int, seq_clean.split(','))) if seq_clean else []
+            elif isinstance(args.prosst_stru_token, (list, tuple)):
+                tokens = [int(x) for x in args.prosst_stru_token]
+            else:
+                tokens = []
+                
+            # 添加到数据字典
+            if tokens:
+                stru_tokens = torch.tensor([tokens], dtype=torch.long)
+                data_dict["aa_seq_stru_tokens"] = stru_tokens
+            else:
+                # 如果没有标记，则使用零填充
+                data_dict["aa_seq_stru_tokens"] = torch.zeros_like(aa_inputs["input_ids"], dtype=torch.long)
+        except Exception as e:
+            print(f"Warning: Failed to process ProSST structure tokens: {e}")
+            # 使用零填充
+            data_dict["aa_seq_stru_tokens"] = torch.zeros_like(aa_inputs["input_ids"], dtype=torch.long)
     
     if args.use_foldseek and foldseek_seq:
         data_dict["foldseek_seq_input_ids"] = foldseek_inputs["input_ids"]

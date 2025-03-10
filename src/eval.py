@@ -45,17 +45,17 @@ def evaluate(model, plm_model, metrics, dataloader, loss_function, device=None):
     
     for i, batch in enumerate(epoch_iterator, 1):
         # 添加调试信息，打印每个batch的键和shape
-        print(f"\n处理批次 {i}:")
-        for k, v in batch.items():
-            print(f"  键: {k}, 形状: {v.shape}")
+        # print(f"\n处理批次 {i}:")
+        # for k, v in batch.items():
+        #     print(f"  键: {k}, 形状: {v.shape}")
             
         for k, v in batch.items():
             batch[k] = v.to(device)
         label = batch["label"]
         
         # 在调用模型前添加调试信息
-        print(f"将批次传递给模型，使用structure_seq: {args.structure_seq}")
-        print(f"使用foldseek: {args.use_foldseek}, 使用ss8: {args.use_ss8}")
+        # print(f"将批次传递给模型，使用structure_seq: {args.structure_seq}")
+        # print(f"使用foldseek: {args.use_foldseek}, 使用ss8: {args.use_ss8}")
         
         logits = model(plm_model, batch)
         pred_labels.extend(logits.argmax(dim=1).cpu().numpy())
@@ -211,7 +211,7 @@ if __name__ == '__main__':
     #     model_path = args.model_path
     # else:
     #     model_path = f"{args.output_root}/{args.output_dir}/{args.output_model_name}"
-    if args.eval_method == "ses-adapter":
+    if args.eval_method in ["ses-adapter", "freeze"]:
         model = AdapterModel(args)
     # ! lora/ qlora
     elif args.eval_method in ["plm-lora", "plm-qlora"]:
@@ -249,12 +249,26 @@ if __name__ == '__main__':
             foldseek_seqs = []
         if args.use_ss8:
             ss8_seqs = []
+        prosst_stru_tokens = [] if "ProSST" in args.plm_model else None
+        
         for e in examples:
             aa_seq = e["aa_seq"]
             if args.use_foldseek:
                 foldseek_seq = e["foldseek_seq"]
             if args.use_ss8:
                 ss8_seq = e["ss8_seq"]
+            
+
+            if "ProSST" in args.plm_model and "prosst_stru_token" in e:
+                stru_token = e["prosst_stru_token"]
+                if isinstance(stru_token, str):
+                    seq_clean = stru_token.strip("[]").replace(" ","")
+                    tokens = list(map(int, seq_clean.split(','))) if seq_clean else []
+                elif isinstance(stru_token, (list, tuple)):
+                    tokens = [int(x) for x in stru_token]
+                else:
+                    tokens = []
+                prosst_stru_tokens.append(torch.tensor(tokens))
             
             if 'prot_bert' in args.plm_model or "prot_t5" in args.plm_model:
                 aa_seq = " ".join(list(aa_seq))
@@ -303,11 +317,25 @@ if __name__ == '__main__':
             "aa_seq_attention_mask": attention_mask,
             "label": labels
         }
+        
+        if "ProSST" in args.plm_model and prosst_stru_tokens:
+            aa_max_length = len(aa_input_ids[0])
+            padded_tokens = []
+            for tokens in prosst_stru_tokens:
+                if tokens is None or len(tokens) == 0:
+
+                    padded_tokens.append([0] * aa_max_length)
+                else:
+                    struct_sequence = tokens.tolist()
+
+                    padded_tokens.append(struct_sequence + [0] * (aa_max_length - len(struct_sequence)))
+            
+            data_dict["aa_seq_stru_tokens"] = torch.tensor(padded_tokens, dtype=torch.long)
+        
         if args.use_foldseek:
             data_dict["foldseek_seq_input_ids"] = foldseek_input_ids
         if args.use_ss8:
             data_dict["ss8_seq_input_ids"] = ss8_input_ids
-        
         
         return data_dict
         
@@ -327,6 +355,14 @@ if __name__ == '__main__':
                 data["foldseek_seq"] = data["foldseek_seq"][:args.max_seq_len]
             if args.use_ss8:
                 data["ss8_seq"] = data["ss8_seq"][:args.max_seq_len]
+            # 如果是 ProSST 模型且有结构标记，也需要截断
+            if "ProSST" in args.plm_model and "prosst_stru_token" in data:
+                # 结构标记可能是字符串或列表形式
+                if isinstance(data["prosst_stru_token"], str):
+
+                    pass
+                elif isinstance(data["prosst_stru_token"], (list, tuple)):
+                    data["prosst_stru_token"] = data["prosst_stru_token"][:args.max_seq_len]
             token_num = min(len(data["aa_seq"]), args.max_seq_len)
         else:
             token_num = len(data["aa_seq"])
