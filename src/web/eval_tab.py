@@ -22,9 +22,87 @@ def create_eval_tab(constant):
     stop_thread = False
     plm_models = constant["plm_models"]
 
+    def format_metrics(metrics_file):
+        """Convert metrics to HTML table format for display"""
+        try:
+            df = pd.read_csv(metrics_file)
+            metrics_dict = df.iloc[0].to_dict()
+            
+            # 定义指标优先级顺序
+            priority_metrics = {
+                "accuracy": 1,
+                "mcc": 2,
+                "f1": 3,
+                "precision": 4,
+                "recall": 5,
+                "auroc": 6,
+                "f1max": 7,
+                "spearman_corr": 8,
+                "mse": 9
+            }
+            
+            # 按优先级排序指标
+            def get_priority(item):
+                key = item[0].lower()
+                return priority_metrics.get(key, 100)  # 未知指标放在最后
+            
+            sorted_metrics = sorted(metrics_dict.items(), key=get_priority)
+            
+            html = """
+            <div style="margin-top: 10px; margin-bottom: 20px;">
+                <table style="width: 30%; border-collapse: collapse; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin: 0 auto;">
+                    <thead>
+                        <tr>
+                            <th style="padding: 10px 15px; text-align: left; background-color: #f5f5f5; font-weight: 600; border-bottom: 1px solid #ddd; color: #333; width: 50%;">Metric</th>
+                            <th style="padding: 10px 15px; text-align: right; background-color: #f5f5f5; font-weight: 600; border-bottom: 1px solid #ddd; color: #333; width: 50%;">Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            """
+            
+            # 添加每个指标行
+            for i, (key, value) in enumerate(sorted_metrics):
+                # 设置交替行的背景色
+                bg_color = "#f9f9f9" if i % 2 == 1 else "white"
+                
+                # 格式化值
+                if isinstance(value, (int, float)):
+                    value_str = f"{value:.4f}" if isinstance(value, float) else str(value)
+                else:
+                    value_str = str(value)
+                
+                html += f"""
+                        <tr style="background-color: {bg_color};">
+                            <td style="padding: 8px 15px; border-bottom: 1px solid #eee; font-weight: 500;">{key}</td>
+                            <td style="padding: 8px 15px; border-bottom: 1px solid #eee; text-align: right; font-family: monospace; font-size: 14px;">{value_str}</td>
+                        </tr>
+                """
+            
+            html += """
+                    </tbody>
+                </table>
+            </div>
+            """
+            
+            return html
+                
+        except Exception as e:
+            return f"Error formatting metrics: {str(e)}"
 
-    def evaluate_model(eval_method, plm_model, model_path, dataset, batch_size, eval_structure_seq, pooling_method, progress=gr.Progress()):
-        nonlocal is_evaluating
+    def process_output(process, queue):
+        nonlocal stop_thread
+        while True:
+            if stop_thread:
+                break
+            output = process.stdout.readline()
+            if output == '' and process.poll() is not None:
+                break
+            if output:
+                queue.put(output.strip())
+        process.stdout.close()
+
+    def evaluate_model(plm_model, model_path, eval_method, is_custom_dataset, dataset_defined, dateset_custom, problem_type, num_labels, metrics, batch_mode, batch_size, batch_token, eval_structure_seq, pooling_method):
+        nonlocal is_evaluating, current_process, stop_thread
         
         if is_evaluating:
             return "Evaluation is already in progress. Please wait...", gr.update(visible=False)
@@ -93,26 +171,19 @@ def create_eval_tab(constant):
                 "test_result_dir": test_result_dir,
                 "dataset": dataset_display_name,
                 "pooling_method": pooling_method,
-                "training_method": training_method
             }
             if batch_mode == "Batch Size Mode":
                 args_dict["batch_size"] = batch_size
             else:
                 args_dict["batch_token"] = batch_token
 
-            if training_method == "ses-adapter":
-                args_dict["structure_seq"] = eval_structure_seq
+            if eval_method == "ses-adapter":
+                args_dict["structure_seq"] = ",".join(eval_structure_seq) if eval_structure_seq else None
                 # Add flags for using foldseek and ss8
                 if "foldseek_seq" in eval_structure_seq:
                     args_dict["use_foldseek"] = True
                 if "ss8_seq" in eval_structure_seq:
                     args_dict["use_ss8"] = True
-            elif training_method == "plm-lora":
-                args_dict["lora_rank"] = lora_r
-                args_dict["lora_alpha"] = lora_alpha
-                args_dict["lora_dropout"] = lora_dropout
-                args_dict["lora_target_modules"] = lora_target_modules
-                args_dict["structure_seq"] = ""
             else:
                 args_dict["structure_seq"] = ""
             
@@ -152,7 +223,7 @@ def create_eval_tab(constant):
                             line = output_queue.get_nowait()
                             new_lines.append(line)
                             progress_info["lines"].append(line)
-                            
+                            # print(line)
                             # Parse total samples
                             if "Total samples" in line:
                                 match = re.search(sample_pattern, line)
@@ -345,14 +416,11 @@ def create_eval_tab(constant):
 
     with gr.Tab("Evaluation"):
 
-        gr.Markdown("## Model Evaluation")
-        with gr.Row():
-            with gr.Column():
-                eval_method = gr.Dropdown(
-                        choices=["full", "freeze", "lora", "ses-adapter", "plm-lora", "plm-qlora"],
-                        label="evaluation Method",
-                        value="freeze"
-                    )
+        gr.Markdown("### Model and Dataset Configuration")
+
+        # Original evaluation interface components
+        with gr.Group():
+            with gr.Row():
                 eval_model_path = gr.Textbox(
                     label="Model Path",
                     placeholder="Path to the trained model"
@@ -363,9 +431,9 @@ def create_eval_tab(constant):
                 )
 
             with gr.Row():
-                    training_method = gr.Dropdown(
-                        choices=["full", "freeze", "ses-adapter", "plm-lora"],
-                        label="Training Method",
+                    eval_method = gr.Dropdown(
+                        choices=["full", "freeze", "ses-adapter", "plm-lora", "plm-qlora"],
+                        label="Evaluation Method",
                         value="freeze"
                     )
                     eval_pooling_method = gr.Dropdown(
@@ -714,52 +782,21 @@ def create_eval_tab(constant):
 
             # for ses-adapter
             with gr.Row(visible=False) as structure_seq_row:
-                eval_structure_seq = gr.Textbox(label="Structure Sequence", placeholder="foldseek_seq,ss8_seq", value="foldseek_seq,ss8_seq")
-
-            # for plm-lora
-            with gr.Row(visible=False) as lora_params_row:
-                # gr.Markdown("#### LoRA Parameters")
-                with gr.Column():
-                    lora_r = gr.Number(
-                        value=8,
-                        label="LoRA Rank",
-                        precision=0,
-                        minimum=1,
-                        maximum=128,
-                    )
-                with gr.Column():
-                    lora_alpha = gr.Number(
-                        value=32,
-                        label="LoRA Alpha",
-                        precision=0,
-                        minimum=1,
-                        maximum=128
-                    )
-                with gr.Column():
-                    lora_dropout = gr.Number(
-                        value=0.1,
-                        label="LoRA Dropout",
-                        minimum=0.0,
-                        maximum=1.0
-                    )
-                with gr.Column():
-                    lora_target_modules = gr.Textbox(
-                        value="query,key,value",
-                        label="LoRA Target Modules",
-                        placeholder="Comma-separated list of target modules",
-                        # info="LoRA will be applied to these modules"
-                    )
+                eval_structure_seq = gr.CheckboxGroup(
+                    label="Structure Sequence",
+                    choices=["foldseek_seq", "ss8_seq"],
+                    value=["foldseek_seq", "ss8_seq"]
+                )
                         
         def update_training_method(method):
             return {
-                structure_seq_row: gr.update(visible=method == "ses-adapter"),
-                lora_params_row: gr.update(visible=method == "plm-lora")
+                structure_seq_row: gr.update(visible=method == "ses-adapter")
             }
 
-        training_method.change(
+        eval_method.change(
             fn=update_training_method,
-            inputs=[training_method],
-            outputs=[structure_seq_row, lora_params_row]
+            inputs=[eval_method],
+            outputs=[structure_seq_row]
         )
 
 
@@ -831,9 +868,28 @@ def create_eval_tab(constant):
         # Connect buttons to functions
         eval_button.click(
             fn=evaluate_model,
-            inputs=[eval_method, eval_plm_model, eval_model_path, eval_dataset, eval_batch_size, eval_structure_seq, eval_pooling_method],
-            outputs=eval_output,
-            queue=True  # Enable queuing for generators
+            inputs=[
+                eval_plm_model,
+                eval_model_path,
+                eval_method,
+                is_custom_dataset,
+                eval_dataset_defined,
+                eval_dataset_custom,
+                problem_type,
+                num_labels,
+                metrics,
+                batch_mode,
+                batch_size,
+                batch_token,
+                eval_structure_seq,
+                eval_pooling_method
+            ],
+            outputs=[eval_output, download_csv_btn]
+        )
+        abort_button.click(
+            fn=handle_abort,
+            inputs=[],
+            outputs=[eval_output, download_csv_btn]
         )
 
     return {

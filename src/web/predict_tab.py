@@ -76,7 +76,7 @@ def create_predict_tab(constant):
         </div>
         """
 
-    def predict_sequence(plm_model, model_path, training_method, aa_seq, foldseek_seq, ss8_seq, eval_structure_seq, pooling_method, problem_type, num_labels):
+    def predict_sequence(plm_model, model_path, eval_method, aa_seq, foldseek_seq, ss8_seq, eval_structure_seq, pooling_method, problem_type, num_labels):
         """Predict a single protein sequence"""
         nonlocal is_predicting, current_process, stop_thread
         
@@ -207,10 +207,11 @@ def create_predict_tab(constant):
                 "ss8_seq": ss8_seq if ss8_seq else "",
                 "pooling_method": pooling_method,
                 "problem_type": problem_type,
-                "num_labels": num_labels
+                "num_labels": num_labels,
+                "eval_method": eval_method
             }
             
-            if training_method == "ses-adapter":
+            if eval_method == "ses-adapter":
                 # 使用多选下拉框选择的结构序列
                 args_dict["structure_seq"] = ",".join(eval_structure_seq) if eval_structure_seq else None
                 
@@ -581,7 +582,7 @@ def create_predict_tab(constant):
                 is_predicting = False
                 current_process = None
 
-    def predict_batch(plm_model, model_path, training_method, input_file, eval_structure_seq, pooling_method, problem_type, num_labels, batch_size):
+    def predict_batch(plm_model, model_path, eval_method, input_file, eval_structure_seq, pooling_method, problem_type, num_labels, batch_size):
         """Batch predict multiple protein sequences"""
         nonlocal is_predicting, current_process, stop_thread
         
@@ -715,10 +716,11 @@ def create_predict_tab(constant):
                 "pooling_method": pooling_method,
                 "problem_type": problem_type,
                 "num_labels": num_labels,
+                "eval_method": eval_method,
                 "batch_size": batch_size
             }
             
-            if training_method == "ses-adapter":
+            if eval_method == "ses-adapter":
                 args_dict["structure_seq"] = ",".join(eval_structure_seq) if eval_structure_seq else None
             else:
                 args_dict["structure_seq"] = None
@@ -1343,9 +1345,9 @@ def create_predict_tab(constant):
                 )
 
             with gr.Row():
-                training_method = gr.Dropdown(
-                    choices=["full", "freeze", "ses-adapter", "plm-lora"],
-                    label="Training Method",
+                eval_method = gr.Dropdown(
+                    choices=["full", "freeze", "ses-adapter", "plm-lora", "plm-qlora"],
+                    label="Evaluation Method",
                     value="freeze"
                 )
                 pooling_method = gr.Dropdown(
@@ -1364,36 +1366,6 @@ def create_predict_tab(constant):
                     info="Select the structure sequences to use for prediction"
                 )
 
-            with gr.Row(visible=False) as lora_params_row:
-                with gr.Column():
-                    lora_r = gr.Number(
-                        value=8,
-                        label="LoRA Rank",
-                        precision=0,
-                        minimum=1,
-                        maximum=128,
-                    )
-                with gr.Column():
-                    lora_alpha = gr.Number(
-                        value=32,
-                        label="LoRA Alpha",
-                        precision=0,
-                        minimum=1,
-                        maximum=128
-                    )
-                with gr.Column():
-                    lora_dropout = gr.Number(
-                        value=0.1,
-                        label="LoRA Dropout",
-                        minimum=0.0,
-                        maximum=1.0
-                    )
-                with gr.Column():
-                    lora_target_modules = gr.Textbox(
-                        value="query,key,value",
-                        label="LoRA Target Modules",
-                        placeholder="Comma-separated list of target modules"
-                    )
             
             with gr.Row():
                 problem_type = gr.Dropdown(
@@ -1417,7 +1389,7 @@ def create_predict_tab(constant):
                         placeholder="Enter protein sequence",
                         lines=3
                     )
-                # 将结构相关的序列输入框放在可控制可见性的行中
+                # Put the structure input rows in a row with controllable visibility    
                 with gr.Row(visible=False) as structure_input_row:
                     foldseek_seq = gr.Textbox(
                         label="Foldseek Sequence",
@@ -1442,7 +1414,7 @@ def create_predict_tab(constant):
                     inputs=[
                         plm_model,
                         model_path,
-                        training_method,
+                        eval_method,
                         aa_seq,
                         foldseek_seq,
                         ss8_seq,
@@ -1554,13 +1526,13 @@ def create_predict_tab(constant):
                         file_count="single"
                     )
                 
-                # 文件预览折叠面板
+                # File preview accordion
                 with gr.Accordion("File Preview", open=False) as file_preview_accordion:
-                    # 文件信息区域
+                    # File info area
                     with gr.Row():
                         file_info = gr.HTML("", elem_classes=["dataset-stats"])
                     
-                    # 表格区域
+                    # Table area
                     with gr.Row():
                         file_preview = gr.Dataframe(
                             headers=["name", "sequence"],
@@ -1571,7 +1543,7 @@ def create_predict_tab(constant):
                             elem_classes=["preview-table"]
                         )
                 
-                # 添加文件预览功能
+                # Add file preview function
                 def update_file_preview(file):
                     if file is None:
                         return gr.update(value="<div class='file-info'>No file uploaded</div>"), gr.update(value=[["No file uploaded", "-"]], headers=["name", "sequence"]), gr.update(open=False)
@@ -1603,7 +1575,7 @@ def create_predict_tab(constant):
                         """
                         return gr.update(value=error_html), gr.update(value=[["Error", str(e)]], headers=["Error", "Message"]), gr.update(open=True)
                 
-                # 使用upload事件而不是click事件
+                # Use upload event instead of click event
                 input_file.upload(
                     fn=update_file_preview,
                     inputs=[input_file],
@@ -1636,7 +1608,7 @@ def create_predict_tab(constant):
                     inputs=[
                         plm_model,
                         model_path,
-                        training_method,
+                        eval_method,
                         input_file,
                         structure_seq,
                         pooling_method,
@@ -1653,28 +1625,27 @@ def create_predict_tab(constant):
                     outputs=[batch_predict_output]
                 )
 
-    # 所有UI组件定义之后添加此代码
-    def update_training_method(method):
+    # Add this code after all UI components are defined
+    def update_eval_method(method):
         return {
             structure_seq_row: gr.update(visible=method == "ses-adapter"),
-            lora_params_row: gr.update(visible=method == "plm-lora"),
             structure_input_row: gr.update(visible=method == "ses-adapter")
         }
 
-    training_method.change(
-        fn=update_training_method,
-        inputs=[training_method],
-        outputs=[structure_seq_row, lora_params_row, structure_input_row]
+    eval_method.change(
+        fn=update_eval_method,
+        inputs=[eval_method],
+        outputs=[structure_seq_row, structure_input_row]
     )
 
-    # 添加一个新函数来控制结构序列输入框的可见性
+    # Add a new function to control the visibility of the structure sequence input boxes
     def update_structure_inputs(structure_seq_choices):
         return {
             foldseek_seq: gr.update(visible="foldseek_seq" in structure_seq_choices),
             ss8_seq: gr.update(visible="ss8_seq" in structure_seq_choices)
         }
 
-    # 在UI定义部分添加事件处理
+    # Add event handling to the UI definition section
     structure_seq.change(
         fn=update_structure_inputs,
         inputs=[structure_seq],
