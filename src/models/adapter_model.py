@@ -143,7 +143,7 @@ class AdapterModel(nn.Module):
         else:
             raise ValueError(f"classifier method {args.pooling_method} not supported")
     
-    def plm_embedding(self, plm_model, aa_seq, attention_mask, structure_tokens):
+    def plm_embedding(self, plm_model, aa_seq, attention_mask, structure_tokens=None):
         if "ProSST" in self.args.plm_model:
             outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask, ss_input_ids=structure_tokens, output_hidden_states=True)
         elif "Prime" in self.args.plm_model:
@@ -162,8 +162,12 @@ class AdapterModel(nn.Module):
         return seq_embeds
     
     def forward(self, plm_model, batch):
-        aa_seq, attention_mask, stru_tokens = batch['aa_seq_input_ids'], batch['aa_seq_attention_mask'], batch['aa_seq_stru_tokens']
-        seq_embeds = self.plm_embedding(plm_model, aa_seq, attention_mask, stru_tokens)
+        if "ProSST" in self.args.plm_model:
+            aa_seq, attention_mask, stru_tokens = batch['aa_seq_input_ids'], batch['aa_seq_attention_mask'], batch['aa_seq_stru_tokens']
+            seq_embeds = self.plm_embedding(plm_model, aa_seq, attention_mask, stru_tokens)
+        else:
+            aa_seq, attention_mask = batch['aa_seq_input_ids'], batch['aa_seq_attention_mask']
+            seq_embeds = self.plm_embedding(plm_model, aa_seq, attention_mask)
 
         if 'foldseek_seq' in self.args.structure_seq:
             foldseek_seq = batch['foldseek_seq_input_ids']

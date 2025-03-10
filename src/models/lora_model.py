@@ -39,7 +39,7 @@ class LoraModel(nn.Module):
         else:
             raise ValueError(f"classifier method {args.pooling_method} not supported")
 
-    def plm_embedding(self, plm_model, aa_seq, attention_mask, stru_token):
+    def plm_embedding(self, plm_model, aa_seq, attention_mask, stru_token=None):
         if (
             self.training
             and hasattr(self, "args")
@@ -58,11 +58,18 @@ class LoraModel(nn.Module):
         return seq_embeds
 
     def forward(self, plm_model, batch):
-        aa_seq, attention_mask, stru_token = (
-            batch["aa_seq_input_ids"],
-            batch["aa_seq_attention_mask"],
-            batch["aa_seq_stru_tokens"]
-        )
-        seq_embeds = self.plm_embedding(plm_model, aa_seq, attention_mask, stru_token)
+        if "ProSST" in self.args.plm_model:
+            aa_seq, attention_mask, stru_token = (
+                batch["aa_seq_input_ids"],
+                batch["aa_seq_attention_mask"],
+                batch["aa_seq_stru_tokens"]
+            )
+            seq_embeds = self.plm_embedding(plm_model, aa_seq, attention_mask, stru_token)
+        else:
+            aa_seq, attention_mask = (
+                batch["aa_seq_input_ids"],
+                batch["aa_seq_attention_mask"],
+            )            
+            seq_embeds = self.plm_embedding(plm_model, aa_seq, attention_mask)
         logits = self.classifier(seq_embeds, attention_mask)
         return logits

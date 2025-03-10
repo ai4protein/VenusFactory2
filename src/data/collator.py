@@ -26,7 +26,10 @@ class Collator:
     def __call__(self, examples: List[Dict[str, Any]]) -> Dict[str, torch.Tensor]:
         """Collate function for batching examples."""
         # Initialize lists to store sequences and labels
-        aa_seqs, labels, str_tokens = [], [], []
+        if "ProSST" in self.plm_model:
+            aa_seqs, labels, str_tokens = [], [], []
+        else:
+            aa_seqs, labels = [], []
         structure_seqs = {
             seq_type: [] for seq_type in (self.structure_seq or [])
         }
@@ -36,8 +39,9 @@ class Collator:
             # Process sequences
             aa_seq = self.process_sequence(e["aa_seq"])
             aa_seqs.append(aa_seq)
-            stru_token = self.process_stru_tokens(e["prosst_stru_token"])
-            str_tokens.append(stru_token)
+            if "ProSST" in self.plm_model:
+                stru_token = self.process_stru_tokens(e["prosst_stru_token"])
+                str_tokens.append(stru_token)
             
             # Process structure sequences if needed
             for seq_type in structure_seqs:
@@ -58,7 +62,10 @@ class Collator:
             labels.append(e["label"])
 
         # Tokenize sequences
-        batch = self.tokenize_sequences(aa_seqs, structure_seqs, str_tokens)
+        if "ProSST" in self.plm_model:
+            batch = self.tokenize_sequences(aa_seqs, structure_seqs, str_tokens)
+        else:
+            batch = self.tokenize_sequences(aa_seqs, structure_seqs)
         
         # Add labels to batch
         batch["label"] = torch.as_tensor(
@@ -93,10 +100,12 @@ class Collator:
         self,
         aa_seqs: List[str],
         structure_seqs: Dict[str, List[str]],
-        str_tokens: List[str]
+        str_tokens: List[str] = None,
     ) -> Dict[str, torch.Tensor]:
         """Tokenize all sequences."""
         # Process amino acid sequences
+        if "esm1b" in self.plm_model or "esm1v" in self.plm_model:
+            self.max_length = 1022
         aa_encodings = self.tokenizer(
             aa_seqs,
             padding=True,
@@ -107,15 +116,19 @@ class Collator:
         
         aa_max_length = len(aa_encodings["input_ids"][0])
         padded_tokens = []
-        for tokens in str_tokens:
-            struct_sequence =  [int(num) for num in tokens]
-            padded_tokens.append(struct_sequence + [0] * (aa_max_length - len(struct_sequence) - 2))
-
-
-        batch = {
+        if str_tokens:
+            for tokens in str_tokens:
+                struct_sequence =  [int(num) for num in tokens]
+                padded_tokens.append(struct_sequence + [0] * (aa_max_length - len(struct_sequence) - 2))
+            batch = {
+                "aa_seq_input_ids": aa_encodings["input_ids"],
+                "aa_seq_attention_mask": aa_encodings["attention_mask"],
+                "aa_seq_stru_tokens": torch.tensor(padded_tokens, dtype=torch.long)
+            }
+        else:
+            batch = {
             "aa_seq_input_ids": aa_encodings["input_ids"],
-            "aa_seq_attention_mask": aa_encodings["attention_mask"],
-            "aa_seq_stru_tokens": torch.tensor(padded_tokens, dtype=torch.long)
+            "aa_seq_attention_mask": aa_encodings["attention_mask"]
         }
         
         # Process structure sequences if provided
