@@ -36,7 +36,7 @@ class Trainer:
                 }
             ]
             self.optimizer = torch.optim.AdamW(optimizer_grouped_parameters)
-        elif self.args.training_method in ['plm-lora', 'plm-qlora']:
+        elif self.args.training_method in ['plm-lora', 'plm-qlora', 'plm-dora', 'plm-adalora', 'plm-ia3']:
             optimizer_grouped_parameters = [
                 {
                     "params": self.model.parameters(),
@@ -61,7 +61,7 @@ class Trainer:
         self.loss_fn = self._setup_loss_function()
         
         # Prepare for distributed training
-        if self.args.training_method in ['full', 'plm-lora', 'plm-qlora']:
+        if self.args.training_method in ['full', 'plm-lora', 'plm-qlora', 'plm-dora', 'plm-adalora', 'plm-ia3']:
             self.model, self.plm_model, self.optimizer = self.accelerator.prepare(
                 self.model, self.plm_model, self.optimizer
             )
@@ -113,7 +113,7 @@ class Trainer:
                 
     def _train_epoch(self, train_loader):
         self.model.train()
-        if self.args.training_method in  ['full', 'plm-lora', 'plm-qlora']:
+        if self.args.training_method in  ['full', 'plm-lora', 'plm-qlora', 'plm-dora', 'plm-adalora', 'plm-ia3']:
             self.plm_model.train()
         total_loss = 0
         total_samples = 0
@@ -121,7 +121,7 @@ class Trainer:
         
         for batch in epoch_iterator:
             # choose models to accumulate
-            models_to_accumulate = [self.model, self.plm_model] if self.args.training_method in  ['full', 'plm-lora', 'plm-qlora'] else [self.model]
+            models_to_accumulate = [self.model, self.plm_model] if self.args.training_method in  ['full', 'plm-lora', 'plm-qlora', 'plm-dora', 'plm-adalora', 'plm-ia3'] else [self.model]
             
             with self.accelerator.accumulate(*models_to_accumulate):
                 # Forward and backward
@@ -137,7 +137,7 @@ class Trainer:
                 if self.args.max_grad_norm > 0:
                     params_to_clip = (
                         list(self.model.parameters()) + list(self.plm_model.parameters())
-                        if self.args.training_method in  ['full', 'plm-lora', 'plm-qlora']
+                        if self.args.training_method in  ['full', 'plm-lora', 'plm-qlora', 'plm-dora', 'plm-adalora', 'plm-ia3']
                         else self.model.parameters()
                     )
                     self.accelerator.clip_grad_norm_(params_to_clip, self.args.max_grad_norm)
@@ -181,7 +181,7 @@ class Trainer:
             tuple: (validation_loss, validation_metrics)
         """
         self.model.eval()
-        if self.args.training_method in  ['full', 'plm-lora', 'plm-qlora']:
+        if self.args.training_method in  ['full', 'plm-lora', 'plm-qlora', 'plm-dora', 'plm-adalora', 'plm-ia3']:
             self.plm_model.eval()
             
         total_loss = 0
@@ -242,7 +242,7 @@ class Trainer:
         This is almost identical to _validate but with "Testing" progress bar.
         """
         self.model.eval()
-        if self.args.training_method in ['full', 'plm-lora']:
+        if self.args.training_method in ['full', 'plm-lora', 'plm-qlora', 'plm-dora', 'plm-adalora', 'plm-ia3']:
             self.plm_model.eval()
             
         total_loss = 0
@@ -351,6 +351,24 @@ class Trainer:
             plm_qlora_path = path.replace('.pt', '_qlora')
             # save plm model lora weights
             self.plm_model.save_pretrained(plm_qlora_path)
+        elif self.args.training_method == "plm-dora":
+            # save model state dict
+            model_state = {k: v.cpu() for k, v in self.model.state_dict().items()}
+            torch.save(model_state, path)
+            plm_dora_path = path.replace('.pt', '_dora.pt')
+            # save plm model lora weights
+            self.plm_model.save_pretrained(plm_dora_path)
+        elif self.args.training_method == "plm-adalora":
+            # save model state dict
+            model_state = {k: v.cpu() for k, v in self.model.state_dict().items()}
+            torch.save(model_state, path)
+            plm_adalora_path = path.replace('.pt', '_adalora.pt')
+            self.plm_model.save_pretrained(plm_adalora_path)
+        elif self.args.training_method == "plm-ia3":
+            model_state = {k: v.cpu() for k, v in self.model.state_dict().items()}
+            torch.save(model_state, path)
+            plm_ia3_path = path.replace('.pt', '_ia3.pt')
+            self.plm_model.save_pretrained(plm_ia3_path)
         else:
             model_state = {k: v.cpu() for k, v in self.model.state_dict().items()}
             torch.save(model_state, path)
@@ -383,6 +401,36 @@ class Trainer:
             self.plm_model = self.plm_model.merge_and_unload()
             self.model.to(self.device)
             self.plm_model.to(self.device)
+        elif self.args.training_method == "plm-dora":
+            # load model state dict
+            checkpoint = torch.load(path, map_location="cpu")
+            self.model.load_state_dict(checkpoint)
+            plm_dora_path = path.replace('.pt', '_dora.pt')
+            # reload plm model and apply dora weights
+            _, self.plm_model = create_plm_and_tokenizer(self.args)
+            self.plm_model = PeftModel.from_pretrained(self.plm_model, plm_dora_path)
+            self.plm_model = self.plm_model.merge_and_unload()
+            self.model.to(self.device)
+            self.plm_model.to(self.device)
+        elif self.args.training_method == "plm-adalora":
+            # load model state dict
+            checkpoint = torch.load(path, map_location="cpu")
+            self.model.load_state_dict(checkpoint)
+            plm_adalora_path = path.replace('.pt', '_adalora.pt')
+            # reload plm model and apply adalora weights
+            _, self.plm_model = create_plm_and_tokenizer(self.args)
+            self.plm_model = PeftModel.from_pretrained(self.plm_model, plm_adalora_path)
+            self.plm_model = self.plm_model.merge_and_unload()
+            self.model.to(self.device)
+            self.plm_model.to(self.device)
+        elif self.args.training_method == "plm-ia3":
+            checkpoint = torch.load(path, map_location="cpu")
+            self.model.load_state_dict(checkpoint)
+            plm_ia3_path = path.replace('.pt', '_ia3.pt')
+            _, self.plm_model = create_plm_and_tokenizer(self.args)
+            self.plm_model = PeftModel.from_pretrained(self.plm_model, plm_ia3_path)
+            self.plm_model = self.plm_model.merge_and_unload()
+            self.model.to(self.device)
         else:
             checkpoint = torch.load(path, map_location="cpu")
             self.model.load_state_dict(checkpoint)

@@ -16,7 +16,7 @@ from torchmetrics.classification import Accuracy, Recall, Precision, MatthewsCor
 from torchmetrics.classification import BinaryAccuracy, BinaryRecall, BinaryAUROC, BinaryF1Score, BinaryPrecision, BinaryMatthewsCorrCoef, BinaryF1Score
 from torchmetrics.regression import SpearmanCorrCoef
 from transformers import EsmTokenizer, EsmModel, BertModel, BertTokenizer
-from transformers import T5Tokenizer, T5EncoderModel, AutoTokenizer, AutoModelForMaskedLM
+from transformers import T5Tokenizer, T5EncoderModel, AutoTokenizer, AutoModelForMaskedLM, AutoModel
 from transformers import logging
 from datasets import load_dataset
 from torch.utils.data import DataLoader
@@ -148,6 +148,15 @@ if __name__ == '__main__':
         tokenizer = AutoTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
         plm_model = AutoModelForMaskedLM.from_pretrained(args.plm_model)
         args.hidden_size = plm_model.config.hidden_size
+    elif "Prime" in args.plm_model:
+        tokenizer = AutoTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
+        plm_model = AutoModelForMaskedLM.from_pretrained(args.plm_model)
+        args.hidden_size = plm_model.config.hidden_size
+    else:
+        tokenizer = AutoTokenizer.from_pretrained(args.plm_model)
+        plm_model = AutoModel.from_pretrained(args.plm_model).to(device).eval()
+        args.hidden_size = plm_model.config.hidden_size
+
     args.vocab_size = plm_model.config.vocab_size
     
     # Define metric configurations
@@ -214,7 +223,7 @@ if __name__ == '__main__':
     if args.eval_method in ["ses-adapter", "freeze"]:
         model = AdapterModel(args)
     # ! lora/ qlora
-    elif args.eval_method in ["plm-lora", "plm-qlora"]:
+    elif args.eval_method in ['plm-lora', 'plm-qlora', 'plm-dora', 'plm-adalora', 'plm-ia3']:
         model = LoraModel(args)
 
     if args.model_path is not None:
@@ -225,12 +234,24 @@ if __name__ == '__main__':
     model.to(device).eval()
     # ! lora/ qlora
     if args.eval_method == 'plm-lora':
-        lora_path = model_path.replace(".pt", "_lora")
+        lora_path = model_path.replace(".pt", "_lora.pt")
         plm_model = PeftModel.from_pretrained(plm_model,lora_path)
         plm_model = plm_model.merge_and_unload()
     elif args.eval_method == 'plm-qlora':
-        lora_path = model_path.replace(".pt", "_qlora")
+        lora_path = model_path.replace(".pt", "_qlora.pt")
         plm_model = PeftModel.from_pretrained(plm_model,lora_path)
+        plm_model = plm_model.merge_and_unload()
+    elif args.eval_method == "plm-dora":
+        dora_path = model_path.replace(".pt", "_dora.pt")
+        plm_model = PeftModel.from_pretrained(plm_model, dora_path)
+        plm_model = plm_model.merge_and_unload()
+    elif args.eval_method == "plm-adalora":
+        adalora_path = model_path.replace(".pt", "_adalora.pt")
+        plm_model = PeftModel.from_pretrained(plm_model, adalora_path)
+        plm_model = plm_model.merge_and_unload()
+    elif args.eval_method == "plm-ia3":
+        ia3_path = model_path.replace(".pt", "_ia3.pt")
+        plm_model = PeftModel.from_pretrained(plm_model, ia3_path)
         plm_model = plm_model.merge_and_unload()
     plm_model.to(device).eval()  
 

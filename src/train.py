@@ -26,7 +26,7 @@ def main():
     os.makedirs(args.output_dir, exist_ok=True)
     
     # Initialize models and tokenizer
-    if args.training_method in ["plm-lora", "plm-qlora"]:
+    if args.training_method in ['plm-lora', 'plm-qlora', 'plm-dora', 'plm-adalora', 'plm-ia3']:
         model, plm_model, tokenizer = lora_factory(args)
     else:
         model, plm_model, tokenizer = create_models(args)
