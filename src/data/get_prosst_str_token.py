@@ -9,8 +9,10 @@ from Bio import SeqIO
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from prosst.structure.quantizer import PdbQuantizer
 from data_utils import extract_seq_from_pdb
-
-processor = PdbQuantizer()
+import warnings
+warnings.filterwarnings("ignore", category=Warning)
+structure_vocab_size = 20
+processor = PdbQuantizer(structure_vocab_size = structure_vocab_size)
 
 def get_prosst_token(pdb_file):
     """Generate ProSST structure tokens for a PDB file"""
@@ -20,16 +22,14 @@ def get_prosst_token(pdb_file):
         
         # 处理结构序列
         structure_result = processor(pdb_file)
-        struct_key = '2048'
         pdb_name = os.path.basename(pdb_file)
-        
         # 验证数据结构
-        if struct_key not in structure_result:
-            raise ValueError(f"Missing structure key: {struct_key}")
-        if pdb_name not in structure_result[struct_key]:
+        if structure_vocab_size not in structure_result:
+            raise ValueError(f"Missing structure key: {structure_vocab_size}")
+        if pdb_name not in structure_result[structure_vocab_size]:
             raise ValueError(f"Missing PDB entry: {pdb_name}")
         
-        struct_sequence = structure_result[struct_key][pdb_name]['struct']
+        struct_sequence = structure_result[structure_vocab_size][pdb_name]['struct']
         struct_sequence = [int(num) for num in struct_sequence]
         
         # 添加特殊标记 [1] + sequence + [2]
@@ -43,7 +43,7 @@ def get_prosst_token(pdb_file):
             "name": os.path.basename(pdb_file).split('.')[0],
             "aa_seq": aa_seq,
             "struct_tokens": structure_input_ids[0].tolist()
-        }
+        }, None
         
     except Exception as e:
         return pdb_file, f"{str(e)}"
@@ -52,15 +52,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='ProSST structure token generator')
     parser.add_argument('--pdb_dir', type=str, help='Directory containing PDB files')
     parser.add_argument('--pdb_file', type=str, help='Single PDB file path')
-    parser.add_argument('--num_workers', type=int, default=4, help='Number of parallel workers')
+    parser.add_argument('--num_workers', type=int, default=16, help='Number of parallel workers')
     parser.add_argument('--pdb_index_file', type=str, default=None, help='PDB index file for sharding')
     parser.add_argument('--pdb_index_level', type=int, default=1, help='Directory hierarchy depth')
     parser.add_argument('--error_file', type=str, help='Error log output path')
     parser.add_argument('--out_file', type=str, required=True, help='Output JSON file path')
     args = parser.parse_args()
-
-    # out_dir = os.path.dirname(args.out_file)
-    # os.makedirs(out_dir, exist_ok=True)
 
     if args.pdb_dir is not None:
         # load pdb index file
@@ -82,7 +79,6 @@ if __name__ == '__main__':
         results, errors = [], []
         with ThreadPoolExecutor(max_workers=args.num_workers) as executor:
             futures = {executor.submit(get_prosst_token, f): f for f in pdb_files}
-            
             with tqdm(total=len(futures), desc="Processing PDBs") as progress:
                 for future in as_completed(futures):
                     result, error = future.result()
@@ -108,4 +104,3 @@ if __name__ == '__main__':
             raise RuntimeError(f"Error processing {args.pdb_file}: {error}")
         with open(args.out_file, 'w') as f:
             json.dump(result, f)
-

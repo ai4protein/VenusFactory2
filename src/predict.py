@@ -12,7 +12,7 @@ import os
 import warnings
 import numpy as np
 from pathlib import Path
-from transformers import EsmTokenizer, EsmModel, BertModel, BertTokenizer
+from transformers import EsmTokenizer, EsmModel, BertModel, BertTokenizer, AutoModelForMaskedLM
 from transformers import T5Tokenizer, T5EncoderModel, AutoTokenizer, AutoModel
 from transformers import logging
 from peft import PeftModel
@@ -110,6 +110,14 @@ def load_model_and_tokenizer(args):
         tokenizer = AutoTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
         plm_model = T5EncoderModel.from_pretrained(args.plm_model)
         args.hidden_size = plm_model.config.d_model
+    elif "ProSST" in args.plm_model:
+        tokenizer = AutoTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
+        plm_model = AutoModelForMaskedLM.from_pretrained(args.plm_model).to(device).eval()
+        args.hidden_size = plm_model.config.hidden_size
+    elif "Prime" in args.plm_model:
+        tokenizer = AutoTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
+        plm_model = AutoModelForMaskedLM.from_pretrained(args.plm_model).to(device).eval()
+        args.hidden_size = plm_model.config.hidden_size
     else:
         tokenizer = AutoTokenizer.from_pretrained(args.plm_model)
         plm_model = AutoModel.from_pretrained(args.plm_model)
@@ -170,6 +178,19 @@ def load_model_and_tokenizer(args):
             lora_path = model_path.replace(".pt", "_qlora")
             plm_model = PeftModel.from_pretrained(plm_model,lora_path)
             plm_model = plm_model.merge_and_unload()
+        elif args.eval_method == "plm-dora":
+            dora_path = model_path.replace(".pt", "_dora.pt")
+            plm_model = PeftModel.from_pretrained(plm_model, dora_path)
+            plm_model = plm_model.merge_and_unload()
+        elif args.eval_method == "plm-adalora":
+            adalora_path = model_path.replace(".pt", "_adalora.pt")
+            plm_model = PeftModel.from_pretrained(plm_model, adalora_path)
+            plm_model = plm_model.merge_and_unload()
+        elif args.eval_method == "plm-ia3":
+            ia3_path = model_path.replace(".pt", "_ia3.pt")
+            plm_model = PeftModel.from_pretrained(plm_model, ia3_path)
+            plm_model = plm_model.merge_and_unload()
+            plm_model.to(device).eval()  
         plm_model.to(device).eval()  
         return model, plm_model, tokenizer, device
     

@@ -36,7 +36,7 @@ from accelerate import Accelerator
 from accelerate.utils import set_seed
 from time import strftime, localtime
 from datasets import load_dataset
-from transformers import EsmTokenizer, EsmModel, BertModel, BertTokenizer
+from transformers import EsmTokenizer, EsmModel, BertModel, BertTokenizer, AutoModelForMaskedLM
 from transformers import T5Tokenizer, T5EncoderModel, AutoTokenizer
 from src.utils.data_utils import BatchSampler
 from models.adapter_mdoel import AdapterModel
@@ -447,6 +447,14 @@ if __name__ == "__main__":
     elif "ankh" in args.plm_model:
         tokenizer = AutoTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
         args.hidden_size = model.plm_model.config.d_model
+    elif "ProSST" in args.plm_model:
+        tokenizer = AutoTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
+        plm_model = AutoModelForMaskedLM.from_pretrained(args.plm_model).to(device).eval()
+        args.hidden_size = plm_model.config.hidden_size
+    elif "Prime" in args.plm_model:
+        tokenizer = AutoTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
+        plm_model = AutoModelForMaskedLM.from_pretrained(args.plm_model).to(device).eval()
+        args.hidden_size = plm_model.config.hidden_size
 
     # if args.structure_seqs is not None:
     #     if "esm3_structure_seq" in args.structure_seqs:
