@@ -7,8 +7,8 @@ import torch
 from tqdm import tqdm
 from Bio import SeqIO
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from prosst.structure.quantizer import PdbQuantizer
-from data_utils import extract_seq_from_pdb
+from src.data.prosst.structure.quantizer import PdbQuantizer
+from src.utils.data_utils import extract_seq_from_pdb
 import warnings
 warnings.filterwarnings("ignore", category=Warning)
 structure_vocab_size = 20
