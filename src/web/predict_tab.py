@@ -396,10 +396,10 @@ def create_predict_tab(constant):
                             <h2>Regression Prediction Results</h2>
                             <table class='styled-table'>
                                 <thead>
-                                    <tr><th>Output</th><th>Value</th></tr>
+                                    <tr><th style="width:50%; text-align:center">Output</th><th style="width:50%; text-align:center">Value</th></tr>
                                 </thead>
                                 <tbody>
-                                    <tr><td>Predicted Value</td><td>{prediction_data['prediction']:.4f}</td></tr>
+                                    <tr><td style="text-align:center">Predicted Value</td><td style="text-align:center">{prediction_data['prediction']:.4f}</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -409,28 +409,28 @@ def create_predict_tab(constant):
                         prob_rows = ""
                         if isinstance(prediction_data['probabilities'], list):
                             prob_rows = "".join([
-                                f"<tr><td>Class {i}</td><td>{prob:.4f}</td></tr>"
+                                f"<tr><td style='text-align:center'>Class {i}</td><td style='text-align:center'>{prob:.4f}</td></tr>"
                                 for i, prob in enumerate(prediction_data['probabilities'])
                             ])
                         else:
                             # Handle case where probabilities is not a list
-                            prob_rows = f"<tr><td>Class 0</td><td>{prediction_data['probabilities']:.4f}</td></tr>"
+                            prob_rows = f"<tr><td style='text-align:center'>Class 0</td><td style='text-align:center'>{prediction_data['probabilities']:.4f}</td></tr>"
                             
                         html_result = f"""
                         <div class="results-container">
                             <h2>Single-Label Classification Results</h2>
                             <table class='styled-table'>
                                 <thead>
-                                    <tr><th>Output</th><th>Value</th></tr>
+                                    <tr><th style="width:50%; text-align:center">Output</th><th style="width:50%; text-align:center">Value</th></tr>
                                 </thead>
                                 <tbody>
-                                    <tr><td>Predicted Class</td><td>{prediction_data['predicted_class']}</td></tr>
+                                    <tr><td style="text-align:center">Predicted Class</td><td style="text-align:center">{prediction_data['predicted_class']}</td></tr>
                                 </tbody>
                             </table>
                             <h3 style='margin-top: 25px; margin-bottom: 15px;'>Class Probabilities</h3>
                             <table class='styled-table'>
                                 <thead>
-                                    <tr><th>Class</th><th>Probability</th></tr>
+                                    <tr><th style="width:50%; text-align:center">Class</th><th style="width:50%; text-align:center">Probability</th></tr>
                                 </thead>
                                 <tbody>
                                     {prob_rows}
@@ -444,21 +444,21 @@ def create_predict_tab(constant):
                         if (isinstance(prediction_data['predictions'], list) and 
                             isinstance(prediction_data['probabilities'], list)):
                             pred_rows = "".join([
-                                f"<tr><td>Label {i}</td><td>{pred}</td><td>{prob:.4f}</td></tr>"
+                                f"<tr><td style='width:33.33%; text-align:center'>Label {i}</td><td style='width:33.33%; text-align:center'>{pred}</td><td style='width:33.33%; text-align:center'>{prob:.4f}</td></tr>"
                                 for i, (pred, prob) in enumerate(zip(prediction_data['predictions'], prediction_data['probabilities']))
                             ])
                         else:
                             # Handle case where predictions or probabilities is not a list
                             pred = prediction_data['predictions'] if 'predictions' in prediction_data else "N/A"
                             prob = prediction_data['probabilities'] if 'probabilities' in prediction_data else 0.0
-                            pred_rows = f"<tr><td>Label 0</td><td>{pred}</td><td>{prob:.4f}</td></tr>"
+                            pred_rows = f"<tr><td style='width:33.33%; text-align:center'>Label 0</td><td style='width:33.33%; text-align:center'>{pred}</td><td style='width:33.33%; text-align:center'>{prob:.4f}</td></tr>"
                             
                         html_result = f"""
                         <div class="results-container">
                             <h2>Multi-Label Classification Results</h2>
                             <table class='styled-table'>
                                 <thead>
-                                    <tr><th>Label</th><th>Prediction</th><th>Probability</th></tr>
+                                    <tr><th style="width:33.33%; text-align:center">Label</th><th style="width:33.33%; text-align:center">Prediction</th><th style="width:33.33%; text-align:center">Probability</th></tr>
                                 </thead>
                                 <tbody>
                                     {pred_rows}
@@ -885,16 +885,16 @@ def create_predict_tab(constant):
                                 </div>
                                 """
                         
-                        # Create HTML table with styling - 使用与dataset preview一致的表格样式
+                        # Create HTML table with styling - using the same table style as dataset preview
                         html_table = f"""
                         <div class="results-container">
                             <h2>Batch Prediction Results</h2>
                             {summary_html}
-                            <div class="table-wrapper">
+                            <div class="table-wrapper" style="display: flex; justify-content: center;">
                                 <table class="dataset-preview-table">
                                     <thead>
                                         <tr>
-                                            {' '.join([f'<th>{col}</th>' for col in df.columns])}
+                                            {' '.join([f'<th style="text-align: center;">{col}</th>' for col in df.columns])}
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -908,7 +908,7 @@ def create_predict_tab(constant):
                         </div>
                         """
                         
-                        # 修改CSS样式，确保与eval_tab完全一致
+                        # Modify CSS styles to ensure consistency with eval_tab
                         final_html = f"""
                         {html_table}
                         <style>
@@ -918,6 +918,7 @@ def create_predict_tab(constant):
                                 box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
                                 padding: 20px;
                                 margin-bottom: 20px;
+                                text-align: center;
                             }}
                             
                             .results-container h2 {{
@@ -956,11 +957,13 @@ def create_predict_tab(constant):
                                 font-weight: bold;
                                 color: #3498db;
                                 margin-bottom: 4px;
+                                text-align: center;
                             }}
                             
                             .stat-label {{
                                 font-size: 12px;
                                 color: #7f8c8d;
+                                text-align: center;
                             }}
                             
                             .table-wrapper {{
@@ -971,12 +974,13 @@ def create_predict_tab(constant):
                                 border-radius: 6px;
                             }}
                             
-                            /* 完全匹配eval_tab中的dataset-preview-table样式 */
+                            /* Match dataset-preview-table style from eval_tab */
                             .dataset-preview-table {{
                                 width: 100%;
                                 border-collapse: collapse;
                                 font-size: 14px;
                                 background-color: white;
+                                table-layout: fixed;
                             }}
                             
                             .dataset-preview-table th {{
@@ -987,6 +991,7 @@ def create_predict_tab(constant):
                                 font-weight: bold;
                                 border-bottom: 1px solid #ccc;
                                 text-align: center;
+                                width: auto;
                             }}
                             
                             .dataset-preview-table td {{
@@ -994,6 +999,7 @@ def create_predict_tab(constant):
                                 font-size: 14px;
                                 border: 1px solid #ddd;
                                 text-align: center;
+                                width: auto;
                             }}
                             
                             .dataset-preview-table tr:nth-child(even) {{
@@ -1217,7 +1223,7 @@ def create_predict_tab(constant):
         """
 
     def generate_table_rows(df, max_rows=100):
-        """生成表格行HTML，处理序列数据的特殊显示，与eval_tab的表格样式保持一致"""
+        """Generate HTML table rows with special handling for sequence data, maintaining consistent style with eval_tab"""
         rows = []
         for i, row in df.iterrows():
             if i >= max_rows:
@@ -1226,15 +1232,19 @@ def create_predict_tab(constant):
             cells = []
             for col in df.columns:
                 value = row[col]
-                # 对序列类型的列进行特殊处理
+                # Special handling for sequence type columns
                 if col in ['aa_seq', 'foldseek_seq', 'ss8_seq'] and isinstance(value, str) and len(value) > 30:
-                    # 添加title属性以便鼠标悬停时显示完整序列
-                    cell = f'<td title="{value}" style="padding: 15px; font-size: 14px; border: 1px solid #ddd; font-family: monospace; text-align: center;">{value[:30]}...</td>'
+                    # Add title attribute to show full sequence on hover
+                    cell = f'<td title="{value}" style="padding: 15px; font-size: 14px; border: 1px solid #ddd; font-family: monospace; text-align: center; vertical-align: middle; display: table-cell; text-align: center;">{value[:30]}...</td>'
+                # Format numeric values to 4 decimal places
+                elif isinstance(value, (int, float)) and not isinstance(value, bool):
+                    formatted_value = f"{value:.4f}" if isinstance(value, float) else value
+                    cell = f'<td style="padding: 15px; font-size: 14px; border: 1px solid #ddd; text-align: center;">{formatted_value}</td>'
                 else:
                     cell = f'<td style="padding: 15px; font-size: 14px; border: 1px solid #ddd; text-align: center;">{value}</td>'
                 cells.append(cell)
             
-            # 添加交替行背景色
+            # Add alternating row background color
             bg_color = "#f9f9f9" if i % 2 == 1 else "white"
             rows.append(f'<tr style="background-color: {bg_color};">{" ".join(cells)}</tr>')
         

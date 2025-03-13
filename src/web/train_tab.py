@@ -100,7 +100,7 @@ class TrainingArgs:
         }
 
         if self.training_method == "ses-adapter" and self.structure_seq:
-            args_dict["structure_seq"] = self.structure_seq
+            args_dict["structure_seq"] = ",".join(self.structure_seq)
 
         # 添加数据集相关参数
         if self.dataset_selection == "Use Pre-defined Dataset":
@@ -216,10 +216,11 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 )
                 
             with gr.Row():
-                    structure_seq = gr.Textbox(
+                    structure_seq = gr.Dropdown(
                         label="Structure Sequence", 
-                        placeholder="foldseek_seq,ss8_seq", 
-                        value="foldseek_seq,ss8_seq",
+                        choices=["foldseek_seq", "ss8_seq"],
+                        value=["foldseek_seq", "ss8_seq"],
+                        multiselect=True,
                         visible=False
                     )
 
@@ -574,7 +575,8 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                     ["Pre-trained Model", "-", "-", "-"],
                     ["Combined Model", "-", "-", "-"]
                 ],
-                interactive=False
+                interactive=False,
+                elem_classes="center"
             )
 
         def update_model_stats(stats: Dict[str, str]) -> List[List[str]]:
@@ -706,7 +708,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             # 处理CSV下载按钮
             if test_metrics and len(test_metrics) > 0:
                 # 创建临时文件保存CSV内容
-                with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.csv') as temp_file:
+                with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.csv', prefix='metrics_results_') as temp_file:
                     # 写入CSV头部
                     temp_file.write("Metric,Value\n")
                     
@@ -722,7 +724,13 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                     # 排序并添加到CSV
                     sorted_metrics = sorted(test_metrics.items(), key=get_priority)
                     for metric_name, metric_value in sorted_metrics:
-                        temp_file.write(f"{metric_name},{metric_value:.6f}\n")
+                        # Convert metric name: uppercase for abbreviations, capitalize for others
+                        display_name = metric_name
+                        if metric_name.lower() in ['f1', 'mcc', 'auroc']:
+                            display_name = metric_name.upper()
+                        else:
+                            display_name = metric_name.capitalize()
+                        temp_file.write(f"{display_name},{metric_value:.6f}\n")
                     
                     file_path = temp_file.name
                 

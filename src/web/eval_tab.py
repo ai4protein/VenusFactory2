@@ -29,58 +29,61 @@ def create_eval_tab(constant):
             metrics_dict = df.iloc[0].to_dict()
             
             # 定义指标优先级顺序
-            priority_metrics = {
-                "accuracy": 1,
-                "mcc": 2,
-                "f1": 3,
-                "precision": 4,
-                "recall": 5,
-                "auroc": 6,
-                "f1max": 7,
-                "spearman_corr": 8,
-                "mse": 9
-            }
+            priority_metrics = ['loss', 'accuracy', 'f1', 'precision', 'recall', 'auroc', 'mcc']
             
-            # 按优先级排序指标
+            # 构建优先级排序键
             def get_priority(item):
-                key = item[0].lower()
-                return priority_metrics.get(key, 100)  # 未知指标放在最后
+                name = item[0]
+                if name in priority_metrics:
+                    return priority_metrics.index(name)
+                return len(priority_metrics)
             
+            # 按优先级排序
             sorted_metrics = sorted(metrics_dict.items(), key=get_priority)
             
-            html = """
-            <div style="margin-top: 10px; margin-bottom: 20px;">
-                <table style="width: 30%; border-collapse: collapse; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin: 0 auto;">
+            # 计算指标数量
+            metrics_count = len(sorted_metrics)
+            
+            html = f"""
+            <div style="max-width: 800px; margin: 0 auto; font-family: Arial, sans-serif;">
+                <p style="text-align: center; margin-bottom: 15px; color: #666;">{metrics_count} metrics found</p>
+                <table style="width: 100%; border-collapse: collapse; font-size: 14px; border: 1px solid #ddd; box-shadow: 0 2px 3px rgba(0,0,0,0.1);">
                     <thead>
-                        <tr>
-                            <th style="padding: 10px 15px; text-align: left; background-color: #f5f5f5; font-weight: 600; border-bottom: 1px solid #ddd; color: #333; width: 50%;">Metric</th>
-                            <th style="padding: 10px 15px; text-align: right; background-color: #f5f5f5; font-weight: 600; border-bottom: 1px solid #ddd; color: #333; width: 50%;">Value</th>
+                        <tr style="background-color: #f0f0f0;">
+                            <th style="padding: 12px; text-align: center; border: 1px solid #ddd; font-weight: bold; width: 50%;">Metric</th>
+                            <th style="padding: 12px; text-align: center; border: 1px solid #ddd; font-weight: bold; width: 50%;">Value</th>
                         </tr>
                     </thead>
                     <tbody>
             """
             
-            # 添加每个指标行
-            for i, (key, value) in enumerate(sorted_metrics):
-                # 设置交替行的背景色
-                bg_color = "#f9f9f9" if i % 2 == 1 else "white"
+            # 添加每个指标行，使用交替行颜色
+            for i, (metric_name, metric_value) in enumerate(sorted_metrics):
+                row_style = 'background-color: #f9f9f9;' if i % 2 == 0 else ''
                 
-                # 格式化值
-                if isinstance(value, (int, float)):
-                    value_str = f"{value:.4f}" if isinstance(value, float) else str(value)
+                # 对优先级指标使用粗体
+                is_priority = metric_name in priority_metrics
+                name_style = 'font-weight: bold;' if is_priority else ''
+                
+                # 转换指标名称：缩写用大写，非缩写首字母大写
+                display_name = metric_name
+                if metric_name.lower() in ['f1', 'mcc', 'auroc']:
+                    display_name = metric_name.upper()
                 else:
-                    value_str = str(value)
+                    display_name = metric_name.capitalize()
                 
+
                 html += f"""
-                        <tr style="background-color: {bg_color};">
-                            <td style="padding: 8px 15px; border-bottom: 1px solid #eee; font-weight: 500;">{key}</td>
-                            <td style="padding: 8px 15px; border-bottom: 1px solid #eee; text-align: right; font-family: monospace; font-size: 14px;">{value_str}</td>
-                        </tr>
+                <tr style="{row_style}">
+                    <td style="padding: 10px; text-align: center; border: 1px solid #ddd; {name_style}">{display_name}</td>
+                    <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">{metric_value:.4f}</td>
+                </tr>
                 """
-            
+                
             html += """
                     </tbody>
                 </table>
+                <p style="text-align: center; margin-top: 10px; color: #888; font-size: 12px;">Test completed at: """ + time.strftime("%Y-%m-%d %H:%M:%S") + """</p>
             </div>
             """
             
@@ -272,7 +275,7 @@ def create_eval_tab(constant):
             
             if current_process.returncode == 0:
                 # Load and format results
-                result_file = os.path.join(test_result_dir, "test_metrics.csv")
+                result_file = os.path.join(test_result_dir, "evaluation_metrics.csv")
                 if os.path.exists(result_file):
                     metrics_html = format_metrics(result_file)
                     
@@ -846,7 +849,6 @@ def create_eval_tab(constant):
             eval_button = gr.Button("Start Evaluation", variant="primary")
             abort_button = gr.Button("Abort", variant="stop")
         
-        # 使用HTML组件替代简单的Textbox，以支持更丰富的显示效果
         eval_output = gr.HTML(
             value="<div style='padding: 15px; background-color: #f5f5f5; border-radius: 5px;'><p style='margin: 0;'>Click the 「Start Evaluation」 button to begin model evaluation</p></div>",
             label="Evaluation Status & Results"
@@ -855,13 +857,12 @@ def create_eval_tab(constant):
         with gr.Row():
             with gr.Column(scale=4):
                 pass
-            with gr.Column(scale=1):  # 限制列的最大宽度
+            with gr.Column(scale=1):
                 download_csv_btn = gr.DownloadButton(
                     "Download CSV", 
                     visible=False,
                     size="lg"
                 )
-            # 添加一个空列来占据剩余空间
             with gr.Column(scale=4):
                 pass
         
