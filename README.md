@@ -165,7 +165,7 @@ IA3: bash ./script/train/train_plm_ia3.sh
 bash ./script/eval/eval.sh
 ```
 
-### Fine-tuning with Venus Board GUI(power by Gradio)
+### Fine-tuning with Venus Board GUI(power by [Gradio](https://github.com/gradio-app/gradio))
 ```
 
 ```
