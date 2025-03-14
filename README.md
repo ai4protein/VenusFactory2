@@ -31,7 +31,7 @@ Recent News:
 | [ESM2](https://huggingface.co/facebook/esm2_t33_650M_UR50D)  | 8M/35M/150M/650M/3B/15B | facebook/esm2_t33_650M_UR50D    |
 | [ESM-1b](https://huggingface.co/facebook/esm1b_t33_650M_UR50S) | 650M                    | facebook/esm1b_t33_650M_UR50S   |
 | [ESM-1v](https://huggingface.co/facebook/esm1v_t33_650M_UR90S_1) | 650M                    | facebook/esm1v_t33_650M_UR90S_1 |
-| [ProtBert-Uniref100](https://huggingface.co/Rostlab/prot_bert) | 420M                    | Rostlab/prot_bert_bfd           |
+| [ProtBert-Uniref100](https://huggingface.co/Rostlab/prot_bert) | 420M                    | Rostlab/prot_bert_uniref100          |
 | [ProtBert-BFD100](https://huggingface.co/Rostlab/prot_bert_bfd) | 420M                    | Rostlab/prot_bert_bfd           |
 | [IgBert](https://huggingface.co/Exscientia/IgBert) | 420M                    | Exscientia/IgBert           |
 | [IgBert_unpaired](https://huggingface.co/Exscientia/IgBert_unpaired) | 420M                    | Exscientia/IgBert_unpaired           |
@@ -45,11 +45,15 @@ Recent News:
 
 ## 🔬 Supported Training Approaches
 
-| Approach               | Full-tuning | Freeze-tuning      | LoRA               | SES-Adapter        |
+| Approach               | Full-tuning | Freeze-tuning      | SES-Adapter        | LoRA               |
 | ---------------------- | ----------- | ------------------ | ------------------ | ------------------ |
 | Pre-Training           | ❎          | ❎                | ❎                 | ❎                |
 | Supervised Fine-Tuning | ✅          | ✅                | ✅                 | ✅                |
 
+| Approach               | QLoRA       | DoRA               | AdaLoRA            | IA3                | 
+| ---------------------- | ----------- | ------------------ | ------------------ | ------------------ |
+| Pre-Training           | ❎          | ❎                | ❎                 | ❎                | 
+| Supervised Fine-Tuning | ✅          | ✅                | ✅                 | ✅                |
 ## 📚 Supported Datasets
 
 <details><summary>Pre-training datasets</summary>
@@ -129,12 +133,44 @@ We recommend a **24GB** RTX 3090 or better, but it mainly depends on which PLM y
 ## 🧬 Get Started
 
 ### Installation
-
-
+```
+1. git clone https://github.com/tyang816/VenusFactory.git
+2. cd VenusFactory
+3. conda create -n venus python==3.10
+4. conda activate venus(windows); source activate venus(linux)
+5. pip install -r ./requirements.txt
+```
 
 ### Quick Start
+*Fine-tuning*: Run the following scripts with different methods and adjust model parameters via ```--plm_model```.
+```
+Freeze: bash ./script/train/train_plm_vanilla.sh
+SES-Adapter: bash ./script/train/train_plm_ses-adapter.sh
+LoRA: bash ./script/train/train_plm_lora.sh
+DoRA: bash ./script/train/train_plm_dora.sh
+AdaLoRA: bash ./script/train/train_plm_adalora.sh
+QLoRA: bash ./script/train/train_plm_qlora.sh
+```
+*eval*: Run following scripts to eval the trained model.
+```
+bash ./script/eval/eval.sh
+```
 
+### Fine-tuning with Venus Board GUI(power by Gradio)
+```
 
+```
+
+### crawler-tools
+*Download the protein sequence from uniprot*.
+```
+bash ./crawler/download_uniprot_seq.sh
+``` 
+*Download the protein structure from Alphafold or RCSB database*:
+```
+Alphafold: bash ./crawler/download_alphafold.sh
+RCSB: bash ./crawler/download_rcsb.sh
+``` 
 
 ## 🙌 Citation
 
