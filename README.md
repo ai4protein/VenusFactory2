@@ -166,14 +166,14 @@ bash ./script/eval/eval.sh
 
 ```
 
-### crawler tools
+### crawler collector
 **Download the protein sequence from Uniprot database**
 ```
 bash ./crawler/download_uniprot_seq.sh
 ``` 
 **Download the protein structure from Alphafold or RCSB database**
 
-AlphaFold:
+AlphaFold2:
 ```
 bash ./crawler/download_alphafold.sh
 ```
