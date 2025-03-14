@@ -142,7 +142,7 @@ We recommend a **24GB** RTX 3090 or better, but it mainly depends on which PLM y
 ```
 
 ### Quick Start
-*Fine-tuning*: Run the following scripts with different methods and adjust model parameters via ```--plm_model```.
+**Fine-tuning**: Run the following scripts with different methods and adjust model parameters via ```--plm_model```.
 ```
 Freeze: bash ./script/train/train_plm_vanilla.sh
 SES-Adapter: bash ./script/train/train_plm_ses-adapter.sh
@@ -151,7 +151,7 @@ DoRA: bash ./script/train/train_plm_dora.sh
 AdaLoRA: bash ./script/train/train_plm_adalora.sh
 QLoRA: bash ./script/train/train_plm_qlora.sh
 ```
-*eval*: Run following scripts to eval the trained model.
+**eval**: Run following scripts to eval the trained model.
 ```
 bash ./script/eval/eval.sh
 ```
@@ -162,11 +162,11 @@ bash ./script/eval/eval.sh
 ```
 
 ### crawler-tools
-*Download the protein sequence from uniprot*.
+**Download the protein sequence from uniprot**
 ```
 bash ./crawler/download_uniprot_seq.sh
 ``` 
-*Download the protein structure from Alphafold or RCSB database*:
+**Download the protein structure from Alphafold or RCSB database**
 ```
 Alphafold: bash ./crawler/download_alphafold.sh
 RCSB: bash ./crawler/download_rcsb.sh
