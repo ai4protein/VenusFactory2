@@ -143,33 +143,21 @@ We recommend a **24GB** RTX 3090 or better, but it mainly depends on which PLM y
 
 ### Quick Start
 **Fine-tuning**: Run the following scripts with different methods and adjust model parameters via ```--plm_model```.
-Freeze:
+
 ```
-bash ./script/train/train_plm_vanilla.sh
-```
-SES-Adapter:
-```
-bash ./script/train/train_plm_ses-adapter.sh
-```
-LoRA: 
-```
-bash ./script/train/train_plm_lora.sh
-```
-DoRA: 
-```
-bash ./script/train/train_plm_dora.sh
-```
-AdaLoRA: 
-```
-bash ./script/train/train_plm_adalora.sh
-```
-QLoRA:
-```
-bash ./script/train/train_plm_qlora.sh
-```
-IA3:
-```
-bash ./script/train/train_plm_ia3.sh
+Freeze: bash ./script/train/train_plm_vanilla.sh
+
+SES-Adapter: bash ./script/train/train_plm_ses-adapter.sh
+
+LoRA: bash ./script/train/train_plm_lora.sh
+
+DoRA: bash ./script/train/train_plm_dora.sh
+
+AdaLoRA: bash ./script/train/train_plm_adalora.sh
+
+QLoRA: bash ./script/train/train_plm_qlora.sh
+
+IA3: bash ./script/train/train_plm_ia3.sh
 ```
 
 **eval**: Run the following scripts to evaluate the trained model.
@@ -189,7 +177,7 @@ bash ./crawler/download_uniprot_seq.sh
 ``` 
 **Download the protein structure from Alphafold or RCSB database**
 
-Alphafold:
+AlphaFold:
 ```
 bash ./crawler/download_alphafold.sh
 ```
