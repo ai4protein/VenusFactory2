@@ -171,7 +171,7 @@ bash ./script/eval/eval.sh
 ```
 
 ### crawler tools
-**Download the protein sequence from uniprot**
+**Download the protein sequence from Uniprot database**
 ```
 bash ./crawler/download_uniprot_seq.sh
 ``` 
