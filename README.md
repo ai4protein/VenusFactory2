@@ -171,7 +171,7 @@ bash ./script/eval/eval.sh
 ```
 bash ./crawler/download_uniprot_seq.sh
 ``` 
-**Download the protein structure from Alphafold or RCSB database**
+**Download the protein structure from Alphafold2 or RCSB database**
 
 AlphaFold2:
 ```
