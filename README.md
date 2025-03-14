@@ -45,15 +45,11 @@ Recent News:
 
 ## 🔬 Supported Training Approaches
 
-| Approach               | Full-tuning | Freeze-tuning      | SES-Adapter        | LoRA               |
-| ---------------------- | ----------- | ------------------ | ------------------ | ------------------ |
-| Pre-Training           | ❎          | ❎                | ❎                 | ❎                |
-| Supervised Fine-Tuning | ✅          | ✅                | ✅                 | ✅                |
+| Approach               | Full-tuning | Freeze-tuning      | SES-Adapter        | LoRA               | QLoRA      | DoRA              | AdaLoRA           | IA3              | 
+| ---------------------- | ----------- | ------------------ | ------------------ | ------------------ |----------- | ------------------ | -----------------| -----------------|
+| Pre-Training           | ❎          | ❎                | ❎                 | ❎                |❎          | ❎                | ❎               | ❎              | 
+| Supervised Fine-Tuning | ✅          | ✅                | ✅                 | ✅                |✅          | ✅                | ✅               | ✅              |
 
-| Approach               | QLoRA       | DoRA               | AdaLoRA            | IA3                | 
-| ---------------------- | ----------- | ------------------ | ------------------ | ------------------ |
-| Pre-Training           | ❎          | ❎                | ❎                 | ❎                | 
-| Supervised Fine-Tuning | ✅          | ✅                | ✅                 | ✅                |
 ## 📚 Supported Datasets
 
 <details><summary>Pre-training datasets</summary>
