@@ -118,7 +118,7 @@ Recent News:
 
 ## ✈️ Reuirement
 
-### Conda Enviroment
+### Conda Environment
 
 Please make sure you have installed **[Anaconda3](https://www.anaconda.com/download)** or **[Miniconda3](https://docs.conda.io/projects/miniconda/en/latest/)**.
 
@@ -145,13 +145,13 @@ Freeze: bash ./script/train/train_plm_vanilla.sh
 
 SES-Adapter: bash ./script/train/train_plm_ses-adapter.sh
 
-LoRA: bash ./script/train/train_plm_lora.sh
-
-DoRA: bash ./script/train/train_plm_dora.sh
-
 AdaLoRA: bash ./script/train/train_plm_adalora.sh
 
 QLoRA: bash ./script/train/train_plm_qlora.sh
+
+LoRA: bash ./script/train/train_plm_lora.sh
+
+DoRA: bash ./script/train/train_plm_dora.sh
 
 IA3: bash ./script/train/train_plm_ia3.sh
 ```
