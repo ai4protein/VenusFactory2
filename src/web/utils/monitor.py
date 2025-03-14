@@ -227,14 +227,13 @@ class TrainingMonitor:
             # 设置科研风格的matplotlib样式
             plt.style.use('seaborn-v0_8-whitegrid')
             matplotlib.rcParams.update({
-                'font.family': 'sans-serif',
-                'font.sans-serif': ['Arial', 'DejaVu Sans', 'Liberation Sans', 'Bitstream Vera Sans', 'sans-serif'],
+                'font.family': ['serif', 'DejaVu Serif'],
                 'font.size': 12,
                 'axes.labelsize': 14,
                 'axes.titlesize': 16,
                 'xtick.labelsize': 12,
                 'ytick.labelsize': 12,
-                'legend.fontsize': 12,
+                'legend.fontsize': 10,
                 'figure.titlesize': 18,
                 'figure.figsize': (8, 6),
                 'figure.dpi': 150,
@@ -266,7 +265,7 @@ class TrainingMonitor:
                 if valid_indices:  # 确保有有效数据
                     valid_epochs = [self.epochs[i] for i in valid_indices]
                     valid_losses = [self.val_losses[i] for i in valid_indices]
-                    ax.plot(valid_epochs, valid_losses, 'o-', label='Val Loss', 
+                    ax.plot(valid_epochs, valid_losses, 'o-', label='Validation Loss', 
                             color='#ff7f0e', linewidth=2, markersize=6, markeredgecolor='white', 
                             markeredgewidth=1.5)
             
@@ -318,14 +317,13 @@ class TrainingMonitor:
             # 设置科研风格的matplotlib样式
             plt.style.use('seaborn-v0_8-whitegrid')
             matplotlib.rcParams.update({
-                'font.family': 'sans-serif',
-                'font.sans-serif': ['Arial', 'DejaVu Sans', 'Liberation Sans', 'Bitstream Vera Sans', 'sans-serif'],
+                'font.family': ['serif', 'DejaVu Serif'],
                 'font.size': 12,
                 'axes.labelsize': 14,
                 'axes.titlesize': 16,
                 'xtick.labelsize': 12,
                 'ytick.labelsize': 12,
-                'legend.fontsize': 12,
+                'legend.fontsize': 10,
                 'figure.titlesize': 18,
                 'figure.figsize': (8, 6),
                 'figure.dpi': 150,
@@ -355,8 +353,19 @@ class TrainingMonitor:
                         has_valid_data = True
                         valid_epochs = [self.epochs[i] for i in valid_indices]
                         valid_values = [values[i] for i in valid_indices]
+                        
+                        # 确保所有值都不超过1.0
+                        valid_values = [min(val, 1.0) for val in valid_values]
+                        
+                        # 格式化指标名称：缩写全大写，非缩写首字母大写
+                        formatted_name = metric_name
+                        if metric_name.lower() in ['acc', 'f1', 'mcc', 'auroc']:
+                            formatted_name = metric_name.upper()
+                        else:
+                            formatted_name = metric_name.capitalize()
+                        
                         ax.plot(valid_epochs, valid_values, 'o-', 
-                                label=f'{metric_name.capitalize()}', 
+                                label=formatted_name, 
                                 color=colors[i % len(colors)], 
                                 linewidth=2, 
                                 markersize=6,
@@ -380,7 +389,8 @@ class TrainingMonitor:
             
             ax.xaxis.set_major_locator(matplotlib.ticker.MaxNLocator(integer=True))
             
-            ax.set_ylim(0, 1.05)
+            # 严格限制y轴范围在0到1之间
+            ax.set_ylim(0, 1.0)
             
             # # 标记最佳模型位置
             # best_epoch = self.current_progress.get('best_epoch', 0)
@@ -930,8 +940,8 @@ class TrainingMonitor:
             <table style="width: 100%; border-collapse: collapse; font-size: 14px; border: 1px solid #ddd; box-shadow: 0 2px 3px rgba(0,0,0,0.1);">
                 <thead>
                     <tr style="background-color: #f0f0f0;">
-                        <th style="padding: 12px; text-align: left; border: 1px solid #ddd; font-weight: bold;">Metric</th>
-                        <th style="padding: 12px; text-align: right; border: 1px solid #ddd; font-weight: bold;">Value</th>
+                        <th style="padding: 12px; text-align: center; border: 1px solid #ddd; font-weight: bold; width: 50%;">Metric</th>
+                        <th style="padding: 12px; text-align: center; border: 1px solid #ddd; font-weight: bold; width: 50%;">Value</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -953,23 +963,29 @@ class TrainingMonitor:
         # Add a row for each metric, using alternating row colors
         for i, (metric_name, metric_value) in enumerate(sorted_metrics):
             row_style = 'background-color: #f9f9f9;' if i % 2 == 0 else ''
-            color_style = self._get_metric_color(metric_name, metric_value)
             
             # Use bold for priority metrics
             is_priority = metric_name in priority_metrics
             name_style = 'font-weight: bold;' if is_priority else ''
             
+            # 转换指标名称：缩写用大写，非缩写首字母大写
+            display_name = metric_name
+            if metric_name.lower() in ['f1', 'mcc', 'auroc']:
+                display_name = metric_name.upper()
+            else:
+                display_name = metric_name.capitalize()
+            
             html_content += f"""
             <tr style="{row_style}">
-                <td style="padding: 10px; text-align: left; border: 1px solid #ddd; {name_style}">{metric_name}</td>
-                <td style="padding: 10px; text-align: right; border: 1px solid #ddd; {color_style}">{metric_value:.4f}</td>
+                <td style="padding: 10px; text-align: center; border: 1px solid #ddd; {name_style}">{display_name}</td>
+                <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">{metric_value:.4f}</td>
             </tr>
             """
             
         html_content += """
                 </tbody>
             </table>
-            <p style="text-align: right; margin-top: 10px; color: #888; font-size: 12px;">Test completed at: """ + time.strftime("%Y-%m-%d %H:%M:%S") + """</p>
+            <p style="text-align: center; margin-top: 10px; color: #888; font-size: 12px;">Test completed at: """ + time.strftime("%Y-%m-%d %H:%M:%S") + """</p>
         </div>
         """
         
@@ -982,7 +998,14 @@ class TrainingMonitor:
         
         # Display in same order as HTML
         for metric_name, metric_value in sorted_metrics:
-            text_results += f"{metric_name.ljust(15)}: {metric_value:.4f}\n"
+            # 转换指标名称：缩写用大写，非缩写首字母大写
+            display_name = metric_name
+            if metric_name.lower() in ['f1', 'mcc', 'auroc']:
+                display_name = metric_name.upper()
+            else:
+                display_name = metric_name.capitalize()
+                
+            text_results += f"{display_name.ljust(15)}: {metric_value:.4f}\n"
             
         text_results += "-" * 30
         text_results += f"\nTotal {metrics_count} metrics"
@@ -993,7 +1016,14 @@ class TrainingMonitor:
         # Generate CSV content for download
         csv_content = "Metric,Value\n"
         for metric_name, metric_value in sorted_metrics:
-            csv_content += f"{metric_name},{metric_value:.6f}\n"
+            # 转换指标名称：缩写用大写，非缩写首字母大写
+            display_name = metric_name
+            if metric_name.lower() in ['f1', 'mcc', 'auroc']:
+                display_name = metric_name.upper()
+            else:
+                display_name = metric_name.capitalize()
+                
+            csv_content += f"{display_name},{metric_value:.6f}\n"
         self.current_progress['test_results_csv'] = csv_content
 
     def _process_test_progress(self, line: str):
@@ -1013,34 +1043,6 @@ class TrainingMonitor:
             return True
             
         return False
-
-    def _get_metric_color(self, metric_name, value):
-        """Get color styling for metrics based on their value"""
-        # For metrics that are better when their value is higher (accuracy, F1, etc.)
-        higher_better = ['accuracy', 'acc', 'f1', 'recall', 'precision', 'auroc', 'auprc', 'spearman', 
-                        'pearson', 'spearman_corr', 'mcc', 'specificity', 'sensitivity']
-        # For metrics that are better when their value is lower (loss, error rate, etc.)
-        lower_better = ['loss', 'error', 'rmse', 'mae', 'mse']
-        
-        if any(better in metric_name.lower() for better in higher_better):
-            if value > 0.9:
-                return 'color: #0a3; font-weight: bold;'
-            elif value > 0.8:
-                return 'color: #4a4;'
-            elif value > 0.7:
-                return 'color: #6a6;'
-            else:
-                return ''
-        elif any(better in metric_name.lower() for better in lower_better):
-            if value < 0.1:
-                return 'color: #0a3; font-weight: bold;'
-            elif value < 0.3:
-                return 'color: #4a4;'
-            elif value < 0.5:
-                return 'color: #6a6;'
-            else:
-                return ''
-        return ''
 
     def check_process_status(self):
         """Check if the training process has completed."""
