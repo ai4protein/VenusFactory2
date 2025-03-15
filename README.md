@@ -82,7 +82,7 @@ Recent News:
 - [GO_MF_ESMFold](https://huggingface.co/datasets/tyang816/GO_MF_ESMFold) | protein-wise | multi_label_classification
 - [MetalIonBinding_AlphaFold2](https://huggingface.co/datasets/tyang816/MetalIonBinding_AlphaFold2) | protein-wise | single_label_classification
 - [MetalIonBinding_ESMFold](https://huggingface.co/datasets/tyang816/MetalIonBinding_ESMFold) | protein-wise | single_label_classification
-- [Thermostability_AlphaFold2](https://huggingface.co/datasets/tyang816/Thermostability_ESMFold) | protein-wise | regression
+- [Thermostability_AlphaFold2](https://huggingface.co/datasets/tyang816/Thermostability_AlphaFold2) | protein-wise | regression
 - [Thermostability_ESMFold](https://huggingface.co/datasets/tyang816/Thermostability_ESMFold) | protein-wise | regression
 
 > ✨ Only structural sequences are different for the same dataset, for example, ``DeepLocBinary_ESMFold`` and ``DeepLocBinary_AlphaFold2`` share the same amino acid sequences, this means if you only want to use the ``aa_seqs``, both are ok! 
@@ -133,7 +133,7 @@ We recommend a **24GB** RTX 3090 or better, but it mainly depends on which PLM y
 1. git clone https://github.com/tyang816/VenusFactory.git
 2. cd VenusFactory
 3. conda create -n venus python==3.10
-4. conda activate venus(windows); source activate venus(linux)
+4. conda activate venus(for windows); source activate venus(for linux)
 5. pip install -r ./requirements.txt
 ```
 
@@ -163,23 +163,34 @@ bash ./script/eval/eval.sh
 
 ### Fine-tuning with Venus Board GUI(power by [Gradio](https://github.com/gradio-app/gradio))
 ```
-
+python ./src/webui.py
 ```
 
 ### crawler collector
+**Convert the cif to pdb**
+```
+bash ./crawler/convert/maxit.sh
+```
+
+**Download the meta data from RCSB database**
+```
+bash ./crawler/metadata/download_rcsb.sh
+```
+
 **Download the protein sequence from Uniprot database**
 ```
-bash ./crawler/download_uniprot_seq.sh
+bash ./crawler/sequence/download_uniprot_seq.sh
 ``` 
+
 **Download the protein structure from AlphaFold2 or RCSB database**
 
 AlphaFold2:
 ```
-bash ./crawler/download_alphafold.sh
+bash ./crawler/structure/download_alphafold.sh
 ```
 RCSB: 
 ```
-bash ./crawler/download_rcsb.sh
+bash ./crawler/structure/download_rcsb.sh
 ```
 
 ## 🙌 Citation
