@@ -138,7 +138,7 @@ We recommend a **24GB** RTX 3090 or better, but it mainly depends on which PLM y
 ```
 
 ### Quick Start
-**Fine-tuning**: Run the following scripts with different methods and adjust model parameters via ```--plm_model```.
+**Fine-tuning**: Run the following scripts with different methods.
 
 ```
 Freeze: bash ./script/train/train_plm_vanilla.sh
@@ -161,13 +161,8 @@ IA3: bash ./script/train/train_plm_ia3.sh
 bash ./script/eval/eval.sh
 ```
 
-### Fine-tuning with Venus Board GUI(power by [Gradio](https://github.com/gradio-app/gradio))
-```
-python ./src/webui.py
-```
-
-### crawler collector
-**Convert the cif to pdb**
+#### Crawler Collector
+**Convert the cif to pdb format**
 ```
 bash ./crawler/convert/maxit.sh
 ```
@@ -191,6 +186,22 @@ bash ./crawler/structure/download_alphafold.sh
 RCSB: 
 ```
 bash ./crawler/structure/download_rcsb.sh
+```
+
+#### Structure Sequence
+**Get structure sequence use esm3**
+```
+bash ./script/get_get_structure_seq/get_esm3_structure_seq.sh
+```
+
+**Get secondary structure sequence**
+```
+bash ./script/get_get_structure_seq/get_secondary_structure_seq.sh
+```
+
+### Fine-tuning with Venus Board GUI(power by [Gradio](https://github.com/gradio-app/gradio))
+```
+python ./src/webui.py
 ```
 
 ## 🙌 Citation
