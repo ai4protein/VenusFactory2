@@ -161,7 +161,17 @@ IA3: bash ./script/train/train_plm_ia3.sh
 bash ./script/eval/eval.sh
 ```
 
-#### Crawler Collector
+**Get structure sequence use esm3**
+```
+bash ./script/get_get_structure_seq/get_esm3_structure_seq.sh
+```
+
+**Get secondary structure sequence**
+```
+bash ./script/get_get_structure_seq/get_secondary_structure_seq.sh
+```
+
+### Crawler Collector
 **Convert the cif to pdb format**
 ```
 bash ./crawler/convert/maxit.sh
@@ -186,17 +196,6 @@ bash ./crawler/structure/download_alphafold.sh
 RCSB: 
 ```
 bash ./crawler/structure/download_rcsb.sh
-```
-
-#### Structure Sequence
-**Get structure sequence use esm3**
-```
-bash ./script/get_get_structure_seq/get_esm3_structure_seq.sh
-```
-
-**Get secondary structure sequence**
-```
-bash ./script/get_get_structure_seq/get_secondary_structure_seq.sh
 ```
 
 ### Fine-tuning with Venus Board GUI(power by [Gradio](https://github.com/gradio-app/gradio))
