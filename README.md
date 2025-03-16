@@ -31,7 +31,7 @@ Recent News:
 | [ESM2](https://huggingface.co/facebook/esm2_t33_650M_UR50D)  | 8M/35M/150M/650M/3B/15B | facebook/esm2_t33_650M_UR50D    |
 | [ESM-1b](https://huggingface.co/facebook/esm1b_t33_650M_UR50S) | 650M                    | facebook/esm1b_t33_650M_UR50S   |
 | [ESM-1v](https://huggingface.co/facebook/esm1v_t33_650M_UR90S_1) | 650M                    | facebook/esm1v_t33_650M_UR90S_1 |
-| [ProtBert-Uniref100](https://huggingface.co/Rostlab/prot_bert) | 420M                    | Rostlab/prot_bert_bfd           |
+| [ProtBert-Uniref100](https://huggingface.co/Rostlab/prot_bert) | 420M                    | Rostlab/prot_bert_uniref100          |
 | [ProtBert-BFD100](https://huggingface.co/Rostlab/prot_bert_bfd) | 420M                    | Rostlab/prot_bert_bfd           |
 | [IgBert](https://huggingface.co/Exscientia/IgBert) | 420M                    | Exscientia/IgBert           |
 | [IgBert_unpaired](https://huggingface.co/Exscientia/IgBert_unpaired) | 420M                    | Exscientia/IgBert_unpaired           |
@@ -45,10 +45,10 @@ Recent News:
 
 ## 🔬 Supported Training Approaches
 
-| Approach               | Full-tuning | Freeze-tuning      | LoRA               | SES-Adapter        |
-| ---------------------- | ----------- | ------------------ | ------------------ | ------------------ |
-| Pre-Training           | ❎          | ❎                | ❎                 | ❎                |
-| Supervised Fine-Tuning | ✅          | ✅                | ✅                 | ✅                |
+| Approach               | Full-tuning | Freeze-tuning      | SES-Adapter        | AdaLoRA            | QLoRA      | LoRA               | DoRA            | IA3              | 
+| ---------------------- | ----------- | ------------------ | ------------------ | ------------------ |----------- | ------------------ | -----------------| -----------------|
+| Pre-Training           | ❎          | ❎                | ❎                 | ❎                |❎          | ❎                | ❎               | ❎              | 
+| Supervised Fine-Tuning | ✅          | ✅                | ✅                 | ✅                |✅          | ✅                | ✅               | ✅              |
 
 ## 📚 Supported Datasets
 
@@ -82,7 +82,7 @@ Recent News:
 - [GO_MF_ESMFold](https://huggingface.co/datasets/tyang816/GO_MF_ESMFold) | protein-wise | multi_label_classification
 - [MetalIonBinding_AlphaFold2](https://huggingface.co/datasets/tyang816/MetalIonBinding_AlphaFold2) | protein-wise | single_label_classification
 - [MetalIonBinding_ESMFold](https://huggingface.co/datasets/tyang816/MetalIonBinding_ESMFold) | protein-wise | single_label_classification
-- [Thermostability_AlphaFold2](https://huggingface.co/datasets/tyang816/Thermostability_ESMFold) | protein-wise | regression
+- [Thermostability_AlphaFold2](https://huggingface.co/datasets/tyang816/Thermostability_AlphaFold2) | protein-wise | regression
 - [Thermostability_ESMFold](https://huggingface.co/datasets/tyang816/Thermostability_ESMFold) | protein-wise | regression
 
 > ✨ Only structural sequences are different for the same dataset, for example, ``DeepLocBinary_ESMFold`` and ``DeepLocBinary_AlphaFold2`` share the same amino acid sequences, this means if you only want to use the ``aa_seqs``, both are ok! 
@@ -118,7 +118,7 @@ Recent News:
 
 ## ✈️ Reuirement
 
-### Conda Enviroment
+### Conda Environment
 
 Please make sure you have installed **[Anaconda3](https://www.anaconda.com/download)** or **[Miniconda3](https://docs.conda.io/projects/miniconda/en/latest/)**.
 
@@ -129,12 +129,79 @@ We recommend a **24GB** RTX 3090 or better, but it mainly depends on which PLM y
 ## 🧬 Get Started
 
 ### Installation
-
-
+```
+1. git clone https://github.com/tyang816/VenusFactory.git
+2. cd VenusFactory
+3. conda create -n venus python==3.10
+4. conda activate venus(for windows); source activate venus(for linux)
+5. pip install -r ./requirements.txt
+```
 
 ### Quick Start
+**Fine-tuning**: Run the following scripts with different methods.
 
+```
+Freeze: bash ./script/train/train_plm_vanilla.sh
 
+SES-Adapter: bash ./script/train/train_plm_ses-adapter.sh
+
+AdaLoRA: bash ./script/train/train_plm_adalora.sh
+
+QLoRA: bash ./script/train/train_plm_qlora.sh
+
+LoRA: bash ./script/train/train_plm_lora.sh
+
+DoRA: bash ./script/train/train_plm_dora.sh
+
+IA3: bash ./script/train/train_plm_ia3.sh
+```
+
+**eval**: Run the following scripts to evaluate the trained model.
+```
+bash ./script/eval/eval.sh
+```
+
+**Get structure sequence use esm3**
+```
+bash ./script/get_get_structure_seq/get_esm3_structure_seq.sh
+```
+
+**Get secondary structure sequence**
+```
+bash ./script/get_get_structure_seq/get_secondary_structure_seq.sh
+```
+
+### Crawler Collector
+**Convert the cif to pdb format**
+```
+bash ./crawler/convert/maxit.sh
+```
+
+**Download the meta data from RCSB database**
+```
+bash ./crawler/metadata/download_rcsb.sh
+```
+
+**Download the protein sequence from Uniprot database**
+```
+bash ./crawler/sequence/download_uniprot_seq.sh
+``` 
+
+**Download the protein structure from AlphaFold2 or RCSB database**
+
+AlphaFold2:
+```
+bash ./crawler/structure/download_alphafold.sh
+```
+RCSB: 
+```
+bash ./crawler/structure/download_rcsb.sh
+```
+
+### Fine-tuning with Venus Board GUI(power by [Gradio](https://github.com/gradio-app/gradio))
+```
+python ./src/webui.py
+```
 
 ## 🙌 Citation
 
