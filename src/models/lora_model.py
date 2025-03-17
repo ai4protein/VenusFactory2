@@ -43,15 +43,20 @@ class LoraModel(nn.Module):
         if (
             self.training
             and hasattr(self, "args")
-            and self.args.training_method in ["full", "plm-lora", "plm-qlora"]
+            and self.args.training_method in ['plm-lora', 'plm-qlora', 'plm-dora', 'plm-adalora', 'plm-ia3']
         ):
             if "ProSST" in self.args.plm_model:
                 outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask, ss_input_ids=stru_token, output_hidden_states=True)
+            elif "Prime" in self.args.plm_model:
+                outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask, output_hidden_states=True)
             else:
                 outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask)
         else:
             with torch.no_grad():
-                outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask)
+                if "ProSST" in self.args.plm_model:
+                    outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask, ss_input_ids=stru_token, output_hidden_states=True)
+                else:
+                    outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask)
         seq_embeds = outputs.last_hidden_state
         gc.collect()
         torch.cuda.empty_cache()
