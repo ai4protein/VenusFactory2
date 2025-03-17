@@ -50,7 +50,8 @@ class TrainingMonitor:
             'loss': 0.0,                     # Loss value
             'test_metrics': {},              # Add test metrics container
             'test_progress': 0.0,            # Test progress percentage
-            'test_results_html': ''          # HTML formatted test results
+            'test_results_html': '',          # HTML formatted test results
+            'lines': []  # 添加lines字段来存储输出行
         }
         
         self.error_message = None
@@ -439,11 +440,21 @@ class TrainingMonitor:
     def _process_output_line(self, line: str):
         """Process training output line for metric tracking."""
         try:
+            # 保存每一行输出到progress_info中
+            if 'lines' not in self.current_progress:
+                self.current_progress['lines'] = []
+            self.current_progress['lines'].append(line)
+            
+            # 限制保存的行数，避免内存占用过大
+            max_lines = 1000  # 保留最近的1000行
+            if len(self.current_progress['lines']) > max_lines:
+                self.current_progress['lines'] = self.current_progress['lines'][-max_lines:]
+            
             # Always check for test progress if in Testing stage
             if self.current_progress.get('stage') == 'Testing':
                 if self._process_test_progress(line):
                     return
-                    
+            
             # Check for test phase start
             if re.search(self.patterns['test_phase_start'], line):
                 self.current_progress['stage'] = 'Testing'
@@ -451,7 +462,7 @@ class TrainingMonitor:
                 self.current_progress['test_metrics'] = {}
                 self.current_progress['test_results_html'] = ''
                 return
-                
+            
             # Check for epoch header pattern (e.g., "---------- Epoch 1 ----------")
             epoch_header_match = re.search(self.patterns['epoch_header'], line)
             if epoch_header_match:
@@ -470,7 +481,7 @@ class TrainingMonitor:
                 # Set stage to 'Testing' when we see the test results header
                 self.current_progress['stage'] = 'Testing'
                 return
-                
+            
             # Extract the actual content part of the log line if it contains timestamp and INFO
             log_content = line
             log_match = re.search(r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} - [a-zA-Z]+ - INFO - (.*)', line)
@@ -801,11 +812,14 @@ class TrainingMonitor:
                 print("Training process has completed. Setting is_completed flag.")
                 
         except Exception as e:
-            # Don't raise exception to avoid interrupting the processing thread
-            # But record the error message
-            self.error_message = f"Failed to parse output line: {str(e)}"
+            # 记录错误信息，同时也保存到输出行中
+            error_msg = f"Error parsing line: {str(e)}"
+            self.error_message = error_msg
+            if 'lines' not in self.current_progress:
+                self.current_progress['lines'] = []
+            self.current_progress['lines'].append(error_msg)
             if self.debug_progress:
-                print(f"Error parsing line: {str(e)}")
+                print(error_msg)
                 print(f"Line content: {line}")
     
     def _reset_tracking(self):
@@ -843,7 +857,8 @@ class TrainingMonitor:
             'loss': 0.0,
             'test_metrics': {},
             'test_progress': 0.0,
-            'test_results_html': ''
+            'test_results_html': '',
+            'lines': []  # 添加lines字段来存储输出行
         }
         
         # 重置统计信息
@@ -921,7 +936,8 @@ class TrainingMonitor:
             'loss': 0.0,
             'test_metrics': {},
             'test_progress': 0.0,
-            'test_results_html': ''
+            'test_results_html': '',
+            'lines': []  # 添加lines字段来存储输出行
         }
 
     def _update_test_results_display(self):

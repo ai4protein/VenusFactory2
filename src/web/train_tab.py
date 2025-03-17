@@ -900,7 +900,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 while monitor.is_training:
                     try:
                         update_count += 1
-                        time.sleep(0.5)  # 减少更新频率，避免UI卡顿
+                        time.sleep(0.5)
                         
                         # 检查进程状态
                         monitor.check_process_status()
@@ -908,49 +908,102 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         # 获取最新的进度信息
                         progress_info = monitor.get_progress()
                         
-                        # 如果进程已经结束，设置完成标志
+                        # 如果进程已经结束，检查是否是正常结束还是出错
                         if not monitor.is_training:
-                            progress_info['is_completed'] = True
-                            monitor.current_progress['is_completed'] = True
+                            if monitor.process and monitor.process.returncode != 0:
+                                # 获取完整的输出记录
+                                error_output = "\n".join(progress_info.get("lines", []))
+                                if not error_output:
+                                    error_output = "No output captured from the training process"
+                                
+                                error_status_html = f"""
+                                <div style="padding: 10px; background-color: #ffebee; border-radius: 5px; margin-bottom: 10px;">
+                                    <p style="margin: 0; color: #c62828; font-weight: bold;">Training failed:</p>
+                                    <pre style="margin: 5px 0 0; white-space: pre-wrap; max-height: 300px; overflow-y: auto; background-color: #f5f5f5; padding: 10px; border-radius: 4px; font-family: monospace;">{error_output}</pre>
+                                </div>
+                                """
+                                yield (
+                                    initial_stats,
+                                    error_status_html,
+                                    "Training failed",
+                                    gr.update(value="", visible=False),
+                                    None,
+                                    None,
+                                    gr.update(visible=False)
+                                )
+                                return
+                            else:
+                                progress_info['is_completed'] = True
+                                monitor.current_progress['is_completed'] = True
                         
-                        # 获取最新的统计信息
+                        # 更新UI
                         stats = monitor.get_stats()
                         if stats:
                             model_stats = update_model_stats(stats)
                         else:
                             model_stats = initial_stats
                         
-                        # 更新UI
+                        status_html, best_info, test_html_update, loss_fig, metrics_fig, download_btn_update = update_progress(progress_info)
+                        
+                        yield model_stats, status_html, best_info, test_html_update, loss_fig, metrics_fig, download_btn_update
+                        
+                    except Exception as e:
+                        # 获取完整的输出记录
+                        error_output = "\n".join(progress_info.get("lines", []))
+                        if not error_output:
+                            error_output = "No output captured from the training process"
+                        
+                        error_status_html = f"""
+                        <div style="padding: 10px; background-color: #ffebee; border-radius: 5px; margin-bottom: 10px;">
+                            <p style="margin: 0; color: #c62828; font-weight: bold;">Error during training:</p>
+                            <p style="margin: 5px 0; color: #c62828;">{str(e)}</p>
+                            <pre style="margin: 5px 0 0; white-space: pre-wrap; max-height: 300px; overflow-y: auto; background-color: #f5f5f5; padding: 10px; border-radius: 4px; font-family: monospace;">{error_output}</pre>
+                        </div>
+                        """
+                        print(f"Error updating UI: {str(e)}")
+                        traceback.print_exc()
+                        yield initial_stats, error_status_html, "Training error", gr.update(value="", visible=False), None, None, gr.update(visible=False)
+                        return
+                
+                # 训练结束后的最终更新（只在正常结束时执行）
+                if monitor.process and monitor.process.returncode == 0:
+                    try:
+                        progress_info = monitor.get_progress()
+                        progress_info['is_completed'] = True
+                        monitor.current_progress['is_completed'] = True
+                        
+                        stats = monitor.get_stats()
+                        if stats:
+                            model_stats = update_model_stats(stats)
+                        else:
+                            model_stats = initial_stats
+                        
                         status_html, best_info, test_html_update, loss_fig, metrics_fig, download_btn_update = update_progress(progress_info)
                         
                         yield model_stats, status_html, best_info, test_html_update, loss_fig, metrics_fig, download_btn_update
                     except Exception as e:
-                        print(f"Error updating UI: {str(e)}")
-                        traceback.print_exc()
-                        time.sleep(1)  # 出错时等待时间长一些
+                        error_output = "\n".join(progress_info.get("lines", []))
+                        if not error_output:
+                            error_output = "No output captured from the training process"
+                        
+                        error_status_html = f"""
+                        <div style="padding: 10px; background-color: #ffebee; border-radius: 5px; margin-bottom: 10px;">
+                            <p style="margin: 0; color: #c62828; font-weight: bold;">Error in final update:</p>
+                            <p style="margin: 5px 0; color: #c62828;">{str(e)}</p>
+                            <pre style="margin: 5px 0 0; white-space: pre-wrap; max-height: 300px; overflow-y: auto; background-color: #f5f5f5; padding: 10px; border-radius: 4px; font-family: monospace;">{error_output}</pre>
+                        </div>
+                        """
+                        yield initial_stats, error_status_html, "Error in final update", gr.update(value="", visible=False), None, None, gr.update(visible=False)
                 
-                # 训练结束后的最终更新
-                try:
-                    # 获取最终的进度信息和统计信息
-                    progress_info = monitor.get_progress()
-                    # 设置训练完成标志
-                    progress_info['is_completed'] = True
-                    monitor.current_progress['is_completed'] = True
-                    
-                    stats = monitor.get_stats()
-                    if stats:
-                        model_stats = update_model_stats(stats)
-                    else:
-                        model_stats = initial_stats
-                    
-                    # 更新UI
-                    status_html, best_info, test_html_update, loss_fig, metrics_fig, download_btn_update = update_progress(progress_info)
-                    
-                    yield model_stats, status_html, best_info, test_html_update, loss_fig, metrics_fig, download_btn_update
-                except Exception as e:
-                    yield initial_stats, f"Training completed with error: {str(e)}", "See log for details", gr.update(value="", visible=False), None, None, gr.update(visible=False)
             except Exception as e:
-                yield initial_stats, f"Error occurred: {str(e)}", "Training failed", gr.update(value="", visible=False), None, None, gr.update(visible=False)
+                # 初始化错误，可能没有输出记录
+                error_status_html = f"""
+                <div style="padding: 10px; background-color: #ffebee; border-radius: 5px; margin-bottom: 10px;">
+                    <p style="margin: 0; color: #c62828; font-weight: bold;">Training initialization failed:</p>
+                    <p style="margin: 5px 0; color: #c62828;">{str(e)}</p>
+                </div>
+                """
+                yield initial_stats, error_status_html, "Training failed", gr.update(value="", visible=False), None, None, gr.update(visible=False)
         
         def handle_abort():
             """Abort training process."""

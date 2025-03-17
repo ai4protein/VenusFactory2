@@ -13,6 +13,7 @@ import csv
 from pathlib import Path
 import traceback
 import re
+from web.utils.command import preview_predict_command
 
 def create_predict_tab(constant):
     plm_models = constant["plm_models"]
@@ -82,26 +83,9 @@ def create_predict_tab(constant):
         
         if is_predicting:
             return gr.HTML("""
-            <div class="warning-container">
-                <div class="warning-icon">⚠️</div>
-                <div class="warning-message">A prediction is already running. Please wait or abort it.</div>
+            <div style="padding: 10px; background-color: #fff8e1; border-radius: 5px;">
+                <p style="margin: 0; color: #f57f17; font-weight: bold;">A prediction is already running. Please wait or abort it.</p>
             </div>
-            <style>
-                .warning-container {
-                    background-color: #fffbea;
-                    border-left: 5px solid #ecc94b;
-                    padding: 15px;
-                    border-radius: 5px;
-                    margin: 10px 0;
-                }
-                .warning-icon {
-                    font-size: 20px;
-                    margin-bottom: 8px;
-                }
-                .warning-message {
-                    font-weight: 500;
-                }
-            </style>
             """)
         
         is_predicting = True
@@ -588,9 +572,8 @@ def create_predict_tab(constant):
         
         if is_predicting:
             return gr.HTML("""
-            <div class="error-container">
-                <div class="error-icon">⚠️</div>
-                <div class="error-message">Prediction is already in progress. Please wait...</div>
+            <div style="padding: 10px; background-color: #fff8e1; border-radius: 5px;">
+                <p style="margin: 0; color: #f57f17; font-weight: bold;">A prediction is already running. Please wait or abort it.</p>
             </div>
             """), None
         
@@ -918,7 +901,6 @@ def create_predict_tab(constant):
                                 box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
                                 padding: 20px;
                                 margin-bottom: 20px;
-                                text-align: center;
                             }}
                             
                             .results-container h2 {{
@@ -1255,29 +1237,13 @@ def create_predict_tab(constant):
         return '\n'.join(rows)
 
     def handle_abort():
-        global is_predicting, current_process
+        """处理中止预测进程"""
+        nonlocal is_predicting, current_process
         if not is_predicting or current_process is None:
             return gr.HTML("""
-            <div class="info-container">
-                <div class="info-icon">ℹ️</div>
-                <div class="info-message">No prediction process is currently running.</div>
+            <div style="padding: 10px; background-color: #f5f5f5; border-radius: 5px;">
+                <p style="margin: 0;">No prediction process is currently running.</p>
             </div>
-            <style>
-                .info-container {
-                    background-color: #ebf8ff;
-                    border-left: 5px solid #4299e1;
-                    padding: 15px;
-                    border-radius: 5px;
-                    margin: 10px 0;
-                }
-                .info-icon {
-                    font-size: 20px;
-                    margin-bottom: 8px;
-                }
-                .info-message {
-                    font-weight: 500;
-                }
-            </style>
             """)
         
         try:
@@ -1291,50 +1257,86 @@ def create_predict_tab(constant):
             current_process = None
             
             return gr.HTML("""
-            <div class="warning-container">
-                <div class="warning-icon">⚠️</div>
-                <div class="warning-message">Prediction process has been aborted.</div>
+            <div style="padding: 10px; background-color: #e8f5e9; border-radius: 5px;">
+                <p style="margin: 0; color: #2e7d32; font-weight: bold;">Prediction successfully terminated!</p>
             </div>
-            <style>
-                .warning-container {
-                    background-color: #fffbea;
-                    border-left: 5px solid #ecc94b;
-                    padding: 15px;
-                    border-radius: 5px;
-                    margin: 10px 0;
-                }
-                .warning-icon {
-                    font-size: 20px;
-                    margin-bottom: 8px;
-                }
-                .warning-message {
-                    font-weight: 500;
-                }
-            </style>
             """)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(os.getpgid(current_process.pid), signal.SIGKILL)
+                return gr.HTML("""
+                <div style="padding: 10px; background-color: #fff8e1; border-radius: 5px;">
+                    <p style="margin: 0; color: #f57f17; font-weight: bold;">Prediction forcefully terminated!</p>
+                </div>
+                """)
+            except Exception as e:
+                return gr.HTML(f"""
+                <div style="padding: 10px; background-color: #ffebee; border-radius: 5px;">
+                    <p style="margin: 0; color: #c62828; font-weight: bold;">Failed to terminate prediction: {str(e)}</p>
+                </div>
+                """)
         except Exception as e:
             return gr.HTML(f"""
-            <div class="error-container">
-                <div class="error-icon">❌</div>
-                <div class="error-message">Error aborting prediction: {str(e)}</div>
-            </div>"""+"""
-            <style>
-                .error-container {
-                    background-color: #fff5f5;
-                    border-left: 5px solid #f56565;
-                    padding: 15px;
-                    border-radius: 5px;
-                    margin: 10px 0;
-                }
-                .error-icon {
-                    font-size: 20px;
-                    margin-bottom: 8px;
-                }
-                .error-message {
-                    font-weight: 500;
-                }
-            </style>
+            <div style="padding: 10px; background-color: #ffebee; border-radius: 5px;">
+                <p style="margin: 0; color: #c62828; font-weight: bold;">Failed to terminate prediction: {str(e)}</p>
+            </div>
             """)
+
+    def handle_preview(plm_model, model_path, eval_method, aa_seq, foldseek_seq, ss8_seq, eval_structure_seq, pooling_method, problem_type, num_labels):
+        """处理单序列预测命令预览"""
+        # 构建参数字典
+        args_dict = {
+            "model_path": model_path,
+            "plm_model": plm_models[plm_model],
+            "aa_seq": aa_seq,
+            "foldseek_seq": foldseek_seq if foldseek_seq else "",
+            "ss8_seq": ss8_seq if ss8_seq else "",
+            "pooling_method": pooling_method,
+            "problem_type": problem_type,
+            "num_labels": num_labels,
+            "eval_method": eval_method
+        }
+        
+        if eval_method == "ses-adapter":
+            args_dict["structure_seq"] = ",".join(eval_structure_seq) if eval_structure_seq else None
+            if eval_structure_seq:
+                if "foldseek_seq" in eval_structure_seq:
+                    args_dict["use_foldseek"] = True
+                if "ss8_seq" in eval_structure_seq:
+                    args_dict["use_ss8"] = True
+        
+        # 生成预览命令
+        preview_text = preview_predict_command(args_dict, is_batch=False)
+        return gr.update(value=preview_text, visible=True)
+
+    def handle_batch_preview(plm_model, model_path, eval_method, input_file, eval_structure_seq, pooling_method, problem_type, num_labels, batch_size):
+        """处理批量预测命令预览"""
+        if not input_file:
+            return gr.update(value="Please upload a file first", visible=True)
+            
+        args_dict = {
+            "model_path": model_path,
+            "plm_model": plm_models[plm_model],
+            "input_file": input_file.name if hasattr(input_file, "name") else "input.csv",
+            "output_file": "predictions.csv",
+            "pooling_method": pooling_method,
+            "problem_type": problem_type,
+            "num_labels": num_labels,
+            "eval_method": eval_method,
+            "batch_size": batch_size
+        }
+        
+        if eval_method == "ses-adapter":
+            args_dict["structure_seq"] = ",".join(eval_structure_seq) if eval_structure_seq else None
+            if eval_structure_seq:
+                if "foldseek_seq" in eval_structure_seq:
+                    args_dict["use_foldseek"] = True
+                if "ss8_seq" in eval_structure_seq:
+                    args_dict["use_ss8"] = True
+        
+        # 生成预览命令
+        preview_text = preview_predict_command(args_dict, is_batch=True)
+        return gr.update(value=preview_text, visible=True)
 
     with gr.Tab("Prediction"):
         with gr.Row():
@@ -1413,12 +1415,21 @@ def create_predict_tab(constant):
                     )
                 
                 with gr.Row():
+                    preview_single_button = gr.Button("Preview Command")
                     predict_button = gr.Button("Predict", variant="primary")
                     abort_button = gr.Button("Abort", variant="stop")
                 
+                # 添加命令预览区域
+                command_preview = gr.Code(
+                    label="Command Preview",
+                    language="shell",
+                    interactive=False,
+                    visible=False
+                )
                 predict_output = gr.HTML(label="Prediction Results")
                 
-                # Connect buttons to functions
+                
+                
                 predict_button.click(
                     fn=predict_sequence,
                     inputs=[
@@ -1603,16 +1614,70 @@ def create_predict_tab(constant):
                         )
                 
                 with gr.Row():
-                    batch_predict_button = gr.Button("Start Batch Prediction", variant="primary", size="lg")
-                    batch_abort_button = gr.Button("Abort", variant="stop", size="lg")
+                    preview_batch_button = gr.Button("Preview Command")
+                    batch_predict_button = gr.Button("Start Batch Prediction", variant="primary")
+                    batch_abort_button = gr.Button("Abort", variant="stop")
                 
-                with gr.Row():
-                    batch_predict_output = gr.HTML(label="Prediction Progress")
+                # 添加命令预览区域
+                batch_command_preview = gr.Code(
+                    label="Command Preview",
+                    language="shell",
+                    interactive=False,
+                    visible=False
+                )
+                batch_predict_output = gr.HTML(label="Prediction Progress")
+                result_file = gr.DownloadButton(label="Download Predictions", visible=False)
+
+                # 在UI部分添加命令预览的可见性控制
+                def toggle_preview(button_text):
+                    """切换命令预览的可见性"""
+                    if "Preview" in button_text:
+                        return gr.update(visible=True)
+                    return gr.update(visible=False)
                 
-                with gr.Row():
-                    result_file = gr.DownloadButton(label="Download Predictions", visible=False)
+                # 连接预览按钮
+                preview_single_button.click(
+                    fn=toggle_preview,
+                    inputs=[preview_single_button],
+                    outputs=[command_preview]
+                ).then(
+                    fn=handle_preview,
+                    inputs=[
+                        plm_model,
+                        model_path,
+                        eval_method,
+                        aa_seq,
+                        foldseek_seq,
+                        ss8_seq,
+                        structure_seq,
+                        pooling_method,
+                        problem_type,
+                        num_labels
+                    ],
+                    outputs=[command_preview]
+                )
                 
-                # Connect buttons to functions
+                # 连接预览按钮
+                preview_batch_button.click(
+                    fn=toggle_preview,
+                    inputs=[preview_batch_button],
+                    outputs=[batch_command_preview]
+                ).then(
+                    fn=handle_batch_preview,
+                    inputs=[
+                        plm_model,
+                        model_path,
+                        eval_method,
+                        input_file,
+                        structure_seq,
+                        pooling_method,
+                        problem_type,
+                        num_labels,
+                        batch_size
+                    ],
+                    outputs=[batch_command_preview]
+                )
+                
                 batch_predict_button.click(
                     fn=predict_batch,
                     inputs=[
@@ -1661,6 +1726,8 @@ def create_predict_tab(constant):
         inputs=[structure_seq],
         outputs=[foldseek_seq, ss8_seq]
     )
+
+    
 
     return {
         "predict_sequence": predict_sequence,

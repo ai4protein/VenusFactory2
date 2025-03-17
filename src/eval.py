@@ -459,6 +459,6 @@ if __name__ == '__main__':
     with torch.no_grad():
         metric, pred_labels = evaluate(model, plm_model, metrics_dict, test_loader, loss_function, device)
         if args.test_result_dir:
-            pd.DataFrame(metric).to_csv(f"{args.test_result_dir}/test_metrics.csv", index=False)
+            pd.DataFrame(metric).to_csv(f"{args.test_result_dir}/evaluation_metrics.csv", index=False)
             test_result_df["pred_label"] = pred_labels
-            test_result_df.to_csv(f"{args.test_result_dir}/test_result.csv", index=False)
+            test_result_df.to_csv(f"{args.test_result_dir}/evaluation_result.csv", index=False)
