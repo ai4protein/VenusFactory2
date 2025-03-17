@@ -172,7 +172,7 @@ conda activate venus  # For Windows
 pip install -r requirements.txt
 ```
 
-## 🚀 Quick Start with Venus Board UI
+## 🚀 Quick Start with Venus Web UI
 
 Get started quickly with our intuitive graphical interface powered by [Gradio](https://github.com/gradio-app/gradio):
 
@@ -180,11 +180,68 @@ Get started quickly with our intuitive graphical interface powered by [Gradio](h
 python ./src/webui.py
 ```
 
-This will launch the Venus Board UI where you can:
+This will launch the Venus Web UI where you can:
 - Configure and run fine-tuning experiments
 - Monitor training progress
 - Evaluate models
 - Visualize results
+
+### Using Each Tab
+
+1. **Training Tab**:
+
+    ![Model_Dataset_Config](img/Train/Model_Dataset_Config.png)
+
+    Select a protein language model from the dropdown menu. Upload your dataset or select from available datasets and choose metrics appropriate for your problem type.
+
+    ![Training_Parameters](img/Train/Training_Parameters.png)
+   Choose a training method (Freeze, SES-Adapter, LoRA, QLoRA etc.) and configure training parameters (batch size, learning rate, etc.).
+   
+    ![Preview_Command](img/Train/Preview_Command.png)
+    ![Training_Progress](img/Train/Training_Progress.png)
+    ![Best_Model](img/Train/Best_Model.png)
+    ![Monitor_Figs](img/Train/Monitor_Figs.png)
+   Click "Start Training" and monitor progress in real-time.
+
+    <p align="center">
+      <img src="img/Train/Metric_Results.png" width="60%" alt="Metric_Results">
+    </p>
+   
+   Click "Download CSV" to download the test metrics results.
+
+
+2. **Evaluation Tab**:
+
+    ![Model_Dataset_Config](img/Eval/Model_Dataset_Config.png)
+
+   Load your trained model by specifying the model path. Select the same protein language model and model configs used during training. Select a test dataset and configure batch size. Choose evaluation metrics appropriate for your problem type. Finally, click "Start Evaluation" to view performance metrics.
+
+3. **Prediction Tab**:
+
+   ![Predict_Tab](img/Predict/Predict_Tab.png)
+
+   Load your trained model by specifying the model path. Select the same protein language model and model configs used during training.
+
+   For single sequence: Enter a protein sequence in the text box.
+
+   For batch prediction: Upload a CSV file with sequences.
+
+   ![Batch](img/Predict/Batch.png)
+
+   Click "Predict" to generate and view results.
+
+4. **Download Tab**:
+
+   - **AlphaFold2 Structures**: Enter UniProt IDs to download protein structures
+   - **UniProt**: Search for protein information using keywords or IDs
+   - **InterPro**: Retrieve protein family and domain information
+   - **RCSB PDB**: Download experimental protein structures
+
+5. **Manual Tab**:
+
+   Select a language (English/Chinese).
+
+   Navigate through the documentation using the table of contents and find step-by-step guides.
 
 ## 🧬 Code-line Usage
 

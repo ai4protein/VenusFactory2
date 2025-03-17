@@ -12,6 +12,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import re
 from datasets import load_dataset
+from web.utils.command import preview_eval_command
 
 def create_eval_tab(constant):
     plm_models = constant["plm_models"]
@@ -299,17 +300,21 @@ def create_eval_tab(constant):
                     # 设置下载按钮可见并指向结果文件
                     yield summary_html, gr.update(value=result_file, visible=True)
                 else:
-                    yield """
+                    error_output = "\n".join(progress_info.get("lines", []))
+                    yield f"""
                     <div style="padding: 10px; background-color: #fff8e1; border-radius: 5px; margin-bottom: 10px;">
-                        <p style="margin: 0; color: #f57f17; font-weight: bold;">Evaluation completed, but metrics file not found.</p>
+                        <p style="margin: 0; color: #f57f17; font-weight: bold;">Evaluation completed, but metrics file not found at: {result_file}</p>
                     </div>
                     """, gr.update(visible=False)
             else:
-                stderr_output = current_process.stderr.read() if current_process.stderr else "No error information available"
+                error_output = "\n".join(progress_info.get("lines", []))
+                if not error_output:
+                    error_output = "No output captured from the evaluation process"
+                
                 yield f"""
                 <div style="padding: 10px; background-color: #ffebee; border-radius: 5px; margin-bottom: 10px;">
                     <p style="margin: 0; color: #c62828; font-weight: bold;">Evaluation failed:</p>
-                    <pre style="margin: 5px 0 0; white-space: pre-wrap;">{stderr_output}</pre>
+                    <pre style="margin: 5px 0 0; white-space: pre-wrap; max-height: 300px; overflow-y: auto;">{error_output}</pre>
                 </div>
                 """, gr.update(visible=False)
 
@@ -846,9 +851,84 @@ def create_eval_tab(constant):
         )
 
         with gr.Row():
-            eval_button = gr.Button("Start Evaluation", variant="primary")
+            preview_button = gr.Button("Preview Command")
             abort_button = gr.Button("Abort", variant="stop")
-        
+            eval_button = gr.Button("Start Evaluation", variant="primary")
+
+        with gr.Row():
+            command_preview = gr.Code(
+                label="Command Preview",
+                language="shell",
+                interactive=False,
+                visible=False
+            )
+
+        def handle_preview(plm_model, model_path, eval_method, is_custom_dataset, dataset_defined, 
+                          dataset_custom, problem_type, num_labels, metrics, batch_mode, 
+                          batch_size, batch_token, eval_structure_seq, eval_pooling_method):
+            """处理预览命令按钮点击事件"""
+            if command_preview.visible:
+                return gr.update(visible=False)
+            
+            # 构建参数字典
+            args = {
+                "plm_model": plm_models[plm_model],
+                "model_path": model_path,
+                "eval_method": eval_method,
+                "pooling_method": eval_pooling_method
+            }
+            
+            # 处理数据集相关参数
+            if is_custom_dataset == "Use Custom Dataset":
+                args["dataset"] = dataset_custom
+                args["problem_type"] = problem_type
+                args["num_labels"] = num_labels
+                args["metrics"] = metrics if isinstance(metrics, str) else ",".join(metrics)
+            else:
+                with open(dataset_configs[dataset_defined], 'r') as f:
+                    config = json.load(f)
+                args["dataset_config"] = dataset_configs[dataset_defined]
+            
+            # 处理批处理参数
+            if batch_mode == "Batch Size Mode":
+                args["batch_size"] = batch_size
+            else:
+                args["batch_token"] = batch_token
+            
+            # 处理结构序列参数
+            if eval_method == "ses-adapter" and eval_structure_seq:
+                args["structure_seq"] = ",".join(eval_structure_seq)
+                if "foldseek_seq" in eval_structure_seq:
+                    args["use_foldseek"] = True
+                if "ss8_seq" in eval_structure_seq:
+                    args["use_ss8"] = True
+            
+            # 生成预览命令
+            preview_text = preview_eval_command(args)
+            return gr.update(value=preview_text, visible=True)
+
+        # 绑定预览按钮事件
+        preview_button.click(
+            fn=handle_preview,
+            inputs=[
+                eval_plm_model,
+                eval_model_path,
+                eval_method,
+                is_custom_dataset,
+                eval_dataset_defined,
+                eval_dataset_custom,
+                problem_type,
+                num_labels,
+                metrics,
+                batch_mode,
+                batch_size,
+                batch_token,
+                eval_structure_seq,
+                eval_pooling_method
+            ],
+            outputs=[command_preview]
+        )
+
         eval_output = gr.HTML(
             value="<div style='padding: 15px; background-color: #f5f5f5; border-radius: 5px;'><p style='margin: 0;'>Click the 「Start Evaluation」 button to begin model evaluation</p></div>",
             label="Evaluation Status & Results"
