@@ -85,7 +85,7 @@ def add_training_args(parser: argparse.ArgumentParser):
                            choices=['full', 'freeze', 'lora', 'ses-adapter', 'plm-lora', 'plm-qlora', 'plm-adalora', 'plm-dora', 'plm-ia3'])
     parser.add_argument("--lora_r", type=int, default=8, help="lora r")
     parser.add_argument("--lora_alpha", type=int, default=32, help="lora_alpha")
-    parser.add_argument("--locra_dropout", type=float, default=0.1, help="lora_dropout")
+    parser.add_argument("--lora_dropout", type=float, default=0.1, help="lora_dropout")
     parser.add_argument("--feedforward_modules", type=str, default="w0")
 
     parser.add_argument(
