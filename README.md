@@ -41,8 +41,9 @@ Recent News:
 | [IgT5](https://huggingface.co/Exscientia/IgT5) | 3B                  | Exscientia/IgT5          |
 | [IgT5_unpaired](https://huggingface.co/Exscientia/IgT5_unpaired) | 3B                  | Exscientia/IgT5_unpaired          |
 | [Ankh](https://huggingface.co/ElnaggarLab/ankh-base)         | 450M/1.2B               | ElnaggarLab/ankh-base           |
-| [ProSST](https://huggingface.co/AI4Protein/ProSST-2048)  |110M                     |AI4Protein/ProSST-2048     |
+| [ProSST](https://huggingface.co/AI4Protein/ProSST-2048)  |20/128/512/1024/2048/4096  |AI4Protein/ProSST-2048     |
 | [ProPrime](https://huggingface.co/AI4Protein/Prime_690M)  |690M                     |AI4Protein/Prime_690M     |
+| [PETA](https://huggingface.co/AI4Protein/deep_base)     |base/bpe_50/bep_100/bep_200/bep_400/bep_800/bpe_1600/bpe_3200/<br>unigram_50/unigram_100/unigram_200/unigram_400/unigram_800/unigram_1600/unigram_3200 |AI4Protein/deep_base     |
 
 ## 🔬 Supported Training Approaches
 

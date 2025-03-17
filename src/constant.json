@@ -26,7 +26,22 @@
         "ProSST-512": "AI4Protein/ProSST-512",
         "ProSST-128": "AI4Protein/ProSST-128",
         "ProSST-20": "AI4Protein/ProSST-20",
-        "ProPrime-690M": "AI4Protein/Prime_690M"
+        "ProPrime-690M": "AI4Protein/Prime_690M",
+        "Deep_base": "AI4Protein/deep_base",
+        "Deep_BPE_50": "AI4Protein/deep_bpe_50",
+        "Deep_BPE_100": "AI4Protein/deep_bpe_100",
+        "Deep_BPE_200": "AI4Protein/deep_bpe_200",
+        "Deep_BPE_400": "AI4Protein/deep_bpe_400",
+        "Deep_BPE_800": "AI4Protein/deep_bpe_800",
+        "Deep_BPE_1600": "AI4Protein/deep_bpe_1600",
+        "Deep_BPE_3200": "AI4Protein/deep_bpe_3200",
+        "Deep_Unigram_50": "AI4Protein/deep_unigram_50",
+        "Deep_Unigram_100": "AI4Protein/deep_unigram_100",
+        "Deep_Unigram_200": "AI4Protein/deep_unigram_200",
+        "Deep_Unigram_400": "AI4Protein/deep_unigram_400",
+        "Deep_Unigram_800": "AI4Protein/deep_unigram_800",
+        "Deep_Unigram_1600": "AI4Protein/deep_unigram_1600",
+        "Deep_Unigram_3200": "AI4Protein/deep_unigram_3200"
 
     },
     "dataset_configs": {
