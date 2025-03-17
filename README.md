@@ -27,29 +27,134 @@ Recent News:
 
 ## 🤖 Supported Models
 
-| Model                                                        | Model size              | Template                        |
-| ------------------------------------------------------------ | ----------------------- | ------------------------------- |
-| [ESM2](https://huggingface.co/facebook/esm2_t33_650M_UR50D)  | 8M/35M/150M/650M/3B/15B | facebook/esm2_t33_650M_UR50D    |
-| [ESM-1b](https://huggingface.co/facebook/esm1b_t33_650M_UR50S) | 650M                    | facebook/esm1b_t33_650M_UR50S   |
-| [ESM-1v](https://huggingface.co/facebook/esm1v_t33_650M_UR90S_1) | 650M                    | facebook/esm1v_t33_650M_UR90S_1 |
-| [ProtBert-Uniref100](https://huggingface.co/Rostlab/prot_bert) | 420M                    | Rostlab/prot_bert_uniref100          |
-| [ProtBert-BFD100](https://huggingface.co/Rostlab/prot_bert_bfd) | 420M                    | Rostlab/prot_bert_bfd           |
-| [IgBert](https://huggingface.co/Exscientia/IgBert) | 420M                    | Exscientia/IgBert           |
-| [IgBert_unpaired](https://huggingface.co/Exscientia/IgBert_unpaired) | 420M                    | Exscientia/IgBert_unpaired           |
-| [ProtT5-Uniref50](https://huggingface.co/Rostlab/prot_t5_xl_uniref50) | 3B/11B                  | Rostlab/prot_t5_xl_uniref50     |
-| [ProtT5-BFD100](https://huggingface.co/Rostlab/prot_t5_xl_bfd) | 3B/11B                  | Rostlab/prot_t5_xl_bfd          |
-| [IgT5](https://huggingface.co/Exscientia/IgT5) | 3B                  | Exscientia/IgT5          |
-| [IgT5_unpaired](https://huggingface.co/Exscientia/IgT5_unpaired) | 3B                  | Exscientia/IgT5_unpaired          |
-| [Ankh](https://huggingface.co/ElnaggarLab/ankh-base)         | 450M/1.2B               | ElnaggarLab/ankh-base           |
-| [ProSST](https://huggingface.co/AI4Protein/ProSST-2048)  |20/128/512/1024/2048/4096  |AI4Protein/ProSST-2048     |
-| [ProPrime](https://huggingface.co/AI4Protein/Prime_690M)  |690M                     |AI4Protein/Prime_690M     |
-| [PETA](https://huggingface.co/AI4Protein/deep_base)     |base/bpe_50/bep_100/bep_200/bep_400/bep_800/bpe_1600/bpe_3200/<br>unigram_50/unigram_100/unigram_200/unigram_400/unigram_800/unigram_1600/unigram_3200 |AI4Protein/deep_base     |
+### Pre-training Protein Language Models
+
+<details>
+<summary>ESM Series Models: Meta AI's protein language models</summary>
+
+| Model | Size | Parameters | GPU Memory | Training Data | Template |
+|-------|------|------------|------------|---------------|----------|
+| ESM2-8M | 8M | 8M | 2GB+ | UR50/D | [facebook/esm2_t6_8M_UR50D](https://huggingface.co/facebook/esm2_t6_8M_UR50D) |
+| ESM2-35M | 35M | 35M | 4GB+ | UR50/D | [facebook/esm2_t12_35M_UR50D](https://huggingface.co/facebook/esm2_t12_35M_UR50D) |
+| ESM2-150M | 150M | 150M | 8GB+ | UR50/D | [facebook/esm2_t30_150M_UR50D](https://huggingface.co/facebook/esm2_t30_150M_UR50D) |
+| ESM2-650M | 650M | 650M | 16GB+ | UR50/D | [facebook/esm2_t33_650M_UR50D](https://huggingface.co/facebook/esm2_t33_650M_UR50D) |
+| ESM2-3B | 3B | 3B | 24GB+ | UR50/D | [facebook/esm2_t36_3B_UR50D](https://huggingface.co/facebook/esm2_t36_3B_UR50D) |
+| ESM2-15B | 15B | 15B | 40GB+ | UR50/D | [facebook/esm2_t48_15B_UR50D](https://huggingface.co/facebook/esm2_t48_15B_UR50D) |
+| ESM-1b | 650M | 650M | 16GB+ | UR50/S | [facebook/esm1b_t33_650M_UR50S](https://huggingface.co/facebook/esm1b_t33_650M_UR50S) |
+| ESM-1v-1 | 650M | 650M | 16GB+ | UR90/S | [facebook/esm1v_t33_650M_UR90S_1](https://huggingface.co/facebook/esm1v_t33_650M_UR90S_1) |
+| ESM-1v-2 | 650M | 650M | 16GB+ | UR90/S | [facebook/esm1v_t33_650M_UR90S_2](https://huggingface.co/facebook/esm1v_t33_650M_UR90S_2) |
+| ESM-1v-3 | 650M | 650M | 16GB+ | UR90/S | [facebook/esm1v_t33_650M_UR90S_3](https://huggingface.co/facebook/esm1v_t33_650M_UR90S_3) |
+| ESM-1v-4 | 650M | 650M | 16GB+ | UR90/S | [facebook/esm1v_t33_650M_UR90S_4](https://huggingface.co/facebook/esm1v_t33_650M_UR90S_4) |
+| ESM-1v-5 | 650M | 650M | 16GB+ | UR90/S | [facebook/esm1v_t33_650M_UR90S_5](https://huggingface.co/facebook/esm1v_t33_650M_UR90S_5) |
+
+> 💡 ESM2 models are the latest generation, offering better performance than ESM-1b/1v
+</details>
+
+<details>
+<summary>BERT-based Models: Transformer encoder architecture</summary>
+
+| Model | Size | Parameters | GPU Memory | Training Data | Template |
+|-------|------|------------|------------|---------------|----------|
+| ProtBert-Uniref100 | 420M | 420M | 12GB+ | UniRef100 | [Rostlab/prot_bert](https://huggingface.co/Rostlab/prot_bert) |
+| ProtBert-BFD | 420M | 420M | 12GB+ | BFD100 | [Rostlab/prot_bert_bfd](https://huggingface.co/Rostlab/prot_bert_bfd) |
+| IgBert | 420M | 420M | 12GB+ | Antibody | [Exscientia/IgBert](https://huggingface.co/Exscientia/IgBert) |
+| IgBert-unpaired | 420M | 420M | 12GB+ | Antibody | [Exscientia/IgBert_unpaired](https://huggingface.co/Exscientia/IgBert_unpaired) |
+
+> 💡 BFD-trained models generally show better performance on structure-related tasks
+</details>
+
+<details>
+<summary>T5-based Models: Encoder-decoder architecture</summary>
+
+| Model | Size | Parameters | GPU Memory | Training Data | Template |
+|-------|------|------------|------------|---------------|----------|
+| ProtT5-XL-UniRef50 | 3B | 3B | 24GB+ | UniRef50 | [Rostlab/prot_t5_xl_uniref50](https://huggingface.co/Rostlab/prot_t5_xl_uniref50) |
+| ProtT5-XXL-UniRef50 | 11B | 11B | 40GB+ | UniRef50 | [Rostlab/prot_t5_xxl_uniref50](https://huggingface.co/Rostlab/prot_t5_xxl_uniref50) |
+| ProtT5-XL-BFD | 3B | 3B | 24GB+ | BFD100 | [Rostlab/prot_t5_xl_bfd](https://huggingface.co/Rostlab/prot_t5_xl_bfd) |
+| ProtT5-XXL-BFD | 11B | 11B | 40GB+ | BFD100 | [Rostlab/prot_t5_xxl_bfd](https://huggingface.co/Rostlab/prot_t5_xxl_bfd) |
+| IgT5 | 3B | 3B | 24GB+ | Antibody | [Exscientia/IgT5](https://huggingface.co/Exscientia/IgT5) |
+| IgT5-unpaired | 3B | 3B | 24GB+ | Antibody | [Exscientia/IgT5_unpaired](https://huggingface.co/Exscientia/IgT5_unpaired) |
+
+> 💡 T5 models can be used for both encoding and generation tasks
+</details>
+
+<details>
+<summary>Specialized Models: Task-specific architectures</summary>
+
+| Model | Size | Parameters | GPU Memory | Features | Template |
+|-------|------|------------|------------|----------|----------|
+| Ankh-base | 450M | 450M | 12GB+ | Encoder-decoder | [ElnaggarLab/ankh-base](https://huggingface.co/ElnaggarLab/ankh-base) |
+| Ankh-large | 1.2B | 1.2B | 20GB+ | Encoder-decoder | [ElnaggarLab/ankh-large](https://huggingface.co/ElnaggarLab/ankh-large) |
+| ProSST-20 | 20 | 110M | 4GB+ | Mutation | [AI4Protein/ProSST-20](https://huggingface.co/AI4Protein/ProSST-20) |
+| ProSST-128 | 128 | 110M | 4GB+ | Mutation | [AI4Protein/ProSST-128](https://huggingface.co/AI4Protein/ProSST-128) |
+| ProSST-512 | 512 | 110M | 4GB+ | Mutation | [AI4Protein/ProSST-512](https://huggingface.co/AI4Protein/ProSST-512) |
+| ProSST-2048 | 2048 | 110M | 4GB+ | Mutation | [AI4Protein/ProSST-2048](https://huggingface.co/AI4Protein/ProSST-2048) |
+| ProSST-4096 | 4096 | 110M | 4GB+ | Mutation | [AI4Protein/ProSST-4096](https://huggingface.co/AI4Protein/ProSST-4096) |
+| ProPrime-690M | 690M | 690M | 16GB+ | OGT-prediction | [AI4Protein/Prime_690M](https://huggingface.co/AI4Protein/Prime_690M) |
+
+> 💡 These models often excel in specific tasks or offer unique architectural benefits
+</details>
+
+<details>
+<summary>PETA Models: Tokenization variants</summary>
+
+#### BPE Tokenization Series
+| Model | Vocab Size | Parameters | GPU Memory | Template |
+|-------|------------|------------|------------|----------|
+| PETA-base | base | 35M | 4GB+ | [AI4Protein/deep_base](https://huggingface.co/AI4Protein/deep_base) |
+| PETA-bpe-50 | 50 | 35M | 4GB+ | [AI4Protein/deep_bpe_50](https://huggingface.co/AI4Protein/deep_bpe_50) |
+| PETA-bpe-200 | 200 | 35M | 4GB+ | [AI4Protein/deep_bpe_200](https://huggingface.co/AI4Protein/deep_bpe_200) |
+| PETA-bpe-400 | 400 | 35M | 4GB+ | [AI4Protein/deep_bpe_400](https://huggingface.co/AI4Protein/deep_bpe_400) |
+| PETA-bpe-800 | 800 | 35M | 4GB+ | [AI4Protein/deep_bpe_800](https://huggingface.co/AI4Protein/deep_bpe_800) |
+| PETA-bpe-1600 | 1600 | 35M | 4GB+ | [AI4Protein/deep_bpe_1600](https://huggingface.co/AI4Protein/deep_bpe_1600) |
+| PETA-bpe-3200 | 3200 | 35M | 4GB+ | [AI4Protein/deep_bpe_3200](https://huggingface.co/AI4Protein/deep_bpe_3200) |
+
+#### Unigram Tokenization Series
+| Model | Vocab Size | Parameters | GPU Memory | Template |
+|-------|------------|------------|------------|----------|
+| PETA-unigram-50 | 50 | 35M | 4GB+ | [AI4Protein/deep_unigram_50](https://huggingface.co/AI4Protein/deep_unigram_50) |
+| PETA-unigram-100 | 100 | 35M | 4GB+ | [AI4Protein/deep_unigram_100](https://huggingface.co/AI4Protein/deep_unigram_100) |
+| PETA-unigram-200 | 200 | 35M | 4GB+ | [AI4Protein/deep_unigram_200](https://huggingface.co/AI4Protein/deep_unigram_200) |
+| PETA-unigram-400 | 400 | 35M | 4GB+ | [AI4Protein/deep_unigram_400](https://huggingface.co/AI4Protein/deep_unigram_400) |
+| PETA-unigram-800 | 800 | 35M | 4GB+ | [AI4Protein/deep_unigram_800](https://huggingface.co/AI4Protein/deep_unigram_800) |
+| PETA-unigram-1600 | 1600 | 35M | 4GB+ | [AI4Protein/deep_unigram_1600](https://huggingface.co/AI4Protein/deep_unigram_1600) |
+| PETA-unigram-3200 | 3200 | 35M | 4GB+ | [AI4Protein/deep_unigram_3200](https://huggingface.co/AI4Protein/deep_unigram_3200) |
+
+> 💡 Different tokenization strategies may be better suited for specific tasks
+</details>
+
+### Model Selection Guide
+
+<details>
+<summary>How to choose the right model?</summary>
+
+1. **Based on Hardware Constraints:**
+   - Limited GPU (<8GB): ESM2-8M, ESM2-35M, ProSST
+   - Medium GPU (8-16GB): ESM2-150M, ESM2-650M, ProtBert series
+   - High-end GPU (24GB+): ESM2-3B, ProtT5-XL, Ankh-large
+   - Multiple GPUs: ESM2-15B, ProtT5-XXL
+
+2. **Based on Task Type:**
+   - Sequence classification: ESM2, ProtBert
+   - Structure prediction: ESM2, Ankh
+   - Generation tasks: ProtT5
+   - Antibody design: IgBert, IgT5
+   - Lightweight deployment: ProSST, PETA-base
+
+3. **Based on Training Data:**
+   - General protein tasks: ESM2, ProtBert
+   - Structure-aware tasks: Ankh
+   - Antibody-specific: IgBert, IgT5
+   - Custom tokenization needs: PETA series
+
+</details>
+
+> 🔍 All models are available through the Hugging Face Hub and can be easily loaded using their templates.
 
 ## 🔬 Supported Training Approaches
 
 | Approach               | Full-tuning | Freeze-tuning      | SES-Adapter        | AdaLoRA            | QLoRA      | LoRA               | DoRA            | IA3              | 
 | ---------------------- | ----------- | ------------------ | ------------------ | ------------------ |----------- | ------------------ | -----------------| -----------------|
-| Pre-Training           | ❎          | ❎                | ❎                 | ❎                |❎          | ❎                | ❎               | ❎              | 
 | Supervised Fine-Tuning | ✅          | ✅                | ✅                 | ✅                |✅          | ✅                | ✅               | ✅              |
 
 ## 📚 Supported Datasets
@@ -174,6 +279,8 @@ pip install -r requirements.txt
 
 ## 🚀 Quick Start with Venus Web UI
 
+### Start Venus Web UI
+
 Get started quickly with our intuitive graphical interface powered by [Gradio](https://github.com/gradio-app/gradio):
 
 ```bash
@@ -188,128 +295,242 @@ This will launch the Venus Web UI where you can:
 
 ### Using Each Tab
 
-1. **Training Tab**:
+We provide a detailed guide to help you navigate through each tab of the Venus Web UI.
 
-    ![Model_Dataset_Config](img/Train/Model_Dataset_Config.png)
+<details>
+<summary>1. Training Tab: Train your own protein language model</summary>
 
-    Select a protein language model from the dropdown menu. Upload your dataset or select from available datasets and choose metrics appropriate for your problem type.
+![Model_Dataset_Config](img/Train/Model_Dataset_Config.png)
 
-    ![Training_Parameters](img/Train/Training_Parameters.png)
-   Choose a training method (Freeze, SES-Adapter, LoRA, QLoRA etc.) and configure training parameters (batch size, learning rate, etc.).
-   
-    ![Preview_Command](img/Train/Preview_Command.png)
-    ![Training_Progress](img/Train/Training_Progress.png)
-    ![Best_Model](img/Train/Best_Model.png)
-    ![Monitor_Figs](img/Train/Monitor_Figs.png)
-   Click "Start Training" and monitor progress in real-time.
+Select a protein language model from the dropdown menu. Upload your dataset or select from available datasets and choose metrics appropriate for your problem type.
 
-    <p align="center">
-      <img src="img/Train/Metric_Results.png" width="60%" alt="Metric_Results">
-    </p>
-   
-   Click "Download CSV" to download the test metrics results.
+![Training_Parameters](img/Train/Training_Parameters.png)
+Choose a training method (Freeze, SES-Adapter, LoRA, QLoRA etc.) and configure training parameters (batch size, learning rate, etc.).
 
+![Preview_Command](img/Train/Preview_Command.png)
+![Training_Progress](img/Train/Training_Progress.png)
+![Best_Model](img/Train/Best_Model.png)
+![Monitor_Figs](img/Train/Monitor_Figs.png)
+Click "Start Training" and monitor progress in real-time.
 
-2. **Evaluation Tab**:
+<p align="center">
+  <img src="img/Train/Metric_Results.png" width="60%" alt="Metric_Results">
+</p>
 
-    ![Model_Dataset_Config](img/Eval/Model_Dataset_Config.png)
+Click "Download CSV" to download the test metrics results.
+</details>
 
-   Load your trained model by specifying the model path. Select the same protein language model and model configs used during training. Select a test dataset and configure batch size. Choose evaluation metrics appropriate for your problem type. Finally, click "Start Evaluation" to view performance metrics.
+<details>
+<summary>2. Evaluation Tab: Evaluate your trained model within a benchmark</summary>
 
-3. **Prediction Tab**:
+![Model_Dataset_Config](img/Eval/Model_Dataset_Config.png)
 
-   ![Predict_Tab](img/Predict/Predict_Tab.png)
+Load your trained model by specifying the model path. Select the same protein language model and model configs used during training. Select a test dataset and configure batch size. Choose evaluation metrics appropriate for your problem type. Finally, click "Start Evaluation" to view performance metrics.
+</details>
 
-   Load your trained model by specifying the model path. Select the same protein language model and model configs used during training.
+<details>
+<summary>3. Prediction Tab: Use your trained model to predict samples</summary>
 
-   For single sequence: Enter a protein sequence in the text box.
+![Predict_Tab](img/Predict/Predict_Tab.png)
 
-   For batch prediction: Upload a CSV file with sequences.
+Load your trained model by specifying the model path. Select the same protein language model and model configs used during training.
 
-   ![Batch](img/Predict/Batch.png)
+For single sequence: Enter a protein sequence in the text box.
 
-   Click "Predict" to generate and view results.
+For batch prediction: Upload a CSV file with sequences.
 
-4. **Download Tab**:
+![Batch](img/Predict/Batch.png)
 
-   - **AlphaFold2 Structures**: Enter UniProt IDs to download protein structures
-   - **UniProt**: Search for protein information using keywords or IDs
-   - **InterPro**: Retrieve protein family and domain information
-   - **RCSB PDB**: Download experimental protein structures
+Click "Predict" to generate and view results.
+</details>
 
-5. **Manual Tab**:
+<details>
+<summary>4. Download Tab: Collect data from different sources with high efficiency</summary>
 
-   Select a language (English/Chinese).
+- **AlphaFold2 Structures**: Enter UniProt IDs to download protein structures
+- **UniProt**: Search for protein information using keywords or IDs
+- **InterPro**: Retrieve protein family and domain information
+- **RCSB PDB**: Download experimental protein structures
+</details>
 
-   Navigate through the documentation using the table of contents and find step-by-step guides.
+<details>
+<summary>5. Manual Tab: Detailed documentation and guides</summary>
+
+Select a language (English/Chinese).
+
+Navigate through the documentation using the table of contents and find step-by-step guides.
+</details>
 
 ## 🧬 Code-line Usage
 
-### Training Methods
-```bash
-# Freeze-tuning
-bash ./script/train/train_plm_vanilla.sh
+For users who prefer command-line interface, we provide comprehensive script solutions for different scenarios.
 
-# SES-Adapter
+<details>
+<summary>Training Methods: Various fine-tuning approaches for different needs</summary>
+
+### Full Model Fine-tuning
+```bash
+# Freeze-tuning: Train only specific layers while freezing others
+bash ./script/train/train_plm_vanilla.sh
+```
+
+### Parameter-Efficient Fine-tuning (PEFT)
+```bash
+# SES-Adapter: Selective and Efficient adapter fine-tuning
 bash ./script/train/train_plm_ses-adapter.sh
 
-# AdaLoRA
+# AdaLoRA: Adaptive Low-Rank Adaptation
 bash ./script/train/train_plm_adalora.sh
 
-# QLoRA
+# QLoRA: Quantized Low-Rank Adaptation
 bash ./script/train/train_plm_qlora.sh
 
-# LoRA
+# LoRA: Low-Rank Adaptation
 bash ./script/train/train_plm_lora.sh
 
-# DoRA
+# DoRA: Double Low-Rank Adaptation
 bash ./script/train/train_plm_dora.sh
 
-# IA3
+# IA3: Infused Adapter by Inhibiting and Amplifying Inner Activations
 bash ./script/train/train_plm_ia3.sh
 ```
 
-**eval**: Run the following scripts to evaluate the trained model.
-```
+#### Training Method Comparison
+| Method | Memory Usage | Training Speed | Performance |
+|--------|--------------|----------------|-------------|
+| Freeze | Low | Fast | Good |
+| SES-Adapter | Medium | Medium | Better |
+| AdaLoRA | Low | Medium | Better |
+| QLoRA | Very Low | Slower | Good |
+| LoRA | Low | Fast | Good |
+| DoRA | Low | Medium | Better |
+| IA3 | Very Low | Fast | Good |
+
+</details>
+
+<details>
+<summary>Model Evaluation: Comprehensive evaluation tools</summary>
+
+### Basic Evaluation
+```bash
+# Evaluate model performance on test sets
 bash ./script/eval/eval.sh
 ```
 
-**Get structure sequence use esm3**
-```
+### Available Metrics
+- Classification: accuracy, precision, recall, F1, MCC, AUC
+- Regression: MSE, Spearman correlation
+- Multi-label: F1-max
+
+### Visualization Tools
+- Training curves
+- Confusion matrices
+- ROC curves
+- Performance comparison plots
+
+</details>
+
+<details>
+<summary>Structure Sequence Tools: Process protein structure information</summary>
+
+### ESM Structure Sequence
+```bash
+# Generate structure sequences using ESM-3
 bash ./script/get_get_structure_seq/get_esm3_structure_seq.sh
 ```
 
-**Get secondary structure sequence**
-```
+### Secondary Structure
+```bash
+# Predict protein secondary structure
 bash ./script/get_get_structure_seq/get_secondary_structure_seq.sh
 ```
 
-### Crawler Collector
-**Convert the cif to pdb format**
-```
+Features:
+- Support for multiple sequence formats
+- Batch processing capability
+- Integration with popular structure prediction tools
+
+</details>
+
+<details>
+<summary>Data Collection Tools: Multi-source protein data acquisition</summary>
+
+### Format Conversion
+```bash
+# Convert CIF format to PDB
 bash ./crawler/convert/maxit.sh
 ```
 
-**Download the meta data from RCSB database**
-```
+### Metadata Collection
+```bash
+# Download metadata from RCSB PDB
 bash ./crawler/metadata/download_rcsb.sh
 ```
 
-**Download the protein sequence from Uniprot database**
-```
+### Sequence Data
+```bash
+# Download protein sequences from UniProt
 bash ./crawler/sequence/download_uniprot_seq.sh
-``` 
-
-**Download the protein structure from AlphaFold2 or RCSB database**
-
-AlphaFold2:
 ```
+
+### Structure Data
+```bash
+# Download from AlphaFold2 Database
 bash ./crawler/structure/download_alphafold.sh
-```
-RCSB: 
-```
+
+# Download from RCSB PDB
 bash ./crawler/structure/download_rcsb.sh
 ```
+
+Features:
+- Automated batch downloading
+- Resume interrupted downloads
+- Data integrity verification
+- Multiple source support
+- Customizable search criteria
+
+#### Supported Databases
+| Database | Data Type | Access Method | Rate Limit |
+|----------|-----------|---------------|------------|
+| AlphaFold2 | Structures | REST API | Yes |
+| RCSB PDB | Structures | FTP/HTTP | No |
+| UniProt | Sequences | REST API | Yes |
+| InterPro | Domains | REST API | Yes |
+
+</details>
+
+<details>
+<summary>Usage Examples: Common scenarios and solutions</summary>
+
+### Training Example
+```bash
+# Train a protein solubility predictor using ESM2
+bash ./script/train/train_plm_lora.sh \
+    --model "facebook/esm2_t33_650M_UR50D" \
+    --dataset "DeepSol" \
+    --batch_size 32 \
+    --learning_rate 1e-4
+```
+
+### Evaluation Example
+```bash
+# Evaluate the trained model
+bash ./script/eval/eval.sh \
+    --model_path "path/to/your/model" \
+    --test_dataset "DeepSol_test"
+```
+
+### Data Collection Example
+```bash
+# Download structures for a list of UniProt IDs
+bash ./crawler/structure/download_alphafold.sh \
+    --input uniprot_ids.txt \
+    --output ./structures
+```
+
+</details>
+
+> 💡 All scripts support additional command-line arguments for customization. Use `--help` with any script to see available options.
 
 ## 🙌 Citation
 
