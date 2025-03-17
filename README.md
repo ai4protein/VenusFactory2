@@ -1,4 +1,13 @@
-![# VenusFactory](img/banner_2503.png)
+<p align="center">
+  <img src="img/banner_2503.png" width="70%" alt="VenusFactory Banner">
+</p>
+
+<div align="center">
+
+[![GitHub stars](https://img.shields.io/github/stars/tyang816/VenusFactory?style=flat-square)](https://github.com/tyang816/VenusFactory/stargazers) [![GitHub forks](https://img.shields.io/github/forks/tyang816/VenusFactory?style=flat-square)](https://github.com/tyang816/VenusFactory/network/members) [![GitHub issues](https://img.shields.io/github/issues/tyang816/VenusFactory?style=flat-square)](https://github.com/tyang816/VenusFactory/issues) [![GitHub license](https://img.shields.io/github/license/tyang816/VenusFactory?style=flat-square)](https://github.com/tyang816/VenusFactory/blob/main/LICENSE)
+[![Python Version](https://img.shields.io/badge/Python-3.10-blue?style=flat-square&logo=python)](https://www.python.org/) [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen?style=flat-square)](https://venusfactory.readthedocs.io/) [![Downloads](https://img.shields.io/github/downloads/tyang816/VenusFactory/total?style=flat-square)](https://github.com/tyang816/VenusFactory/releases)
+
+</div>
 
 Recent News:
 
