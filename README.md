@@ -41,8 +41,9 @@ Recent News:
 | [IgT5](https://huggingface.co/Exscientia/IgT5) | 3B                  | Exscientia/IgT5          |
 | [IgT5_unpaired](https://huggingface.co/Exscientia/IgT5_unpaired) | 3B                  | Exscientia/IgT5_unpaired          |
 | [Ankh](https://huggingface.co/ElnaggarLab/ankh-base)         | 450M/1.2B               | ElnaggarLab/ankh-base           |
-| [ProSST](https://huggingface.co/AI4Protein/ProSST-2048)  |110M                     |AI4Protein/ProSST-2048     |
+| [ProSST](https://huggingface.co/AI4Protein/ProSST-2048)  |20/128/512/1024/2048/4096  |AI4Protein/ProSST-2048     |
 | [ProPrime](https://huggingface.co/AI4Protein/Prime_690M)  |690M                     |AI4Protein/Prime_690M     |
+| [PETA](https://huggingface.co/AI4Protein/deep_base)     |base/bpe_50/bep_100/bep_200/bep_400/bep_800/bpe_1600/bpe_3200/<br>unigram_50/unigram_100/unigram_200/unigram_400/unigram_800/unigram_1600/unigram_3200 |AI4Protein/deep_base     |
 
 ## 🔬 Supported Training Approaches
 
@@ -62,29 +63,45 @@ Recent News:
 
 <details><summary>Supervised fine-tuning datasets (amino acid sequences/ foldseek sequences/ ss8 sequences)</summary>
 
-- [DeepLocBinary_AlphaFold2](https://huggingface.co/datasets/tyang816/DeepLocBinary_AlphaFold2) | protein-wise | single_label_classification
-- [DeepLocBinary_ESMFold](https://huggingface.co/datasets/tyang816/DeepLocBinary_ESMFold) | protein-wise | single_label_classification
-- [DeepLocMulti_AlphaFold2](https://huggingface.co/datasets/tyang816/DeepLocMulti_AlphaFold2) | protein-wise | single_label_classification
-- [DeepLocMulti_ESMFold](https://huggingface.co/datasets/tyang816/DeepLocMulti_ESMFold) | protein-wise | single_label_classification
-- [DeepSol_ESMFold](https://huggingface.co/datasets/tyang816/DeepSol_ESMFold) | protein-wise | single_label_classification
-- [DeepSoluE_ESMFold](https://huggingface.co/datasets/tyang816/DeepSoluE_ESMFold) | protein-wise | single_label_classification
-- [ProtSolM_ESMFold](https://huggingface.co/datasets/tyang816/ProtSolM_ESMFold) | protein-wise | single_label_classification
-- [eSOL_AlphaFold2](https://huggingface.co/datasets/tyang816/eSOL_AlphaFold2) | protein-wise | regression
-- [eSOL_ESMFold](https://huggingface.co/datasets/tyang816/eSOL_ESMFold) | protein-wise | regression
-- [DeepET_Topt_AlphaFold2](https://huggingface.co/datasets/tyang816/DeepET_Topt_AlphaFold2) | protein-wise | regression
-- [DeepET_Topt_ESMFold](https://huggingface.co/datasets/tyang816/DeepET_Topt_ESMFold) | protein-wise | regression
-- [EC_AlphaFold2](https://huggingface.co/datasets/tyang816/EC_AlphaFold2) | protein-wise | multi_label_classification
-- [EC_ESMFold](https://huggingface.co/datasets/tyang816/EC_ESMFold) | protein-wise | multi_label_classification
-- [GO_BP_AlphaFold2](https://huggingface.co/datasets/tyang816/GO_BP_AlphaFold2) | protein-wise | multi_label_classification
-- [GO_BP_ESMFold](https://huggingface.co/datasets/tyang816/GO_BP_ESMFold) | protein-wise | multi_label_classification
-- [GO_CC_AlphaFold2](https://huggingface.co/datasets/tyang816/GO_CC_AlphaFold2) | protein-wise | multi_label_classification
-- [GO_CC_ESMFold](https://huggingface.co/datasets/tyang816/GO_CC_ESMFold) | protein-wise | multi_label_classification
-- [GO_MF_AlphaFold2](https://huggingface.co/datasets/tyang816/GO_MF_AlphaFold2) | protein-wise | multi_label_classification
-- [GO_MF_ESMFold](https://huggingface.co/datasets/tyang816/GO_MF_ESMFold) | protein-wise | multi_label_classification
-- [MetalIonBinding_AlphaFold2](https://huggingface.co/datasets/tyang816/MetalIonBinding_AlphaFold2) | protein-wise | single_label_classification
-- [MetalIonBinding_ESMFold](https://huggingface.co/datasets/tyang816/MetalIonBinding_ESMFold) | protein-wise | single_label_classification
-- [Thermostability_AlphaFold2](https://huggingface.co/datasets/tyang816/Thermostability_AlphaFold2) | protein-wise | regression
-- [Thermostability_ESMFold](https://huggingface.co/datasets/tyang816/Thermostability_ESMFold) | protein-wise | regression
+- DeepLocBinary | protein-wise | single_label_classification
+    - [DeepLocBinary_AlphaFold2](https://huggingface.co/datasets/tyang816/DeepLocBinary_AlphaFold2)
+    - [DeepLocBinary_ESMFold](https://huggingface.co/datasets/tyang816/DeepLocBinary_ESMFold)
+- DeepLocMulti | protein-wise | single_label_classification
+    - [DeepLocMulti_AlphaFold2](https://huggingface.co/datasets/tyang816/DeepLocMulti_AlphaFold2)
+    - [DeepLocMulti_ESMFold](https://huggingface.co/datasets/tyang816/DeepLocMulti_ESMFold)
+- DeepLoc2Multi | protein-wise | single_label_classification
+    - [DeepLoc2Multi_AlphaFold2](https://huggingface.co/datasets/tyang816/DeepLoc2Multi_AlphaFold2)
+    - [DeepLoc2Multi_ESMFold](https://huggingface.co/datasets/tyang816/DeepLoc2Multi_ESMFold)
+- DeepSol | protein-wise | single_label_classification
+    - [DeepSol_ESMFold](https://huggingface.co/datasets/tyang816/DeepSol_ESMFold)
+- DeepSoluE | protein-wise | single_label_classification
+    - [DeepSoluE_ESMFold](https://huggingface.co/datasets/tyang816/DeepSoluE_ESMFold)
+- ProtSolM | protein-wise | single_label_classification
+    - [ProtSolM_ESMFold](https://huggingface.co/datasets/tyang816/ProtSolM_ESMFold)
+- eSOL | protein-wise | regression
+    - [eSOL_AlphaFold2](https://huggingface.co/datasets/tyang816/eSOL_AlphaFold2)
+    - [eSOL_ESMFold](https://huggingface.co/datasets/tyang816/eSOL_ESMFold)
+- DeepET_Topt | protein-wise | regression
+    - [DeepET_Topt_AlphaFold2](https://huggingface.co/datasets/tyang816/DeepET_Topt_AlphaFold2)
+    - [DeepET_Topt_ESMFold](https://huggingface.co/datasets/tyang816/DeepET_Topt_ESMFold)
+- EC | protein-wise | multi_label_classification
+    - [EC_AlphaFold2](https://huggingface.co/datasets/tyang816/EC_AlphaFold2)
+    - [EC_ESMFold](https://huggingface.co/datasets/tyang816/EC_ESMFold)
+- GO_BP | protein-wise | multi_label_classification
+    - [GO_BP_AlphaFold2](https://huggingface.co/datasets/tyang816/GO_BP_AlphaFold2)
+    - [GO_BP_ESMFold](https://huggingface.co/datasets/tyang816/GO_BP_ESMFold)
+- GO_CC | protein-wise | multi_label_classification
+    - [GO_CC_AlphaFold2](https://huggingface.co/datasets/tyang816/GO_CC_AlphaFold2)
+    - [GO_CC_ESMFold](https://huggingface.co/datasets/tyang816/GO_CC_ESMFold)
+- GO_MF | protein-wise | multi_label_classification
+    - [GO_MF_AlphaFold2](https://huggingface.co/datasets/tyang816/GO_MF_AlphaFold2)
+    - [GO_MF_ESMFold](https://huggingface.co/datasets/tyang816/GO_MF_ESMFold)
+- MetalIonBinding | protein-wise | single_label_classification
+    - [MetalIonBinding_AlphaFold2](https://huggingface.co/datasets/tyang816/MetalIonBinding_AlphaFold2)
+    - [MetalIonBinding_ESMFold](https://huggingface.co/datasets/tyang816/MetalIonBinding_ESMFold)
+- Thermostability | protein-wise | regression
+    - [Thermostability_AlphaFold2](https://huggingface.co/datasets/tyang816/Thermostability_AlphaFold2)
+    - [Thermostability_ESMFold](https://huggingface.co/datasets/tyang816/Thermostability_ESMFold)
 
 > ✨ Only structural sequences are different for the same dataset, for example, ``DeepLocBinary_ESMFold`` and ``DeepLocBinary_AlphaFold2`` share the same amino acid sequences, this means if you only want to use the ``aa_seqs``, both are ok! 
 
@@ -92,14 +109,32 @@ Recent News:
 
 <details><summary>Supervised fine-tuning datasets (amino acid sequences)</summary>
 
+- [Demo_Solubility](https://huggingface.co/datasets/tyang816/Demo_Solubility) | protein-wise | single_label_classification
+- [DeepLocBinary](https://huggingface.co/datasets/tyang816/DeepLocBinary) | protein-wise | single_label_classification
+- [DeepLocMulti](https://huggingface.co/datasets/tyang816/DeepLocMulti) | protein-wise | single_label_classification
+- [DeepLoc2Multi](https://huggingface.co/datasets/tyang816/DeepLoc2Multi) | protein-wise | single_label_classification
+- [DeepSol](https://huggingface.co/datasets/tyang816/DeepSol) | protein-wise | single_label_classification
+- [DeepSoluE](https://huggingface.co/datasets/tyang816/DeepSoluE) | protein-wise | single_label_classification
+- [ProtSolM](https://huggingface.co/datasets/tyang816/ProtSolM) | protein-wise | single_label_classification
+- [eSOL](https://huggingface.co/datasets/tyang816/eSOL) | protein-wise | regression
+- [DeepET_Topt](https://huggingface.co/datasets/tyang816/DeepET_Topt) | protein-wise | regression
+- [EC](https://huggingface.co/datasets/tyang816/EC) | protein-wise | multi_label_classification
+- [GO_BP](https://huggingface.co/datasets/tyang816/GO_BP) | protein-wise | multi_label_classification
+- [GO_CC](https://huggingface.co/datasets/tyang816/GO_CC) | protein-wise | multi_label_classification
+- [GO_MF](https://huggingface.co/datasets/tyang816/GO_MF) | protein-wise | multi_label_classification
+- [MetalIonBinding](https://huggingface.co/datasets/tyang816/MetalIonBinding) | protein-wise | single_label_classification
+- [Thermostability](https://huggingface.co/datasets/tyang816/Thermostability) | protein-wise | regression
+- [PaCRISPR](https://huggingface.co/datasets/tyang816/PaCRISPR) | protein-wise
+- [PETA_CHS_Sol](https://huggingface.co/datasets/tyang816/PETA_CHS_Sol) | protein-wise
+- [PETA_LGK_Sol](https://huggingface.co/datasets/tyang816/PETA_LGK_Sol) | protein-wise
+- [PETA_TEM_Sol](https://huggingface.co/datasets/tyang816/PETA_TEM_Sol) | protein-wise
+- [SortingSignal](https://huggingface.co/datasets/tyang816/SortingSignal) | protein-wise
 - FLIP_AAV | protein-site | regression
-    - [FLIP_AAV_one-vs-rest](https://huggingface.co/datasets/tyang816/FLIP_AAV_one-vs-rest), [FLIP_AAV_two-vs-rest](https://huggingface.co/datasets/tyang816/FLIP_AAV_two-vs-rest), [FLIP_AAV_mut-des](https://huggingface.co/datasets/tyang816/FLIP_AAV_mut-des), [FLIP_AAV_des-mut](https://huggingface.co/datasets/tyang816/FLIP_AAV_des-mut), [FLIP_AAV_seven-vs-rest](https://huggingface.co/datasets/tyang816/FLIP_AAV_seven-vs-rest), [FLIP_AAV_low-vs-high](https://huggingface.co/datasets/tyang816/FLIP_AAV_low-vs-high), [ FLIP_AAV_sampled](https://huggingface.co/datasets/tyang816/FLIP_AAV_sampled)
+    - [FLIP_AAV_one-vs-rest](https://huggingface.co/datasets/tyang816/FLIP_AAV_one-vs-rest), [FLIP_AAV_two-vs-rest](https://huggingface.co/datasets/tyang816/FLIP_AAV_two-vs-rest), [FLIP_AAV_mut-des](https://huggingface.co/datasets/tyang816/FLIP_AAV_mut-des), [FLIP_AAV_des-mut](https://huggingface.co/datasets/tyang816/FLIP_AAV_des-mut), [FLIP_AAV_seven-vs-rest](https://huggingface.co/datasets/tyang816/FLIP_AAV_seven-vs-rest), [FLIP_AAV_low-vs-high](https://huggingface.co/datasets/tyang816/FLIP_AAV_low-vs-high), [FLIP_AAV_sampled](https://huggingface.co/datasets/tyang816/FLIP_AAV_sampled)
 - FLIP_GB1 | protein-site | regression
     - [FLIP_GB1_one-vs-rest](https://huggingface.co/datasets/tyang816/FLIP_GB1_one-vs-rest), [FLIP_GB1_two-vs-rest](https://huggingface.co/datasets/tyang816/FLIP_GB1_two-vs-rest), [FLIP_GB1_three-vs-rest](https://huggingface.co/datasets/tyang816/FLIP_GB1_three-vs-rest), [FLIP_GB1_low-vs-high](https://huggingface.co/datasets/tyang816/FLIP_GB1_low-vs-high), [FLIP_GB1_sampled](https://huggingface.co/datasets/tyang816/FLIP_GB1_sampled)
-- TAPE_Fluorescence | protein-site | regression
-    - [TAPE_Fluorescence](https://huggingface.co/datasets/tyang816/TAPE_Fluorescence)
-- TAPE_Stability | protein-site | regression
-    - [TAPE_Stability](https://huggingface.co/datasets/tyang816/TAPE_Stability)
+- [TAPE_Fluorescence](https://huggingface.co/datasets/tyang816/TAPE_Fluorescence) | protein-site | regression
+- [TAPE_Stability](https://huggingface.co/datasets/tyang816/TAPE_Stability) | protein-site | regression
 
 </details>
 

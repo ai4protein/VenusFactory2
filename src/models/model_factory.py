@@ -28,8 +28,18 @@ def create_models(args):
     # Handle PLM parameters based on training method
     if args.training_method != 'full':
         freeze_plm_parameters(plm_model)
-    if args.training_method == 'lora':
+    if args.training_model == 'ses-adapter':
+        plm_model=create_models(plm_model, args)
+    elif args.training_method == 'plm-lora':
         plm_model=setup_lora_plm(plm_model, args)
+    elif args.training_method == 'plm-qlora':
+        plm_model=create_qlora_model(plm_model, args)
+    elif args.training_method == 'plm-adalora':
+        plm_model=create_adalora_model(plm_model, args)
+    elif args.training_method == "plm-dora":
+        plm_model=create_dora_model(plm_model, args)
+    elif args.training_method == "plm-ia3":
+        plm_model=create_ia3_model(plm_model, args)
     
     # Move models to device
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -276,6 +286,12 @@ def create_plm_and_tokenizer(args, qlora_config=None):
             plm_model = AutoModel.from_pretrained(args.plm_model, trust_remote_code=True, quantization_config=qlora_config)
         else:
             plm_model = AutoModel.from_pretrained(args.plm_model, trust_remote_code=True)
+    elif "deep" in args.plm_model:
+        tokenizer = AutoTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
+        if qlora_config:
+            plm_model = AutoModel.from_pretrained(args.plm_model, trust_remote_code=True, quantization_config=qlora_config)
+        else:
+            plm_model = AutoModel.from_pretrained(args.plm_model, trust_remote_code=True)
 
     else:
         raise ValueError(f"Unsupported model type: {args.plm_model}")
@@ -293,6 +309,8 @@ def get_hidden_size(plm_model, model_type):
     elif "ProSST" in model_type:
         return plm_model.config.hidden_size
     elif "Prime" in model_type:
+        return plm_model.config.hidden_size
+    elif "deep" in model_type:
         return plm_model.config.hidden_size
     else:
         raise ValueError(f"Unsupported model type: {model_type}")
