@@ -30,7 +30,7 @@ def create_models(args):
         freeze_plm_parameters(plm_model)
     if args.training_model == 'ses-adapter':
         plm_model=create_models(plm_model, args)
-    elif args.training_method == '-loraplm':
+    elif args.training_method == 'plm-lora':
         plm_model=setup_lora_plm(plm_model, args)
     elif args.training_method == 'plm-qlora':
         plm_model=create_qlora_model(plm_model, args)
