@@ -11,8 +11,9 @@ Recent News:
 - [Supported Training Approaches](#-supported-training-approaches)
 - [Supported Datasets](#-supported-datasets)
 - [Supported Metrics](#-supported-metrics)
-- [Reuirement](#-reuirement)
-- [Get Started](#-get-started)
+- [Requirements](#-requirements)
+- [Quick Start with Venus Board UI](#-quick-start-with-venus-board-ui)
+- [Code-line Usage](#-code-line-usage)
 - [Citation](#-citation)
 - [Acknowledgement](#-acknowledgement)
 
@@ -116,44 +117,64 @@ Recent News:
 | spearman_corr | SpearmanCorrCoef | regression                                              |
 | mse           | MeanSquaredError | regression                                              |
 
-## ✈️ Reuirement
+## ✈️ Requirements
 
-### Conda Environment
+### Hardware Requirements
+- Recommended: NVIDIA RTX 3090 (24GB) or better
+- Actual requirements depend on your chosen protein language model
 
-Please make sure you have installed **[Anaconda3](https://www.anaconda.com/download)** or **[Miniconda3](https://docs.conda.io/projects/miniconda/en/latest/)**.
+### Software Requirements
+- [Anaconda3](https://www.anaconda.com/download) or [Miniconda3](https://docs.conda.io/projects/miniconda/en/latest/)
+- Python 3.10
 
-### Hardware
-
-We recommend a **24GB** RTX 3090 or better, but it mainly depends on which PLM you choose.
-
-## 🧬 Get Started
-
-### Installation
+### Basic Installation
+```bash
+git clone https://github.com/tyang816/VenusFactory.git
+cd VenusFactory
+conda create -n venus python=3.10
+conda activate venus  # For Windows
+# source activate venus  # For Linux
+pip install -r requirements.txt
 ```
-1. git clone https://github.com/tyang816/VenusFactory.git
-2. cd VenusFactory
-3. conda create -n venus python==3.10
-4. conda activate venus(for windows); source activate venus(for linux)
-5. pip install -r ./requirements.txt
+
+## 🚀 Quick Start with Venus Board UI
+
+Get started quickly with our intuitive graphical interface powered by [Gradio](https://github.com/gradio-app/gradio):
+
+```bash
+python ./src/webui.py
 ```
 
-### Quick Start
-**Fine-tuning**: Run the following scripts with different methods.
+This will launch the Venus Board UI where you can:
+- Configure and run fine-tuning experiments
+- Monitor training progress
+- Evaluate models
+- Visualize results
 
-```
-Freeze: bash ./script/train/train_plm_vanilla.sh
+## 🧬 Code-line Usage
 
-SES-Adapter: bash ./script/train/train_plm_ses-adapter.sh
+### Training Methods
+```bash
+# Freeze-tuning
+bash ./script/train/train_plm_vanilla.sh
 
-AdaLoRA: bash ./script/train/train_plm_adalora.sh
+# SES-Adapter
+bash ./script/train/train_plm_ses-adapter.sh
 
-QLoRA: bash ./script/train/train_plm_qlora.sh
+# AdaLoRA
+bash ./script/train/train_plm_adalora.sh
 
-LoRA: bash ./script/train/train_plm_lora.sh
+# QLoRA
+bash ./script/train/train_plm_qlora.sh
 
-DoRA: bash ./script/train/train_plm_dora.sh
+# LoRA
+bash ./script/train/train_plm_lora.sh
 
-IA3: bash ./script/train/train_plm_ia3.sh
+# DoRA
+bash ./script/train/train_plm_dora.sh
+
+# IA3
+bash ./script/train/train_plm_ia3.sh
 ```
 
 **eval**: Run the following scripts to evaluate the trained model.
@@ -198,18 +219,9 @@ RCSB:
 bash ./crawler/structure/download_rcsb.sh
 ```
 
-### Fine-tuning with Venus Board GUI(power by [Gradio](https://github.com/gradio-app/gradio))
-```
-python ./src/webui.py
-```
-
 ## 🙌 Citation
 
 Please cite our work if you have used our code or data.
-
-```
-
-```
 
 ## 🎊 Acknowledgement
 
