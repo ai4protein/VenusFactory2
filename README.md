@@ -1,8 +1,9 @@
-![# VenusFactory](img/banner.png)
+![# VenusFactory](img/banner_2503.png)
 
 Recent News:
 
 - Welcome to VenusFactory!
+- [2025-03-17] Add PETA, ProPrime, ProSST models
 
 ## ✏️ Table of Contents
 
@@ -12,7 +13,7 @@ Recent News:
 - [Supported Datasets](#-supported-datasets)
 - [Supported Metrics](#-supported-metrics)
 - [Requirements](#-requirements)
-- [Quick Start with Venus Board UI](#-quick-start-with-venus-board-ui)
+- [Quick Start with Venus Web UI](#-quick-start-with-venus-web-ui)
 - [Code-line Usage](#-code-line-usage)
 - [Citation](#-citation)
 - [Acknowledgement](#-acknowledgement)
