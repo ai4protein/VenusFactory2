@@ -47,6 +47,8 @@ class LoraModel(nn.Module):
         ):
             if "ProSST" in self.args.plm_model:
                 outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask, ss_input_ids=stru_token, output_hidden_states=True)
+            elif "Prime" in self.args.plm_model:
+                outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask, output_hidden_states=True)
             else:
                 outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask)
         else:
