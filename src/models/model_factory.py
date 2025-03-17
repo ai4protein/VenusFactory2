@@ -96,9 +96,9 @@ def lora_factory(args):
         model, plm_model, tokenizer = create_lora_model(args)
     elif args.training_method == "plm-qlora":
         model, plm_model, tokenizer = create_qlora_model(args)
-    elif args.training_method == "plm_dora":
+    elif args.training_method == "plm-dora":
         model, plm_model, tokenizer = create_dora_model(args)
-    elif args.training_method == "plm_adalora":
+    elif args.training_method == "plm-adalora":
         model, plm_model, tokenizer = create_adalora_model(args)
     elif args.training_method == "plm-ia3":
         model, plm_model, tokenizer = create_ia3_model(args)
