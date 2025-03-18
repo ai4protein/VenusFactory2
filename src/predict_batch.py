@@ -165,7 +165,12 @@ def load_model_and_tokenizer(args):
             model_path = args.model_path
         else:
             model_path = f"{args.output_root}/{args.output_dir}/{args.output_model_name}"
-        model.load_state_dict(torch.load(model_path))
+        if args.eval_method == "full":
+            model_weights = torch.load(model_path)
+            model.load_state_dict(model_weights['model_state_dict'])
+            plm_model.load_state_dict(model_weights['plm_state_dict'])
+        else:
+            model.load_state_dict(torch.load(model_path))
         model.to(device).eval()
         # ! lora/ qlora
         if args.eval_method == 'plm-lora':
