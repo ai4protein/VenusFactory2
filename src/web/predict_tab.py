@@ -585,7 +585,8 @@ def create_predict_tab(constant):
             "total": 0,
             "completed": 0,
             "current_step": "Initializing",
-            "status": "running"
+            "status": "running",
+            "lines": []  # 添加行存储，方便错误处理
         }
         
         yield generate_progress_html(progress_info), None
@@ -595,9 +596,8 @@ def create_predict_tab(constant):
             if not model_path:
                 is_predicting = False
                 yield gr.HTML("""
-                <div class="error-container">
-                    <div class="error-icon">❌</div>
-                    <div class="error-message">Error: Model path is required</div>
+                <div style="padding: 10px; background-color: #ffebee; border-radius: 5px;">
+                    <p style="margin: 0; color: #c62828; font-weight: bold;">Error: Model path is required</p>
                 </div>
                 """), None
                 return
@@ -605,9 +605,8 @@ def create_predict_tab(constant):
             if not os.path.exists(os.path.dirname(model_path)):
                 is_predicting = False
                 yield gr.HTML("""
-                <div class="error-container">
-                    <div class="error-icon">❌</div>
-                    <div class="error-message">Error: Invalid model path - directory does not exist</div>
+                <div style="padding: 10px; background-color: #ffebee; border-radius: 5px;">
+                    <p style="margin: 0; color: #c62828; font-weight: bold;">Error: Invalid model path - directory does not exist</p>
                 </div>
                 """), None
                 return
@@ -615,9 +614,8 @@ def create_predict_tab(constant):
             if not input_file:
                 is_predicting = False
                 yield gr.HTML("""
-                <div class="error-container">
-                    <div class="error-icon">❌</div>
-                    <div class="error-message">Error: Input file is required</div>
+                <div style="padding: 10px; background-color: #ffebee; border-radius: 5px;">
+                    <p style="margin: 0; color: #c62828; font-weight: bold;">Error: Input file is required</p>
                 </div>
                 """), None
                 return
@@ -629,7 +627,9 @@ def create_predict_tab(constant):
             # Create temporary file to save uploaded file
             temp_dir = tempfile.mkdtemp()
             input_path = os.path.join(temp_dir, "input.csv")
-            output_path = os.path.join(temp_dir, "predictions.csv")
+            output_dir = temp_dir  # 使用同一临时目录作为输出目录
+            output_file = "predictions.csv"
+            output_path = os.path.join(output_dir, output_file)
             
             # Save uploaded file
             try:
@@ -647,9 +647,8 @@ def create_predict_tab(constant):
                 if not os.path.exists(input_path):
                     is_predicting = False
                     yield gr.HTML("""
-                    <div class="error-container">
-                        <div class="error-icon">❌</div>
-                        <div class="error-message">Error: Failed to save input file</div>
+                    <div style="padding: 10px; background-color: #ffebee; border-radius: 5px;">
+                        <p style="margin: 0; color: #c62828; font-weight: bold;">Error: Failed to save input file</p>
                     </div>
                     """), None
                     progress_info["status"] = "failed"
@@ -665,9 +664,9 @@ def create_predict_tab(constant):
                 except Exception as e:
                     is_predicting = False
                     yield gr.HTML(f"""
-                    <div class="error-container">
-                        <div class="error-icon">❌</div>
-                        <div class="error-message">Error reading CSV file: {str(e)}</div>
+                    <div style="padding: 10px; background-color: #ffebee; border-radius: 5px;">
+                        <p style="margin: 0; color: #c62828; font-weight: bold;">Error reading CSV file:</p>
+                        <pre style="margin: 5px 0 0; white-space: pre-wrap; max-height: 300px; overflow-y: auto;">{str(e)}</pre>
                     </div>
                     """), None
                     progress_info["status"] = "failed"
@@ -677,9 +676,9 @@ def create_predict_tab(constant):
             except Exception as e:
                 is_predicting = False
                 yield gr.HTML(f"""
-                <div class="error-container">
-                    <div class="error-icon">❌</div>
-                    <div class="error-message">Error saving input file: {str(e)}</div>
+                <div style="padding: 10px; background-color: #ffebee; border-radius: 5px;">
+                    <p style="margin: 0; color: #c62828; font-weight: bold;">Error saving input file:</p>
+                    <pre style="margin: 5px 0 0; white-space: pre-wrap; max-height: 300px; overflow-y: auto;">{str(e)}</pre>
                 </div>
                 """), None
                 progress_info["status"] = "failed"
@@ -695,7 +694,8 @@ def create_predict_tab(constant):
                 "model_path": model_path,
                 "plm_model": plm_models[plm_model],
                 "input_file": input_path,
-                "output_file": output_path,
+                "output_dir": output_dir,  # 更新为输出目录
+                "output_file": output_file,  # 输出文件名
                 "pooling_method": pooling_method,
                 "problem_type": problem_type,
                 "num_labels": num_labels,
@@ -705,6 +705,11 @@ def create_predict_tab(constant):
             
             if eval_method == "ses-adapter":
                 args_dict["structure_seq"] = ",".join(eval_structure_seq) if eval_structure_seq else None
+                if eval_structure_seq:
+                    if "foldseek_seq" in eval_structure_seq:
+                        args_dict["use_foldseek"] = True
+                    if "ss8_seq" in eval_structure_seq:
+                        args_dict["use_ss8"] = True
             else:
                 args_dict["structure_seq"] = None
             
@@ -730,14 +735,14 @@ def create_predict_tab(constant):
                     text=True,
                     bufsize=1,
                     universal_newlines=True,
-                    preexec_fn=os.setsid
+                    preexec_fn=os.setsid if hasattr(os, "setsid") else None
                 )
             except Exception as e:
                 is_predicting = False
                 yield gr.HTML(f"""
-                <div class="error-container">
-                    <div class="error-icon">❌</div>
-                    <div class="error-message">Error starting prediction process: {str(e)}</div>
+                <div style="padding: 10px; background-color: #ffebee; border-radius: 5px;">
+                    <p style="margin: 0; color: #c62828; font-weight: bold;">Error starting prediction process:</p>
+                    <pre style="margin: 5px 0 0; white-space: pre-wrap; max-height: 300px; overflow-y: auto;">{str(e)}</pre>
                 </div>
                 """), None
                 return
@@ -748,14 +753,13 @@ def create_predict_tab(constant):
             
             # Collect output
             result_output = ""
-            log_output = []
             
             while current_process.poll() is None:
                 try:
                     while not output_queue.empty():
                         line = output_queue.get_nowait()
                         result_output += line + "\n"
-                        log_output.append(line)
+                        progress_info["lines"].append(line)
                         
                         # Update progress based on output
                         if "Predicting:" in line:
@@ -781,12 +785,13 @@ def create_predict_tab(constant):
                         
                     time.sleep(0.1)
                 except Exception as e:
-                    yield gr.HTML(f"""
-                    <div class="warning-container">
-                        <div class="warning-icon">⚠️</div>
-                        <div class="warning-message">Warning reading output: {str(e)}</div>
+                    error_html = f"""
+                    <div style="padding: 10px; background-color: #fff8e1; border-radius: 5px;">
+                        <p style="margin: 0; color: #f57f17; font-weight: bold;">Warning reading output:</p>
+                        <pre style="margin: 5px 0 0; white-space: pre-wrap; max-height: 300px; overflow-y: auto;">{str(e)}</pre>
                     </div>
-                    """), None
+                    """
+                    yield gr.HTML(error_html), None
             
             # Process has completed
             if current_process.returncode == 0:
@@ -1005,155 +1010,47 @@ def create_predict_tab(constant):
                         # Return results and download link
                         yield gr.HTML(final_html), gr.DownloadButton(value=output_path, label="Download Predictions", visible=True)
                     except Exception as e:
-                        yield gr.HTML(f"""
-                        <div class="error-container">
-                            <div class="error-icon">❌</div>
-                            <div class="error-message">Could not read prediction results: {str(e)}</div>
-                            <div class="error-details">
-                                <pre>{traceback.format_exc()}</pre>
-                            </div>
+                        error_html = f"""
+                        <div style="padding: 10px; background-color: #ffebee; border-radius: 5px;">
+                            <p style="margin: 0; color: #c62828; font-weight: bold;">Could not read prediction results:</p>
+                            <pre style="margin: 5px 0 0; white-space: pre-wrap; max-height: 300px; overflow-y: auto;">{str(e)}\n\n{traceback.format_exc()}</pre>
                         </div>
-                        <style>
-                            .error-container {{
-                                background-color: #fff5f5;
-                                border-left: 5px solid #e53e3e;
-                                padding: 20px;
-                                border-radius: 5px;
-                                margin: 20px 0;
-                            }}
-                            .error-icon {{
-                                font-size: 24px;
-                                margin-bottom: 10px;
-                            }}
-                            .error-message {{
-                                font-weight: bold;
-                                margin-bottom: 10px;
-                            }}
-                            .error-details {{
-                                background-color: #f8f9fa;
-                                padding: 10px;
-                                border-radius: 5px;
-                                max-height: 200px;
-                                overflow-y: auto;
-                            }}
-                        </style>
-                        """), None
+                        """
+                        yield gr.HTML(error_html), None
                         
                 else:
-                    yield gr.HTML(f"""
-                    <div class="warning-container">
-                        <div class="warning-icon">⚠️</div>
-                        <div class="warning-message">Prediction completed but no output file was generated.</div>
-                        <div class="warning-details">
-                            <pre>{result_output}</pre>
-                        </div>
+                    error_html = f"""
+                    <div style="padding: 10px; background-color: #fff8e1; border-radius: 5px;">
+                        <p style="margin: 0; color: #f57f17; font-weight: bold;">Prediction completed but no output file was generated at: {output_path}</p>
+                        <pre style="margin: 5px 0 0; white-space: pre-wrap; max-height: 300px; overflow-y: auto;">{result_output}</pre>
                     </div>
-                    <style>
-                        .warning-container {{
-                            background-color: #fffbea;
-                            border-left: 5px solid #ecc94b;
-                            padding: 20px;
-                            border-radius: 5px;
-                            margin: 20px 0;
-                        }}
-                        .warning-icon {{
-                            font-size: 24px;
-                            margin-bottom: 10px;
-                        }}
-                        .warning-message {{
-                            font-weight: bold;
-                            margin-bottom: 10px;
-                        }}
-                        .warning-details {{
-                            background-color: #f8f9fa;
-                            padding: 10px;
-                            border-radius: 5px;
-                            max-height: 200px;
-                            overflow-y: auto;
-                        }}
-                    </style>
-                    """), None
+                    """
+                    yield gr.HTML(error_html), None
             else:
                 progress_info["status"] = "failed"
                 progress_info["current_step"] = "Prediction failed"
                 yield generate_progress_html(progress_info), None
                 
-                stderr_output = ""
-                if hasattr(current_process, 'stderr') and current_process.stderr:
-                    stderr_output = current_process.stderr.read()
-                    
-                yield gr.HTML(f"""
-                <div class="error-container">
-                    <div class="error-icon">❌</div>
-                    <div class="error-message">Prediction Failed (Error code: {current_process.returncode})</div>
-                    <div class="error-details">
-                        <pre>{stderr_output}\n{result_output}</pre>
-                    </div>
+                error_output = "\n".join(progress_info.get("lines", []))
+                if not error_output:
+                    error_output = "No output captured from the prediction process"
+                
+                error_html = f"""
+                <div style="padding: 10px; background-color: #ffebee; border-radius: 5px;">
+                    <p style="margin: 0; color: #c62828; font-weight: bold;">Prediction failed (Error code: {current_process.returncode}):</p>
+                    <pre style="margin: 5px 0 0; white-space: pre-wrap; max-height: 300px; overflow-y: auto;">{error_output}</pre>
                 </div>
-                <style>
-                    .error-container {{
-                        background-color: #fff5f5;
-                        border-left: 5px solid #e53e3e;
-                        padding: 20px;
-                        border-radius: 5px;
-                        margin: 20px 0;
-                    }}
-                    .error-icon {{
-                        font-size: 24px;
-                        margin-bottom: 10px;
-                    }}
-                    .error-message {{
-                        font-weight: bold;
-                        margin-bottom: 10px;
-                    }}
-                    .error-details {{
-                        background-color: #f8f9fa;
-                        padding: 10px;
-                        border-radius: 5px;
-                        max-height: 300px;
-                        overflow-y: auto;
-                    }}
-                </style>
-                """), None
+                """
+                yield gr.HTML(error_html), None
 
         except Exception as e:
-            progress_info["status"] = "failed"
-            progress_info["current_step"] = "Error occurred"
-            yield generate_progress_html(progress_info), None
-            
-            yield gr.HTML(f"""
-            <div class="error-container">
-                <div class="error-icon">❌</div>
-                <div class="error-message">Error: {str(e)}</div>
-                <div class="error-details">
-                    <pre>{traceback.format_exc()}</pre>
-                </div>
+            error_html = f"""
+            <div style="padding: 10px; background-color: #ffebee; border-radius: 5px;">
+                <p style="margin: 0; color: #c62828; font-weight: bold;">Error during batch prediction:</p>
+                <pre style="margin: 5px 0 0; white-space: pre-wrap; max-height: 300px; overflow-y: auto;">{str(e)}\n\n{traceback.format_exc()}</pre>
             </div>
-            <style>
-                .error-container {{
-                    background-color: #fff5f5;
-                    border-left: 5px solid #e53e3e;
-                    padding: 20px;
-                    border-radius: 5px;
-                    margin: 20px 0;
-                }}
-                .error-icon {{
-                    font-size: 24px;
-                    margin-bottom: 10px;
-                }}
-                .error-message {{
-                    font-weight: bold;
-                    margin-bottom: 10px;
-                }}
-                .error-details {{
-                    background-color: #f8f9fa;
-                    padding: 10px;
-                    border-radius: 5px;
-                    max-height: 300px;
-                    overflow-y: auto;
-                }}
-            </style>
-            """), None
+            """
+            yield gr.HTML(error_html), None
         finally:
             if current_process:
                 stop_thread = True
@@ -1313,12 +1210,17 @@ def create_predict_tab(constant):
         """处理批量预测命令预览"""
         if not input_file:
             return gr.update(value="Please upload a file first", visible=True)
-            
+        
+        # 创建临时目录作为输出目录
+        temp_dir = "temp_predictions"
+        output_file = "predictions.csv"
+        
         args_dict = {
             "model_path": model_path,
             "plm_model": plm_models[plm_model],
             "input_file": input_file.name if hasattr(input_file, "name") else "input.csv",
-            "output_file": "predictions.csv",
+            "output_dir": temp_dir,  # 新增输出目录参数
+            "output_file": output_file,  # 输出文件名
             "pooling_method": pooling_method,
             "problem_type": problem_type,
             "num_labels": num_labels,
