@@ -158,10 +158,10 @@ def load_model_and_tokenizer(args):
     
     # Create and load model
     try:
-        if args.eval_method in ["ses-adapter", "freeze"]:
+        if args.eval_method in ["full", "ses-adapter", "freeze"]:
             model = AdapterModel(args)
         # ! lora/ qlora
-        elif args.eval_method in ["plm-lora", "plm-qlora"]:
+        elif args.eval_method in ['plm-lora', 'plm-qlora', 'plm-dora', 'plm-adalora', 'plm-ia3']:
             model = LoraModel(args)
         if args.model_path is not None:
             model_path = args.model_path
