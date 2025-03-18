@@ -44,18 +44,10 @@ def evaluate(model, plm_model, metrics, dataloader, loss_function, device=None):
     pred_labels = []
     
     for i, batch in enumerate(epoch_iterator, 1):
-        # 添加调试信息，打印每个batch的键和shape
-        # print(f"\n处理批次 {i}:")
-        # for k, v in batch.items():
-        #     print(f"  键: {k}, 形状: {v.shape}")
             
         for k, v in batch.items():
             batch[k] = v.to(device)
         label = batch["label"]
-        
-        # 在调用模型前添加调试信息
-        # print(f"将批次传递给模型，使用structure_seq: {args.structure_seq}")
-        # print(f"使用foldseek: {args.use_foldseek}, 使用ss8: {args.use_ss8}")
         
         logits = model(plm_model, batch)
         pred_labels.extend(logits.argmax(dim=1).cpu().numpy())
@@ -117,7 +109,6 @@ if __name__ == '__main__':
     parser.add_argument('--training_method', type=str, default="freeze", help='training method')
     args = parser.parse_args()
     
-    # 自动设置结构序列标志
     if 'foldseek_seq' in args.structure_seq:
         args.use_foldseek = True
         print("Enabled foldseek_seq based on structure_seq parameter")
@@ -222,7 +213,7 @@ if __name__ == '__main__':
     #     model_path = f"{args.output_root}/{args.output_dir}/{args.output_model_name}"
     if args.eval_method in ["full", "ses-adapter", "freeze"]:
         model = AdapterModel(args)
-    # ! lora/ qlora
+    
     elif args.eval_method in ['plm-lora', 'plm-qlora', 'plm-dora', 'plm-adalora', 'plm-ia3']:
         model = LoraModel(args)
 
@@ -230,9 +221,14 @@ if __name__ == '__main__':
         model_path = args.model_path
     else:
         model_path = f"{args.output_root}/{args.output_dir}/{args.output_model_name}"
-    model.load_state_dict(torch.load(model_path))
+    if args.eval_method == "full":
+        model_weights = torch.load(model_path)
+        model.load_state_dict(model_weights['model_state_dict'])
+        plm_model.load_state_dict(model_weights['plm_state_dict'])
+    else:
+        model.load_state_dict(torch.load(model_path))
     model.to(device).eval()
-    # ! lora/ qlora
+    
     if args.eval_method == 'plm-lora':
         lora_path = model_path.replace(".pt", "_lora")
         plm_model = PeftModel.from_pretrained(plm_model,lora_path)
