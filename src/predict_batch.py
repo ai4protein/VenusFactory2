@@ -32,7 +32,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Batch predict protein function for multiple sequences")
     
     # Model parameters
-    parser.add_argument('--eval_method', type=str, default="freeze", choices=["freeze", "plm-lora", "plm-qlora", "ses-adapter"], help="Evaluation method")
+    parser.add_argument('--eval_method', type=str, default="freeze", choices=["full", "freeze", "plm-lora", "plm-qlora", "ses-adapter", 'plm-dora', 'plm-adalora', 'plm-ia3'], help="Evaluation method")
     parser.add_argument('--model_path', type=str, required=True, help="Path to the trained model")
     parser.add_argument('--plm_model', type=str, required=True, help="Pretrained language model name or path")
     parser.add_argument('--pooling_method', type=str, default="mean", choices=["mean", "attention1d", "light_attention"], help="Pooling method")
@@ -47,7 +47,8 @@ def parse_args():
     
     # Input and output parameters
     parser.add_argument('--input_file', type=str, required=True, help="Path to input CSV file with sequences")
-    parser.add_argument('--output_file', type=str, required=True, help="Path to output CSV file for predictions")
+    parser.add_argument('--output_dir', type=str, required=True, help="Path to output CSV file dir for predictions")
+    parser.add_argument('--output_file', type=str, required=True, help="output CSV file name for predictions")
     parser.add_argument('--use_foldseek', action='store_true', help="Use foldseek sequence")
     parser.add_argument('--use_ss8', action='store_true', help="Use secondary structure sequence")
     parser.add_argument('--structure_seq', type=str, default=None, help="Structure sequence types to use (comma-separated)")
@@ -302,7 +303,13 @@ def predict_batch(model, plm_model, data_dict, device, args):
         # Process outputs based on problem type
         if args.problem_type == "regression":
             predictions = outputs.squeeze().cpu().numpy()
-            return {"predictions": predictions.tolist()}
+            # 确保返回标量值
+            if np.isscalar(predictions):
+                return {"predictions": predictions}
+            else:
+                # 如果是批处理，返回整个数组
+                return {"predictions": predictions.tolist() if isinstance(predictions, np.ndarray) else predictions}
+        
         
         elif args.problem_type == "single_label_classification":
             probabilities = torch.nn.functional.softmax(outputs, dim=1)
@@ -380,7 +387,11 @@ def main():
                 
                 # Add prediction results based on problem type
                 if args.problem_type == "regression":
-                    result_row["prediction"] = prediction_results["predictions"][0]
+                    # result_row["prediction"] = prediction_results["predictions"][0]
+                    if isinstance(prediction_results["predictions"], (list, np.ndarray)):
+                        result_row["prediction"] = prediction_results["predictions"][0]
+                    else:
+                        result_row["prediction"] = prediction_results["predictions"]
                 
                 elif args.problem_type == "single_label_classification":
                     result_row["predicted_class"] = prediction_results["predicted_classes"][0]
@@ -412,8 +423,11 @@ def main():
         results_df = pd.DataFrame(results)
         
         # Save results to output file
-        print(f"---------- Saving results to {args.output_file} ----------")
-        results_df.to_csv(args.output_file, index=False)
+        if not os.path.exists(args.output_dir):
+            os.makedirs(args.output_dir)
+        output_file = os.path.join(args.output_dir, args.output_file)
+        print(f"---------- Saving results to {output_file} ----------")
+        results_df.to_csv(output_file, index=False)
         print(f"Saved {len(results_df)} prediction results")
         
         print("---------- Batch prediction completed successfully ----------")
