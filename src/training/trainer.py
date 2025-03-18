@@ -355,19 +355,19 @@ class Trainer:
             # save model state dict
             model_state = {k: v.cpu() for k, v in self.model.state_dict().items()}
             torch.save(model_state, path)
-            plm_dora_path = path.replace('.pt', '_dora.pt')
+            plm_dora_path = path.replace('.pt', '_dora')
             # save plm model lora weights
             self.plm_model.save_pretrained(plm_dora_path)
         elif self.args.training_method == "plm-adalora":
             # save model state dict
             model_state = {k: v.cpu() for k, v in self.model.state_dict().items()}
             torch.save(model_state, path)
-            plm_adalora_path = path.replace('.pt', '_adalora.pt')
+            plm_adalora_path = path.replace('.pt', '_adalora')
             self.plm_model.save_pretrained(plm_adalora_path)
         elif self.args.training_method == "plm-ia3":
             model_state = {k: v.cpu() for k, v in self.model.state_dict().items()}
             torch.save(model_state, path)
-            plm_ia3_path = path.replace('.pt', '_ia3.pt')
+            plm_ia3_path = path.replace('.pt', '_ia3')
             self.plm_model.save_pretrained(plm_ia3_path)
         else:
             model_state = {k: v.cpu() for k, v in self.model.state_dict().items()}
@@ -405,7 +405,7 @@ class Trainer:
             # load model state dict
             checkpoint = torch.load(path, map_location="cpu")
             self.model.load_state_dict(checkpoint)
-            plm_dora_path = path.replace('.pt', '_dora.pt')
+            plm_dora_path = path.replace('.pt', '_dora')
             # reload plm model and apply dora weights
             _, self.plm_model = create_plm_and_tokenizer(self.args)
             self.plm_model = PeftModel.from_pretrained(self.plm_model, plm_dora_path)
@@ -416,7 +416,7 @@ class Trainer:
             # load model state dict
             checkpoint = torch.load(path, map_location="cpu")
             self.model.load_state_dict(checkpoint)
-            plm_adalora_path = path.replace('.pt', '_adalora.pt')
+            plm_adalora_path = path.replace('.pt', '_adalora')
             # reload plm model and apply adalora weights
             _, self.plm_model = create_plm_and_tokenizer(self.args)
             self.plm_model = PeftModel.from_pretrained(self.plm_model, plm_adalora_path)
@@ -426,7 +426,7 @@ class Trainer:
         elif self.args.training_method == "plm-ia3":
             checkpoint = torch.load(path, map_location="cpu")
             self.model.load_state_dict(checkpoint)
-            plm_ia3_path = path.replace('.pt', '_ia3.pt')
+            plm_ia3_path = path.replace('.pt', '_ia3')
             _, self.plm_model = create_plm_and_tokenizer(self.args)
             self.plm_model = PeftModel.from_pretrained(self.plm_model, plm_ia3_path)
             self.plm_model = self.plm_model.merge_and_unload()
