@@ -179,15 +179,15 @@ def load_model_and_tokenizer(args):
             plm_model = PeftModel.from_pretrained(plm_model,lora_path)
             plm_model = plm_model.merge_and_unload()
         elif args.eval_method == "plm-dora":
-            dora_path = model_path.replace(".pt", "_dora.pt")
+            dora_path = model_path.replace(".pt", "_dora")
             plm_model = PeftModel.from_pretrained(plm_model, dora_path)
             plm_model = plm_model.merge_and_unload()
         elif args.eval_method == "plm-adalora":
-            adalora_path = model_path.replace(".pt", "_adalora.pt")
+            adalora_path = model_path.replace(".pt", "_adalora")
             plm_model = PeftModel.from_pretrained(plm_model, adalora_path)
             plm_model = plm_model.merge_and_unload()
         elif args.eval_method == "plm-ia3":
-            ia3_path = model_path.replace(".pt", "_ia3.pt")
+            ia3_path = model_path.replace(".pt", "_ia3")
             plm_model = PeftModel.from_pretrained(plm_model, ia3_path)
             plm_model = plm_model.merge_and_unload()
             plm_model.to(device).eval()  
