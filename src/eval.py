@@ -220,7 +220,7 @@ if __name__ == '__main__':
     #     model_path = args.model_path
     # else:
     #     model_path = f"{args.output_root}/{args.output_dir}/{args.output_model_name}"
-    if args.eval_method in ["ses-adapter", "freeze"]:
+    if args.eval_method in ["full", "ses-adapter", "freeze"]:
         model = AdapterModel(args)
     # ! lora/ qlora
     elif args.eval_method in ['plm-lora', 'plm-qlora', 'plm-dora', 'plm-adalora', 'plm-ia3']:
