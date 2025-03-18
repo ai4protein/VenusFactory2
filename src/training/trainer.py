@@ -431,6 +431,7 @@ class Trainer:
             self.plm_model = PeftModel.from_pretrained(self.plm_model, plm_ia3_path)
             self.plm_model = self.plm_model.merge_and_unload()
             self.model.to(self.device)
+            self.plm_model.to(self.device)
         else:
             checkpoint = torch.load(path, map_location="cpu")
             self.model.load_state_dict(checkpoint)
