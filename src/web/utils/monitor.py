@@ -171,22 +171,52 @@ class TrainingMonitor:
     def abort_training(self):
         """Abort the training process."""
         if self.process:
-            # 保存当前的完成状态
+            # Save completed state before termination
             was_completed = self.current_progress.get('is_completed', False)
             
-            # 终止进程
+            # Terminate process
             try:
                 os.killpg(os.getpgid(self.process.pid), signal.SIGTERM)
             except:
                 self.process.terminate()
             
+            # Mark as not training
             self.is_training = False
             
-            # 如果之前不是完成状态，则不设置为完成
-            if not was_completed:
-                self.current_progress['is_completed'] = False
-        
-        # 返回重置后的状态
+            # Fully reset the tracking state
+            self._reset_tracking()
+            self._reset_stats()
+            
+            # Create fresh progress state
+            self.current_progress = {
+                'stage': 'Aborted',
+                'progress': '',
+                'epoch': 0,
+                'current': 0,
+                'total': 0,
+                'total_epochs': 0,
+                'val_accuracy': 0.0,
+                'best_accuracy': 0.0,
+                'best_epoch': -1,
+                'best_metric_name': '',
+                'best_metric_value': 0.0,
+                'progress_detail': '',
+                'elapsed_time': '',
+                'remaining_time': '',
+                'it_per_sec': 0.0,
+                'grad_step': 0,
+                'loss': 0.0,
+                'test_metrics': {},
+                'test_progress': 0.0,
+                'test_results_html': '',
+                'is_completed': False,
+                'lines': []
+            }
+            
+            # Clear process reference
+            self.process = None
+            
+        # Return reset state
         return {
             'progress_status': "Training aborted by user.",
             'best_model': "Training aborted by user.",
@@ -224,6 +254,9 @@ class TrainingMonitor:
         try:
             import matplotlib.pyplot as plt
             import matplotlib
+            
+            # Close any existing figures to prevent memory leaks
+            plt.close('all')
             
             # 设置科研风格的matplotlib样式
             plt.style.use('seaborn-v0_8-whitegrid')
@@ -293,11 +326,11 @@ class TrainingMonitor:
             # 调整布局
             plt.tight_layout()
             
+            # 返回图表
             return fig
         except Exception as e:
-            # 如果出现任何错误，记录错误并返回None
-            error_message = f"Error generating loss plot: {str(e)}"
-            print(error_message)
+            print(f"Error generating loss plot: {str(e)}")
+            plt.close('all')  # Close any open figures in case of error
             return None
     
     def get_metrics_plot(self):
@@ -314,6 +347,9 @@ class TrainingMonitor:
         try:
             import matplotlib.pyplot as plt
             import matplotlib
+            
+            # Close any existing figures to prevent memory leaks
+            plt.close('all')
             
             # 设置科研风格的matplotlib样式
             plt.style.use('seaborn-v0_8-whitegrid')
@@ -417,11 +453,11 @@ class TrainingMonitor:
             
             plt.tight_layout()
             
+            # 返回图表
             return fig
         except Exception as e:
-            # 如果出现任何错误，记录错误并返回None
-            error_message = f"Error generating metrics plot: {str(e)}"
-            print(error_message)
+            print(f"Error generating metrics plot: {str(e)}")
+            plt.close('all')  # Close any open figures in case of error
             return None
     
     def get_plot(self):
@@ -435,7 +471,40 @@ class TrainingMonitor:
     
     def get_progress(self) -> Dict[str, Any]:
         """Return current progress information."""
-        return self.current_progress.copy()
+        # Ensure we're returning a deep copy to prevent reference issues
+        progress_copy = self.current_progress.copy()
+        
+        # Ensure all expected keys have default values if missing
+        default_progress = {
+            'stage': 'Waiting',
+            'progress': '',
+            'epoch': 0,
+            'current': 0,
+            'total': 0,
+            'total_epochs': 0,
+            'val_accuracy': 0.0,
+            'best_accuracy': 0.0,
+            'best_epoch': -1,
+            'best_metric_name': '',
+            'best_metric_value': 0.0,
+            'progress_detail': '',
+            'elapsed_time': '',
+            'remaining_time': '',
+            'it_per_sec': 0.0,
+            'grad_step': 0,
+            'loss': 0.0,
+            'test_metrics': {},
+            'test_progress': 0.0,
+            'test_results_html': '',
+            'lines': []
+        }
+        
+        # Update with defaults for any missing keys
+        for key, value in default_progress.items():
+            if key not in progress_copy:
+                progress_copy[key] = value
+                
+        return progress_copy
     
     def _process_output_line(self, line: str):
         """Process training output line for metric tracking."""
@@ -836,18 +905,19 @@ class TrainingMonitor:
         self.parsing_test_results = False
         self.test_results_html = ""
         
-        # 重置进度信息
+        # Force complete reset by creating a new dictionary instead of modifying existing one
+        # This ensures no old keys remain in the dictionary
         self.current_progress = {
             'stage': 'Waiting',
             'progress': '',
             'epoch': 0,
             'current': 0,
-            'total': 100,
+            'total': 0,  # Set to 0 initially to avoid showing progress
             'total_epochs': 0,
             'val_accuracy': 0.0,
             'best_accuracy': 0.0,
-            'best_epoch': 0,
-            'best_metric_name': 'accuracy',
+            'best_epoch': -1,  # Set to -1 to indicate no best model
+            'best_metric_name': '',
             'best_metric_value': 0.0,
             'progress_detail': '',
             'elapsed_time': '',
@@ -868,11 +938,11 @@ class TrainingMonitor:
         self.skipped_first_separator = False
         
         # 重置缓存的统计信息
-        if hasattr(self, 'last_stats'):
-            self.last_stats = {}
+        self.last_stats = {}
         
         # 重置错误信息
-        self.error_message = None
+        if hasattr(self, 'error_message'):
+            self.error_message = None
 
     def get_stats(self) -> Dict:
         """Get collected statistics."""
@@ -903,7 +973,7 @@ class TrainingMonitor:
             except queue.Empty:
                 break
                 
-        # Reset current statistics
+        # Reset current statistics with new dictionaries
         self.current_stats = {}
         self.parsing_stats = False
         self.current_model = None
@@ -911,6 +981,9 @@ class TrainingMonitor:
         
         # Reset cached statistics
         self.last_stats = {}
+        
+        # Reset stats property explicitly
+        self.stats = {}
         
         # Reset training and validation metrics
         self._reset_tracking()
@@ -1064,7 +1137,21 @@ class TrainingMonitor:
         """Check if the training process has completed."""
         if self.process and self.process.poll() is not None:
             self.is_training = False
-            self.current_progress['is_completed'] = True
-            print("Training process has completed. Setting is_completed flag.")
+            
+            # Check for normal vs error termination based on return code
+            if self.process.returncode == 0:
+                # Normal termination
+                self.current_progress['is_completed'] = True
+                print("Training process has completed successfully. Setting is_completed flag.")
+            else:
+                # Error termination - ensure UI doesn't show "completed"
+                self.current_progress['is_completed'] = False
+                # Explicitly mark the stage as Error for proper UI handling
+                self.current_progress['stage'] = 'Error'
+                # Log the error more prominently
+                print(f"Training process terminated with error code {self.process.returncode}. Setting stage to 'Error'.")
+                
+            # Clear the process reference
+            self.process = None
             return True
         return False

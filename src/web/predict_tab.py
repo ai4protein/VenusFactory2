@@ -14,6 +14,7 @@ from pathlib import Path
 import traceback
 import re
 from web.utils.command import preview_predict_command
+import select
 
 def create_predict_tab(constant):
     plm_models = constant["plm_models"]
@@ -21,6 +22,7 @@ def create_predict_tab(constant):
     current_process = None
     output_queue = queue.Queue()
     stop_thread = False
+    process_aborted = False  # Flag indicating if the process was manually terminated
 
     def process_output(process, queue):
         """Process output from subprocess and put it in queue"""
@@ -63,7 +65,7 @@ def create_predict_tab(constant):
             animation = ""
             animation_style = ""
         
-        # 创建简洁美观的居中提示
+        # Create a clean, centered notification
         return f"""
         <div style="text-align: center; background-color: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin: 20px 0;">
             <div style="display: inline-block; background-color: {status_color}; color: white; border-radius: 50%; width: 60px; height: 60px; line-height: 60px; font-size: 24px; margin-bottom: 15px; {animation_style}">
@@ -77,10 +79,11 @@ def create_predict_tab(constant):
         </div>
         """
 
-    def predict_sequence(plm_model, model_path, eval_method, aa_seq, foldseek_seq, ss8_seq, eval_structure_seq, pooling_method, problem_type, num_labels):
-        """Predict a single protein sequence"""
-        nonlocal is_predicting, current_process, stop_thread
+    def predict_sequence(plm_model, model_path, aa_seq, eval_method, eval_structure_seq, pooling_method, problem_type, num_labels):
+        """Predict for a single protein sequence"""
+        nonlocal is_predicting, current_process, stop_thread, process_aborted
         
+        # Check if we're already predicting
         if is_predicting:
             return gr.HTML("""
             <div style="padding: 10px; background-color: #fff8e1; border-radius: 5px;">
@@ -88,16 +91,21 @@ def create_predict_tab(constant):
             </div>
             """)
         
+        # If the process was aborted but not reset properly, ensure we're in a clean state
+        if process_aborted:
+            process_aborted = False
+            
+        # Set the prediction flag
         is_predicting = True
-        stop_thread = False
+        stop_thread = False  # Ensure this is reset
         
-        # 创建一个状态信息对象，类似于批量预测中的progress_info
+        # Create a status info object, similar to batch prediction
         status_info = {
             "status": "running",
             "current_step": "Starting prediction"
         }
         
-        # 生成初始状态HTML
+        # Show initial status
         yield generate_status_html(status_info)
         
         try:
@@ -177,18 +185,15 @@ def create_predict_tab(constant):
                 </style>
                 """)
             
-            # 更新状态
+            # Update status
             status_info["current_step"] = "Preparing model and parameters"
             yield generate_status_html(status_info)
             
             # Prepare command
-            cmd = [sys.executable, "src/predict.py"]
             args_dict = {
                 "model_path": model_path,
                 "plm_model": plm_models[plm_model],
                 "aa_seq": aa_seq,
-                "foldseek_seq": foldseek_seq if foldseek_seq else "",
-                "ss8_seq": ss8_seq if ss8_seq else "",
                 "pooling_method": pooling_method,
                 "problem_type": problem_type,
                 "num_labels": num_labels,
@@ -196,10 +201,10 @@ def create_predict_tab(constant):
             }
             
             if eval_method == "ses-adapter":
-                # 使用多选下拉框选择的结构序列
+                # Handle structure sequence selection from multi-select dropdown
                 args_dict["structure_seq"] = ",".join(eval_structure_seq) if eval_structure_seq else None
                 
-                # 根据选择的结构序列设置标志
+                # Set flags based on selected structure sequences
                 if eval_structure_seq:
                     if "foldseek_seq" in eval_structure_seq:
                         args_dict["use_foldseek"] = True
@@ -219,7 +224,7 @@ def create_predict_tab(constant):
                     final_cmd.append(f"--{k}")
                     final_cmd.append(str(v))
             
-            # 更新状态
+            # Update status
             status_info["current_step"] = "Starting prediction process"
             yield generate_status_html(status_info)
             
@@ -241,7 +246,8 @@ def create_predict_tab(constant):
                     <div class="error-icon">❌</div>
                     <div class="error-message">Error starting prediction process: {str(e)}</div>
                 </div>
-                <style>"""+"""
+                <style>
+                """+"""
                     .error-container {
                         background-color: #fff5f5;
                         border-left: 5px solid #f56565;
@@ -270,17 +276,21 @@ def create_predict_tab(constant):
             in_json_block = False
             json_lines = []
             
-            # 更新状态
+            # Update status
             status_info["current_step"] = "Processing sequence"
             yield generate_status_html(status_info)
             
             while current_process.poll() is None:
+                # Check if the process was aborted
+                if process_aborted or stop_thread:
+                    break
+                
                 try:
                     while not output_queue.empty():
                         line = output_queue.get_nowait()
                         result_output += line + "\n"
                         
-                        # 更新状态信息，添加更多有意义的状态提示
+                        # Update status with more meaningful messages
                         if "Loading model" in line:
                             status_info["current_step"] = "Loading model and tokenizer"
                         elif "Processing sequence" in line:
@@ -294,7 +304,7 @@ def create_predict_tab(constant):
                         elif "Prediction Results" in line:
                             status_info["current_step"] = "Finalizing results"
                         
-                        # 更新状态显示
+                        # Update status display
                         yield generate_status_html(status_info)
                         
                         # Detect start of JSON results block
@@ -343,9 +353,21 @@ def create_predict_tab(constant):
                     </style>
                     """)
             
+            # Check if the process was aborted
+            if process_aborted:
+                # Show aborted message
+                abort_html = """
+                <div style="padding: 10px; background-color: #fff8e1; border-radius: 5px;">
+                    <p style="margin: 0; color: #f57f17; font-weight: bold;">Prediction was aborted by user</p>
+                </div>
+                """
+                yield gr.HTML(abort_html)
+                is_predicting = False
+                return
+            
             # Process has completed
-            if current_process.returncode == 0:
-                # 更新状态
+            if current_process and current_process.returncode == 0:
+                # Update status
                 status_info["status"] = "completed"
                 status_info["current_step"] = "Prediction completed successfully"
                 yield generate_status_html(status_info)
@@ -391,14 +413,20 @@ def create_predict_tab(constant):
                     elif problem_type == "single_label_classification":
                         # Create probability table
                         prob_rows = ""
-                        if isinstance(prediction_data['probabilities'], list):
+                        if isinstance(prediction_data.get('probabilities'), list):
                             prob_rows = "".join([
                                 f"<tr><td style='text-align:center'>Class {i}</td><td style='text-align:center'>{prob:.4f}</td></tr>"
                                 for i, prob in enumerate(prediction_data['probabilities'])
                             ])
+                        elif isinstance(prediction_data.get('probabilities'), dict):
+                            prob_rows = "".join([
+                                f"<tr><td style='text-align:center'>Class {label}</td><td style='text-align:center'>{prob:.4f}</td></tr>"
+                                for label, prob in prediction_data['probabilities'].items()
+                            ])
                         else:
-                            # Handle case where probabilities is not a list
-                            prob_rows = f"<tr><td style='text-align:center'>Class 0</td><td style='text-align:center'>{prediction_data['probabilities']:.4f}</td></tr>"
+                            # Handle case where probabilities is not a list or dict
+                            prob_value = prediction_data.get('probabilities', 0)
+                            prob_rows = f"<tr><td style='text-align:center'>Class 0</td><td style='text-align:center'>{prob_value:.4f}</td></tr>"
                             
                         html_result = f"""
                         <div class="results-container">
@@ -425,17 +453,33 @@ def create_predict_tab(constant):
                     else:  # multi_label_classification
                         # Create prediction table
                         pred_rows = ""
-                        if (isinstance(prediction_data['predictions'], list) and 
-                            isinstance(prediction_data['probabilities'], list)):
-                            pred_rows = "".join([
-                                f"<tr><td style='width:33.33%; text-align:center'>Label {i}</td><td style='width:33.33%; text-align:center'>{pred}</td><td style='width:33.33%; text-align:center'>{prob:.4f}</td></tr>"
-                                for i, (pred, prob) in enumerate(zip(prediction_data['predictions'], prediction_data['probabilities']))
-                            ])
+                        if 'predictions' in prediction_data and 'probabilities' in prediction_data:
+                            # Handle different formats of predictions and probabilities
+                            if (isinstance(prediction_data['predictions'], list) and 
+                                isinstance(prediction_data['probabilities'], list)):
+                                pred_rows = "".join([
+                                    f"<tr><td style='width:33.33%; text-align:center'>Label {i}</td><td style='width:33.33%; text-align:center'>{pred}</td><td style='width:33.33%; text-align:center'>{prob:.4f}</td></tr>"
+                                    for i, (pred, prob) in enumerate(zip(prediction_data['predictions'], prediction_data['probabilities']))
+                                ])
+                            elif (isinstance(prediction_data['predictions'], dict) and 
+                                  isinstance(prediction_data['probabilities'], dict)):
+                                pred_rows = "".join([
+                                    f"<tr><td style='width:33.33%; text-align:center'>Label {label}</td><td style='width:33.33%; text-align:center'>{pred}</td><td style='width:33.33%; text-align:center'>{prediction_data['probabilities'].get(label, 0):.4f}</td></tr>"
+                                    for label, pred in prediction_data['predictions'].items()
+                                ])
+                            else:
+                                # Handle case where predictions or probabilities is not a list or dict
+                                pred = prediction_data['predictions'] if 'predictions' in prediction_data else "N/A"
+                                prob = prediction_data['probabilities'] if 'probabilities' in prediction_data else 0.0
+                                pred_rows = f"<tr><td style='width:33.33%; text-align:center'>Label 0</td><td style='width:33.33%; text-align:center'>{pred}</td><td style='width:33.33%; text-align:center'>{prob:.4f}</td></tr>"
                         else:
-                            # Handle case where predictions or probabilities is not a list
-                            pred = prediction_data['predictions'] if 'predictions' in prediction_data else "N/A"
-                            prob = prediction_data['probabilities'] if 'probabilities' in prediction_data else 0.0
-                            pred_rows = f"<tr><td style='width:33.33%; text-align:center'>Label 0</td><td style='width:33.33%; text-align:center'>{pred}</td><td style='width:33.33%; text-align:center'>{prob:.4f}</td></tr>"
+                            # Handle other prediction data formats
+                            for key, value in prediction_data.items():
+                                if 'label' in key.lower() or 'class' in key.lower():
+                                    label_name = key
+                                    label_value = value
+                                    prob_value = prediction_data.get(f"{key}_prob", 0.0)
+                                    pred_rows += f"<tr><td style='width:33.33%; text-align:center'>{label_name}</td><td style='width:33.33%; text-align:center'>{label_value}</td><td style='width:33.33%; text-align:center'>{prob_value:.4f}</td></tr>"
                             
                         html_result = f"""
                         <div class="results-container">
@@ -528,25 +572,25 @@ def create_predict_tab(constant):
                     </div>
                     """)
             else:
-                # 更新状态
+                # Update status
                 status_info["status"] = "failed"
                 status_info["current_step"] = "Prediction failed"
                 yield generate_status_html(status_info)
                 
                 stderr_output = ""
-                if hasattr(current_process, 'stderr') and current_process.stderr:
+                if current_process and hasattr(current_process, 'stderr') and current_process.stderr:
                     stderr_output = current_process.stderr.read()
                 yield gr.HTML(f"""
                 <div style='text-align:center; background-color: white; padding: 30px; border-radius: 8px;'>
                     <h2 style='margin-bottom: 20px;'>Prediction Failed</h2>
-                    <p>Error code: {current_process.returncode}</p>
+                    <p>Error code: {current_process.returncode if current_process else 'Unknown'}</p>
                     <div style='text-align:left; max-height: 400px; overflow-y: auto; background-color: white; padding: 10px; border: 1px solid #dddddd; border-radius: 5px;'>
                         <pre>{stderr_output}\n{result_output}</pre>
                     </div>
                 </div>
                 """)
         except Exception as e:
-            # 更新状态
+            # Update status
             status_info["status"] = "failed"
             status_info["current_step"] = "Error occurred"
             yield generate_status_html(status_info)
@@ -561,37 +605,113 @@ def create_predict_tab(constant):
             </div>
             """)
         finally:
-            if current_process:
-                stop_thread = True
-                is_predicting = False
-                current_process = None
+            # Reset state
+            is_predicting = False
+            
+            # Properly clean up the process
+            if current_process and current_process.poll() is None:
+                try:
+                    # Use process group ID to kill all related processes if possible
+                    if hasattr(os, "killpg") and hasattr(os, "getpgid"):
+                        os.killpg(os.getpgid(current_process.pid), signal.SIGTERM)
+                    else:
+                        # On Windows or if killpg is not available
+                        current_process.terminate()
+                        
+                    # Wait briefly for termination
+                    try:
+                        current_process.wait(timeout=1)
+                    except subprocess.TimeoutExpired:
+                        # Force kill if necessary
+                        if hasattr(os, "killpg") and hasattr(os, "getpgid"):
+                            os.killpg(os.getpgid(current_process.pid), signal.SIGKILL)
+                        else:
+                            current_process.kill()
+                except Exception as e:
+                    # Ignore errors during process cleanup
+                    print(f"Error cleaning up process: {e}")
+                
+            # Reset process reference
+            current_process = None
+            stop_thread = False
 
     def predict_batch(plm_model, model_path, eval_method, input_file, eval_structure_seq, pooling_method, problem_type, num_labels, batch_size):
         """Batch predict multiple protein sequences"""
-        nonlocal is_predicting, current_process, stop_thread
+        nonlocal is_predicting, current_process, stop_thread, process_aborted
         
+        # Check if we're already predicting (this check is performed first)
         if is_predicting:
             return gr.HTML("""
             <div style="padding: 10px; background-color: #fff8e1; border-radius: 5px;">
                 <p style="margin: 0; color: #f57f17; font-weight: bold;">A prediction is already running. Please wait or abort it.</p>
             </div>
-            """), None
+            """), gr.update(visible=False)
         
+        # If the process was aborted but not reset properly, ensure we're in a clean state
+        if process_aborted:
+            process_aborted = False
+        
+        # Reset all state completely
         is_predicting = True
         stop_thread = False
         
-        # Initialize progress tracking
+        # Clear the output queue
+        while not output_queue.empty():
+            try:
+                output_queue.get_nowait()
+            except queue.Empty:
+                break
+        
+        # Initialize progress tracking with completely fresh state
         progress_info = {
             "total": 0,
             "completed": 0,
             "current_step": "Initializing",
             "status": "running",
-            "lines": []  # 添加行存储，方便错误处理
+            "lines": []  # Store lines for error handling
         }
         
-        yield generate_progress_html(progress_info), None
+        # Generate completely empty initial progress display
+        initial_progress_html = """
+        <div style="max-width: 100%; margin: 0 auto; font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+            <div style="padding: 20px; background-color: #f8f9fa; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 12px; align-items: center;">
+                    <div style="display: flex; align-items: center;">
+                        <span style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background-color: #3498db; margin-right: 10px; animation: pulse 1s infinite;"></span>
+                        <span style="font-weight: 600; font-size: 16px;">Initializing prediction environment...</span>
+                    </div>
+                    <span style="font-weight: 500; color: #3498db;">0%</span>
+                </div>
+                <div style="width: 100%; height: 8px; background-color: #e0e0e0; border-radius: 4px; overflow: hidden;">
+                    <div style="width: 0%; height: 100%; background-color: #3498db; border-radius: 4px;"></div>
+                </div>
+                <div style="margin-top: 10px; font-size: 14px; color: #666;">
+                    <p style="margin: 5px 0;">Sequences: 0/0</p>
+                </div>
+            </div>
+        </div>
+        <style>
+        @keyframes pulse {
+            0% { opacity: 0.4; }
+            50% { opacity: 1; }
+            100% { opacity: 0.4; }
+        }
+        </style>
+        """
+        
+        # Always ensure the download button is hidden when starting a new prediction
+        yield gr.HTML(initial_progress_html), gr.update(visible=False)
         
         try:
+            # Check abort state before continuing
+            if process_aborted:
+                is_predicting = False
+                return gr.HTML("""
+                <div style="padding: 10px; background-color: #e8f5e9; border-radius: 5px;">
+                    <p style="margin: 0; color: #2e7d32; font-weight: bold;">Process was aborted.</p>
+                </div>
+                """), gr.update(visible=False)
+            
             # Validate inputs
             if not model_path:
                 is_predicting = False
@@ -599,7 +719,7 @@ def create_predict_tab(constant):
                 <div style="padding: 10px; background-color: #ffebee; border-radius: 5px;">
                     <p style="margin: 0; color: #c62828; font-weight: bold;">Error: Model path is required</p>
                 </div>
-                """), None
+                """), gr.update(visible=False)
                 return
                 
             if not os.path.exists(os.path.dirname(model_path)):
@@ -608,7 +728,7 @@ def create_predict_tab(constant):
                 <div style="padding: 10px; background-color: #ffebee; border-radius: 5px;">
                     <p style="margin: 0; color: #c62828; font-weight: bold;">Error: Invalid model path - directory does not exist</p>
                 </div>
-                """), None
+                """), gr.update(visible=False)
                 return
             
             if not input_file:
@@ -617,30 +737,30 @@ def create_predict_tab(constant):
                 <div style="padding: 10px; background-color: #ffebee; border-radius: 5px;">
                     <p style="margin: 0; color: #c62828; font-weight: bold;">Error: Input file is required</p>
                 </div>
-                """), None
+                """), gr.update(visible=False)
                 return
             
             # Update progress
             progress_info["current_step"] = "Preparing input file"
-            yield generate_progress_html(progress_info), None
+            yield generate_progress_html(progress_info), gr.update(visible=False)
             
             # Create temporary file to save uploaded file
             temp_dir = tempfile.mkdtemp()
             input_path = os.path.join(temp_dir, "input.csv")
-            output_dir = temp_dir  # 使用同一临时目录作为输出目录
+            output_dir = temp_dir  # Use the same temporary directory as output directory
             output_file = "predictions.csv"
             output_path = os.path.join(output_dir, output_file)
             
             # Save uploaded file
             try:
                 with open(input_path, "wb") as f:
-                    # 修复文件上传错误，正确处理gradio上传的文件
+                    # Fix file upload error, correctly handle files uploaded through gradio
                     if hasattr(input_file, "name"):
-                        # 如果是NamedString对象，读取文件内容
+                        # If it's a NamedString object, read the file content
                         with open(input_file.name, "rb") as uploaded:
                             f.write(uploaded.read())
                     else:
-                        # 如果是bytes对象，直接写入
+                        # If it's a bytes object, write directly
                         f.write(input_file)
                 
                 # Verify file was saved correctly
@@ -650,7 +770,7 @@ def create_predict_tab(constant):
                     <div style="padding: 10px; background-color: #ffebee; border-radius: 5px;">
                         <p style="margin: 0; color: #c62828; font-weight: bold;">Error: Failed to save input file</p>
                     </div>
-                    """), None
+                    """), gr.update(visible=False)
                     progress_info["status"] = "failed"
                     progress_info["current_step"] = "Failed to save input file"
                     return
@@ -660,7 +780,7 @@ def create_predict_tab(constant):
                     df = pd.read_csv(input_path)
                     progress_info["total"] = len(df)
                     progress_info["current_step"] = f"Found {len(df)} sequences to process"
-                    yield generate_progress_html(progress_info), None
+                    yield generate_progress_html(progress_info), gr.update(visible=False)
                 except Exception as e:
                     is_predicting = False
                     yield gr.HTML(f"""
@@ -668,7 +788,7 @@ def create_predict_tab(constant):
                         <p style="margin: 0; color: #c62828; font-weight: bold;">Error reading CSV file:</p>
                         <pre style="margin: 5px 0 0; white-space: pre-wrap; max-height: 300px; overflow-y: auto;">{str(e)}</pre>
                     </div>
-                    """), None
+                    """), gr.update(visible=False)
                     progress_info["status"] = "failed"
                     progress_info["current_step"] = "Error reading CSV file"
                     return
@@ -680,22 +800,22 @@ def create_predict_tab(constant):
                     <p style="margin: 0; color: #c62828; font-weight: bold;">Error saving input file:</p>
                     <pre style="margin: 5px 0 0; white-space: pre-wrap; max-height: 300px; overflow-y: auto;">{str(e)}</pre>
                 </div>
-                """), None
+                """), gr.update(visible=False)
                 progress_info["status"] = "failed"
                 progress_info["current_step"] = "Failed to save input file"
                 return
             
             # Update progress
             progress_info["current_step"] = "Preparing model and parameters"
-            yield generate_progress_html(progress_info), None
+            yield generate_progress_html(progress_info), gr.update(visible=False)
             
             # Prepare command
             args_dict = {
                 "model_path": model_path,
                 "plm_model": plm_models[plm_model],
                 "input_file": input_path,
-                "output_dir": output_dir,  # 更新为输出目录
-                "output_file": output_file,  # 输出文件名
+                "output_dir": output_dir,  # Update to output directory
+                "output_file": output_file,  # Output filename
                 "pooling_method": pooling_method,
                 "problem_type": problem_type,
                 "num_labels": num_labels,
@@ -724,7 +844,7 @@ def create_predict_tab(constant):
             
             # Update progress
             progress_info["current_step"] = "Starting batch prediction process"
-            yield generate_progress_html(progress_info), None
+            yield generate_progress_html(progress_info), gr.update(visible=False)
             
             # Start prediction process
             try:
@@ -744,64 +864,108 @@ def create_predict_tab(constant):
                     <p style="margin: 0; color: #c62828; font-weight: bold;">Error starting prediction process:</p>
                     <pre style="margin: 5px 0 0; white-space: pre-wrap; max-height: 300px; overflow-y: auto;">{str(e)}</pre>
                 </div>
-                """), None
+                """), gr.update(visible=False)
                 return
             
             output_thread = threading.Thread(target=process_output, args=(current_process, output_queue))
             output_thread.daemon = True
             output_thread.start()
             
-            # Collect output
+            # Start monitoring loop
+            last_update_time = time.time()
             result_output = ""
             
-            while current_process.poll() is None:
+            # Modified processing loop with abort check
+            while True:
+                # Check if process was aborted or completed
+                if process_aborted or current_process is None or current_process.poll() is not None:
+                    break
+                
+                # Check for new output
                 try:
-                    while not output_queue.empty():
-                        line = output_queue.get_nowait()
-                        result_output += line + "\n"
-                        progress_info["lines"].append(line)
+                    # Get new lines
+                    new_lines = []
+                    for _ in range(10):  # Process up to 10 lines at once
+                        try:
+                            line = output_queue.get_nowait()
+                            new_lines.append(line)
+                            result_output += line + "\n"
+                            progress_info["lines"].append(line)
+                            
+                            # Update progress based on output
+                            if "Predicting:" in line:
+                                try:
+                                    # Extract progress from tqdm output
+                                    match = re.search(r'(\d+)/(\d+)', line)
+                                    if match:
+                                        current, total = map(int, match.groups())
+                                        progress_info["completed"] = current
+                                        progress_info["total"] = total
+                                        progress_info["current_step"] = f"Processing sequence {current}/{total}"
+                                except:
+                                    pass
+                            elif "Loading Model and Tokenizer" in line:
+                                progress_info["current_step"] = "Loading model and tokenizer"
+                            elif "Processing sequences" in line:
+                                progress_info["current_step"] = "Processing sequences"
+                            elif "Saving results" in line:
+                                progress_info["current_step"] = "Saving results"
+                        except queue.Empty:
+                            break
+                    
+                    # Check if the process has been aborted before updating UI
+                    if process_aborted:
+                        break
                         
-                        # Update progress based on output
-                        if "Predicting:" in line:
-                            try:
-                                # Extract progress from tqdm output
-                                match = re.search(r'(\d+)/(\d+)', line)
-                                if match:
-                                    current, total = map(int, match.groups())
-                                    progress_info["completed"] = current
-                                    progress_info["total"] = total
-                                    progress_info["current_step"] = f"Processing sequence {current}/{total}"
-                            except:
-                                pass
-                        elif "Loading Model and Tokenizer" in line:
-                            progress_info["current_step"] = "Loading model and tokenizer"
-                        elif "Processing sequences" in line:
-                            progress_info["current_step"] = "Processing sequences"
-                        elif "Saving results" in line:
-                            progress_info["current_step"] = "Saving results"
-                        
-                        # Update progress display
-                        yield generate_progress_html(progress_info), None
-                        
-                    time.sleep(0.1)
+                    # Check if we need to update the UI
+                    current_time = time.time()
+                    if new_lines or (current_time - last_update_time >= 0.5):
+                        yield generate_progress_html(progress_info), gr.update(visible=False)
+                        last_update_time = current_time
+                    
+                    # Small sleep to avoid busy waiting
+                    if not new_lines:
+                        time.sleep(0.1)
+                    
                 except Exception as e:
+                    # Check if the process has been aborted before showing error
+                    if process_aborted:
+                        break
+                        
                     error_html = f"""
                     <div style="padding: 10px; background-color: #fff8e1; border-radius: 5px;">
                         <p style="margin: 0; color: #f57f17; font-weight: bold;">Warning reading output:</p>
                         <pre style="margin: 5px 0 0; white-space: pre-wrap; max-height: 300px; overflow-y: auto;">{str(e)}</pre>
                     </div>
                     """
-                    yield gr.HTML(error_html), None
+                    yield gr.HTML(error_html), gr.update(visible=False)
+            
+            # Check if aborted instead of completed
+            if process_aborted:
+                is_predicting = False
+                aborted_html = """
+                <div style="padding: 10px; background-color: #e8f5e9; border-radius: 5px;">
+                    <p style="margin: 0; color: #2e7d32; font-weight: bold;">Prediction was manually terminated.</p>
+                    <p style="margin: 5px 0 0; color: #388e3c;">All prediction state has been reset.</p>
+                </div>
+                """
+                yield gr.HTML(aborted_html), gr.update(visible=False)
+                return
             
             # Process has completed
-            if current_process.returncode == 0:
-                progress_info["status"] = "completed"
-                progress_info["current_step"] = "Prediction completed successfully"
-                progress_info["completed"] = progress_info["total"]
-                yield generate_progress_html(progress_info), None
-                
-                # Read prediction results
-                if os.path.exists(output_path):
+            if os.path.exists(output_path):
+                if current_process and current_process.returncode == 0:
+                    progress_info["status"] = "completed"
+                    # Generate final success HTML
+                    success_html = f"""
+                    <div style="padding: 15px; background-color: #e8f5e9; border-radius: 5px; margin-bottom: 10px;">
+                        <p style="margin: 0; color: #2e7d32; font-weight: bold;">Prediction completed successfully!</p>
+                        <p style="margin: 5px 0 0;">Results saved to: {output_path}</p>
+                        <p style="margin: 5px 0 0;">Total sequences processed: {progress_info.get('total', 0)}</p>
+                    </div>
+                    """
+                    
+                    # Read prediction results
                     try:
                         df = pd.read_csv(output_path)
                         
@@ -816,15 +980,15 @@ def create_predict_tab(constant):
                                 </div>
                                 <div class="stat-item">
                                     <div class="stat-value">{df['prediction'].mean():.4f}</div>
-                                    <div class="stat-label">Mean Value</div>
+                                    <div class="stat-label">Mean</div>
                                 </div>
                                 <div class="stat-item">
                                     <div class="stat-value">{df['prediction'].min():.4f}</div>
-                                    <div class="stat-label">Min Value</div>
+                                    <div class="stat-label">Min</div>
                                 </div>
                                 <div class="stat-item">
                                     <div class="stat-value">{df['prediction'].max():.4f}</div>
-                                    <div class="stat-label">Max Value</div>
+                                    <div class="stat-label">Max</div>
                                 </div>
                             </div>
                             """
@@ -873,12 +1037,12 @@ def create_predict_tab(constant):
                                 </div>
                                 """
                         
-                        # Create HTML table with styling - using the same table style as dataset preview
+                        # Create table preview with style consistent with dataset preview
                         html_table = f"""
                         <div class="results-container">
-                            <h2>Batch Prediction Results</h2>
+                            <h2>Batch Prediction Results Preview</h2>
                             {summary_html}
-                            <div class="table-wrapper" style="display: flex; justify-content: center;">
+                            <div class="table-wrapper">
                                 <table class="dataset-preview-table">
                                     <thead>
                                         <tr>
@@ -891,13 +1055,13 @@ def create_predict_tab(constant):
                                 </table>
                             </div>
                             <div class="download-hint">
-                                <p>You can download the complete results using the download button below.</p>
+                                <p>You can download the complete prediction results using the button below.</p>
                             </div>
                         </div>
                         """
                         
-                        # Modify CSS styles to ensure consistency with eval_tab
-                        final_html = f"""
+                        # Add CSS styles
+                        final_html = success_html + f"""
                         {html_table}
                         <style>
                             .results-container {{
@@ -1007,55 +1171,55 @@ def create_predict_tab(constant):
                         </style>
                         """
                         
-                        # Return results and download link
-                        yield gr.HTML(final_html), gr.DownloadButton(value=output_path, label="Download Predictions", visible=True)
+                        # Return results preview and download link
+                        yield gr.HTML(final_html), gr.update(value=output_path, visible=True)
                     except Exception as e:
+                        # If reading results file fails, show error but still provide download link
                         error_html = f"""
-                        <div style="padding: 10px; background-color: #ffebee; border-radius: 5px;">
-                            <p style="margin: 0; color: #c62828; font-weight: bold;">Could not read prediction results:</p>
-                            <pre style="margin: 5px 0 0; white-space: pre-wrap; max-height: 300px; overflow-y: auto;">{str(e)}\n\n{traceback.format_exc()}</pre>
+                        {success_html}
+                        <div style="padding: 10px; background-color: #fff8e1; border-radius: 5px; margin-top: 10px;">
+                            <p style="margin: 0; color: #f57f17; font-weight: bold;">Unable to load preview results: {str(e)}</p>
+                            <p style="margin: 5px 0 0;">You can still download the complete prediction results file.</p>
                         </div>
                         """
-                        yield gr.HTML(error_html), None
-                        
+                        yield gr.HTML(error_html), gr.update(value=output_path, visible=True)
                 else:
+                    # Process failed
                     error_html = f"""
-                    <div style="padding: 10px; background-color: #fff8e1; border-radius: 5px;">
-                        <p style="margin: 0; color: #f57f17; font-weight: bold;">Prediction completed but no output file was generated at: {output_path}</p>
+                    <div style="padding: 10px; background-color: #ffebee; border-radius: 5px;">
+                        <p style="margin: 0; color: #c62828; font-weight: bold;">Prediction failed to complete</p>
+                        <p style="margin: 5px 0 0;">Process return code: {current_process.returncode if current_process else 'Unknown'}</p>
                         <pre style="margin: 5px 0 0; white-space: pre-wrap; max-height: 300px; overflow-y: auto;">{result_output}</pre>
                     </div>
                     """
-                    yield gr.HTML(error_html), None
+                    yield gr.HTML(error_html), gr.update(visible=False)
             else:
                 progress_info["status"] = "failed"
-                progress_info["current_step"] = "Prediction failed"
-                yield generate_progress_html(progress_info), None
-                
-                error_output = "\n".join(progress_info.get("lines", []))
-                if not error_output:
-                    error_output = "No output captured from the prediction process"
-                
                 error_html = f"""
                 <div style="padding: 10px; background-color: #ffebee; border-radius: 5px;">
-                    <p style="margin: 0; color: #c62828; font-weight: bold;">Prediction failed (Error code: {current_process.returncode}):</p>
-                    <pre style="margin: 5px 0 0; white-space: pre-wrap; max-height: 300px; overflow-y: auto;">{error_output}</pre>
+                    <p style="margin: 0; color: #c62828; font-weight: bold;">Prediction completed, but output file not found at {output_path}</p>
+                    <pre style="margin: 5px 0 0; white-space: pre-wrap; max-height: 300px; overflow-y: auto;">{result_output}</pre>
                 </div>
                 """
-                yield gr.HTML(error_html), None
-
+                yield gr.HTML(error_html), gr.update(visible=False)
         except Exception as e:
+            # Capture the full error with traceback
+            error_traceback = traceback.format_exc()
+            
+            # Display error with traceback in UI
             error_html = f"""
             <div style="padding: 10px; background-color: #ffebee; border-radius: 5px;">
-                <p style="margin: 0; color: #c62828; font-weight: bold;">Error during batch prediction:</p>
-                <pre style="margin: 5px 0 0; white-space: pre-wrap; max-height: 300px; overflow-y: auto;">{str(e)}\n\n{traceback.format_exc()}</pre>
+                <p style="margin: 0; color: #c62828; font-weight: bold;">Error during batch prediction: {str(e)}</p>
+                <pre style="margin: 5px 0 0; white-space: pre-wrap; max-height: 300px; overflow-y: auto; background-color: #f8f9fa; padding: 10px; border-radius: 5px; font-family: monospace; font-size: 12px;">{error_traceback}</pre>
             </div>
             """
-            yield gr.HTML(error_html), None
+            yield gr.HTML(error_html), gr.update(visible=False)
         finally:
+            # Always reset prediction state
+            is_predicting = False
             if current_process:
-                stop_thread = True
-                is_predicting = False
                 current_process = None
+            process_aborted = False  # Reset abort flag
 
     def generate_progress_html(progress_info):
         """Generate HTML progress bar similar to eval_tab"""
@@ -1134,50 +1298,185 @@ def create_predict_tab(constant):
         return '\n'.join(rows)
 
     def handle_abort():
-        """处理中止预测进程"""
-        nonlocal is_predicting, current_process
+        """Handle abortion of the prediction process for both single and batch prediction"""
+        nonlocal is_predicting, current_process, stop_thread, process_aborted
+        
         if not is_predicting or current_process is None:
-            return gr.HTML("""
+            empty_html = """
             <div style="padding: 10px; background-color: #f5f5f5; border-radius: 5px;">
                 <p style="margin: 0;">No prediction process is currently running.</p>
             </div>
-            """)
+            """
+            # Return full HTML value (not gr.HTML component)
+            return empty_html
         
         try:
+            # Set the abort flag before terminating the process
+            process_aborted = True
+            stop_thread = True
+            
             # Kill the process group
             if hasattr(os, "killpg"):
                 os.killpg(os.getpgid(current_process.pid), signal.SIGTERM)
             else:
                 current_process.terminate()
             
+            # Wait for process to terminate (with timeout)
+            try:
+                current_process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                if hasattr(os, "killpg"):
+                    os.killpg(os.getpgid(current_process.pid), signal.SIGKILL)
+                else:
+                    current_process.kill()
+            
+            # Reset state
             is_predicting = False
             current_process = None
             
-            return gr.HTML("""
+            # Clear output queue
+            while not output_queue.empty():
+                try:
+                    output_queue.get_nowait()
+                except queue.Empty:
+                    break
+            
+            success_html = """
             <div style="padding: 10px; background-color: #e8f5e9; border-radius: 5px;">
                 <p style="margin: 0; color: #2e7d32; font-weight: bold;">Prediction successfully terminated!</p>
+                <p style="margin: 5px 0 0; color: #388e3c;">All prediction state has been reset.</p>
             </div>
-            """)
-        except subprocess.TimeoutExpired:
-            try:
-                os.killpg(os.getpgid(current_process.pid), signal.SIGKILL)
-                return gr.HTML("""
-                <div style="padding: 10px; background-color: #fff8e1; border-radius: 5px;">
-                    <p style="margin: 0; color: #f57f17; font-weight: bold;">Prediction forcefully terminated!</p>
-                </div>
-                """)
-            except Exception as e:
-                return gr.HTML(f"""
-                <div style="padding: 10px; background-color: #ffebee; border-radius: 5px;">
-                    <p style="margin: 0; color: #c62828; font-weight: bold;">Failed to terminate prediction: {str(e)}</p>
-                </div>
-                """)
+            """
+            
+            # Return full HTML value (not gr.HTML component)
+            return success_html
+                
         except Exception as e:
-            return gr.HTML(f"""
+            # Reset states even on error
+            is_predicting = False
+            current_process = None
+            process_aborted = False
+            
+            # Clear queue
+            while not output_queue.empty():
+                try:
+                    output_queue.get_nowait()
+                except queue.Empty:
+                    break
+                    
+            error_html = f"""
             <div style="padding: 10px; background-color: #ffebee; border-radius: 5px;">
                 <p style="margin: 0; color: #c62828; font-weight: bold;">Failed to terminate prediction: {str(e)}</p>
+                <p style="margin: 5px 0 0; color: #c62828;">Prediction state has been reset.</p>
+            </div>
+            """
+            
+            # Return full HTML value (not gr.HTML component)
+            return error_html
+
+    # Create handler functions for each tab
+    def handle_abort_single():
+        """Handle abort for single sequence prediction tab"""
+        # Flag the process for abortion first
+        nonlocal stop_thread, process_aborted, is_predicting, current_process
+        
+        # Only proceed if there's an active prediction
+        if not is_predicting or current_process is None:
+            return gr.HTML("""
+            <div style="padding: 10px; background-color: #f5f5f5; border-radius: 5px;">
+                <p style="margin: 0;">No prediction process is currently running.</p>
             </div>
             """)
+            
+        # Set the abort flags
+        process_aborted = True
+        stop_thread = True
+        
+        # Terminate the process
+        try:
+            if hasattr(os, "killpg"):
+                os.killpg(os.getpgid(current_process.pid), signal.SIGTERM)
+            else:
+                current_process.terminate()
+                
+            # Wait briefly for termination
+            try:
+                current_process.wait(timeout=1)
+            except subprocess.TimeoutExpired:
+                # Force kill if necessary
+                if hasattr(os, "killpg"):
+                    os.killpg(os.getpgid(current_process.pid), signal.SIGKILL)
+                else:
+                    current_process.kill()
+        except Exception as e:
+            pass  # Catch any termination errors
+            
+        # Reset state
+        is_predicting = False
+        current_process = None
+        
+        # Return the success message
+        return gr.HTML("""
+        <div style="padding: 10px; background-color: #e8f5e9; border-radius: 5px;">
+            <p style="margin: 0; color: #2e7d32; font-weight: bold;">Prediction successfully terminated!</p>
+            <p style="margin: 5px 0 0; color: #388e3c;">All prediction state has been reset.</p>
+        </div>
+        """)
+        
+    def handle_abort_batch():
+        """Handle abort for batch prediction tab"""
+        # Flag the process for abortion first
+        nonlocal stop_thread, process_aborted, is_predicting, current_process
+        
+        # Only proceed if there's an active prediction
+        if not is_predicting or current_process is None:
+            return gr.HTML("""
+            <div style="padding: 10px; background-color: #f5f5f5; border-radius: 5px;">
+                <p style="margin: 0;">No prediction process is currently running.</p>
+            </div>
+            """), gr.update(visible=False)
+            
+        # Set the abort flags
+        process_aborted = True
+        stop_thread = True
+        
+        # Terminate the process
+        try:
+            if hasattr(os, "killpg"):
+                os.killpg(os.getpgid(current_process.pid), signal.SIGTERM)
+            else:
+                current_process.terminate()
+                
+            # Wait briefly for termination
+            try:
+                current_process.wait(timeout=1)
+            except subprocess.TimeoutExpired:
+                # Force kill if necessary
+                if hasattr(os, "killpg"):
+                    os.killpg(os.getpgid(current_process.pid), signal.SIGKILL)
+                else:
+                    current_process.kill()
+        except Exception as e:
+            pass  # Catch any termination errors
+            
+        # Reset state
+        is_predicting = False
+        current_process = None
+        
+        # Clear output queue
+        while not output_queue.empty():
+            try:
+                output_queue.get_nowait()
+            except queue.Empty:
+                break
+                
+        # Return the success message and hide the download button
+        return gr.HTML("""
+        <div style="padding: 10px; background-color: #e8f5e9; border-radius: 5px;">
+            <p style="margin: 0; color: #2e7d32; font-weight: bold;">Prediction successfully terminated!</p>
+            <p style="margin: 5px 0 0; color: #388e3c;">All prediction state has been reset.</p>
+        </div>
+        """), gr.update(visible=False)
 
     def handle_preview(plm_model, model_path, eval_method, aa_seq, foldseek_seq, ss8_seq, eval_structure_seq, pooling_method, problem_type, num_labels):
         """处理单序列预测命令预览"""
@@ -1205,7 +1504,7 @@ def create_predict_tab(constant):
         # 生成预览命令
         preview_text = preview_predict_command(args_dict, is_batch=False)
         return gr.update(value=preview_text, visible=True)
-
+        
     def handle_batch_preview(plm_model, model_path, eval_method, input_file, eval_structure_seq, pooling_method, problem_type, num_labels, batch_size):
         """处理批量预测命令预览"""
         if not input_file:
@@ -1332,15 +1631,14 @@ def create_predict_tab(constant):
                 
                 
                 
+                
                 predict_button.click(
                     fn=predict_sequence,
                     inputs=[
                         plm_model,
                         model_path,
-                        eval_method,
                         aa_seq,
-                        foldseek_seq,
-                        ss8_seq,
+                        eval_method,
                         structure_seq,
                         pooling_method,
                         problem_type,
@@ -1350,9 +1648,9 @@ def create_predict_tab(constant):
                 )
                 
                 abort_button.click(
-                    fn=handle_abort,
+                    fn=handle_abort_single,
                     inputs=[],
-                    outputs=predict_output
+                    outputs=[predict_output]
                 )
             
             with gr.Tab("Batch Prediction"):
@@ -1597,9 +1895,9 @@ def create_predict_tab(constant):
                 )
                 
                 batch_abort_button.click(
-                    fn=handle_abort,
+                    fn=handle_abort_batch,
                     inputs=[],
-                    outputs=[batch_predict_output]
+                    outputs=[batch_predict_output, result_file]
                 )
 
     # Add this code after all UI components are defined
