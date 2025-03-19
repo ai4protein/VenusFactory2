@@ -12,6 +12,9 @@ import traceback
 import base64
 import tempfile
 import numpy as np
+import queue
+import subprocess
+import sys
 
 @dataclass
 class TrainingArgs:
@@ -139,6 +142,12 @@ class TrainingArgs:
 def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     # Create training monitor
     monitor = TrainingMonitor()
+    
+    # Add missing variable declarations
+    is_training = False
+    current_process = None
+    stop_thread = False
+    process_aborted = False
     
     plm_models = constant["plm_models"]
     dataset_configs = constant["dataset_configs"]
@@ -389,6 +398,50 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 height: 86px !important;
             }
             
+            /* Center Model Statistics Table */
+            .center-table-content td, .center-table-content th {
+                text-align: center !important;
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+                padding: 10px !important;
+            }
+            
+            .center-table-content table {
+                width: 100% !important;
+                border-collapse: collapse !important;
+                margin-bottom: 20px !important;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
+                border-radius: 8px !important;
+                overflow: hidden !important;
+            }
+            
+            .center-table-content th {
+                background-color: #f0f4f8 !important;
+                color: #2c3e50 !important;
+                font-weight: 600 !important;
+                border-bottom: 2px solid #ddd !important;
+            }
+            
+            .center-table-content tr:nth-child(even) {
+                background-color: #f9f9f9 !important;
+            }
+            
+            .center-table-content tr:hover {
+                background-color: #f0f7ff !important;
+            }
+            
+            /* Improve readability of progress bars */
+            .progress-container {
+                margin-bottom: 20px !important;
+            }
+            
+            .progress-bar {
+                transition: width 0.5s ease-in-out !important;
+            }
+            
+            .status-message {
+                margin-bottom: 8px !important;
+                font-weight: 500 !important;
+            }
         </style>
         """, visible=True)
 
@@ -453,7 +506,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                     )
                 with gr.Column(scale=1, min_width=150):
                     num_epochs = gr.Slider(
-                        minimum=1, maximum=200, value=100, step=1,
+                        minimum=1, maximum=200, value=20, step=1,
                         label="Number of Epochs"
                     )
                 with gr.Column(scale=1, min_width=150):
@@ -576,7 +629,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                     ["Combined Model", "-", "-", "-"]
                 ],
                 interactive=False,
-                elem_classes="center"
+                elem_classes=["center-table-content"]
             )
 
         def update_model_stats(stats: Dict[str, str]) -> List[List[str]]:
@@ -661,15 +714,67 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 )
 
         def update_progress(progress_info):
-            if not progress_info:
+            # If progress_info is empty or None, use completely fresh empty state
+            if not progress_info or not any(progress_info.values()):
+                fresh_status_html = """
+                <div style="background-color: #f8f9fa; border-radius: 10px; padding: 20px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                        <div>
+                            <span style="font-weight: 600; font-size: 16px;">Training Status: </span>
+                            <span style="color: #1976d2; font-weight: 500; font-size: 16px;">Waiting to start...</span>
+                        </div>
+                    </div>
+                </div>
+                """
                 return (
-                    "Waiting to start...",
+                    fresh_status_html,
                     "Best Model: None",
                     gr.update(value="", visible=False),
                     None,
                     None,
                     gr.update(visible=False)
                 )
+            
+            # Reset values if stage is "Waiting" or "Error"
+            if progress_info.get('stage', '') == 'Waiting' or progress_info.get('stage', '') == 'Error':
+                # If this is an error stage, show error styling
+                if progress_info.get('stage', '') == 'Error':
+                    error_status_html = """
+                    <div style="background-color: #ffebee; border-radius: 10px; padding: 20px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                            <div>
+                                <span style="font-weight: 600; font-size: 16px;">Training Status: </span>
+                                <span style="color: #c62828; font-weight: 500; font-size: 16px;">Failed</span>
+                            </div>
+                        </div>
+                    </div>
+                    """
+                    return (
+                        error_status_html,
+                        "Training failed",
+                        gr.update(value="", visible=False),
+                        None,
+                        None,
+                        gr.update(visible=False)
+                    )
+                else:
+                    return (
+                        """
+                        <div style="background-color: #f8f9fa; border-radius: 10px; padding: 20px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                                <div>
+                                    <span style="font-weight: 600; font-size: 16px;">Training Status: </span>
+                                    <span style="color: #1976d2; font-weight: 500; font-size: 16px;">Waiting to start...</span>
+                                </div>
+                            </div>
+                        </div>
+                        """,
+                        "Best Model: None",
+                        gr.update(value="", visible=False),
+                        None,
+                        None,
+                        gr.update(visible=False)
+                    )
             
             current = progress_info.get('current', 0)
             total = progress_info.get('total', 100)
@@ -761,40 +866,6 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                     </div>
                 </div>
                 """
-            elif stage == 'Waiting':
-                status_html = """
-                <div style="background-color: #f8f9fa; border-radius: 10px; padding: 20px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
-                        <div>
-                            <span style="font-weight: 600; font-size: 16px;">Training Status: </span>
-                            <span style="color: #1976d2; font-weight: 500; font-size: 16px;">Waiting to start...</span>
-                        </div>
-                    </div>
-                </div>
-                """
-            elif stage == 'Testing':
-                status_html = f"""
-                <div style="background-color: #f8f9fa; border-radius: 10px; padding: 20px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
-                        <div>
-                            <span style="font-weight: 600; font-size: 16px;">Training Status: </span>
-                            <span style="color: #1976d2; font-weight: 500; font-size: 16px;">Testing Phase</span>
-                        </div>
-                        <div>
-                            <span style="font-weight: 600; color: #333;">{progress_percentage:.1f}%</span>
-                        </div>
-                    </div>
-                    
-                    <div style="margin-bottom: 15px; background-color: #e9ecef; height: 10px; border-radius: 5px; overflow: hidden;">
-                        <div style="background-color: #4285f4; width: {progress_percentage}%; height: 100%; border-radius: 5px; transition: width 0.3s ease;"></div>
-                    </div>
-                    
-                    <div style="display: flex; flex-wrap: wrap; gap: 10px; font-size: 14px; color: #555;">
-                        <div style="background-color: #e8f5e9; padding: 5px 10px; border-radius: 4px;"><span style="font-weight: 500;">Progress:</span> {current}/{total}</div>
-                        {f'<div style="background-color: #fff8e1; padding: 5px 10px; border-radius: 4px;"><span style="font-weight: 500;">Time:</span> {elapsed_time}<{remaining_time}, {it_per_sec:.2f}it/s></div>' if elapsed_time and remaining_time else ''}
-                    </div>
-                </div>
-                """
             else:
                 # 训练或验证阶段
                 epoch_total = total_epochs if total_epochs > 0 else 100
@@ -838,14 +909,53 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             return status_html, best_info, test_html_update, loss_fig, metrics_fig, download_btn_update
 
         def handle_train(*args) -> Generator:
-            # 如果已经在训练，则返回
+            nonlocal is_training, current_process, stop_thread, process_aborted
+            
+            # If already training, return
             if monitor.is_training:
                 yield None, None, None, None, None, None, None
                 return
             
-            # 如果之前的训练已经完成，需要重置monitor状态
-            if monitor.current_progress.get('is_completed', False):
-                monitor._reset_tracking()
+            # Force explicit state reset first thing
+            monitor._reset_tracking()
+            monitor._reset_stats()
+            
+            # Explicitly ensure stats are reset
+            if hasattr(monitor, "stats"):
+                monitor.stats = {}
+            
+            # Force override any cached state in monitor
+            monitor.current_progress = {
+                "current": 0,
+                "total": 0,
+                "epoch": 0,
+                "stage": "Waiting",
+                "progress_detail": "",
+                "best_epoch": -1,
+                "best_metric_name": "",
+                "best_metric_value": 0.0,
+                "elapsed_time": "",
+                "remaining_time": "",
+                "it_per_sec": 0.0,
+                "grad_step": 0,
+                "loss": 0.0,
+                "test_results_html": "",
+                "test_metrics": {},
+                "is_completed": False,
+                "lines": []
+            }
+            
+            # Reset all monitoring data structures
+            monitor.train_losses = []
+            monitor.val_losses = []
+            monitor.metrics = {}
+            monitor.epochs = []
+            if hasattr(monitor, "stats"):
+                monitor.stats = {}
+            
+            # Reset flags for new training session
+            process_aborted = False
+            stop_thread = False
             
             # Initialize table state
             initial_stats = [
@@ -854,7 +964,28 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 ["Combined Model", "-", "-", "-"]
             ]
             
+            # Initial UI state with "Initializing" message
+            initial_status_html = """
+            <div style="background-color: #f8f9fa; border-radius: 10px; padding: 20px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                    <div>
+                        <span style="font-weight: 600; font-size: 16px;">Training Status: </span>
+                        <span style="color: #1976d2; font-weight: 500; font-size: 16px;">Initializing training environment...</span>
+                    </div>
+                </div>
+                <div style="font-size: 14px; color: #555; margin-top: 10px;">
+                    <p>• Parsing configuration parameters</p>
+                    <p>• Preparing training environment</p>
+                    <p>• This may take a few moments...</p>
+                </div>
+            </div>
+            """
+            
+            # First yield to update UI with "initializing" state
+            yield initial_stats, initial_status_html, "Best Model: None", gr.update(value="", visible=False), None, None, gr.update(visible=False)
+            
             try:
+                # Parse training arguments
                 training_args = TrainingArgs(args, plm_models, dataset_configs)
                 
                 if training_args.training_method != "ses-adapter":
@@ -866,27 +997,50 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 total_epochs = args_dict.get('num_epochs', 100)
                 monitor.current_progress['total_epochs'] = total_epochs
                 
-                # Save arguments to file
-                save_arguments(args_dict, args_dict.get('output_dir', 'ckpt'))
-                
-                # Ensure the monitor stats are reset
-                monitor._reset_stats()
-                
-                # Start training
-                monitor.start_training(args_dict)
-                
-                initial_status_html = """
+                # Update status to "Preparing dataset"
+                preparing_status_html = """
                 <div style="background-color: #f8f9fa; border-radius: 10px; padding: 20px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
                         <div>
                             <span style="font-weight: 600; font-size: 16px;">Training Status: </span>
-                            <span style="color: #1976d2; font-weight: 500; font-size: 16px;">Waiting to start...</span>
+                            <span style="color: #1976d2; font-weight: 500; font-size: 16px;">Preparing dataset and model...</span>
                         </div>
+                    </div>
+                    <div style="font-size: 14px; color: #555; margin-top: 10px;">
+                        <p>• Loading dataset</p>
+                        <p>• Initializing model architecture</p>
+                        <p>• Setting up training environment</p>
+                    </div>
+                </div>
+                """
+                yield initial_stats, preparing_status_html, "Best Model: None", gr.update(value="", visible=False), None, None, gr.update(visible=False)
+                
+                # Save arguments to file
+                save_arguments(args_dict, args_dict.get('output_dir', 'ckpt'))
+                
+                # Start training
+                is_training = True
+                process_aborted = False  # Reset abort flag
+                monitor.start_training(args_dict)
+                current_process = monitor.process  # Store the process reference
+                
+                starting_status_html = """
+                <div style="background-color: #f8f9fa; border-radius: 10px; padding: 20px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                        <div>
+                            <span style="font-weight: 600; font-size: 16px;">Training Status: </span>
+                            <span style="color: #1976d2; font-weight: 500; font-size: 16px;">Starting training process...</span>
+                        </div>
+                    </div>
+                    <div style="font-size: 14px; color: #555; margin-top: 10px;">
+                        <p>• Training process launched</p>
+                        <p>• Waiting for first statistics to appear</p>
+                        <p>• This may take a moment for large models</p>
                     </div>
                 </div>
                 """
                 
-                yield initial_stats, initial_status_html, "Best Model: None", gr.update(value="", visible=False), None, None, gr.update(visible=False)
+                yield initial_stats, starting_status_html, "Best Model: None", gr.update(value="", visible=False), None, None, gr.update(visible=False)
 
                 # Add delay to ensure enough time for parsing initial statistics
                 for i in range(3):
@@ -897,28 +1051,43 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         break
                 
                 update_count = 0
-                while monitor.is_training:
+                while True:
+                    # Check if the process still exists and hasn't been aborted
+                    if process_aborted or not monitor.is_training or current_process is None or (current_process and current_process.poll() is not None):
+                        break
+                        
                     try:
                         update_count += 1
                         time.sleep(0.5)
                         
-                        # 检查进程状态
+                        # Check process status
                         monitor.check_process_status()
                         
-                        # 获取最新的进度信息
+                        # Get latest progress info
                         progress_info = monitor.get_progress()
                         
-                        # 如果进程已经结束，检查是否是正常结束还是出错
+                        # If process has ended, check if it's normal end or error
                         if not monitor.is_training:
-                            if monitor.process and monitor.process.returncode != 0:
-                                # 获取完整的输出记录
+                            # Check both monitor.process and current_process since they might be different objects
+                            if (monitor.process and monitor.process.returncode != 0) or (current_process and current_process.poll() is not None and current_process.returncode != 0):
+                                # Get the return code from whichever process object is available
+                                return_code = monitor.process.returncode if monitor.process else current_process.returncode
+                                # Get complete output log
                                 error_output = "\n".join(progress_info.get("lines", []))
                                 if not error_output:
                                     error_output = "No output captured from the training process"
                                 
+                                # Ensure we set the is_completed flag to False for errors
+                                progress_info['is_completed'] = False
+                                monitor.current_progress['is_completed'] = False
+                                
+                                # Also set the stage to Error
+                                progress_info['stage'] = 'Error'
+                                monitor.current_progress['stage'] = 'Error'
+                                
                                 error_status_html = f"""
                                 <div style="padding: 10px; background-color: #ffebee; border-radius: 5px; margin-bottom: 10px;">
-                                    <p style="margin: 0; color: #c62828; font-weight: bold;">Training failed:</p>
+                                    <p style="margin: 0; color: #c62828; font-weight: bold;">Training failed with error code {return_code}:</p>
                                     <pre style="margin: 5px 0 0; white-space: pre-wrap; max-height: 300px; overflow-y: auto; background-color: #f5f5f5; padding: 10px; border-radius: 4px; font-family: monospace;">{error_output}</pre>
                                 </div>
                                 """
@@ -933,10 +1102,11 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                                 )
                                 return
                             else:
+                                # Only set is_completed to True if there was a successful exit code
                                 progress_info['is_completed'] = True
                                 monitor.current_progress['is_completed'] = True
                         
-                        # 更新UI
+                        # Update UI
                         stats = monitor.get_stats()
                         if stats:
                             model_stats = update_model_stats(stats)
@@ -948,7 +1118,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         yield model_stats, status_html, best_info, test_html_update, loss_fig, metrics_fig, download_btn_update
                         
                     except Exception as e:
-                        # 获取完整的输出记录
+                        # Get complete output log
                         error_output = "\n".join(progress_info.get("lines", []))
                         if not error_output:
                             error_output = "No output captured from the training process"
@@ -965,7 +1135,19 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         yield initial_stats, error_status_html, "Training error", gr.update(value="", visible=False), None, None, gr.update(visible=False)
                         return
                 
-                # 训练结束后的最终更新（只在正常结束时执行）
+                # Check if aborted
+                if process_aborted:
+                    is_training = False
+                    current_process = None
+                    aborted_status_html = """
+                    <div style="padding: 10px; background-color: #e8f5e9; border-radius: 5px;">
+                        <p style="margin: 0; color: #2e7d32; font-weight: bold;">Training was manually terminated.</p>
+                    </div>
+                    """
+                    yield initial_stats, aborted_status_html, "Training aborted", gr.update(value="", visible=False), None, None, gr.update(visible=False)
+                    return
+                
+                # Final update after training ends (only for normal completion)
                 if monitor.process and monitor.process.returncode == 0:
                     try:
                         progress_info = monitor.get_progress()
@@ -996,7 +1178,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         yield initial_stats, error_status_html, "Error in final update", gr.update(value="", visible=False), None, None, gr.update(visible=False)
                 
             except Exception as e:
-                # 初始化错误，可能没有输出记录
+                # Initialization error, may not have output log
                 error_status_html = f"""
                 <div style="padding: 10px; background-color: #ffebee; border-radius: 5px; margin-bottom: 10px;">
                     <p style="margin: 0; color: #c62828; font-weight: bold;">Training initialization failed:</p>
@@ -1004,66 +1186,144 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 </div>
                 """
                 yield initial_stats, error_status_html, "Training failed", gr.update(value="", visible=False), None, None, gr.update(visible=False)
+            finally:
+                is_training = False
+                current_process = None
         
         def handle_abort():
-            """Abort training process."""
-            if not monitor.is_training:
-                return (
-                    """
-                    <div style="background-color: #f8f9fa; border-radius: 10px; padding: 20px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
-                            <div>
-                                <span style="font-weight: 600; font-size: 16px;">Training Status: </span>
-                                <span style="color: #1976d2; font-weight: 500; font-size: 16px;">No training process to abort</span>
-                            </div>
-                        </div>
-                    </div>
-                    """,                             # progress_status
-                    "Best Model: None",              # best_model_info
-                    None,                            # model_stats
-                    gr.update(value="", visible=False), # test_results_html
-                    None,                            # loss_plot
-                    None,                            # metrics_plot
-                    gr.update(visible=False)         # download_csv_btn
-                )
+            """Handle abortion of the training process"""
+            nonlocal is_training, current_process, stop_thread, process_aborted
             
-            monitor.abort_training()
-            
-            # Reset model statistics table
-            initial_stats = [
-                ["Training Model", "-", "-", "-"],
-                ["Pre-trained Model", "-", "-", "-"],
-                ["Combined Model", "-", "-", "-"]
-            ]
-            
-            # 返回None作为图表
-            empty_loss_plot = None
-            empty_metrics_plot = None
-            
-            # 创建空测试结果HTML
-            empty_test_results = gr.update(value="", visible=False)
-            
-            # 美化的训练中止信息
-            aborted_status_html = """
-            <div style="background-color: #f8f9fa; border-radius: 10px; padding: 20px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
-                    <div>
-                        <span style="font-weight: 600; font-size: 16px;">Training Status: </span>
-                        <span style="color: #e53935; font-weight: 500; font-size: 16px;">Training aborted! Click Start to train again.</span>
-                    </div>
+            if not is_training or current_process is None:
+                return (gr.HTML("""
+                <div style="padding: 10px; background-color: #f5f5f5; border-radius: 5px;">
+                    <p style="margin: 0;">No training process is currently running.</p>
                 </div>
-            </div>
-            """
+                """),
+                [["Training Model", "-", "-", "-"], 
+                 ["Pre-trained Model", "-", "-", "-"], 
+                 ["Combined Model", "-", "-", "-"]],
+                "Best Model: None",
+                gr.update(value="", visible=False),
+                None,
+                None,
+                gr.update(visible=False))
             
-            return (
-                aborted_status_html,                # progress_status
-                "Training aborted!",                # best_model_info
-                initial_stats,                      # model_stats
-                empty_test_results,                 # test_results_html
-                empty_loss_plot,                    # loss_plot
-                empty_metrics_plot,                 # metrics_plot
-                gr.update(visible=False)            # download_csv_btn
-            )
+            try:
+                # Set the abort flag before terminating the process
+                process_aborted = True
+                stop_thread = True
+                
+                # Use process.terminate() instead of os.killpg for safer termination
+                # This avoids accidentally killing the parent WebUI process
+                current_process.terminate()
+                
+                # Wait for process to terminate (with timeout)
+                try:
+                    current_process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    # Only if terminate didn't work, use a stronger method
+                    # But do NOT use killpg which might kill the parent WebUI
+                    current_process.kill()
+                
+                # Create a completely fresh state - not just resetting
+                monitor.is_training = False
+                
+                # Explicitly create a new dictionary instead of modifying the existing one
+                monitor.current_progress = {
+                    "current": 0,
+                    "total": 0,
+                    "epoch": 0,
+                    "stage": "Waiting",
+                    "progress_detail": "",
+                    "best_epoch": -1,
+                    "best_metric_name": "",
+                    "best_metric_value": 0.0,
+                    "elapsed_time": "",
+                    "remaining_time": "",
+                    "it_per_sec": 0.0,
+                    "grad_step": 0,
+                    "loss": 0.0,
+                    "test_results_html": "",
+                    "test_metrics": {},
+                    "is_completed": False,
+                    "lines": []
+                }
+                
+                # Explicitly clear stats by creating a new dictionary
+                monitor.stats = {}
+                
+                if hasattr(monitor, "process") and monitor.process:
+                    monitor.process = None
+                    
+                # Reset state variables
+                is_training = False
+                current_process = None
+                
+                # Explicitly reset tracking to clear all state
+                monitor._reset_tracking()
+                monitor._reset_stats()
+                
+                # Reset all plots and statistics with new empty lists
+                monitor.train_losses = []
+                monitor.val_losses = []
+                monitor.metrics = {}
+                monitor.epochs = []
+                
+                # Create entirely fresh UI components
+                empty_model_stats = [["Training Model", "-", "-", "-"], 
+                                   ["Pre-trained Model", "-", "-", "-"], 
+                                   ["Combined Model", "-", "-", "-"]]
+                
+                success_html = """
+                <div style="padding: 10px; background-color: #e8f5e9; border-radius: 5px;">
+                    <p style="margin: 0; color: #2e7d32; font-weight: bold;">Training successfully terminated!</p>
+                    <p style="margin: 5px 0 0; color: #388e3c;">All training state has been reset. You can start a new training session.</p>
+                </div>
+                """
+                
+                # Return updates for all relevant components
+                return (gr.HTML(success_html),
+                      empty_model_stats,
+                      "Best Model: None",
+                      gr.update(value="", visible=False),
+                      None,
+                      None,
+                      gr.update(visible=False))
+            except Exception as e:
+                # Still need to reset states even if there's an error
+                is_training = False
+                current_process = None
+                process_aborted = False
+                
+                # Reset monitor state regardless of error
+                monitor.is_training = False
+                monitor.stats = {}
+                if hasattr(monitor, "process") and monitor.process:
+                    monitor.process = None
+                monitor._reset_tracking()
+                monitor._reset_stats()
+                
+                # Fresh empty components
+                empty_model_stats = [["Training Model", "-", "-", "-"], 
+                                   ["Pre-trained Model", "-", "-", "-"], 
+                                   ["Combined Model", "-", "-", "-"]]
+                
+                error_html = f"""
+                <div style="padding: 10px; background-color: #ffebee; border-radius: 5px;">
+                    <p style="margin: 0; color: #c62828; font-weight: bold;">Failed to terminate training: {str(e)}</p>
+                    <p style="margin: 5px 0 0; color: #c62828;">Training state has been reset.</p>
+                </div>
+                """
+                
+                # Return updates for all relevant components including empty model stats
+                return (gr.HTML(error_html),
+                      empty_model_stats,
+                      "Best Model: None",
+                      gr.update(value="", visible=False),
+                      None,
+                      None,
+                      gr.update(visible=False))
 
         def update_wandb_visibility(checkbox):
             return {
@@ -1114,6 +1374,70 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             preview_text = preview_command(training_args.to_dict())
             return gr.update(value=preview_text, visible=True)
 
+        def reset_train_ui():
+            """Reset the UI state before training starts"""
+            # Reset monitor state
+            monitor._reset_tracking()
+            monitor._reset_stats()
+            
+            # Explicitly ensure stats are reset
+            if hasattr(monitor, "stats"):
+                monitor.stats = {}
+            
+            # Create a completely fresh progress state
+            monitor.current_progress = {
+                "current": 0,
+                "total": 0,
+                "epoch": 0,
+                "stage": "Waiting",
+                "progress_detail": "",
+                "best_epoch": -1,
+                "best_metric_name": "",
+                "best_metric_value": 0.0,
+                "elapsed_time": "",
+                "remaining_time": "",
+                "it_per_sec": 0.0,
+                "grad_step": 0,
+                "loss": 0.0,
+                "test_results_html": "",
+                "test_metrics": {},
+                "is_completed": False,
+                "lines": []
+            }
+            
+            # Reset all statistical data
+            monitor.train_losses = []
+            monitor.val_losses = []
+            monitor.metrics = {}
+            monitor.epochs = []
+            
+            # Force UI to reset by creating completely fresh components
+            empty_model_stats = [["Training Model", "-", "-", "-"], 
+                               ["Pre-trained Model", "-", "-", "-"], 
+                               ["Combined Model", "-", "-", "-"]]
+            
+            empty_progress_status = """
+            <div style="background-color: #f8f9fa; border-radius: 10px; padding: 20px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                    <div>
+                        <span style="font-weight: 600; font-size: 16px;">Training Status: </span>
+                        <span style="color: #1976d2; font-weight: 500; font-size: 16px;">Preparing to start training...</span>
+                    </div>
+                </div>
+            </div>
+            """
+            
+            # Return exactly 7 values matching the 7 output components
+            return (
+                empty_model_stats, 
+                empty_progress_status,
+                "Best Model: None",
+                gr.update(value="", visible=False),
+                None,  # loss_plot must be None, not a string
+                None,  # metrics_plot must be None, not a string
+                gr.update(visible=False)
+            )
+
         preview_button.click(
             fn=handle_preview,
             inputs=input_components,
@@ -1121,6 +1445,9 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         )
         
         train_button.click(
+            fn=reset_train_ui,
+            outputs=[model_stats, progress_status, best_model_info, test_results_html, loss_plot, metrics_plot, download_csv_btn]
+        ).then(
             fn=handle_train, 
             inputs=input_components,
             outputs=[model_stats, progress_status, best_model_info, test_results_html, loss_plot, metrics_plot, download_csv_btn]
@@ -1129,7 +1456,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         # bind abort button
         abort_button.click(
             fn=handle_abort,
-            outputs=[progress_status, best_model_info, model_stats, test_results_html, loss_plot, metrics_plot, download_csv_btn]
+            outputs=[progress_status, model_stats, best_model_info, test_results_html, loss_plot, metrics_plot, download_csv_btn]
         )
         
         wandb_logging.change(

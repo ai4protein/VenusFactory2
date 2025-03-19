@@ -21,6 +21,7 @@ def create_eval_tab(constant):
     current_process = None
     output_queue = queue.Queue()
     stop_thread = False
+    process_aborted = False  # 新增标志，表示进程是否被手动终止
     plm_models = constant["plm_models"]
 
     def format_metrics(metrics_file):
@@ -106,13 +107,22 @@ def create_eval_tab(constant):
         process.stdout.close()
 
     def evaluate_model(plm_model, model_path, eval_method, is_custom_dataset, dataset_defined, dateset_custom, problem_type, num_labels, metrics, batch_mode, batch_size, batch_token, eval_structure_seq, pooling_method):
-        nonlocal is_evaluating, current_process, stop_thread
+        nonlocal is_evaluating, current_process, stop_thread, process_aborted
         
         if is_evaluating:
             return "Evaluation is already in progress. Please wait...", gr.update(visible=False)
         
+        # First reset all state variables to ensure clean start
         is_evaluating = True
         stop_thread = False
+        process_aborted = False  # Reset abort flag
+        
+        # Clear the output queue
+        while not output_queue.empty():
+            try:
+                output_queue.get_nowait()
+            except queue.Empty:
+                break
         
         # Initialize progress info and start time
         start_time = time.time()
@@ -126,7 +136,10 @@ def create_eval_tab(constant):
             "lines": []
         }
         
-        yield generate_progress_bar(progress_info), gr.update(visible=False)
+        # Create initial progress bar with completely empty state
+        initial_progress_html = generate_progress_bar(progress_info)
+        
+        yield initial_progress_html, gr.update(visible=False)
         
         try:
             # Validate inputs
@@ -218,7 +231,11 @@ def create_eval_tab(constant):
             
             last_update_time = time.time()
             
-            while current_process.poll() is None:
+            while True:
+                # Check if the process still exists and hasn't been aborted
+                if process_aborted or current_process is None or current_process.poll() is not None:
+                    break
+                
                 try:
                     new_lines = []
                     lines_processed = 0
@@ -262,8 +279,8 @@ def create_eval_tab(constant):
                     if lines_processed > 0 or (current_time - last_update_time) >= 0.5:
                         # Generate progress bar HTML
                         progress_html = generate_progress_bar(progress_info)
-                        # Only show progress bar, removing scrolling message output
-                        yield f"{progress_html}", gr.update(visible=False)
+                        # Only yield updates if there's actual new information
+                        yield progress_html, gr.update(visible=False)
                         last_update_time = current_time
                     
                     time.sleep(0.1)  # 减少循环间隔，使更新更频繁
@@ -383,45 +400,67 @@ def create_eval_tab(constant):
         return html
 
     def handle_abort():
-        nonlocal is_evaluating, current_process, stop_thread
-        if current_process is not None:
+        """Handle abortion of the evaluation process"""
+        nonlocal is_evaluating, current_process, stop_thread, process_aborted
+        
+        if current_process is None:
+            return """
+            <div style="padding: 10px; background-color: #f5f5f5; border-radius: 5px;">
+                <p style="margin: 0;">No evaluation in progress to terminate.</p>
+            </div>
+            """, gr.update(visible=False)
+        
+        try:
+            # Set the abort flag before terminating the process
+            process_aborted = True
+            stop_thread = True
+            
+            # Using terminate instead of killpg for safety
+            current_process.terminate()
+            
+            # Wait for process to terminate (with timeout)
             try:
-                stop_thread = True
-                os.killpg(os.getpgid(current_process.pid), signal.SIGTERM)
                 current_process.wait(timeout=5)
-                current_process = None
-                is_evaluating = False
-                return """
-                <div style="padding: 10px; background-color: #e8f5e9; border-radius: 5px;">
-                    <p style="margin: 0; color: #2e7d32; font-weight: bold;">Evaluation successfully terminated!</p>
-                </div>
-                """, gr.update(visible=False)
             except subprocess.TimeoutExpired:
+                current_process.kill()
+            
+            # Reset state completely
+            current_process = None
+            is_evaluating = False
+            
+            # Reset output queue to clear any pending messages
+            while not output_queue.empty():
                 try:
-                    os.killpg(os.getpgid(current_process.pid), signal.SIGKILL)
-                    return """
-                    <div style="padding: 10px; background-color: #fff8e1; border-radius: 5px;">
-                        <p style="margin: 0; color: #f57f17; font-weight: bold;">Evaluation forcefully terminated!</p>
-                    </div>
-                    """, gr.update(visible=False)
-                except Exception as e:
-                    return f"""
-                    <div style="padding: 10px; background-color: #ffebee; border-radius: 5px;">
-                        <p style="margin: 0; color: #c62828; font-weight: bold;">Failed to terminate evaluation: {str(e)}</p>
-                    </div>
-                    """, gr.update(visible=False)
-            except Exception as e:
-                return f"""
-                <div style="padding: 10px; background-color: #ffebee; border-radius: 5px;">
-                    <p style="margin: 0; color: #c62828; font-weight: bold;">Failed to terminate evaluation: {str(e)}</p>
-                </div>
-                """, gr.update(visible=False)
-        return """
-        <div style="padding: 10px; background-color: #f5f5f5; border-radius: 5px;">
-            <p style="margin: 0;">No evaluation in progress to terminate.</p>
-        </div>
-        """, gr.update(visible=False)
-
+                    output_queue.get_nowait()
+                except queue.Empty:
+                    break
+            
+            return """
+            <div style="padding: 10px; background-color: #e8f5e9; border-radius: 5px;">
+                <p style="margin: 0; color: #2e7d32; font-weight: bold;">Evaluation successfully terminated!</p>
+                <p style="margin: 5px 0 0; color: #388e3c;">All evaluation state has been reset.</p>
+            </div>
+            """, gr.update(visible=False)
+        except Exception as e:
+            # Still need to reset states even if there's an error
+            current_process = None
+            is_evaluating = False
+            process_aborted = False
+            
+            # Reset output queue
+            while not output_queue.empty():
+                try:
+                    output_queue.get_nowait()
+                except queue.Empty:
+                    break
+            
+            return f"""
+            <div style="padding: 10px; background-color: #ffebee; border-radius: 5px;">
+                <p style="margin: 0; color: #c62828; font-weight: bold;">Failed to terminate evaluation: {str(e)}</p>
+                <p style="margin: 5px 0 0; color: #c62828;">Evaluation state has been reset.</p>
+            </div>
+            """, gr.update(visible=False)
+            
     with gr.Tab("Evaluation"):
 
         gr.Markdown("### Model and Dataset Configuration")
