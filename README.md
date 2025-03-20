@@ -1,3 +1,7 @@
+<div align="right">
+  <a href="README.md">English</a> | <a href="README_CN.md">简体中文</a>
+</div>
+
 <p align="center">
   <img src="img/banner_2503.png" width="70%" alt="VenusFactory Banner">
 </p>
@@ -11,7 +15,7 @@
 
 Recent News:
 
-- Welcome to VenusFactory!
+- Welcome to VenusFactory! Please give us a star if you like it!
 - [2025-03-17] Add PETA, ProPrime, ProSST models
 
 ## ✏️ Table of Contents
