@@ -546,6 +546,15 @@ bash ./crawler/structure/download_alphafold.sh \
 
 Please cite our work if you have used our code or data.
 
+```bibtex
+@article{tan2025venusfactory,
+  title={VenusFactory: A Unified Platform for Protein Engineering Data Retrieval and Language Model Fine-Tuning},
+  author={Tan, Yang and Liu, Chen and Gao, Jingyuan and Wu, Banghao and Li, Mingchen and Wang, Ruilin and Zhang, Lingrong and Yu, Huiqun and Fan, Guisheng and Hong, Liang and Zhou, Bingxin},
+  journal={arXiv preprint arXiv:2503.15438},
+  year={2025}
+}
+```
+
 ## 🎊 Acknowledgement
 
 Thanks the support of [Liang's Lab](https://ins.sjtu.edu.cn/people/lhong/index.html).
