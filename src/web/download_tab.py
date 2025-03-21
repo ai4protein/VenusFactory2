@@ -489,16 +489,6 @@ def create_download_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 inputs=[af_method],
                 outputs=[af_id, af_file]
             )
-        
-        # Help tab
-        with gr.Tab("Help"):
-            def load_help_text():
-                """Load help text from README file"""
-                help_path = os.path.join("download", "README.md")
-                with open(help_path, 'r') as f:
-                    return f.read()
-            
-            gr.Markdown(load_help_text())
 
     # Handler functions for download buttons
     def handle_interpro_download(method, id_val, json_val, out_dir, error):

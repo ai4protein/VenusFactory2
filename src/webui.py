@@ -6,6 +6,7 @@ from web.train_tab import create_train_tab
 from web.eval_tab import create_eval_tab
 from web.download_tab import create_download_tab
 from web.predict_tab import create_predict_tab
+from web.manual_tab import create_manual_tab
 
 def load_constant():
     """Load constant values from config files"""
@@ -47,6 +48,7 @@ def create_ui():
                 eval_components = create_eval_tab(constant)
                 predict_components = create_predict_tab(constant)
                 download_components = create_download_tab(constant)
+                manual_components = create_manual_tab(constant)
             except Exception as e:
                 gr.Markdown(f"Error creating UI components: {str(e)}")
                 train_components = {"output_text": None, "loss_plot": None, "metrics_plot": None}
@@ -67,6 +69,6 @@ def create_ui():
 if __name__ == "__main__":
     try:
         demo = create_ui()
-        demo.launch(server_name="0.0.0.0", share=True)
+        demo.launch(server_name="0.0.0.0", share=True, allowed_paths=["img"])
     except Exception as e:
         print(f"Failed to launch UI: {str(e)}")
