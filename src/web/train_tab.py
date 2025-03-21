@@ -15,6 +15,7 @@ import numpy as np
 import queue
 import subprocess
 import sys
+import threading
 
 @dataclass
 class TrainingArgs:
@@ -721,7 +722,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                     <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
                         <div>
                             <span style="font-weight: 600; font-size: 16px;">Training Status: </span>
-                            <span style="color: #1976d2; font-weight: 500; font-size: 16px;">Waiting to start...</span>
+                            <span style="color: #1976d2; font-weight: 500; font-size: 16px;">Click Start to train your model</span>
                         </div>
                     </div>
                 </div>
@@ -909,10 +910,10 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             return status_html, best_info, test_html_update, loss_fig, metrics_fig, download_btn_update
 
         def handle_train(*args) -> Generator:
-            nonlocal is_training, current_process, stop_thread, process_aborted
+            nonlocal is_training, current_process, stop_thread, process_aborted, monitor
             
             # If already training, return
-            if monitor.is_training:
+            if is_training:
                 yield None, None, None, None, None, None, None
                 return
             
