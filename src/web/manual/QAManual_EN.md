@@ -4,27 +4,7 @@
 
 ### Q1: How to properly install ProFactory?
 
-**Answer**: The steps to install ProFactory are as follows:
-
-1. Ensure your system meets the basic requirements:
-   - Python 3.8 or higher
-   - CUDA-supported GPU (for training large models)
-
-2. Clone the repository and install dependencies:
-   ```bash
-   git clone https://github.com/yourusername/ProFactory.git
-   cd ProFactory
-   pip install -r requirements.txt
-   ```
-
-3. If you encounter dependency conflicts, it is recommended to use a virtual environment:
-   ```bash
-   python -m venv profactory_env
-   source profactory_env/bin/activate  # Linux/Mac
-   # or
-   profactory_env\Scripts\activate  # Windows
-   pip install -r requirements.txt
-   ```
+**Answer**: You can find the installation step in README.md at the root directory.
 
 ### Q2: What should I do if I encounter the error "Could not find a specific dependency" during installation?
 

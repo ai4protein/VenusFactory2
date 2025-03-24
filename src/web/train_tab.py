@@ -576,13 +576,13 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             with gr.Column():
                 output_dir = gr.Textbox(
                     label="Save Directory",
-                    value="ckpt",
+                    value="demo",
                     placeholder="Path to save training results"
                 )
                 
                 output_model_name = gr.Textbox(
                     label="Output Model Name",
-                    value="model.pt",
+                    value="demo.pt",
                     placeholder="Name of the output model file"
                 )
 

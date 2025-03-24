@@ -470,6 +470,7 @@ def create_eval_tab(constant):
             with gr.Row():
                 eval_model_path = gr.Textbox(
                     label="Model Path",
+                    value="ckpt/demo/demo_provided.pt",
                     placeholder="Path to the trained model"
                 )
                 eval_plm_model = gr.Dropdown(
