@@ -46,9 +46,9 @@
     },
     "dataset_configs": {
         "Demo_Solubility": "data/Demo/Demo_Solubility_HF.json",
-        "DeepET_Topt": "data/DeepET/DeepET_Topt_HF.json",
-        "DeepET_Topt_AlphaFold2": "data/DeepET/DeepET_Topt_AlphaFold2_HF.json",
-        "DeepET_Topt_ESMFold": "data/DeepET/DeepET_Topt_ESMFold_HF.json",
+        "DeepET_Topt": "data/DeepET_Topt/DeepET_Topt_HF.json",
+        "DeepET_Topt_AlphaFold2": "data/DeepET_Topt/DeepET_Topt_AlphaFold2_HF.json",
+        "DeepET_Topt_ESMFold": "data/DeepET_Topt/DeepET_Topt_ESMFold_HF.json",
         "DeepLoc2Multi": "data/DeepLoc2Multi/DeepLoc2Multi_HF.json",
         "DeepLoc2Multi_AlphaFold2": "data/DeepLoc2Multi/DeepLoc2Multi_AlphaFold2_HF.json",
         "DeepLocBinary": "data/DeepLocBinary/DeepLocBinary_HF.json",
