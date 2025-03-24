@@ -17,9 +17,8 @@ Requests==2.32.3
 scikit_learn==1.6.1
 scipy==1.15.2
 sentencepiece==0.2.0
-torch==2.5.1 --index-url https://download.pytorch.org/whl/cu121
 torch_geometric==2.6.1 -f https://pytorch-geometric.com/whl/torch-2.5.1+cu121.html
-torch_scatter==2.1.2 -f https://pytorch-geometric.com/whl/torch-2.5.1+cu121.html
+--no-index torch_scatter==2.1.2 -f https://pytorch-geometric.com/whl/torch-2.5.1+cu121.html
 torchmetrics==1.6.1
 tqdm==4.67.0
 transformers==4.46.3
