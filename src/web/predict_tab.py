@@ -1550,6 +1550,7 @@ def create_predict_tab(constant):
             with gr.Row():
                 model_path = gr.Textbox(
                     label="Model Path",
+                    value="ckpt/demo/demo_provided.pt",
                     placeholder="Path to the trained model"
                 )
                 plm_model = gr.Dropdown(

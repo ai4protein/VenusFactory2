@@ -4,27 +4,7 @@
 
 ### Q1: 如何正确安装ProFactory？
 
-**回答**：安装ProFactory的步骤如下：
-
-1. 确保您的系统满足基本要求：
-   - Python 3.8或更高版本
-   - CUDA支持的GPU（用于训练大型模型）
-
-2. 克隆仓库并安装依赖：
-   ```bash
-   git clone https://github.com/yourusername/ProFactory.git
-   cd ProFactory
-   pip install -r requirements.txt
-   ```
-
-3. 如果遇到依赖冲突，建议使用虚拟环境：
-   ```bash
-   python -m venv profactory_env
-   source profactory_env/bin/activate  # Linux/Mac
-   # 或者
-   profactory_env\Scripts\activate  # Windows
-   pip install -r requirements.txt
-   ```
+**回答**：你可以在根目录的README.md文件中找到安装的步骤。
 
 ### Q2: 安装时报错"无法找到特定的依赖库"，如何解决？
 
