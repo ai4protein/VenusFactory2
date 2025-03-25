@@ -26,6 +26,7 @@ Recent News:
 - [Supported Datasets](#-supported-datasets)
 - [Supported Metrics](#-supported-metrics)
 - [Requirements](#-requirements)
+- [Installation Guide](#-installation-guide)
 - [Quick Start with Venus Web UI](#-quick-start-with-venus-web-ui)
 - [Code-line Usage](#-code-line-usage)
 - [Citation](#-citation)
@@ -394,6 +395,45 @@ pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorc
 # Install PyG dependencies
 pip install torch_geometric==2.6.1 -f https://pytorch-geometric.com/whl/torch-2.5.1+cu118.html
 pip install --no-index torch_scatter==2.1.2 -f https://pytorch-geometric.com/whl/torch-2.5.1+cu118.html
+```
+
+## 4️⃣ Install remaining dependencies
+
+Install the remaining dependencies using `requirements.txt`:
+```bash
+pip install -r requirements.txt
+```
+</details>
+
+<details><summary> Git start with Windows or Linux on CPU</summary>
+
+## 1️⃣ Clone the repository
+
+First, get the VenusFactory code:
+
+```bash
+git clone https://github.com/tyang816/VenusFactory.git
+cd VenusFactory
+```
+
+## 2️⃣ Create a Conda environment
+
+Ensure you have Anaconda or Miniconda installed. Then, create a new environment named `venus` with Python 3.10:
+
+```bash
+conda create -n venus python=3.10
+conda activate venus
+```
+
+## 3️⃣ Install Pytorch and PyG dependencies
+
+```bash
+# Install PyTorch
+pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cpu
+
+# Install PyG dependencies
+pip install torch_geometric==2.6.1 -f https://pytorch-geometric.com/whl/torch-2.5.1+cpu.html
+pip install --no-index torch_scatter==2.1.2 -f https://pytorch-geometric.com/whl/torch-2.5.1+cpu.html
 ```
 
 ## 4️⃣ Install remaining dependencies
