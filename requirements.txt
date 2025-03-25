@@ -22,4 +22,4 @@ sentencepiece==0.2.0
 torchmetrics==1.6.1
 tqdm==4.67.0
 transformers==4.46.3
-wandb==0.13.5
+wandb==0.19.8

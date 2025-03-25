@@ -276,15 +276,171 @@
 - [Anaconda3](https://www.anaconda.com/download) 或 [Miniconda3](https://docs.conda.io/projects/miniconda/en/latest/)
 - Python 3.10
 
-### 基础安装
+## 📦 安装指南
+<details><summary> 在macOS上开始</summary>
+
+## 1️⃣ 克隆仓库
+
+首先，从Github获取VenusFactory的代码：
+
 ```bash
 git clone https://github.com/tyang816/VenusFactory.git
 cd VenusFactory
+```
+
+## 2️⃣ 创建Conda环境
+
+确保已安装Anaconda或Miniconda。然后，创建一个名为`venus`的新环境，使用Python 3.10：
+
+```bash
 conda create -n venus python=3.10
-conda activate venus  # Windows系统
-# source activate venus  # Linux系统
+conda activate venus
+```
+
+## 3️⃣ 安装PyTorch和PyG依赖项
+
+```bash
+# 安装PyTorch
+pip install --pre torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/nightly/cpu
+
+# 安装PyG依赖项
+pip install torch_scatter torch-sparse torch-cluster torch-geometric -f https://data.pyg.org/whl/torch-2.2.0+cpu.html
+```
+
+## 4️⃣ 安装其他依赖项
+
+使用`requirements_for_macOS.txt`安装剩余依赖项:
+```bash
+pip install -r requirements_for_macOS.txt
+```
+</details>
+
+<details><summary> 在Windows或Linux上开始(使用CUDA 12.X)</summary>
+
+## 我们推荐使用CUDA 12.2
+
+
+## 1️⃣ 克隆仓库
+
+首先，从Github获取VenusFactory的代码：
+
+```bash
+git clone https://github.com/tyang816/VenusFactory.git
+cd VenusFactory
+```
+
+## 2️⃣ 创建Conda环境
+
+确保已安装Anaconda或Miniconda。然后，创建一个名为`venus`的新环境，使用Python 3.10：
+
+
+```bash
+conda create -n venus python=3.10
+conda activate venus
+```
+
+## 3️⃣ 安装PyTorch和PyG依赖项
+
+```bash
+# 安装PyTorch
+pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cu121
+
+# 安装PyG依赖项
+pip install torch_geometric==2.6.1 -f https://pytorch-geometric.com/whl/torch-2.5.1+cu121.html
+pip install --no-index torch_scatter==2.1.2 -f https://pytorch-geometric.com/whl/torch-2.5.1+cu121.html
+```
+
+## 4️⃣ 安装其他依赖项
+
+使用`requirements.txt`安装剩余依赖项:
+```bash
 pip install -r requirements.txt
 ```
+</details>
+
+<details><summary> 在Windows或Linux上开始(使用CUDA 11.X)</summary>
+
+## 我们推荐使用CUDA 11.8或更高版本，因为它们支持更高版本的PyTorch，提供更好的体验。
+
+
+## 1️⃣ 克隆仓库
+
+首先，从Github获取VenusFactory的代码：
+
+```bash
+git clone https://github.com/tyang816/VenusFactory.git
+cd VenusFactory
+```
+
+## 2️⃣ 创建Conda环境
+
+确保已安装Anaconda或Miniconda。然后，创建一个名为`venus`的新环境，使用Python 3.10：
+
+
+```bash
+conda create -n venus python=3.10
+conda activate venus
+```
+
+## 3️⃣ 安装PyTorch和PyG依赖项
+
+```bash
+# 安装PyTorch
+pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cu118
+
+# 安装PyG依赖项
+pip install torch_geometric==2.6.1 -f https://pytorch-geometric.com/whl/torch-2.5.1+cu118.html
+pip install --no-index torch_scatter==2.1.2 -f https://pytorch-geometric.com/whl/torch-2.5.1+cu118.html
+```
+
+## 4️⃣ 安装其他依赖项
+
+使用`requirements.txt`安装剩余依赖项:
+```bash
+pip install -r requirements.txt
+```
+</details>
+
+<details><summary> 在Windows或Linux上开始(使用CPU)</summary>
+
+## 1️⃣ 克隆仓库
+
+首先，从Github获取VenusFactory的代码：
+
+```bash
+git clone https://github.com/tyang816/VenusFactory.git
+cd VenusFactory
+```
+
+## 2️⃣ 创建Conda环境
+
+确保已安装Anaconda或Miniconda。然后，创建一个名为`venus`的新环境，使用Python 3.10：
+
+
+```bash
+conda create -n venus python=3.10
+conda activate venus
+```
+
+## 3️⃣ 安装PyTorch和PyG依赖项
+
+```bash
+# 安装PyTorch
+pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cpu
+
+# 安装PyG依赖项
+pip install torch_geometric==2.6.1 -f https://pytorch-geometric.com/whl/torch-2.5.1+cpu.html
+pip install --no-index torch_scatter==2.1.2 -f https://pytorch-geometric.com/whl/torch-2.5.1+cpu.html
+```
+
+## 4️⃣ 安装其他依赖项
+
+使用`requirements.txt`安装剩余依赖项:
+```bash
+pip install -r requirements.txt
+```
+</details>
+
 
 ## 🚀 快速开始
 

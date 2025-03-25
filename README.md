@@ -281,15 +281,128 @@ Recent News:
 - [Anaconda3](https://www.anaconda.com/download) or [Miniconda3](https://docs.conda.io/projects/miniconda/en/latest/)
 - Python 3.10
 
-### Basic Installation
+## 📦 Installation Guide
+<details><summary> Git start with macOS</summary>
+
+## 1️⃣ Clone the repository
+
+First, get the VenusFactory code:
+
 ```bash
 git clone https://github.com/tyang816/VenusFactory.git
 cd VenusFactory
+```
+
+## 2️⃣ Create a Conda environment
+
+Ensure you have Anaconda or Miniconda installed. Then, create a new environment named `venus` with Python 3.10:
+
+```bash
 conda create -n venus python=3.10
-conda activate venus  # For Windows
-# source activate venus  # For Linux
+conda activate venus
+```
+
+## 3️⃣ Install Pytorch and PyG dependencies
+
+```bash
+# Install PyTorch
+pip install --pre torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/nightly/cpu
+
+# Install PyG dependencies
+pip install torch_scatter torch-sparse torch-cluster torch-geometric -f https://data.pyg.org/whl/torch-2.2.0+cpu.html
+```
+
+## 4️⃣ Install remaining dependencies
+
+Install the remaining dependencies using `requirements_for_macOS.txt`:
+```bash
+pip install -r requirements_for_macOS.txt
+```
+</details>
+
+<details><summary> Git start with Windows or Linux on CUDA 12.x</summary>
+
+## we recommand CUDA 12.2
+
+
+## 1️⃣ Clone the repository
+
+First, get the VenusFactory code:
+
+```bash
+git clone https://github.com/tyang816/VenusFactory.git
+cd VenusFactory
+```
+
+## 2️⃣ Create a Conda environment
+
+Ensure you have Anaconda or Miniconda installed. Then, create a new environment named `venus` with Python 3.10:
+
+```bash
+conda create -n venus python=3.10
+conda activate venus
+```
+
+## 3️⃣ Install Pytorch and PyG dependencies
+
+```bash
+# Install PyTorch
+pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cu121
+
+# Install PyG dependencies
+pip install torch_geometric==2.6.1 -f https://pytorch-geometric.com/whl/torch-2.5.1+cu121.html
+pip install --no-index torch_scatter==2.1.2 -f https://pytorch-geometric.com/whl/torch-2.5.1+cu121.html
+```
+
+## 4️⃣ Install remaining dependencies
+
+Install the remaining dependencies using `requirements.txt`:
+```bash
 pip install -r requirements.txt
 ```
+</details>
+
+<details><summary> Git start with Windows or Linux on CUDA 11.x</summary>
+
+## We recommend using CUDA 11.8 or later versions, as they support higher versions of PyTorch, providing a better experience.
+
+
+## 1️⃣ Clone the repository
+
+First, get the VenusFactory code:
+
+```bash
+git clone https://github.com/tyang816/VenusFactory.git
+cd VenusFactory
+```
+
+## 2️⃣ Create a Conda environment
+
+Ensure you have Anaconda or Miniconda installed. Then, create a new environment named `venus` with Python 3.10:
+
+```bash
+conda create -n venus python=3.10
+conda activate venus
+```
+
+## 3️⃣ Install Pytorch and PyG dependencies
+
+```bash
+# Install PyTorch
+pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cu118
+
+# Install PyG dependencies
+pip install torch_geometric==2.6.1 -f https://pytorch-geometric.com/whl/torch-2.5.1+cu118.html
+pip install --no-index torch_scatter==2.1.2 -f https://pytorch-geometric.com/whl/torch-2.5.1+cu118.html
+```
+
+## 4️⃣ Install remaining dependencies
+
+Install the remaining dependencies using `requirements.txt`:
+```bash
+pip install -r requirements.txt
+```
+</details>
 
 ## 🚀 Quick Start with Venus Web UI
 
