@@ -285,6 +285,8 @@ Recent News:
 ## 📦 Installation Guide
 <details><summary> Git start with macOS</summary>
 
+## To achieve the best performance and experience, we recommend using ​Mac devices with M-series chips (such as M1, M2, M3, etc.).
+
 ## 1️⃣ Clone the repository
 
 First, get the VenusFactory code:
@@ -323,7 +325,7 @@ pip install -r requirements_for_macOS.txt
 
 <details><summary> Git start with Windows or Linux on CUDA 12.x</summary>
 
-## we recommand CUDA 12.2
+## We recommend using CUDA 12.2
 
 
 ## 1️⃣ Clone the repository

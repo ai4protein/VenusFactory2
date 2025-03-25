@@ -280,6 +280,8 @@
 ## 📦 安装指南
 <details><summary> 在macOS上开始</summary>
 
+## 为了获得最佳性能和体验，我们推荐使用 ​带有M系列芯片的Mac设备​（如 M1、M2、M3 等）
+
 ## 1️⃣ 克隆仓库
 
 首先，从Github获取VenusFactory的代码：
