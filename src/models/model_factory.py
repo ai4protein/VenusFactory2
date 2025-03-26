@@ -281,7 +281,7 @@ def create_plm_and_tokenizer(args, qlora_config=None):
         else:
             plm_model = AutoModelForMaskedLM.from_pretrained(args.plm_model, trust_remote_code=True)
     elif "Prime" in args.plm_model:
-        tokenizer = AutoTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
+        tokenizer = AutoTokenizer.from_pretrained(args.plm_model, trust_remote_code=True, do_lower_case=False)
         if qlora_config:
             plm_model = AutoModel.from_pretrained(args.plm_model, trust_remote_code=True, quantization_config=qlora_config)
         else:
