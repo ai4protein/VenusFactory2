@@ -183,7 +183,7 @@ def create_eval_tab(constant):
                 "test_file": test_file,
                 "problem_type": problem_type,
                 "num_labels": num_labels,
-                "metrics": metrics,
+                "metrics": ",".join(metrics),
                 "plm_model": plm_models[plm_model],
                 "test_result_dir": test_result_dir,
                 "dataset": dataset_display_name,
@@ -489,27 +489,33 @@ def create_eval_tab(constant):
                         label="Pooling Method",
                         value="mean"
                     )
+            with gr.Row():
+                with gr.Column(scale=4):
+                    with gr.Row():
+                        is_custom_dataset = gr.Radio(
+                            choices=["Use Custom Dataset", "Use Pre-defined Dataset"],
+                            label="Dataset Selection",
+                            value="Use Pre-defined Dataset"
+                        )
+                        eval_dataset_defined = gr.Dropdown(
+                            choices=list(dataset_configs.keys()),
+                            label="Evaluation Dataset",
+                            visible=True
+                        )
+                        eval_dataset_custom = gr.Textbox(
+                            label="Custom Dataset Path",
+                            placeholder="Huggingface Dataset eg: user/dataset",
+                            visible=False
+                        )
 
-            with gr.Row():
-                is_custom_dataset = gr.Radio(
-                    choices=["Use Custom Dataset", "Use Pre-defined Dataset"],
-                    label="Dataset Selection",
-                    value="Use Pre-defined Dataset"
-                )
-                eval_dataset_defined = gr.Dropdown(
-                    choices=list(dataset_configs.keys()),
-                    label="Evaluation Dataset",
-                    visible=True
-                )
-                eval_dataset_custom = gr.Textbox(
-                    label="Custom Dataset Path",
-                    placeholder="Huggingface Dataset eg: user/dataset",
-                    visible=False
-                )
-            
-            # Add dataset preview functionality
-            with gr.Row():
-                preview_button = gr.Button("Preview Dataset", variant="primary")
+                with gr.Column(scale=1, min_width=120, elem_classes="preview-button-container"):
+                    # Add dataset preview functionality
+                    preview_button = gr.Button(
+                        "Preview Dataset", 
+                        variant="primary", 
+                        size="lg",
+                        elem_classes="preview-button"
+                    )
             
             # 将数据统计和表格都放入折叠面板
             with gr.Row():
@@ -645,27 +651,28 @@ def create_eval_tab(constant):
             """, visible=True)
             
             ### These are settings for custom dataset. ###
-            with gr.Row(visible=True) as custom_dataset_row:
-                with gr.Column(scale=1):
-                    problem_type = gr.Dropdown(
-                        choices=["single_label_classification", "multi_label_classification", "regression"],
-                        label="Problem Type",
-                        value="single_label_classification",
-                        interactive=False
-                    )
-                with gr.Column(scale=1):
-                    num_labels = gr.Number(
-                        value=2,
-                        label="Number of Labels",
-                        interactive=False
-                    )
-                with gr.Column(scale=1):
-                    metrics = gr.Textbox(
-                        label="Metrics",
-                        placeholder="accuracy,recall,precision,f1,mcc,auroc,f1max,spearman_corr,mse",
-                        value="accuracy,mcc,f1,precision,recall,auroc",
-                        interactive=False
-                    )
+            with gr.Row(visible=True) as custom_dataset_settings:
+                problem_type = gr.Dropdown(
+                    choices=["single_label_classification", "multi_label_classification", "regression"],
+                    label="Problem Type",
+                    value="single_label_classification",
+                    scale=23,
+                    interactive=False   
+                )
+                num_labels = gr.Number(
+                    value=2,
+                    label="Number of Labels",
+                    scale=11,
+                    interactive=False
+                )
+                metrics = gr.Dropdown(
+                    choices=["accuracy", "recall", "precision", "f1", "mcc", "auroc", "f1_max", "spearman_corr", "mse"],
+                    label="Metrics",
+                    value=["accuracy", "mcc", "f1", "precision", "recall", "auroc"],
+                    scale=101,
+                    multiselect=True,
+                    interactive=False
+                )
             
             # Add dataset preview function
             def update_dataset_preview(dataset_type=None, defined_dataset=None, custom_dataset=None):
@@ -795,12 +802,16 @@ def create_eval_tab(constant):
                     if dataset_name and dataset_name in dataset_configs:
                         with open(dataset_configs[dataset_name], 'r') as f:
                             config = json.load(f)
+                        # 处理metrics，将字符串转换为列表以适应多选组件
+                        metrics_value = config.get("metrics", "accuracy,mcc,f1,precision,recall,auroc")
+                        if isinstance(metrics_value, str):
+                            metrics_value = metrics_value.split(",")
                         return [
                             gr.update(visible=True),  # eval_dataset_defined
                             gr.update(visible=False), # eval_dataset_custom
                             gr.update(value=config.get("problem_type", ""), interactive=False),
                             gr.update(value=config.get("num_labels", 1), interactive=False),
-                            gr.update(value=config.get("metrics", ""), interactive=False)
+                            gr.update(value=metrics_value, interactive=False)
                         ]
                 else:
                     # Custom dataset settings
@@ -923,7 +934,7 @@ def create_eval_tab(constant):
                 args["dataset"] = dataset_custom
                 args["problem_type"] = problem_type
                 args["num_labels"] = num_labels
-                args["metrics"] = metrics if isinstance(metrics, str) else ",".join(metrics)
+                args["metrics"] = ",".join(metrics)
             else:
                 with open(dataset_configs[dataset_defined], 'r') as f:
                     config = json.load(f)
