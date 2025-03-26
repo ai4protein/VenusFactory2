@@ -1,4 +1,4 @@
-# Download Components Help Guide
+# VenusFactory Download Tab User Guide
 
 ## InterPro Metadata
 **Description**: Downloads protein domain information from InterPro database.

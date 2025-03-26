@@ -496,7 +496,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             with gr.Row(equal_height=True):
                 with gr.Column(scale=1, min_width=150):
                     training_method = gr.Dropdown(
-                        choices=["full", "freeze", "ses-adapter", "plm-lora", "plm-qlora"],
+                        choices=["full", "freeze", "ses-adapter", "plm-lora", "plm-qlora", "plm_adalora", "plm_dora", "plm_ia3"],
                         label="Training Method",
                         value="freeze"
                     )
