@@ -20,7 +20,6 @@ Recent News:
 - **[2025-03-05] 🎉 Congratulations!** 🎉 
 
   Our latest achievement in the **VenusHub** series, **VenusMutHub**, has been officially accepted by *Acta Pharmaceutica Sinica B*!   
-
   In this study, we built **900+ high-quality benchmark datasets** covering **500+ protein functional properties**. VenusMutHub provides a comprehensive evaluation framework for protein mutation effect prediction. It fills the gaps in existing benchmarks by introducing more diversity and challenging cases. This work sets a higher standard for assessing model **generalization, robustness, and real-world applicability**, pushing the field toward more accurate and reliable predictions. 🚀💡
 
    🔗 **Related Links:**  
