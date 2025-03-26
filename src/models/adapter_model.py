@@ -144,19 +144,19 @@ class AdapterModel(nn.Module):
             raise ValueError(f"classifier method {args.pooling_method} not supported")
     
     def plm_embedding(self, plm_model, aa_seq, attention_mask, structure_tokens=None):
-        if "ProSST" in self.args.plm_model:
-            outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask, ss_input_ids=structure_tokens, output_hidden_states=True)
-        elif "Prime" in self.args.plm_model:
-            outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask, output_hidden_states=True)
-        elif self.training and hasattr(self, 'args') and self.args.training_method == 'full':
-            outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask)
-        else:
-            with torch.no_grad():
+        with torch.no_grad():
+            if "ProSST" in self.args.plm_model:
+                outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask, ss_input_ids=structure_tokens, output_hidden_states=True)
+            elif "Prime" in self.args.plm_model or "deep" in self.args.plm_model:
+                outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask, output_hidden_states=True)
+            elif self.training and hasattr(self, 'args') and self.args.training_method == 'full':
                 outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask)
-        if "ProSST" in self.args.plm_model or "Prime" in self.args.plm_model:
-            seq_embeds = outputs.hidden_states[-1]
-        else:
-            seq_embeds = outputs.last_hidden_state
+            else:
+                outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask)
+            if "ProSST" in self.args.plm_model or "Prime" in self.args.plm_model:
+                seq_embeds = outputs.hidden_states[-1]
+            else:
+                seq_embeds = outputs.last_hidden_state
         gc.collect()
         torch.cuda.empty_cache()
         return seq_embeds
