@@ -20,7 +20,7 @@
 - [2025-03-05] 🎉 **祝贺!** 🎉
 
   🚀 我们课题组最新的研究成果**VenusMutHub**被[**Acta Pharmaceutica Sinica B**](https://www.sciencedirect.com/science/article/pii/S2211383525001650) 正式接收，并发布了系列[**排行榜**](https://lianglab.sjtu.edu.cn/muthub/)！    
-  💡 在本研究中，我们构建了[**900+ 高质量基准数据集**](https://huggingface.co/datasets/AI4Protein/VenusMutHub)，涵盖 **500+ 不同功能特性的蛋白质**. VenusMutHub不仅为**蛋白质突变工程的真实应用场景**提供了全新的小样本数据集，还弥补了现有基准数据集在**多样性**方面的空白，为AI驱动的蛋白质突变效应预测奠定了更坚实的基础。
+  💡 在本研究中，我们构建了**900+ 高质量基准**[**数据集**](https://huggingface.co/datasets/AI4Protein/VenusMutHub)，涵盖 **500+ 不同功能特性的蛋白质**. VenusMutHub不仅为**蛋白质突变工程的真实应用场景**提供了全新的小样本数据集，还弥补了现有基准数据集在**多样性**方面的空白，为AI驱动的蛋白质突变效应预测奠定了更坚实的基础。
 
 ## ✏️ 目录
 
