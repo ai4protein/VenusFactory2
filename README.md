@@ -22,11 +22,6 @@ Recent News:
   🚀 Our latest research achievement, **VenusMutHub**, has been officially accepted by [**Acta Pharmaceutica Sinica B**](https://www.sciencedirect.com/science/article/pii/S2211383525001650) and is now featured in a series of [**leaderboards**](https://lianglab.sjtu.edu.cn/muthub/)!    
   💡 In this study, we built **900+ high-quality benchmark datasets** covering **500+ protein functional properties**. VenusMutHub not only offers a new collection of small-sample datasets for **real-world protein mutation engineering**, but also fills the gap in **diversity** within existing benchmarks, laying a stronger foundation for AI-driven protein mutation effect prediction.
 
-   🔗 **Related Links:**  
-  - 📄 [**Article**]  
-  - 📊 [**Dataset**](https://huggingface.co/datasets/AI4Protein/VenusMutHub)  
-  - 🏆 [**Leaderboard**]
-
 
 ## ✏️ Table of Contents
 
