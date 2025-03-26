@@ -19,13 +19,8 @@ Recent News:
 - [2025-03-17] Add PETA, ProPrime, ProSST models
 - **[2025-03-05] 🎉 Congratulations!** 🎉 
 
-  Our latest achievement in the **VenusHub** series, **VenusMutHub**, has been officially accepted by *Acta Pharmaceutica Sinica B*!   
-  In this study, we built **900+ high-quality benchmark datasets** covering **500+ protein functional properties**. VenusMutHub provides a comprehensive evaluation framework for protein mutation effect prediction. It fills the gaps in existing benchmarks by introducing more diversity and challenging cases. This work sets a higher standard for assessing model **generalization, robustness, and real-world applicability**, pushing the field toward more accurate and reliable predictions. 🚀💡
-
-   🔗 **Related Links:**  
-  - 📄 [**Article**](https://www.sciencedirect.com/science/article/pii/S2211383525001650)  
-  - 📊 [**Dataset**](https://huggingface.co/datasets/AI4Protein/VenusMutHub)  
-  - 🏆 [**Leaderboard**](https://lianglab.sjtu.edu.cn/muthub/)
+  🚀 Our latest research achievement, **VenusMutHub**, has been officially accepted by [**Acta Pharmaceutica Sinica B**](https://www.sciencedirect.com/science/article/pii/S2211383525001650) and is now featured in a series of [**leaderboards**](https://lianglab.sjtu.edu.cn/muthub/)!    
+  💡 In this study, we built **900+ high-quality benchmark** [**datasets**](https://huggingface.co/datasets/AI4Protein/VenusMutHub) covering **500+ protein functional properties**. VenusMutHub not only offers a new collection of small-sample datasets for **real-world protein mutation engineering**, but also fills the gap in **diversity** within existing benchmarks, laying a stronger foundation for AI-driven protein mutation effect prediction.
 
 
 ## ✏️ Table of Contents
