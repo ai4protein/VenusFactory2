@@ -177,84 +177,83 @@
 
 <details><summary>预训练数据集</summary>
 
-- [CATH_V43_S40](https://huggingface.co/datasets/tyang816/cath) | 结构数据集
+| 数据集 | 数据来源 |
+|-------|----------|
+| [CATH_V43_S40](https://huggingface.co/datasets/tyang816/cath) | 结构数据集
+| [AGO_family](https://huggingface.co/datasets/tyang816/Ago_database_PDB) | 结构数据集
 
+</details>
+
+<details><summary>零样本数据集</summary>
+
+| 数据集 | 任务 | 数据来源 |
+|-------|----------|----------|
+| [VenusMutHub](https://huggingface.co/datasets/AI4Protein/VenusMutHub) | 突变 | 蛋白质序列
+| [ProteinGym](https://proteingym.org/) | 突变 | 蛋白质序列
 </details>
 
 <details><summary>监督微调数据集（氨基酸序列/foldseek序列/二级结构序列）</summary>
 
-- DeepLocBinary | 蛋白质级别 | 单标签分类
-    - [DeepLocBinary_AlphaFold2](https://huggingface.co/datasets/tyang816/DeepLocBinary_AlphaFold2)
-    - [DeepLocBinary_ESMFold](https://huggingface.co/datasets/tyang816/DeepLocBinary_ESMFold)
-- DeepLocMulti | 蛋白质级别 | 多标签分类
-    - [DeepLocMulti_AlphaFold2](https://huggingface.co/datasets/tyang816/DeepLocMulti_AlphaFold2)
-    - [DeepLocMulti_ESMFold](https://huggingface.co/datasets/tyang816/DeepLocMulti_ESMFold)
-- DeepLoc2Multi | 蛋白质级别 | 多标签分类
-    - [DeepLoc2Multi_AlphaFold2](https://huggingface.co/datasets/tyang816/DeepLoc2Multi_AlphaFold2)
-    - [DeepLoc2Multi_ESMFold](https://huggingface.co/datasets/tyang816/DeepLoc2Multi_ESMFold)
-- DeepSol | 蛋白质级别 | 单标签分类
-    - [DeepSol_AlphaFold2](https://huggingface.co/datasets/tyang816/DeepSol_AlphaFold2)
-    - [DeepSol_ESMFold](https://huggingface.co/datasets/tyang816/DeepSol_ESMFold)
-- DeepSoluE | 蛋白质级别 | 单标签分类
-    - [DeepSoluE_ESMFold](https://huggingface.co/datasets/tyang816/DeepSoluE_ESMFold)
-- ProtSolM | 蛋白质级别 | 单标签分类
-    - [ProtSolM_ESMFold](https://huggingface.co/datasets/tyang816/ProtSolM_ESMFold)
-- eSOL | 蛋白质级别 | 回归
-    - [eSOL_AlphaFold2](https://huggingface.co/datasets/tyang816/eSOL_AlphaFold2)
-    - [eSOL_ESMFold](https://huggingface.co/datasets/tyang816/eSOL_ESMFold)
-- DeepET_Topt | 蛋白质级别 | 回归
-    - [DeepET_Topt_AlphaFold2](https://huggingface.co/datasets/tyang816/DeepET_Topt_AlphaFold2)
-    - [DeepET_Topt_ESMFold](https://huggingface.co/datasets/tyang816/DeepET_Topt_ESMFold)
-- EC | 蛋白质级别 | 多标签分类
-    - [EC_AlphaFold2](https://huggingface.co/datasets/tyang816/EC_AlphaFold2)
-    - [EC_ESMFold](https://huggingface.co/datasets/tyang816/EC_ESMFold)
-- GO_BP | 蛋白质级别 | 多标签分类
-    - [GO_BP_AlphaFold2](https://huggingface.co/datasets/tyang816/GO_BP_AlphaFold2)
-    - [GO_BP_ESMFold](https://huggingface.co/datasets/tyang816/GO_BP_ESMFold)
-- GO_CC | 蛋白质级别 | 多标签分类
-    - [GO_CC_AlphaFold2](https://huggingface.co/datasets/tyang816/GO_CC_AlphaFold2)
-    - [GO_CC_ESMFold](https://huggingface.co/datasets/tyang816/GO_CC_ESMFold)
-- GO_MF | 蛋白质级别 | 多标签分类
-    - [GO_MF_AlphaFold2](https://huggingface.co/datasets/tyang816/GO_MF_AlphaFold2)
-    - [GO_MF_ESMFold](https://huggingface.co/datasets/tyang816/GO_MF_ESMFold)
-- MetalIonBinding | 蛋白质级别 | 单标签分类
-    - [MetalIonBinding_AlphaFold2](https://huggingface.co/datasets/tyang816/MetalIonBinding_AlphaFold2)
-    - [MetalIonBinding_ESMFold](https://huggingface.co/datasets/tyang816/MetalIonBinding_ESMFold)
-- Thermostability | 蛋白质级别 | 回归
-    - [Thermostability_AlphaFold2](https://huggingface.co/datasets/tyang816/Thermostability_AlphaFold2)
-    - [Thermostability_ESMFold](https://huggingface.co/datasets/tyang816/Thermostability_ESMFold)
+| 数据集 | 任务 | 数据层次 | 问题类型 | 数据来源 |
+|-------|------|------------|----------|----------|
+| DeepLocBinary | 定位 | 蛋白质级别 | 单标签分类 | [DeepLocBinary_AlphaFold2](https://huggingface.co/datasets/tyang816/DeepLocBinary_AlphaFold2), [DeepLocBinary_ESMFold](https://huggingface.co/datasets/tyang816/DeepLocBinary_ESMFold) |
+| DeepLocMulti | 定位 | 蛋白质级别 | 多标签分类 | [DeepLocMulti_AlphaFold2](https://huggingface.co/datasets/tyang816/DeepLocMulti_AlphaFold2), [DeepLocMulti_ESMFold](https://huggingface.co/datasets/tyang816/DeepLocMulti_ESMFold) |
+| DeepLoc2Multi | 定位 | 蛋白质级别 | 多标签分类 | [DeepLoc2Multi_AlphaFold2](https://huggingface.co/datasets/tyang816/DeepLoc2Multi_AlphaFold2), [DeepLoc2Multi_ESMFold](https://huggingface.co/datasets/tyang816/DeepLoc2Multi_ESMFold) |
+| DeepSol | 溶解度 | 蛋白质级别 | 单标签分类 | [DeepSol_AlphaFold2](https://huggingface.co/datasets/tyang816/DeepSol_AlphaFold2), [DeepSol_ESMFold](https://huggingface.co/datasets/tyang816/DeepSol_ESMFold) |
+| DeepSoluE | 溶解度 | 蛋白质级别 | 单标签分类 | [DeepSoluE_ESMFold](https://huggingface.co/datasets/tyang816/DeepSoluE_ESMFold) |
+| ProtSolM | 溶解度 | 蛋白质级别 | 单标签分类 | [ProtSolM_ESMFold](https://huggingface.co/datasets/tyang816/ProtSolM_ESMFold) |
+| eSOL | 溶解度 | 蛋白质级别 | 回归 | [eSOL_AlphaFold2](https://huggingface.co/datasets/tyang816/eSOL_AlphaFold2), [eSOL_ESMFold](https://huggingface.co/datasets/tyang816/eSOL_ESMFold) |
+| DeepET_Topt | 最适酶活 | 蛋白质级别 | 回归 | [DeepET_Topt_AlphaFold2](https://huggingface.co/datasets/tyang816/DeepET_Topt_AlphaFold2), [DeepET_Topt_ESMFold](https://huggingface.co/datasets/tyang816/DeepET_Topt_ESMFold) |
+| EC | 功能 | 蛋白质级别 | 多标签分类 | [EC_AlphaFold2](https://huggingface.co/datasets/tyang816/EC_AlphaFold2), [EC_ESMFold](https://huggingface.co/datasets/tyang816/EC_ESMFold) |
+| GO_BP | 功能 | 蛋白质级别 | 多标签分类 | [GO_BP_AlphaFold2](https://huggingface.co/datasets/tyang816/GO_BP_AlphaFold2), [GO_BP_ESMFold](https://huggingface.co/datasets/tyang816/GO_BP_ESMFold) |
+| GO_CC | 功能 | 蛋白质级别 | 多标签分类 | [GO_CC_AlphaFold2](https://huggingface.co/datasets/tyang816/GO_CC_AlphaFold2), [GO_CC_ESMFold](https://huggingface.co/datasets/tyang816/GO_CC_ESMFold) |
+| GO_MF | 功能 | 蛋白质级别 | 多标签分类 | [GO_MF_AlphaFold2](https://huggingface.co/datasets/tyang816/GO_MF_AlphaFold2), [GO_MF_ESMFold](https://huggingface.co/datasets/tyang816/GO_MF_ESMFold) |
+| MetalIonBinding | 结合 | 蛋白质级别 | 单标签分类 | [MetalIonBinding_AlphaFold2](https://huggingface.co/datasets/tyang816/MetalIonBinding_AlphaFold2), [MetalIonBinding_ESMFold](https://huggingface.co/datasets/tyang816/MetalIonBinding_ESMFold) |
+| Thermostability | 稳定性 | 蛋白质级别 | 回归 | [Thermostability_AlphaFold2](https://huggingface.co/datasets/tyang816/Thermostability_AlphaFold2), [Thermostability_ESMFold](https://huggingface.co/datasets/tyang816/Thermostability_ESMFold) |
 
 > 💡 每个数据集都提供了使用 AlphaFold2 和 ESMFold 生成的结构序列版本
 </details>
 
-<details><summary>Supervised fine-tuning datasets (amino acid sequences)</summary>
+<details><summary>监督微调数据集（氨基酸序列）</summary>
 
-- [Demo_Solubility](https://huggingface.co/datasets/tyang816/Demo_Solubility) | 蛋白质级别 | 单标签分类
-- [DeepLocBinary](https://huggingface.co/datasets/tyang816/DeepLocBinary) | 蛋白质级别 | 单标签分类
-- [DeepLocMulti](https://huggingface.co/datasets/tyang816/DeepLocMulti) | 蛋白质级别 | 单标签分类
-- [DeepLoc2Multi](https://huggingface.co/datasets/tyang816/DeepLoc2Multi) | 蛋白质级别 | 单标签分类
-- [DeepSol](https://huggingface.co/datasets/tyang816/DeepSol) | 蛋白质级别 | 单标签分类
-- [DeepSoluE](https://huggingface.co/datasets/tyang816/DeepSoluE) | 蛋白质级别 | 单标签分类
-- [ProtSolM](https://huggingface.co/datasets/tyang816/ProtSolM) | 蛋白质级别 | 单标签分类
-- [eSOL](https://huggingface.co/datasets/tyang816/eSOL) | 蛋白质级别 | 回归
-- [DeepET_Topt](https://huggingface.co/datasets/tyang816/DeepET_Topt) | 蛋白质级别 | 回归
-- [EC](https://huggingface.co/datasets/tyang816/EC) | 蛋白质级别 | 多标签分类
-- [GO_BP](https://huggingface.co/datasets/tyang816/GO_BP) | 蛋白质级别 | 多标签分类
-- [GO_CC](https://huggingface.co/datasets/tyang816/GO_CC) | 蛋白质级别 | 多标签分类
-- [GO_MF](https://huggingface.co/datasets/tyang816/GO_MF) | 蛋白质级别 | 多标签分类
-- [MetalIonBinding](https://huggingface.co/datasets/tyang816/MetalIonBinding) | 蛋白质级别 | 单标签分类
-- [Thermostability](https://huggingface.co/datasets/tyang816/Thermostability) | 蛋白质级别 | 回归
-- [PaCRISPR](https://huggingface.co/datasets/tyang816/PaCRISPR) | 蛋白质级别
-- [PETA_CHS_Sol](https://huggingface.co/datasets/tyang816/PETA_CHS_Sol) | 蛋白质级别
-- [PETA_LGK_Sol](https://huggingface.co/datasets/tyang816/PETA_LGK_Sol) | 蛋白质级别
-- [PETA_TEM_Sol](https://huggingface.co/datasets/tyang816/PETA_TEM_Sol) | 蛋白质级别
-- [SortingSignal](https://huggingface.co/datasets/tyang816/SortingSignal) | 蛋白质级别
-- FLIP_AAV | 蛋白质点位 | 回归
-    - [FLIP_AAV_one-vs-rest](https://huggingface.co/datasets/tyang816/FLIP_AAV_one-vs-rest), [FLIP_AAV_two-vs-rest](https://huggingface.co/datasets/tyang816/FLIP_AAV_two-vs-rest), [FLIP_AAV_mut-des](https://huggingface.co/datasets/tyang816/FLIP_AAV_mut-des), [FLIP_AAV_des-mut](https://huggingface.co/datasets/tyang816/FLIP_AAV_des-mut), [FLIP_AAV_seven-vs-rest](https://huggingface.co/datasets/tyang816/FLIP_AAV_seven-vs-rest), [FLIP_AAV_low-vs-high](https://huggingface.co/datasets/tyang816/FLIP_AAV_low-vs-high), [FLIP_AAV_sampled](https://huggingface.co/datasets/tyang816/FLIP_AAV_sampled)
-- FLIP_GB1 | 蛋白质点位 | 回归
-    - [FLIP_GB1_one-vs-rest](https://huggingface.co/datasets/tyang816/FLIP_GB1_one-vs-rest), [FLIP_GB1_two-vs-rest](https://huggingface.co/datasets/tyang816/FLIP_GB1_two-vs-rest), [FLIP_GB1_three-vs-rest](https://huggingface.co/datasets/tyang816/FLIP_GB1_three-vs-rest), [FLIP_GB1_low-vs-high](https://huggingface.co/datasets/tyang816/FLIP_GB1_low-vs-high), [FLIP_GB1_sampled](https://huggingface.co/datasets/tyang816/FLIP_GB1_sampled)
-- [TAPE_Fluorescence](https://huggingface.co/datasets/tyang816/TAPE_Fluorescence) | 蛋白质点位 | 回归
-- [TAPE_Stability](https://huggingface.co/datasets/tyang816/TAPE_Stability) | 蛋白质点位 | 回归
+| 数据集 | 任务 | 数据层次 | 问题类型 | 数据来源 |
+|-------|------|------------|----------|----------|
+| Demo_Solubility | 溶解度 | 蛋白质级别 | 单标签分类 | [Demo_Solubility](https://huggingface.co/datasets/tyang816/Demo_Solubility) |
+| DeepLocBinary | 定位 | 蛋白质级别 | 单标签分类 | [DeepLocBinary](https://huggingface.co/datasets/tyang816/DeepLocBinary) |
+| DeepLocMulti | 定位 | 蛋白质级别 | 单标签分类 | [DeepLocMulti](https://huggingface.co/datasets/tyang816/DeepLocMulti) |
+| DeepLoc2Multi | 定位 | 蛋白质级别 | 多标签分类 | [DeepLoc2Multi](https://huggingface.co/datasets/tyang816/DeepLoc2Multi) |
+| DeepSol | 溶解度 | 蛋白质级别 | 单标签分类 | [DeepSol](https://huggingface.co/datasets/tyang816/DeepSol) |
+| DeepSoluE | 溶解度 | 蛋白质级别 | 单标签分类 | [DeepSoluE](https://huggingface.co/datasets/tyang816/DeepSoluE) |
+| ProtSolM | 溶解度 | 蛋白质级别 | 单标签分类 | [ProtSolM](https://huggingface.co/datasets/tyang816/ProtSolM) |
+| eSOL | 溶解度 | 蛋白质级别 | 回归 | [eSOL](https://huggingface.co/datasets/tyang816/eSOL) |
+| DeepET_Topt | 最适酶活 | 蛋白质级别 | 回归 | [DeepET_Topt](https://huggingface.co/datasets/tyang816/DeepET_Topt) |
+| EC | 功能 | 蛋白质级别 | 多标签分类 | [EC](https://huggingface.co/datasets/tyang816/EC) |
+| GO_BP | 功能 | 蛋白质级别 | 多标签分类 | [GO_BP](https://huggingface.co/datasets/tyang816/GO_BP) |
+| GO_CC | 功能 | 蛋白质级别 | 多标签分类 | [GO_CC](https://huggingface.co/datasets/tyang816/GO_CC) |
+| GO_MF | 功能 | 蛋白质级别 | 多标签分类 | [GO_MF](https://huggingface.co/datasets/tyang816/GO_MF) |
+| MetalIonBinding | 结合 | 蛋白质级别 | 单标签分类 | [MetalIonBinding](https://huggingface.co/datasets/tyang816/MetalIonBinding) |
+| Thermostability | 稳定性 | 蛋白质级别 | 回归 | [Thermostability](https://huggingface.co/datasets/tyang816/Thermostability) |
+| PaCRISPR | CRISPR | 蛋白质级别 | 回归 | [PaCRISPR](https://huggingface.co/datasets/tyang816/PaCRISPR) |
+| PETA_CHS_Sol | 溶解度 | 蛋白质级别 | 回归 | [PETA_CHS_Sol](https://huggingface.co/datasets/tyang816/PETA_CHS_Sol) |
+| PETA_LGK_Sol | 溶解度 | 蛋白质级别 | 回归 | [PETA_LGK_Sol](https://huggingface.co/datasets/tyang816/PETA_LGK_Sol) |
+| PETA_TEM_Sol | 溶解度 | 蛋白质级别 | 回归 | [PETA_TEM_Sol](https://huggingface.co/datasets/tyang816/PETA_TEM_Sol) |
+| SortingSignal | 信号肽 | 蛋白质级别 | 回归 | [SortingSignal](https://huggingface.co/datasets/tyang816/SortingSignal) |
+| FLIP_AAV | 突变 | 蛋白质点位 | 回归 |  |
+| FLIP_AAV_one-vs-rest | 突变 | 蛋白质点位 | 回归 | [FLIP_AAV_one-vs-rest](https://huggingface.co/datasets/tyang816/FLIP_AAV_one-vs-rest) |
+| FLIP_AAV_two-vs-rest | 突变 | 蛋白质点位 | 回归 | [FLIP_AAV_two-vs-rest](https://huggingface.co/datasets/tyang816/FLIP_AAV_two-vs-rest) |
+| FLIP_AAV_mut-des | 突变 | 蛋白质点位 | 回归 | [FLIP_AAV_mut-des](https://huggingface.co/datasets/tyang816/FLIP_AAV_mut-des) |
+| FLIP_AAV_des-mut | 突变 | 蛋白质点位 | 回归 | [FLIP_AAV_des-mut](https://huggingface.co/datasets/tyang816/FLIP_AAV_des-mut) |
+| FLIP_AAV_seven-vs-rest | 突变 | 蛋白质点位 | 回归 | [FLIP_AAV_seven-vs-rest](https://huggingface.co/datasets/tyang816/FLIP_AAV_seven-vs-rest) |
+| FLIP_AAV_low-vs-high | 突变 | 蛋白质点位 | 回归 | [FLIP_AAV_low-vs-high](https://huggingface.co/datasets/tyang816/FLIP_AAV_low-vs-high) |
+| FLIP_AAV_sampled | 突变 | 蛋白质点位 | 回归 | [FLIP_AAV_sampled](https://huggingface.co/datasets/tyang816/FLIP_AAV_sampled) |
+| FLIP_GB1 | 突变 | 蛋白质点位 | 回归 | |
+| FLIP_GB1_one-vs-rest | 突变 | 蛋白质点位 | 回归 | [FLIP_GB1_one-vs-rest](https://huggingface.co/datasets/tyang816/FLIP_GB1_one-vs-rest) |
+| FLIP_GB1_two-vs-rest | 突变 | 蛋白质点位 | 回归 | [FLIP_GB1_two-vs-rest](https://huggingface.co/datasets/tyang816/FLIP_GB1_two-vs-rest) |
+| FLIP_GB1_three-vs-rest | 突变 | 蛋白质点位 | 回归 | [FLIP_GB1_three-vs-rest](https://huggingface.co/datasets/tyang816/FLIP_GB1_three-vs-rest) |
+| FLIP_GB1_low-vs-high | 突变 | 蛋白质点位 | 回归 | [FLIP_GB1_low-vs-high](https://huggingface.co/datasets/tyang816/FLIP_GB1_low-vs-high) |
+| FLIP_GB1_sampled | 突变 | 蛋白质点位 | 回归 | [FLIP_GB1_sampled](https://huggingface.co/datasets/tyang816/FLIP_GB1_sampled) |
+| TAPE_Fluorescence | 突变 | 蛋白质点位 | 回归 | [TAPE_Fluorescence](https://huggingface.co/datasets/tyang816/TAPE_Fluorescence) |
+| TAPE_Stability | 突变 | 蛋白质点位 | 回归 | [TAPE_Stability](https://huggingface.co/datasets/tyang816/TAPE_Stability) |
 
 
 > 💡 不同数据集的序列结构不同，例如 ``DeepLocBinary_ESMFold`` 和 ``DeepLocBinary_AlphaFold2`` 共享相同的氨基酸序列，因此如果您只想使用 ``aa_seqs``，两者都可以使用！
