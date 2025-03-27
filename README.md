@@ -40,7 +40,7 @@ Recent News:
 
 ## 📑 Features
 
-- **Vaious protein langugae models**: ESM2, ESM-b, ESM-1v, ProtBert, ProtT5, Ankh, etc
+- **Vaious protein langugae models**: Venus series, ESM series, ProtTrans series, Ankh series, etc
 - **Comprehensive supervised datasets**: Localization, Fitness, Solubility, Stability, etc
 - **Easy and quick data collector**: AlphaFold2 Database, RCSB, InterPro, Uniprot, etc
 - **Experiment moitors**: Wandb, Local
@@ -175,9 +175,14 @@ Recent News:
 
 ## 🔬 Supported Training Approaches
 
+<details>
+<summary>Supported Training Approaches</summary>
+
 | Approach               | Full-tuning | Freeze-tuning      | SES-Adapter        | AdaLoRA            | QLoRA      | LoRA               | DoRA            | IA3              | 
 | ---------------------- | ----------- | ------------------ | ------------------ | ------------------ |----------- | ------------------ | -----------------| -----------------|
 | Supervised Fine-Tuning | ✅          | ✅                | ✅                 | ✅                |✅          | ✅                | ✅               | ✅              |
+
+</details>
 
 ## 📚 Supported Datasets
 
@@ -272,6 +277,9 @@ Recent News:
 
 ## 📈 Supported Metrics
 
+<details>
+<summary>Supported Metrics</summary>
+
 | Name          | Torchmetrics     | Problem Type                                            |
 | ------------- | ---------------- | ------------------------------------------------------- |
 | accuracy      | Accuracy         | single_label_classification/ multi_label_classification |
@@ -283,6 +291,8 @@ Recent News:
 | f1_max        | F1ScoreMax       | multi_label_classification                              |
 | spearman_corr | SpearmanCorrCoef | regression                                              |
 | mse           | MeanSquaredError | regression                                              |
+
+</details>
 
 ## ✈️ Requirements
 

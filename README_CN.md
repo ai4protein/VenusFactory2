@@ -50,6 +50,21 @@
 ### 预训练蛋白质语言模型
 
 <details>
+<summary>Venus系列模型：特定任务架构</summary>
+
+| 模型 | 大小 | 参数量 | GPU内存 | 特点 | 模板 |
+|-------|------|------------|------------|----------|----------|
+| ProSST-20 | 20 | 110M | 4GB+ | 突变预测 | [AI4Protein/ProSST-20](https://huggingface.co/AI4Protein/ProSST-20) |
+| ProSST-128 | 128 | 110M | 4GB+ | 突变预测 | [AI4Protein/ProSST-128](https://huggingface.co/AI4Protein/ProSST-128) |
+| ProSST-512 | 512 | 110M | 4GB+ | 突变预测 | [AI4Protein/ProSST-512](https://huggingface.co/AI4Protein/ProSST-512) |
+| ProSST-2048 | 2048 | 110M | 4GB+ | 突变预测 | [AI4Protein/ProSST-2048](https://huggingface.co/AI4Protein/ProSST-2048) |
+| ProSST-4096 | 4096 | 110M | 4GB+ | 突变预测 | [AI4Protein/ProSST-4096](https://huggingface.co/AI4Protein/ProSST-4096) |
+| ProPrime-690M | 690M | 690M | 16GB+ | OGT预测 | [AI4Protein/Prime_690M](https://huggingface.co/AI4Protein/Prime_690M) |
+
+> 💡 这些模型在特定任务上表现出色或提供独特的架构优势
+</details>
+
+<details>
 <summary>Venus-PETA 模型：分词变体</summary>
 
 #### BPE 分词系列
@@ -88,21 +103,6 @@
 | ESM2-650M | 650M | 650M | 16GB+ | UR50/D | [facebook/esm2_t33_650M_UR50D](https://huggingface.co/facebook/esm2_t33_650M_UR50D) |
 | ESM2-3B | 3B | 3B | 24GB+ | UR50/D | [facebook/esm2_t36_3B_UR50D](https://huggingface.co/facebook/esm2_t36_3B_UR50D) |
 | ESM2-15B | 15B | 15B | 40GB+ | UR50/D | [facebook/esm2_t48_15B_UR50D](https://huggingface.co/facebook/esm2_t48_15B_UR50D) |
-
-<details>
-<summary>Venus系列模型：特定任务架构</summary>
-
-| 模型 | 大小 | 参数量 | GPU内存 | 特点 | 模板 |
-|-------|------|------------|------------|----------|----------|
-| ProSST-20 | 20 | 110M | 4GB+ | 突变预测 | [AI4Protein/ProSST-20](https://huggingface.co/AI4Protein/ProSST-20) |
-| ProSST-128 | 128 | 110M | 4GB+ | 突变预测 | [AI4Protein/ProSST-128](https://huggingface.co/AI4Protein/ProSST-128) |
-| ProSST-512 | 512 | 110M | 4GB+ | 突变预测 | [AI4Protein/ProSST-512](https://huggingface.co/AI4Protein/ProSST-512) |
-| ProSST-2048 | 2048 | 110M | 4GB+ | 突变预测 | [AI4Protein/ProSST-2048](https://huggingface.co/AI4Protein/ProSST-2048) |
-| ProSST-4096 | 4096 | 110M | 4GB+ | 突变预测 | [AI4Protein/ProSST-4096](https://huggingface.co/AI4Protein/ProSST-4096) |
-| ProPrime-690M | 690M | 690M | 16GB+ | OGT预测 | [AI4Protein/Prime_690M](https://huggingface.co/AI4Protein/Prime_690M) |
-
-> 💡 这些模型在特定任务上表现出色或提供独特的架构优势
-</details>
 
 > 💡 ESM2 模型是最新一代，性能优于 ESM-1b/1v
 </details>
@@ -165,9 +165,13 @@
 
 ## 🔬 支持的训练方法
 
+<details>
+<summary>支持的训练方法</summary>
+
 | 方法 | 全量微调 | 冻结微调 | SES-Adapter | AdaLoRA | QLoRA | LoRA | DoRA | IA3 |
 |------|---------|----------|-------------|----------|--------|------|------|-----|
 | 监督微调 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+</details>
 
 ## 📚 支持的数据集
 
@@ -259,6 +263,8 @@
 
 
 ## 📈 支持的评估指标
+<details>
+<summary>支持的评估指标</summary>
 
 | 名称 | Torchmetrics | 问题类型 |
 |------|--------------|----------|
@@ -271,7 +277,7 @@
 | f1_max | F1ScoreMax | 多标签分类 |
 | spearman_corr | SpearmanCorrCoef | 回归 |
 | mse | MeanSquaredError | 回归 |
-
+</details>
 ## ✈️ 环境要求
 
 ### 硬件要求
