@@ -15,8 +15,9 @@
 
 最新消息：
 
-- 欢迎使用 VenusFactory！如果您喜欢，请给我们一个星标！
-- [2025-03-17] 新增 PETA、ProPrime、ProSST 模型
+- 欢迎使用 VenusFactory！本项目由[**Liang's Lab**](https://lianglab.sjtu.edu.cn/)开发，由[**Shanghai Jiao Tong University**](https://www.sjtu.edu.cn/)维护。
+- [2025-03-26] 新增 [VenusPLM-300M](https://huggingface.co/AI4Protein/VenusPLM-300M) 模型，基于**VenusPod**独立开发，由[**Hong Liang**](https://lianglab.sjtu.edu.cn/)课题组开发。
+- [2025-03-17] 新增 [Venus-PETA、Venus-ProPrime、Venus-ProSST 模型](https://huggingface.co/AI4Protein)，更多详情请参考[支持的模型](#-支持的模型)
 - [2025-03-05] 🎉 **祝贺!** 🎉
 
   🚀 我们课题组最新的研究成果**VenusMutHub**被[**Acta Pharmaceutica Sinica B**](https://www.sciencedirect.com/science/article/pii/S2211383525001650) 正式接收，并发布了系列[**排行榜**](https://lianglab.sjtu.edu.cn/muthub/)！    
@@ -38,7 +39,7 @@
 
 ## 📑 功能特点
 
-- **丰富的蛋白质语言模型**：ESM2、ESM-b、ESM-1v、ProtBert、ProtT5、Ankh 等
+- **丰富的蛋白质语言模型**：Venus系列、ESM系列、ProtTrans系列、Ankh 系列等
 - **全面的监督数据集**：定位、适应度、溶解度、稳定性等
 - **便捷的数据收集工具**：AlphaFold2 数据库、RCSB、InterPro、Uniprot 等
 - **实验监控**：Wandb、本地监控
@@ -47,6 +48,34 @@
 ## 🤖 支持的模型
 
 ### 预训练蛋白质语言模型
+
+<details>
+<summary>Venus-PETA 模型：分词变体</summary>
+
+#### BPE 分词系列
+| 模型 | 词表大小 | 参数量 | GPU内存 | 模板 |
+|-------|------------|------------|------------|----------|
+| PETA-base | base | 80M | 4GB+ | [AI4Protein/deep_base](https://huggingface.co/AI4Protein/deep_base) |
+| PETA-bpe-50 | 50 | 80M | 4GB+ | [AI4Protein/deep_bpe_50](https://huggingface.co/AI4Protein/deep_bpe_50) |
+| PETA-bpe-200 | 200 | 80M | 4GB+ | [AI4Protein/deep_bpe_200](https://huggingface.co/AI4Protein/deep_bpe_200) |
+| PETA-bpe-400 | 400 | 80M | 4GB+ | [AI4Protein/deep_bpe_400](https://huggingface.co/AI4Protein/deep_bpe_400) |
+| PETA-bpe-800 | 800 | 80M | 4GB+ | [AI4Protein/deep_bpe_800](https://huggingface.co/AI4Protein/deep_bpe_800) |
+| PETA-bpe-1600 | 1600 | 80M | 4GB+ | [AI4Protein/deep_bpe_1600](https://huggingface.co/AI4Protein/deep_bpe_1600) |
+| PETA-bpe-3200 | 3200 | 80M | 4GB+ | [AI4Protein/deep_bpe_3200](https://huggingface.co/AI4Protein/deep_bpe_3200) |
+
+#### Unigram 分词系列
+| 模型 | 词表大小 | 参数量 | GPU内存 | 模板 |
+|-------|------------|------------|------------|----------|
+| PETA-unigram-50 | 50 | 80M | 4GB+ | [AI4Protein/deep_unigram_50](https://huggingface.co/AI4Protein/deep_unigram_50) |
+| PETA-unigram-100 | 100 | 80M | 4GB+ | [AI4Protein/deep_unigram_100](https://huggingface.co/AI4Protein/deep_unigram_100) |
+| PETA-unigram-200 | 200 | 80M | 4GB+ | [AI4Protein/deep_unigram_200](https://huggingface.co/AI4Protein/deep_unigram_200) |
+| PETA-unigram-400 | 400 | 80M | 4GB+ | [AI4Protein/deep_unigram_400](https://huggingface.co/AI4Protein/deep_unigram_400) |
+| PETA-unigram-800 | 800 | 80M | 4GB+ | [AI4Protein/deep_unigram_800](https://huggingface.co/AI4Protein/deep_unigram_800) |
+| PETA-unigram-1600 | 1600 | 80M | 4GB+ | [AI4Protein/deep_unigram_1600](https://huggingface.co/AI4Protein/deep_unigram_1600) |
+| PETA-unigram-3200 | 3200 | 80M | 4GB+ | [AI4Protein/deep_unigram_3200](https://huggingface.co/AI4Protein/deep_unigram_3200) |
+
+> 💡 不同的分词策略可能更适合特定任务
+</details>
 
 <details>
 <summary>ESM 系列模型：Meta AI 的蛋白质语言模型</summary>
@@ -59,6 +88,21 @@
 | ESM2-650M | 650M | 650M | 16GB+ | UR50/D | [facebook/esm2_t33_650M_UR50D](https://huggingface.co/facebook/esm2_t33_650M_UR50D) |
 | ESM2-3B | 3B | 3B | 24GB+ | UR50/D | [facebook/esm2_t36_3B_UR50D](https://huggingface.co/facebook/esm2_t36_3B_UR50D) |
 | ESM2-15B | 15B | 15B | 40GB+ | UR50/D | [facebook/esm2_t48_15B_UR50D](https://huggingface.co/facebook/esm2_t48_15B_UR50D) |
+
+<details>
+<summary>Venus系列模型：特定任务架构</summary>
+
+| 模型 | 大小 | 参数量 | GPU内存 | 特点 | 模板 |
+|-------|------|------------|------------|----------|----------|
+| ProSST-20 | 20 | 110M | 4GB+ | 突变预测 | [AI4Protein/ProSST-20](https://huggingface.co/AI4Protein/ProSST-20) |
+| ProSST-128 | 128 | 110M | 4GB+ | 突变预测 | [AI4Protein/ProSST-128](https://huggingface.co/AI4Protein/ProSST-128) |
+| ProSST-512 | 512 | 110M | 4GB+ | 突变预测 | [AI4Protein/ProSST-512](https://huggingface.co/AI4Protein/ProSST-512) |
+| ProSST-2048 | 2048 | 110M | 4GB+ | 突变预测 | [AI4Protein/ProSST-2048](https://huggingface.co/AI4Protein/ProSST-2048) |
+| ProSST-4096 | 4096 | 110M | 4GB+ | 突变预测 | [AI4Protein/ProSST-4096](https://huggingface.co/AI4Protein/ProSST-4096) |
+| ProPrime-690M | 690M | 690M | 16GB+ | OGT预测 | [AI4Protein/Prime_690M](https://huggingface.co/AI4Protein/Prime_690M) |
+
+> 💡 这些模型在特定任务上表现出色或提供独特的架构优势
+</details>
 
 > 💡 ESM2 模型是最新一代，性能优于 ESM-1b/1v
 </details>
@@ -85,53 +129,10 @@
 | ProtT5-XXL-UniRef50 | 11B | 11B | 40GB+ | UniRef50 | [Rostlab/prot_t5_xxl_uniref50](https://huggingface.co/Rostlab/prot_t5_xxl_uniref50) |
 | ProtT5-XL-BFD | 3B | 3B | 24GB+ | BFD100 | [Rostlab/prot_t5_xl_bfd](https://huggingface.co/Rostlab/prot_t5_xl_bfd) |
 | ProtT5-XXL-BFD | 11B | 11B | 40GB+ | BFD100 | [Rostlab/prot_t5_xxl_bfd](https://huggingface.co/Rostlab/prot_t5_xxl_bfd) |
-
-> 💡 T5 模型可用于编码和生成任务
-</details>
-
-<details>
-<summary>专业模型：特定任务架构</summary>
-
-| 模型 | 大小 | 参数量 | GPU内存 | 特点 | 模板 |
-|-------|------|------------|------------|----------|----------|
 | Ankh-base | 450M | 450M | 12GB+ | 编码器-解码器 | [ElnaggarLab/ankh-base](https://huggingface.co/ElnaggarLab/ankh-base) |
 | Ankh-large | 1.2B | 1.2B | 20GB+ | 编码器-解码器 | [ElnaggarLab/ankh-large](https://huggingface.co/ElnaggarLab/ankh-large) |
-| ProSST-20 | 20 | 110M | 4GB+ | 突变预测 | [AI4Protein/ProSST-20](https://huggingface.co/AI4Protein/ProSST-20) |
-| ProSST-128 | 128 | 110M | 4GB+ | 突变预测 | [AI4Protein/ProSST-128](https://huggingface.co/AI4Protein/ProSST-128) |
-| ProSST-512 | 512 | 110M | 4GB+ | 突变预测 | [AI4Protein/ProSST-512](https://huggingface.co/AI4Protein/ProSST-512) |
-| ProSST-2048 | 2048 | 110M | 4GB+ | 突变预测 | [AI4Protein/ProSST-2048](https://huggingface.co/AI4Protein/ProSST-2048) |
-| ProSST-4096 | 4096 | 110M | 4GB+ | 突变预测 | [AI4Protein/ProSST-4096](https://huggingface.co/AI4Protein/ProSST-4096) |
-| ProPrime-690M | 690M | 690M | 16GB+ | OGT预测 | [AI4Protein/Prime_690M](https://huggingface.co/AI4Protein/Prime_690M) |
 
-> 💡 这些模型在特定任务上表现出色或提供独特的架构优势
-</details>
-
-<details>
-<summary>PETA 模型：分词变体</summary>
-
-#### BPE 分词系列
-| 模型 | 词表大小 | 参数量 | GPU内存 | 模板 |
-|-------|------------|------------|------------|----------|
-| PETA-base | base | 80M | 4GB+ | [AI4Protein/deep_base](https://huggingface.co/AI4Protein/deep_base) |
-| PETA-bpe-50 | 50 | 80M | 4GB+ | [AI4Protein/deep_bpe_50](https://huggingface.co/AI4Protein/deep_bpe_50) |
-| PETA-bpe-200 | 200 | 80M | 4GB+ | [AI4Protein/deep_bpe_200](https://huggingface.co/AI4Protein/deep_bpe_200) |
-| PETA-bpe-400 | 400 | 80M | 4GB+ | [AI4Protein/deep_bpe_400](https://huggingface.co/AI4Protein/deep_bpe_400) |
-| PETA-bpe-800 | 800 | 80M | 4GB+ | [AI4Protein/deep_bpe_800](https://huggingface.co/AI4Protein/deep_bpe_800) |
-| PETA-bpe-1600 | 1600 | 80M | 4GB+ | [AI4Protein/deep_bpe_1600](https://huggingface.co/AI4Protein/deep_bpe_1600) |
-| PETA-bpe-3200 | 3200 | 80M | 4GB+ | [AI4Protein/deep_bpe_3200](https://huggingface.co/AI4Protein/deep_bpe_3200) |
-
-#### Unigram 分词系列
-| 模型 | 词表大小 | 参数量 | GPU内存 | 模板 |
-|-------|------------|------------|------------|----------|
-| PETA-unigram-50 | 50 | 80M | 4GB+ | [AI4Protein/deep_unigram_50](https://huggingface.co/AI4Protein/deep_unigram_50) |
-| PETA-unigram-100 | 100 | 80M | 4GB+ | [AI4Protein/deep_unigram_100](https://huggingface.co/AI4Protein/deep_unigram_100) |
-| PETA-unigram-200 | 200 | 80M | 4GB+ | [AI4Protein/deep_unigram_200](https://huggingface.co/AI4Protein/deep_unigram_200) |
-| PETA-unigram-400 | 400 | 80M | 4GB+ | [AI4Protein/deep_unigram_400](https://huggingface.co/AI4Protein/deep_unigram_400) |
-| PETA-unigram-800 | 800 | 80M | 4GB+ | [AI4Protein/deep_unigram_800](https://huggingface.co/AI4Protein/deep_unigram_800) |
-| PETA-unigram-1600 | 1600 | 80M | 4GB+ | [AI4Protein/deep_unigram_1600](https://huggingface.co/AI4Protein/deep_unigram_1600) |
-| PETA-unigram-3200 | 3200 | 80M | 4GB+ | [AI4Protein/deep_unigram_3200](https://huggingface.co/AI4Protein/deep_unigram_3200) |
-
-> 💡 不同的分词策略可能更适合特定任务
+> 💡 T5 模型可用于编码和生成任务
 </details>
 
 ### 模型选择指南

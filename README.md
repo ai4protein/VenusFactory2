@@ -15,9 +15,10 @@
 
 Recent News:
 
-- Welcome to VenusFactory! Please give us a star if you like it!
-- [2025-03-17] Add PETA, ProPrime, ProSST models
-- **[2025-03-05] 🎉 Congratulations!** 🎉 
+- Welcome to VenusFactory! This project is developed by [**Liang's Lab**](https://lianglab.sjtu.edu.cn/) at [**Shanghai Jiao Tong University**](https://www.sjtu.edu.cn/).
+- [2025-03-26] Add [VenusPLM-300M](https://huggingface.co/AI4Protein/VenusPLM-300M) model, trained based on **VenusPod**, is a protein language model independently developed by Hong Liang's research group at Shanghai Jiao Tong University.
+- [2025-03-17] Add [Venus-PETA, Venus-ProPrime, Venus-ProSST models](https://huggingface.co/AI4Protein), for more details, please refer to [Supported Models](#-supported-models)
+- [2025-03-05] 🎉 Congratulations! 🎉 
 
   🚀 Our latest research achievement, **VenusMutHub**, has been officially accepted by [**Acta Pharmaceutica Sinica B**](https://www.sciencedirect.com/science/article/pii/S2211383525001650) and is now featured in a series of [**leaderboards**](https://lianglab.sjtu.edu.cn/muthub/)!    
   💡 In this study, we built **900+ high-quality benchmark** [**datasets**](https://huggingface.co/datasets/AI4Protein/VenusMutHub) covering **500+ protein functional properties**. VenusMutHub not only offers a new collection of small-sample datasets for **real-world protein mutation engineering**, but also fills the gap in **diversity** within existing benchmarks, laying a stronger foundation for AI-driven protein mutation effect prediction.
@@ -48,6 +49,50 @@ Recent News:
 ## 🤖 Supported Models
 
 ### Pre-training Protein Language Models
+
+<details>
+<summary>Venus Series Models (Published by Liang's Lab)</summary>
+
+| Model | Size | Parameters | GPU Memory | Features | Template |
+|-------|------|------------|------------|----------|----------|
+| ProSST-20 | 20 | 110M | 4GB+ | Mutation | [AI4Protein/ProSST-20](https://huggingface.co/AI4Protein/ProSST-20) |
+| ProSST-128 | 128 | 110M | 4GB+ | Mutation | [AI4Protein/ProSST-128](https://huggingface.co/AI4Protein/ProSST-128) |
+| ProSST-512 | 512 | 110M | 4GB+ | Mutation | [AI4Protein/ProSST-512](https://huggingface.co/AI4Protein/ProSST-512) |
+| ProSST-2048 | 2048 | 110M | 4GB+ | Mutation | [AI4Protein/ProSST-2048](https://huggingface.co/AI4Protein/ProSST-2048) |
+| ProSST-4096 | 4096 | 110M | 4GB+ | Mutation | [AI4Protein/ProSST-4096](https://huggingface.co/AI4Protein/ProSST-4096) |
+| ProPrime-690M | 690M | 690M | 16GB+ | OGT-prediction | [AI4Protein/Prime_690M](https://huggingface.co/AI4Protein/Prime_690M) |
+| VenusPLM-300M | 300M | 300M | 12GB+ | Protein-language | [AI4Protein/VenusPLM-300M](https://huggingface.co/AI4Protein/VenusPLM-300M) |
+
+> 💡 These models often excel in specific tasks or offer unique architectural benefits
+</details>
+
+<details>
+<summary>Venus-PETA Models: Tokenization variants</summary>
+
+#### BPE Tokenization Series
+| Model | Vocab Size | Parameters | GPU Memory | Template |
+|-------|------------|------------|------------|----------|
+| PETA-base | base | 80M | 4GB+ | [AI4Protein/deep_base](https://huggingface.co/AI4Protein/deep_base) |
+| PETA-bpe-50 | 50 | 80M | 4GB+ | [AI4Protein/deep_bpe_50](https://huggingface.co/AI4Protein/deep_bpe_50) |
+| PETA-bpe-200 | 200 | 80M | 4GB+ | [AI4Protein/deep_bpe_200](https://huggingface.co/AI4Protein/deep_bpe_200) |
+| PETA-bpe-400 | 400 | 80M | 4GB+ | [AI4Protein/deep_bpe_400](https://huggingface.co/AI4Protein/deep_bpe_400) |
+| PETA-bpe-800 | 800 | 80M | 4GB+ | [AI4Protein/deep_bpe_800](https://huggingface.co/AI4Protein/deep_bpe_800) |
+| PETA-bpe-1600 | 1600 | 80M | 4GB+ | [AI4Protein/deep_bpe_1600](https://huggingface.co/AI4Protein/deep_bpe_1600) |
+| PETA-bpe-3200 | 3200 | 80M | 4GB+ | [AI4Protein/deep_bpe_3200](https://huggingface.co/AI4Protein/deep_bpe_3200) |
+
+#### Unigram Tokenization Series
+| Model | Vocab Size | Parameters | GPU Memory | Template |
+|-------|------------|------------|------------|----------|
+| PETA-unigram-50 | 50 | 80M | 4GB+ | [AI4Protein/deep_unigram_50](https://huggingface.co/AI4Protein/deep_unigram_50) |
+| PETA-unigram-100 | 100 | 80M | 4GB+ | [AI4Protein/deep_unigram_100](https://huggingface.co/AI4Protein/deep_unigram_100) |
+| PETA-unigram-200 | 200 | 80M | 4GB+ | [AI4Protein/deep_unigram_200](https://huggingface.co/AI4Protein/deep_unigram_200) |
+| PETA-unigram-400 | 400 | 80M | 4GB+ | [AI4Protein/deep_unigram_400](https://huggingface.co/AI4Protein/deep_unigram_400) |
+| PETA-unigram-800 | 800 | 80M | 4GB+ | [AI4Protein/deep_unigram_800](https://huggingface.co/AI4Protein/deep_unigram_800) |
+| PETA-unigram-1600 | 1600 | 80M | 4GB+ | [AI4Protein/deep_unigram_1600](https://huggingface.co/AI4Protein/deep_unigram_1600) |
+| PETA-unigram-3200 | 3200 | 80M | 4GB+ | [AI4Protein/deep_unigram_3200](https://huggingface.co/AI4Protein/deep_unigram_3200) |
+
+> 💡 Different tokenization strategies may be better suited for specific tasks
+</details>
 
 <details>
 <summary>ESM Series Models: Meta AI's protein language models</summary>
@@ -94,53 +139,10 @@ Recent News:
 | ProtT5-XXL-BFD | 11B | 11B | 40GB+ | BFD100 | [Rostlab/prot_t5_xxl_bfd](https://huggingface.co/Rostlab/prot_t5_xxl_bfd) |
 | IgT5 | 3B | 3B | 24GB+ | Antibody | [Exscientia/IgT5](https://huggingface.co/Exscientia/IgT5) |
 | IgT5-unpaired | 3B | 3B | 24GB+ | Antibody | [Exscientia/IgT5_unpaired](https://huggingface.co/Exscientia/IgT5_unpaired) |
-
-> 💡 T5 models can be used for both encoding and generation tasks
-</details>
-
-<details>
-<summary>Specialized Models: Task-specific architectures</summary>
-
-| Model | Size | Parameters | GPU Memory | Features | Template |
-|-------|------|------------|------------|----------|----------|
 | Ankh-base | 450M | 450M | 12GB+ | Encoder-decoder | [ElnaggarLab/ankh-base](https://huggingface.co/ElnaggarLab/ankh-base) |
 | Ankh-large | 1.2B | 1.2B | 20GB+ | Encoder-decoder | [ElnaggarLab/ankh-large](https://huggingface.co/ElnaggarLab/ankh-large) |
-| ProSST-20 | 20 | 110M | 4GB+ | Mutation | [AI4Protein/ProSST-20](https://huggingface.co/AI4Protein/ProSST-20) |
-| ProSST-128 | 128 | 110M | 4GB+ | Mutation | [AI4Protein/ProSST-128](https://huggingface.co/AI4Protein/ProSST-128) |
-| ProSST-512 | 512 | 110M | 4GB+ | Mutation | [AI4Protein/ProSST-512](https://huggingface.co/AI4Protein/ProSST-512) |
-| ProSST-2048 | 2048 | 110M | 4GB+ | Mutation | [AI4Protein/ProSST-2048](https://huggingface.co/AI4Protein/ProSST-2048) |
-| ProSST-4096 | 4096 | 110M | 4GB+ | Mutation | [AI4Protein/ProSST-4096](https://huggingface.co/AI4Protein/ProSST-4096) |
-| ProPrime-690M | 690M | 690M | 16GB+ | OGT-prediction | [AI4Protein/Prime_690M](https://huggingface.co/AI4Protein/Prime_690M) |
 
-> 💡 These models often excel in specific tasks or offer unique architectural benefits
-</details>
-
-<details>
-<summary>PETA Models: Tokenization variants</summary>
-
-#### BPE Tokenization Series
-| Model | Vocab Size | Parameters | GPU Memory | Template |
-|-------|------------|------------|------------|----------|
-| PETA-base | base | 80M | 4GB+ | [AI4Protein/deep_base](https://huggingface.co/AI4Protein/deep_base) |
-| PETA-bpe-50 | 50 | 80M | 4GB+ | [AI4Protein/deep_bpe_50](https://huggingface.co/AI4Protein/deep_bpe_50) |
-| PETA-bpe-200 | 200 | 80M | 4GB+ | [AI4Protein/deep_bpe_200](https://huggingface.co/AI4Protein/deep_bpe_200) |
-| PETA-bpe-400 | 400 | 80M | 4GB+ | [AI4Protein/deep_bpe_400](https://huggingface.co/AI4Protein/deep_bpe_400) |
-| PETA-bpe-800 | 800 | 80M | 4GB+ | [AI4Protein/deep_bpe_800](https://huggingface.co/AI4Protein/deep_bpe_800) |
-| PETA-bpe-1600 | 1600 | 80M | 4GB+ | [AI4Protein/deep_bpe_1600](https://huggingface.co/AI4Protein/deep_bpe_1600) |
-| PETA-bpe-3200 | 3200 | 80M | 4GB+ | [AI4Protein/deep_bpe_3200](https://huggingface.co/AI4Protein/deep_bpe_3200) |
-
-#### Unigram Tokenization Series
-| Model | Vocab Size | Parameters | GPU Memory | Template |
-|-------|------------|------------|------------|----------|
-| PETA-unigram-50 | 50 | 80M | 4GB+ | [AI4Protein/deep_unigram_50](https://huggingface.co/AI4Protein/deep_unigram_50) |
-| PETA-unigram-100 | 100 | 80M | 4GB+ | [AI4Protein/deep_unigram_100](https://huggingface.co/AI4Protein/deep_unigram_100) |
-| PETA-unigram-200 | 200 | 80M | 4GB+ | [AI4Protein/deep_unigram_200](https://huggingface.co/AI4Protein/deep_unigram_200) |
-| PETA-unigram-400 | 400 | 80M | 4GB+ | [AI4Protein/deep_unigram_400](https://huggingface.co/AI4Protein/deep_unigram_400) |
-| PETA-unigram-800 | 800 | 80M | 4GB+ | [AI4Protein/deep_unigram_800](https://huggingface.co/AI4Protein/deep_unigram_800) |
-| PETA-unigram-1600 | 1600 | 80M | 4GB+ | [AI4Protein/deep_unigram_1600](https://huggingface.co/AI4Protein/deep_unigram_1600) |
-| PETA-unigram-3200 | 3200 | 80M | 4GB+ | [AI4Protein/deep_unigram_3200](https://huggingface.co/AI4Protein/deep_unigram_3200) |
-
-> 💡 Different tokenization strategies may be better suited for specific tasks
+> 💡 T5 models can be used for both encoding and generation tasks
 </details>
 
 ### Model Selection Guide
@@ -181,8 +183,13 @@ Recent News:
 
 <details><summary>Pre-training datasets</summary>
 
-
 - [CATH_V43_S40](https://huggingface.co/datasets/tyang816/cath) | structures
+
+</details>
+
+<details><summary>Zero-shot datasets</summary>
+
+- [VenusMutHub](https://huggingface.co/datasets/AI4Protein/VenusMutHub) | mutation effects prediction
 
 </details>
 
