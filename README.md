@@ -246,27 +246,27 @@ Recent News:
 | GO_MF | function | protein-wise | multi_label_classification | [GO_MF](https://huggingface.co/datasets/tyang816/GO_MF) |
 | MetalIonBinding | binding | protein-wise | single_label_classification | [MetalIonBinding](https://huggingface.co/datasets/tyang816/MetalIonBinding) |
 | Thermostability | stability | protein-wise | regression | [Thermostability](https://huggingface.co/datasets/tyang816/Thermostability) |
-| PaCRISPR | protein-wise | single_label_classification | [PaCRISPR](https://huggingface.co/datasets/tyang816/PaCRISPR) |
+| PaCRISPR | CRISPR | protein-wise | single_label_classification | [PaCRISPR](https://huggingface.co/datasets/tyang816/PaCRISPR) |
 | PETA_CHS_Sol | solubility | protein-wise | single_label_classification | [PETA_CHS_Sol](https://huggingface.co/datasets/tyang816/PETA_CHS_Sol) |
 | PETA_LGK_Sol | solubility | protein-wise | single_label_classification | [PETA_LGK_Sol](https://huggingface.co/datasets/tyang816/PETA_LGK_Sol) |
 | PETA_TEM_Sol | solubility | protein-wise | single_label_classification | [PETA_TEM_Sol](https://huggingface.co/datasets/tyang816/PETA_TEM_Sol) |
-| SortingSignal | protein-wise | single_label_classification | [SortingSignal](https://huggingface.co/datasets/tyang816/SortingSignal) |
-| FLIP_AAV | protein-site | regression |
-| FLIP_AAV_one-vs-rest | protein-site | single_label_classification | [FLIP_AAV_one-vs-rest](https://huggingface.co/datasets/tyang816/FLIP_AAV_one-vs-rest) |
-| FLIP_AAV_two-vs-rest | protein-site | single_label_classification | [FLIP_AAV_two-vs-rest](https://huggingface.co/datasets/tyang816/FLIP_AAV_two-vs-rest) |
-| FLIP_AAV_mut-des | protein-site | single_label_classification | [FLIP_AAV_mut-des](https://huggingface.co/datasets/tyang816/FLIP_AAV_mut-des) |
-| FLIP_AAV_des-mut | protein-site | single_label_classification | [FLIP_AAV_des-mut](https://huggingface.co/datasets/tyang816/FLIP_AAV_des-mut) |
-| FLIP_AAV_seven-vs-rest | protein-site | single_label_classification | [FLIP_AAV_seven-vs-rest](https://huggingface.co/datasets/tyang816/FLIP_AAV_seven-vs-rest) |
-| FLIP_AAV_low-vs-high | protein-site | single_label_classification | [FLIP_AAV_low-vs-high](https://huggingface.co/datasets/tyang816/FLIP_AAV_low-vs-high) |
-| FLIP_AAV_sampled | protein-site | single_label_classification | [FLIP_AAV_sampled](https://huggingface.co/datasets/tyang816/FLIP_AAV_sampled) |
-| FLIP_GB1 | protein-site | regression |
-| FLIP_GB1_one-vs-rest | protein-site | single_label_classification | [FLIP_GB1_one-vs-rest](https://huggingface.co/datasets/tyang816/FLIP_GB1_one-vs-rest) |
-| FLIP_GB1_two-vs-rest | protein-site | single_label_classification | [FLIP_GB1_two-vs-rest](https://huggingface.co/datasets/tyang816/FLIP_GB1_two-vs-rest) |
-| FLIP_GB1_three-vs-rest | protein-site | single_label_classification | [FLIP_GB1_three-vs-rest](https://huggingface.co/datasets/tyang816/FLIP_GB1_three-vs-rest) |
-| FLIP_GB1_low-vs-high | protein-site | single_label_classification | [FLIP_GB1_low-vs-high](https://huggingface.co/datasets/tyang816/FLIP_GB1_low-vs-high) |
-| FLIP_GB1_sampled | protein-site | single_label_classification | [FLIP_GB1_sampled](https://huggingface.co/datasets/tyang816/FLIP_GB1_sampled) |
-| TAPE_Fluorescence | protein-site | regression | [TAPE_Fluorescence](https://huggingface.co/datasets/tyang816/TAPE_Fluorescence) |
-| TAPE_Stability | protein-site | regression | [TAPE_Stability](https://huggingface.co/datasets/tyang816/TAPE_Stability) |
+| SortingSignal | sorting signal | protein-wise | single_label_classification | [SortingSignal](https://huggingface.co/datasets/tyang816/SortingSignal) |
+| FLIP_AAV | mutation | protein-site | regression |
+| FLIP_AAV_one-vs-rest | mutation | protein-site | single_label_classification | [FLIP_AAV_one-vs-rest](https://huggingface.co/datasets/tyang816/FLIP_AAV_one-vs-rest) |
+| FLIP_AAV_two-vs-rest | mutation | protein-site | single_label_classification | [FLIP_AAV_two-vs-rest](https://huggingface.co/datasets/tyang816/FLIP_AAV_two-vs-rest) |
+| FLIP_AAV_mut-des | mutation | protein-site | single_label_classification | [FLIP_AAV_mut-des](https://huggingface.co/datasets/tyang816/FLIP_AAV_mut-des) |
+| FLIP_AAV_des-mut | mutation | protein-site | single_label_classification | [FLIP_AAV_des-mut](https://huggingface.co/datasets/tyang816/FLIP_AAV_des-mut) |
+| FLIP_AAV_seven-vs-rest | mutation | protein-site | single_label_classification | [FLIP_AAV_seven-vs-rest](https://huggingface.co/datasets/tyang816/FLIP_AAV_seven-vs-rest) |
+| FLIP_AAV_low-vs-high | mutation | protein-site | single_label_classification | [FLIP_AAV_low-vs-high](https://huggingface.co/datasets/tyang816/FLIP_AAV_low-vs-high) |
+| FLIP_AAV_sampled | mutation | protein-site | single_label_classification | [FLIP_AAV_sampled](https://huggingface.co/datasets/tyang816/FLIP_AAV_sampled) |
+| FLIP_GB1 | mutation | protein-site | regression |
+| FLIP_GB1_one-vs-rest | mutation | protein-site | single_label_classification | [FLIP_GB1_one-vs-rest](https://huggingface.co/datasets/tyang816/FLIP_GB1_one-vs-rest) |
+| FLIP_GB1_two-vs-rest | mutation | protein-site | single_label_classification | [FLIP_GB1_two-vs-rest](https://huggingface.co/datasets/tyang816/FLIP_GB1_two-vs-rest) |
+| FLIP_GB1_three-vs-rest | mutation | protein-site | single_label_classification | [FLIP_GB1_three-vs-rest](https://huggingface.co/datasets/tyang816/FLIP_GB1_three-vs-rest) |
+| FLIP_GB1_low-vs-high | mutation | protein-site | single_label_classification | [FLIP_GB1_low-vs-high](https://huggingface.co/datasets/tyang816/FLIP_GB1_low-vs-high) |
+| FLIP_GB1_sampled | mutation | protein-site | single_label_classification | [FLIP_GB1_sampled](https://huggingface.co/datasets/tyang816/FLIP_GB1_sampled) |
+| TAPE_Fluorescence | fluorescence | protein-site | regression | [TAPE_Fluorescence](https://huggingface.co/datasets/tyang816/TAPE_Fluorescence) |
+| TAPE_Stability | stability | protein-site | regression | [TAPE_Stability](https://huggingface.co/datasets/tyang816/TAPE_Stability) |
 
 </details>
 
