@@ -63,7 +63,11 @@ def parse_args():
 
 def load_model_and_tokenizer(args):
     print("---------- Loading Model and Tokenizer ----------")
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = torch.device("cpu") 
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    if torch.backends.mps.is_available() and torch.backends.mps.is_built():
+        device = torch.device("mps") 
     
     # Check if model file exists
     if not os.path.exists(args.model_path):
@@ -113,6 +117,15 @@ def load_model_and_tokenizer(args):
         tokenizer = AutoTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
         plm_model = AutoModelForMaskedLM.from_pretrained(args.plm_model).to(device).eval()
         args.hidden_size = plm_model.config.hidden_size
+    elif "deep" in args.plm_model:
+        tokenizer = AutoTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
+        plm_model = AutoModel.from_pretrained(args.plm_model, trust_remote_code=True)
+        args.hidden_size = plm_model.config.hidden_size
+    elif "ProPrime_650M_OGT" in args.plm_model:
+        tokenizer = AutoTokenizer.from_pretrained(args.plm_model, do_lower_case=False, trust_remote_code=True)
+        plm_model = AutoModel.from_pretrained(args.plm_model, trust_remote_code=True)
+        args.hidden_size = plm_model.config.hidden_size
+        return None, plm_model, tokenizer, device
     elif "Prime" in args.plm_model:
         tokenizer = AutoTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
         plm_model = AutoModelForMaskedLM.from_pretrained(args.plm_model).to(device).eval()
@@ -292,6 +305,18 @@ def process_sequence(args, tokenizer, plm_model_name, aa_seq, foldseek_seq="", s
 def predict_batch(model, plm_model, data_dict, device, args):
     """Run prediction on a batch of processed input data"""
     
+    if "ProPrime_650M_OGT" in args.plm_model:
+        with torch.no_grad():
+            aa_seq = data_dict['aa_seq_input_ids'].to(device)
+            attention_mask = data_dict['aa_seq_attention_mask'].to(device)
+            plm_model = plm_model.to(device)
+            predictions = plm_model(input_ids=aa_seq, attention_mask=attention_mask).predicted_values.item()
+            print(f"Prediction result: {predictions}")
+            if np.isscalar(predictions):
+                return {"predictions": predictions}
+            else:
+                # 如果是批处理，返回整个数组
+                return {"predictions": predictions.tolist() if isinstance(predictions, np.ndarray) else predictions}
     # Move data to device
     for k, v in data_dict.items():
         data_dict[k] = v.to(device)

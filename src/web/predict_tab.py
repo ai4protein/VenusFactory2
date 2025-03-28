@@ -1558,6 +1558,7 @@ def create_predict_tab(constant):
                     label="Protein Language Model"
                 )
 
+
             with gr.Row():
                 eval_method = gr.Dropdown(
                     choices=["full", "freeze", "ses-adapter", "plm-lora", "plm-qlora"],
@@ -1569,6 +1570,7 @@ def create_predict_tab(constant):
                     label="Pooling Method",
                     value="mean"
                 )
+
 
             # Settings for different training methods
             with gr.Row(visible=False) as structure_seq_row:
@@ -1593,7 +1595,19 @@ def create_predict_tab(constant):
                     precision=0,
                     minimum=1
                 )
+            
 
+            with gr.Row():
+                otg_message = gr.HTML(
+                    """
+                    <style>
+                    .csv-format-info {
+                        background-color: #ffffff;
+                    }
+                    </style>
+                    """
+                )
+                    
         with gr.Tabs():
             with gr.Tab("Sequence Prediction"):
                 gr.Markdown("### Input Sequences")
@@ -1927,8 +1941,55 @@ def create_predict_tab(constant):
         inputs=[structure_seq],
         outputs=[foldseek_seq, ss8_seq]
     )
-
     
+    ss = """
+        .otg-message {
+            background-color: white !important;
+            color: black !important;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        """
+
+    def update_components_based_on_model(plm_model):
+        is_proprime = (plm_model == "ProPrime-650M-OGT")
+    
+        # 公共更新参数
+        update_params = {
+            "interactive": not is_proprime,
+        }
+        
+        otg_message_update = gr.update(
+            visible=is_proprime,
+            value="<div style='background:white; padding:8px;'>This model is used for OTG prediction</div>"
+        )
+
+        if is_proprime:
+            return {
+                model_path: gr.update(**update_params),
+                eval_method: gr.update(**update_params),
+                pooling_method: gr.update( **update_params),
+                num_labels: gr.update(value=1, **update_params),
+                problem_type: gr.update(value="regression", **update_params),
+                otg_message: otg_message_update
+            }
+        else:
+            return {
+                model_path: gr.update(**update_params),
+                eval_method: gr.update(**update_params),
+                pooling_method: gr.update(**update_params),
+                num_labels: gr.update(**update_params),
+                problem_type: gr.update(**update_params),
+                otg_message: otg_message_update
+            }
+
+
+
+    plm_model.change(
+        fn=update_components_based_on_model,
+        inputs=[plm_model],
+        outputs=[model_path, eval_method, pooling_method, num_labels, problem_type, otg_message]
+    )
 
     return {
         "predict_sequence": predict_sequence,

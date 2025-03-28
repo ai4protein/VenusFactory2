@@ -27,6 +27,7 @@
         "ProSST-128": "AI4Protein/ProSST-128",
         "ProSST-20": "AI4Protein/ProSST-20",
         "ProPrime-690M": "AI4Protein/Prime_690M",
+        "ProPrime-650M-OGT": "AI4Protein/ProPrime_650M_OGT_Prediction",
         "Deep_base": "AI4Protein/deep_base",
         "Deep_BPE_50": "AI4Protein/deep_bpe_50",
         "Deep_BPE_100": "AI4Protein/deep_bpe_100",

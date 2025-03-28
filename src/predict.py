@@ -64,8 +64,8 @@ def parse_args():
 
 def load_model_and_tokenizer(args):
     print("---------- Loading Model and Tokenizer ----------")
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    
+    device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
+ 
     # Check if model file exists
     if not os.path.exists(args.model_path):
         raise FileNotFoundError(f"Model file not found: {args.model_path}")
@@ -111,16 +111,25 @@ def load_model_and_tokenizer(args):
         plm_model = T5EncoderModel.from_pretrained(args.plm_model)
         args.hidden_size = plm_model.config.d_model
     elif "ProSST" in args.plm_model:
-        tokenizer = AutoTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
-        plm_model = AutoModelForMaskedLM.from_pretrained(args.plm_model).to(device).eval()
+        tokenizer = AutoTokenizer.from_pretrained(args.plm_model, do_lower_case=False, trust_remote_code=True)
+        plm_model = AutoModelForMaskedLM.from_pretrained(args.plm_model, trust_remote_code=True)
         args.hidden_size = plm_model.config.hidden_size
-    elif "Prime" in args.plm_model:
+    elif "deep" in args.plm_model:
         tokenizer = AutoTokenizer.from_pretrained(args.plm_model, do_lower_case=False)
-        plm_model = AutoModelForMaskedLM.from_pretrained(args.plm_model).to(device).eval()
+        plm_model = AutoModel.from_pretrained(args.plm_model, trust_remote_code=True)
+        args.hidden_size = plm_model.config.hidden_size
+    elif "ProPrime_650M_OGT" in args.plm_model:
+        tokenizer = AutoTokenizer.from_pretrained(args.plm_model, do_lower_case=False, trust_remote_code=True)
+        plm_model = AutoModel.from_pretrained(args.plm_model, trust_remote_code=True)
+        args.hidden_size = plm_model.config.hidden_size
+        return None, plm_model, tokenizer, device
+    elif "Prime" in args.plm_model:
+        tokenizer = AutoTokenizer.from_pretrained(args.plm_model, do_lower_case=False, trust_remote_code=True)
+        plm_model = AutoModel.from_pretrained(args.plm_model, trust_remote_code=True)
         args.hidden_size = plm_model.config.hidden_size
     else:
-        tokenizer = AutoTokenizer.from_pretrained(args.plm_model)
-        plm_model = AutoModel.from_pretrained(args.plm_model)
+        tokenizer = AutoTokenizer.from_pretrained(args.plm_model, trust_remote_code=True)
+        plm_model = AutoModel.from_pretrained(args.plm_model, trust_remote_code=True)
         args.hidden_size = plm_model.config.hidden_size
     
     args.vocab_size = plm_model.config.vocab_size
@@ -296,11 +305,22 @@ def process_sequences(args, tokenizer, plm_model_name):
 def predict(model, data_dict, device, args, plm_model):
     """Run prediction on the processed input data"""
     print("---------- Running Prediction ----------")
-    
+
+    if "ProPrime_650M_OGT" in args.plm_model:
+        with torch.no_grad():
+            aa_seq = data_dict['aa_seq_input_ids'].to(device)
+            attention_mask = data_dict['aa_seq_attention_mask'].to(device)
+            plm_model = plm_model.to(device)
+            predictions = plm_model(input_ids=aa_seq, attention_mask=attention_mask).predicted_values.item()
+            print(f"Prediction result: {predictions}")
+            return {"prediction": predictions}
+        
+
     # Move data to device
     for k, v in data_dict.items():
         data_dict[k] = v.to(device)
     
+
     # Run model inference
     with torch.no_grad():
         outputs = model(plm_model, data_dict)  # Pass the actual plm_model instead of None
