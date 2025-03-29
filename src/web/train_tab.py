@@ -116,7 +116,7 @@ class TrainingArgs:
             args_dict["metrics"] = self.metrics
 
         # Add LoRA parameters
-        if self.training_method in ["plm-lora", "plm-qlora"]:
+        if self.training_method in ["plm-lora", "plm-qlora", "plm_adalora", "plm_dora", "plm_ia3"]:
             args_dict.update({
                 "lora_r": self.lora_r,
                 "lora_alpha": self.lora_alpha,
@@ -234,7 +234,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         visible=False
                     )
 
-            # ! add for plm-lora
+            # ! add for plm-lora, plm-qlora, plm_adalora, plm_dora, plm_ia3
             with gr.Row(visible=False) as lora_params_row:
                 # gr.Markdown("#### LoRA Parameters")
                 with gr.Column():
@@ -524,7 +524,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             def update_training_method(method):
                 return {
                     structure_seq: gr.update(visible=method == "ses-adapter"),
-                    lora_params_row: gr.update(visible=method in ["plm-lora", "plm-qlora"])
+                    lora_params_row: gr.update(visible=method in ["plm-lora", "plm-qlora", "plm_adalora", "plm_dora", "plm_ia3"])
                 }
 
             # Add training_method change event

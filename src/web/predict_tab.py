@@ -1560,7 +1560,7 @@ def create_predict_tab(constant):
 
             with gr.Row():
                 eval_method = gr.Dropdown(
-                    choices=["full", "freeze", "ses-adapter", "plm-lora", "plm-qlora"],
+                    choices=["full", "freeze", "ses-adapter", "plm-lora", "plm-qlora", "plm_adalora", "plm_dora", "plm_ia3"],
                     label="Evaluation Method",
                     value="freeze"
                 )
