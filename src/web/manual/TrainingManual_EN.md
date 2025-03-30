@@ -363,4 +363,4 @@ Q9LSD8,MPEEDLVELKFRLYDGSDVGPFQYSPTATVSMLKERIVSEWPKDKKIVPKSASDIKLINAGKILENGKTVAQC
 ![HF3](/img/HuggingFace/HF3.png)
 ![HF4](/img/HuggingFace/HF4.png)
 
-3. After uploading, use `Owner/Dataset name` as the Custom Dataset Path in VenusFactory
+After uploading, use `Owner/Dataset name` as the Custom Dataset Path in VenusFactory
