@@ -85,6 +85,10 @@ class TrainingArgs:
         self.lora_dropout = args[29]
         self.lora_target_modules = [m.strip() for m in args[30].split(",")] if args[30] else []
 
+        # Monitored parameters
+        self.monitored_metrics = args[31]
+        self.monitored_strategy = args[32]
+
     def to_dict(self) -> Dict[str, Any]:
         args_dict = {
             "plm_model": self.plm_model,
@@ -101,6 +105,8 @@ class TrainingArgs:
             "patience": self.patience,
             "num_workers": self.num_workers,
             "max_grad_norm": self.max_grad_norm,
+            "monitor": self.monitored_metrics,
+            "monitor_strategy": self.monitored_strategy
         }
 
         if self.training_method == "ses-adapter" and self.structure_seq:
@@ -202,29 +208,47 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                     )
                 
             # 自定义数据集的额外配置选项（单独一行）
-            with gr.Row(visible=True) as custom_dataset_settings:
-                problem_type = gr.Dropdown(
-                    choices=["single_label_classification", "multi_label_classification", "regression"],
-                    label="Problem Type",
-                    value="single_label_classification",
-                    scale=23,
-                    interactive=False   
-                )
-                num_labels = gr.Number(
-                    value=2,
-                    label="Number of Labels",
-                    scale=11,
-                    interactive=False
-                )
-                metrics = gr.Dropdown(
-                    choices=["accuracy", "recall", "precision", "f1", "mcc", "auroc", "f1max", "spearman_corr", "mse"],
-                    label="Metrics",
-                    value=["accuracy", "mcc", "f1", "precision", "recall", "auroc"],
-                    scale=101,
-                    multiselect=True,
-                    interactive=False
-                )
+            with gr.Group(visible=True) as custom_dataset_settings:
+                with gr.Row():
+                    problem_type = gr.Dropdown(
+                        choices=["single_label_classification", "multi_label_classification", "regression"],
+                        label="Problem Type",
+                        value="single_label_classification",
+                        scale=23,
+                        interactive=False   
+                    )
+                    num_labels = gr.Number(
+                        value=2,
+                        label="Number of Labels",
+                        scale=11,
+                        interactive=False
+                    )
+                    metrics = gr.Dropdown(
+                        choices=["accuracy", "recall", "precision", "f1", "mcc", "auroc", "f1_max", "spearman_corr", "mse"],
+                        label="Metrics",
+                        value=["accuracy", "mcc", "f1", "precision", "recall", "auroc"],
+                        scale=101,
+                        multiselect=True,
+                        interactive=False
+                    )
                 
+                with gr.Row():
+                    monitored_metrics = gr.Dropdown(
+                        choices=["accuracy", "recall", "precision", "f1", "mcc", "auroc", "f1_max", "spearman_corr", "mse"],
+                        label="Monitored Metrics",
+                        value="accuracy",
+                        scale=10,
+                        multiselect=False,
+                        interactive=False
+                    )
+                    monitored_strategy = gr.Dropdown(
+                        choices=["max", "min"],
+                        label="Monitored Strategy",
+                        value="max",
+                        scale=10,
+                        interactive=False
+                    )
+
             with gr.Row():
                     structure_seq = gr.Dropdown(
                         label="Structure Sequence", 
@@ -1365,6 +1389,8 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             lora_alpha, #28
             lora_dropout, #29
             lora_target_modules, #30
+            monitored_metrics, #31
+            monitored_strategy, #32
         ]
 
         # bind preview and train buttons
@@ -1607,37 +1633,45 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                     if isinstance(metrics_value, str):
                         metrics_value = metrics_value.split(",")
                     
+                    # 处理monitored_metrics，单选
+                    monitored_metrics_value = config.get("monitor", "accuracy")
+                    monitored_strategy_value = config.get("monitor_strategy", "max")
                     result.update({
                         problem_type: gr.update(value=config.get("problem_type", "single_label_classification"), interactive=False),
                         num_labels: gr.update(value=config.get("num_labels", 2), interactive=False),
                         metrics: gr.update(value=metrics_value, interactive=False),
+                        monitored_metrics: gr.update(value=monitored_metrics_value, interactive=False),
+                        monitored_strategy: gr.update(value=monitored_strategy_value, interactive=False)
                     })
                 return result
             else:
                 # 自定义数据集设置，清零/设为默认值并可编辑
                 # 为多选组件提供默认值列表
                 default_metrics = ["accuracy", "mcc", "f1", "precision", "recall", "auroc"]
-                
+                default_monitored_metrics = ["accuracy"]
+                default_monitored_strategy = ["max"]
                 return {
                     dataset_config: gr.update(visible=False),
                     dataset_custom: gr.update(visible=True),
                     custom_dataset_settings: gr.update(visible=True),
                     problem_type: gr.update(value="single_label_classification", interactive=True),
                     num_labels: gr.update(value=2, interactive=True),
-                    metrics: gr.update(value=default_metrics, interactive=True)
+                    metrics: gr.update(value=default_metrics, interactive=True),
+                    monitored_metrics: gr.update(value=default_monitored_metrics, interactive=True),
+                    monitored_strategy: gr.update(value=default_monitored_strategy, interactive=True)
                 }
 
         # 绑定数据集设置更新事件
         is_custom_dataset.change(
             fn=update_dataset_settings,
             inputs=[is_custom_dataset, dataset_config],
-            outputs=[dataset_config, dataset_custom, custom_dataset_settings, problem_type, num_labels, metrics]
+            outputs=[dataset_config, dataset_custom, custom_dataset_settings, problem_type, num_labels, metrics, monitored_metrics, monitored_strategy]
         )
 
         dataset_config.change(
             fn=lambda x: update_dataset_settings("Use Pre-defined Dataset", x),
             inputs=[dataset_config],
-            outputs=[dataset_config, dataset_custom, custom_dataset_settings, problem_type, num_labels, metrics]
+            outputs=[dataset_config, dataset_custom, custom_dataset_settings, problem_type, num_labels, metrics, monitored_metrics, monitored_strategy]
         )
 
         # Return components that need to be accessed from outside
