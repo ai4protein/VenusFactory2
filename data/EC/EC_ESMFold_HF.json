@@ -1,5 +1,5 @@
 {
-    "dataset": "tyang816/EC_ESMFold",
+    "dataset": "AI4Protein/EC_ESMFold",
     "pdb_type": "ESMFold",
     "num_labels": 585,
     "problem_type": "multi_label_classification",

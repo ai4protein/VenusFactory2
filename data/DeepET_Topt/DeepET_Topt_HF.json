@@ -1,5 +1,5 @@
 {
-    "dataset": "tyang816/DeepET_Topt",
+    "dataset": "AI4Protein/DeepET_Topt",
     "num_labels": 1,
     "problem_type": "regression",
     "metrics": "mse,spearman_corr",

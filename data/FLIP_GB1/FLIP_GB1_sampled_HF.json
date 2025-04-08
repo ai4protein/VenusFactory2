@@ -1,5 +1,5 @@
 {
-    "dataset": "tyang816/FLIP_GB1_sampled",
+    "dataset": "AI4Protein/FLIP_GB1_sampled",
     "num_labels": 1,
     "problem_type": "regression",
     "metrics": "spearman_corr",

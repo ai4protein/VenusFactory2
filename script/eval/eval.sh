@@ -7,7 +7,7 @@ python src/eval.py \
     --eval_method ses-adapter \
     --plm_model facebook/$plm_model \
     --problem_type single_label_classification \
-    --test_file tyang816/DeepLocBinary_AlphaFold2 \
+    --test_file AI4Protein/DeepLocBinary_AlphaFold2 \
     --dataset $dataset \
     --model_path $model_path \
     --batch_token 12000 \

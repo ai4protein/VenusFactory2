@@ -1,5 +1,5 @@
 {
-    "dataset": "tyang816/DeepLocBinary_ESMFold",
+    "dataset": "AI4Protein/DeepLocBinary_ESMFold",
     "pdb_type": "ESMFold",
     "num_labels": 2,
     "problem_type": "single_label_classification",

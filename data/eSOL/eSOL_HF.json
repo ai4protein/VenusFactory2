@@ -1,5 +1,5 @@
 {
-    "dataset": "tyang816/eSOL",
+    "dataset": "AI4Protein/eSOL",
     "num_labels": 1,
     "problem_type": "regression",
     "metrics": "mse,spearman_corr",

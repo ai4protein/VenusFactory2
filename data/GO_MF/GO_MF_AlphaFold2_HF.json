@@ -1,5 +1,5 @@
 {
-    "dataset": "tyang816/GO_MF_AlphaFold2",
+    "dataset": "AI4Protein/GO_MF_AlphaFold2",
     "pdb_type": "AlphaFold2",
     "num_labels": 489,
     "problem_type": "multi_label_classification",

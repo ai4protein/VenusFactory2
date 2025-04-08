@@ -1,5 +1,5 @@
 {
-    "dataset": "tyang816/DeepET_Topt_ESMFold",
+    "dataset": "AI4Protein/DeepET_Topt_ESMFold",
     "pdb_type": "ESMFold",
     "num_labels": 1,
     "problem_type": "regression",
