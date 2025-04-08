@@ -43,6 +43,12 @@ if __name__ == '__main__':
     error_messages = []
     all_sequences = []
     
+    if args.merge:
+        merged_file = os.path.join(args.out_dir, "merged.fasta")
+        if os.path.exists(merged_file):
+            print(f"Warning: {merged_file} already exists, skipping merge")
+            exit(0)
+    
     if args.uniprot_id:
         uid, message, sequence = download_fasta(args.uniprot_id, args.out_dir, args.merge)
         print(message)
