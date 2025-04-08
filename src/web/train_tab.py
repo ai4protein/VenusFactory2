@@ -192,7 +192,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         )
                         
                         dataset_custom = gr.Textbox(
-                            label="Custom Dataset Path",
+                            label="Dataset Path (Local Path or Huggingface path)",
                             placeholder="Huggingface Dataset eg: user/dataset",
                             visible=False,
                             scale=2

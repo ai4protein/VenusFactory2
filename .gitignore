@@ -162,8 +162,9 @@ cython_debug/
 dataset/
 data/*.ipynb
 wandb/
-ckpt/ckpt
-ckpt/dev_models
+ckpt/*
+!ckpt/demo/
+
 script_dev/
 .gradio/
 configs/
