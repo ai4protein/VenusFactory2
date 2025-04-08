@@ -36,7 +36,7 @@ def main():
     train_loader, val_loader, test_loader = prepare_dataloaders(args, tokenizer, logger)
     
     # Create trainer
-    trainer = Trainer(args, model, plm_model, logger)
+    trainer = Trainer(args, model, plm_model, logger, train_loader)
     
     # Train and evaluate
     trainer.train(train_loader, val_loader)
