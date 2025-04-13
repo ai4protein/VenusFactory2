@@ -1078,7 +1078,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 update_count = 0
                 while True:
                     # Check if the process still exists and hasn't been aborted
-                    if process_aborted or not monitor.is_training or current_process is None or (current_process and current_process.poll() is not None):
+                    if process_aborted or (current_process and current_process.poll() is not None):
                         break
                         
                     try:
