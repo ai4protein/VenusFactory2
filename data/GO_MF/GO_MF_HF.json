@@ -1,5 +1,5 @@
 {
-    "dataset": "tyang816/GO_MF",
+    "dataset": "AI4Protein/GO_MF",
     "num_labels": 489,
     "problem_type": "multi_label_classification",
     "metrics": "f1_max",

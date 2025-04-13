@@ -1,5 +1,5 @@
 {
-    "dataset": "tyang816/Thermostability",
+    "dataset": "AI4Protein/Thermostability",
     "num_labels": 1,
     "problem_type": "regression",
     "metrics": "spearman_corr",

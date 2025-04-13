@@ -1,5 +1,5 @@
 {
-    "dataset": "tyang816/DeepLocBinary",
+    "dataset": "AI4Protein/DeepLocBinary",
     "num_labels": 2,
     "problem_type": "single_label_classification",
     "metrics": "accuracy,mcc,f1,precision,recall,auroc",

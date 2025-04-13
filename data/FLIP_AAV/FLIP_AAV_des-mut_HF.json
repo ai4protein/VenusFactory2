@@ -1,5 +1,5 @@
 {
-    "dataset": "tyang816/FLIP_AAV_des-mut",
+    "dataset": "AI4Protein/FLIP_AAV_des-mut",
     "num_labels": 1,
     "problem_type": "regression",
     "metrics": "spearman_corr",
