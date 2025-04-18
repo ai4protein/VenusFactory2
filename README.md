@@ -9,6 +9,7 @@
 <div align="center">
 
 [![GitHub stars](https://img.shields.io/github/stars/AI4Protein/VenusFactory?style=flat-square)](https://github.com/AI4Protein/VenusFactory/stargazers) [![GitHub forks](https://img.shields.io/github/forks/AI4Protein/VenusFactory?style=flat-square)](https://github.com/AI4Protein/VenusFactory/network/members) [![GitHub issues](https://img.shields.io/github/issues/AI4Protein/VenusFactory?style=flat-square)](https://github.com/AI4Protein/VenusFactory/issues) [![GitHub license](https://img.shields.io/github/license/AI4Protein/VenusFactory?style=flat-square)](https://github.com/AI4Protein/VenusFactory/blob/main/LICENSE)
+
 [![Python Version](https://img.shields.io/badge/Python-3.10-blue?style=flat-square&logo=python)](https://www.python.org/) [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen?style=flat-square)](https://venusfactory.readthedocs.io/) [![Downloads](https://img.shields.io/github/downloads/AI4Protein/VenusFactory/total?style=flat-square)](https://github.com/AI4Protein/VenusFactory/releases) [![Youtube](https://img.shields.io/badge/Youtube-AI4Protein-red?style=flat-square&logo=youtube)](https://www.youtube.com/watch?v=MT6lPH5kgCc&ab_channel=BxinZhou)
 
 </div>
@@ -40,7 +41,9 @@ Recent News:
 
 ## 📑 Features
 
-***VenusFactory is a one-stop open platform tailored for protein engineering, supporting both **graphical user interface (GUI)** and **command-line operations**. It enables **data retrieval, model training, evaluation, and deployment through a streamlined, no-code workflow**. With support for **local private deployment** and access to over 40 state-of-the-art deep learning models, VenusFactory lowers the barrier to scientific research and accelerates the application of AI in life sciences.
+🙌 ***VenusFactory*** is a unified open platform for protein engineering, supporting both **graphical user interface (GUI)** and **command-line operations**. It enables **data retrieval, model training, evaluation, and deployment through a streamlined, no-code workflow**. 
+
+🆒 With support for **local private deployment** and access to over 40 state-of-the-art deep learning models, VenusFactory lowers the barrier to scientific research and accelerates the application of AI in life sciences.
 
 - **Vaious protein langugae models**: Venus series, ESM series, ProtTrans series, Ankh series, etc
 - **Comprehensive supervised datasets**: Localization, Fitness, Solubility, Stability, etc
