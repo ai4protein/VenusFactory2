@@ -9,7 +9,7 @@
 <div align="center">
 
 [![GitHub stars](https://img.shields.io/github/stars/AI4Protein/VenusFactory?style=flat-square)](https://github.com/AI4Protein/VenusFactory/stargazers) [![GitHub forks](https://img.shields.io/github/forks/AI4Protein/VenusFactory?style=flat-square)](https://github.com/AI4Protein/VenusFactory/network/members) [![GitHub issues](https://img.shields.io/github/issues/AI4Protein/VenusFactory?style=flat-square)](https://github.com/AI4Protein/VenusFactory/issues) [![GitHub license](https://img.shields.io/github/license/AI4Protein/VenusFactory?style=flat-square)](https://github.com/AI4Protein/VenusFactory/blob/main/LICENSE)
-[![Python Version](https://img.shields.io/badge/Python-3.10-blue?style=flat-square&logo=python)](https://www.python.org/) [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen?style=flat-square)](https://venusfactory.readthedocs.io/) [![Downloads](https://img.shields.io/github/downloads/AI4Protein/VenusFactory/total?style=flat-square)](https://github.com/AI4Protein/VenusFactory/releases)
+[![Python Version](https://img.shields.io/badge/Python-3.10-blue?style=flat-square&logo=python)](https://www.python.org/) [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen?style=flat-square)](https://venusfactory.readthedocs.io/) [![Downloads](https://img.shields.io/github/downloads/AI4Protein/VenusFactory/total?style=flat-square)](https://github.com/AI4Protein/VenusFactory/releases) [![Youtube](https://img.shields.io/badge/Youtube-VenusFactory-red?style=flat-square&logo=youtube)](https://www.youtube.com/watch?v=MT6lPH5kgCc&ab_channel=BxinZhou)
 
 </div>
 
@@ -39,11 +39,20 @@
 
 ## 📑 功能特点
 
+***VenusFactory*** 是一个专为蛋白质工程打造的一站式开放平台，支持**图形界面**与**命令行**操作，实现**数据检索、模型训练、评测与部署等功能**。平台以无代码、流程化设计，简化 AI 工程操作，支持**本地私有部署**与 40+ 深度学习模型调用，降低科研门槛，加速 AI 在生命科学中的应用。
+
 - **丰富的蛋白质语言模型**：Venus系列、ESM系列、ProtTrans系列、Ankh 系列等
 - **全面的监督数据集**：定位、适应度、溶解度、稳定性等
 - **便捷的数据收集工具**：AlphaFold2 数据库、RCSB、InterPro、Uniprot 等
 - **实验监控**：Wandb、本地监控
 - **友好的界面**：Gradio UI
+
+<p align="center">
+  <video width="80%" controls>
+    <source src="./img/venusfactory.mp4" type="video/mp4">
+    Your browser does not support the video tag.
+  </video>
+</p>
 
 ## 🤖 支持的模型
 
@@ -276,7 +285,9 @@
 | f1_max | F1ScoreMax | 多标签分类 |
 | spearman_corr | SpearmanCorrCoef | 回归 |
 | mse | MeanSquaredError | 回归 |
+
 </details>
+
 ## ✈️ 环境要求
 
 ### 硬件要求
