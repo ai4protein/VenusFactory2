@@ -69,6 +69,6 @@ def create_ui():
 if __name__ == "__main__":
     try:
         demo = create_ui()
-        demo.launch(server_name="0.0.0.0", share=True, allowed_paths=["img"])
+        demo.launch(server_name="0.0.0.0", server_port=7860, share=True, allowed_paths=["img"])
     except Exception as e:
         print(f"Failed to launch UI: {str(e)}")
