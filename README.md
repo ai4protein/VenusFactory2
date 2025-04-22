@@ -16,7 +16,7 @@
 
 Recent News:
 
-- [2025-04-19] 🎉 **Congratulations!** [VenusREM](https://huggingface.co/AI4Protein/VenusREM) achieves 1st place in [ProteinGym](https://proteingym.org/) and [VenusMutHub](https://lianglab.sjtu.edu.cn/muthub/) leaderboard!
+- [2025-04-19] 🎉 **Congratulations!** [VenusREM](https://github.com/ai4protein/VenusREM) achieves 1st place in [ProteinGym](https://proteingym.org/benchmarks) and [VenusMutHub](https://lianglab.sjtu.edu.cn/muthub/) leaderboard!
 - [2025-03-26] Add [VenusPLM-300M](https://huggingface.co/AI4Protein/VenusPLM-300M) model, trained based on **VenusPod**, is a protein language model independently developed by Hong Liang's research group at Shanghai Jiao Tong University.
 - [2025-03-17] Add [Venus-PETA, Venus-ProPrime, Venus-ProSST models](https://huggingface.co/AI4Protein), for more details, please refer to [Supported Models](#-supported-models)
 - [2025-03-05] 🎉 Congratulation! Our latest research achievement, **VenusMutHub**, has been officially accepted by [**Acta Pharmaceutica Sinica B**](https://www.sciencedirect.com/science/article/pii/S2211383525001650) and is now featured in a series of [**leaderboards**](https://lianglab.sjtu.edu.cn/muthub/)!    

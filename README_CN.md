@@ -16,7 +16,7 @@
 
 最新消息：
 
-- [2025-04-19] 🎉 **祝贺!** [VenusREM](https://huggingface.co/AI4Protein/VenusREM) 在 [ProteinGym](https://proteingym.org/) 和 [VenusMutHub](https://lianglab.sjtu.edu.cn/muthub/) 排行榜中均取得第一名！
+- [2025-04-19] 🎉 **祝贺!** [VenusREM](https://github.com/ai4protein/VenusREM) 在 [ProteinGym](https://proteingym.org/benchmarks) 和 [VenusMutHub](https://lianglab.sjtu.edu.cn/muthub/) 排行榜中均取得第一名！
 - [2025-03-26] 新增 [VenusPLM-300M](https://huggingface.co/AI4Protein/VenusPLM-300M) 模型，基于**VenusPod**独立开发，由[**Hong Liang**](https://lianglab.sjtu.edu.cn/)课题组开发。
 - [2025-03-17] 新增 [Venus-PETA、Venus-ProPrime、Venus-ProSST 模型](https://huggingface.co/AI4Protein)，更多详情请参考[支持的模型](#-支持的模型)
 - [2025-03-05] 🎉 **祝贺!** 课题组最新的研究成果**VenusMutHub**被[**Acta Pharmaceutica Sinica B**](https://www.sciencedirect.com/science/article/pii/S2211383525001650) 正式接收，并发布了系列[**排行榜**](https://lianglab.sjtu.edu.cn/muthub/)！
