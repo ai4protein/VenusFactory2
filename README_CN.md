@@ -16,13 +16,10 @@
 
 最新消息：
 
-- 欢迎使用 VenusFactory！本项目由[**Liang's Lab**](https://lianglab.sjtu.edu.cn/)开发，由[**Shanghai Jiao Tong University**](https://www.sjtu.edu.cn/)维护。
+- [2025-04-19] 🎉 **祝贺!** [VenusREM](https://huggingface.co/AI4Protein/VenusREM) 在 [ProteinGym](https://proteingym.org/) 和 [VenusMutHub](https://lianglab.sjtu.edu.cn/muthub/) 排行榜中均取得第一名！
 - [2025-03-26] 新增 [VenusPLM-300M](https://huggingface.co/AI4Protein/VenusPLM-300M) 模型，基于**VenusPod**独立开发，由[**Hong Liang**](https://lianglab.sjtu.edu.cn/)课题组开发。
 - [2025-03-17] 新增 [Venus-PETA、Venus-ProPrime、Venus-ProSST 模型](https://huggingface.co/AI4Protein)，更多详情请参考[支持的模型](#-支持的模型)
-- [2025-03-05] 🎉 **祝贺!** 🎉
-
-  🚀 我们课题组最新的研究成果**VenusMutHub**被[**Acta Pharmaceutica Sinica B**](https://www.sciencedirect.com/science/article/pii/S2211383525001650) 正式接收，并发布了系列[**排行榜**](https://lianglab.sjtu.edu.cn/muthub/)！    
-  💡 在本研究中，我们构建了**900+ 高质量基准**[**数据集**](https://huggingface.co/datasets/AI4Protein/VenusMutHub)，涵盖 **500+ 不同功能特性的蛋白质**. VenusMutHub不仅为**蛋白质突变工程的真实应用场景**提供了全新的小样本数据集，还弥补了现有基准数据集在**多样性**方面的空白，为AI驱动的蛋白质突变效应预测奠定了更坚实的基础。
+- [2025-03-05] 🎉 **祝贺!** 课题组最新的研究成果**VenusMutHub**被[**Acta Pharmaceutica Sinica B**](https://www.sciencedirect.com/science/article/pii/S2211383525001650) 正式接收，并发布了系列[**排行榜**](https://lianglab.sjtu.edu.cn/muthub/)！
 
 <details>
 <summary>📨 欢迎加入我们的微信交流群</summary>

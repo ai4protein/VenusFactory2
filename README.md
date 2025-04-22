@@ -16,13 +16,10 @@
 
 Recent News:
 
-- Welcome to VenusFactory! This project is developed by [**Liang's Lab**](https://lianglab.sjtu.edu.cn/) at [**Shanghai Jiao Tong University**](https://www.sjtu.edu.cn/).
+- [2025-04-19] 🎉 **Congratulations!** [VenusREM](https://huggingface.co/AI4Protein/VenusREM) achieves 1st place in [ProteinGym](https://proteingym.org/) and [VenusMutHub](https://lianglab.sjtu.edu.cn/muthub/) leaderboard!
 - [2025-03-26] Add [VenusPLM-300M](https://huggingface.co/AI4Protein/VenusPLM-300M) model, trained based on **VenusPod**, is a protein language model independently developed by Hong Liang's research group at Shanghai Jiao Tong University.
 - [2025-03-17] Add [Venus-PETA, Venus-ProPrime, Venus-ProSST models](https://huggingface.co/AI4Protein), for more details, please refer to [Supported Models](#-supported-models)
-- [2025-03-05] 🎉 Congratulations! 🎉 
-
-  🚀 Our latest research achievement, **VenusMutHub**, has been officially accepted by [**Acta Pharmaceutica Sinica B**](https://www.sciencedirect.com/science/article/pii/S2211383525001650) and is now featured in a series of [**leaderboards**](https://lianglab.sjtu.edu.cn/muthub/)!    
-  💡 In this study, we built **900+ high-quality benchmark** [**datasets**](https://huggingface.co/datasets/AI4Protein/VenusMutHub) covering **500+ protein functional properties**. VenusMutHub not only offers a new collection of small-sample datasets for **real-world protein mutation engineering**, but also fills the gap in **diversity** within existing benchmarks, laying a stronger foundation for AI-driven protein mutation effect prediction.
+- [2025-03-05] 🎉 Congratulation! Our latest research achievement, **VenusMutHub**, has been officially accepted by [**Acta Pharmaceutica Sinica B**](https://www.sciencedirect.com/science/article/pii/S2211383525001650) and is now featured in a series of [**leaderboards**](https://lianglab.sjtu.edu.cn/muthub/)!    
 
 <details>
 <summary>📨 Welcome to join our WeChat Group</summary>
