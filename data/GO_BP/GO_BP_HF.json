@@ -1,5 +1,5 @@
 {
-    "dataset": "tyang816/GO_BP",
+    "dataset": "AI4Protein/GO_BP",
     "num_labels": 1943,
     "problem_type": "multi_label_classification",
     "metrics": "f1_max",

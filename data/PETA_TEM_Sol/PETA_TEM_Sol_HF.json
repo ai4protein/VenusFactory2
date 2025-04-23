@@ -1,5 +1,5 @@
 {
-    "dataset": "tyang816/PETA_TEM_Sol",
+    "dataset": "AI4Protein/PETA_TEM_Sol",
     "num_labels": 1,
     "problem_type": "regression",
     "metrics": "spearman_corr",

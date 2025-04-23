@@ -125,6 +125,14 @@ def validate_args(args: argparse.Namespace):
 
 def process_dataset_config(args: argparse.Namespace):
     """Process dataset configuration file."""
+
+    # Handle metrics specially
+    if args.metrics:
+        args.metrics = args.metrics.split(',')
+        if args.metrics == ['None']:
+            args.metrics = ['loss']
+            warnings.warn("No metrics provided, using default metrics: loss")
+
     if not args.dataset_config:
         return
         

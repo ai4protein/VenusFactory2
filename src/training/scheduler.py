@@ -1,11 +1,11 @@
 from torch.optim.lr_scheduler import LambdaLR, CosineAnnealingLR, StepLR
 from transformers import get_linear_schedule_with_warmup, get_cosine_schedule_with_warmup
 
-def create_scheduler(args, optimizer):
+def create_scheduler(args, optimizer, train_loader):
     if not args.scheduler:
         return None
         
-    num_training_steps = args.num_training_steps
+    num_training_steps = args.num_epochs * len(train_loader)
     num_warmup_steps = args.warmup_steps or num_training_steps // 10
     
     scheduler_dict = {

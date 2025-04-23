@@ -470,7 +470,7 @@ def create_eval_tab(constant):
             with gr.Row():
                 eval_model_path = gr.Textbox(
                     label="Model Path",
-                    value="ckpt/demo/demo_provided.pt",
+                    value="ckpt/demo/demo_solubility.pt",
                     placeholder="Path to the trained model"
                 )
                 eval_plm_model = gr.Dropdown(
@@ -480,7 +480,7 @@ def create_eval_tab(constant):
 
             with gr.Row():
                     eval_method = gr.Dropdown(
-                        choices=["full", "freeze", "ses-adapter", "plm-lora", "plm-qlora"],
+                        choices=["full", "freeze", "ses-adapter", "plm-lora", "plm-qlora", "plm_adalora", "plm_dora", "plm_ia3"],
                         label="Evaluation Method",
                         value="freeze"
                     )

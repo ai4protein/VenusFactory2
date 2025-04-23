@@ -1,5 +1,5 @@
 {
-    "dataset": "tyang816/eSOL_ESMFold",
+    "dataset": "AI4Protein/eSOL_ESMFold",
     "pdb_type": "ESMFold",
     "num_labels": 1,
     "problem_type": "regression",

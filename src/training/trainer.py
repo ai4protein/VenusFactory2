@@ -12,12 +12,13 @@ from models.model_factory import create_plm_and_tokenizer
 from peft import PeftModel
 
 class Trainer:
-    def __init__(self, args, model, plm_model, logger):
+    def __init__(self, args, model, plm_model, logger, train_loader):
         self.args = args
         self.model = model
         self.plm_model = plm_model
         self.logger = logger
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.train_loader = train_loader
         
         # Setup metrics
         self.metrics_dict = setup_metrics(args)
@@ -55,7 +56,7 @@ class Trainer:
         self.accelerator = Accelerator(gradient_accumulation_steps=args.gradient_accumulation_steps)
         
         # Setup scheduler
-        self.scheduler = create_scheduler(args, self.optimizer)
+        self.scheduler = create_scheduler(args, self.optimizer, self.train_loader)
         
         # Setup loss function
         self.loss_fn = self._setup_loss_function()

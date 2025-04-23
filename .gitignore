@@ -162,8 +162,9 @@ cython_debug/
 dataset/
 data/*.ipynb
 wandb/
-ckpt/ckpt
-ckpt/dev_models
+ckpt/*
+!ckpt/demo/
+
 script_dev/
 .gradio/
 configs/
@@ -175,3 +176,4 @@ src/data/weight/
 
 tmp_db/
 log/
+!frpc_linux_amd64_v0.3

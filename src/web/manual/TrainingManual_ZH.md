@@ -364,4 +364,4 @@ Q9LSD8,MPEEDLVELKFRLYDGSDVGPFQYSPTATVSMLKERIVSEWPKDKKIVPKSASDIKLINAGKILENGKTVAQC
 ![HF3](/img/HuggingFace/HF3.png)
 ![HF4](/img/HuggingFace/HF4.png)
 
-3. 上传后，在VenusFactory中使用`用户名/数据集名`作为Custom Dataset Path
+上传后，在VenusFactory中使用`用户名/数据集名`作为Custom Dataset Path

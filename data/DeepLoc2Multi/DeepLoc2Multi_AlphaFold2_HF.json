@@ -1,5 +1,5 @@
 {
-    "dataset": "tyang816/DeepLoc2Multi_AlphaFold2",
+    "dataset": "AI4Protein/DeepLoc2Multi_AlphaFold2",
     "pdb_type": "AlphaFold2",
     "num_labels": 10,
     "problem_type": "multi_label_classification",
