@@ -122,7 +122,7 @@ class TrainingArgs:
             args_dict["metrics"] = self.metrics
 
         # Add LoRA parameters
-        if self.training_method in ["plm-lora", "plm-qlora", "plm_adalora", "plm_dora", "plm_ia3"]:
+        if self.training_method in ["plm-lora", "plm-qlora", "plm-adalora", "plm-dora", "plm-ia3"]:
             args_dict.update({
                 "lora_r": self.lora_r,
                 "lora_alpha": self.lora_alpha,
@@ -520,7 +520,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             with gr.Row(equal_height=True):
                 with gr.Column(scale=1, min_width=150):
                     training_method = gr.Dropdown(
-                        choices=["full", "freeze", "ses-adapter", "plm-lora", "plm-qlora", "plm_adalora", "plm_dora", "plm_ia3"],
+                        choices=["full", "freeze", "ses-adapter", "plm-lora", "plm-qlora", "plm-adalora", "plm-dora", "plm-ia3"],
                         label="Training Method",
                         value="freeze"
                     )
@@ -548,7 +548,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             def update_training_method(method):
                 return {
                     structure_seq: gr.update(visible=method == "ses-adapter"),
-                    lora_params_row: gr.update(visible=method in ["plm-lora", "plm-qlora", "plm_adalora", "plm_dora", "plm_ia3"])
+                    lora_params_row: gr.update(visible=method in ["plm-lora", "plm-qlora", "plm-adalora", "plm-dora", "plm-ia3"])
                 }
 
             # Add training_method change event

@@ -29,7 +29,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Predict protein function for a single sequence")
     
     # Model parameters
-    parser.add_argument('--eval_method', type=str, default="freeze", choices=["freeze", "plm-lora", "plm-qlora", "ses-adapter"], help="Evaluation method")
+    parser.add_argument('--eval_method', type=str, default="freeze", choices=["full", "freeze", "ses-adapter", "plm-lora", "plm-qlora", "plm-adalora", "plm-dora", "plm-ia3"], help="Evaluation method")
     parser.add_argument('--model_path', type=str, required=True, help="Path to the trained model")
     parser.add_argument('--plm_model', type=str, required=True, help="Pretrained language model name or path")
     parser.add_argument('--pooling_method', type=str, default="mean", choices=["mean", "attention1d", "light_attention"], help="Pooling method")

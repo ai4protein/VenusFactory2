@@ -1,0 +1,28 @@
+{
+  "plm_model": "AI4Protein/Prime_690M",
+  "training_method": "plm-lora",
+  "pooling_method": "mean",
+  "learning_rate": 0.0005,
+  "num_epochs": 2,
+  "max_seq_len": -1,
+  "gradient_accumulation_steps": 1,
+  "warmup_steps": 0,
+  "scheduler": null,
+  "output_model_name": "demo.pt",
+  "output_dir": "demo",
+  "patience": 10,
+  "num_workers": 4,
+  "max_grad_norm": -1,
+  "monitor": "accuracy",
+  "monitor_strategy": "max",
+  "dataset_config": "data/Demo/Demo_Solubility_HF.json",
+  "lora_r": 8,
+  "lora_alpha": 32,
+  "lora_dropout": 0.1,
+  "lora_target_modules": [
+    "query",
+    "key",
+    "value"
+  ],
+  "batch_size": 16
+}
