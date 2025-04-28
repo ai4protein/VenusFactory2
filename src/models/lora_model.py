@@ -57,7 +57,12 @@ class LoraModel(nn.Module):
                     outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask, ss_input_ids=stru_token, output_hidden_states=True)
                 else:
                     outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask)
-        seq_embeds = outputs.last_hidden_state
+        if "ProSST" in self.args.plm_model:
+            seq_embeds = outputs.hidden_states[-1]
+        elif "Prime" in self.args.plm_model:
+            seq_embeds = outputs.sequence_hidden_states[-1]
+        else:
+            seq_embeds = outputs.last_hidden_state
         gc.collect()
         torch.cuda.empty_cache()
         return seq_embeds

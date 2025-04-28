@@ -480,7 +480,7 @@ def create_eval_tab(constant):
 
             with gr.Row():
                     eval_method = gr.Dropdown(
-                        choices=["full", "freeze", "ses-adapter", "plm-lora", "plm-qlora", "plm_adalora", "plm_dora", "plm_ia3"],
+                        choices=["full", "freeze", "ses-adapter", "plm-lora", "plm-qlora", "plm-adalora", "plm-dora", "plm-ia3"],
                         label="Evaluation Method",
                         value="freeze"
                     )
