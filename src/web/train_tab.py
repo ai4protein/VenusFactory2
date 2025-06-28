@@ -315,148 +315,150 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         with open(css_path, "r") as f:
             custom_css = f.read()
         gr.HTML(f"<style>{custom_css}</style>", visible=True)
-
-        # Batch Processing Configuration
-        gr.Markdown("### Batch Processing Configuration")
-        with gr.Group():
-            with gr.Row(equal_height=True):
-                with gr.Column(scale=1):
-                    batch_mode = gr.Radio(
-                        choices=["Batch Size Mode", "Batch Token Mode"],
-                        label="Batch Processing Mode",
-                        value="Batch Size Mode"
-                    )
-                
-                with gr.Column(scale=2):
-                    batch_size = gr.Slider(
-                        minimum=1,
-                        maximum=128,
-                        value=16,
-                        step=1,
-                        label="Batch Size",
-                        visible=True
-                    )
+        # Hyperparameter Settings
+        with gr.Accordion("Hyperparameter Settings", open=False):
+            # Batch Processing Configuration
+            gr.Markdown("### Batch Processing Configuration")
+            with gr.Group():
+                with gr.Row(equal_height=True):
+                    with gr.Column(scale=1):
+                        batch_mode = gr.Radio(
+                            choices=["Batch Size Mode", "Batch Token Mode"],
+                            label="Batch Processing Mode",
+                            value="Batch Size Mode"
+                        )
                     
-                    batch_token = gr.Slider(
-                        minimum=1000,
-                        maximum=50000,
-                        value=10000,
-                        step=1000,
-                        label="Tokens per Batch",
-                        visible=False
-                    )
+                    with gr.Column(scale=2):
+                        batch_size = gr.Slider(
+                            minimum=1,
+                            maximum=128,
+                            value=16,
+                            step=1,
+                            label="Batch Size",
+                            visible=True
+                        )
+                        
+                        batch_token = gr.Slider(
+                            minimum=1000,
+                            maximum=50000,
+                            value=10000,
+                            step=1000,
+                            label="Tokens per Batch",
+                            visible=False
+                        )
 
-        def update_batch_inputs(mode):
-            return {
-                batch_size: gr.update(visible=mode == "Batch Size Mode"),
-                batch_token: gr.update(visible=mode == "Batch Token Mode")
-            }
-
-        # Update visibility when mode changes
-        batch_mode.change(
-            fn=update_batch_inputs,
-            inputs=[batch_mode],
-            outputs=[batch_size, batch_token]
-        )
-
-        # Training Parameters
-        gr.Markdown("### Training Parameters")
-        with gr.Group():
-            # First row: Basic training parameters
-            with gr.Row(equal_height=True):
-                with gr.Column(scale=1, min_width=150):
-                    training_method = gr.Dropdown(
-                        choices=["full", "freeze", "ses-adapter", "plm-lora", "plm-qlora", "plm-adalora", "plm-dora", "plm-ia3"],
-                        label="Training Method",
-                        value="freeze"
-                    )
-                with gr.Column(scale=1, min_width=150):
-                    learning_rate = gr.Slider(
-                        minimum=1e-8, maximum=1e-2, value=5e-4, step=1e-6,
-                        label="Learning Rate"
-                    )
-                with gr.Column(scale=1, min_width=150):
-                    num_epochs = gr.Slider(
-                        minimum=1, maximum=200, value=20, step=1,
-                        label="Number of Epochs"
-                    )
-                with gr.Column(scale=1, min_width=150):
-                    patience = gr.Slider(
-                        minimum=1, maximum=50, value=10, step=1,
-                        label="Early Stopping Patience"
-                    )
-                with gr.Column(scale=1, min_width=150):
-                    max_seq_len = gr.Slider(
-                        minimum=-1, maximum=2048, value=None, step=32,
-                        label="Max Sequence Length (-1 for unlimited)"
-                    )
-            
-            def update_training_method(method):
+            def update_batch_inputs(mode):
                 return {
-                    structure_seq: gr.update(visible=method == "ses-adapter"),
-                    lora_params_row: gr.update(visible=method in ["plm-lora", "plm-qlora", "plm-adalora", "plm-dora", "plm-ia3"])
+                    batch_size: gr.update(visible=mode == "Batch Size Mode"),
+                    batch_token: gr.update(visible=mode == "Batch Token Mode")
                 }
 
-            # Add training_method change event
-            training_method.change(
-                fn=update_training_method,
-                inputs=[training_method],
-                outputs=[structure_seq, lora_params_row]
+            # Update visibility when mode changes
+            batch_mode.change(
+                fn=update_batch_inputs,
+                inputs=[batch_mode],
+                outputs=[batch_size, batch_token]
             )
 
-            # Second row: Advanced training parameters
-            with gr.Row(equal_height=True):
-                with gr.Column(scale=1, min_width=150):
-                    pooling_method = gr.Dropdown(
-                        choices=["mean", "attention1d", "light_attention"],
-                        label="Pooling Method",
-                        value="mean"
-                    )
+            # Training Parameters
+            gr.Markdown("### Training Parameters")
+            with gr.Group():
+                # First row: Basic training parameters
+                with gr.Row(equal_height=True):
+                    with gr.Column(scale=1, min_width=150):
+                        training_method = gr.Dropdown(
+                            choices=["full", "freeze", "ses-adapter", "plm-lora", "plm-qlora", "plm-adalora", "plm-dora", "plm-ia3"],
+                            label="Training Method",
+                            value="freeze"
+                        )
+                    with gr.Column(scale=1, min_width=150):
+                        learning_rate = gr.Slider(
+                            minimum=1e-8, maximum=1e-2, value=5e-4, step=1e-6,
+                            label="Learning Rate"
+                        )
+                    with gr.Column(scale=1, min_width=150):
+                        num_epochs = gr.Slider(
+                            minimum=1, maximum=200, value=20, step=1,
+                            label="Number of Epochs"
+                        )
+                    with gr.Column(scale=1, min_width=150):
+                        patience = gr.Slider(
+                            minimum=1, maximum=50, value=10, step=1,
+                            label="Early Stopping Patience"
+                        )
+                    with gr.Column(scale=1, min_width=150):
+                        max_seq_len = gr.Slider(
+                            minimum=-1, maximum=2048, value=None, step=32,
+                            label="Max Sequence Length (-1 for unlimited)"
+                        )
                 
-                with gr.Column(scale=1, min_width=150):
-                    scheduler_type = gr.Dropdown(
-                        choices=["linear", "cosine", "step", None],
-                        label="Scheduler Type",
-                        value=None
-                    )
-                with gr.Column(scale=1, min_width=150):
-                    warmup_steps = gr.Slider(
-                        minimum=0, maximum=1000, value=0, step=10,
-                        label="Warmup Steps"
-                    )
-                with gr.Column(scale=1, min_width=150):
-                    gradient_accumulation_steps = gr.Slider(
-                        minimum=1, maximum=32, value=1, step=1,
-                        label="Gradient Accumulation Steps"
-                    )
-                with gr.Column(scale=1, min_width=150):
-                    max_grad_norm = gr.Slider(
-                        minimum=0.1, maximum=10.0, value=-1, step=0.1,
-                        label="Max Gradient Norm (-1 for no clipping)"
-                    )
-                with gr.Column(scale=1, min_width=150):
-                    num_workers = gr.Slider(
-                        minimum=0, maximum=16, value=4, step=1,
-                        label="Number of Workers"
-                    )
-                
-        # Output and Logging Settings
-        gr.Markdown("### Output and Logging Settings")
-        with gr.Row():
-            with gr.Column():
-                output_dir = gr.Textbox(
-                    label="Save Directory",
-                    value="demo",
-                    placeholder="Path to save training results"
-                )
-                
-                output_model_name = gr.Textbox(
-                    label="Output Model Name",
-                    value="demo.pt",
-                    placeholder="Name of the output model file"
+                def update_training_method(method):
+                    return {
+                        structure_seq: gr.update(visible=method == "ses-adapter"),
+                        lora_params_row: gr.update(visible=method in ["plm-lora", "plm-qlora", "plm-adalora", "plm-dora", "plm-ia3"])
+                    }
+
+                # Add training_method change event
+                training_method.change(
+                    fn=update_training_method,
+                    inputs=[training_method],
+                    outputs=[structure_seq, lora_params_row]
                 )
 
-            with gr.Column():
+                # Second row: Advanced training parameters
+                with gr.Row(equal_height=True):
+                    with gr.Column(scale=1, min_width=150):
+                        pooling_method = gr.Dropdown(
+                            choices=["mean", "attention1d", "light_attention"],
+                            label="Pooling Method",
+                            value="mean"
+                        )
+                    
+                    with gr.Column(scale=1, min_width=150):
+                        scheduler_type = gr.Dropdown(
+                            choices=["linear", "cosine", "step", None],
+                            label="Scheduler Type",
+                            value=None
+                        )
+                    with gr.Column(scale=1, min_width=150):
+                        warmup_steps = gr.Slider(
+                            minimum=0, maximum=1000, value=0, step=10,
+                            label="Warmup Steps"
+                        )
+                    with gr.Column(scale=1, min_width=150):
+                        gradient_accumulation_steps = gr.Slider(
+                            minimum=1, maximum=32, value=1, step=1,
+                            label="Gradient Accumulation Steps"
+                        )
+                    with gr.Column(scale=1, min_width=150):
+                        max_grad_norm = gr.Slider(
+                            minimum=0.1, maximum=10.0, value=-1, step=0.1,
+                            label="Max Gradient Norm (-1 for no clipping)"
+                        )
+                    with gr.Column(scale=1, min_width=150):
+                        num_workers = gr.Slider(
+                            minimum=0, maximum=16, value=4, step=1,
+                            label="Number of Workers"
+                        )
+
+        # Output and Training Control
+        with gr.Row():
+            # Left side: Output and Logging Settings
+            with gr.Column(scale=1):
+                gr.Markdown("#### Output and Logging Settings")
+                with gr.Row():
+                    output_dir = gr.Textbox(
+                        label="Save Directory",
+                        value="demo",
+                        placeholder="Path to save training results"
+                    )
+                    
+                    output_model_name = gr.Textbox(
+                        label="Output Model Name",
+                        value="demo.pt",
+                        placeholder="Name of the output model file"
+                    )
+
                 wandb_logging = gr.Checkbox(
                     label="Enable W&B Logging",
                     value=False
@@ -474,12 +476,12 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                     visible=False
                 )
 
-        # Training Control and Output
-        gr.Markdown("### Training Control")
-        with gr.Row():
-            preview_button = gr.Button("Preview Command")
-            abort_button = gr.Button("Abort", variant="stop")
-            train_button = gr.Button("Start", variant="primary")
+            # Right side: Training Control
+            with gr.Column(scale=1):
+                gr.Markdown("#### Training Control")
+                preview_button = gr.Button("Preview Command")
+                abort_button = gr.Button("Abort", variant="stop")
+                train_button = gr.Button("Start", variant="primary")
         
         with gr.Row():
             command_preview = gr.Code(
