@@ -1,6 +1,8 @@
-## zero-shot mutation scores
+# Zero-shot mutation scores
 
 Rank from **high to low** to select the best mutation for wet-lab experiments.
+
+## Sequence-structure models
 
 ### ProSST (highly recommended if you use AlphaFold2 or AlphaFold3 structure)
 
@@ -20,7 +22,7 @@ python src/mutation/models/prosst.py \
 }
 ```
 
-### ProtSSN
+### ProtSSN (highly recommended if you use RCSB PDB)
 
 ```bash
 python src/mutation/models/protssn.py \
@@ -30,23 +32,24 @@ python src/mutation/models/protssn.py \
 
 ```bibtex
 @article{tan2025protssn,
-	article_type = {journal},
-	title = {Semantical and geometrical protein encoding toward enhanced bioactivity and thermostability},
-	author = {Tan, Yang and Zhou, Bingxin and Zheng, Lirong and Fan, Guisheng and Hong, Liang},
-	editor = {Koo, Peter and Cui, Qiang},
-	volume = 13,
-	year = 2025,
-	month = {may},
-	pub_date = {2025-05-02},
-	pages = {RP98033},
-	citation = {eLife 2025;13:RP98033},
-	doi = {10.7554/eLife.98033},
-	url = {https://doi.org/10.7554/eLife.98033},
-	journal = {eLife},
-	issn = {2050-084X},
-	publisher = {eLife Sciences Publications, Ltd},
+  article_type = {journal},
+  title = {Semantical and geometrical protein encoding toward enhanced bioactivity and thermostability},
+  author = {Tan, Yang and Zhou, Bingxin and Zheng, Lirong and Fan, Guisheng and Hong, Liang},
+  volume = 13,
+  year = 2025,
+  month = {may},
+  pub_date = {2025-05-02},
+  pages = {RP98033},
+  citation = {eLife 2025;13:RP98033},
+  doi = {10.7554/eLife.98033},
+  url = {https://doi.org/10.7554/eLife.98033},
+  journal = {eLife},
+  issn = {2050-084X},
+  publisher = {eLife Sciences Publications, Ltd},
 }
 ```
+
+## Sequence-only models
 
 ### ESM2
 
