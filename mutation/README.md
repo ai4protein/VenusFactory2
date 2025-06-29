@@ -22,6 +22,32 @@ python src/mutation/models/prosst.py \
 
 ### ProtSSN
 
+```bash
+python src/mutation/models/protssn.py \
+    --pdb_file download/alphafold2_structures/A0A0C5B5G6.pdb \
+    --output_csv mutation/example/A0A0C5B5G6_protssn.csv
+```
+
+```bibtex
+@article{tan2025protssn,
+	article_type = {journal},
+	title = {Semantical and geometrical protein encoding toward enhanced bioactivity and thermostability},
+	author = {Tan, Yang and Zhou, Bingxin and Zheng, Lirong and Fan, Guisheng and Hong, Liang},
+	editor = {Koo, Peter and Cui, Qiang},
+	volume = 13,
+	year = 2025,
+	month = {may},
+	pub_date = {2025-05-02},
+	pages = {RP98033},
+	citation = {eLife 2025;13:RP98033},
+	doi = {10.7554/eLife.98033},
+	url = {https://doi.org/10.7554/eLife.98033},
+	journal = {eLife},
+	issn = {2050-084X},
+	publisher = {eLife Sciences Publications, Ltd},
+}
+```
+
 ### ESM2
 
 ```bash
@@ -30,11 +56,35 @@ python src/mutation/models/esm2.py \
     --output_csv mutation/example/A0A0C5B5G6_esm2.csv
 ```
 
+```bibtex
+@article{lin2023esm2,
+  title={Evolutionary-scale prediction of atomic-level protein structure with a language model},
+  author={Lin, Zeming and Akin, Halil and Rao, Roshan and Hie, Brian and Zhu, Zhongkai and Lu, Wenting and Smetanin, Nikita and Verkuil, Robert and Kabeli, Ori and Shmueli, Yaniv and others},
+  journal={Science},
+  volume={379},
+  number={6637},
+  pages={1123--1130},
+  year={2023},
+  publisher={American Association for the Advancement of Science}
+}
+```
+
 ### ESM1V
 
 ```bash
 python src/mutation/models/esm1v.py \
     --fasta_file download/uniprot_sequences/A0A0C5B5G6.fasta \
     --output_csv mutation/example/A0A0C5B5G6_esm1v.csv
+```
+
+```bibtex
+@article{meier2021esm1v,
+  title={Language models enable zero-shot prediction of the effects of mutations on protein function},
+  author={Meier, Joshua and Rao, Roshan and Verkuil, Robert and Liu, Jason and Sercu, Tom and Rives, Alex},
+  journal={Advances in Neural Information Processing Systems},
+  volume={34},
+  pages={29287--29303},
+  year={2021}
+}
 ```
 
