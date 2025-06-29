@@ -17,8 +17,9 @@ if __name__ == "__main__":
     parser.add_argument('--output_csv', type=str, default=None, help='Path to the output CSV file')
     args = parser.parse_args()
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    prosst_model = AutoModelForMaskedLM.from_pretrained("AI4Protein/ProSST-2048", trust_remote_code=True)
+    prosst_model = AutoModelForMaskedLM.from_pretrained("AI4Protein/ProSST-2048", trust_remote_code=True).to(device)
     prosst_tokenizer = AutoTokenizer.from_pretrained("AI4Protein/ProSST-2048", trust_remote_code=True)
     predictor = SSTPredictor(structure_vocab_size=2048)
 
@@ -28,8 +29,8 @@ if __name__ == "__main__":
     residue_sequence = extract_seq_from_pdb(args.pdb_file)
 
     tokenized_res = prosst_tokenizer([residue_sequence], return_tensors='pt')
-    input_ids = tokenized_res['input_ids']
-    attention_mask = tokenized_res['attention_mask']
+    input_ids = tokenized_res['input_ids'].to(device)
+    attention_mask = tokenized_res['attention_mask'].to(device)
     structure_input_ids = torch.tensor([1, *structure_sequence_offset, 2], dtype=torch.long).unsqueeze(0)
 
     with torch.no_grad():
