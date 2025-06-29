@@ -1,94 +1,44 @@
 import random
 import torch
-import os
-import biotite
-import torch
-import numpy as np
 import torch.utils.data as data
 from torch_geometric.data import Data, Batch
-from tqdm import tqdm
-from typing import List
-from biotite.structure.residues import get_residues
-from biotite.sequence import ProteinSequence
-from biotite.structure.io import pdbx, pdb
-from biotite.structure import filter_backbone
-from biotite.structure import get_chains
+from Bio.SeqIO import PdbIO
+import os
 
-def load_structure(fpath, chain=None):
+def extract_seq_from_pdb(pdb_file: str, chain_id='A'):
     """
+    extract sequence from pdb file
+    
     Args:
-        fpath: filepath to either pdb or cif file
-        chain: the chain id or list of chain ids to load
+        pdb_file (str): path to the pdb file
+        chain_id (str): chain id
+    
     Returns:
-        biotite.structure.AtomArray
+        dict: a dictionary containing the sequence from SEQRES and ATOM records
     """
-    if fpath.endswith('cif'):
-        with open(fpath) as fin:
-            pdbxf = pdbx.PDBxFile.read(fin)
-        structure = pdbx.get_structure(pdbxf, model=1)
-    elif fpath.endswith('pdb'):
-        with open(fpath) as fin:
-            pdbf = pdb.PDBFile.read(fin)
-        structure = pdb.get_structure(pdbf, model=1)
-    bbmask = filter_backbone(structure)
-    structure = structure[bbmask]
-    all_chains = get_chains(structure)
-    if len(all_chains) == 0:
-        raise ValueError('No chains found in the input file.')
-    if chain is None:
-        chain_ids = all_chains
-    elif isinstance(chain, list):
-        chain_ids = chain
-    else:
-        chain_ids = [chain] 
-    for chain in chain_ids:
-        if chain not in all_chains:
-            raise ValueError(f'Chain {chain} not found in input file')
-    chain_filter = [a.chain_id in chain_ids for a in structure]
-    structure = structure[chain_filter]
-    return structure
+    if not os.path.exists(pdb_file):
+        print(f"Error: file does not exist at path {pdb_file}")
+        return None
+        
+    pdb_id = os.path.basename(pdb_file).split('.')[0] # get id from file name
 
-def get_atom_coords_residuewise(atoms: List[str], struct: biotite.structure.AtomArray):
-    """
-    Example for atoms argument: ["N", "CA", "C"]
-    """
-    def filterfn(s, axis=None):
-        filters = np.stack([s.atom_name == name for name in atoms], axis=1)
-        sum = filters.sum(0)
-        if not np.all(sum <= np.ones(filters.shape[1])):
-            raise RuntimeError("structure has multiple atoms with same name")
-        index = filters.argmax(0)
-        coords = s[index].coord
-        coords[sum == 0] = float("nan")
-        return coords
+    sequences = {
+        "SEQRES": {},
+    }
 
-    return biotite.structure.apply_residue_wise(struct, struct, filterfn)
+    print("\n--- extract sequence from SEQRES records ---")
+    try:
+        with open(pdb_file, 'r') as pdb_file:
+            for record in PdbIO.PdbSeqresIterator(pdb_file):
+                chain_id = record.id.split(':')[1]
+                if chain_id == chain_id:
+                    print(f"Chain {chain_id}: {record.seq}")
+                    sequences["SEQRES"][chain_id] = str(record.seq)
+    except Exception as e:
+        print(f"Error: failed to parse sequence from SEQRES records: {e}")
 
-def extract_coords_from_structure(structure: biotite.structure.AtomArray):
-    """
-    Args:
-        structure: An instance of biotite AtomArray
-    Returns:
-        Tuple (coords, seq)
-            - coords is an L x 3 x 3 array for N, CA, C coordinates
-            - seq is the extracted sequence
-    """
-    coords = get_atom_coords_residuewise(["N", "CA", "C"], structure)
-    residue_identities = get_residues(structure)[1]
-    seq = ''.join([ProteinSequence.convert_letter_3to1(r) for r in residue_identities])
-    return coords
 
-def extract_seq_from_pdb(pdb_file, chain=None):
-    """
-    Args:
-        structure: An instance of biotite AtomArray
-    Returns:
-        - seq is the extracted sequence
-    """
-    structure = load_structure(pdb_file, chain)
-    residue_identities = get_residues(structure)[1]
-    seq = ''.join([ProteinSequence.convert_letter_3to1(r) for r in residue_identities])
-    return seq
+    return sequences['SEQRES'][chain_id]
 
 def convert_graph(graph):
     graph = Data(
