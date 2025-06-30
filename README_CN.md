@@ -16,6 +16,7 @@
 
 最新消息：
 
+- [2025-06-30] 🚀 **更新:** 新增突变零样本预测功能，支持结构和序列模型的高通量突变效应评分。
 - [2025-04-19] 🎉 **祝贺!** [VenusREM](https://github.com/ai4protein/VenusREM) 在 [ProteinGym](https://proteingym.org/benchmarks) 和 [VenusMutHub](https://lianglab.sjtu.edu.cn/muthub/) 排行榜中均取得第一名！
 - [2025-03-26] 新增 [VenusPLM-300M](https://huggingface.co/AI4Protein/VenusPLM-300M) 模型，基于**VenusPod**独立开发，由[**Hong Liang**](https://lianglab.sjtu.edu.cn/)课题组开发。
 - [2025-03-17] 新增 [Venus-PETA、Venus-ProPrime、Venus-ProSST 模型](https://huggingface.co/AI4Protein)，更多详情请参考[支持的模型](#-支持的模型)
@@ -52,6 +53,7 @@
 - **丰富的蛋白质语言模型**：Venus系列、ESM系列、ProtTrans系列、Ankh 系列等
 - **全面的监督数据集**：定位、适应度、溶解度、稳定性等
 - **便捷的数据收集工具**：AlphaFold2 数据库、RCSB、InterPro、Uniprot 等
+- **突变零样本预测**：结构和序列模型的高通量突变效应评分
 - **实验监控**：Wandb、本地监控
 - **友好的界面**：Gradio UI
 
@@ -62,7 +64,22 @@
   </video>
 </p>
 
-## 🤖 支持的模型
+## 🧬 支持的模型 (零样本预测)
+
+### 序列-结构模型
+
+[ProSST, NeurIPS2024](https://proceedings.neurips.cc/paper_files/paper/2024/file/3ed57b293db0aab7cc30c44f45262348-Paper-Conference.pdf), [ProtSSN, eLife2025](https://elifesciences.org/articles/98033), [MIF-ST, PEDS2022](https://academic.oup.com/peds/article-abstract/doi/10.1093/protein/gzad015/7330543?redirectedFrom=fulltext)
+
+### 结构模型
+
+[MIF, PEDS2022](https://academic.oup.com/peds/article-abstract/doi/10.1093/protein/gzad015/7330543?redirectedFrom=fulltext)
+
+### 序列模型
+
+[ESM2, Science2023](https://www.science.org/doi/10.1126/science.ade2574), [ESM-1v, NeurIPS2021](https://proceedings.neurips.cc/paper/2021/file/f51338d736f95dd42427296047067694-Paper.pdf)
+
+
+## 🤖 支持的模型 (监督任务)
 
 ### 预训练蛋白质语言模型
 

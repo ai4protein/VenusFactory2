@@ -16,6 +16,7 @@
 
 Recent News:
 
+- [2025-06-30] 🚀 **Update:** Added mutation zero-shot prediction functionality, supporting structure-based and sequence-based models for high-throughput mutation effect scoring.
 - [2025-04-19] 🎉 **Congratulations!** [VenusREM](https://github.com/ai4protein/VenusREM) achieves 1st place in [ProteinGym](https://proteingym.org/benchmarks) and [VenusMutHub](https://lianglab.sjtu.edu.cn/muthub/) leaderboard!
 - [2025-03-26] Add [VenusPLM-300M](https://huggingface.co/AI4Protein/VenusPLM-300M) model, trained based on **VenusPod**, is a protein language model independently developed by Hong Liang's research group at Shanghai Jiao Tong University.
 - [2025-03-17] Add [Venus-PETA, Venus-ProPrime, Venus-ProSST models](https://huggingface.co/AI4Protein), for more details, please refer to [Supported Models](#-supported-models)
@@ -54,6 +55,7 @@ Recent News:
 - **Vaious protein langugae models**: Venus series, ESM series, ProtTrans series, Ankh series, etc
 - **Comprehensive supervised datasets**: Localization, Fitness, Solubility, Stability, etc
 - **Easy and quick data collector**: AlphaFold2 Database, RCSB, InterPro, Uniprot, etc
+- **Mutation zero-shot prediction**: Structure-based and sequence-based models for high-throughput mutation effect scoring
 - **Experiment moitors**: Wandb, Local
 - **Friendly interface**: Gradio UI
 
@@ -64,7 +66,22 @@ Recent News:
   </video>
 </p>
 
-## 🤖 Supported Models
+## 🧬 Supported Models (Zero-shot prediction)
+
+### Sequence-structure models
+
+[ProSST, NeurIPS2024](https://proceedings.neurips.cc/paper_files/paper/2024/file/3ed57b293db0aab7cc30c44f45262348-Paper-Conference.pdf), [ProtSSN, eLife2025](https://elifesciences.org/articles/98033), [MIF-ST, PEDS2022](https://academic.oup.com/peds/article-abstract/doi/10.1093/protein/gzad015/7330543?redirectedFrom=fulltext)
+
+### Structure-only models
+
+[MIF, PEDS2022](https://academic.oup.com/peds/article-abstract/doi/10.1093/protein/gzad015/7330543?redirectedFrom=fulltext)
+
+### Sequence-only models
+
+[ESM2, Science2023](https://www.science.org/doi/10.1126/science.ade2574), [ESM-1v, NeurIPS2021](https://proceedings.neurips.cc/paper/2021/file/f51338d736f95dd42427296047067694-Paper.pdf)
+
+
+## 🤖 Supported Models (Training for supervised tasks)
 
 ### Pre-training Protein Language Models
 
