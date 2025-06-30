@@ -49,6 +49,50 @@ python src/mutation/models/protssn.py \
 }
 ```
 
+### MIF-ST 
+
+```bash
+python src/mutation/models/mifst.py \
+    --pdb_file download/alphafold2_structures/A0A1B0GTW7.pdb \
+    --output_csv mutation/example/A0A1B0GTW7_mifst.csv
+```
+
+```bibtex
+@article{mifst,
+  title={Masked inverse folding with sequence transfer for protein representation learning},
+  author={Yang, Kevin K and Zanichelli, Niccol{\`o} and Yeh, Hugh},
+  journal={Protein Engineering, Design and Selection},
+  volume={36},
+  pages={gzad015},
+  year={2023},
+  publisher={Oxford University Press}
+}
+```
+
+## Structure-only models
+
+### MIF
+
+```bash
+python src/mutation/models/mifst.py \
+    --pdb_file download/alphafold2_structures/A0A1B0GTW7.pdb \
+    --output_csv mutation/example/A0A1B0GTW7_mif.csv \
+    --model_location mif
+```
+
+```bibtex
+@article{mifst,
+  title={Masked inverse folding with sequence transfer for protein representation learning},
+  author={Yang, Kevin K and Zanichelli, Niccol{\`o} and Yeh, Hugh},
+  journal={Protein Engineering, Design and Selection},
+  volume={36},
+  pages={gzad015},
+  year={2023},
+  publisher={Oxford University Press}
+}
+```
+
+
 ## Sequence-only models
 
 ### ESM2

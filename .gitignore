@@ -177,3 +177,5 @@ src/data/weight/
 tmp_db/
 log/
 !frpc_linux_amd64_v0.3
+.webui_secret_key
+memory_db/
