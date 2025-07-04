@@ -18,8 +18,9 @@ if __name__ == "__main__":
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    esm1v_model = AutoModelForMaskedLM.from_pretrained("facebook/esm1v_t33_650M_UR90S_1", trust_remote_code=True).to(device)
-    esm1v_tokenizer = AutoTokenizer.from_pretrained("facebook/esm1v_t33_650M_UR90S_1", trust_remote_code=True)
+    model_path = "facebook/esm1v_t33_650M_UR90S_1"
+    esm1v_model = AutoModelForMaskedLM.from_pretrained(model_path, trust_remote_code=True).to(device)
+    esm1v_tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
 
     with open(args.fasta_file, 'r') as f:
         lines = f.readlines()
@@ -44,11 +45,12 @@ if __name__ == "__main__":
     pred_scores = []
     for mutant in mutants:
         mutant_score = 0
-        for sub_mutant in mutant.split(":"):
+        sep = ":" if ":" in mutant else ";"
+        for sub_mutant in mutant.split(sep):
             wt, idx, mt = sub_mutant[0], int(sub_mutant[1:-1]) - 1, sub_mutant[-1]
             pred = logits[idx, vocab[mt]] - logits[idx, vocab[wt]]
             mutant_score += pred.item()
-        pred_scores.append(mutant_score)
+        pred_scores.append(mutant_score / len(mutant.split(sep)))
 
     df['esm1v_score'] = pred_scores
 

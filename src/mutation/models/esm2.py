@@ -44,11 +44,12 @@ if __name__ == "__main__":
     pred_scores = []
     for mutant in mutants:
         mutant_score = 0
-        for sub_mutant in mutant.split(":"):
+        sep = ":" if ":" in mutant else ";"
+        for sub_mutant in mutant.split(sep):
             wt, idx, mt = sub_mutant[0], int(sub_mutant[1:-1]) - 1, sub_mutant[-1]
             pred = logits[idx, vocab[mt]] - logits[idx, vocab[wt]]
             mutant_score += pred.item()
-        pred_scores.append(mutant_score)
+        pred_scores.append(mutant_score / len(mutant.split(sep)))
 
     df['esm2_score'] = pred_scores
 
