@@ -9,7 +9,7 @@ from transformers import AutoModelForMaskedLM, AutoTokenizer
 from src.mutation.utils import generate_mutations_from_sequence
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(description='ESM2')
     parser.add_argument('--fasta_file', type=str, required=True, help='Path to the fasta file')
     parser.add_argument('--mutations_csv', type=str, default=None, help='Path to the mutations CSV file')
@@ -58,3 +58,6 @@ if __name__ == "__main__":
     else:
         file_name = f"{args.fasta_file.split('/')[-1].split('.')[0]}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
         df.to_csv(file_name, index=False)
+
+if __name__ == "__main__":
+    main()

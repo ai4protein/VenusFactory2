@@ -123,7 +123,7 @@ def get_struc_seq(foldseek,
     os.remove(tmp_save_path + ".dbtype")
     return seq_dict
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(description='saprot')
     parser.add_argument('--pdb_file', type=str, required=True, help='Path to the pdb file')
     parser.add_argument('--mutations_csv', type=str, default=None, help='Path to the mutations CSV file')
@@ -193,3 +193,6 @@ if __name__ == "__main__":
         file_name = f"{args.pdb_file.split('/')[-1].split('.')[0]}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
         df.to_csv(file_name, index=False)
         print(f"Results saved to {file_name}")
+
+if __name__ == "__main__":
+    main()

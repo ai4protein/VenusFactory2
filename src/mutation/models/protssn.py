@@ -504,7 +504,7 @@ class ProtSSN:
         return torch.from_numpy(transformed_dist.astype(np.float32))
 
 
-if __name__ == '__main__':
+def main():
     parser = argparse.ArgumentParser()
     
     # model config
@@ -591,5 +591,5 @@ if __name__ == '__main__':
         file_name = f"{args.pdb_file.split('/')[-1].split('.')[0]}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
         df.to_csv(file_name, index=False)
 
-    
-    
+if __name__ == "__main__":
+    main()

@@ -9,7 +9,7 @@ from src.mutation.models.sequence_models.pretrained import load_model_and_alphab
 from src.mutation.models.sequence_models.constants import PROTEIN_ALPHABET
 from src.mutation.utils import generate_mutations_from_sequence
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(description='MIF-ST')
     parser.add_argument('--pdb_file', type=str, required=True, help='Path to the pdb file')
     parser.add_argument('--mutations_csv', type=str, default=None, help='Path to the mutations CSV file')
@@ -66,3 +66,6 @@ if __name__ == "__main__":
         import datetime
         file_name = f"{os.path.splitext(os.path.basename(args.pdb_file))[0]}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
         df.to_csv(file_name, index=False)
+
+if __name__ == "__main__":
+    main()

@@ -10,7 +10,7 @@ from src.data.prosst.structure.get_sst_seq import SSTPredictor
 from src.mutation.utils import generate_mutations_from_sequence
 from src.data.prosst.structure.utils.data_utils import extract_seq_from_pdb
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(description='Prosst')
     parser.add_argument('--pdb_file', type=str, required=True, help='Path to the pdb file')
     parser.add_argument('--mutations_csv', type=str, default=None, help='Path to the mutations CSV file')
@@ -66,3 +66,6 @@ if __name__ == "__main__":
     else:
         file_name = f"{args.pdb_file.split('/')[-1].split('.')[0]}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
         df.to_csv(file_name, index=False)
+
+if __name__ == "__main__":
+    main()
