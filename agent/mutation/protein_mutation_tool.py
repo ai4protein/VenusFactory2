@@ -1,56 +1,43 @@
 """
 id: protein-mutation-tool
 name: protein mutation tool
-description: A comprehensive tool for protein mutation analysis using AI models. Supports both saturation mutagenesis (all possible mutations) and specific mutation scoring.
+description: AI tool for protein mutation design. User MUST specify a model name. Returns CSV scoring results only.
 
-WHEN TO USE THIS TOOL:
-- User asks for protein mutation analysis
-- User mentions ESM-2, ESM-1v, or other supported models
-- User uploads protein files (FASTA/PDB) and wants analysis
-- User asks for saturation mutagenesis or specific mutation scoring
+AI INTERACTION GUIDE:
+When user mentions protein mutation design with a specific model, follow this workflow:
 
-HOW TO USE THIS TOOL:
+1. DETECT MODEL: Extract model name from user's request
+   - ESM-2: "esm2", "ESM-2", "esm-2"
+   - ESM-IF1: "esmif1", "ESM-IF1", "esm-if1", "esm if1"
+   - SaProt: "saprot", "SaProt", "sa-prot"
+   - Others: "mifst", "prosst", "protssn", "esm1v"
 
-SIMPLE APPROACH (Recommended):
-1. Call help_with_protein_analysis(user_request) to analyze user's request
-2. If user confirms, call analyze_protein_mutations(model, task) for automatic file detection
+2. DETERMINE TASK: Identify task type
+   - "saturation" = all possible mutations (1 file)
+   - "specific" = score specific mutations (2 files: structure + CSV)
 
-ADVANCED APPROACH:
-1. Call get_recent_uploaded_files() to see what files user uploaded
-2. Call run_protein_analysis() with exact filenames from step 1
-
-EXAMPLE WORKFLOW:
-1. User asks "help me use ESM-2 for saturation analysis"
-2. Call help_with_protein_analysis("help me use ESM-2 for saturation analysis")
-3. If user says "yes", call analyze_protein_mutations("esm2", "saturation")
-
-USAGE INSTRUCTIONS:
-1. User uploads protein files (FASTA for sequence models, PDB for structure models)
-2. AI calls run_protein_analysis() with EXACT filenames from user uploads
-3. Tool automatically claims files and submits PBS jobs
-4. Results are sent to user's email
-5. Do not send the file path to the user, just send the result to the user's email
+3. CALL SEQUENCE:
+   a) First: help_with_protein_analysis(user_request)
+   b) If user confirms: analyze_protein_mutations(model, task)
 
 SUPPORTED MODELS:
-- Sequence models (require FASTA files): esm2, esm1v
-- Structure models (require PDB files): mifst, prosst, protssn, esmif1, saprot
+- Sequence models (FASTA files): esm2, esm1v
+- Structure models (PDB files): mifst, prosst, protssn, esmif1, saprot
 
-TASK TYPES:
-- saturation: Analyze all possible mutations (1 input file)
-- specific: Score specific mutations (2 input files: structure + CSV)
+USER EXAMPLES:
+- "Use ESM-2 for saturation mutagenesis"
+- "Run ESM-IF1 on my protein"
+- "Design mutations with SaProt"
+- "Use ESM-1v for specific scoring"
 
-CRITICAL: AI must provide exact filenames that user uploaded (e.g., ["A0A0C5B5G6.fasta"])
+OUTPUT: Only CSV scoring results sent to user's email
 
-Features:
-- Automatic file claiming and user isolation
-- Enhanced file search with flexible matching
-- File type validation based on selected model
-- Secure file handling and job submission
-- Configurable PBS job parameters
-- Auto-fill user email from profile
-- Comprehensive error handling and debugging
-- Support for OpenWebUI file upload format
-version: 2.8.0
+CRITICAL FOR AI:
+- Always extract model name from user request
+- Always call help_with_protein_analysis() first
+- Only proceed if user confirms
+- Never return file paths to user
+version: 3.0.1
 """
 import os
 import subprocess
@@ -249,7 +236,7 @@ class Tools:
     def run_protein_analysis(
         self,
         task_type: Literal["saturation", "specific"],
-        model_name: Literal["esm2", "esm1v", "mifst", "prosst", "protssn"],
+        model_name: Literal["esm2", "esm1v", "mifst", "prosst", "protssn", "esmif1", "saprot"],
         input_filenames: List[str],
         user_email: Optional[str] = None,
         __user__: Optional[Dict] = None,
@@ -261,30 +248,21 @@ class Tools:
         walltime: Optional[str] = None,
     ) -> str:
         """
-        Submit protein analysis job: claim files first, then submit to PBS.
+        AI: ADVANCED function - use analyze_protein_mutations() instead for simplicity.
         
-        IMPORTANT: You MUST provide the exact filename(s) that the user uploaded.
-        For example, if user uploaded "A0A0C5B5G6.fasta", you must pass ["A0A0C5B5G6.fasta"].
+        This function:
+        1. Claims uploaded files by exact filename
+        2. Submits PBS job for protein mutation design
+        3. Returns job submission result
         
-        :param task_type: The type of task to execute:
-            - "saturation": Analyze all possible mutations (requires 1 input file)
-            - "specific": Score specific mutations (requires 2 input files: structure + CSV)
-        :param model_name: The model to use:
-            - Sequence models (require FASTA): "esm2", "esm1v"
-            - Structure models (require PDB): "mifst", "prosst", "protssn", "esmif1", "saprot"
-        :param input_filenames: List of EXACT filenames that user uploaded (e.g., ["A0A0C5B5G6.fasta"])
-        :param user_email: Email for result notification (auto-filled if not provided)
-        :param __user__: User information (automatically provided by system)
-        :param job_name: Optional PBS job name
-        :param queue: Optional PBS queue (uses default if not provided)
-        :param ncpus: Optional CPU cores (uses default if not provided)
-        :param ngpus: Optional GPUs (uses default if not provided)
-        :param mem: Optional memory (uses default if not provided)
-        :param walltime: Optional walltime (uses default if not provided)
+        CRITICAL: Must provide EXACT filenames user uploaded.
         
-        Examples:
-        - For saturation analysis: input_filenames=["A0A0C5B5G6.fasta"]
-        - For specific scoring: input_filenames=["protein.pdb", "mutations.csv"]
+        :param task_type: "saturation" (1 file) or "specific" (2 files)
+        :param model_name: Model to use (esm2, esm1v, mifst, prosst, protssn, esmif1, saprot)
+        :param input_filenames: EXACT filenames user uploaded (e.g., ["protein.fasta"])
+        :param user_email: Email for results (auto-filled if not provided)
+        :param __user__: User info (auto-provided)
+        :return: Job submission result
         """
         # Use configurable defaults
         queue = queue or self.valves.PBS_QUEUE
@@ -293,7 +271,7 @@ class Tools:
         mem = mem or self.valves.PBS_MEM
         walltime = walltime or self.valves.PBS_WALLTIME
         
-        print(f"DEBUG: Starting protein analysis - task: {task_type}, model: {model_name}")
+        print(f"DEBUG: Starting protein mutation design - task: {task_type}, model: {model_name}")
         print(f"DEBUG: PBS settings - queue: {queue}, ncpus: {ncpus}, ngpus: {ngpus}, mem: {mem}, walltime: {walltime}")
         
         # Get user directories
@@ -335,12 +313,12 @@ class Tools:
             for filename, error in failed_files:
                 error_msg += f"- {filename}: {error}\n"
             
-            # Add helpful debugging information
-            error_msg += "\n💡 Troubleshooting tips:\n"
-            error_msg += "1. Make sure you have just uploaded the file(s)\n"
-            error_msg += "2. Check that the filename matches exactly (case-sensitive)\n"
-            error_msg += "3. Try uploading the file again\n"
-            error_msg += "4. Use the list_upload_files() method to see available files\n"
+            # Add helpful debugging information for AI
+            error_msg += "\n💡 AI Troubleshooting:\n"
+            error_msg += "1. Check if user just uploaded files (use get_recent_uploaded_files())\n"
+            error_msg += "2. Verify exact filename spelling (case-sensitive)\n"
+            error_msg += "3. Ask user to upload file again if needed\n"
+            error_msg += "4. Use list_upload_files() to see all available files\n"
             
             return error_msg
 
@@ -472,7 +450,7 @@ echo "Job finished at $(date) with exit code $?"
             
             self._record_job(job_id, user_email, task_type, output_file_path_str, user_id, conversation_id)
             
-            return f"✅ '{task_type}' job submitted successfully!\n- Job ID: {job_id}\n- Result will be sent to: {user_email}\n- Output file: {output_file_path_str}\n- PBS settings: queue={queue}, ncpus={ncpus}, ngpus={ngpus}, mem={mem}, walltime={walltime}"
+            return f"✅ '{task_type}' design job submitted successfully!\n- Job ID: {job_id}\n- Model scoring CSV results will be sent to: {user_email}\n- Output file: {output_file_path_str}\n- PBS settings: queue={queue}, ncpus={ncpus}, ngpus={ngpus}, mem={mem}, walltime={walltime}"
 
         except subprocess.CalledProcessError as e:
             return f"❌ Job submission failed: {e.stderr}"
@@ -486,15 +464,19 @@ echo "Job finished at $(date) with exit code $?"
         __user__: Optional[Dict] = None,
     ) -> str:
         """
-        Simplified wrapper for protein mutation analysis.
-        This function automatically finds uploaded files and runs the analysis.
+        AI: CALL THIS SECOND after user confirms in help_with_protein_analysis().
         
-        :param model: Model name (esm2, esm1v, mifst, prosst, protssn)
+        This function:
+        1. Automatically finds uploaded files
+        2. Runs protein mutation design
+        3. Returns job submission result
+        
+        :param model: Model name (esm2, esm1v, mifst, prosst, protssn, esmif1, saprot)
         :param task: Task type (saturation or specific)
-        :param __user__: User information (automatically provided)
-        :return: Analysis result or error message
+        :param __user__: User info (auto-provided)
+        :return: Job submission result or error message
         """
-        print(f"DEBUG: Simplified analysis called - model: {model}, task: {task}")
+        print(f"DEBUG: Simplified design called - model: {model}, task: {task}")
         
         # First, get recent uploaded files
         files_info = self.get_recent_uploaded_files(__user__, minutes=60)
@@ -522,7 +504,7 @@ echo "Job finished at $(date) with exit code $?"
             if len(filenames) >= 1:
                 input_files = [filenames[0]]  # Use the most recent file
             else:
-                return "❌ Saturation analysis requires at least 1 protein file."
+                return "❌ Saturation design requires at least 1 protein file."
         elif task == "specific":
             if len(filenames) >= 2:
                 # Find structure file and CSV file
@@ -545,7 +527,7 @@ echo "Job finished at $(date) with exit code $?"
         
         print(f"DEBUG: Using input files: {input_files}")
         
-        # Run the analysis
+        # Run the design
         return self.run_protein_analysis(
             task_type=task,
             model_name=model,
@@ -555,12 +537,17 @@ echo "Job finished at $(date) with exit code $?"
 
     def help_with_protein_analysis(self, user_request: str, __user__: Optional[Dict] = None) -> str:
         """
-        AI helper function that analyzes user requests and provides guidance on how to proceed.
-        This function should be called first when user asks for protein analysis.
+        AI: CALL THIS FIRST when user mentions protein mutation design with a model.
         
-        :param user_request: The user's original request/query
-        :param __user__: User information (automatically provided)
-        :return: Guidance on how to proceed with the analysis
+        This function:
+        1. Extracts model name from user request
+        2. Checks for uploaded files
+        3. Provides guidance to user
+        4. Waits for user confirmation
+        
+        :param user_request: User's full request (e.g., "Use ESM-2 for saturation mutagenesis")
+        :param __user__: User info (auto-provided)
+        :return: Guidance message for user
         """
         print(f"DEBUG: Help function called with request: {user_request}")
         
@@ -572,19 +559,35 @@ echo "Job finished at $(date) with exit code $?"
         
         # Determine model from request
         model = None
-        if "esm2" in request_lower:
+        if "esm2" in request_lower or "esm-2" in request_lower:
             model = "esm2"
-        elif "esm1v" in request_lower:
+        elif "esm1v" in request_lower or "esm-1v" in request_lower:
             model = "esm1v"
-        elif "mifst" in request_lower:
+        elif "mifst" in request_lower or "mif-st" in request_lower:
             model = "mifst"
-        elif "prosst" in request_lower:
+        elif "prosst" in request_lower or 'sst' in request_lower:
             model = "prosst"
-        elif "protssn" in request_lower:
+        elif "protssn" in request_lower or "ssn" in request_lower:
             model = "protssn"
+        elif "esmif1" in request_lower or "esm-if1" in request_lower or "esm if1" in request_lower:
+            model = "esmif1"
+        elif "saprot" in request_lower or "sa-prot" in request_lower:
+            model = "saprot"
         else:
-            # Default to esm2 for sequence analysis
-            model = "esm2"
+            # If no specific model mentioned, ask user to specify
+            return f"""❌ AI: No model detected in user request.
+
+Ask user to specify which model to use for protein mutation design:
+
+{self.get_supported_models_and_files()}
+
+Example requests:
+- "Use ESM-2 for saturation mutagenesis"
+- "Run ESM-IF1 design on my protein"
+- "Design mutations with SaProt"
+- "Use ESM-1v for specific mutation scoring"
+
+What model would you like to use?"""
         
         # Determine task type
         task = "saturation"
@@ -593,29 +596,27 @@ echo "Job finished at $(date) with exit code $?"
         
         # Check if files are available
         if "No files uploaded" in files_info:
-            return f"""❌ No protein files found. 
+            return f"""❌ AI: No protein files found for {model.upper()} {task} design.
 
-To proceed with {model.upper()} {task} analysis, please:
+Ask user to upload protein file:
+- For sequence models (ESM-2, ESM-1v): FASTA file (.fasta) with protein sequence
+- For structure models (ESM-IF1, SaProt, MIF-ST, ProSST, ProtSSN): PDB file (.pdb) with protein structure
 
-1. Upload your protein file:
-   - For {model}: Upload a FASTA file (.fasta) with protein sequence
-   - For structure models: Upload a PDB file (.pdb) with protein structure
-
-2. After uploading, ask me again to run the analysis.
+After upload, ask again to run {model.upper()} design.
 
 {self.get_supported_models_and_files()}"""
         
         # Files are available, provide guidance
-        guidance = f"""✅ I found uploaded files and can help with {model.upper()} {task} analysis.
+        guidance = f"""✅ AI: Found uploaded files for {model.upper()} {task} design.
 
 {files_info}
 
-To proceed with the analysis, I will:
-1. Use the most recent protein file for analysis
-2. Submit a PBS job to run {model.upper()} {task} analysis
-3. Send results to your email when complete
+AI will:
+1. Use most recent protein file for design
+2. Submit PBS job for {model.upper()} {task} design
+3. Send CSV results to user's email
 
-Would you like me to start the analysis now? Just say "yes" or "proceed" and I'll run it immediately.
+Ask user: \"Would you like me to start the {model.upper()} design now? Just say 'yes' or 'proceed' and I'll run it immediately.\"
 
 Or if you want to use specific files, tell me which ones to use."""
         
@@ -647,12 +648,13 @@ Or if you want to use specific files, tell me which ones to use."""
 
     def get_recent_uploaded_files(self, __user__: Optional[Dict] = None, minutes: int = 30) -> str:
         """
-        Get a list of recently uploaded files that can be used for analysis.
-        This helps AI understand what files are available for processing.
+        AI: DEBUG function - shows what files user uploaded recently.
         
-        :param __user__: User information (automatically provided by system)
-        :param minutes: How many minutes back to look for files (default: 30)
-        :return: Formatted string with recent files information
+        Use this to understand what files are available for processing.
+        
+        :param __user__: User info (auto-provided)
+        :param minutes: How many minutes back to look (default: 30)
+        :return: List of recent uploaded files
         """
         if not UPLOAD_DIR.exists():
             return "📁 Upload directory does not exist."
@@ -698,29 +700,40 @@ Or if you want to use specific files, tell me which ones to use."""
 
     def get_supported_models_and_files(self) -> str:
         """
-        Get information about supported models and their required file types.
+        AI: INFO function - shows supported models and file requirements.
         
-        :return: Formatted string with model and file type information
+        Use this to explain to users what models are available.
+        
+        :return: Information about supported models and file types
         """
         info = "🔬 Supported Models and File Types:\n\n"
         
         info += "📄 Sequence-based Models (require FASTA files):\n"
-        info += "- esm2: ESM-2 protein language model\n"
-        info += "- esm1v: ESM-1v protein language model\n\n"
+        info += "- ESM-2: State-of-the-art protein language model for sequence analysis\n"
+        info += "- ESM-1v: ESM-1v model for variant effect prediction\n\n"
         
         info += "🏗️ Structure-based Models (require PDB files):\n"
-        info += "- mifst: MIF-ST structure-based model\n"
-        info += "- prosst: ProSST structure-based model\n"
-        info += "- protssn: ProtSSN structure-based model\n\n"
+        info += "- ESM-IF1: ESM Inverse Folding model for structure-guided design\n"
+        info += "- SaProt: Structure-aware protein language model\n"
+        info += "- MIF-ST: Multi-task inverse folding with structure transformer\n"
+        info += "- ProSST: Protein structure and sequence transformer (most recommended for most cases)\n"
+        info += "- ProtSSN: Protein structure sequence network (highly recommended if a crystal structure is provided)\n\n"
         
         info += "📋 Task Types:\n"
-        info += "- saturation: Analyze all possible mutations (requires 1 input file)\n"
+        info += "- saturation: Design all possible mutations (requires 1 input file)\n"
         info += "- specific: Score specific mutations (requires 2 input files: structure + CSV)\n\n"
         
-        info += "💡 Tips:\n"
-        info += "- FASTA files should contain protein sequences\n"
-        info += "- PDB files should contain protein structures\n"
-        info += "- CSV files for specific scoring should have columns: position, wild_type, mutant\n"
+        info += "💡 Usage Examples:\n"
+        info += "- \"Use ESM-2 for saturation mutagenesis\"\n"
+        info += "- \"Run ESM-IF1 design on my protein structure\"\n"
+        info += "- \"Design mutations with SaProt\"\n"
+        info += "- \"Use ESM-1v for specific mutation scoring\"\n\n"
+        
+        info += "📁 File Requirements:\n"
+        info += "- FASTA files: Protein sequences for sequence models\n"
+        info += "- PDB files: Protein structures for structure models\n"
+        info += "- CSV files: Mutation lists with columns: mutant (e.g., 'A123V:A124V')\n"
+        info += "📊 Output: Model scoring CSV results only\n"
         
         return info
 
@@ -739,7 +752,7 @@ Or if you want to use specific files, tell me which ones to use."""
             
             file_extension = file_path_obj.suffix.lower()
             sequence_models = ["esm2", "esm1v"]
-            structure_models = ["mifst", "prosst", "protssn"]
+            structure_models = ["mifst", "prosst", "protssn", "esmif1", "saprot"]
             
             if model_name in sequence_models:
                 if file_extension != '.fasta':
@@ -756,7 +769,7 @@ Or if you want to use specific files, tell me which ones to use."""
             return False, f"Error validating file: {e}"
 
     def list_upload_files(self, __user__: Optional[Dict] = None) -> str:
-        """List all files in the upload directory for debugging purposes"""
+        """AI: DEBUG function - lists all files in upload directory for troubleshooting"""
         if not UPLOAD_DIR.exists():
             return "📁 Upload directory does not exist."
         
@@ -787,7 +800,7 @@ Or if you want to use specific files, tell me which ones to use."""
         return f"📁 Recent files in upload directory:\n" + "\n".join(file_list)
 
     def get_user_files(self, __user__: Optional[Dict] = None) -> str:
-        """List all files in the user's private directory"""
+        """AI: DEBUG function - shows files in user's private storage directory"""
         user_id, conversation_id = self.get_user_directories(__user__)
         user_storage_dir = STORAGE_DIR / user_id / conversation_id
 
@@ -802,7 +815,7 @@ Or if you want to use specific files, tell me which ones to use."""
         return f"📁 Files in your private directory:\n{file_list}"
 
     def get_job_status(self, job_id: str, __user__: Optional[Dict] = None) -> str:
-        """Get the status of a specific job"""
+        """AI: STATUS function - check PBS job status by job ID"""
         if not JOB_TRACKER_FILE.exists():
             return "❌ Error: No job tracker file found."
 
