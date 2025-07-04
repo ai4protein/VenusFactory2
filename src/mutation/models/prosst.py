@@ -31,7 +31,7 @@ def main():
     tokenized_res = prosst_tokenizer([residue_sequence], return_tensors='pt')
     input_ids = tokenized_res['input_ids'].to(device)
     attention_mask = tokenized_res['attention_mask'].to(device)
-    structure_input_ids = torch.tensor([1, *structure_sequence_offset, 2], dtype=torch.long).unsqueeze(0)
+    structure_input_ids = torch.tensor([1, *structure_sequence_offset, 2], dtype=torch.long).unsqueeze(0).to(device)
 
     with torch.no_grad():
         outputs = prosst_model(
