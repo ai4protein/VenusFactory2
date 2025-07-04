@@ -33,7 +33,7 @@ USAGE INSTRUCTIONS:
 
 SUPPORTED MODELS:
 - Sequence models (require FASTA files): esm2, esm1v
-- Structure models (require PDB files): mifst, prosst, protssn
+- Structure models (require PDB files): mifst, prosst, protssn, esmif1, saprot
 
 TASK TYPES:
 - saturation: Analyze all possible mutations (1 input file)
@@ -271,7 +271,7 @@ class Tools:
             - "specific": Score specific mutations (requires 2 input files: structure + CSV)
         :param model_name: The model to use:
             - Sequence models (require FASTA): "esm2", "esm1v"
-            - Structure models (require PDB): "mifst", "prosst", "protssn"
+            - Structure models (require PDB): "mifst", "prosst", "protssn", "esmif1", "saprot"
         :param input_filenames: List of EXACT filenames that user uploaded (e.g., ["A0A0C5B5G6.fasta"])
         :param user_email: Email for result notification (auto-filled if not provided)
         :param __user__: User information (automatically provided by system)
@@ -351,7 +351,7 @@ class Tools:
         command = ""
         output_file_path_str = ""
         sequence_models = ["esm2", "esm1v"]
-        structure_models = ["mifst", "prosst", "protssn"]
+        structure_models = ["mifst", "prosst", "protssn", "esmif1", "saprot"]
         
         if task_type == "saturation":
             if len(claimed_files) != 1:
@@ -384,12 +384,14 @@ class Tools:
                     f"--fasta_file {source_file.absolute()} "
                     f"--output_csv {output_file_path_str}"
                 )
-            else:
+            elif model_name in structure_models:
                 command = (
                     f"python src/mutation/models/{model_name}.py "
                     f"--pdb_file {source_file.absolute()} "
                     f"--output_csv {output_file_path_str}"
                 )
+            else:
+                return f"❌ Error: Unknown model: {model_name}"
             print(f"DEBUG: Generated command: {command}")
             final_job_name = job_name or f"saturation_{source_file.stem}"
 
@@ -425,17 +427,16 @@ class Tools:
                     f"--mutations_csv {mutation_csv.absolute()} "
                     f"--output_csv {output_file_path_str}"
                 )
-            else:
+            elif model_name in structure_models:
                 command = (
                     f"python src/mutation/models/{model_name}.py "
                     f"--pdb_file {structure_file.absolute()} "
                     f"--mutations_csv {mutation_csv.absolute()} "
                     f"--output_csv {output_file_path_str}"
                 )
+            else:
+                return f"❌ Error: Unknown model: {model_name}"
             final_job_name = job_name or f"scoring_{structure_file.stem}"
-        
-        else:
-            return f"❌ Error: Unknown task type: {task_type}"
         
         # Step 3: Submit to PBS
         try:
