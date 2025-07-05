@@ -14,6 +14,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import scipy.spatial as spa
 import pandas as pd
+from tqdm import tqdm
 from torch_geometric.data import Data
 from scipy.special import softmax
 from Bio.PDB import PDBParser, ShrakeRupley
@@ -57,24 +58,10 @@ class PLM_model(nn.Module):
         with torch.no_grad():
             if not isinstance(batch, List):
                 batch = [batch]
+            one_hot_seqs = [list(elem.x[:,:20].argmax(1)) for elem in batch]
+            truth_res_seqs = ["".join([self.one_letter[self.possible_amino_acids[idx]] for idx in seq_idx]) for seq_idx in one_hot_seqs]
+            input_seqs = truth_res_seqs
             
-            if not hasattr(self.args, "noise_type"):
-                one_hot_seqs = [list(elem.x[:,:20].argmax(1)) for elem in batch]
-                truth_res_seqs = ["".join([self.one_letter[self.possible_amino_acids[idx]] for idx in seq_idx]) for seq_idx in one_hot_seqs]
-                input_seqs = truth_res_seqs
-            
-            elif self.args.noise_type == 'mask':
-                one_hot_truth_seqs = [elem.y for elem in batch]
-                truth_res_seqs = ["".join([self.one_letter[self.possible_amino_acids[idx]] for idx in seq_idx]) for seq_idx in one_hot_truth_seqs]
-                input_seqs = self._mask_input_sequence(truth_res_seqs)
-            
-            elif self.args.noise_type == 'mut':
-                one_hot_seqs = [list(elem.x[:,:20].argmax(1)) for elem in batch]
-                muted_res_seqs = ["".join([self.one_letter[self.possible_amino_acids[idx]] for idx in seq_idx]) for seq_idx in one_hot_seqs]
-                input_seqs = muted_res_seqs
-            else:
-                raise ValueError(f"No implement of {self.args.noise_type}")
-
             batch_graph = self._nlp_inference(input_seqs, batch)
         return batch_graph
         
@@ -504,25 +491,34 @@ class ProtSSN:
         return torch.from_numpy(transformed_dist.astype(np.float32))
 
 
-def main():
-    parser = argparse.ArgumentParser()
+def protssn_score(pdb_file: str, mutants: List[str], 
+                  gnn_model_path: str = None, 
+                  c_alpha_max_neighbors: int = 10,
+                  gnn_config_path: str = "src/mutation/models/egnn/egnn.yaml",
+                  use_ensemble: bool = True) -> List[float]:
+    """
+    Calculate ProtSSN scores for a list of mutations.
     
-    # model config
-    parser.add_argument("--gnn_config", type=str, default="src/mutation/models/egnn/egnn.yaml", help="gnn config")
-    parser.add_argument("--gnn_model_path", type=str, default=None, help="gnn model path")
-    parser.add_argument("--plm", type=str, default="facebook/esm2_t33_650M_UR50D", help="esm param number")
-    parser.add_argument("--c_alpha_max_neighbors", type=int, default=10, help="graph dataset K")
+    Args:
+        pdb_file: Path to the PDB file
+        mutants: List of mutation strings (e.g., ["A1B", "C2D"])
+        gnn_model_path: Path to the GNN model (optional, will download if None)
+        c_alpha_max_neighbors: Number of maximum neighbors for C-alpha atoms (used when use_ensemble=False)
+        gnn_config_path: Path to GNN config file
+        use_ensemble: Whether to use ensemble of multiple models (default: True)
+        
+    Returns:
+        List of scores corresponding to the input mutations
+    """
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
+    if gnn_config_path is None:
+        gnn_config_path = "src/mutation/models/egnn/egnn.yaml"
+    # Load GNN config
+    gnn_config = yaml.load(open(gnn_config_path), Loader=yaml.FullLoader)['egnn']
     
-    # dataset config
-    parser.add_argument("--pdb_file", type=str, default=None, help="pdb file path")
-    parser.add_argument("--mutations_csv", type=str, default=None, help="mutations csv file path")
-    parser.add_argument("--output_csv", type=str, default=None, help="output csv file path")
-    
-    args = parser.parse_args()
-    
-    args.gnn_config = yaml.load(open(args.gnn_config), Loader=yaml.FullLoader)['egnn']
-
-    if args.gnn_model_path is None:
+    # Setup model paths
+    if gnn_model_path is None:
         # if downloaded, use the local model
         model_path = os.path.expanduser("~/.cache/huggingface/hub/models--tyang816--ProtSSN/model/protssn_k10_h512.pt")
         if os.path.exists(model_path):
@@ -535,56 +531,153 @@ def main():
             os.system(f"unzip {cache_dir}/ProtSSN.zip -d {cache_dir}")
             os.system(f"rm {cache_dir}/ProtSSN.zip")
             gnn_base_path = os.path.expanduser("~/.cache/huggingface/hub/models--tyang816--ProtSSN/model")
+    else:
+        gnn_base_path = gnn_model_path
+    
+    # Load sequence from PDB
+    sequence = extract_seq_from_pdb(pdb_file)
+    
+    # Load PLM model
+    plm = "facebook/esm2_t33_650M_UR50D"
+    esm_model = EsmModel.from_pretrained(plm).to(device)
+    tokenizer = AutoTokenizer.from_pretrained(plm)
+    
+    if use_ensemble:
+        # Ensemble mode: use multiple model configurations
+        all_scores = []
+        
+        for k in [10, 20, 30]:
+            norm_file = f'src/mutation/models/egnn/norm/cath_k{k}_mean_attr.pt'
+            for h in [512, 768, 1280]:
+                print(f"Running ProtSSN with k={k} and h={h}")
+                gnn_config["hidden_channels"] = h
+                
+                # Create args object for compatibility
+                class Args:
+                    def __init__(self):
+                        self.gnn_config = gnn_config
+                        self.noise_type = None
+                        self.noise_ratio = 0.0
+                        self.c_alpha_max_neighbors = k
+                
+                args = Args()
+                
+                # Initialize models
+                plm_model = PLM_model(args, esm_model, tokenizer)
+                gnn_model = GNN_model(args)
+                gnn_model.load_state_dict(torch.load(os.path.join(gnn_base_path, f"protssn_k{k}_h{h}.pt")))
+                
+                # Initialize ProtSSN
+                protssn = ProtSSN(
+                    c_alpha_max_neighbors=k,
+                    pre_transform=NormalizeProtein(filename=norm_file),
+                    plm_model=plm_model, gnn_model=gnn_model
+                )
+                
+                # Compute logits
+                logits = protssn.compute_logits(pdb_file).squeeze()
+                
+                # Calculate scores for each mutation
+                pred_scores = []
+                for mutant in tqdm(mutants):
+                    mutant_score = 0
+                    sep = ":" if ":" in mutant else ";"
+                    for sub_mutant in mutant.split(sep):
+                        wt, idx, mt = sub_mutant[0], int(sub_mutant[1:-1]) - 1, sub_mutant[-1]
+                        pred = logits[idx, amino_acids_type.index(mt)] - logits[idx, amino_acids_type.index(wt)]
+                        mutant_score += pred.item()
+                    pred_scores.append(mutant_score / len(mutant.split(sep)))
+                
+                all_scores.append(pred_scores)
+        
+        # Calculate ensemble scores (mean of all models)
+        ensemble_scores = np.mean(all_scores, axis=0)
+        return ensemble_scores.tolist()
+    
+    else:
+        # Single model mode
+        # Create args object for compatibility
+        class Args:
+            def __init__(self):
+                self.gnn_config = gnn_config
+                self.noise_type = None
+                self.noise_ratio = 0.0
+                self.c_alpha_max_neighbors = c_alpha_max_neighbors
+        
+        args = Args()
+        
+        # Initialize models
+        plm_model = PLM_model(args, esm_model, tokenizer)
+        gnn_model = GNN_model(args)
+        
+        # Load GNN model weights
+        norm_file = f'src/mutation/models/egnn/norm/cath_k{c_alpha_max_neighbors}_mean_attr.pt'
+        gnn_model.load_state_dict(torch.load(os.path.join(gnn_base_path, f"protssn_k{c_alpha_max_neighbors}_h512.pt")))
+        
+        # Initialize ProtSSN
+        protssn = ProtSSN(
+            c_alpha_max_neighbors=c_alpha_max_neighbors,
+            pre_transform=NormalizeProtein(filename=norm_file),
+            plm_model=plm_model, gnn_model=gnn_model
+        )
+        
+        # Compute logits
+        logits = protssn.compute_logits(pdb_file).squeeze()
+        
+        # Calculate scores for each mutation
+        pred_scores = []
+        for mutant in tqdm(mutants):
+            mutant_score = 0
+            sep = ":" if ":" in mutant else ";"
+            for sub_mutant in mutant.split(sep):
+                wt, idx, mt = sub_mutant[0], int(sub_mutant[1:-1]) - 1, sub_mutant[-1]
+                pred = logits[idx, amino_acids_type.index(mt)] - logits[idx, amino_acids_type.index(wt)]
+                mutant_score += pred.item()
+            pred_scores.append(mutant_score / len(mutant.split(sep)))
+        
+        return pred_scores
 
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
+def main():
+    parser = argparse.ArgumentParser()
+    
+    # model config
+    parser.add_argument("--gnn_config", type=str, default=None, help="gnn config")
+    parser.add_argument("--gnn_model_path", type=str, default=None, help="gnn model path")
+    parser.add_argument("--c_alpha_max_neighbors", type=int, default=10, help="graph dataset K")
+    parser.add_argument("--use_ensemble", action="store_true", default=True, help="use ensemble of multiple models")
+    
+    # dataset config
+    parser.add_argument("--pdb_file", type=str, default=None, help="pdb file path")
+    parser.add_argument("--mutations_csv", type=str, default=None, help="mutations csv file path")
+    parser.add_argument("--output_csv", type=str, default=None, help="output csv file path")
+    
+    args = parser.parse_args()
+    
+    # Load sequence from PDB
     sequence = extract_seq_from_pdb(args.pdb_file)
-    esm_model = EsmModel.from_pretrained(args.plm).to(device)
-    tokenizer = AutoTokenizer.from_pretrained(args.plm)
-    vocab = tokenizer.get_vocab()
-
+    
+    # Handle mutations
     if args.mutations_csv is None:
         mutants = generate_mutations_from_sequence(sequence)
-        df = pd.DataFrame(mutants, columns=["mutation"])
+        df = pd.DataFrame(mutants, columns=["mutant"])
     else:
         df = pd.read_csv(args.mutations_csv)
-        mutants = df["mutation"].tolist()
-
-    for k in [10, 20, 30]:
-        norm_file = f'src/mutation/models/egnn/norm/cath_k{k}_mean_attr.pt'
-        for h in [512, 768, 1280]:
-            print(f"Running ProtSSN with k={k} and h={h}")
-            args.gnn_config["hidden_channels"] = h
-            plm_model = PLM_model(args, esm_model, tokenizer)
-            gnn_model = GNN_model(args)
-            gnn_model.load_state_dict(torch.load(os.path.join(gnn_base_path, f"protssn_k{k}_h{h}.pt")))
-            protssn = ProtSSN(
-                c_alpha_max_neighbors=k,
-                pre_transform=NormalizeProtein(
-                    filename=norm_file
-                ),
-                plm_model=plm_model, gnn_model=gnn_model
-            )
-            logits = protssn.compute_logits(args.pdb_file).squeeze()
-            
-            pred_scores = []
-            for mutant in mutants:
-                mutant_score = 0
-                sep = ":" if ":" in mutant else ";"
-                for sub_mutant in mutant.split(sep):
-                    wt, idx, mt = sub_mutant[0], int(sub_mutant[1:-1]) - 1, sub_mutant[-1]
-                    pred = logits[idx, amino_acids_type.index(mt)] - logits[idx, amino_acids_type.index(wt)]
-                    mutant_score += pred.item()
-                pred_scores.append(mutant_score / len(mutant.split(sep)))
-            df[f"protssn_k{k}_h{h}"] = pred_scores
-
-    df['protssn_score'] = df.iloc[:, 1:].mean(axis=1)
-    # remove the rest columns
-    drop_columns = [f'protssn_k{k}_h{h}' for k in [10, 20, 30] for h in [512, 768, 1280]]
-    df = df.drop(columns=drop_columns)
-    df['protssn_score'] = df['protssn_score'].rank(method='min', ascending=False)
+        mutants = df["mutant"].tolist()
     
+    # Calculate scores using the new function
+    scores = protssn_score(
+        pdb_file=args.pdb_file,
+        mutants=mutants,
+        gnn_model_path=args.gnn_model_path,
+        c_alpha_max_neighbors=args.c_alpha_max_neighbors,
+        gnn_config_path=args.gnn_config,
+        use_ensemble=args.use_ensemble
+    )
+    
+    df['protssn_score'] = scores
+    
+    # Save results
     if args.output_csv is not None:
         df.to_csv(args.output_csv, index=False)
     else:

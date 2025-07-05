@@ -13,6 +13,7 @@ from src.mutation.models.esm.inverse_folding.util import CoordBatchConverter
 from src.mutation.models.esm import pretrained
 from tqdm import tqdm
 from src.mutation.utils import generate_mutations_from_sequence
+from typing import List
 
 warnings.filterwarnings("ignore")
 
@@ -49,41 +50,58 @@ def load_coords_and_sequence(pdb_path: str, chain: str = "A") -> tuple:
     return coords, pdb_seq
 
 
-def calculate_mutation_score(mutants: list, sequence: str, model, alphabet, coords, 
-                           batch_converter, device: str = "cuda", exhaustive: bool = False) -> float:
+def esmif1_score(pdb_file: str, mutants: List[str], chain: str = "A", 
+                 model_name: str = "esm_if1_gvp4_t16_142M_UR50", 
+                 exhaustive: bool = False) -> List[float]:
     """
-    Calculate the score for a single mutation using ESM-IF1.
+    Calculate ESM-IF1 scores for a list of mutations.
     
     Args:
-        mutants: List of mutations in format "A1B" or "A1B;C2D"
-        sequence: Wild-type sequence
-        model: ESM-IF1 model
-        alphabet: Model alphabet
-        coords: Protein coordinates
-        batch_converter: Coordinate batch converter
-        device: Device to run inference on
+        pdb_file: Path to the PDB file
+        mutants: List of mutation strings (e.g., ["A1B", "C2D"])
+        chain: Chain ID to extract from PDB
+        model_name: ESM-IF1 model name
+        exhaustive: Whether to use exhaustive mode
         
     Returns:
-        float: Mutation score
+        List of scores corresponding to the input mutations
     """
-    # Handle multiple mutations
-    scores = []
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
 
+    # Load model
+    print(f"Loading ESM-IF1 model: {model_name}")
+    model, alphabet = pretrained.load_model_and_alphabet(model_name)
+    model.eval()
+    model = model.to(device)
+    
+    # Load coordinates and sequence
+    print(f"Loading coordinates from: {pdb_file}")
+    coords, pdb_seq = load_coords_and_sequence(pdb_file, chain)
+    print(f"Sequence length: {len(pdb_seq)}")
+    
+    # Prepare batch converter
     batch_converter = CoordBatchConverter(alphabet)
-    batch = [(coords, None, sequence)]
+    
+    # Use cached computation for efficiency
+    batch = [(coords, None, pdb_seq)]
     coords_, confidence, strs, tokens, padding_mask = batch_converter(batch)
     prev_output_tokens = tokens[:, :-1]
-    if not exhaustive:
-        logits, _ = model.forward(
-            coords_.to(device),
-            padding_mask.to(device),
-            confidence.to(device),
-            prev_output_tokens.to(device)
-        )
-
-    for mutation in mutants:
+    logits, _ = model.forward(
+        coords_.to(device),
+        padding_mask.to(device),
+        confidence.to(device),
+        prev_output_tokens.to(device)
+    )
+    
+    # Calculate scores for each mutation
+    scores = []
+    print(f"Processing {len(mutants)} mutations...")
+    
+    for mutation in tqdm(mutants):
         # Create mutated sequence
-        mutated_seq = full_sequence(sequence, mutation, 1)
+        mutated_seq = full_sequence(pdb_seq, mutation, 1)
+        
         # Prepare batch for inference
         batch = [(coords, None, mutated_seq)]
         coords_, confidence, strs, tokens, padding_mask = batch_converter(batch)
@@ -97,7 +115,7 @@ def calculate_mutation_score(mutants: list, sequence: str, model, alphabet, coor
                     confidence.to(device),
                     tokens[:, :-1].to(device)  # prev_output_tokens
                 )
-            
+        
         # Calculate loss
         target = tokens[:, 1:].to(device)
         target_padding_mask = (target == alphabet.padding_idx)
@@ -109,8 +127,7 @@ def calculate_mutation_score(mutants: list, sequence: str, model, alphabet, coor
         score = -avg_loss.detach().cpu().numpy().item()
         scores.append(score)
     
-    # Return average score for multiple mutations
-    return np.mean(scores)
+    return scores
 
 
 def main():
@@ -119,28 +136,11 @@ def main():
     parser.add_argument('--mutations_csv', type=str, default=None, help='Path to the mutations CSV file')
     parser.add_argument('--output_csv', type=str, default=None, help='Path to the output CSV file')
     parser.add_argument('--chain', type=str, default="A", help='Chain to be processed')
-    parser.add_argument('--exhaustive', action='store_true', help='Use cache to speed up the process')
+    parser.add_argument('--exhaustive', action='store_true', help='Use exhaustive mode')
     args = parser.parse_args()
 
-    # Set device
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using device: {device}")
-
-    # Load model
-    model_name = "esm_if1_gvp4_t16_142M_UR50"
-    print(f"Loading ESM-IF1 model: {model_name}")
-    model, alphabet = pretrained.load_model_and_alphabet(model_name)
-    model.eval()
-    model = model.to(device)
-    
-    # Load coordinates and sequence
-    print(f"Loading coordinates from: {args.pdb_file}")
+    # Load coordinates and sequence to get the sequence for mutation generation
     coords, pdb_seq = load_coords_and_sequence(args.pdb_file, args.chain)
-    print(f"Sequence length: {len(pdb_seq)}")
-    print(f"Sequence: {pdb_seq}")
-    
-    # Prepare batch converter
-    batch_converter = CoordBatchConverter(alphabet)
     
     # Handle mutations
     if args.mutations_csv is not None:
@@ -152,12 +152,12 @@ def main():
         mutants = generate_mutations_from_sequence(pdb_seq)
         df = pd.DataFrame(mutants, columns=['mutant'])
     
-    print(f"Processing {len(mutants)} mutations...")
-    
-    # Calculate scores for each mutation
-    scores = calculate_mutation_score(
-        mutants, pdb_seq, model, alphabet, coords, 
-        batch_converter, device, args.exhaustive
+    # Calculate scores using the new function
+    scores = esmif1_score(
+        pdb_file=args.pdb_file,
+        mutants=mutants,
+        chain=args.chain,
+        exhaustive=args.exhaustive
     )
     
     # Add scores to dataframe
@@ -175,7 +175,6 @@ def main():
     
     df.to_csv(output_path, index=False)
     print(f"Results saved to: {output_path}")
-    
 
 if __name__ == "__main__":
     main() 

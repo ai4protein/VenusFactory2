@@ -7,6 +7,7 @@ import torch
 import numpy as np
 import datetime
 import pandas as pd
+from tqdm import tqdm
 from Bio.PDB import PDBParser, MMCIFParser
 from transformers import EsmTokenizer, EsmForMaskedLM
 from src.mutation.utils import generate_mutations_from_sequence
@@ -172,7 +173,7 @@ def main():
 
     # Calculate scores for each mutation
     pred_scores = []
-    for mutant in mutants:
+    for mutant in tqdm(mutants):
         mutant_score = 0
         sep = ":" if ":" in mutant else ";"
         for sub_mutant in mutant.split(sep):
