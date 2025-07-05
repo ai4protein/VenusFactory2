@@ -11,6 +11,7 @@ from tqdm import tqdm
 from Bio.PDB import PDBParser, MMCIFParser
 from transformers import EsmTokenizer, EsmForMaskedLM
 from src.mutation.utils import generate_mutations_from_sequence
+from typing import List
 
 def extract_plddt(pdb_path: str) -> np.ndarray:
     """
@@ -124,53 +125,52 @@ def get_struc_seq(foldseek,
     os.remove(tmp_save_path + ".dbtype")
     return seq_dict
 
-def main():
-    parser = argparse.ArgumentParser(description='saprot')
-    parser.add_argument('--pdb_file', type=str, required=True, help='Path to the pdb file')
-    parser.add_argument('--mutations_csv', type=str, default=None, help='Path to the mutations CSV file')
-    parser.add_argument('--output_csv', type=str, default=None, help='Path to the output CSV file')
-    parser.add_argument('--foldseek_path', type=str, default=None, help='Path to the foldseek binary')
-    parser.add_argument('--chain', type=str, default="A", help='Chain to be processed')
-    args = parser.parse_args()
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+def saprot_score(pdb_file: str, mutants: List[str], chain: str = "A", 
+                 foldseek_path: str = None) -> List[float]:
+    """
+    Calculate SaProt scores for a list of mutations.
     
+    Args:
+        pdb_file: Path to the PDB file
+        mutants: List of mutation strings (e.g., ["A1B", "C2D"])
+        chain: Chain ID to extract from PDB
+        foldseek_path: Path to foldseek binary (optional, will download if None)
+        
+    Returns:
+        List of scores corresponding to the input mutations
+    """
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
+
+    # Load SaProt model and tokenizer
     model_path = "westlake-repl/SaProt_650M_AF2"
     tokenizer = EsmTokenizer.from_pretrained(model_path, trust_remote_code=True)
     model = EsmForMaskedLM.from_pretrained(model_path, trust_remote_code=True).to(device)
 
-    if args.foldseek_path is None:
+    # Setup foldseek path
+    if foldseek_path is None:
         foldseek_path = os.path.expanduser("~/.cache/huggingface/hub/models--westlake-repl--SaProt_650M_AF2/foldseek")
         if not os.path.exists(foldseek_path + "/foldseek"):
-            args.foldseek_path = foldseek_path
-            os.system(f"mkdir -p {args.foldseek_path}")
-            os.system(f"wget https://huggingface.co/tyang816/Foldseek_bin/resolve/main/foldseek -P {args.foldseek_path}")
-            os.system(f"chmod +x {args.foldseek_path}/foldseek")
-        else:
-            args.foldseek_path = foldseek_path
+            os.system(f"mkdir -p {foldseek_path}")
+            os.system(f"wget https://huggingface.co/tyang816/Foldseek_bin/resolve/main/foldseek -P {foldseek_path}")
+            os.system(f"chmod +x {foldseek_path}/foldseek")
     
-    parsed_seqs = get_struc_seq(args.foldseek_path + "/foldseek", args.pdb_file, [args.chain], plddt_mask=False)[args.chain]
+    # Extract structural sequence
+    parsed_seqs = get_struc_seq(foldseek_path + "/foldseek", pdb_file, [chain], plddt_mask=False)[chain]
     seq, foldseek_seq, combined_seq = parsed_seqs
     
     # Tokenize the combined sequence (structure-aware sequence)
     inputs = tokenizer(combined_seq, return_tensors="pt")
     inputs = {k: v.to(device) for k, v in inputs.items()}
 
+    # Compute logits
     with torch.no_grad():
         outputs = model(**inputs)
         logits = outputs.logits.squeeze()
 
     # Get vocabulary for scoring
     vocab = tokenizer.get_vocab()
-
-    # Handle mutations
-    if args.mutations_csv is not None:
-        df = pd.read_csv(args.mutations_csv)
-        mutants = df['mutant'].tolist()
-    else:
-        mutants = generate_mutations_from_sequence(seq)
-        df = pd.DataFrame(mutants, columns=['mutant'])
-
+    
     # Calculate scores for each mutation
     pred_scores = []
     for mutant in tqdm(mutants):
@@ -185,7 +185,33 @@ def main():
             mutant_score += pred.item()
         pred_scores.append(mutant_score / len(mutant.split(sep)))
 
-    df['saprot_score'] = pred_scores
+    return pred_scores
+
+def main():
+    parser = argparse.ArgumentParser(description='saprot')
+    parser.add_argument('--pdb_file', type=str, required=True, help='Path to the pdb file')
+    parser.add_argument('--mutations_csv', type=str, default=None, help='Path to the mutations CSV file')
+    parser.add_argument('--output_csv', type=str, default=None, help='Path to the output CSV file')
+    parser.add_argument('--foldseek_path', type=str, default=None, help='Path to the foldseek binary')
+    parser.add_argument('--chain', type=str, default="A", help='Chain to be processed')
+    args = parser.parse_args()
+
+    # Extract sequence from PDB for mutation generation
+    parsed_seqs = get_struc_seq(args.foldseek_path + "/foldseek" if args.foldseek_path else None, 
+                               args.pdb_file, [args.chain], plddt_mask=False)[args.chain]
+    seq, foldseek_seq, combined_seq = parsed_seqs
+
+    # Handle mutations
+    if args.mutations_csv is not None:
+        df = pd.read_csv(args.mutations_csv)
+        mutants = df['mutant'].tolist()
+    else:
+        mutants = generate_mutations_from_sequence(seq)
+        df = pd.DataFrame(mutants, columns=['mutant'])
+
+    # Calculate scores using the new function
+    scores = saprot_score(args.pdb_file, mutants, args.chain, args.foldseek_path)
+    df['saprot_score'] = scores
 
     # Save results
     if args.output_csv is not None:
