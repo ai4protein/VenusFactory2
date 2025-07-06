@@ -25,7 +25,7 @@ from torch_geometric.data import Batch
 from src.mutation.utils import safe_index, one_hot_res, log, dihedral, NormalizeProtein
 from src.mutation.models.egnn.network import EGNN
 from src.mutation.utils import generate_mutations_from_sequence
-from src.data.prosst.structure.utils.data_utils import extract_seq_from_pdb
+from src.mutation.models.esm.inverse_folding.util import extract_seq_from_pdb
 
 warnings.filterwarnings("ignore")
 

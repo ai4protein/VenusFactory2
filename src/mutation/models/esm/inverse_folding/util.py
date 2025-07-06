@@ -69,6 +69,12 @@ def extract_coords_from_structure(structure: biotite.structure.AtomArray):
     seq = ''.join([ProteinSequence.convert_letter_3to1(r) for r in residue_identities])
     return coords, seq
 
+def extract_seq_from_pdb(pdb_file: str, chain_id='A'):
+    """
+    extract sequence from pdb file
+    """
+    structure = load_structure(pdb_file, chain_id)
+    return extract_coords_from_structure(structure)[1]
 
 def load_coords(fpath, chain):
     """

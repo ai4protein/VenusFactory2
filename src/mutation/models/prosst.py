@@ -8,7 +8,7 @@ import pandas as pd
 from transformers import AutoModelForMaskedLM, AutoTokenizer
 from src.data.prosst.structure.get_sst_seq import SSTPredictor
 from src.mutation.utils import generate_mutations_from_sequence
-from src.data.prosst.structure.utils.data_utils import extract_seq_from_pdb
+from src.mutation.models.esm.inverse_folding.util import extract_seq_from_pdb
 from typing import List
 from tqdm import tqdm
 
