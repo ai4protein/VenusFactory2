@@ -11,6 +11,7 @@ from tqdm import tqdm
 from Bio.PDB import PDBParser, MMCIFParser
 from transformers import EsmTokenizer, EsmForMaskedLM
 from src.mutation.utils import generate_mutations_from_sequence
+from src.mutation.models.esm.inverse_folding.util import extract_seq_from_pdb
 from typing import List
 
 def extract_plddt(pdb_path: str) -> np.ndarray:
@@ -147,6 +148,7 @@ def saprot_score(pdb_file: str, mutants: List[str], chain: str = "A",
     tokenizer = EsmTokenizer.from_pretrained(model_path, trust_remote_code=True)
     model = EsmForMaskedLM.from_pretrained(model_path, trust_remote_code=True).to(device)
 
+    foldseek_struc_vocab = "pynwrqhgdlvtmfsaeikc#"
     # Setup foldseek path
     if foldseek_path is None:
         foldseek_path = os.path.expanduser("~/.cache/huggingface/hub/models--westlake-repl--SaProt_650M_AF2/foldseek")
@@ -154,9 +156,11 @@ def saprot_score(pdb_file: str, mutants: List[str], chain: str = "A",
             os.system(f"mkdir -p {foldseek_path}")
             os.system(f"wget https://huggingface.co/tyang816/Foldseek_bin/resolve/main/foldseek -P {foldseek_path}")
             os.system(f"chmod +x {foldseek_path}/foldseek")
+        else:
+            print(f"Foldseek already exists at {foldseek_path}/foldseek")
     
     # Extract structural sequence
-    parsed_seqs = get_struc_seq(foldseek_path + "/foldseek", pdb_file, [chain], plddt_mask=False)[chain]
+    parsed_seqs = get_struc_seq(foldseek_path + "/foldseek", pdb_file, [chain])[chain]
     seq, foldseek_seq, combined_seq = parsed_seqs
     
     # Tokenize the combined sequence (structure-aware sequence)
@@ -168,20 +172,20 @@ def saprot_score(pdb_file: str, mutants: List[str], chain: str = "A",
         outputs = model(**inputs)
         logits = outputs.logits.squeeze()
 
-    # Get vocabulary for scoring
-    vocab = tokenizer.get_vocab()
-    
     # Calculate scores for each mutation
     pred_scores = []
     for mutant in tqdm(mutants):
         mutant_score = 0
         sep = ":" if ":" in mutant else ";"
         for sub_mutant in mutant.split(sep):
-            wt, idx, mt = sub_mutant[0], int(sub_mutant[1:-1]) - 1, sub_mutant[-1]
-            wt = wt.upper() + foldseek_seq[idx].lower()
-            mt = mt.upper() + foldseek_seq[idx].lower()
-            # Calculate log probability difference: log(P(mutant)) - log(P(wildtype))
-            pred = logits[idx, vocab[mt]] - logits[idx, vocab[wt]]
+            wt, idx, mt = sub_mutant[0], int(sub_mutant[1:-1]), sub_mutant[-1]
+            ori_st = tokenizer.get_vocab()[wt + foldseek_struc_vocab[0]]
+            mut_st = tokenizer.get_vocab()[mt + foldseek_struc_vocab[0]]
+            
+            ori_prob = logits[idx, ori_st: ori_st + len(foldseek_struc_vocab)].sum()
+            mut_prob = logits[idx, mut_st: mut_st + len(foldseek_struc_vocab)].sum()
+
+            pred = mut_prob - ori_prob
             mutant_score += pred.item()
         pred_scores.append(mutant_score / len(mutant.split(sep)))
 
@@ -197,9 +201,7 @@ def main():
     args = parser.parse_args()
 
     # Extract sequence from PDB for mutation generation
-    parsed_seqs = get_struc_seq(args.foldseek_path + "/foldseek" if args.foldseek_path else None, 
-                               args.pdb_file, [args.chain], plddt_mask=False)[args.chain]
-    seq, foldseek_seq, combined_seq = parsed_seqs
+    seq = extract_seq_from_pdb(args.pdb_file)
 
     # Handle mutations
     if args.mutations_csv is not None:
