@@ -87,12 +87,13 @@ def esmif1_score(pdb_file: str, mutants: List[str], chain: str = "A",
     batch = [(coords, None, pdb_seq)]
     coords_, confidence, strs, tokens, padding_mask = batch_converter(batch)
     prev_output_tokens = tokens[:, :-1]
-    logits, _ = model.forward(
-        coords_.to(device),
-        padding_mask.to(device),
-        confidence.to(device),
-        prev_output_tokens.to(device)
-    )
+    with torch.no_grad():
+        logits, _ = model.forward(
+            coords_.to(device),
+            padding_mask.to(device),
+            confidence.to(device),
+            prev_output_tokens.to(device)
+        )
     
     # Calculate scores for each mutation
     scores = []
