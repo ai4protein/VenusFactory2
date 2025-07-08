@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from typing import Tuple
 from .pooling import Attention1dPoolingHead, MeanPoolingHead, LightAttentionPoolingHead
 from .pooling import MeanPooling, MeanPoolingProjection
+from .pooling import ResidueClassificationHeadWithProjection
 
 def rotate_half(x):
     x1, x2 = x.chunk(2, dim=-1)
@@ -130,18 +131,23 @@ class AdapterModel(nn.Module):
         
         self.layer_norm = nn.LayerNorm(args.hidden_size)
         
-        if args.pooling_method == 'attention1d':
-            self.classifier = Attention1dPoolingHead(args.hidden_size, args.num_labels, args.pooling_dropout)
-        elif args.pooling_method == 'mean':
-            if "PPI" in args.dataset:
-                self.pooling = MeanPooling()
-                self.projection = MeanPoolingProjection(args.hidden_size, args.num_labels, args.pooling_dropout)
-            else:
-                self.classifier = MeanPoolingHead(args.hidden_size, args.num_labels, args.pooling_dropout)
-        elif args.pooling_method == 'light_attention':
-            self.classifier = LightAttentionPoolingHead(args.hidden_size, args.num_labels, args.pooling_dropout)
+        if "residue" in args.problem_type:
+            # For residue-level single label classification
+            self.classifier = ResidueClassificationHeadWithProjection(args.hidden_size, args.num_labels, args.pooling_dropout, args.hidden_size)
         else:
-            raise ValueError(f"classifier method {args.pooling_method} not supported")
+            # For other classification tasks
+            if args.pooling_method == 'attention1d':
+                self.classifier = Attention1dPoolingHead(args.hidden_size, args.num_labels, args.pooling_dropout)
+            elif args.pooling_method == 'mean':
+                if "PPI" in args.dataset:
+                    self.pooling = MeanPooling()
+                    self.projection = MeanPoolingProjection(args.hidden_size, args.num_labels, args.pooling_dropout)
+                else:
+                    self.classifier = MeanPoolingHead(args.hidden_size, args.num_labels, args.pooling_dropout)
+            elif args.pooling_method == 'light_attention':
+                self.classifier = LightAttentionPoolingHead(args.hidden_size, args.num_labels, args.pooling_dropout)
+            else:
+                raise ValueError(f"classifier method {args.pooling_method} not supported")
     
     def plm_embedding(self, plm_model, aa_seq, attention_mask, structure_tokens=None):
         with torch.no_grad():

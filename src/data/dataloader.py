@@ -11,13 +11,16 @@ import pandas as pd
 
 def prepare_dataloaders(args, tokenizer, logger):
     """Prepare train, validation and test dataloaders."""
+    aa_seq_key = "aa_seq"
+    if "residue" in args.problem_type:
+        aa_seq_key = "seq_full"
     # Process datasets
     train_dataset = datasets.load_dataset(args.dataset)['train']
-    train_dataset_token_lengths = [len(item['aa_seq']) for item in train_dataset]
+    train_dataset_token_lengths = [len(item[aa_seq_key]) for item in train_dataset]
     val_dataset = datasets.load_dataset(args.dataset)['validation']
-    val_dataset_token_lengths = [len(item['aa_seq']) for item in val_dataset]
+    val_dataset_token_lengths = [len(item[aa_seq_key]) for item in val_dataset]
     test_dataset = datasets.load_dataset(args.dataset)['test']
-    test_dataset_token_lengths = [len(item['aa_seq']) for item in test_dataset]
+    test_dataset_token_lengths = [len(item[aa_seq_key]) for item in test_dataset]
     
     if args.normalize is not None:
         train_dataset, val_dataset, test_dataset = normalize_dataset(train_dataset, val_dataset, test_dataset, args.normalize)

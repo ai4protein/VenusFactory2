@@ -196,3 +196,108 @@ class LightAttentionPoolingHead(nn.Module):
         o = torch.cat([o1, o2], dim=-1)  # [batchsize, 2*hidden_size]
         o = self.linear(o)  # [batchsize, 32]
         return self.output(o)  # [batchsize, num_labels]
+
+class ResidueClassificationHead(nn.Module):
+    """Residue-level classification head for protein sequence tasks.
+    
+    This head is designed for residue-level classification tasks where each position
+    in the sequence needs to be classified independently. It follows the HuggingFace
+    pattern with a simple linear projection layer.
+    
+    Args:
+        hidden_size (int): The size of the hidden states
+        num_labels (int): The number of classification labels
+        dropout (float): Dropout probability
+    """
+    
+    def __init__(self, hidden_size: int, num_labels: int, dropout: float = 0.1):
+        super().__init__()
+        self.dropout = nn.Dropout(dropout)
+        self.classifier = nn.Linear(hidden_size, num_labels)
+        
+    def forward(self, features: torch.Tensor, attention_mask: torch.Tensor = None) -> torch.Tensor:
+        """
+        Forward pass for residue-level classification.
+        
+        Args:
+            features (torch.Tensor): Hidden states from the model [batch_size, seq_len, hidden_size]
+            attention_mask (torch.Tensor, optional): Attention mask [batch_size, seq_len]
+            
+        Returns:
+            torch.Tensor: Logits for each residue position [batch_size, seq_len, num_labels]
+        """
+        # Apply dropout to features
+        features = self.dropout(features)
+        
+        # Apply classification head to each position
+        logits = self.classifier(features)  # [batch_size, seq_len, num_labels]
+        
+        # If attention mask is provided, mask out padded positions
+        if attention_mask is not None:
+            # Create mask for padded positions (where attention_mask is 0)
+            mask = attention_mask.unsqueeze(-1).expand(-1, -1, logits.size(-1))
+            # Set logits for padded positions to a large negative value
+            logits = logits.masked_fill(~mask.bool(), -1e9)
+            
+        return logits
+
+
+class ResidueClassificationHeadWithProjection(nn.Module):
+    """Enhanced residue-level classification head with projection layer.
+    
+    This head includes an additional projection layer before classification,
+    similar to the pattern used in many HuggingFace models.
+    
+    Args:
+        hidden_size (int): The size of the hidden states
+        num_labels (int): The number of classification labels
+        dropout (float): Dropout probability
+        intermediate_size (int, optional): Size of intermediate projection layer
+    """
+    
+    def __init__(self, hidden_size: int, num_labels: int, dropout: float = 0.1, 
+                 intermediate_size: int = None):
+        super().__init__()
+        self.dropout = nn.Dropout(dropout)
+        
+        # Use intermediate_size if provided, otherwise use hidden_size
+        intermediate_size = intermediate_size or hidden_size
+        
+        # Projection layer
+        self.dense = nn.Linear(hidden_size, intermediate_size)
+        self.layer_norm = nn.LayerNorm(intermediate_size)
+        self.activation = nn.GELU()
+        
+        # Classification layer
+        self.classifier = nn.Linear(intermediate_size, num_labels)
+        
+    def forward(self, features: torch.Tensor, attention_mask: torch.Tensor = None) -> torch.Tensor:
+        """
+        Forward pass for enhanced residue-level classification.
+        
+        Args:
+            features (torch.Tensor): Hidden states from the model [batch_size, seq_len, hidden_size]
+            attention_mask (torch.Tensor, optional): Attention mask [batch_size, seq_len]
+            
+        Returns:
+            torch.Tensor: Logits for each residue position [batch_size, seq_len, num_labels]
+        """
+        # Apply dropout to features
+        features = self.dropout(features)
+        
+        # Apply projection layer
+        features = self.dense(features)
+        features = self.layer_norm(features)
+        features = self.activation(features)
+        
+        # Apply classification head
+        logits = self.classifier(features)  # [batch_size, seq_len, num_labels]
+        
+        # If attention mask is provided, mask out padded positions
+        if attention_mask is not None:
+            # Create mask for padded positions (where attention_mask is 0)
+            mask = attention_mask.unsqueeze(-1).expand(-1, -1, logits.size(-1))
+            # Set logits for padded positions to a large negative value
+            logits = logits.masked_fill(~mask.bool(), -1e9)
+            
+        return logits

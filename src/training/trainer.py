@@ -89,6 +89,9 @@ class Trainer:
             return torch.nn.MSELoss()
         elif self.args.problem_type == 'multi_label_classification':
             return torch.nn.BCEWithLogitsLoss()
+        elif "residue" in self.args.problem_type:
+            # For residue-level classification, we need to handle sequence-level loss
+            return torch.nn.CrossEntropyLoss(ignore_index=-1)  # Ignore padding tokens (-1)
         else:
             return torch.nn.CrossEntropyLoss()
     
@@ -165,6 +168,9 @@ class Trainer:
         # Move batch to device
         batch = {k: v.to(self.device) for k, v in batch.items()}
         
+        # Store current batch for metrics update
+        self.current_batch = batch
+        
         # Forward pass
         logits = self.model(self.plm_model, batch)
         loss = self._compute_loss(logits, batch["label"])
@@ -195,6 +201,9 @@ class Trainer:
         with torch.no_grad():
             for batch in tqdm(val_loader, desc="Validating"):
                 batch = {k: v.to(self.device) for k, v in batch.items()}
+                
+                # Store current batch for metrics update
+                self.current_batch = batch
                 
                 # Forward pass
                 logits = self.model(self.plm_model, batch)
@@ -258,6 +267,9 @@ class Trainer:
             for batch in tqdm(test_loader, desc="Testing"):
                 batch = {k: v.to(self.device) for k, v in batch.items()}
                 
+                # Store current batch for metrics update
+                self.current_batch = batch
+                
                 # Forward pass
                 logits = self.model(self.plm_model, batch)
                 loss = self._compute_loss(logits, batch["label"])
@@ -284,6 +296,24 @@ class Trainer:
             return self.loss_fn(logits.squeeze(), labels.squeeze())
         elif self.args.problem_type == 'multi_label_classification':
             return self.loss_fn(logits, labels.float())
+        elif "residue" in self.args.problem_type:
+            # For residue-level classification, reshape logits and labels
+            # logits: [batch_size, seq_len, num_classes] -> [batch_size * seq_len, num_classes]
+            # labels: [batch_size, seq_len] -> [batch_size * seq_len]
+            batch_size, seq_len, num_classes = logits.shape
+            
+            # Ensure labels have the correct shape
+            if labels.dim() == 1:
+                # If labels is [batch_size], expand to [batch_size, seq_len]
+                labels = labels.unsqueeze(1).expand(-1, seq_len)
+            
+            logits_flat = logits.view(-1, num_classes)
+            labels_flat = labels.view(-1)
+            
+            # Ensure shapes match
+            assert logits_flat.size(0) == labels_flat.size(0), f"Logits and labels batch size mismatch: {logits_flat.size(0)} vs {labels_flat.size(0)}"
+            
+            return self.loss_fn(logits_flat, labels_flat)
         else:
             return self.loss_fn(logits, labels)
     
@@ -296,6 +326,14 @@ class Trainer:
                 metric(logits, labels)
             elif self.args.problem_type == 'multi_label_classification':
                 metric(torch.sigmoid(logits), labels)
+            elif "residue" in self.args.problem_type:
+                # For residue-level classification, pass attention mask if available
+                attention_mask = None
+                if "aa_seq_attention_mask" in self.current_batch:
+                    attention_mask = self.current_batch["aa_seq_attention_mask"]
+                
+                # Update residue-specific metrics
+                metric.update(logits, labels, attention_mask)
             else:
                 if self.args.num_labels == 2:
                     if metric_name == 'auroc':
@@ -315,23 +353,7 @@ class Trainer:
                 "train/learning_rate": self.optimizer.param_groups[0]['lr']
             }, step=self.global_steps)
     
-    # def _save_model(self, path):
-    #     if self.args.training_method in ['full', 'plm-lora']:
-    #         torch.save({
-    #             'model_state_dict': self.model.state_dict(),
-    #             'plm_state_dict': self.plm_model.state_dict()
-    #         }, path)
-    #     else:
-    #         torch.save(self.model.state_dict(), path)
-    
-    # def _load_best_model(self):
-    #     path = os.path.join(self.args.output_dir, self.args.output_model_name)
-    #     if self.args.training_method in ['full', 'plm-lora']:
-    #         checkpoint = torch.load(path, weights_only=True)
-    #         self.model.load_state_dict(checkpoint['model_state_dict'])
-    #         self.plm_model.load_state_dict(checkpoint['plm_state_dict'])
-    #     else:
-    #         self.model.load_state_dict(torch.load(path, weights_only=True))      
+  
     def _save_model(self, path):
         if self.args.training_method in ['full', 'lora']:
             model_state = {k: v.cpu() for k, v in self.model.state_dict().items()}

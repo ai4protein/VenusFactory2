@@ -34,7 +34,8 @@ def parse_args():
     parser.add_argument('--plm_model', type=str, required=True, help="Pretrained language model name or path")
     parser.add_argument('--pooling_method', type=str, default="mean", choices=["mean", "attention1d", "light_attention"], help="Pooling method")
     parser.add_argument('--problem_type', type=str, default="single_label_classification", 
-                        choices=["single_label_classification", "multi_label_classification", "regression"], 
+                        choices=["single_label_classification", "multi_label_classification", "regression",
+                                 "residue_single_label_classification", "residue_regression"], 
                         help="Problem type")
     parser.add_argument('--num_labels', type=int, default=2, help="Number of labels")
     parser.add_argument('--hidden_size', type=int, default=None, help="Embedding hidden size of the model")
@@ -269,10 +270,10 @@ def process_sequences(args, tokenizer, plm_model_name):
         "aa_seq_attention_mask": aa_inputs["attention_mask"],
     }
     
-    # 只有 ProSST 模型需要结构标记
+    # only for ProSST model
     if "ProSST" in plm_model_name and hasattr(args, 'prosst_stru_token') and args.prosst_stru_token:
         try:
-            # 处理 ProSST 结构标记
+            # process ProSST structure tokens
             if isinstance(args.prosst_stru_token, str):
                 seq_clean = args.prosst_stru_token.strip("[]").replace(" ","")
                 tokens = list(map(int, seq_clean.split(','))) if seq_clean else []
@@ -281,16 +282,16 @@ def process_sequences(args, tokenizer, plm_model_name):
             else:
                 tokens = []
                 
-            # 添加到数据字典
+            # add to data dictionary
             if tokens:
                 stru_tokens = torch.tensor([tokens], dtype=torch.long)
                 data_dict["aa_seq_stru_tokens"] = stru_tokens
             else:
-                # 如果没有标记，则使用零填充
+                # if no structure tokens, use zero padding
                 data_dict["aa_seq_stru_tokens"] = torch.zeros_like(aa_inputs["input_ids"], dtype=torch.long)
         except Exception as e:
             print(f"Warning: Failed to process ProSST structure tokens: {e}")
-            # 使用零填充
+            # use zero padding
             data_dict["aa_seq_stru_tokens"] = torch.zeros_like(aa_inputs["input_ids"], dtype=torch.long)
     
     if args.use_foldseek and foldseek_seq:

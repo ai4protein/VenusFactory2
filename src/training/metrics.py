@@ -1,8 +1,11 @@
 import torch
 from torchmetrics.classification import Accuracy, Recall, Precision, MatthewsCorrCoef, AUROC, F1Score, MatthewsCorrCoef
 from torchmetrics.classification import BinaryAccuracy, BinaryRecall, BinaryAUROC, BinaryF1Score, BinaryPrecision, BinaryMatthewsCorrCoef, BinaryF1Score
+from torchmetrics.classification import BinaryAveragePrecision, MulticlassAveragePrecision
 from torchmetrics.regression import SpearmanCorrCoef, MeanSquaredError
 from torchmetrics.classification import MultilabelAveragePrecision
+from torchmetrics import Metric
+import torch.nn.functional as F
 
 
 def count_f1_max(pred, target):
@@ -55,6 +58,152 @@ class MultilabelF1Max(MultilabelAveragePrecision):
     def compute(self):
         return count_f1_max(torch.cat(self.preds), torch.cat(self.target))
 
+class BaseResidueMetric(Metric):
+    """
+    An abstract base class for handling common logic in residue-level 
+    classification metrics.
+    - Handles data flattening.
+    - Handles the application of masks.
+    - Handles data filtering based on ignore_index.
+    Subclasses must implement _get_metric_instance and can override _prepare_preds.
+    """
+    def __init__(self, num_classes: int, average: str, ignore_index: int = -1):
+        super().__init__()
+        self.num_classes = num_classes
+        self.ignore_index = ignore_index
+        self.average = average
+        
+        # The specific torchmetrics instance is created by the subclass.
+        self.metric = self._get_metric_instance()
+
+    def _get_metric_instance(self) -> Metric:
+        """Subclasses must implement this method to return the correct torchmetrics instance."""
+        raise NotImplementedError("Subclasses must implement _get_metric_instance")
+
+    def _prepare_preds(self, preds: torch.Tensor, target: torch.Tensor) -> (torch.Tensor, torch.Tensor):
+        """Subclasses can override this method for specific prediction processing (e.g., argmax or slicing)."""
+        return preds, target
+        
+    def update(self, preds: torch.Tensor, target: torch.Tensor, mask: torch.Tensor = None):
+        """Generic update logic: flatten, mask, and filter."""
+        # 1. Flatten the data
+        preds = preds.reshape(-1, preds.shape[-1])
+        target = target.reshape(-1)
+
+        # 2. Apply the mask
+        if mask is not None:
+            mask = mask.reshape(-1).bool()
+            preds = preds[mask]
+            target = target[mask]
+        
+        # 3. Filter based on ignore_index
+        if self.ignore_index is not None:
+            valid_idx = target != self.ignore_index
+            preds = preds[valid_idx]
+            target = target[valid_idx]
+        
+        # If there is no valid data, do not update
+        if target.numel() == 0:
+            return
+            
+        # 4. Call the subclass's specific prediction processing logic
+        preds, target = self._prepare_preds(preds, target)
+        
+        # 5. Update the internal torchmetrics instance
+        self.metric.update(preds, target)
+
+    def compute(self):
+        return self.metric.compute()
+
+    def reset(self):
+        self.metric.reset()
+    
+
+class ResidueAUPR(BaseResidueMetric):
+    """Calculates Average Precision (AUPR) for residue-level classification."""
+    def _get_metric_instance(self):
+        if self.num_classes == 2:
+            return BinaryAveragePrecision()
+        else:
+            return MulticlassAveragePrecision(num_classes=self.num_classes, average=self.average, ignore_index=self.ignore_index)
+
+    def _prepare_preds(self, preds, target):
+        # For binary classification, AUPR/AUROC needs the score for the positive class (logits are fine).
+        if self.num_classes == 2:
+            return preds[:, 1], target
+        return preds, target
+
+class ResidueAUROC(BaseResidueMetric):
+    """Calculates Area Under ROC Curve (AUROC) for residue-level classification."""
+    def _get_metric_instance(self):
+        if self.num_classes == 2:
+            return BinaryAUROC()
+        else:
+            # Note: torchmetrics >= 0.7 unified the AUROC API.
+            return AUROC(task='multiclass', num_classes=self.num_classes, average=self.average, ignore_index=self.ignore_index)
+
+    def _prepare_preds(self, preds, target):
+        # Same logic as AUPR.
+        if self.num_classes == 2:
+            return preds[:, 1], target
+        return preds, target
+
+
+# --- Threshold-based Metrics (F1, Accuracy) ---
+
+class ResidueF1Score(BaseResidueMetric):
+    """Calculates F1-Score for residue-level classification."""
+    def _get_metric_instance(self):
+        if self.num_classes == 2:
+            # ignore_index is not applicable to BinaryF1Score as we have already filtered manually in the base class.
+            return BinaryF1Score()
+        else:
+            return F1Score(task='multiclass', num_classes=self.num_classes, average=self.average, ignore_index=self.ignore_index)
+
+    def _prepare_preds(self, preds, target):
+        # F1/Accuracy requires predicted class labels.
+        return torch.argmax(preds, dim=1), target
+
+
+class ResidueAccuracy(BaseResidueMetric):
+    """Calculates Accuracy for residue-level classification."""
+    def _get_metric_instance(self):
+        if self.num_classes == 2:
+            return BinaryAccuracy()
+        else:
+            return Accuracy(task='multiclass', num_classes=self.num_classes, average=self.average, ignore_index=self.ignore_index)
+
+    def _prepare_preds(self, preds, target):
+        # Same logic as F1-Score.
+        return torch.argmax(preds, dim=1), target
+
+
+class ResidueMCC(BaseResidueMetric):
+    """Calculates Matthews Correlation Coefficient (MCC) for residue-level classification."""
+    def _get_metric_instance(self):
+        if self.num_classes == 2:
+            return MatthewsCorrCoef(task='binary')
+        else:
+            return MatthewsCorrCoef(task='multiclass', num_classes=self.num_classes)
+
+    def _prepare_preds(self, preds, target):
+        # MCC requires predicted class labels.
+        return torch.argmax(preds, dim=1), target
+
+
+class ResidueRecall(BaseResidueMetric):
+    """Calculates Recall for residue-level classification."""
+    def _get_metric_instance(self):
+        if self.num_classes == 2:
+            # For binary recall, torchmetrics uses 'macro' as default, which is fine.
+            return Recall(task='binary', average=self.average)
+        else:
+            return Recall(task='multiclass', num_classes=self.num_classes, average=self.average, ignore_index=self.ignore_index)
+
+    def _prepare_preds(self, preds, target):
+        # Recall requires predicted class labels.
+        return torch.argmax(preds, dim=1), target
+
 def setup_metrics(args):
     """Setup metrics based on problem type and specified metrics list."""
     metrics_dict = {}
@@ -70,6 +219,9 @@ def setup_metrics(args):
                 metric_config = _setup_multiclass_metrics(metric_name, args.num_labels, device)            
         elif args.problem_type == 'multi_label_classification':
             metric_config = _setup_multilabel_metrics(metric_name, args.num_labels, device)
+        elif "residue" in args.problem_type:
+            # Handle residue-level classification tasks
+            metric_config = _setup_residue_metrics(metric_name, args.num_labels, device)
             
         if metric_config:
             metrics_dict[metric_name] = metric_config['metric']
@@ -141,6 +293,30 @@ def _setup_multilabel_metrics(metric_name, num_labels, device):
     metrics_config = {
         'f1_max': {
             'metric': MultilabelF1Max(num_labels=num_labels).to(device),
+        }
+    }
+    return metrics_config.get(metric_name) 
+
+def _setup_residue_metrics(metric_name, num_labels, device):
+    """Setup metrics for residue-level classification tasks."""
+    metrics_config = {
+        'aupr': {
+            'metric': ResidueAUPR(num_classes=num_labels, average='micro').to(device),
+        },
+        'auroc': {
+            'metric': ResidueAUROC(num_classes=num_labels, average='micro').to(device),
+        },
+        'f1': {
+            'metric': ResidueF1Score(num_classes=num_labels, average='micro').to(device),
+        },
+        'accuracy': {
+            'metric': ResidueAccuracy(num_classes=num_labels, average='micro').to(device),
+        },
+        'mcc': {
+            'metric': ResidueMCC(num_classes=num_labels, average='micro').to(device),
+        },
+        'recall': {
+            'metric': ResidueRecall(num_classes=num_labels, average='micro').to(device),
         }
     }
     return metrics_config.get(metric_name) 

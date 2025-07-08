@@ -1,4 +1,5 @@
 import torch
+import json
 import re
 from typing import Dict, List, Any
 from transformers import PreTrainedTokenizer
@@ -33,11 +34,15 @@ class Collator:
         structure_seqs = {
             seq_type: [] for seq_type in (self.structure_seq or [])
         }
-
+        
+        aa_seq_key = "aa_seq"
+        if "residue" in self.problem_type:
+            aa_seq_key = "seq_full"
+        
         # Process each example
         for e in examples:
             # Process sequences
-            aa_seq = self.process_sequence(e["aa_seq"])
+            aa_seq = self.process_sequence(e[aa_seq_key])
             aa_seqs.append(aa_seq)
             if "ProSST" in self.plm_model:
                 stru_vocab = self.plm_model.split("-")[1]
@@ -52,6 +57,7 @@ class Collator:
                     processed_seq = self.process_sequence(e[seq_type])
                 structure_seqs[seq_type].append(processed_seq)
             
+            # Process labels based on problem type
             if self.problem_type == 'multi_label_classification':
                 label_list = e['label'].split(',')
                 e['label'] = [int(l) for l in label_list]
@@ -59,6 +65,9 @@ class Collator:
                 for index in e['label']:
                     binary_list[index] = 1
                 e['label'] = binary_list
+            elif self.problem_type == "residue_single_label_classification":
+                e['label'] = json.loads(e['label'])
+            
             # Process labels
             labels.append(e["label"])
 
@@ -68,11 +77,27 @@ class Collator:
         else:
             batch = self.tokenize_sequences(aa_seqs, structure_seqs)
         
-        # Add labels to batch
-        batch["label"] = torch.as_tensor(
-            labels, 
-            dtype=torch.float if self.problem_type == 'regression' else torch.long
-        )
+        max_seq_len = batch["aa_seq_input_ids"].shape[1]
+        if 'residue' in self.problem_type:
+            # For residue classification, labels should be position-level
+            # Each position in the sequence has a label
+            processed_labels = []
+            for label in labels:
+                if isinstance(label, list):
+                    # Pad the label list to match sequence length
+                    # Use -1 for padding since 0 is a valid class label
+                    padded_label = [-1] + label + [-1] * (max_seq_len - len(label) - 1)
+                    processed_labels.append(padded_label[:max_seq_len])
+                else:
+                    # If it's not a list, create a sequence with the same label
+                    processed_labels.append([int(label)] * max_seq_len)
+            
+            batch["label"] = torch.as_tensor(processed_labels, dtype=torch.long)
+        else:
+            batch["label"] = torch.as_tensor(
+                labels, 
+                dtype=torch.float if self.problem_type == 'regression' else torch.long
+            )
 
         return batch
 
