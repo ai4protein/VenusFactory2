@@ -180,3 +180,4 @@ log/
 .webui_secret_key
 memory_db/
 mutation/proteingym/
+mutation/mycase/
