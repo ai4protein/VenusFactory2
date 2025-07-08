@@ -1,0 +1,8 @@
+{
+    "dataset": "AI4Protein/VenusX_Res_Act_X",
+    "num_labels": 2,
+    "problem_type": "residue_single_label_classification",
+    "metrics": "aupr,auroc,f1,accuracy,mcc,recall",
+    "monitor": "aupr",
+    "monitor_strategy": "max"
+}
