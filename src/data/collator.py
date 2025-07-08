@@ -40,7 +40,8 @@ class Collator:
             aa_seq = self.process_sequence(e["aa_seq"])
             aa_seqs.append(aa_seq)
             if "ProSST" in self.plm_model:
-                stru_token = self.process_stru_tokens(e["prosst_stru_token"])
+                stru_vocab = self.plm_model.split("-")[1]
+                stru_token = self.process_stru_tokens(e[f"stru_token_{stru_vocab}"])
                 str_tokens.append(stru_token)
             
             # Process structure sequences if needed
@@ -118,12 +119,15 @@ class Collator:
         padded_tokens = []
         if str_tokens:
             for tokens in str_tokens:
-                struct_sequence =  [int(num) for num in tokens]
-                padded_tokens.append(struct_sequence + [0] * (aa_max_length - len(struct_sequence) - 2))
+                struct_sequence = ([1] + list(map(int, tokens)) + [2])[:aa_max_length]
+                # pad to the same length as the aa sequence
+                padded_struct_sequence = struct_sequence + [0] * (aa_max_length - len(struct_sequence))
+                padded_tokens.append(padded_struct_sequence)
+            padded_tokens = torch.tensor(padded_tokens, dtype=torch.long)
             batch = {
                 "aa_seq_input_ids": aa_encodings["input_ids"],
                 "aa_seq_attention_mask": aa_encodings["attention_mask"],
-                "aa_seq_stru_tokens": torch.tensor(padded_tokens, dtype=torch.long)
+                "aa_seq_stru_tokens": padded_tokens
             }
         else:
             batch = {
