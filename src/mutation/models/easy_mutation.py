@@ -48,9 +48,37 @@ def normalize_scores(scores: List[float]) -> List[float]:
     return normalized.tolist()
 
 
-def select_recommended_mutations(df: pd.DataFrame, num_recommendations: int = 30) -> List[str]:
+def select_recommended_mutations(df: pd.DataFrame, num_recommendations: int = 30, strategy: str = 'ensemble_round') -> List[str]:
+    """
+    Select recommended mutations using different strategies.
+    
+    Args:
+        df: DataFrame with all model scores
+        num_recommendations: Number of recommended mutations
+        strategy: Selection strategy ('ensemble_round', 'ensemble_top', 'individual_best', 'frequency_based', 'diversity_based')
+        
+    Returns:
+        List of recommended mutations
+    """
+    
+    if strategy == 'ensemble_round':
+        return select_ensemble_round(df, num_recommendations)
+    elif strategy == 'ensemble_top':
+        return select_ensemble_top(df, num_recommendations)
+    elif strategy == 'individual_best':
+        return select_individual_best(df, num_recommendations)
+    elif strategy == 'frequency_based':
+        return select_frequency_based(df, num_recommendations)
+    elif strategy == 'diversity_based':
+        return select_diversity_based(df, num_recommendations)
+    else:
+        raise ValueError(f"Unknown strategy: {strategy}. Available strategies: ensemble_round, ensemble_top, individual_best, frequency_based, diversity_based")
+
+
+def select_ensemble_round(df: pd.DataFrame, num_recommendations: int = 30) -> List[str]:
     """
     Select recommended mutations based on frequency analysis of top mutations from each model.
+    This is the original ensemble round strategy.
     
     Args:
         df: DataFrame with all model scores
@@ -396,8 +424,223 @@ def select_recommended_mutations(df: pd.DataFrame, num_recommendations: int = 30
     return final_selections
 
 
+def select_ensemble_top(df: pd.DataFrame, num_recommendations: int = 30) -> List[str]:
+    """
+    Select top mutations based on ensemble normalized score.
+    
+    Args:
+        df: DataFrame with all model scores
+        num_recommendations: Number of recommended mutations
+        
+    Returns:
+        List of recommended mutations
+    """
+    print(f"Using ensemble_top strategy to select {num_recommendations} mutations...")
+    
+    # Sort by ensemble normalized score and select top N
+    top_mutations = df.nlargest(num_recommendations, 'ensemble_norm_score')['mutant'].tolist()
+    
+    print(f"Selected top {len(top_mutations)} mutations by ensemble score")
+    return top_mutations
+
+
+def select_individual_best(df: pd.DataFrame, num_recommendations: int = 30) -> List[str]:
+    """
+    Select mutations by taking the best from each individual model with specific ratios.
+    
+    Args:
+        df: DataFrame with all model scores
+        num_recommendations: Number of recommended mutations
+        
+    Returns:
+        List of recommended mutations
+    """
+    print(f"Using individual_best strategy to select {num_recommendations} mutations...")
+    
+    # Define model ratios: prosst:protssn:saprot:esmif1 = 3:2:2:2
+    model_ratios = {
+        'prosst_score': 3,
+        'protssn_score': 2, 
+        'saprot_score': 2,
+        'esmif1_score': 2
+    }
+    
+    # Calculate how many to select from each model
+    total_ratio = sum(model_ratios.values())  # 9
+    model_selections = {}
+    for model_col, ratio in model_ratios.items():
+        model_selections[model_col] = max(1, int(num_recommendations * ratio / total_ratio))
+    
+    # Adjust to ensure we get exactly num_recommendations mutations
+    current_total = sum(model_selections.values())
+    if current_total < num_recommendations:
+        # Add extra to prosst (highest priority)
+        model_selections['prosst_score'] += num_recommendations - current_total
+    elif current_total > num_recommendations:
+        # Remove excess from lowest priority models
+        excess = current_total - num_recommendations
+        for model_col in ['esmif1_score', 'saprot_score', 'protssn_score', 'prosst_score']:
+            if excess <= 0:
+                break
+            reduce_by = min(excess, model_selections[model_col])
+            model_selections[model_col] -= reduce_by
+            excess -= reduce_by
+    
+    print(f"Model selection targets: {model_selections}")
+    
+    selected_mutations = []
+    seen_positions = set()
+    
+    def get_position_from_mutant(mutant: str) -> str:
+        """Extract position from mutant string, e.g., M1A -> 1"""
+        return ''.join(filter(str.isdigit, mutant))
+    
+    # Priority order: prosst > protssn > saprot > esmif1
+    priority_order = ['prosst_score', 'protssn_score', 'saprot_score', 'esmif1_score']
+    
+    for model_col in priority_order:
+        target_count = model_selections[model_col]
+        if target_count <= 0:
+            continue
+            
+        print(f"  Selecting {target_count} mutations from {model_col}...")
+        
+        # Get top mutations from this model, excluding already selected positions
+        model_df = df.sort_values(model_col, ascending=False)
+        model_candidates = []
+        
+        for _, row in model_df.iterrows():
+            mut = row['mutant']
+            pos = get_position_from_mutant(mut)
+            
+            # Skip if position already covered
+            if pos in seen_positions:
+                continue
+                
+            model_candidates.append(mut)
+            seen_positions.add(pos)
+            
+            if len(model_candidates) >= target_count:
+                break
+        
+        selected_mutations.extend(model_candidates)
+        print(f"    Selected {len(model_candidates)} mutations from {model_col}")
+    
+    print(f"Total selected mutations: {len(selected_mutations)}")
+    return selected_mutations
+
+
+def select_frequency_based(df: pd.DataFrame, num_recommendations: int = 30) -> List[str]:
+    """
+    Select mutations based on frequency of appearance in top N from each model.
+    
+    Args:
+        df: DataFrame with all model scores
+        num_recommendations: Number of recommended mutations
+        
+    Returns:
+        List of recommended mutations
+    """
+    print(f"Using frequency_based strategy to select {num_recommendations} mutations...")
+    
+    model_columns = ['saprot_score', 'protssn_score', 'prosst_score', 'esmif1_score']
+    top_n = max(num_recommendations, 50)  # Analyze top N from each model
+    
+    # Count frequency of mutations in top N from each model
+    mutation_counts = {}
+    for model_col in model_columns:
+        top_mutations = df.nlargest(top_n, model_col)['mutant'].tolist()
+        for mut in top_mutations:
+            mutation_counts[mut] = mutation_counts.get(mut, 0) + 1
+    
+    # Sort by frequency (descending) and then by ensemble score
+    frequent_mutations = [(mut, count) for mut, count in mutation_counts.items() if count >= 2]
+    frequent_mutations.sort(key=lambda x: (x[1], df[df['mutant'] == x[0]]['ensemble_norm_score'].iloc[0]), reverse=True)
+    
+    # Select top mutations, ensuring no duplicate positions
+    selected_mutations = []
+    seen_positions = set()
+    
+    def get_position_from_mutant(mutant: str) -> str:
+        return ''.join(filter(str.isdigit, mutant))
+    
+    for mut, count in frequent_mutations:
+        if len(selected_mutations) >= num_recommendations:
+            break
+            
+        pos = get_position_from_mutant(mut)
+        if pos not in seen_positions:
+            selected_mutations.append(mut)
+            seen_positions.add(pos)
+    
+    print(f"Selected {len(selected_mutations)} mutations based on frequency")
+    return selected_mutations
+
+
+def select_diversity_based(df: pd.DataFrame, num_recommendations: int = 30) -> List[str]:
+    """
+    Select mutations to maximize diversity across different score ranges and models.
+    
+    Args:
+        df: DataFrame with all model scores
+        num_recommendations: Number of recommended mutations
+        
+    Returns:
+        List of recommended mutations
+    """
+    print(f"Using diversity_based strategy to select {num_recommendations} mutations...")
+    
+    model_columns = ['saprot_score', 'protssn_score', 'prosst_score', 'esmif1_score']
+    selected_mutations = []
+    seen_positions = set()
+    
+    def get_position_from_mutant(mutant: str) -> str:
+        return ''.join(filter(str.isdigit, mutant))
+    
+    # Strategy: Select from different score ranges and models to ensure diversity
+    # 1. Top performers from each model (25% each)
+    top_per_model = max(1, num_recommendations // 4)
+    
+    for model_col in model_columns:
+        model_df = df.sort_values(model_col, ascending=False)
+        count = 0
+        
+        for _, row in model_df.iterrows():
+            if count >= top_per_model:
+                break
+                
+            mut = row['mutant']
+            pos = get_position_from_mutant(mut)
+            
+            if pos not in seen_positions:
+                selected_mutations.append(mut)
+                seen_positions.add(pos)
+                count += 1
+    
+    # 2. Fill remaining with ensemble top performers
+    remaining = num_recommendations - len(selected_mutations)
+    if remaining > 0:
+        ensemble_df = df.sort_values('ensemble_norm_score', ascending=False)
+        
+        for _, row in ensemble_df.iterrows():
+            if len(selected_mutations) >= num_recommendations:
+                break
+                
+            mut = row['mutant']
+            pos = get_position_from_mutant(mut)
+            
+            if pos not in seen_positions:
+                selected_mutations.append(mut)
+                seen_positions.add(pos)
+    
+    print(f"Selected {len(selected_mutations)} mutations for diversity")
+    return selected_mutations
+
+
 def easy_mutation_prediction(pdb_file: str, num_recommendations: int = 30, 
-                           mutations_csv: str = None, output_dir: str = None) -> Tuple[pd.DataFrame, List[str]]:
+                           mutations_csv: str = None, output_dir: str = None, 
+                           strategy: str = 'ensemble_round', output_score_file: str = None,
+                           output_recom_file: str = None) -> Tuple[pd.DataFrame, List[str]]:
     """
     Perform ensemble mutation prediction using multiple models.
     
@@ -406,6 +649,9 @@ def easy_mutation_prediction(pdb_file: str, num_recommendations: int = 30,
         num_recommendations: Number of recommended mutations
         mutations_csv: Path to mutations CSV file (optional)
         output_dir: Output directory for results
+        strategy: Selection strategy for recommended mutations
+        output_score_file: Path to save all scores CSV file
+        output_recom_file: Path to save recommended mutations CSV file
         
     Returns:
         Tuple of (DataFrame with all scores, list of recommended mutations)
@@ -437,8 +683,15 @@ def easy_mutation_prediction(pdb_file: str, num_recommendations: int = 30,
     
     pdb_name = os.path.basename(pdb_file).split('.')[0]
     
-    # Save all scores
-    scores_file = os.path.join(output_dir, f"{pdb_name}_all_scores.csv")
+    # Determine output file paths
+    if output_score_file is None:
+        if output_dir is None:
+            output_dir = "."
+        scores_file = os.path.join(output_dir, f"{pdb_name}_all_scores.csv")
+    else:
+        scores_file = output_score_file
+        # Ensure output directory exists
+        os.makedirs(os.path.dirname(scores_file), exist_ok=True)
     
     if not os.path.exists(scores_file):
         print(f"Processing {len(mutants)} mutations...")
@@ -503,8 +756,20 @@ def easy_mutation_prediction(pdb_file: str, num_recommendations: int = 30,
         df = pd.read_csv(scores_file)
         
     # Select recommended mutations
-    recommended_mutations = select_recommended_mutations(df, num_recommendations)
-    recommended_file = os.path.join(output_dir, f"{pdb_name}_recommended.csv")
+    recommended_mutations = select_recommended_mutations(df, num_recommendations, strategy)
+    
+    # Determine recommended file path
+    if output_recom_file is None:
+        if output_dir is None:
+            output_dir = "."
+        recommended_file = os.path.join(output_dir, strategy, f"{pdb_name}_recommended.csv")
+        # Ensure strategy subdirectory exists
+        os.makedirs(os.path.join(output_dir, strategy), exist_ok=True)
+    else:
+        recommended_file = output_recom_file
+        # Ensure output directory exists
+        os.makedirs(os.path.dirname(recommended_file), exist_ok=True)
+    
     # Save recommended mutations
     recommended_df = df[df['mutant'].isin(recommended_mutations)].copy()
     recommended_df = recommended_df.sort_values('ensemble_norm_score', ascending=False)
@@ -532,6 +797,11 @@ def main():
     parser.add_argument('--mutations_csv', type=str, default=None, help='Path to the mutations CSV file')
     parser.add_argument('--output_dir', type=str, default=None, help='Output directory for results')
     parser.add_argument('--num_recommendations', type=int, default=30, help='Number of recommended mutations')
+    parser.add_argument('--strategy', type=str, default='ensemble_round', 
+                       choices=['ensemble_round', 'ensemble_top', 'individual_best', 'frequency_based', 'diversity_based'],
+                       help='Selection strategy for recommended mutations')
+    parser.add_argument('--output_score_file', type=str, default=None, help='Path to save all scores CSV file')
+    parser.add_argument('--output_recom_file', type=str, default=None, help='Path to save recommended mutations CSV file')
     args = parser.parse_args()
     
     # Perform ensemble prediction
@@ -539,7 +809,10 @@ def main():
         pdb_file=args.pdb_file,
         num_recommendations=args.num_recommendations,
         mutations_csv=args.mutations_csv,
-        output_dir=args.output_dir
+        output_dir=args.output_dir,
+        strategy=args.strategy,
+        output_score_file=args.output_score_file,
+        output_recom_file=args.output_recom_file
     )
     
     print(f"\nPrediction completed successfully!")
