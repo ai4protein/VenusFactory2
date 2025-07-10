@@ -48,7 +48,49 @@ def normalize_scores(scores: List[float]) -> List[float]:
     return normalized.tolist()
 
 
-def select_recommended_mutations(df: pd.DataFrame, num_recommendations: int = 30, strategy: str = 'ensemble_round') -> List[str]:
+def ensure_position_uniqueness(mutations: List[str], df: pd.DataFrame, num_recommendations: int = 30) -> List[str]:
+    """
+    Ensure position uniqueness in mutation list by keeping the best mutation for each position.
+    
+    Args:
+        mutations: List of mutations to filter
+        df: DataFrame with all model scores
+        num_recommendations: Target number of recommendations
+        
+    Returns:
+        List of mutations with unique positions
+    """
+    def get_position_from_mutant(mutant: str) -> str:
+        """Extract position from mutant string, e.g., M1A -> 1"""
+        return ''.join(filter(str.isdigit, mutant))
+    
+    if not mutations:
+        return mutations
+    
+    # Create position to mutation mapping, keeping the best mutation for each position
+    position_best = {}
+    
+    for mut in mutations:
+        pos = get_position_from_mutant(mut)
+        if pos not in position_best:
+            position_best[pos] = mut
+        else:
+            # Compare ensemble scores and keep the better one
+            current_score = df[df['mutant'] == position_best[pos]]['ensemble_norm_score'].iloc[0]
+            new_score = df[df['mutant'] == mut]['ensemble_norm_score'].iloc[0]
+            if new_score > current_score:
+                position_best[pos] = mut
+    
+    # Convert back to list and limit to num_recommendations
+    unique_mutations = list(position_best.values())
+    
+    # Sort by ensemble score to ensure we keep the best ones
+    unique_mutations.sort(key=lambda x: df[df['mutant'] == x]['ensemble_norm_score'].iloc[0], reverse=True)
+    
+    return unique_mutations[:num_recommendations]
+
+
+def select_recommended_mutations(df: pd.DataFrame, num_recommendations: int = 30, strategy: str = 'ensemble_round', position_unique: bool = True) -> List[str]:
     """
     Select recommended mutations using different strategies.
     
@@ -56,26 +98,27 @@ def select_recommended_mutations(df: pd.DataFrame, num_recommendations: int = 30
         df: DataFrame with all model scores
         num_recommendations: Number of recommended mutations
         strategy: Selection strategy ('ensemble_round', 'ensemble_top', 'individual_best', 'frequency_based', 'diversity_based')
+        position_unique: Whether to ensure position uniqueness in recommendations
         
     Returns:
         List of recommended mutations
     """
     
     if strategy == 'ensemble_round':
-        return select_ensemble_round(df, num_recommendations)
+        return select_ensemble_round(df, num_recommendations, position_unique)
     elif strategy == 'ensemble_top':
-        return select_ensemble_top(df, num_recommendations)
+        return select_ensemble_top(df, num_recommendations, position_unique)
     elif strategy == 'individual_best':
-        return select_individual_best(df, num_recommendations)
+        return select_individual_best(df, num_recommendations, position_unique)
     elif strategy == 'frequency_based':
-        return select_frequency_based(df, num_recommendations)
+        return select_frequency_based(df, num_recommendations, position_unique)
     elif strategy == 'diversity_based':
-        return select_diversity_based(df, num_recommendations)
+        return select_diversity_based(df, num_recommendations, position_unique)
     else:
         raise ValueError(f"Unknown strategy: {strategy}. Available strategies: ensemble_round, ensemble_top, individual_best, frequency_based, diversity_based")
 
 
-def select_ensemble_round(df: pd.DataFrame, num_recommendations: int = 30) -> List[str]:
+def select_ensemble_round(df: pd.DataFrame, num_recommendations: int = 30, position_unique: bool = True) -> List[str]:
     """
     Select recommended mutations based on frequency analysis of top mutations from each model.
     This is the original ensemble round strategy.
@@ -83,6 +126,7 @@ def select_ensemble_round(df: pd.DataFrame, num_recommendations: int = 30) -> Li
     Args:
         df: DataFrame with all model scores
         num_recommendations: Number of recommended mutations
+        position_unique: Whether to ensure position uniqueness in recommendations
         
     Returns:
         List of recommended mutations
@@ -367,52 +411,57 @@ def select_ensemble_round(df: pd.DataFrame, num_recommendations: int = 30) -> Li
     # Final position deduplication: ensure no duplicate positions
     print(f"Final selection before deduplication: {len(selected_mutations)} mutations")
     
-    # Remove duplicates by position, keeping the highest ranked mutation for each position
-    final_selections = []
-    seen_positions = set()
-    
-    for mut in selected_mutations:
-        pos = get_position_from_mutant(mut)
-        if pos not in seen_positions:
-            final_selections.append(mut)
-            seen_positions.add(pos)
-        else:
-            # Find the existing mutation at this position
-            existing_mut = None
-            for existing in final_selections:
-                if get_position_from_mutant(existing) == pos:
-                    existing_mut = existing
-                    break
-            
-            if existing_mut:
-                # Compare rankings and keep the better one
-                existing_rankings = get_mutation_rankings(existing_mut)
-                new_rankings = get_mutation_rankings(mut)
+    if position_unique:
+        # Use the existing position deduplication logic
+        final_selections = []
+        seen_positions = set()
+        
+        for mut in selected_mutations:
+            pos = get_position_from_mutant(mut)
+            if pos not in seen_positions:
+                final_selections.append(mut)
+                seen_positions.add(pos)
+            else:
+                # Find the existing mutation at this position
+                existing_mut = None
+                for existing in final_selections:
+                    if get_position_from_mutant(existing) == pos:
+                        existing_mut = existing
+                        break
                 
-                # Calculate average rank (lower is better)
-                existing_ranks = [r for r in existing_rankings.values() if r is not None]
-                new_ranks = [r for r in new_rankings.values() if r is not None]
-                
-                if not existing_ranks or not new_ranks:
-                    continue  # Skip if we can't compare rankings
+                if existing_mut:
+                    # Compare rankings and keep the better one
+                    existing_rankings = get_mutation_rankings(existing_mut)
+                    new_rankings = get_mutation_rankings(mut)
                     
-                existing_avg_rank = np.mean(existing_ranks)
-                new_avg_rank = np.mean(new_ranks)
-                
-                if new_avg_rank < existing_avg_rank:  # New mutation has better average rank
-                    # Replace the existing mutation
-                    final_selections.remove(existing_mut)
-                    final_selections.append(mut)
-                    print(f"Replaced {existing_mut} with {mut} at position {pos} (better rank)")
-    
-    print(f"Final selection after deduplication: {len(final_selections)} mutations")
-    
-    # Ensure we return exactly num_recommendations mutations
-    if len(final_selections) > num_recommendations:
-        # Sort by ensemble normalized score to keep the best ones
-        final_selections.sort(key=lambda x: df[df['mutant'] == x]['ensemble_norm_score'].iloc[0], reverse=True)
-        final_selections = final_selections[:num_recommendations]
-        print(f"Trimmed to target number: {len(final_selections)} mutations")
+                    # Calculate average rank (lower is better)
+                    existing_ranks = [r for r in existing_rankings.values() if r is not None]
+                    new_ranks = [r for r in new_rankings.values() if r is not None]
+                    
+                    if not existing_ranks or not new_ranks:
+                        continue  # Skip if we can't compare rankings
+                        
+                    existing_avg_rank = np.mean(existing_ranks)
+                    new_avg_rank = np.mean(new_ranks)
+                    
+                    if new_avg_rank < existing_avg_rank:  # New mutation has better average rank
+                        # Replace the existing mutation
+                        final_selections.remove(existing_mut)
+                        final_selections.append(mut)
+                        print(f"Replaced {existing_mut} with {mut} at position {pos} (better rank)")
+        
+        print(f"Final selection after deduplication: {len(final_selections)} mutations")
+        
+        # Ensure we return exactly num_recommendations mutations
+        if len(final_selections) > num_recommendations:
+            # Sort by ensemble normalized score to keep the best ones
+            final_selections.sort(key=lambda x: df[df['mutant'] == x]['ensemble_norm_score'].iloc[0], reverse=True)
+            final_selections = final_selections[:num_recommendations]
+            print(f"Trimmed to target number: {len(final_selections)} mutations")
+    else:
+        # If position_unique is False, just use the selected mutations as is
+        final_selections = selected_mutations[:num_recommendations]
+        print(f"No position uniqueness applied, using {len(final_selections)} mutations")
     
     print(f"Final recommended mutations: {len(final_selections)}")
     
@@ -424,13 +473,14 @@ def select_ensemble_round(df: pd.DataFrame, num_recommendations: int = 30) -> Li
     return final_selections
 
 
-def select_ensemble_top(df: pd.DataFrame, num_recommendations: int = 30) -> List[str]:
+def select_ensemble_top(df: pd.DataFrame, num_recommendations: int = 30, position_unique: bool = True) -> List[str]:
     """
     Select top mutations based on ensemble normalized score.
     
     Args:
         df: DataFrame with all model scores
         num_recommendations: Number of recommended mutations
+        position_unique: Whether to ensure position uniqueness in recommendations
         
     Returns:
         List of recommended mutations
@@ -440,17 +490,24 @@ def select_ensemble_top(df: pd.DataFrame, num_recommendations: int = 30) -> List
     # Sort by ensemble normalized score and select top N
     top_mutations = df.nlargest(num_recommendations, 'ensemble_norm_score')['mutant'].tolist()
     
+    # Apply position uniqueness if requested
+    if position_unique:
+        print("Applying position uniqueness filter...")
+        top_mutations = ensure_position_uniqueness(top_mutations, df, num_recommendations)
+        print(f"After position uniqueness: {len(top_mutations)} mutations")
+    
     print(f"Selected top {len(top_mutations)} mutations by ensemble score")
     return top_mutations
 
 
-def select_individual_best(df: pd.DataFrame, num_recommendations: int = 30) -> List[str]:
+def select_individual_best(df: pd.DataFrame, num_recommendations: int = 30, position_unique: bool = True) -> List[str]:
     """
     Select mutations by taking the best from each individual model with specific ratios.
     
     Args:
         df: DataFrame with all model scores
         num_recommendations: Number of recommended mutations
+        position_unique: Whether to ensure position uniqueness in recommendations
         
     Returns:
         List of recommended mutations
@@ -527,16 +584,24 @@ def select_individual_best(df: pd.DataFrame, num_recommendations: int = 30) -> L
         print(f"    Selected {len(model_candidates)} mutations from {model_col}")
     
     print(f"Total selected mutations: {len(selected_mutations)}")
+    
+    # Apply position uniqueness if requested
+    if position_unique:
+        print("Applying position uniqueness filter...")
+        selected_mutations = ensure_position_uniqueness(selected_mutations, df, num_recommendations)
+        print(f"After position uniqueness: {len(selected_mutations)} mutations")
+    
     return selected_mutations
 
 
-def select_frequency_based(df: pd.DataFrame, num_recommendations: int = 30) -> List[str]:
+def select_frequency_based(df: pd.DataFrame, num_recommendations: int = 30, position_unique: bool = True) -> List[str]:
     """
     Select mutations based on frequency of appearance in top N from each model.
     
     Args:
         df: DataFrame with all model scores
         num_recommendations: Number of recommended mutations
+        position_unique: Whether to ensure position uniqueness in recommendations
         
     Returns:
         List of recommended mutations
@@ -574,16 +639,24 @@ def select_frequency_based(df: pd.DataFrame, num_recommendations: int = 30) -> L
             seen_positions.add(pos)
     
     print(f"Selected {len(selected_mutations)} mutations based on frequency")
+    
+    # Apply position uniqueness if requested
+    if position_unique:
+        print("Applying position uniqueness filter...")
+        selected_mutations = ensure_position_uniqueness(selected_mutations, df, num_recommendations)
+        print(f"After position uniqueness: {len(selected_mutations)} mutations")
+    
     return selected_mutations
 
 
-def select_diversity_based(df: pd.DataFrame, num_recommendations: int = 30) -> List[str]:
+def select_diversity_based(df: pd.DataFrame, num_recommendations: int = 30, position_unique: bool = True) -> List[str]:
     """
     Select mutations to maximize diversity across different score ranges and models.
     
     Args:
         df: DataFrame with all model scores
         num_recommendations: Number of recommended mutations
+        position_unique: Whether to ensure position uniqueness in recommendations
         
     Returns:
         List of recommended mutations
@@ -634,13 +707,20 @@ def select_diversity_based(df: pd.DataFrame, num_recommendations: int = 30) -> L
                 seen_positions.add(pos)
     
     print(f"Selected {len(selected_mutations)} mutations for diversity")
+    
+    # Apply position uniqueness if requested
+    if position_unique:
+        print("Applying position uniqueness filter...")
+        selected_mutations = ensure_position_uniqueness(selected_mutations, df, num_recommendations)
+        print(f"After position uniqueness: {len(selected_mutations)} mutations")
+    
     return selected_mutations
 
 
 def easy_mutation_prediction(pdb_file: str, num_recommendations: int = 30, 
                            mutations_csv: str = None, output_dir: str = None, 
                            strategy: str = 'ensemble_round', output_score_file: str = None,
-                           output_recom_file: str = None) -> Tuple[pd.DataFrame, List[str]]:
+                           output_recom_file: str = None, position_unique: bool = True) -> Tuple[pd.DataFrame, List[str]]:
     """
     Perform ensemble mutation prediction using multiple models.
     
@@ -652,6 +732,7 @@ def easy_mutation_prediction(pdb_file: str, num_recommendations: int = 30,
         strategy: Selection strategy for recommended mutations
         output_score_file: Path to save all scores CSV file
         output_recom_file: Path to save recommended mutations CSV file
+        position_unique: Whether to ensure position uniqueness in recommendations
         
     Returns:
         Tuple of (DataFrame with all scores, list of recommended mutations)
@@ -756,7 +837,7 @@ def easy_mutation_prediction(pdb_file: str, num_recommendations: int = 30,
         df = pd.read_csv(scores_file)
         
     # Select recommended mutations
-    recommended_mutations = select_recommended_mutations(df, num_recommendations, strategy)
+    recommended_mutations = select_recommended_mutations(df, num_recommendations, strategy, position_unique)
     
     # Determine recommended file path
     if output_recom_file is None:
@@ -800,9 +881,15 @@ def main():
     parser.add_argument('--strategy', type=str, default='ensemble_round', 
                        choices=['ensemble_round', 'ensemble_top', 'individual_best', 'frequency_based', 'diversity_based'],
                        help='Selection strategy for recommended mutations')
+    parser.add_argument('--position_unique', type=str, default='False', 
+                       choices=['True', 'False'],
+                       help='Ensure position uniqueness in recommendations (default: True)')
     parser.add_argument('--output_score_file', type=str, default=None, help='Path to save all scores CSV file')
     parser.add_argument('--output_recom_file', type=str, default=None, help='Path to save recommended mutations CSV file')
     args = parser.parse_args()
+    
+    # Determine position_unique setting
+    position_unique = args.position_unique.lower() == 'true'
     
     # Perform ensemble prediction
     df, recommended_mutations = easy_mutation_prediction(
@@ -812,7 +899,8 @@ def main():
         output_dir=args.output_dir,
         strategy=args.strategy,
         output_score_file=args.output_score_file,
-        output_recom_file=args.output_recom_file
+        output_recom_file=args.output_recom_file,
+        position_unique=position_unique
     )
     
     print(f"\nPrediction completed successfully!")
