@@ -85,7 +85,8 @@ def main():
     # Calculate scores using the new function
     scores = esm1v_score(args.fasta_file, mutants)
     df['esm1v_score'] = scores
-
+    df = df.sort_values(by='esm1v_score', ascending=False)
+    
     # Save results
     if args.output_csv is not None:
         df.to_csv(args.output_csv, index=False)

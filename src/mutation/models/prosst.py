@@ -93,7 +93,8 @@ def main():
     # Calculate scores using the new function
     scores = prosst_score(args.pdb_file, mutants)
     df['prosst_score'] = scores
-
+    df = df.sort_values(by='prosst_score', ascending=False)
+    
     # Save results
     if args.output_csv is not None:
         df.to_csv(args.output_csv, index=False)

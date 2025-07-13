@@ -676,6 +676,7 @@ def main():
     )
     
     df['protssn_score'] = scores
+    df = df.sort_values(by='protssn_score', ascending=False)
     
     # Save results
     if args.output_csv is not None:

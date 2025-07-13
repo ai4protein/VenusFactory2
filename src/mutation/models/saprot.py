@@ -214,7 +214,8 @@ def main():
     # Calculate scores using the new function
     scores = saprot_score(args.pdb_file, mutants, args.chain, args.foldseek_path)
     df['saprot_score'] = scores
-
+    df = df.sort_values(by='saprot_score', ascending=False)
+    
     # Save results
     if args.output_csv is not None:
         df.to_csv(args.output_csv, index=False)

@@ -94,7 +94,8 @@ def main():
     # Calculate scores using the new function
     scores = mifst_score(args.pdb_file, mutants, args.model_location)
     df['mifst_score'] = scores
-
+    df = df.sort_values(by='mifst_score', ascending=False)
+    
     # Save results
     if args.output_csv is not None:
         df.to_csv(args.output_csv, index=False)

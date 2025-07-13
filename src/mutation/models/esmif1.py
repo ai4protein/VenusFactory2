@@ -163,9 +163,7 @@ def main():
     
     # Add scores to dataframe
     df['esmif1_score'] = scores
-    
-    # Sort by score (higher is better)
-    df = df.sort_values('esmif1_score', ascending=False)
+    df = df.sort_values(by='esmif1_score', ascending=False)
     
     # Save results
     if args.output_csv is not None:
