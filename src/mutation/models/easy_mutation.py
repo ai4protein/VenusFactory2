@@ -865,9 +865,6 @@ def easy_mutation_prediction(pdb_file: str, num_recommendations: int = 30,
     print(f"\n=== Summary ===")
     print(f"Total mutations processed: {len(df)}")
     print(f"Recommended mutations: {len(recommended_mutations)}")
-    print(f"Top 10 recommended mutations:")
-    for i, mut in enumerate(recommended_mutations[:10], 1):
-        print(f"  {i}. {mut}")
     
     return df, recommended_mutations
 
