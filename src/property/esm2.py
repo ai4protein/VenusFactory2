@@ -63,14 +63,14 @@ def load_model_and_tokenizer(args):
             print(f"Loaded configuration from {config_path}")
             for key, value in config.items():
                 setattr(args, key, value)
-            args.structure_seq = ""
+            # args.structure_seq = ""
     except FileNotFoundError:
         print(
             f"Model config not found at {config_path}. Using command line arguments only.")
 
     # Load PLM (Pre-trained Language Model).
     tokenizer = EsmTokenizer.from_pretrained("facebook/esm2_t33_650M_UR50D")
-    plm_model = EsmModel.from_pretrained("facebook/esm2_t33_650M_UR50D")
+    plm_model = EsmModel.from_pretrained("facebook/esm2_t33_650M_UR50D").to(device)
 
     # Instantiate AdapterModel and load the trained weights.
     model = AdapterModel(args)

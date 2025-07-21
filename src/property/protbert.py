@@ -72,7 +72,7 @@ def load_model_and_tokenizer(args):
 
 
     tokenizer = BertTokenizer.from_pretrained("Rostlab/prot_bert", do_lower_case=False)
-    plm_model = BertModel.from_pretrained("Rostlab/prot_bert")
+    plm_model = BertModel.from_pretrained("Rostlab/prot_bert").to(device)
 
     # Instantiate AdapterModel and load the trained weights.
     model = AdapterModel(args)

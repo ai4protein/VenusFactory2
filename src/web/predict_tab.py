@@ -1539,381 +1539,381 @@ def create_predict_tab(constant):
         preview_text = preview_predict_command(args_dict, is_batch=True)
         return gr.update(value=preview_text, visible=True)
 
-    with gr.Tab("Prediction"):
+    # with gr.Tab("Prediction"):
+    with gr.Row():
+        with gr.Column():
+            gr.Markdown("## 🎯 Protein Function Prediction")
+
+    gr.Markdown("### Model Configuration")
+    with gr.Group():
+
         with gr.Row():
-            with gr.Column():
-                gr.Markdown("## Protein Function Prediction")
+            model_path = gr.Textbox(
+                label="Model Path",
+                value="ckpt/demo/demo_solubility.pt",
+                placeholder="Path to the trained model"
+            )
+            plm_model = gr.Dropdown(
+                choices=list(plm_models.keys()),
+                label="Protein Language Model"
+            )
 
-        gr.Markdown("### Model Configuration")
-        with gr.Group():
 
+        with gr.Row():
+            eval_method = gr.Dropdown(
+                choices=["full", "freeze", "ses-adapter", "plm-lora", "plm-qlora", "plm_adalora", "plm_dora", "plm_ia3"],
+                label="Evaluation Method",
+                value="freeze"
+            )
+            pooling_method = gr.Dropdown(
+                choices=["mean", "attention1d", "light_attention"],
+                label="Pooling Method",
+                value="mean"
+            )
+
+
+        # Settings for different training methods
+        with gr.Row(visible=False) as structure_seq_row:
+            structure_seq = gr.Dropdown(
+                choices=["foldseek_seq", "ss8_seq"],
+                label="Structure Sequences",
+                multiselect=True,
+                value=["foldseek_seq", "ss8_seq"],
+                info="Select the structure sequences to use for prediction"
+            )
+
+        
+        with gr.Row():
+            problem_type = gr.Dropdown(
+                choices=["single_label_classification", "multi_label_classification", "regression"],
+                label="Problem Type",
+                value="single_label_classification"
+            )
+            num_labels = gr.Number(
+                value=2,
+                label="Number of Labels",
+                precision=0,
+                minimum=1
+            )
+        
+
+        with gr.Row():
+            otg_message = gr.HTML(
+                """
+                <style>
+                .csv-format-info {
+                    background-color: #ffffff;
+                }
+                </style>
+                """
+            )
+                
+    with gr.Tabs():
+        with gr.Tab("Sequence Prediction"):
+            gr.Markdown("### Input Sequences")
             with gr.Row():
-                model_path = gr.Textbox(
-                    label="Model Path",
-                    value="ckpt/demo/demo_solubility.pt",
-                    placeholder="Path to the trained model"
+                aa_seq = gr.Textbox(
+                    label="Amino Acid Sequence",
+                    placeholder="Enter protein sequence",
+                    lines=3
                 )
-                plm_model = gr.Dropdown(
-                    choices=list(plm_models.keys()),
-                    label="Protein Language Model"
+            # Put the structure input rows in a row with controllable visibility    
+            with gr.Row(visible=False) as structure_input_row:
+                foldseek_seq = gr.Textbox(
+                    label="Foldseek Sequence",
+                    placeholder="Enter foldseek sequence if available",
+                    lines=3
                 )
-
-
-            with gr.Row():
-                eval_method = gr.Dropdown(
-                    choices=["full", "freeze", "ses-adapter", "plm-lora", "plm-qlora", "plm_adalora", "plm_dora", "plm_ia3"],
-                    label="Evaluation Method",
-                    value="freeze"
+                ss8_seq = gr.Textbox(
+                    label="SS8 Sequence",
+                    placeholder="Enter secondary structure sequence if available",
+                    lines=3
                 )
-                pooling_method = gr.Dropdown(
-                    choices=["mean", "attention1d", "light_attention"],
-                    label="Pooling Method",
-                    value="mean"
-                )
-
-
-            # Settings for different training methods
-            with gr.Row(visible=False) as structure_seq_row:
-                structure_seq = gr.Dropdown(
-                    choices=["foldseek_seq", "ss8_seq"],
-                    label="Structure Sequences",
-                    multiselect=True,
-                    value=["foldseek_seq", "ss8_seq"],
-                    info="Select the structure sequences to use for prediction"
-                )
-
             
             with gr.Row():
-                problem_type = gr.Dropdown(
-                    choices=["single_label_classification", "multi_label_classification", "regression"],
-                    label="Problem Type",
-                    value="single_label_classification"
-                )
-                num_labels = gr.Number(
-                    value=2,
-                    label="Number of Labels",
-                    precision=0,
-                    minimum=1
-                )
+                preview_single_button = gr.Button("Preview Command")
+                predict_button = gr.Button("Predict", variant="primary")
+                abort_button = gr.Button("Abort", variant="stop")
             
-
-            with gr.Row():
-                otg_message = gr.HTML(
-                    """
-                    <style>
-                    .csv-format-info {
-                        background-color: #ffffff;
-                    }
-                    </style>
-                    """
-                )
-                    
-        with gr.Tabs():
-            with gr.Tab("Sequence Prediction"):
-                gr.Markdown("### Input Sequences")
-                with gr.Row():
-                    aa_seq = gr.Textbox(
-                        label="Amino Acid Sequence",
-                        placeholder="Enter protein sequence",
-                        lines=3
-                    )
-                # Put the structure input rows in a row with controllable visibility    
-                with gr.Row(visible=False) as structure_input_row:
-                    foldseek_seq = gr.Textbox(
-                        label="Foldseek Sequence",
-                        placeholder="Enter foldseek sequence if available",
-                        lines=3
-                    )
-                    ss8_seq = gr.Textbox(
-                        label="SS8 Sequence",
-                        placeholder="Enter secondary structure sequence if available",
-                        lines=3
-                    )
-                
-                with gr.Row():
-                    preview_single_button = gr.Button("Preview Command")
-                    predict_button = gr.Button("Predict", variant="primary")
-                    abort_button = gr.Button("Abort", variant="stop")
-                
-                # 添加命令预览区域
-                command_preview = gr.Code(
-                    label="Command Preview",
-                    language="shell",
-                    interactive=False,
-                    visible=False
-                )
-                predict_output = gr.HTML(label="Prediction Results")
-                
-                
-                
-                
-                predict_button.click(
-                    fn=predict_sequence,
-                    inputs=[
-                        plm_model,
-                        model_path,
-                        aa_seq,
-                        eval_method,
-                        structure_seq,
-                        pooling_method,
-                        problem_type,
-                        num_labels
-                    ],
-                    outputs=predict_output
-                )
-                
-                abort_button.click(
-                    fn=handle_abort_single,
-                    inputs=[],
-                    outputs=[predict_output]
-                )
+            # 添加命令预览区域
+            command_preview = gr.Code(
+                label="Command Preview",
+                language="shell",
+                interactive=False,
+                visible=False
+            )
+            predict_output = gr.HTML(label="Prediction Results")
             
-            with gr.Tab("Batch Prediction"):
-                gr.Markdown("### Batch Prediction")
-                # Display CSV format information with improved styling
-                gr.HTML("""
-                <div class="csv-format-info">
-                    <h4>CSV File Format Requirements</h4>
-                    <p class="format-description">Please prepare your input CSV file with the following columns:</p>
-                    <div class="csv-columns">
-                        <div class="column-item required">
-                            <div class="column-name">aa_seq (required)</div>
-                            <div class="column-desc">Amino acid sequence</div>
-                        </div>
-                        <div class="column-item optional">
-                            <div class="column-name">id (optional)</div>
-                            <div class="column-desc">Unique identifier for each sequence</div>
-                        </div>
-                        <div class="column-item optional">
-                            <div class="column-name">foldseek_seq (optional)</div>
-                            <div class="column-desc">Foldseek structure sequence</div>
-                        </div>
-                        <div class="column-item optional">
-                            <div class="column-name">ss8_seq (optional)</div>
-                            <div class="column-desc">Secondary structure sequence</div>
-                        </div>
+            
+            
+            
+            predict_button.click(
+                fn=predict_sequence,
+                inputs=[
+                    plm_model,
+                    model_path,
+                    aa_seq,
+                    eval_method,
+                    structure_seq,
+                    pooling_method,
+                    problem_type,
+                    num_labels
+                ],
+                outputs=predict_output
+            )
+            
+            abort_button.click(
+                fn=handle_abort_single,
+                inputs=[],
+                outputs=[predict_output]
+            )
+        
+        with gr.Tab("Batch Prediction"):
+            gr.Markdown("### Batch Prediction")
+            # Display CSV format information with improved styling
+            gr.HTML("""
+            <div class="csv-format-info">
+                <h4>CSV File Format Requirements</h4>
+                <p class="format-description">Please prepare your input CSV file with the following columns:</p>
+                <div class="csv-columns">
+                    <div class="column-item required">
+                        <div class="column-name">aa_seq (required)</div>
+                        <div class="column-desc">Amino acid sequence</div>
+                    </div>
+                    <div class="column-item optional">
+                        <div class="column-name">id (optional)</div>
+                        <div class="column-desc">Unique identifier for each sequence</div>
+                    </div>
+                    <div class="column-item optional">
+                        <div class="column-name">foldseek_seq (optional)</div>
+                        <div class="column-desc">Foldseek structure sequence</div>
+                    </div>
+                    <div class="column-item optional">
+                        <div class="column-name">ss8_seq (optional)</div>
+                        <div class="column-desc">Secondary structure sequence</div>
                     </div>
                 </div>
-                <style>
-                    .csv-format-info {
-                        background-color: #ffffff;
-                        border-radius: 8px;
-                        padding: 15px;
-                        margin: 0 0 15px 0;
-                    }
-                    .csv-format-info h4 {
-                        margin: 0 0 10px 0;
-                        color: #2c3e50;
-                        font-size: 16px;
-                    }
-                    .format-description {
-                        margin-bottom: 12px;
-                        color: #555;
-                        font-size: 14px;
-                    }
-                    .csv-columns {
-                        display: flex;
-                        flex-wrap: wrap;
-                        gap: 10px;
-                        margin-bottom: 10px;
-                    }
-                    .column-item {
-                        background-color: white;
-                        border-radius: 6px;
-                        padding: 10px;
-                        flex: 1 1 200px;
-                        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                        transition: transform 0.2s ease;
-                    }
-                    .column-item:hover {
-                        transform: translateY(-2px);
-                    }
-                    .column-item.required {
-                        border-left: 3px solid #3498db;
-                    }
-                    .column-item.optional {
-                        border-left: 3px solid #27ae60;
-                    }
-                    .column-name {
-                        font-family: monospace;
-                        font-weight: bold;
-                        margin-bottom: 5px;
-                        color: #2c3e50;
-                        font-size: 14px;
-                    }
-                    .column-desc {
-                        font-size: 13px;
-                        color: #7f8c8d;
-                        line-height: 1.3;
-                    }
-                    .csv-example {
-                        background-color: #e9ecef;
-                        border-radius: 6px;
-                        padding: 10px;
-                        margin-top: 8px;
-                    }
-                </style>
-                """)
-                    
+            </div>
+            <style>
+                .csv-format-info {
+                    background-color: #ffffff;
+                    border-radius: 8px;
+                    padding: 15px;
+                    margin: 0 0 15px 0;
+                }
+                .csv-format-info h4 {
+                    margin: 0 0 10px 0;
+                    color: #2c3e50;
+                    font-size: 16px;
+                }
+                .format-description {
+                    margin-bottom: 12px;
+                    color: #555;
+                    font-size: 14px;
+                }
+                .csv-columns {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 10px;
+                    margin-bottom: 10px;
+                }
+                .column-item {
+                    background-color: white;
+                    border-radius: 6px;
+                    padding: 10px;
+                    flex: 1 1 200px;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                    transition: transform 0.2s ease;
+                }
+                .column-item:hover {
+                    transform: translateY(-2px);
+                }
+                .column-item.required {
+                    border-left: 3px solid #3498db;
+                }
+                .column-item.optional {
+                    border-left: 3px solid #27ae60;
+                }
+                .column-name {
+                    font-family: monospace;
+                    font-weight: bold;
+                    margin-bottom: 5px;
+                    color: #2c3e50;
+                    font-size: 14px;
+                }
+                .column-desc {
+                    font-size: 13px;
+                    color: #7f8c8d;
+                    line-height: 1.3;
+                }
+                .csv-example {
+                    background-color: #e9ecef;
+                    border-radius: 6px;
+                    padding: 10px;
+                    margin-top: 8px;
+                }
+            </style>
+            """)
+                
+            with gr.Row():
+                input_file = gr.UploadButton(
+                    label="Upload CSV File",
+                    file_types=[".csv"],
+                    file_count="single"
+                )
+            
+            # File preview accordion
+            with gr.Accordion("File Preview", open=False) as file_preview_accordion:
+                # File info area
                 with gr.Row():
-                    input_file = gr.UploadButton(
-                        label="Upload CSV File",
-                        file_types=[".csv"],
-                        file_count="single"
+                    file_info = gr.HTML("", elem_classes=["dataset-stats"])
+                
+                # Table area
+                with gr.Row():
+                    file_preview = gr.Dataframe(
+                        headers=["name", "sequence"],
+                        value=[["No file uploaded", "-"]],
+                        wrap=True,
+                        interactive=False,
+                        row_count=5,
+                        elem_classes=["preview-table"]
                     )
-                
-                # File preview accordion
-                with gr.Accordion("File Preview", open=False) as file_preview_accordion:
-                    # File info area
-                    with gr.Row():
-                        file_info = gr.HTML("", elem_classes=["dataset-stats"])
-                    
-                    # Table area
-                    with gr.Row():
-                        file_preview = gr.Dataframe(
-                            headers=["name", "sequence"],
-                            value=[["No file uploaded", "-"]],
-                            wrap=True,
-                            interactive=False,
-                            row_count=5,
-                            elem_classes=["preview-table"]
-                        )
-                
-                # Add file preview function
-                def update_file_preview(file):
-                    if file is None:
-                        return gr.update(value="<div class='file-info'>No file uploaded</div>"), gr.update(value=[["No file uploaded", "-"]], headers=["name", "sequence"]), gr.update(open=False)
-                    try:
-                        df = pd.read_csv(file.name)
-                        info_html = f"""
-                        <div style="text-align: center; margin: 20px 0;">
-                            <table style="width: 100%; border-collapse: collapse; margin: 0 auto;">
-                                <tr>
-                                    <th style="padding: 8px; font-size: 14px; border: 1px solid #ddd; background-color: #e0e0e0; font-weight: bold; border-bottom: 1px solid #ccc; text-align: center;">File</th>
-                                    <th style="padding: 8px; font-size: 14px; border: 1px solid #ddd; background-color: #e0e0e0; font-weight: bold; border-bottom: 1px solid #ccc; text-align: center;">Total Sequences</th>
-                                    <th style="padding: 8px; font-size: 14px; border: 1px solid #ddd; background-color: #e0e0e0; font-weight: bold; border-bottom: 1px solid #ccc; text-align: center;">Columns</th>
-                                </tr>
-                                <tr>
-                                    <td style="padding: 15px; font-size: 14px; border: 1px solid #ddd; text-align: center;">{file.name.split('/')[-1]}</td>
-                                    <td style="padding: 15px; font-size: 14px; border: 1px solid #ddd; text-align: center;">{len(df)}</td>
-                                    <td style="padding: 15px; font-size: 14px; border: 1px solid #ddd; text-align: center;">{', '.join(df.columns.tolist())}</td>
-                                </tr>
-                            </table>
-                        </div>
-                        """
-                        return gr.update(value=info_html), gr.update(value=df.head(5).values.tolist(), headers=df.columns.tolist()), gr.update(open=True)
-                    except Exception as e:
-                        error_html = f"""
-                        <div>
-                            <h2>Error reading file</h2>
-                            <p style="color: #c62828;">{str(e)}</p>
-                        </div>
-                        """
-                        return gr.update(value=error_html), gr.update(value=[["Error", str(e)]], headers=["Error", "Message"]), gr.update(open=True)
-                
-                # Use upload event instead of click event
-                input_file.upload(
-                    fn=update_file_preview,
-                    inputs=[input_file],
-                    outputs=[file_info, file_preview, file_preview_accordion]
-                )
-                with gr.Row():
-                    with gr.Column(scale=1):
-                        batch_size = gr.Slider(
-                            minimum=1,
-                            maximum=32,
-                            value=8,
-                            step=1,
-                            label="Batch Size",
-                            info="Number of sequences to process at once"
-                        )
-                
-                with gr.Row():
-                    preview_batch_button = gr.Button("Preview Command")
-                    batch_predict_button = gr.Button("Start Batch Prediction", variant="primary")
-                    batch_abort_button = gr.Button("Abort", variant="stop")
-                
-                # 添加命令预览区域
-                batch_command_preview = gr.Code(
-                    label="Command Preview",
-                    language="shell",
-                    interactive=False,
-                    visible=False
-                )
-                batch_predict_output = gr.HTML(label="Prediction Progress")
-                result_file = gr.DownloadButton(label="Download Predictions", visible=False)
+            
+            # Add file preview function
+            def update_file_preview(file):
+                if file is None:
+                    return gr.update(value="<div class='file-info'>No file uploaded</div>"), gr.update(value=[["No file uploaded", "-"]], headers=["name", "sequence"]), gr.update(open=False)
+                try:
+                    df = pd.read_csv(file.name)
+                    info_html = f"""
+                    <div style="text-align: center; margin: 20px 0;">
+                        <table style="width: 100%; border-collapse: collapse; margin: 0 auto;">
+                            <tr>
+                                <th style="padding: 8px; font-size: 14px; border: 1px solid #ddd; background-color: #e0e0e0; font-weight: bold; border-bottom: 1px solid #ccc; text-align: center;">File</th>
+                                <th style="padding: 8px; font-size: 14px; border: 1px solid #ddd; background-color: #e0e0e0; font-weight: bold; border-bottom: 1px solid #ccc; text-align: center;">Total Sequences</th>
+                                <th style="padding: 8px; font-size: 14px; border: 1px solid #ddd; background-color: #e0e0e0; font-weight: bold; border-bottom: 1px solid #ccc; text-align: center;">Columns</th>
+                            </tr>
+                            <tr>
+                                <td style="padding: 15px; font-size: 14px; border: 1px solid #ddd; text-align: center;">{file.name.split('/')[-1]}</td>
+                                <td style="padding: 15px; font-size: 14px; border: 1px solid #ddd; text-align: center;">{len(df)}</td>
+                                <td style="padding: 15px; font-size: 14px; border: 1px solid #ddd; text-align: center;">{', '.join(df.columns.tolist())}</td>
+                            </tr>
+                        </table>
+                    </div>
+                    """
+                    return gr.update(value=info_html), gr.update(value=df.head(5).values.tolist(), headers=df.columns.tolist()), gr.update(open=True)
+                except Exception as e:
+                    error_html = f"""
+                    <div>
+                        <h2>Error reading file</h2>
+                        <p style="color: #c62828;">{str(e)}</p>
+                    </div>
+                    """
+                    return gr.update(value=error_html), gr.update(value=[["Error", str(e)]], headers=["Error", "Message"]), gr.update(open=True)
+            
+            # Use upload event instead of click event
+            input_file.upload(
+                fn=update_file_preview,
+                inputs=[input_file],
+                outputs=[file_info, file_preview, file_preview_accordion]
+            )
+            with gr.Row():
+                with gr.Column(scale=1):
+                    batch_size = gr.Slider(
+                        minimum=1,
+                        maximum=32,
+                        value=8,
+                        step=1,
+                        label="Batch Size",
+                        info="Number of sequences to process at once"
+                    )
+            
+            with gr.Row():
+                preview_batch_button = gr.Button("Preview Command")
+                batch_predict_button = gr.Button("Start Batch Prediction", variant="primary")
+                batch_abort_button = gr.Button("Abort", variant="stop")
+            
+            # 添加命令预览区域
+            batch_command_preview = gr.Code(
+                label="Command Preview",
+                language="shell",
+                interactive=False,
+                visible=False
+            )
+            batch_predict_output = gr.HTML(label="Prediction Progress")
+            result_file = gr.DownloadButton(label="Download Predictions", visible=False)
 
-                # 在UI部分添加命令预览的可见性控制
-                def toggle_preview(button_text):
-                    """切换命令预览的可见性"""
-                    if "Preview" in button_text:
-                        return gr.update(visible=True)
-                    return gr.update(visible=False)
-                
-                # 连接预览按钮
-                preview_single_button.click(
-                    fn=toggle_preview,
-                    inputs=[preview_single_button],
-                    outputs=[command_preview]
-                ).then(
-                    fn=handle_preview,
-                    inputs=[
-                        plm_model,
-                        model_path,
-                        eval_method,
-                        aa_seq,
-                        foldseek_seq,
-                        ss8_seq,
-                        structure_seq,
-                        pooling_method,
-                        problem_type,
-                        num_labels
-                    ],
-                    outputs=[command_preview]
-                )
-                
-                # 连接预览按钮
-                preview_batch_button.click(
-                    fn=toggle_preview,
-                    inputs=[preview_batch_button],
-                    outputs=[batch_command_preview]
-                ).then(
-                    fn=handle_batch_preview,
-                    inputs=[
-                        plm_model,
-                        model_path,
-                        eval_method,
-                        input_file,
-                        structure_seq,
-                        pooling_method,
-                        problem_type,
-                        num_labels,
-                        batch_size
-                    ],
-                    outputs=[batch_command_preview]
-                )
-                
-                batch_predict_button.click(
-                    fn=predict_batch,
-                    inputs=[
-                        plm_model,
-                        model_path,
-                        eval_method,
-                        input_file,
-                        structure_seq,
-                        pooling_method,
-                        problem_type,
-                        num_labels,
-                        batch_size
-                    ],
-                    outputs=[batch_predict_output, result_file]
-                )
-                
-                batch_abort_button.click(
-                    fn=handle_abort_batch,
-                    inputs=[],
-                    outputs=[batch_predict_output, result_file]
-                )
+            # 在UI部分添加命令预览的可见性控制
+            def toggle_preview(button_text):
+                """切换命令预览的可见性"""
+                if "Preview" in button_text:
+                    return gr.update(visible=True)
+                return gr.update(visible=False)
+            
+            # 连接预览按钮
+            preview_single_button.click(
+                fn=toggle_preview,
+                inputs=[preview_single_button],
+                outputs=[command_preview]
+            ).then(
+                fn=handle_preview,
+                inputs=[
+                    plm_model,
+                    model_path,
+                    eval_method,
+                    aa_seq,
+                    foldseek_seq,
+                    ss8_seq,
+                    structure_seq,
+                    pooling_method,
+                    problem_type,
+                    num_labels
+                ],
+                outputs=[command_preview]
+            )
+            
+            # 连接预览按钮
+            preview_batch_button.click(
+                fn=toggle_preview,
+                inputs=[preview_batch_button],
+                outputs=[batch_command_preview]
+            ).then(
+                fn=handle_batch_preview,
+                inputs=[
+                    plm_model,
+                    model_path,
+                    eval_method,
+                    input_file,
+                    structure_seq,
+                    pooling_method,
+                    problem_type,
+                    num_labels,
+                    batch_size
+                ],
+                outputs=[batch_command_preview]
+            )
+            
+            batch_predict_button.click(
+                fn=predict_batch,
+                inputs=[
+                    plm_model,
+                    model_path,
+                    eval_method,
+                    input_file,
+                    structure_seq,
+                    pooling_method,
+                    problem_type,
+                    num_labels,
+                    batch_size
+                ],
+                outputs=[batch_predict_output, result_file]
+            )
+            
+            batch_abort_button.click(
+                fn=handle_abort_batch,
+                inputs=[],
+                outputs=[batch_predict_output, result_file]
+            )
 
     # Add this code after all UI components are defined
     def update_eval_method(method):

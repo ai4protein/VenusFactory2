@@ -73,7 +73,7 @@ def load_model_and_tokenizer(args):
 
     # Load PLM (Pre-trained Language Model).
     tokenizer = T5Tokenizer.from_pretrained("Rostlab/prot_t5_xl_uniref50", do_lower_case=False)
-    plm_model = T5EncoderModel.from_pretrained("Rostlab/prot_t5_xl_uniref50")
+    plm_model = T5EncoderModel.from_pretrained("Rostlab/prot_t5_xl_uniref50").to(device)
 
     # Instantiate AdapterModel and load the trained weights.
     model = AdapterModel(args)

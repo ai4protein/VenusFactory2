@@ -159,138 +159,138 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     plm_models = constant["plm_models"]
     dataset_configs = constant["dataset_configs"]
 
-    with gr.Tab("Training"):
-        # Model and Dataset Selection
-        gr.Markdown("### Model and Dataset Configuration")
+    # with gr.Tab("Training"):
+    # Model and Dataset Selection
+    gr.Markdown("### Model and Dataset Configuration")
 
-        # Original training interface components
-        with gr.Group():
-            with gr.Row():
-                with gr.Column(scale=4):
-                    with gr.Row():
-                        plm_model = gr.Dropdown(
-                            choices=list(plm_models.keys()),
-                            label="Protein Language Model",
-                            value=list(plm_models.keys())[0],
-                            scale=2
-                        )
+    # Original training interface components
+    with gr.Group():
+        with gr.Row():
+            with gr.Column(scale=4):
+                with gr.Row():
+                    plm_model = gr.Dropdown(
+                        choices=list(plm_models.keys()),
+                        label="Protein Language Model",
+                        value=list(plm_models.keys())[0],
+                        scale=2
+                    )
+                
+                    # add dataset selection method
+                    is_custom_dataset = gr.Radio(
+                        choices=["Use Custom Dataset", "Use Pre-defined Dataset"],
+                        label="Dataset Selection",
+                        value="Use Pre-defined Dataset",
+                        scale=3
+                    )
+            
+                    dataset_config = gr.Dropdown(
+                        choices=list(dataset_configs.keys()),
+                        label="Dataset Configuration",
+                        value=list(dataset_configs.keys())[0],
+                        visible=True,
+                        scale=2
+                    )
                     
-                        # add dataset selection method
-                        is_custom_dataset = gr.Radio(
-                            choices=["Use Custom Dataset", "Use Pre-defined Dataset"],
-                            label="Dataset Selection",
-                            value="Use Pre-defined Dataset",
-                            scale=3
-                        )
-                
-                        dataset_config = gr.Dropdown(
-                            choices=list(dataset_configs.keys()),
-                            label="Dataset Configuration",
-                            value=list(dataset_configs.keys())[0],
-                            visible=True,
-                            scale=2
-                        )
-                        
-                        dataset_custom = gr.Textbox(
-                            label="Dataset Path (Local Path or Huggingface path)",
-                            placeholder="Huggingface Dataset eg: user/dataset",
-                            visible=False,
-                            scale=2
-                        )
-                
-                # add preview button in a separate column and add style
-                with gr.Column(scale=1, min_width=120, elem_classes="preview-button-container"):
-                    dataset_preview_button = gr.Button(
-                        "Preview Dataset", 
-                        variant="primary", 
-                        size="lg",
-                        elem_classes="preview-button"
+                    dataset_custom = gr.Textbox(
+                        label="Dataset Path (Local Path or Huggingface path)",
+                        placeholder="Huggingface Dataset eg: user/dataset",
+                        visible=False,
+                        scale=2
                     )
-                
-            # add extra configuration options for custom dataset (in a separate row)
-            with gr.Group(visible=True) as custom_dataset_settings:
-                with gr.Row():
-                    problem_type = gr.Dropdown(
-                        choices=["single_label_classification", "multi_label_classification", "regression"],
-                        label="Problem Type",
-                        value="single_label_classification",
-                        scale=23,
-                        interactive=False   
-                    )
-                    num_labels = gr.Number(
-                        value=2,
-                        label="Number of Labels",
-                        scale=11,
-                        interactive=False
-                    )
-                    metrics = gr.Dropdown(
-                        choices=["accuracy", "recall", "precision", "f1", "mcc", "auroc", "f1_max", "spearman_corr", "mse"],
-                        label="Metrics",
-                        value=["accuracy", "mcc", "f1", "precision", "recall", "auroc"],
-                        scale=101,
-                        multiselect=True,
-                        interactive=False
-                    )
-                
-                with gr.Row():
-                    monitored_metrics = gr.Dropdown(
-                        choices=["accuracy", "recall", "precision", "f1", "mcc", "auroc", "f1_max", "spearman_corr", "mse"],
-                        label="Monitored Metrics",
-                        value="accuracy",
-                        scale=10,
-                        multiselect=False,
-                        interactive=False
-                    )
-                    monitored_strategy = gr.Dropdown(
-                        choices=["max", "min"],
-                        label="Monitored Strategy",
-                        value="max",
-                        scale=10,
-                        interactive=False
-                    )
-
+            
+            # add preview button in a separate column and add style
+            with gr.Column(scale=1, min_width=120, elem_classes="preview-button-container"):
+                dataset_preview_button = gr.Button(
+                    "Preview Dataset", 
+                    variant="primary", 
+                    size="lg",
+                    elem_classes="preview-button"
+                )
+            
+        # add extra configuration options for custom dataset (in a separate row)
+        with gr.Group(visible=True) as custom_dataset_settings:
             with gr.Row():
-                    structure_seq = gr.Dropdown(
-                        label="Structure Sequence", 
-                        choices=["foldseek_seq", "ss8_seq"],
-                        value=["foldseek_seq", "ss8_seq"],
-                        multiselect=True,
-                        visible=False
-                    )
+                problem_type = gr.Dropdown(
+                    choices=["single_label_classification", "multi_label_classification", "regression"],
+                    label="Problem Type",
+                    value="single_label_classification",
+                    scale=23,
+                    interactive=False   
+                )
+                num_labels = gr.Number(
+                    value=2,
+                    label="Number of Labels",
+                    scale=11,
+                    interactive=False
+                )
+                metrics = gr.Dropdown(
+                    choices=["accuracy", "recall", "precision", "f1", "mcc", "auroc", "f1_max", "spearman_corr", "mse"],
+                    label="Metrics",
+                    value=["accuracy", "mcc", "f1", "precision", "recall", "auroc"],
+                    scale=101,
+                    multiselect=True,
+                    interactive=False
+                )
+            
+            with gr.Row():
+                monitored_metrics = gr.Dropdown(
+                    choices=["accuracy", "recall", "precision", "f1", "mcc", "auroc", "f1_max", "spearman_corr", "mse"],
+                    label="Monitored Metrics",
+                    value="accuracy",
+                    scale=10,
+                    multiselect=False,
+                    interactive=False
+                )
+                monitored_strategy = gr.Dropdown(
+                    choices=["max", "min"],
+                    label="Monitored Strategy",
+                    value="max",
+                    scale=10,
+                    interactive=False
+                )
 
-            # ! add for plm-lora, plm-qlora, plm_adalora, plm_dora, plm_ia3
-            with gr.Row(visible=False) as lora_params_row:
-                # gr.Markdown("#### LoRA Parameters")
-                with gr.Column():
-                    lora_r = gr.Number(
-                        value=8,
-                        label="LoRA Rank",
-                        precision=0,
-                        minimum=1,
-                        maximum=128,
-                    )
-                with gr.Column():
-                    lora_alpha = gr.Number(
-                        value=32,
-                        label="LoRA Alpha",
-                        precision=0,
-                        minimum=1,
-                        maximum=128
-                    )
-                with gr.Column():
-                    lora_dropout = gr.Number(
-                        value=0.1,
-                        label="LoRA Dropout",
-                        minimum=0.0,
-                        maximum=1.0
-                    )
-                with gr.Column():
-                    lora_target_modules = gr.Textbox(
-                        value="query,key,value",
-                        label="LoRA Target Modules",
-                        placeholder="Comma-separated list of target modules",
-                        # info="LoRA will be applied to these modules"
-                    )
+        with gr.Row():
+                structure_seq = gr.Dropdown(
+                    label="Structure Sequence", 
+                    choices=["foldseek_seq", "ss8_seq"],
+                    value=["foldseek_seq", "ss8_seq"],
+                    multiselect=True,
+                    visible=False
+                )
+
+        # ! add for plm-lora, plm-qlora, plm_adalora, plm_dora, plm_ia3
+        with gr.Row(visible=False) as lora_params_row:
+            # gr.Markdown("#### LoRA Parameters")
+            with gr.Column():
+                lora_r = gr.Number(
+                    value=8,
+                    label="LoRA Rank",
+                    precision=0,
+                    minimum=1,
+                    maximum=128,
+                )
+            with gr.Column():
+                lora_alpha = gr.Number(
+                    value=32,
+                    label="LoRA Alpha",
+                    precision=0,
+                    minimum=1,
+                    maximum=128
+                )
+            with gr.Column():
+                lora_dropout = gr.Number(
+                    value=0.1,
+                    label="LoRA Dropout",
+                    minimum=0.0,
+                    maximum=1.0
+                )
+            with gr.Column():
+                lora_target_modules = gr.Textbox(
+                    value="query,key,value",
+                    label="LoRA Target Modules",
+                    placeholder="Comma-separated list of target modules",
+                    # info="LoRA will be applied to these modules"
+                )
 
         # put data statistics and table into accordion panel
         with gr.Row():

@@ -281,214 +281,214 @@ def create_download_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             return f"Error visualizing structure: {str(e)}", None
 
     # Create the main download tab
-    with gr.Tab("Download"):
+    # with gr.Tab("Download"):
+    with gr.Row():
+        with gr.Column():
+            gr.Markdown("### Download Protein Data (See help for more details)")
+            
+    # InterPro Metadata tab
+    with gr.Tab("InterPro Metadata"):
         with gr.Row():
-            with gr.Column():
-                gr.Markdown("### Download Protein Data (See help for more details)")
-                
-        # InterPro Metadata tab
-        with gr.Tab("InterPro Metadata"):
-            with gr.Row():
-                interpro_method = gr.Radio(
-                    choices=["Single ID", "From JSON"],
-                    label="Download Method",
-                    value="Single ID"
-                )
-            
-            with gr.Column():
-                interpro_id = gr.Textbox(label="InterPro ID", value="IPR000001")
-                interpro_json = gr.Textbox(label="InterPro JSON Path", value="download/interpro_domain/interpro_json.customization", visible=False)
-                interpro_out = gr.Textbox(label="Output Directory", value="download/interpro_domain")
-                interpro_error = gr.Checkbox(label="Save error file", value=True)
-                interpro_btn = gr.Button("Download InterPro Data")
-                interpro_output = gr.Textbox(label="Output", interactive=False)
-
-            def update_interpro_visibility(method):
-                """Update visibility of InterPro input fields based on selected method"""
-                return {
-                    interpro_id: gr.update(visible=(method == "Single ID")),
-                    interpro_json: gr.update(visible=(method == "From JSON"))
-                }
-            
-            interpro_method.change(
-                fn=update_interpro_visibility,
-                inputs=[interpro_method],
-                outputs=[interpro_id, interpro_json]
+            interpro_method = gr.Radio(
+                choices=["Single ID", "From JSON"],
+                label="Download Method",
+                value="Single ID"
             )
+        
+        with gr.Column():
+            interpro_id = gr.Textbox(label="InterPro ID", value="IPR000001")
+            interpro_json = gr.Textbox(label="InterPro JSON Path", value="download/interpro_domain/interpro_json.customization", visible=False)
+            interpro_out = gr.Textbox(label="Output Directory", value="download/interpro_domain")
+            interpro_error = gr.Checkbox(label="Save error file", value=True)
+            interpro_btn = gr.Button("Download InterPro Data")
+            interpro_output = gr.Textbox(label="Output", interactive=False)
 
-        # RCSB Metadata tab
-        with gr.Tab("RCSB Metadata"):
-            with gr.Row():
-                rcsb_method = gr.Radio(
-                    choices=["Single ID", "From File"],
-                    label="Download Method",
-                    value="Single ID"
-                )
-            
-            with gr.Column():
-                rcsb_id = gr.Textbox(label="PDB ID", value="1a0j")
-                rcsb_file = gr.Textbox(label="PDB List File", value="download/rcsb.txt", visible=False)
-                rcsb_out = gr.Textbox(label="Output Directory", value="download/rcsb_metadata")
-                rcsb_error = gr.Checkbox(label="Save error file", value=True)
-                rcsb_btn = gr.Button("Download RCSB Metadata")
-                rcsb_output = gr.Textbox(label="Output", interactive=False)
+        def update_interpro_visibility(method):
+            """Update visibility of InterPro input fields based on selected method"""
+            return {
+                interpro_id: gr.update(visible=(method == "Single ID")),
+                interpro_json: gr.update(visible=(method == "From JSON"))
+            }
+        
+        interpro_method.change(
+            fn=update_interpro_visibility,
+            inputs=[interpro_method],
+            outputs=[interpro_id, interpro_json]
+        )
 
-            def update_rcsb_visibility(method):
-                """Update visibility of RCSB input fields based on selected method"""
-                return {
-                    rcsb_id: gr.update(visible=(method == "Single ID")),
-                    rcsb_file: gr.update(visible=(method == "From File"))
-                }
-            
-            rcsb_method.change(
-                fn=update_rcsb_visibility,
-                inputs=[rcsb_method],
-                outputs=[rcsb_id, rcsb_file]
+    # RCSB Metadata tab
+    with gr.Tab("RCSB Metadata"):
+        with gr.Row():
+            rcsb_method = gr.Radio(
+                choices=["Single ID", "From File"],
+                label="Download Method",
+                value="Single ID"
             )
+        
+        with gr.Column():
+            rcsb_id = gr.Textbox(label="PDB ID", value="1a0j")
+            rcsb_file = gr.Textbox(label="PDB List File", value="download/rcsb.txt", visible=False)
+            rcsb_out = gr.Textbox(label="Output Directory", value="download/rcsb_metadata")
+            rcsb_error = gr.Checkbox(label="Save error file", value=True)
+            rcsb_btn = gr.Button("Download RCSB Metadata")
+            rcsb_output = gr.Textbox(label="Output", interactive=False)
 
-        # UniProt Sequences tab
-        with gr.Tab("UniProt Sequences"):
-            with gr.Row():
-                uniprot_method = gr.Radio(
-                    choices=["Single ID", "From File"],
-                    label="Download Method",
-                    value="Single ID"
-                )
-            
-            with gr.Column():
-                uniprot_id = gr.Textbox(label="UniProt ID", value="P00734")
-                uniprot_file = gr.Textbox(label="UniProt ID List File", value="download/uniprot.txt", visible=False)
-                uniprot_out = gr.Textbox(label="Output Directory", value="download/uniprot_sequences")
-                uniprot_merge = gr.Checkbox(label="Merge into single FASTA", value=False)
-                uniprot_error = gr.Checkbox(label="Save error file", value=True)
-                uniprot_btn = gr.Button("Download UniProt Sequences")
-                uniprot_output = gr.Textbox(label="Output", interactive=False)
+        def update_rcsb_visibility(method):
+            """Update visibility of RCSB input fields based on selected method"""
+            return {
+                rcsb_id: gr.update(visible=(method == "Single ID")),
+                rcsb_file: gr.update(visible=(method == "From File"))
+            }
+        
+        rcsb_method.change(
+            fn=update_rcsb_visibility,
+            inputs=[rcsb_method],
+            outputs=[rcsb_id, rcsb_file]
+        )
 
-            def update_uniprot_visibility(method):
-                """Update visibility of UniProt input fields based on selected method"""
-                return {
-                    uniprot_id: gr.update(visible=(method == "Single ID")),
-                    uniprot_file: gr.update(visible=(method == "From File"))
-                }
-            
-            uniprot_method.change(
-                fn=update_uniprot_visibility,
-                inputs=[uniprot_method],
-                outputs=[uniprot_id, uniprot_file]
+    # UniProt Sequences tab
+    with gr.Tab("UniProt Sequences"):
+        with gr.Row():
+            uniprot_method = gr.Radio(
+                choices=["Single ID", "From File"],
+                label="Download Method",
+                value="Single ID"
             )
+        
+        with gr.Column():
+            uniprot_id = gr.Textbox(label="UniProt ID", value="P00734")
+            uniprot_file = gr.Textbox(label="UniProt ID List File", value="download/uniprot.txt", visible=False)
+            uniprot_out = gr.Textbox(label="Output Directory", value="download/uniprot_sequences")
+            uniprot_merge = gr.Checkbox(label="Merge into single FASTA", value=False)
+            uniprot_error = gr.Checkbox(label="Save error file", value=True)
+            uniprot_btn = gr.Button("Download UniProt Sequences")
+            uniprot_output = gr.Textbox(label="Output", interactive=False)
 
-        # RCSB Structures tab
-        with gr.Tab("RCSB Structures"):
-            with gr.Row():
-                # Left column for inputs
-                with gr.Column(scale=3):
-                    with gr.Group():  # Group for better visual separation
-                        struct_method = gr.Radio(
-                            choices=["Single ID", "From File"],
-                            label="Download Method",
-                            value="Single ID"
+        def update_uniprot_visibility(method):
+            """Update visibility of UniProt input fields based on selected method"""
+            return {
+                uniprot_id: gr.update(visible=(method == "Single ID")),
+                uniprot_file: gr.update(visible=(method == "From File"))
+            }
+        
+        uniprot_method.change(
+            fn=update_uniprot_visibility,
+            inputs=[uniprot_method],
+            outputs=[uniprot_id, uniprot_file]
+        )
+
+    # RCSB Structures tab
+    with gr.Tab("RCSB Structures"):
+        with gr.Row():
+            # Left column for inputs
+            with gr.Column(scale=3):
+                with gr.Group():  # Group for better visual separation
+                    struct_method = gr.Radio(
+                        choices=["Single ID", "From File"],
+                        label="Download Method",
+                        value="Single ID"
+                    )
+                    
+                    # Input parameters section with consistent spacing
+                    with gr.Row():
+                        struct_id = gr.Textbox(label="PDB ID", value="1a0j")
+                    
+                    with gr.Row():
+                        struct_file = gr.Textbox(label="PDB List File", value="download/rcsb.txt", visible=False)
+                    
+                    with gr.Row():
+                        struct_out = gr.Textbox(label="Output Directory", value="download/rcsb_structures")
+                    
+                    with gr.Row():
+                        struct_type = gr.Dropdown(
+                            choices=["cif", "pdb", "pdb1", "xml", "sf", "mr", "mrstr"], 
+                            value="pdb", 
+                            label="Structure Type"
                         )
-                        
-                        # Input parameters section with consistent spacing
-                        with gr.Row():
-                            struct_id = gr.Textbox(label="PDB ID", value="1a0j")
-                        
-                        with gr.Row():
-                            struct_file = gr.Textbox(label="PDB List File", value="download/rcsb.txt", visible=False)
-                        
-                        with gr.Row():
-                            struct_out = gr.Textbox(label="Output Directory", value="download/rcsb_structures")
-                        
-                        with gr.Row():
-                            struct_type = gr.Dropdown(
-                                choices=["cif", "pdb", "pdb1", "xml", "sf", "mr", "mrstr"], 
-                                value="pdb", 
-                                label="Structure Type"
-                            )
-                        
-                        with gr.Row():
-                            with gr.Column(scale=1):
-                                struct_unzip = gr.Checkbox(label="Unzip downloaded files", value=True)
-                            with gr.Column(scale=1):
-                                struct_error = gr.Checkbox(label="Save error file", value=True)
-                        
-                        with gr.Row():
-                            struct_btn = gr.Button("Download RCSB Structures", size="lg")
-                        
-                        # Output section
-                        struct_output = gr.Textbox(label="Download Output", interactive=False, lines=4)
-                        struct_viz_status = gr.Textbox(label="Visualization Status", interactive=False)
-                
-                # Right column for visualization
-                with gr.Column(scale=5):
-                    # Visualization section with full height
-                    struct_viz = gr.Plot(label="Structure Visualization", elem_id="struct_viz_plot")
-
-            def update_struct_visibility(method):
-                """Update visibility of RCSB structure input fields based on selected method"""
-                return {
-                    struct_id: gr.update(visible=(method == "Single ID")),
-                    struct_file: gr.update(visible=(method == "From File"))
-                }
+                    
+                    with gr.Row():
+                        with gr.Column(scale=1):
+                            struct_unzip = gr.Checkbox(label="Unzip downloaded files", value=True)
+                        with gr.Column(scale=1):
+                            struct_error = gr.Checkbox(label="Save error file", value=True)
+                    
+                    with gr.Row():
+                        struct_btn = gr.Button("Download RCSB Structures", size="lg")
+                    
+                    # Output section
+                    struct_output = gr.Textbox(label="Download Output", interactive=False, lines=4)
+                    struct_viz_status = gr.Textbox(label="Visualization Status", interactive=False)
             
-            struct_method.change(
-                fn=update_struct_visibility,
-                inputs=[struct_method],
-                outputs=[struct_id, struct_file]
-            )
+            # Right column for visualization
+            with gr.Column(scale=5):
+                # Visualization section with full height
+                struct_viz = gr.Plot(label="Structure Visualization", elem_id="struct_viz_plot")
 
-        # AlphaFold2 Structures tab
-        with gr.Tab("AlphaFold2 Structures"):
-            with gr.Row():
-                # Left column for inputs
-                with gr.Column(scale=3):
-                    with gr.Group():  # Group for better visual separation
-                        af_method = gr.Radio(
-                            choices=["Single ID", "From File"],
-                            label="Download Method",
-                            value="Single ID"
-                        )
-                        
-                        # Input parameters section with consistent spacing
-                        with gr.Row():
-                            af_id = gr.Textbox(label="UniProt ID", value="P00734")
-                        
-                        with gr.Row():
-                            af_file = gr.Textbox(label="UniProt ID List File", value="download/uniprot.txt", visible=False)
-                        
-                        with gr.Row():
-                            af_out = gr.Textbox(label="Output Directory", value="download/alphafold2_structures")
-                        
-                        with gr.Row():
-                            af_index_level = gr.Number(label="Index Level", value=0, precision=0)
-                        
-                        with gr.Row():
-                            af_error = gr.Checkbox(label="Save error file", value=True)
-                        
-                        with gr.Row():
-                            af_btn = gr.Button("Download AlphaFold Structures", size="lg")
-                        
-                        # Output section
-                        af_output = gr.Textbox(label="Download Output", interactive=False, lines=4)
-                        af_viz_status = gr.Textbox(label="Visualization Status", interactive=False)
-                
-                # Right column for visualization
-                with gr.Column(scale=5):
-                    # Visualization section with full height
-                    af_viz = gr.Plot(label="Structure Visualization", elem_id="af_viz_plot")
+        def update_struct_visibility(method):
+            """Update visibility of RCSB structure input fields based on selected method"""
+            return {
+                struct_id: gr.update(visible=(method == "Single ID")),
+                struct_file: gr.update(visible=(method == "From File"))
+            }
+        
+        struct_method.change(
+            fn=update_struct_visibility,
+            inputs=[struct_method],
+            outputs=[struct_id, struct_file]
+        )
 
-            def update_af_visibility(method):
-                """Update visibility of AlphaFold input fields based on selected method"""
-                return {
-                    af_id: gr.update(visible=(method == "Single ID")),
-                    af_file: gr.update(visible=(method == "From File"))
-                }
+    # AlphaFold2 Structures tab
+    with gr.Tab("AlphaFold2 Structures"):
+        with gr.Row():
+            # Left column for inputs
+            with gr.Column(scale=3):
+                with gr.Group():  # Group for better visual separation
+                    af_method = gr.Radio(
+                        choices=["Single ID", "From File"],
+                        label="Download Method",
+                        value="Single ID"
+                    )
+                    
+                    # Input parameters section with consistent spacing
+                    with gr.Row():
+                        af_id = gr.Textbox(label="UniProt ID", value="P00734")
+                    
+                    with gr.Row():
+                        af_file = gr.Textbox(label="UniProt ID List File", value="download/uniprot.txt", visible=False)
+                    
+                    with gr.Row():
+                        af_out = gr.Textbox(label="Output Directory", value="download/alphafold2_structures")
+                    
+                    with gr.Row():
+                        af_index_level = gr.Number(label="Index Level", value=0, precision=0)
+                    
+                    with gr.Row():
+                        af_error = gr.Checkbox(label="Save error file", value=True)
+                    
+                    with gr.Row():
+                        af_btn = gr.Button("Download AlphaFold Structures", size="lg")
+                    
+                    # Output section
+                    af_output = gr.Textbox(label="Download Output", interactive=False, lines=4)
+                    af_viz_status = gr.Textbox(label="Visualization Status", interactive=False)
             
-            af_method.change(
-                fn=update_af_visibility,
-                inputs=[af_method],
-                outputs=[af_id, af_file]
-            )
+            # Right column for visualization
+            with gr.Column(scale=5):
+                # Visualization section with full height
+                af_viz = gr.Plot(label="Structure Visualization", elem_id="af_viz_plot")
+
+        def update_af_visibility(method):
+            """Update visibility of AlphaFold input fields based on selected method"""
+            return {
+                af_id: gr.update(visible=(method == "Single ID")),
+                af_file: gr.update(visible=(method == "From File"))
+            }
+        
+        af_method.change(
+            fn=update_af_visibility,
+            inputs=[af_method],
+            outputs=[af_id, af_file]
+        )
 
     # Handler functions for download buttons
     def handle_interpro_download(method, id_val, json_val, out_dir, error):
