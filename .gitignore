@@ -213,6 +213,29 @@ ckpt/Thermostability/esm2_t33_650M_UR50D/ses-adapter*
 ckpt/Thermostability/prot_bert
 ckpt/Thermostability/prot_t5_xl_uniref50/ses-adapter*
 
+!ckpt/DeepLocBinary/
+ckpt/DeepLocBinary/ankh-base
+ckpt/DeepLocBinary/ankh-large/ses-adapter*
+ckpt/DeepLocBinary/esm2_t30_150M_UR50D
+ckpt/DeepLocBinary/esm2_t33_650M_UR50D/ses-adapter*
+ckpt/DeepLocBinary/prot_bert
+ckpt/DeepLocBinary/prot_t5_xl_uniref50/ses-adapter*
+
+!ckpt/DeepLocMulti/
+ckpt/DeepLocMulti/ankh-base
+ckpt/DeepLocMulti/ankh-large/ses-adapter*
+ckpt/DeepLocMulti/esm2_t30_150M_UR50D
+ckpt/DeepLocMulti/esm2_t33_650M_UR50D/ses-adapter*
+ckpt/DeepLocMulti/prot_bert
+ckpt/DeepLocMulti/prot_t5_xl_uniref50/ses-adapter*
+
+!ckpt/MetalIonBinding/
+ckpt/MetalIonBinding/ankh-base
+ckpt/MetalIonBinding/ankh-large/ses-adapter*
+ckpt/MetalIonBinding/esm2_t30_150M_UR50D
+ckpt/MetalIonBinding/esm2_t33_650M_UR50D/ses-adapter*
+ckpt/MetalIonBinding/prot_bert
+ckpt/MetalIonBinding/prot_t5_xl_uniref50/ses-adapter*
 
 script_dev/
 .gradio/
