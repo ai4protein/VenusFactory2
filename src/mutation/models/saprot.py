@@ -196,7 +196,7 @@ def main():
     parser.add_argument('--pdb_file', type=str, required=True, help='Path to the pdb file')
     parser.add_argument('--mutations_csv', type=str, default=None, help='Path to the mutations CSV file')
     parser.add_argument('--output_csv', type=str, default=None, help='Path to the output CSV file')
-    parser.add_argument('--foldseek_path', type=str, default=None, help='Path to the foldseek binary')
+    parser.add_argument('--foldseek_path', type=str, default=None, required=False, help='Path to the foldseek binary')
     parser.add_argument('--chain', type=str, default="A", help='Chain to be processed')
     args = parser.parse_args()
 

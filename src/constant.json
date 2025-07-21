@@ -45,6 +45,23 @@
         "Deep_Unigram_3200": "AI4Protein/deep_unigram_3200"
 
     },
+    "zero_shot_sequence_model":{
+        "ESM-1v": "facebook/esm1v_t33_650M_UR90S_1",
+        "ESM2-650M": "facebook/esm2_t33_650M_UR50D"
+    },
+    "zero_shot_structure_model":{
+        "SaProt": "westlake-repl/SaProt_650M_AF2",
+        "ESM-IF1": "esm_if1_gvp4_t16_142M_UR50",
+        "MIF-ST": "mifst",
+        "ProSST-2048": "AI4Protein/ProSST-2048",
+        "ProSSN": "tyang816/ProtSSN"
+    },
+    "function_predict_model":{
+        "Ankh-large": "ElnaggarLab/ankh-large",
+        "ESM2-650M": "facebook/esm2_t33_650M_UR50D",
+        "ProtBert-uniref50": "Rostlab/prot_bert",
+        "ProtT5-xl-uniref50": "Rostlab/prot_t5_xl_uniref50"
+    },
     "dataset_configs": {
         "Demo_Solubility": "data/Demo/Demo_Solubility_HF.json",
         "DeepET_Topt": "data/DeepET_Topt/DeepET_Topt_HF.json",

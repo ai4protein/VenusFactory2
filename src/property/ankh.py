@@ -72,7 +72,7 @@ def load_model_and_tokenizer(args):
 
     # Load PLM (Pre-trained Language Model).
     tokenizer = AutoTokenizer.from_pretrained("ElnaggarLab/ankh-large", do_lower_case=False)
-    plm_model = T5EncoderModel.from_pretrained("ElnaggarLab/ankh-large")
+    plm_model = T5EncoderModel.from_pretrained("ElnaggarLab/ankh-large").to(device)
 
     # Instantiate AdapterModel and load the trained weights.
     model = AdapterModel(args)
