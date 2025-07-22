@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import re
 from datasets import load_dataset
 from web.utils.command import preview_eval_command
+from web.utils.html_ui import load_html_template
 
 def create_eval_tab(constant):
     plm_models = constant["plm_models"]
@@ -461,9 +462,7 @@ def create_eval_tab(constant):
             </div>
             """, gr.update(visible=False)
             
-    # with gr.Tab("Evaluation"):
-
-    gr.Markdown("### Model and Dataset Configuration")
+    gr.Markdown("## Model and Dataset Configuration")
 
     # Original evaluation interface components
     with gr.Group():
@@ -479,16 +478,16 @@ def create_eval_tab(constant):
             )
 
         with gr.Row():
-                eval_method = gr.Dropdown(
-                    choices=["full", "freeze", "ses-adapter", "plm-lora", "plm-qlora", "plm-adalora", "plm-dora", "plm-ia3"],
-                    label="Evaluation Method",
-                    value="freeze"
-                )
-                eval_pooling_method = gr.Dropdown(
-                    choices=["mean", "attention1d", "light_attention"],
-                    label="Pooling Method",
-                    value="mean"
-                )
+            eval_method = gr.Dropdown(
+                choices=["full", "freeze", "ses-adapter", "plm-lora", "plm-qlora", "plm-adalora", "plm-dora", "plm-ia3"],
+                label="Evaluation Method",
+                value="freeze"
+            )
+            eval_pooling_method = gr.Dropdown(
+                choices=["mean", "attention1d", "light_attention"],
+                label="Pooling Method",
+                value="mean"
+            )
         with gr.Row():
             with gr.Column(scale=4):
                 with gr.Row():
@@ -516,142 +515,9 @@ def create_eval_tab(constant):
                     size="lg",
                     elem_classes="preview-button"
                 )
-        
-        # 将数据统计和表格都放入折叠面板
-        with gr.Row():
-            with gr.Accordion("Dataset Preview", open=False) as preview_accordion:
-                # 数据统计区域
-                with gr.Row():
-                    dataset_stats_md = gr.HTML("", elem_classes=["dataset-stats"])
                 
-                # 表格区域
-                with gr.Row():
-                    preview_table = gr.Dataframe(
-                        headers=["Name", "Sequence", "Label"],
-                        value=[["No dataset selected", "-", "-"]],
-                        wrap=True,
-                        interactive=False,
-                        row_count=3,
-                        elem_classes=["preview-table"]
-                    )
-
-        # Add CSS styles
-        gr.HTML("""
-        <style>
-            /* 数据统计样式 */
-            .dataset-stats {
-                margin: 0 0 15px 0;
-                padding: 0;
-            }
-            
-            .dataset-stats table {
-                width: 100%;
-                border-collapse: collapse;
-                font-size: 0.9em;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-                border-radius: 8px;
-                overflow: hidden;
-                table-layout: fixed;
-            }
-            
-            .dataset-stats th {
-                background-color: #e0e0e0;
-                font-weight: bold;
-                padding: 6px 10px;
-                text-align: center;
-                border: 1px solid #ddd;
-                font-size: 0.95em;
-                white-space: nowrap;
-                overflow: hidden;
-                min-width: 120px;
-            }
-            
-            .dataset-stats td {
-                padding: 6px 10px;
-                text-align: center;
-                border: 1px solid #ddd;
-            }
-            
-            .dataset-stats h2 {
-                font-size: 1.1em;
-                margin: 0 0 10px 0;
-                text-align: center;
-            }
-            
-            /* 表格样式 */
-            .preview-table table {
-                background-color: white !important;
-                font-size: 0.9em !important;
-                width: 100%;
-                table-layout: fixed !important;
-            }
-            
-            .preview-table .gr-block.gr-box {
-                background-color: transparent !important;
-            }
-            
-            .preview-table .gr-input-label {
-                background-color: transparent !important;
-            }
-
-            /* 表格外观增强 */
-            .preview-table table {
-                margin-top: 0;
-                border-radius: 8px;
-                overflow: hidden;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-            }
-            
-            /* 表头样式 */
-            .preview-table th {
-                background-color: #e0e0e0 !important;
-                font-weight: bold !important;
-                padding: 6px !important;
-                border-bottom: 1px solid #ccc !important;
-                font-size: 0.95em !important;
-                text-align: center !important;
-                white-space: nowrap !important;
-                min-width: 120px !important;
-            }
-            
-            /* 单元格样式 */
-            .preview-table td {
-                padding: 4px 6px !important;
-                max-width: 300px !important;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
-                text-align: left !important;
-            }
-            
-            /* 悬停效果 */
-            .preview-table tr:hover {
-                background-color: #f0f0f0 !important;
-            }
-            
-            /* 折叠面板样式 */
-            .gr-accordion {
-                border: 1px solid #e0e0e0;
-                border-radius: 8px;
-                overflow: hidden;
-                margin-bottom: 15px;
-            }
-            
-            /* 折叠面板标题样式 */
-            .gr-accordion .label-wrap {
-                background-color: #f5f5f5;
-                padding: 8px 15px;
-                font-weight: bold;
-            }
-            
-            .preview-button {
-                height: 86px !important;
-            }
-        </style>
-        """, visible=True)
-        
-        ### These are settings for custom dataset. ###
-        with gr.Row(visible=True) as custom_dataset_settings:
+            # These are settings for custom dataset.
+        with gr.Row():
             problem_type = gr.Dropdown(
                 choices=["single_label_classification", "multi_label_classification", "regression"],
                 label="Problem Type",
@@ -674,407 +540,401 @@ def create_eval_tab(constant):
                 interactive=False
             )
         
-        # Add dataset preview function
-        def update_eval_tab_dataset_preview_UI(dataset_type=None, defined_dataset=None, custom_dataset=None):
-            """Update dataset preview content for Gradio UI
-            Args:
-                dataset_type: dataset type (Use Custom Dataset or Use Pre-defined Dataset)
-                defined_dataset: predefined dataset name
-                custom_dataset: custom dataset path
-            Returns:
-            """
-            # Determine which dataset to use based on selection
-            if dataset_type == "Use Custom Dataset" and custom_dataset:
-                try:
-                    # Try to load custom dataset
-                    dataset = load_dataset(custom_dataset)
-                    stats_html = f"""
-                    <div style="text-align: center; margin: 20px 0;">
-                    <table style="width: 100%; border-collapse: collapse; margin: 0 auto;">
-                        <tr>
-                            <th style="padding: 8px; font-size: 14px; border: 1px solid #ddd; background-color: #e0e0e0; font-weight: bold; border-bottom: 1px solid #ccc; text-align: center;">Dataset</th>
-                            <th style="padding: 8px; font-size: 14px; border: 1px solid #ddd; background-color: #e0e0e0; font-weight: bold; border-bottom: 1px solid #ccc; text-align: center;">Train Samples</th>
-                            <th style="padding: 8px; font-size: 14px; border: 1px solid #ddd; background-color: #e0e0e0; font-weight: bold; border-bottom: 1px solid #ccc; text-align: center;">Val Samples</th>
-                            <th style="padding: 8px; font-size: 14px; border: 1px solid #ddd; background-color: #e0e0e0; font-weight: bold; border-bottom: 1px solid #ccc; text-align: center;">Test Samples</th>
-                        </tr>
-                        <tr>
-                            <td style="padding: 15px; font-size: 14px; border: 1px solid #ddd; text-align: center;">{custom_dataset}</td>
-                            <td style="padding: 15px; font-size: 14px; border: 1px solid #ddd; text-align: center;">{len(dataset["train"]) if "train" in dataset else 0}</td>
-                            <td style="padding: 15px; font-size: 14px; border: 1px solid #ddd; text-align: center;">{len(dataset["validation"]) if "validation" in dataset else 0}</td>
-                            <td style="padding: 15px; font-size: 14px; border: 1px solid #ddd; text-align: center;">{len(dataset["test"]) if "test" in dataset else 0}</td>
-                        </tr>
-                    </table>
-                </div>
-                    """
-                    
-                    # Get sample data points
-                    split = "train" if "train" in dataset else list(dataset.keys())[0]
-                    samples = dataset[split].select(range(min(3, len(dataset[split]))))
-                    if len(samples) == 0:
-                        return gr.update(value=stats_html), gr.update(value=[["No data available", "-", "-"]], headers=["Name", "Sequence", "Label"]), gr.update(open=True)
-                    
-                    # Get fields actually present in the dataset
-                    available_fields = list(samples[0].keys())
-                    
-                    # Build sample data
-                    sample_data = []
-                    for sample in samples:
-                        sample_dict = {}
-                        for field in available_fields:
-                            # Keep full sequence
-                            sample_dict[field] = str(sample[field])
-                        sample_data.append(sample_dict)
-                    
-                    df = pd.DataFrame(sample_data)
-                    return gr.update(value=stats_html), gr.update(value=df.values.tolist(), headers=df.columns.tolist()), gr.update(open=True)
-                except Exception as e:
-                    error_html = f"""
-                    <div>
-                        <h2>Error loading dataset</h2>
-                        <p style="color: #c62828;">{str(e)}</p>
-                    </div>
-                    """
-                    return gr.update(value=error_html), gr.update(value=[["Error", str(e), "-"]], headers=["Name", "Sequence", "Label"]), gr.update(open=True)
+        
+    # put dataset preview in a accordion
+    with gr.Row():
+        with gr.Accordion("Dataset Preview", open=False) as preview_accordion:
+            # dataset stats
+            with gr.Row():
+                dataset_stats_md = gr.HTML("", elem_classes=["dataset-stats"])
             
-            # Use predefined dataset
-            elif dataset_type == "Use Pre-defined Dataset" and defined_dataset:
-                try:
-                    config_path = dataset_configs[defined_dataset]
-                    with open(config_path, 'r') as f:
-                        config = json.load(f)
-                    
-                    # Load dataset statistics
-                    dataset = load_dataset(config["dataset"])
-                    stats_html = f"""
-                    <div style="text-align: center; margin: 20px 0;">
-                        <table style="width: 100%; border-collapse: collapse; margin: 0 auto;">
-                            <tr>
-                                <th style="padding: 8px; font-size: 14px; border: 1px solid #ddd; background-color: #e0e0e0; font-weight: bold; border-bottom: 1px solid #ccc; text-align: center;">Dataset</th>
-                                <th style="padding: 8px; font-size: 14px; border: 1px solid #ddd; background-color: #e0e0e0; font-weight: bold; border-bottom: 1px solid #ccc; text-align: center;">Train Samples</th>
-                                <th style="padding: 8px; font-size: 14px; border: 1px solid #ddd; background-color: #e0e0e0; font-weight: bold; border-bottom: 1px solid #ccc; text-align: center;">Val Samples</th>
-                                <th style="padding: 8px; font-size: 14px; border: 1px solid #ddd; background-color: #e0e0e0; font-weight: bold; border-bottom: 1px solid #ccc; text-align: center;">Test Samples</th>
-                            </tr>
-                            <tr>
-                                <td style="padding: 15px; font-size: 14px; border: 1px solid #ddd; text-align: center;">{config["dataset"]}</td>
-                                <td style="padding: 15px; font-size: 14px; border: 1px solid #ddd; text-align: center;">{len(dataset["train"]) if "train" in dataset else 0}</td>
-                                <td style="padding: 15px; font-size: 14px; border: 1px solid #ddd; text-align: center;">{len(dataset["validation"]) if "validation" in dataset else 0}</td>
-                                <td style="padding: 15px; font-size: 14px; border: 1px solid #ddd; text-align: center;">{len(dataset["test"]) if "test" in dataset else 0}</td>
-                            </tr>
-                        </table>
-                    </div>
-                    """
-                    
-                    # Get sample data points and available fields
-                    samples = dataset["train"].select(range(min(3, len(dataset["train"]))))
-                    if len(samples) == 0:
-                        return gr.update(value=stats_html), gr.update(value=[["No data available", "-", "-"]], headers=["Name", "Sequence", "Label"]), gr.update(open=True)
-                    
-                    # Get fields actually present in the dataset
-                    available_fields = list(samples[0].keys())
-                    
-                    # Build sample data
-                    sample_data = []
-                    for sample in samples:
-                        sample_dict = {}
-                        for field in available_fields:
-                            # Keep full sequence
-                            sample_dict[field] = str(sample[field])
-                        sample_data.append(sample_dict)
-                    
-                    df = pd.DataFrame(sample_data)
-                    return gr.update(value=stats_html), gr.update(value=df.values.tolist(), headers=df.columns.tolist()), gr.update(open=True)
-                except Exception as e:
-                    error_html = f"""
-                    <div>
-                        <h2>Error loading dataset</h2>
-                        <p style="color: #c62828;">{str(e)}</p>
-                    </div>
-                    """
-                    return gr.update(value=error_html), gr.update(value=[["Error", str(e), "-"]], headers=["Name", "Sequence", "Label"]), gr.update(open=True)
-            
-            # If no valid dataset information provided
-            return gr.update(value=""), gr.update(value=[["No dataset selected", "-", "-"]], headers=["Name", "Sequence", "Label"]), gr.update(open=True)
-        
-        # Preview button click event
-        preview_button.click(
-            fn=update_eval_tab_dataset_preview_UI,
-            inputs=[is_custom_dataset, eval_dataset_defined, eval_dataset_custom],
-            outputs=[dataset_stats_md, preview_table, preview_accordion]
-        )
-
-        def update_eval_tab_dataset_settings_UI(choice, dataset_name=None):
-            """Update dataset settings for Gradio UI
-            Args:
-                choice: dataset type (Use Custom Dataset or Use Pre-defined Dataset)
-                dataset_name: predefined dataset name
-            Returns:
-            """
-            if choice == "Use Pre-defined Dataset":
-                # Load configuration from dataset_config
-                if dataset_name and dataset_name in dataset_configs:
-                    with open(dataset_configs[dataset_name], 'r') as f:
-                        config = json.load(f)
-                    # 处理metrics，将字符串转换为列表以适应多选组件
-                    metrics_value = config.get("metrics", "accuracy,mcc,f1,precision,recall,auroc")
-                    if isinstance(metrics_value, str):
-                        metrics_value = metrics_value.split(",")
-                    return [
-                        gr.update(visible=True),  # eval_dataset_defined
-                        gr.update(visible=False), # eval_dataset_custom
-                        gr.update(value=config.get("problem_type", ""), interactive=False),
-                        gr.update(value=config.get("num_labels", 1), interactive=False),
-                        gr.update(value=metrics_value, interactive=False)
-                    ]
-            else:
-                # Custom dataset settings
-                return [
-                    gr.update(visible=False),  # eval_dataset_defined
-                    gr.update(visible=True),   # eval_dataset_custom
-                    gr.update(value="", interactive=True),
-                    gr.update(value=2, interactive=True),
-                    gr.update(value="", interactive=True)
-                ]
-        
-        is_custom_dataset.change(
-            fn=update_eval_tab_dataset_settings_UI,
-            inputs=[is_custom_dataset, eval_dataset_defined],
-            outputs=[eval_dataset_defined, eval_dataset_custom, 
-                    problem_type, num_labels, metrics]
-        )
-
-        def handle_eval_dataset_defined_change(x):
-            """Handle evaluation dataset defined change event
-            Args:
-                x: evaluation dataset defined
-            Returns:
-                Updated UI components
-            """
-            return update_eval_tab_dataset_settings_UI("Use Pre-defined Dataset", x)
-        
-        eval_dataset_defined.change(
-            fn=handle_eval_dataset_defined_change,
-            inputs=[eval_dataset_defined],
-            outputs=[eval_dataset_defined, eval_dataset_custom, 
-                    problem_type, num_labels, metrics]
-        )
-
-        ### These are settings for different training methods. ###
-
-        # for ses-adapter
-        with gr.Row(visible=False) as structure_seq_row:
-            eval_structure_seq = gr.CheckboxGroup(
-                label="Structure Sequence",
-                choices=["foldseek_seq", "ss8_seq"],
-                value=["foldseek_seq", "ss8_seq"]
-            )
-                    
-        def update_structure_seq_visibility_UI(method):
-            """Update the ses-adapter structure sequence visibility for Gradio UI
-            Args:
-                method: training method (ses-adapter)
-            Returns:
-                structure_seq_row: structure sequence input gr.Row (visible or not)
-            """
-            return {
-                structure_seq_row: gr.update(visible=method == "ses-adapter")
-            }
-
-        eval_method.change(
-            fn=update_structure_seq_visibility_UI,
-            inputs=[eval_method],
-            outputs=[structure_seq_row]
-        )
-
-
-        gr.Markdown("### Batch Processing Configuration")
-        with gr.Group():
-            with gr.Row(equal_height=True):
-                with gr.Column(scale=1):
-                    batch_mode = gr.Radio(
-                        choices=["Batch Size Mode", "Batch Token Mode"],
-                        label="Batch Processing Mode",
-                        value="Batch Size Mode"
+            # dataset preview table
+            with gr.Row():
+                preview_table = gr.Dataframe(
+                    headers=["Name", "Sequence", "Label"],
+                    value=[["No dataset selected", "-", "-"]],
+                    wrap=True,
+                    interactive=False,
+                    row_count=3,
+                    elem_classes=["preview-table"]
+                )
+    # Add CSS styles from external file
+    css_path = os.path.join(os.path.dirname(__file__), "assets", "custom_table.css")
+    with open(css_path, "r") as f:
+        custom_css = f.read()
+    gr.HTML(f"<style>{custom_css}</style>", visible=True)
+    
+    def update_eval_tab_dataset_preview_UI(dataset_type=None, dataset_name=None, custom_dataset=None):
+        """Update dataset preview content for Gradio UI
+        Args:
+            dataset_type: dataset type (Use Custom Dataset or Use Pre-defined Dataset)
+            dataset_name: predefined dataset name
+            custom_dataset: custom dataset path
+        Returns:
+        """
+        # Determine which dataset to use based on selection
+        if dataset_type == "Use Custom Dataset" and custom_dataset:
+            try:
+                # Try to load custom dataset
+                dataset = load_dataset(custom_dataset)
+                stats_html = load_html_template(
+                    "dataset_stats_table.html", 
+                    dataset_name=custom_dataset, 
+                    train_count=len(dataset["train"]) if "train" in dataset else 0, 
+                    val_count=len(dataset["validation"]) if "validation" in dataset else 0, 
+                    test_count=len(dataset["test"]) if "test" in dataset else 0
                     )
                 
-                with gr.Column(scale=2):
-                    batch_size = gr.Slider(
-                        minimum=1,
-                        maximum=128,
-                        value=16,
-                        step=1,
-                        label="Batch Size",
-                        visible=True
+                # Get sample data points
+                split = "train" if "train" in dataset else list(dataset.keys())[0]
+                samples = dataset[split].select(range(min(3, len(dataset[split]))))
+                if len(samples) == 0:
+                    return gr.update(value=stats_html), gr.update(value=[["No data available", "-", "-"]], headers=["Name", "Sequence", "Label"]), gr.update(open=True)
+                
+                # Get fields actually present in the dataset
+                available_fields = list(samples[0].keys())
+                
+                # Build sample data - ensure consistent structure
+                sample_data = []
+                for i, sample in enumerate(samples):
+                    row_data = []
+                    for field in available_fields:
+                        # Truncate long sequences for display
+                        value = str(sample[field])
+                        if len(value) > 100:
+                            value = value[:100] + "..."
+                        row_data.append(value)
+                    sample_data.append(row_data)
+                
+                return gr.update(value=stats_html), gr.update(value=sample_data, headers=available_fields), gr.update(open=True)
+            except Exception as e:
+                error_html = load_html_template("error_loading_dataset.html", error_message=str(e))
+                return gr.update(value=error_html), gr.update(value=[["Error", str(e), "-"]], headers=["Error", "Message", "Status"]), gr.update(open=True)
+        
+        # Use predefined dataset
+        elif dataset_type == "Use Pre-defined Dataset" and dataset_name:
+            try:
+                config_path = dataset_configs[dataset_name]
+                with open(config_path, 'r') as f:
+                    config = json.load(f)
+                
+                # Load dataset statistics
+                dataset = load_dataset(config["dataset"])
+                stats_html = load_html_template(
+                    "dataset_stats_table.html", 
+                    dataset_name=config["dataset"], 
+                    train_count=len(dataset["train"]) if "train" in dataset else 0, 
+                    val_count=len(dataset["validation"]) if "validation" in dataset else 0, 
+                    test_count=len(dataset["test"]) if "test" in dataset else 0
                     )
-                    
-                    batch_token = gr.Slider(
-                        minimum=1000,
-                        maximum=50000,
-                        value=10000,
-                        step=1000,
-                        label="Tokens per Batch",
-                        visible=False
-                    )
+                
+                # Get sample data points and available fields
+                samples = dataset["train"].select(range(min(3, len(dataset["train"]))))
+                if len(samples) == 0:
+                    return gr.update(value=stats_html), gr.update(value=[["No data available", "-", "-"]], headers=["Name", "Sequence", "Label"]), gr.update(open=True)
+                
+                # Get fields actually present in the dataset
+                available_fields = list(samples[0].keys())
+                
+                # Build sample data - ensure consistent structure
+                sample_data = []
+                for i, sample in enumerate(samples):
+                    row_data = []
+                    for field in available_fields:
+                        # Truncate long sequences for display
+                        value = str(sample[field])
+                        if len(value) > 100:
+                            value = value[:100] + "..."
+                        row_data.append(value)
+                    sample_data.append(row_data)
+                
+                return gr.update(value=stats_html), gr.update(value=sample_data, headers=available_fields), gr.update(open=True)
+            except Exception as e:
+                error_html = load_html_template("error_loading_dataset.html", error_message=str(e))
+                return gr.update(value=error_html), gr.update(value=[["Error", str(e), "-"]], headers=["Error", "Message", "Status"]), gr.update(open=True)
+        
+        # If no valid dataset information provided
+        return gr.update(value=""), gr.update(value=[["No dataset selected", "-", "-"]], headers=["Status", "Message", "Action"]), gr.update(open=True)
 
-        def update_eval_tab_batch_inputs_UI(mode):
-            """Update batch or token input visibility for Gradio UI
-            Args:
-                mode: batch mode
-            Returns:
-                batch_size: batch size input gr.Slider (visible or not)
-                batch_token: batch token input gr.Slider (visible or not)
-            """
-            return {
-                batch_size: gr.update(visible=mode == "Batch Size Mode"),
-                batch_token: gr.update(visible=mode == "Batch Token Mode")
-            }
-            
-        # Update visibility when mode changes
-        batch_mode.change(
-            fn=update_eval_tab_batch_inputs_UI,
-            inputs=[batch_mode],
-            outputs=[batch_size, batch_token]
+    
+    # Preview button click event
+    preview_button.click(
+        fn=update_eval_tab_dataset_preview_UI,
+        inputs=[is_custom_dataset, eval_dataset_defined, eval_dataset_custom],
+        outputs=[dataset_stats_md, preview_table, preview_accordion]
+    )
+
+    def update_eval_tab_dataset_settings_UI(choice, dataset_name=None):
+        """Update dataset settings for Gradio UI
+        Args:
+            choice: dataset type (Use Custom Dataset or Use Pre-defined Dataset)
+            dataset_name: predefined dataset name
+        Returns:
+        """
+        if choice == "Use Pre-defined Dataset":
+            # Load configuration from dataset_config
+            if dataset_name and dataset_name in dataset_configs:
+                with open(dataset_configs[dataset_name], 'r') as f:
+                    config = json.load(f)
+                # 处理metrics，将字符串转换为列表以适应多选组件
+                metrics_value = config.get("metrics", "accuracy,mcc,f1,precision,recall,auroc")
+                if isinstance(metrics_value, str):
+                    metrics_value = metrics_value.split(",")
+                return [
+                    gr.update(visible=True),  # eval_dataset_defined
+                    gr.update(visible=False), # eval_dataset_custom
+                    gr.update(value=config.get("problem_type", ""), interactive=False),
+                    gr.update(value=config.get("num_labels", 1), interactive=False),
+                    gr.update(value=metrics_value, interactive=False)
+                ]
+        else:
+            # Custom dataset settings
+            return [
+                gr.update(visible=False),  # eval_dataset_defined
+                gr.update(visible=True),   # eval_dataset_custom
+                gr.update(value="", interactive=True),
+                gr.update(value=2, interactive=True),
+                gr.update(value="", interactive=True)
+            ]
+    
+    is_custom_dataset.change(
+        fn=update_eval_tab_dataset_settings_UI,
+        inputs=[is_custom_dataset, eval_dataset_defined],
+        outputs=[eval_dataset_defined, eval_dataset_custom, 
+                problem_type, num_labels, metrics]
+    )
+
+    def handle_eval_dataset_defined_change(x):
+        """Handle evaluation dataset defined change event
+        Args:
+            x: evaluation dataset defined
+        Returns:
+            Updated UI components
+        """
+        return update_eval_tab_dataset_settings_UI("Use Pre-defined Dataset", x)
+    
+    eval_dataset_defined.change(
+        fn=handle_eval_dataset_defined_change,
+        inputs=[eval_dataset_defined],
+        outputs=[eval_dataset_defined, eval_dataset_custom, 
+                problem_type, num_labels, metrics]
+    )
+
+    ### These are settings for different training methods. ###
+
+    # for ses-adapter
+    with gr.Row(visible=False) as structure_seq_row:
+        eval_structure_seq = gr.CheckboxGroup(
+            label="Structure Sequence",
+            choices=["foldseek_seq", "ss8_seq"],
+            value=["foldseek_seq", "ss8_seq"]
         )
+                
+    def update_structure_seq_visibility_UI(method):
+        """Update the ses-adapter structure sequence visibility for Gradio UI
+        Args:
+            method: training method (ses-adapter)
+        Returns:
+            structure_seq_row: structure sequence input gr.Row (visible or not)
+        """
+        return {
+            structure_seq_row: gr.update(visible=method == "ses-adapter")
+        }
 
-        with gr.Row():
-            preview_button = gr.Button("Preview Command")
-            abort_button = gr.Button("Abort", variant="stop")
-            eval_button = gr.Button("Start Evaluation", variant="primary")
-
-        with gr.Row():
-            command_preview = gr.Code(
-                label="Command Preview",
-                language="shell",
-                interactive=False,
+    eval_method.change(
+        fn=update_structure_seq_visibility_UI,
+        inputs=[eval_method],
+        outputs=[structure_seq_row]
+    )
+    
+    gr.Markdown("## Batch Processing Configuration")
+    with gr.Row(equal_height=True):
+        with gr.Column(scale=1):
+            batch_mode = gr.Radio(
+                choices=["Batch Size Mode", "Batch Token Mode"],
+                label="Batch Processing Mode",
+                value="Batch Size Mode"
+            )
+        
+        with gr.Column(scale=2):
+            batch_size = gr.Slider(
+                minimum=1,
+                maximum=128,
+                value=16,
+                step=1,
+                label="Batch Size",
+                visible=True
+            )
+            
+            batch_token = gr.Slider(
+                minimum=1000,
+                maximum=50000,
+                value=10000,
+                step=1000,
+                label="Tokens per Batch",
                 visible=False
             )
 
-        def handle_eval_tab_command_preview(plm_model, model_path, eval_method, is_custom_dataset, dataset_defined, 
-                          dataset_custom, problem_type, num_labels, metrics, batch_mode, 
-                          batch_size, batch_token, eval_structure_seq, eval_pooling_method):
-            """Handle the preview command button click event
-            Args:
-                plm_model: plm model name
-                model_path: model path
-                eval_method: evaluation method
-                is_custom_dataset: whether to use custom dataset (Use Custom Dataset or Use Pre-defined Dataset)
-                dataset_defined: dataset name
-                dataset_custom: custom dataset path
-                problem_type: problem type
-                num_labels: number of labels
-                metrics: metrics (accuracy, recall, precision, f1, mcc, auroc, f1_max, spearman_corr, mse)
-                batch_mode: batch mode (Batch Size Mode or Batch Token Mode)
-                batch_size: batch size
-                batch_token: batch token (tokens per batch)
-                eval_structure_seq: structure sequence (foldseek_seq, ss8_seq)
-                eval_pooling_method: pooling method (mean, attention1d, light_attention)
-            Returns:
-                command_preview: command preview
-            """
-            if command_preview.visible:
-                return gr.update(visible=False)
-            
-            # 构建参数字典
-            args = {
-                "plm_model": plm_models[plm_model],
-                "model_path": model_path,
-                "eval_method": eval_method,
-                "pooling_method": eval_pooling_method
-            }
-            
-            # 处理数据集相关参数
-            if is_custom_dataset == "Use Custom Dataset":
-                args["dataset"] = dataset_custom
-                args["problem_type"] = problem_type
-                args["num_labels"] = num_labels
-                args["metrics"] = ",".join(metrics)
-            else:
-                with open(dataset_configs[dataset_defined], 'r') as f:
-                    config = json.load(f)
-                args["dataset_config"] = dataset_configs[dataset_defined]
-            
-            # 处理批处理参数
-            if batch_mode == "Batch Size Mode":
-                args["batch_size"] = batch_size
-            else:
-                args["batch_token"] = batch_token
-            
-            # 处理结构序列参数
-            if eval_method == "ses-adapter" and eval_structure_seq:
-                args["structure_seq"] = ",".join(eval_structure_seq)
-                if "foldseek_seq" in eval_structure_seq:
-                    args["use_foldseek"] = True
-                if "ss8_seq" in eval_structure_seq:
-                    args["use_ss8"] = True
-            
-            # 生成预览命令
-            preview_text = preview_eval_command(args)
-            return gr.update(value=preview_text, visible=True)
-
-        # 绑定预览按钮事件
-        preview_button.click(
-            fn=handle_eval_tab_command_preview,
-            inputs=[
-                eval_plm_model,
-                eval_model_path,
-                eval_method,
-                is_custom_dataset,
-                eval_dataset_defined,
-                eval_dataset_custom,
-                problem_type,
-                num_labels,
-                metrics,
-                batch_mode,
-                batch_size,
-                batch_token,
-                eval_structure_seq,
-                eval_pooling_method
-            ],
-            outputs=[command_preview]
-        )
-
-        eval_output = gr.HTML(
-            value="<div style='padding: 15px; background-color: #f5f5f5; border-radius: 5px;'><p style='margin: 0;'>Click the 「Start Evaluation」 button to begin model evaluation</p></div>",
-            label="Evaluation Status & Results"
-        )
-
-        with gr.Row():
-            with gr.Column(scale=4):
-                pass
-            with gr.Column(scale=1):
-                download_csv_btn = gr.DownloadButton(
-                    "Download CSV", 
-                    visible=False,
-                    size="lg"
-                )
-            with gr.Column(scale=4):
-                pass
+    def update_eval_tab_batch_inputs_UI(mode):
+        """Update batch or token input visibility for Gradio UI
+        Args:
+            mode: batch mode
+        Returns:
+            batch_size: batch size input gr.Slider (visible or not)
+            batch_token: batch token input gr.Slider (visible or not)
+        """
+        return {
+            batch_size: gr.update(visible=mode == "Batch Size Mode"),
+            batch_token: gr.update(visible=mode == "Batch Token Mode")
+        }
         
-        # Connect buttons to functions
-        eval_button.click(
-            fn=evaluate_model,
-            inputs=[
-                eval_plm_model,
-                eval_model_path,
-                eval_method,
-                is_custom_dataset,
-                eval_dataset_defined,
-                eval_dataset_custom,
-                problem_type,
-                num_labels,
-                metrics,
-                batch_mode,
-                batch_size,
-                batch_token,
-                eval_structure_seq,
-                eval_pooling_method
-            ],
-            outputs=[eval_output, download_csv_btn]
+    # Update visibility when mode changes
+    batch_mode.change(
+        fn=update_eval_tab_batch_inputs_UI,
+        inputs=[batch_mode],
+        outputs=[batch_size, batch_token]
+    )
+
+    with gr.Row():
+        preview_button = gr.Button("Preview Command")
+        abort_button = gr.Button("Abort", variant="stop")
+        eval_button = gr.Button("Start Evaluation", variant="primary")
+
+    with gr.Row():
+        command_preview = gr.Code(
+            label="Command Preview",
+            language="shell",
+            interactive=False,
+            visible=False
         )
-        abort_button.click(
-            fn=handle_eval_tab_abort,
-            inputs=[],
-            outputs=[eval_output, download_csv_btn]
-        )
+
+    def handle_eval_tab_command_preview(plm_model, model_path, eval_method, is_custom_dataset, dataset_defined, 
+                        dataset_custom, problem_type, num_labels, metrics, batch_mode, 
+                        batch_size, batch_token, eval_structure_seq, eval_pooling_method):
+        """Handle the preview command button click event
+        Args:
+            plm_model: plm model name
+            model_path: model path
+            eval_method: evaluation method
+            is_custom_dataset: whether to use custom dataset (Use Custom Dataset or Use Pre-defined Dataset)
+            dataset_defined: dataset name
+            dataset_custom: custom dataset path
+            problem_type: problem type
+            num_labels: number of labels
+            metrics: metrics (accuracy, recall, precision, f1, mcc, auroc, f1_max, spearman_corr, mse)
+            batch_mode: batch mode (Batch Size Mode or Batch Token Mode)
+            batch_size: batch size
+            batch_token: batch token (tokens per batch)
+            eval_structure_seq: structure sequence (foldseek_seq, ss8_seq)
+            eval_pooling_method: pooling method (mean, attention1d, light_attention)
+        Returns:
+            command_preview: command preview
+        """
+        if command_preview.visible:
+            return gr.update(visible=False)
+        
+        # 构建参数字典
+        args = {
+            "plm_model": plm_models[plm_model],
+            "model_path": model_path,
+            "eval_method": eval_method,
+            "pooling_method": eval_pooling_method
+        }
+        
+        # 处理数据集相关参数
+        if is_custom_dataset == "Use Custom Dataset":
+            args["dataset"] = dataset_custom
+            args["problem_type"] = problem_type
+            args["num_labels"] = num_labels
+            args["metrics"] = ",".join(metrics)
+        else:
+            with open(dataset_configs[dataset_defined], 'r') as f:
+                config = json.load(f)
+            args["dataset_config"] = dataset_configs[dataset_defined]
+        
+        # 处理批处理参数
+        if batch_mode == "Batch Size Mode":
+            args["batch_size"] = batch_size
+        else:
+            args["batch_token"] = batch_token
+        
+        # 处理结构序列参数
+        if eval_method == "ses-adapter" and eval_structure_seq:
+            args["structure_seq"] = ",".join(eval_structure_seq)
+            if "foldseek_seq" in eval_structure_seq:
+                args["use_foldseek"] = True
+            if "ss8_seq" in eval_structure_seq:
+                args["use_ss8"] = True
+        
+        # 生成预览命令
+        preview_text = preview_eval_command(args)
+        return gr.update(value=preview_text, visible=True)
+
+    # 绑定预览按钮事件
+    preview_button.click(
+        fn=handle_eval_tab_command_preview,
+        inputs=[
+            eval_plm_model,
+            eval_model_path,
+            eval_method,
+            is_custom_dataset,
+            eval_dataset_defined,
+            eval_dataset_custom,
+            problem_type,
+            num_labels,
+            metrics,
+            batch_mode,
+            batch_size,
+            batch_token,
+            eval_structure_seq,
+            eval_pooling_method
+        ],
+        outputs=[command_preview]
+    )
+
+    eval_output = gr.HTML(
+        value="<div style='padding: 15px; background-color: #f5f5f5; border-radius: 5px;'><p style='margin: 0;'>Click the 「Start Evaluation」 button to begin model evaluation</p></div>",
+        label="Evaluation Status & Results"
+    )
+
+    with gr.Row():
+        with gr.Column(scale=4):
+            pass
+        with gr.Column(scale=1):
+            download_csv_btn = gr.DownloadButton(
+                "Download CSV", 
+                visible=False,
+                size="lg"
+            )
+        with gr.Column(scale=4):
+            pass
+    
+    # Connect buttons to functions
+    eval_button.click(
+        fn=evaluate_model,
+        inputs=[
+            eval_plm_model,
+            eval_model_path,
+            eval_method,
+            is_custom_dataset,
+            eval_dataset_defined,
+            eval_dataset_custom,
+            problem_type,
+            num_labels,
+            metrics,
+            batch_mode,
+            batch_size,
+            batch_token,
+            eval_structure_seq,
+            eval_pooling_method
+        ],
+        outputs=[eval_output, download_csv_btn]
+    )
+    abort_button.click(
+        fn=handle_eval_tab_abort,
+        inputs=[],
+        outputs=[eval_output, download_csv_btn]
+    )
 
     return {
         "eval_button": eval_button,

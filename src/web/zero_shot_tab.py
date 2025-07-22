@@ -5,8 +5,6 @@ import sys
 import subprocess
 import time
 import zipfile
-import json
-import res
 from pathlib import Path
 from typing import Dict, Any, List, Generator, Optional, Tuple
 import plotly.graph_objects as go
