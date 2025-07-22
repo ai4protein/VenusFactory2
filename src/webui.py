@@ -119,6 +119,6 @@ def create_ui():
 if __name__ == "__main__":
     try:
         demo = create_ui()
-        demo.queue().launch(server_name="0.0.0.0", server_port=7860, share=True, allowed_paths=["img"])
+        demo.queue().launch(server_name="0.0.0.0", server_port=7860, share=True, allowed_paths=["img"], mcp_server=True)
     except Exception as e:
         print(f"Failed to launch UI: {str(e)}")

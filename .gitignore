@@ -253,3 +253,5 @@ log/
 memory_db/
 mutation/proteingym/
 mutation/mycase/
+
+temp_outputs/

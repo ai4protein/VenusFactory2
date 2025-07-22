@@ -347,7 +347,15 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                             visible=False
                         )
 
-            def update_batch_inputs(mode):
+            def update_train_tab_batch_inputs_UI(mode):
+                """
+                Update batch or token input visibility for Gradio UI
+                Args:
+                    mode: batch mode
+                Returns:
+                    batch_size: batch size input gr.Slider (visible or not)
+                    batch_token: batch token input gr.Slider (visible or not)
+                """
                 return {
                     batch_size: gr.update(visible=mode == "Batch Size Mode"),
                     batch_token: gr.update(visible=mode == "Batch Token Mode")
@@ -355,7 +363,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
 
             # Update visibility when mode changes
             batch_mode.change(
-                fn=update_batch_inputs,
+                fn=update_train_tab_batch_inputs_UI,
                 inputs=[batch_mode],
                 outputs=[batch_size, batch_token]
             )
@@ -392,7 +400,14 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                             label="Max Sequence Length (-1 for unlimited)"
                         )
                 
-                def update_training_method(method):
+                def update_train_tab_training_method_UI(method):
+                    """Update the training method visibility for Gradio UI
+                    Args:
+                        method: training method (ses-adapter, plm-lora, plm-qlora, plm-adalora, plm-dora, plm-ia3)
+                    Returns:
+                        structure_seq: structure sequence input gr.Dropdown (visible or not)
+                        lora_params_row: lora parameters input gr.Row (visible or not)
+                    """
                     return {
                         structure_seq: gr.update(visible=method == "ses-adapter"),
                         lora_params_row: gr.update(visible=method in ["plm-lora", "plm-qlora", "plm-adalora", "plm-dora", "plm-ia3"])
@@ -400,7 +415,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
 
                 # Add training_method change event
                 training_method.change(
-                    fn=update_training_method,
+                    fn=update_train_tab_training_method_UI,
                     inputs=[training_method],
                     outputs=[structure_seq, lora_params_row]
                 )
@@ -943,7 +958,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 is_training = False
                 current_process = None
         
-        def handle_abort():
+        def handle_train_tab_abort():
             """Handle abortion of the training process"""
             nonlocal is_training, current_process, stop_thread, process_aborted
             
@@ -1064,48 +1079,66 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                       None,
                       gr.update(visible=False))
 
-        def update_wandb_visibility(checkbox):
+        def update_wandb_visibility_UI(checkbox):
+            """Update wandb project and entity visibility for Gradio UI
+            Args:
+                checkbox: wandb checkbox
+            Returns:
+                wandb_project: wandb project input gr.Textbox (visible or not)
+                wandb_entity: wandb entity input gr.Textbox (visible or not)
+            """
             return {
                 wandb_project: gr.update(visible=checkbox),
                 wandb_entity: gr.update(visible=checkbox)
             }
 
         # bind preview and train buttons
-        def handle_preview(
-            plm_model,
-            is_custom_dataset,
-            dataset_config,
-            dataset_custom,
-            problem_type,
-            num_labels,
-            metrics,
-            training_method,
-            pooling_method,
-            batch_mode,
-            batch_size,
-            batch_token,
-            learning_rate,
-            num_epochs,
-            max_seq_len,
-            gradient_accumulation_steps,
-            warmup_steps,
-            scheduler_type,
-            output_model_name,
-            output_dir,
-            wandb_logging,
-            wandb_project,
-            wandb_entity,
-            patience,
-            num_workers,
-            max_grad_norm,
-            structure_seq,
-            lora_r,
-            lora_alpha,
-            lora_dropout,
-            lora_target_modules,
-            monitored_metrics,
-            monitored_strategy
+        def handle_train_tab_command_preview(
+            plm_model, is_custom_dataset, dataset_config, dataset_custom, problem_type, num_labels,
+            metrics, training_method, pooling_method, batch_mode, batch_size, batch_token,
+            learning_rate, num_epochs, max_seq_len, gradient_accumulation_steps, warmup_steps, scheduler_type,
+            output_model_name, output_dir, wandb_logging, wandb_project, wandb_entity,
+            patience, num_workers, max_grad_norm, structure_seq,
+            lora_r, lora_alpha, lora_dropout, lora_target_modules, monitored_metrics, monitored_strategy
         ):
+            """Handle the preview command button click event
+            Args:
+                plm_model: plm model name
+                is_custom_dataset: whether to use custom dataset (Use Custom Dataset or Use Pre-defined Dataset)
+                dataset_config: dataset config path
+                dataset_custom: custom dataset path
+                problem_type: problem type
+                num_labels: number of labels
+                metrics: metrics (accuracy, recall, precision, f1, mcc, auroc, f1_max, spearman_corr, mse)
+                training_method: training method (ses-adapter, plm-lora, plm-qlora, plm-adalora, plm-dora, plm-ia3)
+                pooling_method: pooling method (mean, attention1d, light_attention)
+                batch_mode: batch mode (Batch Size Mode or Batch Token Mode)
+                batch_size: batch size
+                batch_token: batch token (tokens per batch)
+                learning_rate: learning rate
+                num_epochs: number of epochs
+                max_seq_len: max sequence length
+                gradient_accumulation_steps: gradient accumulation steps
+                warmup_steps: warmup steps
+                scheduler_type: scheduler type (linear, cosine, cosine_with_restarts, polynomial, constant)
+                output_model_name: output model name
+                output_dir: output directory
+                wandb_logging: whether to use wandb
+                wandb_project: wandb project name
+                wandb_entity: wandb entity name
+                patience: patience for early stopping
+                num_workers: number of workers
+                max_grad_norm: max gradient norm
+                structure_seq: structure sequence (foldseek_seq, ss8_seq)
+                lora_r: lora rank
+                lora_alpha: lora alpha
+                lora_dropout: lora dropout
+                lora_target_modules: lora target modules
+                monitored_metrics: monitored metrics
+                monitored_strategy: monitored strategy (max, min)
+            Returns:
+                command_preview: command preview
+            """
             if command_preview.visible:
                 return gr.update(visible=False)
             
@@ -1150,8 +1183,14 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             preview_text = preview_command(training_args.to_dict())
             return gr.update(value=preview_text, visible=True)
 
-        def reset_train_ui():
-            """Reset the UI state before training starts"""
+        def reset_train_tab_UI():
+            """Reset the UI state before training starts
+            Returns:
+                empty_model_stats: empty model stats
+                empty_progress_status: empty progress status
+                best_model: best model
+                command_preview: command preview
+            """
             # Reset monitor state
             monitor._reset_tracking()
             monitor._reset_stats()
@@ -1206,40 +1245,54 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             )
 
         def handle_train(
-            plm_model,
-            is_custom_dataset,
-            dataset_config,
-            dataset_custom,
-            problem_type,
-            num_labels,
-            metrics,
-            training_method,
-            pooling_method,
-            batch_mode,
-            batch_size,
-            batch_token,
-            learning_rate,
-            num_epochs,
-            max_seq_len,
-            gradient_accumulation_steps,
-            warmup_steps,
-            scheduler_type,
-            output_model_name,
-            output_dir,
-            wandb_logging,
-            wandb_project,
-            wandb_entity,
-            patience,
-            num_workers,
-            max_grad_norm,
-            structure_seq,
-            lora_r,
-            lora_alpha,
-            lora_dropout,
-            lora_target_modules,
-            monitored_metrics,
-            monitored_strategy
+            plm_model, is_custom_dataset, dataset_config, dataset_custom, problem_type, num_labels,
+            metrics, training_method, pooling_method, batch_mode, batch_size, batch_token,
+            learning_rate, num_epochs, max_seq_len, gradient_accumulation_steps, warmup_steps, scheduler_type,
+            output_model_name, output_dir, wandb_logging, wandb_project, wandb_entity,
+            patience, num_workers, max_grad_norm, structure_seq, 
+            lora_r, lora_alpha, lora_dropout, lora_target_modules, 
+            monitored_metrics, monitored_strategy
         ) -> Generator:
+            """Handle the train command button click event
+            Args:
+                plm_model: plm model name
+                is_custom_dataset: whether to use custom dataset (Use Custom Dataset or Use Pre-defined Dataset)
+                dataset_config: dataset config path
+                dataset_custom: custom dataset path
+                problem_type: problem type
+                num_labels: number of labels
+                metrics: metrics (accuracy, recall, precision, f1, mcc, auroc, f1_max, spearman_corr, mse)
+                training_method: training method (ses-adapter, plm-lora, plm-qlora, plm-adalora, plm-dora, plm-ia3)
+                pooling_method: pooling method (mean, attention1d, light_attention)
+                batch_mode: batch mode (Batch Size Mode or Batch Token Mode)
+                batch_size: batch size
+                batch_token: batch token (tokens per batch)
+                learning_rate: learning rate
+                num_epochs: number of epochs
+                max_seq_len: max sequence length
+                gradient_accumulation_steps: gradient accumulation steps
+                warmup_steps: warmup steps
+                scheduler_type: scheduler type (linear, cosine, cosine_with_restarts, polynomial, constant)
+                output_model_name: output model name
+                output_dir: output directory
+                wandb_logging: whether to use wandb
+                wandb_project: wandb project name
+                wandb_entity: wandb entity name
+                patience: patience for early stopping
+                num_workers: number of workers
+                max_grad_norm: max gradient norm
+                structure_seq: structure sequence (foldseek_seq, ss8_seq)
+                lora_r: lora rank
+                lora_alpha: lora alpha
+                lora_dropout: lora dropout
+                lora_target_modules: lora target modules
+                monitored_metrics: monitored metrics
+                monitored_strategy: monitored strategy (max, min)
+            Returns:
+                model_stats: model stats
+                status_html: status html
+                best_info: best info
+            """
             nonlocal is_training, current_process, stop_thread, process_aborted, monitor
             
             # If already training, return
@@ -1527,13 +1580,13 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         ]
 
         preview_button.click(
-            fn=handle_preview,
+            fn=handle_train_tab_command_preview,
             inputs=input_components,
             outputs=[command_preview]
         )
         
         train_button.click(
-            fn=reset_train_ui,
+            fn=reset_train_tab_UI,
             outputs=[model_stats, progress_status, best_model_info, test_results_html, loss_plot, metrics_plot, download_csv_btn]
         ).then(
             fn=handle_train, 
@@ -1543,18 +1596,24 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
 
         # bind abort button
         abort_button.click(
-            fn=handle_abort,
+            fn=handle_train_tab_abort,
             outputs=[progress_status, model_stats, best_model_info, test_results_html, loss_plot, metrics_plot, download_csv_btn]
         )
         
         wandb_logging.change(
-            fn=update_wandb_visibility,
+            fn=update_wandb_visibility_UI,
             inputs=[wandb_logging],
             outputs=[wandb_project, wandb_entity]
         )
 
-        def update_dataset_preview(dataset_type=None, dataset_name=None, custom_dataset=None):
-            """Update dataset preview content"""
+        def update_train_tab_dataset_preview_UI(dataset_type=None, dataset_name=None, custom_dataset=None):
+            """Update dataset preview content for Gradio UI
+            Args:
+                dataset_type: dataset type (Use Custom Dataset or Use Pre-defined Dataset)
+                dataset_name: predefined dataset name
+                custom_dataset: custom dataset path
+            Returns:
+            """
             # Determine which dataset to use based on selection
             if dataset_type == "Use Custom Dataset" and custom_dataset:
                 try:
@@ -1629,13 +1688,19 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
 
         # Preview button click event
         dataset_preview_button.click(
-            fn=update_dataset_preview,
+            fn=update_train_tab_dataset_preview_UI,
             inputs=[is_custom_dataset, dataset_config, dataset_custom],
             outputs=[dataset_stats_md, preview_table, preview_accordion]
         )
 
         # add function for custom dataset settings
-        def update_dataset_settings(choice, dataset_name=None):
+        def update_train_tab_dataset_settings_UI(choice, dataset_name=None):
+            """Update dataset settings for Gradio UI
+            Args:
+                choice: dataset type (Use Custom Dataset or Use Pre-defined Dataset)
+                dataset_name: predefined dataset name
+            Returns:
+            """
             if choice == "Use Pre-defined Dataset":
                 # load dataset config from dataset_config
                 result = {
@@ -1684,13 +1749,21 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
 
         # bind dataset settings update event
         is_custom_dataset.change(
-            fn=update_dataset_settings,
+            fn=update_train_tab_dataset_settings_UI,
             inputs=[is_custom_dataset, dataset_config],
             outputs=[dataset_config, dataset_custom, custom_dataset_settings, problem_type, num_labels, metrics, monitored_metrics, monitored_strategy]
         )
 
+        def handle_dataset_config_change(x):
+            """Handle dataset config change event
+            Args:
+                x: dataset config
+            Returns:
+            """
+            return update_train_tab_dataset_settings_UI("Use Pre-defined Dataset", x)
+        
         dataset_config.change(
-            fn=lambda x: update_dataset_settings("Use Pre-defined Dataset", x),
+            fn=handle_dataset_config_change,
             inputs=[dataset_config],
             outputs=[dataset_config, dataset_custom, custom_dataset_settings, problem_type, num_labels, metrics, monitored_metrics, monitored_strategy]
         )

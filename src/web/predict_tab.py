@@ -1297,7 +1297,7 @@ def create_predict_tab(constant):
         
         return '\n'.join(rows)
 
-    def handle_abort():
+    def handle_predict_tab_abort():
         """Handle abortion of the prediction process for both single and batch prediction"""
         nonlocal is_predicting, current_process, stop_thread, process_aborted
         
@@ -1478,8 +1478,22 @@ def create_predict_tab(constant):
         </div>
         """), gr.update(visible=False)
 
-    def handle_preview(plm_model, model_path, eval_method, aa_seq, foldseek_seq, ss8_seq, eval_structure_seq, pooling_method, problem_type, num_labels):
-        """处理单序列预测命令预览"""
+    def handle_predict_tab_command_preview(plm_model, model_path, eval_method, aa_seq, foldseek_seq, ss8_seq, eval_structure_seq, pooling_method, problem_type, num_labels):
+        """Handle the preview command button click event
+        Args:
+            plm_model: plm model name
+            model_path: model path
+            eval_method: evaluation method
+            aa_seq: amino acid sequence
+            foldseek_seq: foldseek sequence
+            ss8_seq: ss8 sequence
+            eval_structure_seq: structure sequence (foldseek_seq, ss8_seq)
+            pooling_method: pooling method (mean, attention1d, light_attention)
+            problem_type: problem type (single_label_classification, multi_label_classification, regression)
+            num_labels: number of labels
+        Returns:
+            command_preview: command preview
+        """
         # 构建参数字典
         args_dict = {
             "model_path": model_path,
@@ -1856,7 +1870,7 @@ def create_predict_tab(constant):
                     inputs=[preview_single_button],
                     outputs=[command_preview]
                 ).then(
-                    fn=handle_preview,
+                    fn=handle_predict_tab_command_preview,
                     inputs=[
                         plm_model,
                         model_path,
@@ -1994,5 +2008,5 @@ def create_predict_tab(constant):
     return {
         "predict_sequence": predict_sequence,
         "predict_batch": predict_batch,
-        "handle_abort": handle_abort
+        "handle_abort": handle_predict_tab_abort
     }

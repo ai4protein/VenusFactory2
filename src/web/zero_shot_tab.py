@@ -294,7 +294,7 @@ def create_zero_shot_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         """Update status to show prediction is running"""
         return "🔄 Predicting... Please wait."
     
-    def handle_prediction(model_type: str, model_name: str, file_obj: Any):
+    def handle_zero_shot_prediction(model_type: str, model_name: str, file_obj: Any):
         """Handle prediction and return initial summary view"""
         if not model_name or not file_obj:
             return ("Error: Check inputs", go.Figure(), pd.DataFrame(), 
@@ -381,20 +381,20 @@ def create_zero_shot_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         inputs=[],
         outputs=[seq_status]
     ).then(
-        fn=lambda model, file: handle_prediction("sequence", model, file), 
-        inputs=[seq_model_dropdown, seq_file], 
+        fn=handle_zero_shot_prediction, 
+        inputs=["sequence", seq_model_dropdown, seq_file], 
         outputs=[seq_status, seq_plot, seq_dataframe, seq_download_btn, temp_seq_zip_path, seq_view_controls, seq_full_data]
     )
     
     seq_expand_btn.click(
-        fn=lambda df: expand_heatmap(df, "sequence"),
-        inputs=[seq_full_data],
+        fn=expand_heatmap,
+        inputs=[seq_full_data, "sequence"],
         outputs=[seq_plot, seq_expand_btn, seq_collapse_btn]
     )
     
     seq_collapse_btn.click(
-        fn=lambda df: collapse_heatmap(df, "sequence"),
-        inputs=[seq_full_data],
+        fn=collapse_heatmap,
+        inputs=[seq_full_data, "sequence"],
         outputs=[seq_plot, seq_expand_btn, seq_collapse_btn]
     )
 
@@ -408,20 +408,20 @@ def create_zero_shot_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         inputs=[],
         outputs=[struct_status]
     ).then(
-        fn=lambda model, file: handle_prediction("structure", model, file), 
-        inputs=[struct_model_dropdown, struct_file], 
+        fn=handle_zero_shot_prediction, 
+        inputs=["structure", struct_model_dropdown, struct_file], 
         outputs=[struct_status, struct_plot, struct_dataframe, struct_download_btn, temp_struct_zip_path, struct_view_controls, struct_full_data]
     )
     
     struct_expand_btn.click(
-        fn=lambda df: expand_heatmap(df, "structure"),
-        inputs=[struct_full_data],
+        fn=expand_heatmap,
+        inputs=[struct_full_data, "structure"],
         outputs=[struct_plot, struct_expand_btn, struct_collapse_btn]
     )
     
     struct_collapse_btn.click(
-        fn=lambda df: collapse_heatmap(df, "structure"),
-        inputs=[struct_full_data],
+        fn=collapse_heatmap,
+        inputs=[struct_full_data, "structure"],
         outputs=[struct_plot, struct_expand_btn, struct_collapse_btn]
     )
 

@@ -515,7 +515,16 @@ def create_manual_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     return {"training_md": training_md, "prediction_md": prediction_md, "evaluation_md": evaluation_md, "download_md": download_md, "faq_md": faq_md}
 
 def update_manual(language):
-    """更新手册内容"""
+    """Update the manual content
+    Args:
+        language: language
+    Returns:
+        training_md: training manual
+        prediction_md: prediction manual
+        evaluation_md: evaluation manual
+        download_md: download manual
+        faq_md: faq manual
+    """
     training_content = load_manual_training(language)
     prediction_content = load_manual_prediction(language)
     evaluation_content = load_manual_evaluation(language)
@@ -524,7 +533,7 @@ def update_manual(language):
     
     # 使用Python的markdown库将Markdown转换为HTML
     def markdown_to_html(markdown_content, base_path="src/web/manual"):
-        """将Markdown内容转换为HTML，并将图片嵌入为base64编码"""
+        """Convert Markdown content to HTML, and embed images as base64 encoded"""
         # 处理图片路径，使用base64编码直接嵌入图片
         def embed_image(match):
             alt_text = match.group(1)

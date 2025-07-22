@@ -399,7 +399,7 @@ def create_eval_tab(constant):
         """
         return html
 
-    def handle_abort():
+    def handle_eval_tab_abort():
         """Handle abortion of the evaluation process"""
         nonlocal is_evaluating, current_process, stop_thread, process_aborted
         
@@ -675,8 +675,14 @@ def create_eval_tab(constant):
             )
         
         # Add dataset preview function
-        def update_dataset_preview(dataset_type=None, defined_dataset=None, custom_dataset=None):
-            """Update dataset preview content"""
+        def update_eval_tab_dataset_preview_UI(dataset_type=None, defined_dataset=None, custom_dataset=None):
+            """Update dataset preview content for Gradio UI
+            Args:
+                dataset_type: dataset type (Use Custom Dataset or Use Pre-defined Dataset)
+                defined_dataset: predefined dataset name
+                custom_dataset: custom dataset path
+            Returns:
+            """
             # Determine which dataset to use based on selection
             if dataset_type == "Use Custom Dataset" and custom_dataset:
                 try:
@@ -791,12 +797,18 @@ def create_eval_tab(constant):
         
         # Preview button click event
         preview_button.click(
-            fn=update_dataset_preview,
+            fn=update_eval_tab_dataset_preview_UI,
             inputs=[is_custom_dataset, eval_dataset_defined, eval_dataset_custom],
             outputs=[dataset_stats_md, preview_table, preview_accordion]
         )
 
-        def update_dataset_settings(choice, dataset_name=None):
+        def update_eval_tab_dataset_settings_UI(choice, dataset_name=None):
+            """Update dataset settings for Gradio UI
+            Args:
+                choice: dataset type (Use Custom Dataset or Use Pre-defined Dataset)
+                dataset_name: predefined dataset name
+            Returns:
+            """
             if choice == "Use Pre-defined Dataset":
                 # Load configuration from dataset_config
                 if dataset_name and dataset_name in dataset_configs:
@@ -824,14 +836,23 @@ def create_eval_tab(constant):
                 ]
         
         is_custom_dataset.change(
-            fn=update_dataset_settings,
+            fn=update_eval_tab_dataset_settings_UI,
             inputs=[is_custom_dataset, eval_dataset_defined],
             outputs=[eval_dataset_defined, eval_dataset_custom, 
                     problem_type, num_labels, metrics]
         )
 
+        def handle_eval_dataset_defined_change(x):
+            """Handle evaluation dataset defined change event
+            Args:
+                x: evaluation dataset defined
+            Returns:
+                Updated UI components
+            """
+            return update_eval_tab_dataset_settings_UI("Use Pre-defined Dataset", x)
+        
         eval_dataset_defined.change(
-            fn=lambda x: update_dataset_settings("Use Pre-defined Dataset", x),
+            fn=handle_eval_dataset_defined_change,
             inputs=[eval_dataset_defined],
             outputs=[eval_dataset_defined, eval_dataset_custom, 
                     problem_type, num_labels, metrics]
@@ -847,13 +868,19 @@ def create_eval_tab(constant):
                 value=["foldseek_seq", "ss8_seq"]
             )
                     
-        def update_training_method(method):
+        def update_structure_seq_visibility_UI(method):
+            """Update the ses-adapter structure sequence visibility for Gradio UI
+            Args:
+                method: training method (ses-adapter)
+            Returns:
+                structure_seq_row: structure sequence input gr.Row (visible or not)
+            """
             return {
                 structure_seq_row: gr.update(visible=method == "ses-adapter")
             }
 
         eval_method.change(
-            fn=update_training_method,
+            fn=update_structure_seq_visibility_UI,
             inputs=[eval_method],
             outputs=[structure_seq_row]
         )
@@ -888,7 +915,14 @@ def create_eval_tab(constant):
                         visible=False
                     )
 
-        def update_batch_inputs(mode):
+        def update_eval_tab_batch_inputs_UI(mode):
+            """Update batch or token input visibility for Gradio UI
+            Args:
+                mode: batch mode
+            Returns:
+                batch_size: batch size input gr.Slider (visible or not)
+                batch_token: batch token input gr.Slider (visible or not)
+            """
             return {
                 batch_size: gr.update(visible=mode == "Batch Size Mode"),
                 batch_token: gr.update(visible=mode == "Batch Token Mode")
@@ -896,7 +930,7 @@ def create_eval_tab(constant):
             
         # Update visibility when mode changes
         batch_mode.change(
-            fn=update_batch_inputs,
+            fn=update_eval_tab_batch_inputs_UI,
             inputs=[batch_mode],
             outputs=[batch_size, batch_token]
         )
@@ -914,10 +948,28 @@ def create_eval_tab(constant):
                 visible=False
             )
 
-        def handle_preview(plm_model, model_path, eval_method, is_custom_dataset, dataset_defined, 
+        def handle_eval_tab_command_preview(plm_model, model_path, eval_method, is_custom_dataset, dataset_defined, 
                           dataset_custom, problem_type, num_labels, metrics, batch_mode, 
                           batch_size, batch_token, eval_structure_seq, eval_pooling_method):
-            """处理预览命令按钮点击事件"""
+            """Handle the preview command button click event
+            Args:
+                plm_model: plm model name
+                model_path: model path
+                eval_method: evaluation method
+                is_custom_dataset: whether to use custom dataset (Use Custom Dataset or Use Pre-defined Dataset)
+                dataset_defined: dataset name
+                dataset_custom: custom dataset path
+                problem_type: problem type
+                num_labels: number of labels
+                metrics: metrics (accuracy, recall, precision, f1, mcc, auroc, f1_max, spearman_corr, mse)
+                batch_mode: batch mode (Batch Size Mode or Batch Token Mode)
+                batch_size: batch size
+                batch_token: batch token (tokens per batch)
+                eval_structure_seq: structure sequence (foldseek_seq, ss8_seq)
+                eval_pooling_method: pooling method (mean, attention1d, light_attention)
+            Returns:
+                command_preview: command preview
+            """
             if command_preview.visible:
                 return gr.update(visible=False)
             
@@ -960,7 +1012,7 @@ def create_eval_tab(constant):
 
         # 绑定预览按钮事件
         preview_button.click(
-            fn=handle_preview,
+            fn=handle_eval_tab_command_preview,
             inputs=[
                 eval_plm_model,
                 eval_model_path,
@@ -1019,7 +1071,7 @@ def create_eval_tab(constant):
             outputs=[eval_output, download_csv_btn]
         )
         abort_button.click(
-            fn=handle_abort,
+            fn=handle_eval_tab_abort,
             inputs=[],
             outputs=[eval_output, download_csv_btn]
         )
