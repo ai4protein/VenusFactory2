@@ -448,70 +448,70 @@ def create_manual_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         
         return toc_html, html_content
 
-    # with gr.Tab("Manual"):
-    # 添加自定义CSS和JavaScript
-    gr.HTML(custom_css + custom_js)
+    with gr.Tab("Manual"):
+        # 添加自定义CSS和JavaScript
+        gr.HTML(custom_css + custom_js)
+        
+        with gr.Row():
+           language = gr.Dropdown(choices=['English', 'Chinese'], value='English', label='Language', interactive=True)
+        
+        with gr.Tab("Training"):
+            training_content = load_manual_training(language.value)
+            toc_html, html_content = generate_toc_and_content(training_content)
+            training_md = gr.HTML(f"""
+                <div class="manual-container">
+                    {toc_html}
+                    <div class="manual-content">{html_content}</div>
+                </div>
+            """)
+        
+        with gr.Tab("Prediction"):
+            prediction_content = load_manual_prediction(language.value)
+            toc_html, html_content = generate_toc_and_content(prediction_content)
+            prediction_md = gr.HTML(f"""
+                <div class="manual-container">
+                    {toc_html}
+                    <div class="manual-content">{html_content}</div>
+                </div>
+            """)
+        
+        with gr.Tab("Evaluation"):
+            evaluation_content = load_manual_evaluation(language.value)
+            toc_html, html_content = generate_toc_and_content(evaluation_content)
+            evaluation_md = gr.HTML(f"""
+                <div class="manual-container">
+                    {toc_html}
+                    <div class="manual-content">{html_content}</div>
+                </div>
+            """)
+        
+        with gr.Tab("Download"):
+            download_content = load_manual_download(language.value)
+            toc_html, html_content = generate_toc_and_content(download_content)
+            download_md = gr.HTML(f"""
+                <div class="manual-container">
+                    {toc_html}
+                    <div class="manual-content">{html_content}</div>
+                </div>
+            """)
+        
+        with gr.Tab("FAQ"):
+            faq_content = load_manual_faq(language.value)
+            toc_html, html_content = generate_toc_and_content(faq_content)
+            faq_md = gr.HTML(f"""
+                <div class="manual-container">
+                    {toc_html}
+                    <div class="manual-content">{html_content}</div>
+                </div>
+            """)
+        
+        # 正确绑定语言切换事件
+        language.change(
+            fn=update_manual,
+            inputs=[language],
+            outputs=[training_md, prediction_md, evaluation_md, download_md, faq_md]
+        )
     
-    with gr.Row():
-        language = gr.Dropdown(choices=['English', 'Chinese'], value='English', label='Language', interactive=True)
-    
-    with gr.Tab("Training"):
-        training_content = load_manual_training(language.value)
-        toc_html, html_content = generate_toc_and_content(training_content)
-        training_md = gr.HTML(f"""
-            <div class="manual-container">
-                {toc_html}
-                <div class="manual-content">{html_content}</div>
-            </div>
-        """)
-    
-    with gr.Tab("Prediction"):
-        prediction_content = load_manual_prediction(language.value)
-        toc_html, html_content = generate_toc_and_content(prediction_content)
-        prediction_md = gr.HTML(f"""
-            <div class="manual-container">
-                {toc_html}
-                <div class="manual-content">{html_content}</div>
-            </div>
-        """)
-    
-    with gr.Tab("Evaluation"):
-        evaluation_content = load_manual_evaluation(language.value)
-        toc_html, html_content = generate_toc_and_content(evaluation_content)
-        evaluation_md = gr.HTML(f"""
-            <div class="manual-container">
-                {toc_html}
-                <div class="manual-content">{html_content}</div>
-            </div>
-        """)
-    
-    with gr.Tab("Download"):
-        download_content = load_manual_download(language.value)
-        toc_html, html_content = generate_toc_and_content(download_content)
-        download_md = gr.HTML(f"""
-            <div class="manual-container">
-                {toc_html}
-                <div class="manual-content">{html_content}</div>
-            </div>
-        """)
-    
-    with gr.Tab("FAQ"):
-        faq_content = load_manual_faq(language.value)
-        toc_html, html_content = generate_toc_and_content(faq_content)
-        faq_md = gr.HTML(f"""
-            <div class="manual-container">
-                {toc_html}
-                <div class="manual-content">{html_content}</div>
-            </div>
-        """)
-    
-    # 正确绑定语言切换事件
-    language.change(
-        fn=update_manual,
-        inputs=[language],
-        outputs=[training_md, prediction_md, evaluation_md, download_md, faq_md]
-    )
-
     return {"training_md": training_md, "prediction_md": prediction_md, "evaluation_md": evaluation_md, "download_md": download_md, "faq_md": faq_md}
 
 def update_manual(language):
