@@ -53,9 +53,8 @@ def load_model_and_tokenizer(args):
     if not os.path.exists(model_path):
         raise FileNotFoundError(f"Adapter model file not found: {model_path}")
 
-    config_path = os.path.join(os.path.dirname(model_path), "lr5e-4_bt12k_ga8.json")
-    model_adapter_path = os.path.join(
-        os.path.dirname(model_path), "lr5e-4_bt12k_ga8.pt")
+    config_path = os.path.join(model_path, "lr5e-4_bt12k_ga8.json")
+    model_adapter_path = os.path.join(model_path, "lr5e-4_bt12k_ga8.pt")
     # Load model configuration from config.json, but command-line arguments have higher priority.
     try:
         with open(config_path, "r") as f:
