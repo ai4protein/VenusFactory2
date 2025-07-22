@@ -109,6 +109,7 @@ def create_ui():
                     train_components["loss_plot"],
                     train_components["metrics_plot"]
                 ],
+
             )
         else:
             # This message will be printed to the console where the script is running
