@@ -74,19 +74,19 @@ def create_ui():
             with gr.TabItem("⚡ Quick Start (For Biologists to predict)"):
                 # Nested (Secondary) Tabs for sub-functions
                 with gr.Tabs():
-                    with gr.TabItem("Zero-Shot Prediction"):
+                    with gr.TabItem("Zero-Shot Mutation Prediction (Get better mutants before wet-lab experiments)"):
                         try:
                             zero_shot_components = create_zero_shot_tab(constant)
                         except Exception as e:
                             gr.Markdown(f"**Error creating Zero-Shot Prediction tab:**\n```\n{e}\n```")
 
-                    with gr.TabItem("Protein Function Prediction"):
+                    with gr.TabItem("Protein Function Prediction (Get the function of a protein before wet-lab experiments)"):
                         try:
                             protein_function_components = create_protein_function_tab(constant)
                         except Exception as e:
                             gr.Markdown(f"**Error creating Protein Function Prediction tab:**\n```\n{e}\n```")
 
-                    with gr.TabItem("Download"):
+                    with gr.TabItem("Download (Download PDB/FASTA/InterPro... Files)"):
                         try:
                             download_components = create_download_tab(constant)
                         except Exception as e:

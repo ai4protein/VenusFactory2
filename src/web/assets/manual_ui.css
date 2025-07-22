@@ -1,0 +1,281 @@
+
+/* increase overall text size */
+.manual-content {
+    font-size: 16px !important;
+    line-height: 1.6 !important;
+}
+
+/* title style */
+.manual-content h1 {
+    font-size: 28px !important;
+    margin-top: 30px !important;
+    margin-bottom: 20px !important;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 10px;
+}
+
+.manual-content h2 {
+    font-size: 24px !important;
+    margin-top: 25px !important;
+    margin-bottom: 15px !important;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 8px;
+}
+
+.manual-content h3 {
+    font-size: 20px !important;
+    margin-top: 20px !important;
+    margin-bottom: 10px !important;
+}
+
+.manual-content h4 {
+    font-size: 18px !important;
+    margin-top: 15px !important;
+    margin-bottom: 10px !important;
+}
+
+/* paragraph and list style */
+.manual-content p, .manual-content li {
+    font-size: 16px !important;
+    margin-bottom: 10px !important;
+}
+
+/* nested list style */
+.manual-content ul, .manual-content ol {
+    padding-left: 25px !important;
+    margin-bottom: 15px !important;
+    list-style-position: outside !important;
+}
+
+.manual-content ul ul, 
+.manual-content ol ol,
+.manual-content ul ol,
+.manual-content ol ul {
+    margin-top: 5px !important;
+    margin-bottom: 5px !important;
+    padding-left: 25px !important;
+}
+
+.manual-content ul {
+    list-style-type: disc !important;
+}
+
+.manual-content ul ul {
+    list-style-type: circle !important;
+}
+
+.manual-content ul ul ul {
+    list-style-type: square !important;
+}
+
+.manual-content ol {
+    list-style-type: decimal !important;
+}
+
+.manual-content ol ol {
+    list-style-type: lower-alpha !important;
+}
+
+.manual-content ol ol ol {
+    list-style-type: lower-roman !important;
+}
+
+/* ensure list item is displayed correctly */
+.manual-content li {
+    display: list-item !important;
+    margin-bottom: 5px !important;
+}
+
+.manual-content li p {
+    margin-bottom: 5px !important;
+    display: inline-block !important;
+}
+
+/* code block style */
+.manual-content pre {
+    background-color: #f5f5f5 !important;
+    padding: 15px !important;
+    border-radius: 5px !important;
+    overflow-x: auto !important;
+    margin: 15px 0 !important;
+}
+
+.manual-content code {
+    font-family: 'Courier New', Courier, monospace !important;
+    font-size: 15px !important;
+}
+
+/* table style */
+.manual-content table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin: 20px 0 !important;
+}
+
+.manual-content th, .manual-content td {
+    border: 1px solid #ddd !important;
+    padding: 12px !important;
+    text-align: left !important;
+}
+
+.manual-content th {
+    background-color: #f2f2f2 !important;
+    font-weight: bold !important;
+}
+
+/* left navigation bar style */
+.manual-container {
+    display: flex !important;
+    width: 100% !important;
+    position: relative !important;
+}
+
+.manual-nav {
+    width: 250px !important;
+    padding: 18px !important;
+    background-color: #f8f9fa !important;
+    border-right: 1px solid #ddd !important;
+    border-radius: 5px !important;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1) !important;
+    font-size: 14px !important;
+    line-height: 1.4 !important;
+    align-self: flex-start !important;
+    position: sticky !important;
+    top: 20px !important;
+    max-height: 100% !important;
+    overflow-y: auto !important;
+}
+
+.manual-nav ul {
+    list-style-type: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+.manual-nav li {
+    margin-bottom: 5px !important;
+}
+
+.manual-nav a {
+    display: block !important;
+    padding: 6px 8px !important;
+    color: #333 !important;
+    text-decoration: none !important;
+    border-radius: 4px !important;
+    line-height: 1.4 !important;
+    transition: all 0.2s ease !important;
+}
+
+.manual-nav a:hover {
+    background-color: #e9ecef !important;
+    transform: translateX(2px) !important;
+}
+
+.manual-nav .nav-h2 {
+    padding-left: 15px !important;
+    font-size: 13px !important;
+}
+
+.manual-nav .nav-h3 {
+    padding-left: 30px !important;
+    font-size: 12px !important;
+}
+
+.manual-content {
+    flex: 1 !important;
+    padding: 20px !important;
+    overflow-y: auto !important;
+    margin-left: 20px !important;
+}
+
+/* responsive design */
+@media (max-width: 768px) {
+    .manual-container {
+        flex-direction: column !important;
+    }
+    
+    .manual-nav {
+        position: static !important;
+        width: 100% !important;
+        height: auto !important;
+        max-height: 300px !important;
+        margin-bottom: 20px !important;
+    }
+    
+    .manual-content {
+        margin-left: 0 !important;
+        width: 100% !important;
+    }
+}
+
+/* scrollbar style */
+.manual-nav::-webkit-scrollbar {
+    width: 6px !important;
+}
+
+.manual-nav::-webkit-scrollbar-track {
+    background: #f1f1f1 !important;
+    border-radius: 10px !important;
+}
+
+.manual-nav::-webkit-scrollbar-thumb {
+    background: #c1c1c1 !important;
+    border-radius: 10px !important;
+}
+
+.manual-nav::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8 !important;
+}
+
+/* enhance list style */
+.manual-content ul li, .manual-content ol li {
+    margin-bottom: 8px !important;
+    line-height: 1.5 !important;
+}
+
+.manual-content ul li:last-child, .manual-content ol li:last-child {
+    margin-bottom: 0 !important;
+}
+
+.manual-content ul ul, .manual-content ol ol, .manual-content ul ol, .manual-content ol ul {
+    margin-top: 8px !important;
+}
+
+/* emphasize list item content */
+.manual-content li strong, .manual-content li b {
+    color: #2c3e50 !important;
+}
+
+/* ensure code block is displayed correctly in list items */
+.manual-content li code {
+    background-color: #f5f5f5 !important;
+    padding: 2px 4px !important;
+    border-radius: 3px !important;
+    font-size: 14px !important;
+    color: #e83e8c !important;
+}
+
+/* add image style */
+.manual-content img {
+    max-width: 100% !important;
+    height: auto !important;
+    display: block !important;
+    margin: 20px auto !important;
+    border-radius: 5px !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
+}
+
+/* add description for images */
+.manual-content p img + em {
+    display: block !important;
+    text-align: center !important;
+    color: #666 !important;
+    font-size: 14px !important;
+    margin-top: 8px !important;
+}
+
+.manual-content img:hover {
+    cursor: pointer !important;
+    transform: scale(1.01) !important;
+    transition: transform 0.2s ease !important;
+}
