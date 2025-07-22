@@ -1553,13 +1553,8 @@ def create_predict_tab(constant):
         preview_text = preview_predict_command(args_dict, is_batch=True)
         return gr.update(value=preview_text, visible=True)
 
-    with gr.Row():
-        with gr.Column():
-            gr.Markdown("## Protein Function Prediction")
-
-    gr.Markdown("### Model Configuration")
+    gr.Markdown("## Model Configuration")
     with gr.Group():
-
         with gr.Row():
             model_path = gr.Textbox(
                 label="Model Path",
@@ -1644,9 +1639,9 @@ def create_predict_tab(constant):
                 )
             
             with gr.Row():
-                preview_single_button = gr.Button("Preview Command")
-                predict_button = gr.Button("Predict", variant="primary")
-                abort_button = gr.Button("Abort", variant="stop")
+                preview_single_button = gr.Button("Preview Command", elem_classes=["preview-command-btn"])
+                predict_button = gr.Button("Start Prediction", variant="primary", elem_classes=["train-btn"])
+                abort_button = gr.Button("Abort Prediction", variant="stop", elem_classes=["abort-btn"])
             
             # 添加命令预览区域
             command_preview = gr.Code(

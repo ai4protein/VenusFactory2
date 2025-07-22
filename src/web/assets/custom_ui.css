@@ -1,0 +1,263 @@
+/* Custom table styles for Gradio Dataframe */
+.preview-table {
+    width: 100% !important;
+    overflow-x: auto !important;
+    display: block !important;
+    min-width: 0 !important;
+    max-width: 100vw !important;
+}
+.preview-table .gr-block {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    overflow-x: auto !important;
+    display: block !important;
+}
+.preview-table table {
+    min-width: 600px !important;
+    width: auto !important;
+    table-layout: auto !important;
+    background-color: white !important;
+    font-size: 0.9em !important;
+    border-collapse: collapse !important;
+    margin-top: 0;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+.preview-table th, .preview-table td {
+    min-width: 120px !important;
+    max-width: 400px !important;
+    white-space: nowrap !important;
+    text-align: left !important;
+    padding: 8px 12px !important;
+    border: 1px solid #ddd !important;
+    vertical-align: middle !important;
+}
+.preview-table th {
+    background-color: #e0e0e0 !important;
+    font-weight: bold !important;
+    font-size: 0.95em !important;
+}
+.preview-table tr:hover {
+    background-color: #f0f0f0 !important;
+}
+@media (max-width: 768px) {
+    .preview-table table {
+        font-size: 0.8em !important;
+    }
+    .preview-table th,
+    .preview-table td {
+        padding: 6px 8px !important;
+        min-width: 80px !important;
+    }
+    .preview-table td {
+        max-width: 200px !important;
+    }
+}
+.preview-table table,
+.preview-table th,
+.preview-table td {
+    border-collapse: collapse !important;
+    border-spacing: 0 !important;
+}
+/* Center Model Statistics Table */
+.center-table-content td, .center-table-content th {
+    text-align: center !important;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+    padding: 10px !important;
+    border: 1px solid #ddd !important;
+    vertical-align: middle !important;
+}
+.center-table-content table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin-bottom: 20px !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
+    border-radius: 8px !important;
+    overflow: hidden !important;
+    table-layout: auto !important;
+}
+.center-table-content th {
+    background-color: #f0f4f8 !important;
+    color: #2c3e50 !important;
+    font-weight: 600 !important;
+    border-bottom: 2px solid #ddd !important;
+    white-space: nowrap !important;
+    min-width: 120px !important;
+}
+.center-table-content tr:nth-child(even) {
+    background-color: #f9f9f9 !important;
+}
+.center-table-content tr:hover {
+    background-color: #f0f7ff !important;
+}
+.center-table-content {
+    width: 100% !important;
+    overflow-x: auto !important;
+}
+.center-table-content .gr-block {
+    width: 100% !important;
+    max-width: none !important;
+}
+
+/* Preview button container and button styles */
+.preview-button-container {
+    display: flex !important;
+    align-items: stretch !important;
+    height: 100% !important;
+    min-height: 86px !important;
+}
+
+.preview-button {
+    height: 100% !important;
+    min-height: 86px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    border-radius: 8px !important;
+    transition: all 0.2s ease !important;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    border: none !important;
+    color: white !important;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3) !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+}
+
+.preview-button:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4) !important;
+    background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%) !important;
+}
+
+.preview-button:active {
+    transform: translateY(0) !important;
+    box-shadow: 0 2px 10px rgba(102, 126, 234, 0.3) !important;
+}
+
+/* Training control buttons styles */
+.preview-command-btn {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    border: none !important;
+    color: white !important;
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    padding: 12px 24px !important;
+    border-radius: 8px !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3) !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    margin-bottom: 10px !important;
+    width: 100% !important;
+}
+
+.preview-command-btn:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4) !important;
+    background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%) !important;
+}
+
+.preview-command-btn:active {
+    transform: translateY(0) !important;
+    box-shadow: 0 2px 10px rgba(102, 126, 234, 0.3) !important;
+}
+
+.abort-btn {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%) !important;
+    border: none !important;
+    color: white !important;
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    padding: 12px 24px !important;
+    border-radius: 8px !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 4px 15px rgba(255, 107, 107, 0.3) !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    margin-bottom: 10px !important;
+    width: 100% !important;
+}
+
+.abort-btn:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4) !important;
+    background: linear-gradient(135deg, #ff5252 0%, #d32f2f 100%) !important;
+}
+
+.abort-btn:active {
+    transform: translateY(0) !important;
+    box-shadow: 0 2px 10px rgba(255, 107, 107, 0.3) !important;
+}
+
+.train-btn {
+    background: linear-gradient(135deg, #4caf50 0%, #45a049 100%) !important;
+    border: none !important;
+    color: white !important;
+    font-size: 18px !important;
+    font-weight: 700 !important;
+    padding: 16px 32px !important;
+    border-radius: 10px !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4) !important;
+    text-transform: uppercase !important;
+    letter-spacing: 1px !important;
+    width: 100% !important;
+    position: relative !important;
+    overflow: hidden !important;
+}
+
+.train-btn::before {
+    content: '' !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: -100% !important;
+    width: 100% !important;
+    height: 100% !important;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent) !important;
+    transition: left 0.5s !important;
+}
+
+.train-btn:hover {
+    transform: translateY(-3px) !important;
+    box-shadow: 0 8px 25px rgba(76, 175, 80, 0.5) !important;
+    background: linear-gradient(135deg, #43a047 0%, #388e3c 100%) !important;
+}
+
+.train-btn:hover::before {
+    left: 100% !important;
+}
+
+.train-btn:active {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4) !important;
+}
+
+.download-btn {
+    background: linear-gradient(135deg, #2196f3 0%, #1976d2 100%) !important;
+    border: none !important;
+    color: white !important;
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    padding: 12px 24px !important;
+    border-radius: 8px !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 4px 15px rgba(33, 150, 243, 0.3) !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    width: 100% !important;
+}
+
+.download-btn:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 20px rgba(33, 150, 243, 0.4) !important;
+    background: linear-gradient(135deg, #1e88e5 0%, #1565c0 100%) !important;
+}
+
+.download-btn:active {
+    transform: translateY(0) !important;
+    box-shadow: 0 2px 10px rgba(33, 150, 243, 0.3) !important;
+}

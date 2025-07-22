@@ -24,6 +24,12 @@ def create_eval_tab(constant):
     stop_thread = False
     process_aborted = False  # 新增标志，表示进程是否被手动终止
     plm_models = constant["plm_models"]
+    
+    # Add CSS styles from external file
+    css_path = os.path.join(os.path.dirname(__file__), "assets", "custom_ui.css")
+    with open(css_path, "r") as f:
+        custom_css = f.read()
+    gr.HTML(f"<style>{custom_css}</style>", visible=False)
 
     def format_metrics(metrics_file):
         """Convert metrics to HTML table format for display"""
@@ -153,7 +159,7 @@ def create_eval_tab(constant):
                 """, gr.update(visible=False)
                 return
             
-            if is_custom_dataset == "Use Custom Dataset":
+            if is_custom_dataset == "Custom Dataset":
                 dataset = dateset_custom
                 test_file = dateset_custom
             else:
@@ -492,9 +498,9 @@ def create_eval_tab(constant):
             with gr.Column(scale=4):
                 with gr.Row():
                     is_custom_dataset = gr.Radio(
-                        choices=["Use Custom Dataset", "Use Pre-defined Dataset"],
+                        choices=["Custom Dataset", "Pre-defined Dataset"],
                         label="Dataset Selection",
-                        value="Use Pre-defined Dataset"
+                        value="Pre-defined Dataset"
                     )
                     eval_dataset_defined = gr.Dropdown(
                         choices=list(dataset_configs.keys()),
@@ -558,22 +564,18 @@ def create_eval_tab(constant):
                     row_count=3,
                     elem_classes=["preview-table"]
                 )
-    # Add CSS styles from external file
-    css_path = os.path.join(os.path.dirname(__file__), "assets", "custom_table.css")
-    with open(css_path, "r") as f:
-        custom_css = f.read()
-    gr.HTML(f"<style>{custom_css}</style>", visible=True)
+   
     
     def update_eval_tab_dataset_preview_UI(dataset_type=None, dataset_name=None, custom_dataset=None):
         """Update dataset preview content for Gradio UI
         Args:
-            dataset_type: dataset type (Use Custom Dataset or Use Pre-defined Dataset)
+            dataset_type: dataset type (Custom Dataset or Pre-defined Dataset)
             dataset_name: predefined dataset name
             custom_dataset: custom dataset path
         Returns:
         """
         # Determine which dataset to use based on selection
-        if dataset_type == "Use Custom Dataset" and custom_dataset:
+        if dataset_type == "Custom Dataset" and custom_dataset:
             try:
                 # Try to load custom dataset
                 dataset = load_dataset(custom_dataset)
@@ -612,7 +614,7 @@ def create_eval_tab(constant):
                 return gr.update(value=error_html), gr.update(value=[["Error", str(e), "-"]], headers=["Error", "Message", "Status"]), gr.update(open=True)
         
         # Use predefined dataset
-        elif dataset_type == "Use Pre-defined Dataset" and dataset_name:
+        elif dataset_type == "Pre-defined Dataset" and dataset_name:
             try:
                 config_path = dataset_configs[dataset_name]
                 with open(config_path, 'r') as f:
@@ -667,11 +669,11 @@ def create_eval_tab(constant):
     def update_eval_tab_dataset_settings_UI(choice, dataset_name=None):
         """Update dataset settings for Gradio UI
         Args:
-            choice: dataset type (Use Custom Dataset or Use Pre-defined Dataset)
+            choice: dataset type (Custom Dataset or Pre-defined Dataset)
             dataset_name: predefined dataset name
         Returns:
         """
-        if choice == "Use Pre-defined Dataset":
+        if choice == "Pre-defined Dataset":
             # Load configuration from dataset_config
             if dataset_name and dataset_name in dataset_configs:
                 with open(dataset_configs[dataset_name], 'r') as f:
@@ -711,7 +713,7 @@ def create_eval_tab(constant):
         Returns:
             Updated UI components
         """
-        return update_eval_tab_dataset_settings_UI("Use Pre-defined Dataset", x)
+        return update_eval_tab_dataset_settings_UI("Pre-defined Dataset", x)
     
     eval_dataset_defined.change(
         fn=handle_eval_dataset_defined_change,
@@ -796,9 +798,10 @@ def create_eval_tab(constant):
     )
 
     with gr.Row():
-        preview_button = gr.Button("Preview Command")
-        abort_button = gr.Button("Abort", variant="stop")
-        eval_button = gr.Button("Start Evaluation", variant="primary")
+        preview_button = gr.Button("Preview Command", elem_classes=["preview-command-btn"])
+        eval_button = gr.Button("Start Evaluation", variant="primary", elem_classes=["train-btn"])
+        abort_button = gr.Button("Abort Evaluation", variant="stop", elem_classes=["abort-btn"])
+        
 
     with gr.Row():
         command_preview = gr.Code(
@@ -816,7 +819,7 @@ def create_eval_tab(constant):
             plm_model: plm model name
             model_path: model path
             eval_method: evaluation method
-            is_custom_dataset: whether to use custom dataset (Use Custom Dataset or Use Pre-defined Dataset)
+            is_custom_dataset: whether to Custom Dataset (Custom Dataset or Pre-defined Dataset)
             dataset_defined: dataset name
             dataset_custom: custom dataset path
             problem_type: problem type
@@ -842,7 +845,7 @@ def create_eval_tab(constant):
         }
         
         # 处理数据集相关参数
-        if is_custom_dataset == "Use Custom Dataset":
+        if is_custom_dataset == "Custom Dataset":
             args["dataset"] = dataset_custom
             args["problem_type"] = problem_type
             args["num_labels"] = num_labels

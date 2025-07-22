@@ -70,7 +70,7 @@ The evaluation interface is divided into several main sections, each containing 
     - **Evaluation Dataset**: Select a dataset from the dropdown menu
     - The system automatically loads the problem type, number of labels, and evaluation metrics for the dataset
     - Suitable for quick evaluation and standard benchmarking
-  - **Use Custom Dataset**: Use custom datasets (see the "7.4 Upload Dataset to Hugging Face" section in the Training Module User Guide for details)
+  - **Custom Dataset**: Custom Datasets (see the "7.4 Upload Dataset to Hugging Face" section in the Training Module User Guide for details)
     - **Custom Dataset Path**: Enter the Hugging Face dataset path (format: `username/dataset_name`)
     - Requires manual setting of problem type, number of labels, and evaluation metrics
     - Suitable for evaluating model performance on custom data
@@ -194,7 +194,7 @@ Below is a complete guide to using the VenusFactory evaluation module, from mode
      - Choose a dataset from the dropdown menu
      - The system will automatically load relevant configurations
    - If using a custom dataset:
-     - Select **Use Custom Dataset**
+     - Select **Custom Dataset**
      - Enter the Hugging Face dataset path (format: `username/dataset_name`)
      - Manually set the problem type, number of labels, and evaluation metrics
 

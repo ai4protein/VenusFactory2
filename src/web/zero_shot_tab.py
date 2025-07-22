@@ -384,145 +384,28 @@ def create_zero_shot_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                             )
                     struct_download_btn = gr.DownloadButton("💾 Download Results", visible=False)
 
-    # State variables to store full data
-    temp_seq_zip_path = gr.State(None)
-    temp_struct_zip_path = gr.State(None)
-    seq_full_data = gr.State(None)  # Store full prediction data
-    struct_full_data = gr.State(None)  # Store full prediction data
-
-    def update_predict_button_status(model, file_obj):
-        return gr.update(interactive=bool(model and file_obj and hasattr(file_obj, 'name')))
-
-    def update_status_predicting():
-        """Update status to show prediction is running"""
-        return "🔄 Predicting... Please wait."
+    # --- State variables and Event Handlers ---
+    seq_full_data_state = gr.State()
+    struct_full_data_state = gr.State()
     
-    def handle_prediction(model_type: str, model_name: str, file_obj: Any):
-        """Handle prediction and return initial summary view"""
-        if not model_name or not file_obj:
-            return ("Error: Check inputs", go.Figure(), pd.DataFrame(), 
-                   gr.update(visible=False), None, gr.update(visible=False), None)
-    
-        status, df = run_zero_shot_prediction(model_type, model_name, file_obj.name)
-        
-        if df.empty:
-            return (status, go.Figure().update_layout(title="No results generated"), pd.DataFrame(), 
-                   gr.update(visible=False), None, gr.update(visible=False), None)
-        
-        # Get total residue count
-        total_residues = get_total_residues_count(df)
-        
-        # Generate summary view (first 40 residues)
-        x_labels, y_labels, z_data, rank_data, score_data, score_col = prepare_plotly_heatmap_data(df, max_residues=40)
-        
-        if score_col is None:
-            csv_path = f"temp_{model_type}_result_{int(time.time())}.csv"
-            df.to_csv(csv_path, index=False)
-            return (status, go.Figure().update_layout(title="Score column not found"), df, 
-                   gr.update(visible=True, value=csv_path), csv_path, 
-                   gr.update(visible=False), df)
-
-        # Generate summary heatmap
-        fig = generate_plotly_heatmap(x_labels, y_labels, z_data, rank_data, score_data, 
-                                    is_partial=True, total_residues=total_residues)
-        
-        # Create download files
-        run_timestamp = int(time.time())
-        csv_path = f"temp_{model_type}_results_{run_timestamp}.csv"
-        df.to_csv(csv_path, index=False)
-        heatmap_path = f"temp_{model_type}_heatmap_{run_timestamp}.html"
-        fig.write_html(heatmap_path)
-        zip_path = f"prediction_{model_type}_results_{run_timestamp}.zip"
-        create_zip_archive({csv_path: "prediction_results.csv", heatmap_path: "prediction_heatmap.html"}, zip_path)
-
-        # Show expand button if there are more than 40 residues
-        show_controls = total_residues > 40
-
-        return (status, fig, df, gr.update(visible=True, value=zip_path), zip_path, 
-               gr.update(visible=show_controls), df)
-
-    def expand_heatmap(full_df, model_type):
-        """Show complete heatmap"""
-        if full_df is None or full_df.empty:
-            return go.Figure().update_layout(title="No data available"), gr.update(visible=True), gr.update(visible=False)
-        
-        total_residues = get_total_residues_count(full_df)
-        x_labels, y_labels, z_data, rank_data, score_data, score_col = prepare_plotly_heatmap_data(full_df)
-        
-        if score_col is None:
-            return go.Figure().update_layout(title="Score column not found"), gr.update(visible=True), gr.update(visible=False)
-        
-        fig = generate_plotly_heatmap(x_labels, y_labels, z_data, rank_data, score_data, 
-                                    is_partial=False, total_residues=total_residues)
-        
-        return fig, gr.update(visible=False), gr.update(visible=True)
-
-    def collapse_heatmap(full_df, model_type):
-        """Show summary heatmap (first 40 residues)"""
-        if full_df is None or full_df.empty:
-            return go.Figure().update_layout(title="No data available"), gr.update(visible=True), gr.update(visible=False)
-        
-        total_residues = get_total_residues_count(full_df)
-        x_labels, y_labels, z_data, rank_data, score_data, score_col = prepare_plotly_heatmap_data(full_df, max_residues=40)
-        
-        if score_col is None:
-            return go.Figure().update_layout(title="Score column not found"), gr.update(visible=True), gr.update(visible=False)
-        
-        fig = generate_plotly_heatmap(x_labels, y_labels, z_data, rank_data, score_data, 
-                                    is_partial=True, total_residues=total_residues)
-        
-        return fig, gr.update(visible=True), gr.update(visible=False)
-
-    # Event handlers
-    seq_file.upload(fn=display_protein_sequence_from_fasta, inputs=[seq_file], outputs=[seq_protein_display])
-    seq_file.upload(fn=update_predict_button_status, inputs=[seq_model_dropdown, seq_file], outputs=[seq_predict_btn])
-    seq_model_dropdown.change(fn=update_predict_button_status, inputs=[seq_model_dropdown, seq_file], outputs=[seq_predict_btn])
-    
-    # First update status to show prediction is starting
+    seq_file_upload.upload(fn=display_protein_sequence_from_fasta, inputs=seq_file_upload, outputs=seq_protein_display)
+    seq_enable_ai.change(fn=toggle_ai_section, inputs=seq_enable_ai, outputs=seq_ai_box)
     seq_predict_btn.click(
-        fn=update_status_predicting,
-        inputs=[],
-        outputs=[seq_status]
-    ).then(
-        fn=lambda model, file: handle_prediction("sequence", model, file), 
-        inputs=[seq_model_dropdown, seq_file], 
-        outputs=[seq_status, seq_plot, seq_dataframe, seq_download_btn, temp_seq_zip_path, seq_view_controls, seq_full_data]
+        fn=handle_prediction_with_ai, 
+        inputs=[gr.State("sequence"), seq_model_dd, seq_file_upload, seq_enable_ai, seq_ai_model_dd, seq_api_key_in], 
+        outputs=[seq_status_box, seq_plot_out, seq_df_out, seq_download_btn, gr.State(), seq_view_controls, seq_full_data_state, seq_ai_out]
     )
-    
-    seq_expand_btn.click(
-        fn=lambda df: expand_heatmap(df, "sequence"),
-        inputs=[seq_full_data],
-        outputs=[seq_plot, seq_expand_btn, seq_collapse_btn]
-    )
-    
-    seq_collapse_btn.click(
-        fn=lambda df: collapse_heatmap(df, "sequence"),
-        inputs=[seq_full_data],
-        outputs=[seq_plot, seq_expand_btn, seq_collapse_btn]
-    )
+    seq_expand_btn.click(fn=expand_heatmap, inputs=[seq_full_data_state], outputs=[seq_plot_out, seq_expand_btn, seq_collapse_btn])
+    seq_collapse_btn.click(fn=collapse_heatmap, inputs=[seq_full_data_state], outputs=[seq_plot_out, seq_expand_btn, seq_collapse_btn])
 
     struct_file_upload.upload(fn=display_protein_sequence_from_pdb, inputs=struct_file_upload, outputs=struct_protein_display)
     struct_enable_ai.change(fn=toggle_ai_section, inputs=struct_enable_ai, outputs=struct_ai_box)
     struct_predict_btn.click(
-        fn=update_status_predicting,
-        inputs=[],
-        outputs=[struct_status]
-    ).then(
-        fn=lambda model, file: handle_prediction("structure", model, file), 
-        inputs=[struct_model_dropdown, struct_file], 
-        outputs=[struct_status, struct_plot, struct_dataframe, struct_download_btn, temp_struct_zip_path, struct_view_controls, struct_full_data]
+        fn=handle_prediction_with_ai, 
+        inputs=[gr.State("structure"), struct_model_dd, struct_file_upload, struct_enable_ai, struct_ai_model_dd, struct_api_key_in], 
+        outputs=[struct_status_box, struct_plot_out, struct_df_out, struct_download_btn, gr.State(), struct_view_controls, struct_full_data_state, struct_ai_out]
     )
-    
-    struct_expand_btn.click(
-        fn=lambda df: expand_heatmap(df, "structure"),
-        inputs=[struct_full_data],
-        outputs=[struct_plot, struct_expand_btn, struct_collapse_btn]
-    )
-    
-    struct_collapse_btn.click(
-        fn=lambda df: collapse_heatmap(df, "structure"),
-        inputs=[struct_full_data],
-        outputs=[struct_plot, struct_expand_btn, struct_collapse_btn]
-    )
+    struct_expand_btn.click(fn=expand_heatmap, inputs=[struct_full_data_state], outputs=[struct_plot_out, struct_expand_btn, struct_collapse_btn])
+    struct_collapse_btn.click(fn=collapse_heatmap, inputs=[struct_full_data_state], outputs=[struct_plot_out, struct_expand_btn, struct_collapse_btn])
 
     return {}

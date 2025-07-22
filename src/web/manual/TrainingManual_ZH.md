@@ -74,7 +74,7 @@ VenusFactory 提供多种评估指标，用于评估模型性能。
   - **Use Pre-defined Dataset**：使用系统预定义的数据集
     - **Dataset Configuration**：从下拉菜单中选择一个数据集
     - 系统会自动加载数据集的问题类型、标签数量和评估指标
-  - **Use Custom Dataset**：使用自定义数据集
+  - **Custom Dataset**：使用自定义数据集
     - **Custom Dataset Path**：输入Hugging Face数据集路径（格式：`用户名/数据集名`）
     - **Problem Type**：选择问题类型
       - `single_label_classification`：单标签分类
@@ -231,7 +231,7 @@ VenusFactory 提供多种评估指标，用于评估模型性能。
 
 #### 使用自定义数据集
 1. 准备符合要求的数据集并上传到Hugging Face（详见 [自定义数据集格式要求](#header-7)）
-2. 在**Dataset Selection**中选择"Use Custom Dataset"
+2. 在**Dataset Selection**中选择"Custom Dataset"
 3. 在**Custom Dataset Path**中输入Hugging Face数据集路径（格式：`用户名/数据集名`）
 4. 设置**Problem Type**、**Number of Labels**和**Metrics**
 5. 点击**Preview Dataset**按钮验证数据集是否正确加载

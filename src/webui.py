@@ -48,7 +48,7 @@ def create_ui():
         with gr.Tabs():
             
             # Group 1: Model Train and Prediction
-            with gr.TabItem("🚀 Model Train and Prediction"):
+            with gr.TabItem("🚀 Model Train and Prediction (For Advanced Users)"):
                 # Nested (Secondary) Tabs for sub-functions
                 with gr.Tabs():
                     with gr.TabItem("Training"):
@@ -71,7 +71,7 @@ def create_ui():
                             gr.Markdown(f"**Error creating Prediction tab:**\n```\n{e}\n```")
 
             # Group 2: Quick Start
-            with gr.TabItem("⚡ Quick Start"):
+            with gr.TabItem("⚡ Quick Start (For Biologists to predict)"):
                 # Nested (Secondary) Tabs for sub-functions
                 with gr.Tabs():
                     with gr.TabItem("Zero-Shot Prediction"):
@@ -93,7 +93,7 @@ def create_ui():
                             gr.Markdown(f"**Error creating Download tab:**\n```\n{e}\n```")
 
             # Group 3: Manual (no nested tabs needed)
-            with gr.TabItem("📖 Manual"):
+            with gr.TabItem("📖 Manual (More details about the platform)"):
                 try:
                     manual_components = create_manual_tab(constant)
                 except Exception as e:

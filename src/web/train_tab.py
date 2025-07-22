@@ -19,8 +19,8 @@ class TrainingArgs:
         self.plm_model = plm_models[args_dict["plm_model"]]
         
         # Process dataset selection
-        self.dataset_selection = args_dict["dataset_selection"]  # "Use Custom Dataset" 或 "Use Pre-defined Dataset"
-        if self.dataset_selection == "Use Pre-defined Dataset":
+        self.dataset_selection = args_dict["dataset_selection"]  # "Custom Dataset" 或 "Pre-defined Dataset"
+        if self.dataset_selection == "Pre-defined Dataset":
             self.dataset_config = dataset_configs[args_dict["dataset_config"]]
             self.dataset_custom = None
             # load dataset config
@@ -108,7 +108,7 @@ class TrainingArgs:
             args_dict["structure_seq"] = ",".join(self.structure_seq)
 
         # add dataset related parameters
-        if self.dataset_selection == "Use Pre-defined Dataset":
+        if self.dataset_selection == "Pre-defined Dataset":
             args_dict["dataset_config"] = self.dataset_config
         else:
             args_dict["dataset"] = self.dataset_custom
@@ -153,7 +153,12 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     
     plm_models = constant["plm_models"]
     dataset_configs = constant["dataset_configs"]
-
+    # Add CSS styles from external file
+    css_path = os.path.join(os.path.dirname(__file__), "assets", "custom_ui.css")
+    with open(css_path, "r") as f:
+        custom_css = f.read()
+    gr.HTML(f"<style>{custom_css}</style>", visible=False)
+    
     # Model and Dataset Selection
     gr.Markdown("## Model and Dataset Configuration")
 
@@ -171,9 +176,9 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 
                     # add dataset selection method
                     is_custom_dataset = gr.Radio(
-                        choices=["Use Custom Dataset", "Use Pre-defined Dataset"],
+                        choices=["Custom Dataset", "Pre-defined Dataset"],
                         label="Dataset Selection",
-                        value="Use Pre-defined Dataset",
+                        value="Pre-defined Dataset",
                         scale=3
                     )
             
@@ -193,11 +198,10 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                     )
             
             # add preview button in a separate column and add style
-            with gr.Column(scale=1, min_width=120, elem_classes="preview-button-container"):
+            with gr.Column(scale=1, elem_classes="preview-button-container"):
                 dataset_preview_button = gr.Button(
                     "Preview Dataset", 
                     variant="primary", 
-                    size="lg",
                     elem_classes="preview-button"
                 )
             
@@ -304,11 +308,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                     elem_classes=["preview-table"]
                 )
 
-    # Add CSS styles from external file
-    css_path = os.path.join(os.path.dirname(__file__), "assets", "custom_table.css")
-    with open(css_path, "r") as f:
-        custom_css = f.read()
-    gr.HTML(f"<style>{custom_css}</style>", visible=True)
+    
     # Hyperparameter Settings
     gr.Markdown("## Hyperparameter Settings")
     with gr.Accordion("Hyperparameter Settings", open=False):
@@ -481,9 +481,10 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         # Right side: Training Control
         with gr.Column(scale=1):
             gr.Markdown("## Training Control")
-            preview_button = gr.Button("Preview Command")
-            abort_button = gr.Button("Abort", variant="stop")
-            train_button = gr.Button("Start", variant="primary")
+            preview_button = gr.Button("Preview Command", elem_classes=["preview-command-btn"])
+            train_button = gr.Button("Start Training", variant="primary", elem_classes=["train-btn"])
+            abort_button = gr.Button("Abort Training", variant="stop", elem_classes=["abort-btn"])
+            
     
     with gr.Row():
         command_preview = gr.Code(
@@ -569,7 +570,8 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             download_csv_btn = gr.DownloadButton(
                 "Download CSV", 
                 visible=False,
-                size="lg"
+                size="lg",
+                elem_classes=["download-btn"]
             )
         # add an empty column to occupy the remaining space
         with gr.Column(scale=4):
@@ -1091,7 +1093,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         """Handle the preview command button click event
         Args:
             plm_model: plm model name
-            is_custom_dataset: whether to use custom dataset (Use Custom Dataset or Use Pre-defined Dataset)
+            is_custom_dataset: whether to Custom Dataset (Custom Dataset or Pre-defined Dataset)
             dataset_config: dataset config path
             dataset_custom: custom dataset path
             problem_type: problem type
@@ -1243,7 +1245,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         """Handle the train command button click event
         Args:
             plm_model: plm model name
-            is_custom_dataset: whether to use custom dataset (Use Custom Dataset or Use Pre-defined Dataset)
+            is_custom_dataset: whether to Custom Dataset (Custom Dataset or Pre-defined Dataset)
             dataset_config: dataset config path
             dataset_custom: custom dataset path
             problem_type: problem type
@@ -1596,13 +1598,13 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     def update_train_tab_dataset_preview_UI(dataset_type=None, dataset_name=None, custom_dataset=None):
         """Update dataset preview content for Gradio UI
         Args:
-            dataset_type: dataset type (Use Custom Dataset or Use Pre-defined Dataset)
+            dataset_type: dataset type (Custom Dataset or Pre-defined Dataset)
             dataset_name: predefined dataset name
             custom_dataset: custom dataset path
         Returns:
         """
         # Determine which dataset to use based on selection
-        if dataset_type == "Use Custom Dataset" and custom_dataset:
+        if dataset_type == "Custom Dataset" and custom_dataset:
             try:
                 # Try to load custom dataset
                 dataset = load_dataset(custom_dataset)
@@ -1641,7 +1643,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 return gr.update(value=error_html), gr.update(value=[["Error", str(e), "-"]], headers=["Error", "Message", "Status"]), gr.update(open=True)
         
         # Use predefined dataset
-        elif dataset_type == "Use Pre-defined Dataset" and dataset_name:
+        elif dataset_type == "Pre-defined Dataset" and dataset_name:
             try:
                 config_path = dataset_configs[dataset_name]
                 with open(config_path, 'r') as f:
@@ -1696,11 +1698,11 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     def update_train_tab_dataset_settings_UI(choice, dataset_name=None):
         """Update dataset settings for Gradio UI
         Args:
-            choice: dataset type (Use Custom Dataset or Use Pre-defined Dataset)
+            choice: dataset type (Custom Dataset or Pre-defined Dataset)
             dataset_name: predefined dataset name
         Returns:
         """
-        if choice == "Use Pre-defined Dataset":
+        if choice == "Pre-defined Dataset":
             # load dataset config from dataset_config
             result = {
                 dataset_config: gr.update(visible=True),
@@ -1759,7 +1761,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             x: dataset config
         Returns:
         """
-        return update_train_tab_dataset_settings_UI("Use Pre-defined Dataset", x)
+        return update_train_tab_dataset_settings_UI("Pre-defined Dataset", x)
     
     dataset_config.change(
         fn=handle_dataset_config_change,

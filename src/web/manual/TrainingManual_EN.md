@@ -74,7 +74,7 @@ The training interface is divided into several main sections, each containing sp
   - **Use Pre-defined Dataset**: Use system-defined datasets
     - **Dataset Configuration**: Select a dataset from the dropdown menu
     - The system will automatically load the problem type, number of labels, and evaluation metrics
-  - **Use Custom Dataset**: Use a custom dataset
+  - **Custom Dataset**: Use a custom dataset
     - **Custom Dataset Path**: Enter the Hugging Face dataset path (format: `username/dataset_name`)
     - **Problem Type**: Select the problem type
       - `single_label_classification`: Single-label classification
@@ -231,7 +231,7 @@ Below is a complete guide to using the VenusFactory training module, from data p
 
 #### Using Custom Datasets
 1. Prepare a dataset that meets the requirements and upload it to Hugging Face (see [Custom Dataset Format Requirements](#header-7))
-2. Select "Use Custom Dataset" in **Dataset Selection**
+2. Select "Custom Dataset" in **Dataset Selection**
 3. Enter the Hugging Face dataset path in **Custom Dataset Path** (format: `username/dataset_name`)
 4. Set **Problem Type**, **Number of Labels**, and **Metrics**
 5. Click the **Preview Dataset** button to verify that the dataset is loaded correctly
