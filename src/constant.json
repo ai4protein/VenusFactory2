@@ -47,7 +47,8 @@
     },
     "zero_shot_sequence_model":{
         "ESM-1v": "facebook/esm1v_t33_650M_UR90S_1",
-        "ESM2-650M": "facebook/esm2_t33_650M_UR50D"
+        "ESM2-650M": "facebook/esm2_t33_650M_UR50D",
+        "ESM-1b": "facebook/esm1b_t33_650M_UR50S"
     },
     "zero_shot_structure_model":{
         "SaProt": "westlake-repl/SaProt_650M_AF2",
