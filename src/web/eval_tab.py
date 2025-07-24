@@ -22,14 +22,9 @@ def create_eval_tab(constant):
     current_process = None
     output_queue = queue.Queue()
     stop_thread = False
-    process_aborted = False  # 新增标志，表示进程是否被手动终止
+    process_aborted = False 
     plm_models = constant["plm_models"]
     
-    # Add CSS styles from external file
-    css_path = os.path.join(os.path.dirname(__file__), "assets", "custom_ui.css")
-    with open(css_path, "r") as f:
-        custom_css = f.read()
-    gr.HTML(f"<style>{custom_css}</style>", visible=False)
 
     def format_metrics(metrics_file):
         """Convert metrics to HTML table format for display"""
@@ -37,20 +32,15 @@ def create_eval_tab(constant):
             df = pd.read_csv(metrics_file)
             metrics_dict = df.iloc[0].to_dict()
             
-            # 定义指标优先级顺序
             priority_metrics = ['loss', 'accuracy', 'f1', 'precision', 'recall', 'auroc', 'mcc']
             
-            # 构建优先级排序键
             def get_priority(item):
                 name = item[0]
                 if name in priority_metrics:
                     return priority_metrics.index(name)
                 return len(priority_metrics)
             
-            # 按优先级排序
             sorted_metrics = sorted(metrics_dict.items(), key=get_priority)
-            
-            # 计算指标数量
             metrics_count = len(sorted_metrics)
             
             html = f"""
@@ -66,15 +56,15 @@ def create_eval_tab(constant):
                     <tbody>
             """
             
-            # 添加每个指标行，使用交替行颜色
+            # add alternating row color
             for i, (metric_name, metric_value) in enumerate(sorted_metrics):
                 row_style = 'background-color: #f9f9f9;' if i % 2 == 0 else ''
                 
-                # 对优先级指标使用粗体
+                # use bold for priority metrics
                 is_priority = metric_name in priority_metrics
                 name_style = 'font-weight: bold;' if is_priority else ''
                 
-                # 转换指标名称：缩写用大写，非缩写首字母大写
+                # convert metric name: abbreviations in uppercase, non-abbreviations in capitalize
                 display_name = metric_name
                 if metric_name.lower() in ['f1', 'mcc', 'auroc']:
                     display_name = metric_name.upper()

@@ -153,11 +153,6 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     
     plm_models = constant["plm_models"]
     dataset_configs = constant["dataset_configs"]
-    # Add CSS styles from external file
-    css_path = os.path.join(os.path.dirname(__file__), "assets", "custom_ui.css")
-    with open(css_path, "r") as f:
-        custom_css = f.read()
-    gr.HTML(f"<style>{custom_css}</style>", visible=False)
     
     # Model and Dataset Selection
     gr.Markdown("## Model and Dataset Configuration")

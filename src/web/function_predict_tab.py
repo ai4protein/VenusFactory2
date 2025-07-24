@@ -13,6 +13,9 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import requests
 from dataclasses import dataclass
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # --- 常量与映射 ---
 MODEL_MAPPING = {

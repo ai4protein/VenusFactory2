@@ -11,12 +11,15 @@ import plotly.graph_objects as go
 import numpy as np
 import requests
 from dataclasses import dataclass
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # --- Constants and Mappings ---
 MODEL_MAPPING = {
     "ESM-1v": "esm1v", "ESM2-650M": "esm2", "SaProt": "saprot",
     "ESM-IF1": "esmif1", "MIF-ST": "mifst", "ProSST-2048": "prosst",
-    "ProSSN": "protssn"
+    "ProSSN": "protssn","ESM-1b":"esm1b"
 }
 AI_MODELS = {
     "DeepSeek": {

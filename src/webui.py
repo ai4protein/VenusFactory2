@@ -10,6 +10,7 @@ from web.predict_tab import create_predict_tab
 from web.manual_tab import create_manual_tab
 from web.zero_shot_tab import create_zero_shot_tab
 from web.function_predict_tab import create_protein_function_tab
+from web.chat_tab import create_chat_tab
 from web.venus_factory_tool_tab import create_easy_use_tab
 from web.venus_factory_download_tab import create_tool_download_tab
 from web.dash_viewer import run_dash_server
@@ -41,7 +42,12 @@ def create_ui():
         except Exception as e:
             return f"An error occurred in the UI update loop: {str(e)}", None, None
     
-    with gr.Blocks(title="VenusFactory") as demo:
+    css_links = """
+    <link rel="stylesheet" href="/static/custom_ui.css">
+    <link rel="stylesheet" href="/static/manual_ui.css">
+    """
+    
+    with gr.Blocks(title="VenusFactory", css=css_links) as demo:
         gr.Markdown("# VenusFactory")
         
         # Initialize train_components to None to handle potential creation errors
@@ -72,6 +78,12 @@ def create_ui():
                             predict_components = create_predict_tab(constant)
                         except Exception as e:
                             gr.Markdown(f"**Error creating Prediction tab:**\n```\n{e}\n```")
+
+            with gr.TabItem("AI Chat (DeepSeek API - Smart Assistant)"):
+                try:
+                    chat_components = create_chat_tab(constant)
+                except Exception as e:
+                    gr.Markdown(f"**Error creating Chat tab:**\n```\n{e}\n```")
 
             # Group 2: Quick Start
             with gr.TabItem("⚡ Quick Start (For Biologists to predict)"):
