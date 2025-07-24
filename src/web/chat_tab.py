@@ -139,8 +139,11 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     # Load CSS styles
     css_path = os.path.join(os.path.dirname(__file__), "assets", "chat_ui.css")
     if os.path.exists(css_path):
-        custom_css = open(css_path, "r").read()
-        gr.HTML(f"<style>{custom_css}</style>", visible=False)
+        try:
+            custom_css = open(css_path, "r").read()
+            gr.HTML(f"<style>{custom_css}</style>", visible=False)
+        except Exception as e:
+            print(f"Warning: Could not load chat CSS file: {e}")
     
     # Initialize chat instance
     chat_instance = DeepSeekChat()

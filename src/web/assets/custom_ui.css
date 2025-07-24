@@ -261,3 +261,109 @@
     transform: translateY(0) !important;
     box-shadow: 0 2px 10px rgba(33, 150, 243, 0.3) !important;
 }
+
+/* Tab Font Size Enhancement */
+/* Main tabs (top level) */
+.gradio-tabs > .tabs > .tab-nav > .tab-nav-item {
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    padding: 12px 20px !important;
+    min-height: 50px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+/* Nested tabs (secondary level) */
+.gradio-tabs .gradio-tabs > .tabs > .tab-nav > .tab-nav-item {
+    font-size: 16px !important;
+    font-weight: 500 !important;
+    padding: 10px 16px !important;
+    min-height: 45px !important;
+}
+
+/* Tab hover effects */
+.gradio-tabs > .tabs > .tab-nav > .tab-nav-item:hover,
+.gradio-tabs .gradio-tabs > .tabs > .tab-nav > .tab-nav-item:hover {
+    background-color: rgba(102, 126, 234, 0.1) !important;
+    transform: translateY(-1px) !important;
+    transition: all 0.2s ease !important;
+}
+
+/* Active tab styling */
+.gradio-tabs > .tabs > .tab-nav > .tab-nav-item.selected,
+.gradio-tabs .gradio-tabs > .tabs > .tab-nav > .tab-nav-item.selected {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    color: white !important;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3) !important;
+}
+
+/* Responsive design for tabs */
+@media (max-width: 768px) {
+    .gradio-tabs > .tabs > .tab-nav > .tab-nav-item {
+        font-size: 16px !important;
+        padding: 10px 15px !important;
+        min-height: 45px !important;
+    }
+    
+    .gradio-tabs .gradio-tabs > .tabs > .tab-nav > .tab-nav-item {
+        font-size: 14px !important;
+        padding: 8px 12px !important;
+        min-height: 40px !important;
+    }
+}
+
+/* GitHub button hover effects */
+.github-button {
+    transition: all 0.3s ease !important;
+}
+
+.github-button:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2) !important;
+    background: #e8e8e8 !important;
+    border-color: #d0d0d0 !important;
+}
+
+/* Hugging Face button hover effects */
+.huggingface-button {
+    transition: all 0.3s ease !important;
+}
+
+.huggingface-button:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2) !important;
+    background: #e8e8e8 !important;
+    border-color: #d0d0d0 !important;
+}
+
+/* Header responsive design */
+@media (max-width: 768px) {
+    .header-container {
+        flex-direction: column !important;
+        gap: 15px !important;
+        text-align: center !important;
+    }
+    
+    .header-container > div:first-child {
+        flex-direction: column !important;
+        gap: 10px !important;
+    }
+    
+    .header-container h1 {
+        font-size: 2em !important;
+    }
+    
+    .header-container span {
+        font-size: 1em !important;
+    }
+    
+    .github-button, .huggingface-button {
+        align-self: center !important;
+    }
+    
+    .header-container > div:last-child {
+        flex-direction: column !important;
+        gap: 8px !important;
+    }
+}
