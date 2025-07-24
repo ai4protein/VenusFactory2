@@ -56,7 +56,7 @@ def create_ui():
         # --- Top-Level Tabs for Main Categories ---
         with gr.Tabs():
             
-            # Group 1: Model Train and Prediction
+            # Model Train and Prediction
             with gr.TabItem("🚀 Model Train and Prediction (For Advanced Users)"):
                 # Nested (Secondary) Tabs for sub-functions
                 with gr.Tabs():
@@ -79,14 +79,21 @@ def create_ui():
                         except Exception as e:
                             gr.Markdown(f"**Error creating Prediction tab:**\n```\n{e}\n```")
 
-            with gr.TabItem("AI Chat (DeepSeek API - Smart Assistant)"):
+            with gr.TabItem("🤖 VenusAgent-0.1 (Beta Version)"):
                 try:
                     chat_components = create_chat_tab(constant)
                 except Exception as e:
                     gr.Markdown(f"**Error creating Chat tab:**\n```\n{e}\n```")
 
-            # Group 2: Quick Start
-            with gr.TabItem("⚡ Quick Start (For Biologists to predict)"):
+            # Quick Tools
+            with gr.TabItem("🔧 Quick Tools (For biologists with no AI background)"):
+                try:
+                    easy_use_components = create_easy_use_tab(constant)
+                except Exception as e:
+                    gr.Markdown(f"**Error creating Easy-Use tab:**\n```\n{e}\n```")
+                
+            # Advanced Tools
+            with gr.TabItem("⚡ Advanced Tools (Specifying the model and parameters)"):
                 # Nested (Secondary) Tabs for sub-functions
                 with gr.Tabs():
                     with gr.TabItem("Zero-Shot Mutation Prediction (Get better mutants before wet-lab experiments)"):
@@ -107,12 +114,14 @@ def create_ui():
                         except Exception as e:
                             gr.Markdown(f"**Error creating Download tab:**\n```\n{e}\n```")
 
-            with gr.TabItem(" VenusFactory-Tool is here"):
-                create_easy_use_tab(constant)
-            
-            with gr.TabItem("Download"):
-                create_tool_download_tab(constant)
-            # Group 3: Manual (no nested tabs needed)
+            # Download
+            with gr.TabItem("💾 Download (Download PDB/FASTA/InterPro... Files)"):
+                try:
+                    download_components = create_tool_download_tab(constant)
+                except Exception as e:
+                    gr.Markdown(f"**Error creating Download tab:**\n```\n{e}\n```")
+                
+            # Manual (no nested tabs needed)
             with gr.TabItem("📖 Manual (More details about the platform)"):
                 try:
                     manual_components = create_manual_tab(constant)

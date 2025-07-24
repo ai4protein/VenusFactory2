@@ -57,7 +57,7 @@ class DeepSeekChat:
                             mime_type = f"image/{file_ext[1:]}"
                         elif file_ext in ['.pdf']:
                             mime_type = "application/pdf"
-                        elif file_ext in ['.txt', '.py', '.js', '.html', '.css', '.json', '.md', '.fasta', '.fa']:
+                        elif file_ext in ['.txt', '.py', '.js', '.html', '.css', '.json', '.md', '.fasta', '.fa', '.pdb']:
                             mime_type = f"text/{file_ext[1:]}"
                         else:
                             mime_type = "application/octet-stream"
@@ -173,7 +173,17 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             if has_fasta_file and any(word in message.lower() for word in ['mutation', 'mutant', 'mutate', 'zero-shot', 'zero shot', '设计', 'design', 'function', 'solubility', 'localization', 'binding', 'stability', 'sorting', 'temperature']):
                 # Use VenusFactory API for FASTA files
                 print(f"DEBUG: Processing FASTA file with intent: {intent}")
-                if intent['action'] == 'predict_zero_shot_sequence':
+                
+                # Check if user wants structure-based model but only has FASTA file
+                structure_models = ['SaProt', 'ProtSSN', 'ESM-IF1', 'MIF-ST', 'ProSST-2048']
+                if intent['action'] == 'predict_zero_shot_structure' and intent['model'] in structure_models:
+                    # User wants structure model but only has FASTA file - provide helpful error
+                    response = f"❌ **Error**: You requested {intent['model']} which is a structure-based model, but you only uploaded a FASTA file.\n\n"
+                    response += f"**Solution**: Please upload a PDB or CIF structure file instead of FASTA, or use a sequence-based model like ESM-1v or ESM2-650M.\n\n"
+                    response += f"**Available options**:\n"
+                    response += f"- **Structure models** (need PDB/CIF): SaProt, ProtSSN, ESM-IF1, MIF-ST, ProSST-2048\n"
+                    response += f"- **Sequence models** (work with FASTA): ESM-1v, ESM2-650M, ESM-1b\n"
+                elif intent['action'] == 'predict_zero_shot_sequence':
                     print(f"DEBUG: Calling sequence prediction with model: {intent['model']}")
                     response = call_zero_shot_sequence_prediction_from_file(intent['fasta_file'], intent['model'])
                 elif intent['action'] == 'predict_function':
@@ -187,6 +197,7 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 # Handle VenusFactory specific functions
                 print(f"DEBUG: Processing without FASTA file, intent: {intent}")
                 if intent['action'] == 'predict_zero_shot_sequence':
+                    print(f"DEBUG: Processing sequence prediction")
                     if 'fasta_file' in intent:
                         # Use uploaded FASTA file
                         response = call_zero_shot_sequence_prediction_from_file(intent['fasta_file'], intent['model'])
@@ -195,9 +206,15 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         response = predict_zero_shot_sequence(intent['sequence'], intent['model'])
                     else:
                         response = "Error: No sequence or FASTA file provided for mutation prediction"
-                elif intent['action'] == 'predict_zero_shot_structure' and 'structure_file' in intent:
-                    response = predict_zero_shot_structure(intent['structure_file'], intent['model'])
+                elif intent['action'] == 'predict_zero_shot_structure':
+                    print(f"DEBUG: Processing structure prediction, structure_file in intent: {'structure_file' in intent}")
+                    if 'structure_file' in intent:
+                        print(f"DEBUG: Calling structure prediction with model: {intent['model']}")
+                        response = call_zero_shot_structure_prediction(intent['structure_file'], intent['model'])
+                    else:
+                        response = "Error: No structure file provided for structure-based mutation prediction"
                 elif intent['action'] == 'predict_function':
+                    print(f"DEBUG: Processing function prediction")
                     if 'fasta_file' in intent:
                         # Use uploaded FASTA file
                         response = call_protein_function_prediction_from_file(intent['fasta_file'], intent['model'], intent['task'])
@@ -207,6 +224,7 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                     else:
                         response = "Error: No sequence or FASTA file provided for function prediction"
                 else:
+                    print(f"DEBUG: Falling back to DeepSeek API")
                     # Fall back to DeepSeek API (without files to avoid JSON errors)
                     response = chat_instance.chat(message, [], system_prompt)
             else:
@@ -247,7 +265,7 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             label="System Prompt (Optional)",
             placeholder="Set AI assistant role and behavior...",
             lines=3,
-            value="You are VenusFactory AI Assistant, a specialized protein engineering and bioinformatics expert. You can help users with:\n\n1. Zero-shot mutation prediction using sequence-based models (ESM-1v, ESM2-650M) and structure-based models (SaProt, ProSSN, ESM-IF1, MIF-ST, ProSST-2048)\n2. Protein function prediction including solubility, localization, binding, stability, sorting signal, and optimum temperature\n3. Protein sequence analysis and interpretation\n4. Bioinformatics data analysis and visualization\n\nYou automatically detect user intent and call appropriate VenusFactory APIs. Always respond in English and provide clear, actionable insights."
+            value="You are VenusFactory AI Assistant, a specialized protein engineering and bioinformatics expert. You can help users with:\n\n1. Zero-shot mutation prediction using sequence-based models (ESM-1v, ESM2-650M, ESM-1b) and structure-based models (SaProt, ProtSSN, ESM-IF1, MIF-ST, ProSST-2048)\n2. Protein function prediction including solubility, localization, binding, stability, sorting signal, and optimum temperature.\n Always respond in English and provide clear, actionable insights."
         )
         
         # File upload
@@ -302,7 +320,7 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             
             **Supported Zero-shot Models:**
             - **Sequence-based**: ESM-1v, ESM2-650M
-            - **Structure-based**: SaProt, ProSSN, ESM-IF1, MIF-ST, ProSST-2048
+            - **Structure-based**: SaProt, ProtSSN, ESM-IF1, MIF-ST, ProSST-2048
             
             **Supported Function Models:**
             - ESM2-650M, Ankh-large, ProtBert-uniref50, ProtT5-xl-uniref50
@@ -411,7 +429,7 @@ def call_zero_shot_structure_prediction(structure_file: str, model_name: str = "
             enable_ai=False,
             ai_model="DeepSeek",
             user_api_key="",
-            api_name="/handle_prediction_with_ai"
+            api_name="/handle_prediction_with_ai_1"
         )
         
         # Parse the result - handle_prediction_with_ai returns multiple values
@@ -802,8 +820,8 @@ User message: "{message}"
 Uploaded files: FASTA={has_fasta_file}, Structure={has_structure_file}
 
 Available VenusFactory functions:
-1. Zero-shot mutation prediction (sequence-based): ESM-1v, ESM2-650M
-2. Zero-shot mutation prediction (structure-based): SaProt, ProSSN, ESM-IF1, MIF-ST, ProSST-2048
+1. Zero-shot mutation prediction (sequence-based): ESM-1v, ESM2-650M, ESM-1b
+2. Zero-shot mutation prediction (structure-based): SaProt, ProtSSN, ESM-IF1, MIF-ST, ProSST-2048
 3. Protein function prediction: Solubility, Localization, Binding, Stability, Sorting signal, Optimum temperature
 
 Please analyze the user's intent and return a JSON response with the following structure:
@@ -816,10 +834,12 @@ Please analyze the user's intent and return a JSON response with the following s
 
 Rules:
 - If user wants mutation prediction with FASTA file or sequence, use "predict_zero_shot_sequence"
-- If user wants mutation prediction with structure file, use "predict_zero_shot_structure"
+- If user wants mutation prediction with structure file OR mentions structure-based models (SaProt, ProtSSN, ESM-IF1, MIF-ST, ProSST-2048), use "predict_zero_shot_structure"
+- IMPORTANT: If user mentions structure-based models (SaProt, ProtSSN, ESM-IF1, MIF-ST, ProSST-2048) but only has FASTA file, still use "predict_zero_shot_structure" - the system will handle the error
 - If user wants function prediction, use "predict_function" and set model to "ProtT5-xl-uniref50"
 - If unclear or general question, use "chat"
-- For mutation prediction: extract model preference from message (ESM2, SaProt, etc.)
+- For sequence-based mutation prediction: extract model preference from message (ESM2, ESM-1v, ESM-1b)
+- For structure-based mutation prediction: extract model preference from message (SaProt, ProtSSN, ESM-IF1, MIF-ST, ProSST-2048)
 - For function prediction: extract task preference (solubility, localization, etc.) but always use "ProtT5-xl-uniref50" as model
 """
     
@@ -928,13 +948,14 @@ def fallback_intent_detection(message: str, has_fasta_file: bool, has_structure_
             intent['task'] = 'Solubility'  # Default task
     # Then check for mutation prediction
     elif any(word in message_lower for word in ['mutation', 'mutant', 'mutate', '设计', '预测']):
-        if has_structure_file or any(word in message_lower for word in ['structure', 'pdb', 'cif', 'saprot', 'protssn', 'esmif1', 'mifst', 'prosst']):
+        # Check for structure-based models first (even if only FASTA file is available)
+        if any(word in message_lower for word in ['saprot', 'protssn', 'esmif1', 'mifst', 'prosst', 'structure', 'pdb', 'cif']):
             intent['action'] = 'predict_zero_shot_structure'
             intent['type'] = 'zero_shot_prediction'
             if 'saprot' in message_lower:
                 intent['model'] = 'SaProt'
             elif 'protssn' in message_lower:
-                intent['model'] = 'ProSSN'
+                intent['model'] = 'ProtSSN'
             elif 'esmif1' in message_lower:
                 intent['model'] = 'ESM-IF1'
             elif 'mifst' in message_lower:
@@ -942,15 +963,23 @@ def fallback_intent_detection(message: str, has_fasta_file: bool, has_structure_
             elif 'prosst' in message_lower:
                 intent['model'] = 'ProSST-2048'
             else:
-                intent['model'] = 'ProSST-2048'
-        elif has_fasta_file or intent['sequence']:
+                intent['model'] = 'ProSST-2048'  # Default structure model
+        # Then check for sequence-based models
+        elif has_fasta_file or intent['sequence'] or any(word in message_lower for word in ['esm1v', 'esm-1v', 'esm2', 'esm-2', 'esm1b']):
             intent['action'] = 'predict_zero_shot_sequence'
             intent['type'] = 'zero_shot_prediction'
             if 'esm2' in message_lower or 'esm-2' in message_lower:
                 intent['model'] = 'ESM2-650M'
             elif 'esm1v' in message_lower or 'esm-1v' in message_lower:
                 intent['model'] = 'ESM-1v'
+            elif 'esm1b' in message_lower or 'esm-1b' in message_lower:
+                intent['model'] = 'ESM-1b'
             else:
                 intent['model'] = 'ESM-1v'  # Default sequence model
+        else:
+            # Default to sequence prediction if no specific model mentioned
+            intent['action'] = 'predict_zero_shot_sequence'
+            intent['type'] = 'zero_shot_prediction'
+            intent['model'] = 'ESM-1v'
     
     return intent 
