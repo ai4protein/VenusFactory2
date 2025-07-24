@@ -16,7 +16,7 @@ from dataclasses import dataclass
 MODEL_MAPPING = {
     "ESM-1v": "esm1v", "ESM2-650M": "esm2", "SaProt": "saprot",
     "ESM-IF1": "esmif1", "MIF-ST": "mifst", "ProSST-2048": "prosst",
-    "ProSSN": "protssn"
+    "ProSSN": "protssn","ESM-1b":"esm1b"
 }
 AI_MODELS = {
     "DeepSeek": {
