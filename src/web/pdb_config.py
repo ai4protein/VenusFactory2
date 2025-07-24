@@ -1,0 +1,1 @@
+temp_downloads\alphafold2_structures\P00728.pdb

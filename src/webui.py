@@ -1,5 +1,6 @@
 import json
 import time
+import threading
 import gradio as gr
 from web.utils.monitor import TrainingMonitor
 from web.train_tab import create_train_tab
@@ -10,7 +11,8 @@ from web.manual_tab import create_manual_tab
 from web.zero_shot_tab import create_zero_shot_tab
 from web.function_predict_tab import create_protein_function_tab
 from web.venus_factory_tool_tab import create_easy_use_tab
-
+from web.venus_factory_download_tab import create_tool_download_tab
+from web.dash_viewer import run_dash_server
 def load_constant():
     """Load constant values from config files"""
     try:
@@ -95,6 +97,9 @@ def create_ui():
 
             with gr.TabItem(" VenusFactory-Tool is here"):
                 create_easy_use_tab(constant)
+            
+            with gr.TabItem("Download"):
+                create_tool_download_tab(constant)
             # Group 3: Manual (no nested tabs needed)
             with gr.TabItem("📖 Manual (More details about the platform)"):
                 try:
@@ -123,6 +128,9 @@ def create_ui():
 if __name__ == "__main__":
     try:
         demo = create_ui()
-        demo.queue().launch(server_name="0.0.0.0", server_port=7860, share=True, allowed_paths=["img"])
+        dash_thread = threading.Thread(target=run_dash_server, daemon=True )
+        dash_thread.start()
+        demo.queue().launch(server_port=7860, share=True, allowed_paths=["img"])
+
     except Exception as e:
         print(f"Failed to launch UI: {str(e)}")
