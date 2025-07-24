@@ -11,6 +11,9 @@ import plotly.graph_objects as go
 import numpy as np
 import requests
 from dataclasses import dataclass
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # --- Constants and Mappings ---
 MODEL_MAPPING = {
