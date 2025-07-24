@@ -25,7 +25,7 @@ MODEL_MAPPING_ZERO_SHOT = {
     "SaProt": "saprot",
     "MIF-ST": "mifst",
     "ProSST-2048": "prosst",
-    "ProSSN": "protssn"
+    "ProtSSN": "protssn"
 }
 
 DATASET_MAPPING_ZERO_SHOT = [

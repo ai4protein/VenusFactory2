@@ -55,7 +55,7 @@
         "ESM-IF1": "esm_if1_gvp4_t16_142M_UR50",
         "MIF-ST": "mifst",
         "ProSST-2048": "AI4Protein/ProSST-2048",
-        "ProSSN": "tyang816/ProtSSN"
+        "ProtSSN": "tyang816/ProtSSN"
     },
     "function_predict_model":{
         "Ankh-large": "ElnaggarLab/ankh-large",
