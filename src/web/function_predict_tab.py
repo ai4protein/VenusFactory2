@@ -279,7 +279,7 @@ def create_protein_function_tab(constant: Dict[str, Any] = None) -> Dict[str, An
                     "--output_csv", str(output_file.absolute()),
                 ]
                 subprocess.run(cmd, capture_output=True, text=True, check=True, encoding='utf-8', errors='ignore')
-                
+                # 改成job harsh id
                 if output_file.exists():
                     df = pd.read_csv(output_file)
                     df["Dataset"] = dataset
