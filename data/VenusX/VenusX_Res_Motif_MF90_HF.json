@@ -2,7 +2,7 @@
     "dataset": "AI4Protein/VenusX_Res_Motif_MF90",
     "num_labels": 2,
     "problem_type": "residue_single_label_classification",
-    "metrics": "aupr,auroc,f1,accuracy,mcc,recall",
+    "metrics": "aupr,auroc,f1,f1_positive,f1_negative,accuracy,mcc,recall,precision",
     "monitor": "aupr",
     "monitor_strategy": "max"
 }

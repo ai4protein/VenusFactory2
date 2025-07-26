@@ -204,6 +204,75 @@ class ResidueRecall(BaseResidueMetric):
         # Recall requires predicted class labels.
         return torch.argmax(preds, dim=1), target
 
+
+class ResiduePrecision(BaseResidueMetric):
+    """Calculates Precision for residue-level classification."""
+    def _get_metric_instance(self):
+        if self.num_classes == 2:
+            return Precision(task='binary', average=self.average)
+        else:
+            return Precision(task='multiclass', num_classes=self.num_classes, average=self.average, ignore_index=self.ignore_index)
+
+    def _prepare_preds(self, preds, target):
+        # Precision requires predicted class labels.
+        return torch.argmax(preds, dim=1), target
+
+
+class ResidueF1Positive(BaseResidueMetric):
+    """Calculates F1-Score for positive class in residue-level classification."""
+    def _get_metric_instance(self):
+        if self.num_classes == 2:
+            return F1Score(task='binary', average='none')
+        else:
+            return F1Score(task='multiclass', num_classes=self.num_classes, average='none', ignore_index=self.ignore_index)
+
+    def _prepare_preds(self, preds, target):
+        # F1 requires predicted class labels.
+        return torch.argmax(preds, dim=1), target
+    
+    def compute(self):
+        result = self.metric.compute()
+        # For binary classification, return the positive class (index 1) F1 score
+        # For multiclass, return the positive class (index 1) F1 score
+        if self.num_classes == 2:
+            # Handle case where result might be a scalar (no data)
+            if result.ndim == 0:
+                return result
+            return result[1]  # Positive class F1 score
+        else:
+            # Handle case where result might be a scalar (no data)
+            if result.ndim == 0:
+                return result
+            return result[1]  # Positive class F1 score
+
+
+class ResidueF1Negative(BaseResidueMetric):
+    """Calculates F1-Score for negative class in residue-level classification."""
+    def _get_metric_instance(self):
+        if self.num_classes == 2:
+            return F1Score(task='binary', average='none')
+        else:
+            return F1Score(task='multiclass', num_classes=self.num_classes, average='none', ignore_index=self.ignore_index)
+
+    def _prepare_preds(self, preds, target):
+        # F1 requires predicted class labels.
+        return torch.argmax(preds, dim=1), target
+    
+    def compute(self):
+        result = self.metric.compute()
+        # For binary classification, return the negative class (index 0) F1 score
+        # For multiclass, return the negative class (index 0) F1 score
+        if self.num_classes == 2:
+            # Handle case where result might be a scalar (no data)
+            if result.ndim == 0:
+                return result
+            return result[0]  # Negative class F1 score
+        else:
+            # Handle case where result might be a scalar (no data)
+            if result.ndim == 0:
+                return result
+            return result[0]  # Negative class F1 score
+
 def setup_metrics(args):
     """Setup metrics based on problem type and specified metrics list."""
     metrics_dict = {}
@@ -309,6 +378,12 @@ def _setup_residue_metrics(metric_name, num_labels, device):
         'f1': {
             'metric': ResidueF1Score(num_classes=num_labels, average='micro').to(device),
         },
+        'f1_positive': {
+            'metric': ResidueF1Positive(num_classes=num_labels, average='micro').to(device),
+        },
+        'f1_negative': {
+            'metric': ResidueF1Negative(num_classes=num_labels, average='micro').to(device),
+        },
         'accuracy': {
             'metric': ResidueAccuracy(num_classes=num_labels, average='micro').to(device),
         },
@@ -317,6 +392,9 @@ def _setup_residue_metrics(metric_name, num_labels, device):
         },
         'recall': {
             'metric': ResidueRecall(num_classes=num_labels, average='micro').to(device),
+        },
+        'precision': {
+            'metric': ResiduePrecision(num_classes=num_labels, average='micro').to(device),
         }
     }
     return metrics_config.get(metric_name) 
