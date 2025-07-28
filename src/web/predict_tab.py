@@ -15,6 +15,7 @@ import traceback
 import re
 from web.utils.command import preview_predict_command
 import select
+from datetime import datetime
 
 def create_predict_tab(constant):
     plm_models = constant["plm_models"]
@@ -23,6 +24,16 @@ def create_predict_tab(constant):
     output_queue = queue.Queue()
     stop_thread = False
     process_aborted = False  # Flag indicating if the process was manually terminated
+    
+    def track_usage(module):
+        """追踪功能使用次数"""
+        try:
+            import requests
+            requests.post("http://localhost:8000/api/stats/track", 
+                         json={"module": module, "timestamp": datetime.now().isoformat()})
+        except Exception as e:
+            print(f"Failed to track usage: {e}")
+            # 统计失败不影响主功能
 
     def process_output(process, queue):
         """Process output from subprocess and put it in queue"""
@@ -90,6 +101,9 @@ def create_predict_tab(constant):
                 <p style="margin: 0; color: #f57f17; font-weight: bold;">A prediction is already running. Please wait or abort it.</p>
             </div>
             """)
+        
+        # 追踪功能使用
+        track_usage("mutation_prediction")
         
         # If the process was aborted but not reset properly, ensure we're in a clean state
         if process_aborted:
@@ -645,7 +659,10 @@ def create_predict_tab(constant):
             <div style="padding: 10px; background-color: #fff8e1; border-radius: 5px;">
                 <p style="margin: 0; color: #f57f17; font-weight: bold;">A prediction is already running. Please wait or abort it.</p>
             </div>
-            """), gr.update(visible=False)
+            """)
+        
+        # 追踪功能使用
+        track_usage("mutation_prediction")
         
         # If the process was aborted but not reset properly, ensure we're in a clean state
         if process_aborted:
