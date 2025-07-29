@@ -6,16 +6,14 @@ import gradio as gr
 from web.utils.monitor import TrainingMonitor
 from web.train_tab import create_train_tab
 from web.eval_tab import create_eval_tab
-from web.index_tab import create_index_tab
 from web.download_tab import create_download_tab
 from web.predict_tab import create_predict_tab
 from web.manual_tab import create_manual_tab
-from web.zero_shot_tab import create_zero_shot_tab
-from web.function_predict_tab import create_protein_function_tab
+from web.index_tab import create_index_tab
 from web.chat_tab import create_chat_tab
-from web.venus_factory_tool_tab import create_easy_use_tab
-from web.venus_factory_download_tab import create_tool_download_tab
-from web.dash_viewer import run_dash_server
+from web.venus_factory_advanced_tool_tab import create_advanced_tool_tab
+from web.venus_factory_download_tab import create_download_tool_tab
+from web.venus_factory_quick_tool_tab import create_quick_tool_tab
 def load_constant():
     """Load constant values from config files"""
     try:
@@ -104,7 +102,6 @@ def create_ui():
 
         # --- Top-Level Tabs for Main Categories ---
         with gr.Tabs():
-            
             # Index and Citations
             with gr.TabItem("🏠 Index"):
                 try:
@@ -141,43 +138,28 @@ def create_ui():
                     gr.Markdown(f"**Error creating Chat tab:**\n```\n{e}\n```")
 
             # Quick Tools
-            with gr.TabItem("🔧 Quick Tools (For biologists with no AI background)"):
+            with gr.TabItem("🔧 Quick Tools "):
                 try:
-                    easy_use_components = create_easy_use_tab(constant)
+                    easy_use_components = create_quick_tool_tab(constant)
                 except Exception as e:
                     gr.Markdown(f"**Error creating Easy-Use tab:**\n```\n{e}\n```")
                 
             # Advanced Tools
-            with gr.TabItem("⚡ Advanced Tools (Specifying the model and parameters)"):
-                # Nested (Secondary) Tabs for sub-functions
-                with gr.Tabs():
-                    with gr.TabItem("Zero-Shot Mutation Prediction (Get better mutants before wet-lab experiments)"):
-                        try:
-                            zero_shot_components = create_zero_shot_tab(constant)
-                        except Exception as e:
-                            gr.Markdown(f"**Error creating Zero-Shot Prediction tab:**\n```\n{e}\n```")
-
-                    with gr.TabItem("Protein Function Prediction (Get the function of a protein before wet-lab experiments)"):
-                        try:
-                            protein_function_components = create_protein_function_tab(constant)
-                        except Exception as e:
-                            gr.Markdown(f"**Error creating Protein Function Prediction tab:**\n```\n{e}\n```")
-
-                    with gr.TabItem("Download (Download PDB/FASTA/InterPro... Files)"):
-                        try:
-                            download_components = create_download_tab(constant)
-                        except Exception as e:
-                            gr.Markdown(f"**Error creating Download tab:**\n```\n{e}\n```")
+            with gr.TabItem("⚡ Advanced Tools"):
+                try:
+                    advanced_tool_components = create_advanced_tool_tab(constant)
+                except Exception as e:
+                    gr.Markdown(f"**Error creating Advanced Tools tab:**\n```\n{e}\n```")
 
             # Download
-            with gr.TabItem("💾 Download (Download PDB/FASTA/InterPro... Files)"):
+            with gr.TabItem("💾 Download "):
                 try:
-                    download_components = create_tool_download_tab(constant)
+                    download_components = create_download_tool_tab(constant)
                 except Exception as e:
                     gr.Markdown(f"**Error creating Download tab:**\n```\n{e}\n```")
                 
             # Manual (no nested tabs needed)
-            with gr.TabItem("📖 Manual (More details about the platform)"):
+            with gr.TabItem("📖 Manual "):
                 try:
                     manual_components = create_manual_tab(constant)
                 except Exception as e:
@@ -204,8 +186,6 @@ def create_ui():
 if __name__ == "__main__":
     try:
         demo = create_ui()
-        dash_thread = threading.Thread(target=run_dash_server, daemon=True )
-        dash_thread.start()
         demo.queue().launch(
             server_port=7860, 
             share=True, 
