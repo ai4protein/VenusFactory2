@@ -6,6 +6,7 @@ import gradio as gr
 from web.utils.monitor import TrainingMonitor
 from web.train_tab import create_train_tab
 from web.eval_tab import create_eval_tab
+from web.index_tab import create_index_tab
 from web.download_tab import create_download_tab
 from web.predict_tab import create_predict_tab
 from web.manual_tab import create_manual_tab
@@ -104,6 +105,12 @@ def create_ui():
         # --- Top-Level Tabs for Main Categories ---
         with gr.Tabs():
             
+            # Index and Citations
+            with gr.TabItem("🏠 Index"):
+                try:
+                    index_components = create_index_tab(constant)
+                except Exception as e:
+                    gr.Markdown(f"**Error creating Index tab:**\n```\n{e}\n```")
             # Model Train and Prediction
             with gr.TabItem("🚀 Model Train and Prediction (For Advanced Users)"):
                 # Nested (Secondary) Tabs for sub-functions

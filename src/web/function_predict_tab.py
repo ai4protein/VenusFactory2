@@ -14,6 +14,7 @@ from plotly.subplots import make_subplots
 import requests
 from dataclasses import dataclass
 from dotenv import load_dotenv
+from datetime import datetime
 
 load_dotenv()
 
@@ -249,11 +250,24 @@ def create_protein_function_tab(constant: Dict[str, Any] = None) -> Dict[str, An
 
         return gr.update(visible=enable_ai)
 
+    def track_usage(module):
+        """追踪功能使用次数"""
+        try:
+            import requests
+            requests.post("http://localhost:8000/api/stats/track", 
+                         json={"module": module, "timestamp": datetime.now().isoformat()})
+        except Exception as e:
+            print(f"Failed to track usage: {e}")
+            # 统计失败不影响主功能
+    
     def handle_prediction(model: str, task: str, datasets: List[str], fasta_file: Any, 
                       enable_ai: bool, ai_model: str, user_api_key: str) -> Generator:
         if not all([model, task, datasets, fasta_file]):
             yield "❌ Error: All fields are required.", pd.DataFrame(), None, gr.update(visible=False), ""
             return
+
+        # 追踪功能使用
+        track_usage("function_analysis")
 
         yield "🚀 Starting predictions...", pd.DataFrame(), None, gr.update(visible=False), "AI analysis will appear here..."
         
