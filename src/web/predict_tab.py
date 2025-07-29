@@ -26,14 +26,12 @@ def create_predict_tab(constant):
     process_aborted = False  # Flag indicating if the process was manually terminated
     
     def track_usage(module):
-        """追踪功能使用次数"""
         try:
             import requests
             requests.post("http://localhost:8000/api/stats/track", 
                          json={"module": module, "timestamp": datetime.now().isoformat()})
         except Exception as e:
             print(f"Failed to track usage: {e}")
-            # 统计失败不影响主功能
 
     def process_output(process, queue):
         """Process output from subprocess and put it in queue"""
