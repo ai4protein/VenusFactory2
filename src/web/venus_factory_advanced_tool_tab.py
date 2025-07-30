@@ -18,10 +18,13 @@ from web.venus_factory_quick_tool_tab import *
 # --- Constants and Mappings ---
 
 # For Zero-Shot Mutation Prediction
-MODEL_MAPPING_ZERO_SHOT = {
+MODEL_MAPPING_ZERO_SHOT_SEQUENCE = {
     "ESM2-650M": "esm2",
-    "ESM-IF1": "esmif1",
     "ESM-1v": "esm1v",
+
+}
+MODEL_MAPPING_ZERO_SHOT_STRUCTURE = {
+    "ESM-IF1": "esmif1",
     "SaProt": "saprot",
     "MIF-ST": "mifst",
     "ProSST-2048": "prosst",
@@ -153,18 +156,176 @@ def handle_file_upload(file_obj: Any) -> str:
     else:
         return "Unsupported file type. Please upload a .fasta, .fa, or .pdb file."
 
+def handle_mutation_prediction_advance(
+    function_selection: str, 
+    file_obj: Any, 
+    enable_ai: bool, 
+    ai_model: str, 
+    user_api_key: str, 
+    model_name:str
+) -> Generator:
+    """Handle mutation prediction workflow."""
+    if not file_obj or not function_selection:
+        yield (
+            "❌ Error: Function and file are required.", 
+            None, None, gr.update(visible=False), None, 
+            gr.update(visible=False), None, 
+            "Please select a function and upload a file."
+        )
+        return
+
+    file_path = file_obj.name
+    
+    # # Determine model and type
+    # if model_name:
+    #     model_type = "structure" if model_name == "ESM-IF1" else "sequence"
+    # else:
+    #     if file_path.lower().endswith((".fasta", ".fa")):
+    #         model_name, model_type = "ESM2-650M", "sequence"
+
+    if file_path.lower().endswith((".fasta", ".fa")):
+        model_name, model_type = "ESM2-650M", "sequence"
+
+        # Process FASTA file to keep only the first sequence
+        processed_file_path = process_fasta_file(file_path)
+        if processed_file_path != file_path:
+            file_path = processed_file_path
+            yield (
+                "⚠️ Multi-sequence FASTA detected. Using only the first sequence for prediction.",
+                None, None, gr.update(visible=False), None,
+                gr.update(visible=False), None,
+                "Processing first sequence only..."
+            )
+    elif file_path.lower().endswith(".pdb"):
+        model_name, model_type = "ESM-IF1", "structure"
+    else:
+        yield (
+            "❌ Error: Unsupported file type.", 
+            None, None, gr.update(visible=False), None, 
+            gr.update(visible=False), None, 
+            "Please upload a .fasta, .fa, or .pdb file."
+        )
+        return
+
+    # Start prediction
+    yield (
+        f"⏳ Running prediction...", 
+        None, None, gr.update(visible=False), None, 
+        gr.update(visible=False), None, 
+        "Prediction in progress..."
+    )
+    
+    status, raw_df = run_zero_shot_prediction(model_type, model_name, file_path)
+    
+    if raw_df.empty:
+        yield (
+            status, 
+            go.Figure(layout={'title': 'No results generated'}), 
+            pd.DataFrame(), gr.update(visible=False), None, 
+            gr.update(visible=False), None, 
+            "No results to analyze."
+        )
+        return
+    
+    score_col = next((c for c in raw_df.columns if 'score' in c.lower()), raw_df.columns[1])
+    
+    display_df = pd.DataFrame()
+    display_df['Mutant'] = raw_df['mutant']
+    display_df['Prediction Rank'] = range(1, len(raw_df) + 1)
+    
+    min_s, max_s = raw_df[score_col].min(), raw_df[score_col].max()
+    if max_s == min_s:
+        scaled_scores = pd.Series([0.0] * len(raw_df))
+    else:
+        scaled_scores = -1 + 2 * (raw_df[score_col] - min_s) / (max_s - min_s)
+    display_df['Prediction Score'] = scaled_scores.round(2)
+
+    df_for_heatmap = raw_df.copy()
+    df_for_heatmap['Prediction Rank'] = range(1, len(df_for_heatmap) + 1)
+
+    total_residues = get_total_residues_count(df_for_heatmap)
+    data_tuple = prepare_top_residue_heatmap_data(df_for_heatmap)
+    
+    if data_tuple[0] is None:
+        yield (
+            status, 
+            go.Figure(layout={'title': 'Score column not found'}), 
+            display_df, gr.update(visible=False), None, 
+            gr.update(visible=False), display_df, 
+            "Score column not found."
+        )
+        return
+
+    summary_fig = generate_plotly_heatmap(*data_tuple[:4])
+    
+    # Handle AI analysis
+    ai_summary = "AI Analysis disabled. Enable in settings to generate a report."
+    if enable_ai:
+        yield (
+            f"✅ Prediction complete. 🤖 Generating AI summary...", 
+            summary_fig, display_df, gr.update(visible=False), None, 
+            gr.update(visible=total_residues > 20), display_df, 
+            "🤖 AI is analyzing..."
+        )
+        
+        api_key = get_api_key(ai_model, user_api_key)
+        if not api_key:
+            ai_summary = "❌ No API key found."
+        else:
+            ai_config = AIConfig(
+                api_key, ai_model, 
+                AI_MODELS[ai_model]["api_base"], 
+                AI_MODELS[ai_model]["model"]
+            )
+            prompt = generate_mutation_ai_prompt(display_df, model_name, function_selection)
+            ai_summary = call_ai_api(ai_config, prompt)
+    
+    # Create download files
+    temp_dir = Path("temp_outputs")
+    temp_dir.mkdir(exist_ok=True)
+    timestamp = int(time.time())
+    
+    csv_path = temp_dir / f"mut_res_{timestamp}.csv"
+    heatmap_path = temp_dir / f"mut_map_{timestamp}.html"
+    
+    display_df.to_csv(csv_path, index=False)
+    summary_fig.write_html(heatmap_path)
+    
+    files_to_zip = {
+        str(csv_path): "prediction_results.csv", 
+        str(heatmap_path): "prediction_heatmap.html"
+    }
+    
+    if not ai_summary.startswith("❌") and not ai_summary.startswith("AI Analysis"):
+        report_path = temp_dir / f"ai_report_{timestamp}.md"
+        with open(report_path, 'w', encoding='utf-8') as f:
+            f.write(ai_summary)
+        files_to_zip[str(report_path)] = "AI_Analysis_Report.md"
+
+    zip_path = temp_dir / f"pred_mut_{timestamp}.zip"
+    zip_path_str = create_zip_archive(files_to_zip, str(zip_path))
+
+    final_status = status if not enable_ai else "✅ Prediction and AI analysis complete!"
+    
+    yield (
+        final_status, summary_fig, display_df, 
+        gr.update(visible=True, value=zip_path_str), zip_path_str, 
+        gr.update(visible=total_residues > 20), display_df, ai_summary
+    )
+
+
 def handle_protein_function_prediction_advance(
     task: str, 
     fasta_file: Any, 
     enable_ai: bool, 
     ai_model: str, 
     user_api_key: str, 
-    model_override: Optional[str] = None, 
-    datasets_override: Optional[List[str]] = None
+    model_name: Optional[str] = None, 
+    datasets: Optional[List[str]] = None
     ) -> Generator:
     """Handle protein function prediction workflow."""
-    model = model_override if model_override else "ESM2-650M"
-    datasets = (datasets_override if datasets_override is not None 
+    model = model_name if model_name else "ESM2-650M"
+    datasets = (datasets if datasets is not None 
                else DATASET_MAPPING_FUNCTION.get(task, []))
 
     if not all([task, datasets, fasta_file]):
@@ -378,8 +539,8 @@ def handle_protein_function_prediction_advance(
 
 
 def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
-    sequence_models = list(MODEL_MAPPING_ZERO_SHOT.keys())
-    structure_models = [k for k, v in MODEL_MAPPING_ZERO_SHOT.items() if v == 'esmif1'] # Example filter for structure models
+    sequence_models = list(MODEL_MAPPING_ZERO_SHOT_SEQUENCE.keys())
+    structure_models = list(MODEL_MAPPING_ZERO_SHOT_STRUCTURE.keys())
     function_models = list(MODEL_MAPPING_FUNCTION.keys())
 
     with gr.Blocks() as demo:
@@ -447,10 +608,16 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                     with gr.Column(scale=2):
                         adv_func_model_dd = gr.Dropdown(choices=function_models, label="Select Model", value="ESM2-650M")
                         adv_func_task_dd = gr.Dropdown(choices=list(DATASET_MAPPING_FUNCTION.keys()), label="Select Task", value="Solubility")
-                        default_datasets = DATASET_MAPPING_FUNCTION.get("Solubility", [])
+                        all_possible_datasets = []
+                        for datasets_list in DATASET_MAPPING_FUNCTION.values():
+                            all_possible_datasets.extend(datasets_list)
+                        all_possible_datasets = sorted(list(set(all_possible_datasets))) # Remove duplicates and sort
+
+                        default_datasets_for_solubility = DATASET_MAPPING_FUNCTION.get("Solubility", [])
+
                         adv_func_dataset_cbg = gr.CheckboxGroup(label="Select Datasets", 
-                                                                choices=default_datasets, 
-                                                                value=default_datasets)
+                                                                choices=all_possible_datasets, # Use all possible datasets for validation
+                                                                value=default_datasets_for_solubility) # Set initial selected value based on default task
                         function_fasta_upload = gr.File(label="Upload FASTA file", file_types=[".fasta", ".fa"])
                         function_fasta_example = gr.Examples(
                             examples=[["./download/P60002.fasta"]],
@@ -481,11 +648,18 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         function_download_btn = gr.DownloadButton("💾 Download Results", visible=False)
 
         enable_ai_zshot.change(fn=toggle_ai_section, inputs=enable_ai_zshot, outputs=ai_box_zshot)
-
+        adv_func_task_dd.change(
+            fn=lambda task: gr.CheckboxGroup(
+                choices=DATASET_MAPPING_FUNCTION.get(task, []), 
+                value=DATASET_MAPPING_FUNCTION.get(task, [])[0] if DATASET_MAPPING_FUNCTION.get(task) else None # Default select the first one
+            ),
+            inputs=[adv_func_task_dd], # Ensure you're using adv_func_task_dd here
+            outputs=[adv_func_dataset_cbg]
+        )
         seq_file_upload.upload(fn=parse_fasta_file, inputs=seq_file_upload, outputs=seq_protein_display)
         seq_file_upload.change(fn=parse_fasta_file, inputs=seq_file_upload, outputs=seq_protein_display)
         seq_predict_btn.click(
-            fn=handle_mutation_prediction, 
+            fn=handle_mutation_prediction_advance, 
             inputs=[seq_function_dd, seq_file_upload, enable_ai_zshot, ai_model_dd_zshot, api_key_in_zshot, seq_model_dd],
             outputs=[zero_shot_status_box, zero_shot_plot_out, zero_shot_df_out, zero_shot_download_btn, zero_shot_download_path_state, zero_shot_view_controls, zero_shot_full_data_state, zero_shot_ai_out]
         )
@@ -493,7 +667,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         struct_file_upload.upload(fn=parse_pdb_for_sequence, inputs=struct_file_upload, outputs=struct_protein_display)
         struct_file_upload.change(fn=parse_pdb_for_sequence, inputs=struct_file_upload, outputs=struct_protein_display)
         struct_predict_btn.click(
-            fn=handle_mutation_prediction, 
+            fn=handle_mutation_prediction_advance, 
             inputs=[struct_function_dd, struct_file_upload, enable_ai_zshot, ai_model_dd_zshot, api_key_in_zshot, struct_model_dd], 
             outputs=[zero_shot_status_box, zero_shot_plot_out, zero_shot_df_out, zero_shot_download_btn, zero_shot_download_path_state, zero_shot_view_controls, zero_shot_full_data_state, zero_shot_ai_out]
         )

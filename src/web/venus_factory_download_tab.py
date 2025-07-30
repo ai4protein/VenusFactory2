@@ -255,39 +255,6 @@ def create_download_tool_tab(constant: Dict[str, Any]):
             with gr.TabItem("🧬 Sequence & Metadata Download"):
                 gr.Markdown("### Protein Sequence and Annotation Information Download")
                 with gr.Tabs():
-                    # InterPro Metadata Download
-                    with gr.TabItem("InterPro Metadata"):
-                        gr.Markdown("#### Download protein domain, family, and Gene Ontology annotation metadata from InterPro")
-                        with gr.Row():
-                            interpro_method = gr.Radio(["Single ID", "From JSON"], label="Download Method", value="Single ID")
-                        interpro_id = gr.Textbox(label="InterPro ID", value="IPR000001", visible=True, placeholder="e.g., IPR000001")
-                        interpro_json_upload = gr.File(label="Upload JSON File", file_types=[".json"], visible=False)
-                        interpro_preview = gr.Textbox(label="File Preview", interactive=False, lines=5, visible=False)
-                        interpro_btn = gr.Button("Start Download", variant="primary")
-                        interpro_output = gr.Textbox(label="Download Status", interactive=False, lines=5)
-                        interpro_download_btn = gr.DownloadButton(label="Save Downloaded Data", visible=False)
-                        interpro_error = gr.Checkbox(label="Save error file", value=True)
-                        interpro_user = gr.Textbox(label="User Hash", value="default_user", visible=False)
-                        # Event handlers for InterPro
-                        interpro_method.change(
-                            lambda method: [
-                                gr.update(visible=(method == "Single ID")),
-                                gr.update(visible=(method == "From JSON")),
-                                gr.update(visible=(method == "From JSON")),
-                            ],
-                            inputs=interpro_method,
-                            outputs=[interpro_id, interpro_json_upload, interpro_preview]
-                        )
-                        interpro_json_upload.change(
-                            lambda f: read_json_file(f.name if f else None)[1] if f else "",
-                            inputs=interpro_json_upload,
-                            outputs=interpro_preview
-                        )
-                        interpro_btn.click(
-                            fn=handle_interpro_download, 
-                            inputs=[interpro_method, interpro_id, interpro_json_upload, interpro_user, interpro_error], 
-                            outputs=[interpro_output, interpro_download_btn]
-                        )
                     # RCSB Metadata Download
                     with gr.TabItem("RCSB Metadata"):
                         gr.Markdown("#### Download metadata for PDB entries from RCSB")
@@ -357,6 +324,40 @@ def create_download_tool_tab(constant: Dict[str, Any]):
                             fn=handle_uniprot_download, 
                             inputs=[uniprot_method, uniprot_id, uniprot_file_upload, uniprot_user, uniprot_merge, uniprot_error], 
                             outputs=[uniprot_output, uniprot_download_btn]
+                        )
+                    
+                    # InterPro Metadata Download
+                    with gr.TabItem("InterPro Metadata"):
+                        gr.Markdown("#### Download protein domain, family, and Gene Ontology annotation metadata from InterPro")
+                        with gr.Row():
+                            interpro_method = gr.Radio(["Single ID", "From JSON"], label="Download Method", value="Single ID")
+                        interpro_id = gr.Textbox(label="InterPro ID", value="IPR000001", visible=True, placeholder="e.g., IPR000001")
+                        interpro_json_upload = gr.File(label="Upload JSON File", file_types=[".json"], visible=False)
+                        interpro_preview = gr.Textbox(label="File Preview", interactive=False, lines=5, visible=False)
+                        interpro_btn = gr.Button("Start Download", variant="primary")
+                        interpro_output = gr.Textbox(label="Download Status", interactive=False, lines=5)
+                        interpro_download_btn = gr.DownloadButton(label="Save Downloaded Data", visible=False)
+                        interpro_error = gr.Checkbox(label="Save error file", value=True)
+                        interpro_user = gr.Textbox(label="User Hash", value="default_user", visible=False)
+                        # Event handlers for InterPro
+                        interpro_method.change(
+                            lambda method: [
+                                gr.update(visible=(method == "Single ID")),
+                                gr.update(visible=(method == "From JSON")),
+                                gr.update(visible=(method == "From JSON")),
+                            ],
+                            inputs=interpro_method,
+                            outputs=[interpro_id, interpro_json_upload, interpro_preview]
+                        )
+                        interpro_json_upload.change(
+                            lambda f: read_json_file(f.name if f else None)[1] if f else "",
+                            inputs=interpro_json_upload,
+                            outputs=interpro_preview
+                        )
+                        interpro_btn.click(
+                            fn=handle_interpro_download, 
+                            inputs=[interpro_method, interpro_id, interpro_json_upload, interpro_user, interpro_error], 
+                            outputs=[interpro_output, interpro_download_btn]
                         )
             # --- Structure Download Tab ---
             with gr.TabItem("⚛️ Structure Download"):
