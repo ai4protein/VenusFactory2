@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 from gradio_client import Client, handle_file
 import pandas as pd
 load_dotenv()
-api_key = "REMOVED_CREDENTIAL"
+
 class DeepSeekChat:
     def __init__(self, api_key: str = None):
         self.api_key = api_key or os.getenv("DEEPSEEK_API_KEY")
