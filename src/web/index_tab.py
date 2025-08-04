@@ -407,7 +407,6 @@ def create_index_tab(constant):
                         }}
                         
                         bindEvents() {{
-                            // 监听页面可见性变化
                             document.addEventListener('visibilitychange', () => {{
                                 if (!document.hidden) {{
                                     this.loadStats();
