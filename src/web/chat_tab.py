@@ -150,7 +150,11 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     chat_instance = DeepSeekChat()
     
     def send_message(message: str, api_key: str, files: List[str], system_prompt: str, history: List[List[str]]) -> tuple:
-        """Send message to DeepSeek API and return response with VenusFactory integration"""
+        try:
+            import requests
+            requests.post("/api/stats/track", json={"module": "agent_usage"})
+        except Exception:
+            pass
         if not message.strip():
             return "", history
         
