@@ -10,11 +10,11 @@ class StatsManager:
         self.load_stats()
     
     def ensure_data_dir(self):
-        """确保数据目录存在"""
+        """Ensure data directory exists"""
         os.makedirs("data", exist_ok=True)
     
     def load_stats(self):
-        """加载统计数据"""
+        """Load statistics data"""
         try:
             if os.path.exists(self.stats_file):
                 with open(self.stats_file, 'r', encoding='utf-8') as f:
@@ -31,7 +31,7 @@ class StatsManager:
             self.stats = self.get_default_stats()
     
     def save_stats(self):
-        """保存统计数据"""
+        """Save statistics data"""
         try:
             temp_file = self.stats_file + ".tmp"
             with open(temp_file, 'w', encoding='utf-8') as f:
@@ -46,7 +46,7 @@ class StatsManager:
             print(f"Error saving stats: {e}")
     
     def track_usage(self, module):
-        """追踪功能使用次数"""
+        """Track feature usage count"""
         if module in self.stats:
             self.stats[module] += 1
             self.stats["last_updated"] = datetime.now().isoformat()
@@ -55,11 +55,11 @@ class StatsManager:
         return False
     
     def get_stats(self):
-        """获取统计数据"""
+        """Get statistics data"""
         return self.stats.copy()
     
     def get_default_stats(self):
-        """获取默认统计数据"""
+        """Get default statistics data"""
         return {
             "mutation_prediction": 0,
             "function_analysis": 0,
@@ -68,10 +68,10 @@ class StatsManager:
         }
     
     def reset_stats(self):
-        """重置统计数据"""
+        """Reset statistics data"""
         self.stats = self.get_default_stats()
         self.save_stats()
         return True
 
-# 全局实例
+# Global instance
 global_stats_manager = StatsManager() 
