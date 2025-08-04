@@ -164,6 +164,11 @@ def handle_mutation_prediction_advance(
     user_api_key: str, 
     model_name:str
 ) -> Generator:
+    try:
+        import requests
+        requests.post("/api/stats/track", json={"module": "mutation_prediction"})
+    except Exception:
+        pass
     """Handle mutation prediction workflow."""
     if not file_obj or not function_selection:
         yield (
@@ -323,6 +328,11 @@ def handle_protein_function_prediction_advance(
     model_name: Optional[str] = None, 
     datasets: Optional[List[str]] = None
     ) -> Generator:
+    try:
+        import requests
+        requests.post("/api/stats/track", json={"module": "function_analysis"})
+    except Exception:
+        pass
     """Handle protein function prediction workflow."""
     model = model_name if model_name else "ESM2-650M"
     datasets = (datasets if datasets is not None 
