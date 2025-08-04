@@ -1,6 +1,6 @@
 import gradio as gr
 def create_index_tab(constant):
-    # 读取 gjf 文件内容
+    # Read gjf file content
     try:
         with open("img/Show1.gjf", "r") as f:
             gjf_content = f.read()
@@ -9,6 +9,16 @@ def create_index_tab(constant):
     with gr.Blocks() as index_tab:
         gr.HTML(
             f'''            
+                <script>
+                // 页面加载时自动统计访问量
+                (function() {{
+                    fetch('/api/stats/track', {
+                        method: 'POST',
+                        headers: {{'Content-Type': 'application/json'}},
+                        body: JSON.stringify({{module: 'total_visits'}})
+                    });
+                }})();
+                </script>
                 <style>
                 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
                 body, .gradio-container {{
@@ -32,7 +42,7 @@ def create_index_tab(constant):
                     margin-bottom: 0.5em;
                 }}
                 p, li, ul {{
-                    font-size: 1.18em;
+                    font-size: 1.08em;
                     line-height: 1.7;
                 }}
                 .card {{
@@ -95,15 +105,15 @@ def create_index_tab(constant):
                 <!-- 上半部分:VenusFactory 介绍 -->
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5em;">
                 <img src="/file=img/venus_head.png" alt="Venus Head" style="height: 120px; margin-left: 10px;" />
-                <img src="/file=img/venus_logo.png" alt="Venus Logo" style="height: 70px; margin-right: 10px;" />
+                <img src="/file=img/venus_icon.png" alt="Venus Logo" style="height: 70px; margin-right: 10px;" />
             </div>
             <div style="text-align: center; margin-top: -60px; margin-bottom: 20px;">
                 <h1 style="font-size:3.5em; font-weight:900;">Welcome to <span style='font-weight:900;'>VenusFactory</span> !</h1>
             </div>
-            <div style="max-width: 1100px; margin: 0 auto; font-size: 1.3em; text-align: left;">
-                <p style="font-size:1.3em; margin-bottom: 0.7em;"><b>VenusFactory</b> is a unified open-source platform for protein engineering, designed to simplify data acquisition, model fine-tuning, and functional analysis for both biologists and AI researchers.<br>
+            <div style="max-width: 1100px; margin: 0 auto; font-size: 1.2em; text-align: left;">
+                <p style="font-size:1.2em; margin-bottom: 0.7em;"><b>VenusFactory</b> is a unified open-source platform for protein engineering, designed to simplify data acquisition, model fine-tuning, and functional analysis for both biologists and AI researchers.<br>
                 The Web UI features four core modules:</p>
-                <ul style="font-size:1.1em;">
+                <ul style="font-size:1.0em;">
                     <li>🤖 <b>VenusAgent-0.1</b> is an integrated AI assistant that answers questions related to the platform and protein AI.</li>
                     <li>🛠️ <b>Quick Tools</b> offers one-click protein analysis tools designed as a convenient method, making common tasks easy and accessible.</li>
                     <li>⚡ <b>Advanced Tools</b> enables zero-shot prediction, function analysis, and advanced data options for experienced users.</li>
@@ -114,33 +124,33 @@ def create_index_tab(constant):
             <!-- 中间部分:How to Use VenusFactory -->
             <div style="text-align: left; max-width: 1100px; margin: 0 auto;">
                 <h1 style="font-size:2.2em; font-weight:900; color:#222; margin-bottom: 0.7em;">
-                    <img src="/file=img/venus_logo.png" style="height: 48px; vertical-align: middle; margin-right: 10px;">
+                    <img src="/file=img/venus_icon.png" style="height: 48px; vertical-align: middle; margin-right: 10px;">
                     How to Use VenusFactory ?
                 </h1>
-                <div style="font-size:1.3em;">
-                    <p style="font-size:1.3em;">Depending on your needs, VenusFactory can provide different services.</p>
-                    <p style="font-size:1.3em;">If you want a quick answer about protein mutations, use VenusAgent-0.1. Upload your file, and the AI Assistant will give you a helpful reply.</p>
-                    <p style="font-size:1.3em;">If you want to know possible mutation methods or protein functions, go to Quick Tools, choose the task you need, and you will get the result in a few minutes.</p>
-                    <p style="font-size:1.3em;">If you have some knowledge about different protein models, you can use the Advanced Tools tab. All major models are available to meet your needs.</p>
-                    <p style="font-size:1.3em;">If you want to get some protein data files, click the download tab, input the PDB ID, to download and use it for further research.</p>
-                    <p style="font-size:1.3em; font-weight:bold; margin-top:2em;">Example GIF:</p>
+                <div style="font-size:1.2em;">
+                    <p style="font-size:1.2em;">Depending on your needs, VenusFactory can provide different services.</p>
+                    <p style="font-size:1.2em;">If you want a quick answer about protein mutations, use VenusAgent-0.1. Upload your file, and the AI Assistant will give you a helpful reply.</p>
+                    <p style="font-size:1.2em;">If you want to know possible mutation methods or protein functions, go to Quick Tools, choose the task you need, and you will get the result in a few minutes.</p>
+                    <p style="font-size:1.2em;">If you have some knowledge about different protein models, you can use the Advanced Tools tab. All major models are available to meet your needs.</p>
+                    <p style="font-size:1.2em;">If you want to get some protein data files, click the download tab, input the PDB ID, to download and use it for further research.</p>
+                    <p style="font-size:1.2em; font-weight:bold; margin-top:2em;">Example GIF:</p>
                     <img src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/MovieGen/fig3.png" alt="Example GIF" style="max-width: 100%; height: auto; border-radius: 8px; margin-bottom: 1em;" />
                 </div>
             </div>
             <!-- 其余内容保持不变 -->
             <hr style="margin: 40px 0; border: 1px solid #eee;">
             <!-- Citation 板块 -->
-            <div style="text-align: left; max-width: 1100px; margin: 0 auto; font-size: 1.3em;">
+            <div style="text-align: left; max-width: 1100px; margin: 0 auto; font-size: 1.2em;">
                 <h1 style="font-size:2.2em; font-weight:900; color:#222; margin-bottom: 0.7em;">Citation</h1>
-                <div style="font-size:1.3em; margin-bottom: 0.7em;">✏️ Please cite our work if you have used VenusFactory.</div>
-                <pre style="background:#f8f8f8; border-radius:8px; padding:18px; font-size:1.3em; overflow-x:auto;"><code>@article{{tan2025venusfactory,
+                <div style="font-size:1.2em; margin-bottom: 0.7em;">✏️ Please cite our work if you have used VenusFactory.</div>
+                <pre style="background:#f8f8f8; border-radius:8px; padding:18px; font-size:1.2em; overflow-x:auto;"><code>@article{{tan2025venusfactory,
   title={{VenusFactory: A Unified Platform for Protein Engineering Data Retrieval and Language Model Fine-Tuning}},
   author={{Tan, Yang and Liu, Chen and Gao, Jingyuan and Wu, Banghao and Li, Mingchen and Wang, Ruilin and Zhang, Lingrong and Yu, Huiqun and Fan, Guisheng and Hong, Liang and Zhou, Bingxin}},
   journal={{arXiv preprint arXiv:2503.15438}},
   year={{2025}}
 }}</code></pre>
                 <!-- 合作平台等内容, 作为Citation一部分 -->
-                <div style="display: flex; flex-wrap: wrap; justify-content: space-between; max-width: 1100px; margin: 30px auto 0 auto; color: #666; font-size: 1.3em; gap: 32px;">
+                <div style="display: flex; flex-wrap: wrap; justify-content: space-between; max-width: 1100px; margin: 30px auto 0 auto; color: #666; font-size: 1.2em; gap: 32px;">
                     <div style="flex:1; min-width: 320px;">
                         <b>🤝 Cooperate Platform:</b> <a href="https://openbayes.com/" target="_blank">HyberAI</a><br>
                         <b>🧬 Small-sample mutation prediction tool:</b> <a href="https://github.com/ai4protein/Pro-FSFP" target="_blank">Pro-FSFP</a><br>
@@ -178,51 +188,51 @@ def create_index_tab(constant):
                         <ul style="margin: 18px 0 0 0; padding: 0; list-style: none;">
                             <li style="margin-bottom: 12px;">
                                 <span style="font-weight:bold; color:#2563eb;">ESM-1v/ESM-1b/ESM-650M</span>
-                                <span style="font-size:0.97em; color:#444;"> – State-of-the-art protein language models from Meta AI for sequence-based prediction.</span>
-                                <a href="https://www.biorxiv.org/content/10.1101/622803v4.full" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.97em;">[Paper]</a>
-                                <a href="https://github.com/facebookresearch/esm" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.97em;">[Code]</a>
+                                <span style="font-size:0.87em; color:#444;"> – State-of-the-art protein language models from Meta AI for sequence-based prediction.</span>
+                                <a href="https://www.biorxiv.org/content/10.1101/622803v4.full" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Paper]</a>
+                                <a href="https://github.com/facebookresearch/esm" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Code]</a>
                             </li>
                             <li style="margin-bottom: 12px;">
                                 <span style="font-weight:bold; color:#2563eb;">SaProt</span>
-                                <span style="font-size:0.97em; color:#444;"> – A model for protein sequence analysis and function prediction.</span>
-                                <a href="https://www.biorxiv.org/content/10.1101/2023.10.01.560349v5" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.97em;">[Paper]</a>
-                                <a href="https://github.com/westlake-repl/SaProt" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.97em;">[Code]</a>
+                                <span style="font-size:0.87em; color:#444;"> – A model for protein sequence analysis and function prediction.</span>
+                                <a href="https://www.biorxiv.org/content/10.1101/2023.10.01.560349v5" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Paper]</a>
+                                <a href="https://github.com/westlake-repl/SaProt" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Code]</a>
                             </li>
                             <li style="margin-bottom: 12px;">
                                 <span style="font-weight:bold; color:#2563eb;">MIF-ST</span>
-                                <span style="font-size:0.97em; color:#444;"> – Structure-informed models for protein fitness and mutation effect prediction.</span>
-                                <a href="https://www.biorxiv.org/content/10.1101/2022.05.25.493516v1.full" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.97em;">[Paper]</a>
-                                <a href="https://github.com/microsoft/protein-sequence-models" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.97em;">[Code]</a>
+                                <span style="font-size:0.87em; color:#444;"> – Structure-informed models for protein fitness and mutation effect prediction.</span>
+                                <a href="https://www.biorxiv.org/content/10.1101/2022.05.25.493516v1.full" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Paper]</a>
+                                <a href="https://github.com/microsoft/protein-sequence-models" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Code]</a>
                             </li>
                             <li style="margin-bottom: 12px;">
                                 <span style="font-weight:bold; color:#2563eb;">ProSST-2048</span>
-                                <span style="font-size:0.97em; color:#444;"> – Large-scale protein sequence-structure models for zero-shot and supervised tasks.</span>
-                                <a href="https://www.biorxiv.org/content/10.1101/2024.04.15.589672v2.full" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.97em;">[Paper]</a>
-                                <a href="https://github.com/ai4protein/ProSST" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.97em;">[Code]</a>
+                                <span style="font-size:0.87em; color:#444;"> – Large-scale protein sequence-structure models for zero-shot and supervised tasks.</span>
+                                <a href="https://www.biorxiv.org/content/10.1101/2024.04.15.589672v2.full" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Paper]</a>
+                                <a href="https://github.com/ai4protein/ProSST" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Code]</a>
                             </li>
                             <li style="margin-bottom: 12px;">
                                 <span style="font-weight:bold; color:#2563eb;">ProtSSN</span>
-                                <span style="font-size:0.97em; color:#444;"> – Protein structure and sequence network for protein structure prediction.</span>
-                                <a href="https://elifesciences.org/reviewed-preprints/98033" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.97em;">[Paper]</a>
-                                <a href="https://github.com/ai4protein/ProtSSN" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.97em;">[Code]</a>
+                                <span style="font-size:0.87em; color:#444;"> – Protein structure and sequence network for protein structure prediction.</span>
+                                <a href="https://elifesciences.org/reviewed-preprints/98033" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Paper]</a>
+                                <a href="https://github.com/ai4protein/ProtSSN" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Code]</a>
                             </li>
                             <li style="margin-bottom: 12px;">
                                 <span style="font-weight:bold; color:#2563eb;">Ankh-large</span>
-                                <span style="font-size:0.97em; color:#444;"> – Transformer-based protein language model for structure and function tasks.</span>
-                                <a href="https://www.biorxiv.org/content/10.1101/2023.01.16.524265v1.full" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.97em;">[Paper]</a>
-                                <a href="https://github.com/agemagician/Ankh" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.97em;">[Code]</a>
+                                <span style="font-size:0.87em; color:#444;"> – Transformer-based protein language model for structure and function tasks.</span>
+                                <a href="https://www.biorxiv.org/content/10.1101/2023.01.16.524265v1.full" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Paper]</a>
+                                <a href="https://github.com/agemagician/Ankh" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Code]</a>
                             </li>
                             <li style="margin-bottom: 12px;">
                                 <span style="font-weight:bold; color:#2563eb;">ProtBert-uniref50</span>
-                                <span style="font-size:0.97em; color:#444;"> – BERT-based protein model trained on UniRef50.</span>
-                                <a href="https://www.biorxiv.org/content/10.1101/2021.05.24.445464v1" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.97em;">[Paper]</a>
-                                <a href="https://github.com/agemagician/ProtTrans" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.97em;">[Code]</a>
+                                <span style="font-size:0.87em; color:#444;"> – BERT-based protein model trained on UniRef50.</span>
+                                <a href="https://www.biorxiv.org/content/10.1101/2021.05.24.445464v1" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Paper]</a>
+                                <a href="https://github.com/agemagician/ProtTrans" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Code]</a>
                             </li>
                             <li style="margin-bottom: 12px;">
                                 <span style="font-weight:bold; color:#2563eb;">ProtT5-xl-uniref50</span>
-                                <span style="font-size:0.97em; color:#444;"> – T5-based protein model for sequence and structure prediction.</span>
-                                <a href="https://arxiv.org/abs/2007.06225" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.97em;">[Paper]</a>
-                                <a href="https://github.com/agemagician/ProtTrans" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.97em;">[Code]</a>
+                                <span style="font-size:0.87em; color:#444;"> – T5-based protein model for sequence and structure prediction.</span>
+                                <a href="https://arxiv.org/abs/2007.06225" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Paper]</a>
+                                <a href="https://github.com/agemagician/ProtTrans" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Code]</a>
                             </li>
                         </ul>
                     </div>
@@ -232,57 +242,57 @@ def create_index_tab(constant):
                         <ul style="margin: 18px 0 0 0; padding: 0; list-style: none;">
                             <li style="margin-bottom: 12px;">
                                 <span style="font-weight:bold; color:#2563eb;">DeepSol</span>
-                                <span style="font-size:0.97em; color:#444;"> – Dataset for protein solubility prediction.</span>
-                                <a href="https://academic.oup.com/bioinformatics/article/34/15/2605/4938490" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.97em;">[Paper]</a>
-                                <a href="https://zenodo.org/records/1162886" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.97em;">[Datasets]</a>
+                                <span style="font-size:0.87em; color:#444;"> – Dataset for protein solubility prediction.</span>
+                                <a href="https://academic.oup.com/bioinformatics/article/34/15/2605/4938490" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Paper]</a>
+                                <a href="https://zenodo.org/records/1162886" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Datasets]</a>
                             </li>
                             <li style="margin-bottom: 12px;">
                                 <span style="font-weight:bold; color:#2563eb;">DeepSoluE</span>
-                                <span style="font-size:0.97em; color:#444;"> – Enhanced solubility dataset for benchmarking.</span>
-                                <a href="https://bmcbiol.biomedcentral.com/articles/10.1186/s12915-023-01510-8" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.97em;">[Paper]</a>
-                                <a href="https://github.com/wangchao-malab/DeepSoluE" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.97em;">[Datasets]</a>
+                                <span style="font-size:0.87em; color:#444;"> – Enhanced solubility dataset for benchmarking.</span>
+                                <a href="https://bmcbiol.biomedcentral.com/articles/10.1186/s12915-023-01510-8" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Paper]</a>
+                                <a href="https://github.com/wangchao-malab/DeepSoluE" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Datasets]</a>
                             </li>
                             <li style="margin-bottom: 12px;">
                                 <span style="font-weight:bold; color:#2563eb;">ProtSolM</span>
-                                <span style="font-size:0.97em; color:#444;"> – Solubility dataset for machine learning tasks.</span>
-                                <a href="https://arxiv.org/abs/2406.19744" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.97em;">[Paper]</a>
-                                <a href="https://huggingface.co/datasets/AI4Protein/ProtSolM_ESMFold_PDB" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.97em;">[Datasets]</a>
+                                <span style="font-size:0.87em; color:#444;"> – Solubility dataset for machine learning tasks.</span>
+                                <a href="https://arxiv.org/abs/2406.19744" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Paper]</a>
+                                <a href="https://huggingface.co/datasets/AI4Protein/ProtSolM_ESMFold_PDB" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Datasets]</a>
                             </li>
                             <li style="margin-bottom: 12px;">
                                 <span style="font-weight:bold; color:#2563eb;">DeepLocBinary</span>
-                                <span style="font-size:0.97em; color:#444;"> – Dataset for binary protein subcellular localization prediction.</span>
-                                <a href="https://academic.oup.com/bioinformatics/article/33/21/3387/4099600" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.97em;">[Paper]</a>
-                                <a href="https://huggingface.co/datasets/AI4Protein/DeepLocBinary" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.97em;">[Datasets]</a>
+                                <span style="font-size:0.87em; color:#444;"> – Dataset for binary protein subcellular localization prediction.</span>
+                                <a href="https://academic.oup.com/bioinformatics/article/33/21/3387/4099600" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Paper]</a>
+                                <a href="https://huggingface.co/datasets/AI4Protein/DeepLocBinary" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Datasets]</a>
                             </li>
                             <li style="margin-bottom: 12px;">
                                 <span style="font-weight:bold; color:#2563eb;">DeepLocMulti</span>
-                                <span style="font-size:0.97em; color:#444;"> – Dataset for multi-class protein subcellular localization prediction.</span>
-                                <a href="https://academic.oup.com/bioinformatics/article/33/21/3387/4099600" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.97em;">[Paper]</a>
-                                <a href="https://huggingface.co/datasets/AI4Protein/DeepLocMulti" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.97em;">[Datasets]</a>
+                                <span style="font-size:0.87em; color:#444;"> – Dataset for multi-class protein subcellular localization prediction.</span>
+                                <a href="https://academic.oup.com/bioinformatics/article/33/21/3387/4099600" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Paper]</a>
+                                <a href="https://huggingface.co/datasets/AI4Protein/DeepLocMulti" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Datasets]</a>
                             </li>
                             <li style="margin-bottom: 12px;">
                                 <span style="font-weight:bold; color:#2563eb;">MetallonBinding</span>
-                                <span style="font-size:0.97em; color:#444;"> – Dataset for protein metal ion binding site prediction.</span>
-                                <a href="https://www.biorxiv.org/content/10.1101/2023.10.01.560349v5" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.97em;">[Paper]</a>
-                                <a href="https://huggingface.co/datasets/AI4Protein/MetallonBinding" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.97em;">[Datasets]</a>
+                                <span style="font-size:0.87em; color:#444;"> – Dataset for protein metal ion binding site prediction.</span>
+                                <a href="https://www.biorxiv.org/content/10.1101/2023.10.01.560349v5" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Paper]</a>
+                                <a href="https://huggingface.co/datasets/AI4Protein/MetallonBinding" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Datasets]</a>
                             </li>
                             <li style="margin-bottom: 12px;">
                                 <span style="font-weight:bold; color:#2563eb;">Thermostability</span>
-                                <span style="font-size:0.97em; color:#444;"> – Dataset for protein thermostability prediction.</span>
-                                <a href="https://datasets-benchmarks-proceedings.neurips.cc/paper/2021/file/2b44928ae11fb9384c4cf38708677c48-Paper-round2.pdf" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.97em;">[Paper]</a>
-                                <a href="https://huggingface.co/datasets/AI4Protein/Thermostability" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.97em;">[Datasets]</a>
+                                <span style="font-size:0.87em; color:#444;"> – Dataset for protein thermostability prediction.</span>
+                                <a href="https://datasets-benchmarks-proceedings.neurips.cc/paper/2021/file/2b44928ae11fb9384c4cf38708677c48-Paper-round2.pdf" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Paper]</a>
+                                <a href="https://huggingface.co/datasets/AI4Protein/Thermostability" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Datasets]</a>
                             </li>
                             <li style="margin-bottom: 12px;">
                                 <span style="font-weight:bold; color:#2563eb;">SortingSignal</span>
-                                <span style="font-size:0.97em; color:#444;"> – Dataset for protein sorting signal prediction.</span>
-                                <a href="https://www.nature.com/articles/s41587-019-0036-z" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.97em;">[Paper]</a>
-                                <a href="https://huggingface.co/datasets/AI4Protein/SortingSignal" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.97em;">[Datasets]</a>
+                                <span style="font-size:0.87em; color:#444;"> – Dataset for protein sorting signal prediction.</span>
+                                <a href="https://www.nature.com/articles/s41587-019-0036-z" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Paper]</a>
+                                <a href="https://huggingface.co/datasets/AI4Protein/SortingSignal" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Datasets]</a>
                             </li>
                             <li>
                                 <span style="font-weight:bold; color:#2563eb;">DeepET_Topt</span>
-                                <span style="font-size:0.97em; color:#444;"> – Dataset for optimal growth temperature (Topt) prediction.</span>
-                                <a href="https://academic.oup.com/bib/article/26/2/bbaf114/8074761" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.97em;">[Paper]</a>
-                                <a href="https://huggingface.co/datasets/AI4Protein/DeepET_Topt" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.97em;">[Datasets]</a>
+                                <span style="font-size:0.87em; color:#444;"> – Dataset for optimal growth temperature (Topt) prediction.</span>
+                                <a href="https://academic.oup.com/bib/article/26/2/bbaf114/8074761" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Paper]</a>
+                                <a href="https://huggingface.co/datasets/AI4Protein/DeepET_Topt" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Datasets]</a>
                             </li>
                         </ul>
                     </div>
@@ -335,7 +345,7 @@ def create_index_tab(constant):
                     class RealTimeStatsManager {{
                         constructor() {{
                             this.updateInterval = null;
-                            this.apiBaseUrl = 'http://localhost:8000/api';
+                               this.apiBaseUrl = '/api';
                             this.init();
                         }}
                         
@@ -362,20 +372,17 @@ def create_index_tab(constant):
                         }}
                         
                         updateDisplay(data) {{
-                            // 更新突变预测次数
-                            const evolutionElement = document.getElementById('evolution-usage');
+                               const evolutionElement = document.getElementById('evolution-usage');
                             if (evolutionElement) {{
                                 evolutionElement.textContent = this.formatNumber(data.mutation_prediction || 0);
                             }}
                             
-                            // 更新功能预测次数
-                            const predictionElement = document.getElementById('prediction-usage');
+                               const predictionElement = document.getElementById('prediction-usage');
                             if (predictionElement) {{
                                 predictionElement.textContent = this.formatNumber(data.function_analysis || 0);
                             }}
                             
-                            // 更新总访问量（使用模拟数据）
-                            setTimeout(() => {{
+                               setTimeout(() => {{
                                 const totalElement = document.getElementById('total-visits');
                                 if (totalElement) {{
                                     totalElement.textContent = this.formatNumber(data.total_visits || 0);
@@ -384,8 +391,7 @@ def create_index_tab(constant):
                         }}
                         
                         loadMockData() {{
-                            // 如果API不可用，使用模拟数据
-                            document.getElementById('evolution-usage').textContent = '1,234';
+                               document.getElementById('evolution-usage').textContent = '1,234';
                             document.getElementById('prediction-usage').textContent = '2,341';
                             document.getElementById('total-visits').textContent = '5,678';
                         }}
@@ -397,11 +403,10 @@ def create_index_tab(constant):
                         startAutoRefresh() {{
                             this.updateInterval = setInterval(() => {{
                                 this.loadStats();
-                            }}, 30000); // 每30秒更新一次
+                            }}, 30000); 
                         }}
                         
                         bindEvents() {{
-                            // 监听页面可见性变化
                             document.addEventListener('visibilitychange', () => {{
                                 if (!document.hidden) {{
                                     this.loadStats();
@@ -423,8 +428,7 @@ def create_index_tab(constant):
                                 }});
                                 
                                 if (response.ok) {{
-                                    console.log(`Tracked ${{module}} usage successfully`);
-                                    // 立即更新显示
+                                    console.log(`Tracked ${{module}} usage successfully`); 
                                     await this.loadStats();
                                 }} else {{
                                     console.error('Failed to track usage:', response.status);
@@ -435,13 +439,11 @@ def create_index_tab(constant):
                         }}
                     }}
                     
-                    // 初始化统计管理器
-                    document.addEventListener('DOMContentLoaded', () => {{
+                       document.addEventListener('DOMContentLoaded', () => {{
                         window.statsManager = new RealTimeStatsManager();
                     }});
                     
-                    // 全局追踪函数，供其他页面调用
-                    function trackUsage(module) {{
+                       function trackUsage(module) {{
                         if (window.statsManager) {{
                             window.statsManager.trackUsage(module);
                         }}
@@ -450,4 +452,5 @@ def create_index_tab(constant):
             </div>
             '''
         )
+        
     return {"index_tab": index_tab}
