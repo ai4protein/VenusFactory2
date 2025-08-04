@@ -4,7 +4,7 @@ from datetime import datetime
 import sys
 import os
 
-# 添加项目根目录到路径
+# Add project root directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.stats_manager import global_stats_manager
@@ -17,7 +17,6 @@ class UsageEvent(BaseModel):
 
 @app.post("/api/stats/track")
 async def track_usage(event: UsageEvent):
-    """追踪功能使用次数"""
     if not event.timestamp:
         event.timestamp = datetime.now().isoformat()
     
@@ -33,13 +32,11 @@ async def track_usage(event: UsageEvent):
 
 @app.get("/api/stats")
 async def get_stats():
-    """获取统计数据"""
     stats = global_stats_manager.get_stats()
     return stats
 
 @app.get("/api/stats/reset")
 async def reset_stats():
-    """重置统计数据"""
     success = global_stats_manager.reset_stats()
     if success:
         return {"status": "success", "message": "Stats reset successfully"}
@@ -48,7 +45,6 @@ async def reset_stats():
 
 @app.get("/")
 async def root():
-    """API根路径"""
     return {
         "message": "VenusFactory Stats API",
         "version": "1.0.0",
