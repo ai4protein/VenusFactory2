@@ -631,9 +631,8 @@ def handle_mutation_prediction_base(
     enable_ai: bool, 
     ai_model: str, 
     user_api_key: str, 
-    model_name: Optional[str] = None
-
-) -> Generator:
+    model_name: Optional[str] = None,
+    progress=gr.Progress()) -> Generator:
     try:
         import requests
         requests.post("/api/stats/track", json={"module": "function_analysis"})
@@ -689,9 +688,9 @@ def handle_mutation_prediction_base(
         gr.update(visible=False), None, 
         "Prediction in progress..."
     )
-    
+    progress(0.1, desc="Running prediction...")
     status, raw_df = run_zero_shot_prediction(model_type, model_name, file_path)
-    
+    progress(0.7, desc="Processing results...")
     if raw_df.empty:
         yield (
             status, 
@@ -736,6 +735,7 @@ def handle_mutation_prediction_base(
     # Handle AI analysis
     ai_summary = "AI Analysis disabled. Enable in settings to generate a report."
     if enable_ai:
+        progress(0.8, desc="Generating AI summary...")
         yield (
             f"✅ Prediction complete. 🤖 Generating AI summary...", 
             summary_fig, display_df, gr.update(visible=False), None, 
@@ -754,6 +754,9 @@ def handle_mutation_prediction_base(
             )
             prompt = generate_mutation_ai_prompt(display_df, model_name, function_selection)
             ai_summary = call_ai_api(ai_config, prompt)
+        progress(0.9, desc="Finalizing AI analysis...")
+    else:
+        progress(1.0, desc="Complete!")
     
     # Create download files
     temp_dir = Path("temp_outputs")
@@ -781,7 +784,7 @@ def handle_mutation_prediction_base(
     zip_path_str = create_zip_archive(files_to_zip, str(zip_path))
 
     final_status = status if not enable_ai else "✅ Prediction and AI analysis complete!"
-    
+    progress(1.0, desc="Complete!")
     yield (
         final_status, summary_fig, display_df, 
         gr.update(visible=True, value=zip_path_str), zip_path_str, 
@@ -937,7 +940,8 @@ def handle_protein_function_prediction(
     ai_model: str, 
     user_api_key: str, 
     model_name: Optional[str] = None, 
-    datasets: Optional[List[str]] = None
+    datasets: Optional[List[str]] = None,
+    progress=gr.Progress()
     ) -> Generator:
     try:
         import requests
@@ -970,6 +974,7 @@ def handle_protein_function_prediction(
     temp_dir.mkdir(exist_ok=True)
 
     # Run predictions for each dataset
+    progress(0.1, desc="Running prediction...")
     for i, dataset in enumerate(datasets):
         yield (
             f"⏳ Running prediction...", 
@@ -1003,7 +1008,7 @@ def handle_protein_function_prediction(
             error_detail = e.stderr if isinstance(e, subprocess.CalledProcessError) else str(e)
             print(f"Failed to process '{dataset}': {error_detail}")
             all_results_list.append(pd.DataFrame([{"Dataset": dataset, "header": "ERROR", "sequence": error_detail}]))
-    
+    progress(0.7, desc="Processing results...")
     if not all_results_list:
         yield (
             "⚠️ No results generated.", 
@@ -1207,6 +1212,7 @@ def handle_protein_function_prediction(
     expert_analysis = "<div style='height: 300px; display: flex; align-items: center; justify-content: center; color: #666;'>Analysis will appear here once prediction is complete...</div>"
 
     if enable_ai:
+        progress(0.8, desc="Generating AI summary...")
         yield (
             "🤖 Expert is analyzing results...", 
             display_df, 
@@ -1221,6 +1227,9 @@ def handle_protein_function_prediction(
             prompt = generate_expert_analysis_prompt(display_df, task)
             ai_response = call_ai_api(ai_config, prompt)
             expert_analysis = format_expert_response(ai_response)
+        progress(0.9, desc="Finalizing AI analysis...")
+    else:
+        progress(1.0, desc="Complete!")
     
     # Create download zip with processed results
     zip_path_str = ""
@@ -1254,7 +1263,7 @@ def handle_protein_function_prediction(
         final_status += " Results were aggregated using soft voting."
     if enable_ai and not ai_summary.startswith("❌"): 
         final_status += " AI analysis included."
-    
+    progress(1.0, desc="Complete!")
     yield (
         final_status, 
         display_df, 
@@ -1301,6 +1310,7 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                     with gr.Column(scale=3):
                         gr.Markdown("### Results")
                         zero_shot_status_box = gr.Textbox(label="Status", interactive=False)
+                        
                         with gr.Tabs():
                             with gr.TabItem("📈 Prediction Heatmap"):
                                 zero_shot_plot_out = gr.Plot(label="Heatmap")
@@ -1375,7 +1385,8 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         easy_zshot_predict_btn.click(
             fn=handle_mutation_prediction_base,
             inputs=[zero_shot_function_dd, easy_zshot_file_upload, enable_ai_zshot, ai_model_dd_zshot, api_key_in_zshot],
-            outputs=[zero_shot_status_box, zero_shot_plot_out, zero_shot_df_out, zero_shot_download_btn, zero_shot_download_path_state, zero_shot_view_controls, zero_shot_full_data_state, zero_shot_ai_out]
+            outputs=[zero_shot_status_box, zero_shot_plot_out, zero_shot_df_out, zero_shot_download_btn, zero_shot_download_path_state, zero_shot_view_controls, zero_shot_full_data_state, zero_shot_ai_out],
+            show_progress=True
         )
 
         # Function prediction tab events  
@@ -1390,6 +1401,7 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         easy_func_predict_btn.click(
             fn=handle_protein_function_prediction,
             inputs=[easy_func_task_dd, base_function_fasta_upload, enable_ai_func, ai_model_dd_func, api_key_in_func],
-            outputs=[function_status_textbox, function_results_df, function_download_btn, ai_expert_html] 
+            outputs=[function_status_textbox, function_results_df, function_download_btn, ai_expert_html], 
+            show_progress=True
         )
     return {}

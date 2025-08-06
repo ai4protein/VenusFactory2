@@ -276,6 +276,7 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     # Create UI with modern layout
     with gr.Column(elem_classes="chat-container"):
         # Collapsible settings section
+        gr.Markdown("### 📍 The AI Memory feature is not included in the free trial version.")
         with gr.Accordion("⚙️ Settings", open=False):
             with gr.Row():
                 api_key_input = gr.Textbox(
@@ -321,21 +322,21 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                     elem_classes="chat-input"
                 )
                 # Buttons row positioned at bottom of input area
-                with gr.Row():
-                    send_btn = gr.Button(
-                        "📤 Send", 
-                        variant="primary", 
-                        scale=1,
-                        min_width=80,
-                        elem_classes="send-button"
-                    )
-                    clear_btn = gr.Button(
-                        "🗑️ Clear", 
-                        variant="secondary", 
-                        scale=1,
-                        min_width=80,
-                        elem_classes="clear-button"
-                    )
+                # with gr.Row():
+                #     send_btn = gr.Button(
+                #         "📤 Send", 
+                #         variant="primary", 
+                #         scale=1,
+                #         min_width=80,
+                #         elem_classes="send-button"
+                #     )
+                #     clear_btn = gr.Button(
+                #         "🗑️ Clear", 
+                #         variant="secondary", 
+                #         scale=1,
+                #         min_width=80,
+                #         elem_classes="clear-button"
+                #     )
         # VenusFactory API integration info (collapsible)
         with gr.Accordion("🔬 VenusFactory API Functions", open=False):
             gr.Markdown("""
@@ -374,33 +375,17 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 elem_classes="api-status"
             )
     
-    # Event handlers
-    # Send message on button click
-    send_btn.click(
-        fn=send_message_handler,
-        inputs=[chatbot, chat_input, api_key_input, system_prompt_input],
-        outputs=[chatbot, chat_input]
-    )
-    
-    # Send message on Enter key
     chat_input.submit(
         fn=send_message_handler,
         inputs=[chatbot, chat_input, api_key_input, system_prompt_input],
         outputs=[chatbot, chat_input]
     )
     
-    # Clear chat
-    clear_btn.click(
-        fn=clear_chat,
-        outputs=[chatbot]
-    )
     
     return {
         "chatbot": chatbot,
         "chat_input": chat_input,
         "api_key_input": api_key_input,
-        "send_btn": send_btn,
-        "clear_btn": clear_btn
     }
 
 def call_zero_shot_sequence_prediction(sequence: str, model_name: str = "ESM2-650M", api_key: str = None) -> str:
