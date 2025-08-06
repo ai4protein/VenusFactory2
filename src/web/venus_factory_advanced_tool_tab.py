@@ -665,7 +665,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                                 )
                                 seq_protein_display = gr.Textbox(label="Uploaded Protein Sequence", interactive=False, lines=3, max_lines=7)
                                 gr.Markdown("### Configure AI Analysis (Optional)")
-                                enable_ai_zshot = gr.Checkbox(label="Enable AI Summary", value=False)
+                                enable_ai_zshot_seq = gr.Checkbox(label="Enable AI Summary", value=False)
                                 with gr.Group(visible=False) as ai_box_zshot:
                                     ai_model_seq_zshot = gr.Dropdown(
                                         choices=list(AI_MODELS.keys()), 
@@ -696,7 +696,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                                 )
                                 struct_protein_display = gr.Textbox(label="Uploaded Protein Sequence", interactive=False, lines=3, max_lines=7)
                                 gr.Markdown("### Configure AI Analysis (Optional)")
-                                enable_ai_zshot = gr.Checkbox(label="Enable AI Summary", value=False)
+                                enable_ai_zshot_stru = gr.Checkbox(label="Enable AI Summary", value=False)
                                 with gr.Group(visible=False) as ai_box_zshot:
                                     ai_model_stru_zshot = gr.Dropdown(
                                         choices=list(AI_MODELS.keys()), 
@@ -795,7 +795,8 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         
                         function_download_btn = gr.DownloadButton("💾 Download Results", visible=False)
 
-        enable_ai_zshot.change(fn=toggle_ai_section, inputs=enable_ai_zshot, outputs=ai_box_zshot)
+        enable_ai_zshot_seq.change(fn=toggle_ai_section, inputs=enable_ai_zshot_seq, outputs=ai_box_zshot)
+        enable_ai_zshot_stru.change(fn=toggle_ai_section, inputs=enable_ai_zshot_stru, outputs=ai_box_zshot)
         adv_func_task_dd.change(
             fn=lambda task: gr.CheckboxGroup(
                 choices=DATASET_MAPPING_FUNCTION.get(task, []), 
@@ -823,7 +824,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         seq_file_upload.change(fn=parse_fasta_file, inputs=seq_file_upload, outputs=seq_protein_display)
         seq_predict_btn.click(
             fn=handle_mutation_prediction_advance, 
-            inputs=[seq_function_dd, seq_file_upload, enable_ai_zshot, ai_model_seq_zshot, api_key_in_seq_zshot, seq_model_dd],
+            inputs=[seq_function_dd, seq_file_upload, enable_ai_zshot_seq, ai_model_seq_zshot, api_key_in_seq_zshot, seq_model_dd],
             outputs=[zero_shot_status_box, zero_shot_plot_out, zero_shot_df_out, zero_shot_download_btn, zero_shot_download_path_state, zero_shot_view_controls, zero_shot_full_data_state, zero_shot_ai_out]
         )
 
@@ -831,7 +832,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         struct_file_upload.change(fn=parse_pdb_for_sequence, inputs=struct_file_upload, outputs=struct_protein_display)
         struct_predict_btn.click(
             fn=handle_mutation_prediction_advance, 
-            inputs=[struct_function_dd, struct_file_upload, enable_ai_zshot, ai_model_stru_zshot, api_key_in_stru_zshot, struct_model_dd], 
+            inputs=[struct_function_dd, struct_file_upload, enable_ai_zshot_stru, ai_model_stru_zshot, api_key_in_stru_zshot, struct_model_dd], 
             outputs=[zero_shot_status_box, zero_shot_plot_out, zero_shot_df_out, zero_shot_download_btn, zero_shot_download_path_state, zero_shot_view_controls, zero_shot_full_data_state, zero_shot_ai_out]
         )
 
