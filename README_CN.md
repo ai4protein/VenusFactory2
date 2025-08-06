@@ -751,11 +751,19 @@ bash ./crawler/structure/download_alphafold.sh \
 如果您使用了我们的代码或数据，请引用我们的工作：
 
 ```bibtex
-@article{tan2025venusfactory,
-  title={VenusFactory: A Unified Platform for Protein Engineering Data Retrieval and Language Model Fine-Tuning},
-  author={Tan, Yang and Liu, Chen and Gao, Jingyuan and Wu, Banghao and Li, Mingchen and Wang, Ruilin and Zhang, Lingrong and Yu, Huiqun and Fan, Guisheng and Hong, Liang and Zhou, Bingxin},
-  journal={arXiv preprint arXiv:2503.15438},
-  year={2025}
+@inproceedings{tan-etal-2025-venusfactory,
+    title = "{V}enus{F}actory: An Integrated System for Protein Engineering with Data Retrieval and Language Model Fine-Tuning",
+    author = "Tan, Yang and Liu, Chen and Gao, Jingyuan and Wu, Banghao and Li, Mingchen and Wang, Ruilin and Zhang, Lingrong and Yu, Huiqun and Fan, Guisheng and Hong, Liang and Zhou, Bingxin",
+    editor = "Mishra, Pushkar and Muresan, Smaranda and Yu, Tao",
+    booktitle = "Proceedings of the 63rd Annual Meeting of the Association for Computational Linguistics (Volume 3: System Demonstrations)",
+    month = jul,
+    year = "2025",
+    address = "Vienna, Austria",
+    publisher = "Association for Computational Linguistics",
+    url = "https://aclanthology.org/2025.acl-demo.23/",
+    doi = "10.18653/v1/2025.acl-demo.23",
+    pages = "230--241",
+    ISBN = "979-8-89176-253-4",
 }
 ```
 
