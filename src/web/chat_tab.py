@@ -12,6 +12,7 @@ import time
 from pathlib import Path
 from dotenv import load_dotenv
 from gradio_client import Client, handle_file
+from web.get_interpro_function import download_single_interpro, generate_interpro_ai_summary
 import pandas as pd
 load_dotenv()
 
@@ -137,251 +138,271 @@ class DeepSeekChat:
 def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     """Creates the Chat tab with DeepSeek API integration"""
     
-    # Load CSS styles
-    css_path = os.path.join(os.path.dirname(__file__), "assets", "chat_ui.css")
-    if os.path.exists(css_path):
-        try:
-            custom_css = open(css_path, "r").read()
-            gr.HTML(f"<style>{custom_css}</style>", visible=False)
-        except Exception as e:
-            print(f"Warning: Could not load chat CSS file: {e}")
-    
     # Initialize chat instance
     chat_instance = DeepSeekChat()
     
-    def send_message(message: str, api_key: str, files: List[str], system_prompt: str, history: List[List[str]]) -> tuple:
-        try:
-            import requests
-            requests.post("/api/stats/track", json={"module": "agent_usage"})
-        except Exception:
-            pass
-        if not message.strip():
-            return "", history
+    def add_message(history, message):
+        """Add user message to chat history"""
+        if message and message.get("text"):
+            # Extract text and files from the multimodal input
+            text = message["text"]
+            files = message.get("files", [])
+            
+            # Store files in a global variable - extract file paths properly
+            global current_files
+            current_files = []
+            if files:
+                for file in files:
+                    if hasattr(file, 'name'):
+                        current_files.append(file.name)
+                    elif isinstance(file, str):
+                        current_files.append(file)
+                    else:
+                        current_files.append(str(file))
+            
+            display_text = text
+            if current_files:
+                display_text += f" [Files: {', '.join([os.path.basename(f) for f in current_files])}]"
+            
+            history.append({"role": "user", "content": display_text})
+        
+        return history, gr.MultimodalTextbox(
+            interactive=True,
+            file_count="multiple", 
+            placeholder="💬 Enter your message or upload files (FASTA, PDB, CIF)...",
+            show_label=False,
+            file_types=[".fasta", ".fa", ".pdb", ".cif"],
+            value=None
+        )
+        
+    def bot_response(history, api_key, system_prompt):
+        """Generate bot response"""
+        global current_files
+
+        if not history:
+            return history
+        
+        # Get the last user message
+        last_message = history[-1]
+        if last_message["role"] != "user":
+            return history
+        
+        user_content = last_message["content"]
+        message_text = user_content
         
         # Update API key if provided
         if api_key:
             chat_instance.api_key = api_key
         
-        # Process uploaded files
-        file_paths = []
-        if files:
-            for file in files:
-                if hasattr(file, 'name') and file.name:
-                    file_paths.append(file.name)
-        
-        # Detect user intent and handle VenusFactory functions
-        intent = detect_user_intent(message, file_paths)
-        print(f"DEBUG: Detected intent: {intent}")
-        
-        # Check if FASTA file is uploaded
-        has_fasta_file = 'fasta_file' in intent
+        # Use the globally stored files
+        files = getattr(globals(), 'current_files', [])
+        print(f"DEBUG: Processing files: {files}")
         
         try:
-            # If FASTA file is uploaded, prioritize VenusFactory API
-            if has_fasta_file and any(word in message.lower() for word in ['mutation', 'mutant', 'mutate', 'zero-shot', 'zero shot', '设计', 'design', 'function', 'solubility', 'localization', 'binding', 'stability', 'sorting', 'temperature']):
+            # Detect user intent and handle VenusFactory functions
+            intent = detect_user_intent(message_text, current_files)
+            
+            # Check if FASTA file is uploaded
+            has_fasta_file = 'fasta_file' in intent
+            
+            # Process the request based on intent
+            if has_fasta_file and any(word in message_text.lower() for word in ['mutation', 'mutant', 'mutate', 'zero-shot', 'zero shot', '设计', 'design', 'function', 'solubility', 'localization', 'binding', 'stability', 'sorting', 'temperature']):
                 # Use VenusFactory API for FASTA files
-                print(f"DEBUG: Processing FASTA file with intent: {intent}")
-                
-                # Check if user wants structure-based model but only has FASTA file
                 structure_models = ['SaProt', 'ProtSSN', 'ESM-IF1', 'MIF-ST', 'ProSST-2048']
                 if intent['action'] == 'predict_zero_shot_structure' and intent['model'] in structure_models:
-                    # User wants structure model but only has FASTA file - provide helpful error
                     response = f"❌ **Error**: You requested {intent['model']} which is a structure-based model, but you only uploaded a FASTA file.\n\n"
                     response += f"**Solution**: Please upload a PDB or CIF structure file instead of FASTA, or use a sequence-based model like ESM-1v or ESM2-650M.\n\n"
                     response += f"**Available options**:\n"
                     response += f"- **Structure models** (need PDB/CIF): SaProt, ProtSSN, ESM-IF1, MIF-ST, ProSST-2048\n"
                     response += f"- **Sequence models** (work with FASTA): ESM-1v, ESM2-650M, ESM-1b\n"
                 elif intent['action'] == 'predict_zero_shot_sequence':
-                    print(f"DEBUG: Calling sequence prediction with model: {intent['model']}")
                     response = call_zero_shot_sequence_prediction_from_file(intent['fasta_file'], intent['model'], api_key)
                 elif intent['action'] == 'predict_function':
-                    print(f"DEBUG: Calling function prediction with model: {intent['model']}, task: {intent['task']}")
                     response = call_protein_function_prediction_from_file(intent['fasta_file'], intent['model'], intent['task'], api_key)
+                elif intent['action'] == "query_interpro":
+                    response = call_interpro_function_query(intent['uniprot_id'], api_key)
                 else:
-                    # Default to sequence prediction for FASTA files
-                    print(f"DEBUG: Defaulting to sequence prediction with model: {intent['model']}")
                     response = call_zero_shot_sequence_prediction_from_file(intent['fasta_file'], intent['model'], api_key)
             elif intent['action'] != 'chat':
                 # Handle VenusFactory specific functions
-                print(f"DEBUG: Processing without FASTA file, intent: {intent}")
                 if intent['action'] == 'predict_zero_shot_sequence':
-                    print(f"DEBUG: Processing sequence prediction")
                     if 'fasta_file' in intent:
-                        # Use uploaded FASTA file
                         response = call_zero_shot_sequence_prediction_from_file(intent['fasta_file'], intent['model'], api_key)
                     elif intent['sequence']:
-                        # Use extracted sequence
                         response = predict_zero_shot_sequence(intent['sequence'], intent['model'], api_key)
                     else:
                         response = "Error: No sequence or FASTA file provided for mutation prediction"
                 elif intent['action'] == 'predict_zero_shot_structure':
-                    print(f"DEBUG: Processing structure prediction, structure_file in intent: {'structure_file' in intent}")
                     if 'structure_file' in intent:
-                        print(f"DEBUG: Calling structure prediction with model: {intent['model']}")
                         response = call_zero_shot_structure_prediction(intent['structure_file'], intent['model'], api_key)
                     else:
                         response = "Error: No structure file provided for structure-based mutation prediction"
                 elif intent['action'] == 'predict_function':
-                    print(f"DEBUG: Processing function prediction")
                     if 'fasta_file' in intent:
-                        # Use uploaded FASTA file
                         response = call_protein_function_prediction_from_file(intent['fasta_file'], intent['model'], intent['task'], api_key)
                     elif intent['sequence']:
-                        # Use extracted sequence
                         response = predict_protein_function(intent['sequence'], intent['model'], intent['task'], api_key)
                     else:
                         response = "Error: No sequence or FASTA file provided for function prediction"
+                elif intent['action'] == "query_interpro":
+                    response = call_interpro_function_query(intent['uniprot_id'], api_key)
                 else:
-                    print(f"DEBUG: Falling back to DeepSeek API")
-                    # Fall back to DeepSeek API (without files to avoid JSON errors)
-                    response = chat_instance.chat(message, [], system_prompt)
+                    response = chat_instance.chat(message_text, [], system_prompt)
             else:
-                # Use DeepSeek API for general chat (without files to avoid JSON errors)
-                response = chat_instance.chat(message, [], system_prompt)
+                # Use DeepSeek API for general chat
+                response = chat_instance.chat(message_text, [], system_prompt)
         except Exception as e:
             response = f"Error processing request: {str(e)}"
         
-        # Update history
-        history.append([message, response])
-        
-        return "", history
-
+        # Add bot response to history
+        history.append({"role": "assistant", "content": response})
+        current_files = []
+        return history
     
-    def clear_chat(history: List[List[str]]) -> List[List[str]]:
+    def send_message_handler(history, message, api_key, system_prompt):
+        """Handle sending message and getting response"""
+        # Add user message
+        history, cleared_input = add_message(history, message)
+        # Get bot response  
+        history = bot_response(history, api_key, system_prompt)
+        return history, cleared_input
+    
+    def clear_chat():
         """Clear chat history"""
-        chat_instancea.clear_history()
+        chat_instance.clear_history()
         return []
     
-    def upload_files(files):
-        """Handle file uploads"""
-        if files:
-            return f"Uploaded {len(files)} files: {', '.join([os.path.basename(f.name) for f in files])}"
-        return "No files uploaded"
     
-    # Create UI components
-    with gr.Column():
-        # API Key input
-        api_key_input = gr.Textbox(
-            label="DeepSeek API Key",
-            placeholder="Enter your DeepSeek API Key, we have a free key for you",
-            value=os.getenv("DEEPSEEK_API_KEY"),
-            type="password",
-            lines=1
-        )
+    # Create UI with modern layout
+    with gr.Column(elem_classes="chat-container"):
+        # Collapsible settings section
+        with gr.Accordion("⚙️ Settings", open=False):
+            with gr.Row():
+                api_key_input = gr.Textbox(
+                    label="DeepSeek API Key",
+                    placeholder="Enter your DeepSeek API Key (we have a free key for you)",
+                    value=os.getenv("DEEPSEEK_API_KEY"),
+                    type="password",
+                    scale=3
+                )
+            
+            system_prompt_input = gr.Textbox(
+                label="System Prompt",
+                placeholder="Set AI assistant role and behavior...",
+                lines=3,
+                value="You are VenusFactory AI Assistant, a specialized protein engineering and bioinformatics expert. You can help users with:\n\n1. Zero-shot mutation prediction using sequence-based models (ESM-1v, ESM2-650M, ESM-1b) and structure-based models (SaProt, ProtSSN, ESM-IF1, MIF-ST, ProSST-2048)\n2. Protein function prediction including solubility, localization, binding, stability, sorting signal, and optimum temperature.\n Always respond in English and provide clear, actionable insights."
+            )
         
-        # System prompt
-        system_prompt_input = gr.Textbox(
-            label="System Prompt (Optional)",
-            placeholder="Set AI assistant role and behavior...",
-            lines=3,
-            value="You are VenusFactory AI Assistant, a specialized protein engineering and bioinformatics expert. You can help users with:\n\n1. Zero-shot mutation prediction using sequence-based models (ESM-1v, ESM2-650M, ESM-1b) and structure-based models (SaProt, ProtSSN, ESM-IF1, MIF-ST, ProSST-2048)\n2. Protein function prediction including solubility, localization, binding, stability, sorting signal, and optimum temperature.\n Always respond in English and provide clear, actionable insights."
-        )
-        
-        # File upload
-        file_upload = gr.File(
-            label="Upload Files",
-            file_count="multiple",
-            file_types=[".fasta", ".cif", ".pdb", ".fa"]
-        )
-        
-        file_status = gr.Textbox(
-            label="File Status",
-            interactive=False,
-            lines=1
-        )
-        
-        # Chat interface
+        # Main chat interface
         chatbot = gr.Chatbot(
             label="VenusFactory AI Assistant",
-            height=500,
-            show_label=True
+            type="messages",
+            height=900,
+            show_label=True,
+            avatar_images=(
+                None,
+                "https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png",
+            ),
+            bubble_full_width=False,
+            show_copy_button=True,
+            elem_classes="main-chatbot"
         )
         
-        # Message input
-        msg_input = gr.Textbox(
-            label="Input Message",
-            placeholder="Enter your question...",
-            lines=3
-        )
-        
-        # Buttons
-        with gr.Row():
-            send_btn = gr.Button("Send", variant="primary")
-            clear_btn = gr.Button("Clear Chat")
-        
-        # VenusFactory API integration section
-        with gr.Accordion("VenusFactory API Integration", open=False):
+        current_files = []
+        # Input area with integrated file upload
+        with gr.Row(elem_classes="input-row"):
+            with gr.Column(scale=8):
+                chat_input = gr.MultimodalTextbox(
+                    interactive=True,
+                    file_count="multiple",
+                    placeholder="💬 Enter your message or upload files (FASTA, PDB, CIF)...",
+                    show_label=False,
+                    file_types=[".fasta", ".fa", ".pdb", ".cif"],
+                    elem_classes="chat-input"
+                )
+                # Buttons row positioned at bottom of input area
+                with gr.Row():
+                    send_btn = gr.Button(
+                        "📤 Send", 
+                        variant="primary", 
+                        scale=1,
+                        min_width=80,
+                        elem_classes="send-button"
+                    )
+                    clear_btn = gr.Button(
+                        "🗑️ Clear", 
+                        variant="secondary", 
+                        scale=1,
+                        min_width=80,
+                        elem_classes="clear-button"
+                    )
+        # VenusFactory API integration info (collapsible)
+        with gr.Accordion("🔬 VenusFactory API Functions", open=False):
             gr.Markdown("""
-            ### Available VenusFactory Functions
+            ### Available Functions
             
-            You can call VenusFactory functions using the following patterns:
-            
-            **1. Zero-shot Mutation Prediction:**
+            **🧬 Zero-shot Mutation Prediction:**
             - **Sequence-based**: "Predict mutations using ESM-1v for this sequence: [sequence]"
             - **Structure-based**: "Predict mutations using SaProt for this structure" (upload PDB/CIF file)
             
-            **2. Protein Function Prediction:**
+            **⚗️ Protein Function Prediction:**
             - "Predict solubility for this protein: [sequence]"
             - "Predict localization using Ankh-large for this protein: [sequence]"
             - "Predict binding for this protein: [sequence]"
             
-            The AI assistant will automatically detect your intent and call the appropriate function.
+            **📊 InterPro Function Query:**
+            - "Query function for UniProt ID P00734"
+            - "Get InterPro annotation for P12345"
+            - "What is the function of protein Q9Y6K9?"
             
-            **Supported Zero-shot Models:**
-            - **Sequence-based**: ESM-1v, ESM2-650M
+            **📁 Supported File Types:**
+            - **Sequence**: FASTA files (.fasta, .fa)
+            - **Structure**: PDB files (.pdb), CIF files (.cif)
+            
+            **🤖 Supported Models:**
+            - **Sequence-based**: ESM-1v, ESM2-650M, ESM-1b
             - **Structure-based**: SaProt, ProtSSN, ESM-IF1, MIF-ST, ProSST-2048
+            - **Function Models**: ESM2-650M, Ankh-large, ProtBert-uniref50, ProtT5-xl-uniref50
             
-            **Supported Function Models:**
-            - ESM2-650M, Ankh-large, ProtBert-uniref50, ProtT5-xl-uniref50
-            
-            **Supported Function Tasks:**
+            **🎯 Function Tasks:**
             - Solubility, Localization, Binding, Stability, Sorting signal, Optimum temperature
-            
-            **File Types:**
-            - Sequence: FASTA files (.fasta, .fa)
-            - Structure: PDB files (.pdb), CIF files (.cif)
             """)
             
-            # API status
-            api_status = gr.Textbox(
-                label="API Status",
-                value="VenusFactory API Ready",
-                interactive=False
+            # API status indicator
+            api_status = gr.HTML(
+                value='<div style="color: green; font-weight: bold;">✅ VenusFactory API Ready</div>',
+                elem_classes="api-status"
             )
     
     # Event handlers
-    file_upload.change(
-        fn=upload_files,
-        inputs=[file_upload],
-        outputs=[file_status]
-    )
-    
+    # Send message on button click
     send_btn.click(
-        fn=send_message,
-        inputs=[msg_input, api_key_input, file_upload, system_prompt_input, chatbot],
-        outputs=[msg_input, chatbot]
+        fn=send_message_handler,
+        inputs=[chatbot, chat_input, api_key_input, system_prompt_input],
+        outputs=[chatbot, chat_input]
     )
     
-    msg_input.submit(
-        fn=send_message,
-        inputs=[msg_input, api_key_input, file_upload, system_prompt_input, chatbot],
-        outputs=[msg_input, chatbot]
+    # Send message on Enter key
+    chat_input.submit(
+        fn=send_message_handler,
+        inputs=[chatbot, chat_input, api_key_input, system_prompt_input],
+        outputs=[chatbot, chat_input]
     )
     
+    # Clear chat
     clear_btn.click(
         fn=clear_chat,
-        inputs=[chatbot],
         outputs=[chatbot]
     )
     
     return {
         "chatbot": chatbot,
-        "msg_input": msg_input,
+        "chat_input": chat_input,
         "api_key_input": api_key_input,
-        "file_upload": file_upload
+        "send_btn": send_btn,
+        "clear_btn": clear_btn
     }
 
-# VenusFactory API integration functions
 def call_zero_shot_sequence_prediction(sequence: str, model_name: str = "ESM2-650M", api_key: str = None) -> str:
     """Call VenusFactory zero-shot sequence-based mutation prediction API"""
     try:
@@ -558,6 +579,7 @@ def generate_simple_ai_summary(df, api_key: str = None) -> str:
 
 def call_protein_function_prediction_from_file(fasta_file: str, model_name: str = "ProtT5-xl-uniref50", task: str = "Solubility", api_key: str = None) -> str:
     """Call VenusFactory protein function prediction API using uploaded FASTA file"""
+    print(task)
     try:
         # Get datasets for the task
         dataset_mapping = {
@@ -569,19 +591,21 @@ def call_protein_function_prediction_from_file(fasta_file: str, model_name: str 
             "Optimum temperature": ["DeepET_Topt"]
         }
         datasets = dataset_mapping.get(task, ["DeepSol"])
+        print(f"DEBUG: Using datasets: {datasets}")
         
         # Call the Gradio API
         client = Client("http://localhost:7860/")
         result = client.predict(
             task=task, 
             fasta_file=handle_file(fasta_file),
-            enable_ai=False,
-            ai_model="DeepSeek",
-            user_api_key=api_key,
             model_name=model_name,
             datasets=datasets,
-            api_name="/handle_protein_function_prediction_advance"
+            enable_ai=True,
+            ai_model="DeepSeek",
+            user_api_key=api_key,
+            api_name="/handle_protein_function_prediction_chat"
         )
+        
         # Parse the result
         return parse_function_prediction_result(result, model_name, task, api_key)
     except Exception as e:
@@ -589,25 +613,7 @@ def call_protein_function_prediction_from_file(fasta_file: str, model_name: str 
 
 def parse_function_prediction_result(result, model_name: str, task: str, api_key: str = None) -> str:
     try:
-        data = result[1]
-        # Handle different data formats
-        if isinstance(data, dict) and 'headers' in data and 'data' in data:
-            # Convert dict format to DataFrame
-            df = pd.DataFrame(data['data'], columns=data['headers'])
-        elif isinstance(data, pd.DataFrame):
-            # Already a DataFrame
-            df = data
-        else:
-            return f"Error: Unexpected data format: {type(data)}"
-        
-        if df is None or df.empty:
-            return "Error: No prediction data available"
-        
-        # Generate AI summary with provided api_key
-        ai_summary = generate_simple_ai_summary(df, api_key)
-        
-        # Return the AI summary
-        return ai_summary
+        return result[2]
         
     except Exception as e:
         return f"Error parsing prediction result: {str(e)}"
@@ -629,18 +635,17 @@ def call_protein_function_prediction(sequence: str, model_name: str = "ProtT5-xl
             "Optimum temperature": ["DeepET_Topt"]
         }
         datasets = dataset_mapping.get(task, ["DeepSol"])
-        
         # Call the Gradio API
         client = Client("http://localhost:7860/")
         result = client.predict(
             task=task, 
             fasta_file=handle_file(temp_fasta.name),
-            enable_ai=False,
-            ai_model="DeepSeek",
-            user_api_key=api_key,
             model_name=model_name,
             datasets=datasets,
-            api_name="/handle_protein_function_prediction_advance"
+            enable_ai=True,
+            ai_model="DeepSeek",
+            user_api_key=api_key,
+            api_name="/handle_protein_function_prediction_chat"
         )
 
         # Clean up temporary file
@@ -691,8 +696,6 @@ def predict_protein_function(sequence: str, model_name: str = "ProtT5-xl-uniref5
     except Exception as e:
         return f"Function prediction error: {str(e)}"
 
-
-
 def extract_sequence_from_message(message: str) -> str:
     """Extract protein sequence from user message"""
     # Common patterns for protein sequences
@@ -713,6 +716,43 @@ def extract_sequence_from_message(message: str) -> str:
     
     return ""
 
+def extract_uniprot_id_from_message(message: str) -> str:
+    """Extract UniProt ID from user message"""
+    # UniProt ID patterns: P12345, Q9Y6K9, etc.
+    patterns = [
+        r'\b[OPQ][0-9][A-Z0-9]{3}[0-9]\b',  # Standard UniProt format
+        r'\b[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}\b',  # Alternative formats
+        r'uniprot[：:\s]+([A-Z0-9]+)',  # "uniprot: P12345"
+        r'id[：:\s]+([A-Z0-9]+)',  # "id: P12345"
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, message, re.IGNORECASE)
+        if match:
+            if len(match.groups()) > 0:
+                return match.group(1).upper()
+            else:
+                return match.group(0).upper()
+    
+    return ""
+
+def call_interpro_function_query(uniprot_id: str, api_key: str = None) -> str:
+    try:
+        if not uniprot_id:
+            return "Error: No UniProt ID provided for InterPro query"
+
+        result_json = download_single_interpro(uniprot_id)
+        result_data = json.loads(result_json)
+        
+        if not result_data.get('success', False):
+            return f"Error: {result_data.get('error_message', 'Unknown error occurred')}"
+        ai_summary = generate_interpro_ai_summary(result_data, api_key)
+        
+        return ai_summary
+        
+    except Exception as e:
+        return f"InterPro query error: {str(e)}"
+
 def detect_user_intent(message: str, files: List[str] = None) -> dict:
     """Detect user intent using AI-based analysis"""
     
@@ -723,7 +763,8 @@ def detect_user_intent(message: str, files: List[str] = None) -> dict:
         'action': 'chat', 
         'model': 'ESM2-650M',
         'task': 'Solubility',
-        'prediction_type': 'sequence'
+        'prediction_type': 'sequence',
+        'uniprot_id': ''
     }
     
     # Extract sequence if present
@@ -731,19 +772,27 @@ def detect_user_intent(message: str, files: List[str] = None) -> dict:
     if sequence:
         intent['sequence'] = sequence
     
-    # Check uploaded files
+    uniprot_id = extract_uniprot_id_from_message(message)
+    if uniprot_id:
+        intent['uniprot_id'] = uniprot_id
+
+    # Check uploaded files - fix file path handling
     has_structure_file = False
     has_fasta_file = False
+
     if files:
         for file in files:
-            if file and os.path.exists(file):
-                if file.lower().endswith(('.pdb', '.cif')):
+            # Handle both file objects and file paths
+            file_path = file if isinstance(file, str) else getattr(file, 'name', str(file))
+
+            if file_path and os.path.exists(file_path):
+                if file_path.lower().endswith(('.pdb', '.cif')):
                     has_structure_file = True
-                    intent['structure_file'] = file
-                elif file.lower().endswith(('.fasta', '.fa')):
+                    intent['structure_file'] = file_path
+                elif file_path.lower().endswith(('.fasta', '.fa')):
                     has_fasta_file = True
-                    intent['fasta_file'] = file
-    
+                    intent['fasta_file'] = file_path
+
     # Use AI to analyze intent if we have an API key
     try:
         api_key = os.getenv("DEEPSEEK_API_KEY")
@@ -753,10 +802,9 @@ def detect_user_intent(message: str, files: List[str] = None) -> dict:
             # If no API key, use fallback
             intent = fallback_intent_detection(message, has_fasta_file, has_structure_file, intent)
     except Exception as e:
-        print(f"AI intent analysis failed, using fallback: {e}")
         # Fallback to simple keyword detection
         intent = fallback_intent_detection(message, has_fasta_file, has_structure_file, intent)
-    
+
     return intent
 
 def analyze_intent_with_ai(message: str, has_fasta_file: bool, has_structure_file: bool, default_intent: dict) -> dict:
@@ -775,6 +823,7 @@ Available VenusFactory functions:
 1. Zero-shot mutation prediction (sequence-based): ESM-1v, ESM2-650M, ESM-1b
 2. Zero-shot mutation prediction (structure-based): SaProt, ProtSSN, ESM-IF1, MIF-ST, ProSST-2048
 3. Protein function prediction: Solubility, Localization, Binding, Stability, Sorting signal, Optimum temperature
+4. InterPro protein function query: Query protein annotations and GO terms from InterPro database
 
 TASK: Analyze the user's intent and return ONLY a JSON response. Be very precise about the action type.
 
@@ -782,12 +831,14 @@ ACTION RULES:
 - "predict_zero_shot_sequence": When user wants mutation/mutant prediction with sequence data or FASTA files
 - "predict_zero_shot_structure": When user wants mutation/mutant prediction with structure files (PDB/CIF) OR specifically mentions structure-based models
 - "predict_function": When user wants to predict protein properties like solubility, localization, binding, stability, etc.
+- "query_interpro": When user wants to query InterPro database for protein function/annotation OR mentions "function", "interpro", "go annotation", "annotation"
 - "chat": For general questions, greetings, or unclear requests
 
 MODEL RULES:
 - For zero-shot sequence: ESM-1v, ESM2-650M, ESM-1b
 - For zero-shot structure: SaProt, ProtSSN, ESM-IF1, MIF-ST, ProSST-2048  
 - For function prediction: always use "ESM2-650M"
+- For InterPro query: not applicable
 
 TASK RULES (only for function prediction):
 - Solubility, Localization, Binding, Stability, "Sorting signal", "Optimum temperature"
@@ -795,13 +846,14 @@ TASK RULES (only for function prediction):
 Keywords to look for:
 - Mutation/mutant/design → zero-shot prediction
 - Solubility/localization/binding/stability → function prediction
+- Function/InterPro/annotation/go → InterPro query
 - Structure-based models → zero-shot structure
 - General questions → chat
 
 Return JSON format:
 {{
-    "action": "chat|predict_zero_shot_sequence|predict_zero_shot_structure|predict_function",
-    "model": "model_name",
+    "action": "chat|predict_zero_shot_sequence|predict_zero_shot_structure|predict_function|query_interpro",
+    "model": "model_name_or_null",
     "task": "task_name_or_null",
     "reasoning": "brief explanation"
 }}
@@ -854,20 +906,17 @@ Return JSON format:
                 
                 ai_intent = json.loads(cleaned_response)
                 
-                # 验证和修正AI的响应
-                valid_actions = ["chat", "predict_zero_shot_sequence", "predict_zero_shot_structure", "predict_function"]
+                valid_actions = ["chat", "predict_zero_shot_sequence", "predict_zero_shot_structure", "predict_function", "query_interpro"]
                 if ai_intent.get('action') not in valid_actions:
-                    print(f"Invalid action from AI: {ai_intent.get('action')}, using fallback")
                     return fallback_intent_detection(message, has_fasta_file, has_structure_file, default_intent)
                 
                 # Update intent based on AI analysis
                 default_intent['action'] = ai_intent.get('action', 'chat')
                 default_intent['model'] = ai_intent.get('model', 'ESM2-650M')
                 
-                # 任务名称处理
                 if ai_intent.get('action') == 'predict_function':
                     default_intent['task'] = ai_intent.get('task', 'Solubility')
-                    default_intent['model'] = 'ESM2-650M'  # 功能预测固定使用ESM2-650M
+                    default_intent['model'] = 'ESM2-650M' 
                 else:
                     default_intent['task'] = None
                 
@@ -879,37 +928,32 @@ Return JSON format:
                 else:
                     default_intent['type'] = 'general'
                 
-                print(f"DEBUG: AI intent parsed successfully: {default_intent}")
-                print(f"DEBUG: AI reasoning: {ai_intent.get('reasoning', 'No reasoning provided')}")
                 return default_intent
                 
             except json.JSONDecodeError as e:
-                print(f"Failed to parse AI response: {ai_response}")
-                print(f"JSON decode error: {e}")
                 return fallback_intent_detection(message, has_fasta_file, has_structure_file, default_intent)
         else:
-            print(f"AI API call failed: {response.status_code}")
             return fallback_intent_detection(message, has_fasta_file, has_structure_file, default_intent)
             
     except Exception as e:
-        print(f"AI intent analysis error: {e}")
         return fallback_intent_detection(message, has_fasta_file, has_structure_file, default_intent)
 
 
 def fallback_intent_detection(message: str, has_fasta_file: bool, has_structure_file: bool, intent: dict) -> dict:
-    """Fallback intent detection using simple keyword matching"""
     message_lower = message.lower()
-    
-    print(f"DEBUG: Fallback intent detection for message: '{message_lower}'")
-    print(f"DEBUG: Files - FASTA: {has_fasta_file}, Structure: {has_structure_file}")
-    
-    # 重新设计优先级逻辑
-    
-    # 1. 首先检查是否是突变/设计相关（最高优先级）
+
+    interpro_keywords = ['function', 'interpro', 'annotation', 'go term', 'go annotation', '功能', '注释']
+    is_interpro_request = any(word in message_lower for word in interpro_keywords)
+    has_uniprot_id = bool(intent.get('uniprot_id'))
+
+    if is_interpro_request and has_uniprot_id:
+        intent['action'] = 'query_interpro'
+        intent['type'] = 'interpro_query'
+        return intent
+
     mutation_keywords = ['mutation', 'mutant', 'mutate', '突变', '设计', 'design', 'zero-shot', 'zero shot']
     is_mutation_request = any(word in message_lower for word in mutation_keywords)
     
-    # 2. 检查是否是功能预测相关
     function_keywords = {
         'solubility': ['solubility', '溶解度', 'soluble'],
         'localization': ['localization', '定位', 'location', 'subcellular'],
@@ -925,7 +969,7 @@ def fallback_intent_detection(message: str, has_fasta_file: bool, has_structure_
             detected_function = func_name
             break
     
-    # 3. 检查模型偏好
+
     sequence_models = {
         'ESM-1v': ['esm-1v', 'esm1v'],
         'ESM2-650M': ['esm2', 'esm-2', 'esm2-650m'],
@@ -940,8 +984,8 @@ def fallback_intent_detection(message: str, has_fasta_file: bool, has_structure_
         'ProSST-2048': ['prosst', 'prosst-2048']
     }
     
-    detected_seq_model = 'ESM2-650M'  # 默认
-    detected_struct_model = 'SaProt'  # 默认
+    detected_seq_model = 'ESM2-650M'
+    detected_struct_model = 'SaProt' 
     
     for model_name, keywords in sequence_models.items():
         if any(keyword in message_lower for keyword in keywords):
@@ -953,9 +997,7 @@ def fallback_intent_detection(message: str, has_fasta_file: bool, has_structure_
             detected_struct_model = model_name
             break
     
-    # 4. 决策逻辑
     if is_mutation_request:
-        # 突变预测请求
         structure_indicators = ['structure', 'pdb', 'cif', '结构'] + list(structure_models.keys())
         wants_structure_based = (any(indicator.lower() in message_lower for indicator in structure_indicators) 
                                or has_structure_file)
@@ -964,23 +1006,19 @@ def fallback_intent_detection(message: str, has_fasta_file: bool, has_structure_
             intent['action'] = 'predict_zero_shot_structure'
             intent['type'] = 'zero_shot_prediction'
             intent['model'] = detected_struct_model
-            print(f"DEBUG: Detected structure-based mutation prediction with model {detected_struct_model}")
         else:
             intent['action'] = 'predict_zero_shot_sequence'
             intent['type'] = 'zero_shot_prediction'
             intent['model'] = detected_seq_model
-            print(f"DEBUG: Detected sequence-based mutation prediction with model {detected_seq_model}")
-    
+
     elif detected_function:
         intent['action'] = 'predict_function'
         intent['type'] = 'function_prediction'
         intent['model'] = 'ESM2-650M'
         intent['task'] = detected_function.title()
-        print(f"DEBUG: Detected function prediction for {detected_function}")
-    
+
     else:
         intent['action'] = 'chat'
         intent['type'] = 'general'
-        print(f"DEBUG: Detected general chat")
-    
+
     return intent

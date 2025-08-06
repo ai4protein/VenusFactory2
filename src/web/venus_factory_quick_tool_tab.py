@@ -14,7 +14,8 @@ import requests
 from dataclasses import dataclass
 import re
 import json
-
+from dotenv import load_dotenv
+load_dotenv()
 # --- CONSTANTS AND MAPPINGS ---
 
 MODEL_MAPPING_ZERO_SHOT = {
@@ -79,6 +80,10 @@ COLOR_MAP_FUNCTION = {
 }
 
 REGRESSION_TASKS_FUNCTION = ["Stability", "Optimum temperature"]
+REGRESSION_TASKS_FUNCTION_MAX_MIN = {
+    "Stability": [40.1995166, 66.8968874],
+    "Optimum temperature": [2, 120]
+}
 
 DATASET_TO_TASK_MAP = {
     dataset: task 
@@ -86,10 +91,22 @@ DATASET_TO_TASK_MAP = {
     for dataset in datasets
 }
 
+
 AI_MODELS = {
     "DeepSeek": {
         "api_base": "https://api.deepseek.com/v1", 
-        "model": "deepseek-chat"
+        "model": "deepseek-chat",
+        "env_key": "DEEPSEEK_API_KEY"
+    },
+    "ChatGPT": {
+        "api_base": "https://api.openai.com/v1",
+        "model": "gpt-4o-mini", 
+        "env_key": None
+    },
+    "Gemini": {
+        "api_base": "https://generativelanguage.googleapis.com/v1beta",
+        "model": "gemini-1.5-flash",
+        "env_key": None
     }
 }
 
@@ -97,56 +114,215 @@ AI_MODELS = {
 class AIConfig:
     """Configuration for AI API calls."""
     api_key: str
-    model_name: str
+    ai_model_name: str
     api_base: str
     model: str
 
 # --- HELPER & UTILITY FUNCTIONS ---
 
 def get_api_key(ai_provider: str, user_input_key: str = "") -> Optional[str]:
-    """Get API key from user input or environment variable."""
+    """Get API key based on provider and user input."""
+    model_config = AI_MODELS.get(ai_provider, {})
+    env_key = model_config.get("env_key")
+    
+    if env_key:
+        env_api_key = os.getenv(env_key)
+        if env_api_key and env_api_key.strip():
+            return env_api_key.strip()
+        if user_input_key and user_input_key.strip():
+            return user_input_key.strip()
+        return None
+    
     if user_input_key and user_input_key.strip():
         return user_input_key.strip()
-    env_var_map = {"DeepSeek": "DEEPSEEK_API_KEY"}
-    env_var_name = env_var_map.get(ai_provider)
-    if env_var_name and os.getenv(env_var_name):
-        return os.getenv(env_var_name)
     return None
 
 def call_ai_api(config: AIConfig, prompt: str) -> str:
     """Make API call to AI service."""
-    headers = {
-        "Authorization": f"Bearer {config.api_key}", 
-        "Content-Type": "application/json"
-    }
-    
-    data = {
-        "model": config.model,
-        "messages": [
-            {
-                "role": "system", 
-                "content": "You are an expert protein scientist. Provide clear, structured, and insightful analysis based on the data provided. Do not ask interactive questions."
-            },
-            {
-                "role": "user", 
-                "content": prompt
+    if config.ai_model_name == "ChatGPT":
+        headers = {
+            "Authorization": f"Bearer {config.api_key}",
+            "Content-Type": "application/json"
+        }
+        data = {
+            "model": config.model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You are an expert protein scientist. Provide clear, structured, and insightful analysis based on the data provided. Do not ask interactive questions."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            "temperature": 0.3,
+            "max_tokens": 2000
+        }
+        endpoint = f"{config.api_base}/chat/completions"
+        
+    elif config.ai_model_name == "Gemini":
+        headers = {
+            "Content-Type": "application/json"
+        }
+        data = {
+            "contents": [{
+                "parts": [{
+                    "text": f"You are an expert protein scientist. {prompt}"
+                }]
+            }],
+            "generationConfig": {
+                "temperature": 0.3,
+                "maxOutputTokens": 2000
             }
-        ],
-        "temperature": 0.3, 
-        "max_tokens": 2000
-    }
+        }
+        endpoint = f"{config.api_base}/models/{config.model}:generateContent?key={config.api_key}"
+        
+    else:  # DeepSeek (default)
+        headers = {
+            "Authorization": f"Bearer {config.api_key}",
+            "Content-Type": "application/json"
+        }
+        data = {
+            "model": config.model,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You are an expert protein scientist. Provide clear, structured, and insightful analysis based on the data provided. Do not ask interactive questions."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            "temperature": 0.3,
+            "max_tokens": 2000
+        }
+        endpoint = f"{config.api_base}/chat/completions"
     
     try:
         response = requests.post(
-            f"{config.api_base}/chat/completions", 
-            headers=headers, 
-            json=data, 
+            endpoint,
+            headers=headers,
+            json=data,
             timeout=60
         )
         response.raise_for_status()
-        return response.json()["choices"][0]["message"]["content"]
+        response_json = response.json()
+        
+        if config.ai_model_name == "Gemini":
+            if "candidates" in response_json and len(response_json["candidates"]) > 0:
+                return response_json["candidates"][0]["content"]["parts"][0]["text"]
+            else:
+                return "❌ Gemini API returned empty response"
+        else:  # ChatGPT and DeepSeek
+            return response_json["choices"][0]["message"]["content"]
+            
+    except requests.exceptions.RequestException as e:
+        return f"❌ Network error: {str(e)}"
+    except KeyError as e:
+        return f"❌ API response format error: {str(e)}"
     except Exception as e:
         return f"❌ API call failed: {str(e)}"
+    
+def check_ai_config_status(ai_provider: str, user_api_key: str) -> tuple[bool, str]:
+    """Check AI configuration status and return validity and message."""
+    model_config = AI_MODELS.get(ai_provider, {})
+    env_key = model_config.get("env_key")
+    
+    if env_key:  # DeepSeek
+        env_api_key = os.getenv(env_key)
+        if env_api_key and env_api_key.strip():
+            return True, "✓ Using the Provided API Key"
+        elif user_api_key and user_api_key.strip():
+            return True, "✓ The server will not save your API Key"
+        else:
+            return False, "⚠ No API Key found in .env file"
+    else:  # Other models
+        if user_api_key and user_api_key.strip():
+            return True, "✓ Manual API Key provided"
+        else:
+            return False, "⚠ Manual API Key required"  
+
+def on_ai_model_change(ai_provider: str) -> tuple:
+    """Handle AI model selection change."""
+    model_config = AI_MODELS.get(ai_provider, {})
+    env_key = model_config.get("env_key")
+    
+    if env_key:  # DeepSeek
+        env_api_key = os.getenv(env_key)
+        if env_api_key and env_api_key.strip():
+            status_msg = "✓ Using API Key from .env file"
+            show_input = False
+            placeholder = ""
+        else:
+            status_msg = "⚠ No API Key found in .env file. Please enter manually below:"
+            show_input = True
+            placeholder = "Enter your DeepSeek API Key"
+    else:  # Other models
+        status_msg = f"⚠ Manual API Key required for {ai_provider}"
+        show_input = True
+        if ai_provider == "ChatGPT":
+            placeholder = "Enter your OpenAI API Key (sk-...)"
+        elif ai_provider == "Gemini":
+            placeholder = "Enter your Google AI API Key"
+        else:
+            placeholder = f"Enter your {ai_provider} API Key"
+    
+    return (
+        gr.update(visible=show_input, placeholder=placeholder, value=""),  # API Key input
+        gr.update(value=status_msg)  # Status message
+    )
+
+def generate_expert_analysis_prompt(results_df: pd.DataFrame, task: str) -> str:
+    protein_count = len(results_df)
+
+    prompt = f"""
+        You are a senior protein biochemist with extensive laboratory experience. A colleague has just shown you protein function prediction results for the task '{task}'. 
+        Please analyze these results from a practical biologist's perspective:
+        {results_df.to_string(index=False)}
+        Provide a concise, practical analysis focusing ONLY on:
+        0. The task '{task}' with "Stability" and "Optimum temperature" are regression task
+        1. What the prediction results mean for each protein
+        2. The biological significance of the confidence scores
+        3. Practical experimental recommendations based on these predictions
+        4. Any notable patterns or outliers in the results
+        5. Do not output formatted content, just one paragraph is sufficient
+        Use simple, clear language that a bench scientist would appreciate. Do NOT mention:
+        - Training datasets or models
+        - Technical implementation details  
+        - Computational methods
+        - Statistical concepts beyond confidence scores
+        Keep your response under 200 words and speak as if you're having a conversation with a colleague in the lab.
+        """
+    return prompt
+
+def format_expert_response(ai_response: str) -> str:
+    """Format AI response as HTML with expert avatar and speech bubble."""
+    escaped_response = ai_response.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('\n', '<br>')
+    
+    html = f"""
+    <div style="height: 300px; padding: 10px; display: flex; align-items: flex-end; font-family: Arial, sans-serif;">
+        <div style="margin-right: 15px; text-align: center;">
+            <div style="width: 60px; height: 60px; background-color: #4A90E2; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; color: white; border: 3px solid #357ABD;">
+                👨‍🔬
+            </div>
+            <div style="font-size: 12px; color: #666; margin-top: 5px; font-weight: bold;">
+                Expert
+            </div>
+        </div>
+        <div style="flex: 1; position: relative;">
+            <div style="background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 15px; padding: 15px; position: relative; max-width: 90%; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <div style="position: absolute; left: -10px; bottom: 20px; width: 0; height: 0; border-top: 10px solid transparent; border-bottom: 10px solid transparent; border-right: 10px solid #f8f9fa;"></div>
+                <div style="position: absolute; left: -11px; bottom: 20px; width: 0; height: 0; border-top: 10px solid transparent; border-bottom: 10px solid transparent; border-right: 10px solid #dee2e6;"></div>
+                <div style="font-size: 15px; line-height: 1.4; color: #333;">
+                    {escaped_response}
+                </div>
+            </div>
+        </div>
+    </div>
+    """
+    return html
 
 def generate_mutation_ai_prompt(results_df: pd.DataFrame, model_name: str, function_selection: str) -> str:
     """Generate AI prompt for mutation analysis."""
@@ -176,11 +352,12 @@ def generate_mutation_ai_prompt(results_df: pd.DataFrame, model_name: str, funct
 
         ### Your Analysis Task:
         Based on this data, provide a structured scientific analysis report that includes the following sections:
-        1. **Executive Summary**: Briefly summarize the key findings. Are there clear hotspot regions?
-        2. **Analysis of Beneficial Mutations**: Discuss the top mutations and their potential biochemical impact on '{function_selection}'.
-        3. **Analysis of Detrimental Mutations**: What do the most harmful mutations suggest about critical residues?
-        4. **Recommendations for Experimentation**: Suggest 3-5 specific mutations for validation, with justifications.
-        Provide a concise, clear, and insightful report in a professional scientific tone.
+        1. Executive Summary: Briefly summarize the key findings. Are there clear hotspot regions?
+        2. Analysis of Beneficial Mutations: Discuss the top mutations and their potential biochemical impact on '{function_selection}'.
+        3. Analysis of Detrimental Mutations: What do the most harmful mutations suggest about critical residues?
+        4. Recommendations for Experimentation: Suggest 3-5 specific mutations for validation, with justifications.
+        5. Do not output formatted content, just one paragraph is sufficient
+        Provide a concise, clear, and insightful report in a professional scientific tone, summarize the above content into 1-2 paragraphs and output unformatted content.
         """
 
 def generate_ai_summary_prompt(results_df: pd.DataFrame, task: str, model: str) -> str:
@@ -455,10 +632,11 @@ def handle_mutation_prediction_base(
     ai_model: str, 
     user_api_key: str, 
     model_name: Optional[str] = None
+
 ) -> Generator:
     try:
         import requests
-        requests.post("/api/stats/track", json={"module": "mutation_prediction"})
+        requests.post("/api/stats/track", json={"module": "function_analysis"})
     except Exception:
         pass
     """Handle mutation prediction workflow."""
@@ -760,7 +938,7 @@ def handle_protein_function_prediction(
     user_api_key: str, 
     model_name: Optional[str] = None, 
     datasets: Optional[List[str]] = None
-) -> Generator:
+    ) -> Generator:
     try:
         import requests
         requests.post("/api/stats/track", json={"module": "function_analysis"})
@@ -774,14 +952,16 @@ def handle_protein_function_prediction(
     if not all([task, datasets, fasta_file]):
         yield (
             "❌ Error: Task, Datasets, and FASTA file are required.", 
-            pd.DataFrame(), None, gr.update(visible=False), 
+            pd.DataFrame(), 
+            gr.update(visible=False), 
             "Please provide all required inputs."
         )
         return
 
     yield (
         f"🚀 Starting predictions with {model}...", 
-        pd.DataFrame(), None, gr.update(visible=False), 
+        pd.DataFrame(), 
+        gr.update(visible=False), 
         "AI analysis will appear here..."
     )
     
@@ -793,7 +973,8 @@ def handle_protein_function_prediction(
     for i, dataset in enumerate(datasets):
         yield (
             f"⏳ Running prediction...", 
-            pd.DataFrame(), None, gr.update(visible=False), 
+            pd.DataFrame(), 
+            gr.update(visible=False), 
             "AI analysis will appear here..."
         )
         
@@ -824,7 +1005,12 @@ def handle_protein_function_prediction(
             all_results_list.append(pd.DataFrame([{"Dataset": dataset, "header": "ERROR", "sequence": error_detail}]))
     
     if not all_results_list:
-        yield "⚠️ No results generated.", pd.DataFrame(), None, gr.update(visible=False), "No results to analyze."
+        yield (
+            "⚠️ No results generated.", 
+            pd.DataFrame(), 
+            gr.update(visible=False), 
+            "No results to analyze."
+        )
         return
     
     raw_final_df = pd.concat(all_results_list, ignore_index=True).fillna('N/A')
@@ -835,7 +1021,12 @@ def handle_protein_function_prediction(
     is_voting_run = task not in non_voting_tasks and not any(ds in raw_final_df['Dataset'].unique() for ds in non_voting_datasets) and len(raw_final_df['Dataset'].unique()) > 1
 
     if is_voting_run:
-        yield "🤝 Performing soft voting on prediction results...", pd.DataFrame(), None, gr.update(visible=False), "Aggregating results..."
+        yield (
+            "🤝 Performing soft voting on prediction results...", 
+            pd.DataFrame(), 
+            gr.update(visible=False), 
+            "Aggregating results..."
+        )
         voted_results = []
         for header, group in raw_final_df.groupby('header'):
             if group.empty: continue
@@ -901,6 +1092,7 @@ def handle_protein_function_prediction(
             # Remove Dataset column for voting results
             final_df = final_df.drop(columns=['Dataset'], errors='ignore')
 
+    # Generate plot but don't return it in the yield
     plot_fig = generate_plots_for_all_results(raw_final_df)
     display_df = final_df.copy()
 
@@ -1011,15 +1203,24 @@ def handle_protein_function_prediction(
         display_df["Confidence Score"] = display_df.apply(format_confidence, axis=1)
 
     ai_summary = "AI Analysis disabled. Enable in settings to generate a report."
+
+    expert_analysis = "<div style='height: 300px; display: flex; align-items: center; justify-content: center; color: #666;'>Analysis will appear here once prediction is complete...</div>"
+
     if enable_ai:
-        yield "🤖 Generating AI summary...", display_df, plot_fig, gr.update(visible=False), "🤖 AI is analyzing..."
+        yield (
+            "🤖 Expert is analyzing results...", 
+            display_df, 
+            gr.update(visible=False), 
+            expert_analysis
+        )
         api_key = get_api_key(ai_model, user_api_key)
         if not api_key: 
             ai_summary = f"❌ No API key found for {ai_model}."
         else:
             ai_config = AIConfig(api_key, ai_model, AI_MODELS[ai_model]["api_base"], AI_MODELS[ai_model]["model"])
-            prompt = generate_ai_summary_prompt(display_df, task, model)
-            ai_summary = call_ai_api(ai_config, prompt)
+            prompt = generate_expert_analysis_prompt(display_df, task)
+            ai_response = call_ai_api(ai_config, prompt)
+            expert_analysis = format_expert_response(ai_response)
     
     # Create download zip with processed results
     zip_path_str = ""
@@ -1032,12 +1233,13 @@ def handle_protein_function_prediction(
         processed_df_for_save = display_df.copy()
         processed_df_for_save.to_csv(zip_dir / "Result.csv", index=False)
         
+        # Save plot as HTML file (optional)
         if plot_fig and hasattr(plot_fig, 'data') and plot_fig.data: 
             plot_fig.write_html(str(zip_dir / "results_plot.html"))
         
         if not ai_summary.startswith("❌") and not ai_summary.startswith("AI Analysis"):
             with open(zip_dir / "AI_Report.md", 'w', encoding='utf-8') as f: 
-                f.write(f"# AI Report\n\n{ai_summary}")
+                f.write(f"# AI Expert Analysis\n\n{ai_summary}")
         
         zip_path = temp_dir / f"func_pred_{ts}.zip"
         with zipfile.ZipFile(zip_path, 'w') as zf:
@@ -1053,7 +1255,12 @@ def handle_protein_function_prediction(
     if enable_ai and not ai_summary.startswith("❌"): 
         final_status += " AI analysis included."
     
-    yield final_status, display_df, plot_fig, gr.update(visible=True, value=zip_path_str), ai_summary
+    yield (
+        final_status, 
+        display_df, 
+        gr.update(visible=True, value=zip_path_str) if zip_path_str else gr.update(visible=False), 
+        expert_analysis
+    )
 
 def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     with gr.Blocks() as demo:
@@ -1073,8 +1280,21 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         gr.Markdown("### Configure AI Analysis (Optional)")
                         enable_ai_zshot = gr.Checkbox(label="Enable AI Summary", value=False)
                         with gr.Group(visible=False) as ai_box_zshot:
-                            ai_model_dd_zshot = gr.Dropdown(choices=list(AI_MODELS.keys()), value="DeepSeek", label="Select AI Model")
-                            api_key_in_zshot = gr.Textbox(label="API Key", type="password", placeholder="Leave blank to use environment variable")
+                            ai_model_dd_zshot = gr.Dropdown(
+                                choices=list(AI_MODELS.keys()), 
+                                value="DeepSeek", 
+                                label="Select AI Model"
+                            )
+                            ai_status_zshot = gr.Markdown(
+                                value="✓ Using provided API Key" if os.getenv("DEEPSEEK_API_KEY") else "⚠ No API Key found in .env file",
+                                visible=True
+                            )
+                            api_key_in_zshot = gr.Textbox(
+                                label="API Key", 
+                                type="password", 
+                                placeholder="Enter your API Key if needed",
+                                visible=not bool(os.getenv("DEEPSEEK_API_KEY"))
+                            )
                         
                         easy_zshot_predict_btn = gr.Button("🚀 Start Prediction", variant="primary")
 
@@ -1110,9 +1330,22 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         gr.Markdown("### Configure AI Analysis (Optional)")
                         enable_ai_func = gr.Checkbox(label="Enable AI Summary", value=False)
                         with gr.Group(visible=False) as ai_box_func:
-                            ai_model_dd_func = gr.Dropdown(choices=list(AI_MODELS.keys()), label="Select AI Model", value="DeepSeek")
-                            api_key_in_func = gr.Textbox(label="API Key", type="password", placeholder="Leave blank to use environment variable")
-                        
+                            ai_model_dd_func = gr.Dropdown(
+                                choices=list(AI_MODELS.keys()), 
+                                label="Select AI Model", 
+                                value="DeepSeek"
+                            )
+                            ai_status_func = gr.Markdown(
+                                value="✓ Using provided API Key" if os.getenv("DEEPSEEK_API_KEY") else "⚠ No API Key found in .env file",
+                                visible=True
+                            )
+                            api_key_in_func = gr.Textbox(
+                                label="API Key", 
+                                type="password", 
+                                placeholder="Enter your API Key if needed",
+                                visible=not bool(os.getenv("DEEPSEEK_API_KEY"))
+                            )
+
                         easy_func_predict_btn = gr.Button("🚀 Start Prediction", variant="primary")
                 
                     with gr.Column(scale=3):
@@ -1121,15 +1354,22 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         with gr.Tabs():
                             with gr.TabItem("📊 Raw Results"):
                                 function_results_df = gr.DataFrame(label="Prediction Data", column_widths=["20%", "20%", "20%", "20%", "20%"])
-                            with gr.TabItem("📈 Prediction Plots"):
-                                function_results_plot = gr.Plot(label="Confidence Scores")
-                            with gr.TabItem("🤖 AI Analysis"):
-                                function_ai_summary_output = gr.Textbox(label="AI Analysis Report", value="AI analysis will appear here...", lines=20, interactive=False, show_copy_button=True)
-                        
+                            with gr.TabItem("👨‍🔬 AI Expert Analysis"):
+                                # function_results_plot = gr.Plot(label="Confidence Scores")
+                                ai_expert_html = gr.HTML(
+                                    value="<div style='height: 300px; display: flex; align-items: center; justify-content: center; color: #666;'>AI analysis will appear here...</div>",
+                                    label="👨‍🔬 AI Expert Analysis"
+                                )
                         function_download_btn = gr.DownloadButton("💾 Download Results", visible=False)
 
         # --- EVENT HANDLERS ---
+        # Mutation prediction tab events
         enable_ai_zshot.change(fn=toggle_ai_section, inputs=enable_ai_zshot, outputs=ai_box_zshot)
+        ai_model_dd_zshot.change(
+            fn=on_ai_model_change,
+            inputs=ai_model_dd_zshot,
+            outputs=[api_key_in_zshot, ai_status_zshot]
+        )
         easy_zshot_file_upload.upload(fn=handle_file_upload, inputs=easy_zshot_file_upload, outputs=easy_zshot_protein_display)
         easy_zshot_file_upload.change(fn=handle_file_upload, inputs=easy_zshot_file_upload, outputs=easy_zshot_protein_display)
         easy_zshot_predict_btn.click(
@@ -1138,13 +1378,18 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             outputs=[zero_shot_status_box, zero_shot_plot_out, zero_shot_df_out, zero_shot_download_btn, zero_shot_download_path_state, zero_shot_view_controls, zero_shot_full_data_state, zero_shot_ai_out]
         )
 
+        # Function prediction tab events  
         enable_ai_func.change(fn=toggle_ai_section, inputs=enable_ai_func, outputs=ai_box_func)
+        ai_model_dd_func.change(
+            fn=on_ai_model_change,
+            inputs=ai_model_dd_func,
+            outputs=[api_key_in_func, ai_status_func]
+        )
         base_function_fasta_upload.upload(fn=handle_file_upload, inputs=base_function_fasta_upload, outputs=base_function_protein_display)
         base_function_fasta_upload.change(fn=handle_file_upload, inputs=base_function_fasta_upload, outputs=base_function_protein_display)
         easy_func_predict_btn.click(
             fn=handle_protein_function_prediction,
             inputs=[easy_func_task_dd, base_function_fasta_upload, enable_ai_func, ai_model_dd_func, api_key_in_func],
-            outputs=[function_status_textbox, function_results_df, function_results_plot, function_download_btn, function_ai_summary_output]
+            outputs=[function_status_textbox, function_results_df, function_download_btn, ai_expert_html] 
         )
-
     return {}
