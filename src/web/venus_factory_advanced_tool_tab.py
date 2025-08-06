@@ -174,7 +174,8 @@ def handle_mutation_prediction_advance(
     enable_ai: bool, 
     ai_model: str, 
     user_api_key: str, 
-    model_name:str
+    model_name:str,
+    progress=gr.Progress()
 ) -> Generator:
     try:
         import requests
@@ -225,6 +226,7 @@ def handle_mutation_prediction_advance(
         return
 
     # Start prediction
+    progress(0.1, desc="Running prediction...")
     yield (
         f"⏳ Running prediction...", 
         None, None, gr.update(visible=False), None, 
@@ -233,7 +235,7 @@ def handle_mutation_prediction_advance(
     )
     
     status, raw_df = run_zero_shot_prediction(model_type, model_name, file_path)
-    
+    progress(0.7, desc="Processing results...")
     if raw_df.empty:
         yield (
             status, 
@@ -278,6 +280,7 @@ def handle_mutation_prediction_advance(
     # Handle AI analysis
     ai_summary = "AI Analysis disabled. Enable in settings to generate a report."
     if enable_ai:
+        progress(0.8, desc="Generating AI summary...")
         yield (
             f"✅ Prediction complete. 🤖 Generating AI summary...", 
             summary_fig, display_df, gr.update(visible=False), None, 
@@ -296,7 +299,9 @@ def handle_mutation_prediction_advance(
             )
             prompt = generate_mutation_ai_prompt(display_df, model_name, function_selection)
             ai_summary = call_ai_api(ai_config, prompt)
-    
+        progress(0.9, desc="Finalizing AI analysis...")
+    else:
+        progress(1.0, desc="Complete!")
     # Create download files
     temp_dir = Path("temp_outputs")
     temp_dir.mkdir(exist_ok=True)
@@ -323,7 +328,7 @@ def handle_mutation_prediction_advance(
     zip_path_str = create_zip_archive(files_to_zip, str(zip_path))
 
     final_status = status if not enable_ai else "✅ Prediction and AI analysis complete!"
-    
+    progress(1.0, desc="Complete!")
     yield (
         final_status, summary_fig, display_df, 
         gr.update(visible=True, value=zip_path_str), zip_path_str, 
@@ -414,7 +419,8 @@ def handle_protein_function_prediction_advance(
     ai_model: str, 
     user_api_key: str, 
     model_name: Optional[str] = None, 
-    datasets: Optional[List[str]] = None
+    datasets: Optional[List[str]] = None,
+    progress=gr.Progress()
     ) -> Generator:
     try:
         import requests
@@ -439,7 +445,7 @@ def handle_protein_function_prediction_advance(
             "Please provide all required inputs."
         )
         return
-
+    progress(0.1, desc="Running prediction...")
     yield (
         f"🚀 Starting predictions with {model}...", 
         pd.DataFrame(), None, gr.update(visible=False), 
@@ -487,7 +493,7 @@ def handle_protein_function_prediction_advance(
     if not all_results_list:
         yield "⚠️ No results generated.", pd.DataFrame(), None, gr.update(visible=False), "No results to analyze."
         return
-    
+    progress(0.7, desc="Processing results...")
     # Concatenate all results and keep Dataset column
     final_df = pd.concat(all_results_list, ignore_index=True).fillna('N/A')
     
@@ -600,6 +606,7 @@ def handle_protein_function_prediction_advance(
 
     ai_summary = "AI Analysis disabled. Enable in settings to generate a report."
     if enable_ai:
+        progress(0.8, desc="Generating AI summary...")
         yield "🤖 Generating AI summary...", display_df, plot_fig, gr.update(visible=False), "🤖 AI is analyzing..."
         api_key = get_api_key(ai_model, user_api_key)
         if not api_key: 
@@ -608,6 +615,9 @@ def handle_protein_function_prediction_advance(
             ai_config = AIConfig(api_key, ai_model, AI_MODELS[ai_model]["api_base"], AI_MODELS[ai_model]["model"])
             prompt = generate_ai_summary_prompt(display_df, task, model)
             ai_summary = call_ai_api(ai_config, prompt)
+        progress(0.9, desc="Finalizing AI analysis...")
+    else:
+        progress(1.0, desc="Complete!")
     
     # Create download zip with processed results
     zip_path_str = ""
@@ -638,7 +648,7 @@ def handle_protein_function_prediction_advance(
     final_status = "✅ All predictions completed!"
     if enable_ai and not ai_summary.startswith("❌"): 
         final_status += " AI analysis included."
-    
+    progress(1.0, desc="Complete!")
     yield final_status, display_df, plot_fig, gr.update(visible=True, value=zip_path_str), ai_summary
 
 
@@ -825,7 +835,8 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         seq_predict_btn.click(
             fn=handle_mutation_prediction_advance, 
             inputs=[seq_function_dd, seq_file_upload, enable_ai_zshot_seq, ai_model_seq_zshot, api_key_in_seq_zshot, seq_model_dd],
-            outputs=[zero_shot_status_box, zero_shot_plot_out, zero_shot_df_out, zero_shot_download_btn, zero_shot_download_path_state, zero_shot_view_controls, zero_shot_full_data_state, zero_shot_ai_out]
+            outputs=[zero_shot_status_box, zero_shot_plot_out, zero_shot_df_out, zero_shot_download_btn, zero_shot_download_path_state, zero_shot_view_controls, zero_shot_full_data_state, zero_shot_ai_out],
+            show_progress=True
         )
 
         struct_file_upload.upload(fn=parse_pdb_for_sequence, inputs=struct_file_upload, outputs=struct_protein_display)
@@ -833,9 +844,10 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         struct_predict_btn.click(
             fn=handle_mutation_prediction_advance, 
             inputs=[struct_function_dd, struct_file_upload, enable_ai_zshot_stru, ai_model_stru_zshot, api_key_in_stru_zshot, struct_model_dd], 
-            outputs=[zero_shot_status_box, zero_shot_plot_out, zero_shot_df_out, zero_shot_download_btn, zero_shot_download_path_state, zero_shot_view_controls, zero_shot_full_data_state, zero_shot_ai_out]
+            outputs=[zero_shot_status_box, zero_shot_plot_out, zero_shot_df_out, zero_shot_download_btn, zero_shot_download_path_state, zero_shot_view_controls, zero_shot_full_data_state, zero_shot_ai_out],
+            show_progress=True
         )
-
+        
         enable_ai_func.change(fn=toggle_ai_section, inputs=enable_ai_func, outputs=ai_box_func)
         
         function_fasta_upload.upload(fn=handle_file_upload, inputs=function_fasta_upload, outputs=function_protein_display)
@@ -846,7 +858,8 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         adv_func_predict_btn.click(
             fn=handle_protein_function_prediction_advance,
             inputs=[adv_func_task_dd, function_fasta_upload, enable_ai_func, ai_model_seq_func, api_key_in_seq_func, adv_func_model_dd, adv_func_dataset_cbg],
-            outputs=[function_status_textbox, function_results_df, function_results_plot, function_download_btn, function_ai_summary_output]
+            outputs=[function_status_textbox, function_results_df, function_results_plot, function_download_btn, function_ai_summary_output],
+            show_progress=True
         )
         function_protein_chat_btn.click(
             fn=handle_protein_function_prediction_chat,

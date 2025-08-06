@@ -269,6 +269,28 @@ def create_download_tool_tab(constant: Dict[str, Any]):
         zip_path = zip_task_results(task_folder, task_id, "uniprot_sequence")
         return download_result, gr.update(visible=True, value=zip_path)
 
+    def handle_ncbi_download(method: str, id_val: str, file_val, user_hash: str, merge: bool, error: bool) -> tuple:
+        """Handles NCBI sequence download."""
+        task_id = generate_task_id(user_hash)
+        task_folder = create_task_folder(task_id, "ncbi_sequence")
+
+        file_path = None
+        if method == "From File" and file_val:
+            lines, preview = read_uploaded_file(file_val.name)
+            if lines:
+                file_path = save_truncated_file(file_val.name, lines, task_folder)
+        
+        args = {
+            "id": id_val if method == "Single ID" else None,
+            "file": file_path,
+            "out_dir": task_folder,
+            "merge": "--merge" if merge else None,
+            "error_file": f"{task_folder}/failed.txt" if error else None
+        }
+        download_result = run_download_script("sequence/download_ncbi_seq.py", **args)
+        zip_path = zip_task_results(task_folder, task_id, "ncbi_sequence")
+        return download_result, gr.update(visible=True, value=zip_path)
+
     def handle_struct_download(method: str, id_val: str, file_upload, user_hash: str, type_val: str, error: bool) -> tuple:
         """Handles RCSB structure download and updates the UI."""
         task_id = generate_task_id(user_hash)
@@ -351,8 +373,93 @@ def create_download_tool_tab(constant: Dict[str, Any]):
 
         with gr.Tabs():
             # --- Sequence and Metadata Download Tab ---
-            with gr.TabItem("🧬 Sequence & Metadata Download"):
+            with gr.TabItem("🧬 Sequence Download"):
                 gr.Markdown("### Protein Sequence and Annotation Information Download")
+                with gr.Tabs():
+                    # UniProt Sequences Download
+                    with gr.TabItem("UniProt Sequences"):
+                        gr.Markdown("#### Download protein sequences from UniProt in FASTA format")
+                        with gr.Row():
+                            uniprot_method = gr.Radio(["Single ID", "From File"], label="Download Method", value="Single ID")
+                        uniprot_id = gr.Textbox(label="UniProt ID", value="P00734", placeholder="e.g., P00734", interactive=True)
+                        with gr.Column(visible=False) as uniprot_file_column:
+                            uniprot_file_upload = gr.File(label="Upload UniProt ID List", file_types=[".txt"])
+                            uniprot_file_example = gr.Examples(
+                                examples=["./download/uniprot.txt"],
+                                inputs=uniprot_file_upload,
+                                label="Click example to load"
+                            )
+                            uniprot_preview = gr.Textbox(label="File Preview", interactive=False, lines=5, visible=False)
+                        uniprot_btn = gr.Button("Start Download", variant="primary")
+                        uniprot_output = gr.Textbox(label="Download Status", interactive=False, lines=5)
+                        uniprot_download_btn = gr.DownloadButton(label="Save Downloaded Data", visible=False)
+                        uniprot_merge = gr.Checkbox(label="Merge into single FASTA file", value=False)
+                        uniprot_error = gr.Checkbox(label="Save error file", value=True)
+                        uniprot_user = gr.Textbox(label="User Hash", value="default_user", visible=False)
+                        # Event handlers for UniProt
+                        uniprot_method.change(
+                            lambda method: [
+                                gr.update(visible=(method == "From File")),
+                                gr.update(interactive=(method == "Single ID"))
+                            ],
+                            inputs=uniprot_method,
+                            outputs=[uniprot_file_column, uniprot_id]
+                        )
+                        uniprot_file_upload.change(
+                            lambda f: read_uploaded_file(f.name if f else None)[1] if f else "",
+                            inputs=uniprot_file_upload,
+                            outputs=uniprot_preview
+                        )
+                        uniprot_btn.click(
+                            fn=handle_uniprot_download, 
+                            inputs=[uniprot_method, uniprot_id, uniprot_file_upload, uniprot_user, uniprot_merge, uniprot_error], 
+                            outputs=[uniprot_output, uniprot_download_btn]
+                        )
+                    
+                    # InterPro Metadata Download
+                    with gr.TabItem("NCBI Metadata"):
+                        gr.Markdown("#### Download protein sequences from NCBI in FASTA format")
+                        with gr.Row():
+                            ncbi_method = gr.Radio(["Single ID", "From File"], label="Download Method", value="Single ID")
+                        ncbi_id = gr.Textbox(label="NCBI ID", value="NP_000517.1", visible=True, placeholder="e.g., NP_000517.1", interactive=True)
+                        with gr.Column(visible=False) as ncbi_file_column:
+                            ncbi_file_upload = gr.File(label="Upload NCBI ID List", file_types=[".txt"])
+                            ncbi_file_example = gr.Examples(
+                                examples=["./download/ncbi.txt"],
+                                inputs=ncbi_file_upload,
+                                label="Click example to load"
+                            )
+                            ncbi_preview = gr.Textbox(label="File Preview", interactive=False, lines=5)
+                        ncbi_btn = gr.Button("Start Download", variant="primary")
+                        ncbi_output = gr.Textbox(label="Download Status", interactive=False, lines=5)
+                        ncbi_download_btn = gr.DownloadButton(label="Save Downloaded Data", visible=False)
+                        ncbi_merge = gr.Checkbox(label="Merge into single FASTA file", value=False)
+                        ncbi_error = gr.Checkbox(label="Save error file", value=True)
+                        ncbi_user = gr.Textbox(label="User Hash", value="default_user", visible=False)
+                        # Event handlers for InterPro
+                        ncbi_method.change(
+                            lambda method: [
+                                gr.update(visible=(method == "From File")),
+                                gr.update(interactive=(method == "Single ID"))
+                            ],
+                            inputs=ncbi_method,
+                            outputs=[ncbi_file_column, ncbi_id]
+                        )
+                        ncbi_file_upload.change(
+                            lambda f: read_uploaded_file(f.name if f else None)[1] if f else "",
+                            inputs=ncbi_file_upload,
+                            outputs=ncbi_preview
+                        )
+                        ncbi_btn.click(
+                            fn=handle_ncbi_download, 
+                            inputs=[ncbi_method, ncbi_id, ncbi_file_upload, ncbi_user, ncbi_merge, ncbi_error], 
+                            outputs=[ncbi_output, ncbi_download_btn]
+                        )
+                    
+                    
+            # --- Structure Download Tab ---
+            with gr.TabItem("🗂️ Metadata Download"):
+                gr.Markdown("### Annotation Information Download")
                 with gr.Tabs():
                     # RCSB Metadata Download
                     with gr.TabItem("RCSB Metadata"):
@@ -391,45 +498,6 @@ def create_download_tool_tab(constant: Dict[str, Any]):
                             inputs=[rcsb_method, rcsb_id, rcsb_file_upload, rcsb_user, rcsb_error], 
                             outputs=[rcsb_output, rcsb_download_btn]
                         )
-                    # UniProt Sequences Download
-                    with gr.TabItem("UniProt Sequences"):
-                        gr.Markdown("#### Download protein sequences from UniProt in FASTA format")
-                        with gr.Row():
-                            uniprot_method = gr.Radio(["Single ID", "From File"], label="Download Method", value="Single ID")
-                        uniprot_id = gr.Textbox(label="UniProt ID", value="P00734", placeholder="e.g., P00734", interactive=True)
-                        with gr.Column(visible=False) as uniprot_file_column:
-                            uniprot_file_upload = gr.File(label="Upload UniProt ID List", file_types=[".txt"])
-                            uniprot_file_example = gr.Examples(
-                                examples=["./download/uniprot.txt"],
-                                inputs=uniprot_file_upload,
-                                label="Click example to load"
-                            )
-                            uniprot_preview = gr.Textbox(label="File Preview", interactive=False, lines=5)
-                        uniprot_btn = gr.Button("Start Download", variant="primary")
-                        uniprot_output = gr.Textbox(label="Download Status", interactive=False, lines=5)
-                        uniprot_download_btn = gr.DownloadButton(label="Save Downloaded Data", visible=False)
-                        uniprot_merge = gr.Checkbox(label="Merge into single FASTA file", value=False)
-                        uniprot_error = gr.Checkbox(label="Save error file", value=True)
-                        uniprot_user = gr.Textbox(label="User Hash", value="default_user", visible=False)
-                        # Event handlers for UniProt
-                        uniprot_method.change(
-                            lambda method: [
-                                gr.update(visible=(method == "From File")),
-                                gr.update(interactive=(method == "Single ID"))
-                            ],
-                            inputs=uniprot_method,
-                            outputs=[uniprot_file_column, uniprot_id]
-                        )
-                        uniprot_file_upload.change(
-                            lambda f: read_uploaded_file(f.name if f else None)[1] if f else "",
-                            inputs=uniprot_file_upload,
-                            outputs=uniprot_preview
-                        )
-                        uniprot_btn.click(
-                            fn=handle_uniprot_download, 
-                            inputs=[uniprot_method, uniprot_id, uniprot_file_upload, uniprot_user, uniprot_merge, uniprot_error], 
-                            outputs=[uniprot_output, uniprot_download_btn]
-                        )
                     
                     # InterPro Metadata Download
                     with gr.TabItem("InterPro Metadata"):
@@ -464,10 +532,10 @@ def create_download_tool_tab(constant: Dict[str, Any]):
                             inputs=[interpro_method, interpro_id, interpro_json_upload, interpro_user, interpro_error], 
                             outputs=[interpro_output, interpro_download_btn]
                         )
-            # --- Structure Download Tab ---
+               
+
             with gr.TabItem("⚛️ Structure Download"):
                 gr.Markdown("### Protein Structure Download and Visualization")
-                
                 # Main Tabs to switch between RCSB and AlphaFold
                 with gr.Tabs():
 
