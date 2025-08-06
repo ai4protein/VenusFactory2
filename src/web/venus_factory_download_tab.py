@@ -11,6 +11,9 @@ from gradio_molecule3d import Molecule3D
 from pathlib import Path
 from typing import Dict, Any, List, Tuple, Union
 
+# Maximum number of items to process in batch mode
+MAX_BATCH_ITEMS = 50
+
 # Molecule3D representations for different coloring schemes
 RCSB_REPS =  [
     {
@@ -98,34 +101,73 @@ def create_download_tool_tab(constant: Dict[str, Any]):
         return sorted(list(chains))
 
     def read_uploaded_file(file_path: str, max_lines: int = 20) -> Tuple[List[str], str]:
-        """Read and preview uploaded file content."""
+        """Read and preview uploaded file content with batch size limitation."""
         if not file_path or not os.path.exists(file_path):
             return [], "No file uploaded"
+        
         preview_text = ""
+        is_truncated = False
+        truncated_for_batch = False
+        
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 lines = [line.strip() for line in f.readlines() if line.strip()]
-            preview_text += "\n".join(lines[:max_lines])
+            
+            # Check if we need to truncate for batch processing
+            original_count = len(lines)
+            if original_count > MAX_BATCH_ITEMS:
+                lines = lines[:MAX_BATCH_ITEMS]
+                truncated_for_batch = True
+            
+            # Create preview (limited to max_lines for display)
+            preview_lines = lines[:max_lines]
+            preview_text += "\n".join(preview_lines)
+            
             if len(lines) > max_lines:
-                preview_text += f"\n... and {len(lines) - max_lines} more entries"
+                preview_text += f"\n... and {len(lines) - max_lines} more entries (showing first {max_lines})"
+            
+            # Add batch limitation warning
+            if truncated_for_batch:
+                preview_text += f"\n\n⚠️  BATCH LIMIT: Only processing first {MAX_BATCH_ITEMS} items out of {original_count} total items."
+                preview_text += f"\nRemaining {original_count - MAX_BATCH_ITEMS} items will be ignored."
+            
             return lines, preview_text
+            
         except Exception as e:
             return [], f"Error reading file: {str(e)}"
 
     def read_json_file(file_path: str, max_items: int = 10) -> Tuple[Any, str]:
-        """Read and preview uploaded JSON file content."""
+        """Read and preview uploaded JSON file content with batch size limitation."""
         if not file_path or not os.path.exists(file_path):
             return None, "No file uploaded"
+        
         preview_text = ""
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
+            
+            truncated_for_batch = False
+            original_count = 0
+            
             if isinstance(data, list):
+                original_count = len(data)
+                if original_count > MAX_BATCH_ITEMS:
+                    data = data[:MAX_BATCH_ITEMS]
+                    truncated_for_batch = True
+                
                 for i, item in enumerate(data[:max_items]):
                     preview_text += f"{i+1}. {item}\n"
                 if len(data) > max_items:
                     preview_text += f"... and {len(data) - max_items} more entries"
+                    
             elif isinstance(data, dict):
+                original_count = len(data)
+                if original_count > MAX_BATCH_ITEMS:
+                    # For dict, keep first MAX_BATCH_ITEMS keys
+                    keys_to_keep = list(data.keys())[:MAX_BATCH_ITEMS]
+                    data = {k: data[k] for k in keys_to_keep}
+                    truncated_for_batch = True
+                
                 keys = list(data.keys())[:max_items]
                 for key in keys:
                     preview_text += f"- {key}: {str(data[key])[:50]}...\n"
@@ -133,15 +175,47 @@ def create_download_tool_tab(constant: Dict[str, Any]):
                     preview_text += f"... and {len(data) - max_items} more keys"
             else:
                 preview_text = f"JSON content: {str(data)[:200]}..."
+            
+            # Add batch limitation warning
+            if truncated_for_batch:
+                preview_text += f"\n\n⚠️  BATCH LIMIT: Only processing first {MAX_BATCH_ITEMS} items out of {original_count} total items."
+                preview_text += f"\nRemaining {original_count - MAX_BATCH_ITEMS} items will be ignored."
+            
             return data, preview_text
+            
         except Exception as e:
             return None, f"Error reading JSON file: {str(e)}"
+
+    def save_truncated_file(original_file_path: str, lines: List[str], task_folder: str) -> str:
+        """Save truncated file for batch processing."""
+        if not lines:
+            return original_file_path
+        
+        # Create truncated file in task folder
+        truncated_file_path = os.path.join(task_folder, "truncated_input.txt")
+        with open(truncated_file_path, 'w', encoding='utf-8') as f:
+            for line in lines:
+                f.write(f"{line}\n")
+        return truncated_file_path
+
+    def save_truncated_json(data: Any, task_folder: str) -> str:
+        """Save truncated JSON for batch processing."""
+        truncated_file_path = os.path.join(task_folder, "truncated_input.json")
+        with open(truncated_file_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2)
+        return truncated_file_path
 
     def handle_interpro_download(method: str, id_val: str, json_file, user_hash: str, error: bool) -> tuple:
         """Handles InterPro metadata download."""
         task_id = generate_task_id(user_hash)
         task_folder = create_task_folder(task_id, "interpro_metadata")
-        json_val = json_file.name if (method == "From JSON" and json_file) else None
+        
+        json_val = None
+        if method == "From JSON" and json_file:
+            data, preview = read_json_file(json_file.name)
+            if data:
+                json_val = save_truncated_json(data, task_folder)
+        
         args = {
             "interpro_id": id_val if method == "Single ID" else None,
             "interpro_json": json_val,
@@ -156,7 +230,13 @@ def create_download_tool_tab(constant: Dict[str, Any]):
         """Handles RCSB metadata download."""
         task_id = generate_task_id(user_hash)
         task_folder = create_task_folder(task_id, "rcsb_metadata")
-        file_path = file_val.name if (method == "From File" and file_val) else None
+        
+        file_path = None
+        if method == "From File" and file_val:
+            lines, preview = read_uploaded_file(file_val.name)
+            if lines:
+                file_path = save_truncated_file(file_val.name, lines, task_folder)
+        
         args = {
             "pdb_id": id_val if method == "Single ID" else None,
             "pdb_id_file": file_path,
@@ -171,7 +251,13 @@ def create_download_tool_tab(constant: Dict[str, Any]):
         """Handles UniProt sequence download."""
         task_id = generate_task_id(user_hash)
         task_folder = create_task_folder(task_id, "uniprot_sequence")
-        file_path = file_val.name if (method == "From File" and file_val) else None
+        
+        file_path = None
+        if method == "From File" and file_val:
+            lines, preview = read_uploaded_file(file_val.name)
+            if lines:
+                file_path = save_truncated_file(file_val.name, lines, task_folder)
+        
         args = {
             "uniprot_id": id_val if method == "Single ID" else None,
             "file": file_path,
@@ -187,7 +273,13 @@ def create_download_tool_tab(constant: Dict[str, Any]):
         """Handles RCSB structure download and updates the UI."""
         task_id = generate_task_id(user_hash)
         task_folder = create_task_folder(task_id, "rcsb_structure")
-        file_path = file_upload.name if (method == "From File" and file_upload) else None
+        
+        file_path = None
+        if method == "From File" and file_upload:
+            lines, preview = read_uploaded_file(file_upload.name)
+            if lines:
+                file_path = save_truncated_file(file_upload.name, lines, task_folder)
+        
         download_output = run_download_script(
             "structure/download_rcsb.py",
             pdb_id=id_val if method == "Single ID" else None,
@@ -220,7 +312,13 @@ def create_download_tool_tab(constant: Dict[str, Any]):
         """Handles AlphaFold structure download and updates the UI."""
         task_id = generate_task_id(user_hash)
         task_folder = create_task_folder(task_id, "AlphaFold_structure")
-        file_path = file_upload.name if (method == "From File" and file_upload) else None
+        
+        file_path = None
+        if method == "From File" and file_upload:
+            lines, preview = read_uploaded_file(file_upload.name)
+            if lines:
+                file_path = save_truncated_file(file_upload.name, lines, task_folder)
+        
         download_output = run_download_script(
             "structure/download_alphafold.py",
             uniprot_id=id_val if method == "Single ID" else None,
@@ -249,6 +347,7 @@ def create_download_tool_tab(constant: Dict[str, Any]):
     # --- Gradio UI Layout ---
     with gr.Blocks() as download_tab_content:
         gr.Markdown("## Download Center")
+        gr.Markdown(f"**Note**: Batch downloads are limited to {MAX_BATCH_ITEMS} items maximum for performance reasons.")
 
         with gr.Tabs():
             # --- Sequence and Metadata Download Tab ---
@@ -259,7 +358,7 @@ def create_download_tool_tab(constant: Dict[str, Any]):
                     with gr.TabItem("RCSB Metadata"):
                         gr.Markdown("#### Download metadata for PDB entries from RCSB")
                         rcsb_method = gr.Radio(["Single ID", "From File"], label="Download Method", value="Single ID")
-                        rcsb_id = gr.Textbox(label="PDB ID", value="1a0j", visible=True, placeholder="e.g., 1a0j")
+                        rcsb_id = gr.Textbox(label="PDB ID", value="1a0j", visible=True, placeholder="e.g., 1a0j", interactive=True)
                         with gr.Column(visible=False) as rcsb_file_column:
                             rcsb_file_upload = gr.File(label="Upload PDB ID List", file_types=[".txt"])
                             rcsb_file_example = gr.Examples(
@@ -275,9 +374,12 @@ def create_download_tool_tab(constant: Dict[str, Any]):
                         rcsb_user = gr.Textbox(label="User Hash", value="default_user", visible=False)
                         # Event handlers for RCSB
                         rcsb_method.change(
-                            lambda method: gr.update(visible=(method == "From File")),
+                            lambda method: [
+                                gr.update(visible=(method == "From File")),
+                                gr.update(interactive=(method == "Single ID"))
+                            ],
                             inputs=rcsb_method,
-                            outputs=rcsb_file_column
+                            outputs=[rcsb_file_column, rcsb_id]
                         )
                         rcsb_file_upload.change(
                             lambda f: read_uploaded_file(f.name if f else None)[1] if f else "",
@@ -294,7 +396,7 @@ def create_download_tool_tab(constant: Dict[str, Any]):
                         gr.Markdown("#### Download protein sequences from UniProt in FASTA format")
                         with gr.Row():
                             uniprot_method = gr.Radio(["Single ID", "From File"], label="Download Method", value="Single ID")
-                        uniprot_id = gr.Textbox(label="UniProt ID", value="P00734", placeholder="e.g., P00734")
+                        uniprot_id = gr.Textbox(label="UniProt ID", value="P00734", placeholder="e.g., P00734", interactive=True)
                         with gr.Column(visible=False) as uniprot_file_column:
                             uniprot_file_upload = gr.File(label="Upload UniProt ID List", file_types=[".txt"])
                             uniprot_file_example = gr.Examples(
@@ -311,9 +413,12 @@ def create_download_tool_tab(constant: Dict[str, Any]):
                         uniprot_user = gr.Textbox(label="User Hash", value="default_user", visible=False)
                         # Event handlers for UniProt
                         uniprot_method.change(
-                            lambda method: gr.update(visible=(method == "From File")),
+                            lambda method: [
+                                gr.update(visible=(method == "From File")),
+                                gr.update(interactive=(method == "Single ID"))
+                            ],
                             inputs=uniprot_method,
-                            outputs=uniprot_file_column
+                            outputs=[uniprot_file_column, uniprot_id]
                         )
                         uniprot_file_upload.change(
                             lambda f: read_uploaded_file(f.name if f else None)[1] if f else "",
@@ -331,7 +436,7 @@ def create_download_tool_tab(constant: Dict[str, Any]):
                         gr.Markdown("#### Download protein domain, family, and Gene Ontology annotation metadata from InterPro")
                         with gr.Row():
                             interpro_method = gr.Radio(["Single ID", "From JSON"], label="Download Method", value="Single ID")
-                        interpro_id = gr.Textbox(label="InterPro ID", value="IPR000001", visible=True, placeholder="e.g., IPR000001")
+                        interpro_id = gr.Textbox(label="InterPro ID", value="IPR000001", visible=True, placeholder="e.g., IPR000001", interactive=True)
                         interpro_json_upload = gr.File(label="Upload JSON File", file_types=[".json"], visible=False)
                         interpro_preview = gr.Textbox(label="File Preview", interactive=False, lines=5, visible=False)
                         interpro_btn = gr.Button("Start Download", variant="primary")
@@ -342,7 +447,7 @@ def create_download_tool_tab(constant: Dict[str, Any]):
                         # Event handlers for InterPro
                         interpro_method.change(
                             lambda method: [
-                                gr.update(visible=(method == "Single ID")),
+                                gr.update(visible=(method == "Single ID"), interactive=(method == "Single ID")),
                                 gr.update(visible=(method == "From JSON")),
                                 gr.update(visible=(method == "From JSON")),
                             ],
@@ -375,7 +480,7 @@ def create_download_tool_tab(constant: Dict[str, Any]):
                             with gr.Column(scale=2):
                                 gr.Markdown("#### Download from RCSB PDB")
                                 struct_method = gr.Radio(["Single ID", "From File"], label="Method", value="Single ID")
-                                struct_id = gr.Textbox(label="PDB ID", value="1a0j", placeholder="e.g., 1crn", visible=True)
+                                struct_id = gr.Textbox(label="PDB ID", value="1a0j", placeholder="e.g., 1crn", visible=True, interactive=True)
                                 struct_type = gr.Dropdown(["pdb", "cif"], value="pdb", label="File Type")
                                 struct_unzip = gr.Checkbox(label="Unzip files", value=True)
                                 struct_error = gr.Checkbox(label="Save error log", value=True)
@@ -411,11 +516,11 @@ def create_download_tool_tab(constant: Dict[str, Any]):
                             with gr.Column(scale=2):
                                 gr.Markdown("#### Download from AlphaFold DB")
                                 af_method = gr.Radio(["Single ID", "From File"], label="Method", value="Single ID")
-                                af_id = gr.Textbox(label="UniProt ID", value="P00734", placeholder="e.g., P0DTD1", visible=True)
+                                af_id = gr.Textbox(label="UniProt ID", value="P00734", placeholder="e.g., P0DTD1", visible=True, interactive=True)
                                 af_unzip = gr.Checkbox(label="Unzip files", value=True) # Note: AF files are not zipped, so this may not be needed
                                 af_error = gr.Checkbox(label="Save error log", value=True)
                                 with gr.Column(visible=False) as af_file_column:
-                                    af_file_upload = gr.File(label="Upload PAlphaFold DB ID List", file_types=[".txt"])
+                                    af_file_upload = gr.File(label="Upload AlphaFold DB ID List", file_types=[".txt"])
                                     af_file_example = gr.Examples(
                                         examples=["./download/uniprot.txt"],
                                         inputs=af_file_upload,
@@ -436,17 +541,22 @@ def create_download_tool_tab(constant: Dict[str, Any]):
                                 )
                                 af_download_btn = gr.DownloadButton(label="Save Downloaded Data", visible=False)
 
-    
                         # File preview handlers
                         struct_method.change(
-                            lambda method: gr.update(visible=(method == "From File")),
+                            lambda method: [
+                                gr.update(visible=(method == "From File")),
+                                gr.update(interactive=(method == "Single ID"))
+                            ],
                             inputs=struct_method, 
-                            outputs=struct_file_column
+                            outputs=[struct_file_column, struct_id]
                         )
                         af_method.change(
-                            lambda method: gr.update(visible=(method == "From File")), 
+                            lambda method: [
+                                gr.update(visible=(method == "From File")),
+                                gr.update(interactive=(method == "Single ID"))
+                            ], 
                             inputs=af_method, 
-                            outputs=af_file_column
+                            outputs=[af_file_column, af_id]
                         )
                         struct_file_upload.change(
                             lambda f: read_uploaded_file(f.name if f else None)[1] if f else "",

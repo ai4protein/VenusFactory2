@@ -2,6 +2,7 @@ import gradio as gr
 import pandas as pd
 import os
 import sys
+import tempfile
 import subprocess
 import time
 import zipfile
@@ -94,13 +95,24 @@ DATASET_TO_TASK_MAP = {
     dataset: task for task, datasets in DATASET_MAPPING_FUNCTION.items() for dataset in datasets
 }
 
+
 AI_MODELS = {
     "DeepSeek": {
-        "api_base": "https://api.deepseek.com/v1",
-        "model": "deepseek-chat"
+        "api_base": "https://api.deepseek.com/v1", 
+        "model": "deepseek-chat",
+        "env_key": "DEEPSEEK_API_KEY"
+    },
+    "ChatGPT": {
+        "api_base": "https://api.openai.com/v1",
+        "model": "gpt-4o-mini", 
+        "env_key": None
+    },
+    "Gemini": {
+        "api_base": "https://generativelanguage.googleapis.com/v1beta",
+        "model": "gemini-1.5-flash",
+        "env_key": None
     }
 }
-
 
 def parse_fasta_file(file_path: str) -> str:
     if not file_path: return ""
@@ -318,6 +330,82 @@ def handle_mutation_prediction_advance(
         gr.update(visible=total_residues > 20), display_df, ai_summary
     )
 
+def handle_protein_function_prediction_chat(
+    task: str,
+    fasta_file: str,
+    model_name: str,
+    datasets: List[str],
+    enable_ai: bool,
+    ai_model: str,
+    user_api_key: str
+) -> Generator:
+    try:
+        import requests
+        requests.post("/api/stats/track", json={"module": "mutation_prediction"})
+    except Exception:
+        pass
+    model = model_name if model_name else "ESM2-650M"
+    final_datasets = datasets if datasets and len(datasets) > 0 else DATASET_MAPPING_FUNCTION.get(task, [])
+    all_results_list = []
+    temp_dir = Path("temp_outputs")
+    temp_dir.mkdir(exist_ok=True)
+
+    # Create a temporary file to run predictions
+    for i, dataset in enumerate(final_datasets):
+        try:
+            model_key = MODEL_MAPPING_FUNCTION.get(model)
+            if not model_key:
+                raise ValueError(f"Model key not found for {model}")
+
+            adapter_key = MODEL_ADAPTER_MAPPING_FUNCTION[model_key]
+            script_path = Path("src") / "property" / f"{model_key}.py"
+            adapter_path = Path("ckpt") / dataset / adapter_key
+            output_file = temp_dir / f"temp_{dataset}_{model}.csv"
+
+            if not script_path.exists() or not adapter_path.exists():
+                raise FileNotFoundError(f"Required files not found for dataset {dataset}")
+
+            cmd = [sys.executable, str(script_path), "--fasta_file", str(Path(fasta_file.name)), "--adapter_path", str(adapter_path), "--output_csv", str(output_file)]
+            subprocess.run(cmd, capture_output=True, text=True, check=True, encoding='utf-8', errors='ignore')
+
+            if output_file.exists():
+                df = pd.read_csv(output_file)
+                df["Dataset"] = dataset
+                all_results_list.append(df)
+                os.remove(output_file)
+        except Exception as e:
+            error_detail = e.stderr if isinstance(e, subprocess.CalledProcessError) else str(e)
+            all_results_list.append(pd.DataFrame([{"Dataset": dataset, "header": "ERROR", "sequence": error_detail}]))
+
+    if not all_results_list:
+        return "⚠️ No results generated.", pd.DataFrame(), "Prediction scripts produced no output."
+
+    final_df = pd.concat(all_results_list, ignore_index=True).fillna('N/A')
+    
+    display_df = final_df.copy()
+    if 'prediction' in display_df.columns:
+        display_df.drop(columns=['prediction'], inplace=True)
+    rename_map = {
+        'header': "Protein Name", 'sequence': "Sequence", 'predicted_class': "Predicted Class",
+        'probabilities': "Confidence Score", 'Dataset': "Dataset"
+    }
+    display_df.rename(columns=rename_map, inplace=True)
+
+    if enable_ai:
+        api_key = get_api_key(ai_model, user_api_key)
+        if not api_key: 
+            ai_summary = f"❌ No API key found for {ai_model}."
+        else:
+            ai_config = AIConfig(api_key, ai_model, AI_MODELS[ai_model]["api_base"], AI_MODELS[ai_model]["model"])
+            prompt = generate_expert_analysis_prompt(display_df, task)
+            ai_summary = call_ai_api(ai_config, prompt)
+
+    final_status = "✅ All predictions completed!"
+    if enable_ai and not ai_summary.startswith("❌"):
+        final_status += " AI analysis included."
+    return final_status, display_df, ai_summary
+
+
 
 def handle_protein_function_prediction_advance(
     task: str, 
@@ -330,13 +418,19 @@ def handle_protein_function_prediction_advance(
     ) -> Generator:
     try:
         import requests
-        requests.post("/api/stats/track", json={"module": "function_analysis"})
+        requests.post("/api/stats/track", json={"module": "mutation_prediction"})
     except Exception:
         pass
     """Handle protein function prediction workflow."""
     model = model_name if model_name else "ESM2-650M"
-    datasets = (datasets if datasets is not None 
-               else DATASET_MAPPING_FUNCTION.get(task, []))
+    if datasets is not None and len(datasets) > 0:
+        final_datasets = datasets
+        print(f"DEBUG: Using provided datasets: {final_datasets}")
+    else:
+        final_datasets = DATASET_MAPPING_FUNCTION.get(task, [])
+        print(f"DEBUG: Using default datasets for {task}: {final_datasets}")
+    
+    print(f"DEBUG: Final datasets to process: {final_datasets}")
 
     if not all([task, datasets, fasta_file]):
         yield (
@@ -357,7 +451,7 @@ def handle_protein_function_prediction_advance(
     temp_dir.mkdir(exist_ok=True)
 
     # Run predictions for each dataset
-    for i, dataset in enumerate(datasets):
+    for i, dataset in enumerate(final_datasets):
         yield (
             f"⏳ Running prediction...", 
             pd.DataFrame(), None, gr.update(visible=False), 
@@ -573,8 +667,21 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                                 gr.Markdown("### Configure AI Analysis (Optional)")
                                 enable_ai_zshot = gr.Checkbox(label="Enable AI Summary", value=False)
                                 with gr.Group(visible=False) as ai_box_zshot:
-                                    ai_model_dd_zshot = gr.Dropdown(choices=list(AI_MODELS.keys()), value="DeepSeek", label="Select AI Model")
-                                    api_key_in_zshot = gr.Textbox(label="API Key (Optional)", type="password", placeholder="Leave blank for env var")
+                                    ai_model_seq_zshot = gr.Dropdown(
+                                        choices=list(AI_MODELS.keys()), 
+                                        value="DeepSeek", 
+                                        label="Select AI Model"
+                                    )
+                                    ai_status_seq_zshot = gr.Markdown(
+                                        value="✓ Using provided API Key" if os.getenv("DEEPSEEK_API_KEY") else "⚠ No API Key found in .env file",
+                                        visible=True
+                                    )
+                                    api_key_in_seq_zshot = gr.Textbox(
+                                        label="API Key", 
+                                        type="password", 
+                                        placeholder="Enter your API Key if needed",
+                                        visible=not bool(os.getenv("DEEPSEEK_API_KEY"))
+                                    )                                
                                 seq_predict_btn = gr.Button("🚀 Start Prediction (Sequence)", variant="secondary")
 
                             with gr.TabItem("🏗️ Structure-based Model"):
@@ -591,8 +698,21 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                                 gr.Markdown("### Configure AI Analysis (Optional)")
                                 enable_ai_zshot = gr.Checkbox(label="Enable AI Summary", value=False)
                                 with gr.Group(visible=False) as ai_box_zshot:
-                                    ai_model_dd_zshot = gr.Dropdown(choices=list(AI_MODELS.keys()), value="DeepSeek", label="Select AI Model")
-                                    api_key_in_zshot = gr.Textbox(label="API Key (Optional)", type="password", placeholder="Leave blank for env var")
+                                    ai_model_stru_zshot = gr.Dropdown(
+                                        choices=list(AI_MODELS.keys()), 
+                                        value="DeepSeek", 
+                                        label="Select AI Model"
+                                    )
+                                    ai_status_stru_zshot = gr.Markdown(
+                                        value="✓ Using provided API Key" if os.getenv("DEEPSEEK_API_KEY") else "⚠ No API Key found in .env file",
+                                        visible=True
+                                    )
+                                    api_key_in_stru_zshot = gr.Textbox(
+                                        label="API Key", 
+                                        type="password", 
+                                        placeholder="Enter your API Key if needed",
+                                        visible=not bool(os.getenv("DEEPSEEK_API_KEY"))
+                                    )
                                 struct_predict_btn = gr.Button("🚀 Start Prediction (Structure)", variant="primary")
                     
                     with gr.Column(scale=3):
@@ -626,8 +746,12 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         default_datasets_for_solubility = DATASET_MAPPING_FUNCTION.get("Solubility", [])
 
                         adv_func_dataset_cbg = gr.CheckboxGroup(label="Select Datasets", 
-                                                                choices=all_possible_datasets, # Use all possible datasets for validation
-                                                                value=default_datasets_for_solubility) # Set initial selected value based on default task
+                                                                choices=default_datasets_for_solubility,
+                                                                value=default_datasets_for_solubility)
+                        adv_func_dataset_cbg_chat = gr.CheckboxGroup(
+                                                        choices=all_possible_datasets,
+                                                        value=all_possible_datasets,
+                                                        visible=False)
                         function_fasta_upload = gr.File(label="Upload FASTA file", file_types=[".fasta", ".fa"])
                         function_fasta_example = gr.Examples(
                             examples=[["./download/P60002.fasta"]],
@@ -635,13 +759,27 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                             label="Click example to load"
                         )
                         function_protein_display = gr.Textbox(label="Uploaded Protein", interactive=False, lines=3, max_lines=7)
+                        function_protein_chat_btn = gr.Button("Chat API Trigger", visible=False)
 
                         gr.Markdown("### Configure AI Analysis (Optional)")
                         with gr.Accordion("AI Settings", open=True):
                             enable_ai_func = gr.Checkbox(label="Enable AI Summary", value=False)
                             with gr.Group(visible=False) as ai_box_func:
-                                ai_model_dd_func = gr.Dropdown(choices=list(AI_MODELS.keys()), label="Select AI Model", value="DeepSeek")
-                                api_key_in_func = gr.Textbox(label="API Key (Optional)", type="password", placeholder="Leave blank to use environment variable")
+                                ai_model_seq_func = gr.Dropdown(
+                                    choices=list(AI_MODELS.keys()), 
+                                    label="Select AI Model", 
+                                    value="DeepSeek"
+                                )
+                                ai_status_seq_func = gr.Markdown(
+                                    value="✓ Using provided API Key" if os.getenv("DEEPSEEK_API_KEY") else "⚠ No API Key found in .env file",
+                                    visible=True
+                                )
+                                api_key_in_seq_func = gr.Textbox(
+                                    label="API Key", 
+                                    type="password", 
+                                    placeholder="Enter your API Key if needed",
+                                    visible=not bool(os.getenv("DEEPSEEK_API_KEY"))
+                                )
                         adv_func_predict_btn = gr.Button("🚀 Start Prediction (Advanced)", variant="primary")
 
                     with gr.Column(scale=3):
@@ -661,16 +799,31 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         adv_func_task_dd.change(
             fn=lambda task: gr.CheckboxGroup(
                 choices=DATASET_MAPPING_FUNCTION.get(task, []), 
-                value=DATASET_MAPPING_FUNCTION.get(task, [])[0] if DATASET_MAPPING_FUNCTION.get(task) else None # Default select the first one
+                value=DATASET_MAPPING_FUNCTION.get(task, [])
             ),
-            inputs=[adv_func_task_dd], # Ensure you're using adv_func_task_dd here
+            inputs=[adv_func_task_dd], 
             outputs=[adv_func_dataset_cbg]
+        )
+        ai_model_stru_zshot.change(
+            fn=on_ai_model_change,
+            inputs=ai_model_stru_zshot,
+            outputs=[api_key_in_stru_zshot, ai_status_stru_zshot]
+        )
+        ai_model_seq_zshot.change(
+            fn=on_ai_model_change,
+            inputs=ai_model_seq_zshot,
+            outputs=[api_key_in_seq_zshot, ai_status_seq_zshot]
+        )
+        ai_model_seq_func.change(
+            fn=on_ai_model_change,
+            inputs=ai_model_seq_func,
+            outputs=[api_key_in_seq_func, ai_status_seq_func]
         )
         seq_file_upload.upload(fn=parse_fasta_file, inputs=seq_file_upload, outputs=seq_protein_display)
         seq_file_upload.change(fn=parse_fasta_file, inputs=seq_file_upload, outputs=seq_protein_display)
         seq_predict_btn.click(
             fn=handle_mutation_prediction_advance, 
-            inputs=[seq_function_dd, seq_file_upload, enable_ai_zshot, ai_model_dd_zshot, api_key_in_zshot, seq_model_dd],
+            inputs=[seq_function_dd, seq_file_upload, enable_ai_zshot, ai_model_seq_zshot, api_key_in_seq_zshot, seq_model_dd],
             outputs=[zero_shot_status_box, zero_shot_plot_out, zero_shot_df_out, zero_shot_download_btn, zero_shot_download_path_state, zero_shot_view_controls, zero_shot_full_data_state, zero_shot_ai_out]
         )
 
@@ -678,7 +831,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         struct_file_upload.change(fn=parse_pdb_for_sequence, inputs=struct_file_upload, outputs=struct_protein_display)
         struct_predict_btn.click(
             fn=handle_mutation_prediction_advance, 
-            inputs=[struct_function_dd, struct_file_upload, enable_ai_zshot, ai_model_dd_zshot, api_key_in_zshot, struct_model_dd], 
+            inputs=[struct_function_dd, struct_file_upload, enable_ai_zshot, ai_model_stru_zshot, api_key_in_stru_zshot, struct_model_dd], 
             outputs=[zero_shot_status_box, zero_shot_plot_out, zero_shot_df_out, zero_shot_download_btn, zero_shot_download_path_state, zero_shot_view_controls, zero_shot_full_data_state, zero_shot_ai_out]
         )
 
@@ -691,8 +844,13 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
 
         adv_func_predict_btn.click(
             fn=handle_protein_function_prediction_advance,
-            inputs=[adv_func_task_dd, function_fasta_upload, enable_ai_func, ai_model_dd_func, api_key_in_func, adv_func_model_dd, adv_func_dataset_cbg],
+            inputs=[adv_func_task_dd, function_fasta_upload, enable_ai_func, ai_model_seq_func, api_key_in_seq_func, adv_func_model_dd, adv_func_dataset_cbg],
             outputs=[function_status_textbox, function_results_df, function_results_plot, function_download_btn, function_ai_summary_output]
+        )
+        function_protein_chat_btn.click(
+            fn=handle_protein_function_prediction_chat,
+            inputs=[adv_func_task_dd, function_fasta_upload, adv_func_model_dd, adv_func_dataset_cbg_chat, enable_ai_func, ai_model_seq_func, api_key_in_seq_func],
+            outputs=[function_status_textbox, function_results_df, function_ai_summary_output]
         )
 
     return {}

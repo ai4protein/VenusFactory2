@@ -10,13 +10,18 @@ def create_index_tab(constant):
         gr.HTML(
             f'''            
                 <script>
-                // 页面加载时自动统计访问量
+                // Track page visits asynchronously without blocking page load
                 (function() {{
-                    fetch('/api/stats/track', {
-                        method: 'POST',
-                        headers: {{'Content-Type': 'application/json'}},
-                        body: JSON.stringify({{module: 'total_visits'}})
-                    });
+                    // Use setTimeout to ensure page is fully loaded before tracking
+                    setTimeout(() => {{
+                        fetch('/api/stats/track', {{
+                            method: 'POST',
+                            headers: {{'Content-Type': 'application/json'}},
+                            body: JSON.stringify({{module: 'total_visits'}})
+                        }}).catch(error => {{
+                            console.log('Stats API call failed, using mock data');
+                        }});
+                    }}, 1000);
                 }})();
                 </script>
                 <style>
@@ -104,10 +109,10 @@ def create_index_tab(constant):
             <div class="main-content">
                 <!-- 上半部分:VenusFactory 介绍 -->
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5em;">
-                <img src="/file=img/venus_head.png" alt="Venus Head" style="height: 120px; margin-left: 10px;" />
-                <img src="/file=img/venus_icon.png" alt="Venus Logo" style="height: 70px; margin-right: 10px;" />
+                <img src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venusfactory_logo.png" alt="Venus Head" style="height: 150px; margin-left: 10px;" />
+                <img src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png" alt="Venus Logo" style="height: 100px; margin-right: 10px; margin-top: 20px;" />
             </div>
-            <div style="text-align: center; margin-top: -60px; margin-bottom: 20px;">
+            <div style="text-align: center; margin-top: -80px; margin-bottom: 40px;">
                 <h1 style="font-size:3.5em; font-weight:900;">Welcome to <span style='font-weight:900;'>VenusFactory</span> !</h1>
             </div>
             <div style="max-width: 1100px; margin: 0 auto; font-size: 1.2em; text-align: left;">
@@ -124,7 +129,6 @@ def create_index_tab(constant):
             <!-- 中间部分:How to Use VenusFactory -->
             <div style="text-align: left; max-width: 1100px; margin: 0 auto;">
                 <h1 style="font-size:2.2em; font-weight:900; color:#222; margin-bottom: 0.7em;">
-                    <img src="/file=img/venus_icon.png" style="height: 48px; vertical-align: middle; margin-right: 10px;">
                     How to Use VenusFactory ?
                 </h1>
                 <div style="font-size:1.2em;">
@@ -150,7 +154,7 @@ def create_index_tab(constant):
   year={{2025}}
 }}</code></pre>
                 <!-- 合作平台等内容, 作为Citation一部分 -->
-                <div style="display: flex; flex-wrap: wrap; justify-content: space-between; max-width: 1100px; margin: 30px auto 0 auto; color: #666; font-size: 1.2em; gap: 32px;">
+                <div style="display: flex; flex-wrap: wrap; justify-content: space-between; max-width: 1100px; margin: 30px auto 0 auto; color: #666; font-size: 1.0em; gap: 32px;">
                     <div style="flex:1; min-width: 320px;">
                         <b>🤝 Cooperate Platform:</b> <a href="https://openbayes.com/" target="_blank">HyberAI</a><br>
                         <b>🧬 Small-sample mutation prediction tool:</b> <a href="https://github.com/ai4protein/Pro-FSFP" target="_blank">Pro-FSFP</a><br>
@@ -162,16 +166,20 @@ def create_index_tab(constant):
                         <b>🏢 Joint unit:</b>
                         <ul style="margin-left: 20px; list-style: none; padding: 0;">
                             <li style="display:inline-flex; align-items:center; margin-bottom: 10px;">
-                                <a href="https://www.sjtu.edu.cn/" target="_blank" style="font-size:0.7em;">Shanghai Jiao Tong University</a>
+                                <img src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/sjtu_logo.jpg" alt="SJTU Logo" style="height: 20px; margin-right: 8px; vertical-align: middle;">
+                                <a href="https://www.sjtu.edu.cn/" target="_blank" style="font-size:0.9em;">Shanghai Jiao Tong University</a>
                             </li>
                             <li style="display:inline-flex; align-items:center; margin-bottom: 10px;">
-                                <a href="https://www.ecust.edu.cn/" target="_blank" style="font-size:0.7em;">East China University of Science and Technology</a>
+                                <img src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/ecust_logo.jpg" alt="ECUST Logo" style="height: 20px; margin-right: 8px; vertical-align: middle;">
+                                <a href="https://www.ecust.edu.cn/" target="_blank" style="font-size:0.9em;">East China University of Science and Technology</a>
                             </li>
                             <li style="display:inline-flex; align-items:center; margin-bottom: 10px;">
-                                <a href="https://www.ecnu.edu.cn/" target="_blank" style="font-size:0.7em;">East China Normal University</a>
+                                <img src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/ecnu_logo.jpg" alt="ECNU Logo" style="height: 20px; margin-right: 8px; vertical-align: middle;">
+                                <a href="https://www.ecnu.edu.cn/" target="_blank" style="font-size:0.9em;">East China Normal University</a>
                             </li>
                             <li style="display:inline-flex; align-items:center; margin-bottom: 10px;">
-                                <a href="https://www.shlab.org.cn/" target="_blank" style="font-size:0.7em;">Shanghai Artificial Intelligence Laboratory</a>
+                                <img src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/shailab_logo.jpg" alt="SHAILab Logo" style="height: 20px; margin-right: 8px; vertical-align: middle;">
+                                <a href="https://www.shlab.org.cn/" target="_blank" style="font-size:0.9em;">Shanghai Artificial Intelligence Laboratory</a>
                             </li>
                         </ul>
                     </div>
@@ -357,16 +365,28 @@ def create_index_tab(constant):
                         
                         async loadStats() {{
                             try {{
-                                const response = await fetch(`${{this.apiBaseUrl}}/stats`);
+                                // Add timeout to prevent long waiting
+                                const controller = new AbortController();
+                                const timeoutId = setTimeout(() => controller.abort(), 3000);
+                                
+                                const response = await fetch(`${{this.apiBaseUrl}}/stats`, {{
+                                    signal: controller.signal
+                                }});
+                                clearTimeout(timeoutId);
+                                
                                 if (response.ok) {{
                                     const data = await response.json();
                                     this.updateDisplay(data);
                                 }} else {{
-                                    console.error('Failed to load stats:', response.status);
+                                    console.log('Stats API returned error, using mock data');
                                     this.loadMockData();
                                 }}
                             }} catch (error) {{
-                                console.error('Failed to load stats:', error);
+                                if (error.name === 'AbortError') {{
+                                    console.log('Stats API timeout, using mock data');
+                                }} else {{
+                                    console.log('Stats API call failed, using mock data');
+                                }}
                                 this.loadMockData();
                             }}
                         }}
@@ -401,21 +421,33 @@ def create_index_tab(constant):
                         }}
                         
                         startAutoRefresh() {{
+                            // Refresh stats every 60 seconds instead of 30 to reduce API calls
                             this.updateInterval = setInterval(() => {{
                                 this.loadStats();
-                            }}, 30000); 
+                            }}, 60000); 
                         }}
                         
                         bindEvents() {{
+                            // Listen for page visibility changes with debouncing
+                            let visibilityTimeout;
                             document.addEventListener('visibilitychange', () => {{
                                 if (!document.hidden) {{
-                                    this.loadStats();
+                                    // Clear existing timeout to prevent multiple calls
+                                    clearTimeout(visibilityTimeout);
+                                    // Delay stats loading to avoid rapid calls
+                                    visibilityTimeout = setTimeout(() => {{
+                                        this.loadStats();
+                                    }}, 2000);
                                 }}
                             }});
                         }}
                         
                         async trackUsage(module) {{
                             try {{
+                                // Add timeout to prevent long waiting
+                                const controller = new AbortController();
+                                const timeoutId = setTimeout(() => controller.abort(), 2000);
+                                
                                 const response = await fetch(`${{this.apiBaseUrl}}/stats/track`, {{
                                     method: 'POST',
                                     headers: {{
@@ -424,17 +456,24 @@ def create_index_tab(constant):
                                     body: JSON.stringify({{
                                         module: module,
                                         timestamp: new Date().toISOString()
-                                    }})
+                                    }}),
+                                    signal: controller.signal
                                 }});
+                                clearTimeout(timeoutId);
                                 
                                 if (response.ok) {{
                                     console.log(`Tracked ${{module}} usage successfully`); 
-                                    await this.loadStats();
+                                    // Load stats asynchronously without waiting
+                                    this.loadStats().catch(() => {{}});
                                 }} else {{
-                                    console.error('Failed to track usage:', response.status);
+                                    console.log('Failed to track usage, continuing without stats update');
                                 }}
                             }} catch (error) {{
-                                console.error('Failed to track usage:', error);
+                                if (error.name === 'AbortError') {{
+                                    console.log('Track usage timeout, continuing without stats update');
+                                }} else {{
+                                    console.log('Failed to track usage, continuing without stats update');
+                                }}
                             }}
                         }}
                     }}
