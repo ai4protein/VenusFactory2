@@ -291,7 +291,7 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 label="System Prompt",
                 placeholder="Set AI assistant role and behavior...",
                 lines=3,
-                value="You are VenusFactory AI Assistant, a specialized protein engineering and bioinformatics expert. You can help users with:\n\n1. Zero-shot mutation prediction using sequence-based models (ESM-1v, ESM2-650M, ESM-1b) and structure-based models (SaProt, ProtSSN, ESM-IF1, MIF-ST, ProSST-2048)\n2. Protein function prediction including solubility, localization, binding, stability, sorting signal, and optimum temperature.\n Always respond in English and provide clear, actionable insights."
+                value="You are VenusFactory AI Assistant, a specialized protein engineering and bioinformatics expert. You can help users with:\n\n1. Zero-shot mutation prediction using sequence-based models (ESM-1v, ESM2-650M, ESM-1b) and structure-based models (SaProt, ProtSSN, ESM-IF1, MIF-ST, ProSST-2048)\n2. Protein function prediction including solubility, localization, metal ion binding, stability, sorting signal, and optimum temperature.\n Always respond in English and provide clear, actionable insights."
             )
         
         # Main chat interface
@@ -349,7 +349,7 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             **⚗️ Protein Function Prediction:**
             - "Predict solubility for this protein: [sequence]"
             - "Predict localization using Ankh-large for this protein: [sequence]"
-            - "Predict binding for this protein: [sequence]"
+            - "Predict metal ion binding for this protein: [sequence]"
             
             **📊 InterPro Function Query:**
             - "Query function for UniProt ID P00734"
@@ -815,7 +815,7 @@ TASK: Analyze the user's intent and return ONLY a JSON response. Be very precise
 ACTION RULES:
 - "predict_zero_shot_sequence": When user wants mutation/mutant prediction with sequence data or FASTA files
 - "predict_zero_shot_structure": When user wants mutation/mutant prediction with structure files (PDB/CIF) OR specifically mentions structure-based models
-- "predict_function": When user wants to predict protein properties like solubility, localization, binding, stability, etc.
+- "predict_function": When user wants to predict protein properties like solubility, localization, metal ion binding, stability, etc.
 - "query_interpro": When user wants to query InterPro database for protein function/annotation OR mentions "function", "interpro", "go annotation", "annotation"
 - "chat": For general questions, greetings, or unclear requests
 
@@ -830,7 +830,7 @@ TASK RULES (only for function prediction):
 
 Keywords to look for:
 - Mutation/mutant/design → zero-shot prediction
-- Solubility/localization/binding/stability → function prediction
+- Solubility/localization/metal ion binding/stability → function prediction
 - Function/InterPro/annotation/go → InterPro query
 - Structure-based models → zero-shot structure
 - General questions → chat
@@ -942,10 +942,10 @@ def fallback_intent_detection(message: str, has_fasta_file: bool, has_structure_
     function_keywords = {
         'solubility': ['solubility', '溶解度', 'soluble'],
         'localization': ['localization', '定位', 'location', 'subcellular'],
-        'binding': ['binding', '结合', 'bind', 'interaction'],
+        'metal ion binding': ['binding', '结合', 'bind', 'interaction', 'metal ion'],
         'stability': ['stability', '稳定性', 'stable', 'thermal'],
         'sorting signal': ['sorting', 'signal', '信号', '分选'],
-        'optimum temperature': ['temperature', '温度', 'thermal', 'optimum']
+        'optimum temperature': ['temperature', '温度', 'thermal', 'optimum', 'optimum temperature']
     }
     
     detected_function = None

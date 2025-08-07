@@ -53,7 +53,7 @@ MODEL_ADAPTER_MAPPING_FUNCTION = {
 DATASET_MAPPING_FUNCTION = {
     "Solubility": ["DeepSol", "DeepSoluE", "ProtSolM"],
     "Localization": ["DeepLocBinary", "DeepLocMulti"],
-    "Binding": ["MetalIonBinding"], 
+    "Metal ion binding": ["MetalIonBinding"], 
     "Stability": ["Thermostability"],
     "Sorting signal": ["SortingSignal"], 
     "Optimum temperature": ["DeepET_Topt"]
@@ -66,7 +66,7 @@ LABEL_MAPPING_FUNCTION = {
         "Cytoplasm", "Nucleus", "Extracellular", "Mitochondrion", "Cell membrane",
         "Endoplasmic reticulum", "Plastid", "Golgi apparatus", "Lysosome/Vacuole", "Peroxisome"
     ],
-    "Binding": ["Non-binding", "Binding"],
+    "Metal ion binding": ["Non-binding", "Binding"],
     "SortingSignal": ['No signal', 'Signal']
 }
 
@@ -256,7 +256,7 @@ def on_ai_model_change(ai_provider: str) -> tuple:
             show_input = False
             placeholder = ""
         else:
-            status_msg = "⚠ No API Key found in .env file. Please enter manually below:"
+            status_msg = "⚠ No API Key available. Please enter manually below:"
             show_input = True
             placeholder = "Enter your DeepSeek API Key"
     else:  # Other models
@@ -362,10 +362,24 @@ def generate_mutation_ai_prompt(results_df: pd.DataFrame, model_name: str, funct
 
 def generate_ai_summary_prompt(results_df: pd.DataFrame, task: str, model: str) -> str:
     """Generate AI prompt for function prediction summary."""
-    prompt = f"""Please provide a comprehensive biological interpretation of the protein function prediction results for the task '{task}' using the '{model}' model. The raw data is in JSON format:
-        {results_df.to_json(orient='records')}
-        Structure your analysis with an Executive Summary, Detailed Analysis per Sequence, Biological Significance, and Recommendations for Next Steps. Do not use Markdown."""
-            
+    prompt = f"""
+        You are a senior protein biochemist with extensive laboratory experience. A colleague has just shown you protein function prediction results for the task '{task}' on model '{model}'. 
+        Please analyze these results from a practical biologist's perspective:
+        {results_df.to_string(index=False)}
+        Provide a concise, practical analysis focusing ONLY on:
+        0. The task '{task}' with "Stability" and "Optimum temperature" are regression task
+        1. What the prediction results mean for each protein
+        2. The biological significance of the confidence scores
+        3. Practical experimental recommendations based on these predictions
+        4. Any notable patterns or outliers in the results
+        5. Do not output formatted content, just one paragraph is sufficient
+        Use simple, clear language that a bench scientist would appreciate. Do NOT mention:
+        - Training datasets or models
+        - Technical implementation details  
+        - Computational methods
+        - Statistical concepts beyond confidence scores
+        Keep your response under 200 words and speak as if you're having a conversation with a colleague in the lab.
+        """
     return prompt
 
 def handle_file_upload(file_obj: Any) -> str:
@@ -734,13 +748,16 @@ def handle_mutation_prediction_base(
     
     # Handle AI analysis
     ai_summary = "AI Analysis disabled. Enable in settings to generate a report."
+
+    expert_analysis = "<div style='height: 300px; display: flex; align-items: center; justify-content: center; color: #666;'>Analysis will appear here once prediction is complete...</div>"
+
     if enable_ai:
         progress(0.8, desc="Generating AI summary...")
         yield (
-            f"✅ Prediction complete. 🤖 Generating AI summary...", 
+            f"🤖 Expert is analyzing results...", 
             summary_fig, display_df, gr.update(visible=False), None, 
             gr.update(visible=total_residues > 20), display_df, 
-            "🤖 AI is analyzing..."
+            expert_analysis
         )
         
         api_key = get_api_key(ai_model, user_api_key)
@@ -754,6 +771,7 @@ def handle_mutation_prediction_base(
             )
             prompt = generate_mutation_ai_prompt(display_df, model_name, function_selection)
             ai_summary = call_ai_api(ai_config, prompt)
+            expert_analysis = format_expert_response(ai_summary)
         progress(0.9, desc="Finalizing AI analysis...")
     else:
         progress(1.0, desc="Complete!")
@@ -788,7 +806,7 @@ def handle_mutation_prediction_base(
     yield (
         final_status, summary_fig, display_df, 
         gr.update(visible=True, value=zip_path_str), zip_path_str, 
-        gr.update(visible=total_residues > 20), display_df, ai_summary
+        gr.update(visible=total_residues > 20), display_df, expert_analysis
     )
 
 def generate_plots_for_all_results(results_df: pd.DataFrame) -> go.Figure:
@@ -1316,9 +1334,12 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                                 zero_shot_plot_out = gr.Plot(label="Heatmap")
                             with gr.TabItem("📊 Raw Results"):
                                 zero_shot_df_out = gr.DataFrame(label="Raw Data")
-                            with gr.TabItem("🤖 AI Analysis"):
-                                zero_shot_ai_out = gr.Textbox(label="AI Analysis Report", value="AI analysis will appear here...", lines=20, interactive=False, show_copy_button=True)
-                        
+                            with gr.TabItem("👨‍🔬 AI Expert Analysis"):
+                                # function_results_plot = gr.Plot(label="Confidence Scores")
+                                zero_shot_ai_expert_html = gr.HTML(
+                                    value="<div style='height: 300px; display: flex; align-items: center; justify-content: center; color: #666;'>AI analysis will appear here...</div>",
+                                    label="👨‍🔬 AI Expert Analysis"
+                                )                        
                         zero_shot_download_btn = gr.DownloadButton("💾 Download Results", visible=False)
                         zero_shot_download_path_state = gr.State()
                         zero_shot_view_controls = gr.State() # Placeholder for potential future controls
@@ -1366,7 +1387,7 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                                 function_results_df = gr.DataFrame(label="Prediction Data", column_widths=["20%", "20%", "20%", "20%", "20%"])
                             with gr.TabItem("👨‍🔬 AI Expert Analysis"):
                                 # function_results_plot = gr.Plot(label="Confidence Scores")
-                                ai_expert_html = gr.HTML(
+                                function_ai_expert_html = gr.HTML(
                                     value="<div style='height: 300px; display: flex; align-items: center; justify-content: center; color: #666;'>AI analysis will appear here...</div>",
                                     label="👨‍🔬 AI Expert Analysis"
                                 )
@@ -1385,7 +1406,7 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         easy_zshot_predict_btn.click(
             fn=handle_mutation_prediction_base,
             inputs=[zero_shot_function_dd, easy_zshot_file_upload, enable_ai_zshot, ai_model_dd_zshot, api_key_in_zshot],
-            outputs=[zero_shot_status_box, zero_shot_plot_out, zero_shot_df_out, zero_shot_download_btn, zero_shot_download_path_state, zero_shot_view_controls, zero_shot_full_data_state, zero_shot_ai_out],
+            outputs=[zero_shot_status_box, zero_shot_plot_out, zero_shot_df_out, zero_shot_download_btn, zero_shot_download_path_state, zero_shot_view_controls, zero_shot_full_data_state, zero_shot_ai_expert_html],
             show_progress=True
         )
 
@@ -1401,7 +1422,7 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         easy_func_predict_btn.click(
             fn=handle_protein_function_prediction,
             inputs=[easy_func_task_dd, base_function_fasta_upload, enable_ai_func, ai_model_dd_func, api_key_in_func],
-            outputs=[function_status_textbox, function_results_df, function_download_btn, ai_expert_html], 
+            outputs=[function_status_textbox, function_results_df, function_download_btn, function_ai_expert_html], 
             show_progress=True
         )
     return {}
