@@ -123,6 +123,7 @@ def parse_fasta_file(file_path: str) -> str:
         return f"Error reading FASTA file: {e}"
 
 def parse_pdb_for_sequence(file_path: str) -> str:
+    if not file_path: return ""
     aa_map = {
         'ALA': 'A', 'CYS': 'C', 'ASP': 'D', 'GLU': 'E', 'PHE': 'F',
         'GLY': 'G', 'HIS': 'H', 'ILE': 'I', 'LYS': 'K', 'LEU': 'L',
@@ -672,7 +673,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                             with gr.TabItem("🧬 Sequence-based Model"):
                                 gr.Markdown("### Model Configuration")
                                 seq_function_dd = gr.Dropdown(choices=DATASET_MAPPING_ZERO_SHOT, label="Select Protein Function", value=DATASET_MAPPING_ZERO_SHOT[0])
-                                seq_model_dd = gr.Dropdown(choices=sequence_models, label="Select Sequence-based Model", value=sequence_models[0] if sequence_models else None)
+                                seq_model_dd = gr.Dropdown(choices=sequence_models, label="Select Sequence-based Model", value=sequence_models[0])
                                 seq_file_upload = gr.File(label="Upload FASTA file", file_types=[".fasta", ".fa"])
                                 seq_file_example = gr.Examples(
                                     examples=[["./download/P60002.fasta"]],
@@ -698,13 +699,13 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                                             type="password", 
                                             placeholder="Enter your API Key if needed",
                                             visible=not bool(os.getenv("DEEPSEEK_API_KEY"))
-                                        )                                
+                                        )                           
                                 seq_predict_btn = gr.Button("🚀 Start Prediction (Sequence)", variant="primary")
 
                             with gr.TabItem("🏗️ Structure-based Model"):
                                 gr.Markdown("### Model Configuration")
                                 struct_function_dd = gr.Dropdown(choices=DATASET_MAPPING_ZERO_SHOT, label="Select Protein Function", value=DATASET_MAPPING_ZERO_SHOT[0])
-                                struct_model_dd = gr.Dropdown(choices=structure_models, label="Select Structure-based Model", value=structure_models[0] if structure_models else None)
+                                struct_model_dd = gr.Dropdown(choices=structure_models, label="Select Structure-based Model", value=structure_models[0])
                                 struct_file_upload = gr.File(label="Upload PDB file", file_types=[".pdb"])
                                 struct_file_example = gr.Examples(
                                     examples=[["./download/alphafold2_structures/A0A0C5B5G6.pdb"]],
@@ -739,7 +740,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         with gr.Tabs():
                             with gr.TabItem("📈 Prediction Heatmap"):
                                 with gr.Row(visible=False) as zero_shot_view_controls:
-                                    expand_btn = gr.Button("Show Complete Heatmap", size="sm")
+                                    expand_btn = gr.Button("Show Complete Heatmap", size="sm", visible=False)
                                     collapse_btn = gr.Button("Show Summary View", size="sm", visible=False)
                                 zero_shot_plot_out = gr.Plot(label="Heatmap")
                             with gr.TabItem("📊 Raw Results"):
