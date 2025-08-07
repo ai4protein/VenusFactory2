@@ -14,8 +14,10 @@ from web.chat_tab import create_chat_tab
 from web.venus_factory_advanced_tool_tab import create_advanced_tool_tab
 from web.venus_factory_download_tab import create_download_tool_tab
 from web.venus_factory_quick_tool_tab import create_quick_tool_tab
+
+from stats_manager import get_stats_api, track_usage_api, stats_manager
+
 def load_constant():
-    """Load constant values from config files"""
     try:
         return json.load(open("src/constant.json"))
     except Exception as e:
@@ -23,12 +25,9 @@ def load_constant():
         return {"error": f"Failed to load constant.json: {str(e)}"}
 
 def create_ui():
-    """Creates the main Gradio UI with a nested tab layout."""
     monitor = TrainingMonitor()
     constant = load_constant()
-    
     def update_output():
-        """Callback function to update the training monitor UI components."""
         try:
             if monitor.is_training:
                 messages = monitor.get_messages()
@@ -42,7 +41,27 @@ def create_ui():
         except Exception as e:
             return f"An error occurred in the UI update loop: {str(e)}", None, None
     
-    # Read CSS files and embed them directly
+    def get_stats():
+        return get_stats_api()
+    
+    def track_usage(module):
+        return track_usage_api(module)
+    
+    def track_agent_usage():
+        return track_usage_api('agent_usage')
+    
+    def track_mutation_quick():
+        return track_usage_api('mutation_prediction_quick')
+    
+    def track_mutation_advanced():
+        return track_usage_api('mutation_prediction_advanced')
+    
+    def track_function_quick():
+        return track_usage_api('function_prediction_quick')
+    
+    def track_function_advanced():
+        return track_usage_api('function_prediction_advanced')
+    
     def read_css_file(file_path):
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
@@ -52,17 +71,11 @@ def create_ui():
         except Exception as e:
             print(f"❌ Warning: Could not read CSS file {file_path}: {e}")
             return ""
-    
-    # Get the directory of this file
     current_dir = os.path.dirname(os.path.abspath(__file__))
     assets_dir = os.path.join(current_dir, "web", "assets")
-    
-    # Read CSS files
     custom_css = read_css_file(os.path.join(assets_dir, "custom_ui.css"))
     manual_css = read_css_file(os.path.join(assets_dir, "manual_ui.css"))
     manual_js = read_css_file(os.path.join(assets_dir, "manual_ui.js"))
-    
-    # Combine all CSS
     css_links = f"""
     <style>
     {custom_css}
@@ -70,9 +83,7 @@ def create_ui():
     {manual_js}
     </style>
     """
-    
     with gr.Blocks(css=css_links) as demo:
-        # Header with GitHub icon
         header_html = """
         <div class="header-container" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
             <div style="display: flex; align-items: center; gap: 15px;">
@@ -96,103 +107,197 @@ def create_ui():
         </div>
         """
         gr.HTML(header_html)
-        
-        # Initialize train_components to None to handle potential creation errors
         train_components = None
-
-        # --- Top-Level Tabs for Main Categories ---
         with gr.Tabs():
-            # Index and Citations
             with gr.TabItem("🏠 Index"):
                 try:
                     index_components = create_index_tab(constant)
                 except Exception as e:
-                    gr.Markdown(f"**Error creating Index tab:**\n```\n{e}\n```")
-            # Model Train and Prediction
+                    gr.Markdown(f"""**Error creating Index tab:**\n```
+{e}\n```""")
             with gr.TabItem("🚀 Model Train and Prediction (For Advanced Users)"):
-                # Nested (Secondary) Tabs for sub-functions
                 with gr.Tabs():
                     with gr.TabItem("Training"):
                         try:
-                            # This function must return a dictionary with the required components
-                            train_components = create_train_tab(constant) 
+                            train_components = create_train_tab(constant)
                         except Exception as e:
-                            gr.Markdown(f"**Error creating Training tab:**\n```\n{e}\n```")
-                    
+                            gr.Markdown(f"""**Error creating Training tab:**\n```
+{e}\n```""")
                     with gr.TabItem("Evaluation"):
                         try:
                             eval_components = create_eval_tab(constant)
                         except Exception as e:
-                            gr.Markdown(f"**Error creating Evaluation tab:**\n```\n{e}\n```")
-
+                            gr.Markdown(f"""**Error creating Evaluation tab:**\n```
+{e}\n```""")
                     with gr.TabItem("Prediction"):
                         try:
                             predict_components = create_predict_tab(constant)
                         except Exception as e:
-                            gr.Markdown(f"**Error creating Prediction tab:**\n```\n{e}\n```")
-
+                            gr.Markdown(f"""**Error creating Prediction tab:**\n```
+{e}\n```""")
             with gr.TabItem("🤖 VenusAgent-0.1 (Beta Version)"):
                 try:
                     chat_components = create_chat_tab(constant)
                 except Exception as e:
-                    gr.Markdown(f"**Error creating Chat tab:**\n```\n{e}\n```")
-
-            # Quick Tools
+                    gr.Markdown(f"""**Error creating Chat tab:**\n```
+{e}\n```""")
             with gr.TabItem("🔧 Quick Tools "):
                 try:
                     easy_use_components = create_quick_tool_tab(constant)
                 except Exception as e:
-                    gr.Markdown(f"**Error creating Easy-Use tab:**\n```\n{e}\n```")
-                
-            # Advanced Tools
+                    gr.Markdown(f"""**Error creating Easy-Use tab:**\n```
+{e}\n```""")
             with gr.TabItem("⚡ Advanced Tools"):
                 try:
                     advanced_tool_components = create_advanced_tool_tab(constant)
                 except Exception as e:
-                    gr.Markdown(f"**Error creating Advanced Tools tab:**\n```\n{e}\n```")
-
-            # Download
+                    gr.Markdown(f"""**Error creating Advanced Tools tab:**\n```
+{e}\n```""")
             with gr.TabItem("💾 Download "):
                 try:
                     download_components = create_download_tool_tab(constant)
                 except Exception as e:
-                    gr.Markdown(f"**Error creating Download tab:**\n```\n{e}\n```")
-                
-            # Manual (no nested tabs needed)
+                    gr.Markdown(f"""**Error creating Download tab:**\n```
+{e}\n```""")
             with gr.TabItem("📖 Manual "):
                 try:
                     manual_components = create_manual_tab(constant)
                 except Exception as e:
-                    gr.Markdown(f"**Error creating Manual tab:**\n```\n{e}\n```")
-        
-        # Check if the training components were created successfully before setting up the monitor loop
+                    gr.Markdown(f"""**Error creating Manual tab:**\n```
+{e}\n```""")
         if train_components and all(k in train_components for k in ["output_text", "loss_plot", "metrics_plot"]):
             demo.load(
                 fn=update_output,
                 inputs=None,
                 outputs=[
-                    train_components["output_text"], 
+                    train_components["output_text"],
                     train_components["loss_plot"],
                     train_components["metrics_plot"]
                 ],
-
             )
         else:
-            # This message will be printed to the console where the script is running
             print("Warning: Training monitor components not found. The live update feature for training will be disabled.")
+
+        # 注册统计API函数到Gradio - 使用更简单的方式
+        stats_output = gr.JSON(label="Statistics", visible=False)
+        demo.load(fn=get_stats, inputs=None, outputs=stats_output)
+        
+        track_input = gr.Textbox(label="Module", visible=False)
+        track_output = gr.JSON(label="Track Result", visible=False)
+        demo.load(fn=track_usage, inputs=track_input, outputs=track_output)
+        
+        # 添加统计记录接口
+        gr.HTML("""
+        <script>
+        // 页面加载时自动记录访问
+        document.addEventListener('DOMContentLoaded', function() {
+            // 记录页面访问
+            trackPageVisit();
             
+            // 监听Agent的send按钮
+            setupAgentTracking();
+            
+            // 监听功能按钮
+            setupFunctionTracking();
+        });
+        
+        function setupAgentTracking() {
+            // 监听Agent的send按钮点击
+            document.addEventListener('click', function(e) {
+                if (e.target && (e.target.textContent.includes('Send') || e.target.textContent.includes('发送'))) {
+                    // 检查是否在Agent标签页内
+                    const agentTab = document.querySelector('[data-testid="tab"]:has-text("VenusAgent")');
+                    if (agentTab && agentTab.classList.contains('selected')) {
+                        trackUsage('agent_usage');
+                    }
+                }
+            });
+        }
+        
+        function setupFunctionTracking() {
+            // 监听突变预测按钮
+            document.addEventListener('click', function(e) {
+                const buttonText = e.target.textContent || '';
+                
+                // 突变预测按钮
+                if (buttonText.includes('Mutation') || buttonText.includes('突变') || buttonText.includes('Predict')) {
+                    const quickToolsTab = document.querySelector('[data-testid="tab"]:has-text("Quick Tools")');
+                    const advancedToolsTab = document.querySelector('[data-testid="tab"]:has-text("Advanced Tools")');
+                    
+                    if (quickToolsTab && quickToolsTab.classList.contains('selected')) {
+                        trackUsage('mutation_prediction_quick');
+                    } else if (advancedToolsTab && advancedToolsTab.classList.contains('selected')) {
+                        trackUsage('mutation_prediction_advanced');
+                    }
+                }
+                
+                // 功能预测按钮
+                if (buttonText.includes('Function') || buttonText.includes('功能') || buttonText.includes('Analysis')) {
+                    const quickToolsTab = document.querySelector('[data-testid="tab"]:has-text("Quick Tools")');
+                    const advancedToolsTab = document.querySelector('[data-testid="tab"]:has-text("Advanced Tools")');
+                    
+                    if (quickToolsTab && quickToolsTab.classList.contains('selected')) {
+                        trackUsage('function_prediction_quick');
+                    } else if (advancedToolsTab && advancedToolsTab.classList.contains('selected')) {
+                        trackUsage('function_prediction_advanced');
+                    }
+                }
+            });
+        }
+        
+        function trackPageVisit() {
+            // 使用localStorage避免重复记录
+            const today = new Date().toDateString();
+            const lastVisit = localStorage.getItem('lastVisit');
+            
+            if (lastVisit !== today) {
+                localStorage.setItem('lastVisit', today);
+                
+                // 使用Gradio API调用统计函数
+                fetch('/api/predict/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        fn_index: 1,  // 使用数字索引
+                        data: ['total_visits']
+                    })
+                }).catch(error => {
+                    console.log('Failed to track page visit:', error);
+                });
+            }
+        }
+        
+        function trackUsage(module) {
+            // 使用Gradio API调用统计函数
+            fetch('/api/predict/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    fn_index: 1,  // 使用数字索引
+                    data: [module]
+                })
+            }).catch(error => {
+                console.log('Failed to track usage:', error);
+            });
+        }
+        </script>
+        """)
+        
     return demo
 
 if __name__ == "__main__":
     try:
         demo = create_ui()
         demo.queue().launch(
-            server_port=7860, 
-            share=True, 
+            server_port=7860,
+            share=True,
             allowed_paths=["img"],
             show_error=True,
             inbrowser=True,
         )
-
     except Exception as e:
         print(f"Failed to launch UI: {str(e)}")
