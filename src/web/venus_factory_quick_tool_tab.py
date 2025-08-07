@@ -806,7 +806,7 @@ def handle_mutation_prediction_base(
     yield (
         final_status, summary_fig, display_df, 
         gr.update(visible=True, value=zip_path_str), zip_path_str, 
-        gr.update(visible=total_residues > 20), display_df, expert_analysis
+        gr.update(visible=total_residues > 20), display_df, expert_analysis, ai_summary
     )
 
 def generate_plots_for_all_results(results_df: pd.DataFrame) -> go.Figure:
@@ -1286,7 +1286,7 @@ def handle_protein_function_prediction(
         final_status, 
         display_df, 
         gr.update(visible=True, value=zip_path_str) if zip_path_str else gr.update(visible=False), 
-        expert_analysis
+        expert_analysis, ai_response
     )
 
 def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
@@ -1305,24 +1305,24 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         )
                         easy_zshot_protein_display = gr.Textbox(label="Uploaded Protein Sequence", interactive=False, lines=3, max_lines=7)
                         gr.Markdown("### Configure AI Analysis (Optional)")
-                        with gr.Accordion("AI Settings", open=True):
-                            enable_ai_zshot = gr.Checkbox(label="Enable AI Summary", value=False)
-                            with gr.Group(visible=False) as ai_box_zshot:
-                                ai_model_dd_zshot = gr.Dropdown(
-                                    choices=list(AI_MODELS.keys()), 
-                                    value="DeepSeek", 
-                                    label="Select AI Model"
-                                )
-                                ai_status_zshot = gr.Markdown(
-                                    value="✓ Using provided API Key" if os.getenv("DEEPSEEK_API_KEY") else "⚠ No API Key found in .env file",
-                                    visible=True
-                                )
-                                api_key_in_zshot = gr.Textbox(
-                                    label="API Key", 
-                                    type="password", 
-                                    placeholder="Enter your API Key if needed",
-                                    visible=not bool(os.getenv("DEEPSEEK_API_KEY"))
-                                )
+                        
+                        enable_ai_zshot = gr.Checkbox(label="Enable AI Summary", value=False)
+                        with gr.Group(visible=False) as ai_box_zshot:
+                            ai_model_dd_zshot = gr.Dropdown(
+                                choices=list(AI_MODELS.keys()), 
+                                value="DeepSeek", 
+                                label="Select AI Model"
+                            )
+                            ai_status_zshot = gr.Markdown(
+                                value="✓ Using provided API Key" if os.getenv("DEEPSEEK_API_KEY") else "⚠ No API Key found in .env file",
+                                visible=True
+                            )
+                            api_key_in_zshot = gr.Textbox(
+                                label="API Key", 
+                                type="password", 
+                                placeholder="Enter your API Key if needed",
+                                visible=not bool(os.getenv("DEEPSEEK_API_KEY"))
+                            )
                         
                         easy_zshot_predict_btn = gr.Button("🚀 Start Prediction", variant="primary")
 

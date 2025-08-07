@@ -196,7 +196,6 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         
         # Use the globally stored files
         files = getattr(globals(), 'current_files', [])
-        print(f"DEBUG: Processing files: {files}")
         
         try:
             # Detect user intent and handle VenusFactory functions
@@ -366,7 +365,7 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             - **Function Models**: ESM2-650M, Ankh-large, ProtBert-uniref50, ProtT5-xl-uniref50
             
             **🎯 Function Tasks:**
-            - Solubility, Localization, Binding, Stability, Sorting signal, Optimum temperature
+            - Solubility, Localization, Metal Ion Binding, Stability, Sorting signal, Optimum temperature
             """)
             
             # API status indicator
@@ -476,7 +475,7 @@ def parse_zero_shot_prediction_result(result: tuple, api_key: str = None) -> str
             return "Error: No prediction data available"
         
         # Generate AI summary with provided api_key
-        ai_summary = generate_simple_ai_summary(df, api_key)
+        ai_summary = generate_simple_ai_summary_mutatuon(df, api_key)
         
         # Return the AI summary
         return ai_summary
@@ -484,8 +483,7 @@ def parse_zero_shot_prediction_result(result: tuple, api_key: str = None) -> str
     except Exception as e:
         return f"Error parsing prediction result: {str(e)}"
 
-def generate_simple_ai_summary(df, api_key: str = None) -> str:
-    """Generate simple AI summary for mutation prediction results"""
+def generate_simple_ai_summary_function(df, task, api_key: str = None) -> str:
     try:
         import requests
         import os
@@ -496,34 +494,25 @@ def generate_simple_ai_summary(df, api_key: str = None) -> str:
         
         if not api_key:
             return "❌ No API key found. Please set DEEPSEEK_API_KEY environment variable or provide API key in the interface."
-        
-        # Prepare data for AI analysis
-        score_col = next((col for col in df.columns if isinstance(col, str) and 'score' in col.lower()), None)
-        if not score_col:
-            score_col = next((col for col in df.columns if isinstance(col, str) and any(word in col.lower() for word in ['prediction', 'value', 'rank', 'effect'])), None)
-        
-        if not score_col:
-            return "❌ Could not identify score column for analysis."
-        
-        # Sort by score and get top mutations
-        df_sorted = df.sort_values(score_col, ascending=False)
-        top_mutations = df_sorted.head(10)
-        
-        # Create simple prompt for AI
+
         prompt = f"""
-        Please analyze these protein mutation prediction results and provide a concise summary:
-
-        Top 10 predicted mutations:
-        {top_mutations.to_string(index=False)}
-
-        Summary statistics:
-        - Total mutations: {len(df)}
-        - Best score: {df_sorted.iloc[0].get(score_col, 'N/A'):.4f}
-        - Average score: {df[score_col].mean():.4f}
-
-        Please provide a brief analysis of the key findings and suggest the most promising mutations for experimental validation.
-        """
-        
+            You are a senior protein biochemist with extensive laboratory experience. A colleague has just shown you protein function prediction results for the task '{task}'. 
+            Please analyze these results from a practical biologist's perspective:
+            {df.to_string(index=False)}
+            Provide a concise, practical analysis focusing ONLY on:
+            0. The task '{task}' with "Stability" and "Optimum temperature" are regression task
+            1. What the prediction results mean for each protein
+            2. The biological significance of the confidence scores
+            3. Practical experimental recommendations based on these predictions
+            4. Any notable patterns or outliers in the results
+            5. Do not output formatted content, just one paragraph is sufficient
+            Use simple, clear language that a bench scientist would appreciate. Do NOT mention:
+            - Training datasets or models
+            - Technical implementation details  
+            - Computational methods
+            - Statistical concepts beyond confidence scores
+            Keep your response under 200 words and speak as if you're having a conversation with a colleague in the lab.
+            """
         # Call AI API
         headers = {
             "Authorization": f"Bearer {api_key}",
@@ -558,25 +547,109 @@ def generate_simple_ai_summary(df, api_key: str = None) -> str:
             return result['choices'][0]['message']['content']
         else:
             return f"❌ AI API call failed: {response.status_code}"
+                
+    except Exception as e:
+        return f"❌ Error generating AI summary: {str(e)}"
+
+
+def generate_simple_ai_summary_mutatuon(df, api_key: str = None) -> str:
+    """Generate simple AI summary for mutation prediction results"""
+    try:
+        import requests
+        import os
+        
+        # Use provided API key or fallback to environment variable
+        if not api_key:
+            api_key = os.getenv("DEEPSEEK_API_KEY")
+        
+        if not api_key:
+            return "❌ No API key found. Please set DEEPSEEK_API_KEY environment variable or provide API key in the interface."
+        
+        # Prepare data for AI analysis
+        score_col = next(
+        (col for col in df.columns if 'Prediction Rank' in col.lower()), 
+        df.columns[1] if len(df.columns) > 1 else None
+        )
+    
+        if not score_col:
+            return "Error: Score column not found."
+
+        num_rows = len(df)
+        top_count = max(20, int(num_rows * 0.05)) if num_rows >= 5 else num_rows
+        top_mutations_str = df.head(top_count)[['Mutant', score_col]].to_string(index=False)
+        
+        prompt =  f"""
+            Please act as an expert protein engineer and analyze the following mutation prediction results generated.
+            A deep mutational scan was performed. The results are sorted from most beneficial to least beneficial based on the '{score_col}'. Below are the top 5% of mutations.
+
+            ### Top 5% Predicted Mutations (Potentially Most Beneficial):
+            ```
+            {top_mutations_str}
+            ```
+
+            ### Your Analysis Task:
+            Based on this data, provide a structured scientific analysis report that includes the following sections:
+            1. Executive Summary: Briefly summarize the key findings. Are there clear hotspot regions?
+            2. Analysis of Beneficial Mutations: Discuss the top mutations and their potential biochemical impact.
+            3. Analysis of Detrimental Mutations: What do the most harmful mutations suggest about critical residues?
+            4. Recommendations for Experimentation: Suggest 3-5 specific mutations for validation, with justifications.
+            5. Do not output formatted content, just one paragraph is sufficient
+            Provide a concise, clear, and insightful report in a professional scientific tone, summarize the above content into 1-2 paragraphs and output unformatted content.
+            """
+
             
+        # Call AI API
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        data = {
+            "model": "deepseek-chat",
+            "messages": [
+                {
+                    "role": "system", 
+                    "content": "You are a protein engineering expert. Provide concise analysis of mutation prediction results."
+                },
+                {
+                    "role": "user", 
+                    "content": prompt
+                }
+            ],
+            "temperature": 0.3,
+            "max_tokens": 1000
+        }
+        
+        response = requests.post(
+            "https://api.deepseek.com/v1/chat/completions",
+            headers=headers,
+            json=data,
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            return result['choices'][0]['message']['content']
+        else:
+            return f"❌ AI API call failed: {response.status_code}"
+                
     except Exception as e:
         return f"❌ Error generating AI summary: {str(e)}"
 
 def call_protein_function_prediction_from_file(fasta_file: str, model_name: str = "ProtT5-xl-uniref50", task: str = "Solubility", api_key: str = None) -> str:
     """Call VenusFactory protein function prediction API using uploaded FASTA file"""
-    print(task)
+
     try:
         # Get datasets for the task
         dataset_mapping = {
             "Solubility": ["DeepSol", "DeepSoluE", "ProtSolM"],
             "Localization": ["DeepLocBinary", "DeepLocMulti"],
-            "Binding": ["MetalIonBinding"],
+            "Metal ion binding": ["MetalIonBinding"],
             "Stability": ["Thermostability"],
             "Sorting signal": ["SortingSignal"],
             "Optimum temperature": ["DeepET_Topt"]
         }
         datasets = dataset_mapping.get(task, ["DeepSol"])
-        print(f"DEBUG: Using datasets: {datasets}")
         
         # Call the Gradio API
         client = Client("http://localhost:7860/")
@@ -598,7 +671,28 @@ def call_protein_function_prediction_from_file(fasta_file: str, model_name: str 
 
 def parse_function_prediction_result(result, model_name: str, task: str, api_key: str = None) -> str:
     try:
-        return result[2]
+        import pandas as pd
+        
+        # Extract DataFrame from result[1]
+        data = result[1]
+        
+        # Handle different data formats
+        if isinstance(data, dict) and 'headers' in data and 'data' in data:
+            # Convert dict format to DataFrame
+            df = pd.DataFrame(data['data'], columns=data['headers'])
+        elif isinstance(data, pd.DataFrame):
+            # Already a DataFrame
+            df = data
+        else:
+            return f"Error: Unexpected data format: {type(data)}"
+        
+        if df is None or df.empty:
+            return "Error: No prediction data available"
+        
+        ai_summary = generate_simple_ai_summary_function(df, task, api_key)
+
+        # Return the AI summary
+        return ai_summary
         
     except Exception as e:
         return f"Error parsing prediction result: {str(e)}"
@@ -614,7 +708,7 @@ def call_protein_function_prediction(sequence: str, model_name: str = "ProtT5-xl
         dataset_mapping = {
             "Solubility": ["DeepSol", "DeepSoluE", "ProtSolM"],
             "Localization": ["DeepLocBinary", "DeepLocMulti"],
-            "Binding": ["MetalIonBinding"],
+            "Metal ion binding": ["MetalIonBinding"],
             "Stability": ["Thermostability"],
             "Sorting signal": ["SortingSignal"],
             "Optimum temperature": ["DeepET_Topt"]
@@ -650,7 +744,7 @@ def predict_zero_shot_sequence(sequence: str, model_name: str = "ESM2-650M", api
         # Call VenusFactory zero-shot sequence prediction API
         result = call_zero_shot_sequence_prediction(sequence, model_name, api_key)
         
-        return f"Zero-shot Sequence-based Mutation Prediction Results:\n\n{result}"
+        return f"{result}"
     except Exception as e:
         return f"Sequence prediction error: {str(e)}"
 
@@ -677,7 +771,7 @@ def predict_protein_function(sequence: str, model_name: str = "ProtT5-xl-uniref5
         # Call VenusFactory protein function prediction API
         result = call_protein_function_prediction(sequence, model_name, task)
         
-        return f"Protein Function Prediction Results:\n\n{result}"
+        return f"{result}"
     except Exception as e:
         return f"Function prediction error: {str(e)}"
 
@@ -807,7 +901,7 @@ Uploaded files: FASTA={has_fasta_file}, Structure={has_structure_file}
 Available VenusFactory functions:
 1. Zero-shot mutation prediction (sequence-based): ESM-1v, ESM2-650M, ESM-1b
 2. Zero-shot mutation prediction (structure-based): SaProt, ProtSSN, ESM-IF1, MIF-ST, ProSST-2048
-3. Protein function prediction: Solubility, Localization, Binding, Stability, Sorting signal, Optimum temperature
+3. Protein function prediction: Solubility, Localization, Metal ion binding, Stability, Sorting signal, Optimum temperature
 4. InterPro protein function query: Query protein annotations and GO terms from InterPro database
 
 TASK: Analyze the user's intent and return ONLY a JSON response. Be very precise about the action type.
@@ -826,7 +920,7 @@ MODEL RULES:
 - For InterPro query: not applicable
 
 TASK RULES (only for function prediction):
-- Solubility, Localization, Binding, Stability, "Sorting signal", "Optimum temperature"
+- Solubility, Localization, Metal ion binding, Stability, Sorting signal, Optimum temperature
 
 Keywords to look for:
 - Mutation/mutant/design → zero-shot prediction
@@ -838,7 +932,7 @@ Keywords to look for:
 Return JSON format:
 {{
     "action": "chat|predict_zero_shot_sequence|predict_zero_shot_structure|predict_function|query_interpro",
-    "model": "model_name_or_null",
+    "model_name": "model_name_or_null",
     "task": "task_name_or_null",
     "reasoning": "brief explanation"
 }}
@@ -925,8 +1019,10 @@ Return JSON format:
 
 
 def fallback_intent_detection(message: str, has_fasta_file: bool, has_structure_file: bool, intent: dict) -> dict:
+    """Fallback intent detection with exact matching to Gradio UI choices"""
     message_lower = message.lower()
 
+    # InterPro query detection
     interpro_keywords = ['function', 'interpro', 'annotation', 'go term', 'go annotation', '功能', '注释']
     is_interpro_request = any(word in message_lower for word in interpro_keywords)
     has_uniprot_id = bool(intent.get('uniprot_id'))
@@ -938,27 +1034,25 @@ def fallback_intent_detection(message: str, has_fasta_file: bool, has_structure_
 
     mutation_keywords = ['mutation', 'mutant', 'mutate', '突变', '设计', 'design', 'zero-shot', 'zero shot']
     is_mutation_request = any(word in message_lower for word in mutation_keywords)
-    
+
     function_keywords = {
-        'solubility': ['solubility', '溶解度', 'soluble'],
-        'localization': ['localization', '定位', 'location', 'subcellular'],
-        'metal ion binding': ['binding', '结合', 'bind', 'interaction', 'metal ion'],
-        'stability': ['stability', '稳定性', 'stable', 'thermal'],
-        'sorting signal': ['sorting', 'signal', '信号', '分选'],
-        'optimum temperature': ['temperature', '温度', 'thermal', 'optimum', 'optimum temperature']
+        'Solubility': ['solubility', '溶解度', 'soluble'],
+        'Localization': ['localization', '定位', 'location', 'subcellular'],
+        'Metal ion binding': ['binding', '结合', 'bind', 'interaction', 'metal ion', 'metal'],
+        'Stability': ['stability', '稳定性', 'stable', 'thermal'],
+        'Sorting signal': ['sorting', 'signal', '信号', '分选'],
+        'Optimum temperature': ['temperature', '温度', 'thermal', 'optimum', 'optimum temperature']
     }
     
     detected_function = None
     for func_name, keywords in function_keywords.items():
         if any(keyword in message_lower for keyword in keywords):
-            detected_function = func_name
+            detected_function = func_name 
             break
     
-
     sequence_models = {
-        'ESM-1v': ['esm-1v', 'esm1v'],
-        'ESM2-650M': ['esm2', 'esm-2', 'esm2-650m'],
-        'ESM-1b': ['esm-1b', 'esm1b']
+        'ESM-1v': ['esm-1v', 'esm1v', 'esm_1v'],
+        'ESM2-650M': ['esm2', 'esm-2', 'esm2-650m', 'esm2_650m', 'esm-2-650m'],
     }
     
     structure_models = {
@@ -969,8 +1063,9 @@ def fallback_intent_detection(message: str, has_fasta_file: bool, has_structure_
         'ProSST-2048': ['prosst', 'prosst-2048']
     }
     
+    # Default models
     detected_seq_model = 'ESM2-650M'
-    detected_struct_model = 'SaProt' 
+    detected_struct_model = 'ESM-IF1' 
     
     for model_name, keywords in sequence_models.items():
         if any(keyword in message_lower for keyword in keywords):
@@ -981,10 +1076,10 @@ def fallback_intent_detection(message: str, has_fasta_file: bool, has_structure_
         if any(keyword in message_lower for keyword in keywords):
             detected_struct_model = model_name
             break
-    
+
     if is_mutation_request:
-        structure_indicators = ['structure', 'pdb', 'cif', '结构'] + list(structure_models.keys())
-        wants_structure_based = (any(indicator.lower() in message_lower for indicator in structure_indicators) 
+        structure_indicators = ['structure', 'pdb', 'cif'] + [name.lower() for name in structure_models.keys()]
+        wants_structure_based = (any(indicator in message_lower for indicator in structure_indicators) 
                                or has_structure_file)
         
         if wants_structure_based:
@@ -1000,7 +1095,7 @@ def fallback_intent_detection(message: str, has_fasta_file: bool, has_structure_
         intent['action'] = 'predict_function'
         intent['type'] = 'function_prediction'
         intent['model'] = 'ESM2-650M'
-        intent['task'] = detected_function.title()
+        intent['task'] = detected_function
 
     else:
         intent['action'] = 'chat'

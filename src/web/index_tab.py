@@ -169,24 +169,32 @@ def create_index_tab(constant):
                 </div>
             </div>
             <hr style="margin: 40px 0; border: 1px solid #eee;">
-            <!-- Citation 板块 -->
+
             <div style="text-align: left; max-width: 1400px; margin: 0 auto; font-size: 1.2em;">
                 <h1 style="font-size:2.2em; font-weight:900; color:#222; margin-bottom: 0.7em;">Citation</h1>
                 <div style="font-size:1.2em; margin-bottom: 0.7em;">✏️ Please cite our work if you have used VenusFactory.</div>
-                <pre style="background:#f8f8f8; border-radius:8px; padding:18px; font-size:1.2em; overflow-x:auto;"><code>@article{{tan2025venusfactory,
-  title={{VenusFactory: A Unified Platform for Protein Engineering Data Retrieval and Language Model Fine-Tuning}},
-  author={{Tan, Yang and Liu, Chen and Gao, Jingyuan and Wu, Banghao and Li, Mingchen and Wang, Ruilin and Zhang, Lingrong and Yu, Huiqun and Fan, Guisheng and Hong, Liang and Zhou, Bingxin}},
-  journal={{arXiv preprint arXiv:2503.15438}},
-  year={{2025}}
-}}</code></pre>
-                <!-- 合作平台等内容, 作为Citation一部分 -->
+                <pre style="background:#f8f8f8; border-radius:8px; padding:18px; font-size:1.2em; overflow-x:auto;"><code>@inproceedings{{tan-etal-2025-venusfactory,
+            title = "{{V}}enus{{F}}actory: An Integrated System for Protein Engineering with Data Retrieval and Language Model Fine-Tuning",
+            author = "Tan, Yang and Liu, Chen and Gao, Jingyuan and Wu, Banghao and Li, Mingchen and Wang, Ruilin and Zhang, Lingrong and Yu, Huiqun and Fan, Guisheng and Hong, Liang and Zhou, Bingxin",
+            editor = "Mishra, Pushkar and Muresan, Smaranda and Yu, Tao",
+            booktitle = "Proceedings of the 63rd Annual Meeting of the Association for Computational Linguistics (Volume 3: System Demonstrations)",
+            month = jul,
+            year = "2025",
+            address = "Vienna, Austria",
+            publisher = "Association for Computational Linguistics",
+            url = "https://aclanthology.org/2025.acl-demo.23/",
+            doi = "10.18653/v1/2025.acl-demo.23",
+            pages = "230--241",
+            ISBN = "979-8-89176-253-4",
+        }}</code></pre>
+
                 <div style="display: flex; flex-wrap: wrap; justify-content: space-between; max-width: 1400px; margin: 30px auto 0 auto; color: #666; font-size: 1.0em; gap: 32px;">
                     <div style="flex:1; min-width: 320px; line-height:2.1;">
                         <b>🤝 Cooperate Platform:</b> <a href="https://openbayes.com/" target="_blank">HyberAI</a><br>
                         <b>🧬 Small-sample mutation prediction tool:</b> <a href="https://github.com/ai4protein/Pro-FSFP" target="_blank">Pro-FSFP</a><br>
                         <b>⚡ The most advanced zero-shot protein prediction tool:</b> <a href="https://github.com/ai4protein/VenusREM" target="_blank">VenusREM</a><br>
                         <b>🏠 Developer homepage:</b> <a href="https://tyang816.github.io/" target="_blank">https://tyang816.github.io/</a><br>
-                        <b>✉️ Developer contact information:</b> <a href="mailto:tanyang.august@sjtu.edu.cn">tanyang.august@sjtu.edu.cn</a>
+                        <b>✉️ Developer contact information:</b> <a href="mailto:tanyang.august@sjtu.edu.cn">tanyang.august@sjtu.edu.cn</a>, <a href="mailto:zlr_zmm@163.com">zlr_zmm@163.com</a>
                     </div>
                     <div style="flex:1; min-width: 320px;">
                         <b>🏢 Joint unit:</b>
