@@ -44,7 +44,7 @@ DATASET_MAPPING_ZERO_SHOT = [
 MODEL_MAPPING_FUNCTION = {
     "ESM2-650M": "esm2",
     "Ankh-large": "ankh",
-    "ProtBert-uniref50": "protbert",
+    "ProtBert": "protbert",
     "ProtT5-xl-uniref50": "prott5",
 }
 
