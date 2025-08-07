@@ -130,14 +130,14 @@ def create_index_tab(constant):
             <!-- Middle section: How to Use VenusFactory -->
             <div style="text-align: left; max-width: 1400px; margin: 0 auto;">
                 <h1 style="font-size:2.2em; font-weight:900; color:#222; margin-bottom: 0.7em;">
-                    How to Use VenusFactory ?
+                    How to Use VenusFactory
                 </h1>
                 <div style="font-size:1.2em;">
                     <p style="font-size:1.2em;">Depending on your needs, VenusFactory can provide different services.</p>
                     <p style="font-size:1.2em;">If you want a quick answer about protein mutations, use VenusAgent-0.1. Upload your file, and the AI Assistant will give you a helpful reply.</p>
                     <p style="font-size:1.2em;">If you want to know possible mutation methods or protein functions, go to Quick Tools, choose the task you need, and you will get the result in a few minutes.</p>
                     <p style="font-size:1.2em;">If you have some knowledge about different protein models, you can use the Advanced Tools tab. All major models are available to meet your needs.</p>
-                    <p style="font-size:1.2em;">If you want to get some protein data files, click the download tab, input the PDB ID, to download and use it for further research.</p>
+                    <p style="font-size:1.2em;">If you want to get some protein data files, click the download tab, input the PDB ID or UniProt ID, and download it for further research.</p>
                     
                     <p style="font-size:1.2em; font-weight:bold; margin-top:2em;">Module Demonstrations:</p>
                     
@@ -188,59 +188,59 @@ def create_index_tab(constant):
             ISBN = "979-8-89176-253-4",
         }}</code></pre>
 
-                <!-- 合作院校展示区域 -->
+                <!-- Partner Institutions Display Area -->
                 <div style="background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); border-radius: 16px; padding: 40px; margin: 40px auto; max-width: 1400px; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
                     <div style="text-align: center; margin-bottom: 30px;">
-                        <h2 style="font-size: 1.5em; font-weight: 700; color: #1e293b; margin-bottom: 10px;">合作单位</h2>
+                        <h2 style="font-size: 1.5em; font-weight: 700; color: #1e293b; margin-bottom: 10px;">Partner Institutions</h2>
                     </div>
                     
-                    <!-- 四个机构 -->
-                    <div style="display: grid; grid-template-columns: 0.9fr 0.9fr 0.9fr 1.3fr; gap: 20px;">
+                    <!-- Four Institutions -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                         <a href="https://www.sjtu.edu.cn/" target="_blank" style="text-decoration: none; color: inherit;">
                             <div style="background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); transition: all 0.3s ease; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; gap: 15px;">
                                 <img src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/sjtu_logo.jpg" alt="SJTU" style="height: 40px;">
-                                <div style="font-size: 1.2em; font-weight: 600; color: #1e293b;">上海交通大学</div>
+                                <div style="font-size: 1.2em; font-weight: 600; color: #1e293b;">Shanghai Jiao Tong University</div>
                             </div>
                         </a>
                         <a href="https://www.ecust.edu.cn/" target="_blank" style="text-decoration: none; color: inherit;">
                             <div style="background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); transition: all 0.3s ease; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; gap: 15px;">
                                 <img src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/ecust_logo.jpg" alt="ECUST" style="height: 40px;">
-                                <div style="font-size: 1.2em; font-weight: 600; color: #1e293b;">华东理工大学</div>
+                                <div style="font-size: 1.2em; font-weight: 600; color: #1e293b;">East China University of Science and Technology</div>
                             </div>
                         </a>
                         <a href="https://www.ecnu.edu.cn/" target="_blank" style="text-decoration: none; color: inherit;">
                             <div style="background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); transition: all 0.3s ease; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; gap: 15px;">
                                 <img src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/ecnu_logo.jpg" alt="ECNU" style="height: 40px;">
-                                <div style="font-size: 1.2em; font-weight: 600; color: #1e293b;">华东师范大学</div>
+                                <div style="font-size: 1.2em; font-weight: 600; color: #1e293b;">East China Normal University</div>
                             </div>
                         </a>
                         <a href="https://www.shlab.org.cn/" target="_blank" style="text-decoration: none; color: inherit;">
                             <div style="background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); transition: all 0.3s ease; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; gap: 15px;">
                                 <img src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/shailab_logo.jpg" alt="SHAILab" style="height: 40px;">
-                                <div style="font-size: 1.2em; font-weight: 600; color: #1e293b;">上海人工智能实验室</div>
+                                <div style="font-size: 1.2em; font-weight: 600; color: #1e293b;">Shanghai AI Laboratory</div>
                             </div>
                         </a>
                     </div>
                 </div>
                 
-                <!-- 开发者信息区域 -->
+                <!-- Developer Information Area -->
                 <div style="background: #f8fafc; border-radius: 12px; padding: 30px; margin: 30px auto; max-width: 1400px;">
-                    <h3 style="font-size: 1.2em; font-weight: 700; color: #1e293b; margin-bottom: 20px;">🤝 合作平台与开发者信息</h3>
+                    <h3 style="font-size: 1.2em; font-weight: 700; color: #1e293b; margin-bottom: 20px;">Cooperation Platform & Developer Information</h3>
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; font-size: 1.1em;">
                         <div>
-                            <b>🤝 Cooperate Platform:</b> <a href="https://openbayes.com/" target="_blank" style="color: #2563eb;">HyberAI</a><br>
-                            <b>🧬 Small-sample mutation prediction tool:</b> <a href="https://github.com/ai4protein/Pro-FSFP" target="_blank" style="color: #2563eb;">Pro-FSFP</a><br>
-                            <b>⚡ The most advanced zero-shot protein prediction tool:</b> <a href="https://github.com/ai4protein/VenusREM" target="_blank" style="color: #2563eb;">VenusREM</a>
+                            <div style="margin-bottom: 12px;"><b>🤝 Cooperation Platform:</b> <a href="https://openbayes.com/" target="_blank" style="color: #2563eb;">HyberAI</a></div>
+                            <div style="margin-bottom: 12px;"><b>🧬 Few-shot mutation prediction tool:</b> <a href="https://github.com/ai4protein/Pro-FSFP" target="_blank" style="color: #2563eb;">Pro-FSFP</a></div>
+                            <div style="margin-bottom: 12px;"><b>⚡ The most advanced zero-shot protein prediction tool:</b> <a href="https://github.com/ai4protein/VenusREM" target="_blank" style="color: #2563eb;">VenusREM</a></div>
                         </div>
                         <div>
-                            <b>🏠 Developer homepage:</b> <a href="https://tyang816.github.io/" target="_blank" style="color: #2563eb;">https://tyang816.github.io/</a><br>
-                            <b>✉️ Developer contact information:</b> <a href="mailto:tanyang.august@sjtu.edu.cn" style="color: #2563eb;">tanyang.august@sjtu.edu.cn</a>, <a href="mailto:zlr_zmm@163.com" style="color: #2563eb;">zlr_zmm@163.com</a>
+                            <div style="margin-bottom: 12px;"><b>🏠 Developer homepage:</b> <a href="https://tyang816.github.io/" target="_blank" style="color: #2563eb;">https://tyang816.github.io/</a></div>
+                            <div style="margin-bottom: 12px;"><b>✉️ Developer contact information:</b> <a href="mailto:tanyang.august@sjtu.edu.cn" style="color: #2563eb;">tanyang.august@sjtu.edu.cn</a>, <a href="mailto:zlr_zmm@163.com" style="color: #2563eb;">zlr_zmm@163.com</a></div>
                         </div>
                     </div>
                 </div>
             </div>
             <hr style="margin: 40px 0; border: 1px solid #eee;">
-            <!-- Additional Information 板块 -->
+            <!-- Additional Information Section -->
             <div style="background: #f7fafd; border-radius: 14px; box-shadow: 0 2px 12px rgba(30,41,59,0.06); padding: 32px 28px 24px 28px; max-width: 1400px; margin: 40px auto 0 auto;">
                 <h1 style="font-size:2em; font-weight:900; color:#2563eb; margin-bottom: 0.5em; border-bottom: 2px solid #e0e7ef; padding-bottom: 0.2em; letter-spacing: 1px;">Additional Information</h1>
                 <div style="display: flex; flex-wrap: wrap; gap: 40px;">
@@ -333,10 +333,10 @@ def create_index_tab(constant):
                                 <a href="https://huggingface.co/datasets/AI4Protein/DeepLocMulti" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Datasets]</a>
                             </li>
                             <li style="margin-bottom: 12px;">
-                                <span style="font-weight:bold; color:#2563eb;">MetallonBinding</span>
+                                <span style="font-weight:bold; color:#2563eb;">MetalIonBinding</span>
                                 <span style="font-size:0.87em; color:#444;"> – Dataset for protein metal ion binding site prediction.</span>
                                 <a href="https://www.biorxiv.org/content/10.1101/2023.10.01.560349v5" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Paper]</a>
-                                <a href="https://huggingface.co/datasets/AI4Protein/MetallonBinding" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Datasets]</a>
+                                <a href="https://huggingface.co/datasets/AI4Protein/MetalIonBinding" target="_blank" style="margin-left:8px; color:#2563eb; text-decoration:underline; font-size:0.87em;">[Datasets]</a>
                             </li>
                             <li style="margin-bottom: 12px;">
                                 <span style="font-weight:bold; color:#2563eb;">Thermostability</span>
