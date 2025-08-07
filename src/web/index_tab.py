@@ -1,4 +1,5 @@
 import gradio as gr
+
 def create_index_tab(constant):
     # Read gjf file content
     try:
@@ -8,7 +9,7 @@ def create_index_tab(constant):
         gjf_content = "(Show1.gjf not found)"
     with gr.Blocks() as index_tab:
         gr.HTML(
-            f'''            
+            f'''
                 <script>
                 // Track page visits asynchronously without blocking page load
                 (function() {{
@@ -33,7 +34,7 @@ def create_index_tab(constant):
                 }}
                 .main-content {{
                     margin-top: 80px;
-                    max-width: 1100px;
+                    max-width: 1400px;
                     margin-left: auto;
                     margin-right: auto;
                     background: #fff;
@@ -58,56 +59,56 @@ def create_index_tab(constant):
                     margin-bottom: 18px;
                 }}
                 .stats-container {{
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    background: linear-gradient(135deg, #f6fbff 0%, #e3f3fb 100%);
                     border-radius: 16px;
                     padding: 32px;
                     margin-top: 40px;
-                    color: white;
-                    box-shadow: 0 8px 32px rgba(102, 126, 234, 0.3);
+                    color: #1e293b;
+                    box-shadow: 0 8px 32px rgba(37, 99, 235, 0.07);
                 }}
                 .stats-grid {{
                     display: grid;
-                    grid-template-columns: repeat(2, 1fr);
+                    grid-template-columns: repeat(4, 1fr);
                     gap: 32px;
-                    margin-top: 32px;
-                    max-width: 800px;
+                    margin-top: 24px;
+                    max-width: 1200px;
                     margin-left: auto;
                     margin-right: auto;
                 }}
                 .stat-item {{
-                    background: rgba(255, 255, 255, 0.15);
-                    border-radius: 16px;
-                    padding: 28px 24px;
+                    background: rgba(255, 255, 255, 0.8);
+                    border-radius: 12px;
+                    padding: 16px 10px;
                     text-align: center;
-                    backdrop-filter: blur(15px);
-                    border: 1px solid rgba(255, 255, 255, 0.25);
+                    backdrop-filter: blur(10px);
+                    border: 1px solid rgba(37, 99, 235, 0.15);
                     transition: all 0.3s ease;
-                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+                    box-shadow: 0 4px 16px rgba(37, 99, 235, 0.08);
                 }}
                 .stat-item:hover {{
                     transform: translateY(-4px);
-                    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
-                    background: rgba(255, 255, 255, 0.2);
+                    box-shadow: 0 12px 40px rgba(37, 99, 235, 0.15);
+                    background: rgba(255, 255, 255, 0.9);
                 }}
                 .stat-number {{
-                    font-size: 2.5em;
+                    font-size: 1.5em;
                     font-weight: 900;
-                    margin-bottom: 8px;
-                    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+                    margin-bottom: 4px;
+                    text-shadow: 0 1px 2px rgba(37, 99, 235, 0.12);
                 }}
                 .stat-label {{
-                    font-size: 1.1em;
+                    font-size: 0.95em;
                     opacity: 0.9;
                     font-weight: 500;
                 }}
                 .stat-icon {{
-                    font-size: 2em;
-                    margin-bottom: 12px;
+                    font-size: 1.3em;
+                    margin-bottom: 6px;
                     display: block;
                 }}
                 </style>
-            <div class="main-content">
-                <!-- 上半部分:VenusFactory 介绍 -->
+                <div class="main-content">
+            <!-- Top section: VenusFactory introduction -->
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5em;">
                 <img src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venusfactory_logo.png" alt="Venus Head" style="height: 150px; margin-left: 10px;" />
                 <img src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png" alt="Venus Logo" style="height: 100px; margin-right: 10px; margin-top: 20px;" />
@@ -115,7 +116,7 @@ def create_index_tab(constant):
             <div style="text-align: center; margin-top: -80px; margin-bottom: 40px;">
                 <h1 style="font-size:3.5em; font-weight:900;">Welcome to <span style='font-weight:900;'>VenusFactory</span> !</h1>
             </div>
-            <div style="max-width: 1100px; margin: 0 auto; font-size: 1.2em; text-align: left;">
+            <div style="max-width: 1400px; margin: 0 auto; font-size: 1.2em; text-align: left;">
                 <p style="font-size:1.2em; margin-bottom: 0.7em;"><b>VenusFactory</b> is a unified open-source platform for protein engineering, designed to simplify data acquisition, model fine-tuning, and functional analysis for both biologists and AI researchers.<br>
                 The Web UI features four core modules:</p>
                 <ul style="font-size:1.0em;">
@@ -126,8 +127,8 @@ def create_index_tab(constant):
                 </ul>
             </div>
             <hr style="margin: 40px 0; border: 1px solid #eee;">
-            <!-- 中间部分:How to Use VenusFactory -->
-            <div style="text-align: left; max-width: 1100px; margin: 0 auto;">
+            <!-- Middle section: How to Use VenusFactory -->
+            <div style="text-align: left; max-width: 1400px; margin: 0 auto;">
                 <h1 style="font-size:2.2em; font-weight:900; color:#222; margin-bottom: 0.7em;">
                     How to Use VenusFactory ?
                 </h1>
@@ -137,14 +138,39 @@ def create_index_tab(constant):
                     <p style="font-size:1.2em;">If you want to know possible mutation methods or protein functions, go to Quick Tools, choose the task you need, and you will get the result in a few minutes.</p>
                     <p style="font-size:1.2em;">If you have some knowledge about different protein models, you can use the Advanced Tools tab. All major models are available to meet your needs.</p>
                     <p style="font-size:1.2em;">If you want to get some protein data files, click the download tab, input the PDB ID, to download and use it for further research.</p>
-                    <p style="font-size:1.2em; font-weight:bold; margin-top:2em;">Example GIF:</p>
-                    <img src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/MovieGen/fig3.png" alt="Example GIF" style="max-width: 100%; height: auto; border-radius: 8px; margin-bottom: 1em;" />
+                    
+                    <p style="font-size:1.2em; font-weight:bold; margin-top:2em;">Module Demonstrations:</p>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-top: 1em;">
+                        <!-- VenusAgent-0.1 GIF -->
+                        <div style="text-align: center;">
+                            <h3 style="color: #2563eb; margin-bottom: 10px;">🤖 VenusAgent-0.1</h3>
+                            <img src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/gif/agent.gif" alt="VenusAgent-0.1 Demo" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />
+                        </div>
+                        
+                        <!-- Quick Tools GIF -->
+                        <div style="text-align: center;">
+                            <h3 style="color: #2563eb; margin-bottom: 10px;">🛠️ Quick Tools</h3>
+                            <img src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/gif/quick_tool.gif" alt="Quick Tools Demo" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />
+                        </div>
+                        
+                        <!-- Advanced Tools GIF -->
+                        <div style="text-align: center;">
+                            <h3 style="color: #2563eb; margin-bottom: 10px;">⚡ Advanced Tools</h3>
+                            <img src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/gif/advanced_tool.gif" alt="Advanced Tools Demo" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />
+                        </div>
+                        
+                        <!-- Download GIF -->
+                        <div style="text-align: center;">
+                            <h3 style="color: #2563eb; margin-bottom: 10px;">💾 Download</h3>
+                            <img src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/gif/download.gif" alt="Download Demo" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />
+                        </div>
+                    </div>
                 </div>
             </div>
-            <!-- 其余内容保持不变 -->
             <hr style="margin: 40px 0; border: 1px solid #eee;">
             <!-- Citation 板块 -->
-            <div style="text-align: left; max-width: 1100px; margin: 0 auto; font-size: 1.2em;">
+            <div style="text-align: left; max-width: 1400px; margin: 0 auto; font-size: 1.2em;">
                 <h1 style="font-size:2.2em; font-weight:900; color:#222; margin-bottom: 0.7em;">Citation</h1>
                 <div style="font-size:1.2em; margin-bottom: 0.7em;">✏️ Please cite our work if you have used VenusFactory.</div>
                 <pre style="background:#f8f8f8; border-radius:8px; padding:18px; font-size:1.2em; overflow-x:auto;"><code>@article{{tan2025venusfactory,
@@ -154,8 +180,8 @@ def create_index_tab(constant):
   year={{2025}}
 }}</code></pre>
                 <!-- 合作平台等内容, 作为Citation一部分 -->
-                <div style="display: flex; flex-wrap: wrap; justify-content: space-between; max-width: 1100px; margin: 30px auto 0 auto; color: #666; font-size: 1.0em; gap: 32px;">
-                    <div style="flex:1; min-width: 320px;">
+                <div style="display: flex; flex-wrap: wrap; justify-content: space-between; max-width: 1400px; margin: 30px auto 0 auto; color: #666; font-size: 1.0em; gap: 32px;">
+                    <div style="flex:1; min-width: 320px; line-height:2.1;">
                         <b>🤝 Cooperate Platform:</b> <a href="https://openbayes.com/" target="_blank">HyberAI</a><br>
                         <b>🧬 Small-sample mutation prediction tool:</b> <a href="https://github.com/ai4protein/Pro-FSFP" target="_blank">Pro-FSFP</a><br>
                         <b>⚡ The most advanced zero-shot protein prediction tool:</b> <a href="https://github.com/ai4protein/VenusREM" target="_blank">VenusREM</a><br>
@@ -165,19 +191,19 @@ def create_index_tab(constant):
                     <div style="flex:1; min-width: 320px;">
                         <b>🏢 Joint unit:</b>
                         <ul style="margin-left: 20px; list-style: none; padding: 0;">
-                            <li style="display:inline-flex; align-items:center; margin-bottom: 10px;">
+                            <li style="display:inline-flex; align-items:center; margin-bottom: 18px;">
                                 <img src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/sjtu_logo.jpg" alt="SJTU Logo" style="height: 20px; margin-right: 8px; vertical-align: middle;">
                                 <a href="https://www.sjtu.edu.cn/" target="_blank" style="font-size:0.9em;">Shanghai Jiao Tong University</a>
                             </li>
-                            <li style="display:inline-flex; align-items:center; margin-bottom: 10px;">
+                            <li style="display:inline-flex; align-items:center; margin-bottom: 18px;">
                                 <img src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/ecust_logo.jpg" alt="ECUST Logo" style="height: 20px; margin-right: 8px; vertical-align: middle;">
                                 <a href="https://www.ecust.edu.cn/" target="_blank" style="font-size:0.9em;">East China University of Science and Technology</a>
                             </li>
-                            <li style="display:inline-flex; align-items:center; margin-bottom: 10px;">
+                            <li style="display:inline-flex; align-items:center; margin-bottom: 18px;">
                                 <img src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/ecnu_logo.jpg" alt="ECNU Logo" style="height: 20px; margin-right: 8px; vertical-align: middle;">
                                 <a href="https://www.ecnu.edu.cn/" target="_blank" style="font-size:0.9em;">East China Normal University</a>
                             </li>
-                            <li style="display:inline-flex; align-items:center; margin-bottom: 10px;">
+                            <li style="display:inline-flex; align-items:center; margin-bottom: 18px;">
                                 <img src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/shailab_logo.jpg" alt="SHAILab Logo" style="height: 20px; margin-right: 8px; vertical-align: middle;">
                                 <a href="https://www.shlab.org.cn/" target="_blank" style="font-size:0.9em;">Shanghai Artificial Intelligence Laboratory</a>
                             </li>
@@ -187,7 +213,7 @@ def create_index_tab(constant):
             </div>
             <hr style="margin: 40px 0; border: 1px solid #eee;">
             <!-- Additional Information 板块 -->
-            <div style="background: #f7fafd; border-radius: 14px; box-shadow: 0 2px 12px rgba(30,41,59,0.06); padding: 32px 28px 24px 28px; max-width: 1100px; margin: 40px auto 0 auto;">
+            <div style="background: #f7fafd; border-radius: 14px; box-shadow: 0 2px 12px rgba(30,41,59,0.06); padding: 32px 28px 24px 28px; max-width: 1400px; margin: 40px auto 0 auto;">
                 <h1 style="font-size:2em; font-weight:900; color:#2563eb; margin-bottom: 0.5em; border-bottom: 2px solid #e0e7ef; padding-bottom: 0.2em; letter-spacing: 1px;">Additional Information</h1>
                 <div style="display: flex; flex-wrap: wrap; gap: 40px;">
                     <!-- Supported Models -->
@@ -309,10 +335,10 @@ def create_index_tab(constant):
             
             <!-- Usage Statistics Section -->
             <div class="stats-container">
-                <h1 style="font-size:2.2em; font-weight:900; color:white; margin-bottom: 0.5em; text-align: center;">
+                <h1 style="font-size:2.2em; font-weight:900; color:#1e293b; margin-bottom: 0.5em; text-align: center;">
                     📊 Platform Usage Statistics
                 </h1>
-                <p style="text-align: center; font-size: 1.2em; opacity: 0.9; margin-bottom: 0;">
+                <p style="text-align: center; font-size: 1.2em; opacity: 0.8; margin-bottom: 0; color:#1e293b;">
                     Real-time platform usage statistics
                 </p>
                 
@@ -491,5 +517,4 @@ def create_index_tab(constant):
             </div>
             '''
         )
-        
     return {"index_tab": index_tab}
