@@ -58,7 +58,7 @@ MODEL_ADAPTER_MAPPING_FUNCTION = {
 DATASET_MAPPING_FUNCTION = {
     "Solubility": ["DeepSol", "DeepSoluE", "ProtSolM"],
     "Localization": ["DeepLocBinary", "DeepLocMulti"],
-    "Binding": ["MetalIonBinding"],
+    "Metal ion binding": ["MetalIonBinding"],
     "Stability": ["Thermostability"],
     "Sorting signal": ["SortingSignal"],
     "Optimum temperature": ["DeepET_Topt"]
@@ -71,7 +71,7 @@ LABEL_MAPPING_FUNCTION = {
         "Cytoplasm", "Nucleus", "Extracellular", "Mitochondrion", "Cell membrane",
         "Endoplasmic reticulum", "Plastid", "Golgi apparatus", "Lysosome/Vacuole", "Peroxisome"
     ],
-    "Binding": ["Non-binding", "Binding"],
+    "Metal ion binding": ["Non-binding", "Binding"],
     "SortingSignal": ['No signal', 'Signal']
 }
 
@@ -80,7 +80,7 @@ COLOR_MAP_FUNCTION = {
     "Cytoplasm": "#10B981", "Nucleus": "#8B5CF6", "Extracellular": "#F97316",
     "Mitochondrion": "#EC4899", "Cell membrane": "#6B7280", "Endoplasmic reticulum": "#84CC16",
     "Plastid": "#06B6D4", "Golgi apparatus": "#A78BFA", "Lysosome/Vacuole": "#FBBF24", "Peroxisome": "#34D399",
-    "Binding": "#3B82F6", "Non-binding": "#EF4444",
+    "Metal ion binding": "#3B82F6", "Non-binding": "#EF4444",
     "Signal": "#3B82F6", "No signal": "#EF4444",
     "Default": "#9CA3AF"
 }
@@ -276,7 +276,8 @@ def handle_mutation_prediction_advance(
         return
 
     summary_fig = generate_plotly_heatmap(*data_tuple[:4])
-    
+    expert_analysis = "<div style='height: 300px; display: flex; align-items: center; justify-content: center; color: #666;'>Analysis will appear here once prediction is complete...</div>"
+
     # Handle AI analysis
     ai_summary = "AI Analysis disabled. Enable in settings to generate a report."
     if enable_ai:
@@ -285,7 +286,7 @@ def handle_mutation_prediction_advance(
             f"✅ Prediction complete. 🤖 Generating AI summary...", 
             summary_fig, display_df, gr.update(visible=False), None, 
             gr.update(visible=total_residues > 20), display_df, 
-            "🤖 AI is analyzing..."
+            expert_analysis
         )
         
         api_key = get_api_key(ai_model, user_api_key)
@@ -299,6 +300,7 @@ def handle_mutation_prediction_advance(
             )
             prompt = generate_mutation_ai_prompt(display_df, model_name, function_selection)
             ai_summary = call_ai_api(ai_config, prompt)
+            expert_analysis = format_expert_response(ai_summary)
         progress(0.9, desc="Finalizing AI analysis...")
     else:
         progress(1.0, desc="Complete!")
@@ -332,7 +334,7 @@ def handle_mutation_prediction_advance(
     yield (
         final_status, summary_fig, display_df, 
         gr.update(visible=True, value=zip_path_str), zip_path_str, 
-        gr.update(visible=total_residues > 20), display_df, ai_summary
+        gr.update(visible=total_residues > 20), display_df, expert_analysis
     )
 
 def handle_protein_function_prediction_chat(
@@ -404,11 +406,12 @@ def handle_protein_function_prediction_chat(
             ai_config = AIConfig(api_key, ai_model, AI_MODELS[ai_model]["api_base"], AI_MODELS[ai_model]["model"])
             prompt = generate_expert_analysis_prompt(display_df, task)
             ai_summary = call_ai_api(ai_config, prompt)
+            expert_analysis = format_expert_response(ai_summary)
 
     final_status = "✅ All predictions completed!"
     if enable_ai and not ai_summary.startswith("❌"):
         final_status += " AI analysis included."
-    return final_status, display_df, ai_summary
+    return final_status, display_df, expert_analysis
 
 
 
@@ -605,9 +608,11 @@ def handle_protein_function_prediction_advance(
         display_df["Confidence Score"] = display_df.apply(format_confidence, axis=1)
 
     ai_summary = "AI Analysis disabled. Enable in settings to generate a report."
+    expert_analysis = "<div style='height: 300px; display: flex; align-items: center; justify-content: center; color: #666;'>Analysis will appear here once prediction is complete...</div>"
+
     if enable_ai:
         progress(0.8, desc="Generating AI summary...")
-        yield "🤖 Generating AI summary...", display_df, plot_fig, gr.update(visible=False), "🤖 AI is analyzing..."
+        yield "🤖 Generating AI summary...", display_df, plot_fig, gr.update(visible=False), expert_analysis
         api_key = get_api_key(ai_model, user_api_key)
         if not api_key: 
             ai_summary = f"❌ No API key found for {ai_model}."
@@ -615,6 +620,7 @@ def handle_protein_function_prediction_advance(
             ai_config = AIConfig(api_key, ai_model, AI_MODELS[ai_model]["api_base"], AI_MODELS[ai_model]["model"])
             prompt = generate_ai_summary_prompt(display_df, task, model)
             ai_summary = call_ai_api(ai_config, prompt)
+            expert_analysis = format_expert_response(ai_summary)
         progress(0.9, desc="Finalizing AI analysis...")
     else:
         progress(1.0, desc="Complete!")
@@ -649,7 +655,7 @@ def handle_protein_function_prediction_advance(
     if enable_ai and not ai_summary.startswith("❌"): 
         final_status += " AI analysis included."
     progress(1.0, desc="Complete!")
-    yield final_status, display_df, plot_fig, gr.update(visible=True, value=zip_path_str), ai_summary
+    yield final_status, display_df, plot_fig, gr.update(visible=True, value=zip_path_str), expert_analysis
 
 
 def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
@@ -692,7 +698,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                                         placeholder="Enter your API Key if needed",
                                         visible=not bool(os.getenv("DEEPSEEK_API_KEY"))
                                     )                                
-                                seq_predict_btn = gr.Button("🚀 Start Prediction (Sequence)", variant="secondary")
+                                seq_predict_btn = gr.Button("🚀 Start Prediction (Sequence)", variant="primary")
 
                             with gr.TabItem("🏗️ Structure-based Model"):
                                 gr.Markdown("### Model Configuration")
@@ -736,9 +742,12 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                                 zero_shot_plot_out = gr.Plot(label="Heatmap")
                             with gr.TabItem("📊 Raw Results"):
                                 zero_shot_df_out = gr.DataFrame(label="Raw Data")
-                            with gr.TabItem("🤖 AI Analysis"):
-                                zero_shot_ai_out = gr.Textbox(label="AI Analysis Report", value="AI analysis will appear here...", lines=20, interactive=False, show_copy_button=True)
-                        
+                            with gr.TabItem("👨‍🔬 AI Expert Analysis"):
+                                # function_results_plot = gr.Plot(label="Confidence Scores")
+                                zero_shot_ai_expert_html = gr.HTML(
+                                    value="<div style='height: 300px; display: flex; align-items: center; justify-content: center; color: #666;'>AI analysis will appear here...</div>",
+                                    label="👨‍🔬 AI Expert Analysis"
+                                )
                         zero_shot_download_btn = gr.DownloadButton("💾 Download Results", visible=False)
                         zero_shot_full_data_state = gr.State()
                         zero_shot_download_path_state = gr.State()
@@ -800,9 +809,12 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                                 function_results_df = gr.DataFrame(label="Prediction Data", column_widths=["20%", "20%", "20%", "20%", "20%"])
                             with gr.TabItem("📈 Prediction Plots"):
                                 function_results_plot = gr.Plot(label="Confidence Scores")
-                            with gr.TabItem("🤖 AI Analysis"):
-                                function_ai_summary_output = gr.Textbox(label="AI Analysis Report", value="AI analysis will appear here...", lines=20, interactive=False, show_copy_button=True)
-                        
+                            with gr.TabItem("👨‍🔬 AI Expert Analysis"):
+                                # function_results_plot = gr.Plot(label="Confidence Scores")
+                                function_ai_expert_html = gr.HTML(
+                                    value="<div style='height: 300px; display: flex; align-items: center; justify-content: center; color: #666;'>AI analysis will appear here...</div>",
+                                    label="👨‍🔬 AI Expert Analysis"
+                                )
                         function_download_btn = gr.DownloadButton("💾 Download Results", visible=False)
 
         enable_ai_zshot_seq.change(fn=toggle_ai_section, inputs=enable_ai_zshot_seq, outputs=ai_box_zshot)
@@ -835,7 +847,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         seq_predict_btn.click(
             fn=handle_mutation_prediction_advance, 
             inputs=[seq_function_dd, seq_file_upload, enable_ai_zshot_seq, ai_model_seq_zshot, api_key_in_seq_zshot, seq_model_dd],
-            outputs=[zero_shot_status_box, zero_shot_plot_out, zero_shot_df_out, zero_shot_download_btn, zero_shot_download_path_state, zero_shot_view_controls, zero_shot_full_data_state, zero_shot_ai_out],
+            outputs=[zero_shot_status_box, zero_shot_plot_out, zero_shot_df_out, zero_shot_download_btn, zero_shot_download_path_state, zero_shot_view_controls, zero_shot_full_data_state, zero_shot_ai_expert_html],
             show_progress=True
         )
 
@@ -844,7 +856,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         struct_predict_btn.click(
             fn=handle_mutation_prediction_advance, 
             inputs=[struct_function_dd, struct_file_upload, enable_ai_zshot_stru, ai_model_stru_zshot, api_key_in_stru_zshot, struct_model_dd], 
-            outputs=[zero_shot_status_box, zero_shot_plot_out, zero_shot_df_out, zero_shot_download_btn, zero_shot_download_path_state, zero_shot_view_controls, zero_shot_full_data_state, zero_shot_ai_out],
+            outputs=[zero_shot_status_box, zero_shot_plot_out, zero_shot_df_out, zero_shot_download_btn, zero_shot_download_path_state, zero_shot_view_controls, zero_shot_full_data_state, zero_shot_ai_expert_html],
             show_progress=True
         )
         
@@ -858,13 +870,13 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         adv_func_predict_btn.click(
             fn=handle_protein_function_prediction_advance,
             inputs=[adv_func_task_dd, function_fasta_upload, enable_ai_func, ai_model_seq_func, api_key_in_seq_func, adv_func_model_dd, adv_func_dataset_cbg],
-            outputs=[function_status_textbox, function_results_df, function_results_plot, function_download_btn, function_ai_summary_output],
+            outputs=[function_status_textbox, function_results_df, function_results_plot, function_download_btn, function_ai_expert_html],
             show_progress=True
         )
         function_protein_chat_btn.click(
             fn=handle_protein_function_prediction_chat,
             inputs=[adv_func_task_dd, function_fasta_upload, adv_func_model_dd, adv_func_dataset_cbg_chat, enable_ai_func, ai_model_seq_func, api_key_in_seq_func],
-            outputs=[function_status_textbox, function_results_df, function_ai_summary_output]
+            outputs=[function_status_textbox, function_results_df, function_ai_expert_html]
         )
 
     return {}
