@@ -188,34 +188,54 @@ def create_index_tab(constant):
             ISBN = "979-8-89176-253-4",
         }}</code></pre>
 
-                <div style="display: flex; flex-wrap: wrap; justify-content: space-between; max-width: 1400px; margin: 30px auto 0 auto; color: #666; font-size: 1.0em; gap: 32px;">
-                    <div style="flex:1; min-width: 320px; line-height:2.1;">
-                        <b>🤝 Cooperate Platform:</b> <a href="https://openbayes.com/" target="_blank">HyberAI</a><br>
-                        <b>🧬 Small-sample mutation prediction tool:</b> <a href="https://github.com/ai4protein/Pro-FSFP" target="_blank">Pro-FSFP</a><br>
-                        <b>⚡ The most advanced zero-shot protein prediction tool:</b> <a href="https://github.com/ai4protein/VenusREM" target="_blank">VenusREM</a><br>
-                        <b>🏠 Developer homepage:</b> <a href="https://tyang816.github.io/" target="_blank">https://tyang816.github.io/</a><br>
-                        <b>✉️ Developer contact information:</b> <a href="mailto:tanyang.august@sjtu.edu.cn">tanyang.august@sjtu.edu.cn</a>, <a href="mailto:zlr_zmm@163.com">zlr_zmm@163.com</a>
+                <!-- 合作院校展示区域 -->
+                <div style="background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); border-radius: 16px; padding: 40px; margin: 40px auto; max-width: 1400px; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
+                    <div style="text-align: center; margin-bottom: 30px;">
+                        <h2 style="font-size: 1.5em; font-weight: 700; color: #1e293b; margin-bottom: 10px;">合作单位</h2>
                     </div>
-                    <div style="flex:1; min-width: 320px;">
-                        <b>🏢 Joint unit:</b>
-                        <ul style="margin-left: 20px; list-style: none; padding: 0;">
-                            <li style="display:inline-flex; align-items:center; margin-bottom: 18px;">
-                                <img src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/sjtu_logo.jpg" alt="SJTU Logo" style="height: 20px; margin-right: 8px; vertical-align: middle;">
-                                <a href="https://www.sjtu.edu.cn/" target="_blank" style="font-size:0.9em;">Shanghai Jiao Tong University</a>
-                            </li>
-                            <li style="display:inline-flex; align-items:center; margin-bottom: 18px;">
-                                <img src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/ecust_logo.jpg" alt="ECUST Logo" style="height: 20px; margin-right: 8px; vertical-align: middle;">
-                                <a href="https://www.ecust.edu.cn/" target="_blank" style="font-size:0.9em;">East China University of Science and Technology</a>
-                            </li>
-                            <li style="display:inline-flex; align-items:center; margin-bottom: 18px;">
-                                <img src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/ecnu_logo.jpg" alt="ECNU Logo" style="height: 20px; margin-right: 8px; vertical-align: middle;">
-                                <a href="https://www.ecnu.edu.cn/" target="_blank" style="font-size:0.9em;">East China Normal University</a>
-                            </li>
-                            <li style="display:inline-flex; align-items:center; margin-bottom: 18px;">
-                                <img src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/shailab_logo.jpg" alt="SHAILab Logo" style="height: 20px; margin-right: 8px; vertical-align: middle;">
-                                <a href="https://www.shlab.org.cn/" target="_blank" style="font-size:0.9em;">Shanghai Artificial Intelligence Laboratory</a>
-                            </li>
-                        </ul>
+                    
+                    <!-- 四个机构 -->
+                    <div style="display: grid; grid-template-columns: 0.9fr 0.9fr 0.9fr 1.3fr; gap: 20px;">
+                        <a href="https://www.sjtu.edu.cn/" target="_blank" style="text-decoration: none; color: inherit;">
+                            <div style="background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); transition: all 0.3s ease; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; gap: 15px;">
+                                <img src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/sjtu_logo.jpg" alt="SJTU" style="height: 40px;">
+                                <div style="font-size: 1.2em; font-weight: 600; color: #1e293b;">上海交通大学</div>
+                            </div>
+                        </a>
+                        <a href="https://www.ecust.edu.cn/" target="_blank" style="text-decoration: none; color: inherit;">
+                            <div style="background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); transition: all 0.3s ease; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; gap: 15px;">
+                                <img src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/ecust_logo.jpg" alt="ECUST" style="height: 40px;">
+                                <div style="font-size: 1.2em; font-weight: 600; color: #1e293b;">华东理工大学</div>
+                            </div>
+                        </a>
+                        <a href="https://www.ecnu.edu.cn/" target="_blank" style="text-decoration: none; color: inherit;">
+                            <div style="background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); transition: all 0.3s ease; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; gap: 15px;">
+                                <img src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/ecnu_logo.jpg" alt="ECNU" style="height: 40px;">
+                                <div style="font-size: 1.2em; font-weight: 600; color: #1e293b;">华东师范大学</div>
+                            </div>
+                        </a>
+                        <a href="https://www.shlab.org.cn/" target="_blank" style="text-decoration: none; color: inherit;">
+                            <div style="background: white; border-radius: 12px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); transition: all 0.3s ease; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: center; gap: 15px;">
+                                <img src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/shailab_logo.jpg" alt="SHAILab" style="height: 40px;">
+                                <div style="font-size: 1.2em; font-weight: 600; color: #1e293b;">上海人工智能实验室</div>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- 开发者信息区域 -->
+                <div style="background: #f8fafc; border-radius: 12px; padding: 30px; margin: 30px auto; max-width: 1400px;">
+                    <h3 style="font-size: 1.2em; font-weight: 700; color: #1e293b; margin-bottom: 20px;">🤝 合作平台与开发者信息</h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; font-size: 1.1em;">
+                        <div>
+                            <b>🤝 Cooperate Platform:</b> <a href="https://openbayes.com/" target="_blank" style="color: #2563eb;">HyberAI</a><br>
+                            <b>🧬 Small-sample mutation prediction tool:</b> <a href="https://github.com/ai4protein/Pro-FSFP" target="_blank" style="color: #2563eb;">Pro-FSFP</a><br>
+                            <b>⚡ The most advanced zero-shot protein prediction tool:</b> <a href="https://github.com/ai4protein/VenusREM" target="_blank" style="color: #2563eb;">VenusREM</a>
+                        </div>
+                        <div>
+                            <b>🏠 Developer homepage:</b> <a href="https://tyang816.github.io/" target="_blank" style="color: #2563eb;">https://tyang816.github.io/</a><br>
+                            <b>✉️ Developer contact information:</b> <a href="mailto:tanyang.august@sjtu.edu.cn" style="color: #2563eb;">tanyang.august@sjtu.edu.cn</a>, <a href="mailto:zlr_zmm@163.com" style="color: #2563eb;">zlr_zmm@163.com</a>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -387,67 +407,56 @@ def create_index_tab(constant):
                     class RealTimeStatsManager {{
                         constructor() {{
                             this.updateInterval = null;
-                               this.apiBaseUrl = '/api';
                             this.init();
                         }}
                         
                         async init() {{
-                            await this.loadStats();
+                            this.loadMockData();
                             this.startAutoRefresh();
                             this.bindEvents();
                         }}
                         
-                        async loadStats() {{
-                            try {{
-                                // Add timeout to prevent long waiting
-                                const controller = new AbortController();
-                                const timeoutId = setTimeout(() => controller.abort(), 3000);
-                                
-                                const response = await fetch(`${{this.apiBaseUrl}}/stats`, {{
-                                    signal: controller.signal
-                                }});
-                                clearTimeout(timeoutId);
-                                
-                                if (response.ok) {{
-                                    const data = await response.json();
-                                    this.updateDisplay(data);
-                                }} else {{
-                                    console.log('Stats API returned error, using mock data');
-                                    this.loadMockData();
-                                }}
-                            }} catch (error) {{
-                                if (error.name === 'AbortError') {{
-                                    console.log('Stats API timeout, using mock data');
-                                }} else {{
-                                    console.log('Stats API call failed, using mock data');
-                                }}
-                                this.loadMockData();
-                            }}
-                        }}
-                        
-                        updateDisplay(data) {{
-                               const evolutionElement = document.getElementById('evolution-usage');
-                            if (evolutionElement) {{
-                                evolutionElement.textContent = this.formatNumber(data.mutation_prediction || 0);
-                            }}
-                            
-                               const predictionElement = document.getElementById('prediction-usage');
-                            if (predictionElement) {{
-                                predictionElement.textContent = this.formatNumber(data.function_analysis || 0);
-                            }}
-                            
-                               setTimeout(() => {{
-                                const totalElement = document.getElementById('total-visits');
-                                if (totalElement) {{
-                                    totalElement.textContent = this.formatNumber(data.total_visits || 0);
-                                }}
-                            }}, 2000);
-                        }}
-                        
                         loadMockData() {{
-                               document.getElementById('evolution-usage').textContent = '1,234';
-                            document.getElementById('prediction-usage').textContent = '2,341';
-                            document.getElementById('total-visits').textContent = '5,678';
+                            try {{
+                                fetch('/file/stats_data.json')
+                                    .then(response => response.json())
+                                    .then(data => {{
+                                        const mutationTotal = (data.mutation_prediction_quick || 0) + (data.mutation_prediction_advanced || 0);
+                                        const evolutionElement = document.getElementById('evolution-usage');
+                                        if (evolutionElement) {{
+                                            evolutionElement.textContent = this.formatNumber(mutationTotal);
+                                        }}
+                                        
+                                        const functionTotal = (data.function_prediction_quick || 0) + (data.function_prediction_advanced || 0);
+                                        const predictionElement = document.getElementById('prediction-usage');
+                                        if (predictionElement) {{
+                                            predictionElement.textContent = this.formatNumber(functionTotal);
+                                        }}
+                                        
+                                        const agentElement = document.getElementById('agent-usage');
+                                        if (agentElement) {{
+                                            agentElement.textContent = this.formatNumber(data.agent_usage || 0);
+                                        }}
+                                        
+                                        const totalElement = document.getElementById('total-visits');
+                                        if (totalElement) {{
+                                            totalElement.textContent = this.formatNumber(data.total_visits || 0);
+                                        }}
+                                    }})
+                                    .catch(error => {{
+                                        console.log('Failed to load stats file, using fallback data');
+                                        document.getElementById('evolution-usage').textContent = '0';
+                                        document.getElementById('prediction-usage').textContent = '0';
+                                        document.getElementById('agent-usage').textContent = '0';
+                                        document.getElementById('total-visits').textContent = '0';
+                                    }});
+                            }} catch (error) {{
+                                console.log('Error loading stats:', error);
+                                document.getElementById('evolution-usage').textContent = '0';
+                                document.getElementById('prediction-usage').textContent = '0';
+                                document.getElementById('agent-usage').textContent = '0';
+                                document.getElementById('total-visits').textContent = '0';
+                            }}
                         }}
                         
                         formatNumber(num) {{
@@ -455,22 +464,18 @@ def create_index_tab(constant):
                         }}
                         
                         startAutoRefresh() {{
-                            // Refresh stats every 60 seconds instead of 30 to reduce API calls
                             this.updateInterval = setInterval(() => {{
-                                this.loadStats();
+                                this.loadMockData();
                             }}, 60000); 
                         }}
                         
                         bindEvents() {{
-                            // Listen for page visibility changes with debouncing
                             let visibilityTimeout;
                             document.addEventListener('visibilitychange', () => {{
                                 if (!document.hidden) {{
-                                    // Clear existing timeout to prevent multiple calls
                                     clearTimeout(visibilityTimeout);
-                                    // Delay stats loading to avoid rapid calls
                                     visibilityTimeout = setTimeout(() => {{
-                                        this.loadStats();
+                                        this.loadMockData();
                                     }}, 2000);
                                 }}
                             }});
@@ -478,45 +483,29 @@ def create_index_tab(constant):
                         
                         async trackUsage(module) {{
                             try {{
-                                // Add timeout to prevent long waiting
-                                const controller = new AbortController();
-                                const timeoutId = setTimeout(() => controller.abort(), 2000);
-                                
-                                const response = await fetch(`${{this.apiBaseUrl}}/stats/track`, {{
+                                fetch('/api/predict/', {{
                                     method: 'POST',
                                     headers: {{
                                         'Content-Type': 'application/json',
                                     }},
                                     body: JSON.stringify({{
-                                        module: module,
-                                        timestamp: new Date().toISOString()
-                                    }}),
-                                    signal: controller.signal
+                                        fn_index: 1,
+                                        data: [module]
+                                    }})
+                                }}).catch(error => {{
+                                    console.log('Failed to track usage:', error);
                                 }});
-                                clearTimeout(timeoutId);
-                                
-                                if (response.ok) {{
-                                    console.log(`Tracked ${{module}} usage successfully`); 
-                                    // Load stats asynchronously without waiting
-                                    this.loadStats().catch(() => {{}});
-                                }} else {{
-                                    console.log('Failed to track usage, continuing without stats update');
-                                }}
                             }} catch (error) {{
-                                if (error.name === 'AbortError') {{
-                                    console.log('Track usage timeout, continuing without stats update');
-                                }} else {{
-                                    console.log('Failed to track usage, continuing without stats update');
-                                }}
+                                console.log('Failed to track usage:', error);
                             }}
                         }}
                     }}
                     
-                       document.addEventListener('DOMContentLoaded', () => {{
+                    document.addEventListener('DOMContentLoaded', () => {{
                         window.statsManager = new RealTimeStatsManager();
                     }});
                     
-                       function trackUsage(module) {{
+                    function trackUsage(module) {{
                         if (window.statsManager) {{
                             window.statsManager.trackUsage(module);
                         }}
