@@ -203,6 +203,7 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             
             # Check if FASTA file is uploaded
             has_fasta_file = 'fasta_file' in intent
+            has_structure_file = 'structure_file' in intent
             
             # Process the request based on intent
             if has_fasta_file and any(word in message_text.lower() for word in ['mutation', 'mutant', 'mutate', 'zero-shot', 'zero shot', '设计', 'design', 'function', 'solubility', 'localization', 'binding', 'stability', 'sorting', 'temperature']):
@@ -222,6 +223,8 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                     response = call_interpro_function_query(intent['uniprot_id'], api_key)
                 else:
                     response = call_zero_shot_sequence_prediction_from_file(intent['fasta_file'], intent['model'], api_key)
+            elif has_structure_file and any(word in message_text.lower() for word in ['mutation', 'mutant', 'mutate', 'zero-shot', 'zero shot', '设计', 'design']):
+                response = call_zero_shot_structure_prediction_from_file(intent['structure_file'], intent['model'], api_key)
             elif intent['action'] != 'chat':
                 # Handle VenusFactory specific functions
                 if intent['action'] == 'predict_zero_shot_sequence':
@@ -233,7 +236,7 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         response = "Error: No sequence or FASTA file provided for mutation prediction"
                 elif intent['action'] == 'predict_zero_shot_structure':
                     if 'structure_file' in intent:
-                        response = call_zero_shot_structure_prediction(intent['structure_file'], intent['model'], api_key)
+                        response = call_zero_shot_structure_prediction_from_file(intent['structure_file'], intent['model'], api_key)
                     else:
                         response = "Error: No structure file provided for structure-based mutation prediction"
                 elif intent['action'] == 'predict_function':
@@ -404,7 +407,7 @@ def call_zero_shot_sequence_prediction(sequence: str, model_name: str = "ESM2-65
             ai_model="DeepSeek",
             user_api_key=api_key,
             model_name=model_name,
-            api_name="/handle_mutation_prediction_advance"
+            api_name="/handle_mutation_prediction_base"
         )
         # Clean up temporary file
         os.unlink(temp_fasta.name)
@@ -425,15 +428,13 @@ def call_zero_shot_sequence_prediction_from_file(fasta_file: str, model_name: st
             ai_model="DeepSeek",
             user_api_key=api_key,
             model_name=model_name,
-            api_name="/handle_mutation_prediction_advance"
+            api_name="/handle_mutation_prediction_base"
         )
-        
-        # Parse the result - handle_mutation_prediction_advance returns multiple values
         return parse_zero_shot_prediction_result(result, api_key)
     except Exception as e:
         return f"Zero-shot sequence prediction error: {str(e)}"
 
-def call_zero_shot_structure_prediction(structure_file: str, model_name: str = "SaProt", api_key: str = None) -> str:
+def call_zero_shot_structure_prediction_from_file(structure_file: str, model_name: str = "ESM-IF1", api_key: str = None) -> str:
     """Call VenusFactory zero-shot structure-based mutation prediction API"""
     try:
         # Call the Gradio API for structure-based prediction
@@ -445,9 +446,8 @@ def call_zero_shot_structure_prediction(structure_file: str, model_name: str = "
             ai_model="DeepSeek",
             user_api_key=api_key,
             model_name=model_name,
-            api_name="/handle_mutation_prediction_advance"
+            api_name="/handle_mutation_prediction_base"
         )
-        
         # Parse the result - handle_mutation_prediction_advance returns multiple values
         return parse_zero_shot_prediction_result(result, api_key)
     except Exception as e:
@@ -748,14 +748,12 @@ def predict_zero_shot_sequence(sequence: str, model_name: str = "ESM2-650M", api
     except Exception as e:
         return f"Sequence prediction error: {str(e)}"
 
-def predict_zero_shot_structure(structure_file: str, model_name: str = "SaProt", api_key: str = None) -> str:
+def predict_zero_shot_structure(structure_file: str, model_name: str = "ESM-IF1", api_key: str = None) -> str:
     """Predict mutations using structure-based zero-shot models"""
     try:
-        if not structure_file or not os.path.exists(structure_file):
-            return "Error: Please provide a valid structure file (PDB/CIF)"
-        
+
         # Call VenusFactory zero-shot structure prediction API
-        result = call_zero_shot_structure_prediction(structure_file, model_name)
+        result = call_zero_shot_structure_prediction_from_file(structure_file, model_name, api_key)
         
         return f"Zero-shot Structure-based Mutation Prediction Results:\n\n{result}"
     except Exception as e:
@@ -868,11 +866,15 @@ def detect_user_intent(message: str, files: List[str] = None) -> dict:
                 if file_path.lower().endswith(('.pdb', '.cif')):
                     has_structure_file = True
                     intent['structure_file'] = file_path
+                    intent['model'] = 'ESM-IF1'
+                    intent['prediction_type'] = 'structure'
                 elif file_path.lower().endswith(('.fasta', '.fa')):
                     has_fasta_file = True
                     intent['fasta_file'] = file_path
-
+                    intent['model'] = 'ESM2-650M'
+                    intent['prediction_type'] = 'sequence'
     # Use AI to analyze intent if we have an API key
+
     try:
         api_key = os.getenv("DEEPSEEK_API_KEY")
         if api_key:
@@ -883,7 +885,6 @@ def detect_user_intent(message: str, files: List[str] = None) -> dict:
     except Exception as e:
         # Fallback to simple keyword detection
         intent = fallback_intent_detection(message, has_fasta_file, has_structure_file, intent)
-
     return intent
 
 def analyze_intent_with_ai(message: str, has_fasta_file: bool, has_structure_file: bool, default_intent: dict) -> dict:
@@ -900,7 +901,7 @@ Uploaded files: FASTA={has_fasta_file}, Structure={has_structure_file}
 
 Available VenusFactory functions:
 1. Zero-shot mutation prediction (sequence-based): ESM-1v, ESM2-650M, ESM-1b
-2. Zero-shot mutation prediction (structure-based): SaProt, ProtSSN, ESM-IF1, MIF-ST, ProSST-2048
+2. Zero-shot mutation prediction (structure-based): ESM-IF1, SaProt, ProtSSN, MIF-ST, ProSST-2048
 3. Protein function prediction: Solubility, Localization, Metal ion binding, Stability, Sorting signal, Optimum temperature
 4. InterPro protein function query: Query protein annotations and GO terms from InterPro database
 
@@ -915,19 +916,11 @@ ACTION RULES:
 
 MODEL RULES:
 - For zero-shot sequence: ESM-1v, ESM2-650M, ESM-1b
-- For zero-shot structure: SaProt, ProtSSN, ESM-IF1, MIF-ST, ProSST-2048  
+- For zero-shot structure: ESM-IF1, SaProt, ProtSSN, MIF-ST, ProSST-2048  
 - For function prediction: always use "ESM2-650M"
 - For InterPro query: not applicable
 
-TASK RULES (only for function prediction):
-- Solubility, Localization, Metal ion binding, Stability, Sorting signal, Optimum temperature
-
-Keywords to look for:
-- Mutation/mutant/design → zero-shot prediction
-- Solubility/localization/metal ion binding/stability → function prediction
-- Function/InterPro/annotation/go → InterPro query
-- Structure-based models → zero-shot structure
-- General questions → chat
+IMPORTANT: If Structure=True, the action should be "predict_zero_shot_structure" and model should be from structure models.
 
 Return JSON format:
 {{
@@ -956,7 +949,7 @@ Return JSON format:
                     "content": context
                 }
             ],
-            "temperature": 0.0,  # 降低温度确保一致性
+            "temperature": 0.0,
             "max_tokens": 300
         }
         
@@ -989,21 +982,35 @@ Return JSON format:
                 if ai_intent.get('action') not in valid_actions:
                     return fallback_intent_detection(message, has_fasta_file, has_structure_file, default_intent)
                 
-                # Update intent based on AI analysis
                 default_intent['action'] = ai_intent.get('action', 'chat')
-                default_intent['model'] = ai_intent.get('model', 'ESM2-650M')
+                ai_model = ai_intent.get('model_name')
                 
                 if ai_intent.get('action') == 'predict_function':
                     default_intent['task'] = ai_intent.get('task', 'Solubility')
-                    default_intent['model'] = 'ESM2-650M' 
+                    default_intent['model'] = 'ESM2-650M'
+                elif ai_intent.get('action') == 'predict_zero_shot_structure':
+                    structure_models = ['SaProt', 'ProtSSN', 'ESM-IF1', 'MIF-ST', 'ProSST-2048']
+                    if ai_model and ai_model in structure_models:
+                        default_intent['model'] = ai_model
+                    elif default_intent['model'] not in structure_models:
+                        default_intent['model'] = 'ESM-IF1'
+                    default_intent['task'] = None
+                elif ai_intent.get('action') == 'predict_zero_shot_sequence':
+                    sequence_models = ['ESM-1v', 'ESM2-650M', 'ESM-1b']
+                    if ai_model and ai_model in sequence_models:
+                        default_intent['model'] = ai_model
+                    else:
+                        default_intent['model'] = 'ESM2-650M'
+                    default_intent['task'] = None
                 else:
                     default_intent['task'] = None
                 
-                # Set type based on action
                 if 'zero_shot' in ai_intent.get('action', ''):
                     default_intent['type'] = 'zero_shot_prediction'
                 elif 'function' in ai_intent.get('action', ''):
                     default_intent['type'] = 'function_prediction'
+                elif 'interpro' in ai_intent.get('action', ''):
+                    default_intent['type'] = 'interpro_query'
                 else:
                     default_intent['type'] = 'general'
                 
@@ -1016,7 +1023,6 @@ Return JSON format:
             
     except Exception as e:
         return fallback_intent_detection(message, has_fasta_file, has_structure_file, default_intent)
-
 
 def fallback_intent_detection(message: str, has_fasta_file: bool, has_structure_file: bool, intent: dict) -> dict:
     """Fallback intent detection with exact matching to Gradio UI choices"""
@@ -1053,6 +1059,7 @@ def fallback_intent_detection(message: str, has_fasta_file: bool, has_structure_
     sequence_models = {
         'ESM-1v': ['esm-1v', 'esm1v', 'esm_1v'],
         'ESM2-650M': ['esm2', 'esm-2', 'esm2-650m', 'esm2_650m', 'esm-2-650m'],
+        'ESM-1b': ['esm1b', 'esm-1b']
     }
     
     structure_models = {

@@ -22,7 +22,7 @@ from web.venus_factory_quick_tool_tab import *
 MODEL_MAPPING_ZERO_SHOT_SEQUENCE = {
     "ESM2-650M": "esm2",
     "ESM-1v": "esm1v",
-
+    "ESM-1b": "esm1b"
 }
 MODEL_MAPPING_ZERO_SHOT_STRUCTURE = {
     "ESM-IF1": "esmif1",
@@ -194,16 +194,16 @@ def handle_mutation_prediction_advance(
         return
 
     file_path = file_obj.name
-    
-    # # Determine model and type
-    # if model_name:
-    #     model_type = "structure" if model_name == "ESM-IF1" else "sequence"
-    # else:
-    #     if file_path.lower().endswith((".fasta", ".fa")):
-    #         model_name, model_type = "ESM2-650M", "sequence"
-
-    if file_path.lower().endswith((".fasta", ".fa")):
-        model_name, model_type = "ESM2-650M", "sequence"
+    if file_path.lower().endswith(".pdb"):
+        if model_name:
+            model_type = "structure"
+        else:
+            model_name, model_type = "ESM-IF1", "structure"
+    elif file_path.lower().endswith((".fasta", ".fa")):
+        if model_name:
+            model_type = "sequence"
+        else:
+            model_name, model_type = "ESM2-650M", "sequence"
 
         # Process FASTA file to keep only the first sequence
         processed_file_path = process_fasta_file(file_path)
@@ -215,8 +215,6 @@ def handle_mutation_prediction_advance(
                 gr.update(visible=False), None,
                 "Processing first sequence only..."
             )
-    elif file_path.lower().endswith(".pdb"):
-        model_name, model_type = "ESM-IF1", "structure"
     else:
         yield (
             "❌ Error: Unsupported file type.", 
@@ -706,7 +704,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                                 gr.Markdown("### Model Configuration")
                                 struct_function_dd = gr.Dropdown(choices=DATASET_MAPPING_ZERO_SHOT, label="Select Protein Function", value=DATASET_MAPPING_ZERO_SHOT[0])
                                 struct_model_dd = gr.Dropdown(choices=structure_models, label="Select Structure-based Model", value=structure_models[0])
-                                struct_file_upload = gr.File(label="Upload PDB file", file_types=[".pdb"])
+                                struct_file_upload = gr.File(label="Upload PDB file", file_types=["pdb"])
                                 struct_file_example = gr.Examples(
                                     examples=[["./download/alphafold2_structures/A0A0C5B5G6.pdb"]],
                                     inputs=struct_file_upload,

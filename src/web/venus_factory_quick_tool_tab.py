@@ -19,6 +19,7 @@ load_dotenv()
 
 MODEL_MAPPING_ZERO_SHOT = {
     "ESM2-650M": "esm2", 
+    "ESM-1b": "esm1b",
     "ESM-IF1": "esmif1", 
     "ESM-1v": "esm1v",
     "SaProt": "saprot", 
@@ -116,8 +117,6 @@ class AIConfig:
     ai_model_name: str
     api_base: str
     model: str
-
-# --- HELPER & UTILITY FUNCTIONS ---
 
 def get_api_key(ai_provider: str, user_input_key: str = "") -> Optional[str]:
     """Get API key based on provider and user input."""
@@ -645,7 +644,8 @@ def handle_mutation_prediction_base(
     ai_model: str, 
     user_api_key: str, 
     model_name: Optional[str] = None,
-    progress=gr.Progress()) -> Generator:
+    progress=gr.Progress()
+) -> Generator:
     try:
         import requests
         requests.post("/api/stats/track", json={"module": "function_analysis"})
@@ -662,16 +662,12 @@ def handle_mutation_prediction_base(
         return
 
     file_path = file_obj.name
-    
-    # # Determine model and type
-    # if model_name:
-    #     model_type = "structure" if model_name == "ESM-IF1" else "sequence"
-    # else:
-    #     if file_path.lower().endswith((".fasta", ".fa")):
-    #         model_name, model_type = "ESM2-650M", "sequence"
 
     if file_path.lower().endswith((".fasta", ".fa")):
-        model_name, model_type = "ESM2-650M", "sequence"
+        if model_name and model_name in ["ESM2-650M", "ESM-1v", "ESM-1b"]:
+            model_type = "sequence"
+        else:
+            model_name, model_type = "ESM2-650M", "sequence"
 
         # Process FASTA file to keep only the first sequence
         processed_file_path = process_fasta_file(file_path)
@@ -684,7 +680,10 @@ def handle_mutation_prediction_base(
                 "Processing first sequence only..."
             )
     elif file_path.lower().endswith(".pdb"):
-        model_name, model_type = "ESM-IF1", "structure"
+        if model_name and model_name in ["ESM-IF1", "SaProt", "MIF-ST", "ProSST-2048", "ProSSN"]:
+            model_type = "structure"
+        else:
+            model_name, model_type = "ESM-IF1", "structure"
     else:
         yield (
             "❌ Error: Unsupported file type.", 
@@ -1289,6 +1288,7 @@ def handle_protein_function_prediction(
     )
 
 def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
+    zero_shot_model = list(MODEL_MAPPING_ZERO_SHOT.keys())
     with gr.Blocks() as demo:
         with gr.Tabs():
             with gr.TabItem("Directed Evolution: AI-Powered Mutation Prediction"):
@@ -1297,6 +1297,7 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         gr.Markdown("### Select Function & Upload File")
                         zero_shot_function_dd = gr.Dropdown(choices=DATASET_MAPPING_ZERO_SHOT, label="Select Protein Function", value=DATASET_MAPPING_ZERO_SHOT[0])
                         easy_zshot_file_upload = gr.File(label="Upload Protein File (.fasta, .fa, .pdb)", file_types=[".fasta", ".fa", ".pdb"])
+                        zero_shot_model_dd = gr.Dropdown(choices=zero_shot_model, label="Select Structure-based Model", visible=False)
                         easy_zshot_file_example = gr.Examples(
                             examples=[["./download/P60002.fasta"]],
                             inputs=easy_zshot_file_upload,
@@ -1406,11 +1407,10 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         easy_zshot_file_upload.change(fn=handle_file_upload, inputs=easy_zshot_file_upload, outputs=easy_zshot_protein_display)
         easy_zshot_predict_btn.click(
             fn=handle_mutation_prediction_base,
-            inputs=[zero_shot_function_dd, easy_zshot_file_upload, enable_ai_zshot, ai_model_dd_zshot, api_key_in_zshot],
+            inputs=[zero_shot_function_dd, easy_zshot_file_upload, enable_ai_zshot, ai_model_dd_zshot, api_key_in_zshot, zero_shot_model_dd],
             outputs=[zero_shot_status_box, zero_shot_plot_out, zero_shot_df_out, zero_shot_download_btn, zero_shot_download_path_state, zero_shot_view_controls, zero_shot_full_data_state, zero_shot_ai_expert_html],
             show_progress=True
         )
-
         # Function prediction tab events  
         enable_ai_func.change(fn=toggle_ai_section, inputs=enable_ai_func, outputs=ai_box_func)
         ai_model_dd_func.change(
