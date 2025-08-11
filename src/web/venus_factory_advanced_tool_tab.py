@@ -29,7 +29,7 @@ MODEL_MAPPING_ZERO_SHOT_STRUCTURE = {
     "SaProt": "saprot",
     "MIF-ST": "mifst",
     "ProSST-2048": "prosst",
-    "ProSSN": "prossn"
+    "ProtSSN": "protssn"
 }
 
 DATASET_MAPPING_ZERO_SHOT = [
@@ -704,7 +704,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                                 gr.Markdown("### Model Configuration")
                                 struct_function_dd = gr.Dropdown(choices=DATASET_MAPPING_ZERO_SHOT, label="Select Protein Function", value=DATASET_MAPPING_ZERO_SHOT[0])
                                 struct_model_dd = gr.Dropdown(choices=structure_models, label="Select Structure-based Model", value=structure_models[0])
-                                struct_file_upload = gr.File(label="Upload PDB file", file_types=["pdb"])
+                                struct_file_upload = gr.File(label="Upload PDB file", file_types=[".pdb"])
                                 struct_file_example = gr.Examples(
                                     examples=[["./download/alphafold2_structures/A0A0C5B5G6.pdb"]],
                                     inputs=struct_file_upload,
