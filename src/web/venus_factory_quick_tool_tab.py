@@ -25,7 +25,7 @@ MODEL_MAPPING_ZERO_SHOT = {
     "SaProt": "saprot", 
     "MIF-ST": "mifst", 
     "ProSST-2048": "prosst", 
-    "ProSSN": "prossn"
+    "ProtSSN": "protssn"
 }
 
 DATASET_MAPPING_ZERO_SHOT = [
@@ -680,7 +680,7 @@ def handle_mutation_prediction_base(
                 "Processing first sequence only..."
             )
     elif file_path.lower().endswith(".pdb"):
-        if model_name and model_name in ["ESM-IF1", "SaProt", "MIF-ST", "ProSST-2048", "ProSSN"]:
+        if model_name and model_name in ["ESM-IF1", "SaProt", "MIF-ST", "ProSST-2048", "ProtSSN"]:
             model_type = "structure"
         else:
             model_name, model_type = "ESM-IF1", "structure"
