@@ -15,16 +15,14 @@ import requests
 from dataclasses import dataclass
 import re
 import json
+from .utils.paste_content_handler import process_pasted_content
 from web.venus_factory_quick_tool_tab import *
 # --- Constants and Mappings ---
 
-# For Zero-Shot Mutation Prediction
-MODEL_MAPPING_ZERO_SHOT_SEQUENCE = {
+MODEL_MAPPING_ZERO_SHOT = {
     "ESM2-650M": "esm2",
     "ESM-1v": "esm1v",
-    "ESM-1b": "esm1b"
-}
-MODEL_MAPPING_ZERO_SHOT_STRUCTURE = {
+    "ESM-1b": "esm1b",
     "ESM-IF1": "esmif1",
     "SaProt": "saprot",
     "MIF-ST": "mifst",
@@ -40,7 +38,6 @@ DATASET_MAPPING_ZERO_SHOT = [
     "Stability"
 ]
 
-# For Protein Function Prediction
 MODEL_MAPPING_FUNCTION = {
     "ESM2-650M": "esm2",
     "Ankh-large": "ankh",
@@ -95,7 +92,6 @@ DATASET_TO_TASK_MAP = {
     dataset: task for task, datasets in DATASET_MAPPING_FUNCTION.items() for dataset in datasets
 }
 
-
 AI_MODELS = {
     "DeepSeek": {
         "api_base": "https://api.deepseek.com/v1", 
@@ -113,6 +109,137 @@ AI_MODELS = {
         "env_key": None
     }
 }
+
+@dataclass
+class AIConfig:
+    api_key: str
+    ai_model_name: str
+    api_base: str
+    model: str
+
+def get_api_key(ai_model: str, user_api_key: str) -> str:
+    if user_api_key and user_api_key.strip():
+        return user_api_key.strip()
+    
+    env_key = AI_MODELS[ai_model]["env_key"]
+    if env_key:
+        return os.getenv(env_key, "")
+    return ""
+
+def call_ai_api(ai_config: AIConfig, prompt: str) -> str:
+    try:
+        if ai_config.ai_model_name == "DeepSeek":
+            headers = {"Authorization": f"Bearer {ai_config.api_key}"}
+            data = {
+                "model": ai_config.model,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.7,
+                "max_tokens": 2000
+            }
+            response = requests.post(
+                f"{ai_config.api_base}/chat/completions",
+                headers=headers,
+                json=data,
+                timeout=60
+            )
+            response.raise_for_status()
+            return response.json()["choices"][0]["message"]["content"]
+            
+        elif ai_config.ai_model_name == "ChatGPT":
+            headers = {"Authorization": f"Bearer {ai_config.api_key}"}
+            data = {
+                "model": ai_config.model,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.7,
+                "max_tokens": 2000
+            }
+            response = requests.post(
+                f"{ai_config.api_base}/chat/completions",
+                headers=headers,
+                json=data,
+                timeout=60
+            )
+            response.raise_for_status()
+            return response.json()["choices"][0]["message"]["content"]
+            
+        elif ai_config.ai_model_name == "Gemini":
+            headers = {"Content-Type": "application/json"}
+            data = {
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {
+                    "temperature": 0.7,
+                    "maxOutputTokens": 2000
+                }
+            }
+            response = requests.post(
+                f"{ai_config.api_base}/models/gemini-1.5-flash:generateContent?key={ai_config.api_key}",
+                headers=headers,
+                json=data,
+                timeout=60
+            )
+            response.raise_for_status()
+            return response.json()["candidates"][0]["content"]["parts"][0]["text"]
+            
+        else:
+            return f"Unsupported AI model: {ai_config.ai_model_name}"
+            
+    except Exception as e:
+        return f"Error calling AI API: {str(e)}"
+
+def format_expert_response(ai_response: str) -> str:
+    if not ai_response or ai_response.startswith("Error"):
+        return f"<div style='color: #ef4444; padding: 20px;'>{ai_response or 'No response received'}</div>"
+    
+    formatted = ai_response.replace("**", "<strong>").replace("**", "</strong>")
+    formatted = formatted.replace("*", "<em>").replace("*", "</em>")
+    formatted = formatted.replace("\n", "<br>")
+    
+    return f"<div style='padding: 20px; line-height: 1.6;'>{formatted}</div>"
+
+def generate_mutation_ai_prompt(df: pd.DataFrame, model_name: str, function_selection: str) -> str:
+    if df.empty:
+        return "No mutation data available for analysis."
+    
+    top_mutations = df.head(10).to_dict('records')
+    mutation_summary = "\n".join([
+        f"- {mut['Mutant']}: Score {mut['Prediction Score']}"
+        for mut in top_mutations
+    ])
+    
+    prompt = f"""Analyze the following mutation prediction results from {model_name} for {function_selection}:
+
+Top 10 mutations:
+{mutation_summary}
+
+Please provide:
+1. A brief summary of the prediction results
+2. Key insights about the most impactful mutations
+3. Recommendations for experimental validation
+4. Any potential limitations of the predictions
+
+Keep the analysis concise and actionable."""
+    
+    return prompt
+
+def generate_expert_analysis_prompt(df: pd.DataFrame, task: str) -> str:
+    if df.empty:
+        return "No prediction data available for analysis."
+    
+    prompt = f"""Analyze the following protein function prediction results for {task}:
+
+Dataset: {', '.join(df['Dataset'].unique()) if 'Dataset' in df.columns else 'Single dataset'}
+Number of predictions: {len(df)}
+
+Please provide:
+1. A summary of the prediction results
+2. Key insights about the protein's predicted properties
+3. Biological significance of the predictions
+4. Recommendations for experimental validation
+5. Any potential limitations or considerations
+
+Keep the analysis concise and actionable."""
+    
+    return prompt
 
 def parse_fasta_file(file_path: str) -> str:
     if not file_path: return ""
@@ -157,6 +284,51 @@ def update_dataset_choices(task: str) -> gr.CheckboxGroup:
     datasets = DATASET_MAPPING_FUNCTION.get(task, [])
     return gr.update(choices=datasets, value=datasets)
 
+def run_zero_shot_prediction(model_type: str, model_name: str, file_path: str) -> Tuple[str, pd.DataFrame]:
+    try:
+        output_csv = f"temp_{model_type}_{int(time.time())}.csv"
+        
+        script_name = MODEL_MAPPING_ZERO_SHOT.get(model_name)
+        
+        if not script_name:
+            return f"Error: Model '{model_name}' not found in model mapping.", pd.DataFrame()
+
+        script_path = f"src/mutation/models/{script_name}.py"
+            
+        if not os.path.exists(script_path):
+            return f"Script not found: {script_path}", pd.DataFrame()
+        
+        file_argument = "--pdb_file" if file_path.lower().endswith(".pdb") else "--fasta_file"
+        
+        cmd = [
+            sys.executable, script_path, 
+            file_argument, file_path, 
+            "--output_csv", output_csv
+        ]
+        
+        print(f"DEBUG: Running command: {' '.join(cmd)}")
+        
+        subprocess.run(
+            cmd, 
+            capture_output=True, 
+            text=True, 
+            check=True, 
+            encoding='utf-8', 
+            errors='ignore'
+        )
+
+        if os.path.exists(output_csv):
+            df = pd.read_csv(output_csv)
+            os.remove(output_csv)
+            return "Prediction completed successfully!", df
+        
+        return "Prediction finished but no output file was created.", pd.DataFrame()
+        
+    except subprocess.CalledProcessError as e:
+        error_msg = e.stderr or e.stdout or "Unknown subprocess error"
+        return f"Prediction script failed: {error_msg}", pd.DataFrame()
+    except Exception as e:
+        return f"An unexpected error occurred: {e}", pd.DataFrame()
 
 def handle_file_upload(file_obj: Any) -> str:
     if not file_obj:
@@ -205,7 +377,6 @@ def handle_mutation_prediction_advance(
         else:
             model_name, model_type = "ESM2-650M", "sequence"
 
-        # Process FASTA file to keep only the first sequence
         processed_file_path = process_fasta_file(file_path)
         if processed_file_path != file_path:
             file_path = processed_file_path
@@ -224,7 +395,6 @@ def handle_mutation_prediction_advance(
         )
         return
 
-    # Start prediction
     progress(0.1, desc="Running prediction...")
     yield (
         f"⏳ Running prediction...", 
@@ -277,7 +447,6 @@ def handle_mutation_prediction_advance(
     summary_fig = generate_plotly_heatmap(*data_tuple[:4])
     expert_analysis = "<div style='height: 300px; display: flex; align-items: center; justify-content: center; color: #666;'>Analysis will appear here once prediction is complete...</div>"
 
-    # Handle AI analysis
     ai_summary = "AI Analysis disabled. Enable in settings to generate a report."
     if enable_ai:
         progress(0.8, desc="Generating AI summary...")
@@ -303,7 +472,6 @@ def handle_mutation_prediction_advance(
         progress(0.9, desc="Finalizing AI analysis...")
     else:
         progress(1.0, desc="Complete!")
-    # Create download files
     temp_dir = Path("temp_outputs")
     temp_dir.mkdir(exist_ok=True)
     timestamp = int(time.time())
@@ -356,7 +524,6 @@ def handle_protein_function_prediction_chat(
     temp_dir = Path("temp_outputs")
     temp_dir.mkdir(exist_ok=True)
 
-    # Create a temporary file to run predictions
     for i, dataset in enumerate(final_datasets):
         try:
             model_key = MODEL_MAPPING_FUNCTION.get(model)
@@ -458,7 +625,6 @@ def handle_protein_function_prediction_advance(
     temp_dir = Path("temp_outputs")
     temp_dir.mkdir(exist_ok=True)
 
-    # Run predictions for each dataset
     for i, dataset in enumerate(final_datasets):
         yield (
             f"⏳ Running prediction...", 
@@ -496,17 +662,14 @@ def handle_protein_function_prediction_advance(
         yield "⚠️ No results generated.", pd.DataFrame(), None, gr.update(visible=False), "No results to analyze."
         return
     progress(0.7, desc="Processing results...")
-    # Concatenate all results and keep Dataset column
     final_df = pd.concat(all_results_list, ignore_index=True).fillna('N/A')
     
     plot_fig = generate_plots_for_all_results(final_df)
     display_df = final_df.copy()
 
-    # Map prediction values to text labels BEFORE renaming columns
     def map_labels(row):
         current_task = DATASET_TO_TASK_MAP.get(row.get('Dataset', ''), task)
         
-        # For regression tasks, return the numeric value as is
         if current_task in REGRESSION_TASKS_FUNCTION: 
             scaled_value = row.get("prediction")
             if pd.notna(scaled_value) and scaled_value != 'N/A' and current_task in REGRESSION_TASKS_FUNCTION_MAX_MIN:
@@ -522,7 +685,6 @@ def handle_protein_function_prediction_advance(
             return scaled_value
 
         
-        # For classification tasks, map to text labels
         labels_key = ("DeepLocMulti" if row.get('Dataset') == "DeepLocMulti" 
                      else "DeepLocBinary" if row.get('Dataset') == "DeepLocBinary" 
                      else current_task)
@@ -541,7 +703,6 @@ def handle_protein_function_prediction_advance(
         
         return str(pred_val)
 
-    # Apply label mapping
     if "prediction" in display_df.columns:
         display_df["predicted_class"] = display_df.apply(map_labels, axis=1)
     elif "predicted_class" in display_df.columns:
@@ -559,11 +720,9 @@ def handle_protein_function_prediction_advance(
     }
     display_df.rename(columns=rename_map, inplace=True)
     
-    # Truncate sequence display
     if "Sequence" in display_df.columns:
         display_df["Sequence"] = display_df["Sequence"].apply(lambda x: x[:] if isinstance(x, str) and len(x) > 30 else x)
 
-    # Format confidence score to 2 decimal places
     if "Confidence Score" in display_df.columns and "Predicted Class" in display_df.columns:
         def format_confidence(row):
             score = row["Confidence Score"]
@@ -577,14 +736,11 @@ def handle_protein_function_prediction_advance(
                         prob_str = score.strip('[]')
                         probs = [float(x.strip()) for x in prob_str.split(',')]
                         
-                        # Get the current task for this row
                         current_task = DATASET_TO_TASK_MAP.get(row.get('Dataset', ''), task)
                         
-                        # For regression, return the actual value
                         if current_task in REGRESSION_TASKS_FUNCTION:
                             return predicted_class
                         else:
-                            # For classification, find the index of the predicted class
                             labels_key = ("DeepLocMulti" if row.get('Dataset') == "DeepLocMulti" 
                                          else "DeepLocBinary" if row.get('Dataset') == "DeepLocBinary" 
                                          else current_task)
@@ -592,11 +748,9 @@ def handle_protein_function_prediction_advance(
                             
                             if labels and predicted_class in labels:
                                 pred_index = labels.index(predicted_class)
-                                # Return the confidence for the predicted class
                                 if 0 <= pred_index < len(probs):
                                     return round(probs[pred_index], 2)
                             
-                            # If we can't find the index, return the max probability
                             return round(max(probs), 2)
                     else:
                         return round(float(score), 2)
@@ -624,14 +778,12 @@ def handle_protein_function_prediction_advance(
     else:
         progress(1.0, desc="Complete!")
     
-    # Create download zip with processed results
     zip_path_str = ""
     try:
         ts = int(time.time())
         zip_dir = temp_dir / f"download_{ts}"
         zip_dir.mkdir()
         
-        # Save the processed results with Dataset column
         processed_df_for_save = display_df.copy()
         processed_df_for_save.to_csv(zip_dir / "Result.csv", index=False)
         
@@ -658,8 +810,8 @@ def handle_protein_function_prediction_advance(
 
 
 def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
-    sequence_models = list(MODEL_MAPPING_ZERO_SHOT_SEQUENCE.keys())
-    structure_models = list(MODEL_MAPPING_ZERO_SHOT_STRUCTURE.keys())
+    sequence_models = ["ESM2-650M", "ESM-1v", "ESM-1b"]
+    structure_models = ["ESM-IF1", "SaProt", "MIF-ST", "ProSST-2048", "ProtSSN"]
     function_models = list(MODEL_MAPPING_FUNCTION.keys())
 
     with gr.Blocks() as demo:
@@ -678,6 +830,17 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                                     inputs=seq_file_upload,
                                     label="Click example to load"
                                 )
+                                
+                                with gr.Accordion("📋 Paste Content Directly", open=False):
+                                    seq_paste_content_input = gr.Textbox(
+                                        label="Paste FASTA Content",
+                                        placeholder="Paste FASTA content here...",
+                                        lines=8,
+                                        max_lines=15
+                                    )
+                                    seq_paste_content_btn = gr.Button("🔍 Detect & Save Content", variant="secondary", size="sm")
+                                    seq_paste_content_status = gr.Textbox(label="Status", interactive=False, lines=2)
+                                
                                 seq_protein_display = gr.Textbox(label="Uploaded Protein Sequence", interactive=False, lines=3, max_lines=7)
                                 gr.Markdown("### Configure AI Analysis (Optional)")
                                 with gr.Accordion("AI Settings", open=True):
@@ -710,6 +873,17 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                                     inputs=struct_file_upload,
                                     label="Click example to load"
                                 )
+                                
+                                with gr.Accordion("📋 Paste Content Directly", open=False):
+                                    struct_paste_content_input = gr.Textbox(
+                                        label="Paste PDB Content",
+                                        placeholder="Paste PDB content here...",
+                                        lines=8,
+                                        max_lines=15
+                                    )
+                                    struct_paste_content_btn = gr.Button("🔍 Detect & Save Content", variant="secondary", size="sm")
+                                    struct_paste_content_status = gr.Textbox(label="Status", interactive=False, lines=2)
+                                
                                 struct_protein_display = gr.Textbox(label="Uploaded Protein Sequence", interactive=False, lines=3, max_lines=7)
                                 gr.Markdown("### Configure AI Analysis (Optional)")
                                 with gr.Accordion("AI Settings", open=True):
@@ -760,7 +934,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         all_possible_datasets = []
                         for datasets_list in DATASET_MAPPING_FUNCTION.values():
                             all_possible_datasets.extend(datasets_list)
-                        all_possible_datasets = sorted(list(set(all_possible_datasets))) # Remove duplicates and sort
+                        all_possible_datasets = sorted(list(set(all_possible_datasets)))
 
                         default_datasets_for_solubility = DATASET_MAPPING_FUNCTION.get("Solubility", [])
 
@@ -819,22 +993,31 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             choices = DATASET_MAPPING_FUNCTION.get(task, [])
             return gr.CheckboxGroup(choices=choices, value=choices)
         
-        enable_ai_zshot_seq.change(fn=toggle_ai_section, inputs=enable_ai_zshot_seq, outputs=ai_box_zshot_seq)
-        enable_ai_zshot_stru.change(fn=toggle_ai_section, inputs=enable_ai_zshot_stru, outputs=ai_box_zshot_stru)
-        enable_ai_func.change(fn=toggle_ai_section, inputs=enable_ai_func, outputs=ai_box_func)
+        def toggle_ai_section_simple(is_checked: bool):
+            return gr.update(visible=is_checked)
+        
+        enable_ai_zshot_seq.change(fn=toggle_ai_section_simple, inputs=enable_ai_zshot_seq, outputs=ai_box_zshot_seq)
+        enable_ai_zshot_stru.change(fn=toggle_ai_section_simple, inputs=enable_ai_zshot_stru, outputs=ai_box_zshot_stru)
+        enable_ai_func.change(fn=toggle_ai_section_simple, inputs=enable_ai_func, outputs=ai_box_func)
+        
+        def on_ai_model_change_simple(ai_provider: str) -> tuple:
+            if ai_provider == "DeepSeek":
+                return gr.update(visible=False), gr.update(visible=True)
+            else:
+                return gr.update(visible=True), gr.update(visible=False)
         
         ai_model_stru_zshot.change(
-            fn=on_ai_model_change,
+            fn=on_ai_model_change_simple,
             inputs=ai_model_stru_zshot,
             outputs=[api_key_in_stru_zshot, ai_status_stru_zshot]
         )
         ai_model_seq_zshot.change(
-            fn=on_ai_model_change,
+            fn=on_ai_model_change_simple,
             inputs=ai_model_seq_zshot,
             outputs=[api_key_in_seq_zshot, ai_status_seq_zshot]
         )
         ai_model_seq_func.change(
-            fn=on_ai_model_change,
+            fn=on_ai_model_change_simple,
             inputs=ai_model_seq_func,
             outputs=[api_key_in_seq_func, ai_status_seq_func]
         )
@@ -879,6 +1062,30 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             fn=handle_protein_function_prediction_chat,
             inputs=[adv_func_task_dd, function_fasta_upload, adv_func_model_dd, adv_func_dataset_cbg_chat, enable_ai_func, ai_model_seq_func, api_key_in_seq_func],
             outputs=[function_status_textbox, function_results_df, function_ai_expert_html]
+        )
+
+        def handle_paste_content_adv(content, display_component, file_upload_component):
+            if not content:
+                return "", "❌ Please enter content", None
+            file_path, content_type, status_msg = process_pasted_content(content)
+            if file_path:
+                if content_type == 'fasta':
+                    sequence = parse_fasta_file(file_path)
+                else:
+                    sequence = parse_pdb_for_sequence(file_path)
+                return sequence, status_msg, file_path
+            return "", status_msg, None
+
+        seq_paste_content_btn.click(
+            fn=lambda x: handle_paste_content_adv(x, seq_protein_display, seq_file_upload),
+            inputs=[seq_paste_content_input],
+            outputs=[seq_protein_display, seq_paste_content_status, seq_file_upload]
+        )
+        
+        struct_paste_content_btn.click(
+            fn=lambda x: handle_paste_content_adv(x, struct_protein_display, struct_file_upload),
+            inputs=[struct_paste_content_input],
+            outputs=[struct_protein_display, struct_paste_content_status, struct_file_upload]
         )
 
     return demo
