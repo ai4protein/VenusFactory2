@@ -14,6 +14,7 @@ import requests
 from dataclasses import dataclass
 import re
 import json
+from .utils.paste_content_handler import process_pasted_content
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -176,7 +177,7 @@ def call_ai_api(config: AIConfig, prompt: str) -> str:
         }
         endpoint = f"{config.api_base}/models/{config.model}:generateContent?key={config.api_key}"
         
-    else:  # DeepSeek (default)
+    else:
         headers = {
             "Authorization": f"Bearer {config.api_key}",
             "Content-Type": "application/json"
@@ -213,7 +214,7 @@ def call_ai_api(config: AIConfig, prompt: str) -> str:
                 return response_json["candidates"][0]["content"]["parts"][0]["text"]
             else:
                 return "❌ Gemini API returned empty response"
-        else:  # ChatGPT and DeepSeek
+        else:
             return response_json["choices"][0]["message"]["content"]
             
     except requests.exceptions.RequestException as e:
@@ -228,7 +229,7 @@ def check_ai_config_status(ai_provider: str, user_api_key: str) -> tuple[bool, s
     model_config = AI_MODELS.get(ai_provider, {})
     env_key = model_config.get("env_key")
     
-    if env_key:  # DeepSeek
+    if env_key:
         env_api_key = os.getenv(env_key)
         if env_api_key and env_api_key.strip():
             return True, "✓ Using the Provided API Key"
@@ -236,7 +237,7 @@ def check_ai_config_status(ai_provider: str, user_api_key: str) -> tuple[bool, s
             return True, "✓ The server will not save your API Key"
         else:
             return False, "⚠ No API Key found in .env file"
-    else:  # Other models
+    else:
         if user_api_key and user_api_key.strip():
             return True, "✓ Manual API Key provided"
         else:
@@ -247,7 +248,7 @@ def on_ai_model_change(ai_provider: str) -> tuple:
     model_config = AI_MODELS.get(ai_provider, {})
     env_key = model_config.get("env_key")
     
-    if env_key:  # DeepSeek
+    if env_key:
         env_api_key = os.getenv(env_key)
         if env_api_key and env_api_key.strip():
             status_msg = "✓ Using API Key from .env file"
@@ -257,7 +258,7 @@ def on_ai_model_change(ai_provider: str) -> tuple:
             status_msg = "⚠ No API Key available. Please enter manually below:"
             show_input = True
             placeholder = "Enter your DeepSeek API Key"
-    else:  # Other models
+    else:
         status_msg = f"⚠ Manual API Key required for {ai_provider}"
         show_input = True
         if ai_provider == "ChatGPT":
@@ -268,8 +269,8 @@ def on_ai_model_change(ai_provider: str) -> tuple:
             placeholder = f"Enter your {ai_provider} API Key"
     
     return (
-        gr.update(visible=show_input, placeholder=placeholder, value=""),  # API Key input
-        gr.update(value=status_msg)  # Status message
+        gr.update(visible=show_input, placeholder=placeholder, value=""),
+        gr.update(value=status_msg)
     )
 
 def generate_expert_analysis_prompt(results_df: pd.DataFrame, task: str) -> str:
@@ -515,7 +516,6 @@ def prepare_top_residue_heatmap_data(df: pd.DataFrame) -> Tuple:
     if score_col is None:
         return (None,) * 5
 
-    # Filter valid mutations (original != mutant amino acid)
     valid_df = df[
         df['mutant'].apply(
             lambda m: isinstance(m, str) and 
@@ -527,7 +527,6 @@ def prepare_top_residue_heatmap_data(df: pd.DataFrame) -> Tuple:
     if valid_df.empty:
         return ([], [], np.array([[]]), np.array([[]]), score_col)
 
-    # Normalize scores to [-1, 1] range
     min_score, max_score = valid_df[score_col].min(), valid_df[score_col].max()
     if max_score == min_score:
         valid_df['scaled_score'] = 0.0
@@ -536,12 +535,10 @@ def prepare_top_residue_heatmap_data(df: pd.DataFrame) -> Tuple:
     
     valid_df['position'] = valid_df['mutant'].str[1:-1].astype(int)
 
-    # Calculate average effect per position and select top positions
     effect_scores = valid_df.groupby('position')['scaled_score'].mean()
     sorted_positions = effect_scores.sort_values(ascending=False)
     top_positions = sorted_positions.head(20).index if len(sorted_positions) > 20 else sorted_positions.index
     top_df = valid_df[valid_df['position'].isin(top_positions)]
-    # Prepare heatmap data
     x_labels = list("ACDEFGHIKLMNPQRSTVWY")
     x_map = {label: i for i, label in enumerate(x_labels)}
     wt_map = {pos: mut[0] for pos, mut in zip(top_df['position'], top_df['mutant'])}
@@ -619,7 +616,6 @@ def process_fasta_file(file_path: str) -> str:
         if current_header and current_seq:
             sequences.append((current_header, current_seq))
     
-    # If only one sequence, return original file path
     if len(sequences) <= 1:
         return file_path
     
@@ -669,7 +665,6 @@ def handle_mutation_prediction_base(
         else:
             model_name, model_type = "ESM2-650M", "sequence"
 
-        # Process FASTA file to keep only the first sequence
         processed_file_path = process_fasta_file(file_path)
         if processed_file_path != file_path:
             file_path = processed_file_path
@@ -693,7 +688,6 @@ def handle_mutation_prediction_base(
         )
         return
 
-    # Start prediction
     yield (
         f"⏳ Running prediction...", 
         None, None, gr.update(visible=False), None, 
@@ -744,7 +738,6 @@ def handle_mutation_prediction_base(
 
     summary_fig = generate_plotly_heatmap(*data_tuple[:4])
     
-    # Handle AI analysis
     ai_summary = "AI Analysis disabled. Enable in settings to generate a report."
 
     expert_analysis = "<div style='height: 300px; display: flex; align-items: center; justify-content: center; color: #666;'>Analysis will appear here once prediction is complete...</div>"
@@ -774,7 +767,6 @@ def handle_mutation_prediction_base(
     else:
         progress(1.0, desc="Complete!")
     
-    # Create download files
     temp_dir = Path("temp_outputs")
     temp_dir.mkdir(exist_ok=True)
     timestamp = int(time.time())
@@ -974,7 +966,8 @@ def handle_protein_function_prediction(
             "❌ Error: Task, Datasets, and FASTA file are required.", 
             pd.DataFrame(), 
             gr.update(visible=False), 
-            "Please provide all required inputs."
+            "Please provide all required inputs.",
+            "AI Analysis disabled."
         )
         return
 
@@ -982,7 +975,8 @@ def handle_protein_function_prediction(
         f"🚀 Starting predictions with {model}...", 
         pd.DataFrame(), 
         gr.update(visible=False), 
-        "AI analysis will appear here..."
+        "AI analysis will appear here...",
+        "AI Analysis disabled."
     )
     
     all_results_list = []
@@ -996,7 +990,8 @@ def handle_protein_function_prediction(
             f"⏳ Running prediction...", 
             pd.DataFrame(), 
             gr.update(visible=False), 
-            "AI analysis will appear here..."
+            "AI analysis will appear here...",
+            "AI Analysis disabled."
         )
         
         try:
@@ -1030,7 +1025,8 @@ def handle_protein_function_prediction(
             "⚠️ No results generated.", 
             pd.DataFrame(), 
             gr.update(visible=False), 
-            "No results to analyze."
+            "No results to analyze.",
+            "AI Analysis disabled."
         )
         return
     
@@ -1046,7 +1042,8 @@ def handle_protein_function_prediction(
             "🤝 Performing soft voting on prediction results...", 
             pd.DataFrame(), 
             gr.update(visible=False), 
-            "Aggregating results..."
+            "Aggregating results...",
+            "AI Analysis disabled."
         )
         voted_results = []
         for header, group in raw_final_df.groupby('header'):
@@ -1224,6 +1221,7 @@ def handle_protein_function_prediction(
         display_df["Confidence Score"] = display_df.apply(format_confidence, axis=1)
 
     ai_summary = "AI Analysis disabled. Enable in settings to generate a report."
+    ai_response = "AI Analysis disabled."  # Initialize ai_response variable
 
     expert_analysis = "<div style='height: 300px; display: flex; align-items: center; justify-content: center; color: #666;'>Analysis will appear here once prediction is complete...</div>"
 
@@ -1233,7 +1231,8 @@ def handle_protein_function_prediction(
             "🤖 Expert is analyzing results...", 
             display_df, 
             gr.update(visible=False), 
-            expert_analysis
+            expert_analysis,
+            "AI Analysis in progress..."
         )
         api_key = get_api_key(ai_model, user_api_key)
         if not api_key: 
@@ -1303,6 +1302,18 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                             inputs=easy_zshot_file_upload,
                             label="Click example to load"
                         )
+                        
+                        # Add paste content functionality
+                        with gr.Accordion("📋 Paste Content Directly", open=False):
+                            easy_zshot_paste_content_input = gr.Textbox(
+                                label="Paste Content",
+                                placeholder="Paste PDB or FASTA content here...",
+                                lines=8,
+                                max_lines=15
+                            )
+                            easy_zshot_paste_content_btn = gr.Button("🔍 Detect & Save Content", variant="secondary", size="sm")
+                            easy_zshot_paste_content_status = gr.Textbox(label="Status", interactive=False, lines=2)
+                        
                         easy_zshot_protein_display = gr.Textbox(label="Uploaded Protein Sequence", interactive=False, lines=3, max_lines=7)
                         gr.Markdown("### Configure AI Analysis (Optional)")
                         
@@ -1357,6 +1368,18 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                             inputs=base_function_fasta_upload,
                             label="Click example to load"
                         )
+                        
+                        # Add paste content functionality
+                        with gr.Accordion("📋 Paste Content Directly", open=False):
+                            base_func_paste_content_input = gr.Textbox(
+                                label="Paste FASTA Content",
+                                placeholder="Paste FASTA content here...",
+                                lines=8,
+                                max_lines=15
+                            )
+                            base_func_paste_content_btn = gr.Button("🔍 Detect & Save Content", variant="secondary", size="sm")
+                            base_func_paste_content_status = gr.Textbox(label="Status", interactive=False, lines=2)
+                        
                         base_function_protein_display = gr.Textbox(label="Uploaded Protein Sequence", interactive=False, lines=3, max_lines=7)
 
                         gr.Markdown("### Configure AI Analysis (Optional)")
@@ -1423,7 +1446,34 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         easy_func_predict_btn.click(
             fn=handle_protein_function_prediction,
             inputs=[easy_func_task_dd, base_function_fasta_upload, enable_ai_func, ai_model_dd_func, api_key_in_func],
-            outputs=[function_status_textbox, function_results_df, function_download_btn, function_ai_expert_html], 
+            outputs=[function_status_textbox, function_results_df, function_download_btn, function_ai_expert_html, gr.State()], 
             show_progress=True
         )
+
+        # Paste content processing function
+        def handle_paste_content_quick(content, display_component, file_upload_component):
+            if not content:
+                return "", "❌ Please enter content", None
+            file_path, content_type, status_msg = process_pasted_content(content)
+            if file_path:
+                # Update display component
+                if content_type == 'fasta':
+                    sequence = _read_fasta_file(file_path)
+                else:
+                    sequence = _read_pdb_file(file_path)
+                return sequence, status_msg, file_path
+            return "", status_msg, None
+
+        easy_zshot_paste_content_btn.click(
+            fn=lambda x: handle_paste_content_quick(x, easy_zshot_protein_display, easy_zshot_file_upload),
+            inputs=[easy_zshot_paste_content_input],
+            outputs=[easy_zshot_protein_display, easy_zshot_paste_content_status, easy_zshot_file_upload]
+        )
+        
+        base_func_paste_content_btn.click(
+            fn=lambda x: handle_paste_content_quick(x, base_function_protein_display, base_function_fasta_upload),
+            inputs=[base_func_paste_content_input],
+            outputs=[base_function_protein_display, base_func_paste_content_status, base_function_fasta_upload]
+        )
+
     return {}
