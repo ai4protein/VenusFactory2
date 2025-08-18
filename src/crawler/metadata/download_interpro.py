@@ -12,7 +12,7 @@ def fetch_info_data(url):
         data = response.json()
         data_list.extend(data["results"])
         url = data.get("next")
-        time.sleep(10)
+        time.sleep(1)
     return data_list
 
 def download_single_interpro(interpro_id, out_dir):

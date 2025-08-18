@@ -227,8 +227,8 @@ def create_index_tab(constant):
                 <div style="background: #f8fafc; border-radius: 12px; padding: 30px; margin: 30px auto; max-width: 1400px;">
                     <h3 style="font-size: 1.2em; font-weight: 700; color: #1e293b; margin-bottom: 20px;">Cooperation Platform & Developer Information</h3>
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; font-size: 1.1em;">
-                        <div>
-                            <div style="margin-bottom: 12px;"><b>🤝 Cooperation Platform:</b> <a href="https://openbayes.com/" target="_blank" style="color: #2563eb;">HyberAI</a></div>
+                        <div>  
+                            <div style="margin-bottom: 12px;"><b>🤝 Cooperation Platform:</b> <a href="https://hyper.ai/cn/tutorials/38568" target="_blank" style="color: #2563eb;">HyberAI</a></div>
                             <div style="margin-bottom: 12px;"><b>🧬 Few-shot mutation prediction tool:</b> <a href="https://github.com/ai4protein/Pro-FSFP" target="_blank" style="color: #2563eb;">Pro-FSFP</a></div>
                             <div style="margin-bottom: 12px;"><b>⚡ The most advanced zero-shot protein prediction tool:</b> <a href="https://github.com/ai4protein/VenusREM" target="_blank" style="color: #2563eb;">VenusREM</a></div>
                         </div>
