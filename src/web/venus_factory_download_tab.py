@@ -417,7 +417,7 @@ def create_download_tool_tab(constant: Dict[str, Any]):
                         )
                     
                     # InterPro Metadata Download
-                    with gr.TabItem("NCBI Metadata"):
+                    with gr.TabItem("NCBI Sequences"):
                         gr.Markdown("#### Download protein sequences from NCBI in FASTA format")
                         with gr.Row():
                             ncbi_method = gr.Radio(["Single ID", "From File"], label="Download Method", value="Single ID")
@@ -456,82 +456,6 @@ def create_download_tool_tab(constant: Dict[str, Any]):
                             outputs=[ncbi_output, ncbi_download_btn]
                         )
                     
-                    
-            # --- Structure Download Tab ---
-            with gr.TabItem("🗂️ Metadata Download"):
-                gr.Markdown("### Annotation Information Download")
-                with gr.Tabs():
-                    # RCSB Metadata Download
-                    with gr.TabItem("RCSB Metadata"):
-                        gr.Markdown("#### Download metadata for PDB entries from RCSB")
-                        rcsb_method = gr.Radio(["Single ID", "From File"], label="Download Method", value="Single ID")
-                        rcsb_id = gr.Textbox(label="PDB ID", value="1a0j", visible=True, placeholder="e.g., 1a0j", interactive=True)
-                        with gr.Column(visible=False) as rcsb_file_column:
-                            rcsb_file_upload = gr.File(label="Upload PDB ID List", file_types=[".txt"])
-                            rcsb_file_example = gr.Examples(
-                                examples=["./download/rcsb.txt"],
-                                inputs=rcsb_file_upload,
-                                label="Click example to load"
-                            )
-                            rcsb_preview = gr.Textbox(label="File Preview", interactive=False, lines=5)
-                        rcsb_btn = gr.Button("Start Download", variant="primary")
-                        rcsb_output = gr.Textbox(label="Download Status", interactive=False, lines=5)
-                        rcsb_download_btn = gr.DownloadButton(label="Save Downloaded Data", visible=False)
-                        rcsb_error = gr.Checkbox(label="Save error file", value=True)
-                        rcsb_user = gr.Textbox(label="User Hash", value="default_user", visible=False)
-                        # Event handlers for RCSB
-                        rcsb_method.change(
-                            lambda method: [
-                                gr.update(visible=(method == "From File")),
-                                gr.update(interactive=(method == "Single ID"))
-                            ],
-                            inputs=rcsb_method,
-                            outputs=[rcsb_file_column, rcsb_id]
-                        )
-                        rcsb_file_upload.change(
-                            lambda f: read_uploaded_file(f.name if f else None)[1] if f else "",
-                            inputs=rcsb_file_upload,
-                            outputs=rcsb_preview
-                        )
-                        rcsb_btn.click(
-                            fn=handle_rcsb_download, 
-                            inputs=[rcsb_method, rcsb_id, rcsb_file_upload, rcsb_user, rcsb_error], 
-                            outputs=[rcsb_output, rcsb_download_btn]
-                        )
-                    
-                    # InterPro Metadata Download
-                    with gr.TabItem("InterPro Metadata"):
-                        gr.Markdown("#### Download protein domain, family, and Gene Ontology annotation metadata from InterPro")
-                        with gr.Row():
-                            interpro_method = gr.Radio(["Single ID", "From JSON"], label="Download Method", value="Single ID")
-                        interpro_id = gr.Textbox(label="InterPro ID", value="IPR000001", visible=True, placeholder="e.g., IPR000001", interactive=True)
-                        interpro_json_upload = gr.File(label="Upload JSON File", file_types=[".json"], visible=False)
-                        interpro_preview = gr.Textbox(label="File Preview", interactive=False, lines=5, visible=False)
-                        interpro_btn = gr.Button("Start Download", variant="primary")
-                        interpro_output = gr.Textbox(label="Download Status", interactive=False, lines=5)
-                        interpro_download_btn = gr.DownloadButton(label="Save Downloaded Data", visible=False)
-                        interpro_error = gr.Checkbox(label="Save error file", value=True)
-                        interpro_user = gr.Textbox(label="User Hash", value="default_user", visible=False)
-                        # Event handlers for InterPro
-                        interpro_method.change(
-                            lambda method: [
-                                gr.update(visible=(method == "Single ID"), interactive=(method == "Single ID")),
-                                gr.update(visible=(method == "From JSON")),
-                                gr.update(visible=(method == "From JSON")),
-                            ],
-                            inputs=interpro_method,
-                            outputs=[interpro_id, interpro_json_upload, interpro_preview]
-                        )
-                        interpro_json_upload.change(
-                            lambda f: read_json_file(f.name if f else None)[1] if f else "",
-                            inputs=interpro_json_upload,
-                            outputs=interpro_preview
-                        )
-                        interpro_btn.click(
-                            fn=handle_interpro_download, 
-                            inputs=[interpro_method, interpro_id, interpro_json_upload, interpro_user, interpro_error], 
-                            outputs=[interpro_output, interpro_download_btn]
-                        )
                
 
             with gr.TabItem("⚛️ Structure Download"):
@@ -646,5 +570,81 @@ def create_download_tool_tab(constant: Dict[str, Any]):
                             inputs=[af_method, af_id, af_file_upload, af_user, af_error], 
                             outputs=[af_output, af_viz_status, af_molecule_viewer, af_download_btn]
                         )
-
+    
+            # --- Structure Download Tab ---
+            with gr.TabItem("🗂️ Metadata Download"):
+                gr.Markdown("### Annotation Information Download")
+                with gr.Tabs():
+                    # RCSB Metadata Download
+                    with gr.TabItem("RCSB Metadata"):
+                        gr.Markdown("#### Download metadata for PDB entries from RCSB")
+                        rcsb_method = gr.Radio(["Single ID", "From File"], label="Download Method", value="Single ID")
+                        rcsb_id = gr.Textbox(label="PDB ID", value="1a0j", visible=True, placeholder="e.g., 1a0j", interactive=True)
+                        with gr.Column(visible=False) as rcsb_file_column:
+                            rcsb_file_upload = gr.File(label="Upload PDB ID List", file_types=[".txt"])
+                            rcsb_file_example = gr.Examples(
+                                examples=["./download/rcsb.txt"],
+                                inputs=rcsb_file_upload,
+                                label="Click example to load"
+                            )
+                            rcsb_preview = gr.Textbox(label="File Preview", interactive=False, lines=5)
+                        rcsb_btn = gr.Button("Start Download", variant="primary")
+                        rcsb_output = gr.Textbox(label="Download Status", interactive=False, lines=5)
+                        rcsb_download_btn = gr.DownloadButton(label="Save Downloaded Data", visible=False)
+                        rcsb_error = gr.Checkbox(label="Save error file", value=True)
+                        rcsb_user = gr.Textbox(label="User Hash", value="default_user", visible=False)
+                        # Event handlers for RCSB
+                        rcsb_method.change(
+                            lambda method: [
+                                gr.update(visible=(method == "From File")),
+                                gr.update(interactive=(method == "Single ID"))
+                            ],
+                            inputs=rcsb_method,
+                            outputs=[rcsb_file_column, rcsb_id]
+                        )
+                        rcsb_file_upload.change(
+                            lambda f: read_uploaded_file(f.name if f else None)[1] if f else "",
+                            inputs=rcsb_file_upload,
+                            outputs=rcsb_preview
+                        )
+                        rcsb_btn.click(
+                            fn=handle_rcsb_download, 
+                            inputs=[rcsb_method, rcsb_id, rcsb_file_upload, rcsb_user, rcsb_error], 
+                            outputs=[rcsb_output, rcsb_download_btn]
+                        )
+                    
+                    # InterPro Metadata Download
+                    with gr.TabItem("InterPro Metadata"):
+                        gr.Markdown("#### Download protein domain, family, and Gene Ontology annotation metadata from InterPro")
+                        with gr.Row():
+                            interpro_method = gr.Radio(["Single ID", "From JSON"], label="Download Method", value="Single ID")
+                        interpro_id = gr.Textbox(label="InterPro ID", value="IPR000001", visible=True, placeholder="e.g., IPR000001", interactive=True)
+                        interpro_json_upload = gr.File(label="Upload JSON File", file_types=[".json"], visible=False)
+                        interpro_preview = gr.Textbox(label="File Preview", interactive=False, lines=5, visible=False)
+                        interpro_btn = gr.Button("Start Download", variant="primary")
+                        interpro_output = gr.Textbox(label="Download Status", interactive=False, lines=5)
+                        interpro_download_btn = gr.DownloadButton(label="Save Downloaded Data", visible=False)
+                        interpro_error = gr.Checkbox(label="Save error file", value=True)
+                        interpro_user = gr.Textbox(label="User Hash", value="default_user", visible=False)
+                        # Event handlers for InterPro
+                        interpro_method.change(
+                            lambda method: [
+                                gr.update(visible=(method == "Single ID"), interactive=(method == "Single ID")),
+                                gr.update(visible=(method == "From JSON")),
+                                gr.update(visible=(method == "From JSON")),
+                            ],
+                            inputs=interpro_method,
+                            outputs=[interpro_id, interpro_json_upload, interpro_preview]
+                        )
+                        interpro_json_upload.change(
+                            lambda f: read_json_file(f.name if f else None)[1] if f else "",
+                            inputs=interpro_json_upload,
+                            outputs=interpro_preview
+                        )
+                        interpro_btn.click(
+                            fn=handle_interpro_download, 
+                            inputs=[interpro_method, interpro_id, interpro_json_upload, interpro_user, interpro_error], 
+                            outputs=[interpro_output, interpro_download_btn]
+                        )
+            
     return download_tab_content
