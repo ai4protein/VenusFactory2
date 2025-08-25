@@ -31,6 +31,24 @@ Recent News:
 
 </details>
 
+<details>
+<summary>
+  📝 Your Feedback is Valuable! We invite you to complete our survey by scanning either QR code below.
+</summary>
+<div style="display: flex; justify-content: space-evenly; align-items: center; padding-top: 15px; text-align: center;">
+  
+  <div style="margin: 10px;">
+    <img src="img/Questionnaire/Google_QA.png" width="200" alt="Google Form QR Code">
+    <p style="margin-top: 5px; font-size: 14px;">Google Form</p>
+  </div>
+  
+  <div style="margin: 10px;">
+    <img src="img/Questionnaire/XWJ_QA.jpg" width="200" alt="Wenjuanxing Survey QR Code">
+    <p style="margin-top: 5px; font-size: 14px;">Wenjuanxing Survey</p>
+  </div>
+
+</div>
+</details>
 
 ## ✏️ Table of Contents
 

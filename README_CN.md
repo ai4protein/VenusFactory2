@@ -31,6 +31,25 @@
 </p>
 </details>
 
+<details>
+<summary>
+  📝 您的反馈至关重要！诚邀您扫描下方任一二维码填写问卷。
+</summary>
+<div style="display: flex; justify-content: space-evenly; align-items: center; padding-top: 15px; text-align: center;">
+  
+  <div style="margin: 10px;">
+    <img src="img/Questionnaire/Google_QA.png" width="200" alt="谷歌问卷二维码">
+    <p style="margin-top: 5px; font-size: 14px;">谷歌问卷</p>
+  </div>
+  
+  <div style="margin: 10px;">
+    <img src="img/Questionnaire/XWJ_QA.jpg" width="200" alt="问卷星问卷二维码">
+    <p style="margin-top: 5px; font-size: 14px;">问卷星</p>
+  </div>
+
+</div>
+</details>
+
 ## ✏️ 目录
 
 - [功能特点](#-功能特点)
