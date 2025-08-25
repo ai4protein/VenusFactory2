@@ -381,22 +381,276 @@ def generate_ai_summary_prompt(results_df: pd.DataFrame, task: str, model: str) 
         """
     return prompt
 
-def handle_file_upload(file_obj: Any) -> str:
-    """Handle file upload and extract protein sequence."""
-    if not file_obj:
-        return ""
-    
-    file_path = file_obj.name
+def parse_fasta_paste_content(fasta_content):
+    if not fasta_content or not fasta_content.strip():
+        return "", gr.update(choices=["Sequence 1"], value="Sequence 1", visible=False), {}, "", ""
     
     try:
-        if file_path.lower().endswith((".fasta", ".fa")):
-            return _read_fasta_file(file_path)
-        elif file_path.lower().endswith(".pdb"):
-            return _read_pdb_file(file_path)
-        else:
-            return "Unsupported file type. Please upload a .fasta, .fa, or .pdb file."
+        sequences = {}
+        current_header = None
+        current_sequence = ""
+        
+        for line in fasta_content.strip().split('\n'):
+            line = line.strip()
+            if not line:
+                continue
+
+            if line.startswith('>'):
+                if current_header is not None and current_sequence:
+                    sequences[current_header] = current_sequence
+                
+                current_header = line[1:].strip()
+                if not current_header:
+                    current_header = f"Sequence_{len(sequences) + 1}"
+                current_sequence = ""
+            else:
+                if current_header is None:
+                    current_header = "Sequence_1"
+                clean_line = ''.join(c.upper() for c in line if c.isalpha())
+                current_sequence += clean_line
+        
+        if current_header is not None and current_sequence:
+            sequences[current_header] = current_sequence
+        
+        if not sequences:
+            return "No valid protein sequences found in FASTA content", gr.update(choices=["Sequence 1"], value="Sequence 1", visible=False), {}, "Sequence 1", ""
+
+        sequence_choices = list(sequences.keys())
+        default_sequence = sequence_choices[0]
+        display_sequence = sequences[default_sequence]
+        selector_visible = len(sequence_choices) > 1
+        temp_dir = Path("temp_outputs")
+        sequence_dir = temp_dir / "Fasta"
+        sequence_dir.mkdir(exist_ok=True)
+        temp_fasta_path = os.path.join(sequence_dir, f"paste_content_seq_{sanitize_filename(default_sequence)}.fasta")
+        save_selected_sequence_fasta(fasta_content, default_sequence, temp_fasta_path)
+        return display_sequence, gr.update(choices=sequence_choices, value=default_sequence, visible=selector_visible), sequences, default_sequence, temp_fasta_path
+        
     except Exception as e:
-        return f"Error reading file: {e}"
+        print(f"Error in parse_fasta_paste_content: {str(e)}")
+        return f"Error parsing FASTA content: {str(e)}", gr.update(choices=["Sequence 1"], value="Sequence 1", visible=False), {}, "Sequence 1", ""
+
+def save_selected_sequence_fasta(original_fasta_content, selected_sequence, output_path):
+    new_fasta_lines = []
+    lines = original_fasta_content.strip().split('\n')
+    i = 0
+    
+    while i < len(lines):
+        line = lines[i].strip()
+        if line.startswith('>'):
+            header = line[1:].strip()
+            if header == selected_sequence:
+                new_fasta_lines.append(line)
+                new_fasta_lines.append(lines[i+1])
+                break
+            else:
+                i += 1
+        else:
+            i += 1
+    with open(output_path, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(new_fasta_lines))
+
+def handle_paste_sequence_selection(selected_sequence, sequences_dict, original_fasta_content_from_state):
+    if not sequences_dict or selected_sequence not in sequences_dict:
+        return "", ""
+    
+    try:
+        temp_dir = Path("temp_outputs")
+        sequence_dir = temp_dir / "Fasta"
+        sequence_dir.mkdir(exist_ok=True)
+        temp_pdb_path = os.path.join(sequence_dir, f"paste_content_seq_{selected_sequence}.fasta")
+        save_selected_sequence_fasta(original_fasta_content_from_state, selected_sequence, temp_pdb_path)
+        
+        return sequences_dict[selected_sequence], temp_pdb_path
+        
+    except Exception as e:
+        return f"Error processing chain selection: {str(e)}", ""
+
+def handle_fasta_sequence_change(selected_sequence, sequences_dict, original_fasta_path):
+    if not sequences_dict or selected_sequence not in sequences_dict:
+        return "", ""
+    
+    try:
+        with open(original_fasta_path, 'r') as f:
+            lines = f.read()
+
+        new_fasta_lines = []
+        new_fasta_lines.append(">"+selected_sequence)
+        new_fasta_lines.append(sequences_dict[selected_sequence])
+        
+        dir_path = os.path.dirname(original_fasta_path)
+        base_name, extension = os.path.splitext(os.path.basename(original_fasta_path))
+        new_filename = f"{base_name}_1{extension}"
+        new_fasta_path = os.path.join(dir_path, new_filename)
+        with open(new_fasta_path, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(new_fasta_lines))
+        
+        return sequences_dict[selected_sequence], new_fasta_path
+
+    except Exception as e:
+        return f"Error processing sequence selection: {str(e)}", ""
+
+def parse_pdb_paste_content(pdb_content):
+    if not pdb_content.strip():
+        return "", gr.update(choices=["A"], value="A", visible=False), {}, "A", ""
+    
+    try:
+        chains = {}
+        current_chain = None
+        sequence = ""
+        
+        for line in pdb_content.strip().split('\n'):
+            if line.startswith('ATOM'):
+                chain_id = line[21:22].strip()
+                if chain_id == "":
+                    chain_id = "A"
+                
+                if current_chain != chain_id:
+                    if current_chain is not None and sequence:
+                        chains[current_chain] = sequence
+                    current_chain = chain_id
+                    sequence = ""
+                
+                res_name = line[17:20].strip()
+                if res_name in ['ALA', 'CYS', 'ASP', 'GLU', 'PHE', 'GLY', 'HIS', 'ILE', 'LYS', 'LEU', 'MET', 'ASN', 'PRO', 'GLN', 'ARG', 'SER', 'THR', 'VAL', 'TRP', 'TYR']:
+                    aa_map = {'ALA': 'A', 'CYS': 'C', 'ASP': 'D', 'GLU': 'E', 'PHE': 'F', 
+                             'GLY': 'G', 'HIS': 'H', 'ILE': 'I', 'LYS': 'K', 'LEU': 'L', 
+                             'MET': 'M', 'ASN': 'N', 'PRO': 'P', 'GLN': 'Q', 'ARG': 'R', 
+                             'SER': 'S', 'THR': 'T', 'VAL': 'V', 'TRP': 'W', 'TYR': 'Y'}
+                    
+                    res_num = int(line[22:26].strip())
+                    if len(sequence) < res_num:
+                        sequence += aa_map[res_name]
+        
+        if current_chain is not None and sequence:
+            chains[current_chain] = sequence
+        
+        if not chains:
+            return "No valid protein chains found in PDB content", gr.update(choices=["A"], value="A", visible=False), {}, "A", ""
+        
+        chain_choices = list(chains.keys())
+        default_chain = chain_choices[0]
+        display_sequence = chains[default_chain]
+        selector_visible = len(chain_choices) > 1
+        temp_dir = Path("temp_outputs")
+        sequence_dir = temp_dir / "Fasta"
+        sequence_dir.mkdir(exist_ok=True)
+        temp_pdb_path = os.path.join(sequence_dir, f"paste_content_chain_{default_chain}.pdb")
+        save_selected_chain_pdb(pdb_content, default_chain, temp_pdb_path)
+        return display_sequence, gr.update(choices=chain_choices, value=default_chain, visible=selector_visible), chains, default_chain, temp_pdb_path
+        
+    except Exception as e:
+        return f"Error parsing PDB content: {str(e)}", gr.update(choices=["A"], value="A", visible=False), {}, "A", ""
+
+def save_selected_chain_pdb(original_pdb_content, selected_chain, output_path):
+    new_pdb_lines = []
+    atom_counter = 1
+    
+    for line in original_pdb_content.strip().split('\n'):
+        if line.startswith('ATOM'):
+            chain_id = line[21:22].strip()
+            if chain_id == "":
+                chain_id = "A"
+            
+            if chain_id == selected_chain:
+                new_line = line[:21] + 'A' + line[22:]
+                new_line = f"ATOM  {atom_counter:5d}" + new_line[11:]
+                new_pdb_lines.append(new_line)
+                atom_counter += 1
+        elif not line.startswith('ATOM'):
+            new_pdb_lines.append(line)
+    
+    with open(output_path, 'w') as f:
+        f.write('\n'.join(new_pdb_lines))
+
+def handle_paste_chain_selection(selected_chain, chains_dict, original_pdb_content_from_state):
+    if not chains_dict or selected_chain not in chains_dict:
+        return "", ""
+    
+    try:
+        temp_dir = Path("temp_outputs")
+        sequence_dir = temp_dir / "PDB"
+        sequence_dir.mkdir(exist_ok=True)
+        temp_pdb_path = os.path.join(sequence_dir, f"paste_content_chain_{selected_chain}.pdb")
+        save_selected_chain_pdb(original_pdb_content_from_state, selected_chain, temp_pdb_path)
+        
+        return chains_dict[selected_chain], temp_pdb_path
+        
+    except Exception as e:
+        return f"Error processing chain selection: {str(e)}", ""
+
+def handle_pdb_chain_change(selected_chain, chains_dict, original_file_path):
+    if not chains_dict or selected_chain not in chains_dict:
+        return "", ""
+    try:
+        with open(original_file_path, 'r') as f:
+            pdb_content = f.read()
+        
+        new_pdb_lines = []
+        atom_counter = 1
+        
+        for line in pdb_content.strip().split('\n'):
+            if line.startswith('ATOM'):
+                chain_id = line[21:22].strip()
+                if chain_id == "":
+                    chain_id = "A"
+                
+                if chain_id == selected_chain:
+                    new_line = line[:21] + 'A' + line[22:]
+                    new_line = f"ATOM  {atom_counter:5d}" + new_line[11:]
+                    new_pdb_lines.append(new_line)
+                    atom_counter += 1
+            elif not line.startswith('ATOM'):
+                new_pdb_lines.append(line)
+        
+        dir_path = os.path.dirname(original_file_path)
+        base_name, extension = os.path.splitext(os.path.basename(original_file_path))
+        new_filename = f"{base_name}_A{extension}"
+        new_pdb_path = os.path.join(dir_path, new_filename)
+        
+        with open(new_pdb_path, 'w') as f:
+            f.write('\n'.join(new_pdb_lines))
+        
+        return chains_dict[selected_chain], new_pdb_path
+        
+    except Exception as e:
+        return f"Error processing chain selection: {str(e)}", ""
+
+def process_pdb_file_upload(file_path):
+    if not file_path:
+        return "", gr.update(choices=["A"], value="A", visible=False), {}, "A", "", ""
+    try:
+        with open(file_path, 'r') as f:
+            pdb_content = f.read()
+        sequence, chain_update, chains_dict, default_chain, _ = parse_pdb_paste_content(pdb_content)
+        return sequence, chain_update, chains_dict, default_chain, file_path, file_path
+    except Exception as e:
+        return f"Error reading PDB file: {str(e)}", gr.update(choices=["A"], value="A", visible=False), {}, "A", "", ""
+
+def process_fasta_file_upload(file_path):
+    if not file_path:
+        return "", gr.update(choices=["Sequence 1"], value="Sequence 1", visible=False), {}, "Sequence 1", "", ""
+    try:
+        with open(file_path, 'r') as f:
+            fasta_content = f.read()
+        sequence, selector_update, sequences_dict, default_sequence, file_path = parse_fasta_paste_content(fasta_content)
+        return sequence, selector_update, sequences_dict, default_sequence, file_path, file_path
+    except Exception as e:
+        return f"Error reading FASTA file: {str(e)}", gr.update(choices=["Sequence 1"], value="Sequence 1", visible=False), {}, "Sequence 1", "", ""
+        
+def handle_file_upload(file_obj: Any) -> str:
+    if not file_obj:
+        return ""
+    if isinstance(file_obj, str):
+        file_path = file_obj
+    else:
+        file_path = file_obj.name
+    if file_path.lower().endswith((".fasta", ".fa")):
+        return process_fasta_file_upload(file_path)
+    elif file_path.lower().endswith(".pdb"):
+        return process_pdb_file_upload(file_path)
+    else:
+        return "Unsupported file type. Please upload a .fasta, .fa, or .pdb file."
 
 def _read_fasta_file(file_path: str) -> str:
     with open(file_path, "r") as f:
@@ -622,9 +876,10 @@ def process_fasta_file(file_path: str) -> str:
 
     original_path = Path(file_path)
     temp_dir = Path("temp_outputs")
-    temp_dir.mkdir(exist_ok=True)
+    fasra_dir = temp_dir / "Fasta"
+    fasra_dir.mkdir(exist_ok=True)
 
-    new_file_path = temp_dir / f"filtered_{original_path.name}"
+    new_file_path = fasra_dir / f"filtered_{original_path.name}"
     
     with open(new_file_path, 'w', encoding='utf-8') as f:
         f.write(f"{sequences[0][0]}\n")
@@ -657,7 +912,10 @@ def handle_mutation_prediction_base(
         )
         return
 
-    file_path = file_obj.name
+    if isinstance(file_obj, str):
+        file_path = file_obj
+    else:
+        file_path = file_obj.name
 
     if file_path.lower().endswith((".fasta", ".fa")):
         if model_name and model_name in ["ESM2-650M", "ESM-1v", "ESM-1b"]:
@@ -1006,8 +1264,11 @@ def handle_protein_function_prediction(
             
             if not script_path.exists() or not adapter_path.exists():
                 raise FileNotFoundError(f"Required files not found: Script={script_path}, Adapter={adapter_path}")
-            
-            cmd = [sys.executable, str(script_path), "--fasta_file", str(Path(fasta_file.name)), "--adapter_path", str(adapter_path), "--output_csv", str(output_file)]
+            if isinstance(fasta_file, str):
+                file_path = fasta_file
+            else:
+                file_path = fasta_file.name
+            cmd = [sys.executable, str(script_path), "--fasta_file", str(Path(file_path)), "--adapter_path", str(adapter_path), "--output_csv", str(output_file)]
             subprocess.run(cmd, capture_output=True, text=True, check=True, encoding='utf-8', errors='ignore')
             
             if output_file.exists():
@@ -1293,48 +1554,47 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             with gr.TabItem("Directed Evolution: AI-Powered Mutation Prediction"):
                 with gr.Row(equal_height=False):
                     with gr.Column(scale=2):
-                        gr.Markdown("### Select Function & Upload File")
+                        gr.Markdown("### Model Configuration")
                         zero_shot_function_dd = gr.Dropdown(choices=DATASET_MAPPING_ZERO_SHOT, label="Select Protein Function", value=DATASET_MAPPING_ZERO_SHOT[0])
-                        easy_zshot_file_upload = gr.File(label="Upload Protein File (.fasta, .fa, .pdb)", file_types=[".fasta", ".fa", ".pdb"])
                         zero_shot_model_dd = gr.Dropdown(choices=zero_shot_model, label="Select Structure-based Model", visible=False)
-                        easy_zshot_file_example = gr.Examples(
-                            examples=[["./download/P60002.fasta"]],
-                            inputs=easy_zshot_file_upload,
-                            label="Click example to load"
-                        )
-                        
-                        # Add paste content functionality
-                        with gr.Accordion("📋 Paste Content Directly", open=False):
-                            easy_zshot_paste_content_input = gr.Textbox(
-                                label="Paste Content",
-                                placeholder="Paste PDB or FASTA content here...",
-                                lines=8,
-                                max_lines=15
-                            )
-                            easy_zshot_paste_content_btn = gr.Button("🔍 Detect & Save Content", variant="secondary", size="sm")
-                            easy_zshot_paste_content_status = gr.Textbox(label="Status", interactive=False, lines=2)
-                        
+                        gr.Markdown("**Data Input**")
+                        with gr.Tabs():
+                            with gr.TabItem("Upload Protein File (.fasta, .fa, .pdb)"):
+                                easy_zshot_file_upload = gr.File(label="Upload Protein File (.fasta, .fa, .pdb)", file_types=[".fasta", ".fa", ".pdb"])
+                                easy_zshot_file_example = gr.Examples(examples=[["./download/P60002.fasta"]], inputs=easy_zshot_file_upload, label="Click example to load")
+                            with gr.TabItem("Paste Protein Content"):
+                                easy_zshot_paste_content_input =  gr.Textbox(label="Paste Protein Content", placeholder="Paste protein content here...", lines=8, max_lines=15)
+                                with gr.Row():
+                                    easy_zshot_paste_content_btn = gr.Button("🔍 Detect Content", variant="primary", size="m")
+                                    easy_zshot_paste_clear_btn = gr.Button("🗑️ Clear", variant="primary", size="m")
+
                         easy_zshot_protein_display = gr.Textbox(label="Uploaded Protein Sequence", interactive=False, lines=3, max_lines=7)
+                        easy_zshot_sequence_selector = gr.Dropdown(label="Select Chain", choices=["Sequence 1"], value="Sequence 1", visible=False)
+                        easy_zshot_original_file_path_state = gr.State("")
+                        easy_zshot_original_paste_content_state = gr.State("")
+                        easy_zshot_selected_sequence_state = gr.State("Sequence 1")
+                        easy_zshot_sequence_state = gr.State({})
+                        easy_zshot_current_file_state = gr.State("")
+                        
                         gr.Markdown("### Configure AI Analysis (Optional)")
-                        
-                        enable_ai_zshot = gr.Checkbox(label="Enable AI Summary", value=False)
-                        with gr.Group(visible=False) as ai_box_zshot:
-                            ai_model_dd_zshot = gr.Dropdown(
-                                choices=list(AI_MODELS.keys()), 
-                                value="DeepSeek", 
-                                label="Select AI Model"
-                            )
-                            ai_status_zshot = gr.Markdown(
-                                value="✓ Using provided API Key" if os.getenv("DEEPSEEK_API_KEY") else "⚠ No API Key found in .env file",
-                                visible=True
-                            )
-                            api_key_in_zshot = gr.Textbox(
-                                label="API Key", 
-                                type="password", 
-                                placeholder="Enter your API Key if needed",
-                                visible=not bool(os.getenv("DEEPSEEK_API_KEY"))
-                            )
-                        
+                        with gr.Accordion("AI Settings", open=True):
+                            enable_ai_zshot = gr.Checkbox(label="Enable AI Summary", value=False)
+                            with gr.Group(visible=False) as ai_box_zshot:
+                                ai_model_dd_zshot = gr.Dropdown(
+                                    choices=list(AI_MODELS.keys()), 
+                                    value="DeepSeek", 
+                                    label="Select AI Model"
+                                )
+                                ai_status_zshot = gr.Markdown(
+                                    value="✓ Using provided API Key" if os.getenv("DEEPSEEK_API_KEY") else "⚠ No API Key found in .env file",
+                                    visible=True
+                                )
+                                api_key_in_zshot = gr.Textbox(
+                                    label="API Key", 
+                                    type="password", 
+                                    placeholder="Enter your API Key if needed",
+                                    visible=not bool(os.getenv("DEEPSEEK_API_KEY"))
+                                )
                         easy_zshot_predict_btn = gr.Button("🚀 Start Prediction", variant="primary")
 
                     with gr.Column(scale=3):
@@ -1342,10 +1602,10 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         zero_shot_status_box = gr.Textbox(label="Status", interactive=False)
                         
                         with gr.Tabs():
-                            with gr.TabItem("📈 Prediction Heatmap"):
-                                zero_shot_plot_out = gr.Plot(label="Heatmap")
                             with gr.TabItem("📊 Raw Results"):
                                 zero_shot_df_out = gr.DataFrame(label="Raw Data")
+                            with gr.TabItem("📈 Prediction Heatmap"):
+                                zero_shot_plot_out = gr.Plot(label="Heatmap")
                             with gr.TabItem("👨‍🔬 AI Expert Analysis"):
                                 # function_results_plot = gr.Plot(label="Confidence Scores")
                                 zero_shot_ai_expert_html = gr.HTML(
@@ -1360,48 +1620,47 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             with gr.TabItem("Protein Function Prediction"):
                 with gr.Row(equal_height=False):
                     with gr.Column(scale=2):
-                        gr.Markdown("### Select Task & Upload File")
+                        gr.Markdown("**Model Configuration**")
                         easy_func_task_dd = gr.Dropdown(choices=list(DATASET_MAPPING_FUNCTION.keys()), label="Select Task", value="Solubility")
-                        base_function_fasta_upload = gr.File(label="Upload FASTA file", file_types=[".fasta", ".fa"])
-                        base_function_file_example = gr.Examples(
-                            examples=[["./download/P60002.fasta"]],
-                            inputs=base_function_fasta_upload,
-                            label="Click example to load"
-                        )
-                        
-                        # Add paste content functionality
-                        with gr.Accordion("📋 Paste Content Directly", open=False):
-                            base_func_paste_content_input = gr.Textbox(
-                                label="Paste FASTA Content",
-                                placeholder="Paste FASTA content here...",
-                                lines=8,
-                                max_lines=15
-                            )
-                            base_func_paste_content_btn = gr.Button("🔍 Detect & Save Content", variant="secondary", size="sm")
-                            base_func_paste_content_status = gr.Textbox(label="Status", interactive=False, lines=2)
+                        gr.Markdown("**Data Input**")
+                        with gr.Tabs():
+                            with gr.TabItem("Upload FASTA File"):
+                                base_function_fasta_upload = gr.File(label="Upload FASTA file", file_types=[".fasta", ".fa"])
+                                base_function_file_example = gr.Examples(examples=[["./download/P60002.fasta"]], inputs=base_function_fasta_upload, label="Click example to load")
+                            with gr.TabItem("Paste FASTA Content"):
+                                base_func_paste_content_input = gr.Textbox(label="Paste FASTA Content", placeholder="Paste FASTA content here...", lines=8, max_lines=15)
+                                with gr.Row():
+                                    base_func_paste_content_btn = gr.Button("🔍 Detect & Save Content", variant="primary", size="m")
+                                    base_func_paste_clear_btn = gr.Button("🗑️ Clear", variant="primary", size="m")
                         
                         base_function_protein_display = gr.Textbox(label="Uploaded Protein Sequence", interactive=False, lines=3, max_lines=7)
+                        base_function_selector = gr.Dropdown(label="Select Chain", choices=["Sequence 1"], value="Sequence 1", visible=False)
+                        base_function_original_file_path_state = gr.State("")
+                        base_function_original_paste_content_state = gr.State("")
+                        base_function_selected_sequence_state = gr.State("Sequence 1")
+                        base_function_sequence_state = gr.State({})
+                        base_function_current_file_state = gr.State("")
 
                         gr.Markdown("### Configure AI Analysis (Optional)")
-                        enable_ai_func = gr.Checkbox(label="Enable AI Summary", value=False)
                         with gr.Accordion("AI Settings", open=True):
-                            with gr.Group(visible=False) as ai_box_func:
-                                ai_model_dd_func = gr.Dropdown(
-                                    choices=list(AI_MODELS.keys()), 
-                                    label="Select AI Model", 
-                                    value="DeepSeek"
-                                )
-                                ai_status_func = gr.Markdown(
-                                    value="✓ Using provided API Key" if os.getenv("DEEPSEEK_API_KEY") else "⚠ No API Key found in .env file",
-                                    visible=True
-                                )
-                                api_key_in_func = gr.Textbox(
-                                    label="API Key", 
-                                    type="password", 
-                                    placeholder="Enter your API Key if needed",
-                                    visible=not bool(os.getenv("DEEPSEEK_API_KEY"))
-                                )
-
+                            enable_ai_func = gr.Checkbox(label="Enable AI Summary", value=False)
+                            with gr.Accordion("AI Settings", open=True):
+                                with gr.Group(visible=False) as ai_box_func:
+                                    ai_model_dd_func = gr.Dropdown(
+                                        choices=list(AI_MODELS.keys()), 
+                                        label="Select AI Model", 
+                                        value="DeepSeek"
+                                    )
+                                    ai_status_func = gr.Markdown(
+                                        value="✓ Using provided API Key" if os.getenv("DEEPSEEK_API_KEY") else "⚠ No API Key found in .env file",
+                                        visible=True
+                                    )
+                                    api_key_in_func = gr.Textbox(
+                                        label="API Key", 
+                                        type="password", 
+                                        placeholder="Enter your API Key if needed",
+                                        visible=not bool(os.getenv("DEEPSEEK_API_KEY"))
+                                    )
                         easy_func_predict_btn = gr.Button("🚀 Start Prediction", variant="primary")
                 
                     with gr.Column(scale=3):
@@ -1411,69 +1670,124 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                             with gr.TabItem("📊 Raw Results"):
                                 function_results_df = gr.DataFrame(label="Prediction Data", column_widths=["20%", "20%", "20%", "20%", "20%"])
                             with gr.TabItem("👨‍🔬 AI Expert Analysis"):
-                                # function_results_plot = gr.Plot(label="Confidence Scores")
                                 function_ai_expert_html = gr.HTML(
                                     value="<div style='height: 300px; display: flex; align-items: center; justify-content: center; color: #666;'>AI analysis will appear here...</div>",
                                     label="👨‍🔬 AI Expert Analysis"
                                 )
                         function_download_btn = gr.DownloadButton("💾 Download Results", visible=False)
 
-        # --- EVENT HANDLERS ---
-        # Mutation prediction tab events
+        def clear_paste_content_pdb():
+            return "", "", gr.update(choices=["A"], value="A", visible=False), {}, "A", ""
+
+        def clear_paste_content_fasta():
+            return "", "", gr.update(choices=["Sequence 1"], value="Sequence 1", visible=False), {}, "Sequence 1", ""
+
+        def toggle_ai_section_simple(is_checked: bool):
+            return gr.update(visible=is_checked)
+        
+        def on_ai_model_change_simple(ai_provider: str) -> tuple:
+            if ai_provider == "DeepSeek":
+                return gr.update(visible=False), gr.update(visible=True)
+            else:
+                return gr.update(visible=True), gr.update(visible=False)
+        
+        def handle_paste_fasta_detect(fasta_content):
+            result = parse_fasta_paste_content(fasta_content)
+            return result + (fasta_content, )
+        
         enable_ai_zshot.change(fn=toggle_ai_section, inputs=enable_ai_zshot, outputs=ai_box_zshot)
+        enable_ai_func.change(fn=toggle_ai_section, inputs=enable_ai_func, outputs=ai_box_func)
+
         ai_model_dd_zshot.change(
             fn=on_ai_model_change,
             inputs=ai_model_dd_zshot,
             outputs=[api_key_in_zshot, ai_status_zshot]
         )
-        easy_zshot_file_upload.upload(fn=handle_file_upload, inputs=easy_zshot_file_upload, outputs=easy_zshot_protein_display)
-        easy_zshot_file_upload.change(fn=handle_file_upload, inputs=easy_zshot_file_upload, outputs=easy_zshot_protein_display)
-        easy_zshot_predict_btn.click(
-            fn=handle_mutation_prediction_base,
-            inputs=[zero_shot_function_dd, easy_zshot_file_upload, enable_ai_zshot, ai_model_dd_zshot, api_key_in_zshot, zero_shot_model_dd],
-            outputs=[zero_shot_status_box, zero_shot_plot_out, zero_shot_df_out, zero_shot_download_btn, zero_shot_download_path_state, zero_shot_view_controls, zero_shot_full_data_state, zero_shot_ai_expert_html],
-            show_progress=True
-        )
-        # Function prediction tab events  
-        enable_ai_func.change(fn=toggle_ai_section, inputs=enable_ai_func, outputs=ai_box_func)
         ai_model_dd_func.change(
             fn=on_ai_model_change,
             inputs=ai_model_dd_func,
             outputs=[api_key_in_func, ai_status_func]
         )
-        base_function_fasta_upload.upload(fn=handle_file_upload, inputs=base_function_fasta_upload, outputs=base_function_protein_display)
-        base_function_fasta_upload.change(fn=handle_file_upload, inputs=base_function_fasta_upload, outputs=base_function_protein_display)
+
+        easy_zshot_file_upload.upload(
+            fn=handle_file_upload, 
+            inputs=easy_zshot_file_upload, 
+            outputs=[easy_zshot_protein_display, easy_zshot_sequence_selector, easy_zshot_sequence_state, easy_zshot_selected_sequence_state, easy_zshot_original_file_path_state, easy_zshot_current_file_state]
+        )
+        easy_zshot_file_upload.change(
+            fn=handle_file_upload, 
+            inputs=easy_zshot_file_upload, 
+            outputs=[easy_zshot_protein_display, easy_zshot_sequence_selector, easy_zshot_sequence_state, easy_zshot_selected_sequence_state, easy_zshot_original_file_path_state, easy_zshot_current_file_state]
+        )
+        easy_zshot_paste_clear_btn.click(
+            fn=clear_paste_content_fasta,
+            outputs=[easy_zshot_paste_content_input, easy_zshot_protein_display, easy_zshot_sequence_selector, easy_zshot_sequence_state, easy_zshot_selected_sequence_state, easy_zshot_original_file_path_state]
+        )
+        easy_zshot_paste_content_btn.click(
+            fn=handle_paste_fasta_detect,
+            inputs=easy_zshot_paste_content_input,
+            outputs=[easy_zshot_protein_display, easy_zshot_sequence_selector, easy_zshot_sequence_state, easy_zshot_selected_sequence_state, easy_zshot_original_file_path_state, easy_zshot_original_paste_content_state]
+        )
+        
+        def handle_sequence_change_unified(selected_chain, chains_dict, original_file_path, original_paste_content):
+            if original_file_path.endswith('.fasta'):
+                if original_paste_content:
+                    return handle_paste_sequence_selection(selected_chain, chains_dict, original_paste_content)
+                else:
+                    return handle_fasta_sequence_change(selected_chain, chains_dict, original_file_path)
+            elif original_file_path.endswith('.pdb'):
+                if original_paste_content:
+                    return handle_paste_chain_selection(selected_chain, chains_dict, original_paste_content)
+                else:
+                    return handle_pdb_chain_change(selected_chain, chains_dict, original_file_path)
+
+        easy_zshot_sequence_selector.change(
+            fn=handle_sequence_change_unified,
+            inputs=[easy_zshot_sequence_selector, easy_zshot_sequence_state, easy_zshot_original_file_path_state, easy_zshot_original_paste_content_state],
+            outputs=[easy_zshot_protein_display, easy_zshot_current_file_state]
+        )
+
+        easy_zshot_predict_btn.click(
+            fn=handle_mutation_prediction_base,
+            inputs=[zero_shot_function_dd, easy_zshot_current_file_state, enable_ai_zshot, ai_model_dd_zshot, api_key_in_zshot, zero_shot_model_dd],
+            outputs=[zero_shot_status_box, zero_shot_plot_out, zero_shot_df_out, zero_shot_download_btn, zero_shot_download_path_state, zero_shot_view_controls, zero_shot_full_data_state, zero_shot_ai_expert_html],
+            show_progress=True
+        )
+
+        base_function_fasta_upload.upload(
+            fn=handle_file_upload, 
+            inputs=base_function_fasta_upload, 
+            outputs=[base_function_protein_display, base_function_selector, base_function_sequence_state, base_function_selected_sequence_state, base_function_original_file_path_state, base_function_current_file_state]
+        )
+        base_function_fasta_upload.change(
+            fn=handle_file_upload, 
+            inputs=base_function_fasta_upload, 
+            outputs=[base_function_protein_display, base_function_selector, base_function_sequence_state, base_function_selected_sequence_state, base_function_original_file_path_state, base_function_current_file_state]
+        )
+
+        base_func_paste_clear_btn.click(
+            fn=clear_paste_content_fasta,
+            outputs=[base_func_paste_content_input, base_function_protein_display, base_function_selector, base_function_sequence_state, base_function_selected_sequence_state, base_function_original_file_path_state]
+        )
+
+        base_func_paste_content_btn.click(
+            fn=handle_paste_fasta_detect,
+            inputs=base_func_paste_content_input,
+            outputs=[base_function_protein_display, base_function_selector, base_function_sequence_state, base_function_selected_sequence_state, base_function_original_file_path_state, base_function_original_paste_content_state]
+        )
+
+        base_function_selector.change(
+            fn=handle_sequence_change_unified,
+            inputs=[base_function_selector, base_function_sequence_state, base_function_original_file_path_state, base_function_original_paste_content_state],
+            outputs=[base_function_protein_display, base_function_current_file_state]
+        )
+
         easy_func_predict_btn.click(
             fn=handle_protein_function_prediction,
-            inputs=[easy_func_task_dd, base_function_fasta_upload, enable_ai_func, ai_model_dd_func, api_key_in_func],
+            inputs=[easy_func_task_dd, base_function_current_file_state, enable_ai_func, ai_model_dd_func, api_key_in_func],
             outputs=[function_status_textbox, function_results_df, function_download_btn, function_ai_expert_html, gr.State()], 
             show_progress=True
         )
 
-        # Paste content processing function
-        def handle_paste_content_quick(content, display_component, file_upload_component):
-            if not content:
-                return "", "❌ Please enter content", None
-            file_path, content_type, status_msg = process_pasted_content(content)
-            if file_path:
-                # Update display component
-                if content_type == 'fasta':
-                    sequence = _read_fasta_file(file_path)
-                else:
-                    sequence = _read_pdb_file(file_path)
-                return sequence, status_msg, file_path
-            return "", status_msg, None
-
-        easy_zshot_paste_content_btn.click(
-            fn=lambda x: handle_paste_content_quick(x, easy_zshot_protein_display, easy_zshot_file_upload),
-            inputs=[easy_zshot_paste_content_input],
-            outputs=[easy_zshot_protein_display, easy_zshot_paste_content_status, easy_zshot_file_upload]
-        )
-        
-        base_func_paste_content_btn.click(
-            fn=lambda x: handle_paste_content_quick(x, base_function_protein_display, base_function_fasta_upload),
-            inputs=[base_func_paste_content_input],
-            outputs=[base_function_protein_display, base_func_paste_content_status, base_function_fasta_upload]
-        )
 
     return {}
