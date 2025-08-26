@@ -640,7 +640,7 @@ def process_fasta_file_upload(file_path):
         
 def handle_file_upload(file_obj: Any) -> str:
     if not file_obj:
-        return ""
+        return "", "", "", "", "", ""
     if isinstance(file_obj, str):
         file_path = file_obj
     else:
