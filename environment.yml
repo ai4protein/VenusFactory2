@@ -87,10 +87,10 @@ dependencies:
       - attrs==24.2.0
       - babel==2.16.0
       - beautifulsoup4==4.12.3
-      - bio==1.7.1
-      - biopython==1.84
+      - bio==1.8.0
+      - biopython==1.85
       - biothings-client==0.3.1
-      - biotite==0.41.2
+      - biotite==1.4.0
       - biotraj==1.2.2
       - bleach==6.2.0
       - bottle==0.12.25
