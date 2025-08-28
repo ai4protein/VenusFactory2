@@ -1,0 +1,10 @@
+{
+    "dataset": "AI4Protein/VenusX_Frag_Act_MF70",
+    "num_labels": 132,
+    "problem_type": "single_label_classification",
+    "sequence_column_name": "seq_fragment",
+    "label_column_name": "interpro_label",
+    "metrics": "accuracy,mcc,f1,precision,recall,auroc",
+    "monitor": "mcc",
+    "monitor_strategy": "max"
+}
