@@ -1,0 +1,310 @@
+{
+  "input_file": "download/alphafold2_structures/A0A0C5B5G6.pdb",
+  "file_type": "pdb",
+  "chain_id": "A",
+  "analysis_timestamp": "2025-08-28T21:29:16.608243",
+  "properties": {
+    "physicochemical": {
+      "sequence_id": "A0A0C5B5G6.pdb_chain_A",
+      "sequence_length": 16,
+      "molecular_weight": 2174.59,
+      "theoretical_pI": 10.27,
+      "aromaticity": 0.25,
+      "instability_index": 77.3,
+      "gravy": -0.938,
+      "secondary_structure_fraction": {
+        "helix": 0.312,
+        "turn": 0.125,
+        "sheet": 0.375
+      },
+      "amino_acid_composition": {
+        "A": 0.0,
+        "C": 0.0,
+        "D": 0.0,
+        "E": 0.0625,
+        "F": 0.0625,
+        "G": 0.0625,
+        "H": 0.0,
+        "I": 0.0625,
+        "K": 0.0625,
+        "L": 0.0625,
+        "M": 0.125,
+        "N": 0.0,
+        "P": 0.0625,
+        "Q": 0.0625,
+        "R": 0.1875,
+        "S": 0.0,
+        "T": 0.0,
+        "V": 0.0,
+        "W": 0.0625,
+        "Y": 0.125
+      }
+    },
+    "sasa": {
+      "chain_id": "A",
+      "total_sasa": 2924.19,
+      "residue_sasa": {
+        "1": {
+          "resname": "MET",
+          "sasa": 247.46
+        },
+        "2": {
+          "resname": "ARG",
+          "sasa": 219.33
+        },
+        "3": {
+          "resname": "TRP",
+          "sasa": 236.49
+        },
+        "4": {
+          "resname": "GLN",
+          "sasa": 171.4
+        },
+        "5": {
+          "resname": "GLU",
+          "sasa": 168.38
+        },
+        "6": {
+          "resname": "MET",
+          "sasa": 182.15
+        },
+        "7": {
+          "resname": "GLY",
+          "sasa": 65.37
+        },
+        "8": {
+          "resname": "TYR",
+          "sasa": 210.44
+        },
+        "9": {
+          "resname": "ILE",
+          "sasa": 108.01
+        },
+        "10": {
+          "resname": "PHE",
+          "sasa": 180.06
+        },
+        "11": {
+          "resname": "TYR",
+          "sasa": 168.43
+        },
+        "12": {
+          "resname": "PRO",
+          "sasa": 111.2
+        },
+        "13": {
+          "resname": "ARG",
+          "sasa": 210.53
+        },
+        "14": {
+          "resname": "LYS",
+          "sasa": 189.78
+        },
+        "15": {
+          "resname": "LEU",
+          "sasa": 167.49
+        },
+        "16": {
+          "resname": "ARG",
+          "sasa": 287.67
+        }
+      }
+    },
+    "rsa": {
+      "chain_id": "A",
+      "exposed_residues": 16,
+      "buried_residues": 0,
+      "residue_rsa": {
+        "1": {
+          "aa": "M",
+          "rsa": 1.0,
+          "location": "exposed"
+        },
+        "2": {
+          "aa": "R",
+          "rsa": 0.9758064516129032,
+          "location": "exposed"
+        },
+        "3": {
+          "aa": "W",
+          "rsa": 1.0,
+          "location": "exposed"
+        },
+        "4": {
+          "aa": "Q",
+          "rsa": 0.9292929292929293,
+          "location": "exposed"
+        },
+        "5": {
+          "aa": "E",
+          "rsa": 0.9536082474226805,
+          "location": "exposed"
+        },
+        "6": {
+          "aa": "M",
+          "rsa": 0.9574468085106383,
+          "location": "exposed"
+        },
+        "7": {
+          "aa": "G",
+          "rsa": 0.8214285714285714,
+          "location": "exposed"
+        },
+        "8": {
+          "aa": "Y",
+          "rsa": 0.954954954954955,
+          "location": "exposed"
+        },
+        "9": {
+          "aa": "I",
+          "rsa": 0.6923076923076923,
+          "location": "exposed"
+        },
+        "10": {
+          "aa": "F",
+          "rsa": 0.9543147208121827,
+          "location": "exposed"
+        },
+        "11": {
+          "aa": "Y",
+          "rsa": 0.7882882882882883,
+          "location": "exposed"
+        },
+        "12": {
+          "aa": "P",
+          "rsa": 0.8308823529411765,
+          "location": "exposed"
+        },
+        "13": {
+          "aa": "R",
+          "rsa": 0.9233870967741935,
+          "location": "exposed"
+        },
+        "14": {
+          "aa": "K",
+          "rsa": 0.975609756097561,
+          "location": "exposed"
+        },
+        "15": {
+          "aa": "L",
+          "rsa": 1.0,
+          "location": "exposed"
+        },
+        "16": {
+          "aa": "R",
+          "rsa": 1.0,
+          "location": "exposed"
+        }
+      }
+    },
+    "secondary_structure": {
+      "chain_id": "A",
+      "aa_sequence": "MRWQEMGYIFYPRKLR",
+      "ss8_sequence": "----------------",
+      "ss3_sequence": "CCCCCCCCCCCCCCCC",
+      "ss_counts": {
+        "helix": 0,
+        "sheet": 0,
+        "coil": 16
+      },
+      "residue_ss": {
+        "1": {
+          "aa_seq": "M",
+          "ss8_seq": "-",
+          "ss3_seq": "C",
+          "ss8_name": "Loop/Irregular"
+        },
+        "2": {
+          "aa_seq": "R",
+          "ss8_seq": "-",
+          "ss3_seq": "C",
+          "ss8_name": "Loop/Irregular"
+        },
+        "3": {
+          "aa_seq": "W",
+          "ss8_seq": "-",
+          "ss3_seq": "C",
+          "ss8_name": "Loop/Irregular"
+        },
+        "4": {
+          "aa_seq": "Q",
+          "ss8_seq": "-",
+          "ss3_seq": "C",
+          "ss8_name": "Loop/Irregular"
+        },
+        "5": {
+          "aa_seq": "E",
+          "ss8_seq": "-",
+          "ss3_seq": "C",
+          "ss8_name": "Loop/Irregular"
+        },
+        "6": {
+          "aa_seq": "M",
+          "ss8_seq": "-",
+          "ss3_seq": "C",
+          "ss8_name": "Loop/Irregular"
+        },
+        "7": {
+          "aa_seq": "G",
+          "ss8_seq": "-",
+          "ss3_seq": "C",
+          "ss8_name": "Loop/Irregular"
+        },
+        "8": {
+          "aa_seq": "Y",
+          "ss8_seq": "-",
+          "ss3_seq": "C",
+          "ss8_name": "Loop/Irregular"
+        },
+        "9": {
+          "aa_seq": "I",
+          "ss8_seq": "-",
+          "ss3_seq": "C",
+          "ss8_name": "Loop/Irregular"
+        },
+        "10": {
+          "aa_seq": "F",
+          "ss8_seq": "-",
+          "ss3_seq": "C",
+          "ss8_name": "Loop/Irregular"
+        },
+        "11": {
+          "aa_seq": "Y",
+          "ss8_seq": "-",
+          "ss3_seq": "C",
+          "ss8_name": "Loop/Irregular"
+        },
+        "12": {
+          "aa_seq": "P",
+          "ss8_seq": "-",
+          "ss3_seq": "C",
+          "ss8_name": "Loop/Irregular"
+        },
+        "13": {
+          "aa_seq": "R",
+          "ss8_seq": "-",
+          "ss3_seq": "C",
+          "ss8_name": "Loop/Irregular"
+        },
+        "14": {
+          "aa_seq": "K",
+          "ss8_seq": "-",
+          "ss3_seq": "C",
+          "ss8_name": "Loop/Irregular"
+        },
+        "15": {
+          "aa_seq": "L",
+          "ss8_seq": "-",
+          "ss3_seq": "C",
+          "ss8_name": "Loop/Irregular"
+        },
+        "16": {
+          "aa_seq": "R",
+          "ss8_seq": "-",
+          "ss3_seq": "C",
+          "ss8_name": "Loop/Irregular"
+        }
+      }
+    }
+  }
+}

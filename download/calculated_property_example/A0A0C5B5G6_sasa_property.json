@@ -1,0 +1,77 @@
+{
+  "pdb_file": "download/alphafold2_structures/A0A0C5B5G6.pdb",
+  "algorithm": "Shrake-Rupley",
+  "units": "Å^2",
+  "chains": {
+    "A": {
+      "total_sasa": 2924.19,
+      "residue_count": 16,
+      "residue_sasa": {
+        "1": {
+          "resname": "MET",
+          "sasa": 247.46
+        },
+        "2": {
+          "resname": "ARG",
+          "sasa": 219.33
+        },
+        "3": {
+          "resname": "TRP",
+          "sasa": 236.49
+        },
+        "4": {
+          "resname": "GLN",
+          "sasa": 171.4
+        },
+        "5": {
+          "resname": "GLU",
+          "sasa": 168.38
+        },
+        "6": {
+          "resname": "MET",
+          "sasa": 182.15
+        },
+        "7": {
+          "resname": "GLY",
+          "sasa": 65.37
+        },
+        "8": {
+          "resname": "TYR",
+          "sasa": 210.44
+        },
+        "9": {
+          "resname": "ILE",
+          "sasa": 108.01
+        },
+        "10": {
+          "resname": "PHE",
+          "sasa": 180.06
+        },
+        "11": {
+          "resname": "TYR",
+          "sasa": 168.43
+        },
+        "12": {
+          "resname": "PRO",
+          "sasa": 111.2
+        },
+        "13": {
+          "resname": "ARG",
+          "sasa": 210.53
+        },
+        "14": {
+          "resname": "LYS",
+          "sasa": 189.78
+        },
+        "15": {
+          "resname": "LEU",
+          "sasa": 167.49
+        },
+        "16": {
+          "resname": "ARG",
+          "sasa": 287.67
+        }
+      }
+    }
+  }
+}

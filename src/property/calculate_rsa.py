@@ -1,5 +1,6 @@
 import os
 import argparse
+import json
 from Bio.PDB import PDBParser
 from Bio.PDB.DSSP import DSSP
 
@@ -57,15 +58,49 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Calculate RSA from PDB file')
     parser.add_argument('--pdb_file', type=str, required=True, help='Path to the PDB file')
     parser.add_argument('--chain_id', type=str, default='A', help='Chain ID to analyze (default is "A")')
+    parser.add_argument('--output_file', type=str, default=None, help='(optional) path to the output JSON file.\nIf not provided, the results will be printed to the screen.')
     args = parser.parse_args()
 
     # calculate the RSA value of chain 'A'
     all_rsa_values = calculate_rsa_from_pdb(args.pdb_file, chain_id=args.chain_id)
 
     if all_rsa_values:
-        print(f"successfully calculate the RSA value of chain '{args.chain_id}' in file '{args.pdb_file}'")
-        for res_id, data in all_rsa_values.items():
-            aa = data['aa']
-            rsa = data['rsa']
-            location = "Exposed (surface)" if rsa >= 0.25 else "Buried (core)"
-            print(f"  residue {res_id} ({aa}): RSA = {rsa:.3f}  ({location})")
+        # Prepare results for output
+        exposed_count = sum(1 for res in all_rsa_values.values() if res['rsa'] >= 0.25)
+        buried_count = len(all_rsa_values) - exposed_count
+        
+        # Add location information to each residue
+        for res_id, res_data in all_rsa_values.items():
+            res_data['location'] = 'exposed' if res_data['rsa'] >= 0.25 else 'buried'
+        
+        results = {
+            'chain_id': args.chain_id,
+            'pdb_file': args.pdb_file,
+            'exposed_residues': exposed_count,
+            'buried_residues': buried_count,
+            'total_residues': len(all_rsa_values),
+            'residue_rsa': all_rsa_values
+        }
+        
+        if args.output_file:
+            # Write results to JSON file
+            try:
+                with open(args.output_file, 'w') as f:
+                    json.dump(results, f, indent=2, ensure_ascii=False)
+                print(f"\n✅ Results saved to: {args.output_file}")
+            except IOError as e:
+                print(f"error: cannot write to file '{args.output_file}': {e}")
+        else:
+            # Print results to screen
+            print(f"successfully calculate the RSA value of chain '{args.chain_id}' in file '{args.pdb_file}'")
+            print("-" * 50)
+            print(f"Exposed residues: {exposed_count}")
+            print(f"Buried residues: {buried_count}")
+            print(f"Total residues: {len(all_rsa_values)}")
+            print("-" * 50)
+            for res_id, data in all_rsa_values.items():
+                aa = data['aa']
+                rsa = data['rsa']
+                location = "Exposed (surface)" if rsa >= 0.25 else "Buried (core)"
+                print(f"  residue {res_id} ({aa}): RSA = {rsa:.3f}  ({location})")
+            print("-" * 50)

@@ -1,0 +1,110 @@
+{
+  "chain_id": "A",
+  "pdb_file": "download/alphafold2_structures/A0A0C5B5G6.pdb",
+  "aa_sequence": "MRWQEMGYIFYPRKLR",
+  "ss8_sequence": "----------------",
+  "ss3_sequence": "CCCCCCCCCCCCCCCC",
+  "ss_counts": {
+    "helix": 0,
+    "sheet": 0,
+    "coil": 16
+  },
+  "residue_ss": {
+    "1": {
+      "aa_seq": "M",
+      "ss8_seq": "-",
+      "ss3_seq": "C",
+      "ss8_name": "Loop/Irregular"
+    },
+    "2": {
+      "aa_seq": "R",
+      "ss8_seq": "-",
+      "ss3_seq": "C",
+      "ss8_name": "Loop/Irregular"
+    },
+    "3": {
+      "aa_seq": "W",
+      "ss8_seq": "-",
+      "ss3_seq": "C",
+      "ss8_name": "Loop/Irregular"
+    },
+    "4": {
+      "aa_seq": "Q",
+      "ss8_seq": "-",
+      "ss3_seq": "C",
+      "ss8_name": "Loop/Irregular"
+    },
+    "5": {
+      "aa_seq": "E",
+      "ss8_seq": "-",
+      "ss3_seq": "C",
+      "ss8_name": "Loop/Irregular"
+    },
+    "6": {
+      "aa_seq": "M",
+      "ss8_seq": "-",
+      "ss3_seq": "C",
+      "ss8_name": "Loop/Irregular"
+    },
+    "7": {
+      "aa_seq": "G",
+      "ss8_seq": "-",
+      "ss3_seq": "C",
+      "ss8_name": "Loop/Irregular"
+    },
+    "8": {
+      "aa_seq": "Y",
+      "ss8_seq": "-",
+      "ss3_seq": "C",
+      "ss8_name": "Loop/Irregular"
+    },
+    "9": {
+      "aa_seq": "I",
+      "ss8_seq": "-",
+      "ss3_seq": "C",
+      "ss8_name": "Loop/Irregular"
+    },
+    "10": {
+      "aa_seq": "F",
+      "ss8_seq": "-",
+      "ss3_seq": "C",
+      "ss8_name": "Loop/Irregular"
+    },
+    "11": {
+      "aa_seq": "Y",
+      "ss8_seq": "-",
+      "ss3_seq": "C",
+      "ss8_name": "Loop/Irregular"
+    },
+    "12": {
+      "aa_seq": "P",
+      "ss8_seq": "-",
+      "ss3_seq": "C",
+      "ss8_name": "Loop/Irregular"
+    },
+    "13": {
+      "aa_seq": "R",
+      "ss8_seq": "-",
+      "ss3_seq": "C",
+      "ss8_name": "Loop/Irregular"
+    },
+    "14": {
+      "aa_seq": "K",
+      "ss8_seq": "-",
+      "ss3_seq": "C",
+      "ss8_name": "Loop/Irregular"
+    },
+    "15": {
+      "aa_seq": "L",
+      "ss8_seq": "-",
+      "ss3_seq": "C",
+      "ss8_name": "Loop/Irregular"
+    },
+    "16": {
+      "aa_seq": "R",
+      "ss8_seq": "-",
+      "ss3_seq": "C",
+      "ss8_name": "Loop/Irregular"
+    }
+  }
+}

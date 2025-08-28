@@ -1,0 +1,89 @@
+{
+  "chain_id": "A",
+  "pdb_file": "download/alphafold2_structures/A0A0C5B5G6.pdb",
+  "exposed_residues": 16,
+  "buried_residues": 0,
+  "total_residues": 16,
+  "residue_rsa": {
+    "1": {
+      "aa": "M",
+      "rsa": 1.0,
+      "location": "exposed"
+    },
+    "2": {
+      "aa": "R",
+      "rsa": 0.9758064516129032,
+      "location": "exposed"
+    },
+    "3": {
+      "aa": "W",
+      "rsa": 1.0,
+      "location": "exposed"
+    },
+    "4": {
+      "aa": "Q",
+      "rsa": 0.9292929292929293,
+      "location": "exposed"
+    },
+    "5": {
+      "aa": "E",
+      "rsa": 0.9536082474226805,
+      "location": "exposed"
+    },
+    "6": {
+      "aa": "M",
+      "rsa": 0.9574468085106383,
+      "location": "exposed"
+    },
+    "7": {
+      "aa": "G",
+      "rsa": 0.8214285714285714,
+      "location": "exposed"
+    },
+    "8": {
+      "aa": "Y",
+      "rsa": 0.954954954954955,
+      "location": "exposed"
+    },
+    "9": {
+      "aa": "I",
+      "rsa": 0.6923076923076923,
+      "location": "exposed"
+    },
+    "10": {
+      "aa": "F",
+      "rsa": 0.9543147208121827,
+      "location": "exposed"
+    },
+    "11": {
+      "aa": "Y",
+      "rsa": 0.7882882882882883,
+      "location": "exposed"
+    },
+    "12": {
+      "aa": "P",
+      "rsa": 0.8308823529411765,
+      "location": "exposed"
+    },
+    "13": {
+      "aa": "R",
+      "rsa": 0.9233870967741935,
+      "location": "exposed"
+    },
+    "14": {
+      "aa": "K",
+      "rsa": 0.975609756097561,
+      "location": "exposed"
+    },
+    "15": {
+      "aa": "L",
+      "rsa": 1.0,
+      "location": "exposed"
+    },
+    "16": {
+      "aa": "R",
+      "rsa": 1.0,
+      "location": "exposed"
+    }
+  }
+}
