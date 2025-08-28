@@ -47,7 +47,9 @@ def evaluate(model, plm_model, metrics, dataloader, loss_function, device=None):
             
         for k, v in batch.items():
             batch[k] = v.to(device)
-        label = batch["label"]
+        # Use the label column name from args if available, otherwise default to "label"
+        label_column_name = getattr(args, 'label_column_name', 'label')
+        label = batch[label_column_name]
         
         logits = model(plm_model, batch)
         pred_labels.extend(logits.argmax(dim=1).cpu().numpy())
@@ -269,7 +271,9 @@ if __name__ == '__main__':
         prosst_stru_tokens = [] if "ProSST" in args.plm_model else None
         
         for e in examples:
-            aa_seq = e["aa_seq"]
+            # Use the sequence column name from args if available, otherwise default to "aa_seq"
+            sequence_column_name = getattr(args, 'sequence_column_name', 'aa_seq')
+            aa_seq = e[sequence_column_name]
             if args.use_foldseek:
                 foldseek_seq = e["foldseek_seq"]
             if args.use_ss8:
@@ -306,7 +310,9 @@ if __name__ == '__main__':
                 foldseek_seqs.append(foldseek_seq)
             if args.use_ss8:
                 ss8_seqs.append(ss8_seq)
-            labels.append(e["label"])
+            # Use the label column name from args if available, otherwise default to "label"
+            label_column_name = getattr(args, 'label_column_name', 'label')
+            labels.append(e[label_column_name])
         
         if 'ankh' in args.plm_model:
             aa_inputs = tokenizer.batch_encode_plus(aa_seqs, add_special_tokens=True, padding=True, is_split_into_words=True, return_tensors="pt")
@@ -359,15 +365,19 @@ if __name__ == '__main__':
     loss_function = nn.CrossEntropyLoss()
     
     def process_data_line(data):
+        # Use the column names from args if available, otherwise use defaults
+        sequence_column_name = getattr(args, 'sequence_column_name', 'aa_seq')
+        label_column_name = getattr(args, 'label_column_name', 'label')
+        
         if args.problem_type == 'multi_label_classification':
-            label_list = data['label'].split(',')
-            data['label'] = [int(l) for l in label_list]
+            label_list = data[label_column_name].split(',')
+            data[label_column_name] = [int(l) for l in label_list]
             binary_list = [0] * args.num_labels
-            for index in data['label']:
+            for index in data[label_column_name]:
                 binary_list[index] = 1
-            data['label'] = binary_list
+            data[label_column_name] = binary_list
         if args.max_seq_len is not None:
-            data["aa_seq"] = data["aa_seq"][:args.max_seq_len]
+            data[sequence_column_name] = data[sequence_column_name][:args.max_seq_len]
             if args.use_foldseek:
                 data["foldseek_seq"] = data["foldseek_seq"][:args.max_seq_len]
             if args.use_ss8:
@@ -380,9 +390,9 @@ if __name__ == '__main__':
                     pass
                 elif isinstance(data["prosst_stru_token"], (list, tuple)):
                     data["prosst_stru_token"] = data["prosst_stru_token"][:args.max_seq_len]
-            token_num = min(len(data["aa_seq"]), args.max_seq_len)
+            token_num = min(len(data[sequence_column_name]), args.max_seq_len)
         else:
-            token_num = len(data["aa_seq"])
+            token_num = len(data[sequence_column_name])
         return data, token_num
     
     # process dataset from json file

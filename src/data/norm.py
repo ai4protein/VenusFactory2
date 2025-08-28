@@ -2,102 +2,102 @@ import numpy as np
 from typing import List, Tuple, Any
 from sklearn.preprocessing import StandardScaler, RobustScaler
 
-def min_max_normalize_dataset(train_dataset, val_dataset, test_dataset):
+def min_max_normalize_dataset(train_dataset, val_dataset, test_dataset, label_column_name='label'):
     """Min-max normalization (0-1 scaling)."""
-    labels = [e["label"] for e in train_dataset]
+    labels = [e[label_column_name] for e in train_dataset]
     min_label, max_label = min(labels), max(labels)
     normalized_train_dataset = []
     normalized_val_dataset = []
     normalized_test_dataset = []
     for e in train_dataset:
-        e["label"] = (e["label"] - min_label) / (max_label - min_label)
+        e[label_column_name] = (e[label_column_name] - min_label) / (max_label - min_label)
         normalized_train_dataset.append(e)
     for e in val_dataset:
-        e["label"] = (e["label"] - min_label) / (max_label - min_label)
+        e[label_column_name] = (e[label_column_name] - min_label) / (max_label - min_label)
         normalized_val_dataset.append(e)
     for e in test_dataset:
-        e["label"] = (e["label"] - min_label) / (max_label - min_label)
+        e[label_column_name] = (e[label_column_name] - min_label) / (max_label - min_label)
         normalized_test_dataset.append(e)
     print(normalized_train_dataset[0])
     return normalized_train_dataset, normalized_val_dataset, normalized_test_dataset
 
-def standard_normalize_dataset(train_dataset, val_dataset, test_dataset):
+def standard_normalize_dataset(train_dataset, val_dataset, test_dataset, label_column_name='label'):
     """Z-score normalization (standardization)."""
-    train_labels = np.array([e["label"] for e in train_dataset])
+    train_labels = np.array([e[label_column_name] for e in train_dataset])
     mean_label = np.mean(train_labels)
     std_label = np.std(train_labels)
     normalized_train_dataset = []
     normalized_val_dataset = []
     normalized_test_dataset = []
     for e in train_dataset:
-        e["label"] = (e["label"] - mean_label) / std_label
+        e[label_column_name] = (e[label_column_name] - mean_label) / std_label
         normalized_train_dataset.append(e)
     for e in val_dataset:
-        e["label"] = (e["label"] - mean_label) / std_label
+        e[label_column_name] = (e[label_column_name] - mean_label) / std_label
         normalized_val_dataset.append(e)
     for e in test_dataset:
-        e["label"] = (e["label"] - mean_label) / std_label
+        e[label_column_name] = (e[label_column_name] - mean_label) / std_label
         normalized_test_dataset.append(e)
     return normalized_train_dataset, normalized_val_dataset, normalized_test_dataset
 
-def robust_normalize_dataset(train_dataset, val_dataset, test_dataset):
+def robust_normalize_dataset(train_dataset, val_dataset, test_dataset, label_column_name='label'):
     """Robust scaling using statistics that are robust to outliers."""
     scaler = RobustScaler()
-    train_labels = np.array([e["label"] for e in train_dataset]).reshape(-1, 1)
+    train_labels = np.array([e[label_column_name] for e in train_dataset]).reshape(-1, 1)
     scaler.fit(train_labels)
     normalized_train_dataset = []
     normalized_val_dataset = []
     normalized_test_dataset = []
     for e in train_dataset:
-        e["label"] = scaler.transform([[e["label"]]])[0][0]
+        e[label_column_name] = scaler.transform([[e[label_column_name]]])[0][0]
         normalized_train_dataset.append(e)
     for e in val_dataset:
-        e["label"] = scaler.transform([[e["label"]]])[0][0]
+        e[label_column_name] = scaler.transform([[e[label_column_name]]])[0][0]
         normalized_val_dataset.append(e)
     for e in test_dataset:
-        e["label"] = scaler.transform([[e["label"]]])[0][0]
+        e[label_column_name] = scaler.transform([[e[label_column_name]]])[0][0]
         normalized_test_dataset.append(e)
     return normalized_train_dataset, normalized_val_dataset, normalized_test_dataset
 
-def log_normalize_dataset(train_dataset, val_dataset, test_dataset, offset=1.0):
+def log_normalize_dataset(train_dataset, val_dataset, test_dataset, offset=1.0, label_column_name='label'):
     """Log normalization, useful for skewed data."""
     normalized_train_dataset = []
     normalized_val_dataset = []
     normalized_test_dataset = []
     for e in train_dataset:
-        e["label"] = np.log(e["label"] + offset)
+        e[label_column_name] = np.log(e[label_column_name] + offset)
         normalized_train_dataset.append(e)
     for e in val_dataset:
-        e["label"] = np.log(e["label"] + offset)
+        e[label_column_name] = np.log(e[label_column_name] + offset)
         normalized_val_dataset.append(e)
     for e in test_dataset:
-        e["label"] = np.log(e["label"] + offset)
+        e[label_column_name] = np.log(e[label_column_name] + offset)
         normalized_test_dataset.append(e)
     return normalized_train_dataset, normalized_val_dataset, normalized_test_dataset
 
-def quantile_normalize_dataset(train_dataset, val_dataset, test_dataset, n_quantiles=1000):
+def quantile_normalize_dataset(train_dataset, val_dataset, test_dataset, n_quantiles=1000, label_column_name='label'):
     """Quantile normalization to achieve a uniform distribution."""
     from sklearn.preprocessing import QuantileTransformer
     
     transformer = QuantileTransformer(n_quantiles=n_quantiles, output_distribution='uniform')
-    train_labels = np.array([e["label"] for e in train_dataset]).reshape(-1, 1)
+    train_labels = np.array([e[label_column_name] for e in train_dataset]).reshape(-1, 1)
     transformer.fit(train_labels)
     
     normalized_train_dataset = []
     normalized_val_dataset = []
     normalized_test_dataset = []
     for e in train_dataset:
-        e["label"] = transformer.transform([[e["label"]]])[0][0]
+        e[label_column_name] = transformer.transform([[e[label_column_name]]])[0][0]
         normalized_train_dataset.append(e)
     for e in val_dataset:
-        e["label"] = transformer.transform([[e["label"]]])[0][0]
+        e[label_column_name] = transformer.transform([[e[label_column_name]]])[0][0]
         normalized_val_dataset.append(e)
     for e in test_dataset:
-        e["label"] = transformer.transform([[e["label"]]])[0][0]
+        e[label_column_name] = transformer.transform([[e[label_column_name]]])[0][0]
         normalized_test_dataset.append(e)
     return normalized_train_dataset, normalized_val_dataset, normalized_test_dataset
 
-def normalize_dataset(train_dataset, val_dataset, test_dataset, method='min_max', **kwargs):
+def normalize_dataset(train_dataset, val_dataset, test_dataset, method='min_max', label_column_name='label', **kwargs):
     """
     Unified interface for different normalization methods.
     
@@ -106,6 +106,7 @@ def normalize_dataset(train_dataset, val_dataset, test_dataset, method='min_max'
         val_dataset: Validation dataset
         test_dataset: Test dataset
         method: Normalization method ('min_max', 'standard', 'robust', 'log', 'quantile')
+        label_column_name: Name of the label column in the dataset
         **kwargs: Additional arguments for specific normalization methods
     
     Returns:
@@ -123,5 +124,5 @@ def normalize_dataset(train_dataset, val_dataset, test_dataset, method='min_max'
         raise ValueError(f"Unsupported normalization method: {method}. "
                         f"Available methods: {list(normalization_methods.keys())}")
     
-    return normalization_methods[method](train_dataset, val_dataset, test_dataset, **kwargs)
+    return normalization_methods[method](train_dataset, val_dataset, test_dataset, label_column_name=label_column_name, **kwargs)
 

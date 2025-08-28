@@ -13,10 +13,11 @@ def set_seed(seed: int):
 
 def min_max_normalize_dataset(train_dataset: List[Dict[str, Any]], 
                             val_dataset: List[Dict[str, Any]], 
-                            test_dataset: List[Dict[str, Any]]) -> tuple:
+                            test_dataset: List[Dict[str, Any]],
+                            label_column_name: str = 'label') -> tuple:
     """Normalize datasets using min-max normalization."""
     # Get all labels from training set
-    train_labels = [data['label'] for data in train_dataset]
+    train_labels = [data[label_column_name] for data in train_dataset]
     
     # Calculate min and max from training set
     min_val = min(train_labels)
@@ -25,7 +26,7 @@ def min_max_normalize_dataset(train_dataset: List[Dict[str, Any]],
     # Normalize all datasets
     for dataset in [train_dataset, val_dataset, test_dataset]:
         for data in dataset:
-            data['label'] = (data['label'] - min_val) / (max_val - min_val)
+            data[label_column_name] = (data[label_column_name] - min_val) / (max_val - min_val)
     
     return train_dataset, val_dataset, test_dataset
 

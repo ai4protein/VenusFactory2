@@ -58,6 +58,8 @@ def add_dataset_args(parser: argparse.ArgumentParser):
     data_group.add_argument('--normalize', type=str)
     data_group.add_argument('--num_labels', type=int)
     data_group.add_argument('--problem_type', type=str)
+    data_group.add_argument('--sequence_column_name', type=str, default='aa_seq')
+    data_group.add_argument('--label_column_name', type=str, default='label')
     data_group.add_argument('--pdb_type', type=str)
     data_group.add_argument('--train_file', type=str)
     data_group.add_argument('--valid_file', type=str)
@@ -144,6 +146,18 @@ def process_dataset_config(args: argparse.Namespace):
                 'metrics', 'normalize']:
         if getattr(args, key) is None and key in config:
             setattr(args, key, config[key])
+    
+    # Handle sequence and label column names specially - always override with config if present
+    for key in ['sequence_column_name', 'label_column_name']:
+        if key in config:
+            old_value = getattr(args, key)
+            setattr(args, key, config[key])
+            # Note: We'll log this information later when logger is available
+            args._column_override_info = getattr(args, '_column_override_info', {})
+            args._column_override_info[key] = {'old': old_value, 'new': config[key]}
+        else:
+            args._column_override_info = getattr(args, '_column_override_info', {})
+            args._column_override_info[key] = {'default': getattr(args, key)}
     
     # Handle metrics specially
     if args.metrics:

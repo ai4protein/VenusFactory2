@@ -23,6 +23,8 @@ class Collator:
     problem_type: str = 'classification'
     plm_model: str = None
     num_labels: int = None
+    sequence_column_name: str = 'aa_seq'
+    label_column_name: str = 'label'
 
     def __call__(self, examples: List[Dict[str, Any]]) -> Dict[str, torch.Tensor]:
         """Collate function for batching examples."""
@@ -35,7 +37,8 @@ class Collator:
             seq_type: [] for seq_type in (self.structure_seq or [])
         }
         
-        aa_seq_key = "aa_seq"
+        # Use the configured sequence column name
+        aa_seq_key = self.sequence_column_name
         if "residue" in self.problem_type:
             aa_seq_key = "seq_full"
         
@@ -59,17 +62,17 @@ class Collator:
             
             # Process labels based on problem type
             if self.problem_type == 'multi_label_classification':
-                label_list = e['label'].split(',')
-                e['label'] = [int(l) for l in label_list]
+                label_list = e[self.label_column_name].split(',')
+                e[self.label_column_name] = [int(l) for l in label_list]
                 binary_list = [0] * self.num_labels
-                for index in e['label']:
+                for index in e[self.label_column_name]:
                     binary_list[index] = 1
-                e['label'] = binary_list
+                e[self.label_column_name] = binary_list
             elif self.problem_type == "residue_single_label_classification":
-                e['label'] = json.loads(e['label'])
+                e[self.label_column_name] = json.loads(e[self.label_column_name])
             
             # Process labels
-            labels.append(e["label"])
+            labels.append(e[self.label_column_name])
 
         # Tokenize sequences
         if "ProSST" in self.plm_model:
@@ -92,9 +95,9 @@ class Collator:
                     # If it's not a list, create a sequence with the same label
                     processed_labels.append([int(label)] * max_seq_len)
             
-            batch["label"] = torch.as_tensor(processed_labels, dtype=torch.long)
+            batch[self.label_column_name] = torch.as_tensor(processed_labels, dtype=torch.long)
         else:
-            batch["label"] = torch.as_tensor(
+            batch[self.label_column_name] = torch.as_tensor(
                 labels, 
                 dtype=torch.float if self.problem_type == 'regression' else torch.long
             )

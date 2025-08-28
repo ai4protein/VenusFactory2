@@ -11,9 +11,7 @@ import pandas as pd
 
 def prepare_dataloaders(args, tokenizer, logger):
     """Prepare train, validation and test dataloaders."""
-    aa_seq_key = "aa_seq"
-    if "residue" in args.problem_type:
-        aa_seq_key = "seq_full"
+    aa_seq_key = args.sequence_column_name
     # Process datasets
     train_dataset = datasets.load_dataset(args.dataset)['train']
     train_dataset_token_lengths = [len(item[aa_seq_key]) for item in train_dataset]
@@ -23,7 +21,11 @@ def prepare_dataloaders(args, tokenizer, logger):
     test_dataset_token_lengths = [len(item[aa_seq_key]) for item in test_dataset]
     
     if args.normalize is not None:
-        train_dataset, val_dataset, test_dataset = normalize_dataset(train_dataset, val_dataset, test_dataset, args.normalize)
+        train_dataset, val_dataset, test_dataset = normalize_dataset(
+            train_dataset, val_dataset, test_dataset, 
+            args.normalize, 
+            label_column_name=args.label_column_name
+        )
     
     # log dataset info
     logger.info("Dataset Statistics:")
@@ -46,7 +48,9 @@ def prepare_dataloaders(args, tokenizer, logger):
         structure_seq=args.structure_seq,
         problem_type=args.problem_type,
         plm_model=args.plm_model,
-        num_labels=args.num_labels
+        num_labels=args.num_labels,
+        sequence_column_name=args.sequence_column_name,
+        label_column_name=args.label_column_name
     )
     
     # Common dataloader parameters

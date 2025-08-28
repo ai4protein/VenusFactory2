@@ -20,6 +20,9 @@ class Trainer:
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.train_loader = train_loader
         
+        # Log column name override information if available
+        self._log_column_override_info()
+        
         # Setup metrics
         self.metrics_dict = setup_metrics(args)
         
@@ -83,6 +86,19 @@ class Trainer:
         # Save args
         with open(os.path.join(self.args.output_dir, f'{self.args.output_model_name.split(".")[0]}.json'), 'w') as f:
             json.dump(self.args.__dict__, f)
+    
+    def _log_column_override_info(self):
+        """Log column name override information if available."""
+        if hasattr(self.args, '_column_override_info'):
+            for key, info in self.args._column_override_info.items():
+                if 'old' in info and 'new' in info:
+                    self.logger.info(f"Overriding {key}: {info['old']} -> {info['new']}")
+                elif 'default' in info:
+                    self.logger.info(f"Using default {key}: {info['default']}")
+        else:
+            # Fallback to current values if no override info is available
+            self.logger.info(f"Using sequence column: {self.args.sequence_column_name}")
+            self.logger.info(f"Using label column: {self.args.label_column_name}")
         
     def _setup_loss_function(self):
         if self.args.problem_type == 'regression':
@@ -133,7 +149,7 @@ class Trainer:
                 self.accelerator.backward(loss)
                     
                 # Update statistics
-                batch_size = batch["label"].size(0)
+                batch_size = batch[self.args.label_column_name].size(0)
                 total_loss += loss.item() * batch_size
                 total_samples += batch_size
                 
@@ -173,7 +189,7 @@ class Trainer:
         
         # Forward pass
         logits = self.model(self.plm_model, batch)
-        loss = self._compute_loss(logits, batch["label"])
+        loss = self._compute_loss(logits, batch[self.args.label_column_name])
         
         return loss
     
@@ -207,15 +223,15 @@ class Trainer:
                 
                 # Forward pass
                 logits = self.model(self.plm_model, batch)
-                loss = self._compute_loss(logits, batch["label"])
+                loss = self._compute_loss(logits, batch[self.args.label_column_name])
                 
                 # Update loss statistics
-                batch_size = len(batch["label"])
+                batch_size = len(batch[self.args.label_column_name])
                 total_loss += loss.item() * batch_size
                 total_samples += batch_size
                 
                 # Update metrics
-                self._update_metrics(logits, batch["label"])
+                self._update_metrics(logits, batch[self.args.label_column_name])
         
         # Compute average loss
         avg_loss = total_loss / total_samples
@@ -272,15 +288,15 @@ class Trainer:
                 
                 # Forward pass
                 logits = self.model(self.plm_model, batch)
-                loss = self._compute_loss(logits, batch["label"])
+                loss = self._compute_loss(logits, batch[self.args.label_column_name])
                 
                 # Update loss statistics
-                batch_size = len(batch["label"])
+                batch_size = len(batch[self.args.label_column_name])
                 total_loss += loss.item() * batch_size
                 total_samples += batch_size
                 
                 # Update metrics
-                self._update_metrics(logits, batch["label"])
+                self._update_metrics(logits, batch[self.args.label_column_name])
         
         # Compute average loss
         avg_loss = total_loss / total_samples
