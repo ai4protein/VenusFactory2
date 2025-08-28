@@ -2,6 +2,7 @@
     "dataset": "AI4Protein/VenusX_Res_Dom_MF50",
     "num_labels": 2,
     "problem_type": "residue_single_label_classification",
+    "sequence_column_name": "seq_full",
     "metrics": "aupr,auroc,f1,f1_positive,f1_negative,accuracy,mcc,recall,precision",
     "monitor": "aupr",
     "monitor_strategy": "max"
