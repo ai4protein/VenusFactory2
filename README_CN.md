@@ -10,7 +10,7 @@
 
 [![GitHub stars](https://img.shields.io/github/stars/AI4Protein/VenusFactory?style=flat-square)](https://github.com/AI4Protein/VenusFactory/stargazers) [![GitHub forks](https://img.shields.io/github/forks/AI4Protein/VenusFactory?style=flat-square)](https://github.com/AI4Protein/VenusFactory/network/members) [![GitHub issues](https://img.shields.io/github/issues/AI4Protein/VenusFactory?style=flat-square)](https://github.com/AI4Protein/VenusFactory/issues) [![GitHub license](https://img.shields.io/github/license/AI4Protein/VenusFactory?style=flat-square)](https://github.com/AI4Protein/VenusFactory/blob/main/LICENSE)
 
-[![Python Version](https://img.shields.io/badge/Python-3.10-blue?style=flat-square&logo=python)](https://www.python.org/) [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen?style=flat-square)](https://venusfactory.readthedocs.io/) [![Downloads](https://img.shields.io/github/downloads/AI4Protein/VenusFactory/total?style=flat-square)](https://github.com/AI4Protein/VenusFactory/releases) [![Youtube](https://img.shields.io/badge/Youtube-VenusFactory-red?style=flat-square&logo=youtube)](https://www.youtube.com/watch?v=MT6lPH5kgCc&ab_channel=BxinZhou) [![Demo on OpenBayes](https://img.shields.io/badge/Demo-OpenBayes贝式计算-blue)](https://openbayes.com/console/public/tutorials/O3RCA0XUKa0)
+[![Python Version](https://img.shields.io/badge/Python-3.12-blue?style=flat-square&logo=python)](https://www.python.org/) [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen?style=flat-square)](https://venusfactory.readthedocs.io/) [![Downloads](https://img.shields.io/github/downloads/AI4Protein/VenusFactory/total?style=flat-square)](https://github.com/AI4Protein/VenusFactory/releases) [![Youtube](https://img.shields.io/badge/Youtube-VenusFactory-red?style=flat-square&logo=youtube)](https://www.youtube.com/watch?v=MT6lPH5kgCc&ab_channel=BxinZhou) [![Demo on OpenBayes](https://img.shields.io/badge/Demo-OpenBayes贝式计算-blue)](https://openbayes.com/console/public/tutorials/O3RCA0XUKa0)
 
 
 </div>
@@ -341,7 +341,7 @@
 
 ### 软件要求
 - [Anaconda3](https://www.anaconda.com/download) 或 [Miniconda3](https://docs.conda.io/projects/miniconda/en/latest/)
-- Python 3.10
+- Python 3.12
 
 ## 📦 安装指南
 <details><summary> 在macOS上开始</summary>
@@ -359,10 +359,10 @@ cd VenusFactory
 
 ## 2️⃣ 创建Conda环境
 
-确保已安装Anaconda或Miniconda。然后，创建一个名为`venus`的新环境，使用Python 3.10：
+确保已安装Anaconda或Miniconda。然后，创建一个名为`venus`的新环境，使用Python 3.12：
 
 ```bash
-conda create -n venus python=3.10
+conda create -n venus python=3.12
 conda activate venus
 ```
 
@@ -373,7 +373,7 @@ conda activate venus
 pip install --pre torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/nightly/cpu
 
 # 安装PyG依赖项
-pip install torch_scatter torch-sparse torch-cluster torch-geometric -f https://data.pyg.org/whl/torch-2.2.0+cpu.html
+pip install torch_scatter torch-sparse torch-cluster torch-geometric -f https://data.pyg.org/whl/torch-2.8.0+cpu.html
 ```
 
 ## 4️⃣ 安装其他依赖项
@@ -400,11 +400,11 @@ cd VenusFactory
 
 ## 2️⃣ 创建Conda环境
 
-确保已安装Anaconda或Miniconda。然后，创建一个名为`venus`的新环境，使用Python 3.10：
+确保已安装Anaconda或Miniconda。然后，创建一个名为`venus`的新环境，使用Python 3.12：
 
 
 ```bash
-conda create -n venus python=3.10
+conda create -n venus python=3.12
 conda activate venus
 ```
 
@@ -412,11 +412,11 @@ conda activate venus
 
 ```bash
 # 安装PyTorch
-pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cu121
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
 
 # 安装PyG依赖项
-pip install torch_geometric==2.6.1 -f https://pytorch-geometric.com/whl/torch-2.5.1+cu121.html
-pip install --no-index torch_scatter==2.1.2 -f https://pytorch-geometric.com/whl/torch-2.5.1+cu121.html
+pip install torch_geometric
+pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.8.0+cu128.html
 ```
 
 ## 4️⃣ 安装其他依赖项
@@ -443,11 +443,11 @@ cd VenusFactory
 
 ## 2️⃣ 创建Conda环境
 
-确保已安装Anaconda或Miniconda。然后，创建一个名为`venus`的新环境，使用Python 3.10：
+确保已安装Anaconda或Miniconda。然后，创建一个名为`venus`的新环境，使用Python 3.12：
 
 
 ```bash
-conda create -n venus python=3.10
+conda create -n venus python=3.12
 conda activate venus
 ```
 
@@ -455,11 +455,11 @@ conda activate venus
 
 ```bash
 # 安装PyTorch
-pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cu118
+pip install torch==2.7.0 --index-url https://download.pytorch.org/whl/cu118
 
 # 安装PyG依赖项
-pip install torch_geometric==2.6.1 -f https://pytorch-geometric.com/whl/torch-2.5.1+cu118.html
-pip install --no-index torch_scatter==2.1.2 -f https://pytorch-geometric.com/whl/torch-2.5.1+cu118.html
+pip install torch_geometric
+pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.7.0+cu118.html
 ```
 
 ## 4️⃣ 安装其他依赖项
@@ -483,11 +483,11 @@ cd VenusFactory
 
 ## 2️⃣ 创建Conda环境
 
-确保已安装Anaconda或Miniconda。然后，创建一个名为`venus`的新环境，使用Python 3.10：
+确保已安装Anaconda或Miniconda。然后，创建一个名为`venus`的新环境，使用Python 3.12：
 
 
 ```bash
-conda create -n venus python=3.10
+conda create -n venus python=3.12
 conda activate venus
 ```
 
@@ -495,11 +495,11 @@ conda activate venus
 
 ```bash
 # 安装PyTorch
-pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cpu
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 
 # 安装PyG依赖项
-pip install torch_geometric==2.6.1 -f https://pytorch-geometric.com/whl/torch-2.5.1+cpu.html
-pip install --no-index torch_scatter==2.1.2 -f https://pytorch-geometric.com/whl/torch-2.5.1+cpu.html
+pip install torch_geometric
+pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.8.0+cpu.html
 ```
 
 ## 4️⃣ 安装其他依赖项
