@@ -829,7 +829,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                                             seq_paste_clear_btn = gr.Button("🗑️ Clear", variant="primary", size="m")
                                 
                                 seq_protein_display = gr.Textbox(label="Uploaded Protein Sequence", interactive=False, lines=3, max_lines=7)
-                                seq_sequence_selector = gr.Dropdown(label="Select Chain", choices=["Sequence 1"], value="Sequence 1", visible=False)
+                                seq_sequence_selector = gr.Dropdown(label="Select Chain", choices=["Sequence 1"], value="Sequence 1", visible=False, allow_custom_value=True)
                                 seq_original_file_path_state = gr.State("")
                                 seq_original_paste_content_state = gr.State("")
                                 seq_selected_sequence_state = gr.State("Sequence 1")
@@ -873,7 +873,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                                             struct_paste_clear_btn = gr.Button("🗑️ Clear", variant="secondary", size="sm")
                                     
                                 struct_protein_display = gr.Textbox(label="Uploaded Protein Sequence", interactive=False, lines=3, max_lines=7)
-                                struct_chain_selector = gr.Dropdown(label="Select Chain", choices=["A"], value="A", visible=False)
+                                struct_chain_selector = gr.Dropdown(label="Select Chain", choices=["A"], value="A", visible=False, allow_custom_value=True)
                                 struct_original_file_path_state = gr.State("")
                                 struct_original_paste_content_state = gr.State("")
                                 struct_selected_chain_state = gr.State("A")
@@ -947,7 +947,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                             
                         function_protein_display = gr.Textbox(label="Uploaded Protein", interactive=False, lines=3, max_lines=7)
                         function_protein_chat_btn = gr.Button("Chat API Trigger", visible=False)
-                        function_protein_selector = gr.Dropdown(label="Select Chain", choices=["Sequence 1"], value="Sequence 1", visible=False)
+                        function_protein_selector = gr.Dropdown(label="Select Chain", choices=["Sequence 1"], value="Sequence 1", visible=False, allow_custom_value=True)
                         function_original_file_path_state = gr.State("")
                         function_original_paste_content_state = gr.State("")
                         function_selected_sequence_state = gr.State("Sequence 1")
@@ -992,10 +992,10 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 
         
         def clear_paste_content_pdb():
-            return "", "", gr.update(choices=["A"], value="A", visible=False), {}, "A", ""
+            return "No file selected", "No file selected", gr.update(choices=["A"], value="A", visible=False), {}, "A", ""
 
         def clear_paste_content_fasta():
-            return "", "", gr.update(choices=["Sequence 1"], value="Sequence 1", visible=False), {}, "Sequence 1", ""
+            return "No file selected", "No file selected", gr.update(choices=["Sequence 1"], value="Sequence 1", visible=False), {}, "Sequence 1", ""
         
         def update_dataset_choices_fixed(task):
             choices = DATASET_MAPPING_FUNCTION.get(task, [])
@@ -1058,10 +1058,23 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         )
 
         def handle_sequence_change_unified(selected_chain, chains_dict, original_file_path, original_paste_content):
-            if original_paste_content:
-                return handle_paste_sequence_selection(selected_chain, chains_dict, original_paste_content)
+            # Check for None or empty file path
+            if not original_file_path:
+                return "No file selected", ""
+            
+            if original_file_path.endswith('.fasta'):
+                if original_paste_content:
+                    return handle_paste_sequence_selection(selected_chain, chains_dict, original_paste_content)
+                else:
+                    return handle_fasta_sequence_change(selected_chain, chains_dict, original_file_path)
+            elif original_file_path.endswith('.pdb'):
+                if original_paste_content:
+                    return handle_paste_chain_selection(selected_chain, chains_dict, original_paste_content)
+                else:
+                    return handle_pdb_chain_change(selected_chain, chains_dict, original_file_path)
             else:
-                return handle_fasta_sequence_change(selected_chain, chains_dict, original_file_path)
+                # Default case for no file selected
+                return "No file selected", ""
 
         seq_sequence_selector.change(
             fn=handle_sequence_change_unified,
@@ -1098,6 +1111,10 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         )
 
         def handle_chain_change_unified(selected_chain, chains_dict, original_file_path, original_paste_content):
+            # Check for None or empty file path
+            if not original_file_path:
+                return "No file selected", ""
+                
             if original_paste_content:
                 return handle_paste_chain_selection(selected_chain, chains_dict, original_paste_content)
             else:

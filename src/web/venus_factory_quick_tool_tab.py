@@ -383,7 +383,7 @@ def generate_ai_summary_prompt(results_df: pd.DataFrame, task: str, model: str) 
 
 def parse_fasta_paste_content(fasta_content):
     if not fasta_content or not fasta_content.strip():
-        return "", gr.update(choices=["Sequence 1"], value="Sequence 1", visible=False), {}, "", ""
+        return "No file selected", gr.update(choices=["Sequence 1"], value="Sequence 1", visible=False), {}, "Sequence 1", ""
     
     try:
         sequences = {}
@@ -452,7 +452,11 @@ def save_selected_sequence_fasta(original_fasta_content, selected_sequence, outp
 
 def handle_paste_sequence_selection(selected_sequence, sequences_dict, original_fasta_content_from_state):
     if not sequences_dict or selected_sequence not in sequences_dict:
-        return "", ""
+        return "No file selected", ""
+    
+    # Check if the content is valid
+    if not original_fasta_content_from_state or original_fasta_content_from_state == "No file selected":
+        return "No file selected", ""
     
     try:
         temp_dir = Path("temp_outputs")
@@ -468,7 +472,11 @@ def handle_paste_sequence_selection(selected_sequence, sequences_dict, original_
 
 def handle_fasta_sequence_change(selected_sequence, sequences_dict, original_fasta_path):
     if not sequences_dict or selected_sequence not in sequences_dict:
-        return "", ""
+        return "No file selected", ""
+    
+    # Check if the file path is valid and exists
+    if not original_fasta_path or original_fasta_path == "No file selected" or not os.path.exists(original_fasta_path):
+        return "No file selected", ""
     
     try:
         with open(original_fasta_path, 'r') as f:
@@ -492,7 +500,7 @@ def handle_fasta_sequence_change(selected_sequence, sequences_dict, original_fas
 
 def parse_pdb_paste_content(pdb_content):
     if not pdb_content.strip():
-        return "", gr.update(choices=["A"], value="A", visible=False), {}, "A", ""
+        return "No file selected", gr.update(choices=["A"], value="A", visible=False), {}, "A", ""
     
     try:
         chains = {}
@@ -565,7 +573,11 @@ def save_selected_chain_pdb(original_pdb_content, selected_chain, output_path):
 
 def handle_paste_chain_selection(selected_chain, chains_dict, original_pdb_content_from_state):
     if not chains_dict or selected_chain not in chains_dict:
-        return "", ""
+        return "No file selected", ""
+    
+    # Check if the content is valid
+    if not original_pdb_content_from_state or original_pdb_content_from_state == "No file selected":
+        return "No file selected", ""
     
     try:
         temp_dir = Path("temp_outputs")
@@ -581,7 +593,12 @@ def handle_paste_chain_selection(selected_chain, chains_dict, original_pdb_conte
 
 def handle_pdb_chain_change(selected_chain, chains_dict, original_file_path):
     if not chains_dict or selected_chain not in chains_dict:
-        return "", ""
+        return "No file selected", ""
+    
+    # Check if the file path is valid and exists
+    if not original_file_path or original_file_path == "No file selected" or not os.path.exists(original_file_path):
+        return "No file selected", ""
+        
     try:
         with open(original_file_path, 'r') as f:
             pdb_content = f.read()
@@ -618,7 +635,7 @@ def handle_pdb_chain_change(selected_chain, chains_dict, original_file_path):
 
 def process_pdb_file_upload(file_path):
     if not file_path:
-        return "", gr.update(choices=["A"], value="A", visible=False), {}, "A", "", ""
+        return "No file selected", gr.update(choices=["A"], value="A", visible=False), {}, "A", "", ""
     try:
         with open(file_path, 'r') as f:
             pdb_content = f.read()
@@ -629,7 +646,7 @@ def process_pdb_file_upload(file_path):
 
 def process_fasta_file_upload(file_path):
     if not file_path:
-        return "", gr.update(choices=["Sequence 1"], value="Sequence 1", visible=False), {}, "Sequence 1", "", ""
+        return "No file selected", gr.update(choices=["Sequence 1"], value="Sequence 1", visible=False), {}, "Sequence 1", "", ""
     try:
         with open(file_path, 'r') as f:
             fasta_content = f.read()
@@ -640,7 +657,7 @@ def process_fasta_file_upload(file_path):
         
 def handle_file_upload(file_obj: Any) -> str:
     if not file_obj:
-        return "", "", "", "", "", ""
+        return "No file selected", "No file selected", "No file selected", "No file selected", "No file selected", "No file selected"
     if isinstance(file_obj, str):
         file_path = file_obj
     else:
@@ -650,7 +667,7 @@ def handle_file_upload(file_obj: Any) -> str:
     elif file_path.lower().endswith(".pdb"):
         return process_pdb_file_upload(file_path)
     else:
-        return "Unsupported file type. Please upload a .fasta, .fa, or .pdb file."
+        return "No file selected", "No file selected", "No file selected", "No file selected", "No file selected", "No file selected"
 
 def _read_fasta_file(file_path: str) -> str:
     with open(file_path, "r") as f:
@@ -1569,7 +1586,7 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                                     easy_zshot_paste_clear_btn = gr.Button("🗑️ Clear", variant="primary", size="m")
 
                         easy_zshot_protein_display = gr.Textbox(label="Uploaded Protein Sequence", interactive=False, lines=3, max_lines=7)
-                        easy_zshot_sequence_selector = gr.Dropdown(label="Select Chain", choices=["Sequence 1"], value="Sequence 1", visible=False)
+                        easy_zshot_sequence_selector = gr.Dropdown(label="Select Chain", choices=["Sequence 1"], value="Sequence 1", visible=False, allow_custom_value=True)
                         easy_zshot_original_file_path_state = gr.State("")
                         easy_zshot_original_paste_content_state = gr.State("")
                         easy_zshot_selected_sequence_state = gr.State("Sequence 1")
@@ -1634,7 +1651,7 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                                     base_func_paste_clear_btn = gr.Button("🗑️ Clear", variant="primary", size="m")
                         
                         base_function_protein_display = gr.Textbox(label="Uploaded Protein Sequence", interactive=False, lines=3, max_lines=7)
-                        base_function_selector = gr.Dropdown(label="Select Chain", choices=["Sequence 1"], value="Sequence 1", visible=False)
+                        base_function_selector = gr.Dropdown(label="Select Chain", choices=["Sequence 1"], value="Sequence 1", visible=False, allow_custom_value=True)
                         base_function_original_file_path_state = gr.State("")
                         base_function_original_paste_content_state = gr.State("")
                         base_function_selected_sequence_state = gr.State("Sequence 1")
@@ -1680,7 +1697,7 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             return "", "", gr.update(choices=["A"], value="A", visible=False), {}, "A", ""
 
         def clear_paste_content_fasta():
-            return "", "", gr.update(choices=["Sequence 1"], value="Sequence 1", visible=False), {}, "Sequence 1", ""
+            return "No file selected", "No file selected", gr.update(choices=["Sequence 1"], value="Sequence 1", visible=False), {}, "Sequence 1", ""
 
         def toggle_ai_section_simple(is_checked: bool):
             return gr.update(visible=is_checked)
@@ -1730,6 +1747,10 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         )
         
         def handle_sequence_change_unified(selected_chain, chains_dict, original_file_path, original_paste_content):
+            # Check for None or empty file path
+            if not original_file_path:
+                return "No file selected", ""
+            
             if original_file_path.endswith('.fasta'):
                 if original_paste_content:
                     return handle_paste_sequence_selection(selected_chain, chains_dict, original_paste_content)
@@ -1740,6 +1761,9 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                     return handle_paste_chain_selection(selected_chain, chains_dict, original_paste_content)
                 else:
                     return handle_pdb_chain_change(selected_chain, chains_dict, original_file_path)
+            else:
+                # Default case for no file selected
+                return "No file selected", ""
 
         easy_zshot_sequence_selector.change(
             fn=handle_sequence_change_unified,
