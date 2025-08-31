@@ -60,9 +60,9 @@ def create_ui():
     assets_dir = os.path.join(current_dir, "web", "assets")
     
     # Read CSS files
-    custom_css = read_css_file(os.path.join(assets_dir, "custom_ui.css"))
-    manual_css = read_css_file(os.path.join(assets_dir, "manual_ui.css"))
-    manual_js = read_css_file(os.path.join(assets_dir, "manual_ui.js"))
+    custom_css = read_css_file(os.path.join(assets_dir,"css", "custom_ui.css"))
+    manual_css = read_css_file(os.path.join(assets_dir, "css", "manual_ui.css"))
+    manual_js = read_css_file(os.path.join(assets_dir, "js", "manual_ui.js"))
     
     # Combine all CSS
     css_links = f"""

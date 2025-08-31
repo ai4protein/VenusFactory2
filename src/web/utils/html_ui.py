@@ -132,6 +132,50 @@ def generate_prediction_results_html(problem_type, prediction_data):
             prob_rows = f"<tr><td style='text-align:center'>Class 0</td><td style='text-align:center'>{prob_value:.4f}</td></tr>"
         
         probabilities_table = load_html_template("probabilities_table.html", prob_rows=prob_rows)
+    elif problem_type == "residue_single_label_classification":
+        problem_type_title = "Residue-Level Classification Results"
+        
+        # Get the amino acid sequence from the prediction data if available
+        aa_seq = prediction_data.get('aa_seq', '')
+        predicted_classes = prediction_data.get('predicted_classes', [])
+        probabilities = prediction_data.get('probabilities', [])
+        
+        # Create residue-level table rows
+        residue_rows = ""
+        for pos, (aa, pred_class, probs) in enumerate(zip(aa_seq, predicted_classes, probabilities)):
+            # Format probabilities for display
+            prob_str = ", ".join([f"Class {i}: {prob:.3f}" for i, prob in enumerate(probs)])
+            residue_rows += f"""
+            <tr>
+                <td style='text-align:center'>{pos + 1}</td>
+                <td style='text-align:center'>{aa}</td>
+                <td style='text-align:center'>{pred_class}</td>
+                <td style='text-align:left; font-size: 0.9em;'>{prob_str}</td>
+            </tr>
+            """
+        
+        results_table = load_html_template("residue_results_table.html", residue_rows=residue_rows)
+        probabilities_table = ""
+    elif problem_type == "residue_regression":
+        problem_type_title = "Residue-Level Regression Results"
+        
+        # Get the amino acid sequence from the prediction data if available
+        aa_seq = prediction_data.get('aa_seq', '')
+        predictions = prediction_data.get('predictions', [])
+        
+        # Create residue-level table rows
+        residue_rows = ""
+        for pos, (aa, pred_value) in enumerate(zip(aa_seq, predictions)):
+            residue_rows += f"""
+            <tr>
+                <td style='text-align:center'>{pos + 1}</td>
+                <td style='text-align:center'>{aa}</td>
+                <td style='text-align:center'>{pred_value:.4f}</td>
+            </tr>
+            """
+        
+        results_table = load_html_template("residue_regression_results_table.html", residue_rows=residue_rows)
+        probabilities_table = ""
     else:  # multi_label_classification
         problem_type_title = "Multi-Label Classification Results"
         # Create prediction table
@@ -164,7 +208,17 @@ def generate_prediction_results_html(problem_type, prediction_data):
         results_table = load_html_template("multilabel_results_table.html", pred_rows=pred_rows)
         probabilities_table = ""
     
-    return load_html_template("prediction_results.html",
+    # Load residue prediction CSS if needed
+    css_style = ""
+    if problem_type in ["residue_single_label_classification", "residue_regression"]:
+        try:
+            css_path = os.path.join("src", "web", "assets", "css", "residue_prediction.css")
+            with open(css_path, "r", encoding="utf-8") as f:
+                css_style = f"<style>{f.read()}</style>"
+        except FileNotFoundError:
+            print("Warning: residue_prediction.css not found")
+    
+    return css_style + load_html_template("prediction_results.html",
                             problem_type_title=problem_type_title,
                             results_table=results_table,
                             probabilities_table=probabilities_table)
@@ -200,6 +254,76 @@ def generate_batch_prediction_results_html(df, problem_type):
             </div>
         </div>
         """
+    elif problem_type == "residue_single_label_classification":
+        # For residue classification, show summary of residue predictions
+        total_residues = 0
+        class_counts = {}
+        
+        for _, row in df.iterrows():
+            if 'residue_predictions' in row and isinstance(row['residue_predictions'], list):
+                total_residues += len(row['residue_predictions'])
+                for pred in row['residue_predictions']:
+                    class_counts[pred] = class_counts.get(pred, 0) + 1
+        
+        summary_stats = f"""
+        <div class="summary-stats">
+            <div class="stat-item">
+                <div class="stat-value">{len(df)}</div>
+                <div class="stat-label">Sequences</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">{total_residues}</div>
+                <div class="stat-label">Total Residues</div>
+            </div>
+        </div>
+        """
+        
+        # Add class distribution if available
+        if class_counts:
+            class_dist = ", ".join([f"Class {k}: {v}" for k, v in sorted(class_counts.items())])
+            summary_stats += f"""
+            <div class="class-distribution">
+                <h4>Class Distribution:</h4>
+                <p>{class_dist}</p>
+            </div>
+            """
+    elif problem_type == "residue_regression":
+        # For residue regression, show summary of residue predictions
+        total_residues = 0
+        all_values = []
+        
+        for _, row in df.iterrows():
+            if 'residue_predictions' in row and isinstance(row['residue_predictions'], list):
+                total_residues += len(row['residue_predictions'])
+                all_values.extend(row['residue_predictions'])
+        
+        if all_values:
+            import numpy as np
+            all_values = np.array(all_values)
+            summary_stats = f"""
+            <div class="summary-stats">
+                <div class="stat-item">
+                    <div class="stat-value">{len(df)}</div>
+                    <div class="stat-label">Sequences</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">{total_residues}</div>
+                    <div class="stat-label">Total Residues</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">{all_values.mean():.4f}</div>
+                    <div class="stat-label">Mean Value</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">{all_values.min():.4f}</div>
+                    <div class="stat-label">Min Value</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">{all_values.max():.4f}</div>
+                    <div class="stat-label">Max Value</div>
+                </div>
+            </div>
+            """
     elif problem_type == "single_label_classification":
         if 'predicted_class' in df.columns:
             class_counts = df['predicted_class'].value_counts()
@@ -249,7 +373,17 @@ def generate_batch_prediction_results_html(df, problem_type):
     table_headers = " ".join([f'<th style="text-align: center;">{col}</th>' for col in df.columns])
     table_rows = generate_table_rows(df)
     
-    return load_html_template("batch_prediction_results.html",
+    # Load residue prediction CSS if needed
+    css_style = ""
+    if problem_type in ["residue_single_label_classification", "residue_regression"]:
+        try:
+            css_path = os.path.join("src", "web", "assets", "css", "residue_prediction.css")
+            with open(css_path, "r", encoding="utf-8") as f:
+                css_style = f"<style>{f.read()}</style>"
+        except FileNotFoundError:
+            print("Warning: residue_prediction.css not found")
+    
+    return css_style + load_html_template("batch_prediction_results.html",
                             summary_stats=summary_stats,
                             table_headers=table_headers,
                             table_rows=table_rows)
@@ -274,6 +408,15 @@ def generate_table_rows(df, max_rows=100):
             if col in ['aa_seq', 'foldseek_seq', 'ss8_seq'] and isinstance(value, str) and len(value) > 30:
                 # Add title attribute to show full sequence on hover
                 cell = f'<td title="{value}" style="padding: 15px; font-size: 14px; border: 1px solid #ddd; font-family: monospace; text-align: center; vertical-align: middle; display: table-cell; text-align: center;">{value[:30]}...</td>'
+            # Special handling for residue predictions (lists)
+            elif col in ['residue_predictions', 'aa_seq_residues'] and isinstance(value, list):
+                if len(value) > 10:
+                    # Show first 10 elements and indicate there are more
+                    display_value = str(value[:10]) + "..."
+                    full_value = str(value)
+                    cell = f'<td title="{full_value}" style="padding: 15px; font-size: 12px; border: 1px solid #ddd; text-align: center; max-width: 200px; overflow: hidden;">{display_value}</td>'
+                else:
+                    cell = f'<td style="padding: 15px; font-size: 12px; border: 1px solid #ddd; text-align: center; max-width: 200px; overflow: hidden;">{value}</td>'
             # Format numeric values to 4 decimal places
             elif isinstance(value, (int, float)) and not isinstance(value, bool):
                 formatted_value = f"{value:.4f}" if isinstance(value, float) else value

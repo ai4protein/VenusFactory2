@@ -211,7 +211,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         with gr.Group(visible=True) as custom_dataset_settings:
             with gr.Row():
                 problem_type = gr.Dropdown(
-                    choices=["single_label_classification", "multi_label_classification", "regression", "residue_single_label_classification"],
+                    choices=["single_label_classification", "multi_label_classification", "regression", "residue_single_label_classification", "residue_regression"],
                     label="Problem Type",
                     value="single_label_classification",
                     scale=23,

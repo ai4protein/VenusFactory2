@@ -15,7 +15,7 @@ def load_css_file(css_filename: str) -> str:
     current_dir = Path(__file__).parent.parent
     
     # Construct path to assets directory
-    assets_dir = current_dir / "assets"
+    assets_dir = current_dir / "assets" / "css"
     css_path = assets_dir / css_filename
     
     try:

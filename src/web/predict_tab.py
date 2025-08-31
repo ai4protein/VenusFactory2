@@ -16,6 +16,93 @@ from web.utils.html_ui import load_html_template, generate_prediction_status_htm
 from web.utils.css_loader import get_css_style_tag
 from datetime import datetime
 
+def create_single_prediction_csv(prediction_data, problem_type, aa_seq):
+    """Create CSV file for single prediction results"""
+    try:
+        # Create temporary file
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.csv', prefix='single_prediction_') as temp_file:
+            if problem_type == "residue_single_label_classification":
+                # For residue classification, create detailed CSV with position-level predictions
+                aa_seq_list = prediction_data.get('aa_seq', list(aa_seq))
+                predicted_classes = prediction_data.get('predicted_classes', [])
+                probabilities = prediction_data.get('probabilities', [])
+                
+                # Write header
+                temp_file.write("Position,Amino_Acid,Predicted_Class")
+                if probabilities and len(probabilities) > 0 and len(probabilities[0]) > 0:
+                    for i in range(len(probabilities[0])):
+                        temp_file.write(f",Class_{i}_Probability")
+                temp_file.write("\n")
+                
+                # Write data rows
+                for pos, (aa, pred_class, probs) in enumerate(zip(aa_seq_list, predicted_classes, probabilities)):
+                    temp_file.write(f"{pos + 1},{aa},{pred_class}")
+                    if probs:
+                        for prob in probs:
+                            temp_file.write(f",{prob:.6f}")
+                    temp_file.write("\n")
+                    
+            elif problem_type == "residue_regression":
+                # For residue regression, create CSV with position-level predictions
+                aa_seq_list = prediction_data.get('aa_seq', list(aa_seq))
+                predictions = prediction_data.get('predictions', [])
+                
+                # Write header
+                temp_file.write("Position,Amino_Acid,Predicted_Value\n")
+                
+                # Write data rows
+                for pos, (aa, pred_value) in enumerate(zip(aa_seq_list, predictions)):
+                    temp_file.write(f"{pos + 1},{aa},{pred_value:.6f}\n")
+                    
+            elif problem_type == "single_label_classification":
+                # For single-label classification
+                predicted_class = prediction_data.get('predicted_class', 0)
+                probabilities = prediction_data.get('probabilities', [])
+                
+                # Write header
+                temp_file.write("Predicted_Class")
+                for i in range(len(probabilities)):
+                    temp_file.write(f",Class_{i}_Probability")
+                temp_file.write(",Amino_Acid_Sequence\n")
+                
+                # Write data row
+                temp_file.write(f"{predicted_class}")
+                for prob in probabilities:
+                    temp_file.write(f",{prob:.6f}")
+                temp_file.write(f",{aa_seq}\n")
+                
+            elif problem_type == "multi_label_classification":
+                # For multi-label classification
+                predictions = prediction_data.get('predictions', [])
+                probabilities = prediction_data.get('probabilities', [])
+                
+                # Write header
+                temp_file.write("Predicted_Labels")
+                for i in range(len(probabilities)):
+                    temp_file.write(f",Label_{i}_Probability")
+                temp_file.write(",Amino_Acid_Sequence\n")
+                
+                # Write data row
+                temp_file.write(f"{predictions}")
+                for prob in probabilities:
+                    temp_file.write(f",{prob:.6f}")
+                temp_file.write(f",{aa_seq}\n")
+                
+            elif problem_type == "regression":
+                # For regression
+                prediction = prediction_data.get('prediction', 0)
+                
+                # Write header
+                temp_file.write("Predicted_Value,Amino_Acid_Sequence\n")
+                
+                # Write data row
+                temp_file.write(f"{prediction:.6f},{aa_seq}\n")
+        
+        return temp_file.name
+    except Exception as e:
+        print(f"Error creating CSV file: {e}")
+        return None
+
 def create_predict_tab(constant):
     plm_models = constant["plm_models"]
     is_predicting = False
@@ -61,7 +148,7 @@ def create_predict_tab(constant):
             return gr.HTML(f"""
             {get_css_style_tag('prediction_ui.css')}
             {load_html_template('prediction_warning.html', warning_message="A prediction is already running. Please wait or abort it.")}
-            """)
+            """), gr.update(visible=False)
         
         # 追踪功能使用
         track_usage("mutation_prediction")
@@ -81,7 +168,7 @@ def create_predict_tab(constant):
         }
         
         # Show initial status
-        yield generate_status_html(status_info)
+        yield generate_status_html(status_info), gr.update(visible=False)
         
         try:
             # Validate inputs
@@ -90,25 +177,25 @@ def create_predict_tab(constant):
                 return gr.HTML(f"""
                 {get_css_style_tag('prediction_ui.css')}
                 {load_html_template('prediction_error.html', error_message="Please provide a model path")}
-                """)
+                """), gr.update(visible=False)
                 
             if not os.path.exists(os.path.dirname(model_path)):
                 is_predicting = False
                 return gr.HTML(f"""
                 {get_css_style_tag('prediction_ui.css')}
                 {load_html_template('prediction_error.html', error_message="Invalid model path - directory does not exist")}
-                """)
+                """), gr.update(visible=False)
                 
             if not aa_seq:
                 is_predicting = False
                 return gr.HTML(f"""
                 {get_css_style_tag('prediction_ui.css')}
                 {load_html_template('prediction_error.html', error_message="Amino acid sequence is required")}
-                """)
+                """), gr.update(visible=False)
             
             # Update status
             status_info["current_step"] = "Preparing model and parameters"
-            yield generate_status_html(status_info)
+            yield generate_status_html(status_info), gr.update(visible=False)
             
             # Prepare command
             args_dict = {
@@ -147,7 +234,7 @@ def create_predict_tab(constant):
             
             # Update status
             status_info["current_step"] = "Starting prediction process"
-            yield generate_status_html(status_info)
+            yield generate_status_html(status_info), gr.update(visible=False)
             
             # Start prediction process
             try:
@@ -165,7 +252,7 @@ def create_predict_tab(constant):
                 return gr.HTML(f"""
                 {get_css_style_tag('prediction_ui.css')}
                 {load_html_template('prediction_error.html', error_message=f"Error starting prediction process: {str(e)}")}
-                """)
+                """), gr.update(visible=False)
             
             output_thread = threading.Thread(target=process_output, args=(current_process, output_queue))
             output_thread.daemon = True
@@ -180,7 +267,7 @@ def create_predict_tab(constant):
             
             # Update status
             status_info["current_step"] = "Processing sequence"
-            yield generate_status_html(status_info)
+            yield generate_status_html(status_info), gr.update(visible=False)
             
             while current_process.poll() is None:
                 # Check if the process was aborted
@@ -207,7 +294,7 @@ def create_predict_tab(constant):
                             status_info["current_step"] = "Finalizing results"
                         
                         # Update status display
-                        yield generate_status_html(status_info)
+                        yield generate_status_html(status_info), gr.update(visible=False)
                         
                         # Detect start of JSON results block
                         if "---------- Prediction Results ----------" in line:
@@ -235,7 +322,7 @@ def create_predict_tab(constant):
                     yield gr.HTML(f"""
                     {get_css_style_tag('prediction_ui.css')}
                     {load_html_template('prediction_warning.html', warning_message=f"Warning reading output: {str(e)}")}
-                    """)
+                    """), gr.update(visible=False)
             
             # Check if the process was aborted
             if process_aborted:
@@ -243,7 +330,7 @@ def create_predict_tab(constant):
                 yield gr.HTML(f"""
                 {get_css_style_tag('prediction_ui.css')}
                 {load_html_template('prediction_warning.html', warning_message="Prediction was aborted by user")}
-                """)
+                """), gr.update(visible=False)
                 is_predicting = False
                 return
             
@@ -252,7 +339,7 @@ def create_predict_tab(constant):
                 # Update status
                 status_info["status"] = "completed"
                 status_info["current_step"] = "Prediction completed successfully"
-                yield generate_status_html(status_info)
+                yield generate_status_html(status_info), gr.update(visible=False)
                 
                 # If no prediction data found, try to parse from complete output
                 if not prediction_data:
@@ -282,18 +369,22 @@ def create_predict_tab(constant):
                     {get_css_style_tag('prediction_ui.css')}
                     {generate_prediction_results_html(problem_type, prediction_data)}
                     """
-                    yield gr.HTML(html_result)
+                    
+                    # Create CSV file for download
+                    csv_file = create_single_prediction_csv(prediction_data, problem_type, aa_seq)
+                    
+                    yield gr.HTML(html_result), gr.update(value=csv_file, visible=True)
                 else:
                     # If no prediction data found, display raw output
                     yield gr.HTML(f"""
                     {get_css_style_tag('prediction_ui.css')}
                     {load_html_template('prediction_completed_no_results.html', result_output=result_output)}
-                    """)
+                    """), gr.update(visible=False)
             else:
                 # Update status
                 status_info["status"] = "failed"
                 status_info["current_step"] = "Prediction failed"
-                yield generate_status_html(status_info)
+                yield generate_status_html(status_info), gr.update(visible=False)
                 
                 stderr_output = ""
                 if current_process and hasattr(current_process, 'stderr') and current_process.stderr:
@@ -303,19 +394,19 @@ def create_predict_tab(constant):
                 {load_html_template('prediction_failed.html', 
                                   error_code=current_process.returncode if current_process else 'Unknown',
                                   error_output=f"{stderr_output}\n{result_output}")}
-                """)
+                """), gr.update(visible=False)
         except Exception as e:
             # Update status
             status_info["status"] = "failed"
             status_info["current_step"] = "Error occurred"
-            yield generate_status_html(status_info)
+            yield generate_status_html(status_info), gr.update(visible=False)
             
             yield gr.HTML(f"""
             {get_css_style_tag('prediction_ui.css')}
             {load_html_template('prediction_error_with_traceback.html', 
                               error_message=str(e),
                               traceback=traceback.format_exc())}
-            """)
+            """), gr.update(visible=False)
         finally:
             # Reset state
             is_predicting = False
@@ -804,7 +895,7 @@ def create_predict_tab(constant):
             return gr.HTML(f"""
             {get_css_style_tag('prediction_ui.css')}
             {load_html_template('status_empty.html', message="No prediction process is currently running.")}
-            """)
+            """), gr.update(visible=False)
             
         # Set the abort flags
         process_aborted = True
@@ -833,11 +924,11 @@ def create_predict_tab(constant):
         is_predicting = False
         current_process = None
         
-        # Return the success message
+        # Return the success message and hide download button
         return gr.HTML(f"""
         {get_css_style_tag('prediction_ui.css')}
         {load_html_template('status_success.html', message="Prediction successfully terminated! All prediction state has been reset.")}
-        """)
+        """), gr.update(visible=False)
         
     def handle_abort_batch():
         """Handle abort for batch prediction tab"""
@@ -1006,7 +1097,7 @@ def create_predict_tab(constant):
         
         with gr.Row():
             problem_type = gr.Dropdown(
-                choices=["single_label_classification", "multi_label_classification", "regression", "residue_single_label_classification"],
+                choices=["single_label_classification", "multi_label_classification", "regression", "residue_single_label_classification", "residue_regression"],
                 label="Problem Type",
                 value="single_label_classification"
             )
@@ -1060,6 +1151,7 @@ def create_predict_tab(constant):
                 visible=False
             )
             predict_output = gr.HTML(label="Prediction Results")
+            single_result_file = gr.DownloadButton(label="Download Results", visible=False)
             
             
             
@@ -1076,13 +1168,13 @@ def create_predict_tab(constant):
                     problem_type,
                     num_labels
                 ],
-                outputs=predict_output
+                outputs=[predict_output, single_result_file]
             )
             
             abort_button.click(
                 fn=handle_abort_single,
                 inputs=[],
-                outputs=[predict_output]
+                outputs=[predict_output, single_result_file]
             )
         
         with gr.Tab("Batch Prediction"):

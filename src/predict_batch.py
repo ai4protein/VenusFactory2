@@ -37,7 +37,7 @@ def parse_args():
     parser.add_argument('--plm_model', type=str, required=True, help="Pretrained language model name or path")
     parser.add_argument('--pooling_method', type=str, default="mean", choices=["mean", "attention1d", "light_attention"], help="Pooling method")
     parser.add_argument('--problem_type', type=str, default="single_label_classification", 
-                        choices=["single_label_classification", "multi_label_classification", "regression"], 
+                        choices=["single_label_classification", "multi_label_classification", "regression", "residue_single_label_classification", "residue_regression"], 
                         help="Problem type")
     parser.add_argument('--num_labels', type=int, default=2, help="Number of labels")
     parser.add_argument('--hidden_size', type=int, default=None, help="Embedding hidden size of the model")
@@ -217,6 +217,9 @@ def load_model_and_tokenizer(args):
 def process_sequence(args, tokenizer, plm_model_name, aa_seq, foldseek_seq="", ss8_seq="", prosst_stru_token=None):
     """Process and prepare a single input sequence for prediction"""
     
+    # Store original amino acid sequence for residue predictions
+    original_aa_seq = aa_seq.strip()
+    
     # Process amino acid sequence
     aa_seq = aa_seq.strip()
     if not aa_seq:
@@ -300,6 +303,9 @@ def process_sequence(args, tokenizer, plm_model_name, aa_seq, foldseek_seq="", s
     if args.use_ss8 and ss8_seq:
         data_dict["ss8_seq_input_ids"] = ss8_inputs["input_ids"]
     
+    # Add original amino acid sequence for residue predictions
+    data_dict["original_aa_seq"] = original_aa_seq
+    
     return data_dict
 
 def predict_batch(model, plm_model, data_dict, device, args):
@@ -315,7 +321,7 @@ def predict_batch(model, plm_model, data_dict, device, args):
             if np.isscalar(predictions):
                 return {"predictions": predictions}
             else:
-                # 如果是批处理，返回整个数组
+                # if batch processing, return entire array
                 return {"predictions": predictions.tolist() if isinstance(predictions, np.ndarray) else predictions}
     # Move data to device
     for k, v in data_dict.items():
@@ -328,11 +334,11 @@ def predict_batch(model, plm_model, data_dict, device, args):
         # Process outputs based on problem type
         if args.problem_type == "regression":
             predictions = outputs.squeeze().cpu().numpy()
-            # 确保返回标量值
+            # ensure return scalar value
             if np.isscalar(predictions):
                 return {"predictions": predictions}
             else:
-                # 如果是批处理，返回整个数组
+                # if batch processing, return entire array
                 return {"predictions": predictions.tolist() if isinstance(predictions, np.ndarray) else predictions}
         
         
@@ -354,6 +360,33 @@ def predict_batch(model, plm_model, data_dict, device, args):
             return {
                 "predictions": predictions.tolist(),
                 "probabilities": probabilities.tolist()
+            }
+        
+        elif args.problem_type == "residue_single_label_classification":
+            # For residue classification, outputs are per-position predictions
+            probabilities = torch.nn.functional.softmax(outputs, dim=-1)  # Apply softmax along the last dimension
+            predicted_classes = torch.argmax(probabilities, dim=-1).cpu().numpy()
+            class_probs = probabilities.cpu().numpy()
+            
+            # Get original amino acid sequence
+            original_aa_seq = data_dict.get("original_aa_seq", "")
+            
+            return {
+                "aa_seq": list(original_aa_seq),  # Include amino acid sequence
+                "predicted_classes": predicted_classes.tolist(),
+                "probabilities": class_probs.tolist()
+            }
+        
+        elif args.problem_type == "residue_regression":
+            # For residue regression, outputs are per-position regression values
+            predictions = outputs.cpu().numpy()
+            
+            # Get original amino acid sequence
+            original_aa_seq = data_dict.get("original_aa_seq", "")
+            
+            return {
+                "aa_seq": list(original_aa_seq),  # Include amino acid sequence
+                "predictions": predictions.tolist()
             }
 
 def main():
@@ -433,6 +466,28 @@ def main():
                     # Add probabilities
                     for i, prob in enumerate(prediction_results["probabilities"][0]):
                         result_row[f"label_{i}_prob"] = prob
+                
+                elif args.problem_type == "residue_single_label_classification":
+                    # For residue classification, each position has a prediction
+                    # Store as a list of predictions per position
+                    result_row["residue_predictions"] = prediction_results["predicted_classes"]
+                    
+                    # Store probabilities for each position and class
+                    for pos_idx, pos_probs in enumerate(prediction_results["probabilities"]):
+                        for class_idx, prob in enumerate(pos_probs):
+                            result_row[f"pos_{pos_idx}_class_{class_idx}_prob"] = prob
+                    
+                    # Store amino acid sequence for reference
+                    if "aa_seq" in prediction_results:
+                        result_row["aa_seq_residues"] = prediction_results["aa_seq"]
+                
+                elif args.problem_type == "residue_regression":
+                    # For residue regression, each position has a regression value
+                    result_row["residue_predictions"] = prediction_results["predictions"]
+                    
+                    # Store amino acid sequence for reference
+                    if "aa_seq" in prediction_results:
+                        result_row["aa_seq_residues"] = prediction_results["aa_seq"]
                 
                 results.append(result_row)
                 

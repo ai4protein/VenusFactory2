@@ -1,0 +1,109 @@
+/* Residue prediction results styling */
+.residue-results-table,
+.residue-regression-results-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+    font-size: 14px;
+}
+
+.residue-results-table th,
+.residue-results-table td,
+.residue-regression-results-table th,
+.residue-regression-results-table td {
+    border: 1px solid #ddd;
+    padding: 8px 12px;
+    text-align: center;
+}
+
+.residue-results-table th,
+.residue-regression-results-table th {
+    background-color: #f5f5f5;
+    font-weight: bold;
+    color: #333;
+}
+
+.residue-results-table tr:nth-child(even),
+.residue-regression-results-table tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+.residue-results-table tr:hover,
+.residue-regression-results-table tr:hover {
+    background-color: #f0f0f0;
+}
+
+/* Class distribution styling */
+.class-distribution {
+    margin: 20px 0;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 5px;
+    border-left: 4px solid #007bff;
+}
+
+.class-distribution h4 {
+    margin: 0 0 10px 0;
+    color: #333;
+    font-size: 16px;
+}
+
+.class-distribution p {
+    margin: 0;
+    color: #666;
+    font-size: 14px;
+}
+
+/* Summary stats for residue predictions */
+.summary-stats {
+    display: flex;
+    justify-content: space-around;
+    margin: 20px 0;
+    padding: 20px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.stat-item {
+    text-align: center;
+    flex: 1;
+}
+
+.stat-value {
+    font-size: 24px;
+    font-weight: bold;
+    color: #007bff;
+    margin-bottom: 5px;
+}
+
+.stat-label {
+    font-size: 12px;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Responsive design for residue tables */
+@media (max-width: 768px) {
+    .residue-results-table,
+    .residue-regression-results-table {
+        font-size: 12px;
+    }
+    
+    .residue-results-table th,
+    .residue-results-table td,
+    .residue-regression-results-table th,
+    .residue-regression-results-table td {
+        padding: 6px 8px;
+    }
+    
+    .summary-stats {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .stat-item {
+        flex: none;
+    }
+}

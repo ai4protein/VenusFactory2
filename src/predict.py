@@ -367,6 +367,42 @@ def predict(model, data_dict, device, args, plm_model):
                 "predictions": predictions,
                 "probabilities": probabilities
             }
+        
+        elif args.problem_type == "residue_single_label_classification":
+            # For residue classification, outputs are per-position predictions
+            probabilities = torch.nn.functional.softmax(outputs, dim=-1)  # Apply softmax along the last dimension
+            predicted_classes = torch.argmax(probabilities, dim=-1).squeeze().tolist()
+            class_probs = probabilities.squeeze().tolist()
+            
+            # Ensure we have lists
+            if not isinstance(predicted_classes, list):
+                predicted_classes = [predicted_classes]
+            if not isinstance(class_probs, list):
+                class_probs = [class_probs]
+            
+            print(f"Predicted residue classes: {predicted_classes}")
+            print(f"Residue class probabilities: {class_probs}")
+            
+            return {
+                "aa_seq": list(args.aa_seq),  # Include amino acid sequence
+                "predicted_classes": predicted_classes,
+                "probabilities": class_probs
+            }
+        
+        elif args.problem_type == "residue_regression":
+            # For residue regression, outputs are per-position regression values
+            predictions = outputs.squeeze().tolist()
+            
+            # Ensure we have a list
+            if not isinstance(predictions, list):
+                predictions = [predictions]
+            
+            print(f"Predicted residue values: {predictions}")
+            
+            return {
+                "aa_seq": list(args.aa_seq),  # Include amino acid sequence
+                "predictions": predictions
+            }
 
 def main():
     try:

@@ -237,6 +237,27 @@ ckpt/MetalIonBinding/esm2_t33_650M_UR50D/ses-adapter*
 ckpt/MetalIonBinding/prot_bert/ses-adapter*
 ckpt/MetalIonBinding/prot_t5_xl_uniref50/ses-adapter*
 
+# VenusX
+!ckpt/VenusX_Res_Act_MP90/
+ckpt/VenusX_Res_Act_MP90/ankh-base
+ckpt/VenusX_Res_Act_MP90/esm2_t30_150M_UR50D
+ckpt/VenusX_Res_Act_MP90/prot_bert
+
+!ckpt/VenusX_Res_BindI_MP90/
+ckpt/VenusX_Res_BindI_MP90/ankh-base
+ckpt/VenusX_Res_BindI_MP90/esm2_t30_150M_UR50D
+ckpt/VenusX_Res_BindI_MP90/prot_bert
+
+!ckpt/VenusX_Res_Motif_MP90/
+ckpt/VenusX_Res_Motif_MP90/ankh-base
+ckpt/VenusX_Res_Motif_MP90/esm2_t30_150M_UR50D
+ckpt/VenusX_Res_Motif_MP90/prot_bert
+
+!ckpt/VenusX_Res_Evo_MP90/
+ckpt/VenusX_Res_Evo_MP90/ankh-base
+ckpt/VenusX_Res_Evo_MP90/esm2_t30_150M_UR50D
+ckpt/VenusX_Res_Evo_MP90/prot_bert
+
 script_dev/
 .gradio/
 configs/
