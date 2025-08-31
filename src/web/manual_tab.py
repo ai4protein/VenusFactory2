@@ -6,10 +6,10 @@ from typing import Dict, Any
 
 def create_manual_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     # Add CSS styles from external file
-    css_path = os.path.join(os.path.dirname(__file__), "assets", "manual_ui.css")
+    css_path = os.path.join(os.path.dirname(__file__), "assets", "css", "manual_ui.css")
     custom_css = open(css_path, "r").read()
     
-    js_path = os.path.join(os.path.dirname(__file__), "assets", "manual_ui.js")
+    js_path = os.path.join(os.path.dirname(__file__), "assets", "js", "manual_ui.js")
     custom_js = open(js_path, "r").read()
     
     gr.HTML(f"<style>{custom_css}</style><script>{custom_js}</script>", visible=False)
