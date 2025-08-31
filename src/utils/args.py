@@ -3,7 +3,7 @@ import json
 import os
 import warnings
 from typing import Dict, Any
-from datetime import datetime
+from time import localtime, strftime
 
 def parse_args() -> Dict[str, Any]:
     """Parse and validate command line arguments."""
@@ -171,8 +171,6 @@ def setup_output_dirs(args: argparse.Namespace):
     if args.output_dir is None:
         current_date = strftime("%Y%m%d", localtime())
         args.output_dir = os.path.join(args.output_root, current_date)
-    else:
-        args.output_dir = os.path.join(args.output_root, args.output_dir)
     os.makedirs(args.output_dir, exist_ok=True)
 
 def setup_wandb_config(args: argparse.Namespace):

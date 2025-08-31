@@ -1,0 +1,21 @@
+<div class="progress-container">
+    <div class="progress-header">
+        <div>
+            <span class="progress-title">Evaluation Status: </span>
+            <span class="progress-status">{stage}</span>
+        </div>
+        <div>
+            <span class="progress-percentage">{progress:.1f}%</span>
+        </div>
+    </div>
+    
+    <div class="progress-bar-container">
+        <div class="progress-bar" style="width: {progress}%;"></div>
+    </div>
+    
+    <div class="progress-details">
+        {total_samples_detail}
+        {progress_detail}
+        {time_detail}
+    </div>
+</div>

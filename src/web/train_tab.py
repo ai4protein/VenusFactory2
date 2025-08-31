@@ -1,4 +1,3 @@
-import os
 import json
 import gradio as gr
 import time
@@ -29,12 +28,16 @@ class TrainingArgs:
             self.problem_type = config.get("problem_type", "single_label_classification")
             self.num_labels = config.get("num_labels", 2)
             self.metrics = config.get("metrics", "accuracy,mcc,f1,precision,recall,auroc")
+            self.sequence_column_name = config.get("sequence_column_name", "aa_seq")
+            self.label_column_name = config.get("label_column_name", "label")
         else:
             self.dataset_config = None
             self.dataset_custom = args_dict["dataset_custom"]  # Custom dataset path
             self.problem_type = args_dict["problem_type"]
             self.num_labels = args_dict["num_labels"]
             self.metrics = args_dict["metrics"]
+            self.sequence_column_name = args_dict["sequence_column_name"]
+            self.label_column_name = args_dict["label_column_name"]
             # if metrics is a list, convert to comma-separated string
             if isinstance(self.metrics, list):
                 self.metrics = ",".join(self.metrics)
@@ -115,6 +118,10 @@ class TrainingArgs:
             args_dict["problem_type"] = self.problem_type
             args_dict["num_labels"] = self.num_labels
             args_dict["metrics"] = self.metrics
+        
+        # Add column name parameters for both predefined and custom datasets
+        args_dict["sequence_column_name"] = self.sequence_column_name
+        args_dict["label_column_name"] = self.label_column_name
 
         # Add LoRA parameters
         if self.training_method in ["plm-lora", "plm-qlora", "plm-adalora", "plm-dora", "plm-ia3"]:
@@ -204,7 +211,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         with gr.Group(visible=True) as custom_dataset_settings:
             with gr.Row():
                 problem_type = gr.Dropdown(
-                    choices=["single_label_classification", "multi_label_classification", "regression"],
+                    choices=["single_label_classification", "multi_label_classification", "regression", "residue_single_label_classification"],
                     label="Problem Type",
                     value="single_label_classification",
                     scale=23,
@@ -217,7 +224,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                     interactive=False
                 )
                 metrics = gr.Dropdown(
-                    choices=["accuracy", "recall", "precision", "f1", "mcc", "auroc", "f1_max", "spearman_corr", "mse"],
+                    choices=["accuracy", "recall", "precision", "f1", "mcc", "auroc", "aupr", "f1_max", "f1_positive", "f1_negative", "spearman_corr", "mse"],
                     label="Metrics",
                     value=["accuracy", "mcc", "f1", "precision", "recall", "auroc"],
                     scale=101,
@@ -226,8 +233,23 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 )
             
             with gr.Row():
+                sequence_column_name = gr.Textbox(
+                    label="Amino Acid Sequence Column Name",
+                    value="aa_seq",
+                    placeholder="Name of the amino acid sequence column in dataset",
+                    scale=10,
+                    interactive=False
+                )
+                label_column_name = gr.Textbox(
+                    label="Target Label Column Name",
+                    value="label",
+                    placeholder="Name of the target label column in dataset",
+                    scale=10,
+                    interactive=False
+                )
+                
                 monitored_metrics = gr.Dropdown(
-                    choices=["accuracy", "recall", "precision", "f1", "mcc", "auroc", "f1_max", "spearman_corr", "mse"],
+                    choices=["accuracy", "recall", "precision", "f1", "mcc", "auroc", "aupr", "f1_max", "f1_positive", "f1_negative", "spearman_corr", "mse"],
                     label="Monitored Metrics",
                     value="accuracy",
                     scale=10,
@@ -306,7 +328,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     
     # Hyperparameter Settings
     gr.Markdown("## Hyperparameter Settings")
-    with gr.Accordion("Hyperparameter Settings", open=False):
+    with gr.Accordion("Click here to expand (If you are confused about the parameters, please check the documentation or take a screenshot and ask ChatGPT/Gemini for help)", open=False):
         # Batch Processing Configuration
         gr.Markdown("### Batch Processing Configuration")
         with gr.Group():
@@ -445,9 +467,9 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             gr.Markdown("## Output and Logging Settings")
             with gr.Row():
                 output_dir = gr.Textbox(
-                    label="Save Directory",
-                    value="demo",
-                    placeholder="Path to save training results"
+                    label="Save Directory (Better under `ckpt` directory)",
+                    value="ckpt/demo",
+                    placeholder="Path to save training results (relative to ckpt directory)"
                 )
                 
                 output_model_name = gr.Textbox(
@@ -1083,7 +1105,8 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         learning_rate, num_epochs, max_seq_len, gradient_accumulation_steps, warmup_steps, scheduler_type,
         output_model_name, output_dir, wandb_logging, wandb_project, wandb_entity,
         patience, num_workers, max_grad_norm, structure_seq,
-        lora_r, lora_alpha, lora_dropout, lora_target_modules, monitored_metrics, monitored_strategy
+        lora_r, lora_alpha, lora_dropout, lora_target_modules, monitored_metrics, monitored_strategy,
+        sequence_column_name, label_column_name
     ):
         """Handle the preview command button click event
         Args:
@@ -1120,6 +1143,8 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             lora_target_modules: lora target modules
             monitored_metrics: monitored metrics
             monitored_strategy: monitored strategy (max, min)
+            sequence_column_name: name of the sequence column in dataset
+            label_column_name: name of the label column in dataset
         Returns:
             command_preview: command preview
         """
@@ -1161,6 +1186,8 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             "lora_target_modules": lora_target_modules,
             "monitored_metrics": monitored_metrics,
             "monitored_strategy": monitored_strategy,
+            "sequence_column_name": sequence_column_name,
+            "label_column_name": label_column_name,
         }
         
         training_args = TrainingArgs(args_dict, plm_models, dataset_configs)
@@ -1235,7 +1262,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         output_model_name, output_dir, wandb_logging, wandb_project, wandb_entity,
         patience, num_workers, max_grad_norm, structure_seq, 
         lora_r, lora_alpha, lora_dropout, lora_target_modules, 
-        monitored_metrics, monitored_strategy
+        monitored_metrics, monitored_strategy, sequence_column_name, label_column_name
     ) -> Generator:
         """Handle the train command button click event
         Args:
@@ -1272,6 +1299,8 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             lora_target_modules: lora target modules
             monitored_metrics: monitored metrics
             monitored_strategy: monitored strategy (max, min)
+            sequence_column_name: name of the sequence column in dataset
+            label_column_name: name of the label column in dataset
         Returns:
             model_stats: model stats
             status_html: status html
@@ -1374,6 +1403,8 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 "lora_target_modules": lora_target_modules,
                 "monitored_metrics": monitored_metrics,
                 "monitored_strategy": monitored_strategy,
+                "sequence_column_name": sequence_column_name,
+                "label_column_name": label_column_name,
             }
             
             # Parse training arguments
@@ -1561,6 +1592,8 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         lora_target_modules,
         monitored_metrics,
         monitored_strategy,
+        sequence_column_name,
+        label_column_name,
     ]
 
     preview_button.click(
@@ -1723,7 +1756,9 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                     num_labels: gr.update(value=config.get("num_labels", 2), interactive=False),
                     metrics: gr.update(value=metrics_value, interactive=False),
                     monitored_metrics: gr.update(value=monitored_metrics_value, interactive=False),
-                    monitored_strategy: gr.update(value=monitored_strategy_value, interactive=False)
+                    monitored_strategy: gr.update(value=monitored_strategy_value, interactive=False),
+                    sequence_column_name: gr.update(value=config.get("sequence_column_name", "aa_seq"), interactive=False),
+                    label_column_name: gr.update(value=config.get("label_column_name", "label"), interactive=False)
                 })
             return result
         else:
@@ -1740,14 +1775,16 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 num_labels: gr.update(value=2, interactive=True),
                 metrics: gr.update(value=default_metrics, interactive=True),
                 monitored_metrics: gr.update(value=default_monitored_metrics, interactive=True),
-                monitored_strategy: gr.update(value=default_monitored_strategy, interactive=True)
+                monitored_strategy: gr.update(value=default_monitored_strategy, interactive=True),
+                sequence_column_name: gr.update(value="aa_seq", interactive=True),
+                label_column_name: gr.update(value="label", interactive=True)
             }
 
     # bind dataset settings update event
     is_custom_dataset.change(
         fn=update_train_tab_dataset_settings_UI,
         inputs=[is_custom_dataset, dataset_config],
-        outputs=[dataset_config, dataset_custom, custom_dataset_settings, problem_type, num_labels, metrics, monitored_metrics, monitored_strategy]
+        outputs=[dataset_config, dataset_custom, custom_dataset_settings, problem_type, num_labels, metrics, monitored_metrics, monitored_strategy, sequence_column_name, label_column_name]
     )
 
     def handle_dataset_config_change(x):
@@ -1761,7 +1798,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     dataset_config.change(
         fn=handle_dataset_config_change,
         inputs=[dataset_config],
-        outputs=[dataset_config, dataset_custom, custom_dataset_settings, problem_type, num_labels, metrics, monitored_metrics, monitored_strategy]
+        outputs=[dataset_config, dataset_custom, custom_dataset_settings, problem_type, num_labels, metrics, monitored_metrics, monitored_strategy, sequence_column_name, label_column_name]
     )
 
     # Return components that need to be accessed from outside
@@ -1799,5 +1836,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             "lora_alpha": lora_alpha,
             "lora_dropout": lora_dropout,
             "lora_target_modules": lora_target_modules,
+            "sequence_column_name": sequence_column_name,
+            "label_column_name": label_column_name,
         }
     }

@@ -1,0 +1,21 @@
+<div style="background-color: #f8f9fa; border-radius: 10px; padding: 20px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+    <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+        <div>
+            <span style="font-weight: 600; font-size: 16px;">Prediction Status: </span>
+            <span style="color: #1976d2; font-weight: 500; font-size: 16px;">{stage}</span>
+        </div>
+        <div>
+            <span style="font-weight: 600; color: #333;">{percentage:.1f}%</span>
+        </div>
+    </div>
+    
+    <div style="margin-bottom: 15px; background-color: #e9ecef; height: 10px; border-radius: 5px; overflow: hidden;">
+        <div style="background-color: #4285f4; width: {percentage}%; height: 100%; border-radius: 5px; transition: width 0.3s ease;"></div>
+    </div>
+    
+    <div style="display: flex; flex-wrap: wrap; gap: 10px; font-size: 14px; color: #555;">
+        {total_sequences_detail}
+        {progress_detail}
+        {status_detail}
+    </div>
+</div>

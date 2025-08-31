@@ -3,17 +3,15 @@ import json
 import os
 import subprocess
 import sys
-import signal
 import threading
 import queue
 import time
 import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
 import re
 from datasets import load_dataset
 from web.utils.command import preview_eval_command
-from web.utils.html_ui import load_html_template
+from web.utils.html_ui import load_html_template, format_metrics_table
+from web.utils.css_loader import get_css_style_tag
 
 def create_eval_tab(constant):
     plm_models = constant["plm_models"]
@@ -32,58 +30,15 @@ def create_eval_tab(constant):
             df = pd.read_csv(metrics_file)
             metrics_dict = df.iloc[0].to_dict()
             
-            priority_metrics = ['loss', 'accuracy', 'f1', 'precision', 'recall', 'auroc', 'mcc']
-            
-            def get_priority(item):
-                name = item[0]
-                if name in priority_metrics:
-                    return priority_metrics.index(name)
-                return len(priority_metrics)
-            
-            sorted_metrics = sorted(metrics_dict.items(), key=get_priority)
-            metrics_count = len(sorted_metrics)
+            metrics_rows = format_metrics_table(metrics_dict)
+            metrics_count = len(metrics_dict)
             
             html = f"""
-            <div style="max-width: 800px; margin: 0 auto; font-family: Arial, sans-serif;">
-                <p style="text-align: center; margin-bottom: 15px; color: #666;">{metrics_count} metrics found</p>
-                <table style="width: 100%; border-collapse: collapse; font-size: 14px; border: 1px solid #ddd; box-shadow: 0 2px 3px rgba(0,0,0,0.1);">
-                    <thead>
-                        <tr style="background-color: #f0f0f0;">
-                            <th style="padding: 12px; text-align: center; border: 1px solid #ddd; font-weight: bold; width: 50%;">Metric</th>
-                            <th style="padding: 12px; text-align: center; border: 1px solid #ddd; font-weight: bold; width: 50%;">Value</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            """
-            
-            # add alternating row color
-            for i, (metric_name, metric_value) in enumerate(sorted_metrics):
-                row_style = 'background-color: #f9f9f9;' if i % 2 == 0 else ''
-                
-                # use bold for priority metrics
-                is_priority = metric_name in priority_metrics
-                name_style = 'font-weight: bold;' if is_priority else ''
-                
-                # convert metric name: abbreviations in uppercase, non-abbreviations in capitalize
-                display_name = metric_name
-                if metric_name.lower() in ['f1', 'mcc', 'auroc']:
-                    display_name = metric_name.upper()
-                else:
-                    display_name = metric_name.capitalize()
-                
-
-                html += f"""
-                <tr style="{row_style}">
-                    <td style="padding: 10px; text-align: center; border: 1px solid #ddd; {name_style}">{display_name}</td>
-                    <td style="padding: 10px; text-align: center; border: 1px solid #ddd;">{metric_value:.4f}</td>
-                </tr>
-                """
-                
-            html += """
-                    </tbody>
-                </table>
-                <p style="text-align: center; margin-top: 10px; color: #888; font-size: 12px;">Test completed at: """ + time.strftime("%Y-%m-%d %H:%M:%S") + """</p>
-            </div>
+            {get_css_style_tag('eval_predict_ui.css')}
+            {load_html_template('metrics_table.html', 
+                              metrics_count=metrics_count,
+                              metrics_rows=metrics_rows,
+                              completion_time=time.strftime("%Y-%m-%d %H:%M:%S"))}
             """
             
             return html
@@ -103,7 +58,7 @@ def create_eval_tab(constant):
                 queue.put(output.strip())
         process.stdout.close()
 
-    def evaluate_model(plm_model, model_path, eval_method, is_custom_dataset, dataset_defined, dateset_custom, problem_type, num_labels, metrics, batch_mode, batch_size, batch_token, eval_structure_seq, pooling_method):
+    def evaluate_model(plm_model, model_path, eval_method, is_custom_dataset, dataset_defined, dateset_custom, problem_type, num_labels, metrics, batch_mode, batch_size, batch_token, eval_structure_seq, pooling_method, sequence_column_name, label_column_name):
         nonlocal is_evaluating, current_process, stop_thread, process_aborted
         
         if is_evaluating:
@@ -142,10 +97,9 @@ def create_eval_tab(constant):
             # Validate inputs
             if not model_path or not os.path.exists(os.path.dirname(model_path)):
                 is_evaluating = False
-                yield """
-                <div style="padding: 10px; background-color: #ffebee; border-radius: 5px; margin-bottom: 10px;">
-                    <p style="margin: 0; color: #c62828; font-weight: bold;">Error: Invalid model path</p>
-                </div>
+                yield f"""
+                {get_css_style_tag('eval_predict_ui.css')}
+                {load_html_template('evaluation_error.html', error_message="Error: Invalid model path")}
                 """, gr.update(visible=False)
                 return
             
@@ -156,10 +110,9 @@ def create_eval_tab(constant):
                 dataset = dataset_defined
                 if dataset not in dataset_configs:
                     is_evaluating = False
-                    yield """
-                    <div style="padding: 10px; background-color: #ffebee; border-radius: 5px; margin-bottom: 10px;">
-                        <p style="margin: 0; color: #c62828; font-weight: bold;">Error: Invalid dataset selection</p>
-                    </div>
+                    yield f"""
+                    {get_css_style_tag('eval_predict_ui.css')}
+                    {load_html_template('evaluation_error.html', error_message="Error: Invalid dataset selection")}
                     """, gr.update(visible=False)
                     return
                 config_path = dataset_configs[dataset]
@@ -185,6 +138,8 @@ def create_eval_tab(constant):
                 "test_result_dir": test_result_dir,
                 "dataset": dataset_display_name,
                 "pooling_method": pooling_method,
+                "sequence_column_name": sequence_column_name,
+                "label_column_name": label_column_name,
             }
             if batch_mode == "Batch Size Mode":
                 args_dict["batch_size"] = batch_size
@@ -301,13 +256,12 @@ def create_eval_tab(constant):
                     time_str = f"{hours:02}:{minutes:02}:{seconds:02}"
                     
                     summary_html = f"""
-                    <div style="padding: 15px; background-color: #e8f5e9; border-radius: 5px; margin-bottom: 15px;">
-                        <h3 style="margin-top: 0; color: #2e7d32;">Evaluation completed successfully!</h3>
-                        <p><b>Total evaluation time:</b> {time_str}</p>
-                        <p><b>Evaluation dataset:</b> {dataset_display_name}</p>
-                        <p><b>Total samples:</b> {progress_info.get('total_samples', 0)}</p>
-                    </div>
-                    <div style="margin-top: 20px; font-weight: bold; font-size: 18px; text-align: center;">Evaluation Results</div>
+                    {get_css_style_tag('eval_predict_ui.css')}
+                    {load_html_template('evaluation_success.html', 
+                                      total_time=time_str,
+                                      dataset_name=dataset_display_name,
+                                      total_samples=progress_info.get('total_samples', 0))}
+                    <div class="results-title">Evaluation Results</div>
                     {metrics_html}
                     """
                     
@@ -316,9 +270,8 @@ def create_eval_tab(constant):
                 else:
                     error_output = "\n".join(progress_info.get("lines", []))
                     yield f"""
-                    <div style="padding: 10px; background-color: #fff8e1; border-radius: 5px; margin-bottom: 10px;">
-                        <p style="margin: 0; color: #f57f17; font-weight: bold;">Evaluation completed, but metrics file not found at: {result_file}</p>
-                    </div>
+                    {get_css_style_tag('eval_predict_ui.css')}
+                    {load_html_template('evaluation_warning.html', warning_message=f"Evaluation completed, but metrics file not found at: {result_file}")}
                     """, gr.update(visible=False)
             else:
                 error_output = "\n".join(progress_info.get("lines", []))
@@ -326,18 +279,18 @@ def create_eval_tab(constant):
                     error_output = "No output captured from the evaluation process"
                 
                 yield f"""
-                <div style="padding: 10px; background-color: #ffebee; border-radius: 5px; margin-bottom: 10px;">
-                    <p style="margin: 0; color: #c62828; font-weight: bold;">Evaluation failed:</p>
-                    <pre style="margin: 5px 0 0; white-space: pre-wrap; max-height: 300px; overflow-y: auto;">{error_output}</pre>
-                </div>
+                {get_css_style_tag('eval_predict_ui.css')}
+                {load_html_template('evaluation_error.html', 
+                                  error_message="Evaluation failed:",
+                                  error_details=f"<pre class='error-details'>{error_output}</pre>")}
                 """, gr.update(visible=False)
 
         except Exception as e:
             yield f"""
-            <div style="padding: 10px; background-color: #ffebee; border-radius: 5px; margin-bottom: 10px;">
-                <p style="margin: 0; color: #c62828; font-weight: bold;">Error during evaluation process:</p>
-                <pre style="margin: 5px 0 0; white-space: pre-wrap;">{str(e)}</pre>
-            </div>
+            {get_css_style_tag('eval_predict_ui.css')}
+            {load_html_template('evaluation_error.html', 
+                              error_message="Error during evaluation process:",
+                              error_details=f"<pre class='error-details'>{str(e)}</pre>")}
             """, gr.update(visible=False)
         finally:
             if current_process:
@@ -357,42 +310,19 @@ def create_eval_tab(constant):
         progress = max(0, min(100, progress))
         
         # 准备详细信息
-        details = []
-        if total_samples > 0:
-            details.append(f"Total samples: {total_samples}")
-        if current > 0 and total > 0:
-            details.append(f"Current progress: {current}/{total}")
-        
-        # 计算评估时间（如果有）
-        elapsed_time = progress_info.get("elapsed_time", "")
-        if elapsed_time:
-            details.append(f"Elapsed time: {elapsed_time}")
-        
-        details_text = ", ".join(details)
+        total_samples_detail = f'<div class="progress-detail-item progress-detail-total"><span style="font-weight: 500;">Total samples:</span> {total_samples}</div>' if total_samples > 0 else ''
+        progress_detail = f'<div class="progress-detail-item progress-detail-current"><span style="font-weight: 500;">Progress:</span> {current}/{total}</div>' if current > 0 and total > 0 else ''
+        time_detail = f'<div class="progress-detail-item progress-detail-time"><span style="font-weight: 500;">Time:</span> {progress_info.get("elapsed_time", "")}</div>' if progress_info.get("elapsed_time", "") else ''
         
         # 创建更现代化的进度条
         html = f"""
-        <div style="background-color: #f8f9fa; border-radius: 10px; padding: 20px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
-                <div>
-                    <span style="font-weight: 600; font-size: 16px;">Evaluation Status: </span>
-                    <span style="color: #1976d2; font-weight: 500; font-size: 16px;">{stage}</span>
-                </div>
-                <div>
-                    <span style="font-weight: 600; color: #333;">{progress:.1f}%</span>
-                </div>
-            </div>
-            
-            <div style="margin-bottom: 15px; background-color: #e9ecef; height: 10px; border-radius: 5px; overflow: hidden;">
-                <div style="background-color: #4285f4; width: {progress}%; height: 100%; border-radius: 5px; transition: width 0.3s ease;"></div>
-            </div>
-            
-            <div style="display: flex; flex-wrap: wrap; gap: 10px; font-size: 14px; color: #555;">
-                {f'<div style="background-color: #e3f2fd; padding: 5px 10px; border-radius: 4px;"><span style="font-weight: 500;">Total samples:</span> {total_samples}</div>' if total_samples > 0 else ''}
-                {f'<div style="background-color: #e8f5e9; padding: 5px 10px; border-radius: 4px;"><span style="font-weight: 500;">Progress:</span> {current}/{total}</div>' if current > 0 and total > 0 else ''}
-                {f'<div style="background-color: #fff8e1; padding: 5px 10px; border-radius: 4px;"><span style="font-weight: 500;">Time:</span> {elapsed_time}</div>' if elapsed_time else ''}
-            </div>
-        </div>
+        {get_css_style_tag('eval_predict_ui.css')}
+        {load_html_template('evaluation_progress.html',
+                          stage=stage,
+                          progress=progress,
+                          total_samples_detail=total_samples_detail,
+                          progress_detail=progress_detail,
+                          time_detail=time_detail)}
         """
         return html
 
@@ -401,11 +331,10 @@ def create_eval_tab(constant):
         nonlocal is_evaluating, current_process, stop_thread, process_aborted
         
         if current_process is None:
-            return """
-            <div style="padding: 10px; background-color: #f5f5f5; border-radius: 5px;">
-                <p style="margin: 0;">No evaluation in progress to terminate.</p>
-            </div>
-            """, gr.update(visible=False)
+                    return f"""
+        {get_css_style_tag('eval_predict_ui.css')}
+        {load_html_template('status_empty.html', message="No evaluation in progress to terminate.")}
+        """, gr.update(visible=False)
         
         try:
             # Set the abort flag before terminating the process
@@ -432,11 +361,9 @@ def create_eval_tab(constant):
                 except queue.Empty:
                     break
             
-            return """
-            <div style="padding: 10px; background-color: #e8f5e9; border-radius: 5px;">
-                <p style="margin: 0; color: #2e7d32; font-weight: bold;">Evaluation successfully terminated!</p>
-                <p style="margin: 5px 0 0; color: #388e3c;">All evaluation state has been reset.</p>
-            </div>
+            return f"""
+            {get_css_style_tag('eval_predict_ui.css')}
+            {load_html_template('status_success.html', message="Evaluation successfully terminated! All evaluation state has been reset.")}
             """, gr.update(visible=False)
         except Exception as e:
             # Still need to reset states even if there's an error
@@ -452,10 +379,8 @@ def create_eval_tab(constant):
                     break
             
             return f"""
-            <div style="padding: 10px; background-color: #ffebee; border-radius: 5px;">
-                <p style="margin: 0; color: #c62828; font-weight: bold;">Failed to terminate evaluation: {str(e)}</p>
-                <p style="margin: 5px 0 0; color: #c62828;">Evaluation state has been reset.</p>
-            </div>
+            {get_css_style_tag('eval_predict_ui.css')}
+            {load_html_template('status_failed_terminate.html', error_message=f"Failed to terminate evaluation: {str(e)}")}
             """, gr.update(visible=False)
             
     gr.Markdown("## Model and Dataset Configuration")
@@ -515,10 +440,10 @@ def create_eval_tab(constant):
             # These are settings for custom dataset.
         with gr.Row():
             problem_type = gr.Dropdown(
-                choices=["single_label_classification", "multi_label_classification", "regression"],
+                choices=["single_label_classification", "multi_label_classification", "regression", "residue_single_label_classification"],
                 label="Problem Type",
                 value="single_label_classification",
-                scale=23,
+                scale=12,
                 interactive=False   
             )
             num_labels = gr.Number(
@@ -528,14 +453,28 @@ def create_eval_tab(constant):
                 interactive=False
             )
             metrics = gr.Dropdown(
-                choices=["accuracy", "recall", "precision", "f1", "mcc", "auroc", "f1_max", "spearman_corr", "mse"],
+                choices=["accuracy", "recall", "precision", "f1", "mcc", "auroc", "aupr", "f1_max", "f1_positive", "f1_negative", "spearman_corr", "mse"],
                 label="Metrics",
                 value=["accuracy", "mcc", "f1", "precision", "recall", "auroc"],
-                scale=101,
+                scale=30,
                 multiselect=True,
                 interactive=False
             )
-        
+            sequence_column_name = gr.Textbox(
+                label="Amino Acid Sequence Column Name",
+                value="aa_seq",
+                placeholder="Name of the amino acid sequence column in dataset",
+                scale=20,
+                interactive=False
+            )
+            label_column_name = gr.Textbox(
+                label="Target Label Column Name",
+                value="label",
+                placeholder="Name of the target label column in dataset",
+                scale=20,
+                interactive=False
+            )
+                
         
     # put dataset preview in a accordion
     with gr.Row():
@@ -677,7 +616,9 @@ def create_eval_tab(constant):
                     gr.update(visible=False), # eval_dataset_custom
                     gr.update(value=config.get("problem_type", ""), interactive=False),
                     gr.update(value=config.get("num_labels", 1), interactive=False),
-                    gr.update(value=metrics_value, interactive=False)
+                    gr.update(value=metrics_value, interactive=False),
+                    gr.update(value=config.get("sequence_column_name", "sequence"), interactive=False),
+                    gr.update(value=config.get("label_column_name", "label"), interactive=False)
                 ]
         else:
             # Custom dataset settings
@@ -686,14 +627,16 @@ def create_eval_tab(constant):
                 gr.update(visible=True),   # eval_dataset_custom
                 gr.update(value="", interactive=True),
                 gr.update(value=2, interactive=True),
-                gr.update(value="", interactive=True)
+                gr.update(value="", interactive=True),
+                gr.update(value="sequence", interactive=True),
+                gr.update(value="label", interactive=True)
             ]
     
     is_custom_dataset.change(
         fn=update_eval_tab_dataset_settings_UI,
         inputs=[is_custom_dataset, eval_dataset_defined],
         outputs=[eval_dataset_defined, eval_dataset_custom, 
-                problem_type, num_labels, metrics]
+                problem_type, num_labels, metrics, sequence_column_name, label_column_name]
     )
 
     def handle_eval_dataset_defined_change(x):
@@ -709,7 +652,7 @@ def create_eval_tab(constant):
         fn=handle_eval_dataset_defined_change,
         inputs=[eval_dataset_defined],
         outputs=[eval_dataset_defined, eval_dataset_custom, 
-                problem_type, num_labels, metrics]
+                problem_type, num_labels, metrics, sequence_column_name, label_column_name]
     )
 
     ### These are settings for different training methods. ###
@@ -803,7 +746,7 @@ def create_eval_tab(constant):
 
     def handle_eval_tab_command_preview(plm_model, model_path, eval_method, is_custom_dataset, dataset_defined, 
                         dataset_custom, problem_type, num_labels, metrics, batch_mode, 
-                        batch_size, batch_token, eval_structure_seq, eval_pooling_method):
+                        batch_size, batch_token, eval_structure_seq, eval_pooling_method, sequence_column_name, label_column_name):
         """Handle the preview command button click event
         Args:
             plm_model: plm model name
@@ -814,19 +757,21 @@ def create_eval_tab(constant):
             dataset_custom: custom dataset path
             problem_type: problem type
             num_labels: number of labels
-            metrics: metrics (accuracy, recall, precision, f1, mcc, auroc, f1_max, spearman_corr, mse)
+            metrics: metrics (accuracy, recall, precision, f1, mcc, auroc, aupr, f1_max, f1_positive, f1_negative, spearman_corr, mse)
             batch_mode: batch mode (Batch Size Mode or Batch Token Mode)
             batch_size: batch size
             batch_token: batch token (tokens per batch)
             eval_structure_seq: structure sequence (foldseek_seq, ss8_seq)
             eval_pooling_method: pooling method (mean, attention1d, light_attention)
+            sequence_column_name: name of the sequence column in dataset
+            label_column_name: name of the label column in dataset
         Returns:
             command_preview: command preview
         """
         if command_preview.visible:
             return gr.update(visible=False)
         
-        # 构建参数字典
+        # create args dictionary
         args = {
             "plm_model": plm_models[plm_model],
             "model_path": model_path,
@@ -834,24 +779,28 @@ def create_eval_tab(constant):
             "pooling_method": eval_pooling_method
         }
         
-        # 处理数据集相关参数
+        # process dataset related parameters
         if is_custom_dataset == "Custom Dataset":
             args["dataset"] = dataset_custom
             args["problem_type"] = problem_type
             args["num_labels"] = num_labels
             args["metrics"] = ",".join(metrics)
+            args["sequence_column_name"] = sequence_column_name
+            args["label_column_name"] = label_column_name
         else:
             with open(dataset_configs[dataset_defined], 'r') as f:
                 config = json.load(f)
             args["dataset_config"] = dataset_configs[dataset_defined]
+            args["sequence_column_name"] = sequence_column_name
+            args["label_column_name"] = label_column_name
         
-        # 处理批处理参数
+        # process batch processing parameters
         if batch_mode == "Batch Size Mode":
             args["batch_size"] = batch_size
         else:
             args["batch_token"] = batch_token
         
-        # 处理结构序列参数
+        # process structure sequence parameters
         if eval_method == "ses-adapter" and eval_structure_seq:
             args["structure_seq"] = ",".join(eval_structure_seq)
             if "foldseek_seq" in eval_structure_seq:
@@ -859,11 +808,11 @@ def create_eval_tab(constant):
             if "ss8_seq" in eval_structure_seq:
                 args["use_ss8"] = True
         
-        # 生成预览命令
+        # generate preview command
         preview_text = preview_eval_command(args)
         return gr.update(value=preview_text, visible=True)
 
-    # 绑定预览按钮事件
+    # bind preview button event
     preview_button.click(
         fn=handle_eval_tab_command_preview,
         inputs=[
@@ -880,7 +829,9 @@ def create_eval_tab(constant):
             batch_size,
             batch_token,
             eval_structure_seq,
-            eval_pooling_method
+            eval_pooling_method,
+            sequence_column_name,
+            label_column_name
         ],
         outputs=[command_preview]
     )
@@ -919,7 +870,9 @@ def create_eval_tab(constant):
             batch_size,
             batch_token,
             eval_structure_seq,
-            eval_pooling_method
+            eval_pooling_method,
+            sequence_column_name,
+            label_column_name
         ],
         outputs=[eval_output, download_csv_btn]
     )

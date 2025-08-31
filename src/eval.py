@@ -91,6 +91,8 @@ if __name__ == '__main__':
     # dataset
     parser.add_argument('--dataset', type=str, default=None, help='dataset name')
     parser.add_argument('--problem_type', type=str, default=None, help='problem type')
+    parser.add_argument('--sequence_column_name', type=str, default=None, help='sequence column name')
+    parser.add_argument('--label_column_name', type=str, default=None, help='label column name')
     parser.add_argument('--test_file', type=str, default=None, help='test file')
     parser.add_argument('--split', type=str, default=None, help='split name in Huggingface')
     parser.add_argument('--test_result_dir', type=str, default=None, help='test result directory')
