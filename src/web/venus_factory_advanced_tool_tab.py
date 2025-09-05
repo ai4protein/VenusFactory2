@@ -20,14 +20,15 @@ from web.venus_factory_quick_tool_tab import *
 # --- Constants and Mappings ---
 
 MODEL_MAPPING_ZERO_SHOT = {
+    "ProSST-2048": "prosst",
+    "ProtSSN": "protssn",
+    "VenusPLM": "venusplm",
     "ESM2-650M": "esm2",
     "ESM-1v": "esm1v",
     "ESM-1b": "esm1b",
     "ESM-IF1": "esmif1",
     "SaProt": "saprot",
-    "MIF-ST": "mifst",
-    "ProSST-2048": "prosst",
-    "ProtSSN": "protssn"
+    "MIF-ST": "mifst"
 }
 
 DATASET_MAPPING_ZERO_SHOT = [
@@ -42,6 +43,12 @@ MODEL_MAPPING_FUNCTION = {
     "ESM2-650M": "esm2",
     "Ankh-large": "ankh",
     "ProtBert": "protbert",
+    "ProtT5-xl-uniref50": "prott5",
+}
+
+MODEL_RESIDUE_MAPPING_FUNCTION = {
+    "ESM2-650M": "esm2",
+    "Ankh-large": "ankh",
     "ProtT5-xl-uniref50": "prott5",
 }
 
@@ -110,136 +117,6 @@ AI_MODELS = {
     }
 }
 
-@dataclass
-class AIConfig:
-    api_key: str
-    ai_model_name: str
-    api_base: str
-    model: str
-
-def get_api_key(ai_model: str, user_api_key: str) -> str:
-    if user_api_key and user_api_key.strip():
-        return user_api_key.strip()
-    
-    env_key = AI_MODELS[ai_model]["env_key"]
-    if env_key:
-        return os.getenv(env_key, "")
-    return ""
-
-def call_ai_api(ai_config: AIConfig, prompt: str) -> str:
-    try:
-        if ai_config.ai_model_name == "DeepSeek":
-            headers = {"Authorization": f"Bearer {ai_config.api_key}"}
-            data = {
-                "model": ai_config.model,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.7,
-                "max_tokens": 2000
-            }
-            response = requests.post(
-                f"{ai_config.api_base}/chat/completions",
-                headers=headers,
-                json=data,
-                timeout=60
-            )
-            response.raise_for_status()
-            return response.json()["choices"][0]["message"]["content"]
-            
-        elif ai_config.ai_model_name == "ChatGPT":
-            headers = {"Authorization": f"Bearer {ai_config.api_key}"}
-            data = {
-                "model": ai_config.model,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.7,
-                "max_tokens": 2000
-            }
-            response = requests.post(
-                f"{ai_config.api_base}/chat/completions",
-                headers=headers,
-                json=data,
-                timeout=60
-            )
-            response.raise_for_status()
-            return response.json()["choices"][0]["message"]["content"]
-            
-        elif ai_config.ai_model_name == "Gemini":
-            headers = {"Content-Type": "application/json"}
-            data = {
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {
-                    "temperature": 0.7,
-                    "maxOutputTokens": 2000
-                }
-            }
-            response = requests.post(
-                f"{ai_config.api_base}/models/gemini-1.5-flash:generateContent?key={ai_config.api_key}",
-                headers=headers,
-                json=data,
-                timeout=60
-            )
-            response.raise_for_status()
-            return response.json()["candidates"][0]["content"]["parts"][0]["text"]
-            
-        else:
-            return f"Unsupported AI model: {ai_config.ai_model_name}"
-            
-    except Exception as e:
-        return f"Error calling AI API: {str(e)}"
-
-def format_expert_response(ai_response: str) -> str:
-    if not ai_response or ai_response.startswith("Error"):
-        return f"<div style='color: #ef4444; padding: 20px;'>{ai_response or 'No response received'}</div>"
-    
-    formatted = ai_response.replace("**", "<strong>").replace("**", "</strong>")
-    formatted = formatted.replace("*", "<em>").replace("*", "</em>")
-    formatted = formatted.replace("\n", "<br>")
-    
-    return f"<div style='padding: 20px; line-height: 1.6;'>{formatted}</div>"
-
-def generate_mutation_ai_prompt(df: pd.DataFrame, model_name: str, function_selection: str) -> str:
-    if df.empty:
-        return "No mutation data available for analysis."
-    
-    top_mutations = df.head(10).to_dict('records')
-    mutation_summary = "\n".join([
-        f"- {mut['Mutant']}: Score {mut['Prediction Score']}"
-        for mut in top_mutations
-    ])
-    
-    prompt = f"""Analyze the following mutation prediction results from {model_name} for {function_selection}:
-
-Top 10 mutations:
-{mutation_summary}
-
-Please provide:
-1. A brief summary of the prediction results
-2. Key insights about the most impactful mutations
-3. Recommendations for experimental validation
-4. Any potential limitations of the predictions
-
-Keep the analysis concise and actionable."""
-    
-    return prompt
-
-def generate_expert_analysis_prompt(df: pd.DataFrame, task: str) -> str:
-    if df.empty:
-        return "No prediction data available for analysis."
-    
-    prompt = f"""Analyze the following protein function prediction results for {task}:
-
-Dataset: {', '.join(df['Dataset'].unique()) if 'Dataset' in df.columns else 'Single dataset'}
-Number of predictions: {len(df)}
-
-Please provide:
-1. A summary of the prediction results
-2. Key insights about the protein's predicted properties
-3. Biological significance of the predictions
-4. Recommendations for experimental validation
-5. Any potential limitations or considerations
-
-Keep the analysis concise and actionable."""
-    
-    return prompt
 
 def parse_fasta_file(file_path: str) -> str:
     if not file_path: return ""
@@ -286,9 +163,14 @@ def update_dataset_choices(task: str) -> gr.CheckboxGroup:
 
 def run_zero_shot_prediction(model_type: str, model_name: str, file_path: str) -> Tuple[str, pd.DataFrame]:
     try:
-        output_csv = f"temp_{model_type}_{int(time.time())}.csv"
-        
+        temp_dir = Path("temp_outputs")
+        temp_dir_ = temp_dir / "Zero_shot_result"
+        timestamp = str(int(time.time()))
+        sequence_dir = temp_dir_ / timestamp
+        sequence_dir.mkdir(exist_ok=True)
+        output_csv = sequence_dir / f"{model_type}.csv"
         script_name = MODEL_MAPPING_ZERO_SHOT.get(model_name)
+        
         
         if not script_name:
             return f"Error: Model '{model_name}' not found in model mapping.", pd.DataFrame()
@@ -303,7 +185,7 @@ def run_zero_shot_prediction(model_type: str, model_name: str, file_path: str) -
         cmd = [
             sys.executable, script_path, 
             file_argument, file_path, 
-            "--output_csv", output_csv
+            "--output_csv", str(output_csv)
         ]
         
         print(f"DEBUG: Running command: {' '.join(cmd)}")
@@ -465,11 +347,12 @@ def handle_mutation_prediction_advance(
     else:
         progress(1.0, desc="Complete!")
     temp_dir = Path("temp_outputs")
-    timestamp = int(time.time())
-    session_dir = temp_dir / str(timestamp) 
+    temp_dir_ = temp_dir / "Zero_shot_result"
+    timestamp = str(int(time.time()))
+    session_dir = temp_dir_ / timestamp
     session_dir.mkdir(exist_ok=True)
     
-    csv_path = session_dir / f"mut_res.csv"
+    csv_path = session_dir/ f"mut_res.csv"
     heatmap_path = session_dir/ f"mut_map.html"
     
     display_df.to_csv(csv_path, index=False)
@@ -515,7 +398,10 @@ def handle_protein_function_prediction_chat(
     final_datasets = datasets if datasets and len(datasets) > 0 else DATASET_MAPPING_FUNCTION.get(task, [])
     all_results_list = []
     temp_dir = Path("temp_outputs")
-    temp_dir.mkdir(exist_ok=True)
+    temp_dir_ = temp_dir / "Protein_Function"
+    timestamp = str(int(time.time()))
+    function_dir = temp_dir_ / timestamp
+    function_dir.mkdir(exist_ok=True)
 
     for i, dataset in enumerate(final_datasets):
         try:
@@ -526,7 +412,7 @@ def handle_protein_function_prediction_chat(
             adapter_key = MODEL_ADAPTER_MAPPING_FUNCTION[model_key]
             script_path = Path("src") / "property" / f"{model_key}.py"
             adapter_path = Path("ckpt") / dataset / adapter_key
-            output_file = temp_dir / f"temp_{dataset}_{model}.csv"
+            output_file = function_dir/ f"temp_{dataset}_{model}.csv"
 
             if not script_path.exists() or not adapter_path.exists():
                 raise FileNotFoundError(f"Required files not found for dataset {dataset}")
@@ -616,7 +502,10 @@ def handle_protein_function_prediction_advance(
     
     all_results_list = []
     temp_dir = Path("temp_outputs")
-    temp_dir.mkdir(exist_ok=True)
+    temp_dir_ = temp_dir / "Protein_Function"
+    timestamp = str(int(time.time()))
+    function_dir = temp_dir_ / timestamp
+    function_dir.mkdir(exist_ok=True)
 
     for i, dataset in enumerate(final_datasets):
         yield (
@@ -633,7 +522,7 @@ def handle_protein_function_prediction_advance(
             adapter_key = MODEL_ADAPTER_MAPPING_FUNCTION[model_key]
             script_path = Path("src") / "property" / f"{model_key}.py"
             adapter_path = Path("ckpt") / dataset / adapter_key
-            output_file = temp_dir / f"temp_{dataset}_{model}.csv"
+            output_file = function_dir / f"temp_{dataset}_{model}.csv"
             
             if not script_path.exists() or not adapter_path.exists():
                 raise FileNotFoundError(f"Required files not found: Script={script_path}, Adapter={adapter_path}")
@@ -677,6 +566,21 @@ def handle_protein_function_prediction_advance(
 
             return scaled_value
 
+        if row.get('Dataset') == 'SortingSignal':
+            predictions_str = row['predicted_class']
+            predictions = json.loads(predictions_str)
+            if all(p == 0 for p in predictions):
+                return "No signal"
+            # Get labels for SortingSignal
+            signal_labels = ["CH", 'GPI', "MT", "NES", "NLS", "PTS", "SP", "TM", "TH"]
+            active_labels = []
+            # Find indices where prediction is 1 (active labels)
+            for i, pred in enumerate(predictions):
+                if pred == 1:
+                    active_labels.append(signal_labels[i])
+            print(predictions)
+            # Return concatenated labels or "None" if no active labels
+            return "_".join(active_labels) if active_labels else "None"
         
         labels_key = ("DeepLocMulti" if row.get('Dataset') == "DeepLocMulti" 
                      else "DeepLocBinary" if row.get('Dataset') == "DeepLocBinary" 
@@ -774,7 +678,7 @@ def handle_protein_function_prediction_advance(
     zip_path_str = ""
     try:
         ts = int(time.time())
-        zip_dir = temp_dir / f"download_{ts}"
+        zip_dir = function_dir /  f"download_{ts}"
         zip_dir.mkdir()
         
         processed_df_for_save = display_df.copy()
@@ -787,7 +691,7 @@ def handle_protein_function_prediction_advance(
             with open(zip_dir / "AI_Report.md", 'w', encoding='utf-8') as f: 
                 f.write(f"# AI Report\n\n{ai_summary}")
         
-        zip_path = temp_dir / f"func_pred_{ts}.zip"
+        zip_path = function_dir / f"func_pred_{ts}.zip"
         with zipfile.ZipFile(zip_path, 'w') as zf:
             for file in zip_dir.glob("*"): 
                 zf.write(file, file.name)
@@ -802,20 +706,132 @@ def handle_protein_function_prediction_advance(
     yield final_status, display_df, plot_fig, gr.update(visible=True, value=zip_path_str), expert_analysis
 
 
+def handle_protein_residue_function_prediction_chat(
+    task: str,
+    fasta_file: Any,
+    enable_ai: bool,
+    ai_model: str,
+    user_api_key: str,
+    model_name: str,
+    progress=gr.Progress()
+) -> Generator:
+    try:
+        import requests
+        requests.post("/api/stats/track", json={"module": "function_analysis"})
+    except Exception:
+        pass
+
+    """Handle protein residue function prediction workflow."""
+    model = model_name if model_name else "ESM2-650M"
+
+    if not all([task, fasta_file]):
+        yield(
+           "❌ Error: Task and FASTA file are required.", 
+            pd.DataFrame(), None,
+            gr.update(visible=False), 
+            "Please provide all required inputs.",
+            "AI Analysis disabled." 
+        )
+        return
+
+    progress(0.1, desc="Running Prediction...")
+    yield(
+        f"🚀 Starting predictions with {model}...", 
+        pd.DataFrame(), None,
+        gr.update(visible=False), 
+        "AI analysis will appear here...",
+        "AI Analysis disabled."
+    )
+
+    all_results_list = []
+    temp_dir = Path("temp_outputs")
+    temp_dir_ = temp_dir /  "Residue_save"
+    timestamp = str(int(time.time()))
+    residue_save_dir = temp_dir_ / timestamp
+    residue_save_dir.mkdir(parents=True, exist_ok=True)
+
+    yield(
+        f"⏳ Running prediction...", 
+        pd.DataFrame(), None,
+        gr.update(visible=False), 
+        "AI analysis will appear here...",
+        "AI Analysis disabled."
+    )
+    
+    model_key = MODEL_MAPPING_FUNCTION.get(model)
+    if not model_key:
+        raise ValueError(f"Model key not found for {model}")
+    
+    adapter_key = MODEL_ADAPTER_MAPPING_FUNCTION[model_key]
+
+    # Get residue task dataset
+    datasets = RESIDUE_MAPPING_FUNCTION.get(task, [])
+    if not datasets:
+        raise ValueError(f"No datasets found for task: {task}")
+    
+    for dataset in datasets:
+        script_path = Path("src") / "property" / f"{model_key}.py"
+        adapter_path = Path("ckpt") / dataset / adapter_key
+        output_file = residue_save_dir/ f"{dataset}_{model}.csv"
+
+        if not script_path.exists() or not adapter_path.exists():
+            raise FileNotFoundError(f"Required files not found: Script={script_path}, Adapter={adapter_path}")
+        if isinstance(fasta_file, str):
+            file_path = fasta_file
+        else:
+            file_path = fasta_file.name
+        
+        cmd = [sys.executable, str(script_path), "--fasta_file", str(Path(file_path)), "--adapter_path", str(adapter_path), "--output_csv", str(output_file)]
+        subprocess.run(cmd, capture_output=True, text=True, check=True, encoding='utf-8', errors='ignore')
+        
+        if output_file.exists():
+            df = pd.read_csv(output_file) 
+            df["Task"] = task
+            df["Dataset"] = dataset
+            all_results_list.append(df)
+            os.remove(output_file)
+
+    
+    if all_results_list:
+        combined_df = pd.concat(all_results_list, ignore_index=True)
+        final_df = expand_residue_predictions(combined_df)
+    else:
+        final_df = pd.DataFrame()
+    download_path = residue_save_dir/ f"prediction_results.csv"
+    final_df.to_csv(download_path, index=False)
+    display_df = final_df.copy()
+    column_rename = {
+        'index': 'Position',
+        'residue': 'Residue',
+        'predicted_label': 'Predicted Label',
+        'probability': 'Probability',
+    }
+    display_df.rename(columns=column_rename, inplace=True)
+    if 'Probability' in display_df.columns:
+        display_df['Probability'] = display_df['Probability'].round(3)
+    yield (
+            "🤖 Expert is analyzing results...", 
+            display_df, None,
+            gr.update(visible=False), 
+            None,
+            "AI Analysis in progress..."
+        )
+
 def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
-    sequence_models = ["ESM2-650M", "ESM-1v", "ESM-1b"]
-    structure_models = ["ESM-IF1", "SaProt", "MIF-ST", "ProSST-2048", "ProtSSN"]
+    sequence_models = ["VenusPLM","ESM2-650M", "ESM-1v", "ESM-1b"]
+    structure_models = [ "ProSST-2048", "ProtSSN", "ESM-IF1", "SaProt", "MIF-ST"]
     function_models = list(MODEL_MAPPING_FUNCTION.keys())
+    residue_function_models = list(MODEL_RESIDUE_MAPPING_FUNCTION.keys())
 
     with gr.Blocks() as demo:
         with gr.Tabs():
-            with gr.TabItem("Directed Evolution: AI-Powered Mutation Prediction"):
+            with gr.TabItem("Intelligent Directed Evolution"):
                 with gr.Row(equal_height=False):
                     with gr.Column(scale=2):
                          with gr.Tabs():
                             with gr.TabItem("🧬 Sequence-based Model"):
                                 gr.Markdown("### Model Configuration")
-                                seq_function_dd = gr.Dropdown(choices=DATASET_MAPPING_ZERO_SHOT, label="Select Protein Function", value=DATASET_MAPPING_ZERO_SHOT[0])
+                                seq_function_dd = gr.Dropdown(choices=DATASET_MAPPING_ZERO_SHOT, label="Select Protein Function", value=DATASET_MAPPING_ZERO_SHOT[0], visible=False)
                                 seq_model_dd = gr.Dropdown(choices=sequence_models, label="Select Sequence-based Model", value=sequence_models[0])
                                 gr.Markdown("**Data Input**")
                                 with gr.Tabs():
@@ -859,7 +875,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
 
                             with gr.TabItem("🏗️ Structure-based Model"):
                                 gr.Markdown("### Model Configuration")
-                                struct_function_dd = gr.Dropdown(choices=DATASET_MAPPING_ZERO_SHOT, label="Select Protein Function", value=DATASET_MAPPING_ZERO_SHOT[0])
+                                struct_function_dd = gr.Dropdown(choices=DATASET_MAPPING_ZERO_SHOT, label="Select Protein Function", value=DATASET_MAPPING_ZERO_SHOT[0], visible=False)
                                 struct_model_dd = gr.Dropdown(choices=structure_models, label="Select Structure-based Model", value=structure_models[0])
                                 gr.Markdown("**Data Input**")
                                 with gr.Tabs():
@@ -990,7 +1006,69 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                                 )
                         function_download_btn = gr.DownloadButton("💾 Download Results", visible=False)
                 
-        
+            with gr.TabItem("Functional Residue Prediction"):
+                with gr.Row(equal_height=False):
+                    with gr.Column(scale=2):
+                        gr.Markdown("### Model Configuration")
+                        adv_residue_function_model_dd = gr.Dropdown(choices=residue_function_models, label="Select Model", value="ESM2-650M")
+                        adv_residue_function_task_dd = gr.Dropdown(choices=list(RESIDUE_MAPPING_FUNCTION.keys()), label="Select Task", value="Activity Site")
+                        gr.Markdown("**Data Input**")
+                        with gr.Tabs():
+                            with gr.TabItem("Upload FASTA File"):
+                                adv_residue_function_fasta_upload = gr.File(label="Upload Fasta file", file_types=[".fasta", ".fa"])
+                                adv_residue_function_file_exmaple = gr.Examples(examples=[["./download/P60002.fasta"]], inputs=adv_residue_function_fasta_upload, label="Click example to load")
+                            with gr.TabItem("Paste FASTA Content"):
+                                adv_residue_function_paste_content_input = gr.Textbox(label="Paste FASTA Content", placeholder="Paste FASTA content here...", lines=8, max_lines=15)
+                                with gr.Row():
+                                    adv_residue_function_paste_content_btn = gr.Button("🔍 Detect & Save Content", variant="primary", size="m")
+                                    adv_residue_function_paste_clear_btn = gr.Button("🗑️ Clear", variant="primary", size="m")
+                        
+                        adv_residue_function_protein_display = gr.Textbox(label="Uploaded Protein Sequence", interactive=False, lines=3, max_lines=7)
+                        adv_residue_function_protein_chat_btn = gr.Button("Chat API Trigger", visible=False)
+                        adv_residue_function_selector = gr.Dropdown(label="Select Chain", choices=["Sequence 1"], value="Sequence 1", visible=False, allow_custom_value=True)
+                        adv_residue_function_original_file_path_state = gr.State("")
+                        adv_residue_function_original_paste_content_state = gr.State("")
+                        adv_residue_function_selected_sequence_state = gr.State("Sequence 1")
+                        adv_residue_function_sequence_state = gr.State({})
+                        adv_residue_function_current_file_state = gr.State("")
+
+                        gr.Markdown("### Configure AI  Analysis (Optional)")
+                        with gr.Accordion("AI Settings", open=True):
+                            enable_ai_residue_function = gr.Checkbox(label="Enable AI Summary", value=False)
+                            with gr.Accordion("AI  Settings", open=True):
+                                with gr.Group(visible=False) as ai_box_residue_function:
+                                    ai_model_dd_residue_function = gr.Dropdown(
+                                        choices=list(AI_MODELS.keys()),
+                                        label="Select AI Model",
+                                        value="DeepSeek"
+                                    )
+                                    ai_status_residue_function = gr.Markdown(
+                                        value="✓ Using provided API Key" if os.getenv("DEEPSEEK_API_KEY") else "⚠ No API Key found in .env file",
+                                        visible=True
+                                    )
+                                    api_key_in_residue_function = gr.Textbox(
+                                        label="API Key",
+                                        type="password",
+                                        placeholder="Ener your API Key if needed",
+                                        visible=not bool(os.getenv("DEEPSEEK_API_KEY"))
+                                    )
+                        adv_residue_function_predict_btn = gr.Button("🚀 Start Prediction", variant="primary")
+                    
+                    with gr.Column(scale=3):
+                        gr.Markdown("### Results")
+                        adv_residue_function_status_textbox = gr.Textbox(label="Status", interactive=False)
+                        with gr.Tabs():
+                            with gr.TabItem("📊 Raw Results"):
+                                adv_residue_function_results_df = gr.DataFrame(label="Prediction Data", column_widths=["20%", "20%", "20%", "20%", "20%"])
+                            with gr.TabItem("📈 Prediction Heatmap"):
+                                adv_residue_function_plot_out = gr.Plot(label="Heatmap")
+                            with gr.TabItem("👨‍🔬 AI Expert Analysis"):
+                                adv_residue_function_ai_expert_html = gr.HTML(
+                                    value="<div style='height: 300px; display: flex; align-items: center; justify-content: center; color: #666;'>AI analysis will appear here...</div>",
+                                    label="👨‍🔬 AI Expert Analysis"
+                                )
+                        adv_residue_function_download_btn = gr.DownloadButton("💾 Download Results", visible=False)
+
         def clear_paste_content_pdb():
             return "No file selected", "No file selected", gr.update(choices=["A"], value="A", visible=False), {}, "A", ""
 
@@ -1013,7 +1091,8 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         enable_ai_zshot_seq.change(fn=toggle_ai_section_simple, inputs=enable_ai_zshot_seq, outputs=ai_box_zshot_seq)
         enable_ai_zshot_stru.change(fn=toggle_ai_section_simple, inputs=enable_ai_zshot_stru, outputs=ai_box_zshot_stru)
         enable_ai_func.change(fn=toggle_ai_section_simple, inputs=enable_ai_func, outputs=ai_box_func)
-        
+        enable_ai_residue_function.change(fn=toggle_ai_section_simple, inputs=enable_ai_residue_function, outputs=ai_box_residue_function)
+
         ai_model_stru_zshot.change(
             fn=on_ai_model_change_simple,
             inputs=ai_model_stru_zshot,
@@ -1028,6 +1107,11 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             fn=on_ai_model_change_simple,
             inputs=ai_model_seq_func,
             outputs=[api_key_in_seq_func, ai_status_seq_func]
+        )
+        ai_model_dd_residue_function.change(
+            fn=on_ai_model_change,
+            inputs=ai_model_dd_residue_function,
+            outputs=[api_key_in_seq_func, ai_status_residue_function]
         )
         
         seq_file_upload.upload(
@@ -1158,6 +1242,40 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             outputs=[adv_func_dataset_cbg]
         )
         
+        adv_residue_function_fasta_upload.upload(
+            fn=handle_file_upload,
+            inputs=adv_residue_function_fasta_upload,
+            outputs=[adv_residue_function_protein_display, adv_residue_function_selector, adv_residue_function_sequence_state, adv_residue_function_selected_sequence_state, adv_residue_function_original_file_path_state, adv_residue_function_current_file_state]
+        )
+        adv_residue_function_fasta_upload.change(
+            fn=handle_file_upload,
+            inputs=adv_residue_function_fasta_upload,
+            outputs=[adv_residue_function_protein_display, adv_residue_function_selector, adv_residue_function_sequence_state, adv_residue_function_selected_sequence_state, adv_residue_function_original_file_path_state, adv_residue_function_current_file_state]
+        )
+        adv_residue_function_paste_clear_btn.click(
+            fn=clear_paste_content_fasta,
+            outputs=[adv_residue_function_paste_content_input, adv_residue_function_protein_display, adv_residue_function_selector, adv_residue_function_sequence_state, adv_residue_function_selected_sequence_state, adv_residue_function_original_file_path_state]
+        )
+        adv_residue_function_paste_content_btn.click(
+            fn=handle_paste_fasta_detect,
+            inputs=adv_residue_function_paste_content_input,
+            outputs=[adv_residue_function_protein_display, adv_residue_function_selector, adv_residue_function_sequence_state, adv_residue_function_selected_sequence_state, adv_residue_function_original_file_path_state, adv_residue_function_original_paste_content_state]
+        )
+        adv_residue_function_selector.change(
+            fn=handle_sequence_change_unified,
+            inputs=[adv_residue_function_selector, adv_residue_function_sequence_state, adv_residue_function_original_file_path_state, adv_residue_function_original_paste_content_state],
+            outputs=[adv_residue_function_protein_display, adv_residue_function_current_file_state]
+        )
+        adv_residue_function_predict_btn.click(
+            fn=handle_protein_residue_function_prediction,
+            inputs=[adv_residue_function_task_dd, adv_residue_function_current_file_state, enable_ai_residue_function, ai_model_dd_residue_function, api_key_in_residue_function, adv_residue_function_model_dd],
+            outputs=[adv_residue_function_status_textbox, adv_residue_function_results_df, adv_residue_function_plot_out, adv_residue_function_download_btn, adv_residue_function_ai_expert_html, gr.State()]
+        )
+        adv_residue_function_protein_chat_btn.click(
+            fn=handle_protein_residue_function_prediction_chat,
+            inputs=[adv_residue_function_task_dd, adv_residue_function_fasta_upload, enable_ai_residue_function, ai_model_dd_residue_function, api_key_in_residue_function, adv_residue_function_model_dd],
+            outputs=[adv_residue_function_status_textbox, adv_residue_function_results_df, adv_residue_function_plot_out, adv_residue_function_download_btn, adv_residue_function_ai_expert_html, gr.State()]
+        )
         seq_predict_btn.click(
             fn=handle_mutation_prediction_advance, 
             inputs=[seq_function_dd, seq_current_file_state, enable_ai_zshot_seq, ai_model_seq_zshot, api_key_in_seq_zshot, seq_model_dd],

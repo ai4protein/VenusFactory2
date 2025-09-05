@@ -76,7 +76,7 @@ if __name__ == "__main__":
     if args.pdb_file:
         tmp_fasta_file = f"tmp_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.fasta"
         sequence = extract_seq_from_pdb(args.pdb_file, chain=args.chain_id)
-        with open(tmp_fasta_file, 'w') as f:
+        with open(tmp_fasta_file, 'w', encoding='utf-8') as f:
             f.write(f">{args.pdb_file}\n{sequence}")
         args.fasta_file = tmp_fasta_file
     elif not os.path.exists(args.fasta_file):
@@ -89,9 +89,9 @@ if __name__ == "__main__":
         if args.output_file:
             # Write results to JSON file
             try:
-                with open(args.output_file, 'w') as f:
+                with open(args.output_file, 'w', encoding='utf-8') as f:
                     json.dump(properties, f, indent=2, ensure_ascii=False)
-                print(f"\n✅ Results saved to: {args.output_file}")
+                print(f"Results saved to: {args.output_file}")
             except IOError as e:
                 print(f"error: cannot write to file '{args.output_file}': {e}")
         else:
