@@ -14,6 +14,7 @@ from web.chat_tab import create_chat_tab
 from web.venus_factory_advanced_tool_tab import create_advanced_tool_tab
 from web.venus_factory_download_tab import create_download_tool_tab
 from web.venus_factory_quick_tool_tab import create_quick_tool_tab
+from web.venus_factory_comprehensive_tab import create_comprehensive_tab
 
 
 def load_constant():
@@ -103,14 +104,17 @@ def create_ui():
 
         # --- Top-Level Tabs for Main Categories ---
         with gr.Tabs():
-            # Index and Citations
-            with gr.TabItem("🏠 Index"):
+            with gr.TabItem("📋 VenusScope"):
+                comprehensive_componsents = create_comprehensive_tab(constant)
+            
+            with gr.TabItem("🤖 VenusAgent-0.1"):
                 try:
-                    index_components = create_index_tab(constant)
+                    chat_components = create_chat_tab(constant)
                 except Exception as e:
-                    gr.Markdown(f"**Error creating Index tab:**\n```\n{e}\n```")
+                    gr.Markdown(f"**Error creating Chat tab:**\n```\n{e}\n```")
+                    
             # Model Train and Prediction
-            with gr.TabItem("🚀 Model Train and Prediction (For Advanced Users)"):
+            with gr.TabItem("🚀 Model Train and Prediction"):
                 # Nested (Secondary) Tabs for sub-functions
                 with gr.Tabs():
                     with gr.TabItem("Training"):
@@ -132,11 +136,7 @@ def create_ui():
                         except Exception as e:
                             gr.Markdown(f"**Error creating Prediction tab:**\n```\n{e}\n```")
 
-            with gr.TabItem("🤖 VenusAgent-0.1 (Beta Version)"):
-                try:
-                    chat_components = create_chat_tab(constant)
-                except Exception as e:
-                    gr.Markdown(f"**Error creating Chat tab:**\n```\n{e}\n```")
+            
 
             # Quick Tools
             with gr.TabItem("🔧 Quick Tools "):
@@ -158,7 +158,14 @@ def create_ui():
                     download_components = create_download_tool_tab(constant)
                 except Exception as e:
                     gr.Markdown(f"**Error creating Download tab:**\n```\n{e}\n```")
-                
+            
+            # Index and Citations
+            with gr.TabItem("🏠 Index"):
+                try:
+                    index_components = create_index_tab(constant)
+                except Exception as e:
+                    gr.Markdown(f"**Error creating Index tab:**\n```\n{e}\n```")
+
             # Manual (no nested tabs needed)
             with gr.TabItem("📖 Manual "):
                 try:

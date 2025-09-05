@@ -1,3 +1,4 @@
+import os
 import json
 import gradio as gr
 import time
@@ -163,6 +164,22 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     
     # Model and Dataset Selection
     gr.Markdown("## Model and Dataset Configuration")
+
+    with gr.Accordion("Import Training Configuration", open=False) as config_import_accordion:
+        gr.Markdown("### Import your training config")
+        with gr.Row():
+            with gr.Column(scale=4):
+                config_path_input = gr.Textbox(
+                    label="Configuration File Path",
+                    placeholder="Enter path to your training config JSON file (e.g., ./config.json)",
+                    value=""
+                )
+            with gr.Column(scale=1):
+                import_config_button = gr.Button(
+                    "Import Config",
+                    variant="primary",
+                    elem_classes=["import-config-btn"]
+                )
 
     # Original training interface components
     with gr.Group():
@@ -1557,6 +1574,133 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             is_training = False
             current_process = None
 
+    def handle_config_import(config_path: str) -> List[gr.update]:
+        """
+        Loads a training configuration from a JSON file and correctly updates the UI components.
+        """
+        try:
+            if not os.path.exists(config_path):
+                gr.Warning(f"Configuration file not found: {config_path}")
+                return [gr.update() for _ in input_components]
+            
+            with open(config_path, "r", encoding='utf-8') as f:
+                config = json.load(f)
+            
+            update_dict = {comp: gr.update() for comp in input_components}
+            def get_config_val(key, default):
+                return config.get(key, default)
+
+            update_dict[plm_model] = gr.update(value=get_config_val("plm_model", plm_model.value))
+            
+            dataset_selection_value = get_config_val("dataset_selection", "Custom Dataset")
+            update_dict[is_custom_dataset] = gr.update(value=dataset_selection_value)
+            
+            if dataset_selection_value == "Pre-defined Dataset":
+                dataset_config_value = get_config_val("dataset_config", "Demo_Solubility")
+                # Ensure the value is in the choices list
+                if dataset_config_value in list(dataset_configs.keys()):
+                    update_dict[dataset_config] = gr.update(visible=True, value=dataset_config_value)
+                else:
+                    # If not in choices, use the first available choice
+                    update_dict[dataset_config] = gr.update(visible=True, value=list(dataset_configs.keys())[0])
+            else:
+                # For custom dataset, hide dataset_config and don't set any value
+                update_dict[dataset_config] = gr.update(visible=False)
+                
+            update_dict[dataset_custom] = gr.update(
+                visible=(dataset_selection_value == "Custom Dataset"),
+                value=get_config_val("dataset_custom", "")
+            )
+
+            is_interactive = (dataset_selection_value == "Custom Dataset")
+            
+            update_dict[custom_dataset_settings] = gr.update(visible=True)
+            
+            update_dict[problem_type] = gr.update(
+                value=get_config_val("problem_type", "single_label_classification"), 
+                interactive=is_interactive
+            )
+            update_dict[num_labels] = gr.update(
+                value=get_config_val("num_labels", 2), 
+                interactive=is_interactive
+            )
+
+            metrics_value = get_config_val("metrics", ["accuracy"])
+            if isinstance(metrics_value, str):
+                metrics_value = metrics_value.split(",")
+            update_dict[metrics] = gr.update(
+                value=metrics_value, 
+                interactive=is_interactive
+            )
+            
+            update_dict[monitored_metrics] = gr.update(
+                value=get_config_val("monitored_metrics", "accuracy"), 
+                interactive=is_interactive
+            )
+            update_dict[monitored_strategy] = gr.update(
+                value=get_config_val("monitored_strategy", "max"), 
+                interactive=is_interactive
+            )
+            
+            training_method_value = get_config_val("training_method", "freeze")
+            update_dict[training_method] = gr.update(value=training_method_value)
+            
+            update_dict[structure_seq] = gr.update(
+                visible=(training_method_value == "ses-adapter"),
+                value=get_config_val("structure_seq", ["foldseek_seq", "ss8_seq"])
+            )
+            update_dict[lora_params_row] = gr.update(
+                visible=(training_method_value in ["plm-lora", "plm-qlora", "plm-adalora", "plm-dora", "plm-ia3"])
+            )
+            
+            update_dict[pooling_method] = gr.update(value=get_config_val("pooling_method", "mean"))
+            
+            batch_mode_value = get_config_val("batch_mode", "Batch Size Mode")
+            update_dict[batch_mode] = gr.update(value=batch_mode_value)
+            update_dict[batch_size] = gr.update(
+                visible=(batch_mode_value == "Batch Size Mode"), 
+                value=get_config_val("batch_size", 16)
+            )
+            update_dict[batch_token] = gr.update(
+                visible=(batch_mode_value == "Batch Token Mode"), 
+                value=get_config_val("batch_token", 10000)
+            )
+
+            update_dict[learning_rate] = gr.update(value=get_config_val("learning_rate", 5e-4))
+            update_dict[num_epochs] = gr.update(value=get_config_val("num_epochs", 20))
+            update_dict[max_seq_len] = gr.update(value=get_config_val("max_seq_len", None))
+            update_dict[gradient_accumulation_steps] = gr.update(value=get_config_val("gradient_accumulation_steps", 1))
+            update_dict[warmup_steps] = gr.update(value=get_config_val("warmup_steps", 0))
+            update_dict[scheduler_type] = gr.update(value=get_config_val("scheduler", None))
+            
+            update_dict[output_model_name] = gr.update(value=get_config_val("output_model_name", "demo.pt"))
+            update_dict[output_dir] = gr.update(value=get_config_val("output_dir", "demo"))
+            
+            wandb_enabled = get_config_val("wandb_enabled", False)
+            update_dict[wandb_logging] = gr.update(value=wandb_enabled)
+            update_dict[wandb_project] = gr.update(visible=wandb_enabled, value=get_config_val("wandb_project", ""))
+            update_dict[wandb_entity] = gr.update(visible=wandb_enabled, value=get_config_val("wandb_entity", ""))
+            
+            update_dict[patience] = gr.update(value=get_config_val("patience", 10))
+            update_dict[num_workers] = gr.update(value=get_config_val("num_workers", 4))
+            update_dict[max_grad_norm] = gr.update(value=get_config_val("max_grad_norm", -1))
+            
+            update_dict[lora_r] = gr.update(value=get_config_val("lora_r", 8))
+            update_dict[lora_alpha] = gr.update(value=get_config_val("lora_alpha", 32))
+            update_dict[lora_dropout] = gr.update(value=get_config_val("lora_dropout", 0.1))
+            update_dict[lora_target_modules] = gr.update(value=get_config_val("lora_target_modules", "query,key,value"))
+
+            gr.Info(f"Configuration successfully imported from {config_path}")
+            
+            return [update_dict[comp] for comp in input_components]
+
+        except (json.JSONDecodeError, KeyError) as e:
+            gr.Warning(f"Error parsing configuration file: {str(e)}")
+            return [gr.update() for _ in input_components]
+        except Exception as e:
+            gr.Warning(f"An unexpected error occurred during import: {str(e)}")
+            return [gr.update() for _ in input_components]
+ 
     # define all input components
     input_components = [
         plm_model,
