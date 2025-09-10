@@ -27,7 +27,7 @@ from langchain.schema.runnable import RunnablePassthrough
 from langchain.callbacks.base import BaseCallbackHandler
 from langchain.schema import LLMResult
 from langchain.tools.base import BaseTool
-from langchain.pydantic_v1 import BaseModel, Field
+from pydantic import BaseModel, Field
 
 load_dotenv()
 
@@ -1239,7 +1239,7 @@ def process_csv_and_generate_config(csv_file: str, test_csv_file: Optional[str] 
         config = create_comprehensive_config(csv_file, test_csv_file, ai_config, analysis)
         temp_dir = Path("temp_outputs")
         sequence_dir = temp_dir / "training_configs"
-        sequence_dir.mkdir(exist_ok=True)
+        os.makedirs(sequence_dir, exist_ok=True)
         timestamp = int(time.time())
         config_path = os.path.join(sequence_dir, f"{output_name}_{timestamp}.json")
         with open(config_path, 'w') as f:

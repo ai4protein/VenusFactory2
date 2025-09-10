@@ -167,6 +167,8 @@ def main():
     
     # Save results
     if args.output_csv is not None:
+        output_dir = os.path.dirname(args.output_csv)
+        os.makedirs(output_dir, exist_ok=True)
         output_path = args.output_csv
     else:
         file_name = f"{os.path.basename(args.pdb_file).split('.')[0]}_esmif1_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
