@@ -57,6 +57,9 @@ Recent News:
 - [Supported Training Approaches](#-supported-training-approaches)
 - [Supported Datasets](#-supported-datasets)
 - [Supported Metrics](#-supported-metrics)
+- [VenusAgent-0.1(Beta Version)](#-venusagent-01-your-ai-assistant)
+- [Quick Tools](#-quick-tools-your-go-to-for-rapid-predictions)。
+- [Advanced Tools](#-advanced-tools-for-in-depth-protein-analysis)
 - [Requirements](#-requirements)
 - [Installation Guide](#-installation-guide)
 - [Quick Start with Venus Web UI](#-quick-start-with-venus-web-ui)
@@ -66,15 +69,17 @@ Recent News:
 
 ## 📑 Features
 
-🙌 ***VenusFactory*** is a unified open platform for protein engineering, supporting both **graphical user interface (GUI)** and **command-line operations**. It enables **data retrieval, model training, evaluation, and deployment through a streamlined, no-code workflow**. 
+🙌 ***VenusFactory*** is a unified open platform for protein engineering, supporting both **graphical user interface (GUI)** and **command-line operations**. It enables **data retrieval, model training, evaluation, and deployment through a streamlined, no-code workflow**.
 
 🆒 With support for **local private deployment** and access to over 40 state-of-the-art deep learning models, VenusFactory lowers the barrier to scientific research and accelerates the application of AI in life sciences.
 
-- **Vaious protein langugae models**: Venus series, ESM series, ProtTrans series, Ankh series, etc
-- **Comprehensive supervised datasets**: Localization, Fitness, Solubility, Stability, etc
-- **Easy and quick data collector**: AlphaFold2 Database, RCSB, InterPro, Uniprot, etc
-- **Mutation zero-shot prediction**: Structure-based and sequence-based models for high-throughput mutation effect scoring
-- **Experiment moitors**: Wandb, Local
+- **AI-Powered Assistance**: `VenusAgent-0.1` acts as an intelligent AI assistant, providing expert answers and analysis for protein engineering tasks.
+- **Efficient Workflows**: **Quick Tools** enables rapid, no-code predictions for common tasks like protein function and mutation effect scoring.
+- **Advanced Analysis**: **Advanced Tools** offers powerful, in-depth analysis for both sequence-based and structure-based zero-shot mutation predictions.
+- **Various protein language models**: Venus series, ESM series, ProtTrans series, Ankh series, etc.
+- **Comprehensive supervised datasets**: Localization, Fitness, Solubility, Stability, etc.
+- **Easy and quick data collector**: AlphaFold2 Database, RCSB, InterPro, UniProt, etc.
+- **Experiment monitors**: Wandb, Local
 - **Friendly interface**: Gradio UI
 
 <p align="center">
@@ -111,9 +116,11 @@ Recent News:
 | ProSST-20 | 20 | 110M | 4GB+ | Mutation | [AI4Protein/ProSST-20](https://huggingface.co/AI4Protein/ProSST-20) |
 | ProSST-128 | 128 | 110M | 4GB+ | Mutation | [AI4Protein/ProSST-128](https://huggingface.co/AI4Protein/ProSST-128) |
 | ProSST-512 | 512 | 110M | 4GB+ | Mutation | [AI4Protein/ProSST-512](https://huggingface.co/AI4Protein/ProSST-512) |
+| ProSST-1024	| 1024 | 110M	| 4GB+ |	Mutation | [AI4Protein/ProSST-1024](https://huggingface.co/AI4Protein/ProSST-1024)|
 | ProSST-2048 | 2048 | 110M | 4GB+ | Mutation | [AI4Protein/ProSST-2048](https://huggingface.co/AI4Protein/ProSST-2048) |
 | ProSST-4096 | 4096 | 110M | 4GB+ | Mutation | [AI4Protein/ProSST-4096](https://huggingface.co/AI4Protein/ProSST-4096) |
 | ProPrime-690M | 690M | 690M | 16GB+ | OGT-prediction | [AI4Protein/Prime_690M](https://huggingface.co/AI4Protein/Prime_690M) |
+| ProPrime-650M-OGT |	650M | 650M |	16GB+	| OGT-prediction | [AI4Protein/ProPrime-650M-OGT](AI4Protein/ProPrime-650M-OGT) |
 | VenusPLM-300M | 300M | 300M | 12GB+ | Protein-language | [AI4Protein/VenusPLM-300M](https://huggingface.co/AI4Protein/VenusPLM-300M) |
 
 > 💡 These models often excel in specific tasks or offer unique architectural benefits
@@ -127,6 +134,7 @@ Recent News:
 |-------|------------|------------|------------|----------|
 | PETA-base | base | 80M | 4GB+ | [AI4Protein/deep_base](https://huggingface.co/AI4Protein/deep_base) |
 | PETA-bpe-50 | 50 | 80M | 4GB+ | [AI4Protein/deep_bpe_50](https://huggingface.co/AI4Protein/deep_bpe_50) |
+| PETA-bpe-100 | 100 | 80M | 4GB+ | [AI4Protein/deep_bpe_100](https://huggingface.co/AI4Protein/deep_bpe_100) |
 | PETA-bpe-200 | 200 | 80M | 4GB+ | [AI4Protein/deep_bpe_200](https://huggingface.co/AI4Protein/deep_bpe_200) |
 | PETA-bpe-400 | 400 | 80M | 4GB+ | [AI4Protein/deep_bpe_400](https://huggingface.co/AI4Protein/deep_bpe_400) |
 | PETA-bpe-800 | 800 | 80M | 4GB+ | [AI4Protein/deep_bpe_800](https://huggingface.co/AI4Protein/deep_bpe_800) |
@@ -342,6 +350,39 @@ Recent News:
 
 </details>
 
+## 🤖 VenusAgent-0.1: Your AI Assistant
+
+`VenusAgent-0.1` is an intelligent AI assistant integrated into the VenusFactory platform, designed to answer questions and provide in-depth analysis on protein engineering and bioinformatics. It acts as a specialized expert, helping both biologists and AI researchers streamline their research workflow.
+
+#### Key Features:
+
+* **Zero-shot Prediction**: Directly utilize cutting-edge sequence-based (e.g., ESM-2, ESM-1v, ESM-1b) and structure-based models (e.g., SaProt, ProtSSN, ESM-IF1, MIF-ST, ProSST) to perform zero-shot mutation prediction.
+* **Protein Function Prediction**: Accurately predict various protein functions, including solubility, localization, metal ion binding, stability, sorting signal, and optimum temperature.
+* **Clear Insights**: Always provides clear, actionable insights in response to your queries.
+
+> 💡 **Note**: This feature requires an API key to access and is currently in Beta.
+
+## ⚡ Quick Tools: Your Go-to for Rapid Predictions
+
+`Quick Tools` is designed for users who need fast, efficient, and straightforward analysis without extensive configuration. It provides a no-code entry point to two key prediction tasks.
+
+* **Directed Evolution: AI-Powered Mutation Prediction**
+    This tool allows for the rapid scoring and analysis of protein mutations. Simply upload a PDB file or paste the PDB content, and the platform will provide insights into the effects of single or multiple mutations on the protein.
+
+* **Protein Function Prediction**
+    Leveraging pre-trained models, this module predicts various protein functions from a given amino acid sequence. You can upload a FASTA file or paste the sequence directly to predict properties such as solubility, localization, and more.
+
+## 🧪 Advanced Tools: For In-depth Protein Analysis
+
+`Advanced Tools` is built for researchers who require more granular control and deeper analysis. It offers powerful zero-shot prediction capabilities by allowing you to choose between two distinct model types.
+
+* **Sequence-based Model**
+    This submodule focuses on high-throughput mutation effect scoring using powerful sequence-only models like **ESM-2**. You can upload a FASTA file or paste a protein sequence to perform large-scale predictions and score mutations.
+
+* **Structure-based Model**
+    For tasks that require a deep understanding of protein 3D geometry, this tool utilizes **structure-aware models** like **ESM-IF1**. By uploading a PDB file or pasting its content, you can perform sophisticated zero-shot predictions that take the protein's spatial context into account.
+
+  
 ## ✈️ Requirements
 
 ### Hardware Requirements

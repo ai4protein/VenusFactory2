@@ -57,6 +57,9 @@
 - [支持的训练方法](#-支持的训练方法)
 - [支持的数据集](#-支持的数据集)
 - [支持的评估指标](#-支持的评估指标)
+- [VenusAgent-0.1: 您的AI助手](#-VenusAgent-0.1:您的AI助手)
+- [快速工具：您的快速预测之选](#-快速工具：您的快速预测之选)
+- [高级工具：用于深度蛋白质分析](#-高级工具：用于深度蛋白质分析)
 - [环境要求](#-环境要求)
 - [安装指南](#-安装指南)
 - [快速开始](#-快速开始)
@@ -66,16 +69,20 @@
 
 ## 📑 功能特点
 
-🙌 ***VenusFactory*** 是一个专为蛋白质工程打造的一站式开放平台，支持**图形界面**与**命令行**操作，实现**数据检索、模型训练、评测与部署等功能**。
+🙌     ***VenusFactory*** 是一个统一的蛋白质工程开放平台，同时支持**图形用户界面（GUI）**和**命令行操作**。它通过简化的无代码工作流，实现了**数据检索、模型训练、评估和部署**。
 
-🆒 平台以无代码、流程化设计，简化 AI 工程操作，支持**本地私有部署**与 40+ 深度学习模型调用，降低科研门槛，加速 AI 在生命科学中的应用。
+## 核心亮点
 
-- **丰富的蛋白质语言模型**：Venus系列、ESM系列、ProtTrans系列、Ankh 系列等
-- **全面的监督数据集**：定位、适应度、溶解度、稳定性等
-- **便捷的数据收集工具**：AlphaFold2 数据库、RCSB、InterPro、Uniprot 等
-- **突变零样本预测**：结构和序列模型的高通量突变效应评分
-- **实验监控**：Wandb、本地监控
-- **友好的界面**：Gradio UI
+-   **本地私有部署**：支持本地化私有部署，确保数据安全
+-   **领先模型集成**：集成了超过40种最先进的深度学习模型，降低了科研门槛，加速了人工智能在生命科学领域的应用
+-   **AI 智能助手**：**VenusAgent-0.1** 作为一个智能AI助手，为蛋白质工程任务提供专业的解答和分析
+-   **高效工作流**：**快速工具（Quick Tools）**为蛋白质功能和突变效果评分等常见任务提供快速、无代码的预测
+-   **深度分析**：**高级工具（Advanced Tools）**为基于序列和基于结构的零样本突变预测提供强大而深入的分析
+-   **多样化的蛋白质语言模型**：Venus系列、ESM系列、ProtTrans系列、Ankh系列等
+-   **全面的监督数据集**：定位（Localization）、适应度（Fitness）、溶解度（Solubility）、稳定性（Stability）等
+-   **简便快捷的数据收集器**：AlphaFold2数据库、RCSB、InterPro、UniProt等
+-   **实验监控**：Wandb、本地监控
+-   **友好的用户界面**：Gradio UI
 
 <p align="center">
   <video width="80%" controls>
@@ -111,6 +118,7 @@
 | ProSST-20 | 20 | 110M | 4GB+ | 突变预测 | [AI4Protein/ProSST-20](https://huggingface.co/AI4Protein/ProSST-20) |
 | ProSST-128 | 128 | 110M | 4GB+ | 突变预测 | [AI4Protein/ProSST-128](https://huggingface.co/AI4Protein/ProSST-128) |
 | ProSST-512 | 512 | 110M | 4GB+ | 突变预测 | [AI4Protein/ProSST-512](https://huggingface.co/AI4Protein/ProSST-512) |
+| ProSST-1024 | 1024 | 110M | 4GB+ | 突变预测 | [AI4Protein/ProSST-1024](https://huggingface.co/AI4Protein/ProSST-1024) |
 | ProSST-2048 | 2048 | 110M | 4GB+ | 突变预测 | [AI4Protein/ProSST-2048](https://huggingface.co/AI4Protein/ProSST-2048) |
 | ProSST-4096 | 4096 | 110M | 4GB+ | 突变预测 | [AI4Protein/ProSST-4096](https://huggingface.co/AI4Protein/ProSST-4096) |
 | ProPrime-690M | 690M | 690M | 16GB+ | OGT预测 | [AI4Protein/Prime_690M](https://huggingface.co/AI4Protein/Prime_690M) |
@@ -126,6 +134,7 @@
 |-------|------------|------------|------------|----------|
 | PETA-base | base | 80M | 4GB+ | [AI4Protein/deep_base](https://huggingface.co/AI4Protein/deep_base) |
 | PETA-bpe-50 | 50 | 80M | 4GB+ | [AI4Protein/deep_bpe_50](https://huggingface.co/AI4Protein/deep_bpe_50) |
+| PETA-bpe-100 | 100 | 80M | 4GB+ | [AI4Protein/deep_bpe_100](https://huggingface.co/AI4Protein/deep_bpe_100) |
 | PETA-bpe-200 | 200 | 80M | 4GB+ | [AI4Protein/deep_bpe_200](https://huggingface.co/AI4Protein/deep_bpe_200) |
 | PETA-bpe-400 | 400 | 80M | 4GB+ | [AI4Protein/deep_bpe_400](https://huggingface.co/AI4Protein/deep_bpe_400) |
 | PETA-bpe-800 | 800 | 80M | 4GB+ | [AI4Protein/deep_bpe_800](https://huggingface.co/AI4Protein/deep_bpe_800) |
@@ -332,6 +341,39 @@
 | mse | MeanSquaredError | 回归 |
 
 </details>
+
+## 🤖 VenusAgent-0.1: 您的AI助手
+
+`VenusAgent-0.1` 是集成在 VenusFactory 平台中的智能AI助手，旨在回答有关蛋白质工程和生物信息学的问题，并提供深入分析。它扮演着专业专家的角色，帮助生物学家和AI研究人员简化他们的研究工作流程。
+
+### 主要功能：
+
+- **零样本预测**：直接利用尖端的基于序列（例如 ESM-2, ESM-1v, ESM-1b）和基于结构（例如 SaProt, ProtSSN, ESM-IF1, MIF-ST, ProSST）的模型，执行零样本突变预测。
+- **蛋白质功能预测**：精确预测各种蛋白质功能，包括溶解度、定位、金属离子结合、稳定性、分选信号和最适温度。
+- **清晰洞见**：始终对您的查询提供清晰、可操作的洞见。
+
+> 💡 **注意**：此功能需要API密钥才能访问，目前处于测试阶段（Beta）。
+
+## ⚡️ 快速工具：您的快速预测之选
+**快速工具**专为需要快速、高效和直接分析而无需大量配置的用户设计。它提供了两个关键预测任务的无代码入口
+
+**定向进化：AI驱动的突变预测**
+该工具可用于快速评估和分析蛋白质突变。只需上传一个PDB文件或粘贴PDB内容，平台将提供关于单个或多个突变对蛋白质影响的见解
+
+**蛋白质功能预测**
+该模块利用预训练模型，根据给定的氨基酸序列预测各种蛋白质功能。您可以上传一个FASTA文件或直接粘贴序列来预测溶解度、定位等特性
+
+---
+
+## 🧪 高级工具：用于深度蛋白质分析
+**高级工具**专为需要更精细控制和更深层分析的研究人员而构建。它通过允许您选择两种不同模型类型，提供了强大的零样本预测能力
+
+**基于序列的模型**
+该子模块侧重于使用强大的仅基于序列的模型（如**ESM-2**）进行高通量突变效果评分。您可以上传一个FASTA文件或粘贴一个蛋白质序列来执行大规模预测和突变评分
+
+**基于结构的模型**
+对于需要深入了解蛋白质三维几何形状的任务，该工具利用了**结构感知模型**（如**ESM-IF1**）。通过上传一个PDB文件或粘贴其内容，您可以执行复杂的零样本预测，这些预测会考虑蛋白质的空间上下文
+
 
 ## ✈️ 环境要求
 
