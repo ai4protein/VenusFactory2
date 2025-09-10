@@ -468,7 +468,7 @@ def parse_fasta_paste_content(fasta_content):
         selector_visible = len(sequence_choices) > 1
         temp_dir = Path("temp_outputs")
         sequence_dir = temp_dir / "Fasta"
-        sequence_dir.mkdir(exist_ok=True)
+        sequence_dir.mkdir(parents=True, exist_ok=True)
         temp_fasta_path = os.path.join(sequence_dir, f"paste_content_seq_{sanitize_filename(default_sequence)}.fasta")
         save_selected_sequence_fasta(fasta_content, default_sequence, temp_fasta_path)
         return display_sequence, gr.update(choices=sequence_choices, value=default_sequence, visible=selector_visible), sequences, default_sequence, temp_fasta_path
@@ -508,7 +508,7 @@ def handle_paste_sequence_selection(selected_sequence, sequences_dict, original_
     try:
         temp_dir = Path("temp_outputs")
         sequence_dir = temp_dir / "Fasta"
-        sequence_dir.mkdir(exist_ok=True)
+        sequence_dir.mkdir(parents=True, exist_ok=True)
         temp_pdb_path = os.path.join(sequence_dir, f"paste_content_seq_{selected_sequence}.fasta")
         save_selected_sequence_fasta(original_fasta_content_from_state, selected_sequence, temp_pdb_path)
         
@@ -589,7 +589,7 @@ def parse_pdb_paste_content(pdb_content):
         selector_visible = len(chain_choices) > 1
         temp_dir = Path("temp_outputs")
         sequence_dir = temp_dir / "Fasta"
-        sequence_dir.mkdir(exist_ok=True)
+        sequence_dir.mkdir(parents=True, exist_ok=True)
         temp_pdb_path = os.path.join(sequence_dir, f"paste_content_chain_{default_chain}.pdb")
         save_selected_chain_pdb(pdb_content, default_chain, temp_pdb_path)
         return display_sequence, gr.update(choices=chain_choices, value=default_chain, visible=selector_visible), chains, default_chain, temp_pdb_path
@@ -629,7 +629,7 @@ def handle_paste_chain_selection(selected_chain, chains_dict, original_pdb_conte
     try:
         temp_dir = Path("temp_outputs")
         sequence_dir = temp_dir / "PDB"
-        sequence_dir.mkdir(exist_ok=True)
+        sequence_dir.mkdir(parents=True, exist_ok=True)
         temp_pdb_path = os.path.join(sequence_dir, f"paste_content_chain_{selected_chain}.pdb")
         save_selected_chain_pdb(original_pdb_content_from_state, selected_chain, temp_pdb_path)
         
@@ -792,7 +792,7 @@ def run_zero_shot_prediction(model_type: str, model_name: str, file_path: str) -
         temp_dir_ = temp_dir / "Zero_shot_result"
         timestamp = str(int(time.time()))
         sequence_dir = temp_dir_ / timestamp
-        sequence_dir.mkdir(exist_ok=True)
+        sequence_dir.mkdir(parents=True, exist_ok=True)
         output_csv = sequence_dir / f"{model_type}.csv"
         script_name = MODEL_MAPPING_ZERO_SHOT.get(model_name)
         
@@ -946,7 +946,7 @@ def process_fasta_file(file_path: str) -> str:
     original_path = Path(file_path)
     temp_dir = Path("temp_outputs")
     fasra_dir = temp_dir / "Fasta"
-    fasra_dir.mkdir(exist_ok=True)
+    fasra_dir.mkdir(parents=True, exist_ok=True)
 
     new_file_path = fasra_dir / f"filtered_{original_path.name}"
     
@@ -1099,7 +1099,7 @@ def handle_mutation_prediction_base(
     temp_dir_ = temp_dir / "Zero_shot_result"
     timestamp = str(int(time.time()))
     heatmap_dir = temp_dir_ / timestamp
-    heatmap_dir.mkdir(exist_ok=True)
+    heatmap_dir.mkdir(parents=True, exist_ok=True)
     csv_path = heatmap_dir / f"mut_res.csv"
     heatmap_path = heatmap_dir / f"mut_map.html"
     
@@ -1313,7 +1313,7 @@ def handle_protein_function_prediction(
     temp_dir_ = temp_dir / "Protein_Function"
     timestamp = str(int(time.time()))
     function_dir = temp_dir_ / timestamp
-    function_dir.mkdir(exist_ok=True)
+    function_dir.mkdir(parents=True, exist_ok=True)
 
 
     # Run predictions for each dataset
@@ -1604,7 +1604,7 @@ def handle_protein_function_prediction(
         temp_dir_ = temp_dir / "Function_download"
         timestamp = str(int(time.time()))
         zip_dir = temp_dir_ / timestamp
-        zip_dir.mkdir(exist_ok=True)
+        zip_dir.mkdir(parents=True, exist_ok=True)
         
         # Save only the processed results
         processed_df_for_save = display_df.copy()
@@ -1957,7 +1957,7 @@ def run_protein_properties_prediction(task_type: str, file_path: str) -> Tuple[s
         temp_dir_ = temp_dir / "Protein_properties"
         timestamp = str(int(time.time()))
         properties_dir = temp_dir_ / timestamp
-        properties_dir.mkdir(exist_ok=True)
+        properties_dir.mkdir(parents=True, exist_ok=True)
         output_json = properties_dir / f"{task_type.replace(' ', '_').replace('(', '').replace(')', '')}.json"
        
         script_name = PROTEIN_PROPERTIES_MAP_FUNCTION.get(task_type)

@@ -167,7 +167,7 @@ def run_zero_shot_prediction(model_type: str, model_name: str, file_path: str) -
         temp_dir_ = temp_dir / "Zero_shot_result"
         timestamp = str(int(time.time()))
         sequence_dir = temp_dir_ / timestamp
-        sequence_dir.mkdir(exist_ok=True)
+        sequence_dir.mkdir(parents=True, exist_ok=True)
         output_csv = sequence_dir / f"{model_type}.csv"
         script_name = MODEL_MAPPING_ZERO_SHOT.get(model_name)
         
@@ -350,7 +350,7 @@ def handle_mutation_prediction_advance(
     temp_dir_ = temp_dir / "Zero_shot_result"
     timestamp = str(int(time.time()))
     session_dir = temp_dir_ / timestamp
-    session_dir.mkdir(exist_ok=True)
+    session_dir.mkdir(parents=True, exist_ok=True)
     
     csv_path = session_dir/ f"mut_res.csv"
     heatmap_path = session_dir/ f"mut_map.html"
@@ -401,7 +401,7 @@ def handle_protein_function_prediction_chat(
     temp_dir_ = temp_dir / "Protein_Function"
     timestamp = str(int(time.time()))
     function_dir = temp_dir_ / timestamp
-    function_dir.mkdir(exist_ok=True)
+    function_dir.mkdir(parents=True, exist_ok=True)
 
     for i, dataset in enumerate(final_datasets):
         try:
@@ -505,7 +505,7 @@ def handle_protein_function_prediction_advance(
     temp_dir_ = temp_dir / "Protein_Function"
     timestamp = str(int(time.time()))
     function_dir = temp_dir_ / timestamp
-    function_dir.mkdir(exist_ok=True)
+    function_dir.mkdir(parents=True, exist_ok=True)
 
     for i, dataset in enumerate(final_datasets):
         yield (
@@ -678,9 +678,12 @@ def handle_protein_function_prediction_advance(
     zip_path_str = ""
     try:
         ts = int(time.time())
-        zip_dir = function_dir /  f"download_{ts}"
-        zip_dir.mkdir()
-        
+        temp_dir = Path("temp_outputs")
+        temp_dir_ = temp_dir / "Downloads_zip"
+        timestamp = str(int(time.time()))
+        zip_dir = temp_dir_ / timestamp
+        zip_dir.mkdir(parents=True, exist_ok=True)
+
         processed_df_for_save = display_df.copy()
         processed_df_for_save.to_csv(zip_dir / "Result.csv", index=False)
         

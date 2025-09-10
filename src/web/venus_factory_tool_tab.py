@@ -395,7 +395,7 @@ def handle_mutation_prediction(function_selection: str, file_obj: Any, enable_ai
     full_plot_data = full_data_tuple[:5]
     full_fig = generate_plotly_heatmap(*full_plot_data, is_partial=False, total_residues=total_residues)
     
-    temp_dir = Path("temp_outputs"); temp_dir.mkdir(exist_ok=True)
+    temp_dir = Path("temp_outputs"); temp_dir.mkdir(parents=True, exist_ok=True)
     run_timestamp = int(time.time())
     csv_path = temp_dir / f"temp_mutation_results_{run_timestamp}.csv"
     df.to_csv(csv_path, index=False)
@@ -494,7 +494,7 @@ def handle_protein_function_prediction(task: str, fasta_file: Any, enable_ai: bo
     yield f"🚀 Starting predictions with {model}...", pd.DataFrame(), None, gr.update(visible=False), "AI analysis will appear here..."
     
     all_results_list, temp_dir = [], Path("temp_outputs")
-    temp_dir.mkdir(exist_ok=True)
+    temp_dir.mkdir(parents=True, exist_ok=True)
 
     for i, dataset in enumerate(datasets):
         yield f"⏳ Running prediction for '{dataset}' ({i+1}/{len(datasets)})...", None, None, gr.update(visible=False), "AI analysis will appear here..."

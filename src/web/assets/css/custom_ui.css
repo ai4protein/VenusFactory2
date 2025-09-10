@@ -42,17 +42,35 @@
 .preview-table tr:hover {
     background-color: #f0f0f0 !important;
 }
-@media (max-width: 768px) {
-    .preview-table table {
-        font-size: 0.8em !important;
+@media (prefers-color-scheme: dark) {
+    .dataset-stats table, .preview-table table {
+        background-color: #2b2b2b !important; 
+        color: #f0f0f0 !important; 
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3) !important;
     }
-    .preview-table th,
-    .preview-table td {
-        padding: 6px 8px !important;
-        min-width: 80px !important;
+
+    .dataset-stats th, .preview-table th {
+        background-color: #2c3e50 !important;
+        color: #e0e0e0 !important;
+        font-weight: bold !important;
+        border: 1px solid #444 !important;
     }
-    .preview-table td {
-        max-width: 200px !important;
+
+    .dataset-stats td, .preview-table td {
+        color: #ccc !important;
+        border: 1px solid #444 !important;
+    }
+
+    .dataset-stats tr:hover, .preview-table tr:hover {
+        background-color: #3c3c3c !important;
+    }
+
+    .dataset-stats tr, .preview-table tr {
+        background-color: #1e1e1e !important;
+    }
+
+    .dataset-stats tr:nth-child(even), .preview-table tr:nth-child(even) {
+        background-color: #2a2a2a !important;
     }
 }
 .preview-table table,
@@ -85,6 +103,8 @@
     border-bottom: 2px solid #ddd !important;
     white-space: nowrap !important;
     min-width: 120px !important;
+}.center-table-content td {
+    color: #333 !important; 
 }
 .center-table-content tr:nth-child(even) {
     background-color: #f9f9f9 !important;
@@ -101,6 +121,41 @@
     max-width: none !important;
 }
 
+
+@media (prefers-color-scheme: dark) {
+    .center-table-content td, .center-table-content th {
+        border-color: #444 !important;
+    }
+
+    .center-table-content table {
+        box-shadow: 0 2px 8px rgba(0,0,0,0.5) !important;
+    }
+    
+    /* Header styles for dark mode */
+    .center-table-content th {
+        background-color: #2c3e50 !important;
+        color: #e0e0e0 !important;
+        border-bottom-color: #555 !important;
+    }
+
+    /* Cell text color for dark mode */
+    .center-table-content td {
+        color: #ccc !important;
+    }
+
+    /* Row background colors for dark mode */
+    .center-table-content tr {
+        background-color: #1e1e1e !important;
+    }
+
+    .center-table-content tr:nth-child(even) {
+        background-color: #2a2a2a !important;
+    }
+
+    .center-table-content tr:hover {
+        background-color: #3c3c3c !important;
+    }
+}
 /* Preview button container and button styles */
 .preview-button-container {
     display: flex !important;
