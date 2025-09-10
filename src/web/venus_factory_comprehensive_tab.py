@@ -210,13 +210,15 @@ def handle_individual_mutation_prediction(content, selected_chain, current_file,
    
     # Determine input type and prepare file
     temp_dir = Path("temp_outputs")
-    temp_dir.mkdir(exist_ok=True)
-    timestamp = int(time.time())
-   
+    temp_dir_ = temp_dir / "VenusScope_input"
+    timestamp = str(int(time.time()))
+    input_data_dir = temp_dir_ / timestamp
+    input_data_dir.mkdir(parents=True, exist_ok=True)
+
     is_pdb = content.strip().startswith('ATOM') or (current_file and current_file.endswith('.pdb'))
    
     if is_pdb:
-        input_file = temp_dir / f"input_pdb_{timestamp}.pdb"
+        input_file = input_data_dir / f"input_pdb_{timestamp}.pdb"
         if current_file and current_file.endswith('.pdb'):
             with open(current_file, 'r') as f:
                 pdb_content = f.read()
@@ -229,7 +231,7 @@ def handle_individual_mutation_prediction(content, selected_chain, current_file,
         model_name = "ESM-IF1"
         model_type = "structure"
     else:
-        input_file = temp_dir / f"input_fasta_{timestamp}.fasta"
+        input_file = input_data_dir / f"input_fasta_{timestamp}.fasta"
         if current_file and current_file.endswith(('.fasta', '.fa')):
             with open(current_file, 'r') as f:
                 fasta_content = f.read()
@@ -318,8 +320,10 @@ def handle_individual_function_prediction(content, selected_chain, current_file,
     
     # Prepare FASTA file for function prediction
     temp_dir = Path("temp_outputs")
-    temp_dir.mkdir(exist_ok=True)
-    timestamp = int(time.time())
+    temp_dir_ = temp_dir / "VenusScope_input"
+    timestamp = str(int(time.time()))
+    input_data_dir = temp_dir_ / timestamp
+    input_data_dir.mkdir(parents=True, exist_ok=True)
     
     is_pdb = content.strip().startswith('ATOM') or (current_file and current_file.endswith('.pdb'))
     
@@ -341,7 +345,7 @@ def handle_individual_function_prediction(content, selected_chain, current_file,
             fasta_content = f">{selected_chain}\n{content}"
     
     # Save FASTA file
-    fasta_file = temp_dir / f"function_input_{timestamp}.fasta"
+    fasta_file = input_data_dir / f"function_input_{timestamp}.fasta"
     with open(fasta_file, 'w') as f:
         f.write(fasta_content)
     
@@ -356,7 +360,7 @@ def handle_individual_function_prediction(content, selected_chain, current_file,
             adapter_key = MODEL_ADAPTER_MAPPING_FUNCTION[model_key]
             script_path = Path("src") / "property" / f"{model_key}.py"
             adapter_path = Path("ckpt") / dataset / adapter_key
-            output_file = temp_dir / f"temp_{dataset}_{model_name}_{timestamp}.csv"
+            output_file = input_data_dir / f"temp_{dataset}_{model_name}_{timestamp}.csv"
             
             if script_path.exists() and adapter_path.exists():
                 cmd = [
@@ -530,8 +534,10 @@ def handle_functional_residue_prediction(content, selected_chain, current_file, 
     
     # Prepare FASTA file for function prediction
     temp_dir = Path("temp_outputs")
-    temp_dir.mkdir(exist_ok=True)
-    timestamp = int(time.time())
+    temp_dir_ = temp_dir / "VenusScope_input"
+    timestamp = str(int(time.time()))
+    input_data_dir = temp_dir_ / timestamp
+    input_data_dir.mkdir(parents=True, exist_ok=True)
     
     is_pdb = content.strip().startswith('ATOM') or (current_file and current_file.endswith('.pdb'))
     
@@ -557,7 +563,7 @@ def handle_functional_residue_prediction(content, selected_chain, current_file, 
         sequence_length = len(sequence)
 
     # Save FASTA file
-    fasta_file = temp_dir / f"residue_input_{timestamp}.fasta"
+    fasta_file = input_data_dir / f"residue_input_{timestamp}.fasta"
     with open(fasta_file, 'w') as f:
         f.write(fasta_content)
 
@@ -575,7 +581,7 @@ def handle_functional_residue_prediction(content, selected_chain, current_file, 
                 adapter_key = MODEL_ADAPTER_MAPPING_FUNCTION[model_key]
                 script_path = Path("src") / "property" / f"{model_key}.py"
                 adapter_path = Path("ckpt") / dataset / adapter_key
-                output_file = temp_dir / f"temp_{dataset}_{model_name}_{timestamp}.csv"
+                output_file = input_data_dir / f"temp_{dataset}_{model_name}_{timestamp}.csv"
                 
                 if script_path.exists() and adapter_path.exists():
                     cmd = [
@@ -798,8 +804,11 @@ def handle_physical_chemical_properties(content, selected_chain, current_file, s
     
     # Prepare FASTA file for function prediction
     temp_dir = Path("temp_outputs")
-    temp_dir.mkdir(exist_ok=True)
-    timestamp = int(time.time())
+    temp_dir_ = temp_dir / "VenusScope_input"
+    timestamp = str(int(time.time()))
+    input_data_dir = temp_dir_ / timestamp
+    input_data_dir.mkdir(parents=True, exist_ok=True)
+
     is_pdb = content.strip().startswith('ATOM') or (current_file and current_file.endswith('.pdb'))
     
     try:
@@ -809,7 +818,7 @@ def handle_physical_chemical_properties(content, selected_chain, current_file, s
                 input_file = current_file
             else:
                 # Save pasted PDB content to file
-                input_file = temp_dir / f"temp_pdb_{timestamp}.pdb"
+                input_file = input_data_dir / f"temp_pdb_{timestamp}.pdb"
                 with open(input_file, 'w') as f:
                     f.write(content)
                 input_file = str(input_file)
@@ -821,7 +830,7 @@ def handle_physical_chemical_properties(content, selected_chain, current_file, s
                 input_file = current_file
             else:
                 # Save sequence as FASTA
-                input_file = temp_dir / f"temp_fasta_{timestamp}.fasta"
+                input_file = input_data_dir / f"temp_fasta_{timestamp}.fasta"
                 if original_content and original_content.strip().startswith('>'):
                     fasta_content = original_content
                 else:
@@ -835,7 +844,7 @@ def handle_physical_chemical_properties(content, selected_chain, current_file, s
             file_type = 'fasta'
             
         # Run calculate_all_property.py as subprocess
-        output_file = temp_dir / f"property_results_{timestamp}.json"
+        output_file = input_data_dir / f"property_results_{timestamp}.json"
         script_path = Path("src") / "property" / "calculate_all_property.py"
         cmd = [
             sys.executable, str(script_path),
@@ -995,9 +1004,12 @@ def export_ai_report_to_html(ai_report_content):
     
     # Create temp file
     temp_dir = Path("temp_outputs")
-    temp_dir.mkdir(exist_ok=True)
-    timestamp = int(time.time())
-    html_file = temp_dir / f"venusfactory_ai_report_{timestamp}.html"
+    temp_dir_ = temp_dir / "VenusScope_input"
+    timestamp = str(int(time.time()))
+    input_data_dir = temp_dir_ / timestamp
+    input_data_dir.mkdir(parents=True, exist_ok=True)
+    
+    html_file = input_data_dir / f"venusfactory_ai_report_{timestamp}.html"
     
     try:
         # Convert markdown to HTML
