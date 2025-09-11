@@ -619,6 +619,10 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     with gr.Column(elem_classes="chat-container"):
         # Conversation management row
         with gr.Row():
+            with gr.Column(scale=1):
+                new_chat_btn = gr.Button("➕ New Chat", variant="secondary", size="sm")
+                delete_chat_btn = gr.Button("🗑️ Delete", variant="secondary", size="sm")
+        
             with gr.Column(scale=4):
                 conversations = conv_manager.list_conversations()
                 choices = [(f"{conv['title']} ({conv['created_at'].strftime('%H:%M')})", conv['id']) for conv in conversations]
@@ -630,10 +634,7 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                     interactive=True
                 )
             
-            with gr.Column(scale=1):
-                new_chat_btn = gr.Button("➕ New Chat", variant="secondary", size="sm")
-                delete_chat_btn = gr.Button("🗑️ Delete", variant="secondary", size="sm")
-        
+            
         # Settings accordion
         with gr.Accordion("⚙️ Settings", open=False):
             system_prompt_input = gr.Textbox(
@@ -1998,9 +1999,8 @@ def create_agent_executor(llm, tools, prompt, memory):
     
     return EnhancedAgent(llm, tools, prompt, memory)
 
-# Update the send_message function in create_chat_tab
 def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
-    """Creates the enhanced Chat tab with AI-powered intent recognition"""
+    """Creates the enhanced Chat tab with Claude-style collapsible sidebar"""
     
     # Create initial conversation
     initial_conv_id = conv_manager.create_conversation("New Chat")
@@ -2050,7 +2050,6 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         """Delete the current conversation"""
         if selected_conv_id and len(conv_manager.conversations) > 1:
             conv_manager.delete_conversation(selected_conv_id)
-            
             conversations = conv_manager.list_conversations()
             if conversations:
                 new_conv_id = conversations[0]['id']
@@ -2085,6 +2084,7 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         text = message["text"]
         files = message.get("files", [])
         has_csv = files and any(f.lower().endswith('.csv') for f in files if isinstance(f, str))
+
 
         file_paths = []
         if files:
@@ -2135,83 +2135,138 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         except Exception as e:
             response = f"❌ An error occurred while processing your request: {str(e)}"
 
-
         history[-1] = {"role": "assistant", "content": response}
         yield history, gr.MultimodalTextbox(value=None, interactive=True)
 
-    
-    # Create UI with enhanced styling
-    with gr.Column(elem_classes="chat-container"):
-        # Header with title and conversation management
-        with gr.Row(elem_classes="header-row"):
-            gr.Markdown("# 🧬 VenusFactory AI Assistant", elem_classes="main-title")
-            
-        with gr.Row():
-            with gr.Column(scale=4):
-                conversations = conv_manager.list_conversations()
-                choices = [(f"{conv['title']} ({conv['created_at'].strftime('%H:%M')})", conv['id']) for conv in conversations]
+    def toggle_sidebar_visiblity(is_visible):
+        # Toggles the visiblity of the sidebar
+        new_visibility = not is_visible
+        return gr.update(visible=new_visibility), new_visibility
+    custom_css = """
+        <style>
+        .claude-sidebar-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 8px;
+        }
+        .claude-action-btn {
+            padding: 10px 12px !important;
+            border-radius: 8px !important;
+            font-size: 14px !important;
+            font-weight: 500;
+            line-height: 1 !important;
+            justify-content: center;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
+        }
+        .claude-action-btn.primary {
+            background-color: #2563eb !important;
+            color: white !important;
+            border: none !important;
+        }
+        .claude-action-btn.primary:hover {
+            background-color: #1d4ed8 !important;
+        }
+        .claude-action-btn.secondary {
+            background-color: #f3f4f6 !important;
+            color: #374151 !important;
+            border: 1px solid #d1d5db !important;
+        }
+        .claude-action-btn.secondary:hover {
+            background-color: #e5e7eb !important;
+            border-color: #9ca3af !important;
+        }
+        </style>
+        """
+
+    # Main layout container
+    with gr.Column():
+        gr.HTML(custom_css)
+        gr.Markdown("# 🧬 VenusFactory AI Assistant", elem_classes="chat-title")
+        with gr.Row(elem_classes="chat-main-container"):
+            with gr.Column(scale=1, elem_classes="claude-sidebar-container") as sidebar:
+                with gr.Column(elem_classes="claude-sidebar-actions"):
+                    new_chat_btn = gr.Button(
+                        "➕ New Chat", 
+                        variant="primary", 
+                        size="sm",
+                        elem_classes="claude-action-btn new-chat-btn"
+                    )
+                    delete_chat_btn = gr.Button(
+                        "🗑️ Delete Chat", 
+                        variant="secondary", 
+                        size="sm",
+                        elem_classes="claude-action-btn delete-chat-btn"
+                    )
+
+                with gr.Column(elem_classes="sidebar-content-area"):
+                    conversations = conv_manager.list_conversations()
+                    choices = [(f"{conv['title']} ({conv['created_at'].strftime('%H:%M')})", conv['id']) for conv in conversations]
+                    
+                    conversation_dropdown = gr.Dropdown(
+                        choices=choices,
+                        value=initial_conv_id,
+                        label="Conversations",
+                        interactive=True
+                    )
                 
-                conversation_dropdown = gr.Dropdown(
-                    choices=choices,
-                    value=initial_conv_id,
-                    label="💬 Conversations",
-                    interactive=True,
-                    elem_classes="conversation-dropdown"
-                )
-            
-            with gr.Column(scale=1):
-                with gr.Row():
-                    new_chat_btn = gr.Button("➕ New Chat", variant="primary", size="sm")
-                    delete_chat_btn = gr.Button("🗑️ Delete", variant="secondary", size="sm")
-        
-        # Settings accordion
-        with gr.Accordion("⚙️ Settings", open=False):
-            with gr.Row():
-                with gr.Column():
+
+            with gr.Column(scale=4, elem_classes="main-chat-container"):
+                with gr.Accordion("⚙️ Settings", open=False, elem_classes="settings-accordion"):
                     system_prompt_input = gr.Textbox(
                         label="System Prompt",
                         placeholder="Customize AI assistant behavior...",
                         lines=3,
-                        value="You are VenusFactory AI Assistant, a specialized protein engineering and bioinformatics expert."
+                        value="You are VenusFactory AI Assistant, a specialized protein engineering and bioinformatics expert.",
+                        elem_classes="system-prompt-input"
                     )
-                with gr.Column():
+            
                     gr.Markdown("""
                     ### 🔧 Configuration
                     - **AI Intent Recognition:** Enabled
                     - **Tools:** 4 protein analysis tools available
                     - **Context:** Last 10 messages remembered
-                    """)
-        
-        # Main chat interface
-        chatbot = gr.Chatbot(
-            label="VenusFactory AI Assistant",
-            type="messages",
-            height=650,
-            show_label=True,
-            avatar_images=(
-                None,
-                "https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png",
-            ),
-            bubble_full_width=False,
-            show_copy_button=True,
-            elem_classes="main-chatbot"
-        )
-        
-        # Enhanced input area
-        chat_input = gr.MultimodalTextbox(
-            interactive=True,
-            file_count="multiple",
-            placeholder="💬 Ask me about protein engineering, upload files (FASTA, PDB), or request analysis...",
-            show_label=False,
-            file_types=[".fasta", ".fa", ".pdb", ".csv"],
-            elem_classes="chat-input"
-        )
+                    """, elem_classes="config-info")
+                
+                # Main chatbot interface
+                chatbot = gr.Chatbot(
+                    label="VenusFactory AI Assistant",
+                    type="messages",
+                    height=650,
+                    show_label=False,
+                    avatar_images=(
+                        None,
+                        "https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png",
+                    ),
+                    bubble_full_width=False,
+                    show_copy_button=True,
+                    elem_classes="main-chatbot"
+                )
+                
+                # Enhanced input area
+                chat_input = gr.MultimodalTextbox(
+                    interactive=True,
+                    file_count="multiple",
+                    placeholder="💬 Ask me about protein engineering, upload files (FASTA, PDB), or request analysis...",
+                    show_label=False,
+                    file_types=[".fasta", ".fa", ".pdb", ".csv"],
+                    elem_classes="chat-input"
+                )
+                
+                # Status and disclaimer
+                gr.Markdown(
+                    "<p style='text-align: center; color: #666; font-size: 0.9em;'>Responses from VenusAgent, including information related to people, may not be completely accurate. Please verify carefully.</p>",
+                    elem_classes="disclaimer"
+                )
+                
+                # Status indicator
         gr.Markdown(
-            "<p style='text-align: center;'>Responses from VenusAgent, including information related to people, may not be completely accurate. Please verify carefully.</p>",
+            "🟢 **Status:** AI Intent Recognition Active | DeepSeek API Connected", 
             elem_classes="status-indicator"
-        )        
-        # Tool information panel
-        with gr.Accordion("🔬 AI-Powered Analysis Tools", open=False):
+        )
+        
+        # Tool information panel (collapsible)
+        with gr.Accordion("🔬 AI-Powered Analysis Tools", open=False, elem_classes="tools-accordion"):
             with gr.Row():
                 with gr.Column():
                     gr.Markdown("""
@@ -2219,8 +2274,8 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                     The AI automatically selects the best tool based on your request:
                     
                     **🧬 Mutation Prediction**
-                    - Sequence-based: VenusPLM, ESM-1v, ESM2-650M, ESM-1b, 
-                    - Structure-based: ProSST-2048, ProtSSN, SaProt, ESM-IF1, MIF-ST, 
+                    - Sequence-based: VenusPLM, ESM-1v, ESM2-650M, ESM-1b
+                    - Structure-based: ProSST-2048, ProtSSN, SaProt, ESM-IF1, MIF-ST
                     
                     **⚗️ Function Protein Prediction**
                     - Solubility, Localization, Metal ion binding
@@ -2245,15 +2300,11 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                     - SASA value
                     - Secondary structure
                     """)
-        
-        # Status indicator
-        gr.Markdown("🟢 **Status:** AI Intent Recognition Active | DeepSeek API Connected", elem_classes="status-indicator")
-    
-    # Event handlers with enhanced functionality
     new_chat_btn.click(
         fn=create_new_conversation,
         outputs=[conversation_dropdown, chatbot, chat_input]
     )
+    
     
     delete_chat_btn.click(
         fn=delete_current_conversation,
