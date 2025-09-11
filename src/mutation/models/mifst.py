@@ -98,6 +98,8 @@ def main():
     
     # Save results
     if args.output_csv is not None:
+        output_dir = os.path.dirname(args.output_csv)
+        os.makedirs(output_dir, exist_ok=True)
         df.to_csv(args.output_csv, index=False)
     else:
         import datetime
