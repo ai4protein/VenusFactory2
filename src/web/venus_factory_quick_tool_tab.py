@@ -1753,6 +1753,7 @@ def expand_residue_predictions(df):
             predictions = json.loads(row['predicted_class'])
             probabilities = json.loads(row['probabilities']) if isinstance(row['probabilities'], str) else row['probabilities']
             
+            
             if isinstance(predictions[0], list):
                 predictions = predictions[0]
             if isinstance(probabilities[0], list):
