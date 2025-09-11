@@ -1750,7 +1750,7 @@ def expand_residue_predictions(df):
         task = row['Task']
         dataset = row['Dataset']
         try:
-            predictions = json.loads(row['prediction'])
+            predictions = json.loads(row['predicted_class'])
             probabilities = json.loads(row['probabilities']) if isinstance(row['probabilities'], str) else row['probabilities']
             
             if isinstance(predictions[0], list):
