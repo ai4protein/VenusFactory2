@@ -8,9 +8,8 @@ def create_index_tab(constant):
             gjf_content = f.read()
     except Exception:
         gjf_content = "(Show1.gjf not found)"
-    with gr.Blocks() as index_tab:
-        gr.HTML(
-            f'''
+    
+    return    f'''
                 <script>
                 // Track page visits asynchronously without blocking page load
                 (function() {{
@@ -32,12 +31,6 @@ def create_index_tab(constant):
                 /* CSS Variables for Theme Switching */
                 :root {{
                     /* Light theme variables */
-                    --bg-primary: #f4f7fa;
-                    --bg-secondary: #fff;
-                    --bg-card: #f4f7fa;
-                    --bg-stats: linear-gradient(135deg, #f6fbff 0%, #e3f3fb 100%);
-                    --bg-stats-item: rgba(255, 255, 255, 0.8);
-                    --bg-stats-item-hover: rgba(255, 255, 255, 0.9);
                     --text-primary: #222;
                     --text-secondary: #1e293b;
                     --text-muted: #444;
@@ -54,12 +47,6 @@ def create_index_tab(constant):
                 /* Dark theme variables */
                 @media (prefers-color-scheme: dark) {{
                     :root {{
-                        --bg-primary: #0f172a;
-                        --bg-secondary: #1e293b;
-                        --bg-card: #334155;
-                        --bg-stats: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-                        --bg-stats-item: rgba(51, 65, 85, 0.8);
-                        --bg-stats-item-hover: rgba(51, 65, 85, 0.9);
                         --text-primary: #f1f5f9;
                         --text-secondary: #e2e8f0;
                         --text-muted: #94a3b8;
@@ -532,5 +519,4 @@ def create_index_tab(constant):
             </div>
             
             '''
-        )
-    return {"index_tab": index_tab}
+
