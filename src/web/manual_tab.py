@@ -127,15 +127,6 @@ def create_manual_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     with gr.Row():
         language = gr.Dropdown(choices=['English', 'Chinese'], value='English', label='Language', interactive=True)
     
-    with gr.Tab("Training"):
-        training_content = load_manual_training(language.value)
-        toc_html, html_content = generate_toc_and_content(training_content)
-        training_md = gr.HTML(f"""
-            <div class="manual-container">
-                {toc_html}
-                <div class="manual-content">{html_content}</div>
-            </div>
-        """)
 
     with gr.Tab("Index"): 
         gr.HTML(f'''
@@ -660,6 +651,17 @@ def create_manual_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             </div>
             
             ''')
+
+
+    with gr.Tab("Training"):
+        training_content = load_manual_training(language.value)
+        toc_html, html_content = generate_toc_and_content(training_content)
+        training_md = gr.HTML(f"""
+            <div class="manual-container">
+                {toc_html}
+                <div class="manual-content">{html_content}</div>
+            </div>
+        """)
     
     with gr.Tab("Prediction"):
         prediction_content = load_manual_prediction(language.value)
