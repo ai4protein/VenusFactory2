@@ -136,6 +136,9 @@ def create_manual_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 <div class="manual-content">{html_content}</div>
             </div>
         """)
+
+    with gr.Tab("Index"): 
+        gr.HTML(create_index_tab(constant))
     
     with gr.Tab("Prediction"):
         prediction_content = load_manual_prediction(language.value)
