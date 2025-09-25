@@ -1,3 +1,4 @@
+
 import gradio as gr
 
 def create_index_tab(constant):
@@ -7,8 +8,9 @@ def create_index_tab(constant):
             gjf_content = f.read()
     except Exception:
         gjf_content = "(Show1.gjf not found)"
-    
-    return    f'''
+    with gr.Blocks() as index_tab:
+        gr.HTML(
+            f'''
                 <script>
                 // Track page visits asynchronously without blocking page load
                 (function() {{
@@ -530,4 +532,5 @@ def create_index_tab(constant):
             </div>
             
             '''
-     
+        )
+    return {"index_tab": index_tab}
