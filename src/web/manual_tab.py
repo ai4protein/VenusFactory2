@@ -3,6 +3,7 @@ import os
 import re
 import markdown
 from typing import Dict, Any
+from .index_tab import create_index_tab
 
 def create_manual_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     # Add CSS styles from external file
@@ -127,6 +128,10 @@ def create_manual_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     with gr.Row():
         language = gr.Dropdown(choices=['English', 'Chinese'], value='English', label='Language', interactive=True)
     
+
+    with gr.Tab("Index"): 
+        gr.HTML(create_index_tab(constant))
+
     with gr.Tab("Training"):
         training_content = load_manual_training(language.value)
         toc_html, html_content = generate_toc_and_content(training_content)

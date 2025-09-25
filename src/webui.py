@@ -9,7 +9,6 @@ from web.eval_tab import create_eval_tab
 from web.download_tab import create_download_tab
 from web.predict_tab import create_predict_tab
 from web.manual_tab import create_manual_tab
-from web.index_tab import create_index_tab
 from web.chat_tab import create_chat_tab
 from web.venus_factory_advanced_tool_tab import create_advanced_tool_tab
 from web.venus_factory_download_tab import create_download_tool_tab
@@ -158,13 +157,6 @@ def create_ui():
                     download_components = create_download_tool_tab(constant)
                 except Exception as e:
                     gr.Markdown(f"**Error creating Download tab:**\n```\n{e}\n```")
-            
-            # Index and Citations
-            with gr.TabItem("🏠 Index"):
-                try:
-                    index_components = create_index_tab(constant)
-                except Exception as e:
-                    gr.Markdown(f"**Error creating Index tab:**\n```\n{e}\n```")
 
             # Manual (no nested tabs needed)
             with gr.TabItem("📖 Manual "):
