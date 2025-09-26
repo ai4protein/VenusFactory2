@@ -468,8 +468,8 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                     )
                 with gr.Column(scale=1, min_width=150):
                     max_grad_norm = gr.Slider(
-                        minimum=0.1, maximum=10.0, value=-1, step=0.1,
-                        label="Max Gradient Norm (-1 for no clipping)"
+                        minimum=0.1, maximum=10.0, value=0.1, step=0.1,
+                        label="Max Gradient Norm"
                     )
                 with gr.Column(scale=1, min_width=150):
                     num_workers = gr.Slider(
@@ -542,6 +542,26 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             elem_classes=["center-table-content"]
         )
 
+    def format_to_millions(value):
+        """Converts a number or a string with 'K'/'M' suffix to millions."""
+        if not isinstance(value, str) or value == '-':
+            return str(value)
+        value_str = value.strip().upper()
+        
+        try:
+            if value_str.endswith('K'):
+                number = float(value_str[:-1]) * 1_000
+            elif value_str.endswith('M'):
+                number = float(value_str[:-1]) * 1_000_000
+            else:
+                number = float(value_str)
+                
+            millions = number / 1_000_000
+            return f"{millions:.2f}M"
+            
+        except (ValueError, TypeError):
+            return value
+            
     def update_model_stats(stats: Dict[str, str]) -> List[List[str]]:
         """Update model statistics in table format."""
         if not stats:
@@ -559,10 +579,17 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         combined_trainable = stats.get('combined_trainable', '-')
         trainable_percentage = stats.get('trainable_percentage', '-')
         
+        adapter_total_m = format_to_millions(adapter_total)
+        adapter_trainable_m = format_to_millions(adapter_trainable)
+        pretrain_total_m = format_to_millions(pretrain_total)
+        pretrain_trainable_m = format_to_millions(pretrain_trainable)
+        combined_total_m = format_to_millions(combined_total)
+        combined_trainable_m = format_to_millions(combined_trainable)
+        
         return [
-            ["Training Model", str(adapter_total), str(adapter_trainable), "-"],
-            ["Pre-trained Model", str(pretrain_total), str(pretrain_trainable), "-"],
-            ["Combined Model", str(combined_total), str(combined_trainable), str(trainable_percentage)]
+            ["Training Model", adapter_total_m, adapter_trainable_m, "-"],
+            ["Pre-trained Model", pretrain_total_m, pretrain_trainable_m, "-"],
+            ["Combined Model", combined_total_m, combined_trainable_m, str(trainable_percentage)+"%"]
         ]
 
     # Training Progress
@@ -585,7 +612,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     with gr.Row():
         best_model_info = gr.Textbox(
             value="Best Model: None",
-            label="Best Performance",
+            label="Best Model and Performance",
             interactive=False
         )
 
@@ -1158,7 +1185,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             lora_alpha: lora alpha
             lora_dropout: lora dropout
             lora_target_modules: lora target modules
-            monitored_metrics: monitored metrics
+            monitored_metrics: monitored metric
             monitored_strategy: monitored strategy (max, min)
             sequence_column_name: name of the sequence column in dataset
             label_column_name: name of the label column in dataset
@@ -1314,7 +1341,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             lora_alpha: lora alpha
             lora_dropout: lora dropout
             lora_target_modules: lora target modules
-            monitored_metrics: monitored metrics
+            monitored_metrics: monitored metric
             monitored_strategy: monitored strategy (max, min)
             sequence_column_name: name of the sequence column in dataset
             label_column_name: name of the label column in dataset
@@ -1739,7 +1766,11 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         sequence_column_name,
         label_column_name,
     ]
-
+    import_config_button.click(
+        fn=handle_config_import,
+        inputs=[config_path_input],
+        outputs=input_components
+    )
     preview_button.click(
         fn=handle_train_tab_command_preview,
         inputs=input_components,
@@ -1796,6 +1827,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 
                 # Get fields actually present in the dataset
                 available_fields = list(samples[0].keys())
+                capitalized_headers = [field.capitalize() for field in available_fields]
                 
                 # Build sample data - ensure consistent structure
                 sample_data = []
@@ -1809,7 +1841,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         row_data.append(value)
                     sample_data.append(row_data)
                 
-                return gr.update(value=stats_html), gr.update(value=sample_data, headers=available_fields), gr.update(open=True)
+                return gr.update(value=stats_html), gr.update(value=sample_data, headers=capitalized_headers), gr.update(open=True)
             except Exception as e:
                 error_html = load_html_template("error_loading_dataset.html", error_message=str(e))
                 return gr.update(value=error_html), gr.update(value=[["Error", str(e), "-"]], headers=["Error", "Message", "Status"]), gr.update(open=True)
@@ -1838,6 +1870,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 
                 # Get fields actually present in the dataset
                 available_fields = list(samples[0].keys())
+                capitalized_headers = [field.capitalize() for field in available_fields]
                 
                 # Build sample data - ensure consistent structure
                 sample_data = []
@@ -1851,7 +1884,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         row_data.append(value)
                     sample_data.append(row_data)
                 
-                return gr.update(value=stats_html), gr.update(value=sample_data, headers=available_fields), gr.update(open=True)
+                return gr.update(value=stats_html), gr.update(value=sample_data, headers=capitalized_headers), gr.update(open=True)
             except Exception as e:
                 error_html = load_html_template("error_loading_dataset.html", error_message=str(e))
                 return gr.update(value=error_html), gr.update(value=[["Error", str(e), "-"]], headers=["Error", "Message", "Status"]), gr.update(open=True)

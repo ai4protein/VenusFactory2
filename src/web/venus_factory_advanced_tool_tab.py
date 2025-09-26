@@ -188,8 +188,6 @@ def run_zero_shot_prediction(model_type: str, model_name: str, file_path: str) -
             "--output_csv", str(output_csv)
         ]
         
-        print(f"DEBUG: Running command: {' '.join(cmd)}")
-        
         subprocess.run(
             cmd, 
             capture_output=True, 
@@ -479,13 +477,8 @@ def handle_protein_function_prediction_advance(
     model = model_name if model_name else "ESM2-650M"
     if datasets is not None and len(datasets) > 0:
         final_datasets = datasets
-        print(f"DEBUG: Using provided datasets: {final_datasets}")
     else:
         final_datasets = DATASET_MAPPING_FUNCTION.get(task, [])
-        print(f"DEBUG: Using default datasets for {task}: {final_datasets}")
-    
-    print(f"DEBUG: Final datasets to process: {final_datasets}")
-
     if not all([task, datasets, fasta_file]):
         yield (
             "❌ Error: Task, Datasets, and FASTA file are required.", 
@@ -848,10 +841,10 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                                             seq_paste_clear_btn = gr.Button("🗑️ Clear", variant="primary", size="m")
                                 
                                 seq_protein_display = gr.Textbox(label="Uploaded Protein Sequence", interactive=False, lines=3, max_lines=7)
-                                seq_sequence_selector = gr.Dropdown(label="Select Chain", choices=["Sequence 1"], value="Sequence 1", visible=False, allow_custom_value=True)
+                                seq_sequence_selector = gr.Dropdown(label="Select Chain", choices=["Sequence_1"], value="Sequence_1", visible=False, allow_custom_value=True)
                                 seq_original_file_path_state = gr.State("")
                                 seq_original_paste_content_state = gr.State("")
-                                seq_selected_sequence_state = gr.State("Sequence 1")
+                                seq_selected_sequence_state = gr.State("Sequence_1")
                                 seq_sequence_state = gr.State({})
                                 seq_current_file_state = gr.State("")
 
@@ -966,10 +959,10 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                             
                         function_protein_display = gr.Textbox(label="Uploaded Protein", interactive=False, lines=3, max_lines=7)
                         function_protein_chat_btn = gr.Button("Chat API Trigger", visible=False)
-                        function_protein_selector = gr.Dropdown(label="Select Chain", choices=["Sequence 1"], value="Sequence 1", visible=False, allow_custom_value=True)
+                        function_protein_selector = gr.Dropdown(label="Select Chain", choices=["Sequence_1"], value="Sequence_1", visible=False, allow_custom_value=True)
                         function_original_file_path_state = gr.State("")
                         function_original_paste_content_state = gr.State("")
-                        function_selected_sequence_state = gr.State("Sequence 1")
+                        function_selected_sequence_state = gr.State("Sequence_1")
                         function_sequence_state = gr.State({})
                         function_current_file_state = gr.State("")
                         
@@ -1028,10 +1021,10 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         
                         adv_residue_function_protein_display = gr.Textbox(label="Uploaded Protein Sequence", interactive=False, lines=3, max_lines=7)
                         adv_residue_function_protein_chat_btn = gr.Button("Chat API Trigger", visible=False)
-                        adv_residue_function_selector = gr.Dropdown(label="Select Chain", choices=["Sequence 1"], value="Sequence 1", visible=False, allow_custom_value=True)
+                        adv_residue_function_selector = gr.Dropdown(label="Select Chain", choices=["Sequence_1"], value="Sequence_1", visible=False, allow_custom_value=True)
                         adv_residue_function_original_file_path_state = gr.State("")
                         adv_residue_function_original_paste_content_state = gr.State("")
-                        adv_residue_function_selected_sequence_state = gr.State("Sequence 1")
+                        adv_residue_function_selected_sequence_state = gr.State("Sequence_1")
                         adv_residue_function_sequence_state = gr.State({})
                         adv_residue_function_current_file_state = gr.State("")
 
@@ -1076,7 +1069,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             return "No file selected", "No file selected", gr.update(choices=["A"], value="A", visible=False), {}, "A", ""
 
         def clear_paste_content_fasta():
-            return "No file selected", "No file selected", gr.update(choices=["Sequence 1"], value="Sequence 1", visible=False), {}, "Sequence 1", ""
+            return "No file selected", "No file selected", gr.update(choices=["Sequence_1"], value="Sequence_1", visible=False), {}, "Sequence_1", ""
         
         def update_dataset_choices_fixed(task):
             choices = DATASET_MAPPING_FUNCTION.get(task, [])
@@ -1136,7 +1129,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
 
         def handle_paste_fasta_detect(fasta_content):
             result = parse_fasta_paste_content(fasta_content)
-            return result + (fasta_content, )
+            return result
 
         seq_paste_content_btn.click(
             fn=handle_paste_fasta_detect,

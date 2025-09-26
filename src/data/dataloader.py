@@ -32,7 +32,7 @@ def prepare_dataloaders(args, tokenizer, logger):
     logger.info("------------------------")
     logger.info(f"Dataset: {args.dataset}")
     logger.info(f"  Number of train samples: {len(train_dataset)}")
-    logger.info(f"  Number of val samples: {len(val_dataset)}")
+    logger.info(f"  Number of validation samples: {len(val_dataset)}")
     logger.info(f"  Number of test samples: {len(test_dataset)}")
     
     # log 3 data points from train_dataset

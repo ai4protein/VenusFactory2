@@ -15,6 +15,21 @@ from web.venus_factory_download_tab import create_download_tool_tab
 from web.venus_factory_quick_tool_tab import create_quick_tool_tab
 from web.venus_factory_comprehensive_tab import create_comprehensive_tab
 
+def delete_old_files():
+    try:
+        target_date = datetime.now() - timedelta(days=2)
+        base_path = Path("temp_outputs")
+        dir_to_delete = base_path / target_date.strftime('%Y') / target_date.strftime('%m') / target_date.strftime('%d')
+        if dir_to_delete.is_dir():
+            shutil.rmtree(dir_to_delete)
+
+    except Exception as e:
+        print(f"Clean file error: {e}")
+
+def run_cleanup_schedule():
+    while True:
+        delete_old_files()
+        time.sleep(60 * 60)
 
 def load_constant():
     """Load constant values from config files"""
@@ -106,7 +121,7 @@ def create_ui():
             with gr.TabItem("📋 VenusScope"):
                 comprehensive_componsents = create_comprehensive_tab(constant)
             
-            with gr.TabItem("🤖 VenusAgent-0.1"):
+            with gr.TabItem("🤖 VenusAgent"):
                 try:
                     chat_components = create_chat_tab(constant)
                 except Exception as e:
