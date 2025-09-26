@@ -8,8 +8,17 @@ def create_index_tab(constant):
             gjf_content = f.read()
     except Exception:
         gjf_content = "(Show1.gjf not found)"
-    
-    return    f'''
+
+    index_inner_html = f"""
+        <style>
+        .index-container {{
+            transform: scale({INDEX_SCALE});
+            transform-origin: top left;
+        }}
+        </style>
+
+        <div class="index-container">
+        
                 <script>
                 // Track page visits asynchronously without blocking page load
                 (function() {{
@@ -518,5 +527,10 @@ def create_index_tab(constant):
                 </div>
             </div>
             
-            '''
+          
 
+        </div>
+    """
+    
+    return index_inner_html
+   
