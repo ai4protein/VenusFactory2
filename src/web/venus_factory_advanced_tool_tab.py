@@ -1203,7 +1203,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         struct_chain_selector.change(
             fn=handle_chain_change_unified,
             inputs=[struct_chain_selector, struct_chains_state, struct_original_file_path_state, struct_original_paste_content_state],
-            outputs=[struct_protein_display, struct_current_file_state] 
+            outputs=[struct_protein_display, struct_file_upload] 
         )
 
         function_fasta_upload.upload(
@@ -1230,7 +1230,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         function_protein_selector.change(
             fn=handle_sequence_change_unified,
             inputs=[function_protein_selector, function_sequence_state, function_original_file_path_state, function_original_paste_content_state],
-            outputs=[function_protein_display, function_current_file_state]
+            outputs=[function_protein_display, function_fasta_upload]
         )
         adv_func_task_dd.change(
             fn=update_dataset_choices_fixed,
@@ -1260,11 +1260,11 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         adv_residue_function_selector.change(
             fn=handle_sequence_change_unified,
             inputs=[adv_residue_function_selector, adv_residue_function_sequence_state, adv_residue_function_original_file_path_state, adv_residue_function_original_paste_content_state],
-            outputs=[adv_residue_function_protein_display, adv_residue_function_current_file_state]
+            outputs=[adv_residue_function_protein_display, adv_residue_function_fasta_upload]
         )
         adv_residue_function_predict_btn.click(
             fn=handle_protein_residue_function_prediction,
-            inputs=[adv_residue_function_task_dd, adv_residue_function_current_file_state, enable_ai_residue_function, ai_model_dd_residue_function, api_key_in_residue_function, adv_residue_function_model_dd],
+            inputs=[adv_residue_function_task_dd, adv_residue_function_fasta_upload, enable_ai_residue_function, ai_model_dd_residue_function, api_key_in_residue_function, adv_residue_function_model_dd],
             outputs=[adv_residue_function_status_textbox, adv_residue_function_results_df, adv_residue_function_plot_out, adv_residue_function_download_btn, adv_residue_function_ai_expert_html, gr.State()]
         )
         adv_residue_function_protein_chat_btn.click(
@@ -1274,14 +1274,14 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         )
         seq_predict_btn.click(
             fn=handle_mutation_prediction_advance, 
-            inputs=[seq_function_dd, seq_current_file_state, enable_ai_zshot_seq, ai_model_seq_zshot, api_key_in_seq_zshot, seq_model_dd],
+            inputs=[seq_function_dd, seq_file_upload, enable_ai_zshot_seq, ai_model_seq_zshot, api_key_in_seq_zshot, seq_model_dd],
             outputs=[zero_shot_status_box, zero_shot_plot_out, zero_shot_df_out, zero_shot_download_btn, zero_shot_download_path_state, zero_shot_view_controls, zero_shot_full_data_state, zero_shot_ai_expert_html],
             show_progress=True
         )
 
         struct_predict_btn.click(
             fn=handle_mutation_prediction_advance, 
-            inputs=[struct_function_dd, struct_current_file_state, enable_ai_zshot_stru, ai_model_stru_zshot, api_key_in_stru_zshot, struct_model_dd], 
+            inputs=[struct_function_dd, struct_file_upload, enable_ai_zshot_stru, ai_model_stru_zshot, api_key_in_stru_zshot, struct_model_dd], 
             outputs=[zero_shot_status_box, zero_shot_plot_out, zero_shot_df_out, zero_shot_download_btn, zero_shot_download_path_state, zero_shot_view_controls, zero_shot_full_data_state, zero_shot_ai_expert_html],
             show_progress=True
         )
