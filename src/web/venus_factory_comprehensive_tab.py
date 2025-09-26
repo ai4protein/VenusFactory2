@@ -51,6 +51,16 @@ def extract_sequence_from_pdb(pdb_content: str) -> str:
     
     return "".join(sequence)
 
+def get_save_path(subdir):
+    temp_dir = Path("temp_outputs")
+    now = datetime.now()
+    year = str(now.year)
+    month = str(now.month).zfill(2)
+    day = str(now.day).zfill(2)
+    temp_dir_ = temp_dir / year / month / day / subdir
+    temp_dir_.mkdir(parents=True, exist_ok=True)
+    return temp_dir_
+
 def generate_comprehensive_report(mutation_results: pd.DataFrame, function_results: pd.DataFrame) -> str:
     """Generate a comprehensive analysis report."""
     
@@ -208,12 +218,8 @@ def handle_individual_mutation_prediction(content, selected_chain, current_file,
     if not content.strip():
         return "Error: Please provide protein sequence or upload a file."
    
-    # Determine input type and prepare file
-    temp_dir = Path("temp_outputs")
-    temp_dir_ = temp_dir / "VenusScope_input"
     timestamp = str(int(time.time()))
-    input_data_dir = temp_dir_ / timestamp
-    input_data_dir.mkdir(parents=True, exist_ok=True)
+    input_data_dir = get_save_path("VenusScope_result")
 
     is_pdb = content.strip().startswith('ATOM') or (current_file and current_file.endswith('.pdb'))
    
@@ -318,12 +324,8 @@ def handle_individual_function_prediction(content, selected_chain, current_file,
     if not content.strip():
         return "Error: Please provide protein sequence or upload a file."
     
-    # Prepare FASTA file for function prediction
-    temp_dir = Path("temp_outputs")
-    temp_dir_ = temp_dir / "VenusScope_input"
     timestamp = str(int(time.time()))
-    input_data_dir = temp_dir_ / timestamp
-    input_data_dir.mkdir(parents=True, exist_ok=True)
+    input_data_dir = get_save_path("VenusScope_result")
     
     is_pdb = content.strip().startswith('ATOM') or (current_file and current_file.endswith('.pdb'))
     
@@ -533,11 +535,8 @@ def handle_functional_residue_prediction(content, selected_chain, current_file, 
         return "Error: Please provide protein sequence or upload a file."
     
     # Prepare FASTA file for function prediction
-    temp_dir = Path("temp_outputs")
-    temp_dir_ = temp_dir / "VenusScope_input"
     timestamp = str(int(time.time()))
-    input_data_dir = temp_dir_ / timestamp
-    input_data_dir.mkdir(parents=True, exist_ok=True)
+    input_data_dir = get_save_path("VenusScope_result")
     
     is_pdb = content.strip().startswith('ATOM') or (current_file and current_file.endswith('.pdb'))
     
@@ -803,11 +802,8 @@ def handle_physical_chemical_properties(content, selected_chain, current_file, s
         return "Error: Please provide protein sequence or upload a file."
     
     # Prepare FASTA file for function prediction
-    temp_dir = Path("temp_outputs")
-    temp_dir_ = temp_dir / "VenusScope_input"
     timestamp = str(int(time.time()))
-    input_data_dir = temp_dir_ / timestamp
-    input_data_dir.mkdir(parents=True, exist_ok=True)
+    input_data_dir = get_save_path("VenusScope_result")
 
     is_pdb = content.strip().startswith('ATOM') or (current_file and current_file.endswith('.pdb'))
     
@@ -1002,13 +998,9 @@ def export_ai_report_to_html(ai_report_content):
     if not ai_report_content or ai_report_content.startswith("Error:") or ai_report_content.startswith("*"):
         return None
     
-    # Create temp file
-    temp_dir = Path("temp_outputs")
-    temp_dir_ = temp_dir / "VenusScope_input"
     timestamp = str(int(time.time()))
-    input_data_dir = temp_dir_ / timestamp
-    input_data_dir.mkdir(parents=True, exist_ok=True)
-    
+    input_data_dir = get_save_path("VenusScope_result")
+
     html_file = input_data_dir / f"venusfactory_ai_report_{timestamp}.html"
     
     try:

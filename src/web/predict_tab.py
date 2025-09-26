@@ -150,7 +150,6 @@ def create_predict_tab(constant):
             {load_html_template('prediction_warning.html', warning_message="A prediction is already running. Please wait or abort it.")}
             """), gr.update(visible=False)
         
-        # 追踪功能使用
         track_usage("mutation_prediction")
         
         # If the process was aborted but not reset properly, ensure we're in a clean state
@@ -448,8 +447,7 @@ def create_predict_tab(constant):
             {get_css_style_tag('prediction_ui.css')}
             {load_html_template('prediction_warning.html', warning_message="A prediction is already running. Please wait or abort it.")}
             """)
-        
-        # 追踪功能使用
+
         track_usage("mutation_prediction")
         
         # If the process was aborted but not reset properly, ensure we're in a clean state

@@ -6,6 +6,7 @@ import subprocess
 import time
 import zipfile
 from pathlib import Path
+from datetime import datetime
 from typing import Dict, Any, List, Generator, Optional, Tuple, Union
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -428,74 +429,113 @@ def generate_ai_summary_prompt(results_df: pd.DataFrame, task: str, model: str) 
         """
     return prompt
 
+def get_save_path(subdir):
+    temp_dir = Path("temp_outputs")
+    now = datetime.now()
+    year = str(now.year)
+    month = str(now.month).zfill(2)
+    day = str(now.day).zfill(2)
+    temp_dir_ = temp_dir / year / month / day / subdir
+    temp_dir_.mkdir(parents=True, exist_ok=True)
+    return temp_dir_
+
 def parse_fasta_paste_content(fasta_content):
     if not fasta_content or not fasta_content.strip():
-        return "No file selected", gr.update(choices=["Sequence 1"], value="Sequence 1", visible=False), {}, "Sequence 1", ""
-    
+        return "No file selected", gr.update(choices=["Sequence_1"], value="Sequence_1", visible=False), {}, "Sequence_1", ""
+   
     try:
         sequences = {}
         current_header = None
         current_sequence = ""
-        
+        sequence_counter = 1
+       
         for line in fasta_content.strip().split('\n'):
             line = line.strip()
             if not line:
                 continue
-
+                
             if line.startswith('>'):
                 if current_header is not None and current_sequence:
                     sequences[current_header] = current_sequence
                 
                 current_header = line[1:].strip()
-                if not current_header:
-                    current_header = f"Sequence_{len(sequences) + 1}"
                 current_sequence = ""
             else:
+                sequence_data = ''.join(c.upper() for c in line if c.isalpha())
+                
                 if current_header is None:
-                    current_header = "Sequence_1"
-                clean_line = ''.join(c.upper() for c in line if c.isalpha())
-                current_sequence += clean_line
-        
+                    current_header = f"Sequence_{sequence_counter}"
+                    sequence_counter += 1
+                
+                current_sequence += sequence_data
+
         if current_header is not None and current_sequence:
             sequences[current_header] = current_sequence
-        
+       
         if not sequences:
-            return "No valid protein sequences found in FASTA content", gr.update(choices=["Sequence 1"], value="Sequence 1", visible=False), {}, "Sequence 1", ""
-
+            return "No valid protein sequences found in FASTA content", gr.update(choices=["Sequence_1"], value="Sequence_1", visible=False), {}, "Sequence_1", ""
+        
+        fasta_lines = []
+        for header, sequence in sequences.items():
+            fasta_lines.append(f">{header}")
+            fasta_lines.append(sequence)
+        modify_fasta_content = "\n".join(fasta_lines)
+       
         sequence_choices = list(sequences.keys())
         default_sequence = sequence_choices[0]
         display_sequence = sequences[default_sequence]
         selector_visible = len(sequence_choices) > 1
-        temp_dir = Path("temp_outputs")
-        sequence_dir = temp_dir / "Fasta"
-        sequence_dir.mkdir(parents=True, exist_ok=True)
-        temp_fasta_path = os.path.join(sequence_dir, f"paste_content_seq_{sanitize_filename(default_sequence)}.fasta")
-        save_selected_sequence_fasta(fasta_content, default_sequence, temp_fasta_path)
-        return display_sequence, gr.update(choices=sequence_choices, value=default_sequence, visible=selector_visible), sequences, default_sequence, temp_fasta_path
         
+        timestamp = str(int(time.time()))
+        sequence_dir = get_save_path("Upload_dataset")
+        temp_fasta_path = os.path.join(sequence_dir, f"paste_content_seq_{sanitize_filename(default_sequence)}_{timestamp}.fasta")
+        save_selected_sequence_fasta(modify_fasta_content, default_sequence, temp_fasta_path)
+        return display_sequence, gr.update(choices=sequence_choices, value=default_sequence, visible=selector_visible), sequences, default_sequence, temp_fasta_path, modify_fasta_content
+       
     except Exception as e:
         print(f"Error in parse_fasta_paste_content: {str(e)}")
-        return f"Error parsing FASTA content: {str(e)}", gr.update(choices=["Sequence 1"], value="Sequence 1", visible=False), {}, "Sequence 1", ""
+        return f"Error parsing FASTA content: {str(e)}", gr.update(choices=["Sequence_1"], value="Sequence_1", visible=False), {}, "Sequence_1", "", ""
 
 def save_selected_sequence_fasta(original_fasta_content, selected_sequence, output_path):
-    new_fasta_lines = []
-    lines = original_fasta_content.strip().split('\n')
-    i = 0
-    
-    while i < len(lines):
-        line = lines[i].strip()
+    sequences = {}
+    current_header = None
+    current_sequence = ""
+    sequence_counter = 1
+   
+    for line in original_fasta_content.strip().split('\n'):
+        line = line.strip()
+        if not line:
+            continue
+            
         if line.startswith('>'):
-            header = line[1:].strip()
-            if header == selected_sequence:
-                new_fasta_lines.append(line)
-                new_fasta_lines.append(lines[i+1])
-                break
-            else:
-                i += 1
+            if current_header is not None and current_sequence:
+                sequences[current_header] = current_sequence
+            
+            current_header = line[1:].strip()
+            current_sequence = ""
         else:
-            i += 1
-    with open(output_path, 'w', encoding='utf-8') as f:
-        f.write('\n'.join(new_fasta_lines))
+            sequence_data = ''.join(c.upper() for c in line if c.isalpha())
+            
+            if current_header is None:
+                current_header = f"Sequence_{sequence_counter}"
+                sequence_counter += 1
+            
+            current_sequence += sequence_data
+
+    if current_header is not None and current_sequence:
+        sequences[current_header] = current_sequence
+   
+    if not sequences or selected_sequence not in sequences:
+        print(f"Error: Sequence '{selected_sequence}' not found in parsed sequences")
+        return
+
+    try:
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write(f">{selected_sequence}\n")
+            f.write(sequences[selected_sequence])
+        print(f"Successfully saved sequence '{selected_sequence}' to {output_path}")
+    except Exception as e:
+        print(f"Error saving file: {str(e)}")
 
 def handle_paste_sequence_selection(selected_sequence, sequences_dict, original_fasta_content_from_state):
     if not sequences_dict or selected_sequence not in sequences_dict:
@@ -506,10 +546,9 @@ def handle_paste_sequence_selection(selected_sequence, sequences_dict, original_
         return "No file selected", ""
     
     try:
-        temp_dir = Path("temp_outputs")
-        sequence_dir = temp_dir / "Fasta"
-        sequence_dir.mkdir(parents=True, exist_ok=True)
-        temp_pdb_path = os.path.join(sequence_dir, f"paste_content_seq_{selected_sequence}.fasta")
+        timestamp = str(int(time.time()))
+        sequence_dir = get_save_path("Upload_dataset")
+        temp_pdb_path = os.path.join(sequence_dir, f"paste_content_seq_{selected_sequence}_{timestamp}.fasta")
         save_selected_sequence_fasta(original_fasta_content_from_state, selected_sequence, temp_pdb_path)
         
         return sequences_dict[selected_sequence], temp_pdb_path
@@ -587,10 +626,9 @@ def parse_pdb_paste_content(pdb_content):
         default_chain = chain_choices[0]
         display_sequence = chains[default_chain]
         selector_visible = len(chain_choices) > 1
-        temp_dir = Path("temp_outputs")
-        sequence_dir = temp_dir / "Fasta"
-        sequence_dir.mkdir(parents=True, exist_ok=True)
-        temp_pdb_path = os.path.join(sequence_dir, f"paste_content_chain_{default_chain}.pdb")
+        timestamp = str(int(time.time()))
+        sequence_dir = get_save_path("Upload_dataset")
+        temp_pdb_path = os.path.join(sequence_dir, f"paste_content_chain_{default_chain}_{timestamp}.pdb")
         save_selected_chain_pdb(pdb_content, default_chain, temp_pdb_path)
         return display_sequence, gr.update(choices=chain_choices, value=default_chain, visible=selector_visible), chains, default_chain, temp_pdb_path
         
@@ -627,10 +665,9 @@ def handle_paste_chain_selection(selected_chain, chains_dict, original_pdb_conte
         return "No file selected", ""
     
     try:
-        temp_dir = Path("temp_outputs")
-        sequence_dir = temp_dir / "PDB"
-        sequence_dir.mkdir(parents=True, exist_ok=True)
-        temp_pdb_path = os.path.join(sequence_dir, f"paste_content_chain_{selected_chain}.pdb")
+        timestamp = str(int(time.time()))
+        sequence_dir = get_save_path("Upload_dataset")
+        temp_pdb_path = os.path.join(sequence_dir, f"paste_content_chain_{selected_chain}_{timestamp}.pdb")
         save_selected_chain_pdb(original_pdb_content_from_state, selected_chain, temp_pdb_path)
         
         return chains_dict[selected_chain], temp_pdb_path
@@ -693,18 +730,18 @@ def process_pdb_file_upload(file_path):
 
 def process_fasta_file_upload(file_path):
     if not file_path:
-        return "No file selected", gr.update(choices=["Sequence 1"], value="Sequence 1", visible=False), {}, "Sequence 1", "", ""
+        return "No file selected", gr.update(choices=["Sequence_1"], value="Sequence_1", visible=False), {}, "Sequence_1", "", ""
     try:
         with open(file_path, 'r') as f:
             fasta_content = f.read()
-        sequence, selector_update, sequences_dict, default_sequence, file_path = parse_fasta_paste_content(fasta_content)
+        sequence, selector_update, sequences_dict, default_sequence, file_path, modify_fasta_content = parse_fasta_paste_content(fasta_content)
         return sequence, selector_update, sequences_dict, default_sequence, file_path, file_path
     except Exception as e:
-        return f"Error reading FASTA file: {str(e)}", gr.update(choices=["Sequence 1"], value="Sequence 1", visible=False), {}, "Sequence 1", "", ""
+        return f"Error reading FASTA file: {str(e)}", gr.update(choices=["Sequence_1"], value="Sequence_1", visible=False), {}, "Sequence_1", "", ""
         
 def handle_file_upload(file_obj: Any) -> str:
     if not file_obj:
-        return "No file selected", gr.update(choices=["Sequence 1"], value="Sequence 1", visible=False), {}, "Sequence 1", "", ""
+        return "No file selected", gr.update(choices=["Sequence_1"], value="Sequence_1", visible=False), {}, "Sequence_1", "", ""
     if isinstance(file_obj, str):
         file_path = file_obj
     else:
@@ -714,42 +751,7 @@ def handle_file_upload(file_obj: Any) -> str:
     elif file_path.lower().endswith(".pdb"):
         return process_pdb_file_upload(file_path)
     else:
-        return "No file selected", gr.update(choices=["Sequence 1"], value="Sequence 1", visible=False), {}, "Sequence 1", "", ""
-
-def _read_fasta_file(file_path: str) -> str:
-    with open(file_path, "r") as f:
-        return f.read()
-
-def _read_pdb_file(file_path: str) -> str:
-    """Extract amino acid sequence from PDB file."""
-    aa_map = {
-        'ALA': 'A', 'CYS': 'C', 'ASP': 'D', 'GLU': 'E', 'PHE': 'F',
-        'GLY': 'G', 'HIS': 'H', 'ILE': 'I', 'LYS': 'K', 'LEU': 'L',
-        'MET': 'M', 'ASN': 'N', 'PRO': 'P', 'GLN': 'Q', 'ARG': 'R',
-        'SER': 'S', 'THR': 'T', 'VAL': 'V', 'TRP': 'W', 'TYR': 'Y'
-    }
-    
-    sequence = []
-    seen_residues = set()
-    chain = None
-    
-    with open(file_path, 'r') as f:
-        for line in f:
-            if line.startswith("ATOM"):
-                chain_id = line[21]
-                if chain is None:
-                    chain = chain_id
-                if chain_id != chain:
-                    break
-                
-                res_id = (chain_id, int(line[22:26]))
-                if res_id not in seen_residues:
-                    res_name = line[17:20].strip()
-                    if res_name in aa_map:
-                        sequence.append(aa_map[res_name])
-                        seen_residues.add(res_id)
-    
-    return "".join(sequence)
+        return "No file selected", gr.update(choices=["Sequence_1"], value="Sequence_1", visible=False), {}, "Sequence_1", "", ""
 
 def sanitize_filename(name: str) -> str:
     """Sanitize filename for safe file operations."""
@@ -779,21 +781,12 @@ def create_zip_archive(files_to_zip: Dict[str, str], zip_filename: str) -> str:
                 zf.write(src, arcname=arc)
     return zip_filename
 
-def update_dataset_choices(task: str) -> gr.CheckboxGroup:
-    """Update dataset choices based on selected task."""
-    datasets = DATASET_MAPPING_FUNCTION.get(task, [])
-    return gr.CheckboxGroup.update(choices=datasets, value=datasets)
-
-
 def run_zero_shot_prediction(model_type: str, model_name: str, file_path: str) -> Tuple[str, pd.DataFrame]:
     """Run zero-shot mutation prediction."""
     try:
-        temp_dir = Path("temp_outputs")
-        temp_dir_ = temp_dir / "Zero_shot_result"
         timestamp = str(int(time.time()))
-        sequence_dir = temp_dir_ / timestamp
-        sequence_dir.mkdir(parents=True, exist_ok=True)
-        output_csv = sequence_dir / f"{model_type}.csv"
+        sequence_dir = get_save_path("Zero_shot_result")
+        output_csv = sequence_dir / f"{model_type}_{timestamp}.csv"
         script_name = MODEL_MAPPING_ZERO_SHOT.get(model_name)
         
         if not script_name:
@@ -944,11 +937,10 @@ def process_fasta_file(file_path: str) -> str:
     
 
     original_path = Path(file_path)
-    temp_dir = Path("temp_outputs")
-    fasra_dir = temp_dir / "Fasta"
-    fasra_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = str(int(time.time()))
+    fasra_dir = get_save_path("Upload_data")
 
-    new_file_path = fasra_dir / f"filtered_{original_path.name}"
+    new_file_path = fasra_dir / f"filtered_{original_path.name}_{timestamp}"
     
     with open(new_file_path, 'w', encoding='utf-8') as f:
         f.write(f"{sequences[0][0]}\n")
@@ -1094,30 +1086,26 @@ def handle_mutation_prediction_base(
     else:
         progress(1.0, desc="Complete!")
     
-    
-    temp_dir = Path("temp_outputs")
-    temp_dir_ = temp_dir / "Zero_shot_result"
     timestamp = str(int(time.time()))
-    heatmap_dir = temp_dir_ / timestamp
-    heatmap_dir.mkdir(parents=True, exist_ok=True)
-    csv_path = heatmap_dir / f"mut_res.csv"
-    heatmap_path = heatmap_dir / f"mut_map.html"
+    heatmap_dir = get_save_path("Zero_shot_result")
+    csv_path = heatmap_dir / f"mut_res_{timestamp}.csv"
+    heatmap_path = heatmap_dir / f"mut_map_{timestamp}.html"
     
     display_df.to_csv(csv_path, index=False)
     summary_fig.write_html(heatmap_path)
     
     files_to_zip = {
-        str(csv_path): "prediction_results.csv", 
-        str(heatmap_path): "prediction_heatmap.html"
+        str(csv_path): f"prediction_results_{timestamp}.csv", 
+        str(heatmap_path): f"prediction_heatmap_{timestamp}.html"
     }
     
     if not ai_summary.startswith("❌") and not ai_summary.startswith("AI Analysis"):
-        report_path = heatmap_dir / f"ai_report.md"
+        report_path = heatmap_dir / f"ai_report_{timestamp}.md"
         with open(report_path, 'w', encoding='utf-8') as f:
             f.write(ai_summary)
-        files_to_zip[str(report_path)] = "AI_Analysis_Report.md"
+        files_to_zip[str(report_path)] = f"AI_Analysis_Report_{timestamp}.md"
 
-    zip_path = heatmap_dir / f"pred_mut.zip"
+    zip_path = heatmap_dir / f"pred_mut_{timestamp}.zip"
     zip_path_str = create_zip_archive(files_to_zip, str(zip_path))
 
     final_status = status if not enable_ai else "✅ Prediction and AI analysis complete!"
@@ -1309,12 +1297,8 @@ def handle_protein_function_prediction(
     )
     
     all_results_list = []
-    temp_dir = Path("temp_outputs")
-    temp_dir_ = temp_dir / "Protein_Function"
     timestamp = str(int(time.time()))
-    function_dir = temp_dir_ / timestamp
-    function_dir.mkdir(parents=True, exist_ok=True)
-
+    function_dir = get_save_path("Protein_function_result")
 
     # Run predictions for each dataset
     progress(0.1, desc="Running prediction...")
@@ -1335,7 +1319,7 @@ def handle_protein_function_prediction(
             adapter_key = MODEL_ADAPTER_MAPPING_FUNCTION[model_key]
             script_path = Path("src") / "property" / f"{model_key}.py"
             adapter_path = Path("ckpt") / dataset / adapter_key
-            output_file = function_dir / f"temp_{dataset}_{model}.csv"
+            output_file = function_dir / f"{dataset}_{model}_{timestamp}.csv"
             
             if not script_path.exists() or not adapter_path.exists():
                 raise FileNotFoundError(f"Required files not found: Script={script_path}, Adapter={adapter_path}")
@@ -1385,11 +1369,9 @@ def handle_protein_function_prediction(
         for header, group in raw_final_df.groupby('header'):
             if group.empty: continue
             
-            # Get the column name for predictions (could be 'prediction' or 'predicted_class')
             pred_col = 'prediction' if 'prediction' in group.columns else 'predicted_class'
             if pred_col not in group.columns: continue
             
-            # Collect all probability distributions
             all_probs = []
             valid_rows = []
             
@@ -1417,12 +1399,10 @@ def handle_protein_function_prediction(
                 continue
             
             # Perform soft voting: average all probability distributions
-            # Ensure all probability arrays have the same length
             max_len = max(len(probs) for probs in all_probs)
             normalized_probs = []
             for probs in all_probs:
                 if len(probs) < max_len:
-                    # Pad with zeros if needed
                     probs.extend([0.0] * (max_len - len(probs)))
                 normalized_probs.append(probs)
             
@@ -1443,18 +1423,12 @@ def handle_protein_function_prediction(
         
         if voted_results:
             final_df = pd.concat(voted_results, ignore_index=True)
-            # Remove Dataset column for voting results
             final_df = final_df.drop(columns=['Dataset'], errors='ignore')
 
-    # Generate plot but don't return it in the yield
     plot_fig = generate_plots_for_all_results(raw_final_df)
     display_df = final_df.copy()
-
-    # Map prediction values to text labels BEFORE renaming columns
     def map_labels(row):
         current_task = DATASET_TO_TASK_MAP.get(row.get('Dataset', ''), task)
-        
-        # For regression tasks, return the numeric value as is
         if current_task in REGRESSION_TASKS_FUNCTION: 
             scaled_value = row.get("prediction")
             if pd.notna(scaled_value) and scaled_value != 'N/A' and current_task in REGRESSION_TASKS_FUNCTION_MAX_MIN:
@@ -1477,15 +1451,12 @@ def handle_protein_function_prediction(
                 # Get labels for SortingSignal
                 signal_labels = ["CH", 'GPI', "MT", "NES", "NLS", "PTS", "SP", "TM", "TH"]
                 active_labels = []
-                # Find indices where prediction is 1 (active labels)
                 for i, pred in enumerate(predictions):
                     if pred == 1:
                         active_labels.append(signal_labels[i])
                 print(predictions)
-                # Return concatenated labels or "None" if no active labels
                 return "_".join(active_labels) if active_labels else "None"
 
-        # For classification tasks, map to text labels
         labels_key = ("DeepLocMulti" if row.get('Dataset') == "DeepLocMulti" 
                      else "DeepLocBinary" if row.get('Dataset') == "DeepLocBinary" 
                      else current_task)
@@ -1504,7 +1475,6 @@ def handle_protein_function_prediction(
         
         return str(pred_val)
 
-    # Apply label mapping
     if "prediction" in display_df.columns:
         display_df["predicted_class"] = display_df.apply(map_labels, axis=1)
     elif "predicted_class" in display_df.columns:
@@ -1516,17 +1486,15 @@ def handle_protein_function_prediction(
     rename_map = {
         'header': "Protein Name", 
         'sequence': "Sequence", 
-        'predicted_class': "Predicted Class", # This now correctly renames the only remaining prediction column
+        'predicted_class': "Predicted Class",
         'probabilities': "Confidence Score", 
         'Dataset': "Dataset"
     }
     display_df.rename(columns=rename_map, inplace=True)
     
-    # Truncate sequence display
     if "Sequence" in display_df.columns:
         display_df["Sequence"] = display_df["Sequence"].apply(lambda x: x[:]  if isinstance(x, str) and len(x) > 30 else x)
 
-    # Format confidence score to 2 decimal places
     if "Confidence Score" in display_df.columns and "Predicted Class" in display_df.columns:
         def format_confidence(row):
             score = row["Confidence Score"]
@@ -1540,28 +1508,21 @@ def handle_protein_function_prediction(
                         prob_str = score.strip('[]')
                         probs = [float(x.strip()) for x in prob_str.split(',')]
                         
-                        # Get the original prediction index before text mapping
-                        # We need to reverse map the text label back to index
                         pred_index = None
                         current_task = task if is_voting_run else row.get('Dataset', task)
                         
-                        # Find the reverse mapping
                         if current_task in REGRESSION_TASKS_FUNCTION:
-                            # For regression, return the actual value
                             return predicted_class
                         else:
-                            # For classification, find the index of the predicted class
                             labels_key = task if is_voting_run else ("DeepLocMulti" if row.get('Dataset') == "DeepLocMulti" else "DeepLocBinary" if row.get('Dataset') == "DeepLocBinary" else current_task)
                             labels = LABEL_MAPPING_FUNCTION.get(labels_key, [])
                             
                             if labels and predicted_class in labels:
                                 pred_index = labels.index(predicted_class)
-                            
-                            # Return the confidence for the predicted class
+
                             if pred_index is not None and 0 <= pred_index < len(probs):
                                 return round(probs[pred_index], 2)
                             else:
-                                # If we can't find the index, return the max probability
                                 return round(max(probs), 2)
                     else:
                         return round(float(score), 2)
@@ -1572,7 +1533,7 @@ def handle_protein_function_prediction(
         display_df["Confidence Score"] = display_df.apply(format_confidence, axis=1)
 
     ai_summary = "AI Analysis disabled. Enable in settings to generate a report."
-    ai_response = "AI Analysis disabled."  # Initialize ai_response variable
+    ai_response = "AI Analysis disabled." 
 
     expert_analysis = "<div style='height: 300px; display: flex; align-items: center; justify-content: center; color: #666;'>Analysis will appear here once prediction is complete...</div>"
 
@@ -1597,28 +1558,24 @@ def handle_protein_function_prediction(
     else:
         progress(1.0, desc="Complete!")
     
-    # Create download zip with processed results
     zip_path_str = ""
     try:
-        temp_dir = Path("temp_outputs")
-        temp_dir_ = temp_dir / "Function_download"
         timestamp = str(int(time.time()))
-        zip_dir = temp_dir_ / timestamp
-        zip_dir.mkdir(parents=True, exist_ok=True)
+        zip_dir = get_save_path("Protein_function_result")
         
         # Save only the processed results
         processed_df_for_save = display_df.copy()
-        processed_df_for_save.to_csv(zip_dir  / "Result.csv", index=False)
+        processed_df_for_save.to_csv(zip_dir  / f"Result_{timestamp}.csv", index=False)
         
         # Save plot as HTML file (optional)
         if plot_fig and hasattr(plot_fig, 'data') and plot_fig.data: 
-            plot_fig.write_html(str(zip_dir/ "results_plot.html"))
+            plot_fig.write_html(str(zip_dir/ f"results_plot_{timestamp}.html"))
         
         if not ai_summary.startswith("❌") and not ai_summary.startswith("AI Analysis"):
-            with open(zip_dir / "AI_Report.md", 'w', encoding='utf-8') as f: 
+            with open(zip_dir / f"AI_Report_{timestamp}.md", 'w', encoding='utf-8') as f: 
                 f.write(f"# AI Expert Analysis\n\n{ai_summary}")
         
-        zip_path = temp_dir / f"func_pred_{ts}.zip"
+        zip_path = zip_dir / f"func_pred_{timestamp}.zip"
         with zipfile.ZipFile(zip_path, 'w') as zf:
             for file in zip_dir.glob("*"): 
                 zf.write(file, file.name)
@@ -1808,24 +1765,11 @@ def handle_protein_residue_function_prediction(
         return
 
     all_results_list = []
-    temp_dir = Path("temp_outputs")
-    temp_dir_ = temp_dir /  "Residue_save"
     timestamp = str(int(time.time()))
-    residue_save_dir = temp_dir_ / timestamp
-    residue_save_dir.mkdir(parents=True, exist_ok=True)
+    residue_save_dir = get_save_path("Residue_function_result")
 
-    progress(0.1, desc="Running Prediction...")
-    yield(
-        f"🚀 Starting predictions with {model}...", 
-        pd.DataFrame(), None,
-        gr.update(visible=False), 
-        "AI analysis will appear here...",
-        "AI Analysis disabled."
-    )
-
-    
     # Run predictions for each dataset
-    progress(0.1, desc="Running Predicrtion...")
+    progress(0.2, desc="Running Predicrtion...")
     yield(
         f"⏳ Running prediction...", 
         pd.DataFrame(), None,
@@ -1849,7 +1793,7 @@ def handle_protein_residue_function_prediction(
         for dataset in datasets:
             script_path = Path("src") / "property" / f"{model_key}.py"
             adapter_path = Path("ckpt") / dataset / adapter_key
-            output_file = residue_save_dir/ f"{dataset}_{model}.csv"
+            output_file = residue_save_dir/ f"{dataset}_{model}_{timestamp}.csv"
 
             if not script_path.exists() or not adapter_path.exists():
                 raise FileNotFoundError(f"Required files not found: Script={script_path}, Adapter={adapter_path}")
@@ -1890,7 +1834,7 @@ def handle_protein_residue_function_prediction(
         final_df = expand_residue_predictions(combined_df)
     else:
         final_df = pd.DataFrame()
-    download_path = residue_save_dir / f"prediction_results.csv"
+    download_path = residue_save_dir / f"prediction_results_{timestamp}.csv"
     final_df.to_csv(download_path, index=False)
 
     progress(0.8, desc="Creating visualization...")
@@ -1953,14 +1897,9 @@ def handle_protein_residue_function_prediction(
 def run_protein_properties_prediction(task_type: str, file_path: str) -> Tuple[str, str]:
     """Run protein properties prediction"""
     try:
-       # Ensure temp_outputs directory exists
-        temp_dir = Path("temp_outputs")
-        temp_dir_ = temp_dir / "Protein_properties"
         timestamp = str(int(time.time()))
-        properties_dir = temp_dir_ / timestamp
-        properties_dir.mkdir(parents=True, exist_ok=True)
-        output_json = properties_dir / f"{task_type.replace(' ', '_').replace('(', '').replace(')', '')}.json"
-       
+        properties_dir = get_save_path("Protein_properties_result")
+        output_json = properties_dir / f"{task_type.replace(' ', '_').replace('(', '').replace(')', '')}_{timestamp}.json"
         script_name = PROTEIN_PROPERTIES_MAP_FUNCTION.get(task_type)
         if not script_name:
            return "", f"Error: Task '{task_type}' is not allowed"
@@ -2213,10 +2152,10 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                                     easy_zshot_paste_clear_btn = gr.Button("🗑️ Clear", variant="primary", size="m")
 
                         easy_zshot_protein_display = gr.Textbox(label="Uploaded Protein Sequence", interactive=False, lines=3, max_lines=7)
-                        easy_zshot_sequence_selector = gr.Dropdown(label="Select Chain", choices=["Sequence 1"], value="Sequence 1", visible=False, allow_custom_value=True)
+                        easy_zshot_sequence_selector = gr.Dropdown(label="Select Chain", choices=["Sequence_1"], value="Sequence_1", visible=False, allow_custom_value=True)
                         easy_zshot_original_file_path_state = gr.State("")
                         easy_zshot_original_paste_content_state = gr.State("")
-                        easy_zshot_selected_sequence_state = gr.State("Sequence 1")
+                        easy_zshot_selected_sequence_state = gr.State("Sequence_1")
                         easy_zshot_sequence_state = gr.State({})
                         easy_zshot_current_file_state = gr.State("")
                         
@@ -2278,10 +2217,10 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                                     base_func_paste_clear_btn = gr.Button("🗑️ Clear", variant="primary", size="m")
                         
                         base_function_protein_display = gr.Textbox(label="Uploaded Protein Sequence", interactive=False, lines=3, max_lines=7)
-                        base_function_selector = gr.Dropdown(label="Select Chain", choices=["Sequence 1"], value="Sequence 1", visible=False, allow_custom_value=True)
+                        base_function_selector = gr.Dropdown(label="Select Chain", choices=["Sequence_1"], value="Sequence_1", visible=False, allow_custom_value=True)
                         base_function_original_file_path_state = gr.State("")
                         base_function_original_paste_content_state = gr.State("")
-                        base_function_selected_sequence_state = gr.State("Sequence 1")
+                        base_function_selected_sequence_state = gr.State("Sequence_1")
                         base_function_sequence_state = gr.State({})
                         base_function_current_file_state = gr.State("")
 
@@ -2337,10 +2276,10 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                                     base_residue_function_paste_clear_btn = gr.Button("🗑️ Clear", variant="primary", size="m")
                         
                         base_residue_function_protein_display = gr.Textbox(label="Uploaded Protein Sequence", interactive=False, lines=3, max_lines=7)
-                        base_residue_function_selector = gr.Dropdown(label="Select Chain", choices=["Sequence 1"], value="Sequence 1", visible=False, allow_custom_value=True)
+                        base_residue_function_selector = gr.Dropdown(label="Select Chain", choices=["Sequence_1"], value="Sequence_1", visible=False, allow_custom_value=True)
                         base_residue_function_original_file_path_state = gr.State("")
                         base_residue_function_original_paste_content_state = gr.State("")
-                        base_residue_function_selected_sequence_state = gr.State("Sequence 1")
+                        base_residue_function_selected_sequence_state = gr.State("Sequence_1")
                         base_residue_function_sequence_state = gr.State({})
                         base_residue_function_current_file_state = gr.State("")
 
@@ -2404,10 +2343,10 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         
                         
                         protein_properties_protein_display = gr.Textbox(label="Uploaded Protein Sequence", interactive=False, lines=3, max_lines=7)
-                        protein_properties_sequence_selector = gr.Dropdown(label="Select Chain", choices=["Sequence 1"], value="Sequence 1", visible=False, allow_custom_value=True)
+                        protein_properties_sequence_selector = gr.Dropdown(label="Select Chain", choices=["Sequence_1"], value="Sequence_1", visible=False, allow_custom_value=True)
                         protein_properties_original_file_path_state = gr.State("")
                         protein_properties_original_paste_content_state = gr.State("")
-                        protein_properties_selected_sequence_state = gr.State("Sequence 1")
+                        protein_properties_selected_sequence_state = gr.State("Sequence_1")
                         protein_properties_sequence_state = gr.State({})
                         protein_properties_current_file_state = gr.State("")
 
@@ -2433,7 +2372,7 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             return "", "", gr.update(choices=["A"], value="A", visible=False), {}, "A", ""
 
         def clear_paste_content_fasta():
-            return "No file selected", "No file selected", gr.update(choices=["Sequence 1"], value="Sequence 1", visible=False), {}, "Sequence 1", ""
+            return "No file selected", "No file selected", gr.update(choices=["Sequence_1"], value="Sequence_1", visible=False), {}, "Sequence_1", ""
 
         def toggle_ai_section_simple(is_checked: bool):
             return gr.update(visible=is_checked)
@@ -2446,7 +2385,7 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         
         def handle_paste_fasta_detect(fasta_content):
             result = parse_fasta_paste_content(fasta_content)
-            return result + (fasta_content, )
+            return result
         
         enable_ai_zshot.change(fn=toggle_ai_section, inputs=enable_ai_zshot, outputs=ai_box_zshot)
         enable_ai_func.change(fn=toggle_ai_section, inputs=enable_ai_func, outputs=ai_box_func)
@@ -2521,7 +2460,7 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
 
         easy_zshot_predict_btn.click(
             fn=handle_mutation_prediction_base,
-            inputs=[zero_shot_function_dd, easy_zshot_file_upload, enable_ai_zshot, ai_model_dd_zshot, api_key_in_zshot, zero_shot_model_dd],
+            inputs=[zero_shot_function_dd, easy_zshot_current_file_state, enable_ai_zshot, ai_model_dd_zshot, api_key_in_zshot, zero_shot_model_dd],
             outputs=[zero_shot_status_box, zero_shot_plot_out, zero_shot_df_out, zero_shot_download_btn, zero_shot_download_path_state, zero_shot_view_controls, zero_shot_full_data_state, zero_shot_ai_expert_html],
             show_progress=True
         )
@@ -2620,7 +2559,7 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
 
         protein_properties_predict_btn.click(
             fn=handle_protein_properties_generation,
-            inputs=[protein_properties_task_dd, protein_properties_file_upload],
+            inputs=[protein_properties_task_dd, protein_properties_current_file_state],
             outputs=[protein_properties_status_box, protein_properties_result_out, protein_properties_download_btn, protein_properties_path_state, gr.State()],
             show_progress=True
         )

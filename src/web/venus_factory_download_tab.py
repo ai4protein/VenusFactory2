@@ -1,11 +1,13 @@
 import os
+import time
 import subprocess
 import tempfile
 import json
 import hashlib
 import zipfile
 import gradio as gr
-
+from pathlib import Path
+from datetime import datetime
 from datetime import datetime
 from gradio_molecule3d import Molecule3D
 from pathlib import Path
@@ -39,20 +41,20 @@ AF2_REPS =  [
     }
   ]
 
+def get_save_path():
+    temp_dir = Path("temp_outputs")
+    now = datetime.now()
+    year = str(now.year)
+    month = str(now.month).zfill(2)
+    day = str(now.day).zfill(2)
+    timestamp = str(int(time.time()))
+    temp_dir_ = temp_dir / year / month / day / "Download_data" / timestamp
+    temp_dir_.mkdir(parents=True, exist_ok=True)
+    return temp_dir_
 
-def generate_task_id(user_hash: str = None) -> str:
-    if not user_hash:
-        user_hash = "default_user"
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    return f"{user_hash}/{timestamp}"
-
-def create_task_folder(task_id: str, task_type: str) -> str:
-    task_folder = f"temp_downloads/tasks/{task_id}/{task_type}"
-    os.makedirs(task_folder, exist_ok=True)
-    return task_folder
-
-def zip_task_results(task_folder: str, task_id: str, task_type: str) -> str:
-    zip_path = f"temp_downloads/zips/{task_id}_{task_type}.zip"
+def zip_task_results(task_folder: str, task_type: str) -> str:
+    zip_dir_path = get_save_path()
+    zip_path = f"{zip_dir_path}/zips/{task_type}.zip"
     os.makedirs(os.path.dirname(zip_path), exist_ok=True)
     
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
@@ -207,9 +209,7 @@ def create_download_tool_tab(constant: Dict[str, Any]):
 
     def handle_interpro_download(method: str, id_val: str, json_file, user_hash: str, error: bool) -> tuple:
         """Handles InterPro metadata download."""
-        task_id = generate_task_id(user_hash)
-        task_folder = create_task_folder(task_id, "interpro_metadata")
-        
+        task_folder = get_save_path()
         json_val = None
         if method == "From JSON" and json_file:
             data, preview = read_json_file(json_file.name)
@@ -223,13 +223,12 @@ def create_download_tool_tab(constant: Dict[str, Any]):
             "error_file": f"{task_folder}/failed.txt" if error else None
         }
         download_result = run_download_script("metadata/download_interpro.py", **args)
-        zip_path = zip_task_results(task_folder, task_id, "interpro_metadata")
+        zip_path = zip_task_results(task_folder, "interpro_metadata")
         return download_result, gr.update(visible=True, value=zip_path)
 
     def handle_rcsb_download(method: str, id_val: str, file_val, user_hash: str, error: bool) -> tuple:
         """Handles RCSB metadata download."""
-        task_id = generate_task_id(user_hash)
-        task_folder = create_task_folder(task_id, "rcsb_metadata")
+        task_folder = get_save_path()
         
         file_path = None
         if method == "From File" and file_val:
@@ -244,13 +243,12 @@ def create_download_tool_tab(constant: Dict[str, Any]):
             "error_file": f"{task_folder}/failed.txt" if error else None
         }
         download_result = run_download_script("metadata/download_rcsb.py", **args)
-        zip_path = zip_task_results(task_folder, task_id, "rcsb_metadata")
+        zip_path = zip_task_results(task_folder, "rcsb_metadata")
         return download_result, gr.update(visible=True, value=zip_path)
 
     def handle_uniprot_download(method: str, id_val: str, file_val, user_hash: str, merge: bool, error: bool) -> tuple:
         """Handles UniProt sequence download."""
-        task_id = generate_task_id(user_hash)
-        task_folder = create_task_folder(task_id, "uniprot_sequence")
+        task_folder = get_save_path()
         
         file_path = None
         if method == "From File" and file_val:
@@ -266,13 +264,12 @@ def create_download_tool_tab(constant: Dict[str, Any]):
             "error_file": f"{task_folder}/failed.txt" if error else None
         }
         download_result = run_download_script("sequence/download_uniprot_seq.py", **args)
-        zip_path = zip_task_results(task_folder, task_id, "uniprot_sequence")
+        zip_path = zip_task_results(task_folder, "uniprot_sequence")
         return download_result, gr.update(visible=True, value=zip_path)
 
     def handle_ncbi_download(method: str, id_val: str, file_val, user_hash: str, merge: bool, error: bool) -> tuple:
         """Handles NCBI sequence download."""
-        task_id = generate_task_id(user_hash)
-        task_folder = create_task_folder(task_id, "ncbi_sequence")
+        task_folder = get_save_path()
 
         file_path = None
         if method == "From File" and file_val:
@@ -288,13 +285,12 @@ def create_download_tool_tab(constant: Dict[str, Any]):
             "error_file": f"{task_folder}/failed.txt" if error else None
         }
         download_result = run_download_script("sequence/download_ncbi_seq.py", **args)
-        zip_path = zip_task_results(task_folder, task_id, "ncbi_sequence")
+        zip_path = zip_task_results(task_folder, "ncbi_sequence")
         return download_result, gr.update(visible=True, value=zip_path)
 
     def handle_struct_download(method: str, id_val: str, file_upload, user_hash: str, type_val: str, error: bool) -> tuple:
         """Handles RCSB structure download and updates the UI."""
-        task_id = generate_task_id(user_hash)
-        task_folder = create_task_folder(task_id, "rcsb_structure")
+        task_folder = get_save_path()
         
         file_path = None
         if method == "From File" and file_upload:
@@ -312,7 +308,7 @@ def create_download_tool_tab(constant: Dict[str, Any]):
             error_file=f"{task_folder}/failed.txt" if error else None
         )
         viz_status = "Download finished."
-        zip_path = zip_task_results(task_folder, task_id, "rcsb_structure")
+        zip_path = zip_task_results(task_folder, "rcsb_structure")
         
         # Update viewer for single ID downloads
         viewer_update = gr.update()
@@ -332,8 +328,7 @@ def create_download_tool_tab(constant: Dict[str, Any]):
 
     def handle_af_download(method: str, id_val: str, file_upload, user_hash: str, error: bool) -> tuple:
         """Handles AlphaFold structure download and updates the UI."""
-        task_id = generate_task_id(user_hash)
-        task_folder = create_task_folder(task_id, "AlphaFold_structure")
+        task_folder = get_save_path()
         
         file_path = None
         if method == "From File" and file_upload:
@@ -348,7 +343,7 @@ def create_download_tool_tab(constant: Dict[str, Any]):
             out_dir=task_folder, error_file=f"{task_folder}/failed.txt" if error else None
         )
         viz_status = "Download finished."
-        zip_path = zip_task_results(task_folder, task_id, "AlphaFold_structure")
+        zip_path = zip_task_results(task_folder, "AlphaFold_structure")
         
         # Update viewer for single ID downloads
         viewer_update = gr.update()
