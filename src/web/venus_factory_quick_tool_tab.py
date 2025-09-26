@@ -533,7 +533,6 @@ def save_selected_sequence_fasta(original_fasta_content, selected_sequence, outp
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(f">{selected_sequence}\n")
             f.write(sequences[selected_sequence])
-        print(f"Successfully saved sequence '{selected_sequence}' to {output_path}")
     except Exception as e:
         print(f"Error saving file: {str(e)}")
 
@@ -712,7 +711,7 @@ def handle_pdb_chain_change(selected_chain, chains_dict, original_file_path):
         with open(new_pdb_path, 'w') as f:
             f.write('\n'.join(new_pdb_lines))
         
-        return chains_dict[selected_chain], new_pdb_path
+        return chains_dict[selected_chain], gr.update(value=new_pdb_path)
         
     except Exception as e:
         return f"Error processing chain selection: {str(e)}", ""
@@ -2455,12 +2454,12 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         easy_zshot_sequence_selector.change(
             fn=handle_sequence_change_unified,
             inputs=[easy_zshot_sequence_selector, easy_zshot_sequence_state, easy_zshot_original_file_path_state, easy_zshot_original_paste_content_state],
-            outputs=[easy_zshot_protein_display, easy_zshot_current_file_state]
+            outputs=[easy_zshot_protein_display, easy_zshot_file_upload]
         )
 
         easy_zshot_predict_btn.click(
             fn=handle_mutation_prediction_base,
-            inputs=[zero_shot_function_dd, easy_zshot_current_file_state, enable_ai_zshot, ai_model_dd_zshot, api_key_in_zshot, zero_shot_model_dd],
+            inputs=[zero_shot_function_dd, easy_zshot_file_upload, enable_ai_zshot, ai_model_dd_zshot, api_key_in_zshot, zero_shot_model_dd],
             outputs=[zero_shot_status_box, zero_shot_plot_out, zero_shot_df_out, zero_shot_download_btn, zero_shot_download_path_state, zero_shot_view_controls, zero_shot_full_data_state, zero_shot_ai_expert_html],
             show_progress=True
         )
@@ -2490,12 +2489,12 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         base_function_selector.change(
             fn=handle_sequence_change_unified,
             inputs=[base_function_selector, base_function_sequence_state, base_function_original_file_path_state, base_function_original_paste_content_state],
-            outputs=[base_function_protein_display, base_function_current_file_state]
+            outputs=[base_function_protein_display, base_function_fasta_upload]
         )
 
         easy_func_predict_btn.click(
             fn=handle_protein_function_prediction,
-            inputs=[easy_func_task_dd, base_function_current_file_state, enable_ai_func, ai_model_dd_func, api_key_in_func],
+            inputs=[easy_func_task_dd, base_function_fasta_upload, enable_ai_func, ai_model_dd_func, api_key_in_func],
             outputs=[function_status_textbox, function_results_df, function_download_btn, function_ai_expert_html, gr.State()], 
             show_progress=True
         )
@@ -2522,11 +2521,11 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         base_residue_function_selector.change(
             fn=handle_sequence_change_unified,
             inputs=[base_residue_function_selector, base_residue_function_sequence_state, base_residue_function_original_file_path_state, base_residue_function_original_paste_content_state],
-            outputs=[base_residue_function_protein_display, base_residue_function_current_file_state]
+            outputs=[base_residue_function_protein_display, base_residue_function_fasta_upload]
         )
         base_residue_function_predict_btn.click(
             fn=handle_protein_residue_function_prediction,
-            inputs=[base_residue_function_task_dd, base_residue_function_current_file_state, enable_ai_residue_function, ai_model_dd_residue_function, api_key_in_residue_function],
+            inputs=[base_residue_function_task_dd, base_residue_function_fasta_upload, enable_ai_residue_function, ai_model_dd_residue_function, api_key_in_residue_function],
             outputs=[base_residue_function_status_textbox, base_residue_function_results_df, base_residue_function_plot_out,base_residue_function_download_btn, base_residue_function_ai_expert_html, gr.State()],
             show_progress = True
         )
@@ -2554,12 +2553,12 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         protein_properties_sequence_selector.change(
             fn=handle_sequence_change_unified,
             inputs=[protein_properties_sequence_selector, protein_properties_sequence_state, protein_properties_original_file_path_state, protein_properties_original_paste_content_state],
-            outputs=[protein_properties_protein_display, protein_properties_current_file_state]
+            outputs=[protein_properties_protein_display, protein_properties_file_upload]
         )
 
         protein_properties_predict_btn.click(
             fn=handle_protein_properties_generation,
-            inputs=[protein_properties_task_dd, protein_properties_current_file_state],
+            inputs=[protein_properties_task_dd, protein_properties_file_upload],
             outputs=[protein_properties_status_box, protein_properties_result_out, protein_properties_download_btn, protein_properties_path_state, gr.State()],
             show_progress=True
         )
