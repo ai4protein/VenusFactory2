@@ -1,6 +1,8 @@
 
 import gradio as gr
 
+INDEX_SCALE = 0.9
+
 def create_index_tab(constant):
     # Read gjf file content
     try:
