@@ -11,7 +11,7 @@ def create_index_tab(constant):
     except Exception:
         gjf_content = "(Show1.gjf not found)"
 
-    index_inner_html = f"""
+    return f"""
         <style>
         .index-container {{
             transform: scale({INDEX_SCALE});
@@ -544,13 +544,13 @@ def create_index_tab(constant):
                 </div>
             </div>
             
+            """
           
 
-        </div>
-    """
-
     
-    return index_inner_html
+
+
+
     
     
    
