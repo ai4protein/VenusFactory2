@@ -267,7 +267,7 @@ def create_index_tab(constant):
                 </style>
                 <div class="main-content">
                 
-            <h2 id="welcome">Welcome to VenusFactory!</h2>
+            <a id="welcome"></a>
             
             <!-- Top section: VenusFactory introduction -->
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5em;">
@@ -302,7 +302,7 @@ def create_index_tab(constant):
             <div style="text-align: left; max-width: 1400px; margin: 0 auto;">
                 <h1 style="font-size:2.2em; font-weight:900; color:var(--text-primary); margin-bottom: 0.7em;">
 
-                <h2 id="how-to-use">How to use VenusFactory</h2>
+                <a id="how-to-use"></a>
                 
                     How to Use VenusFactory
                 </h1>
@@ -347,7 +347,7 @@ def create_index_tab(constant):
                 <!-- Survey and Partner Institutions Display Area -->
                 <div style="background: var(--bg-stats); border-radius: 16px; padding: 40px; margin: 40px auto; max-width: 1400px; box-shadow: 0 4px 20px var(--shadow-color);">
 
-                    <h2 id="research-partners">Research Questionnaires & Partner Institutions</h2>
+                    <a id="research-partners"></a>
                     
                     <!-- Upper Section: Research Questionnaires -->
                     <div style="margin-bottom: 40px;">
@@ -404,7 +404,7 @@ def create_index_tab(constant):
                     </div>
                 </div>
 
-                <h2 id="cooperation-platform">Cooperation platform & Developer Information</h2>
+                <a id="cooperation-platform"></a>
                 
                 <!-- Developer Information Area -->
                 <div style="background: var(--bg-card); border-radius: 12px; padding: 30px; margin: 30px auto; max-width: 1400px;">
@@ -424,7 +424,7 @@ def create_index_tab(constant):
                     </div>
                 </div>
 
-                <h2 id="citation">Citation</h2>
+                <a id="citation"></a>
 
                 <!-- Citation Area -->
                 <div style="background: var(--bg-card); border-radius: 12px; padding: 30px; margin: 30px auto; max-width: 1400px;">
@@ -454,7 +454,7 @@ def create_index_tab(constant):
 
             <hr style="margin: 40px 0; border: 1px solid var(--border-color);">
 
-            <h2 id="additional-info">Additional Information</h2>
+            <a id="additional-info"></a>
             
             <!-- Additional Information Section -->
             <div style="background: var(--bg-card); border-radius: 14px; box-shadow: 0 2px 12px var(--card-shadow); padding: 32px 28px 24px 28px; max-width: 1400px; margin: 40px auto 0 auto;">
@@ -586,5 +586,5 @@ def create_index_tab(constant):
     index_inner_html = nav_html + index_inner_html
     return index_inner_html
     
-    return index_inner_html
+    
    
