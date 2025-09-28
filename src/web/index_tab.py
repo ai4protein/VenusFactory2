@@ -230,8 +230,9 @@ def create_index_tab(constant):
             
             <!-- Top section: VenusFactory introduction -->
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5em;">
-                <img id="venusfactory-logo" src="..." alt="Venus Head" style="max-width: 100%; max-height: 150px; margin-left: 10px; height: auto;" />
-                <img id="venus-logo" src="..." alt="Venus Logo" style="max-width: 100%; max-height: 100px; margin-right: 10px; margin-top: 20px; height: auto;" />
+                <img id="venusfactory-logo" src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venusfactory_logo.png" alt="Venus Head" style="height: 150px; margin-left: 10px;" />
+                <img id="venus-logo" src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png" alt="Venus Logo" style="height: 100px; margin-right: 10px; margin-top: 20px;" />
+            </div>
             <style>
                 @media (prefers-color-scheme: dark) {{
                     #venusfactory-logo {{
@@ -242,7 +243,7 @@ def create_index_tab(constant):
                     }}
                 }}
             </style>
-            <div style="text-align: center; margin-top: 20px; margin-bottom: 40px;">
+            <div style="text-align: center; margin-top: -80px; margin-bottom: 40px;">
                 <h1 style="font-size:3.5em; font-weight:900;">Welcome to <span style='font-weight:900;'>VenusFactory</span>!</h1>
             </div>
             <div style="max-width: 1400px; margin: 0 auto; font-size: 1.2em; text-align: left;">
