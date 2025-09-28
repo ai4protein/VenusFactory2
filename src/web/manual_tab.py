@@ -174,22 +174,22 @@ def create_manual_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         language = gr.Dropdown(choices=['English', 'Chinese'], value='English', label='Language', interactive=True)
     
     # In manual_tab.py's create_manual_tab, find the Index Tab generation section:
-with gr.Tab("Index"):
-    index_raw = create_index_tab(constant)
-    if not isinstance(index_raw, str):
-       try:
-          index_raw = getattr(index_raw, "value", str(index_raw))
-       except Exception:
-          index_raw = str(index_raw)
-    # Call the same TOC generation logic as other Tabs (generate_toc_from_html needs to align structurally with generate_toc_and_content)
-    index_toc, index_html = generate_toc_from_html(index_raw)
-    # Wrap with .manual-container to unify structure with other Tabs
-    index_md = gr.HTML(f"""
-              <div class="manual-container">
-                     {index_toc}
-              <div class="manual-content">{index_html}</div>
-         </div>
-    """)
+    with gr.Tab("Index"):
+       index_raw = create_index_tab(constant)
+       if not isinstance(index_raw, str):
+          try:
+             index_raw = getattr(index_raw, "value", str(index_raw))
+          except Exception:
+             index_raw = str(index_raw)
+       # Call the same TOC generation logic as other Tabs (generate_toc_from_html needs to align structurally with generate_toc_and_content)
+       index_toc, index_html = generate_toc_from_html(index_raw)
+       # Wrap with .manual-container to unify structure with other Tabs
+       index_md = gr.HTML(f"""
+                 <div class="manual-container">
+                        {index_toc}
+                 <div class="manual-content">{index_html}</div>
+            </div>
+       """)
 
     with gr.Tab("Training"):
         training_content = load_manual_training(language.value)
