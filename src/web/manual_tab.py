@@ -174,22 +174,22 @@ def create_manual_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         language = gr.Dropdown(choices=['English', 'Chinese'], value='English', label='Language', interactive=True)
     
     with gr.Tab("Index"):
-    index_raw = create_index_tab(constant)
+        index_raw = create_index_tab(constant)
 
-    if not isinstance(index_raw, str):
-        try:
+        if not isinstance(index_raw, str):
+         try:
             index_raw = getattr(index_raw, "value", str(index_raw))
-        except Exception:
+         except Exception:
             index_raw = str(index_raw)
 
-    index_toc, index_html = generate_toc_from_html(index_raw)
+         index_toc, index_html = generate_toc_from_html(index_raw)
 
-    index_md = gr.HTML(f"""
-        <div class="manual-container">
-            {index_toc}
-            <div class="manual-content">{index_html}</div>
-        </div>
-    """)
+         index_md = gr.HTML(f"""
+                  <div class="manual-container">
+                         {index_toc}
+                  <div class="manual-content">{index_html}</div>
+             </div>
+         """)
 
     with gr.Tab("Training"):
         training_content = load_manual_training(language.value)
