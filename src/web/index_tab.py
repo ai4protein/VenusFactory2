@@ -549,8 +549,7 @@ def create_index_tab(constant):
         </div>
     """
 
-    nav_html = create_index_navbar(top=20, left=20, width=260)
-    index_inner_html = nav_html + index_inner_html
+    
     return index_inner_html
     
     
