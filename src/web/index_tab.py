@@ -3,39 +3,6 @@ import gradio as gr
 
 INDEX_SCALE = 0.8
 
-def create_index_navbar(top: int = 20, left: int = 20, width: int = 260) -> str:
-    # conservative version: reuse .manual-nav/.nav-h2 classes, only add positioning
-    return f"""
-    <style>
-      .index-fixed-nav {{
-          position: fixed;
-          top: {top}px;
-          left: {left}px;
-          z-index: 1100;
-          max-width: {width}px;
-      }}
-      /* keep manual-nav styles intact; only reset margins so layout matches other tabs */
-      .index-fixed-nav .manual-nav {{ margin: 0; }}
-      .index-fixed-nav .manual-nav ul {{ padding-left: 0; margin: 0; list-style: none; }}
-      .index-fixed-nav .manual-nav li {{ margin: 6px 0; }}
-      /* no hover/bg overrides, no mobile hide — leaves original styles untouched */
-    </style>
-
-    <div class="index-fixed-nav">
-      <div class="manual-nav">
-        <ul>
-          <li><a href="#welcome" class="nav-h2">1. Welcome to VenusFactory!</a></li>
-          <li><a href="#how-to-use" class="nav-h2">2. How to use VenusFactory</a></li>
-          <li><a href="#research-partners" class="nav-h2">3. Research Questionnaires & Partner Institutions</a></li>
-          <li><a href="#cooperation-platform" class="nav-h2">4. Cooperation platform & Developer Information</a></li>
-          <li><a href="#citation" class="nav-h2">5. Citation</a></li>
-          <li><a href="#additional-info" class="nav-h2">6. Additional Information</a></li>
-        </ul>
-      </div>
-    </div>
-    """
-
-
 def create_index_tab(constant):
     # Read gjf file content
     try:
