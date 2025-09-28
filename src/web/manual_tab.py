@@ -5,6 +5,51 @@ import markdown
 from typing import Dict, Any
 from .index_tab import create_index_tab
 
+def generate_toc_from_html(html_content: str):
+    """
+    Extract h1/h2/h3 (or existing anchor <a id="...">) from an HTML string and
+    produce (toc_html, processed_html) compatible with .manual-nav / .manual-content layout.
+    """
+    # find headings with id: <h1 id="x">, <h2 id="x">, <h3 id="x">
+    headers_with_id = re.findall(r'<h([1-3])[^>]*id=["\']([^"\']+)["\'][^>]*>(.*?)</h\1>', html_content, flags=re.I | re.S)
+    # find anchors alone: <a id="x"></a> followed by optional heading text
+    anchors = re.findall(r'<a\s+id=["\']([^"\']+)["\']\s*>\s*</a>\s*(?:<h[1-3][^>]*>(.*?)</h[1-3]>)?', html_content, flags=re.I | re.S)
+
+    items = []
+    for level, idv, inner in headers_with_id:
+        text = re.sub(r'<[^>]+>', '', inner).strip()
+        items.append((int(level), idv, text))
+
+    existing_ids = {it[1] for it in items}
+    for idv, maybe_text in anchors:
+        if idv in existing_ids:
+            continue
+        text = (maybe_text or idv).strip()
+        items.append((2, idv, text))  # treat anchor as level 2
+
+    if not items:
+        simple_heads = re.findall(r'<h([1-3])[^>]*>(.*?)</h\1>', html_content, flags=re.I | re.S)
+        for i, (level, inner) in enumerate(simple_heads):
+            text = re.sub(r'<[^>]+>', '', inner).strip()
+            gen_id = f"generated-header-{i}"
+            items.append((int(level), gen_id, text))
+            # insert anchor after <hN>
+            pattern = re.compile(rf'(<h{level}[^>]*>)(\s*{re.escape(inner)}\s*)(</h{level}>)', flags=re.I | re.S)
+            html_content = pattern.sub(rf"\1\2\3<a id='{gen_id}'></a>", html_content, count=1)
+
+    toc_html = '<div class="manual-nav"><ul>'
+    for level, idv, text in items:
+        css_class = ""
+        if level == 2:
+            css_class = "nav-h2"
+        elif level == 3:
+            css_class = "nav-h3"
+        safe_text = text or idv
+        toc_html += f"<li><a href='#{idv}' class='{css_class}'>{safe_text}</a></li>"
+    toc_html += "</ul></div>"
+
+    return toc_html, html_content
+
 def create_manual_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     # Add CSS styles from external file
     css_path = os.path.join(os.path.dirname(__file__), "assets", "css", "manual_ui.css")
@@ -128,9 +173,23 @@ def create_manual_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     with gr.Row():
         language = gr.Dropdown(choices=['English', 'Chinese'], value='English', label='Language', interactive=True)
     
+    with gr.Tab("Index"):
+    index_raw = create_index_tab(constant)
 
-    with gr.Tab("Index"): 
-        gr.HTML(create_index_tab(constant))
+    if not isinstance(index_raw, str):
+        try:
+            index_raw = getattr(index_raw, "value", str(index_raw))
+        except Exception:
+            index_raw = str(index_raw)
+
+    index_toc, index_html = generate_toc_from_html(index_raw)
+
+    index_md = gr.HTML(f"""
+        <div class="manual-container">
+            {index_toc}
+            <div class="manual-content">{index_html}</div>
+        </div>
+    """)
 
     with gr.Tab("Training"):
         training_content = load_manual_training(language.value)
