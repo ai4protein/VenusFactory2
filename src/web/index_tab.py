@@ -20,9 +20,9 @@ def create_index_tab(constant):
                     top: 0; 
                 }}
 
-                #venusfactory-logo, #venus-logo {
+                #venusfactory-logo, #venus-logo {{
                     max-width: none !important;
-                }
+                }}
                 </style>
 
                 
