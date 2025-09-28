@@ -13,13 +13,14 @@ def create_index_tab(constant):
 
     return f"""
                 <style>
-                .index-container {{
-                    margin-top: 0 !important; 
-                    padding-top: 0 !important; 
-                    position: relative; 
-                    top: 0; 
+               .index-container {{
+                    margin: 0 auto !important;
+                    padding: 0 !important;
+                    position: relative;
+                    top: 0;
+                    width: 100%;
+                    max-width: 1400px;
                 }}
-
                 #venusfactory-logo, #venus-logo {{
                     max-width: none !important;
                 }}
@@ -86,7 +87,10 @@ def create_index_tab(constant):
                     transition: background-color 0.3s ease, color 0.3s ease;
                 }}
                 .main-content {{
-                    margin-top: 80px;
+                    margin-top: 0;
+                    max-width: 1400px;
+                    margin-left: auto;
+                    margin-right: auto;
                     max-width: 1400px;
                     margin-left: auto;
                     margin-right: auto;
@@ -245,8 +249,15 @@ def create_index_tab(constant):
             
             <!-- Top section: VenusFactory introduction -->
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5em;">
-                <img id="venusfactory-logo" src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venusfactory_logo.png" alt="Venus Head" style="width: 150px; height: auto; margin-left: 10px;" />
-                <img id="venus-logo" src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png" alt="Venus Logo" style="width: 100px; height: auto; margin-right: 10px; margin-top: 20px;" />
+               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1em; gap: 20px;">
+               <img id="venusfactory-logo" src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venusfactory_logo.png"
+                     alt="Venus Head"
+                    style="width: 150px; height: auto; max-width: 30%; object-fit: contain;" />
+               <img id="venus-logo" src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png"
+                    alt="Venus Logo"
+                    style="width: 100px; height: auto; max-width: 20%; object-fit: contain;" />
+              
+
             </div>
             <style>
                 @media (prefers-color-scheme: dark) {{
