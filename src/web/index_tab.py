@@ -12,15 +12,7 @@ def create_index_tab(constant):
         gjf_content = "(Show1.gjf not found)"
 
     return f"""
-        <style>
-        .index-container {{
-            transform: scale({INDEX_SCALE});
-            transform-origin: top right;
-        }}
-        </style>
-
-        <div class="index-container">
-        
+    
                 <script>
                 // Track page visits asynchronously without blocking page load
                 (function() {{
