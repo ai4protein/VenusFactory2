@@ -12,7 +12,13 @@ def create_index_tab(constant):
         gjf_content = "(Show1.gjf not found)"
 
     return f"""
-    
+                <style>
+                .index-container {{
+                  margin-top: 0; 
+                }}
+                </style>
+
+        <div class="index-container">
                 <script>
                 // Track page visits asynchronously without blocking page load
                 (function() {{
@@ -230,8 +236,8 @@ def create_index_tab(constant):
             
             <!-- Top section: VenusFactory introduction -->
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5em;">
-                <img id="venusfactory-logo" src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venusfactory_logo.png" alt="Venus Head" style="height: 150px; margin-left: 10px;" />
-                <img id="venus-logo" src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png" alt="Venus Logo" style="height: 100px; margin-right: 10px; margin-top: 20px;" />
+                <img id="venusfactory-logo" src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venusfactory_logo.png" alt="Venus Head" style="height: 25px; margin-left: 3px;" />
+                <img id="venus-logo" src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png" alt="Venus Logo" style="height: 16px; margin-right: 3px; margin-top: 3px;" />
             </div>
             <style>
                 @media (prefers-color-scheme: dark) {{
