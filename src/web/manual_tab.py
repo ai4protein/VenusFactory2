@@ -454,14 +454,14 @@ def update_manual(language):
     """
     
     return  venusscope_output,      # 1
-            venusagent_output,      # 2
-            training_output,        # 3
-            prediction_output,      # 4
-            evaluation_output,      # 5
-            quicktools_output,      # 6
-            advancedtools_output,   # 7
-            download_output,        # 8
-            faq_output              # 9
+    venusagent_output,      # 2
+    training_output,        # 3
+    prediction_output,      # 4
+    evaluation_output,      # 5
+    quicktools_output,      # 6
+    advancedtools_output,   # 7
+    download_output,        # 8
+    faq_output              # 9
 
 def load_manual_training(language):
     if language == 'Chinese':
