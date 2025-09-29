@@ -12,8 +12,10 @@ def generate_toc_from_html(html_content: str):
     """
     # find headings with id: <h1 id="x">, <h2 id="x">, <h3 id="x">
     headers_with_id = re.findall(r'<h([1-3])[^>]*id=["\']([^"\']+)["\'][^>]*>(.*?)</h\1>', html_content, flags=re.I | re.S)
+    
     # find anchors alone: <a id="x"></a> followed by optional heading text
-    anchors = re.findall(r'<a\s+id=["\']([^"\']+)["\']\s*>\s*</a>\s*(?:<h[1-3][^>]*>(.*?)</h[1-3]>)?', html_content, flags=re.I | re.S)
+  
+    anchors = re.findall(r'<a[^>]+id=["\']([^"\']+)["\'][^>]*>\s*</a>\s*(?:<[^>]*>)?\s*(.*?)(?=<a\s+id=|$)', html_content, flags=re.I | re.S)
 
     items = []
     for level, idv, inner in headers_with_id:
@@ -21,10 +23,26 @@ def generate_toc_from_html(html_content: str):
         items.append((int(level), idv, text))
 
     existing_ids = {it[1] for it in items}
+    
+    
+    anchor_title_map = {
+        'welcome': 'Welcome',
+        'how-to-use': 'How to Use VenusFactory',
+        'research-partners': 'Research Partners',
+        'cooperation-platform': 'Cooperation Platform',
+        'citation': 'Citation',
+        'additional-info': 'Additional Information'
+    }
+    
     for idv, maybe_text in anchors:
         if idv in existing_ids:
             continue
-        text = (maybe_text or idv).strip()
+
+        text = anchor_title_map.get(idv, maybe_text.strip() if maybe_text else idv)
+
+        text = re.sub(r'<[^>]+>', '', text).strip()
+        if not text:
+            text = idv.replace('-', ' ').title()
         items.append((2, idv, text))  # treat anchor as level 2
 
     if not items:
@@ -37,18 +55,18 @@ def generate_toc_from_html(html_content: str):
             pattern = re.compile(rf'(<h{level}[^>]*>)(\s*{re.escape(inner)}\s*)(</h{level}>)', flags=re.I | re.S)
             html_content = pattern.sub(rf"\1\2\3<a id='{gen_id}'></a>", html_content, count=1)
 
-    toc_html = '<div class="manual-nav"><ul>'
-    for level, idv, text in items:
-        css_class = ""
-        if level == 2:
-            css_class = "nav-h2"
-        elif level == 3:
-            css_class = "nav-h3"
-        safe_text = text or idv
-        toc_html += f"<li><a href='#{idv}' class='{css_class}'>{safe_text}</a></li>"
-    toc_html += "</ul></div>"
+        toc_html = '<div class="manual-nav"><ul>'
+        for level, idv, text in items:
+            css_class = ""
+            if level == 2:
+                css_class = "nav-h2"
+            elif level == 3:
+                css_class = "nav-h3"
+            safe_text = text or idv
+            toc_html += f"<li><a href='#{idv}' class='{css_class}'>{safe_text}</a></li>"
+        toc_html += "</ul></div>"
 
-    return toc_html, html_content
+        return toc_html, html_content
 
 def create_manual_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     # Add CSS styles from external file
@@ -175,21 +193,14 @@ def create_manual_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     
     # In manual_tab.py's create_manual_tab, find the Index Tab generation section:
     with gr.Tab("Index"):
-       index_raw = create_index_tab(constant)
-       if not isinstance(index_raw, str):
-          try:
-             index_raw = getattr(index_raw, "value", str(index_raw))
-          except Exception:
-             index_raw = str(index_raw)
-       # Call the same TOC generation logic as other Tabs (generate_toc_from_html needs to align structurally with generate_toc_and_content)
-       index_toc, index_html = generate_toc_from_html(index_raw)
-       # Wrap with .manual-container to unify structure with other Tabs
-       index_md = gr.HTML(f"""
-                 <div class="manual-container">
-                        {index_toc}
-                 <div class="manual-content">{index_html}</div>
-            </div>
-       """)
+         index_raw = create_index_tab(constant)
+         if not isinstance(index_raw, str):
+              try:
+            index_raw = getattr(index_raw, "value", str(index_raw))
+         except Exception:
+            index_raw = str(index_raw)
+
+         index_md = gr.HTML(index_raw)
 
     with gr.Tab("Training"):
         training_content = load_manual_training(language.value)
