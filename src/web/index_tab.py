@@ -277,8 +277,8 @@ def create_index_tab(constant):
 
                    <div class="manual-content">
 
-                                            <div style="text-align:center; margin: 40px auto 40px auto; max-width: 100%;">
-                            <img src="https://your-custom-image.com/welcome_banner.png" 
+                        <div style="text-align:center; margin: 40px auto 40px auto; max-width: 100%;">
+                            <img src="https://raw.githubusercontent.com/Patiskey/VenusFactory/main/img/Index.png" ... /> 
                                  alt="Welcome to VenusFactory Banner" 
                                  style="max-width: 100%; height: auto; border-radius: 8px;" />
                         </div>
