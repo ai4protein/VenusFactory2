@@ -229,7 +229,7 @@ def create_manual_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     language.change(
         fn=update_manual,
         inputs=[language],
-        outputs=[venusscope_md，venusagent_md,training_md, prediction_md, evaluation_md, quicktools_md,  advancedtools_md，download_md, faq_md, 
+        outputs=[venusscope_md，venusagent_md,training_md, prediction_md, evaluation_md, quicktools_md,  advancedtools_md，download_md, faq_md
              ]
      )
 
