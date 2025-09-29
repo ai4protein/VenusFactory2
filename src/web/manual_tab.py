@@ -202,9 +202,12 @@ def update_manual(language):
         download_md: download manual
         faq_md: faq manual
     """
+    
     training_content = load_manual_training(language)
     prediction_content = load_manual_prediction(language)
     evaluation_content = load_manual_evaluation(language)
+    quicktools_content = load_manual_quicktools(language)
+    advancedtools_content = load_manual_advancedtools(language)
     download_content = load_manual_download(language)
     faq_content = load_manual_faq(language)
     
