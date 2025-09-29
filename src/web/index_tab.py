@@ -272,9 +272,10 @@ def create_index_tab(constant):
                         <div class="manual-content">
 
                     <!-- Top section: VenusFactory introduction -->
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 0 20px;">
-                            <img id="venusfactory-logo" src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venusfactory_logo.png" alt="Venus Head" style="height: 120px; object-fit: contain;" />
-                            <img id="venus-logo" src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png" alt="Venus Logo" style="height: 80px; object-fit: contain;" />
+                    <div id="welcome">
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5em;">
+                        <img id="venusfactory-logo" src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venusfactory_logo.png" alt="Venus Head" style="height: 150px; margin-left: 10px;" />
+                        <img id="venus-logo" src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png" alt="Venus Logo" style="height: 100px; margin-right: 10px; margin-top: 20px;" />
                     </div>
                     <style>
                         @media (prefers-color-scheme: dark) {{
@@ -286,8 +287,8 @@ def create_index_tab(constant):
                             }}
                         }}
                     </style>
-                    <div style="text-align: center; margin-bottom: 30px;">
-                        <h1 style="font-size:2.8em; font-weight:900; margin: 0;">Welcome to <span style='font-weight:900;'>VenusFactory</span>!</h1>
+                    <div style="text-align: center; margin-top: -80px; margin-bottom: 40px;">
+                        <h1 style="font-size:3.5em; font-weight:900;">Welcome to <span style='font-weight:900;'>VenusFactory</span>!</h1>
                     </div>
                     <div style="max-width: 1400px; margin: 0 auto; font-size: 1.2em; text-align: left;">
                         <p style="font-size:1.2em; margin-bottom: 0.7em;"><b>VenusFactory</b> is a unified open-source platform for protein engineering, designed to simplify data acquisition, model fine-tuning, and functional analysis for both biologists and AI researchers.<br>
