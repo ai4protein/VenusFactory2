@@ -253,7 +253,7 @@ def create_index_tab(constant):
                 </style>
 
                 <div class="manual-container">
-                         <!-- 左侧导航 -->
+                         
                         <div class="manual-nav">
                             <ul>
                                 <li><a href="#welcome" class="nav-h2">Welcome to VenusFactory</a></li>
@@ -268,13 +268,13 @@ def create_index_tab(constant):
                             </ul>
                         </div>
                         
-                        <!-- 右侧内容 -->
+                       
                         <div class="manual-content">
 
                     <!-- Top section: VenusFactory introduction -->
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 0 20px;">
-                            <img id="venusfactory-logo" src="..." alt="Venus Head" style="height: 120px; object-fit: contain;" />
-                            <img id="venus-logo" src="..." alt="Venus Logo" style="height: 80px; object-fit: contain;" />
+                            <img id="venusfactory-logo" src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venusfactory_logo.png" alt="Venus Head" style="height: 120px; object-fit: contain;" />
+                            <img id="venus-logo" src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png" alt="Venus Logo" style="height: 80px; object-fit: contain;" />
                     </div>
                     <style>
                         @media (prefers-color-scheme: dark) {{
