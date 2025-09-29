@@ -195,10 +195,10 @@ def create_manual_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     with gr.Tab("Index"):
          index_raw = create_index_tab(constant)
          if not isinstance(index_raw, str):
-              try:
-            index_raw = getattr(index_raw, "value", str(index_raw))
-         except Exception:
-            index_raw = str(index_raw)
+            try:
+               index_raw = getattr(index_raw, "value", str(index_raw))
+            except Exception:
+               index_raw = str(index_raw)
 
          index_md = gr.HTML(index_raw)
 
