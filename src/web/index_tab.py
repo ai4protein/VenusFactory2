@@ -279,7 +279,7 @@ def create_index_tab(constant):
                    <div class="manual-content">
 
                         <div style="text-align:center; margin: 0px auto 40px auto; max-width: 100%;">
-                            <img src="https://raw.githubusercontent.com/Patiskey/VenusFactory/main/img/Index.png" ... /> 
+                            <img src="https://raw.githubusercontent.com/ai4protein/VenusFactory/main/img/Index.png" ... /> 
                                  
                         </div>
                         
