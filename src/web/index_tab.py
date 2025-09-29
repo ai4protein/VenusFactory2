@@ -1,8 +1,6 @@
 
 import gradio as gr
 
-INDEX_SCALE = 0.8
-
 def create_index_tab(constant):
     # Read gjf file content
     try:
@@ -10,24 +8,8 @@ def create_index_tab(constant):
             gjf_content = f.read()
     except Exception:
         gjf_content = "(Show1.gjf not found)"
-
-    return f"""
-                <style>
-                .index-container {{
-                    margin-top: 0 !important; 
-                    padding-top: 0 !important; 
-                    position: relative; 
-                    top: 0; 
-                }}
-
-                #venusfactory-logo, #venus-logo {{
-                    max-width: none !important;
-                }}
-                </style>
-
-                
-
-        <div class="index-container">
+    
+    return    f'''
                 <script>
                 // Track page visits asynchronously without blocking page load
                 (function() {{
@@ -240,13 +222,10 @@ def create_index_tab(constant):
                 }}
                 </style>
                 <div class="main-content">
-                
-            <a id="welcome"></a>
-            
             <!-- Top section: VenusFactory introduction -->
             <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5em;">
-                <img id="venusfactory-logo" src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venusfactory_logo.png" alt="Venus Head" style="width: 150px; height: auto; margin-left: 10px;" />
-                <img id="venus-logo" src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png" alt="Venus Logo" style="width: 100px; height: auto; margin-right: 10px; margin-top: 20px;" />
+                <img id="venusfactory-logo" src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venusfactory_logo.png" alt="Venus Head" style="height: 150px; margin-left: 10px;" />
+                <img id="venus-logo" src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png" alt="Venus Logo" style="height: 100px; margin-right: 10px; margin-top: 20px;" />
             </div>
             <style>
                 @media (prefers-color-scheme: dark) {{
@@ -258,8 +237,8 @@ def create_index_tab(constant):
                     }}
                 }}
             </style>
-            <div style="text-align: center; margin-top: 20px; margin-bottom: 40px;">
-               <h1 style="font-size:3.5em; font-weight:900;">Welcome to <span style='font-weight:900;'>VenusFactory</span>!</h1>
+            <div style="text-align: center; margin-top: -80px; margin-bottom: 40px;">
+                <h1 style="font-size:3.5em; font-weight:900;">Welcome to <span style='font-weight:900;'>VenusFactory</span>!</h1>
             </div>
             <div style="max-width: 1400px; margin: 0 auto; font-size: 1.2em; text-align: left;">
                 <p style="font-size:1.2em; margin-bottom: 0.7em;"><b>VenusFactory</b> is a unified open-source platform for protein engineering, designed to simplify data acquisition, model fine-tuning, and functional analysis for both biologists and AI researchers.<br>
@@ -275,9 +254,6 @@ def create_index_tab(constant):
             <!-- Middle section: How to Use VenusFactory -->
             <div style="text-align: left; max-width: 1400px; margin: 0 auto;">
                 <h1 style="font-size:2.2em; font-weight:900; color:var(--text-primary); margin-bottom: 0.7em;">
-
-                <a id="how-to-use"></a>
-                
                     How to Use VenusFactory
                 </h1>
                 <div style="font-size:1.2em;">
@@ -320,8 +296,6 @@ def create_index_tab(constant):
 
                 <!-- Survey and Partner Institutions Display Area -->
                 <div style="background: var(--bg-stats); border-radius: 16px; padding: 40px; margin: 40px auto; max-width: 1400px; box-shadow: 0 4px 20px var(--shadow-color);">
-
-                    <a id="research-partners"></a>
                     
                     <!-- Upper Section: Research Questionnaires -->
                     <div style="margin-bottom: 40px;">
@@ -377,8 +351,6 @@ def create_index_tab(constant):
                         </div>
                     </div>
                 </div>
-
-                <a id="cooperation-platform"></a>
                 
                 <!-- Developer Information Area -->
                 <div style="background: var(--bg-card); border-radius: 12px; padding: 30px; margin: 30px auto; max-width: 1400px;">
@@ -397,8 +369,6 @@ def create_index_tab(constant):
                         </div>
                     </div>
                 </div>
-
-                <a id="citation"></a>
 
                 <!-- Citation Area -->
                 <div style="background: var(--bg-card); border-radius: 12px; padding: 30px; margin: 30px auto; max-width: 1400px;">
@@ -427,9 +397,6 @@ def create_index_tab(constant):
             
 
             <hr style="margin: 40px 0; border: 1px solid var(--border-color);">
-
-            <a id="additional-info"></a>
-            
             <!-- Additional Information Section -->
             <div style="background: var(--bg-card); border-radius: 14px; box-shadow: 0 2px 12px var(--card-shadow); padding: 32px 28px 24px 28px; max-width: 1400px; margin: 40px auto 0 auto;">
                 <h1 style="font-size:2em; font-weight:900; color:var(--accent-color); margin-bottom: 0.5em; border-bottom: 2px solid var(--border-color); padding-bottom: 0.2em; letter-spacing: 1px;">Additional Information</h1>
@@ -551,13 +518,4 @@ def create_index_tab(constant):
                 </div>
             </div>
             
-            """
-          
-
-    
-
-
-
-    
-    
-   
+            '''
