@@ -132,6 +132,28 @@ def create_manual_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     with gr.Tab("Index"): 
         gr.HTML(create_index_tab(constant))
 
+    with gr.Tab("VenusScope"):
+ 
+        venusscope_content = load_manual_venussccope(language.value) 
+        toc_html, html_content = generate_toc_and_content(venusscope_content)
+        venusscope_md = gr.HTML(f"""
+            <div class="manual-container">
+                {toc_html}
+                <div class="manual-content">{html_content}</div>
+            </div>
+        """)
+
+    with gr.Tab("VenusAgent"):
+        venusagent_content = load_manual_venusagent(language.value)
+        toc_html, html_content = generate_toc_and_content(venusagent_content)
+        venusagent_md = gr.HTML(f"""
+            <div class="manual-container">
+                {toc_html}
+                <div class="manual-content">{html_content}</div>
+            </div>
+        """)
+
+
     with gr.Tab("Training"):
         training_content = load_manual_training(language.value)
         toc_html, html_content = generate_toc_and_content(training_content)
@@ -156,6 +178,27 @@ def create_manual_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         evaluation_content = load_manual_evaluation(language.value)
         toc_html, html_content = generate_toc_and_content(evaluation_content)
         evaluation_md = gr.HTML(f"""
+            <div class="manual-container">
+                {toc_html}
+                <div class="manual-content">{html_content}</div>
+            </div>
+        """)
+
+    with gr.Tab("QuickTools"):
+        quicktools_content = load_manual_quicktools(language.value)
+        toc_html, html_content = generate_toc_and_content(quicktools_content)
+        quicktools_md = gr.HTML(f"""
+            <div class="manual-container">
+                {toc_html}
+                <div class="manual-content">{html_content}</div>
+            </div>
+        """)
+
+
+    with gr.Tab("AdvancedTools"):
+        advancedtools_content = load_manual_advancedtools(language.value)
+        toc_html, html_content = generate_toc_and_content(advancedtools_content)
+        advancedtools_md = gr.HTML(f"""
             <div class="manual-container">
                 {toc_html}
                 <div class="manual-content">{html_content}</div>
@@ -186,19 +229,32 @@ def create_manual_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     language.change(
         fn=update_manual,
         inputs=[language],
-        outputs=[training_md, prediction_md, evaluation_md, download_md, faq_md]
-    )
-    
-    return {"training_md": training_md, "prediction_md": prediction_md, "evaluation_md": evaluation_md, "download_md": download_md, "faq_md": faq_md}
+        outputs=[venusscope_md，venusagent_md,training_md, prediction_md, evaluation_md, quicktools_md,  advancedtools_md，download_md, faq_md, 
+             ]
+     )
+
+     return {"venusscope_md": venusscope_md,
+            "venusagent_md": venusagent_md,
+            "training_md": training_md,
+            "prediction_md": prediction_md,
+            "evaluation_md": evaluation_md,
+            "quicktools_md": quicktools_md,
+            "advancedtools_md": advancedtools_md,
+            "download_md": download_md,
+            "faq_md": faq_md}
 
 def update_manual(language):
     """Update the manual content
     Args:
         language: language
     Returns:
+        venusscope_md: VenusScope manual
+        venusagent_md: VenusAgent manual
         training_md: training manual
         prediction_md: prediction manual
         evaluation_md: evaluation manual
+        quicktools_md: QuickTools manual
+        advancedtools_md: AdvancedTools manual
         download_md: download manual
         faq_md: faq manual
     """
@@ -208,7 +264,11 @@ def update_manual(language):
     evaluation_content = load_manual_evaluation(language)
     download_content = load_manual_download(language)
     faq_content = load_manual_faq(language)
-    
+    quicktools_content = load_manual_quicktools(language)
+    venusagent_content = load_manual_venusagent(language)
+    venusscope_content = load_manual_venussccope(language)
+    advancedtools_content = load_manual_advancedtools(language)
+
     # Use Python's markdown library to convert Markdown to HTML
     def markdown_to_html(markdown_content, base_path="src/web/manual"):
         """Convert Markdown content to HTML, and embed images as base64 encoded"""
