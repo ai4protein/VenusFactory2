@@ -232,7 +232,7 @@ def create_manual_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         outputs=[venusscope_md, venusagent_md, training_md, prediction_md, evaluation_md, quicktools_md, advancedtools_md, download_md, faq_md]
      )
 
-     return {"venusscope_md": venusscope_md,
+    return {"venusscope_md": venusscope_md,
             "venusagent_md": venusagent_md,
             "training_md": training_md,
             "prediction_md": prediction_md,
