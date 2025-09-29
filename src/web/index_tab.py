@@ -34,7 +34,7 @@ def create_index_tab(constant):
                         flex: 1;
                         background: var(--bg-secondary);
                         border-radius: 12px;
-                        padding: 40px;
+                        padding-top: 0;
                     }}
                     
                 
@@ -277,10 +277,9 @@ def create_index_tab(constant):
 
                    <div class="manual-content">
 
-                        <div style="text-align:center; margin: 40px auto 40px auto; max-width: 100%;">
+                        <div style="text-align:center; margin: 0px auto 40px auto; max-width: 100%;">
                             <img src="https://raw.githubusercontent.com/Patiskey/VenusFactory/main/img/Index.png" ... /> 
-                                 alt="Welcome to VenusFactory Banner" 
-                                 style="max-width: 100%; height: auto; border-radius: 8px;" />
+                                 
                         </div>
                         
                     <div style="max-width: 1400px; margin: 0 auto; font-size: 1.2em; text-align: left;">
