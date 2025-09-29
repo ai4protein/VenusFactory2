@@ -240,7 +240,8 @@ def create_manual_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             "quicktools_md": quicktools_md,
             "advancedtools_md": advancedtools_md,
             "download_md": download_md,
-            "faq_md": faq_md}
+            "faq_md": faq_md
+            }
 
 def update_manual(language):
     """Update the manual content
