@@ -68,7 +68,7 @@ def create_index_tab(constant):
                     transition: background-color 0.3s ease, color 0.3s ease;
                 }}
                 .main-content {{
-                    margin-top: 80px;
+                    margin-top: 0px;
                     max-width: 1400px;
                     margin-left: auto;
                     margin-right: auto;
