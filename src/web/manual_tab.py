@@ -419,3 +419,63 @@ def load_manual_faq(language):
             return f.read()
     except Exception as e:
         return f"# FAQ\n\n{str(e)}"
+
+def load_manual_quicktools(language):
+    """
+    Loads the QuickTools manual in the specified language (English or Chinese).
+    """
+    if language == 'Chinese':
+        manual_path = os.path.join("src/web/manual", "QuickTools_CN.md")
+    else:
+        # Default to English if language is not 'Chinese'
+        manual_path = os.path.join("src/web/manual", "QuickTools_EN.md")
+    try:
+        with open(manual_path, "r", encoding="utf-8") as f:
+            return f.read()
+    except Exception as e:
+        return f"# Error loading QuickTools manual\n\n{str(e)}"
+
+def load_manual_venusagent(language):
+    """
+    Loads the VenusAgent manual in the specified language (English or Chinese).
+    """
+    if language == 'Chinese':
+        manual_path = os.path.join("src/web/manual", "VenusAgentManual_CN.md")
+    else:
+        # Default to English if language is not 'Chinese'
+        manual_path = os.path.join("src/web/manual", "VenusAgentManual_EN.md")
+    try:
+        with open(manual_path, "r", encoding="utf-8") as f:
+            return f.read()
+    except Exception as e:
+        return f"# Error loading VenusAgent manual\n\n{str(e)}"
+
+def load_manual_venussccope(language):
+    """
+    Loads the VenusScope manual in the specified language (English or Chinese).
+    """
+    if language == 'Chinese':
+        manual_path = os.path.join("src/web/manual", "VenusScopeManual_CN.md")
+    else:
+        # Default to English if language is not 'Chinese'
+        manual_path = os.path.join("src/web/manual", "VenusScopeManual_EN.md")
+    try:
+        with open(manual_path, "r", encoding="utf-8") as f:
+            return f.read()
+    except Exception as e:
+        return f"# Error loading VenusScope manual\n\n{str(e)}"
+
+def load_manual_advancedtools(language):
+    """
+    Loads the AdvancedTools manual in the specified language (English or Chinese).
+    """
+    if language == 'Chinese':
+        manual_path = os.path.join("src/web/manual", "AdvancedToolsManual_CN.md")
+    else:
+        # Default to English if language is not 'Chinese'
+        manual_path = os.path.join("src/web/manual", "AdvancedToolsManual_EN.md")
+    try:
+        with open(manual_path, "r", encoding="utf-8") as f:
+            return f.read()
+    except Exception as e:
+        return f"# Error loading AdvancedTools manual\n\n{str(e)}"
