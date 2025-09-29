@@ -385,6 +385,10 @@ def update_manual(language):
     evaluation_toc, evaluation_html = generate_toc_and_content(evaluation_content)
     download_toc, download_html = generate_toc_and_content(download_content)
     faq_toc, faq_html = generate_toc_and_content(faq_content)
+    quicktools_toc, quicktools_html = generate_toc_and_content(quicktools_content)
+    venusagent_toc, venusagent_html = generate_toc_and_content(venusagent_content)
+    venusscope_toc, venusscope_html = generate_toc_and_content(venusscope_content)
+    advancedtools_toc, advancedtools_html = generate_toc_and_content(advancedtools_content)
     
     training_output = f"""
         <div class="manual-container">
@@ -420,8 +424,44 @@ def update_manual(language):
             <div class="manual-content">{faq_html}</div>
         </div>
     """
+
+     quicktools_output = f"""
+            <div class="manual-container">
+                {quicktools_toc}
+                <div class="manual-content">{quicktools_html}</div>
+            </div>
+        """
+        
+        venusagent_output = f"""
+            <div class="manual-container">
+                {venusagent_toc}
+                <div class="manual-content">{venusagent_html}</div>
+            </div>
+        """
+        
+        venusscope_output = f"""
+            <div class="manual-container">
+                {venusscope_toc}
+                <div class="manual-content">{venusscope_html}</div>
+            </div>
+        """
     
-    return training_output, prediction_output, evaluation_output, download_output, faq_output
+        advancedtools_output = f"""
+            <div class="manual-container">
+                {advancedtools_toc}
+                <div class="manual-content">{advancedtools_html}</div>
+            </div>
+        """
+    
+    return  venusscope_output,      # 1
+            venusagent_output,      # 2
+            training_output,        # 3
+            prediction_output,      # 4
+            evaluation_output,      # 5
+            quicktools_output,      # 6
+            advancedtools_output,   # 7
+            download_output,        # 8
+            faq_output              # 9
 
 def load_manual_training(language):
     if language == 'Chinese':
