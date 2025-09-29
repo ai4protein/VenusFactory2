@@ -11,7 +11,7 @@ def create_index_tab(constant):
     
     return    f'''
                 <style>
-                    /* 添加导航栏相关样式 */
+                    
                     .manual-container {{
                         display: flex;
                         gap: 20px;
