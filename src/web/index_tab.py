@@ -273,42 +273,16 @@ def create_index_tab(constant):
 
                     <!-- Top section: VenusFactory introduction -->
                     
-                        <div id="welcome" style="text-align:center; margin: 40px 0;">
-                            <div style="display: flex; justify-content: center; align-items: center; gap: 40px;">
-                                <!-- Left image -->
-                                <img id="venusfactory-logo"
-                                     src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venusfactory_logo.png"
-                                     alt="Venus Head"
-                                     style="height:7em;" />
-
-                        <!-- Title -->
-                        <h1 style="font-size:3.5em; font-weight:900; margin: 0;">
-                            Welcome to <span style="font-weight:900;">VenusFactory</span>!
-                        </h1>
-
-                        <!-- Right image -->
-                        <img id="venus-logo"
-                             src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png"
-                             alt="Venus Logo"
-                             style="height:7em;" />
-                        </div>
-                    
-                        <!-- Dark mode style -->
-                        <style>
-                            @media (prefers-color-scheme: dark) {{
-                                #venusfactory-logo {{
-                                    content: url('https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venusfactory_logo_darkmode.png');
-                                }}
-                                #venus-logo {{
-                                    content: url('https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo_darkmode.png');
-                                }}
-                            }}
-                    </style>
                     
 
-                    <div style="text-align: center; margin-top: -80px; margin-bottom: 40px;">
-                        <h1 style="font-size:3.5em; font-weight:900;">Welcome to <span style='font-weight:900;'>VenusFactory</span>!</h1>
-                    </div>
+                   <div class="manual-content">
+
+                                            <div style="text-align:center; margin: 40px auto 40px auto; max-width: 100%;">
+                            <img src="https://your-custom-image.com/welcome_banner.png" 
+                                 alt="Welcome to VenusFactory Banner" 
+                                 style="max-width: 100%; height: auto; border-radius: 8px;" />
+                        </div>
+                        
                     <div style="max-width: 1400px; margin: 0 auto; font-size: 1.2em; text-align: left;">
                         <p style="font-size:1.2em; margin-bottom: 0.7em;"><b>VenusFactory</b> is a unified open-source platform for protein engineering, designed to simplify data acquisition, model fine-tuning, and functional analysis for both biologists and AI researchers.<br>
                         The Web UI features four core modules:</p>
