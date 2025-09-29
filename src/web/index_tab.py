@@ -14,7 +14,7 @@ def create_index_tab(constant):
                     
                     .manual-container {{
                         display: flex;
-                        gap: 5px;
+                        gap: 0px;
                         max-width: 1400px;
                         margin: 0 auto;
                     }}
