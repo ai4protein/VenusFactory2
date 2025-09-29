@@ -35,6 +35,7 @@ def create_index_tab(constant):
                         background: var(--bg-secondary);
                         border-radius: 12px;
                         padding-top: 0;
+                        margin-top: -40px;
                     }}
                     
                 
