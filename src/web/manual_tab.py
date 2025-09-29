@@ -425,33 +425,33 @@ def update_manual(language):
         </div>
     """
 
-     quicktools_output = f"""
+    quicktools_output = f"""
             <div class="manual-container">
                 {quicktools_toc}
                 <div class="manual-content">{quicktools_html}</div>
             </div>
-        """
+    """
         
-        venusagent_output = f"""
+    venusagent_output = f"""
             <div class="manual-container">
                 {venusagent_toc}
                 <div class="manual-content">{venusagent_html}</div>
             </div>
-        """
+    """
         
-        venusscope_output = f"""
+    venusscope_output = f"""
             <div class="manual-container">
                 {venusscope_toc}
                 <div class="manual-content">{venusscope_html}</div>
             </div>
-        """
+    """
     
-        advancedtools_output = f"""
+    advancedtools_output = f"""
             <div class="manual-container">
                 {advancedtools_toc}
                 <div class="manual-content">{advancedtools_html}</div>
             </div>
-        """
+    """
     
     return  venusscope_output,      # 1
             venusagent_output,      # 2
