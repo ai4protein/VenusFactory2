@@ -1424,112 +1424,24 @@ def handle_protein_function_prediction(
             final_df = pd.concat(voted_results, ignore_index=True)
             final_df = final_df.drop(columns=['Dataset'], errors='ignore')
 
-    plot_fig = generate_plots_for_all_results(raw_final_df)
+    # Simplified processing - just use the raw data
     display_df = final_df.copy()
-    def map_labels(row):
-        current_task = DATASET_TO_TASK_MAP.get(row.get('Dataset', ''), task)
-        if current_task in REGRESSION_TASKS_FUNCTION: 
-            scaled_value = row.get("prediction")
-            if pd.notna(scaled_value) and scaled_value != 'N/A' and current_task in REGRESSION_TASKS_FUNCTION_MAX_MIN:
-                try:
-                    scaled_value = float(scaled_value)
-                    min_val, max_val = REGRESSION_TASKS_FUNCTION_MAX_MIN[current_task]
-                    original_value = scaled_value * (max_val - min_val) + min_val
-                    return round(original_value, 2)
-                
-                except (ValueError, TypeError):
-                    return scaled_value
-
-            return scaled_value
-
-        if row.get('Dataset') == 'SortingSignal':
-                predictions_str = row['predicted_class']
-                predictions = json.loads(predictions_str)
-                if all(p == 0 for p in predictions):
-                    return "No signal"
-                # Get labels for SortingSignal
-                signal_labels = ["CH", 'GPI', "MT", "NES", "NLS", "PTS", "SP", "TM", "TH"]
-                active_labels = []
-                for i, pred in enumerate(predictions):
-                    if pred == 1:
-                        active_labels.append(signal_labels[i])
-                print(predictions)
-                return "_".join(active_labels) if active_labels else "None"
-
-        labels_key = ("DeepLocMulti" if row.get('Dataset') == "DeepLocMulti" 
-                     else "DeepLocBinary" if row.get('Dataset') == "DeepLocBinary" 
-                     else current_task)
-        labels = LABEL_MAPPING_FUNCTION.get(labels_key)
-        
-        pred_val = row.get("prediction", row.get("predicted_class"))
-        if pred_val is None or pred_val == "N/A":
-            return "N/A"
-            
-        try:
-            pred_val = int(float(pred_val))
-            if labels and 0 <= pred_val < len(labels): 
-                return labels[pred_val]
-        except (ValueError, TypeError):
-            pass
-        
-        return str(pred_val)
-
-    if "prediction" in display_df.columns:
-        display_df["predicted_class"] = display_df.apply(map_labels, axis=1)
-    elif "predicted_class" in display_df.columns:
-        display_df["predicted_class"] = display_df.apply(map_labels, axis=1)
-
-    if 'prediction' in display_df.columns:
-        display_df.drop(columns=['prediction'], inplace=True)
-
-    rename_map = {
-        'header': "Protein Name", 
-        'sequence': "Sequence", 
-        'predicted_class': "Predicted Class",
-        'probabilities': "Confidence Score", 
-        'Dataset': "Dataset"
-    }
-    display_df.rename(columns=rename_map, inplace=True)
+    print(f"Using simplified processing, final_df shape: {final_df.shape}")
     
-    if "Sequence" in display_df.columns:
-        display_df["Sequence"] = display_df["Sequence"].apply(lambda x: x[:]  if isinstance(x, str) and len(x) > 30 else x)
-
-    if "Confidence Score" in display_df.columns and "Predicted Class" in display_df.columns:
-        def format_confidence(row):
-            score = row["Confidence Score"]
-            predicted_class = row["Predicted Class"]
-            
-            if isinstance(score, (float, int)) and score != 'N/A':
-                return round(float(score), 2)
-            elif isinstance(score, str) and score not in ['N/A', '']:
-                try:
-                    if score.startswith('[') and score.endswith(']'):
-                        prob_str = score.strip('[]')
-                        probs = [float(x.strip()) for x in prob_str.split(',')]
-                        
-                        pred_index = None
-                        current_task = task if is_voting_run else row.get('Dataset', task)
-                        
-                        if current_task in REGRESSION_TASKS_FUNCTION:
-                            return predicted_class
-                        else:
-                            labels_key = task if is_voting_run else ("DeepLocMulti" if row.get('Dataset') == "DeepLocMulti" else "DeepLocBinary" if row.get('Dataset') == "DeepLocBinary" else current_task)
-                            labels = LABEL_MAPPING_FUNCTION.get(labels_key, [])
-                            
-                            if labels and predicted_class in labels:
-                                pred_index = labels.index(predicted_class)
-
-                            if pred_index is not None and 0 <= pred_index < len(probs):
-                                return round(probs[pred_index], 2)
-                            else:
-                                return round(max(probs), 2)
-                    else:
-                        return round(float(score), 2)
-                except (ValueError, IndexError):
-                    return score
-            return score
-        
-        display_df["Confidence Score"] = display_df.apply(format_confidence, axis=1)
+    # Simple column renaming
+    if 'header' in display_df.columns:
+        display_df.rename(columns={'header': 'Protein Name'}, inplace=True)
+    if 'sequence' in display_df.columns:
+        display_df.rename(columns={'sequence': 'Sequence'}, inplace=True)
+    if 'predicted_class' in display_df.columns:
+        display_df.rename(columns={'predicted_class': 'Predicted Class'}, inplace=True)
+    if 'probabilities' in display_df.columns:
+        display_df.rename(columns={'probabilities': 'Confidence Score'}, inplace=True)
+    if 'Dataset' in display_df.columns:
+        display_df.rename(columns={'Dataset': 'Dataset'}, inplace=True)
+    
+    print(f"After simple rename, display_df columns: {list(display_df.columns)}")
+    print(f"Display_df shape: {display_df.shape}")
 
     ai_summary = "AI Analysis disabled. Enable in settings to generate a report."
     ai_response = "AI Analysis disabled." 
@@ -1564,36 +1476,42 @@ def handle_protein_function_prediction(
         
         # Save only the processed results
         processed_df_for_save = display_df.copy()
-        processed_df_for_save.to_csv(zip_dir  / f"Result_{timestamp}.csv", index=False)
+        csv_path = zip_dir / f"Result_{timestamp}.csv"
+        processed_df_for_save.to_csv(csv_path, index=False)
+        print(f"Saved CSV to: {csv_path}")
         
-        # Save plot as HTML file (optional)
-        if plot_fig and hasattr(plot_fig, 'data') and plot_fig.data: 
-            plot_fig.write_html(str(zip_dir/ f"results_plot_{timestamp}.html"))
-        
-        if not ai_summary.startswith("❌") and not ai_summary.startswith("AI Analysis"):
-            with open(zip_dir / f"AI_Report_{timestamp}.md", 'w', encoding='utf-8') as f: 
-                f.write(f"# AI Expert Analysis\n\n{ai_summary}")
-        
+        # Create simple zip with just the CSV file
         zip_path = zip_dir / f"func_pred_{timestamp}.zip"
         with zipfile.ZipFile(zip_path, 'w') as zf:
-            for file in zip_dir.glob("*"): 
-                zf.write(file, file.name)
+            zf.write(csv_path, csv_path.name)
         zip_path_str = str(zip_path)
+        print(f"Created zip file: {zip_path_str}")
     except Exception as e: 
         print(f"Error creating zip file: {e}")
+        zip_path_str = ""
 
     final_status = "✅ All predictions completed!"
     if is_voting_run: 
         final_status += " Results were aggregated using soft voting."
     if enable_ai and not ai_summary.startswith("❌"): 
         final_status += " AI analysis included."
+    
+    print(f"Final status: {final_status}")
+    print(f"Display DF shape: {display_df.shape}")
+    print(f"Zip path: {zip_path_str}")
+    print(f"About to yield final results...")
+    
     progress(1.0, desc="Complete!")
+    print("Progress set to 100%, about to yield...")
+    
+    # Simple yield without try-catch to avoid any issues
     yield (
         final_status, 
         display_df, 
         gr.update(visible=True, value=zip_path_str) if zip_path_str else gr.update(visible=False), 
         expert_analysis, ai_response
     )
+    print("Final yield completed successfully!")
 
 
 def generate_plots_for_residue_results(results_df: pd.DataFrame, task: str = "Functional Prediction") -> go.Figure:
