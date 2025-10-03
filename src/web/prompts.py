@@ -16,6 +16,14 @@ IMPORTANT FILE HANDLING RULES:
 - For data processing tasks (like dataset splitting), always use the ai_code_execution tool with input_files parameter
 - File path format: Use the exact file paths provided in the context section
 
+TOOL DISTINCTION RULES:
+- For NCBI sequences: Use ncbi_sequence_download with accession_id (e.g., NP_000517.1, NM_001234567)
+- For AlphaFold structures: Use alphafold_structure_download with uniprot_id (e.g., P00734, P12345)
+- For RCSB structures: Use existing structure prediction tools with pdb_id (e.g., 1ABC, 1CRN)
+- NCBI sequences are for downloading protein/nucleotide sequences from NCBI database
+- AlphaFold structures are for downloading predicted protein structures from AlphaFold database
+- RCSB structures are for downloading experimental protein structures from PDB database
+
 TOOL PARAMETER MAPPING:
 - zero_shot_sequence_prediction: sequence OR fasta_file, model_name
 - zero_shot_structure_prediction: structure_file, model_name  
@@ -27,6 +35,8 @@ TOOL PARAMETER MAPPING:
 - generate_training_config: csv_file, test_csv_file (optional), output_name
 - protein_properties_generation: sequence OR fasta_file, task_name
 - ai_code_execution: task_description, input_files (LIST of file paths)
+- ncbi_sequence_download: accession_id, output_format (for downloading NCBI sequences)
+- alphafold_structure_download: uniprot_id, output_format (for downloading AlphaFold structures)
 
 CONTEXT ANALYSIS:
 Parse the following user input and context carefully:
@@ -71,6 +81,32 @@ User uploads protein.fasta and asks for function prediction:
       "fasta_file": "/path/to/protein.fasta",
       "model_name": "ESM2-650M",
       "task": "Solubility"
+    }}
+  }}
+]
+
+User asks to download NCBI sequence:
+[
+  {{
+    "step": 1,
+    "task_description": "Download protein sequence from NCBI database",
+    "tool_name": "ncbi_sequence_download",
+    "tool_input": {{
+      "accession_id": "NP_000517.1",
+      "output_format": "fasta"
+    }}
+  }}
+]
+
+User asks to download AlphaFold structure:
+[
+  {{
+    "step": 1,
+    "task_description": "Download protein structure from AlphaFold database",
+    "tool_name": "alphafold_structure_download",
+    "tool_input": {{
+      "uniprot_id": "P00734",
+      "output_format": "pdb"
     }}
   }}
 ]

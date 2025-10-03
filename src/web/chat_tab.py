@@ -111,9 +111,11 @@ class ProteinContextManager:
         self.sequences = {}  # {sequence_id: {'sequence': str, 'timestamp': datetime}}
         self.files = {}      # {file_id: {'path': str, 'type': str, 'timestamp': datetime}}
         self.uniprot_ids = {} # {uniprot_id: timestamp}
+        self.structure_files = {} # {structure_id: {'path': str, 'source': str, 'uniprot_id': str, 'timestamp': datetime}}
         self.last_sequence = None
         self.last_file = None
         self.last_uniprot_id = None
+        self.last_structure = None
     
     def add_sequence(self, sequence: str) -> str:
         seq_id = f"seq_{len(self.sequences) + 1}"
@@ -143,6 +145,19 @@ class ProteinContextManager:
         self.uniprot_ids[uniprot_id] = datetime.now()
         self.last_uniprot_id = uniprot_id
     
+    def add_structure_file(self, file_path: str, source: str, uniprot_id: str = None) -> str:
+        """Add a structure file to context (AlphaFold, RCSB, etc.)"""
+        struct_id = f"struct_{len(self.structure_files) + 1}"
+        self.structure_files[struct_id] = {
+            'path': file_path,
+            'source': source,  # 'alphafold', 'rcsb', etc.
+            'uniprot_id': uniprot_id,
+            'timestamp': datetime.now(),
+            'name': os.path.basename(file_path)
+        }
+        self.last_structure = file_path
+        return struct_id
+    
     def get_context_summary(self) -> str:
         summary_parts = []
         
@@ -157,10 +172,16 @@ class ProteinContextManager:
         if self.last_uniprot_id:
             summary_parts.append(f"Most recent UniProt ID: {self.last_uniprot_id}")
         
+        if self.last_structure:
+            struct_name = os.path.basename(self.last_structure)
+            summary_parts.append(f"Most recent structure: {struct_name}")
+        
         if len(self.sequences) > 1:
             summary_parts.append(f"Total sequences in memory: {len(self.sequences)}")
         if len(self.files) > 1:
             summary_parts.append(f"Total files in memory: {len(self.files)}")
+        if len(self.structure_files) > 1:
+            summary_parts.append(f"Total structures in memory: {len(self.structure_files)}")
         if len(self.uniprot_ids) > 1:
             summary_parts.append(f"Total UniProt IDs in memory: {len(self.uniprot_ids)}")
         
@@ -187,7 +208,9 @@ def get_tools():
         pdb_query_tool,
         protein_properties_generation_tool,
         generate_training_config_tool,
-        ai_code_execution_tool
+        ai_code_execution_tool,
+        ncbi_sequence_download_tool,
+        alphafold_structure_download_tool
     ]
 
 def create_planner_chain(llm: BaseChatModel, tools: List[BaseTool]):
@@ -422,12 +445,26 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 else:
                     file_context += f"- {file_name}: File at path '{fp}'\n"
 
-        planner_input = f"{text}\n\n[CONTEXT: User has uploaded files: {', '.join(file_paths)}]\n\nProtein context: {protein_ctx.get_context_summary()}"
+        # Build comprehensive context including structure files
+        context_parts = []
+        if file_paths:
+            context_parts.append(f"User has uploaded files: {', '.join(file_paths)}")
+        
+        # Add structure files to context
+        if protein_ctx.structure_files:
+            struct_info = []
+            for struct_id, struct_data in protein_ctx.structure_files.items():
+                struct_info.append(f"{struct_data['source']} structure: {struct_data['name']} (path: {struct_data['path']})")
+            context_parts.append(f"Available structure files: {'; '.join(struct_info)}")
+        
+        context_parts.append(f"Protein context: {protein_ctx.get_context_summary()}")
+        
+        planner_input = f"{text}\n\n[CONTEXT: {'; '.join(context_parts)}]"
         
         try:
             plan = conv['planner'].invoke({"input": planner_input})
         except Exception as e:
-            history[-1] = {"role": "assistant", "content": f"Sorry, I failed to create a plan. Error: {e}"}
+            history.append({"role": "assistant", "content": f"❌ **Planning Failed:** Sorry, I failed to create a plan. Error: {e}"})
             yield history, gr.MultimodalTextbox(value=None, interactive=True)
             return
         
@@ -479,10 +516,37 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                     worker_result = worker.invoke({"input": worker_input_str})
                     raw_output = str(worker_result)
                     step_results[step_num] = {'raw_output': raw_output}
+                    
+                    # Parse tool output to extract file paths and update context
+                    try:
+                        if tool_name in ['ncbi_sequence_download', 'alphafold_structure_download']:
+                            # Parse JSON output to extract file path
+                            output_data = json.loads(raw_output)
+                            if output_data.get('success') and 'file_path' in output_data:
+                                file_path = output_data['file_path']
+                                if tool_name == 'alphafold_structure_download':
+                                    # Add structure file to context
+                                    uniprot_id = tool_input.get('uniprot_id', 'unknown')
+                                    protein_ctx.add_structure_file(file_path, 'alphafold', uniprot_id)
+                                elif tool_name == 'ncbi_sequence_download':
+                                    # Add sequence file to context
+                                    protein_ctx.add_file(file_path)
+                    except (json.JSONDecodeError, KeyError):
+                        pass  # If parsing fails, continue without context update
+                    
+                    # Create detailed step result display
+                    step_detail = f"**Step {step_num}:** {task_desc}\n\n"
+                    step_detail += f"**Tool:** {tool_name}\n"
+                    step_detail += f"**Input:** {json.dumps(tool_input, indent=2)}\n\n"
+                    step_detail += f"**Output:**\n```\n{raw_output[:500]}{'...' if len(raw_output) > 500 else ''}\n```"
+                    
                     analysis_log += f"--- Analysis for Step {step_num}: {task_desc} ---\n\n"
+                    analysis_log += f"Tool: {tool_name}\n"
+                    analysis_log += f"Input: {json.dumps(tool_input, indent=2)}\n"
+                    analysis_log += f"Output: {raw_output}\n\n"
 
-                    # Update UI with step completion
-                    history[-1] = {"role": "assistant", "content": f"{plan_text}\n\n---\n\n✅ **Step {step_num} Complete:** {task_desc}"}
+                    # Update UI with detailed step completion
+                    history[-1] = {"role": "assistant", "content": f"{plan_text}\n\n---\n\n✅ **Step {step_num} Complete:** {task_desc}\n\n{step_detail}"}
                     yield history, gr.MultimodalTextbox(value=None, interactive=False)
 
                 except Exception as e:

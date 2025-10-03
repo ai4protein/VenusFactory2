@@ -44,7 +44,7 @@ class ResidueFunctionPredictionInput(BaseModel):
     sequence: Optional[str] = Field(None, description="Protein sequence in single letter amino acid code")
     fasta_file: Optional[str] = Field(None, description="Path to FASTA file")
     model_name: str = Field(default="ESM2-650M", description="Model name for function prediction")
-    task: str = Field(default="Activate", description="Task: Activate, Binding, Evolutionary, Motif")
+    task: str = Field(default="Activity Site", description="Task: Activity Site, Binding Site, Conserved Site, Motif")
 
 class InterProQueryInput(BaseModel):
     """Input for InterPro database query"""
@@ -74,6 +74,16 @@ class CodeExecutionInput(BaseModel):
     """Input for AI-generated code execution"""
     task_description: str = Field(..., description="Description of the task to be accomplished")
     input_files: List[str] = Field(default=[], description="List of input file paths")
+
+class NCBISequenceInput(BaseModel):
+    """Input for NCBI sequence download"""
+    accession_id: str = Field(..., description="NCBI accession ID (e.g., NP_001123456, NM_001234567)")
+    output_format: str = Field(default="fasta", description="Output format: fasta, genbank")
+
+class AlphaFoldStructureInput(BaseModel):
+    """Input for AlphaFold structure download"""
+    uniprot_id: str = Field(..., description="UniProt ID for AlphaFold structure download")
+    output_format: str = Field(default="pdb", description="Output format: pdb, mmcif")
 
 # Langchain Tools
 @tool("zero_shot_sequence_prediction", args_schema=ZeroShotSequenceInput)
@@ -188,6 +198,22 @@ def ai_code_execution_tool(task_description: str, input_files: List[str] = []) -
         return generate_and_execute_code(task_description, input_files)
     except Exception as e:
         return f"Code execution error: {str(e)}"
+
+@tool("ncbi_sequence_download", args_schema=NCBISequenceInput)
+def ncbi_sequence_download_tool(accession_id: str, output_format: str = "fasta") -> str:
+    """Download protein or nucleotide sequences from NCBI database using accession ID."""
+    try:
+        return download_ncbi_sequence(accession_id, output_format)
+    except Exception as e:
+        return f"NCBI sequence download error: {str(e)}"
+
+@tool("alphafold_structure_download", args_schema=AlphaFoldStructureInput)
+def alphafold_structure_download_tool(uniprot_id: str, output_format: str = "pdb") -> str:
+    """Download protein structures from AlphaFold database using UniProt ID."""
+    try:
+        return download_alphafold_structure(uniprot_id, output_format)
+    except Exception as e:
+        return f"AlphaFold structure download error: {str(e)}"
 
 def call_zero_shot_sequence_prediction(sequence: str, model_name: str = "ESM2-650M", api_key: str = None) -> str:
     """Call VenusFactory zero-shot sequence-based mutation prediction API"""
@@ -497,6 +523,137 @@ def get_pdb_sequence(pdb_id):
             "pdb_id": pdb_id,
             "error_message": f"Error fetching sequence for {pdb_id}: {str(e)}"
         }
+
+def download_ncbi_sequence(accession_id: str, output_format: str = "fasta") -> str:
+    """Download protein or nucleotide sequences from NCBI using existing crawler script."""
+    try:
+        # Create temporary directory for output
+        temp_dir = Path("temp_outputs")
+        sequence_dir = temp_dir / "ncbi_sequences"
+        os.makedirs(sequence_dir, exist_ok=True)
+        
+        # Determine database type based on accession ID
+        db_type = "protein" if accession_id.startswith(('NP_', 'XP_', 'YP_', 'WP_')) else "nuccore"
+        
+        # Call the existing NCBI download script
+        cmd = [
+            "python", "src/crawler/sequence/download_ncbi_seq.py",
+            "--id", accession_id,
+            "--out_dir", str(sequence_dir),
+            "--db", db_type
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        
+        # Find the downloaded file
+        expected_file = sequence_dir / f"{accession_id}.fasta"
+        if expected_file.exists():
+            return json.dumps({
+                "success": True,
+                "accession_id": accession_id,
+                "format": output_format,
+                "file_path": str(expected_file),
+                "message": f"Sequence downloaded successfully and saved to: {expected_file}",
+                "script_output": result.stdout
+            })
+        else:
+            return json.dumps({
+                "success": False,
+                "accession_id": accession_id,
+                "error_message": f"Download completed but file not found: {expected_file}",
+                "script_output": result.stdout
+            })
+            
+    except subprocess.CalledProcessError as e:
+        return json.dumps({
+            "success": False,
+            "accession_id": accession_id,
+            "error_message": f"Download script failed: {e.stderr}",
+            "script_output": e.stdout
+        })
+    except Exception as e:
+        return json.dumps({
+            "success": False,
+            "accession_id": accession_id,
+            "error_message": f"Error downloading sequence for {accession_id}: {str(e)}"
+        })
+
+def download_alphafold_structure(uniprot_id: str, output_format: str = "pdb") -> str:
+    """Download protein structures from AlphaFold using existing crawler script."""
+    try:
+        # Create temporary directory for output
+        temp_dir = Path("temp_outputs")
+        structure_dir = temp_dir / "alphafold_structures"
+        os.makedirs(structure_dir, exist_ok=True)
+        
+        # Call the existing AlphaFold download script (not RCSB!)
+        cmd = [
+            "python", "src/crawler/structure/download_alphafold.py",
+            "--uniprot_id", uniprot_id,
+            "--out_dir", str(structure_dir)
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        
+        # Find the downloaded file (AlphaFold uses UniProt ID as filename)
+        expected_file = structure_dir / f"{uniprot_id}.pdb"
+        if expected_file.exists():
+            # Extract confidence information from PDB file
+            confidence_info = {}
+            try:
+                with open(expected_file, 'r') as f:
+                    structure_data = f.read()
+                
+                confidence_scores = []
+                for line in structure_data.split('\n'):
+                    if line.startswith('ATOM') and 'CA' in line:
+                        try:
+                            confidence = float(line[60:66].strip())
+                            confidence_scores.append(confidence)
+                        except (ValueError, IndexError):
+                            continue
+                
+                if confidence_scores:
+                    confidence_info = {
+                        "mean_confidence": round(sum(confidence_scores) / len(confidence_scores), 2),
+                        "min_confidence": round(min(confidence_scores), 2),
+                        "max_confidence": round(max(confidence_scores), 2),
+                        "high_confidence_residues": sum(1 for score in confidence_scores if score >= 70),
+                        "total_residues": len(confidence_scores)
+                    }
+            except Exception:
+                pass  # Confidence parsing failed, but download was successful
+            
+            return json.dumps({
+                "success": True,
+                "uniprot_id": uniprot_id,
+                "format": output_format,
+                "file_path": str(expected_file),
+                "confidence_info": confidence_info,
+                "message": f"AlphaFold structure downloaded successfully and saved to: {expected_file}",
+                "script_output": result.stdout
+            })
+        else:
+            return json.dumps({
+                "success": False,
+                "uniprot_id": uniprot_id,
+                "error_message": f"Download completed but file not found: {expected_file}",
+                "script_output": result.stdout
+            })
+            
+    except subprocess.CalledProcessError as e:
+        return json.dumps({
+            "success": False,
+            "uniprot_id": uniprot_id,
+            "error_message": f"Download script failed: {e.stderr}",
+            "script_output": e.stdout
+        })
+    except Exception as e:
+        return json.dumps({
+            "success": False,
+            "uniprot_id": uniprot_id,
+            "error_message": f"Error downloading structure for {uniprot_id}: {str(e)}"
+        })
 
 def call_protein_properties_prediction_from_file(fasta_file: str, task_name: str, api_key: str = None) -> str:
     try:
