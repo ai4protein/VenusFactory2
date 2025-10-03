@@ -95,9 +95,13 @@ def zero_shot_sequence_prediction_tool(sequence: Optional[str] = None, fasta_fil
         if fasta_file:
             if not os.path.exists(fasta_file):
                 return f"Error: FASTA file not found at path: {fasta_file}"
-            return call_zero_shot_sequence_prediction_from_file(fasta_file, model_name, api_key)
+            return call_zero_shot_sequence_prediction(
+                fasta_file=fasta_file, model_name=model_name, api_key=api_key
+                )
         elif sequence:
-            return call_zero_shot_sequence_prediction(sequence, model_name, api_key)
+            return call_zero_shot_sequence_prediction(
+                sequence=sequence, model_name=model_name, api_key=api_key
+                )
         else:
             return "Error: Either sequence or fasta_file must be provided"
     except Exception as e:
@@ -108,9 +112,24 @@ def zero_shot_structure_prediction_tool(structure_file: str, model_name: str = "
     """Predict beneficial mutations using structure-based zero-shot models. Use for mutation prediction with PDB structure files."""
     try:
         api_key = os.getenv("DEEPSEEK_API_KEY")
-        if not os.path.exists(structure_file):
-            return f"Error: Structure file not found at path: {structure_file}"
-        return call_zero_shot_structure_prediction_from_file(structure_file, model_name, api_key)
+        
+        # Handle both direct file paths and JSON responses from download tools
+        actual_file_path = structure_file
+        
+        # Check if structure_file is a JSON string containing file path
+        try:
+            import json
+            if structure_file.startswith('{') and structure_file.endswith('}'):
+                file_info = json.loads(structure_file)
+                if isinstance(file_info, dict) and 'file_path' in file_info:
+                    actual_file_path = file_info['file_path']
+        except (json.JSONDecodeError, KeyError, TypeError):
+            # If not JSON or doesn't have file_path, use original value
+            pass
+        
+        if not os.path.exists(actual_file_path):
+            return f"Error: Structure file not found at path: {actual_file_path}"
+        return call_zero_shot_structure_prediction_from_file(actual_file_path, model_name, api_key)
     except Exception as e:
         return f"Zero-shot structure prediction error: {str(e)}"
 
@@ -120,9 +139,13 @@ def protein_function_prediction_tool(sequence: Optional[str] = None, fasta_file:
     try:
         api_key = os.getenv("DEEPSEEK_API_KEY")
         if fasta_file and os.path.exists(fasta_file):
-            return call_protein_function_prediction_from_file(fasta_file, model_name, task, api_key)
+            return call_protein_function_prediction(
+                fasta_file=fasta_file, model_name=model_name, task=task, api_key=api_key
+                )
         elif sequence:
-            return call_protein_function_prediction(sequence, model_name, task, api_key)
+            return call_protein_function_prediction(
+                sequence=sequence, model_name=model_name, task=task, api_key=api_key
+                )
         else:
             return "Error: Either sequence or fasta_file must be provided"
     except Exception as e:
@@ -133,9 +156,13 @@ def functional_residue_prediction_tool(sequence: Optional[str] = None, fasta_fil
     try:
         api_key = os.getenv("DEEPSEEK_API_KEY")
         if fasta_file and os.path.exists(fasta_file):
-            return call_functional_residue_prediction_from_file(fasta_file, model_name, task, api_key)
+            return call_functional_residue_prediction(
+                fasta_file=fasta_file, model_name=model_name, task=task, api_key=api_key
+                )
         elif sequence:
-            return call_functional_residue_prediction(sequence, model_name, task, api_key)
+            return call_functional_residue_prediction(
+                sequence=sequence, model_name=model_name, task=task, api_key=api_key
+                )
         else:
             return "Error: Either sequence or fasta_file must be procided"
     except Exception as e:
@@ -182,14 +209,18 @@ def protein_properties_generation_tool(sequence: Optional[str] = None, fasta_fil
         if fasta_file:
             if not os.path.exists(fasta_file):
                 return f"Error: FASTA file not found at path: {fasta_file}"
-            return call_protein_properties_prediction_from_file(fasta_file, task_name, api_key)
+            return call_protein_properties_prediction(
+                fasta_file=fasta_file, task_name=task_name, api_key=api_key
+                )
         elif sequence:
-            return call_protein_properties_prediction(sequence, task_name, api_key)
+            return call_protein_properties_prediction(
+                sequence=sequence, task_name=task_name, api_key=api_key
+                )
         else:
             return f"Error: Structure file not found at path: {fasta_file}"
         
     except Exception as e:
-        return f"Zero-shot structure prediction error: {str(e)}"
+        return f"Protein properties prediction error: {str(e)}"
 
 @tool("ai_code_execution", args_schema=CodeExecutionInput)
 def ai_code_execution_tool(task_description: str, input_files: List[str] = []) -> str:
@@ -215,43 +246,76 @@ def alphafold_structure_download_tool(uniprot_id: str, output_format: str = "pdb
     except Exception as e:
         return f"AlphaFold structure download error: {str(e)}"
 
-def call_zero_shot_sequence_prediction(sequence: str, model_name: str = "ESM2-650M", api_key: str = None) -> str:
-    """Call VenusFactory zero-shot sequence-based mutation prediction API"""
+def call_zero_shot_sequence_prediction(
+    sequence: str = None,
+    fasta_file: str = None,
+    model_name: str = "ESM2-650M",
+    api_key: str = None
+) -> str:
+    """
+    Call VenusFactory zero-shot sequence-based mutation prediction API.
+    If fasta_file is provided, use it directly; otherwise, use sequence (writes to temp fasta).
+    """
     try:
-        temp_fasta = tempfile.NamedTemporaryFile(mode='w', suffix='.fasta', delete=False)
-        temp_fasta.write(f">temp_sequence\n{sequence}\n")
-        temp_fasta.close()
-        
-        client = Client("http://localhost:7860/")
-        result = client.predict(
-            function_selection="Activity",
-            file_obj=handle_file(temp_fasta.name),
-            enable_ai=False,
-            ai_model="DeepSeek",
-            user_api_key=api_key,
-            model_name=model_name,
-            api_name="/handle_mutation_prediction_base"
-        )
-        os.unlink(temp_fasta.name)
-        
-        return result[2]
-    except Exception as e:
-        return f"Zero-shot sequence prediction error: {str(e)}"
+        if fasta_file:
+            fasta_path = fasta_file
+            temp_fasta_created = False
+        elif sequence:
+            temp_fasta = tempfile.NamedTemporaryFile(mode='w', suffix='.fasta', delete=False)
+            temp_fasta.write(f">temp_sequence\n{sequence}\n")
+            temp_fasta.close()
+            fasta_path = temp_fasta.name
+            temp_fasta_created = True
+        else:
+            return "Zero-shot sequence prediction error: No sequence or fasta_file provided."
 
-def call_zero_shot_sequence_prediction_from_file(fasta_file: str, model_name: str = "ESM2-650M", api_key: str = None) -> str:
-    """Call VenusFactory zero-shot sequence prediction API using uploaded FASTA file"""
-    try:
         client = Client("http://localhost:7860/")
         result = client.predict(
             function_selection="Activity",
-            file_obj=handle_file(fasta_file),
+            file_obj=handle_file(fasta_path),
             enable_ai=False,
             ai_model="DeepSeek",
             user_api_key=api_key,
             model_name=model_name,
             api_name="/handle_mutation_prediction_base"
         )
-        return result[2]
+
+        if 'temp_fasta_created' in locals() and temp_fasta_created:
+            os.unlink(fasta_path)
+
+        # Limit mutation results to first 200 entries to avoid long context
+        raw_result = result[2]
+        try:
+            import json
+            # Check if raw_result is already a dict or needs to be parsed
+            if isinstance(raw_result, dict):
+                result_data = raw_result
+            else:
+                result_data = json.loads(raw_result)
+            
+            # Handle the data format with 'data' field containing mutations
+            if isinstance(result_data, dict) and 'data' in result_data:
+                mutations_data = result_data['data']
+                if len(mutations_data) > 200:
+                    # Keep only first 200 mutations
+                    result_data['data'] = mutations_data[:200]
+                    result_data['total_mutations'] = len(mutations_data)
+                    result_data['displayed_mutations'] = 200
+                    result_data['note'] = f"Showing first 200 of {len(mutations_data)} total mutations to avoid long context"
+                    return json.dumps(result_data)
+            # Handle the old format with 'mutations' field
+            elif isinstance(result_data, dict) and 'mutations' in result_data:
+                mutations = result_data['mutations']
+                if len(mutations) > 200:
+                    result_data['mutations'] = mutations[:200]
+                    result_data['total_mutations'] = len(mutations)
+                    result_data['displayed_mutations'] = 200
+                    result_data['note'] = f"Showing first 200 of {len(mutations)} total mutations to avoid long context"
+                    return json.dumps(result_data)
+            return raw_result
+        except (json.JSONDecodeError, KeyError, TypeError):
+            # If not JSON or doesn't have expected structure, return as is
+            return raw_result
     except Exception as e:
         return f"Zero-shot sequence prediction error: {str(e)}"
 
@@ -268,12 +332,49 @@ def call_zero_shot_structure_prediction_from_file(structure_file: str, model_nam
             model_name=model_name,
             api_name="/handle_mutation_prediction_base"
         )
-        return result[2]
+        # Limit mutation results to first 200 entries to avoid long context
+        raw_result = result[2]
+        try:
+            import json
+            result_data = json.loads(raw_result)
+            
+            # Handle the data format with 'data' field containing mutations
+            if isinstance(result_data, dict) and 'data' in result_data:
+                mutations_data = result_data['data']
+                if len(mutations_data) > 200:
+                    # Keep only first 200 mutations
+                    result_data['data'] = mutations_data[:200]
+                    result_data['total_mutations'] = len(mutations_data)
+                    result_data['displayed_mutations'] = 200
+                    result_data['note'] = f"Showing first 200 of {len(mutations_data)} total mutations to avoid long context"
+                    return json.dumps(result_data)
+            # Handle the old format with 'mutations' field
+            elif isinstance(result_data, dict) and 'mutations' in result_data:
+                mutations = result_data['mutations']
+                if len(mutations) > 200:
+                    result_data['mutations'] = mutations[:200]
+                    result_data['total_mutations'] = len(mutations)
+                    result_data['displayed_mutations'] = 200
+                    result_data['note'] = f"Showing first 200 of {len(mutations)} total mutations to avoid long context"
+                    return json.dumps(result_data)
+            return raw_result
+        except (json.JSONDecodeError, KeyError, TypeError):
+            # If not JSON or doesn't have expected structure, return as is
+            return raw_result
     except Exception as e:
         return f"Zero-shot structure prediction error: {str(e)}"
 
-def call_protein_function_prediction_from_file(fasta_file: str, model_name: str = "ProtT5-xl-uniref50", task: str = "Solubility", api_key: str = None) -> str:
-    """Call VenusFactory protein function prediction API using uploaded FASTA file"""
+def call_protein_function_prediction(
+    sequence: str = None,
+    fasta_file: str = None,
+    model_name: str = "ProtT5-xl-uniref50",
+    task: str = "Solubility",
+    api_key: str = None
+) -> str:
+    """
+    Call VenusFactory protein function prediction API.
+    If fasta_file is provided, use it; otherwise, use sequence (writes to temp fasta).
+    """
     try:
         dataset_mapping = {
             "Solubility": ["DeepSol", "DeepSoluE", "ProtSolM"],
@@ -284,11 +385,23 @@ def call_protein_function_prediction_from_file(fasta_file: str, model_name: str 
             "Optimum temperature": ["DeepET_Topt"]
         }
         datasets = dataset_mapping.get(task, ["DeepSol"])
-        
+
+        temp_fasta_path = None
+        if fasta_file:
+            fasta_path = fasta_file
+        elif sequence:
+            temp_fasta = tempfile.NamedTemporaryFile(mode='w', suffix='.fasta', delete=False)
+            temp_fasta.write(f">temp_sequence\n{sequence}\n")
+            temp_fasta.close()
+            temp_fasta_path = temp_fasta.name
+            fasta_path = temp_fasta_path
+        else:
+            return "Error: Either sequence or fasta_file must be provided"
+
         client = Client("http://localhost:7860/")
         result = client.predict(
-            task=task, 
-            fasta_file=handle_file(fasta_file),
+            task=task,
+            fasta_file=handle_file(fasta_path),
             model_name=model_name,
             datasets=datasets,
             enable_ai=True,
@@ -296,81 +409,86 @@ def call_protein_function_prediction_from_file(fasta_file: str, model_name: str 
             user_api_key=api_key,
             api_name="/handle_protein_function_prediction_chat"
         )
+
+        if temp_fasta_path:
+            os.unlink(temp_fasta_path)
+
         return result[1]
     except Exception as e:
         return f"Function prediction error: {str(e)}"
 
-def call_protein_function_prediction(sequence: str, model_name: str = "ProtT5-xl-uniref50", task: str = "Solubility", api_key: str = None) -> str:
-    """Call VenusFactory protein function prediction API with sequence"""
+def call_functional_residue_prediction(
+    sequence: str = None,
+    fasta_file: str = None,
+    model_name: str = "ESM2-650M",
+    task: str = "Activity",
+    api_key: str = None
+) -> str:
+    """
+    Call VenusFactory functional residue prediction API using either a sequence or a FASTA file.
+    If fasta_file is provided, use it; otherwise, use sequence (writes to temp fasta).
+    """
     try:
-        temp_fasta = tempfile.NamedTemporaryFile(mode='w', suffix='.fasta', delete=False)
-        temp_fasta.write(f">temp_sequence\n{sequence}\n")
-        temp_fasta.close()
-
-        dataset_mapping = {
-            "Solubility": ["DeepSol", "DeepSoluE", "ProtSolM"],
-            "Localization": ["DeepLocBinary", "DeepLocMulti"],
-            "Metal ion binding": ["MetalIonBinding"],
-            "Stability": ["Thermostability"],
-            "Sorting signal": ["SortingSignal"],
-            "Optimum temperature": ["DeepET_Topt"]
-        }
-        datasets = dataset_mapping.get(task, ["DeepSol"])
-        
-        client = Client("http://localhost:7860/")
-        result = client.predict(
-            task=task, 
-            fasta_file=handle_file(temp_fasta.name),
-            model_name=model_name,
-            datasets=datasets,
-            enable_ai=True,
-            ai_model="DeepSeek",
-            user_api_key=api_key,
-            api_name="/handle_protein_function_prediction_chat"
-        )
-        os.unlink(temp_fasta.name)
-        
-        return result[1]
-    except Exception as e:
-        return f"Function prediction error: {str(e)}"
-
-def call_functional_residue_prediction_from_file(fasta_file: str, model_name: str = "ESM2-650M", task: str = "Activity", api_key: str = None) -> str:
-    """Call VenusFactory functional residue prediction API using uploaded FASTA file"""
-    try:
+        temp_fasta_path = None
+        if fasta_file:
+            fasta_path = fasta_file
+        elif sequence:
+            temp_fasta = tempfile.NamedTemporaryFile(mode='w', suffix='.fasta', delete=False)
+            temp_fasta.write(f">temp_sequence\n{sequence}\n")
+            temp_fasta.close()
+            temp_fasta_path = temp_fasta.name
+            fasta_path = temp_fasta_path
+        else:
+            return "Error: Either sequence or fasta_file must be provided"
 
         client = Client("http://localhost:7860/")
         result = client.predict(
-            task=task, 
-            fasta_file=handle_file(fasta_file),
+            task=task,
+            fasta_file=handle_file(fasta_path),
             enable_ai=True,
             ai_model="DeepSeek",
             user_api_key=api_key,
             model_name=model_name,
             api_name="/handle_protein_residue_function_prediction_chat"
         )
-        return result[1]
-    except Exception as e:
-        return f"Functional residue prediction error: {str(e)}"
 
-def call_functional_residue_prediction(sequence: str, model_name: str = "ESM2-650M", task: str = "Activity", api_key: str = None) -> str:
-    """Call VenusFactory functional residue prediction API using uploaded FASTA file"""
-    try:
-        temp_fasta = tempfile.NamedTemporaryFile(mode='w', suffix='.fasta', delete=False)
-        temp_fasta.write(f">temp_sequence\n{sequence}\n")
-        temp_fasta.close()
+        if temp_fasta_path:
+            os.unlink(temp_fasta_path)
 
-        client = Client("http://localhost:7860/")
-        result = client.predict(
-            task=task, 
-            fasta_file=handle_file(temp_fasta.name),
-            enable_ai=True,
-            ai_model="DeepSeek",
-            user_api_key=api_key,
-            model_name=model_name,
-            api_name="/handle_protein_residue_function_prediction_chat"
-        )
-        os.unlink(temp_fasta.name)
-        return result[1]
+        # Filter results to only include residues with predicted label = 1
+        raw_result = result[1]
+        try:
+            import json
+            # Check if raw_result is already a dict or needs to be parsed
+            if isinstance(raw_result, dict):
+                result_data = raw_result
+            else:
+                result_data = json.loads(raw_result)
+            
+            # Handle the data format with 'data' field containing residue predictions
+            if isinstance(result_data, dict) and 'data' in result_data:
+                all_residues = result_data['data']
+                # Filter to only keep residues with predicted label = 1
+                functional_residues = [residue for residue in all_residues if residue[2] == 1]
+                
+                if functional_residues:
+                    result_data['data'] = functional_residues
+                    result_data['total_residues'] = len(all_residues)
+                    result_data['functional_residues'] = len(functional_residues)
+                    result_data['note'] = f"Showing {len(functional_residues)} functional residues (label=1) out of {len(all_residues)} total residues"
+                    return json.dumps(result_data)
+                else:
+                    # No functional residues found
+                    result_data['data'] = []
+                    result_data['total_residues'] = len(all_residues)
+                    result_data['functional_residues'] = 0
+                    result_data['note'] = f"No functional residues (label=1) found out of {len(all_residues)} total residues"
+                    return json.dumps(result_data)
+            
+            return raw_result
+        except (json.JSONDecodeError, KeyError, TypeError):
+            # If not JSON or doesn't have expected structure, return as is
+            return raw_result
     except Exception as e:
         return f"Functional residue prediction error: {str(e)}"
 
@@ -655,31 +773,33 @@ def download_alphafold_structure(uniprot_id: str, output_format: str = "pdb") ->
             "error_message": f"Error downloading structure for {uniprot_id}: {str(e)}"
         })
 
-def call_protein_properties_prediction_from_file(fasta_file: str, task_name: str, api_key: str = None) -> str:
+def call_protein_properties_prediction(sequence: str = None, fasta_file: str = None, task_name: str = "Physical and chemical properties", api_key: str = None) -> str:
+    """
+    Predict protein properties from a sequence or a fasta file.
+    If fasta_file is provided, use it directly; otherwise, use sequence (writes to temp fasta).
+    """
     try:
+        if fasta_file:
+            file_path = fasta_file
+            temp_fasta_created = False
+        elif sequence:
+            temp_fasta = tempfile.NamedTemporaryFile(mode='w', suffix='.fasta', delete=False)
+            temp_fasta.write(f">temp_sequence\n{sequence}\n")
+            temp_fasta.close()
+            file_path = temp_fasta.name
+            temp_fasta_created = True
+        else:
+            return "Protein properties prediction error: No sequence or fasta_file provided."
+
         client = Client("http://localhost:7860/")
         result = client.predict(
             task=task_name,
-            file_obj=handle_file(fasta_file),
+            file_obj=handle_file(file_path),
             api_name="/handle_protein_properties_generation"
         )
-        return result[1]
-    except Exception as e:
-        return f"Protein properties prediction error: {str(e)}"
 
-def call_protein_properties_prediction(sequence: str, task_name, api_key: str = None) -> str:
-    try:
-        temp_fasta = tempfile.NamedTemporaryFile(mode='w', suffix='.fasta', delete=False)
-        temp_fasta.write(f">temp_sequence\n{sequence}\n")
-        temp_fasta.close()
-
-        client = Client("http://localhost:7860/")
-        result = client.predict(
-            task=task_name,
-            file_obj=handle_file(temp_fasta.name),
-            api_name="/handle_protein_properties_generation"
-        )
-        os.unlink(temp_fasta.name)
+        if 'temp_fasta_created' in locals() and temp_fasta_created:
+            os.unlink(file_path)
         return result[1]
     except Exception as e:
         return f"Protein properties prediction error: {str(e)}"

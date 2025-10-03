@@ -369,6 +369,7 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     
     # This is the new COORDINATOR logic
     def send_message(history, message, selected_conv_id):
+        
         BASE_UPLOAD_DIR = "temp_outputs/upload_data"
         current_time = time.localtime()
         time_stamped_subdir = os.path.join(
@@ -514,6 +515,7 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                     # Worker input needs to be a single string for some agents
                     worker_input_str = json.dumps(tool_input)
                     worker_result = worker.invoke({"input": worker_input_str})
+                    
                     raw_output = str(worker_result)
                     step_results[step_num] = {'raw_output': raw_output}
                     
@@ -636,6 +638,7 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         show_copy_button=True,
                         elem_classes="main-chatbot"
                     )
+                    
                     chat_input = gr.MultimodalTextbox(
                         interactive=True,
                         file_count="multiple",
