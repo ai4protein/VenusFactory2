@@ -51,9 +51,6 @@ This module displays the prediction results upon task completion and provides op
 
 - **Download Results**: Allows the user to download all prediction results from the table to their local computer.
 
-
-
-
 ## 3. Intelligent Directed Evolution
 
 ### 3.1 Sequence Input and Protein Function Selection
@@ -142,16 +139,6 @@ I will first translate the Chinese text into English, removing any redundant phr
 
 -----
 
-
-
-
-
-
-
-
-
-
-
 ## 5. Functional Residue Prediction
 
 ### 5.1 Task Selection and Sequence Input
@@ -200,9 +187,6 @@ I will first translate the Chinese text into English, removing all redundant phr
 
 -----
 
-
-
-
 ## 6. Physicochemical Property Analysis
 
 ### 6.1 Task Selection and Sequence Input
@@ -235,3 +219,4 @@ I will first translate the Chinese text into English, removing all redundant phr
 * **Secondary structure:** Displays a table showing the **Position**, **Residue type**, and the corresponding **DSSP secondary structure code** (e.g., $\text{H}$ for $\alpha$-helix, $\text{E}$ for $\beta$-sheet) for each residue.
 
 **Download Results:** Users can click this button to **download all detailed prediction data** from the table to their local computer for further data processing and archival.
+
