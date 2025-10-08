@@ -1203,7 +1203,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         struct_chain_selector.change(
             fn=handle_chain_change_unified,
             inputs=[struct_chain_selector, struct_chains_state, struct_original_file_path_state, struct_original_paste_content_state],
-            outputs=[struct_protein_display, struct_file_upload] 
+            outputs=[struct_protein_display, struct_current_file_state] 
         )
 
         function_fasta_upload.upload(
@@ -1230,7 +1230,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         function_protein_selector.change(
             fn=handle_sequence_change_unified,
             inputs=[function_protein_selector, function_sequence_state, function_original_file_path_state, function_original_paste_content_state],
-            outputs=[function_protein_display, function_fasta_upload]
+            outputs=[function_protein_display, function_current_file_state]
         )
         adv_func_task_dd.change(
             fn=update_dataset_choices_fixed,
@@ -1260,7 +1260,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         adv_residue_function_selector.change(
             fn=handle_sequence_change_unified,
             inputs=[adv_residue_function_selector, adv_residue_function_sequence_state, adv_residue_function_original_file_path_state, adv_residue_function_original_paste_content_state],
-            outputs=[adv_residue_function_protein_display, adv_residue_function_fasta_upload]
+            outputs=[adv_residue_function_protein_display, adv_residue_function_current_file_state]
         )
         adv_residue_function_predict_btn.click(
             fn=handle_protein_residue_function_prediction,
