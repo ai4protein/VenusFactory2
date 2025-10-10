@@ -163,7 +163,7 @@ dataset/
 data/*.ipynb
 wandb/
 ckpt/*
-!ckpt/demo/
+!ckpt/demo/demo_solubility*
 !ckpt/DeepSol/
 ckpt/DeepSol/ankh-base
 ckpt/DeepSol/ankh-large/ses-adapter*

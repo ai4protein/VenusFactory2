@@ -1,0 +1,8 @@
+{
+    "dataset": "AI4Protein/DLKcat",
+    "num_labels": 1,
+    "problem_type": "regression",
+    "metrics": "mse",
+    "monitor": "mse",
+    "monitor_strategy": "min"
+}
