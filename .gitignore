@@ -237,6 +237,22 @@ ckpt/MetalIonBinding/esm2_t33_650M_UR50D/ses-adapter*
 ckpt/MetalIonBinding/prot_bert/ses-adapter*
 ckpt/MetalIonBinding/prot_t5_xl_uniref50/ses-adapter*
 
+!ckpt/DLKcat/
+ckpt/DLKcat/ankh-base
+ckpt/DLKcat/ankh-large/ses-adapter*
+ckpt/DLKcat/esm2_t30_150M_UR50D
+ckpt/DLKcat/esm2_t33_650M_UR50D/ses-adapter*
+ckpt/DLKcat/prot_bert/ses-adapter*
+ckpt/DLKcat/prot_t5_xl_uniref50/ses-adapter*
+
+!ckpt/EpHod/
+ckpt/EpHod/ankh-base
+ckpt/EpHod/ankh-large/ses-adapter*
+ckpt/EpHod/esm2_t30_150M_UR50D
+ckpt/EpHod/esm2_t33_650M_UR50D/ses-adapter*
+ckpt/EpHod/prot_bert/ses-adapter*
+ckpt/EpHod/prot_t5_xl_uniref50/ses-adapter*
+
 # VenusX
 !ckpt/VenusX_Res_Act_MP90/
 ckpt/VenusX_Res_Act_MP90/ankh-base
@@ -257,6 +273,31 @@ ckpt/VenusX_Res_Motif_MP90/prot_bert
 ckpt/VenusX_Res_Evo_MP90/ankh-base
 ckpt/VenusX_Res_Evo_MP90/esm2_t30_150M_UR50D
 ckpt/VenusX_Res_Evo_MP90/prot_bert
+
+# VenusVaccine
+!ckpt/VenusVaccine_BacteriaBinary/
+ckpt/VenusVaccine_BacteriaBinary/ankh-base
+ckpt/VenusVaccine_BacteriaBinary/ankh-large/ses-adapter*
+ckpt/VenusVaccine_BacteriaBinary/esm2_t30_150M_UR50D
+ckpt/VenusVaccine_BacteriaBinary/esm2_t33_650M_UR50D/ses-adapter*
+ckpt/VenusVaccine_BacteriaBinary/prot_bert/ses-adapter*
+ckpt/VenusVaccine_BacteriaBinary/prot_t5_xl_uniref50/ses-adapter*
+
+!ckpt/VenusVaccine_TumorBinary/
+ckpt/VenusVaccine_TumorBinary/ankh-base
+ckpt/VenusVaccine_TumorBinary/ankh-large/ses-adapter*
+ckpt/VenusVaccine_TumorBinary/esm2_t30_150M_UR50D
+ckpt/VenusVaccine_TumorBinary/esm2_t33_650M_UR50D/ses-adapter*
+ckpt/VenusVaccine_TumorBinary/prot_bert/ses-adapter*
+ckpt/VenusVaccine_TumorBinary/prot_t5_xl_uniref50/ses-adapter*
+
+!ckpt/VenusVaccine_VirusBinary/
+ckpt/VenusVaccine_VirusBinary/ankh-base
+ckpt/VenusVaccine_VirusBinary/ankh-large/ses-adapter*
+ckpt/VenusVaccine_VirusBinary/esm2_t30_150M_UR50D
+ckpt/VenusVaccine_VirusBinary/esm2_t33_650M_UR50D/ses-adapter*
+ckpt/VenusVaccine_VirusBinary/prot_bert/ses-adapter*
+ckpt/VenusVaccine_VirusBinary/prot_t5_xl_uniref50/ses-adapter*
 
 script_dev/
 .gradio/
