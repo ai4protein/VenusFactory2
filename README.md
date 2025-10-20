@@ -15,7 +15,7 @@
 </div>
  
 Recent News:
-- [2025-08-10] 🎉 VenusFactory releases a free website at [venusfactory.cn](http://www.venusfactory.cn/).
+- [2025-08-10] 🎉 VenusFactory releases a free website at [venusfactory.cn/playground/](http://www.venusfactory.cn/playground/).
 - [2025-06-30] 🚀 **Update:** Added mutation zero-shot prediction functionality, supporting structure-based and sequence-based models for high-throughput mutation effect scoring.
 - [2025-04-19] 🎉 **Congratulations!** [VenusREM](https://github.com/ai4protein/VenusREM) achieves 1st place in [ProteinGym](https://proteingym.org/benchmarks) and [VenusMutHub](https://lianglab.sjtu.edu.cn/muthub/) leaderboard!
 - [2025-03-26] Add [VenusPLM-300M](https://huggingface.co/AI4Protein/VenusPLM-300M) model, trained based on **VenusPod**, is a protein language model independently developed by Hong Liang's research group at Shanghai Jiao Tong University.
