@@ -27,3 +27,13 @@ transformers==4.48.1
 wandb==0.21.3
 vplm==0.0.1
 dotenv==0.9.9
+
+langchain==0.3.27 
+langchain-community==0.3.31
+langchain-core==0.3.79
+langchain-openai==0.3.35
+langchain-text-splitters==0.3.11
+langsmith==0.4.37
+lightning-utilities==0.15.2
+openai==2.4.0
+sortedcontainers==2.4.0
