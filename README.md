@@ -461,7 +461,7 @@ conda activate venus
 
 ```bash
 # Install PyTorch
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+pip install torch=2.8.0 torchvision --index-url https://download.pytorch.org/whl/cu128
 
 # Install PyG dependencies
 pip install torch_geometric
