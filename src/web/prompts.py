@@ -6,6 +6,7 @@ from langchain.prompts import ChatPromptTemplate
 PLANNER_PROMPT_TEMPLATE = """
 You are VenusAgent, a specialized protein engineering and bioinformatics project planner.
 Your task is to design a precise, step-by-step execution plan to address the user's request.
+The formulated plan needs to be simple and effective, and the proposed solution can efficiently and simply solve the current problem
 
 Available tools:
 {tools_description}
@@ -54,9 +55,10 @@ CRITICAL RULES:
 1. For file-based tasks, extract file paths from the context and include them in tool_input
 2. For ai_code_execution, always include "input_files" as a list of file paths
 3. For data processing requests (splitting datasets, analysis), use ai_code_execution
-4. Use dependencies like "dependency:step_N:output" for chained operations
+4. Use "dependency:step_1:file_path" to extract file_path from JSON, and use "dependency:step_1" to use the entire output
 5. If no tools are needed, return empty array []
-
+6. Protein function prediction and residue-function prediction are based on sequence model, use sequence or FASTA as input.
+7. Recommand to use sequence-based model in order to save computation cost.
 EXAMPLES:
 User uploads dataset.csv and asks to split it:
 [
@@ -116,11 +118,17 @@ PLANNER_PROMPT = ChatPromptTemplate.from_template(PLANNER_PROMPT_TEMPLATE)
 
 # --- Worker Prompt (Generic for Tool Execution) ---
 WORKER_PROMPT = ChatPromptTemplate.from_messages([
-    ("system", "You are VenusAgent, a computer scientist with strong expertise in biology. Use the provided tools to answer the user's request."),
-    ("human", "{input}"),
-    ("placeholder", "{agent_scratchpad}"),
-])
+    ("system", """You are VenusAgent, a computer scientist with strong expertise in biology.
 
+    MANDATORY RULE: Every response MUST contain text content. When using tools:
+    - ALWAYS write "I will now [action]" or similar text BEFORE the tool call
+    - NEVER return only a tool call without any text
+    - Format: [Explanation text] + [Tool call]
+
+    Example: "I will now query UniProt for the Catalase sequence." [then tool call]"""),
+        ("human", "{input}"),
+        ("placeholder", "{agent_scratchpad}"),
+    ])
 
 # --- Analyzer Prompt ---
 ANALYZER_PROMPT_TEMPLATE = """

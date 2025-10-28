@@ -6,947 +6,21 @@ import subprocess
 import time
 import zipfile
 from pathlib import Path
-from datetime import datetime
-from typing import Dict, Any, List, Generator, Optional, Tuple, Union
+from typing import Dict, Any, List, Generator, Optional, Tuple
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import numpy as np
-import requests
-from dataclasses import dataclass
-import re
 import json
-from .utils.paste_content_handler import process_pasted_content
 from dotenv import load_dotenv
+
+from web.utils.constants import *
+from web.utils.common_utils import *
+from web.utils.file_handlers import *
+from web.utils.ai_helpers import *
+from web.utils.data_processors import *
+from web.utils.visualization import *
+from web.utils.prediction_runners import *
+
 load_dotenv()
-
-MODEL_MAPPING_ZERO_SHOT = {
-    "ESM2-650M": "esm2", 
-    "ESM-1b": "esm1b",
-    "ESM-IF1": "esmif1", 
-    "ESM-1v": "esm1v",
-    "SaProt": "saprot", 
-    "MIF-ST": "mifst", 
-    "ProSST-2048": "prosst", 
-    "ProtSSN": "protssn"
-}
-
-DATASET_MAPPING_ZERO_SHOT = [
-    "Activity",
-    "Binding",
-    "Expression",
-    "Organismal Fitness",
-    "Stability"
-]
-
-MODEL_MAPPING_FUNCTION = {
-    "ESM2-650M": "esm2", 
-    "Ankh-large": "ankh",
-    "ProtBert": "protbert", 
-    "ProtT5-xl-uniref50": "prott5",
-}
-
-MODEL_ADAPTER_MAPPING_FUNCTION = {
-    "esm2": "esm2_t33_650M_UR50D", 
-    "ankh": "ankh-large",
-    "protbert": "prot_bert", 
-    "prott5": "prot_t5_xl_uniref50",
-}
-
-DATASET_MAPPING_FUNCTION = {
-    "Solubility": ["DeepSol", "DeepSoluE", "ProtSolM"],
-    "Localization": ["DeepLocBinary", "DeepLocMulti"],
-    "Metal ion binding": ["MetalIonBinding"], 
-    "Stability": ["Thermostability"],
-    "Sortingsignal": ["SortingSignal"], 
-    "Optimum temperature": ["DeepET_Topt"]
-}
-
-LABEL_MAPPING_FUNCTION = {
-    "Solubility": ["Insoluble", "Soluble"],
-    "DeepLocBinary": ["Membrane", "Soluble"],
-    "DeepLocMulti": [
-        "Cytoplasm", "Nucleus", "Extracellular", "Mitochondrion", "Cell membrane",
-        "Endoplasmic reticulum", "Plastid", "Golgi apparatus", "Lysosome/Vacuole", "Peroxisome"
-    ],
-    "Metal ion binding": ["Non-binding", "Binding"],
-    "Sortingsignal": ['No signal', "CH", 'GPI', "MT", "NES", "NLS", "PTS", "SP", "TM", "TH"]    
-}
-
-RESIDUE_MAPPING_FUNCTION = {
-    "Activity Site": ["VenusX_Res_Act_MP90"],
-    "Binding Site": ["VenusX_Res_BindI_MP90"],
-    "Conserved Site": ["VenusX_Res_Evo_MP90"],
-    "Motif": ["VenusX_Res_Motif_MP90"]
-}
-
-COLOR_MAP_FUNCTION = {
-    "Soluble": "#3B82F6", "Insoluble": "#EF4444", "Membrane": "#F59E0B", 
-    "Cytoplasm": "#10B981", "Nucleus": "#8B5CF6", "Extracellular": "#F97316", 
-    "Mitochondrion": "#EC4899", "Cell membrane": "#6B7280", "Endoplasmic reticulum": "#84CC16", 
-    "Plastid": "#06B6D4", "Golgi apparatus": "#A78BFA", "Lysosome/Vacuole": "#FBBF24", 
-    "Peroxisome": "#34D399", "Binding": "#3B82F6", "Non-binding": "#EF4444", 
-    "Signal": "#3B82F6", "No signal": "#EF4444", "Default": "#9CA3AF"
-}
-
-PROTEIN_PROPERTIES_FUNCTION = {
-    "Physical and chemical properties",
-    "Relative solvent accessible surface area (PDB only)",
-    "SASA value (PDB only)",
-    "Secondary structure (PDB only)"
-}
-PROTEIN_PROPERTIES_MAP_FUNCTION = {
-    "Physical and chemical properties" : "calculate_physchem",
-    "Relative solvent accessible surface area (PDB only)" : "calculate_rsa",
-    "SASA value (PDB only)": "calculate_sasa",
-    "Secondary structure (PDB only)" : "calculate_secondary_structure"
-}
-
-REGRESSION_TASKS_FUNCTION = ["Stability", "Optimum temperature"]
-REGRESSION_TASKS_FUNCTION_MAX_MIN = {
-    "Stability": [40.1995166, 66.8968874],
-    "Optimum temperature": [2, 120]
-}
-
-DATASET_TO_TASK_MAP = {
-    dataset: task 
-    for task, datasets in DATASET_MAPPING_FUNCTION.items() 
-    for dataset in datasets
-}
-
-
-AI_MODELS = {
-    "DeepSeek": {
-        "api_base": "https://api.deepseek.com/v1", 
-        "model": "deepseek-chat",
-        "env_key": "DEEPSEEK_API_KEY"
-    },
-    "ChatGPT": {
-        "api_base": "https://api.openai.com/v1",
-        "model": "gpt-4o-mini", 
-        "env_key": None
-    },
-    "Gemini": {
-        "api_base": "https://generativelanguage.googleapis.com/v1beta",
-        "model": "gemini-1.5-flash",
-        "env_key": None
-    }
-}
-
-@dataclass
-class AIConfig:
-    """Configuration for AI API calls."""
-    api_key: str
-    ai_model_name: str
-    api_base: str
-    model: str
-
-def get_api_key(ai_provider: str, user_input_key: str = "") -> Optional[str]:
-    """Get API key based on provider and user input."""
-    model_config = AI_MODELS.get(ai_provider, {})
-    env_key = model_config.get("env_key")
-    
-    if env_key:
-        env_api_key = os.getenv(env_key)
-        if env_api_key and env_api_key.strip():
-            return env_api_key.strip()
-        if user_input_key and user_input_key.strip():
-            return user_input_key.strip()
-        return None
-    
-    if user_input_key and user_input_key.strip():
-        return user_input_key.strip()
-    return None
-
-def call_ai_api(config: AIConfig, prompt: str) -> str:
-    """Make API call to AI service."""
-    if config.ai_model_name == "ChatGPT":
-        headers = {
-            "Authorization": f"Bearer {config.api_key}",
-            "Content-Type": "application/json"
-        }
-        data = {
-            "model": config.model,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": "You are an expert protein scientist. Provide clear, structured, and insightful analysis based on the data provided. Do not ask interactive questions."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            "temperature": 0.3,
-            "max_tokens": 2000
-        }
-        endpoint = f"{config.api_base}/chat/completions"
-        
-    elif config.ai_model_name == "Gemini":
-        headers = {
-            "Content-Type": "application/json"
-        }
-        data = {
-            "contents": [{
-                "parts": [{
-                    "text": f"You are an expert protein scientist. {prompt}"
-                }]
-            }],
-            "generationConfig": {
-                "temperature": 0.3,
-                "maxOutputTokens": 2000
-            }
-        }
-        endpoint = f"{config.api_base}/models/{config.model}:generateContent?key={config.api_key}"
-        
-    else:
-        headers = {
-            "Authorization": f"Bearer {config.api_key}",
-            "Content-Type": "application/json"
-        }
-        data = {
-            "model": config.model,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": "You are an expert protein scientist. Provide clear, structured, and insightful analysis based on the data provided. Do not ask interactive questions."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            "temperature": 0.3,
-            "max_tokens": 2000
-        }
-        endpoint = f"{config.api_base}/chat/completions"
-    
-    try:
-        response = requests.post(
-            endpoint,
-            headers=headers,
-            json=data,
-            timeout=60
-        )
-        response.raise_for_status()
-        response_json = response.json()
-        
-        if config.ai_model_name == "Gemini":
-            if "candidates" in response_json and len(response_json["candidates"]) > 0:
-                return response_json["candidates"][0]["content"]["parts"][0]["text"]
-            else:
-                return "❌ Gemini API returned empty response"
-        else:
-            return response_json["choices"][0]["message"]["content"]
-            
-    except requests.exceptions.RequestException as e:
-        return f"❌ Network error: {str(e)}"
-    except KeyError as e:
-        return f"❌ API response format error: {str(e)}"
-    except Exception as e:
-        return f"❌ API call failed: {str(e)}"
-    
-def check_ai_config_status(ai_provider: str, user_api_key: str) -> tuple[bool, str]:
-    """Check AI configuration status and return validity and message."""
-    model_config = AI_MODELS.get(ai_provider, {})
-    env_key = model_config.get("env_key")
-    
-    if env_key:
-        env_api_key = os.getenv(env_key)
-        if env_api_key and env_api_key.strip():
-            return True, "✓ Using the Provided API Key"
-        elif user_api_key and user_api_key.strip():
-            return True, "✓ The server will not save your API Key"
-        else:
-            return False, "⚠ No API Key found in .env file"
-    else:
-        if user_api_key and user_api_key.strip():
-            return True, "✓ Manual API Key provided"
-        else:
-            return False, "⚠ Manual API Key required"  
-
-def on_ai_model_change(ai_provider: str) -> tuple:
-    """Handle AI model selection change."""
-    model_config = AI_MODELS.get(ai_provider, {})
-    env_key = model_config.get("env_key")
-    
-    if env_key:
-        env_api_key = os.getenv(env_key)
-        if env_api_key and env_api_key.strip():
-            status_msg = "✓ Using API Key from .env file"
-            show_input = False
-            placeholder = ""
-        else:
-            status_msg = "⚠ No API Key available. Please enter manually below:"
-            show_input = True
-            placeholder = "Enter your DeepSeek API Key"
-    else:
-        status_msg = f"⚠ Manual API Key required for {ai_provider}"
-        show_input = True
-        if ai_provider == "ChatGPT":
-            placeholder = "Enter your OpenAI API Key (sk-...)"
-        elif ai_provider == "Gemini":
-            placeholder = "Enter your Google AI API Key"
-        else:
-            placeholder = f"Enter your {ai_provider} API Key"
-    
-    return (
-        gr.update(visible=show_input, placeholder=placeholder, value=""),
-        gr.update(value=status_msg)
-    )
-
-
-def generate_expert_analysis_prompt_residue(results_df: pd.DataFrame, task: str) -> str:
-    """
-    Generates a prompt for an LLM to analyze residue-level prediction results.
-    """
-    prompt = f"""
-        You are a senior protein biochemist and structural biologist with deep expertise in enzyme mechanisms and protein engineering. 
-        A colleague has just brought you the following prediction results identifying key functional residues, specifically for the task '{task}'.
-        Please analyze these residue-specific results from a practical, lab-focused perspective:
-
-        {results_df.to_string(index=False)}
-
-        Provide a concise, practical analysis in a single paragraph, focusing ONLY on:
-        1. The predicted functional role of the individual high-scoring residues (e.g., activity site, binding site, conserved site, and motif).
-        2. The significance of the confidence scores (i.e., how certain are we that a specific residue is critical for the function).
-        3. Specific experimental validation steps, especially which residues are the top candidates for site-directed mutagenesis to confirm their roles.
-        4. Any notable patterns or outliers (e.g., a cluster of high-scoring residues forming a potential active site, or a surprising critical residue far from the expected functional region).
-        5. Do not output formatted content, just one paragraph is sufficient
-        Use simple, direct language that a bench scientist would use. Do NOT mention:
-        - The model used or its training data.
-        - Any computational or implementation details.
-        - Complex statistical concepts beyond confidence.
-
-        Keep your response under 200 words and speak as if you are discussing next steps for an experiment with a colleague.
-        """
-    return prompt
-
-def generate_expert_analysis_prompt(results_df: pd.DataFrame, task: str) -> str:
-    protein_count = len(results_df)
-
-    prompt = f"""
-        You are a senior protein biochemist with extensive laboratory experience. A colleague has just shown you protein function prediction results for the task '{task}'. 
-        Please analyze these results from a practical biologist's perspective:
-        {results_df.to_string(index=False)}
-        Provide a concise, practical analysis focusing ONLY on:
-        0. The task '{task}' with "Stability" and "Optimum temperature" are regression task
-        1. What the prediction results mean for each protein
-        2. The biological significance of the confidence scores
-        3. Practical experimental recommendations based on these predictions
-        4. Any notable patterns or outliers in the results
-        5. Do not output formatted content, just one paragraph is sufficient
-        Use simple, clear language that a bench scientist would appreciate. Do NOT mention:
-        - Training datasets or models
-        - Technical implementation details  
-        - Computational methods
-        - Statistical concepts beyond confidence scores
-        Keep your response under 200 words and speak as if you're having a conversation with a colleague in the lab.
-        """
-    return prompt
-
-def format_expert_response(ai_response: str) -> str:
-    """Format AI response as HTML with expert avatar and speech bubble."""
-    escaped_response = ai_response.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('\n', '<br>')
-    
-    html = f"""
-    <div style="min-height: 150px; padding: 10px; display: flex; align-items: flex-end; font-family: Arial, sans-serif;">
-        <div style="margin-right: 15px; text-align: center;">
-            <div style="width: 60px; height: 60px; background-color: #4A90E2; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; color: white; border: 3px solid #357ABD;">
-                👨‍🔬
-            </div>
-            <div style="font-size: 12px; color: #666; margin-top: 5px; font-weight: bold;">
-                Expert
-            </div>
-        </div>
-        <div style="flex: 1; position: relative;">
-            <div style="background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 15px; padding: 15px; position: relative; max-width: 90%; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                <div style="position: absolute; left: -10px; bottom: 20px; width: 0; height: 0; border-top: 10px solid transparent; border-bottom: 10px solid transparent; border-right: 10px solid #f8f9fa;"></div>
-                <div style="position: absolute; left: -11px; bottom: 20px; width: 0; height: 0; border-top: 10px solid transparent; border-bottom: 10px solid transparent; border-right: 10px solid #dee2e6;"></div>
-                <div style="font-size: 15px; line-height: 1.4; color: #333;">
-                    {escaped_response}
-                </div>
-            </div>
-        </div>
-    </div>
-    """
-    return html
-
-def generate_mutation_ai_prompt(results_df: pd.DataFrame, model_name: str, function_selection: str) -> str:
-    """Generate AI prompt for mutation analysis."""
-    if 'Mutant' not in results_df.columns:
-        return "Error: 'Mutant' column not found."
-    
-    score_col = next(
-        (col for col in results_df.columns if 'Prediction Rank' in col.lower()), 
-        results_df.columns[1] if len(results_df.columns) > 1 else None
-    )
-    
-    if not score_col:
-        return "Error: Score column not found."
-
-    num_rows = len(results_df)
-    top_count = max(20, int(num_rows * 0.05)) if num_rows >= 5 else num_rows
-    top_mutations_str = results_df.head(top_count)[['Mutant', score_col]].to_string(index=False)
-    
-    return f"""
-        Please act as an expert protein engineer and analyze the following mutation prediction results generated by the '{model_name}' model for the function '{function_selection}'.
-        A deep mutational scan was performed. The results are sorted from most beneficial to least beneficial based on the '{score_col}'. Below are the top 5% of mutations.
-
-        ### Top 5% Predicted Mutations (Potentially Most Beneficial):
-        ```
-        {top_mutations_str}
-        ```
-
-        ### Your Analysis Task:
-        Based on this data, provide a structured scientific analysis report that includes the following sections:
-        1. Executive Summary: Briefly summarize the key findings. Are there clear hotspot regions?
-        2. Analysis of Beneficial Mutations: Discuss the top mutations and their potential biochemical impact on '{function_selection}'.
-        3. Analysis of Detrimental Mutations: What do the most harmful mutations suggest about critical residues?
-        4. Recommendations for Experimentation: Suggest 3-5 specific mutations for validation, with justifications.
-        5. Do not output formatted content, just one paragraph is sufficient
-        Provide a concise, clear, and insightful report in a professional scientific tone, summarize the above content into 1-2 paragraphs and output unformatted content.
-        """
-
-def generate_ai_summary_prompt(results_df: pd.DataFrame, task: str, model: str) -> str:
-    """Generate AI prompt for function prediction summary."""
-    prompt = f"""
-        You are a senior protein biochemist with extensive laboratory experience. A colleague has just shown you protein function prediction results for the task '{task}' on model '{model}'. 
-        Please analyze these results from a practical biologist's perspective:
-        {results_df.to_string(index=False)}
-        Provide a concise, practical analysis focusing ONLY on:
-        0. The task '{task}' with "Stability" and "Optimum temperature" are regression task
-        1. What the prediction results mean for each protein
-        2. The biological significance of the confidence scores
-        3. Practical experimental recommendations based on these predictions
-        4. Any notable patterns or outliers in the results
-        5. Do not output formatted content, just one paragraph is sufficient
-        Use simple, clear language that a bench scientist would appreciate. Do NOT mention:
-        - Training datasets or models
-        - Technical implementation details  
-        - Computational methods
-        - Statistical concepts beyond confidence scores
-        Keep your response under 200 words and speak as if you're having a conversation with a colleague in the lab.
-        """
-    return prompt
-
-def get_save_path(subdir):
-    temp_dir = Path("temp_outputs")
-    now = datetime.now()
-    year = str(now.year)
-    month = str(now.month).zfill(2)
-    day = str(now.day).zfill(2)
-    temp_dir_ = temp_dir / year / month / day / subdir
-    temp_dir_.mkdir(parents=True, exist_ok=True)
-    return temp_dir_
-
-def parse_fasta_paste_content(fasta_content):
-    if not fasta_content or not fasta_content.strip():
-        return "No file selected", gr.update(choices=["Sequence_1"], value="Sequence_1", visible=False), {}, "Sequence_1", ""
-   
-    try:
-        sequences = {}
-        current_header = None
-        current_sequence = ""
-        sequence_counter = 1
-       
-        for line in fasta_content.strip().split('\n'):
-            line = line.strip()
-            if not line:
-                continue
-                
-            if line.startswith('>'):
-                if current_header is not None and current_sequence:
-                    sequences[current_header] = current_sequence
-                
-                current_header = line[1:].strip()
-                current_sequence = ""
-            else:
-                sequence_data = ''.join(c.upper() for c in line if c.isalpha())
-                
-                if current_header is None:
-                    current_header = f"Sequence_{sequence_counter}"
-                    sequence_counter += 1
-                
-                current_sequence += sequence_data
-
-        if current_header is not None and current_sequence:
-            sequences[current_header] = current_sequence
-       
-        if not sequences:
-            return "No valid protein sequences found in FASTA content", gr.update(choices=["Sequence_1"], value="Sequence_1", visible=False), {}, "Sequence_1", ""
-        
-        fasta_lines = []
-        for header, sequence in sequences.items():
-            fasta_lines.append(f">{header}")
-            fasta_lines.append(sequence)
-        modify_fasta_content = "\n".join(fasta_lines)
-       
-        sequence_choices = list(sequences.keys())
-        default_sequence = sequence_choices[0]
-        display_sequence = sequences[default_sequence]
-        selector_visible = len(sequence_choices) > 1
-        
-        timestamp = str(int(time.time()))
-        sequence_dir = get_save_path("Upload_dataset")
-        temp_fasta_path = os.path.join(sequence_dir, f"paste_content_seq_{sanitize_filename(default_sequence)}_{timestamp}.fasta")
-        save_selected_sequence_fasta(modify_fasta_content, default_sequence, temp_fasta_path)
-        return display_sequence, gr.update(choices=sequence_choices, value=default_sequence, visible=selector_visible), sequences, default_sequence, temp_fasta_path, modify_fasta_content
-       
-    except Exception as e:
-        print(f"Error in parse_fasta_paste_content: {str(e)}")
-        return f"Error parsing FASTA content: {str(e)}", gr.update(choices=["Sequence_1"], value="Sequence_1", visible=False), {}, "Sequence_1", "", ""
-
-def save_selected_sequence_fasta(original_fasta_content, selected_sequence, output_path):
-    sequences = {}
-    current_header = None
-    current_sequence = ""
-    sequence_counter = 1
-   
-    for line in original_fasta_content.strip().split('\n'):
-        line = line.strip()
-        if not line:
-            continue
-            
-        if line.startswith('>'):
-            if current_header is not None and current_sequence:
-                sequences[current_header] = current_sequence
-            
-            current_header = line[1:].strip()
-            current_sequence = ""
-        else:
-            sequence_data = ''.join(c.upper() for c in line if c.isalpha())
-            
-            if current_header is None:
-                current_header = f"Sequence_{sequence_counter}"
-                sequence_counter += 1
-            
-            current_sequence += sequence_data
-
-    if current_header is not None and current_sequence:
-        sequences[current_header] = current_sequence
-   
-    if not sequences or selected_sequence not in sequences:
-        print(f"Error: Sequence '{selected_sequence}' not found in parsed sequences")
-        return
-
-    try:
-        with open(output_path, 'w', encoding='utf-8') as f:
-            f.write(f">{selected_sequence}\n")
-            f.write(sequences[selected_sequence])
-    except Exception as e:
-        print(f"Error saving file: {str(e)}")
-
-def handle_paste_sequence_selection(selected_sequence, sequences_dict, original_fasta_content_from_state):
-    if not sequences_dict or selected_sequence not in sequences_dict:
-        return "No file selected", ""
-    
-    # Check if the content is valid
-    if not original_fasta_content_from_state or original_fasta_content_from_state == "No file selected":
-        return "No file selected", ""
-    
-    try:
-        timestamp = str(int(time.time()))
-        sequence_dir = get_save_path("Upload_dataset")
-        temp_pdb_path = os.path.join(sequence_dir, f"paste_content_seq_{selected_sequence}_{timestamp}.fasta")
-        save_selected_sequence_fasta(original_fasta_content_from_state, selected_sequence, temp_pdb_path)
-        
-        return sequences_dict[selected_sequence], temp_pdb_path
-        
-    except Exception as e:
-        return f"Error processing chain selection: {str(e)}", ""
-
-def handle_fasta_sequence_change(selected_sequence, sequences_dict, original_fasta_path):
-    if not sequences_dict or selected_sequence not in sequences_dict:
-        return "No file selected", ""
-    
-    # Check if the file path is valid and exists
-    if not original_fasta_path or original_fasta_path == "No file selected" or not os.path.exists(original_fasta_path):
-        return "No file selected", ""
-    
-    try:
-        with open(original_fasta_path, 'r') as f:
-            lines = f.read()
-
-        new_fasta_lines = []
-        new_fasta_lines.append(">"+selected_sequence)
-        new_fasta_lines.append(sequences_dict[selected_sequence])
-        
-        dir_path = os.path.dirname(original_fasta_path)
-        base_name, extension = os.path.splitext(os.path.basename(original_fasta_path))
-        new_filename = f"{base_name}_1{extension}"
-        new_fasta_path = os.path.join(dir_path, new_filename)
-        with open(new_fasta_path, 'w', encoding='utf-8') as f:
-            f.write('\n'.join(new_fasta_lines))
-        
-        return sequences_dict[selected_sequence], new_fasta_path
-
-    except Exception as e:
-        return f"Error processing sequence selection: {str(e)}", ""
-
-def parse_pdb_paste_content(pdb_content):
-    if not pdb_content.strip():
-        return "No file selected", gr.update(choices=["A"], value="A", visible=False), {}, "A", ""
-    
-    try:
-        chains = {}
-        current_chain = None
-        sequence = ""
-        
-        for line in pdb_content.strip().split('\n'):
-            if line.startswith('ATOM'):
-                chain_id = line[21:22].strip()
-                if chain_id == "":
-                    chain_id = "A"
-                
-                if current_chain != chain_id:
-                    if current_chain is not None and sequence:
-                        chains[current_chain] = sequence
-                    current_chain = chain_id
-                    sequence = ""
-                
-                res_name = line[17:20].strip()
-                if res_name in ['ALA', 'CYS', 'ASP', 'GLU', 'PHE', 'GLY', 'HIS', 'ILE', 'LYS', 'LEU', 'MET', 'ASN', 'PRO', 'GLN', 'ARG', 'SER', 'THR', 'VAL', 'TRP', 'TYR']:
-                    aa_map = {'ALA': 'A', 'CYS': 'C', 'ASP': 'D', 'GLU': 'E', 'PHE': 'F', 
-                             'GLY': 'G', 'HIS': 'H', 'ILE': 'I', 'LYS': 'K', 'LEU': 'L', 
-                             'MET': 'M', 'ASN': 'N', 'PRO': 'P', 'GLN': 'Q', 'ARG': 'R', 
-                             'SER': 'S', 'THR': 'T', 'VAL': 'V', 'TRP': 'W', 'TYR': 'Y'}
-                    
-                    res_num = int(line[22:26].strip())
-                    if len(sequence) < res_num:
-                        sequence += aa_map[res_name]
-        
-        if current_chain is not None and sequence:
-            chains[current_chain] = sequence
-        
-        if not chains:
-            return "No valid protein chains found in PDB content", gr.update(choices=["A"], value="A", visible=False), {}, "A", ""
-        
-        chain_choices = list(chains.keys())
-        default_chain = chain_choices[0]
-        display_sequence = chains[default_chain]
-        selector_visible = len(chain_choices) > 1
-        timestamp = str(int(time.time()))
-        sequence_dir = get_save_path("Upload_dataset")
-        temp_pdb_path = os.path.join(sequence_dir, f"paste_content_chain_{default_chain}_{timestamp}.pdb")
-        save_selected_chain_pdb(pdb_content, default_chain, temp_pdb_path)
-        return display_sequence, gr.update(choices=chain_choices, value=default_chain, visible=selector_visible), chains, default_chain, temp_pdb_path
-        
-    except Exception as e:
-        return f"Error parsing PDB content: {str(e)}", gr.update(choices=["A"], value="A", visible=False), {}, "A", ""
-
-def save_selected_chain_pdb(original_pdb_content, selected_chain, output_path):
-    new_pdb_lines = []
-    atom_counter = 1
-    
-    for line in original_pdb_content.strip().split('\n'):
-        if line.startswith('ATOM'):
-            chain_id = line[21:22].strip()
-            if chain_id == "":
-                chain_id = "A"
-            
-            if chain_id == selected_chain:
-                new_line = line[:21] + 'A' + line[22:]
-                new_line = f"ATOM  {atom_counter:5d}" + new_line[11:]
-                new_pdb_lines.append(new_line)
-                atom_counter += 1
-        elif not line.startswith('ATOM'):
-            new_pdb_lines.append(line)
-    
-    with open(output_path, 'w') as f:
-        f.write('\n'.join(new_pdb_lines))
-
-def handle_paste_chain_selection(selected_chain, chains_dict, original_pdb_content_from_state):
-    if not chains_dict or selected_chain not in chains_dict:
-        return "No file selected", ""
-    
-    # Check if the content is valid
-    if not original_pdb_content_from_state or original_pdb_content_from_state == "No file selected":
-        return "No file selected", ""
-    
-    try:
-        timestamp = str(int(time.time()))
-        sequence_dir = get_save_path("Upload_dataset")
-        temp_pdb_path = os.path.join(sequence_dir, f"paste_content_chain_{selected_chain}_{timestamp}.pdb")
-        save_selected_chain_pdb(original_pdb_content_from_state, selected_chain, temp_pdb_path)
-        
-        return chains_dict[selected_chain], temp_pdb_path
-        
-    except Exception as e:
-        return f"Error processing chain selection: {str(e)}", ""
-
-def handle_pdb_chain_change(selected_chain, chains_dict, original_file_path):
-    if not chains_dict or selected_chain not in chains_dict:
-        return "No file selected", ""
-    
-    # Check if the file path is valid and exists
-    if not original_file_path or original_file_path == "No file selected" or not os.path.exists(original_file_path):
-        return "No file selected", ""
-        
-    try:
-        with open(original_file_path, 'r') as f:
-            pdb_content = f.read()
-        
-        new_pdb_lines = []
-        atom_counter = 1
-        
-        for line in pdb_content.strip().split('\n'):
-            if line.startswith('ATOM'):
-                chain_id = line[21:22].strip()
-                if chain_id == "":
-                    chain_id = "A"
-                
-                if chain_id == selected_chain:
-                    new_line = line[:21] + 'A' + line[22:]
-                    new_line = f"ATOM  {atom_counter:5d}" + new_line[11:]
-                    new_pdb_lines.append(new_line)
-                    atom_counter += 1
-            elif not line.startswith('ATOM'):
-                new_pdb_lines.append(line)
-        
-        dir_path = os.path.dirname(original_file_path)
-        base_name, extension = os.path.splitext(os.path.basename(original_file_path))
-        new_filename = f"{base_name}_A{extension}"
-        new_pdb_path = os.path.join(dir_path, new_filename)
-        
-        with open(new_pdb_path, 'w') as f:
-            f.write('\n'.join(new_pdb_lines))
-        
-        return chains_dict[selected_chain], gr.update(value=new_pdb_path)
-        
-    except Exception as e:
-        return f"Error processing chain selection: {str(e)}", ""
-
-def process_pdb_file_upload(file_path):
-    if not file_path:
-        return "No file selected", gr.update(choices=["A"], value="A", visible=False), {}, "A", "", ""
-    try:
-        with open(file_path, 'r') as f:
-            pdb_content = f.read()
-        sequence, chain_update, chains_dict, default_chain, _ = parse_pdb_paste_content(pdb_content)
-        return sequence, chain_update, chains_dict, default_chain, file_path, file_path
-    except Exception as e:
-        return f"Error reading PDB file: {str(e)}", gr.update(choices=["A"], value="A", visible=False), {}, "A", "", ""
-
-def process_fasta_file_upload(file_path):
-    if not file_path:
-        return "No file selected", gr.update(choices=["Sequence_1"], value="Sequence_1", visible=False), {}, "Sequence_1", "", ""
-    try:
-        with open(file_path, 'r') as f:
-            fasta_content = f.read()
-        sequence, selector_update, sequences_dict, default_sequence, file_path, modify_fasta_content = parse_fasta_paste_content(fasta_content)
-        return sequence, selector_update, sequences_dict, default_sequence, file_path, file_path
-    except Exception as e:
-        return f"Error reading FASTA file: {str(e)}", gr.update(choices=["Sequence_1"], value="Sequence_1", visible=False), {}, "Sequence_1", "", ""
-        
-def handle_file_upload(file_obj: Any) -> str:
-    if not file_obj:
-        return "No file selected", gr.update(choices=["Sequence_1"], value="Sequence_1", visible=False), {}, "Sequence_1", "", ""
-    if isinstance(file_obj, str):
-        file_path = file_obj
-    else:
-        file_path = file_obj.name
-    if file_path.lower().endswith((".fasta", ".fa")):
-        return process_fasta_file_upload(file_path)
-    elif file_path.lower().endswith(".pdb"):
-        return process_pdb_file_upload(file_path)
-    else:
-        return "No file selected", gr.update(choices=["Sequence_1"], value="Sequence_1", visible=False), {}, "Sequence_1", "", ""
-
-def sanitize_filename(name: str) -> str:
-    """Sanitize filename for safe file operations."""
-    name = re.split(r'[|\s/]', name)[0]
-    return re.sub(r'[^\w\-. ]', '_', name)
-
-def get_total_residues_count(df: pd.DataFrame) -> int:
-    """Get total number of unique residue positions from mutation data."""
-    if 'mutant' not in df.columns:
-        return 0
-    
-    try:
-        positions = df['mutant'].str.extract(r'(\d+)').dropna()
-        return positions[0].astype(int).nunique() if not positions.empty else 0
-    except Exception:
-        return 0
-
-def toggle_ai_section(is_checked: bool):
-    """Toggle visibility of AI configuration section."""
-    return gr.update(visible=is_checked)
-
-def create_zip_archive(files_to_zip: Dict[str, str], zip_filename: str) -> str:
-    """Create ZIP archive with specified files."""
-    with zipfile.ZipFile(zip_filename, 'w', zipfile.ZIP_DEFLATED) as zf:
-        for src, arc in files_to_zip.items():
-            if os.path.exists(src):
-                zf.write(src, arcname=arc)
-    return zip_filename
-
-def run_zero_shot_prediction(model_type: str, model_name: str, file_path: str) -> Tuple[str, pd.DataFrame]:
-    """Run zero-shot mutation prediction."""
-    try:
-        timestamp = str(int(time.time()))
-        sequence_dir = get_save_path("Zero_shot_result")
-        output_csv = sequence_dir / f"{model_type}_{timestamp}.csv"
-        script_name = MODEL_MAPPING_ZERO_SHOT.get(model_name)
-        
-        if not script_name:
-            return f"Error: Model '{model_name}' has no script.", pd.DataFrame()
-
-        script_path = f"src/mutation/models/{script_name}.py"
-        if not os.path.exists(script_path):
-            return f"Script not found: {script_path}", pd.DataFrame()
-        
-        file_argument = "--pdb_file" if model_type == "structure" else "--fasta_file"
-        cmd = [
-            sys.executable, script_path, 
-            file_argument, file_path, 
-            "--output_csv", output_csv
-        ]
-        
-        subprocess.run(
-            cmd, 
-            capture_output=True, 
-            text=True, 
-            check=True, 
-            encoding='utf-8', 
-            errors='ignore'
-        )
-
-        if os.path.exists(output_csv):
-            df = pd.read_csv(output_csv)
-            os.remove(output_csv)
-            return "Prediction completed successfully!", df
-        
-        return "Prediction finished but no output file was created.", pd.DataFrame()
-        
-    except subprocess.CalledProcessError as e:
-        error_msg = e.stderr or e.stdout or "Unknown subprocess error"
-        return f"Prediction script failed: {error_msg}", pd.DataFrame()
-    except Exception as e:
-        return f"An unexpected error occurred: {e}", pd.DataFrame()
-
-def prepare_top_residue_heatmap_data(df: pd.DataFrame) -> Tuple:
-    """Prepare data for heatmap visualization."""
-    score_col = next((col for col in df.columns if 'score' in col.lower()), None)
-    rank_col = "Prediction Rank"
-    if score_col is None:
-        return (None,) * 5
-
-    valid_df = df[
-        df['mutant'].apply(
-            lambda m: isinstance(m, str) and 
-            re.match(r'^[A-Z]\d+[A-Z]$', m) and 
-            m[0] != m[-1]
-        )
-    ].copy()
-    
-    if valid_df.empty:
-        return ([], [], np.array([[]]), np.array([[]]), score_col)
-
-    min_score, max_score = valid_df[score_col].min(), valid_df[score_col].max()
-    if max_score == min_score:
-        valid_df['scaled_score'] = 0.0
-    else:
-        valid_df['scaled_score'] = -1 + 2 * (valid_df[score_col] - min_score) / (max_score - min_score)
-    
-    valid_df['position'] = valid_df['mutant'].str[1:-1].astype(int)
-
-    effect_scores = valid_df.groupby('position')['scaled_score'].mean()
-    sorted_positions = effect_scores.sort_values(ascending=False)
-    top_positions = sorted_positions.head(20).index if len(sorted_positions) > 20 else sorted_positions.index
-    top_df = valid_df[valid_df['position'].isin(top_positions)]
-    x_labels = list("ACDEFGHIKLMNPQRSTVWY")
-    x_map = {label: i for i, label in enumerate(x_labels)}
-    wt_map = {pos: mut[0] for pos, mut in zip(top_df['position'], top_df['mutant'])}
-    y_labels = [f"{wt_map.get(pos, '?')}{pos}" for pos in top_positions]
-    y_map = {pos: i for i, pos in enumerate(top_positions)}
-    
-    z_data = np.full((len(y_labels), len(x_labels)), np.nan)
-    score_matrix = np.full((len(y_labels), len(x_labels)), np.nan)
-    rank_matrix = np.full((len(y_labels), len(x_labels)), np.nan)
-
-    for _, row in top_df.iterrows():
-        pos, mut_aa = row['position'], row['mutant'][-1]
-        if pos in y_map and mut_aa in x_map:
-            y_idx, x_idx = y_map[pos], x_map[mut_aa]
-            z_data[y_idx, x_idx] = row['scaled_score']
-            score_matrix[y_idx, x_idx] = round(row[score_col], 3)
-            rank_matrix[y_idx, x_idx] = row[rank_col]
-            
-    return x_labels, y_labels, z_data, score_matrix, rank_matrix
-
-def generate_plotly_heatmap(x_labels: List, y_labels: List, z_data: np.ndarray, score_data: np.ndarray) -> go.Figure:
-    """Generate Plotly heatmap visualization."""
-    if z_data is None or z_data.size == 0:
-        return go.Figure().update_layout(title="Not enough data for heatmap")
-
-    num_residues = len(y_labels)
-    fig = go.Figure(data=go.Heatmap(
-        z=z_data, 
-        x=x_labels, 
-        y=y_labels, 
-        customdata=score_data,
-        hovertemplate=(
-            "<b>Position</b>: %{y}<br>"
-            "<b>Mutation</b>: %{x}<br>"
-            "<b>Effect</b>: %{z:.2f}"
-            "<extra></extra>"
-        ),
-        colorscale='Blues', 
-        zmin=-1, 
-        zmax=1, 
-        showscale=True,
-        colorbar={
-            'title': 'Normalized Effect', 
-            'tickvals': [-1, 0, 1], 
-            'ticktext': ['Low', 'Neutral', 'High']
-        }
-    ))
-    
-    fig.update_layout( 
-        xaxis_title='Mutant Amino Acid', 
-        yaxis_title='Residue Position (by impact)',
-        height=max(400, 30 * num_residues + 150), 
-        yaxis_autorange='reversed'
-    )
-    
-    return fig
-
-
-def process_fasta_file(file_path: str) -> str:
-    sequences = []
-    current_seq = ""
-    current_header = ""
-    
-    with open(file_path, 'r', encoding='utf-8') as f:
-        for line in f:
-            line = line.strip()
-            if line.startswith('>'):
-                if current_header and current_seq:
-                    sequences.append((current_header, current_seq))
-                current_header = line
-                current_seq = ""
-            else:
-                current_seq += line
-
-        if current_header and current_seq:
-            sequences.append((current_header, current_seq))
-    
-    if len(sequences) <= 1:
-        return file_path
-    
-
-    original_path = Path(file_path)
-    timestamp = str(int(time.time()))
-    fasra_dir = get_save_path("Upload_data")
-
-    new_file_path = fasra_dir / f"filtered_{original_path.name}_{timestamp}"
-    
-    with open(new_file_path, 'w', encoding='utf-8') as f:
-        f.write(f"{sequences[0][0]}\n")
-        seq = sequences[0][1]
-        f.write(f"{seq}\n")
-    
-    return str(new_file_path)
 
 def handle_mutation_prediction_base(
     function_selection: str, 
@@ -1423,11 +497,70 @@ def handle_protein_function_prediction(
         if voted_results:
             final_df = pd.concat(voted_results, ignore_index=True)
             final_df = final_df.drop(columns=['Dataset'], errors='ignore')
-
-    # Simplified processing - just use the raw data
     display_df = final_df.copy()
     print(f"Using simplified processing, final_df shape: {final_df.shape}")
-    
+    # Map predictions to human-readable labels
+    def map_labels(row):
+        current_task = DATASET_TO_TASK_MAP.get(row.get('Dataset', ''), task)
+        
+        # Handle regression tasks
+        if current_task in REGRESSION_TASKS_FUNCTION: 
+            scaled_value = row.get("prediction")
+            if pd.notna(scaled_value) and scaled_value != 'N/A' :
+                try:
+                    scaled_value = float(scaled_value)
+                    if current_task in REGRESSION_TASKS_FUNCTION_MAX_MIN:
+                        min_val, max_val = REGRESSION_TASKS_FUNCTION_MAX_MIN[current_task]
+                        original_value = scaled_value * (max_val - min_val) + min_val
+                        return round(original_value, 2)
+                    else:
+                        return round(scaled_value, 2)
+                except (ValueError, TypeError):
+                    return scaled_value
+            return scaled_value
+
+        # Handle SortingSignal special case
+        if row.get('Dataset') == 'SortingSignal':
+            predictions_str = row.get('predicted_class')
+            if predictions_str:
+                try:
+                    predictions = json.loads(predictions_str) if isinstance(predictions_str, str) else predictions_str
+                    if all(p == 0 for p in predictions):
+                        return "No signal"
+                    signal_labels = ["CH", 'GPI', "MT", "NES", "NLS", "PTS", "SP", "TM", "TH"]
+                    active_labels = [signal_labels[i] for i, pred in enumerate(predictions) if pred == 1]
+                    return "_".join(active_labels) if active_labels else "None"
+                except:
+                    pass
+        
+        # Handle classification tasks
+        labels_key = ("DeepLocMulti" if row.get('Dataset') == "DeepLocMulti" 
+                     else "DeepLocBinary" if row.get('Dataset') == "DeepLocBinary" 
+                     else current_task)
+        labels = LABEL_MAPPING_FUNCTION.get(labels_key)
+        
+        pred_val = row.get("prediction", row.get("predicted_class"))
+        if pred_val is None or pred_val == "N/A":
+            return "N/A"
+            
+        try:
+            pred_val = int(float(pred_val))
+            if labels and 0 <= pred_val < len(labels): 
+                return labels[pred_val]
+        except (ValueError, TypeError):
+            pass
+        
+        return str(pred_val)
+
+    # Apply label mapping
+    if "prediction" in display_df.columns:
+        display_df["predicted_class"] = display_df.apply(map_labels, axis=1)
+    elif "predicted_class" in display_df.columns:
+        display_df["predicted_class"] = display_df.apply(map_labels, axis=1)
+
+    # Remove raw prediction column if it exists
+    if 'prediction' in display_df.columns and 'predicted_class' in display_df.columns:
+        display_df.drop(columns=['prediction'], inplace=True)
     # Simple column renaming
     if 'header' in display_df.columns:
         display_df.rename(columns={'header': 'Protein Name'}, inplace=True)
@@ -1438,6 +571,19 @@ def handle_protein_function_prediction(
     if 'probabilities' in display_df.columns:
         display_df.rename(columns={'probabilities': 'Confidence Score'}, inplace=True)
     if 'Dataset' in display_df.columns:
+        first_dataset = display_df['Dataset'].iloc[0] if len(display_df) > 0 else None
+        first_task = DATASET_TO_TASK_MAP.get(first_dataset) if first_dataset else None
+        
+        if first_task in REGRESSION_TASKS_FUNCTION:
+            if 'prediction' in display_df.columns:
+                display_df.rename(columns={'prediction': 'Predicted Value'}, inplace=True)
+                display_df['Predicted Value'] = display_df['Predicted Value'].round(2)
+        else:
+            if 'predicted_class' in display_df.columns:
+                display_df.rename(columns={'predicted_class': 'Predicted Class'}, inplace=True)
+            if 'probabilities' in display_df.columns:
+                display_df.rename(columns={'probabilities': 'Confidence Score'}, inplace=True)
+        
         display_df.rename(columns={'Dataset': 'Dataset'}, inplace=True)
     
     print(f"After simple rename, display_df columns: {list(display_df.columns)}")
@@ -2283,27 +1429,7 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         protein_properties_download_btn = gr.DownloadButton("💾 Download Results", visible=False)
                         protein_properties_path_state = gr.State()
                         protein_properties_view_controls = gr.State()
-                        protein_properties_full_data_state = gr.State()
-        
-        def clear_paste_content_pdb():
-            return "", "", gr.update(choices=["A"], value="A", visible=False), {}, "A", ""
-
-        def clear_paste_content_fasta():
-            return "No file selected", "No file selected", gr.update(choices=["Sequence_1"], value="Sequence_1", visible=False), {}, "Sequence_1", ""
-
-        def toggle_ai_section_simple(is_checked: bool):
-            return gr.update(visible=is_checked)
-        
-        def on_ai_model_change_simple(ai_provider: str) -> tuple:
-            if ai_provider == "DeepSeek":
-                return gr.update(visible=False), gr.update(visible=True)
-            else:
-                return gr.update(visible=True), gr.update(visible=False)
-        
-        def handle_paste_fasta_detect(fasta_content):
-            result = parse_fasta_paste_content(fasta_content)
-            return result
-        
+                        protein_properties_full_data_state = gr.State()        
         enable_ai_zshot.change(fn=toggle_ai_section, inputs=enable_ai_zshot, outputs=ai_box_zshot)
         enable_ai_func.change(fn=toggle_ai_section, inputs=enable_ai_func, outputs=ai_box_func)
 
@@ -2345,29 +1471,10 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             outputs=[easy_zshot_paste_content_input, easy_zshot_protein_display, easy_zshot_sequence_selector, easy_zshot_sequence_state, easy_zshot_selected_sequence_state, easy_zshot_original_file_path_state]
         )
         easy_zshot_paste_content_btn.click(
-            fn=handle_paste_fasta_detect,
+            fn=parse_fasta_paste_content,
             inputs=easy_zshot_paste_content_input,
             outputs=[easy_zshot_protein_display, easy_zshot_sequence_selector, easy_zshot_sequence_state, easy_zshot_selected_sequence_state, easy_zshot_original_file_path_state, easy_zshot_original_paste_content_state]
         )
-
-        def handle_sequence_change_unified(selected_chain, chains_dict, original_file_path, original_paste_content):
-            # Check for None or empty file path
-            if not original_file_path:
-                return "No file selected", ""
-            
-            if original_file_path.endswith('.fasta'):
-                if original_paste_content:
-                    return handle_paste_sequence_selection(selected_chain, chains_dict, original_paste_content)
-                else:
-                    return handle_fasta_sequence_change(selected_chain, chains_dict, original_file_path)
-            elif original_file_path.endswith('.pdb'):
-                if original_paste_content:
-                    return handle_paste_chain_selection(selected_chain, chains_dict, original_paste_content)
-                else:
-                    return handle_pdb_chain_change(selected_chain, chains_dict, original_file_path)
-            else:
-                # Default case for no file selected
-                return "No file selected", ""
 
         easy_zshot_sequence_selector.change(
             fn=handle_sequence_change_unified,
@@ -2399,7 +1506,7 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         )
 
         base_func_paste_content_btn.click(
-            fn=handle_paste_fasta_detect,
+            fn=parse_fasta_paste_content,
             inputs=base_func_paste_content_input,
             outputs=[base_function_protein_display, base_function_selector, base_function_sequence_state, base_function_selected_sequence_state, base_function_original_file_path_state, base_function_original_paste_content_state]
         )
@@ -2432,7 +1539,7 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             outputs=[base_residue_function_paste_content_input, base_residue_function_protein_display, base_residue_function_selector, base_residue_function_sequence_state, base_residue_function_selected_sequence_state, base_residue_function_original_file_path_state]
         )
         base_residue_function_paste_content_btn.click(
-            fn=handle_paste_fasta_detect,
+            fn=parse_fasta_paste_content,
             inputs=base_residue_function_paste_content_input,
             outputs=[base_residue_function_protein_display, base_residue_function_selector, base_residue_function_sequence_state, base_residue_function_selected_sequence_state, base_residue_function_original_file_path_state, base_residue_function_original_paste_content_state]
         )
@@ -2463,7 +1570,7 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             outputs=[protein_properties_paste_content_input, protein_properties_protein_display, protein_properties_sequence_selector, protein_properties_sequence_state, protein_properties_selected_sequence_state, protein_properties_original_file_path_state]
         )
         protein_properties_paste_content_btn.click(
-            fn=handle_paste_fasta_detect,
+            fn=parse_fasta_paste_content,
             inputs=protein_properties_paste_content_input,
             outputs=[protein_properties_protein_display, protein_properties_sequence_selector, protein_properties_sequence_state, protein_properties_selected_sequence_state, protein_properties_original_file_path_state, protein_properties_original_paste_content_state]
         )
@@ -2481,4 +1588,4 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             show_progress=True
         )
 
-    return {}
+    return demo

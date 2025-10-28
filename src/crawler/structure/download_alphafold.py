@@ -11,7 +11,7 @@ from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 def download(pdb, outdir):
-    url = BASE_URL + pdb + "-F1-model_v4.pdb"
+    url = BASE_URL + pdb + "-F1-model_v6.pdb"
     out_path = os.path.join(outdir, f"{pdb}.pdb")
 
     message = f"{pdb} successfully downloaded"
