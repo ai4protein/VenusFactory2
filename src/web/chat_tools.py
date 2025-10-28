@@ -294,25 +294,22 @@ def call_zero_shot_sequence_prediction(
                 result_data = json.loads(raw_result)
             
             # Handle the data format with 'data' field containing mutations
-            if isinstance(result_data, dict) and 'data' in result_data:
-                mutations_data = result_data['data']
-                if len(mutations_data) > 200:
-                    # Keep only first 200 mutations
-                    result_data['data'] = mutations_data[:200]
-                    result_data['total_mutations'] = len(mutations_data)
-                    result_data['displayed_mutations'] = 200
-                    result_data['note'] = f"Showing first 200 of {len(mutations_data)} total mutations to avoid long context"
-                    return json.dumps(result_data)
-            # Handle the old format with 'mutations' field
-            elif isinstance(result_data, dict) and 'mutations' in result_data:
-                mutations = result_data['mutations']
-                if len(mutations) > 200:
-                    result_data['mutations'] = mutations[:200]
-                    result_data['total_mutations'] = len(mutations)
-                    result_data['displayed_mutations'] = 200
-                    result_data['note'] = f"Showing first 200 of {len(mutations)} total mutations to avoid long context"
-                    return json.dumps(result_data)
-            return raw_result
+            if isinstance(raw_result, dict) and 'data' in raw_result:
+                mutations_data = raw_result['data']
+                total_mutations = len(mutations_data)
+                if total_mutations > 1000:
+                    top_50 = mutations_data[:500]
+                    bottom_50 = mutations_data[-500:]
+                    separator_row = ['...', '...', '...']
+                    combined_data = top_50 + [separator_row] + bottom_50
+                    raw_result['data'] = combined_data
+                    raw_result['total_mutations'] = total_mutations
+                    raw_result['displayed_mutations'] = 1000
+                    raw_result['note'] = (f"Showing top 500 most beneficial and bottom 500 least beneficial mutations "
+                                          f"out of {total_mutations} total to avoid long context. "
+                                          f"Results are separated by '...'.")
+        
+            return json.dumps(raw_result, indent=2)
         except (json.JSONDecodeError, KeyError, TypeError):
             # If not JSON or doesn't have expected structure, return as is
             return raw_result
@@ -339,25 +336,22 @@ def call_zero_shot_structure_prediction_from_file(structure_file: str, model_nam
             result_data = json.loads(raw_result)
             
             # Handle the data format with 'data' field containing mutations
-            if isinstance(result_data, dict) and 'data' in result_data:
-                mutations_data = result_data['data']
-                if len(mutations_data) > 200:
-                    # Keep only first 200 mutations
-                    result_data['data'] = mutations_data[:200]
-                    result_data['total_mutations'] = len(mutations_data)
-                    result_data['displayed_mutations'] = 200
-                    result_data['note'] = f"Showing first 200 of {len(mutations_data)} total mutations to avoid long context"
-                    return json.dumps(result_data)
-            # Handle the old format with 'mutations' field
-            elif isinstance(result_data, dict) and 'mutations' in result_data:
-                mutations = result_data['mutations']
-                if len(mutations) > 200:
-                    result_data['mutations'] = mutations[:200]
-                    result_data['total_mutations'] = len(mutations)
-                    result_data['displayed_mutations'] = 200
-                    result_data['note'] = f"Showing first 200 of {len(mutations)} total mutations to avoid long context"
-                    return json.dumps(result_data)
-            return raw_result
+            if isinstance(raw_result, dict) and 'data' in raw_result:
+                mutations_data = raw_result['data']
+                total_mutations = len(mutations_data)
+                if total_mutations > 100:
+                    top_50 = mutations_data[:50]
+                    bottom_50 = mutations_data[-50:]
+                    separator_row = ['...', '...', '...']
+                    combined_data = top_50 + [separator_row] + bottom_50
+                    raw_result['data'] = combined_data
+                    raw_result['total_mutations'] = total_mutations
+                    raw_result['displayed_mutations'] = 100
+                    raw_result['note'] = (f"Showing top 50 most beneficial and bottom 50 least beneficial mutations "
+                                          f"out of {total_mutations} total to avoid long context. "
+                                          f"Results are separated by '...'.")
+        
+            return json.dumps(raw_result, indent=2)
         except (json.JSONDecodeError, KeyError, TypeError):
             # If not JSON or doesn't have expected structure, return as is
             return raw_result
@@ -378,10 +372,11 @@ def call_protein_function_prediction(
     try:
         dataset_mapping = {
             "Solubility": ["DeepSol", "DeepSoluE", "ProtSolM"],
-            "Localization": ["DeepLocBinary", "DeepLocMulti"],
-            "Metal ion binding": ["MetalIonBinding"],
+            "Localization": ["DeepLocMulti"],
+            "Membrane Protein Identification": ["DeepLocBinary"],
+            "Metal ion binding": ["MetalIonBinding"], 
             "Stability": ["Thermostability"],
-            "Sorting signal": ["SortingSignal"],
+            "Sortingsignal": ["SortingSignal"], 
             "Optimum temperature": ["DeepET_Topt"]
         }
         datasets = dataset_mapping.get(task, ["DeepSol"])
@@ -804,53 +799,126 @@ def call_protein_properties_prediction(sequence: str = None, fasta_file: str = N
     except Exception as e:
         return f"Protein properties prediction error: {str(e)}"
 
-def generate_and_execute_code(task_description: str, input_files: List[str]) -> str:
+def generate_and_execute_code(task_description: str, input_files: List[str] = []) -> str:
+    """
+    Generate and execute Python code based on task description.
+    """
     script_path = None 
     try:
         api_key = os.getenv("DEEPSEEK_API_KEY")
+        
+        # Validate and prepare input files
         valid_files = []
+        file_info = []
         for file_path in input_files:
             if os.path.exists(file_path):
                 valid_files.append(file_path)
-            else:
-                return f"Error, file not found: {file_path}"
+                # Get file info for better context
+                file_ext = os.path.splitext(file_path)[1]
+                file_size = os.path.getsize(file_path)
+                file_info.append({
+                    "path": file_path,
+                    "extension": file_ext,
+                    "size_kb": round(file_size / 1024, 2)
+                })
         
-        if not valid_files:
-            return "Error, there are no valuable input file。"
+        # Determine output directory
+        if valid_files:
+            primary_file = valid_files[0]
+            output_directory = os.path.dirname(primary_file)
+        else:
+            # Create temp output directory if no input files
+            temp_dir = Path("temp_outputs")
+            output_directory = str(temp_dir / "generated_outputs")
+            os.makedirs(output_directory, exist_ok=True)
 
-        primary_file = valid_files[0]
+        # Enhanced prompt with more context and flexibility
+        code_prompt = f"""You are an expert Python programmer specializing in bioinformatics and data processing.
+Generate a complete, executable Python script to accomplish the following task.
 
-        output_directory = os.path.dirname(primary_file)
+**TASK DESCRIPTION:**
+{task_description}
 
-        code_prompt = f"""
-        You are an expert Python programmer specializing in data processing.
-        Generate a complete, executable Python script to accomplish the following task.
+**INPUT FILES:**
+{json.dumps(file_info, indent=2) if file_info else "No input files provided"}
 
-        Task: {task_description}
-        Input File(s): {valid_files}
-        Output Directory: '{output_directory}'
+**OUTPUT DIRECTORY:**
+{output_directory}
 
-        Requirements:
-        1. Read the primary input file: '{primary_file}'.
-        2. Perform the required data processing.
-        3. Save any output files to the specified output directory: '{output_directory}'. For example, use os.path.join('{output_directory}', 'train.csv'). 
-        4. The script MUST be runnable from the command line and contain all necessary imports.
-        5. Save the file names as train.csv, valid.csv, and test.csv in the same folder as before
-        6. Print a final summary message to the console indicating success and listing the created files. This print message will be the result.
+**REQUIREMENTS:**
+1. Generate PRODUCTION-READY code with proper error handling
+2. If input files are provided, read and process them appropriately
+3. Save ALL output files to: {output_directory}
+   - Use descriptive filenames (e.g., 'mutant_A12R.fasta', 'analysis_results.csv')
+   - Use os.path.join('{output_directory}', 'filename.ext') for all output paths
+4. The script MUST be runnable standalone from command line
+5. Include ALL necessary imports at the top
+6. Add informative print statements for progress tracking
+7. At the end, print a JSON summary with:
+   - "success": true/false
+   - "output_files": list of created file paths
+   - "summary": brief description of what was done
+   - "details": any relevant metrics or information
 
-        Available libraries: pandas, numpy, scikit-learn, json, os, shutil, time.
-        Generate only the raw Python code, without any markdown formatting (like ```python) or explanations.
-        """
+**AVAILABLE LIBRARIES:**
+pandas, numpy, scikit-learn, biopython (Bio.SeqIO, Bio.Seq), json, os, shutil, pathlib, re, collections
 
+**COMMON TASK PATTERNS:**
+
+For SEQUENCE MUTATION:
+- Read FASTA file using Bio.SeqIO
+- Apply mutation (e.g., seq[position] = new_amino_acid)
+- Save mutant to new FASTA file
+- Example: A12R means position 12 (0-indexed: 11), Alanine → Arginine
+
+For DATA SPLITTING:
+- Use train_test_split from sklearn
+- Maintain label distribution with stratify parameter
+- Save as separate CSV files (train.csv, valid.csv, test.csv)
+
+For FILE MODIFICATION:
+- Read file, apply modifications, save with new name or overwrite
+- Always backup important files before modification
+
+For ANALYSIS:
+- Generate statistics, visualizations, or reports
+- Save results to JSON or CSV format
+
+**CRITICAL:**
+- Return ONLY raw Python code (no markdown, no ```python blocks, no explanations)
+- Code must be immediately executable
+- Use try-except blocks for robust error handling
+- Final print must be valid JSON for parsing
+
+**EXAMPLE FINAL OUTPUT:**
+print(json.dumps({{
+    "success": True,
+    "output_files": ["/path/to/output1.fasta", "/path/to/output2.csv"],
+    "summary": "Created A12R mutant from human insulin sequence",
+    "details": {{"original_length": 110, "mutation": "A12R", "position": 12}}
+}}))
+"""
+
+        # Call DeepSeek API
         headers = {
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
+        
         data = {
             "model": "deepseek-chat",
-            "messages": [{"role": "user", "content": code_prompt}],
+            "messages": [
+                {
+                    "role": "system", 
+                    "content": "You are an expert Python programmer. Generate clean, executable code without any markdown formatting."
+                },
+                {
+                    "role": "user", 
+                    "content": code_prompt
+                }
+            ],
             "temperature": 0.1,
-            "max_tokens": 2000
+            "max_tokens": 3000  # Increased for more complex code
         }
         
         response = requests.post(
@@ -861,33 +929,80 @@ def generate_and_execute_code(task_description: str, input_files: List[str]) -> 
         )
         
         if response.status_code != 200:
-            return f"Generate code error: {response.status_code} - {response.text}"
+            return json.dumps({
+                "success": False,
+                "error": f"API error: {response.status_code} - {response.text}"
+            })
         
         result = response.json()
         generated_code = result['choices'][0]['message']['content'].strip()
+        
+        # Clean up code (remove markdown if present)
+        generated_code = re.sub(r'^```python\s*', '', generated_code)
+        generated_code = re.sub(r'^```\s*', '', generated_code)
+        generated_code = re.sub(r'\s*```$', '', generated_code)
+        
+        # Save generated code for debugging
         temp_script_name = f"generated_code_{uuid.uuid4().hex}.py"
         script_path = os.path.join(tempfile.gettempdir(), temp_script_name)
         
         with open(script_path, 'w', encoding='utf-8') as f:
             f.write(generated_code)
-
+        
+        # Execute the generated code
         process = subprocess.run(
             [sys.executable, script_path],
             capture_output=True, 
             text=True,           
-            timeout=120        
+            timeout=120,
+            cwd=output_directory  # Run in output directory for relative paths
         )
 
         if process.returncode == 0:
-            return f"Success:\n---\n{process.stdout}"
+            # Try to parse JSON output from the script
+            stdout = process.stdout.strip()
+            try:
+                # Look for JSON in the output
+                json_match = re.search(r'\{.*\}', stdout, re.DOTALL)
+                if json_match:
+                    result_json = json.loads(json_match.group())
+                    result_json["generated_code_path"] = script_path  # Keep for debugging
+                    return json.dumps(result_json, indent=2)
+                else:
+                    # Fallback if no JSON found
+                    return json.dumps({
+                        "success": True,
+                        "output": stdout,
+                        "generated_code_path": script_path
+                    }, indent=2)
+            except json.JSONDecodeError:
+                # If JSON parsing fails, return raw output
+                return json.dumps({
+                    "success": True,
+                    "output": stdout,
+                    "generated_code_path": script_path
+                }, indent=2)
         else:
-            return f"Error:\n---\n{process.stderr}"
+            return json.dumps({
+                "success": False,
+                "error": process.stderr,
+                "stdout": process.stdout,
+                "generated_code_path": script_path
+            }, indent=2)
             
+    except subprocess.TimeoutExpired:
+        return json.dumps({
+            "success": False,
+            "error": "Code execution timed out (>120 seconds)",
+            "generated_code_path": script_path
+        })
     except Exception as e:
-        return f"Function Error: {str(e)}"
-    finally:
-        if script_path and os.path.exists(script_path):
-            os.remove(script_path)
+        return json.dumps({
+            "success": False,
+            "error": f"Unexpected error: {str(e)}",
+            "generated_code_path": script_path
+        })
+
 
 def process_csv_and_generate_config(csv_file: str, test_csv_file: Optional[str] = None, output_name: str = "custom_training_config", user_overrides: Optional[Dict] = None) -> str:
     try:

@@ -27,7 +27,6 @@ transformers==4.48.1
 wandb==0.21.3
 vplm==0.0.1
 dotenv==0.9.9
-
 langchain==0.3.27 
 langchain-community==0.3.31
 langchain-core==0.3.79

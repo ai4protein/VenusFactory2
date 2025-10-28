@@ -200,6 +200,8 @@ def create_ui():
 
 if __name__ == "__main__":
     try:
+        cleanup_thread = threading.Thread(target=run_cleanup_schedule, daemon=True)
+        cleanup_thread.start()
         demo = create_ui()
         demo.queue().launch(
             server_port=7860, 

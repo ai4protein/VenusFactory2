@@ -2,213 +2,33 @@ import gradio as gr
 import pandas as pd
 import os
 import sys
-import tempfile
 import subprocess
 import time
 import zipfile
 from pathlib import Path
 from typing import Dict, Any, List, Generator, Optional, Tuple
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import numpy as np
-import requests
-from dataclasses import dataclass
-import re
 import json
-from .utils.paste_content_handler import process_pasted_content
+import logging
+from dotenv import load_dotenv
+
+from web.utils.constants import *
+from web.utils.common_utils import *
+from web.utils.file_handlers import *
+from web.utils.ai_helpers import *
+from web.utils.data_processors import *
+from web.utils.visualization import *
+from web.utils.prediction_runners import *
 from web.venus_factory_quick_tool_tab import *
-# --- Constants and Mappings ---
+load_dotenv()
 
-MODEL_MAPPING_ZERO_SHOT = {
-    "ProSST-2048": "prosst",
-    "ProtSSN": "protssn",
-    "VenusPLM": "venusplm",
-    "ESM2-650M": "esm2",
-    "ESM-1v": "esm1v",
-    "ESM-1b": "esm1b",
-    "ESM-IF1": "esmif1",
-    "SaProt": "saprot",
-    "MIF-ST": "mifst"
-}
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
-DATASET_MAPPING_ZERO_SHOT = [
-    "Activity",
-    "Binding",
-    "Expression",
-    "Organismal Fitness",
-    "Stability"
-]
-
-MODEL_MAPPING_FUNCTION = {
-    "ESM2-650M": "esm2",
-    "Ankh-large": "ankh",
-    "ProtBert": "protbert",
-    "ProtT5-xl-uniref50": "prott5",
-}
-
-MODEL_RESIDUE_MAPPING_FUNCTION = {
-    "ESM2-650M": "esm2",
-    "Ankh-large": "ankh",
-    "ProtT5-xl-uniref50": "prott5",
-}
-
-MODEL_ADAPTER_MAPPING_FUNCTION = {
-    "esm2": "esm2_t33_650M_UR50D",
-    "ankh": "ankh-large",
-    "protbert": "prot_bert",
-    "prott5": "prot_t5_xl_uniref50",
-}
-
-DATASET_MAPPING_FUNCTION = {
-    "Solubility": ["DeepSol", "DeepSoluE", "ProtSolM"],
-    "Localization": ["DeepLocBinary", "DeepLocMulti"],
-    "Metal ion binding": ["MetalIonBinding"],
-    "Stability": ["Thermostability"],
-    "Sorting signal": ["SortingSignal"],
-    "Optimum temperature": ["DeepET_Topt"]
-}
-
-LABEL_MAPPING_FUNCTION = {
-    "Solubility": ["Insoluble", "Soluble"],
-    "DeepLocBinary": ["Membrane", "Soluble"],
-    "DeepLocMulti": [
-        "Cytoplasm", "Nucleus", "Extracellular", "Mitochondrion", "Cell membrane",
-        "Endoplasmic reticulum", "Plastid", "Golgi apparatus", "Lysosome/Vacuole", "Peroxisome"
-    ],
-    "Metal ion binding": ["Non-binding", "Binding"],
-    "SortingSignal": ['No signal', 'Signal']
-}
-
-COLOR_MAP_FUNCTION = {
-    "Soluble": "#3B82F6", "Insoluble": "#EF4444", "Membrane": "#F59E0B",
-    "Cytoplasm": "#10B981", "Nucleus": "#8B5CF6", "Extracellular": "#F97316",
-    "Mitochondrion": "#EC4899", "Cell membrane": "#6B7280", "Endoplasmic reticulum": "#84CC16",
-    "Plastid": "#06B6D4", "Golgi apparatus": "#A78BFA", "Lysosome/Vacuole": "#FBBF24", "Peroxisome": "#34D399",
-    "Metal ion binding": "#3B82F6", "Non-binding": "#EF4444",
-    "Signal": "#3B82F6", "No signal": "#EF4444",
-    "Default": "#9CA3AF"
-}
-
-REGRESSION_TASKS_FUNCTION = ["Stability", "Optimum temperature"]
-REGRESSION_TASKS_FUNCTION_MAX_MIN = {
-    "Stability": [40.1995166, 66.8968874],
-    "Optimum temperature": [2, 120]
-}
-
-DATASET_TO_TASK_MAP = {
-    dataset: task for task, datasets in DATASET_MAPPING_FUNCTION.items() for dataset in datasets
-}
-
-AI_MODELS = {
-    "DeepSeek": {
-        "api_base": "https://api.deepseek.com/v1", 
-        "model": "deepseek-chat",
-        "env_key": "DEEPSEEK_API_KEY"
-    },
-    "ChatGPT": {
-        "api_base": "https://api.openai.com/v1",
-        "model": "gpt-4o-mini", 
-        "env_key": None
-    },
-    "Gemini": {
-        "api_base": "https://generativelanguage.googleapis.com/v1beta",
-        "model": "gemini-1.5-flash",
-        "env_key": None
-    }
-}
-
-
-def parse_fasta_file(file_path: str) -> str:
-    if not file_path: return ""
-    try:
-        with open(file_path, "r") as f:
-            return f.read()
-    except Exception as e:
-        return f"Error reading FASTA file: {e}"
-
-def parse_pdb_for_sequence(file_path: str) -> str:
-    if not file_path: return ""
-    aa_map = {
-        'ALA': 'A', 'CYS': 'C', 'ASP': 'D', 'GLU': 'E', 'PHE': 'F',
-        'GLY': 'G', 'HIS': 'H', 'ILE': 'I', 'LYS': 'K', 'LEU': 'L',
-        'MET': 'M', 'ASN': 'N', 'PRO': 'P', 'GLN': 'Q', 'ARG': 'R',
-        'SER': 'S', 'THR': 'T', 'VAL': 'V', 'TRP': 'W', 'TYR': 'Y'
-    }
-    
-    sequence = []
-    seen_residues = set()
-    chain = None
-    
-    with open(file_path, 'r') as f:
-        for line in f:
-            if line.startswith("ATOM"):
-                chain_id = line[21]
-                if chain is None:
-                    chain = chain_id
-                if chain_id != chain:
-                    break
-                
-                res_id = (chain_id, int(line[22:26]))
-                if res_id not in seen_residues:
-                    res_name = line[17:20].strip()
-                    if res_name in aa_map:
-                        sequence.append(aa_map[res_name])
-                        seen_residues.add(res_id)
-    
-    return "".join(sequence)
-
-def update_dataset_choices(task: str) -> gr.CheckboxGroup:
-    datasets = DATASET_MAPPING_FUNCTION.get(task, [])
-    return gr.update(choices=datasets, value=datasets)
-
-def run_zero_shot_prediction(model_type: str, model_name: str, file_path: str) -> Tuple[str, pd.DataFrame]:
-    try:
-        temp_dir = Path("temp_outputs")
-        temp_dir_ = temp_dir / "Zero_shot_result"
-        timestamp = str(int(time.time()))
-        sequence_dir = temp_dir_ / timestamp
-        sequence_dir.mkdir(parents=True, exist_ok=True)
-        output_csv = sequence_dir / f"{model_type}.csv"
-        script_name = MODEL_MAPPING_ZERO_SHOT.get(model_name)
-        
-        
-        if not script_name:
-            return f"Error: Model '{model_name}' not found in model mapping.", pd.DataFrame()
-
-        script_path = f"src/mutation/models/{script_name}.py"
-            
-        if not os.path.exists(script_path):
-            return f"Script not found: {script_path}", pd.DataFrame()
-        
-        file_argument = "--pdb_file" if file_path.lower().endswith(".pdb") else "--fasta_file"
-        
-        cmd = [
-            sys.executable, script_path, 
-            file_argument, file_path, 
-            "--output_csv", str(output_csv)
-        ]
-        
-        subprocess.run(
-            cmd, 
-            capture_output=True, 
-            text=True, 
-            check=True, 
-            encoding='utf-8', 
-            errors='ignore'
-        )
-
-        if os.path.exists(output_csv):
-            df = pd.read_csv(output_csv)
-            os.remove(output_csv)
-            return "Prediction completed successfully!", df
-        
-        return "Prediction finished but no output file was created.", pd.DataFrame()
-        
-    except subprocess.CalledProcessError as e:
-        error_msg = e.stderr or e.stdout or "Unknown subprocess error"
-        return f"Prediction script failed: {error_msg}", pd.DataFrame()
-    except Exception as e:
-        return f"An unexpected error occurred: {e}", pd.DataFrame()
 
 def handle_mutation_prediction_advance(
     function_selection: str, 
@@ -431,30 +251,158 @@ def handle_protein_function_prediction_chat(
         return "⚠️ No results generated.", pd.DataFrame(), "Prediction scripts produced no output."
 
     final_df = pd.concat(all_results_list, ignore_index=True).fillna('N/A')
-    
+    non_voting_tasks = REGRESSION_TASKS_FUNCTION
+    non_voting_datasets = ["DeepLocMulti", "DeepLocBinary"]
+    is_voting_run = task not in non_voting_tasks and not any(ds in final_df['Dataset'].unique() for ds in non_voting_datasets) and len(final_df['Dataset'].unique()) > 1
+    if is_voting_run:
+        voted_results = []
+        for header, group in final_df.groupby('header'):
+            if group.empty: continue
+            
+            pred_col = 'prediction' if 'prediction' in group.columns else 'predicted_class'
+            if pred_col not in group.columns: continue
+            
+            all_probs = []
+            valid_rows = []
+            
+            for _, row in group.iterrows():
+                prob_col = 'probabilities' if 'probabilities' in row else None
+                if prob_col and pd.notna(row[prob_col]):
+                    try:
+                        # Handle string representation of list
+                        if isinstance(row[prob_col], str):
+                            # Remove brackets and split by comma
+                            prob_str = row[prob_col].strip('[]')
+                            probs = [float(x.strip()) for x in prob_str.split(',')]
+                        elif isinstance(row[prob_col], list):
+                            probs = row[prob_col]
+                        else:
+                            probs = json.loads(str(row[prob_col]))
+                        
+                        if isinstance(probs, list) and len(probs) > 0:
+                            all_probs.append(probs)
+                            valid_rows.append(row)
+                    except (json.JSONDecodeError, ValueError, IndexError):
+                        continue
+            
+            if not all_probs:
+                continue
+            
+            # Perform soft voting: average all probability distributions
+            max_len = max(len(probs) for probs in all_probs)
+            normalized_probs = []
+            for probs in all_probs:
+                if len(probs) < max_len:
+                    probs.extend([0.0] * (max_len - len(probs)))
+                normalized_probs.append(probs)
+            
+            # Calculate average probabilities across all models
+            avg_probs = np.mean(normalized_probs, axis=0)
+            
+            # Get the class with highest average probability
+            voted_class = np.argmax(avg_probs)
+            voted_confidence = avg_probs[voted_class]
+            
+            # Create result row
+            result_row = group.iloc[0].copy()
+            result_row[pred_col] = voted_class
+            if 'probabilities' in result_row:
+                result_row['probabilities'] = voted_confidence
+            
+            voted_results.append(result_row.to_frame().T)
+        
+        if voted_results:
+            final_df = pd.concat(voted_results, ignore_index=True)
+            final_df = final_df.drop(columns=['Dataset'], errors='ignore')
     display_df = final_df.copy()
-    if 'prediction' in display_df.columns:
-        display_df.drop(columns=['prediction'], inplace=True)
-    rename_map = {
-        'header': "Protein Name", 'sequence': "Sequence", 'predicted_class': "Predicted Class",
-        'probabilities': "Confidence Score", 'Dataset': "Dataset"
-    }
-    display_df.rename(columns=rename_map, inplace=True)
+    def map_labels(row):
+        current_task = DATASET_TO_TASK_MAP.get(row.get('Dataset', ''), task)
+        
+        # Handle regression tasks
+        if current_task in REGRESSION_TASKS_FUNCTION: 
+            scaled_value = row.get("prediction")
+            if pd.notna(scaled_value) and scaled_value != 'N/A' :
+                try:
+                    scaled_value = float(scaled_value)
+                    if current_task in REGRESSION_TASKS_FUNCTION_MAX_MIN:
+                        min_val, max_val = REGRESSION_TASKS_FUNCTION_MAX_MIN[current_task]
+                        original_value = scaled_value * (max_val - min_val) + min_val
+                        return round(original_value, 2)
+                    else:
+                        return round(scaled_value, 2)
+                except (ValueError, TypeError):
+                    return scaled_value
+            return scaled_value
 
-    if enable_ai:
-        api_key = get_api_key(ai_model, user_api_key)
-        if not api_key: 
-            ai_summary = f"❌ No API key found for {ai_model}."
+        # Handle SortingSignal special case
+        if row.get('Dataset') == 'SortingSignal':
+            predictions_str = row.get('predicted_class')
+            if predictions_str:
+                try:
+                    predictions = json.loads(predictions_str) if isinstance(predictions_str, str) else predictions_str
+                    if all(p == 0 for p in predictions):
+                        return "No signal"
+                    signal_labels = ["CH", 'GPI', "MT", "NES", "NLS", "PTS", "SP", "TM", "TH"]
+                    active_labels = [signal_labels[i] for i, pred in enumerate(predictions) if pred == 1]
+                    return "_".join(active_labels) if active_labels else "None"
+                except:
+                    pass
+        
+        # Handle classification tasks
+        labels_key = ("DeepLocMulti" if row.get('Dataset') == "DeepLocMulti" 
+                     else "DeepLocBinary" if row.get('Dataset') == "DeepLocBinary" 
+                     else current_task)
+        labels = LABEL_MAPPING_FUNCTION.get(labels_key)
+        
+        pred_val = row.get("prediction", row.get("predicted_class"))
+        if pred_val is None or pred_val == "N/A":
+            return "N/A"
+            
+        try:
+            pred_val = int(float(pred_val))
+            if labels and 0 <= pred_val < len(labels): 
+                return labels[pred_val]
+        except (ValueError, TypeError):
+            pass
+        
+        return str(pred_val)
+
+    # Apply label mapping
+    if "prediction" in display_df.columns:
+        display_df["predicted_class"] = display_df.apply(map_labels, axis=1)
+    elif "predicted_class" in display_df.columns:
+        display_df["predicted_class"] = display_df.apply(map_labels, axis=1)
+
+    # Remove raw prediction column if it exists
+    if 'prediction' in display_df.columns and 'predicted_class' in display_df.columns:
+        display_df.drop(columns=['prediction'], inplace=True)
+    # Simple column renaming
+    if 'header' in display_df.columns:
+        display_df.rename(columns={'header': 'Protein Name'}, inplace=True)
+    if 'sequence' in display_df.columns:
+        display_df.rename(columns={'sequence': 'Sequence'}, inplace=True)
+    if 'predicted_class' in display_df.columns:
+        display_df.rename(columns={'predicted_class': 'Predicted Class'}, inplace=True)
+    if 'probabilities' in display_df.columns:
+        display_df.rename(columns={'probabilities': 'Confidence Score'}, inplace=True)
+    if 'Dataset' in display_df.columns:
+        first_dataset = display_df['Dataset'].iloc[0] if len(display_df) > 0 else None
+        first_task = DATASET_TO_TASK_MAP.get(first_dataset) if first_dataset else None
+        
+        if first_task in REGRESSION_TASKS_FUNCTION:
+            if 'prediction' in display_df.columns:
+                display_df.rename(columns={'prediction': 'Predicted Value'}, inplace=True)
+                display_df['Predicted Value'] = display_df['Predicted Value'].round(2)
         else:
-            ai_config = AIConfig(api_key, ai_model, AI_MODELS[ai_model]["api_base"], AI_MODELS[ai_model]["model"])
-            prompt = generate_expert_analysis_prompt(display_df, task)
-            ai_summary = call_ai_api(ai_config, prompt)
-            expert_analysis = format_expert_response(ai_summary)
+            if 'predicted_class' in display_df.columns:
+                display_df.rename(columns={'predicted_class': 'Predicted Class'}, inplace=True)
+            if 'probabilities' in display_df.columns:
+                display_df.rename(columns={'probabilities': 'Confidence Score'}, inplace=True)
+        
+        display_df.rename(columns={'Dataset': 'Dataset'}, inplace=True)
 
     final_status = "✅ All predictions completed!"
-    if enable_ai and not ai_summary.startswith("❌"):
-        final_status += " AI analysis included."
-    return final_status, display_df, expert_analysis
+    return final_status, display_df, ""
 
 
 
@@ -547,13 +495,15 @@ def handle_protein_function_prediction_advance(
         
         if current_task in REGRESSION_TASKS_FUNCTION: 
             scaled_value = row.get("prediction")
-            if pd.notna(scaled_value) and scaled_value != 'N/A' and current_task in REGRESSION_TASKS_FUNCTION_MAX_MIN:
+            if pd.notna(scaled_value) and scaled_value != 'N/A' :
                 try:
                     scaled_value = float(scaled_value)
-                    min_val, max_val = REGRESSION_TASKS_FUNCTION_MAX_MIN[current_task]
-                    original_value = scaled_value * (max_val - min_val) + min_val
-                    return round(original_value, 2)
-                
+                    if current_task in REGRESSION_TASKS_FUNCTION_MAX_MIN:
+                        min_val, max_val = REGRESSION_TASKS_FUNCTION_MAX_MIN[current_task]
+                        original_value = scaled_value * (max_val - min_val) + min_val
+                        return round(original_value, 2)
+                    else:
+                        return round(scaled_value, 2)
                 except (ValueError, TypeError):
                     return scaled_value
 

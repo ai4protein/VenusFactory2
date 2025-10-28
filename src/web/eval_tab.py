@@ -384,7 +384,21 @@ def create_eval_tab(constant):
             """, gr.update(visible=False)
             
     gr.Markdown("## Model and Dataset Configuration")
-
+    with gr.Accordion("Import Training Configuration", open=False) as config_import_accordion:
+        gr.Markdown("### Import your training config")
+        with gr.Row():
+            with gr.Column(scale=4):
+                config_path_input = gr.Textbox(
+                    label="Configuration File Path",
+                    placeholder="Enter path to your training config JSON file (e.g., ./config.json)",
+                    value=""
+                )
+            with gr.Column(scale=1):
+                import_config_button = gr.Button(
+                    "Import Config",
+                    variant="primary",
+                    elem_classes=["import-config-btn"]
+                )
     # Original evaluation interface components
     with gr.Group():
         with gr.Row():
