@@ -44,7 +44,7 @@ load_dotenv()
 
 class DeepSeekLLM(BaseChatModel):
     api_key: str = None
-    base_url: str = "https://www.dmxapi.com/v1"
+    base_url: str = "https://www.dmxapi.cn/v1"
     model_name: str = "gpt-4o-mini"
     temperature: float = 0.4
     max_tokens: int = 4096
