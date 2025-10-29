@@ -179,6 +179,7 @@ def handle_mutation_prediction_base(
         files_to_zip[str(report_path)] = f"AI_Analysis_Report_{timestamp}.md"
 
     zip_path = heatmap_dir / f"pred_mut_{timestamp}.zip"
+    os.chmod(zip_path, 0o777)
     zip_path_str = create_zip_archive(files_to_zip, str(zip_path))
 
     final_status = status if not enable_ai else "✅ Prediction and AI analysis complete!"
@@ -630,6 +631,7 @@ def handle_protein_function_prediction(
         zip_path = zip_dir / f"func_pred_{timestamp}.zip"
         with zipfile.ZipFile(zip_path, 'w') as zf:
             zf.write(csv_path, csv_path.name)
+        os.chmod(zip_path, 0o777)
         zip_path_str = str(zip_path)
         print(f"Created zip file: {zip_path_str}")
     except Exception as e: 

@@ -188,6 +188,7 @@ def handle_mutation_prediction_advance(
         files_to_zip[str(report_path)] = "AI_Analysis_Report.md"
 
     zip_path = session_dir / f"pred_mut.zip"
+    os.chmod(zip_path, 0o777)
     zip_path_str = create_zip_archive(files_to_zip, str(zip_path))
 
     final_status = status if not enable_ai else "✅ Prediction and AI analysis complete!"
@@ -641,6 +642,7 @@ def handle_protein_function_prediction_advance(
         with zipfile.ZipFile(zip_path, 'w') as zf:
             for file in zip_dir.glob("*"): 
                 zf.write(file, file.name)
+        os.chmod(zip_path, 0o777)
         zip_path_str = str(zip_path)
     except Exception as e: 
         print(f"Error creating zip file: {e}")
