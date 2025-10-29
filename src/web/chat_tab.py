@@ -632,13 +632,12 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                     examples=[
                         ["Can you predict the stability of the protein Catalase (UniProt ID: P04040)?"],
                         ["Retrieve P05067 and determine its likely biological process using GO terms."],
-                        ["Based on the structure from PDB ID 6M0J in chain A, where are the potential ligand binding sites?"]
+                        ["What is the conservative mutation result of C113 site in P68871 protein?"]
                     ],
                     inputs=chat_input,
                     label=None
                 )
             
-            # Feedback Section (Default Closed)
             with gr.Accordion("📝 Provide Feedback", open=False):
                 gr.Markdown("**Your Feedback**")
                 feedback_input = gr.Textbox(
@@ -675,22 +674,18 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         "session_state": session_state
     }
 
-
-# Example of how to run this if it's the main script
 if __name__ == "__main__":
     components = create_chat_tab({})
     
     with gr.Blocks(theme=gr.themes.Soft(), css=".gradio-container {max-width: 95% !important;}") as demo:
         create_chat_tab({})
-    
-    # Configure queue for concurrent processing
+
     demo.queue(
         concurrency_count=3,  
         max_size=20, 
         api_open=False
     )
-    
-    # Launch with optimized settings
+
     demo.launch(
         share=True,
         max_threads=40,  
