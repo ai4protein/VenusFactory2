@@ -1,4 +1,4 @@
-"""Common utility functions for Venus Factory."""
+"""Common utility functions for VenusFactory."""
 
 import os
 import re

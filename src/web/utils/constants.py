@@ -1,6 +1,5 @@
-"""Constants and configuration mappings for Venus Factory."""
+"""Constants and configuration mappings for VenusFactory."""
 
-# Model mappings for zero-shot prediction
 MODEL_MAPPING_ZERO_SHOT = {
     "ESM2-650M": "esm2", 
     "ESM-1b": "esm1b",
@@ -43,31 +42,30 @@ MODEL_RESIDUE_MAPPING_FUNCTION = {
 
 DATASET_MAPPING_FUNCTION = {
     "Solubility": ["DeepSol", "DeepSoluE", "ProtSolM"],
-    "Localization": ["DeepLocMulti"],
+    "Subcellular Localization Prediction": ["DeepLocMulti"],
     "Membrane Protein Identification": ["DeepLocBinary"],
     "Metal ion binding": ["MetalIonBinding"], 
     "Stability": ["Thermostability"],
     "Sortingsignal": ["SortingSignal"], 
     "Optimum temperature": ["DeepET_Topt"],
     "Kcat": ["DLKcat"],
-    "PH": ["EpHod"],
-    "Virus": ["VenusVaccine_VirusBinary"],
-    "Bacteria": ["VenusVaccine_BacteriaBinary"],
+    "Optimal pH": ["EpHod"],
+    "Immunogenicity Prediction - Virus": ["VenusVaccine_VirusBinary"],
+    "Immunogenicity Prediction - Bacteria": ["VenusVaccine_BacteriaBinary"],
     "Tumor": ["VenusVaccine_TumorBinary"],
 }
 
 LABEL_MAPPING_FUNCTION = {
     "Solubility": ["Insoluble", "Soluble"],
-    "DeepLocBinary": ["Membrane", "Soluble"],
-    "DeepLocMulti": [
+    "Membrane Protein Identification": ["Membrane", "Soluble"],
+    "Subcellular Localization Prediction": [
         "Cytoplasm", "Nucleus", "Extracellular", "Mitochondrion", "Cell membrane",
         "Endoplasmic reticulum", "Plastid", "Golgi apparatus", "Lysosome/Vacuole", "Peroxisome"
     ],
     "Metal ion binding": ["Non-binding", "Binding"],
     "Sortingsignal": ['No signal', "CH", 'GPI', "MT", "NES", "NLS", "PTS", "SP", "TM", "TH"],
-    "SortingSignal": ['No signal', 'Signal'],
-    "Varius": ["Non-virus", "Virus"],
-    "Bacteria": ["Non-bacteria", "Bacteria"],
+    "Immunogenicity Prediction - Virus": ["Non-virus", "Virus"],
+    "Immunogenicity Prediction - Bacteria": ["Non-bacteria", "Bacteria"],
     "Tumor": ["Non-tumor", "Tumor"],
 }
 

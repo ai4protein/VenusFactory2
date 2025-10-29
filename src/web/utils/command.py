@@ -53,13 +53,10 @@ def build_eval_command_list(args: Dict[str, Any]) -> list:
     return cmd
 
 def preview_eval_command(args: Dict[str, Any]) -> str:
-    """生成评估命令的预览"""
     cmd = build_eval_command_list(args)
     return " ".join(cmd)
 
 def build_predict_command_list(args: Dict[str, Any], is_batch: bool = False) -> list:
-    """构建预测脚本的命令行列表"""
-    # 根据是否为批量预测选择不同的脚本
     script = "src/predict_batch.py" if is_batch else "src/predict.py"
     cmd = ["python", script]
     
@@ -80,6 +77,5 @@ def build_predict_command_list(args: Dict[str, Any], is_batch: bool = False) -> 
     return cmd
 
 def preview_predict_command(args: Dict[str, Any], is_batch: bool = False) -> str:
-    """生成预测命令的预览"""
     cmd = build_predict_command_list(args, is_batch)
     return " ".join(cmd) 
