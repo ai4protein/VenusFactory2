@@ -42,31 +42,31 @@ MODEL_RESIDUE_MAPPING_FUNCTION = {
 
 DATASET_MAPPING_FUNCTION = {
     "Solubility": ["DeepSol", "DeepSoluE", "ProtSolM"],
-    "Subcellular Localization Prediction": ["DeepLocMulti"],
-    "Membrane Protein Identification": ["DeepLocBinary"],
-    "Metal ion binding": ["MetalIonBinding"], 
+    "Subcellular Localization": ["DeepLocMulti"],
+    "Membrane Protein": ["DeepLocBinary"],
+    "Metal Ion Binding": ["MetalIonBinding"], 
     "Stability": ["Thermostability"],
     "Sortingsignal": ["SortingSignal"], 
-    "Optimum temperature": ["DeepET_Topt"],
+    "Optimal Temperature": ["DeepET_Topt"],
     "Kcat": ["DLKcat"],
-    "Optimal pH": ["EpHod"],
+    "Optimal PH": ["EpHod"],
     "Immunogenicity Prediction - Virus": ["VenusVaccine_VirusBinary"],
     "Immunogenicity Prediction - Bacteria": ["VenusVaccine_BacteriaBinary"],
-    "Tumor": ["VenusVaccine_TumorBinary"],
+    "Immunogenicity Prediction - Tumor": ["VenusVaccine_TumorBinary"],
 }
 
 LABEL_MAPPING_FUNCTION = {
     "Solubility": ["Insoluble", "Soluble"],
-    "Membrane Protein Identification": ["Membrane", "Soluble"],
-    "Subcellular Localization Prediction": [
+    "Membrane Protein": ["Membrane", "Soluble"],
+    "Subcellular Localization": [
         "Cytoplasm", "Nucleus", "Extracellular", "Mitochondrion", "Cell membrane",
         "Endoplasmic reticulum", "Plastid", "Golgi apparatus", "Lysosome/Vacuole", "Peroxisome"
     ],
-    "Metal ion binding": ["Non-binding", "Binding"],
+    "Metal Ion Binding": ["Non-binding", "Binding"],
     "Sortingsignal": ['No signal', "CH", 'GPI', "MT", "NES", "NLS", "PTS", "SP", "TM", "TH"],
     "Immunogenicity Prediction - Virus": ["Non-virus", "Virus"],
     "Immunogenicity Prediction - Bacteria": ["Non-bacteria", "Bacteria"],
-    "Tumor": ["Non-tumor", "Tumor"],
+    "Immunogenicity Prediction - Tumor": ["Non-tumor", "Tumor"],
 }
 
 COLOR_MAP_FUNCTION = {
@@ -100,11 +100,11 @@ RESIDUE_MAPPING_FUNCTION = {
     "Motif": ["VenusX_Res_Motif_MP90"]
 }
 
-REGRESSION_TASKS_FUNCTION = ["Stability", "Optimum temperature", "Kcat", "PH"]
+REGRESSION_TASKS_FUNCTION = ["Stability", "Optimal Temperature", "Kcat", "Optimal PH"]
 
 REGRESSION_TASKS_FUNCTION_MAX_MIN = {
     "Stability": [40.1995166, 66.8968874],
-    "Optimum temperature": [2, 120]
+    "Optimal temperature": [2, 120]
 }
 
 DATASET_TO_TASK_MAP = {
