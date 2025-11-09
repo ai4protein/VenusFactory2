@@ -3,6 +3,7 @@ import time
 import threading
 import os
 import gradio as gr
+import datetime
 from web.utils.monitor import TrainingMonitor
 from web.train_tab import create_train_tab
 from web.eval_tab import create_eval_tab
@@ -17,7 +18,7 @@ from web.venus_factory_comprehensive_tab import create_comprehensive_tab
 
 def delete_old_files():
     try:
-        target_date = datetime.now() - timedelta(days=2)
+        target_date = datetime.datetime.now() - datetime.timedelta(days=2)
         base_path = Path("temp_outputs")
         dir_to_delete = base_path / target_date.strftime('%Y') / target_date.strftime('%m') / target_date.strftime('%d')
         if dir_to_delete.is_dir():
