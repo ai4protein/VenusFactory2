@@ -25,7 +25,7 @@ class ZeroShotSequenceInput(BaseModel):
     """Input for zero-shot sequence mutation prediction"""
     sequence: Optional[str] = Field(None, description="Protein sequence in single letter amino acid code")
     fasta_file: Optional[str] = Field(None, description="Path to FASTA file")
-    model_name: str = Field(default="ESM2-650M", description="Model name: ESM-1v, ESM2-650M, ESM-1b")
+    model_name: str = Field(default="ESM2-650M", description="Model name: ESM-1v, ESM2-650M, ESM-1b, VenusPLM")
 
 class ZeroShotStructureInput(BaseModel):
     """Input for zero-shot structure mutation prediction"""
