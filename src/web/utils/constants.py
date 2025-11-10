@@ -9,7 +9,8 @@ MODEL_MAPPING_ZERO_SHOT = {
     "MIF-ST": "mifst", 
     "ProSST-2048": "prosst", 
     "ProtSSN": "protssn",
-    "VenusPLM": "venusplm"
+    "VenusPLM": "venusplm",
+    "VenusREM": "venusrem"
 }
 
 DATASET_MAPPING_ZERO_SHOT = [

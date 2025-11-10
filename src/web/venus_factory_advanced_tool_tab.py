@@ -660,7 +660,6 @@ def handle_protein_function_prediction_advance(
     
     zip_path_str = ""
     try:
-        temp_dir_ = temp_dir / "Downloads_zip"
         timestamp = str(int(time.time()))
         zip_dir = get_save_path("Downloads_zip")
         zip_dir.mkdir(parents=True, exist_ok=True)
@@ -728,7 +727,6 @@ def handle_protein_residue_function_prediction_chat(
     )
 
     all_results_list = []
-    temp_dir_ = temp_dir /  "Residue_save"
     timestamp = str(int(time.time()))
     residue_save_dir = get_save_path("Residue_save")
     residue_save_dir.mkdir(parents=True, exist_ok=True)
@@ -1397,7 +1395,7 @@ def handle_VenusMine(
 
 def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     sequence_models = ["VenusPLM","ESM2-650M", "ESM-1v", "ESM-1b"]
-    structure_models = [ "ProSST-2048", "ProtSSN", "ESM-IF1", "SaProt", "MIF-ST"]
+    structure_models = [ "ProSST-2048", "ProtSSN", "ESM-IF1", "SaProt", "MIF-ST", "VenusREM"]
     function_models = list(MODEL_MAPPING_FUNCTION.keys())
     residue_function_models = list(MODEL_RESIDUE_MAPPING_FUNCTION.keys())
 
