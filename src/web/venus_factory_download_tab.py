@@ -64,7 +64,6 @@ def zip_task_results(task_folder: str, task_type: str) -> str:
                 arcname = os.path.relpath(file_path, task_folder)
                 zipf.write(file_path, arcname)
                 
-    os.chmod(zip_path, 0o777)
     return zip_path
 
 def create_download_tool_tab(constant: Dict[str, Any]):

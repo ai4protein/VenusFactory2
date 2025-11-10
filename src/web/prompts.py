@@ -41,6 +41,16 @@ TOOL PARAMETER MAPPING:
 - ncbi_sequence_download: accession_id, output_format (for downloading NCBI sequences)
 - alphafold_structure_download: uniprot_id, output_format (for downloading AlphaFold structures)
 
+CRITICAL - CONTEXT AWARENESS:
+- The user may refer to previously uploaded files, sequences, or UniProt IDs using phrases like:
+  * "the protein", "this sequence", "that file"
+  * "it", "analyze it", "predict its stability"
+  * "the one I uploaded", "from before"
+- Check the [CONVERSATION CONTEXT] section carefully to identify what the user is referring to
+- Use the "Most recent X" items when the user says "it" or "the protein"
+- If multiple resources exist, default to the most recent unless specified otherwise
+
+
 CONTEXT ANALYSIS:
 Parse the following user input and context carefully:
 {input}
@@ -126,6 +136,14 @@ WORKER_PROMPT = ChatPromptTemplate.from_messages([
     - ALWAYS write "I will now [action]" or similar text BEFORE the tool call
     - NEVER return only a tool call without any text
     - Format: [Explanation text] + [Tool call]
+
+    CONTEXT AWARENESS:
+    - You have access to the conversation history through the chat memory
+    - When the user refers to "the protein", "this sequence", "that file", etc., 
+      look back in the conversation history to find the actual values
+    - Use file paths, sequences, and UniProt IDs from previous messages in the conversation
+    - If a tool input parameter seems incomplete or refers to previous context, 
+      check the conversation history to resolve the reference
 
     Example: "I will now query UniProt for the Catalase sequence." [then tool call]"""),
         ("human", "{input}"),
