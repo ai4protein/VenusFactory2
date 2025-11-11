@@ -10,7 +10,7 @@ MODEL_MAPPING_ZERO_SHOT = {
     "ProSST-2048": "prosst", 
     "ProtSSN": "protssn",
     "VenusPLM": "venusplm",
-    "VenusREM": "venusrem"
+    "VenusREM (foldseek-based)": "venusrem"
 }
 
 DATASET_MAPPING_ZERO_SHOT = [

@@ -45,7 +45,7 @@ load_dotenv()
 class DeepSeekLLM(BaseChatModel):
     api_key: str = None
     base_url: str = "https://www.dmxapi.com/v1"
-    model_name: str = "deepseek-chat"
+    model_name: str = "gemini-2.5-flash"
     temperature: float = 0.4
     max_tokens: int = 4096
     
@@ -446,53 +446,33 @@ async def send_message(history, message, session_state):
     history.append({"role": "assistant", "content": "🤔 Thinking... Creating a plan..."})
     yield history, gr.MultimodalTextbox(value=None, interactive=False)
 
+    # Build comprehensive context
     context_parts = []
     if file_paths:
-        context_parts.append(f"Current upload: {', '.join(file_paths)}")
+        context_parts.append(f"User has uploaded files: {', '.join(file_paths)}")
     
-    if protein_ctx.files:
-        all_files = [f"{data['name']} (path: {data['path']})" for fid, data in protein_ctx.files.items()]
-        context_parts.append(f"Available files in memory: {'; '.join(all_files)}")
-    
-
-    if protein_ctx.sequences:
-        seq_info = [f"Sequence {sid}: {data['length']} aa" for sid, data in protein_ctx.sequences.items()]
-        context_parts.append(f"Available sequences: {'; '.join(seq_info)}")
-        if protein_ctx.last_sequence:
-            context_parts.append(f"Most recent sequence: {protein_ctx.last_sequence[:50]}... ({len(protein_ctx.last_sequence)} aa)")
-    
-    if protein_ctx.uniprot_ids:
-        uniprot_list = list(protein_ctx.uniprot_ids.keys())
-        context_parts.append(f"Available UniProt IDs: {', '.join(uniprot_list)}")
-        if protein_ctx.last_uniprot_id:
-            context_parts.append(f"Most recent UniProt ID: {protein_ctx.last_uniprot_id}")
-
     if protein_ctx.structure_files:
         struct_info = []
         for struct_id, struct_data in protein_ctx.structure_files.items():
             struct_info.append(f"{struct_data['source']} structure: {struct_data['name']} (path: {struct_data['path']})")
         context_parts.append(f"Available structure files: {'; '.join(struct_info)}")
-    
-    context_summary = "\n".join([f"- {part}" for part in context_parts]) if context_parts else "- No previous protein data"
-    
-    conversation_history = "\n".join([
-        f"{msg['role'].upper()}: {msg['content']}" 
-        for msg in session_state['history'][-10:]
-    ])
-    
-    planner_input = f"""User Query: {text}
 
-[CONVERSATION HISTORY]:
-{conversation_history}
+    context_parts.append(f"Protein context: {protein_ctx.get_context_summary()}")
 
-[AVAILABLE RESOURCES]:
-{context_summary}
+    protein_context_summary = "; ".join(context_parts)
 
-IMPORTANT: The user may refer to previously uploaded files, sequences, or UniProt IDs from the conversation history above. Use the resources listed to resolve these references."""
-    
+    memory = session_state['memory']
+    chat_history = memory.chat_memory.messages
+
+    planner_inputs = {
+        "input": text,
+        "chat_history": chat_history,
+        "protein_context_summary": protein_context_summary
+     }
+
     try:
-        # Async planner invocation
-        plan = await asyncio.to_thread(session_state['planner'].invoke, {"input": planner_input})
+    # Async planner invocation
+        plan = await asyncio.to_thread( session_state['planner'].invoke,  planner_inputs )
     except Exception as e:
         history[-1] = {"role": "assistant", "content": f"❌ **Planning Failed:** Sorry, I failed to create a plan. Error: {e}"}
         yield history, gr.MultimodalTextbox(value=None, interactive=True)
@@ -504,9 +484,7 @@ IMPORTANT: The user may refer to previously uploaded files, sequences, or UniPro
         yield history, gr.MultimodalTextbox(value=None, interactive=False)
         
         llm = session_state['llm']
-        
-        context_message = f"[Context: {protein_ctx.get_context_summary()}]\n\nUser: {text}"
-        response = await llm.ainvoke(session_state['memory'].chat_memory.messages + [HumanMessage(content=context_message)])
+        response = await llm.ainvoke(session_state['memory'].chat_memory.messages + [HumanMessage(content=text)])
         final_response = response.content
     else:
         # Execute Plan
@@ -545,7 +523,7 @@ IMPORTANT: The user may refer to previously uploaded files, sequences, or UniPro
                         else:
                             tool_input[key] = raw_output
 
-                # Get worker and execute
+                # Get worker and execute (run in thread to avoid blocking)
                 worker = session_state['workers'].get(tool_name)
                 if not worker: 
                     raise ValueError(f"Worker for tool '{tool_name}' not found.")
@@ -594,15 +572,9 @@ IMPORTANT: The user may refer to previously uploaded files, sequences, or UniPro
         history[-1] = {"role": "assistant", "content": f"{plan_text}\n\n---\n\n📄 **All steps complete. Generating final report...**"}
         yield history, gr.MultimodalTextbox(value=None, interactive=False)
 
-        finalizer_input = {
-            "original_input": text,
-            "analysis_log": analysis_log,
-            "context_summary": protein_ctx.get_context_summary()
-        }
-        
         final_response = await asyncio.to_thread(
             session_state['finalizer'].invoke,
-            finalizer_input
+            {"original_input": text, "analysis_log": analysis_log}
         )
 
     history[-1] = {"role": "assistant", "content": final_response}

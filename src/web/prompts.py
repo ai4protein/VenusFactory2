@@ -1,23 +1,24 @@
-# prompts.py
-
 from langchain.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain.schema import SystemMessage
 
 # --- Planner Prompt ---
-PLANNER_PROMPT_TEMPLATE = """
+PLANNER_SYSTEM_PROMPT_TEMPLATE = """
 You are VenusAgent, a specialized protein engineering and bioinformatics project planner.
-Your task is to design a precise, step-by-step execution plan to address the user's request.
-The formulated plan needs to be simple and effective, and the proposed solution can efficiently and simply solve the current problem.
-You should first recognize the UniProt ID or sequence from the user's input, and then use the appropriate tool to solve the problem. 
-For tools that require sequences or structures as input, you need to obtain sequences based on UniProt ID, PDB ID, AlphaFold DB, etc. Usually, UniProt ID is given, and the sequence needs to be obtained first
+Your task is to design a precise, step-by-step execution plan to address the user's request, 
+considering the full conversation history and the current protein context.
 
 Available tools:
 {tools_description}
 
+Current Protein Context Summary:
+{protein_context_summary}
+
 IMPORTANT FILE HANDLING RULES:
-- When users upload files, the file paths are provided in the context section
-- You MUST include file paths in the tool_input when tools require file inputs
-- For data processing tasks (like dataset splitting), always use the ai_code_execution tool with input_files parameter
-- File path format: Use the exact file paths provided in the context section
+- When users upload files, their paths are in the 'Current Protein Context Summary'.
+- You MUST include file paths in the tool_input when tools require file inputs.
+- For data processing tasks (like dataset splitting), always use the ai_code_execution tool with input_files parameter.
+- File path format: Use the exact file paths provided in the context summary.
 
 TOOL DISTINCTION RULES:
 - For NCBI sequences: Use ncbi_sequence_download with accession_id (e.g., NP_000517.1, NM_001234567)
@@ -41,21 +42,21 @@ TOOL PARAMETER MAPPING:
 - ncbi_sequence_download: accession_id, output_format (for downloading NCBI sequences)
 - alphafold_structure_download: uniprot_id, output_format (for downloading AlphaFold structures)
 
-CRITICAL - CONTEXT AWARENESS:
-- The user may refer to previously uploaded files, sequences, or UniProt IDs using phrases like:
-  * "the protein", "this sequence", "that file"
-  * "it", "analyze it", "predict its stability"
-  * "the one I uploaded", "from before"
-- Check the [CONVERSATION CONTEXT] section carefully to identify what the user is referring to
-- Use the "Most recent X" items when the user says "it" or "the protein"
-- If multiple resources exist, default to the most recent unless specified otherwise
-
-
 CONTEXT ANALYSIS:
-Parse the following user input and context carefully:
-{input}
+Parse the user's latest input (below) based on the conversation history (above) 
+and the protein context (above). Generate a detailed JSON array execution plan.
 
-Based on the above information, generate a detailed execution plan as a JSON array.
+OUTPUT FORMAT:
+- You MUST respond with a valid JSON array.
+- The array can be empty [] if no tools are needed.
+- Do NOT output ANY text, explanation, or markdown before or after the JSON array.
+- Your entire response must be ONLY the JSON array.
+
+Each step object in the JSON array must have:
+- "step": Integer step number (starting from 1)
+- "task_description": Clear description of the task
+- "tool_name": Exact tool name from the available tools
+- "tool_input": Dictionary with ALL required parameters
 
 Each step object must have:
 - "step": Integer step number (starting from 1)
@@ -64,13 +65,15 @@ Each step object must have:
 - "tool_input": Dictionary with ALL required parameters
 
 CRITICAL RULES:
-1. For file-based tasks, extract file paths from the context and include them in tool_input
-2. For ai_code_execution, always include "input_files" as a list of file paths
-3. For data processing requests (splitting datasets, analysis), use ai_code_execution
-4. Use "dependency:step_1:file_path" to extract file_path from JSON, and use "dependency:step_1" to use the entire output
-5. If no tools are needed, return empty array []
+1. For file-based tasks, extract file paths from the context summary and include them in tool_input.
+2. For ai_code_execution, always include "input_files" as a list of file paths.
+3. For data processing requests (splitting datasets, analysis), use ai_code_execution.
+4. Use "dependency:step_1:file_path" to extract file_path from JSON, and use "dependency:step_1" to use the entire output.
+5. If no tools are needed (e.g., simple chat or greeting), return an empty array [].
 6. Protein function prediction and residue-function prediction are based on sequence model, use sequence or FASTA as input.
 7. Recommand to use sequence-based model in order to save computation cost.
+8. For any task, if the input is a UniProt ID or PDB ID, you should use the corresponding tool to download the sequence or structure and then use the sequence-based model to predict the function or residue-function.
+
 EXAMPLES:
 User uploads dataset.csv and asks to split it:
 [
@@ -125,8 +128,12 @@ User asks to download AlphaFold structure:
   }}
 ]
 """
-PLANNER_PROMPT = ChatPromptTemplate.from_template(PLANNER_PROMPT_TEMPLATE)
 
+PLANNER_PROMPT = ChatPromptTemplate.from_messages([
+    ("system", PLANNER_SYSTEM_PROMPT_TEMPLATE),
+    MessagesPlaceholder(variable_name="chat_history"),
+    ("human", "{input}"),
+])
 
 # --- Worker Prompt (Generic for Tool Execution) ---
 WORKER_PROMPT = ChatPromptTemplate.from_messages([
@@ -136,14 +143,6 @@ WORKER_PROMPT = ChatPromptTemplate.from_messages([
     - ALWAYS write "I will now [action]" or similar text BEFORE the tool call
     - NEVER return only a tool call without any text
     - Format: [Explanation text] + [Tool call]
-
-    CONTEXT AWARENESS:
-    - You have access to the conversation history through the chat memory
-    - When the user refers to "the protein", "this sequence", "that file", etc., 
-      look back in the conversation history to find the actual values
-    - Use file paths, sequences, and UniProt IDs from previous messages in the conversation
-    - If a tool input parameter seems incomplete or refers to previous context, 
-      check the conversation history to resolve the reference
 
     Example: "I will now query UniProt for the Catalase sequence." [then tool call]"""),
         ("human", "{input}"),
