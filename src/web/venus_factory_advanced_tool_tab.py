@@ -821,7 +821,7 @@ def handle_VenusMine(
     logger = logging.getLogger(__name__)
     start_time = time.time()
     
-    mmseqs_database_path = "/home/lrzhang/VenusFactory/dataset/CATH.fasta"
+    mmseqs_database_path = "/global/lhshare/uniref100.fasta"
 
     if not pdb_file:
         yield (
@@ -1646,7 +1646,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         adv_residue_function_download_btn = gr.DownloadButton("💾 Download Results", visible=False)
 
 
-            with gr.TabItem("VenusMine", visible=False):
+            with gr.TabItem("VenusMine"):
                 with gr.Row(equal_height=False):
                     with gr.Column(scale=2):
                         gr.Markdown("### 📁 Input Configuration")
@@ -1662,9 +1662,9 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                             
                             with gr.Group():
                                 gr.Markdown("**MMseqs2 Search Parameters**")
-                                venus_mmseqs_threads = gr.Slider(label="Threads", minimum=1, maximum=32, value=8, step=1)
+                                venus_mmseqs_threads = gr.Slider(label="Threads", minimum=1, maximum=100, value=96, step=1)
                                 venus_mmseqs_iterations = gr.Slider(label="Iterations", minimum=1, maximum=10, value=3, step=1)
-                                venus_mmseqs_max_seqs = gr.Slider(label="Max Sequences", minimum=100, maximum=2000, value=100, step=100)
+                                venus_mmseqs_max_seqs = gr.Slider(label="Max Sequences", minimum=100, maximum=5000, value=100, step=100)
                             
                             with gr.Group():
                                 gr.Markdown("**Clustering Parameters**")
@@ -1673,7 +1673,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                             
                             with gr.Group():
                                 gr.Markdown("**Tree Building Parameters**")
-                                venus_top_n = gr.Slider(label="Top N Results", minimum=1, maximum=100, value=10, step=1)
+                                venus_top_n = gr.Slider(label="Top N Results", minimum=1, maximum=10000, value=10, step=1)
                                 venus_evalue = gr.Number(label="E-value Threshold", value=1e-5)
                         
                         venus_start_btn = gr.Button("🚀 Start VenusMine Pipeline", variant="primary", size="lg")

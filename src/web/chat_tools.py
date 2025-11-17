@@ -11,6 +11,8 @@ import gradio as gr
 import uuid
 import subprocess
 import sys
+from Bio.PDB import PDBParser
+from Bio.SeqUtils import seq1
 from typing import Dict, Any, List, Optional, Tuple
 from pathlib import Path
 from dotenv import load_dotenv
@@ -54,9 +56,10 @@ class UniProtQueryInput(BaseModel):
     """Input for UniProt database query"""
     uniprot_id: str = Field(..., description="UniProt ID for protein sequence query")
 
-class PDBQueryInput(BaseModel):
-    """Input for PDB database query"""
-    pdb_id: str = Field(..., description="PDB ID for protein sequence query")
+
+class PDBSequenceExtractionInput(BaseModel):
+    """Input for extracting sequence from a local PDB file"""
+    pdb_file: str = Field(..., description="Path to local PDB file")
 
 class CSVTrainingConfigInput(BaseModel):
     """Input for CSV training config generation"""
@@ -83,6 +86,11 @@ class NCBISequenceInput(BaseModel):
 class AlphaFoldStructureInput(BaseModel):
     """Input for AlphaFold structure download"""
     uniprot_id: str = Field(..., description="UniProt ID for AlphaFold structure download")
+    output_format: str = Field(default="pdb", description="Output format: pdb, mmcif")
+
+class PDBStructureInput(BaseModel):
+    """Input for PDB database structure download"""
+    pdb_id: str = Field(..., description="PDB ID for protein structure download")
     output_format: str = Field(default="pdb", description="Output format: pdb, mmcif")
 
 # Langchain Tools
@@ -112,11 +120,7 @@ def zero_shot_structure_prediction_tool(structure_file: str, model_name: str = "
     """Predict beneficial mutations using structure-based zero-shot models. Use for mutation prediction with PDB structure files."""
     try:
         api_key = os.getenv("DEEPSEEK_API_KEY")
-        
-        # Handle both direct file paths and JSON responses from download tools
         actual_file_path = structure_file
-        
-        # Check if structure_file is a JSON string containing file path
         try:
             import json
             if structure_file.startswith('{') and structure_file.endswith('}'):
@@ -184,13 +188,39 @@ def uniprot_query_tool(uniprot_id: str) -> str:
     except Exception as e:
         return f"UniProt query error: {str(e)}"
 
-@tool("PDB_query", args_schema=PDBQueryInput)
-def pdb_query_tool(pdb_id: str) -> str:
-    """Query PDB database for protein sequence"""
+@tool("PDB_structure_download", args_schema=PDBStructureInput)
+def pdb_structure_download_tool(pdb_id: str, output_format: str = "pdb") -> str:
+    """Download protein structure from PDB database using PDB ID."""
     try:
-        return get_pdb_sequence(pdb_id)
+        return download_pdb_structure_from_id(pdb_id, output_format)
     except Exception as e:
-        return f"PDB query error: {str(e)}"
+        return f"PDB structure download error: {str(e)}"
+
+@tool("PDB_sequence_extraction", args_schema=PDBSequenceExtractionInput)
+def PDB_sequence_extraction_tool(pdb_file: str) -> str:
+    """Extract protein sequence(s) from a local PDB file using Biopython."""
+    try:
+        parser = PDBParser(QUIET=True)
+        structure = parser.get_structure("pdb_struct", pdb_file)
+        sequences = []
+        for model in structure:
+            for chain in model:
+                residues = []
+                for residue in chain:
+                    if residue.id[0] == " ":
+                        try:
+                            residues.append(seq1(residue.resname))
+                        except Exception:
+                            pass
+                if residues:
+                    sequences.append({"chain": chain.id, "sequence": "".join(residues)})
+
+        if not sequences:
+            return json.dumps({"success": False, "error": "No protein sequences found in PDB file."})
+
+        return json.dumps({"success": True, "pdb_file": pdb_file, "sequences": sequences}, indent=2)
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
 
 @tool("generate_training_config", args_schema=CSVTrainingConfigInput)
 def generate_training_config_tool(csv_file: str, test_csv_file: Optional[str] = None, output_name: str = "custom_training_config") -> str:
@@ -583,59 +613,76 @@ def get_uniprot_sequence(uniprot_id):
             "error_message": f"Error fetching sequence for {uniprot_id}: {str(e)}"
         }
 
-def get_pdb_sequence(pdb_id):
-    """
-    Fetches protein sequences for a single PDB ID.
-    """
-    pdb_id = pdb_id.upper()
-    url = f"https://www.rcsb.org/fasta/entry/{pdb_id}"
-    
+def download_pdb_structure_from_id(pdb_id: str, output_format: str = "pdb") -> str:
     try:
-        response = requests.get(url)
+        # Create temporary directory for output
+        temp_dir = Path("temp_outputs")
+        structure_dir = temp_dir / "pdb_structures"
+        os.makedirs(structure_dir, exist_ok=True)
+
+        pdb_id = pdb_id.upper()
+        url = f"https://files.rcsb.org/download/{pdb_id}.pdb"
+
+        response = requests.get(url, timeout=30)
         response.raise_for_status()
-        fasta_text = response.text
-        
-        sequences = []
-        current_chain = None
-        current_sequence = ""
-        
-        for line in fasta_text.strip().split('\n'):
-            if line.startswith('>'):
-                # Save previous sequence if exists
-                if current_chain and current_sequence:
-                    sequences.append({
-                        "chain": current_chain,
-                        "sequence": current_sequence
-                    })
-                
-                # Parse chain info from header
-                # Example: >1ABC_1|Chain A|LYSOZYME|Gallus gallus (9031)
-                parts = line.split('|')
-                chain_info = parts[0].replace('>', '')
-                current_chain = parts[1] if len(parts) > 1 else chain_info
-                current_sequence = ""
-            else:
-                current_sequence += line
-        
-        # Add last sequence
-        if current_chain and current_sequence:
-            sequences.append({
-                "chain": current_chain,
-                "sequence": current_sequence
-            })
-        
-        return {
-            "success": True,
-            "pdb_id": pdb_id,
-            "sequences": sequences
-        }
-        
+        structure_text = response.text
+
+        expected_file = structure_dir / f"{pdb_id}.pdb"
+        with open(expected_file, "w", encoding="utf-8") as f:
+            f.write(structure_text)
+
+        # Parse saved PDB and extract chain A by default
+        try:
+            parser = PDBParser(QUIET=True)
+            structure = parser.get_structure(pdb_id, str(expected_file))
+            seqs = []
+            for model in structure:
+                for chain in model:
+                    if chain.id == "A":
+                        residues = []
+                        for residue in chain:
+                            if residue.id[0] == " ":
+                                try:
+                                    residues.append(seq1(residue.resname))
+                                except Exception:
+                                    pass
+                        chain_seq = "".join(residues)
+                        seqs.append({"chain": chain.id, "sequence": chain_seq})
+                        break
+                if seqs:
+                    break
+            if not seqs:
+                # fallback: try first chain
+                for model in structure:
+                    for chain in model:
+                        residues = []
+                        for residue in chain:
+                            if residue.id[0] == " ":
+                                try:
+                                    residues.append(seq1(residue.resname))
+                                except Exception:
+                                    pass
+                        chain_seq = "".join(residues)
+                        if chain_seq:
+                            seqs.append({"chain": chain.id, "sequence": chain_seq})
+                            break
+                    if seqs:
+                        break
+
+            if not seqs:
+                return json.dumps({"success": False, "pdb_id": pdb_id, "error_message": "No protein sequence found in PDB file."})
+
+            return json.dumps({
+                "success": True,
+                "pdb_id": pdb_id,
+                "pdb_file": str(expected_file),
+                "sequences": seqs,
+                "message": f"PDB structure downloaded and chain A extracted: {expected_file}"
+            }, indent=2)
+        except Exception as e:
+            return json.dumps({"success": False, "pdb_id": pdb_id, "error_message": f"Failed to parse PDB: {str(e)}"})
     except Exception as e:
-        return {
-            "success": False,
-            "pdb_id": pdb_id,
-            "error_message": f"Error fetching sequence for {pdb_id}: {str(e)}"
-        }
+        return json.dumps({"success": False, "pdb_id": pdb_id, "error_message": f"Error downloading structure for {pdb_id}: {str(e)}"})
 
 def download_ncbi_sequence(accession_id: str, output_format: str = "fasta") -> str:
     """Download protein or nucleotide sequences from NCBI using existing crawler script."""
@@ -665,7 +712,7 @@ def download_ncbi_sequence(accession_id: str, output_format: str = "fasta") -> s
                 "success": True,
                 "accession_id": accession_id,
                 "format": output_format,
-                "file_path": str(expected_file),
+                "pdb_file": str(expected_file),
                 "message": f"Sequence downloaded successfully and saved to: {expected_file}",
                 "script_output": result.stdout
             })
@@ -741,7 +788,7 @@ def download_alphafold_structure(uniprot_id: str, output_format: str = "pdb") ->
                 "success": True,
                 "uniprot_id": uniprot_id,
                 "format": output_format,
-                "file_path": str(expected_file),
+                "pdb_file": str(expected_file),
                 "confidence_info": confidence_info,
                 "message": f"AlphaFold structure downloaded successfully and saved to: {expected_file}",
                 "script_output": result.stdout

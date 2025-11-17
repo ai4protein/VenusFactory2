@@ -642,7 +642,7 @@ def build_and_visualize_tree(refseq_pkl: str, discovered_pkl: str, ec_pkl: str, 
         distance_to_ref_ec.append(distance_to_reference(repr_ec[i], ref))
     
     # Use same threshold for EC sequences
-    top_n_threshold_ec = min(top_n_threshold, full_length_ec)
+    top_n_threshold_ec = 100
     
     # Merge representations
     merge_repr_discover = np.concatenate([repr_refseq, repr_discover[np.argsort(distance_to_ref_discover)[0:top_n_threshold]], repr_ec[np.argsort(distance_to_ref_ec)[0:top_n_threshold_ec]]])
