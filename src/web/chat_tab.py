@@ -48,7 +48,7 @@ load_dotenv()
 class DeepSeekLLM(BaseChatModel):
     api_key: str = None
     base_url: str = "https://www.dmxapi.com/v1"
-    model_name: str = "claude-3-7-sonnet-20250219"
+    model_name: str = "gemini-2.5-pro"
     temperature: float = 0.2
     max_tokens: int = 4096
     
@@ -187,14 +187,48 @@ class ProteinContextManager:
         self.tool_history = []
 
     def add_tool_call(self, step: int, tool_name: str, inputs: dict, outputs: Any, cached: bool = False):
+        merged_params = _merge_tool_parameters_with_context(self, inputs)
+        cache_key = generate_cache_key(tool_name, merged_params)
+        # Store structured tool record
+        tool_record = {
+            'step': step,
+            'name': tool_name,
+            'parameters': merged_params,
+            'outputs': outputs,
+            'cached': cached,
+            'cache_key': cache_key,
+            'timestamp': datetime.now().isoformat()
+        }
+        # Legacy fields kept for backward compatibility
         self.tool_history.append({
             'step': step,
             'tool_name': tool_name,
-            'inputs': inputs,
-            'outputs': str(outputs), 
+            'inputs': merged_params,
+            'outputs': str(outputs),
+            'cache_key': cache_key,
             'timestamp': datetime.now(),
-            'cached': cached
+            'cached': cached,
+            'tool_record': tool_record,
         })
+
+    def get_tool_records(self) -> List[Dict[str, Any]]:
+        records = []
+        for call in self.tool_history:
+            rec = call.get('tool_record')
+            if rec:
+                records.append(rec)
+            else:
+                # Fallback: construct a minimal record if missing
+                records.append({
+                    'step': call.get('step'),
+                    'name': call.get('tool_name'),
+                    'parameters': call.get('inputs'),
+                    'outputs': call.get('outputs'),
+                    'cached': call.get('cached', False),
+                    'cache_key': call.get('cache_key'),
+                    'timestamp': call.get('timestamp').isoformat() if call.get('timestamp') else None,
+                })
+        return records
     
     def get_tool_history_summary(self) -> str:
         if not self.tool_history:
@@ -205,6 +239,7 @@ class ProteinContextManager:
             cache_status = "✓ cached" if call['cached'] else "✗ executed"
             summary += f"{i}. [{cache_status}] Step {call['step']}: {call['tool_name']}\n"
             summary += f"   Inputs: {json.dumps(call['inputs'], indent=2)[:200]}...\n"
+            summary += f"   Cache Key: {call.get('cache_key', 'N/A')}\n"
             summary += f"   Time: {call['timestamp'].strftime('%H:%M:%S')}\n\n"
         
         return summary
@@ -288,19 +323,58 @@ class ProteinContextManager:
         return type_mapping.get(file_ext, 'unknown')
         
 def generate_cache_key(tool_name: str, tool_input: dict) -> str:
-    input_str = json.dumps(tool_input, sort_keys=True)
-    return tool_name
+    input_str = json.dumps(tool_input, sort_keys=True, ensure_ascii=False)
+    params_hash = hashlib.md5(input_str.encode('utf-8')).hexdigest()[:12]
+    cache_key = f"{tool_name}_{params_hash}"
+    
+    return cache_key
+
+
+def _merge_tool_parameters_with_context(protein_ctx: "ProteinContextManager", base_params: Dict[str, Any]) -> Dict[str, Any]:
+    """Merge tool input parameters with current protein context (files/sequence/UniProt).
+    This ensures Planner receives unified, structured parameters for each tool call.
+    """
+    params = dict(base_params or {})
+    try:
+        # Add latest context snapshots
+        params.setdefault("last_sequence", getattr(protein_ctx, "last_sequence", None))
+        params.setdefault("last_uniprot_id", getattr(protein_ctx, "last_uniprot_id", None))
+        params.setdefault("last_file", getattr(protein_ctx, "last_file", None))
+
+        # Include all known files for reference
+        all_files = []
+        for _, f in getattr(protein_ctx, "files", {}).items():
+            if f.get("path"):
+                all_files.append(f["path"])
+        params.setdefault("files", sorted(list(set(all_files))))
+    except Exception:
+        # Fail-safe: never crash tool recording due to context merge issues
+        pass
+    return params
 
 
 def get_cached_tool_result(session_state: dict, tool_name: str, tool_input: dict) -> Optional[Dict[str, Any]]:
     cache_key = generate_cache_key(tool_name, tool_input)
     cache = session_state.get("tool_cache", {})
-    return cache.get(cache_key)
+    cached_result = cache.get(cache_key)
+    
+    if cached_result:
+        cached_inputs = cached_result.get("inputs", {})
+        if cached_inputs == tool_input:
+            print(f"✓ Cache HIT (exact match): {cache_key}")
+            return cached_result
+        else:
+            print(f"⚠ Cache key collision detected for {cache_key}, inputs differ")
+            return None
+    
+    print(f"✗ Cache MISS: {cache_key}")
+    return None
 
 
 def save_cached_tool_result(session_state: dict, tool_name: str, tool_input: dict, outputs: Any) -> None:
     cache_key = generate_cache_key(tool_name, tool_input)
     cache = session_state.setdefault("tool_cache", {})
+    
     cache[cache_key] = {
         "tool_name": tool_name,
         "inputs": tool_input,
@@ -308,6 +382,7 @@ def save_cached_tool_result(session_state: dict, tool_name: str, tool_input: dic
         "timestamp": time.time(),
         "cache_key": cache_key
     }
+    
 
 
 def save_inmemory_tool_result(session_state: dict, protein_id: str, tool_name: str, inputs: Dict[str, Any], outputs: Any, files: Optional[Dict[str, str]] = None, meta: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -545,23 +620,28 @@ async def send_message(history, message, session_state):
     memory = session_state['memory']
     chat_history = memory.chat_memory.messages
 
-    # Aggregate recent tool outputs and pass into planner to avoid re-calling tools
+    # Aggregate recent tool outputs and build unified tools JSON for Planner
     recent_tool_calls = getattr(protein_ctx, "tool_history", [])[-10:]
     tool_outputs_summary = []
     for call in reversed(recent_tool_calls):  # most recent first
         tool_outputs_summary.append({
             "step": call.get("step"),
             "tool": call.get("tool_name"),
+            "inputs": call.get("inputs"),
+            "cache_key": call.get("cache_key"),
             "cached": call.get("cached", False),
             "timestamp": call.get("timestamp").isoformat() if call.get("timestamp") else None,
-            "outputs": call.get("outputs")  # outputs stored as string
+            "outputs": call.get("outputs")[:500]
         })
+
+    tool_records = protein_ctx.get_tool_records()
 
     planner_inputs = {
         "input": text,
         "chat_history": chat_history,
         "protein_context_summary": protein_context_summary,
-        "tool_outputs": json.dumps(tool_outputs_summary, ensure_ascii=False)
+        "tool_outputs": json.dumps(tool_outputs_summary, ensure_ascii=False),
+        "tools": json.dumps(tool_records, ensure_ascii=False)
     }
 
     try:
@@ -613,28 +693,31 @@ async def send_message(history, message, session_state):
             yield history, gr.MultimodalTextbox(value=None, interactive=False)
 
             try:
-                cached_entry = get_cached_tool_result(session_state, tool_name, tool_input)
+                merged_tool_input = _merge_tool_parameters_with_context(protein_ctx, tool_input)
+                cached_entry = get_cached_tool_result(session_state, tool_name, merged_tool_input)
                 
                 if cached_entry:
                     raw_output = cached_entry.get("outputs", "")
                     step_results[step_num] = {'raw_output': raw_output, 'cached': True}
-                    protein_ctx.add_tool_call(step_num, tool_name, tool_input, raw_output, cached=True)
+                    protein_ctx.add_tool_call(step_num, tool_name, merged_tool_input, raw_output, cached=True)
 
                     step_detail = f"**Step {step_num}:** {task_desc}\n\n"
                     step_detail += f"**Tool:** {tool_name} ⚡ (cached result)\n"
-                    step_detail += f"**Input:** {json.dumps(tool_input, indent=2)}\n\n"
+                    step_detail += f"**Input:** {json.dumps(merged_tool_input, indent=2)}\n\n"
+                    step_detail += f"**Cache Key:** {cached_entry.get('cache_key', 'N/A')}\n\n"
                     step_detail += f"**Output:**\n```\n{str(raw_output)[:500]}{'...' if len(str(raw_output)) > 500 else ''}\n```"
+                    
                     
                     analysis_log += f"--- Cached Analysis for Step {step_num}: {task_desc} ---\n\n"
                     analysis_log += f"Tool: {tool_name} (cached)\n"
-                    analysis_log += f"Input: {json.dumps(tool_input, indent=2)}\n"
+                    analysis_log += f"Input: {json.dumps(merged_tool_input, indent=2)}\n"
                     analysis_log += f"Output: {raw_output}\n\n"
 
                     history[-1] = {"role": "assistant", "content": f"{plan_text}\n\n---\n\n✅ **Step {step_num} Complete (cached):** {task_desc}\n\n{step_detail}"}
                     yield history, gr.MultimodalTextbox(value=None, interactive=False)
                     continue
 
-                for key, value in tool_input.items():
+                for key, value in merged_tool_input.items():
                     if isinstance(value, str) and value.startswith("dependency:"):
                         parts = value.split(':')
                         dep_step = int(parts[1].replace('step_', '').replace('step', ''))
@@ -643,17 +726,17 @@ async def send_message(history, message, session_state):
                             field_name = parts[2]
                             try:
                                 parsed = json.loads(raw_output) if isinstance(raw_output, str) else raw_output
-                                tool_input[key] = parsed.get(field_name, raw_output)
+                                merged_tool_input[key] = parsed.get(field_name, raw_output)
                             except:
-                                tool_input[key] = raw_output
+                                merged_tool_input[key] = raw_output
                         else:
-                            tool_input[key] = raw_output
+                            merged_tool_input[key] = raw_output
 
                 worker = session_state['workers'].get(tool_name)
                 if not worker: 
                     raise ValueError(f"Worker for tool '{tool_name}' not found.")
                 
-                worker_input_str = json.dumps(tool_input)
+                worker_input_str = json.dumps(merged_tool_input)
                 worker_result = await asyncio.to_thread(worker.invoke, {"input": worker_input_str})
                 
                 raw_output = str(worker_result)
@@ -666,10 +749,10 @@ async def send_message(history, message, session_state):
                     except Exception:
                         parsed_output = raw_output
                     
-                    save_cached_tool_result(session_state, tool_name, tool_input, parsed_output)
+                    save_cached_tool_result(session_state, tool_name, merged_tool_input, parsed_output)
                 except Exception as e:
                     print(f"Failed to cache result: {e}")
-                protein_ctx.add_tool_call(step_num, tool_name, tool_input, raw_output, cached=False)
+                protein_ctx.add_tool_call(step_num, tool_name, merged_tool_input, raw_output, cached=False)
                 
                 # Parse tool output to update context
                 try:
@@ -682,7 +765,7 @@ async def send_message(history, message, session_state):
                         if output_data.get('success') and 'file_path' in output_data:
                             file_path = output_data['file_path']
                             if tool_name == 'alphafold_structure_download':
-                                uniprot_id = tool_input.get('uniprot_id', 'unknown')
+                                uniprot_id = merged_tool_input.get('uniprot_id', 'unknown')
                                 protein_ctx.add_structure_file(file_path, 'alphafold', uniprot_id)
                             elif tool_name == 'ncbi_sequence_download':
                                 protein_ctx.add_file(file_path)
@@ -693,12 +776,12 @@ async def send_message(history, message, session_state):
                 # Create detailed step result display
                 step_detail = f"**Step {step_num}:** {task_desc}\n\n"
                 step_detail += f"**Tool:** {tool_name}\n"
-                step_detail += f"**Input:** {json.dumps(tool_input, indent=2)}\n\n"
+                step_detail += f"**Input:** {json.dumps(merged_tool_input, indent=2)}\n\n"
                 step_detail += f"**Output:**\n```\n{raw_output[:500]}{'...' if len(raw_output) > 500 else ''}\n```"
                 
                 analysis_log += f"--- Analysis for Step {step_num}: {task_desc} ---\n\n"
                 analysis_log += f"Tool: {tool_name}\n"
-                analysis_log += f"Input: {json.dumps(tool_input, indent=2)}\n"
+                analysis_log += f"Input: {json.dumps(merged_tool_input, indent=2)}\n"
                 analysis_log += f"Output: {raw_output}\n\n"
 
                 history[-1] = {"role": "assistant", "content": f"{plan_text}\n\n---\n\n✅ **Step {step_num} Complete:** {task_desc}\n\n{step_detail}"}
@@ -777,7 +860,6 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                     **Note**: This is a research demo with limited compute resources (16GB RAM, 4 vCPUs, no GPU) — please avoid submitting very large-scale computational tasks.
                         """)
             
-
             with gr.Accordion("💡 Example Research Questions", open=True):
                 gr.Examples(
                     examples=[
