@@ -131,27 +131,27 @@ def create_ui():
                     gr.Markdown(f"**Error creating Chat tab:**\n```\n{e}\n```")
                     
             # Model Train and Prediction
-            with gr.TabItem("🚀 Model Train and Prediction"):
-                # Nested (Secondary) Tabs for sub-functions
-                with gr.Tabs():
-                    with gr.TabItem("Training"):
-                        try:
-                            # This function must return a dictionary with the required components
-                            train_components = create_train_tab(constant) 
-                        except Exception as e:
-                            gr.Markdown(f"**Error creating Training tab:**\n```\n{e}\n```")
+            # with gr.TabItem("🚀 Model Train and Prediction"):
+            #     # Nested (Secondary) Tabs for sub-functions
+            #     with gr.Tabs():
+            #         with gr.TabItem("Training"):
+            #             try:
+            #                 # This function must return a dictionary with the required components
+            #                 train_components = create_train_tab(constant) 
+            #             except Exception as e:
+            #                 gr.Markdown(f"**Error creating Training tab:**\n```\n{e}\n```")
                     
-                    with gr.TabItem("Evaluation"):
-                        try:
-                            eval_components = create_eval_tab(constant)
-                        except Exception as e:
-                            gr.Markdown(f"**Error creating Evaluation tab:**\n```\n{e}\n```")
+            #         with gr.TabItem("Evaluation"):
+            #             try:
+            #                 eval_components = create_eval_tab(constant)
+            #             except Exception as e:
+            #                 gr.Markdown(f"**Error creating Evaluation tab:**\n```\n{e}\n```")
 
-                    with gr.TabItem("Prediction"):
-                        try:
-                            predict_components = create_predict_tab(constant)
-                        except Exception as e:
-                            gr.Markdown(f"**Error creating Prediction tab:**\n```\n{e}\n```")
+            #         with gr.TabItem("Prediction"):
+            #             try:
+            #                 predict_components = create_predict_tab(constant)
+            #             except Exception as e:
+            #                 gr.Markdown(f"**Error creating Prediction tab:**\n```\n{e}\n```")
 
             
 
