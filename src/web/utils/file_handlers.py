@@ -9,6 +9,44 @@ import gradio as gr
 
 from .common_utils import get_save_path, sanitize_filename
 
+def extract_sequence_from_pdb(pdb_content: str) -> str:
+    """
+    Extract FASTA sequence from PDB content.
+    
+    Args:
+        pdb_content: PDB file content as string
+    
+    Returns:
+        Extracted amino acid sequence as string
+    """
+    aa_map = {
+        'ALA': 'A', 'CYS': 'C', 'ASP': 'D', 'GLU': 'E', 'PHE': 'F',
+        'GLY': 'G', 'HIS': 'H', 'ILE': 'I', 'LYS': 'K', 'LEU': 'L',
+        'MET': 'M', 'ASN': 'N', 'PRO': 'P', 'GLN': 'Q', 'ARG': 'R',
+        'SER': 'S', 'THR': 'T', 'VAL': 'V', 'TRP': 'W', 'TYR': 'Y'
+    }
+    
+    sequence = []
+    seen_residues = set()
+    chain = None
+    
+    for line in pdb_content.strip().split('\n'):
+        if line.startswith("ATOM"):
+            chain_id = line[21]
+            if chain is None:
+                chain = chain_id
+            if chain_id != chain:
+                break
+            
+            res_id = (chain_id, int(line[22:26]))
+            if res_id not in seen_residues:
+                res_name = line[17:20].strip()
+                if res_name in aa_map:
+                    sequence.append(aa_map[res_name])
+                    seen_residues.add(res_id)
+    
+    return "".join(sequence)
+
 
 def parse_fasta_paste_content(fasta_content: str) -> Tuple:
     """Parse FASTA content from paste input."""

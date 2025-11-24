@@ -20,6 +20,7 @@ from gradio_client import Client, handle_file
 import pandas as pd
 from langchain.tools import tool
 from pydantic import BaseModel, Field, validator
+from web.utils.literature import literature_search
 
 load_dotenv()
 
@@ -39,7 +40,7 @@ class FunctionPredictionInput(BaseModel):
     sequence: Optional[str] = Field(None, description="Protein sequence in single letter amino acid code")
     fasta_file: Optional[str] = Field(None, description="Path to FASTA file")
     model_name: str = Field(default="ESM2-650M", description="Model name for function prediction")
-    task: str = Field(default="Solubility", description="Task: Solubility, Localization, Metal ion binding, Stability, Sorting signal, Optimum temperature")
+    task: str = Field(default="Solubility", description="Task: Solubility, Subcellular Localization, Membrane Protein, Metal ion binding, Stability, Sortingsignal, Optimum temperature, Kcat, Optimal PH, Immunogenicity Prediction - Virus, Immunogenicity Prediction - Bacteria, Immunogenicity Prediction - Tumor")
 
 class ResidueFunctionPredictionInput(BaseModel):
     """Input for functional residue prediction"""
@@ -93,22 +94,26 @@ class PDBStructureInput(BaseModel):
     pdb_id: str = Field(..., description="PDB ID for protein structure download")
     output_format: str = Field(default="pdb", description="Output format: pdb, mmcif")
 
+class LiteratureSearchInput(BaseModel):
+    """Input for literature search"""
+    query: str = Field(..., description="Search query")
+    max_results: int = Field(5, description="Maximum number of results to return")
+
+
 # Langchain Tools
 @tool("zero_shot_sequence_prediction", args_schema=ZeroShotSequenceInput)
 def zero_shot_sequence_prediction_tool(sequence: Optional[str] = None, fasta_file: Optional[str] = None, model_name: str = "ESM2-650M") -> str:
     """Predict beneficial mutations using sequence-based zero-shot models. Use for mutation prediction with protein sequences."""
     try:
-        api_key = os.getenv("DEEPSEEK_API_KEY")
-        
         if fasta_file:
             if not os.path.exists(fasta_file):
                 return f"Error: FASTA file not found at path: {fasta_file}"
             return call_zero_shot_sequence_prediction(
-                fasta_file=fasta_file, model_name=model_name, api_key=api_key
+                fasta_file=fasta_file, model_name=model_name
                 )
         elif sequence:
             return call_zero_shot_sequence_prediction(
-                sequence=sequence, model_name=model_name, api_key=api_key
+                sequence=sequence, model_name=model_name
                 )
         else:
             return "Error: Either sequence or fasta_file must be provided"
@@ -119,7 +124,6 @@ def zero_shot_sequence_prediction_tool(sequence: Optional[str] = None, fasta_fil
 def zero_shot_structure_prediction_tool(structure_file: str, model_name: str = "ESM-IF1") -> str:
     """Predict beneficial mutations using structure-based zero-shot models. Use for mutation prediction with PDB structure files."""
     try:
-        api_key = os.getenv("DEEPSEEK_API_KEY")
         actual_file_path = structure_file
         try:
             import json
@@ -133,22 +137,21 @@ def zero_shot_structure_prediction_tool(structure_file: str, model_name: str = "
         
         if not os.path.exists(actual_file_path):
             return f"Error: Structure file not found at path: {actual_file_path}"
-        return call_zero_shot_structure_prediction_from_file(actual_file_path, model_name, api_key)
+        return call_zero_shot_structure_prediction_from_file(actual_file_path, model_name)
     except Exception as e:
-        return f"Zero-shot structure prediction error: {str(e)}"
+        return json.dumps({"success": False, "error": f"Zero-shot structure prediction error: {str(e)}"}, ensure_ascii=False)
 
 @tool("protein_function_prediction", args_schema=FunctionPredictionInput)
 def protein_function_prediction_tool(sequence: Optional[str] = None, fasta_file: Optional[str] = None, model_name: str = "ESM2-650M", task: str = "Solubility") -> str:
     """Predict protein functions like solubility, localization, metal ion binding, stability, sorting signal, and optimum temperature."""
     try:
-        api_key = os.getenv("DEEPSEEK_API_KEY")
         if fasta_file and os.path.exists(fasta_file):
             return call_protein_function_prediction(
-                fasta_file=fasta_file, model_name=model_name, task=task, api_key=api_key
+                fasta_file=fasta_file, model_name=model_name, task=task
                 )
         elif sequence:
             return call_protein_function_prediction(
-                sequence=sequence, model_name=model_name, task=task, api_key=api_key
+                sequence=sequence, model_name=model_name, task=task
                 )
         else:
             return "Error: Either sequence or fasta_file must be provided"
@@ -158,14 +161,13 @@ def protein_function_prediction_tool(sequence: Optional[str] = None, fasta_file:
 @tool("functional_residue_prediction", args_schema=ResidueFunctionPredictionInput)
 def functional_residue_prediction_tool(sequence: Optional[str] = None, fasta_file: Optional[str] = None, model_name: str = "ESM2-650M", task: str = "Activate") -> str:
     try:
-        api_key = os.getenv("DEEPSEEK_API_KEY")
         if fasta_file and os.path.exists(fasta_file):
             return call_functional_residue_prediction(
-                fasta_file=fasta_file, model_name=model_name, task=task, api_key=api_key
+                fasta_file=fasta_file, model_name=model_name, task=task
                 )
         elif sequence:
             return call_functional_residue_prediction(
-                sequence=sequence, model_name=model_name, task=task, api_key=api_key
+                sequence=sequence, model_name=model_name, task=task
                 )
         else:
             return "Error: Either sequence or fasta_file must be procided"
@@ -234,17 +236,15 @@ def generate_training_config_tool(csv_file: str, test_csv_file: Optional[str] = 
 def protein_properties_generation_tool(sequence: Optional[str] = None, fasta_file: Optional[str] = None, task_name = "Physical and chemical properties" ) -> str:
     """Predict the protein phyical, chemical, and structure properties."""
     try:
-        api_key = os.getenv("DEEPSEEK_API_KEY")
-        
         if fasta_file:
             if not os.path.exists(fasta_file):
                 return f"Error: FASTA file not found at path: {fasta_file}"
             return call_protein_properties_prediction(
-                fasta_file=fasta_file, task_name=task_name, api_key=api_key
+                fasta_file=fasta_file, task_name=task_name
                 )
         elif sequence:
             return call_protein_properties_prediction(
-                sequence=sequence, task_name=task_name, api_key=api_key
+                sequence=sequence, task_name=task_name
                 )
         else:
             return f"Error: Structure file not found at path: {fasta_file}"
@@ -275,6 +275,25 @@ def alphafold_structure_download_tool(uniprot_id: str, output_format: str = "pdb
         return download_alphafold_structure(uniprot_id, output_format)
     except Exception as e:
         return f"AlphaFold structure download error: {str(e)}"
+
+
+@tool("literature_search", args_schema=LiteratureSearchInput)
+def literature_search_tool(query: str, max_results: int = 5) -> str:
+    """
+    Search for literature using MCP Tools: arXiv / PubMed / Google
+
+    Args:
+        query: The query to search for.
+        max_results: The maximum number of results to return.
+
+    Returns:
+        A JSON string containing the search results.
+    """
+    try:
+        refs = literature_search(query, max_results=max_results)
+        return json.dumps({"success": True, "references": refs}, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
 
 def call_zero_shot_sequence_prediction(
     sequence: str = None,
@@ -402,12 +421,18 @@ def call_protein_function_prediction(
     try:
         dataset_mapping = {
             "Solubility": ["DeepSol", "DeepSoluE", "ProtSolM"],
-            "Localization": ["DeepLocMulti"],
-            "Membrane Protein Identification": ["DeepLocBinary"],
-            "Metal ion binding": ["MetalIonBinding"], 
+            "Subcellular Localization": ["DeepLocMulti"],
+            "Membrane Protein": ["DeepLocBinary"],
+            "Metal Ion Binding": ["MetalIonBinding"], 
             "Stability": ["Thermostability"],
             "Sortingsignal": ["SortingSignal"], 
-            "Optimum temperature": ["DeepET_Topt"]
+            "Optimal Temperature": ["DeepET_Topt"],
+            "Kcat": ["DLKcat"],
+            "Optimal PH": ["EpHod"],
+            "Immunogenicity Prediction - Virus": ["VenusVaccine_VirusBinary"],
+            "Immunogenicity Prediction - Bacteria": ["VenusVaccine_BacteriaBinary"],
+            "Immunogenicity Prediction - Tumor": ["VenusVaccine_TumorBinary"],
+
         }
         datasets = dataset_mapping.get(task, ["DeepSol"])
 

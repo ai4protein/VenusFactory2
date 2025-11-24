@@ -81,13 +81,11 @@ def prepare_top_residue_heatmap_data(df: pd.DataFrame) -> Tuple:
     if score_col is None:
         return (None,) * 5
 
-    valid_df = df[
-        df['mutant'].apply(
-            lambda m: isinstance(m, str) and 
-            re.match(r'^[A-Z]\d+[A-Z]$', m) and 
-            m[0] != m[-1]
-        )
-    ].copy()
+    def is_valid_mutant(mutant):
+        """Check if mutant string is valid (format: A123B where A != B)."""
+        return isinstance(mutant, str) and re.match(r'^[A-Z]\d+[A-Z]$', mutant) and mutant[0] != mutant[-1]
+    
+    valid_df = df[df['mutant'].apply(is_valid_mutant)].copy()
     
     if valid_df.empty:
         return ([], [], np.array([[]]), np.array([[]]), score_col)

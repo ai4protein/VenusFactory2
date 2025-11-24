@@ -25,6 +25,15 @@ from web.utils.ai_helpers import *
 from web.utils.data_processors import *
 from web.utils.visualization import *
 from web.utils.prediction_runners import *
+from web.utils.venusmine import *
+from web.utils.label_mappers import map_labels
+from web.utils.ui_helpers import (
+    create_progress_html,
+    create_status_html,
+    handle_paste_fasta_detect,
+    handle_paste_pdb_detect,
+    update_dataset_choices_fixed,
+)
 from web.venus_factory_quick_tool_tab import *
 
 load_dotenv()
@@ -49,32 +58,55 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def create_progress_html(message: str = "Processing...") -> str:
-    """Create a breathing progress indicator HTML."""
-    return f"""
-    <div style="text-align: center; padding: 20px;">
-        <div style="display: inline-block;">
-            <div style="width: 60px; height: 60px; border: 4px solid #f3f3f3; border-top: 4px solid #3498db; 
-                        border-radius: 50%; animation: spin 1s linear infinite;"></div>
-            <p style="margin-top: 10px; color: #666; font-weight: 500;">{message}</p>
-        </div>
-        <style>
-            @keyframes spin {{
-                0% {{ transform: rotate(0deg); }}
-                100% {{ transform: rotate(360deg); }}
-            }}
-            @keyframes breathe {{
-                0%, 100% {{ opacity: 0.6; }}
-                50% {{ opacity: 1; }}
-            }}
-        </style>
-    </div>
-    """
+def truncate_sequence(seq):
+    """Truncate sequence if it's a string longer than 30 characters."""
+    if isinstance(seq, str) and len(seq) > 30:
+        return seq[:]
+    return seq
 
 
-def create_status_html(status: str, color: str = "#666") -> str:
-    """Create a status indicator HTML."""
-    return f"<div style='text-align: center; padding: 10px;'><span style='color: {color}; font-weight: 500;'>{status}</span></div>"
+def format_confidence(row, task):
+    """Format confidence score for display."""
+    score = row["Confidence Score"]
+    predicted_class = row["Predicted Class"]
+    
+    if isinstance(score, (float, int)) and score != 'N/A':
+        return round(float(score), 2)
+    elif isinstance(score, str) and score not in ['N/A', '']:
+        try:
+            if score.startswith('[') and score.endswith(']'):
+                prob_str = score.strip('[]')
+                probs = [float(x.strip()) for x in prob_str.split(',')]
+                
+                current_task = DATASET_TO_TASK_MAP.get(row.get('Dataset', ''), task)
+                
+                if current_task in REGRESSION_TASKS_FUNCTION:
+                    return predicted_class
+                else:
+                    labels_key = ("DeepLocMulti" if row.get('Dataset') == "DeepLocMulti" 
+                                 else "DeepLocBinary" if row.get('Dataset') == "DeepLocBinary" 
+                                 else current_task)
+                    labels = LABEL_MAPPING_FUNCTION.get(labels_key, [])
+                    
+                    if labels and predicted_class in labels:
+                        pred_index = labels.index(predicted_class)
+                        if 0 <= pred_index < len(probs):
+                            return round(probs[pred_index], 2)
+                    
+                    return round(max(probs), 2)
+            else:
+                return round(float(score), 2)
+        except (ValueError, IndexError):
+            return score
+    return score
+
+
+def handle_venus_pdb_upload(file):
+    """Handle PDB file upload for VenusMine viewer."""
+    return file if file else None
+
+
+# create_progress_html and create_status_html are now imported from utils.ui_helpers
 
 
 def handle_mutation_prediction_advance(
@@ -356,63 +388,10 @@ def handle_protein_function_prediction_chat(
             final_df = pd.concat(voted_results, ignore_index=True)
             final_df = final_df.drop(columns=['Dataset'], errors='ignore')
     display_df = final_df.copy()
-    def map_labels(row):
-        current_task = DATASET_TO_TASK_MAP.get(row.get('Dataset', ''), task)
-        
-        # Handle regression tasks
-        if current_task in REGRESSION_TASKS_FUNCTION: 
-            scaled_value = row.get("prediction")
-            if pd.notna(scaled_value) and scaled_value != 'N/A' :
-                try:
-                    scaled_value = float(scaled_value)
-                    if current_task in REGRESSION_TASKS_FUNCTION_MAX_MIN:
-                        min_val, max_val = REGRESSION_TASKS_FUNCTION_MAX_MIN[current_task]
-                        original_value = scaled_value * (max_val - min_val) + min_val
-                        return round(original_value, 2)
-                    else:
-                        return round(scaled_value, 2)
-                except (ValueError, TypeError):
-                    return scaled_value
-            return scaled_value
-
-        # Handle SortingSignal special case
-        if row.get('Dataset') == 'SortingSignal':
-            predictions_str = row.get('predicted_class')
-            if predictions_str:
-                try:
-                    predictions = json.loads(predictions_str) if isinstance(predictions_str, str) else predictions_str
-                    if all(p == 0 for p in predictions):
-                        return "No signal"
-                    signal_labels = ["CH", 'GPI', "MT", "NES", "NLS", "PTS", "SP", "TM", "TH"]
-                    active_labels = [signal_labels[i] for i, pred in enumerate(predictions) if pred == 1]
-                    return "_".join(active_labels) if active_labels else "None"
-                except:
-                    pass
-        
-        # Handle classification tasks
-        labels_key = ("DeepLocMulti" if row.get('Dataset') == "DeepLocMulti" 
-                     else "DeepLocBinary" if row.get('Dataset') == "DeepLocBinary" 
-                     else current_task)
-        labels = LABEL_MAPPING_FUNCTION.get(labels_key)
-        
-        pred_val = row.get("prediction", row.get("predicted_class"))
-        if pred_val is None or pred_val == "N/A":
-            return "N/A"
-            
-        try:
-            pred_val = int(float(pred_val))
-            if labels and 0 <= pred_val < len(labels): 
-                return labels[pred_val]
-        except (ValueError, TypeError):
-            pass
-        
-        return str(pred_val)
-
+    # map_labels is now imported from utils.label_mappers
+    
     # Apply label mapping
-    if "prediction" in display_df.columns:
-        display_df["predicted_class"] = display_df.apply(map_labels, axis=1)
-    elif "predicted_class" in display_df.columns:
-        display_df["predicted_class"] = display_df.apply(map_labels, axis=1)
+    display_df["predicted_class"] = display_df.apply(lambda row: map_labels(row, task), axis=1)
 
     # Remove raw prediction column if it exists
     if 'prediction' in display_df.columns and 'predicted_class' in display_df.columns:
@@ -529,64 +508,7 @@ def handle_protein_function_prediction_advance(
     plot_fig = generate_plots_for_all_results(final_df)
     display_df = final_df.copy()
 
-    def map_labels(row):
-        current_task = DATASET_TO_TASK_MAP.get(row.get('Dataset', ''), task)
-        
-        if current_task in REGRESSION_TASKS_FUNCTION: 
-            scaled_value = row.get("prediction")
-            if pd.notna(scaled_value) and scaled_value != 'N/A' :
-                try:
-                    scaled_value = float(scaled_value)
-                    if current_task in REGRESSION_TASKS_FUNCTION_MAX_MIN:
-                        min_val, max_val = REGRESSION_TASKS_FUNCTION_MAX_MIN[current_task]
-                        original_value = scaled_value * (max_val - min_val) + min_val
-                        return round(original_value, 2)
-                    else:
-                        return round(scaled_value, 2)
-                except (ValueError, TypeError):
-                    return scaled_value
-
-            return scaled_value
-
-        if row.get('Dataset') == 'SortingSignal':
-            predictions_str = row['predicted_class']
-            predictions = json.loads(predictions_str)
-            if all(p == 0 for p in predictions):
-                return "No signal"
-            # Get labels for SortingSignal
-            signal_labels = ["CH", 'GPI', "MT", "NES", "NLS", "PTS", "SP", "TM", "TH"]
-            active_labels = []
-            # Find indices where prediction is 1 (active labels)
-            for i, pred in enumerate(predictions):
-                if pred == 1:
-                    active_labels.append(signal_labels[i])
-            print(predictions)
-            # Return concatenated labels or "None" if no active labels
-            return "_".join(active_labels) if active_labels else "None"
-        
-        labels_key = ("DeepLocMulti" if row.get('Dataset') == "DeepLocMulti" 
-                     else "DeepLocBinary" if row.get('Dataset') == "DeepLocBinary" 
-                     else current_task)
-        labels = LABEL_MAPPING_FUNCTION.get(labels_key)
-        
-        pred_val = row.get("prediction", row.get("predicted_class"))
-        if pred_val is None or pred_val == "N/A":
-            return "N/A"
-            
-        try:
-            pred_val = int(float(pred_val))
-            if labels and 0 <= pred_val < len(labels): 
-                return labels[pred_val]
-        except (ValueError, TypeError):
-            pass
-        
-        return str(pred_val)
-
-    if "prediction" in display_df.columns:
-        display_df["predicted_class"] = display_df.apply(map_labels, axis=1)
-    elif "predicted_class" in display_df.columns:
-        display_df["predicted_class"] = display_df.apply(map_labels, axis=1)
-
+    display_df["predicted_class"] = display_df.apply(lambda row: map_labels(row, task), axis=1)
     if 'prediction' in display_df.columns:
         display_df.drop(columns=['prediction'], inplace=True)
 
@@ -600,44 +522,10 @@ def handle_protein_function_prediction_advance(
     display_df.rename(columns=rename_map, inplace=True)
     
     if "Sequence" in display_df.columns:
-        display_df["Sequence"] = display_df["Sequence"].apply(lambda x: x[:] if isinstance(x, str) and len(x) > 30 else x)
+        display_df["Sequence"] = display_df["Sequence"].apply(truncate_sequence)
 
     if "Confidence Score" in display_df.columns and "Predicted Class" in display_df.columns:
-        def format_confidence(row):
-            score = row["Confidence Score"]
-            predicted_class = row["Predicted Class"]
-            
-            if isinstance(score, (float, int)) and score != 'N/A':
-                return round(float(score), 2)
-            elif isinstance(score, str) and score not in ['N/A', '']:
-                try:
-                    if score.startswith('[') and score.endswith(']'):
-                        prob_str = score.strip('[]')
-                        probs = [float(x.strip()) for x in prob_str.split(',')]
-                        
-                        current_task = DATASET_TO_TASK_MAP.get(row.get('Dataset', ''), task)
-                        
-                        if current_task in REGRESSION_TASKS_FUNCTION:
-                            return predicted_class
-                        else:
-                            labels_key = ("DeepLocMulti" if row.get('Dataset') == "DeepLocMulti" 
-                                         else "DeepLocBinary" if row.get('Dataset') == "DeepLocBinary" 
-                                         else current_task)
-                            labels = LABEL_MAPPING_FUNCTION.get(labels_key, [])
-                            
-                            if labels and predicted_class in labels:
-                                pred_index = labels.index(predicted_class)
-                                if 0 <= pred_index < len(probs):
-                                    return round(probs[pred_index], 2)
-                            
-                            return round(max(probs), 2)
-                    else:
-                        return round(float(score), 2)
-                except (ValueError, IndexError):
-                    return score
-            return score
-        
-        display_df["Confidence Score"] = display_df.apply(format_confidence, axis=1)
+        display_df["Confidence Score"] = display_df.apply(lambda row: format_confidence(row, task), axis=1)
 
     ai_summary = "AI Analysis disabled. Enable in settings to generate a report."
     expert_analysis = "<div style='height: 300px; display: flex; align-items: center; justify-content: center; color: #666;'>Analysis will appear here once prediction is complete...</div>"
@@ -797,10 +685,604 @@ def handle_protein_residue_function_prediction_chat(
             "AI Analysis in progress..."
         )
 
+def handle_VenusMine(
+    pdb_file: Any,
+    protect_start: int,
+    protect_end: int,
+    mmseqs_threads: int,
+    mmseqs_iterations: int,
+    mmseqs_max_seqs: int,
+    cluster_min_seq_id: float,
+    cluster_threads: int,
+    top_n_threshold: int,
+    evalue_threshold: float,
+    progress=None
+) -> Generator[Tuple[str, Any, Any, Any, Any, Any, Any, str], None, None]:
+    """
+    Returns:
+        Generator yielding tuples of:
+        (log_text, tree_image_path, labels_df, tree_download_btn, labels_download_btn, 
+         zip_download_btn, tree_progress_html, status_indicator_html)
+    """
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    logger = logging.getLogger(__name__)
+    start_time = time.time()
+    
+    mmseqs_database_path = "/home/lrzhang/VenusFactory/dataset/CATH.fasta"
+
+    if not pdb_file:
+        yield (
+            "❌ Error: Please upload a PDB file first.",
+            None,
+            pd.DataFrame(),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(value="", visible=False),
+            create_status_html("❌ Missing PDB file", "#dc3545")
+        )
+        return
+    
+    # Create session-specific directory with timestamp
+    from datetime import datetime
+    now = datetime.now()
+    session_timestamp = now.strftime("%Y%m%d_%H%M%S")
+    session_dir = Path("temp_outputs") / now.strftime("%Y/%m/%d") / f"VenusMine_{session_timestamp}"
+    session_dir.mkdir(parents=True, exist_ok=True)
+    
+    log_content = "🚀 Initializing VenusMine pipeline...\n"
+    log_content += f"{'='*30}\n"
+    log_content += f"Session ID: {session_timestamp}\n"
+    log_content += f"Output Directory: {session_dir}\n"
+    log_content += f"Protected Region: {protect_start}-{protect_end}\n"
+    log_content += f"{'='*30}\n\n"
+    
+    yield (
+        log_content,
+        None,
+        pd.DataFrame(),
+        gr.update(visible=False),
+        gr.update(visible=False),
+        gr.update(visible=False),
+        gr.update(value="", visible=False),
+        create_status_html("🔵 Initializing...", "#0d6efd")
+    )
+
+    try:
+        # ==================== Step 1: Setup Directories ====================
+        log_content += "📁 Step 1/9: Setting up directories...\n"
+        yield (
+            log_content,
+            None,
+            pd.DataFrame(),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(value="", visible=False),
+            create_status_html("🔵 Step 1/9 - Setup", "#0d6efd")
+        )
+        protein_name = "protein"
+        foldseek_dir = session_dir / "FoldSeek_Search"
+        foldseek_dir.mkdir(parents=True, exist_ok=True)
+        
+        logger.info(f"Working directory: {foldseek_dir}")
+        log_content += f"   ✓ Working directory created: {foldseek_dir}\n\n"
+
+        pdb_file_path = foldseek_dir / f"{protein_name}.pdb"
+        if isinstance(pdb_file, str):
+            shutil.copy(pdb_file, pdb_file_path)
+        else:
+            with open(pdb_file_path, 'w') as f:
+                content = pdb_file.read() if hasattr(pdb_file, 'read') else str(pdb_file)
+                f.write(content)
+    
+        # ==================== Step 2: FoldSeek Search ====================
+        log_content += "🔍 Step 2/9: Running FoldSeek structural search...\n"
+        yield (
+            log_content,
+            None,
+            pd.DataFrame(),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(value="", visible=False),
+            create_status_html("⏳ Running FoldSeek search...", "#0d6efd")
+        )
+        
+        downloaded_files = download_foldseek_m8(str(pdb_file_path), foldseek_dir)
+        logger.info(f"FoldSeek finished, results in {foldseek_dir}")
+        log_content += f"   ✓ FoldSeek search completed\n"
+        log_content += f"   ✓ Downloaded {len(downloaded_files)} alignment files\n\n"
+
+        # ==================== Step 3: Parse FoldSeek Alignments ====================
+        log_content += "📝 Step 3/9: Parsing FoldSeek alignments...\n"
+        yield (
+            log_content,
+            None,
+            pd.DataFrame(),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(value="", visible=False),
+            create_status_html("⏳ Parsing alignments...", "#0d6efd")
+        )
+        
+        filename_list = [
+            os.path.join(str(foldseek_dir), "alis_afdb-proteome.m8"),
+            os.path.join(str(foldseek_dir), "alis_afdb-swissprot.m8"),
+            os.path.join(str(foldseek_dir), "alis_afdb50.m8"),
+            os.path.join(str(foldseek_dir), "alis_cath50.m8"),
+            os.path.join(str(foldseek_dir), "alis_gmgcl_id.m8"),
+            os.path.join(str(foldseek_dir), "alis_mgnify_esm30.m8"),
+            os.path.join(str(foldseek_dir), "alis_pdb100.m8")
+        ]
+        alignments_collection = []
+        alignments_dbname = [
+            "afdb_proteome", "afdb_swissprot", "afdb50", "cath50",
+            "gmgcl_id", "mgnify_esm30", "pdb100"]
+        
+        # Parse the FoldSeek result files
+        for filename in filename_list:
+            parser = FoldSeekAlignmentParser(filename)
+            alignments = parser.parse()
+            alignments_collection.append(alignments)
+
+        total_alignments = 0
+        # print results
+        for i in range(len(alignments_dbname)):
+            log_content += "Database: {}, found alignments: {}\n".format(alignments_dbname[i], len(alignments_collection[i]))
+            total_alignments += len(alignments_collection[i])
+
+
+
+        foldseek_dir_path = Path(foldseek_dir)
+        output_file = foldseek_dir_path / f"{foldseek_dir_path.name}_foldseek.fasta"
+        f_out = open(output_file, "w")
+        count = 0
+
+        for alignments_index in range(len(alignments_dbname)):
+            alignments = alignments_collection[alignments_index]
+            alignments_db = alignments_dbname[alignments_index]
+
+            for alignment in alignments:
+                # consider protect region
+                if alignment.qstart <= protect_start and alignment.qend >= protect_end:
+                    f_out.write(">" + alignments_db + " " + alignment.tseqid.split(" ")[0] + "\n")
+                    f_out.write(alignment.tseq + "\n")
+                    count += 1
+        
+        f_out.close()
+        
+        log_content += f"   ✓ Found {count} sequences matching protected region\n"
+        log_content += f"   ✓ Sequences saved to: {output_file.name}\n\n"
+        
+        # Check if we have sequences to search
+        if count == 0:
+            log_content += "   ⚠️ No sequences found matching the protected region criteria.\n"
+            log_content += "   💡 Try adjusting the protected region parameters (start/end positions).\n"
+            yield (
+                log_content,
+                None,
+                pd.DataFrame(),
+                gr.update(visible=False),
+                gr.update(visible=False),
+                gr.update(visible=False),
+                gr.update(value="⚠️ No sequences found"),
+                gr.update(visible=True, value="⚠️ *No sequences matched protected region*"),
+                gr.update(value="**Status:** ⚠️ No sequences to search")
+            )
+            return
+
+        # ==================== Step 4: MMseqs Search ====================
+        log_content += "🔎 Step 4/9: Running MMseqs2 sequence search...\n"
+        yield (
+            log_content,
+            None,
+            pd.DataFrame(),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(value="", visible=False),
+            create_status_html("⏳ Running MMseqs2 search...", "#0d6efd")
+        )
+        
+        # Check if mmseqs is installed
+        mmseqs_check = subprocess.run(['which', 'mmseqs'], capture_output=True, text=True)
+        
+        
+        # Check if database exists
+        if not Path(mmseqs_database_path).exists():
+            log_content += f"   ❌ Database file not found: {mmseqs_database_path}\n"
+            yield (
+                log_content,
+                None,
+                pd.DataFrame(),
+                gr.update(visible=False),
+                gr.update(visible=False),
+                gr.update(visible=False),
+                gr.update(value="❌ Database not found"),
+                gr.update(visible=True, value="❌ *Database file missing*"),
+                gr.update(value="**Status:** ❌ Database not found")
+            )
+            return
+        
+        mmseqs_prefix = foldseek_dir / f"{protein_name}_MEER"
+        mmseqs_tsv = Path(str(mmseqs_prefix) + ".tsv")
+        tmp_dir = foldseek_dir / "tmp"
+        tmp_dir.mkdir(exist_ok=True)
+
+        cmd_search = [
+            "mmseqs", "easy-search", 
+            str(output_file), 
+            str(mmseqs_database_path), 
+            str(mmseqs_tsv), 
+            str(tmp_dir),
+            "--format-output", "query,target,pident,fident,nident,alnlen,bits,tseq,evalue",
+            "--threads", str(mmseqs_threads),
+            "--num-iterations", str(mmseqs_iterations),
+            "--max-seqs", str(mmseqs_max_seqs),
+            "--search-type", "1"
+        ]
+        
+        log_content += f"   • Database: {Path(mmseqs_database_path).name}\n"
+        log_content += f"   • Threads: {mmseqs_threads}, Iterations: {mmseqs_iterations}\n"
+        log_content += f"   • Max sequences: {mmseqs_max_seqs}\n"
+        
+        try:
+            result = subprocess.run(cmd_search, capture_output=True, text=True, check=True)
+            log_content += f"   ✓ MMseqs search completed successfully\n"
+        except subprocess.CalledProcessError as e:
+            log_content += f"   ❌ MMseqs search failed with error:\n"
+            log_content += f"   {e.stderr[:500]}\n"
+            yield (
+                log_content,
+                None,
+                pd.DataFrame(),
+                gr.update(visible=False),
+                gr.update(visible=False),
+                gr.update(visible=False),
+                gr.update(value="❌ MMseqs failed"),
+                gr.update(visible=True, value="❌ *MMseqs search failed*"),
+                gr.update(value="**Status:** ❌ Failed - MMseqs error")
+            )
+            return
+        
+        if not mmseqs_tsv.exists():
+            log_content += "   ❌ MMseqs output file not created.\n"
+            yield (
+                log_content,
+                None,
+                pd.DataFrame(),
+                gr.update(visible=False),
+                gr.update(visible=False),
+                gr.update(visible=False),
+                gr.update(value="❌ MMseqs failed"),
+                gr.update(visible=True, value="❌ *MMseqs search failed*"),
+                gr.update(value="**Status:** ❌ Failed - MMseqs error")
+            )
+            return
+        
+        log_content += f"   ✓ MMseqs search completed\n"
+        log_content += f"   ✓ Results saved to: {mmseqs_tsv.name}\n\n"
+
+        # Convert TSV to FASTA
+        log_content += "   • Converting TSV to FASTA format...\n"
+        mmseqs_fasta = Path(str(mmseqs_prefix) + ".fasta")
+        
+        try:
+            header, data = read_tsv(str(mmseqs_tsv))
+            log_content += f"   • Loaded TSV file successfully, {len(data)} entries\n"
+            write_fasta_from_tsv(header, data, str(mmseqs_fasta), evalue=None)
+            log_content += f"   ✓ FASTA file created: {mmseqs_fasta.name}\n\n"
+        except Exception as e:
+            log_content += f"   ❌ TSV to FASTA conversion failed: {str(e)[:200]}\n"
+            yield (
+                log_content,
+                None,
+                pd.DataFrame(),
+                gr.update(visible=False),
+                gr.update(visible=False),
+                gr.update(visible=False),
+                gr.update(value="❌ Conversion failed"),
+                gr.update(visible=True, value="❌ *Format conversion failed*"),
+                gr.update(value="**Status:** ❌ Failed - Conversion error")
+            )
+            return
+        
+        if not mmseqs_fasta.exists():
+            log_content += "   ❌ FASTA file was not created.\n"
+            yield (
+                log_content,
+                None,
+                pd.DataFrame(),
+                gr.update(visible=False),
+                gr.update(visible=False),
+                gr.update(visible=False),
+                gr.update(value="❌ Conversion failed"),
+                gr.update(visible=True, value="❌ *Format conversion failed*"),
+                gr.update(value="**Status:** ❌ Failed - Conversion error")
+            )
+            return
+
+        # ==================== Step 5: MMseqs Clustering ====================
+        log_content += "🧮 Step 5/9: Clustering sequences (removing redundancy)...\n"
+        yield (
+            log_content,
+            None,
+            pd.DataFrame(),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(value="", visible=False),
+            create_status_html("⏳ Clustering sequences...", "#0d6efd")
+        )
+        
+        cluster_out = foldseek_dir / f"{protein_name}_clus2_NR_out"
+        log_content += f"   • Min sequence identity: {cluster_min_seq_id}\n"
+        log_content += f"   • Threads: {cluster_threads}\n"
+        
+        try:
+            result = subprocess.run(
+                ["mmseqs", "easy-cluster", str(mmseqs_fasta), str(cluster_out), str(tmp_dir),
+                 "--min-seq-id", str(cluster_min_seq_id), "--threads", str(cluster_threads)],
+                capture_output=True, text=True, check=True
+            )
+            log_content += f"   ✓ Clustering completed\n"
+        except subprocess.CalledProcessError as e:
+            log_content += f"   ❌ Clustering failed: {e.stderr[:200]}\n"
+            yield (
+                log_content,
+                None,
+                pd.DataFrame(),
+                gr.update(visible=False),
+                gr.update(visible=False),
+                gr.update(visible=False),
+                gr.update(value="❌ Clustering failed"),
+                gr.update(visible=True, value="❌ *Clustering failed*"),
+                gr.update(value="**Status:** ❌ Failed - Clustering error")
+            )
+            return
+        
+        cluster_rep_fasta = foldseek_dir / f"{protein_name}_clus2_NR_out_rep_seq.fasta"
+        if not cluster_rep_fasta.exists():
+            log_content += "   ❌ Cluster representative file not created.\n"
+            yield (
+                log_content,
+                None,
+                pd.DataFrame(),
+                gr.update(visible=False),
+                gr.update(visible=False),
+                gr.update(visible=False),
+                gr.update(value="❌ Clustering failed"),
+                gr.update(visible=True, value="❌ *Clustering failed*"),
+                gr.update(value="**Status:** ❌ Failed - Clustering error")
+            )
+            return
+        
+        log_content += f"   ✓ Representative sequences: {cluster_rep_fasta.name}\n\n"
+
+        # ==================== Step 6: ProstT5 Embedding ====================
+        log_content += "🧬 Step 6/9: Computing ProstT5 embeddings for discovered sequences...\n"
+        yield (
+            log_content,
+            None,
+            pd.DataFrame(),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(value="", visible=False),
+            create_status_html("⏳ Computing embeddings...", "#0d6efd")
+        )
+        
+        log_content += f"   • Loading ProstT5 model on cuda...\n"
+        tokenizer = T5Tokenizer.from_pretrained('Rostlab/ProstT5', do_lower_case=False)
+        model = T5EncoderModel.from_pretrained("Rostlab/ProstT5").to("cuda")
+        model = model.half()
+
+        data = parse_fasta(str(cluster_rep_fasta))
+        batch_size = 16
+        log_content += f"   • Processing {len(data)} sequences (batch_size={batch_size})...\n"
+        
+        seq_labels, seq_strs, rep = calculate_representation(model, tokenizer, data, logger, start_time, batch_size=batch_size)
+        
+        result_pkl = foldseek_dir / "result.pkl"
+        save_representation(seq_labels, seq_strs, rep, str(result_pkl))
+        
+        log_content += f"   ✓ Embeddings computed for {len(seq_labels)} sequences\n"
+        log_content += f"   ✓ Saved to: {result_pkl.name}\n\n"
+        
+        del model, tokenizer
+        torch.cuda.empty_cache()
+
+        # ==================== Step 7: Reference (PDB) Embedding ====================
+        log_content += "🎯 Step 7/9: Computing embeddings for reference protein...\n"
+        yield (
+            log_content,
+            None,
+            pd.DataFrame(),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(value="", visible=False),
+            create_status_html("⏳ Processing reference...", "#0d6efd")
+        )
+        
+        ref_sequences = extract_sequence_from_pdb(str(pdb_file_path))
+        ref_pkl = foldseek_dir / "refseq.pkl"
+        
+        log_content += f"   • Loading ProstT5 model...\n"
+        tokenizer = T5Tokenizer.from_pretrained('Rostlab/ProstT5', do_lower_case=False)
+        model = T5EncoderModel.from_pretrained("Rostlab/ProstT5").to("cuda")
+        model = model.half()
+        
+        # Reference sequences are usually few, use batch_size=1
+        ref_labels, ref_strs, ref_rep = calculate_representation(model, tokenizer, ref_sequences, logger, start_time, batch_size=1)
+        save_representation(ref_labels, ref_strs, ref_rep, str(ref_pkl))
+        
+        log_content += f"   ✓ Reference embeddings computed\n"
+        log_content += f"   ✓ Saved to: {ref_pkl.name}\n\n"
+        
+        del model, tokenizer
+
+        torch.cuda.empty_cache()
+
+        # ==================== Step 8: EC Dataset Embedding ====================
+        log_content += "📚 Step 8/9: Processing EC enzyme classification dataset...\n"
+        yield (
+            log_content,
+            None,
+            pd.DataFrame(),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(value="", visible=False),
+            create_status_html("⏳ Processing EC dataset...", "#0d6efd")
+        )
+        
+        ec_fasta = Path("data/VenusMine/ec_dataset.fasta")
+        ec_pkl = Path("data/VenusMine/ec.pkl")
+        ec_csv = Path("data/VenusMine/ec_dataset.csv")
+        
+        if not ec_pkl.exists():
+            log_content += f"   • EC embeddings not found, computing...\n"
+            tokenizer = T5Tokenizer.from_pretrained('Rostlab/ProstT5', do_lower_case=False)
+            model = T5EncoderModel.from_pretrained("Rostlab/ProstT5").to("cuda")
+            model = model.half()
+            
+            data = parse_fasta(str(ec_fasta))
+            batch_size = 16 if len(data) > 100 else 8
+            log_content += f"   • Processing {len(data)} EC sequences (batch_size={batch_size})...\n"
+            ec_labels, ec_strs, ec_rep = calculate_representation(model, tokenizer, data, logger, start_time, batch_size=batch_size)
+            save_representation(ec_labels, ec_strs, ec_rep, str(ec_pkl))
+            
+            log_content += f"   ✓ EC embeddings computed and cached\n\n"
+            
+            del model, tokenizer
+            torch.cuda.empty_cache()
+        else:
+            log_content += f"   ✓ Using cached EC embeddings\n\n"
+
+        # ==================== Step 9: Build Tree ====================
+        log_content += "🌳 Step 9/9: Building phylogenetic tree and visualization...\n"
+        yield (
+            log_content,
+            None,
+            pd.DataFrame(),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(value=create_progress_html("Building phylogenetic tree..."), visible=True),
+            create_status_html("🔵 Step 9/9 - Tree construction", "#0d6efd")
+        )
+        
+        log_content += f"   • Top N threshold: {top_n_threshold}\n"
+        log_content += f"   • E-value threshold: {evalue_threshold}\n"
+        
+        plot_path, label_path = build_and_visualize_tree(
+            refseq_pkl=str(ref_pkl),
+            discovered_pkl=str(result_pkl),
+            ec_pkl=str(ec_pkl),
+            ec_csv=str(ec_csv),
+            top_n_threshold=top_n_threshold,
+            output_dir=session_dir
+        )
+        
+        log_content += f"   ✓ Tree visualization created\n"
+        log_content += f"   ✓ Plot saved to: {Path(plot_path).name}\n"
+        log_content += f"   ✓ Labels saved to: {Path(label_path).name}\n\n"
+
+        # ==================== Final: Package Results ====================
+        log_content += "📦 Packaging results...\n"
+        
+        # 读取标签数据
+        labels_df = pd.DataFrame()
+        if label_path and Path(label_path).exists():
+            try:
+                labels_df = pd.read_csv(label_path, sep='\t')  # TSV file
+                log_content += f"   ✓ Loaded {len(labels_df)} sequence labels\n"
+            except Exception as e:
+                log_content += f"   ⚠ Could not read labels: {e}\n"
+        
+        # 创建ZIP文件
+        zip_path = None
+        try:
+            zip_path = session_dir / f"venusmine_results_{session_timestamp}.zip"
+            with zipfile.ZipFile(zip_path, 'w') as zf:
+                zf.write(plot_path, Path(plot_path).name)
+                zf.write(label_path, Path(label_path).name)
+                
+                # 添加参数记录
+                params_txt = Path(plot_path).parent / "parameters.txt"
+                with open(params_txt, 'w') as f:
+                    f.write(f"VenusMine Run Parameters\n")
+                    f.write(f"========================\n")
+                    f.write(f"Protected Region: {protect_start}-{protect_end}\n")
+                    f.write(f"Database: {mmseqs_database_path}\n")
+                    f.write(f"MMseqs Threads: {mmseqs_threads}\n")
+                    f.write(f"MMseqs Iterations: {mmseqs_iterations}\n")
+                    f.write(f"Max Sequences: {mmseqs_max_seqs}\n")
+                    f.write(f"Min Seq Identity: {cluster_min_seq_id}\n")
+                    f.write(f"Cluster Threads: {cluster_threads}\n")
+                    f.write(f"Top N: {top_n_threshold}\n")
+                    f.write(f"E-value: {evalue_threshold}\n")
+                zf.write(params_txt, params_txt.name)
+            
+            log_content += f"   ✓ Results packaged to: {zip_path.name}\n"
+        except Exception as e:
+            log_content += f"   ⚠ Could not create ZIP: {e}\n"
+        
+        # 最终日志
+        log_content += f"\n{'='*60}\n"
+        log_content += f"✅ VenusMine Pipeline Completed Successfully!\n"
+        log_content += f"{'='*60}\n\n"
+        log_content += f"📊 Summary Statistics:\n"
+        log_content += f"   • Total sequences discovered: {len(labels_df)}\n"
+        log_content += f"   • Processing time: {time.time() - start_time:.2f} seconds\n"
+        log_content += f"   • Results directory: {session_dir}\n"
+        log_content += f"\n{'='*60}\n"
+        
+        # 最终输出
+        yield (
+            log_content,
+            str(plot_path) if plot_path else None,  # 返回图片路径
+            labels_df,
+            gr.update(visible=True, value=str(plot_path)),
+            gr.update(visible=True, value=str(label_path)),
+            gr.update(visible=True, value=str(zip_path) if zip_path else None),
+            gr.update(value="", visible=False),  # 隐藏进度指示器
+            create_status_html("✅ Completed successfully!", "#198754")
+        )
+    
+    except Exception as e:
+        # 错误处理
+        error_log = f"\n{'='*60}\n"
+        error_log += f"❌ Pipeline Error\n"
+        error_log += f"{'='*60}\n\n"
+        error_log += f"Error Type: {type(e).__name__}\n"
+        error_log += f"Error Message: {str(e)}\n\n"
+        
+        import traceback
+        error_log += f"Full Traceback:\n{traceback.format_exc()}\n"
+        error_log += f"{'='*60}\n"
+        
+        final_log = log_content + error_log
+        
+        logger.error(f"Pipeline failed: {str(e)}", exc_info=True)
+        
+        yield (
+            final_log,
+            None,
+            pd.DataFrame(),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(value="", visible=False),
+            create_status_html(f"❌ Error: {type(e).__name__}", "#dc3545")
+        )
 
 def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     sequence_models = ["VenusPLM", "ESM2-650M", "ESM-1v", "ESM-1b"]
-    structure_models = ["VenusREM (foldseek-based)", "ProSST-2048", "ProtSSN", "ESM-IF1", "SaProt", "MIF-ST"]
+    structure_models = ["VenusREM (foldseek-based)", "ProSST-2048", "ProtSSN", "ESM-IF1", "SaProt", "MIF-ST", "VenusREM"]
     function_models = list(MODEL_MAPPING_FUNCTION.keys())
     residue_function_models = list(MODEL_RESIDUE_MAPPING_FUNCTION.keys())
 
@@ -1051,239 +1533,307 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         adv_residue_function_download_btn = gr.DownloadButton("💾 Download Results", visible=False)
 
 
-        def clear_paste_content_pdb():
-            return "No file selected", "No file selected", gr.update(choices=["A"], value="A", visible=False), {}, "A", ""
+            with gr.TabItem("VenusMine"):
+                with gr.Row(equal_height=False):
+                    with gr.Column(scale=2):
+                        gr.Markdown("### 📁 Input Configuration")
+                        
+                        venus_pdb_upload = gr.File(label="Upload PDB Structure", file_types=[".pdb"], type="filepath")
+                        
+                        with gr.Accordion("⚙️ Advanced Parameters", open=False):
+                            with gr.Group():
+                                gr.Markdown("**Protected Region**")
+                                with gr.Row():
+                                    venus_protect_start = gr.Number(label="Start Position", value=1, minimum=1, step=1)
+                                    venus_protect_end = gr.Number(label="End Position", value=100, minimum=1, step=1)
+                            
+                            with gr.Group():
+                                gr.Markdown("**MMseqs2 Search Parameters**")
+                                venus_mmseqs_threads = gr.Slider(label="Threads", minimum=1, maximum=100, value=96, step=1)
+                                venus_mmseqs_iterations = gr.Slider(label="Iterations", minimum=1, maximum=10, value=3, step=1)
+                                venus_mmseqs_max_seqs = gr.Slider(label="Max Sequences", minimum=100, maximum=5000, value=100, step=100)
+                            
+                            with gr.Group():
+                                gr.Markdown("**Clustering Parameters**")
+                                venus_cluster_min_seq_id = gr.Slider(label="Min Sequence Identity", minimum=0.1, maximum=1.0, value=0.5, step=0.05)
+                                venus_cluster_threads = gr.Slider(label="Threads", minimum=1, maximum=100, value=96, step=1)
+                            
+                            with gr.Group():
+                                gr.Markdown("**Tree Building Parameters**")
+                                venus_top_n = gr.Slider(label="Top N Results", minimum=1, maximum=10000, value=10, step=1)
+                                venus_evalue = gr.Number(label="E-value Threshold", value=1e-5)
+                        
+                        venus_start_btn = gr.Button("🚀 Start VenusMine Pipeline", variant="primary", size="lg")
+                        
+                        # Status indicator
+                        venus_status_indicator = gr.HTML(value="<div style='text-align: center; padding: 10px;'><span style='color: #666;'>Ready to start</span></div>")
 
-        def clear_paste_content_fasta():
-            return "No file selected", "No file selected", gr.update(choices=["Sequence_1"], value="Sequence_1", visible=False), {}, "Sequence_1", ""
+                    with gr.Column(scale=5):
+                        gr.Markdown("### 📈 Pipeline Results")
+                        with gr.Tabs() as venus_result_tabs:
+                            with gr.TabItem("🔬 Structure Visualization"):
+                                venus_pdb_viewer = Molecule3D(label="Structure Viewer", reps=RCSB_REPS, height=400)
+                            with gr.TabItem("🌳 Phylogenetic Tree"):
+                                # 进度指示器
+                                venus_tree_progress = gr.HTML(value="", visible=False)
+                                venus_tree_image = gr.Image(label="Evolutionary Tree", type="filepath", visible=True)
+                                venus_tree_download_btn = gr.DownloadButton("📊 Download Tree Image", visible=False)
+                                
+                            with gr.TabItem("🏷️ Sequence Labels"):
+                                venus_labels_df = gr.DataFrame(
+                                    label="Discovered Sequences",
+                                    interactive=False, wrap=True)
+                                venus_labels_download_btn = gr.DownloadButton("📄 Download Labels (TSV)", visible=False)
+                            
+                            with gr.TabItem("📦 Complete Results"):
+                                gr.Markdown("Download all results in a single ZIP file")
+                                venus_full_zip_btn = gr.DownloadButton("📦 Download Complete Results", visible=False)
+                            
+                            with gr.TabItem("📋 Processing Log"):
+                                venus_log_output = gr.Textbox(
+                                    label="Real-time Processing Log", lines=20, max_lines=25,
+                                    interactive=False, autoscroll=True)
+
+        # clear_paste_content_pdb and clear_paste_content_fasta are imported from file_handlers
         
-        def update_dataset_choices_fixed(task):
-            choices = DATASET_MAPPING_FUNCTION.get(task, [])
-            return gr.CheckboxGroup(choices=choices, value=choices)
+        # update_dataset_choices_fixed is now imported from utils.ui_helpers
         
-        def toggle_ai_section_simple(is_checked: bool):
-            return gr.update(visible=is_checked)
         
-        def on_ai_model_change_simple(ai_provider: str) -> tuple:
-            if ai_provider == "DeepSeek":
-                return gr.update(visible=False), gr.update(visible=True)
-            else:
-                return gr.update(visible=True), gr.update(visible=False)
-        
-        enable_ai_zshot_seq.change(fn=toggle_ai_section_simple, inputs=enable_ai_zshot_seq, outputs=ai_box_zshot_seq)
-        enable_ai_zshot_stru.change(fn=toggle_ai_section_simple, inputs=enable_ai_zshot_stru, outputs=ai_box_zshot_stru)
-        enable_ai_func.change(fn=toggle_ai_section_simple, inputs=enable_ai_func, outputs=ai_box_func)
-        enable_ai_residue_function.change(fn=toggle_ai_section_simple, inputs=enable_ai_residue_function, outputs=ai_box_residue_function)
+        enable_ai_zshot_seq.change(fn=toggle_ai_section, inputs=enable_ai_zshot_seq, outputs=ai_box_zshot_seq, api_name=False)
+        enable_ai_zshot_stru.change(fn=toggle_ai_section, inputs=enable_ai_zshot_stru, outputs=ai_box_zshot_stru, api_name=False)
+        enable_ai_func.change(fn=toggle_ai_section, inputs=enable_ai_func, outputs=ai_box_func, api_name=False)
+        enable_ai_residue_function.change(fn=toggle_ai_section, inputs=enable_ai_residue_function, outputs=ai_box_residue_function, api_name=False)
 
         ai_model_stru_zshot.change(
-            fn=on_ai_model_change_simple,
+            fn=on_ai_model_change,
             inputs=ai_model_stru_zshot,
-            outputs=[api_key_in_stru_zshot, ai_status_stru_zshot]
+            outputs=[api_key_in_stru_zshot, ai_status_stru_zshot],
+            api_name=False
         )
         ai_model_seq_zshot.change(
-            fn=on_ai_model_change_simple,
+            fn=on_ai_model_change,
             inputs=ai_model_seq_zshot,
-            outputs=[api_key_in_seq_zshot, ai_status_seq_zshot]
+            outputs=[api_key_in_seq_zshot, ai_status_seq_zshot],
+            api_name=False
         )
         ai_model_seq_func.change(
-            fn=on_ai_model_change_simple,
+            fn=on_ai_model_change,
             inputs=ai_model_seq_func,
-            outputs=[api_key_in_seq_func, ai_status_seq_func]
+            outputs=[api_key_in_seq_func, ai_status_seq_func],
+            api_name=False
         )
         ai_model_dd_residue_function.change(
             fn=on_ai_model_change,
             inputs=ai_model_dd_residue_function,
-            outputs=[api_key_in_seq_func, ai_status_residue_function]
+            outputs=[api_key_in_seq_func, ai_status_residue_function],
+            api_name=False
         )
         
         seq_file_upload.upload(
             fn=handle_file_upload, 
             inputs=seq_file_upload, 
-            outputs=[seq_protein_display, seq_sequence_selector, seq_sequence_state, seq_selected_sequence_state, seq_original_file_path_state, seq_current_file_state]
+            outputs=[seq_protein_display, seq_sequence_selector, seq_sequence_state, seq_selected_sequence_state, seq_original_file_path_state, seq_current_file_state],
+            api_name=False
         )
 
         seq_file_upload.change(
             fn=handle_file_upload, 
             inputs=seq_file_upload, 
-            outputs=[seq_protein_display, seq_sequence_selector, seq_sequence_state, seq_selected_sequence_state, seq_original_file_path_state, seq_current_file_state]
+            outputs=[seq_protein_display, seq_sequence_selector, seq_sequence_state, seq_selected_sequence_state, seq_original_file_path_state, seq_current_file_state],
+            api_name=False
         )
 
         seq_paste_clear_btn.click(
             fn=clear_paste_content_fasta,
-            outputs=[seq_paste_content_input, seq_protein_display, seq_sequence_selector, seq_sequence_state, seq_selected_sequence_state, seq_original_file_path_state]
+            outputs=[seq_paste_content_input, seq_protein_display, seq_sequence_selector, seq_sequence_state, seq_selected_sequence_state, seq_original_file_path_state],
+            api_name=False
         )
-
-        def handle_paste_fasta_detect(fasta_content):
-            result = parse_fasta_paste_content(fasta_content)
-            return result
 
         seq_paste_content_btn.click(
             fn=handle_paste_fasta_detect,
             inputs=seq_paste_content_input,
-            outputs=[seq_protein_display, seq_sequence_selector, seq_sequence_state, seq_selected_sequence_state, seq_original_file_path_state, seq_original_paste_content_state]
+            outputs=[seq_protein_display, seq_sequence_selector, seq_sequence_state, seq_selected_sequence_state, seq_original_file_path_state, seq_original_paste_content_state],
+            api_name=False
         )
-
-        def handle_sequence_change_unified(selected_chain, chains_dict, original_file_path, original_paste_content):
-            # Check for None or empty file path
-            if not original_file_path:
-                return "No file selected", ""
-            
-            if original_file_path.endswith('.fasta'):
-                if original_paste_content:
-                    return handle_paste_sequence_selection(selected_chain, chains_dict, original_paste_content)
-                else:
-                    return handle_fasta_sequence_change(selected_chain, chains_dict, original_file_path)
-            elif original_file_path.endswith('.pdb'):
-                if original_paste_content:
-                    return handle_paste_chain_selection(selected_chain, chains_dict, original_paste_content)
-                else:
-                    return handle_pdb_chain_change(selected_chain, chains_dict, original_file_path)
-            else:
-                # Default case for no file selected
-                return "No file selected", ""
 
         seq_sequence_selector.change(
             fn=handle_sequence_change_unified,
             inputs=[seq_sequence_selector, seq_sequence_state, seq_original_file_path_state, seq_original_paste_content_state],
-            outputs=[seq_protein_display, seq_current_file_state]
+            outputs=[seq_protein_display, seq_current_file_state],
+            api_name=False
         )
 
 
         struct_file_upload.upload(
             fn=handle_file_upload, 
             inputs=struct_file_upload, 
-            outputs=[struct_protein_display, struct_chain_selector, struct_chains_state, struct_selected_chain_state, struct_original_file_path_state, struct_current_file_state]
+            outputs=[struct_protein_display, struct_chain_selector, struct_chains_state, struct_selected_chain_state, struct_original_file_path_state, struct_current_file_state],
+            api_name=False
         )
 
         struct_file_upload.change(
             fn=handle_file_upload, 
             inputs=struct_file_upload, 
-            outputs=[struct_protein_display, struct_chain_selector, struct_chains_state, struct_selected_chain_state, struct_original_file_path_state, struct_current_file_state]
+            outputs=[struct_protein_display, struct_chain_selector, struct_chains_state, struct_selected_chain_state, struct_original_file_path_state, struct_current_file_state],
+            api_name=False
         )
         
         struct_paste_clear_btn.click(
             fn=clear_paste_content_pdb,
-            outputs=[struct_paste_content_input, struct_protein_display, struct_chain_selector, struct_chains_state, struct_selected_chain_state, struct_original_file_path_state]
+            outputs=[struct_paste_content_input, struct_protein_display, struct_chain_selector, struct_chains_state, struct_selected_chain_state, struct_original_file_path_state],
+            api_name=False
         )
         
-        def handle_paste_detect(pdb_content):
-            result = parse_pdb_paste_content(pdb_content)
-            return result + (pdb_content,) 
-
         struct_paste_content_btn.click(
-            fn=handle_paste_detect,
+            fn=handle_paste_pdb_detect,
             inputs=struct_paste_content_input,
-            outputs=[struct_protein_display, struct_chain_selector, struct_chains_state, struct_selected_chain_state, struct_original_file_path_state, struct_original_paste_content_state]
+            outputs=[struct_protein_display, struct_chain_selector, struct_chains_state, struct_selected_chain_state, struct_original_file_path_state, struct_original_paste_content_state],
+            api_name=False
         )
 
-        def handle_chain_change_unified(selected_chain, chains_dict, original_file_path, original_paste_content):
-            # Check for None or empty file path
-            if not original_file_path:
-                return "No file selected", ""
-                
-            if original_paste_content:
-                return handle_paste_chain_selection(selected_chain, chains_dict, original_paste_content)
-            else:
-                return handle_pdb_chain_change(selected_chain, chains_dict, original_file_path)
-
         struct_chain_selector.change(
-            fn=handle_chain_change_unified,
+            fn=handle_sequence_change_unified,
             inputs=[struct_chain_selector, struct_chains_state, struct_original_file_path_state, struct_original_paste_content_state],
-            outputs=[struct_protein_display, struct_current_file_state] 
+            outputs=[struct_protein_display, struct_current_file_state],
+            api_name=False
         )
 
         function_fasta_upload.upload(
             fn=handle_file_upload, 
             inputs=function_fasta_upload, 
-            outputs=[function_protein_display, function_protein_selector, function_sequence_state, function_selected_sequence_state, function_original_file_path_state, function_current_file_state]
+            outputs=[function_protein_display, function_protein_selector, function_sequence_state, function_selected_sequence_state, function_original_file_path_state, function_current_file_state],
+            api_name=False
         )
         function_fasta_upload.change(
             fn=handle_file_upload, 
             inputs=function_fasta_upload, 
-            outputs=[function_protein_display, function_protein_selector, function_sequence_state, function_selected_sequence_state, function_original_file_path_state, function_current_file_state]
+            outputs=[function_protein_display, function_protein_selector, function_sequence_state, function_selected_sequence_state, function_original_file_path_state, function_current_file_state],
+            api_name=False
         )
         function_paste_clear_btn.click(
             fn=clear_paste_content_fasta,
-            outputs=[function_paste_content_input, function_protein_display, function_protein_selector, function_sequence_state, function_selected_sequence_state, function_original_file_path_state]
+            outputs=[function_paste_content_input, function_protein_display, function_protein_selector, function_sequence_state, function_selected_sequence_state, function_original_file_path_state],
+            api_name=False
         )
 
         function_paste_content_btn.click(
             fn=handle_paste_fasta_detect,
             inputs=function_paste_content_input,
-            outputs=[function_protein_display, function_protein_selector, function_sequence_state, function_selected_sequence_state, function_original_file_path_state, function_original_paste_content_state]
+            outputs=[function_protein_display, function_protein_selector, function_sequence_state, function_selected_sequence_state, function_original_file_path_state, function_original_paste_content_state],
+            api_name=False
         )
 
         function_protein_selector.change(
             fn=handle_sequence_change_unified,
             inputs=[function_protein_selector, function_sequence_state, function_original_file_path_state, function_original_paste_content_state],
-            outputs=[function_protein_display, function_current_file_state]
+            outputs=[function_protein_display, function_current_file_state],
+            api_name=False
         )
         adv_func_task_dd.change(
             fn=update_dataset_choices_fixed,
-            inputs=[adv_func_task_dd], 
-            outputs=[adv_func_dataset_cbg]
+            inputs=adv_func_task_dd, 
+            outputs=adv_func_dataset_cbg,
+            api_name=False
         )
         
         adv_residue_function_fasta_upload.upload(
             fn=handle_file_upload,
             inputs=adv_residue_function_fasta_upload,
-            outputs=[adv_residue_function_protein_display, adv_residue_function_selector, adv_residue_function_sequence_state, adv_residue_function_selected_sequence_state, adv_residue_function_original_file_path_state, adv_residue_function_current_file_state]
+            outputs=[adv_residue_function_protein_display, adv_residue_function_selector, adv_residue_function_sequence_state, adv_residue_function_selected_sequence_state, adv_residue_function_original_file_path_state, adv_residue_function_current_file_state],
+            api_name=False
         )
         adv_residue_function_fasta_upload.change(
             fn=handle_file_upload,
             inputs=adv_residue_function_fasta_upload,
-            outputs=[adv_residue_function_protein_display, adv_residue_function_selector, adv_residue_function_sequence_state, adv_residue_function_selected_sequence_state, adv_residue_function_original_file_path_state, adv_residue_function_current_file_state]
+            outputs=[adv_residue_function_protein_display, adv_residue_function_selector, adv_residue_function_sequence_state, adv_residue_function_selected_sequence_state, adv_residue_function_original_file_path_state, adv_residue_function_current_file_state],
+            api_name=False
         )
         adv_residue_function_paste_clear_btn.click(
             fn=clear_paste_content_fasta,
-            outputs=[adv_residue_function_paste_content_input, adv_residue_function_protein_display, adv_residue_function_selector, adv_residue_function_sequence_state, adv_residue_function_selected_sequence_state, adv_residue_function_original_file_path_state]
+            outputs=[adv_residue_function_paste_content_input, adv_residue_function_protein_display, adv_residue_function_selector, adv_residue_function_sequence_state, adv_residue_function_selected_sequence_state, adv_residue_function_original_file_path_state],
+            api_name=False
         )
         adv_residue_function_paste_content_btn.click(
             fn=handle_paste_fasta_detect,
             inputs=adv_residue_function_paste_content_input,
-            outputs=[adv_residue_function_protein_display, adv_residue_function_selector, adv_residue_function_sequence_state, adv_residue_function_selected_sequence_state, adv_residue_function_original_file_path_state, adv_residue_function_original_paste_content_state]
+            outputs=[adv_residue_function_protein_display, adv_residue_function_selector, adv_residue_function_sequence_state, adv_residue_function_selected_sequence_state, adv_residue_function_original_file_path_state, adv_residue_function_original_paste_content_state],
+            api_name=False
         )
         adv_residue_function_selector.change(
             fn=handle_sequence_change_unified,
             inputs=[adv_residue_function_selector, adv_residue_function_sequence_state, adv_residue_function_original_file_path_state, adv_residue_function_original_paste_content_state],
-            outputs=[adv_residue_function_protein_display, adv_residue_function_current_file_state]
+            outputs=[adv_residue_function_protein_display, adv_residue_function_current_file_state],
+            api_name=False
         )
         adv_residue_function_predict_btn.click(
             fn=handle_protein_residue_function_prediction,
             inputs=[adv_residue_function_task_dd, adv_residue_function_fasta_upload, enable_ai_residue_function, ai_model_dd_residue_function, api_key_in_residue_function, adv_residue_function_model_dd],
-            outputs=[adv_residue_function_status_textbox, adv_residue_function_results_df, adv_residue_function_plot_out, adv_residue_function_download_btn, adv_residue_function_ai_expert_html, gr.State()]
+            outputs=[adv_residue_function_status_textbox, adv_residue_function_results_df, adv_residue_function_plot_out, adv_residue_function_download_btn, adv_residue_function_ai_expert_html, gr.State()],
+            api_name=False
         )
         adv_residue_function_protein_chat_btn.click(
             fn=handle_protein_residue_function_prediction_chat,
             inputs=[adv_residue_function_task_dd, adv_residue_function_fasta_upload, enable_ai_residue_function, ai_model_dd_residue_function, api_key_in_residue_function, adv_residue_function_model_dd],
-            outputs=[adv_residue_function_status_textbox, adv_residue_function_results_df, adv_residue_function_plot_out, adv_residue_function_download_btn, adv_residue_function_ai_expert_html, gr.State()]
+            outputs=[adv_residue_function_status_textbox, adv_residue_function_results_df, adv_residue_function_plot_out, adv_residue_function_download_btn, adv_residue_function_ai_expert_html, gr.State()],
+            api_name="/handle_protein_residue_function_prediction_chat"
         )
         seq_predict_btn.click(
             fn=handle_mutation_prediction_advance, 
             inputs=[seq_function_dd, seq_file_upload, enable_ai_zshot_seq, ai_model_seq_zshot, api_key_in_seq_zshot, seq_model_dd],
             outputs=[zero_shot_status_box, zero_shot_plot_out, zero_shot_df_out, zero_shot_download_btn, zero_shot_download_path_state, zero_shot_view_controls, zero_shot_full_data_state, zero_shot_ai_expert_html],
-            show_progress=True
+            show_progress=True,
+            api_name=False
         )
 
         struct_predict_btn.click(
             fn=handle_mutation_prediction_advance, 
             inputs=[struct_function_dd, struct_file_upload, enable_ai_zshot_stru, ai_model_stru_zshot, api_key_in_stru_zshot, struct_model_dd], 
             outputs=[zero_shot_status_box, zero_shot_plot_out, zero_shot_df_out, zero_shot_download_btn, zero_shot_download_path_state, zero_shot_view_controls, zero_shot_full_data_state, zero_shot_ai_expert_html],
-            show_progress=True
+            show_progress=True,
+            api_name=False
         )
 
         adv_func_predict_btn.click(
             fn=handle_protein_function_prediction_advance,
             inputs=[adv_func_task_dd, function_fasta_upload, enable_ai_func, ai_model_seq_func, api_key_in_seq_func, adv_func_model_dd, adv_func_dataset_cbg],
             outputs=[function_status_textbox, function_results_df, function_results_plot, function_download_btn, function_ai_expert_html],
-            show_progress=True
+            show_progress=True,
+            api_name=False
         )
         
         function_protein_chat_btn.click(
             fn=handle_protein_function_prediction_chat,
             inputs=[adv_func_task_dd, function_fasta_upload, adv_func_model_dd, adv_func_dataset_cbg_chat, enable_ai_func, ai_model_seq_func, api_key_in_seq_func],
-            outputs=[function_status_textbox, function_results_df, function_ai_expert_html]
+            outputs=[function_status_textbox, function_results_df, function_ai_expert_html],
+            api_name="/handle_protein_function_prediction_chat"
         )
 
+        # handle_venus_pdb_upload is now defined outside create_advanced_tool_tab
         
+        venus_pdb_upload.change(
+            fn=handle_venus_pdb_upload,
+            inputs=[venus_pdb_upload],
+            outputs=[venus_pdb_viewer],
+            api_name=False
+        )
+
+        venus_start_btn.click(
+            fn=handle_VenusMine,
+            inputs=[venus_pdb_upload, venus_protect_start, venus_protect_end,
+                venus_mmseqs_threads, venus_mmseqs_iterations, venus_mmseqs_max_seqs,
+                venus_cluster_min_seq_id, venus_cluster_threads, venus_top_n, venus_evalue
+            ],
+            outputs=[
+                venus_log_output, 
+                venus_tree_image, 
+                venus_labels_df,
+                venus_tree_download_btn, 
+                venus_labels_download_btn, 
+                venus_full_zip_btn,
+                venus_tree_progress,
+                venus_status_indicator
+            ],
+            show_progress=True,
+            api_name=False
+        )
     return demo
