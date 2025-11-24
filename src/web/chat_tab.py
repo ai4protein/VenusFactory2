@@ -46,7 +46,7 @@ import threading
 load_dotenv()
 
 
-class DeepSeekLLM(BaseChatModel):
+class Chat_LLM(BaseChatModel):
     api_key: str = None
     base_url: str = "https://www.dmxapi.com/v1"
     model_name: str = "gemini-2.5-pro"
@@ -171,7 +171,7 @@ class DeepSeekLLM(BaseChatModel):
 
     @property
     def _llm_type(self) -> str:
-        return "deepseek-chat"
+        return "chat-llm"
 
 
 class ProteinContextManager:
@@ -433,10 +433,8 @@ def create_worker_executor(llm: BaseChatModel, tools: List[BaseTool]):
     # Expecting tools to be a single-item list (one worker per tool)
     tool = tools[0] if isinstance(tools, list) and tools else None
     # Create a tool-specific prompt instance
-    try:
-        worker_prompt = WORKER_PROMPT.partial(tool_name=(tool.name if tool else "tool"), tool_description=(tool.description if tool else ""))
-    except Exception:
-        worker_prompt = WORKER_PROMPT
+
+    worker_prompt = WORKER_PROMPT.partial(tool_name=(tool.name if tool else "tool"), tool_description=(tool.description if tool else ""))
 
     agent = create_openai_tools_agent(llm, tools, worker_prompt)
     executor = AgentExecutor(
@@ -456,7 +454,7 @@ def create_finalizer_chain(llm: BaseChatModel):
 
 def initialize_session_state() -> Dict[str, Any]:
     """Initialize a new session state with all necessary components"""
-    llm = DeepSeekLLM(temperature=0.1)
+    llm = Chat_LLM(temperature=0.1)
     all_tools = get_tools()
 
     planner_chain = create_planner_chain(llm, all_tools)
@@ -477,6 +475,31 @@ def initialize_session_state() -> Dict[str, Any]:
         'created_at': datetime.now()
     }
 
+def update_llm_model(selected: str, state: Dict[str, Any]):
+    mapping = {
+        "ChatGPT-4o": "gpt-4o",
+        "Gemini-2.5-Pro": "gemini-2.5-pro",
+        "Claude-3.7": "claude-3-7-sonnet-20250219",
+        "DeepSeek-R1": "deepseek-r1-0528"
+    }
+    state['llm'].model_name = mapping.get(selected, "gemini-2.5-pro")
+    return state
+
+def _dedupe_references(refs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    seen = set()
+    out = []
+    for r in refs or []:
+        if not isinstance(r, dict):
+            continue
+        title = (r.get('title') or '').strip().lower()
+        doi = (r.get('doi') or '').strip().lower()
+        url = (r.get('url') or '').strip().lower()
+        key = (title, doi, url)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(r)
+    return out
 
 def extract_sequence_from_message(message: str) -> Optional[str]:
     """Extract protein sequence from user message"""
@@ -796,26 +819,20 @@ async def send_message(history, message, session_state):
         finalizer_inputs = {
             "original_input": text,
             "analysis_log": analysis_log,
-            "references": json.dumps(collected_references, ensure_ascii=False)
+            "references": json.dumps(_dedupe_references(collected_references), ensure_ascii=False)
         }
         final_response = await asyncio.to_thread(
             session_state['finalizer'].invoke,
             finalizer_inputs
         )
 
-        # If Finalizer didn't include references, append them in chat output for visibility
-        try:
-            if collected_references:
-                refs_text = "\n\nReferences:\n" + "\n".join([f"- {r.get('title','')} ({r.get('source','')}) {r.get('url','')}" for r in collected_references])
-                final_response = final_response + "\n\n" + refs_text
-        except Exception:
-            pass
-
-    history[-1] = {"role": "assistant", "content": final_response}
-    session_state['history'].append({"role": "assistant", "content": final_response})
-    
-    # Update memory
-    session_state['memory'].save_context({"input": display_text}, {"output": final_response})
+        history[-1] = {"role": "assistant", "content": final_response}
+        session_state['history'].append({"role": "assistant", "content": final_response})
+        
+        # Update memory
+        session_state['memory'].save_context({"input": display_text}, {"output": final_response})
+        
+        yield history, gr.MultimodalTextbox(value=None, interactive=True, file_count="multiple")
     
     yield history, gr.MultimodalTextbox(value=None, interactive=True, file_count="multiple")
 
@@ -837,6 +854,12 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 show_copy_button=True
             )
             
+            with gr.Row():
+                model_selector = gr.Dropdown(
+                    choices=["ChatGPT-4o", "Gemini-2.5-Pro", "Claude-3.7", "DeepSeek-R1"],
+                    value="Gemini-2.5-Pro",
+                    label="Chat Model"
+                )
             chat_input = gr.MultimodalTextbox(
                 interactive=True,
                 file_count="multiple",
@@ -914,6 +937,11 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         )
 
         # Event handler with concurrency limit
+        model_selector.change(
+            fn=update_llm_model,
+            inputs=[model_selector, session_state],
+            outputs=[session_state]
+        )
         chat_input.submit(
             fn=send_message,
             inputs=[chatbot, chat_input, session_state],

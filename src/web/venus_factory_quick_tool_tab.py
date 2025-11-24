@@ -506,6 +506,7 @@ def handle_protein_function_prediction(
             final_df = final_df.drop(columns=['Dataset'], errors='ignore')
     display_df = final_df.copy()
     print(f"Using simplified processing, final_df shape: {final_df.shape}")
+    # map_labels is now imported from utils.label_mappers
     
     # Apply label mapping
     display_df["predicted_class"] = display_df.apply(lambda row: map_labels(row, task), axis=1)
@@ -1394,190 +1395,162 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         protein_properties_path_state = gr.State()
                         protein_properties_view_controls = gr.State()
                         protein_properties_full_data_state = gr.State()        
-        enable_ai_zshot.change(fn=toggle_ai_section, inputs=enable_ai_zshot, outputs=ai_box_zshot, api_name=False)
-        enable_ai_func.change(fn=toggle_ai_section, inputs=enable_ai_func, outputs=ai_box_func, api_name=False)
+        enable_ai_zshot.change(fn=toggle_ai_section, inputs=enable_ai_zshot, outputs=ai_box_zshot)
+        enable_ai_func.change(fn=toggle_ai_section, inputs=enable_ai_func, outputs=ai_box_func)
 
         ai_model_dd_zshot.change(
             fn=on_ai_model_change,
             inputs=ai_model_dd_zshot,
-            outputs=[api_key_in_zshot, ai_status_zshot],
-            api_name=False
+            outputs=[api_key_in_zshot, ai_status_zshot]
         )
         ai_model_dd_func.change(
             fn=on_ai_model_change,
             inputs=ai_model_dd_func,
-            outputs=[api_key_in_func, ai_status_func],
-            api_name=False
+            outputs=[api_key_in_func, ai_status_func]
         )
         enable_ai_residue_function.change(
             fn=toggle_ai_section, 
             inputs=enable_ai_residue_function, 
-            outputs=ai_box_residue_function,
-            api_name=False
+            outputs=ai_box_residue_function
         )
 
         ai_model_dd_residue_function.change(
             fn=on_ai_model_change,
             inputs=ai_model_dd_residue_function,
-            outputs=[api_key_in_residue_function, ai_status_residue_function],
-            api_name=False
+            outputs=[api_key_in_residue_function, ai_status_residue_function]
         )
 
 
         easy_zshot_file_upload.upload(
             fn=handle_file_upload, 
             inputs=easy_zshot_file_upload, 
-            outputs=[easy_zshot_protein_display, easy_zshot_sequence_selector, easy_zshot_sequence_state, easy_zshot_selected_sequence_state, easy_zshot_original_file_path_state, easy_zshot_current_file_state],
-            api_name=False
+            outputs=[easy_zshot_protein_display, easy_zshot_sequence_selector, easy_zshot_sequence_state, easy_zshot_selected_sequence_state, easy_zshot_original_file_path_state, easy_zshot_current_file_state]
         )
         easy_zshot_file_upload.change(
             fn=handle_file_upload, 
             inputs=easy_zshot_file_upload, 
-            outputs=[easy_zshot_protein_display, easy_zshot_sequence_selector, easy_zshot_sequence_state, easy_zshot_selected_sequence_state, easy_zshot_original_file_path_state, easy_zshot_current_file_state],
-            api_name=False
+            outputs=[easy_zshot_protein_display, easy_zshot_sequence_selector, easy_zshot_sequence_state, easy_zshot_selected_sequence_state, easy_zshot_original_file_path_state, easy_zshot_current_file_state]
         )
         easy_zshot_paste_clear_btn.click(
             fn=clear_paste_content_fasta,
-            outputs=[easy_zshot_paste_content_input, easy_zshot_protein_display, easy_zshot_sequence_selector, easy_zshot_sequence_state, easy_zshot_selected_sequence_state, easy_zshot_original_file_path_state],
-            api_name=False
+            outputs=[easy_zshot_paste_content_input, easy_zshot_protein_display, easy_zshot_sequence_selector, easy_zshot_sequence_state, easy_zshot_selected_sequence_state, easy_zshot_original_file_path_state]
         )
         easy_zshot_paste_content_btn.click(
             fn=parse_fasta_paste_content,
             inputs=easy_zshot_paste_content_input,
-            outputs=[easy_zshot_protein_display, easy_zshot_sequence_selector, easy_zshot_sequence_state, easy_zshot_selected_sequence_state, easy_zshot_original_file_path_state, easy_zshot_original_paste_content_state],
-            api_name=False
+            outputs=[easy_zshot_protein_display, easy_zshot_sequence_selector, easy_zshot_sequence_state, easy_zshot_selected_sequence_state, easy_zshot_original_file_path_state, easy_zshot_original_paste_content_state]
         )
 
         easy_zshot_sequence_selector.change(
             fn=handle_sequence_change_unified,
             inputs=[easy_zshot_sequence_selector, easy_zshot_sequence_state, easy_zshot_original_file_path_state, easy_zshot_original_paste_content_state],
-            outputs=[easy_zshot_protein_display, easy_zshot_file_upload],
-            api_name=False
+            outputs=[easy_zshot_protein_display, easy_zshot_file_upload]
         )
 
         easy_zshot_predict_btn.click(
             fn=handle_mutation_prediction_base,
             inputs=[zero_shot_function_dd, easy_zshot_file_upload, enable_ai_zshot, ai_model_dd_zshot, api_key_in_zshot, zero_shot_model_dd],
             outputs=[zero_shot_status_box, zero_shot_plot_out, zero_shot_df_out, zero_shot_download_btn, zero_shot_download_path_state, zero_shot_view_controls, zero_shot_full_data_state, zero_shot_ai_expert_html],
-            show_progress=True,
-            api_name="/handle_mutation_prediction_base"
+            show_progress=True
         )
 
         base_function_fasta_upload.upload(
             fn=handle_file_upload, 
             inputs=base_function_fasta_upload, 
-            outputs=[base_function_protein_display, base_function_selector, base_function_sequence_state, base_function_selected_sequence_state, base_function_original_file_path_state, base_function_current_file_state],
-            api_name=False
+            outputs=[base_function_protein_display, base_function_selector, base_function_sequence_state, base_function_selected_sequence_state, base_function_original_file_path_state, base_function_current_file_state]
         )
         base_function_fasta_upload.change(
             fn=handle_file_upload, 
             inputs=base_function_fasta_upload, 
-            outputs=[base_function_protein_display, base_function_selector, base_function_sequence_state, base_function_selected_sequence_state, base_function_original_file_path_state, base_function_current_file_state],
-            api_name=False
+            outputs=[base_function_protein_display, base_function_selector, base_function_sequence_state, base_function_selected_sequence_state, base_function_original_file_path_state, base_function_current_file_state]
         )
 
         base_func_paste_clear_btn.click(
             fn=clear_paste_content_fasta,
-            outputs=[base_func_paste_content_input, base_function_protein_display, base_function_selector, base_function_sequence_state, base_function_selected_sequence_state, base_function_original_file_path_state],
-            api_name=False
+            outputs=[base_func_paste_content_input, base_function_protein_display, base_function_selector, base_function_sequence_state, base_function_selected_sequence_state, base_function_original_file_path_state]
         )
 
         base_func_paste_content_btn.click(
             fn=parse_fasta_paste_content,
             inputs=base_func_paste_content_input,
-            outputs=[base_function_protein_display, base_function_selector, base_function_sequence_state, base_function_selected_sequence_state, base_function_original_file_path_state, base_function_original_paste_content_state],
-            api_name=False
+            outputs=[base_function_protein_display, base_function_selector, base_function_sequence_state, base_function_selected_sequence_state, base_function_original_file_path_state, base_function_original_paste_content_state]
         )
 
         base_function_selector.change(
             fn=handle_sequence_change_unified,
             inputs=[base_function_selector, base_function_sequence_state, base_function_original_file_path_state, base_function_original_paste_content_state],
-            outputs=[base_function_protein_display, base_function_fasta_upload],
-            api_name=False
+            outputs=[base_function_protein_display, base_function_fasta_upload]
         )
 
         easy_func_predict_btn.click(
             fn=handle_protein_function_prediction,
             inputs=[easy_func_task_dd, base_function_fasta_upload, enable_ai_func, ai_model_dd_func, api_key_in_func],
             outputs=[function_status_textbox, function_results_df, function_download_btn, function_ai_expert_html, gr.State()], 
-            show_progress=True,
-            api_name=False
+            show_progress=True
         )
 
         base_residue_function_fasta_upload.upload(
             fn=handle_file_upload,
             inputs=base_residue_function_fasta_upload,
-            outputs=[base_residue_function_protein_display, base_residue_function_selector, base_residue_function_sequence_state, base_residue_function_selected_sequence_state, base_residue_function_original_file_path_state, base_residue_function_current_file_state],
-            api_name=False
+            outputs=[base_residue_function_protein_display, base_residue_function_selector, base_residue_function_sequence_state, base_residue_function_selected_sequence_state, base_residue_function_original_file_path_state, base_residue_function_current_file_state]
         )
         base_residue_function_fasta_upload.change(
             fn=handle_file_upload,
             inputs=base_residue_function_fasta_upload,
-            outputs=[base_residue_function_protein_display, base_residue_function_selector, base_residue_function_sequence_state, base_residue_function_selected_sequence_state, base_residue_function_original_file_path_state, base_residue_function_current_file_state],
-            api_name=False
+            outputs=[base_residue_function_protein_display, base_residue_function_selector, base_residue_function_sequence_state, base_residue_function_selected_sequence_state, base_residue_function_original_file_path_state, base_residue_function_current_file_state]
         )
         base_residue_function_paste_clear_btn.click(
             fn=clear_paste_content_fasta,
-            outputs=[base_residue_function_paste_content_input, base_residue_function_protein_display, base_residue_function_selector, base_residue_function_sequence_state, base_residue_function_selected_sequence_state, base_residue_function_original_file_path_state],
-            api_name=False
+            outputs=[base_residue_function_paste_content_input, base_residue_function_protein_display, base_residue_function_selector, base_residue_function_sequence_state, base_residue_function_selected_sequence_state, base_residue_function_original_file_path_state]
         )
         base_residue_function_paste_content_btn.click(
             fn=parse_fasta_paste_content,
             inputs=base_residue_function_paste_content_input,
-            outputs=[base_residue_function_protein_display, base_residue_function_selector, base_residue_function_sequence_state, base_residue_function_selected_sequence_state, base_residue_function_original_file_path_state, base_residue_function_original_paste_content_state],
-            api_name=False
+            outputs=[base_residue_function_protein_display, base_residue_function_selector, base_residue_function_sequence_state, base_residue_function_selected_sequence_state, base_residue_function_original_file_path_state, base_residue_function_original_paste_content_state]
         )
         base_residue_function_selector.change(
             fn=handle_sequence_change_unified,
             inputs=[base_residue_function_selector, base_residue_function_sequence_state, base_residue_function_original_file_path_state, base_residue_function_original_paste_content_state],
-            outputs=[base_residue_function_protein_display, base_residue_function_fasta_upload],
-            api_name=False
+            outputs=[base_residue_function_protein_display, base_residue_function_fasta_upload]
         )
         base_residue_function_predict_btn.click(
             fn=handle_protein_residue_function_prediction,
             inputs=[base_residue_function_task_dd, base_residue_function_fasta_upload, enable_ai_residue_function, ai_model_dd_residue_function, api_key_in_residue_function],
             outputs=[base_residue_function_status_textbox, base_residue_function_results_df, base_residue_function_plot_out,base_residue_function_download_btn, base_residue_function_ai_expert_html, gr.State()],
-            show_progress = True,
-            api_name=False
+            show_progress = True
         )
 
         protein_properties_file_upload.upload(
             fn=handle_file_upload,
             inputs=protein_properties_file_upload,
-            outputs=[protein_properties_protein_display, protein_properties_sequence_selector, protein_properties_sequence_state, protein_properties_selected_sequence_state, protein_properties_original_file_path_state, protein_properties_current_file_state],
-            api_name=False
+            outputs=[protein_properties_protein_display, protein_properties_sequence_selector, protein_properties_sequence_state, protein_properties_selected_sequence_state, protein_properties_original_file_path_state, protein_properties_current_file_state]
         )
         protein_properties_file_upload.change(
             fn=handle_file_upload,
             inputs=protein_properties_file_upload,
-            outputs=[protein_properties_protein_display, protein_properties_sequence_selector, protein_properties_sequence_state, protein_properties_selected_sequence_state, protein_properties_original_file_path_state, protein_properties_current_file_state],
-            api_name=False
+            outputs=[protein_properties_protein_display, protein_properties_sequence_selector, protein_properties_sequence_state, protein_properties_selected_sequence_state, protein_properties_original_file_path_state, protein_properties_current_file_state]
         )
         protein_properties_paste_clear_btn.click(
             fn=clear_paste_content_fasta,
-            outputs=[protein_properties_paste_content_input, protein_properties_protein_display, protein_properties_sequence_selector, protein_properties_sequence_state, protein_properties_selected_sequence_state, protein_properties_original_file_path_state],
-            api_name=False
+            outputs=[protein_properties_paste_content_input, protein_properties_protein_display, protein_properties_sequence_selector, protein_properties_sequence_state, protein_properties_selected_sequence_state, protein_properties_original_file_path_state]
         )
         protein_properties_paste_content_btn.click(
             fn=parse_fasta_paste_content,
             inputs=protein_properties_paste_content_input,
-            outputs=[protein_properties_protein_display, protein_properties_sequence_selector, protein_properties_sequence_state, protein_properties_selected_sequence_state, protein_properties_original_file_path_state, protein_properties_original_paste_content_state],
-            api_name=False
+            outputs=[protein_properties_protein_display, protein_properties_sequence_selector, protein_properties_sequence_state, protein_properties_selected_sequence_state, protein_properties_original_file_path_state, protein_properties_original_paste_content_state]
         )
 
         protein_properties_sequence_selector.change(
             fn=handle_sequence_change_unified,
             inputs=[protein_properties_sequence_selector, protein_properties_sequence_state, protein_properties_original_file_path_state, protein_properties_original_paste_content_state],
-            outputs=[protein_properties_protein_display, protein_properties_file_upload],
-            api_name=False
+            outputs=[protein_properties_protein_display, protein_properties_file_upload]
         )
 
         protein_properties_predict_btn.click(
             fn=handle_protein_properties_generation,
             inputs=[protein_properties_task_dd, protein_properties_file_upload],
             outputs=[protein_properties_status_box, protein_properties_result_out, protein_properties_download_btn, protein_properties_path_state, gr.State()],
-            show_progress=True,
-            api_name="/handle_protein_properties_generation"
+            show_progress=True
         )
 
     return demo

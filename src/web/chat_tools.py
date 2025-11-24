@@ -105,15 +105,17 @@ class LiteratureSearchInput(BaseModel):
 def zero_shot_sequence_prediction_tool(sequence: Optional[str] = None, fasta_file: Optional[str] = None, model_name: str = "ESM2-650M") -> str:
     """Predict beneficial mutations using sequence-based zero-shot models. Use for mutation prediction with protein sequences."""
     try:
+        api_key = os.getenv("DEEPSEEK_API_KEY")
+        
         if fasta_file:
             if not os.path.exists(fasta_file):
                 return f"Error: FASTA file not found at path: {fasta_file}"
             return call_zero_shot_sequence_prediction(
-                fasta_file=fasta_file, model_name=model_name
+                fasta_file=fasta_file, model_name=model_name, api_key=api_key
                 )
         elif sequence:
             return call_zero_shot_sequence_prediction(
-                sequence=sequence, model_name=model_name
+                sequence=sequence, model_name=model_name, api_key=api_key
                 )
         else:
             return "Error: Either sequence or fasta_file must be provided"
@@ -124,6 +126,7 @@ def zero_shot_sequence_prediction_tool(sequence: Optional[str] = None, fasta_fil
 def zero_shot_structure_prediction_tool(structure_file: str, model_name: str = "ESM-IF1") -> str:
     """Predict beneficial mutations using structure-based zero-shot models. Use for mutation prediction with PDB structure files."""
     try:
+        api_key = os.getenv("DEEPSEEK_API_KEY")
         actual_file_path = structure_file
         try:
             import json
@@ -137,7 +140,7 @@ def zero_shot_structure_prediction_tool(structure_file: str, model_name: str = "
         
         if not os.path.exists(actual_file_path):
             return f"Error: Structure file not found at path: {actual_file_path}"
-        return call_zero_shot_structure_prediction_from_file(actual_file_path, model_name)
+        return call_zero_shot_structure_prediction_from_file(actual_file_path, model_name, api_key)
     except Exception as e:
         return json.dumps({"success": False, "error": f"Zero-shot structure prediction error: {str(e)}"}, ensure_ascii=False)
 
@@ -145,13 +148,14 @@ def zero_shot_structure_prediction_tool(structure_file: str, model_name: str = "
 def protein_function_prediction_tool(sequence: Optional[str] = None, fasta_file: Optional[str] = None, model_name: str = "ESM2-650M", task: str = "Solubility") -> str:
     """Predict protein functions like solubility, localization, metal ion binding, stability, sorting signal, and optimum temperature."""
     try:
+        api_key = os.getenv("DEEPSEEK_API_KEY")
         if fasta_file and os.path.exists(fasta_file):
             return call_protein_function_prediction(
-                fasta_file=fasta_file, model_name=model_name, task=task
+                fasta_file=fasta_file, model_name=model_name, task=task, api_key=api_key
                 )
         elif sequence:
             return call_protein_function_prediction(
-                sequence=sequence, model_name=model_name, task=task
+                sequence=sequence, model_name=model_name, task=task, api_key=api_key
                 )
         else:
             return "Error: Either sequence or fasta_file must be provided"
@@ -161,13 +165,14 @@ def protein_function_prediction_tool(sequence: Optional[str] = None, fasta_file:
 @tool("functional_residue_prediction", args_schema=ResidueFunctionPredictionInput)
 def functional_residue_prediction_tool(sequence: Optional[str] = None, fasta_file: Optional[str] = None, model_name: str = "ESM2-650M", task: str = "Activate") -> str:
     try:
+        api_key = os.getenv("DEEPSEEK_API_KEY")
         if fasta_file and os.path.exists(fasta_file):
             return call_functional_residue_prediction(
-                fasta_file=fasta_file, model_name=model_name, task=task
+                fasta_file=fasta_file, model_name=model_name, task=task, api_key=api_key
                 )
         elif sequence:
             return call_functional_residue_prediction(
-                sequence=sequence, model_name=model_name, task=task
+                sequence=sequence, model_name=model_name, task=task, api_key=api_key
                 )
         else:
             return "Error: Either sequence or fasta_file must be procided"
@@ -236,15 +241,17 @@ def generate_training_config_tool(csv_file: str, test_csv_file: Optional[str] = 
 def protein_properties_generation_tool(sequence: Optional[str] = None, fasta_file: Optional[str] = None, task_name = "Physical and chemical properties" ) -> str:
     """Predict the protein phyical, chemical, and structure properties."""
     try:
+        api_key = os.getenv("DEEPSEEK_API_KEY")
+        
         if fasta_file:
             if not os.path.exists(fasta_file):
                 return f"Error: FASTA file not found at path: {fasta_file}"
             return call_protein_properties_prediction(
-                fasta_file=fasta_file, task_name=task_name
+                fasta_file=fasta_file, task_name=task_name, api_key=api_key
                 )
         elif sequence:
             return call_protein_properties_prediction(
-                sequence=sequence, task_name=task_name
+                sequence=sequence, task_name=task_name, api_key=api_key
                 )
         else:
             return f"Error: Structure file not found at path: {fasta_file}"
