@@ -37,7 +37,6 @@ def save_arguments(args: Dict[str, Any], output_dir: str):
         json.dump(args, f, indent=2)
 
 def build_eval_command_list(args: Dict[str, Any]) -> list:
-    """构建评估脚本的命令行列表"""
     cmd = ["python", "src/eval.py"]
     
     for key, value in args.items():

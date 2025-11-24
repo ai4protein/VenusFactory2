@@ -4,7 +4,6 @@ import re
 import aiohttp
 import asyncio
 import base64
-import smtplib
 import hashlib
 import tempfile
 import shutil
@@ -15,8 +14,6 @@ import pandas as pd
 import gradio as gr
 from datetime import datetime
 from typing import Dict, Any, List, Optional, Tuple, Mapping
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 
 from langchain.agents import AgentExecutor, create_openai_tools_agent
 from langchain.tools import BaseTool, tool
@@ -38,8 +35,12 @@ from dotenv import load_dotenv
 from gradio_client import Client, handle_file
 from web.chat_tools import *
 # Import prompts from the new file
-from web.prompts import PLANNER_PROMPT, WORKER_PROMPT, FINALIZER_PROMPT
-import html as _html
+from web.prompts import PLANNER_PROMPT, WORKER_PROMPT, FINALIZER_PROMPT, CHAT_SYSTEM_PROMPT
+from web.utils.chat_helpers import (
+    handle_feedback_submit,
+    export_chat_history_html,
+    save_chat_history_to_server
+)
 import threading
 
 load_dotenv()
@@ -418,6 +419,7 @@ def get_tools():
         ncbi_sequence_download_tool,
         alphafold_structure_download_tool,
         PDB_sequence_extraction_tool,
+        literature_search_tool,
     ]
 
 def create_planner_chain(llm: BaseChatModel, tools: List[BaseTool]):
@@ -428,67 +430,29 @@ def create_planner_chain(llm: BaseChatModel, tools: List[BaseTool]):
 
 def create_worker_executor(llm: BaseChatModel, tools: List[BaseTool]):
     """Creates a Worker AgentExecutor for a given set of tools."""
-    agent = create_openai_tools_agent(llm, tools, WORKER_PROMPT)
+    # Expecting tools to be a single-item list (one worker per tool)
+    tool = tools[0] if isinstance(tools, list) and tools else None
+    # Create a tool-specific prompt instance
+    try:
+        worker_prompt = WORKER_PROMPT.partial(tool_name=(tool.name if tool else "tool"), tool_description=(tool.description if tool else ""))
+    except Exception:
+        worker_prompt = WORKER_PROMPT
+
+    agent = create_openai_tools_agent(llm, tools, worker_prompt)
     executor = AgentExecutor(
         agent=agent,
         tools=tools,
-        verbose=False,
+        verbose=True,
         handle_parsing_errors=True,
         max_iterations=3, 
         max_execution_time=300,
+        return_intermediate_steps=True,
     )
     return executor
 
 def create_finalizer_chain(llm: BaseChatModel):
     """Creates the Finalizer chain to aggregate all analyses into a final report."""
     return FINALIZER_PROMPT | llm | StrOutputParser()
-
-def send_feedback_email(feedback_text: str) -> str:
-    """Send feedback email via SMTP"""
-    if not feedback_text.strip():
-        return "❌ Please enter your feedback before submitting."
-    
-    sender_email = "zmm.zlr@qq.com"
-    receiver_email = "zlr_zmm@163.com"
-    subject = "VenusFactory User Feedback"
-    password = os.getenv("EMAIL_PASSWORD")
-
-    server = None
-    try:
-        msg = MIMEMultipart()
-        msg['From'] = sender_email
-        msg['To'] = receiver_email
-        msg['Subject'] = subject
-
-        body = f"""
-VenusFactory User Feedback
---------------------------
-Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-
-Feedback:
-{feedback_text}
---------------------------
-        """
-        msg.attach(MIMEText(body, 'plain', 'utf-8'))
-
-        smtp_server = "smtp.qq.com"
-        smtp_port = 465
-        
-        server = smtplib.SMTP_SSL(smtp_server, smtp_port)
-        server.login(sender_email, password)
-        server.send_message(msg)
-        
-        return "✅ Thank you for your feedback! Email sent successfully."
-
-    except Exception as e:
-        return f"❌ Failed to send feedback: {str(e)}"
-
-    finally:
-        if server:
-            try:
-                server.quit()
-            except Exception:
-                pass
 
 def initialize_session_state() -> Dict[str, Any]:
     """Initialize a new session state with all necessary components"""
@@ -497,7 +461,7 @@ def initialize_session_state() -> Dict[str, Any]:
 
     planner_chain = create_planner_chain(llm, all_tools)
     finalizer_chain = create_finalizer_chain(llm)
-    workers = {tool.name: create_worker_executor(llm, [tool]) for tool in all_tools}
+    workers = {t.name: t for t in all_tools}
     
     return {
         'session_id': str(uuid.uuid4()),
@@ -652,7 +616,9 @@ async def send_message(history, message, session_state):
         history[-1] = {"role": "assistant", "content": "🧭 Plan not required for this question. Answering directly..."}
         yield history, gr.MultimodalTextbox(value=None, interactive=False)
         llm = session_state['llm']
-        response = await llm.ainvoke(session_state['memory'].chat_memory.messages + [HumanMessage(content=text)])
+        # Add system prompt for direct chat
+        messages_with_system = [SystemMessage(content=CHAT_SYSTEM_PROMPT)] + session_state['memory'].chat_memory.messages + [HumanMessage(content=text)]
+        response = await llm.ainvoke(messages_with_system)
         final_response = response.content
         history[-1] = {"role": "assistant", "content": final_response}
         session_state['history'].append({"role": "assistant", "content": final_response})
@@ -672,7 +638,9 @@ async def send_message(history, message, session_state):
         yield history, gr.MultimodalTextbox(value=None, interactive=False)
         
         llm = session_state['llm']
-        response = await llm.ainvoke(session_state['memory'].chat_memory.messages + [HumanMessage(content=text)])
+        # Add system prompt for direct chat
+        messages_with_system = [SystemMessage(content=CHAT_SYSTEM_PROMPT)] + session_state['memory'].chat_memory.messages + [HumanMessage(content=text)]
+        response = await llm.ainvoke(messages_with_system)
         final_response = response.content
     else:
         # Execute Plan
@@ -682,6 +650,7 @@ async def send_message(history, message, session_state):
         
         step_results = {}
         analysis_log = ""
+        collected_references = []
 
         for step in plan:
             step_num = step['step']
@@ -700,6 +669,16 @@ async def send_message(history, message, session_state):
                     raw_output = cached_entry.get("outputs", "")
                     step_results[step_num] = {'raw_output': raw_output, 'cached': True}
                     protein_ctx.add_tool_call(step_num, tool_name, merged_tool_input, raw_output, cached=True)
+
+                    # Collect references from cached outputs if present
+                    try:
+                        cached_outputs = cached_entry.get("outputs", {})
+                        if isinstance(cached_outputs, dict) and cached_outputs.get("references"):
+                            for rr in cached_outputs.get("references", []):
+                                if rr and (rr.get("title") or rr.get("url")):
+                                    collected_references.append(rr)
+                    except Exception:
+                        pass
 
                     step_detail = f"**Step {step_num}:** {task_desc}\n\n"
                     step_detail += f"**Tool:** {tool_name} ⚡ (cached result)\n"
@@ -732,24 +711,33 @@ async def send_message(history, message, session_state):
                         else:
                             merged_tool_input[key] = raw_output
 
-                worker = session_state['workers'].get(tool_name)
-                if not worker: 
-                    raise ValueError(f"Worker for tool '{tool_name}' not found.")
-                
-                worker_input_str = json.dumps(merged_tool_input)
-                worker_result = await asyncio.to_thread(worker.invoke, {"input": worker_input_str})
-                
-                raw_output = str(worker_result)
+                tool_inst = session_state['workers'].get(tool_name)
+                if not tool_inst:
+                    raise ValueError(f"Tool '{tool_name}' not found.")
+
+                # Directly invoke the tool with merged input parameters
+                worker_result = await asyncio.to_thread(tool_inst.invoke, merged_tool_input)
+
+                # Normalize to string for consistent downstream handling and UI display
+                raw_output = worker_result if isinstance(worker_result, str) else json.dumps(worker_result, ensure_ascii=False)
                 step_results[step_num] = {'raw_output': raw_output, 'cached': False}
-                
+
                 try:
-                    parsed_output = None
                     try:
                         parsed_output = json.loads(raw_output)
                     except Exception:
                         parsed_output = raw_output
-                    
+
                     save_cached_tool_result(session_state, tool_name, merged_tool_input, parsed_output)
+
+                    # Collect references from parsed output if provided by the tool
+                    try:
+                        if isinstance(parsed_output, dict) and parsed_output.get("references"):
+                            for rr in parsed_output.get("references", []):
+                                if rr and (rr.get("title") or rr.get("url")):
+                                    collected_references.append(rr)
+                    except Exception:
+                        pass
                 except Exception as e:
                     print(f"Failed to cache result: {e}")
                 protein_ctx.add_tool_call(step_num, tool_name, merged_tool_input, raw_output, cached=False)
@@ -759,7 +747,7 @@ async def send_message(history, message, session_state):
                     if tool_name in ['ncbi_sequence_download', 'alphafold_structure_download', 'uniprot_query', 'interpro_query',
                                      'protein_function_prediction', 'functional_residue_prediction',
                                      'protein_properties_generation', 'zero_shot_sequence_prediction', 'zero_shot_structure_prediction',
-                                     'PDB_sequence_extraction', 'PDB_structure_download']:
+                                     'PDB_sequence_extraction', 'PDB_structure_download', 'literature_search']:
                         output_data = json.loads(raw_output)
                         # Structure downloads
                         if output_data.get('success') and 'file_path' in output_data:
@@ -769,6 +757,14 @@ async def send_message(history, message, session_state):
                                 protein_ctx.add_structure_file(file_path, 'alphafold', uniprot_id)
                             elif tool_name == 'ncbi_sequence_download':
                                 protein_ctx.add_file(file_path)
+                        # Collect literature references if provided
+                        if tool_name == 'literature_search' and isinstance(output_data, dict) and output_data.get('references'):
+                            try:
+                                for rr in output_data.get('references', []):
+                                    if rr and (rr.get('title') or rr.get('url')):
+                                        collected_references.append(rr)
+                            except Exception:
+                                pass
                         # Sequence from UniProt or NCBI when provided
                 except (json.JSONDecodeError, KeyError):
                     pass
@@ -797,10 +793,23 @@ async def send_message(history, message, session_state):
         history[-1] = {"role": "assistant", "content": f"{plan_text}\n\n---\n\n📄 **All steps complete. Generating final report...**"}
         yield history, gr.MultimodalTextbox(value=None, interactive=False)
 
+        finalizer_inputs = {
+            "original_input": text,
+            "analysis_log": analysis_log,
+            "references": json.dumps(collected_references, ensure_ascii=False)
+        }
         final_response = await asyncio.to_thread(
             session_state['finalizer'].invoke,
-            {"original_input": text, "analysis_log": analysis_log}
+            finalizer_inputs
         )
+
+        # If Finalizer didn't include references, append them in chat output for visibility
+        try:
+            if collected_references:
+                refs_text = "\n\nReferences:\n" + "\n".join([f"- {r.get('title','')} ({r.get('source','')}) {r.get('url','')}" for r in collected_references])
+                final_response = final_response + "\n\n" + refs_text
+        except Exception:
+            pass
 
     history[-1] = {"role": "assistant", "content": final_response}
     session_state['history'].append({"role": "assistant", "content": final_response})
@@ -887,86 +896,11 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             export_saved_status = gr.Markdown("", visible=False)
 
         # Feedback submission handler
-        def handle_feedback_submit(feedback_text):
-            result = send_feedback_email(feedback_text)
-            return "", result, gr.update(visible=True)
-
         feedback_submit.click(
             fn=handle_feedback_submit,
             inputs=[feedback_input],
             outputs=[feedback_input, feedback_status, feedback_status]
         )
-
-        def _make_chat_html(path: Path, history_list: List[Dict[str, Any]]):
-            css = """
-            body { font-family: Arial, sans-serif; background: #f6f8fb; padding: 20px; }
-            .chat-container { max-width: 900px; margin: 0 auto; }
-            .message { display: flex; margin: 8px 0; }
-            .message.user { justify-content: flex-end; }
-            .bubble { max-width: 75%; padding: 12px 16px; border-radius: 12px; white-space: pre-wrap; }
-            .bubble.user { background: #0b93f6; color: #fff; border-bottom-right-radius: 4px; }
-            .bubble.assistant { background: #eef1f7; color: #111; border-bottom-left-radius: 4px; }
-            .meta { font-size: 12px; color: #666; margin: 4px 8px; }
-            """
-            with open(path, "w", encoding="utf-8") as f:
-                f.write("<!doctype html><html><head><meta charset='utf-8'><title>Chat Export</title>")
-                f.write(f"<style>{css}</style></head><body>")
-                f.write("<div class='chat-container'>")
-                f.write("<h2>VenusFactory Chat Export</h2>\n")
-                for msg in history_list:
-                    role = str(msg.get("role", "")).lower()
-                    content = str(msg.get("content", ""))
-                    ts = ""
-                    if isinstance(msg.get("timestamp"), str):
-                        ts = msg.get("timestamp")
-                    elif isinstance(msg.get("timestamp"), datetime):
-                        ts = msg.get("timestamp").strftime("%Y-%m-%d %H:%M:%S")
-                    content_esc = _html.escape(content)
-                    cls = "assistant" if role != "user" else "user"
-                    f.write(f"<div class='message {cls}'>")
-                    f.write(f"<div class='bubble {cls}'>{content_esc}</div>")
-                    f.write(f"</div>")
-                    if ts:
-                        f.write(f"<div class='meta' style='text-align: {'right' if role=='user' else 'left'}'>{_html.escape(ts)}</div>")
-                f.write("</div></body></html>")
-
-        def export_chat_history_html(session_state_value):
-            """Create (or overwrite) session-scoped HTML file on server and return status update and download update."""
-            try:
-                ss = session_state_value
-                history_list = ss.get('history', [])
-                out_dir = Path("temp_outputs") / "exports"
-                out_dir.mkdir(parents=True, exist_ok=True)
-                session_id = ss.get('session_id') or "anon"
-                filename = out_dir / f"chat_history_{session_id}.html"
-                _make_chat_html(filename, history_list)
-                # return two outputs: (markdown update, downloadbutton update)
-                return (
-                    gr.update(visible=True, value=f"Exported HTML to: {str(filename)}"),
-                    gr.update(visible=True, value=str(filename))
-                )
-            except Exception as e:
-                return (
-                    gr.update(visible=True, value=f"Export failed: {e}"),
-                    gr.update(visible=False, value="")
-                )
-
-        def save_chat_history_to_server(session_state_value):
-            """Return the path to the session-scoped HTML file for download; create it if missing."""
-            try:
-                ss = session_state_value
-                out_dir = Path("temp_outputs") / "exports"
-                out_dir.mkdir(parents=True, exist_ok=True)
-                session_id = ss.get('session_id') or "anon"
-                filename = out_dir / f"chat_history_{session_id}.html"
-                # create file if not exists
-                if not filename.exists():
-                    history_list = ss.get('history', [])
-                    _make_chat_html(filename, history_list)
-                # return update to trigger DownloadButton
-                return gr.update(visible=True, value=str(filename))
-            except Exception as e:
-                return gr.update(visible=False, value="")
 
         export_btn.click(
             fn=export_chat_history_html,

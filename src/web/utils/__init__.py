@@ -7,6 +7,9 @@ from .ai_helpers import *
 from .data_processors import *
 from .visualization import *
 from .prediction_runners import *
+from .chat_helpers import *
+from .label_mappers import *
+from .ui_helpers import *
 
 __all__ = [
     # Constants
@@ -82,5 +85,26 @@ __all__ = [
     'run_zero_shot_prediction',
     'run_single_function_prediction',
     'run_protein_properties_prediction',
+    
+    # Chat helpers
+    'send_feedback_email',
+    'handle_feedback_submit',
+    'make_chat_html',
+    'export_chat_history_html',
+    'save_chat_history_to_server',
+    
+    # Label mappers
+    'map_labels',
+    'map_labels_individual',
+    
+    # UI helpers
+    'create_progress_html',
+    'create_status_html',
+    'handle_paste_fasta_detect',
+    'handle_paste_pdb_detect',
+    'update_dataset_choices_fixed',
+    
+    # Sequence utils
+    'extract_sequence_from_pdb',
 ]
 

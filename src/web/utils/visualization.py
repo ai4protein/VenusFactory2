@@ -56,11 +56,13 @@ def generate_plotly_heatmap(x_labels: List, y_labels: List, z_data: np.ndarray, 
 def generate_plots_for_all_results(results_df: pd.DataFrame) -> go.Figure:
     """Generate plots for function prediction results with consistent Dardana font and academic styling."""
     # Filter data
+    def is_non_regression_task(dataset):
+        """Check if dataset is not a regression task."""
+        return DATASET_TO_TASK_MAP.get(dataset) not in REGRESSION_TASKS_FUNCTION
+    
     plot_df = results_df[
         (results_df['header'] != "ERROR") & 
-        (results_df['Dataset'].apply(
-            lambda d: DATASET_TO_TASK_MAP.get(d) not in REGRESSION_TASKS_FUNCTION
-        ))
+        (results_df['Dataset'].apply(is_non_regression_task))
     ].copy()
 
     if plot_df.empty:
@@ -134,9 +136,13 @@ def generate_plots_for_all_results(results_df: pd.DataFrame) -> go.Figure:
                     for lbl in labels
                 ]
                 
+                def get_confidence(item):
+                    """Get confidence score from plot data item."""
+                    return item[1]
+                
                 plot_data = sorted(
                     zip(labels, confidences, colors), 
-                    key=lambda x: x[1], 
+                    key=get_confidence, 
                     reverse=True
                 )
                 sorted_labels, sorted_conf, sorted_colors = zip(*plot_data)
