@@ -1599,213 +1599,182 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         # update_dataset_choices_fixed is now imported from utils.ui_helpers
         
         
-        enable_ai_zshot_seq.change(fn=toggle_ai_section, inputs=enable_ai_zshot_seq, outputs=ai_box_zshot_seq, api_name=False)
-        enable_ai_zshot_stru.change(fn=toggle_ai_section, inputs=enable_ai_zshot_stru, outputs=ai_box_zshot_stru, api_name=False)
-        enable_ai_func.change(fn=toggle_ai_section, inputs=enable_ai_func, outputs=ai_box_func, api_name=False)
-        enable_ai_residue_function.change(fn=toggle_ai_section, inputs=enable_ai_residue_function, outputs=ai_box_residue_function, api_name=False)
+        enable_ai_zshot_seq.change(fn=toggle_ai_section, inputs=enable_ai_zshot_seq, outputs=ai_box_zshot_seq)
+        enable_ai_zshot_stru.change(fn=toggle_ai_section, inputs=enable_ai_zshot_stru, outputs=ai_box_zshot_stru)
+        enable_ai_func.change(fn=toggle_ai_section, inputs=enable_ai_func, outputs=ai_box_func)
+        enable_ai_residue_function.change(fn=toggle_ai_section, inputs=enable_ai_residue_function, outputs=ai_box_residue_function)
 
         ai_model_stru_zshot.change(
             fn=on_ai_model_change,
             inputs=ai_model_stru_zshot,
-            outputs=[api_key_in_stru_zshot, ai_status_stru_zshot],
-            api_name=False
+            outputs=[api_key_in_stru_zshot, ai_status_stru_zshot]
         )
         ai_model_seq_zshot.change(
             fn=on_ai_model_change,
             inputs=ai_model_seq_zshot,
-            outputs=[api_key_in_seq_zshot, ai_status_seq_zshot],
-            api_name=False
+            outputs=[api_key_in_seq_zshot, ai_status_seq_zshot]
         )
         ai_model_seq_func.change(
             fn=on_ai_model_change,
             inputs=ai_model_seq_func,
-            outputs=[api_key_in_seq_func, ai_status_seq_func],
-            api_name=False
+            outputs=[api_key_in_seq_func, ai_status_seq_func]
         )
         ai_model_dd_residue_function.change(
             fn=on_ai_model_change,
             inputs=ai_model_dd_residue_function,
-            outputs=[api_key_in_seq_func, ai_status_residue_function],
-            api_name=False
+            outputs=[api_key_in_seq_func, ai_status_residue_function]
         )
         
         seq_file_upload.upload(
             fn=handle_file_upload, 
             inputs=seq_file_upload, 
-            outputs=[seq_protein_display, seq_sequence_selector, seq_sequence_state, seq_selected_sequence_state, seq_original_file_path_state, seq_current_file_state],
-            api_name=False
+            outputs=[seq_protein_display, seq_sequence_selector, seq_sequence_state, seq_selected_sequence_state, seq_original_file_path_state, seq_current_file_state]
         )
 
         seq_file_upload.change(
             fn=handle_file_upload, 
             inputs=seq_file_upload, 
-            outputs=[seq_protein_display, seq_sequence_selector, seq_sequence_state, seq_selected_sequence_state, seq_original_file_path_state, seq_current_file_state],
-            api_name=False
+            outputs=[seq_protein_display, seq_sequence_selector, seq_sequence_state, seq_selected_sequence_state, seq_original_file_path_state, seq_current_file_state]
         )
 
         seq_paste_clear_btn.click(
             fn=clear_paste_content_fasta,
-            outputs=[seq_paste_content_input, seq_protein_display, seq_sequence_selector, seq_sequence_state, seq_selected_sequence_state, seq_original_file_path_state],
-            api_name=False
+            outputs=[seq_paste_content_input, seq_protein_display, seq_sequence_selector, seq_sequence_state, seq_selected_sequence_state, seq_original_file_path_state]
         )
 
         seq_paste_content_btn.click(
             fn=handle_paste_fasta_detect,
             inputs=seq_paste_content_input,
-            outputs=[seq_protein_display, seq_sequence_selector, seq_sequence_state, seq_selected_sequence_state, seq_original_file_path_state, seq_original_paste_content_state],
-            api_name=False
+            outputs=[seq_protein_display, seq_sequence_selector, seq_sequence_state, seq_selected_sequence_state, seq_original_file_path_state, seq_original_paste_content_state]
         )
 
         seq_sequence_selector.change(
             fn=handle_sequence_change_unified,
             inputs=[seq_sequence_selector, seq_sequence_state, seq_original_file_path_state, seq_original_paste_content_state],
-            outputs=[seq_protein_display, seq_current_file_state],
-            api_name=False
+            outputs=[seq_protein_display, seq_current_file_state]
         )
 
 
         struct_file_upload.upload(
             fn=handle_file_upload, 
             inputs=struct_file_upload, 
-            outputs=[struct_protein_display, struct_chain_selector, struct_chains_state, struct_selected_chain_state, struct_original_file_path_state, struct_current_file_state],
-            api_name=False
+            outputs=[struct_protein_display, struct_chain_selector, struct_chains_state, struct_selected_chain_state, struct_original_file_path_state, struct_current_file_state]
         )
 
         struct_file_upload.change(
             fn=handle_file_upload, 
             inputs=struct_file_upload, 
-            outputs=[struct_protein_display, struct_chain_selector, struct_chains_state, struct_selected_chain_state, struct_original_file_path_state, struct_current_file_state],
-            api_name=False
+            outputs=[struct_protein_display, struct_chain_selector, struct_chains_state, struct_selected_chain_state, struct_original_file_path_state, struct_current_file_state]
         )
         
         struct_paste_clear_btn.click(
             fn=clear_paste_content_pdb,
-            outputs=[struct_paste_content_input, struct_protein_display, struct_chain_selector, struct_chains_state, struct_selected_chain_state, struct_original_file_path_state],
-            api_name=False
+            outputs=[struct_paste_content_input, struct_protein_display, struct_chain_selector, struct_chains_state, struct_selected_chain_state, struct_original_file_path_state]
         )
         
         struct_paste_content_btn.click(
             fn=handle_paste_pdb_detect,
             inputs=struct_paste_content_input,
-            outputs=[struct_protein_display, struct_chain_selector, struct_chains_state, struct_selected_chain_state, struct_original_file_path_state, struct_original_paste_content_state],
-            api_name=False
+            outputs=[struct_protein_display, struct_chain_selector, struct_chains_state, struct_selected_chain_state, struct_original_file_path_state, struct_original_paste_content_state]
         )
 
         struct_chain_selector.change(
             fn=handle_sequence_change_unified,
             inputs=[struct_chain_selector, struct_chains_state, struct_original_file_path_state, struct_original_paste_content_state],
-            outputs=[struct_protein_display, struct_current_file_state],
-            api_name=False
+            outputs=[struct_protein_display, struct_current_file_state] 
         )
 
         function_fasta_upload.upload(
             fn=handle_file_upload, 
             inputs=function_fasta_upload, 
-            outputs=[function_protein_display, function_protein_selector, function_sequence_state, function_selected_sequence_state, function_original_file_path_state, function_current_file_state],
-            api_name=False
+            outputs=[function_protein_display, function_protein_selector, function_sequence_state, function_selected_sequence_state, function_original_file_path_state, function_current_file_state]
         )
         function_fasta_upload.change(
             fn=handle_file_upload, 
             inputs=function_fasta_upload, 
-            outputs=[function_protein_display, function_protein_selector, function_sequence_state, function_selected_sequence_state, function_original_file_path_state, function_current_file_state],
-            api_name=False
+            outputs=[function_protein_display, function_protein_selector, function_sequence_state, function_selected_sequence_state, function_original_file_path_state, function_current_file_state]
         )
         function_paste_clear_btn.click(
             fn=clear_paste_content_fasta,
-            outputs=[function_paste_content_input, function_protein_display, function_protein_selector, function_sequence_state, function_selected_sequence_state, function_original_file_path_state],
-            api_name=False
+            outputs=[function_paste_content_input, function_protein_display, function_protein_selector, function_sequence_state, function_selected_sequence_state, function_original_file_path_state]
         )
 
         function_paste_content_btn.click(
             fn=handle_paste_fasta_detect,
             inputs=function_paste_content_input,
-            outputs=[function_protein_display, function_protein_selector, function_sequence_state, function_selected_sequence_state, function_original_file_path_state, function_original_paste_content_state],
-            api_name=False
+            outputs=[function_protein_display, function_protein_selector, function_sequence_state, function_selected_sequence_state, function_original_file_path_state, function_original_paste_content_state]
         )
 
         function_protein_selector.change(
             fn=handle_sequence_change_unified,
             inputs=[function_protein_selector, function_sequence_state, function_original_file_path_state, function_original_paste_content_state],
-            outputs=[function_protein_display, function_current_file_state],
-            api_name=False
+            outputs=[function_protein_display, function_current_file_state]
         )
         adv_func_task_dd.change(
             fn=update_dataset_choices_fixed,
             inputs=adv_func_task_dd, 
-            outputs=adv_func_dataset_cbg,
-            api_name=False
+            outputs=adv_func_dataset_cbg
         )
         
         adv_residue_function_fasta_upload.upload(
             fn=handle_file_upload,
             inputs=adv_residue_function_fasta_upload,
-            outputs=[adv_residue_function_protein_display, adv_residue_function_selector, adv_residue_function_sequence_state, adv_residue_function_selected_sequence_state, adv_residue_function_original_file_path_state, adv_residue_function_current_file_state],
-            api_name=False
+            outputs=[adv_residue_function_protein_display, adv_residue_function_selector, adv_residue_function_sequence_state, adv_residue_function_selected_sequence_state, adv_residue_function_original_file_path_state, adv_residue_function_current_file_state]
         )
         adv_residue_function_fasta_upload.change(
             fn=handle_file_upload,
             inputs=adv_residue_function_fasta_upload,
-            outputs=[adv_residue_function_protein_display, adv_residue_function_selector, adv_residue_function_sequence_state, adv_residue_function_selected_sequence_state, adv_residue_function_original_file_path_state, adv_residue_function_current_file_state],
-            api_name=False
+            outputs=[adv_residue_function_protein_display, adv_residue_function_selector, adv_residue_function_sequence_state, adv_residue_function_selected_sequence_state, adv_residue_function_original_file_path_state, adv_residue_function_current_file_state]
         )
         adv_residue_function_paste_clear_btn.click(
             fn=clear_paste_content_fasta,
-            outputs=[adv_residue_function_paste_content_input, adv_residue_function_protein_display, adv_residue_function_selector, adv_residue_function_sequence_state, adv_residue_function_selected_sequence_state, adv_residue_function_original_file_path_state],
-            api_name=False
+            outputs=[adv_residue_function_paste_content_input, adv_residue_function_protein_display, adv_residue_function_selector, adv_residue_function_sequence_state, adv_residue_function_selected_sequence_state, adv_residue_function_original_file_path_state]
         )
         adv_residue_function_paste_content_btn.click(
             fn=handle_paste_fasta_detect,
             inputs=adv_residue_function_paste_content_input,
-            outputs=[adv_residue_function_protein_display, adv_residue_function_selector, adv_residue_function_sequence_state, adv_residue_function_selected_sequence_state, adv_residue_function_original_file_path_state, adv_residue_function_original_paste_content_state],
-            api_name=False
+            outputs=[adv_residue_function_protein_display, adv_residue_function_selector, adv_residue_function_sequence_state, adv_residue_function_selected_sequence_state, adv_residue_function_original_file_path_state, adv_residue_function_original_paste_content_state]
         )
         adv_residue_function_selector.change(
             fn=handle_sequence_change_unified,
             inputs=[adv_residue_function_selector, adv_residue_function_sequence_state, adv_residue_function_original_file_path_state, adv_residue_function_original_paste_content_state],
-            outputs=[adv_residue_function_protein_display, adv_residue_function_current_file_state],
-            api_name=False
+            outputs=[adv_residue_function_protein_display, adv_residue_function_current_file_state]
         )
         adv_residue_function_predict_btn.click(
             fn=handle_protein_residue_function_prediction,
             inputs=[adv_residue_function_task_dd, adv_residue_function_fasta_upload, enable_ai_residue_function, ai_model_dd_residue_function, api_key_in_residue_function, adv_residue_function_model_dd],
-            outputs=[adv_residue_function_status_textbox, adv_residue_function_results_df, adv_residue_function_plot_out, adv_residue_function_download_btn, adv_residue_function_ai_expert_html, gr.State()],
-            api_name=False
+            outputs=[adv_residue_function_status_textbox, adv_residue_function_results_df, adv_residue_function_plot_out, adv_residue_function_download_btn, adv_residue_function_ai_expert_html, gr.State()]
         )
         adv_residue_function_protein_chat_btn.click(
             fn=handle_protein_residue_function_prediction_chat,
             inputs=[adv_residue_function_task_dd, adv_residue_function_fasta_upload, enable_ai_residue_function, ai_model_dd_residue_function, api_key_in_residue_function, adv_residue_function_model_dd],
-            outputs=[adv_residue_function_status_textbox, adv_residue_function_results_df, adv_residue_function_plot_out, adv_residue_function_download_btn, adv_residue_function_ai_expert_html, gr.State()],
-            api_name="/handle_protein_residue_function_prediction_chat"
+            outputs=[adv_residue_function_status_textbox, adv_residue_function_results_df, adv_residue_function_plot_out, adv_residue_function_download_btn, adv_residue_function_ai_expert_html, gr.State()]
         )
         seq_predict_btn.click(
             fn=handle_mutation_prediction_advance, 
             inputs=[seq_function_dd, seq_file_upload, enable_ai_zshot_seq, ai_model_seq_zshot, api_key_in_seq_zshot, seq_model_dd],
             outputs=[zero_shot_status_box, zero_shot_plot_out, zero_shot_df_out, zero_shot_download_btn, zero_shot_download_path_state, zero_shot_view_controls, zero_shot_full_data_state, zero_shot_ai_expert_html],
-            show_progress=True,
-            api_name=False
+            show_progress=True
         )
 
         struct_predict_btn.click(
             fn=handle_mutation_prediction_advance, 
             inputs=[struct_function_dd, struct_file_upload, enable_ai_zshot_stru, ai_model_stru_zshot, api_key_in_stru_zshot, struct_model_dd], 
             outputs=[zero_shot_status_box, zero_shot_plot_out, zero_shot_df_out, zero_shot_download_btn, zero_shot_download_path_state, zero_shot_view_controls, zero_shot_full_data_state, zero_shot_ai_expert_html],
-            show_progress=True,
-            api_name=False
+            show_progress=True
         )
 
         adv_func_predict_btn.click(
             fn=handle_protein_function_prediction_advance,
             inputs=[adv_func_task_dd, function_fasta_upload, enable_ai_func, ai_model_seq_func, api_key_in_seq_func, adv_func_model_dd, adv_func_dataset_cbg],
             outputs=[function_status_textbox, function_results_df, function_results_plot, function_download_btn, function_ai_expert_html],
-            show_progress=True,
-            api_name=False
+            show_progress=True
         )
         
         function_protein_chat_btn.click(
             fn=handle_protein_function_prediction_chat,
             inputs=[adv_func_task_dd, function_fasta_upload, adv_func_model_dd, adv_func_dataset_cbg_chat, enable_ai_func, ai_model_seq_func, api_key_in_seq_func],
-            outputs=[function_status_textbox, function_results_df, function_ai_expert_html],
-            api_name="/handle_protein_function_prediction_chat"
+            outputs=[function_status_textbox, function_results_df, function_ai_expert_html]
         )
 
         # handle_venus_pdb_upload is now defined outside create_advanced_tool_tab
@@ -1813,8 +1782,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         venus_pdb_upload.change(
             fn=handle_venus_pdb_upload,
             inputs=[venus_pdb_upload],
-            outputs=[venus_pdb_viewer],
-            api_name=False
+            outputs=[venus_pdb_viewer]
         )
 
         venus_start_btn.click(
@@ -1833,7 +1801,6 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 venus_tree_progress,
                 venus_status_indicator
             ],
-            show_progress=True,
-            api_name=False
+            show_progress=True
         )
     return demo
