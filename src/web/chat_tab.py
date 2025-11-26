@@ -657,7 +657,7 @@ async def send_message(history, message, session_state):
 
     # If plan is empty, just chat
     if not plan:
-        history[-1] = {"role": "assistant", "content": "I can help with that! I'm generating answers, please be patient"}
+        history[-1] = {"role": "assistant", "content": "🧭 Generating answers, please wait..."}
         yield history, gr.MultimodalTextbox(value=None, interactive=False)
         
         llm = session_state['llm']
