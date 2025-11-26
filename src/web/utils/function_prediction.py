@@ -16,6 +16,15 @@ from dataclasses import dataclass
 import re
 import json
 
+# Import file handling functions from file_handlers to avoid duplication
+from .constants import (
+    AI_MODELS,
+    MODEL_MAPPING_ZERO_SHOT,
+    DATASET_TO_TASK_MAP,
+    REGRESSION_TASKS_FUNCTION,
+    LABEL_MAPPING_FUNCTION,
+)
+
 def load_constant():
     """Load constant values from config files"""
     try:
@@ -341,63 +350,6 @@ def run_zero_shot_prediction(model_type: str, model_name: str, file_path: str) -
     except Exception as e:
         return f"An unexpected error occurred: {e}", pd.DataFrame()
 
-def parse_fasta_paste_content(fasta_content):
-    if not fasta_content or not fasta_content.strip():
-        return "No file selected", gr.update(choices=["Sequence_1"], value="Sequence_1", visible=False), {}, "Sequence_1", ""
-   
-    try:
-        sequences = {}
-        current_header = None
-        current_sequence = ""
-        sequence_counter = 1
-       
-        for line in fasta_content.strip().split('\n'):
-            line = line.strip()
-            if not line:
-                continue
-                
-            if line.startswith('>'):
-                if current_header is not None and current_sequence:
-                    sequences[current_header] = current_sequence
-                
-                current_header = line[1:].strip()
-                current_sequence = ""
-            else:
-                sequence_data = ''.join(c.upper() for c in line if c.isalpha())
-                
-                if current_header is None:
-                    current_header = f"Sequence_{sequence_counter}"
-                    sequence_counter += 1
-                
-                current_sequence += sequence_data
-
-        if current_header is not None and current_sequence:
-            sequences[current_header] = current_sequence
-       
-        if not sequences:
-            return "No valid protein sequences found in FASTA content", gr.update(choices=["Sequence_1"], value="Sequence_1", visible=False), {}, "Sequence_1", ""
-        
-        fasta_lines = []
-        for header, sequence in sequences.items():
-            fasta_lines.append(f">{header}")
-            fasta_lines.append(sequence)
-        modify_fasta_content = "\n".join(fasta_lines)
-       
-        sequence_choices = list(sequences.keys())
-        default_sequence = sequence_choices[0]
-        display_sequence = sequences[default_sequence]
-        selector_visible = len(sequence_choices) > 1
-        
-        timestamp = str(int(time.time()))
-        sequence_dir = get_save_path("Upload_dataset")
-        temp_fasta_path = os.path.join(sequence_dir, f"paste_content_seq_{sanitize_filename(default_sequence)}_{timestamp}.fasta")
-        save_selected_sequence_fasta(modify_fasta_content, default_sequence, temp_fasta_path)
-        return display_sequence, gr.update(choices=sequence_choices, value=default_sequence, visible=selector_visible), sequences, default_sequence, temp_fasta_path, modify_fasta_content
-       
-    except Exception as e:
-        print(f"Error in parse_fasta_paste_content: {str(e)}")
-        return f"Error parsing FASTA content: {str(e)}", gr.update(choices=["Sequence_1"], value="Sequence_1", visible=False), {}, "Sequence_1", "", ""
-
 def get_total_residues_count(df: pd.DataFrame) -> int:
     """Get total number of unique residue positions from mutation data."""
     if 'mutant' not in df.columns:
@@ -416,13 +368,11 @@ def prepare_top_residue_heatmap_data(df: pd.DataFrame) -> Tuple:
     if score_col is None:
         return (None,) * 5
 
-    valid_df = df[
-        df['mutant'].apply(
-            lambda m: isinstance(m, str) and 
-            re.match(r'^[A-Z]\d+[A-Z]$', m) and 
-            m[0] != m[-1]
-        )
-    ].copy()
+    def is_valid_mutant(mutant):
+        """Check if mutant string is valid (format: A123B where A != B)."""
+        return isinstance(mutant, str) and re.match(r'^[A-Z]\d+[A-Z]$', mutant) and mutant[0] != mutant[-1]
+    
+    valid_df = df[df['mutant'].apply(is_valid_mutant)].copy()
     
     if valid_df.empty:
         return ([], [], np.array([[]]), np.array([[]]), score_col)
@@ -497,51 +447,17 @@ def generate_plotly_heatmap(x_labels: List, y_labels: List, z_data: np.ndarray, 
     
     return fig
 
-def process_fasta_file(file_path: str) -> str:
-    sequences = []
-    current_seq = ""
-    current_header = ""
-    
-    with open(file_path, 'r', encoding='utf-8') as f:
-        for line in f:
-            line = line.strip()
-            if line.startswith('>'):
-                if current_header and current_seq:
-                    sequences.append((current_header, current_seq))
-                current_header = line
-                current_seq = ""
-            else:
-                current_seq += line
-
-        if current_header and current_seq:
-            sequences.append((current_header, current_seq))
-    
-    if len(sequences) <= 1:
-        return file_path
-    
-
-    original_path = Path(file_path)
-    timestamp = str(int(time.time()))
-    fasra_dir = get_save_path("Upload_data")
-
-    new_file_path = fasra_dir / f"filtered_{original_path.name}_{timestamp}"
-    
-    with open(new_file_path, 'w', encoding='utf-8') as f:
-        f.write(f"{sequences[0][0]}\n")
-        seq = sequences[0][1]
-        f.write(f"{seq}\n")
-    
-    return str(new_file_path)
-
 
 def generate_plots_for_all_results(results_df: pd.DataFrame) -> go.Figure:
     """Generate plots for function prediction results with consistent Dardana font and academic styling."""
     # Filter data
+    def is_non_regression_task(dataset):
+        """Check if dataset is not a regression task."""
+        return DATASET_TO_TASK_MAP.get(dataset) not in REGRESSION_TASKS_FUNCTION
+    
     plot_df = results_df[
         (results_df['header'] != "ERROR") & 
-        (results_df['Dataset'].apply(
-            lambda d: DATASET_TO_TASK_MAP.get(d) not in REGRESSION_TASKS_FUNCTION
-        ))
+        (results_df['Dataset'].apply(is_non_regression_task))
     ].copy()
 
     if plot_df.empty:
@@ -615,9 +531,13 @@ def generate_plots_for_all_results(results_df: pd.DataFrame) -> go.Figure:
                     for lbl in labels
                 ]
                 
+                def get_confidence(item):
+                    """Get confidence score from plot data item."""
+                    return item[1]
+                
                 plot_data = sorted(
                     zip(labels, confidences, colors), 
-                    key=lambda x: x[1], 
+                    key=get_confidence, 
                     reverse=True
                 )
                 sorted_labels, sorted_conf, sorted_colors = zip(*plot_data)
@@ -814,279 +734,4 @@ def expand_residue_predictions(df):
             continue
     
     return pd.DataFrame(expanded_rows)
-
-def save_selected_sequence_fasta(original_fasta_content, selected_sequence, output_path):
-    sequences = {}
-    current_header = None
-    current_sequence = ""
-    sequence_counter = 1
-   
-    for line in original_fasta_content.strip().split('\n'):
-        line = line.strip()
-        if not line:
-            continue
-            
-        if line.startswith('>'):
-            if current_header is not None and current_sequence:
-                sequences[current_header] = current_sequence
-            
-            current_header = line[1:].strip()
-            current_sequence = ""
-        else:
-            sequence_data = ''.join(c.upper() for c in line if c.isalpha())
-            
-            if current_header is None:
-                current_header = f"Sequence_{sequence_counter}"
-                sequence_counter += 1
-            
-            current_sequence += sequence_data
-
-    if current_header is not None and current_sequence:
-        sequences[current_header] = current_sequence
-   
-    if not sequences or selected_sequence not in sequences:
-        print(f"Error: Sequence '{selected_sequence}' not found in parsed sequences")
-        return
-
-    try:
-        with open(output_path, 'w', encoding='utf-8') as f:
-            f.write(f">{selected_sequence}\n")
-            f.write(sequences[selected_sequence])
-    except Exception as e:
-        print(f"Error saving file: {str(e)}")
-
-def handle_paste_sequence_selection(selected_sequence, sequences_dict, original_fasta_content_from_state):
-    if not sequences_dict or selected_sequence not in sequences_dict:
-        return "No file selected", ""
-    
-    # Check if the content is valid
-    if not original_fasta_content_from_state or original_fasta_content_from_state == "No file selected":
-        return "No file selected", ""
-    
-    try:
-        timestamp = str(int(time.time()))
-        sequence_dir = get_save_path("Upload_dataset")
-        temp_pdb_path = os.path.join(sequence_dir, f"paste_content_seq_{selected_sequence}_{timestamp}.fasta")
-        save_selected_sequence_fasta(original_fasta_content_from_state, selected_sequence, temp_pdb_path)
-        
-        return sequences_dict[selected_sequence], temp_pdb_path
-        
-    except Exception as e:
-        return f"Error processing chain selection: {str(e)}", ""
-
-def handle_fasta_sequence_change(selected_sequence, sequences_dict, original_fasta_path):
-    if not sequences_dict or selected_sequence not in sequences_dict:
-        return "No file selected", ""
-    
-    # Check if the file path is valid and exists
-    if not original_fasta_path or original_fasta_path == "No file selected" or not os.path.exists(original_fasta_path):
-        return "No file selected", ""
-    
-    try:
-        with open(original_fasta_path, 'r') as f:
-            lines = f.read()
-
-        new_fasta_lines = []
-        new_fasta_lines.append(">"+selected_sequence)
-        new_fasta_lines.append(sequences_dict[selected_sequence])
-        
-        dir_path = os.path.dirname(original_fasta_path)
-        base_name, extension = os.path.splitext(os.path.basename(original_fasta_path))
-        new_filename = f"{base_name}_1{extension}"
-        new_fasta_path = os.path.join(dir_path, new_filename)
-        with open(new_fasta_path, 'w', encoding='utf-8') as f:
-            f.write('\n'.join(new_fasta_lines))
-        
-        return sequences_dict[selected_sequence], new_fasta_path
-
-    except Exception as e:
-        return f"Error processing sequence selection: {str(e)}", ""
-
-def parse_pdb_paste_content(pdb_content):
-    if not pdb_content.strip():
-        return "No file selected", gr.update(choices=["A"], value="A", visible=False), {}, "A", ""
-    
-    try:
-        chains = {}
-        current_chain = None
-        sequence = ""
-        
-        for line in pdb_content.strip().split('\n'):
-            if line.startswith('ATOM'):
-                chain_id = line[21:22].strip()
-                if chain_id == "":
-                    chain_id = "A"
-                
-                if current_chain != chain_id:
-                    if current_chain is not None and sequence:
-                        chains[current_chain] = sequence
-                    current_chain = chain_id
-                    sequence = ""
-                
-                res_name = line[17:20].strip()
-                if res_name in ['ALA', 'CYS', 'ASP', 'GLU', 'PHE', 'GLY', 'HIS', 'ILE', 'LYS', 'LEU', 'MET', 'ASN', 'PRO', 'GLN', 'ARG', 'SER', 'THR', 'VAL', 'TRP', 'TYR']:
-                    aa_map = {'ALA': 'A', 'CYS': 'C', 'ASP': 'D', 'GLU': 'E', 'PHE': 'F', 
-                             'GLY': 'G', 'HIS': 'H', 'ILE': 'I', 'LYS': 'K', 'LEU': 'L', 
-                             'MET': 'M', 'ASN': 'N', 'PRO': 'P', 'GLN': 'Q', 'ARG': 'R', 
-                             'SER': 'S', 'THR': 'T', 'VAL': 'V', 'TRP': 'W', 'TYR': 'Y'}
-                    
-                    res_num = int(line[22:26].strip())
-                    if len(sequence) < res_num:
-                        sequence += aa_map[res_name]
-        
-        if current_chain is not None and sequence:
-            chains[current_chain] = sequence
-        
-        if not chains:
-            return "No valid protein chains found in PDB content", gr.update(choices=["A"], value="A", visible=False), {}, "A", ""
-        
-        chain_choices = list(chains.keys())
-        default_chain = chain_choices[0]
-        display_sequence = chains[default_chain]
-        selector_visible = len(chain_choices) > 1
-        timestamp = str(int(time.time()))
-        sequence_dir = get_save_path("Upload_dataset")
-        temp_pdb_path = os.path.join(sequence_dir, f"paste_content_chain_{default_chain}_{timestamp}.pdb")
-        save_selected_chain_pdb(pdb_content, default_chain, temp_pdb_path)
-        return display_sequence, gr.update(choices=chain_choices, value=default_chain, visible=selector_visible), chains, default_chain, temp_pdb_path
-        
-    except Exception as e:
-        return f"Error parsing PDB content: {str(e)}", gr.update(choices=["A"], value="A", visible=False), {}, "A", ""
-
-def save_selected_chain_pdb(original_pdb_content, selected_chain, output_path):
-    new_pdb_lines = []
-    atom_counter = 1
-    
-    for line in original_pdb_content.strip().split('\n'):
-        if line.startswith('ATOM'):
-            chain_id = line[21:22].strip()
-            if chain_id == "":
-                chain_id = "A"
-            
-            if chain_id == selected_chain:
-                new_line = line[:21] + 'A' + line[22:]
-                new_line = f"ATOM  {atom_counter:5d}" + new_line[11:]
-                new_pdb_lines.append(new_line)
-                atom_counter += 1
-        elif not line.startswith('ATOM'):
-            new_pdb_lines.append(line)
-    
-    with open(output_path, 'w') as f:
-        f.write('\n'.join(new_pdb_lines))
-
-def handle_paste_chain_selection(selected_chain, chains_dict, original_pdb_content_from_state):
-    if not chains_dict or selected_chain not in chains_dict:
-        return "No file selected", ""
-    
-    # Check if the content is valid
-    if not original_pdb_content_from_state or original_pdb_content_from_state == "No file selected":
-        return "No file selected", ""
-    
-    try:
-        timestamp = str(int(time.time()))
-        sequence_dir = get_save_path("Upload_dataset")
-        temp_pdb_path = os.path.join(sequence_dir, f"paste_content_chain_{selected_chain}_{timestamp}.pdb")
-        save_selected_chain_pdb(original_pdb_content_from_state, selected_chain, temp_pdb_path)
-        
-        return chains_dict[selected_chain], temp_pdb_path
-        
-    except Exception as e:
-        return f"Error processing chain selection: {str(e)}", ""
-
-def handle_pdb_chain_change(selected_chain, chains_dict, original_file_path):
-    if not chains_dict or selected_chain not in chains_dict:
-        return "No file selected", ""
-    
-    # Check if the file path is valid and exists
-    if not original_file_path or original_file_path == "No file selected" or not os.path.exists(original_file_path):
-        return "No file selected", ""
-        
-    try:
-        with open(original_file_path, 'r') as f:
-            pdb_content = f.read()
-        
-        new_pdb_lines = []
-        atom_counter = 1
-        
-        for line in pdb_content.strip().split('\n'):
-            if line.startswith('ATOM'):
-                chain_id = line[21:22].strip()
-                if chain_id == "":
-                    chain_id = "A"
-                
-                if chain_id == selected_chain:
-                    new_line = line[:21] + 'A' + line[22:]
-                    new_line = f"ATOM  {atom_counter:5d}" + new_line[11:]
-                    new_pdb_lines.append(new_line)
-                    atom_counter += 1
-            elif not line.startswith('ATOM'):
-                new_pdb_lines.append(line)
-        
-        dir_path = os.path.dirname(original_file_path)
-        base_name, extension = os.path.splitext(os.path.basename(original_file_path))
-        new_filename = f"{base_name}_A{extension}"
-        new_pdb_path = os.path.join(dir_path, new_filename)
-        
-        with open(new_pdb_path, 'w') as f:
-            f.write('\n'.join(new_pdb_lines))
-        
-        return chains_dict[selected_chain], gr.update(value=new_pdb_path)
-        
-    except Exception as e:
-        return f"Error processing chain selection: {str(e)}", ""
-
-def process_pdb_file_upload(file_path):
-    if not file_path:
-        return "No file selected", gr.update(choices=["A"], value="A", visible=False), {}, "A", "", ""
-    try:
-        with open(file_path, 'r') as f:
-            pdb_content = f.read()
-        sequence, chain_update, chains_dict, default_chain, _ = parse_pdb_paste_content(pdb_content)
-        return sequence, chain_update, chains_dict, default_chain, file_path, file_path
-    except Exception as e:
-        return f"Error reading PDB file: {str(e)}", gr.update(choices=["A"], value="A", visible=False), {}, "A", "", ""
-
-def process_fasta_file_upload(file_path):
-    if not file_path:
-        return "No file selected", gr.update(choices=["Sequence_1"], value="Sequence_1", visible=False), {}, "Sequence_1", "", ""
-    try:
-        with open(file_path, 'r') as f:
-            fasta_content = f.read()
-        sequence, selector_update, sequences_dict, default_sequence, file_path, modify_fasta_content = parse_fasta_paste_content(fasta_content)
-        return sequence, selector_update, sequences_dict, default_sequence, file_path, file_path
-    except Exception as e:
-        return f"Error reading FASTA file: {str(e)}", gr.update(choices=["Sequence_1"], value="Sequence_1", visible=False), {}, "Sequence_1", "", ""
-
-def handle_file_upload(file_obj: Any) -> str:
-    if not file_obj:
-        return "No file selected", gr.update(choices=["Sequence_1"], value="Sequence_1", visible=False), {}, "Sequence_1", "", ""
-    if isinstance(file_obj, str):
-        file_path = file_obj
-    else:
-        file_path = file_obj.name
-    if file_path.lower().endswith((".fasta", ".fa")):
-        return process_fasta_file_upload(file_path)
-    elif file_path.lower().endswith(".pdb"):
-        return process_pdb_file_upload(file_path)
-    else:
-        return "No file selected", gr.update(choices=["Sequence_1"], value="Sequence_1", visible=False), {}, "Sequence_1", "", ""
-
-def sanitize_filename(name: str) -> str:
-    """Sanitize filename for safe file operations."""
-    name = re.split(r'[|\s/]', name)[0]
-    return re.sub(r'[^\w\-. ]', '_', name)
-
-
-def toggle_ai_section(is_checked: bool):
-    """Toggle visibility of AI configuration section."""
-    return gr.update(visible=is_checked)
-
-def create_zip_archive(files_to_zip: Dict[str, str], zip_filename: str) -> str:
-    """Create ZIP archive with specified files."""
-    with zipfile.ZipFile(zip_filename, 'w', zipfile.ZIP_DEFLATED) as zf:
-        for src, arc in files_to_zip.items():
-            if os.path.exists(src):
-                zf.write(src, arcname=arc)
-    return zip_filename
-
 

@@ -113,22 +113,31 @@ DATASET_TO_TASK_MAP = {
     for task, datasets in DATASET_MAPPING_FUNCTION.items() 
     for dataset in datasets
 }
-
 AI_MODELS = {
     "DeepSeek": {
         "api_base": "https://api.deepseek.com/v1", 
         "model": "deepseek-chat",
         "env_key": "DEEPSEEK_API_KEY"
     },
-    "ChatGPT": {
-        "api_base": "https://api.openai.com/v1",
-        "model": "gpt-4o-mini", 
-        "env_key": None
+    "Gemini-2.5-Pro": {
+        "api_base": "https://www.dmxapi.com/v1",
+        "model": "gemini-2.5-pro",
+        "env_key": "OPENAI_API_KEY"
     },
-    "Gemini": {
-        "api_base": "https://generativelanguage.googleapis.com/v1beta",
-        "model": "gemini-1.5-flash",
-        "env_key": None
+    "ChatGPT-4o": {
+        "api_base": "https://www.dmxapi.com/v1",
+        "model": "gpt-4o",
+        "env_key": "OPENAI_API_KEY"
+    },
+    "Claude-3.7": {
+        "api_base": "https://www.dmxapi.com/v1",
+        "model": "claude-3-7-sonnet-20250219",
+        "env_key": "OPENAI_API_KEY"
+    },
+    "DeepSeek-R1": {
+        "api_base": "https://www.dmxapi.com/v1",
+        "model": "deepseek-r1-0528",
+        "env_key": "OPENAI_API_KEY"
     }
 }
 

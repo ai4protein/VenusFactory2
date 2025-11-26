@@ -70,8 +70,12 @@ def format_rsa_results(data: dict) -> str:
     result += f"Buried residues: {data['buried_residues']}\n"
     result += f"Total residues: {data['total_residues']}\n"
     
+    def get_residue_number_rsa(item):
+        """Get residue number from item for sorting."""
+        return int(item[0])
+    
     try:
-        sorted_residues = sorted(data['residue_rsa'].items(), key=lambda x: int(x[0]))
+        sorted_residues = sorted(data['residue_rsa'].items(), key=get_residue_number_rsa)
     except ValueError:
         sorted_residues = sorted(data['residue_rsa'].items())
     
@@ -91,8 +95,12 @@ def format_sasa_results(data: dict) -> str:
     for chain_id, chain_data in sorted(data['chains'].items()):
         result += f"--- Chain {chain_id} (Total SASA: {chain_data['total_sasa']:.2f} Ų) ---\n"
         
+        def get_residue_number_sasa(item):
+            """Get residue number from item for sorting."""
+            return int(item[0])
+        
         try:
-            sorted_residues = sorted(chain_data['residue_sasa'].items(), key=lambda x: int(x[0]))
+            sorted_residues = sorted(chain_data['residue_sasa'].items(), key=get_residue_number_sasa)
         except ValueError:
             sorted_residues = sorted(chain_data['residue_sasa'].items())
         
@@ -111,8 +119,12 @@ def format_secondary_structure_results(data: dict) -> str:
     result += f"Sheet (E): {data['ss_counts']['sheet']} ({data['ss_counts']['sheet']/len(data['aa_sequence'])*100:.1f}%)\n"
     result += f"Coil (C): {data['ss_counts']['coil']} ({data['ss_counts']['coil']/len(data['aa_sequence'])*100:.1f}%)\n"
     
+    def get_residue_number_ss(item):
+        """Get residue number from item for sorting."""
+        return int(item[0])
+    
     try:
-        sorted_residues = sorted(data['residue_ss'].items(), key=lambda x: int(x[0]))
+        sorted_residues = sorted(data['residue_ss'].items(), key=get_residue_number_ss)
     except ValueError:
         sorted_residues = sorted(data['residue_ss'].items())
     
