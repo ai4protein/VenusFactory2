@@ -636,7 +636,7 @@ async def send_message(history, message, session_state):
         plan = await asyncio.to_thread(session_state['planner'].invoke, planner_inputs)
     except Exception as e:
         # Fallback: if planning/parsing fails, try answering directly without tools
-        history[-1] = {"role": "assistant", "content": "🧭 Plan not required for this question. Answering directly..."}
+        history[-1] = {"role": "assistant", "content": "🧭 Generating answers, please wait..."}
         yield history, gr.MultimodalTextbox(value=None, interactive=False)
         llm = session_state['llm']
         # Add system prompt for direct chat
