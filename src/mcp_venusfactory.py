@@ -6,17 +6,9 @@ from pathlib import Path
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 from uuid import uuid4
-import sys 
-if sys.platform == 'win32':
-    sys.stdout.reconfigure(encoding='utf-8')
-    sys.stderr.reconfigure(encoding='utf-8')
 from pydantic import Field
-# ------------------------------------------------------------------
-# 关键修改：导入 FastMCP 而不是 Server
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 from mcp.types import TextContent
-# ------------------------------------------------------------------
-
 from web.utils.common_utils import get_save_path
 from web.chat_tools import (
     PDB_sequence_extraction_tool,
@@ -36,22 +28,17 @@ from web.chat_tools import (
 )
 
 UPLOAD_DIR = get_save_path("MCP_Server", "Uploads")
-OUTPUT_DIR = get_save_path("MCP_Server", "Temp_Outputs")
+OUTPUT_DIR = get_save_path("MCP_Server", "Outputs")
 
-# 配置日志
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-# ------------------------------------------------------------------
-# 关键修改：初始化 FastMCP
-app = FastMCP("venusfactory-protein-analysis")
-# ------------------------------------------------------------------
+mcp = FastMCP("VenusFactory MCP Server")
 
 def format_tool_response(result: Any) -> List[TextContent]:
-    """辅助函数：将结果格式化为 MCP 标准响应"""
     response_dict = {
         "success": True,
         "data": None,
@@ -80,15 +67,10 @@ def format_tool_response(result: Any) -> List[TextContent]:
         response_dict["success"] = False
         response_dict["error"] = str(e)
 
-    # 必须序列化为 JSON 字符串
     json_str = json.dumps(response_dict, ensure_ascii=False, indent=2, default=str)
     return [TextContent(type="text", text=json_str)]
 
-# ============================================================================
-# 工具定义 (无需修改，FastMCP 支持 @app.tool)
-# ============================================================================
-
-@app.tool()
+@mcp.tool()
 async def query_uniprot(uniprot_id: str) -> List[TextContent]:
     try:
         result = await asyncio.to_thread(uniprot_query_tool.invoke, {"uniprot_id": uniprot_id})
@@ -96,7 +78,7 @@ async def query_uniprot(uniprot_id: str) -> List[TextContent]:
     except Exception as e:
         return format_tool_response({"success": False, "error": str(e)})
 
-@app.tool()
+@mcp.tool()
 async def query_interpro(uniprot_id: str) -> List[TextContent]:
     try:
         result = await asyncio.to_thread(interpro_query_tool.invoke, {"uniprot_id": uniprot_id})
@@ -104,7 +86,7 @@ async def query_interpro(uniprot_id: str) -> List[TextContent]:
     except Exception as e:
         return format_tool_response({"success": False, "error": str(e)})
 
-@app.tool()
+@mcp.tool()
 async def download_pdb_structure(pdb_id: str, output_format: str = "pdb") -> List[TextContent]:
     try:
         result = await asyncio.to_thread(pdb_structure_download_tool.invoke, {
@@ -115,7 +97,7 @@ async def download_pdb_structure(pdb_id: str, output_format: str = "pdb") -> Lis
     except Exception as e:
         return format_tool_response({"success": False, "error": str(e)})
 
-@app.tool()
+@mcp.tool()
 async def download_ncbi_sequence(accession_id: str, output_format: str = "fasta") -> List[TextContent]:
     try:
         result = await asyncio.to_thread(ncbi_sequence_download_tool.invoke, {
@@ -126,7 +108,7 @@ async def download_ncbi_sequence(accession_id: str, output_format: str = "fasta"
     except Exception as e:
         return format_tool_response({"success": False, "error": str(e)})
 
-@app.tool()
+@mcp.tool()
 async def download_alphafold_structure(uniprot_id: str, output_format: str = "pdb") -> List[TextContent]:
     try:
         result = await asyncio.to_thread(alphafold_structure_download_tool.invoke, {
@@ -137,7 +119,7 @@ async def download_alphafold_structure(uniprot_id: str, output_format: str = "pd
     except Exception as e:
         return format_tool_response({"success": False, "error": str(e)})
 
-@app.tool()
+@mcp.tool()
 async def extract_pdb_sequence(pdb_file_path: str) -> List[TextContent]:
     try:
         result = await asyncio.to_thread(PDB_sequence_extraction_tool.invoke, {"pdb_file": pdb_file_path})
@@ -145,7 +127,7 @@ async def extract_pdb_sequence(pdb_file_path: str) -> List[TextContent]:
     except Exception as e:
         return format_tool_response({"success": False, "error": str(e)})
 
-@app.tool()
+@mcp.tool()
 async def predict_zero_shot_sequence(
     sequence: Optional[str] = None, 
     fasta_file: Optional[str] = None,
@@ -165,7 +147,7 @@ async def predict_zero_shot_sequence(
     except Exception as e:
         return format_tool_response({"success": False, "error": str(e)})
 
-@app.tool()
+@mcp.tool()
 async def predict_zero_shot_structure(
     structure_file_path: str,
     model_name: str = "ESM-IF1"
@@ -179,7 +161,7 @@ async def predict_zero_shot_structure(
     except Exception as e:
         return format_tool_response({"success": False, "error": str(e)})
 
-@app.tool()
+@mcp.tool()
 async def predict_protein_function(
     sequence: Optional[str] = None,
     fasta_file: Optional[str] = None,
@@ -203,7 +185,7 @@ async def predict_protein_function(
     except Exception as e:
         return format_tool_response({"success": False, "error": str(e)})
 
-@app.tool()
+@mcp.tool()
 async def predict_functional_residue(
     sequence: Optional[str] = None,
     fasta_file: Optional[str] = None,
@@ -227,7 +209,7 @@ async def predict_functional_residue(
     except Exception as e:
         return format_tool_response({"success": False, "error": str(e)})
 
-@app.tool()
+@mcp.tool()
 async def predict_protein_properties(
     sequence: Optional[str] = None,
     fasta_file: Optional[str] = None,
@@ -249,7 +231,7 @@ async def predict_protein_properties(
     except Exception as e:
         return format_tool_response({"success": False, "error": str(e)})
 
-@app.tool()
+@mcp.tool()
 async def generate_training_config(
     csv_file_path: str,
     test_csv_file_path: Optional[str] = None,
@@ -265,7 +247,7 @@ async def generate_training_config(
     except Exception as e:
         return format_tool_response({"success": False, "error": str(e)})
 
-@app.tool()
+@mcp.tool()
 async def execute_ai_code(
     task_description: str,
     input_files: List[str] = Field(default_factory=list)
@@ -279,7 +261,7 @@ async def execute_ai_code(
     except Exception as e:
         return format_tool_response({"success": False, "error": str(e)})
 
-@app.tool()
+@mcp.tool()
 async def search_literature(query: str, max_results: int = 5) -> List[TextContent]:
     try:
         result = await asyncio.to_thread(literature_search_tool.invoke, {
@@ -290,15 +272,6 @@ async def search_literature(query: str, max_results: int = 5) -> List[TextConten
     except Exception as e:
         return format_tool_response({"success": False, "error": str(e)})
 
-# ============================================================================
-# Main Loop (FastMCP 写法更简洁)
-# ============================================================================
-
-if __name__ == "__main__":
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    
-    logger.info("VenusFactory MCP Server starting (FastMCP mode)...")
-    
-    # FastMCP 自带运行逻辑，不需要手写 stdio 循环
-    app.run(transport="stdio")
+if __name__ == "__main__":    
+    logger.info("VenusFactory MCP Server starting...")
+    mcp.run(transport="stdio")
