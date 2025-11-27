@@ -20,6 +20,7 @@ from gradio_client import Client, handle_file
 import pandas as pd
 from langchain.tools import tool
 from pydantic import BaseModel, Field, validator
+from web.utils.common_utils import get_save_path
 from web.utils.literature import literature_search
 
 load_dotenv()
@@ -647,14 +648,11 @@ def get_uniprot_sequence(uniprot_id):
 
 def download_pdb_structure_from_id(pdb_id: str, output_format: str = "pdb") -> str:
     try:
-        # Create temporary directory for output
-        temp_dir = Path("temp_outputs")
-        structure_dir = temp_dir / "pdb_structures"
-        os.makedirs(structure_dir, exist_ok=True)
-
+        structure_dir = get_save_path("Download_Data", "RCSB")
+        
         pdb_id = pdb_id.upper()
-        url = f"https://files.rcsb.org/download/{pdb_id}.pdb"
-
+        url = f"https://files.rcsb.org/download/{pdb_id}.{output_format}"
+        
         response = requests.get(url, timeout=30)
         response.raise_for_status()
         structure_text = response.text
@@ -719,10 +717,7 @@ def download_pdb_structure_from_id(pdb_id: str, output_format: str = "pdb") -> s
 def download_ncbi_sequence(accession_id: str, output_format: str = "fasta") -> str:
     """Download protein or nucleotide sequences from NCBI using existing crawler script."""
     try:
-        # Create temporary directory for output
-        temp_dir = Path("temp_outputs")
-        sequence_dir = temp_dir / "ncbi_sequences"
-        os.makedirs(sequence_dir, exist_ok=True)
+        sequence_dir = get_save_path("Download_Data", "NCBI")
         
         # Determine database type based on accession ID
         db_type = "protein" if accession_id.startswith(('NP_', 'XP_', 'YP_', 'WP_')) else "nuccore"
@@ -773,10 +768,7 @@ def download_ncbi_sequence(accession_id: str, output_format: str = "fasta") -> s
 def download_alphafold_structure(uniprot_id: str, output_format: str = "pdb") -> str:
     """Download protein structures from AlphaFold using existing crawler script."""
     try:
-        # Create temporary directory for output
-        temp_dir = Path("temp_outputs")
-        structure_dir = temp_dir / "alphafold_structures"
-        os.makedirs(structure_dir, exist_ok=True)
+        structure_dir = get_save_path("Download_Data", "AlphaFold")
         
         # Call the existing AlphaFold download script (not RCSB!)
         cmd = [
@@ -906,10 +898,7 @@ def generate_and_execute_code(task_description: str, input_files: List[str] = []
             primary_file = valid_files[0]
             output_directory = os.path.dirname(primary_file)
         else:
-            # Create temp output directory if no input files
-            temp_dir = Path("temp_outputs")
-            output_directory = str(temp_dir / "generated_outputs")
-            os.makedirs(output_directory, exist_ok=True)
+            output_directory = str(get_save_path("Code_Execution", "Generated_Outputs"))
 
         # Enhanced prompt with more context and flexibility
         code_prompt = f"""You are an expert Python programmer specializing in bioinformatics and data processing.
@@ -1098,11 +1087,9 @@ def process_csv_and_generate_config(csv_file: str, test_csv_file: Optional[str] 
         default_config = get_default_config(analysis)
         final_params = merge_configs(user_config, ai_config, default_config)
         config = create_comprehensive_config(csv_file, test_csv_file, final_params, analysis)
-        temp_dir = Path("temp_outputs")
-        sequence_dir = temp_dir / "training_configs"
-        os.makedirs(sequence_dir, exist_ok=True)
+        config_dir = get_save_path("training_pipeline", "configs")
         timestamp = int(time.time())
-        config_path = os.path.join(sequence_dir, f"{output_name}_{timestamp}.json")
+        config_path = os.path.join(config_dir, f"{output_name}_{timestamp}.json")
         with open(config_path, 'w') as f:
             json.dump(config, f, indent=2)
         message = f"Training configuration generated successfully! Config file: {config_path} The configuration is ready for use in the training interface."

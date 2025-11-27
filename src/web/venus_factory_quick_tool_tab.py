@@ -4,7 +4,6 @@ import os
 import sys
 import subprocess
 import time
-import zipfile
 from pathlib import Path
 from typing import Dict, Any, List, Generator, Optional, Tuple
 import plotly.graph_objects as go
@@ -161,14 +160,14 @@ def handle_mutation_prediction_base(
         progress(1.0, desc="Complete!")
     
     timestamp = str(int(time.time()))
-    heatmap_dir = get_save_path("Zero_shot_result")
+    heatmap_dir = get_save_path("Zero_shot", "HeatMap")
     csv_path = heatmap_dir / f"mut_res_{timestamp}.csv"
     heatmap_path = heatmap_dir / f"mut_map_{timestamp}.html"
     
     display_df.to_csv(csv_path, index=False)
     summary_fig.write_html(heatmap_path)
     
-    files_to_zip = {
+    files_to_tar = {
         str(csv_path): f"prediction_results_{timestamp}.csv", 
         str(heatmap_path): f"prediction_heatmap_{timestamp}.html"
     }
@@ -177,16 +176,16 @@ def handle_mutation_prediction_base(
         report_path = heatmap_dir / f"ai_report_{timestamp}.md"
         with open(report_path, 'w', encoding='utf-8') as f:
             f.write(ai_summary)
-        files_to_zip[str(report_path)] = f"AI_Analysis_Report_{timestamp}.md"
+        files_to_tar[str(report_path)] = f"AI_Analysis_Report_{timestamp}.md"
 
-    zip_path = heatmap_dir / f"pred_mut_{timestamp}.zip"
-    zip_path_str = create_zip_archive(files_to_zip, str(zip_path))
+    tar_path = heatmap_dir / f"pred_mut_{timestamp}.tar.gz"
+    tar_path_str = create_tar_archive(files_to_tar, str(tar_path))
 
     final_status = status if not enable_ai else "✅ Prediction and AI analysis complete!"
     progress(1.0, desc="Complete!")
     yield (
         final_status, summary_fig, display_df, 
-        gr.update(visible=True, value=zip_path_str), zip_path_str, 
+        gr.update(visible=True, value=tar_path_str), tar_path_str, 
         gr.update(visible=total_residues > 20), display_df, expert_analysis
     )
 
@@ -378,7 +377,7 @@ def handle_protein_function_prediction(
     
     all_results_list = []
     timestamp = str(int(time.time()))
-    function_dir = get_save_path("Protein_function_result")
+    function_dir = get_save_path("Protein_Function", "Result")
 
     # Run predictions for each dataset
     progress(0.1, desc="Running prediction...")
@@ -568,26 +567,25 @@ def handle_protein_function_prediction(
     else:
         progress(1.0, desc="Complete!")
     
-    zip_path_str = ""
+    tar_path_str = ""
     try:
         timestamp = str(int(time.time()))
-        zip_dir = get_save_path("Protein_function_result")
-        
+        tar_dir = get_save_path("Protein_Function", "Result")
+
         # Save only the processed results
         processed_df_for_save = display_df.copy()
-        csv_path = zip_dir / f"Result_{timestamp}.csv"
+        csv_path = tar_dir / f"Result_{timestamp}.csv"
         processed_df_for_save.to_csv(csv_path, index=False)
         print(f"Saved CSV to: {csv_path}")
-        
-        # Create simple zip with just the CSV file
-        zip_path = zip_dir / f"func_pred_{timestamp}.zip"
-        with zipfile.ZipFile(zip_path, 'w') as zf:
-            zf.write(csv_path, csv_path.name)
-        zip_path_str = str(zip_path)
-        print(f"Created zip file: {zip_path_str}")
+
+        # Create simple tar.gz with just the CSV file
+        files_to_tar = {str(csv_path): csv_path.name}
+        tar_path = tar_dir / f"func_pred_{timestamp}.tar.gz"
+        tar_path_str = create_tar_archive(files_to_tar, str(tar_path))
+        print(f"Created tar.gz file: {tar_path_str}")
     except Exception as e: 
-        print(f"Error creating zip file: {e}")
-        zip_path_str = ""
+        print(f"Error creating tar.gz file: {e}")
+        tar_path_str = ""
 
     final_status = "✅ All predictions completed!"
     if is_voting_run: 
@@ -597,7 +595,7 @@ def handle_protein_function_prediction(
     
     print(f"Final status: {final_status}")
     print(f"Display DF shape: {display_df.shape}")
-    print(f"Zip path: {zip_path_str}")
+    print(f"Archive path: {tar_path_str}")
     print(f"About to yield final results...")
     
     progress(1.0, desc="Complete!")
@@ -607,7 +605,7 @@ def handle_protein_function_prediction(
     yield (
         final_status, 
         display_df, 
-        gr.update(visible=True, value=zip_path_str) if zip_path_str else gr.update(visible=False), 
+        gr.update(visible=True, value=tar_path_str) if tar_path_str else gr.update(visible=False), 
         expert_analysis, ai_response
     )
     print("Final yield completed successfully!")
@@ -782,7 +780,7 @@ def handle_protein_residue_function_prediction(
 
     all_results_list = []
     timestamp = str(int(time.time()))
-    residue_save_dir = get_save_path("Residue_function_result")
+    residue_save_dir = get_save_path("Residue_Prediction", "Result")
 
     # Run predictions for each dataset
     progress(0.2, desc="Running Predicrtion...")
@@ -914,7 +912,7 @@ def run_protein_properties_prediction(task_type: str, file_path: str) -> Tuple[s
     """Run protein properties prediction"""
     try:
         timestamp = str(int(time.time()))
-        properties_dir = get_save_path("Protein_properties_result")
+        properties_dir = get_save_path("Protein_Properties", "Result")
         output_json = properties_dir / f"{task_type.replace(' ', '_').replace('(', '').replace(')', '')}_{timestamp}.json"
         script_name = PROTEIN_PROPERTIES_MAP_FUNCTION.get(task_type)
         if not script_name:

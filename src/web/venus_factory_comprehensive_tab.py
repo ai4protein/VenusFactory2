@@ -6,7 +6,7 @@ import os
 import sys
 import subprocess
 import time
-import zipfile
+import tarfile
 from pathlib import Path
 from typing import Dict, Any, List, Generator, Optional, Tuple, Union
 import plotly.graph_objects as go
@@ -22,6 +22,7 @@ from web.utils.file_handlers import extract_sequence_from_pdb
 from web.utils.label_mappers import map_labels_individual
 from web.utils.ui_helpers import handle_paste_fasta_detect
 from web.utils.ai_helpers import get_api_key, call_ai_api, AIConfig
+from web.utils.common_utils import get_save_path
 from web.utils.constants import AI_MODELS
 from dotenv import load_dotenv
 load_dotenv()
@@ -184,7 +185,7 @@ def handle_individual_mutation_prediction(content, selected_chain, current_file,
         return "Error: Please provide protein sequence or upload a file."
    
     timestamp = str(int(time.time()))
-    input_data_dir = get_save_path("VenusScope_result")
+    input_data_dir = get_save_path("VenusScope", "Upload_data")
 
     is_pdb = content.strip().startswith('ATOM') or (current_file and current_file.endswith('.pdb'))
    
@@ -292,7 +293,8 @@ def handle_individual_function_prediction(content, selected_chain, current_file,
         return "Error: Please provide protein sequence or upload a file."
     
     timestamp = str(int(time.time()))
-    input_data_dir = get_save_path("VenusScope_result")
+    input_data_dir = get_save_path("VenusScope", "Upload_data")
+    output_data_dir = get_save_path("VenusScope", "Results")
     
     is_pdb = content.strip().startswith('ATOM') or (current_file and current_file.endswith('.pdb'))
     
@@ -329,7 +331,7 @@ def handle_individual_function_prediction(content, selected_chain, current_file,
             adapter_key = MODEL_ADAPTER_MAPPING_FUNCTION[model_key]
             script_path = Path("src") / "property" / f"{model_key}.py"
             adapter_path = Path("ckpt") / dataset / adapter_key
-            output_file = input_data_dir / f"temp_{dataset}_{model_name}_{timestamp}.csv"
+            output_file = output_data_dir / f"temp_{dataset}_{model_name}_{timestamp}.csv"
             
             if script_path.exists() and adapter_path.exists():
                 cmd = [
@@ -442,7 +444,8 @@ def handle_functional_residue_prediction(content, selected_chain, current_file, 
     
     # Prepare FASTA file for function prediction
     timestamp = str(int(time.time()))
-    input_data_dir = get_save_path("VenusScope_result")
+    input_data_dir = get_save_path("VenusScope", "Upload_data")
+    output_data_dir = get_save_path("VenusScope", "Results")
     
     is_pdb = content.strip().startswith('ATOM') or (current_file and current_file.endswith('.pdb'))
     
@@ -486,7 +489,7 @@ def handle_functional_residue_prediction(content, selected_chain, current_file, 
                 adapter_key = MODEL_ADAPTER_MAPPING_FUNCTION[model_key]
                 script_path = Path("src") / "property" / f"{model_key}.py"
                 adapter_path = Path("ckpt") / dataset / adapter_key
-                output_file = input_data_dir / f"temp_{dataset}_{model_name}_{timestamp}.csv"
+                output_file = output_data_dir / f"temp_{dataset}_{model_name}_{timestamp}.csv"
                 
                 if script_path.exists() and adapter_path.exists():
                     cmd = [
@@ -709,7 +712,8 @@ def handle_physical_chemical_properties(content, selected_chain, current_file, s
     
     # Prepare FASTA file for function prediction
     timestamp = str(int(time.time()))
-    input_data_dir = get_save_path("VenusScope_result")
+    input_data_dir = get_save_path("VenusScope", "Upload_data")
+    output_data_dir = get_save_path("VenusScope", "Results")
 
     is_pdb = content.strip().startswith('ATOM') or (current_file and current_file.endswith('.pdb'))
     
@@ -746,7 +750,7 @@ def handle_physical_chemical_properties(content, selected_chain, current_file, s
             file_type = 'fasta'
             
         # Run calculate_all_property.py as subprocess
-        output_file = input_data_dir / f"property_results_{timestamp}.json"
+        output_file = output_data_dir / f"property_results_{timestamp}.json"
         script_path = Path("src") / "property" / "calculate_all_property.py"
         cmd = [
             sys.executable, str(script_path),
@@ -800,9 +804,10 @@ def export_ai_report_to_html(ai_report_content):
         return None
     
     timestamp = str(int(time.time()))
-    input_data_dir = get_save_path("VenusScope_result")
+    input_data_dir = get_save_path("VenusScope", "Upload_data")
+    output_data_dir = get_save_path("VenusScope", "Results")
 
-    html_file = input_data_dir / f"venusfactory_ai_report_{timestamp}.html"
+    html_file = output_data_dir / f"venusfactory_ai_report_{timestamp}.html"
     
     try:
         # Convert markdown to HTML
@@ -1119,7 +1124,7 @@ def create_comprehensive_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             """
             <div style="text-align: center; margin-bottom: 2em;">
                 <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 1em;">
-                    <img id="venusfactory-logo" src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venusfactory_logo.png" 
+                    <img id="venusfactory-logo" src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png" 
                          alt="VenusFactory Logo" style="height: 80px; margin-right: 15px;" />
                     <h1 style="font-size: 3.5em; font-weight: 900; margin: 0;">
                         Welcome to  VenusFactory</span>!
@@ -1129,7 +1134,7 @@ def create_comprehensive_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             <style>
                 @media (prefers-color-scheme: dark) {
                     #venusfactory-logo {
-                        content: url('https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venusfactory_logo_darkmode.png');
+                        content: url('https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png');
                     }
                 }
                 .main-container { 
