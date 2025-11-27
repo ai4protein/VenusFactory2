@@ -2,7 +2,6 @@ import os
 import sys
 import subprocess
 import time
-import zipfile
 import json
 import logging
 import logging
@@ -245,32 +244,32 @@ def handle_mutation_prediction_advance(
         progress(1.0, desc="Complete!")
     
     timestamp = str(int(time.time()))
-    session_dir = get_save_path("Zero_shot_result")
+    session_dir = get_save_path("Zero_Shot", "Result")
     csv_path = session_dir/ f"mut_res_{timestamp}.csv"
     heatmap_path = session_dir/ f"mut_map_{timestamp}.html"
     
     display_df.to_csv(csv_path, index=False)
     summary_fig.write_html(heatmap_path)
     
-    files_to_zip = {
+    files_to_tar = {
         str(csv_path): "prediction_results.csv", 
         str(heatmap_path): "prediction_heatmap.html"
     }
-    
+
     if not ai_summary.startswith("❌") and not ai_summary.startswith("AI Analysis"):
-        report_path = session_dir / f"ai_report.md"
+        report_path = session_dir / f"ai_report_{timestamp}.md"
         with open(report_path, 'w', encoding='utf-8') as f:
             f.write(ai_summary)
-        files_to_zip[str(report_path)] = "AI_Analysis_Report.md"
+        files_to_tar[str(report_path)] = "AI_Analysis_Report.md"
 
-    zip_path = session_dir / f"pred_mut.zip"
-    zip_path_str = create_zip_archive(files_to_zip, str(zip_path))
+    tar_path = session_dir / f"pred_mut_{timestamp}.tar.gz"
+    tar_path_str = create_tar_archive(files_to_tar, str(tar_path))
 
     final_status = status if not enable_ai else "✅ Prediction and AI analysis complete!"
     progress(1.0, desc="Complete!")
     yield (
         final_status, summary_fig, display_df, 
-        gr.update(visible=True, value=zip_path_str), zip_path_str, 
+        gr.update(visible=True, value=tar_path_str), tar_path_str, 
         gr.update(visible=total_residues > 20), display_df, expert_analysis
     )
 
@@ -292,7 +291,7 @@ def handle_protein_function_prediction_chat(
     final_datasets = datasets if datasets and len(datasets) > 0 else DATASET_MAPPING_FUNCTION.get(task, [])
     all_results_list = []
     timestamp = str(int(time.time()))
-    function_dir = get_save_path("Protein_Function")
+    function_dir = get_save_path("Protein_Function", "Result")
 
     for i, dataset in enumerate(final_datasets):
         try:
@@ -464,7 +463,7 @@ def handle_protein_function_prediction_advance(
     all_results_list = []
 
     timestamp = str(int(time.time()))
-    function_dir = get_save_path("Protein_Function")
+    function_dir = get_save_path("Protein_Function", "Result")
 
     for i, dataset in enumerate(final_datasets):
         yield (
@@ -545,35 +544,45 @@ def handle_protein_function_prediction_advance(
     else:
         progress(1.0, desc="Complete!")
     
-    zip_path_str = ""
+    tar_path_str = ""
     try:
         timestamp = str(int(time.time()))
-        zip_dir = get_save_path("Downloads_zip")
-        zip_dir.mkdir(parents=True, exist_ok=True)
+        archive_dir = get_save_path("Protein_Function", "Downloads_zip")
 
         processed_df_for_save = display_df.copy()
-        processed_df_for_save.to_csv(zip_dir / "Result_{timestamp}.csv", index=False)
-        
+        result_path = archive_dir / f"Result_{timestamp}.csv"
+        processed_df_for_save.to_csv(result_path, index=False)
+
         if plot_fig and hasattr(plot_fig, 'data') and plot_fig.data: 
-            plot_fig.write_html(str(zip_dir / "results_plot.html"))
-        
+            plot_path = archive_dir / "results_plot.html"
+            plot_fig.write_html(str(plot_path))
+        else:
+            plot_path = None
+
         if not ai_summary.startswith("❌") and not ai_summary.startswith("AI Analysis"):
-            with open(zip_dir / "AI_Report_{timestamp}.md", 'w', encoding='utf-8') as f: 
+            report_path = archive_dir / f"AI_Report_{timestamp}.md"
+            with open(report_path, 'w', encoding='utf-8') as f: 
                 f.write(f"# AI Report\n\n{ai_summary}")
-        
-        zip_path = function_dir / f"func_pred_{timestamp}.zip"
-        with zipfile.ZipFile(zip_path, 'w') as zf:
-            for file in zip_dir.glob("*"): 
-                zf.write(file, file.name)
-        zip_path_str = str(zip_path)
+        else:
+            report_path = None
+
+        files_to_tar = {str(result_path): result_path.name}
+        if plot_path and plot_path.exists():
+            files_to_tar[str(plot_path)] = plot_path.name
+        if report_path and report_path.exists():
+            files_to_tar[str(report_path)] = report_path.name
+
+        tar_path = function_dir / f"func_pred_{timestamp}.tar.gz"
+        tar_path_str = create_tar_archive(files_to_tar, str(tar_path))
     except Exception as e: 
-        print(f"Error creating zip file: {e}")
+        print(f"Error creating tar.gz file: {e}")
+        tar_path_str = ""
 
     final_status = "✅ All predictions completed!"
     if enable_ai and not ai_summary.startswith("❌"): 
         final_status += " AI analysis included."
     progress(1.0, desc="Complete!")
-    yield final_status, display_df, plot_fig, gr.update(visible=True, value=zip_path_str), expert_analysis
+    yield final_status, display_df, plot_fig, gr.update(visible=True, value=tar_path_str), expert_analysis
 
 
 def handle_protein_residue_function_prediction_chat(
@@ -615,8 +624,7 @@ def handle_protein_residue_function_prediction_chat(
 
     all_results_list = []
     timestamp = str(int(time.time()))
-    residue_save_dir = get_save_path("Residue_save")
-    residue_save_dir.mkdir(parents=True, exist_ok=True)
+    residue_save_dir = get_save_path("Protein_Function", "Residue_save")
 
     yield(
         f"⏳ Running prediction...", 
@@ -726,10 +734,8 @@ def handle_VenusMine(
     # Create session-specific directory with timestamp
     from datetime import datetime
     now = datetime.now()
+    session_dir = get_save_path("VenusMine", "Result")
     session_timestamp = now.strftime("%Y%m%d_%H%M%S")
-    session_dir = Path("temp_outputs") / now.strftime("%Y/%m/%d") / f"VenusMine_{session_timestamp}"
-    session_dir.mkdir(parents=True, exist_ok=True)
-    
     log_content = "🚀 Initializing VenusMine pipeline...\n"
     log_content += f"{'='*30}\n"
     log_content += f"Session ID: {session_timestamp}\n"
@@ -762,8 +768,7 @@ def handle_VenusMine(
             create_status_html("🔵 Step 1/9 - Setup", "#0d6efd")
         )
         protein_name = "protein"
-        foldseek_dir = session_dir / "FoldSeek_Search"
-        foldseek_dir.mkdir(parents=True, exist_ok=True)
+        foldseek_dir = get_save_path("VenusMine", "FoldSeek_Search")
         
         logger.info(f"Working directory: {foldseek_dir}")
         log_content += f"   ✓ Working directory created: {foldseek_dir}\n\n"
@@ -908,8 +913,7 @@ def handle_VenusMine(
         
         mmseqs_prefix = foldseek_dir / f"{protein_name}_MEER"
         mmseqs_tsv = Path(str(mmseqs_prefix) + ".tsv")
-        tmp_dir = foldseek_dir / "tmp"
-        tmp_dir.mkdir(exist_ok=True)
+        tmp_dir = get_save_path("VenusMine", "tmp")
 
         cmd_search = [
             "mmseqs", "easy-search", 
@@ -1203,33 +1207,24 @@ def handle_VenusMine(
             except Exception as e:
                 log_content += f"   ⚠ Could not read labels: {e}\n"
         
-        # 创建ZIP文件
-        zip_path = None
+        # 创建 tar.gz 文件
+        tar_path = None
         try:
-            zip_path = session_dir / f"venusmine_results_{session_timestamp}.zip"
-            with zipfile.ZipFile(zip_path, 'w') as zf:
-                zf.write(plot_path, Path(plot_path).name)
-                zf.write(label_path, Path(label_path).name)
-                
-                # 添加参数记录
-                params_txt = Path(plot_path).parent / "parameters.txt"
-                with open(params_txt, 'w') as f:
-                    f.write(f"VenusMine Run Parameters\n")
-                    f.write(f"========================\n")
-                    f.write(f"Protected Region: {protect_start}-{protect_end}\n")
-                    f.write(f"Database: {mmseqs_database_path}\n")
-                    f.write(f"MMseqs Threads: {mmseqs_threads}\n")
-                    f.write(f"MMseqs Iterations: {mmseqs_iterations}\n")
-                    f.write(f"Max Sequences: {mmseqs_max_seqs}\n")
-                    f.write(f"Min Seq Identity: {cluster_min_seq_id}\n")
-                    f.write(f"Cluster Threads: {cluster_threads}\n")
-                    f.write(f"Top N: {top_n_threshold}\n")
-                    f.write(f"E-value: {evalue_threshold}\n")
-                zf.write(params_txt, params_txt.name)
-            
-            log_content += f"   ✓ Results packaged to: {zip_path.name}\n"
+            results_dir = get_save_path("VenusMine", "Result")
+            files_to_tar = {}
+            if plot_path and Path(plot_path).exists():
+                files_to_tar[str(plot_path)] = Path(plot_path).name
+            if label_path and Path(label_path).exists():
+                files_to_tar[str(label_path)] = Path(label_path).name
+
+            if files_to_tar:
+                tar_path = results_dir / f"venusmine_results_{session_timestamp}.tar.gz"
+                create_tar_archive(files_to_tar, str(tar_path))
+                log_content += f"   ✓ Results packaged to: {tar_path.name}\n"
+            else:
+                log_content += "   ⚠ No files available to package\n"
         except Exception as e:
-            log_content += f"   ⚠ Could not create ZIP: {e}\n"
+            log_content += f"   ⚠ Could not create tar.gz: {e}\n"
         
         # 最终日志
         log_content += f"\n{'='*60}\n"
@@ -1248,7 +1243,7 @@ def handle_VenusMine(
             labels_df,
             gr.update(visible=True, value=str(plot_path)),
             gr.update(visible=True, value=str(label_path)),
-            gr.update(visible=True, value=str(zip_path) if zip_path else None),
+            gr.update(visible=True, value=str(tar_path) if tar_path else None),
             gr.update(value="", visible=False),  # 隐藏进度指示器
             create_status_html("✅ Completed successfully!", "#198754")
         )

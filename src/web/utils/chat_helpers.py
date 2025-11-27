@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import Dict, Any, List
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from .common_utils import get_save_path
 
 
 def send_feedback_email(feedback_text: str) -> str:
@@ -106,8 +107,7 @@ def export_chat_history_html(session_state_value: Dict[str, Any]) -> tuple:
     try:
         ss = session_state_value
         history_list = ss.get('history', [])
-        out_dir = Path("temp_outputs") / "exports"
-        out_dir.mkdir(parents=True, exist_ok=True)
+        out_dir = get_save_path("VenusAgent", "Expert_Chat")
         session_id = ss.get('session_id') or "anon"
         filename = out_dir / f"chat_history_{session_id}.html"
         make_chat_html(filename, history_list)
@@ -127,8 +127,7 @@ def save_chat_history_to_server(session_state_value: Dict[str, Any]) -> gr.updat
     """Return the path to the session-scoped HTML file for download; create it if missing."""
     try:
         ss = session_state_value
-        out_dir = Path("temp_outputs") / "exports"
-        out_dir.mkdir(parents=True, exist_ok=True)
+        out_dir = get_save_path("VenusAgent", "Expert_Chat")
         session_id = ss.get('session_id') or "anon"
         filename = out_dir / f"chat_history_{session_id}.html"
         # create file if not exists

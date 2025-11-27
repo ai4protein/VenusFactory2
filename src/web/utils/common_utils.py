@@ -2,7 +2,7 @@
 
 import os
 import re
-import zipfile
+import tarfile
 from pathlib import Path
 from datetime import datetime
 from typing import Dict
@@ -15,16 +15,18 @@ def sanitize_filename(name: str) -> str:
     return re.sub(r'[^\w\-. ]', '_', name)
 
 
-def get_save_path(subdir: str) -> Path:
+def get_save_path(subdir1: str, subdir2: str | None = None) -> Path:
     """Get save path with date-based directory structure."""
-    temp_dir = Path("temp_outputs")
     now = datetime.now()
-    year = str(now.year)
-    month = str(now.month).zfill(2)
-    day = str(now.day).zfill(2)
-    temp_dir_ = temp_dir / year / month / day / subdir
-    temp_dir_.mkdir(parents=True, exist_ok=True)
-    return temp_dir_
+    date_path = Path("temp_outputs") / f"{now.year}/{now.month:02d}/{now.day:02d}"
+
+    if subdir2:
+        path = date_path / subdir1 / subdir2
+    else:
+        path = date_path / subdir1
+
+    path.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 def toggle_ai_section(is_checked: bool):
@@ -32,13 +34,22 @@ def toggle_ai_section(is_checked: bool):
     return gr.update(visible=is_checked)
 
 
-def create_zip_archive(files_to_zip: Dict[str, str], zip_filename: str) -> str:
-    """Create ZIP archive with specified files."""
-    with zipfile.ZipFile(zip_filename, 'w', zipfile.ZIP_DEFLATED) as zf:
-        for src, arc in files_to_zip.items():
+def create_tar_archive(files_to_archive: Dict[str, str], output_filename: str) -> str:
+    """
+    Create tar.gz archive with specified files.
+    
+    Args:
+        files_to_archive: Dict mapping source paths to archive names (internal paths)
+        output_filename: The output filename (e.g., 'archive.tar.gz')
+    """
+    with tarfile.open(output_filename, "w:gz") as tar:
+        for src, arcname in files_to_archive.items():
             if os.path.exists(src):
-                zf.write(src, arcname=arc)
-    return zip_filename
+                tar.add(src, arcname=arcname)
+            else:
+                print(f"Warning: File not found: {src}")
+                
+    return output_filename
 
 
 def format_physical_chemical_properties(data: dict) -> str:

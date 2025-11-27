@@ -15,6 +15,7 @@ import requests
 from dataclasses import dataclass
 import re
 import json
+from .common_utils import get_save_path
 
 # Import file handling functions from file_handlers to avoid duplication
 from .constants import (
@@ -302,53 +303,6 @@ def generate_ai_summary_prompt(results_df: pd.DataFrame, task: str, model: str) 
         Keep your response under 200 words and speak as if you're having a conversation with a colleague in the lab.
         """
     return prompt
-
-def run_zero_shot_prediction(model_type: str, model_name: str, file_path: str) -> Tuple[str, pd.DataFrame]:
-    """Run zero-shot mutation prediction."""
-    try:
-        temp_dir = Path("temp_outputs")
-        temp_dir_ = temp_dir / "Zero_shot_result"
-        timestamp = str(int(time.time()))
-        sequence_dir = temp_dir_ / timestamp
-        sequence_dir.mkdir(parents=True, exist_ok=True)
-        output_csv = sequence_dir / f"{model_type}.csv"
-        script_name = MODEL_MAPPING_ZERO_SHOT.get(model_name)
-        
-        if not script_name:
-            return f"Error: Model '{model_name}' has no script.", pd.DataFrame()
-
-        script_path = f"src/mutation/models/{script_name}.py"
-        if not os.path.exists(script_path):
-            return f"Script not found: {script_path}", pd.DataFrame()
-        
-        file_argument = "--pdb_file" if model_type == "structure" else "--fasta_file"
-        cmd = [
-            sys.executable, script_path, 
-            file_argument, file_path, 
-            "--output_csv", output_csv
-        ]
-        
-        subprocess.run(
-            cmd, 
-            capture_output=True, 
-            text=True, 
-            check=True, 
-            encoding='utf-8', 
-            errors='ignore'
-        )
-
-        if os.path.exists(output_csv):
-            df = pd.read_csv(output_csv)
-            os.remove(output_csv)
-            return "Prediction completed successfully!", df
-        
-        return "Prediction finished but no output file was created.", pd.DataFrame()
-        
-    except subprocess.CalledProcessError as e:
-        error_msg = e.stderr or e.stdout or "Unknown subprocess error"
-        return f"Prediction script failed: {error_msg}", pd.DataFrame()
-    except Exception as e:
-        return f"An unexpected error occurred: {e}", pd.DataFrame()
 
 def get_total_residues_count(df: pd.DataFrame) -> int:
     """Get total number of unique residue positions from mutation data."""
