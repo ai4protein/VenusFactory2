@@ -12,6 +12,8 @@ from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, validator
 import uvicorn
+from web.utils.common_utils import get_save_path
+
 
 from web.chat_tools import (
     PDB_sequence_extraction_tool,
@@ -30,10 +32,8 @@ from web.chat_tools import (
     literature_search_tool,
 )
 
-UPLOAD_DIR = Path("uploads")
-OUTPUT_DIR = Path("temp_outputs")
-UPLOAD_DIR.mkdir(exist_ok=True)
-OUTPUT_DIR.mkdir(exist_ok=True)
+UPLOAD_DIR = get_save_path("Fast_API", "Uploads")
+OUTPUT_DIR = get_save_path("Fast_API", "Temp_Outputs")
 
 # File constraints
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB

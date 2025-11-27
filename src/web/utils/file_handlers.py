@@ -97,8 +97,8 @@ def parse_fasta_paste_content(fasta_content: str) -> Tuple:
         selector_visible = len(sequence_choices) > 1
         
         timestamp = str(int(time.time()))
-        sequence_dir = get_save_path("Upload_dataset")
-        temp_fasta_path = os.path.join(sequence_dir, f"paste_content_seq_{sanitize_filename(default_sequence)}_{timestamp}.fasta")
+        sequence_dir = get_save_path("Upload_Data", "Upload_Fasta")
+        temp_fasta_path = os.path.join(sequence_dir, f"{sanitize_filename(default_sequence)}_{timestamp}.fasta")
         save_selected_sequence_fasta(modify_fasta_content, default_sequence, temp_fasta_path)
         return display_sequence, gr.update(choices=sequence_choices, value=default_sequence, visible=selector_visible), sequences, default_sequence, temp_fasta_path, modify_fasta_content
        
@@ -193,7 +193,7 @@ def parse_pdb_paste_content(pdb_content: str) -> Tuple:
         display_sequence = chains[default_chain]
         selector_visible = len(chain_choices) > 1
         timestamp = str(int(time.time()))
-        sequence_dir = get_save_path("Upload_dataset")
+        sequence_dir = get_save_path("Upload_Data", "Upload_PDB")
         temp_pdb_path = os.path.join(sequence_dir, f"paste_content_chain_{default_chain}_{timestamp}.pdb")
         save_selected_chain_pdb(pdb_content, default_chain, temp_pdb_path)
         return display_sequence, gr.update(choices=chain_choices, value=default_chain, visible=selector_visible), chains, default_chain, temp_pdb_path
@@ -235,8 +235,8 @@ def handle_paste_chain_selection(selected_chain: str, chains_dict: Dict, origina
     
     try:
         timestamp = str(int(time.time()))
-        sequence_dir = get_save_path("Upload_dataset")
-        temp_pdb_path = os.path.join(sequence_dir, f"paste_content_chain_{selected_chain}_{timestamp}.pdb")
+        sequence_dir = get_save_path("Upload_Data", "Upload_PDB_Single")
+        temp_pdb_path = os.path.join(sequence_dir, f"{selected_chain}_{timestamp}.pdb")
         save_selected_chain_pdb(original_pdb_content, selected_chain, temp_pdb_path)
         
         return chains_dict[selected_chain], temp_pdb_path
@@ -255,8 +255,8 @@ def handle_paste_sequence_selection(selected_sequence: str, sequences_dict: Dict
     
     try:
         timestamp = str(int(time.time()))
-        sequence_dir = get_save_path("Upload_dataset")
-        temp_pdb_path = os.path.join(sequence_dir, f"paste_content_seq_{selected_sequence}_{timestamp}.fasta")
+        sequence_dir = get_save_path("Upload_Data", "Upload_Fasta")
+        temp_pdb_path = os.path.join(sequence_dir, f"{selected_sequence}_{timestamp}.fasta")
         save_selected_sequence_fasta(original_fasta_content, selected_sequence, temp_pdb_path)
         
         return sequences_dict[selected_sequence], temp_pdb_path
@@ -404,9 +404,9 @@ def process_fasta_file(file_path: str) -> str:
     
     original_path = Path(file_path)
     timestamp = str(int(time.time()))
-    fasra_dir = get_save_path("Upload_data")
+    fasta_dir = get_save_path("Upload_Data", "Upload_Fasta")
 
-    new_file_path = fasra_dir / f"filtered_{original_path.name}_{timestamp}"
+    new_file_path = fasta_dir / f"filtered_{original_path.name}_{timestamp}"
     
     with open(new_file_path, 'w', encoding='utf-8') as f:
         f.write(f"{sequences[0][0]}\n")

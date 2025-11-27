@@ -20,6 +20,7 @@ from web.venus_factory_download_tab import create_download_tool_tab
 from web.venus_factory_quick_tool_tab import create_quick_tool_tab
 from web.venus_factory_comprehensive_tab import create_comprehensive_tab
 from fast_api import app as fastapi_app
+from fastapi_mcp import FastApiMCP
 import uvicorn
 
 
@@ -27,6 +28,9 @@ _fastapi_server_thread = None
 _fastapi_server_lock = threading.Lock()
 _fastapi_server = None
 
+mcp_server = FastApiMCP(fastapi_app)
+mcp_server.mount_http()
+mcp_server.mount_sse()  
 
 def start_fastapi_server(host: str = None, port: int = None) -> Tuple[str, int]:
     """Launch the FastAPI application in a background thread if not already running."""
