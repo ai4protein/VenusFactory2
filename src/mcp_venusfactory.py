@@ -2,6 +2,8 @@ import os
 import json
 import logging
 import asyncio
+import threading
+import time
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 from datetime import datetime
@@ -30,6 +32,9 @@ from web.chat_tools import (
 UPLOAD_DIR = get_save_path("MCP_Server", "Uploads")
 OUTPUT_DIR = get_save_path("MCP_Server", "Outputs")
 
+default_port = int(os.getenv("MCP_HTTP_PORT", "8002"))
+default_host = os.getenv("MCP_HTTP_HOST", "0.0.0.0")
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -38,56 +43,63 @@ logger = logging.getLogger(__name__)
 
 mcp = FastMCP("VenusFactory MCP Server")
 
-def format_tool_response(result: Any) -> List[TextContent]:
-    response_dict = {
-        "success": True,
-        "data": None,
-        "error": None,
-        "timestamp": datetime.now().isoformat(),
-        "request_id": str(uuid4())
-    }
+_http_server_thread: Optional[threading.Thread] = None
+_http_server_lock = threading.Lock()
 
+
+def start_http_server(host: Optional[str] = None, port: Optional[int] = None) -> tuple[str, int]:
+    global _http_server_thread
+    host = host or os.getenv("MCP_HTTP_HOST", "0.0.0.0")
+    port = port or int(os.getenv("MCP_HTTP_PORT", "8080"))
+
+    def _serve() -> None:
+        try:
+            logger.info(f"🚀 VenusFactory MCP Server running internally on {host}:{port}")
+            logger.info(f"📡 SSE Endpoint: http://{host}:{port}/sse") 
+            mcp.run(transport="sse", host=host, port=port)
+            
+        except Exception as exc:
+            logger.error("MCP HTTP server exited unexpectedly: %s", exc)
+
+    with _http_server_lock:
+        if _http_server_thread and _http_server_thread.is_alive():
+            logger.info("Server thread is already running.")
+            return host, port
+        thread = threading.Thread(target=_serve, name="MCPHttpServer", daemon=True)
+        thread.start()
+        _http_server_thread = thread
+        time.sleep(2)
+
+    return host, port
+
+def format_tool_response(result: Any) -> str:
     try:
         if hasattr(result, 'content'):
-            parsed_data = result.content
-        elif isinstance(result, str):
-            try:
-                parsed_data = json.loads(result)
-            except json.JSONDecodeError:
-                parsed_data = result
-        else:
-            parsed_data = result
-        
-        if isinstance(parsed_data, dict) and "success" in parsed_data:
-            response_dict = parsed_data
-        else:
-            response_dict["data"] = parsed_data
-
+            return str(result.content)
+        if isinstance(result, (dict, list)):
+            return json.dumps(result, ensure_ascii=False, indent=2)
+        return str(result)
     except Exception as e:
-        response_dict["success"] = False
-        response_dict["error"] = str(e)
-
-    json_str = json.dumps(response_dict, ensure_ascii=False, indent=2, default=str)
-    return [TextContent(type="text", text=json_str)]
+        return f"Error processing result: {str(e)}"
 
 @mcp.tool()
-async def query_uniprot(uniprot_id: str) -> List[TextContent]:
+async def query_uniprot(uniprot_id: str) -> str:
     try:
         result = await asyncio.to_thread(uniprot_query_tool.invoke, {"uniprot_id": uniprot_id})
         return format_tool_response(result)
     except Exception as e:
-        return format_tool_response({"success": False, "error": str(e)})
+        return f"Tool execution failed: {str(e)}"
 
 @mcp.tool()
-async def query_interpro(uniprot_id: str) -> List[TextContent]:
+async def query_interpro(uniprot_id: str) -> str:
     try:
         result = await asyncio.to_thread(interpro_query_tool.invoke, {"uniprot_id": uniprot_id})
         return format_tool_response(result)
     except Exception as e:
-        return format_tool_response({"success": False, "error": str(e)})
+        return f"Tool execution failed: {str(e)}"
 
 @mcp.tool()
-async def download_pdb_structure(pdb_id: str, output_format: str = "pdb") -> List[TextContent]:
+async def download_pdb_structure(pdb_id: str, output_format: str = "pdb") -> str:
     try:
         result = await asyncio.to_thread(pdb_structure_download_tool.invoke, {
             "pdb_id": pdb_id,
@@ -95,10 +107,10 @@ async def download_pdb_structure(pdb_id: str, output_format: str = "pdb") -> Lis
         })
         return format_tool_response(result)
     except Exception as e:
-        return format_tool_response({"success": False, "error": str(e)})
+        return f"Tool execution failed: {str(e)}"
 
 @mcp.tool()
-async def download_ncbi_sequence(accession_id: str, output_format: str = "fasta") -> List[TextContent]:
+async def download_ncbi_sequence(accession_id: str, output_format: str = "fasta") -> str:
     try:
         result = await asyncio.to_thread(ncbi_sequence_download_tool.invoke, {
             "accession_id": accession_id,
@@ -106,10 +118,10 @@ async def download_ncbi_sequence(accession_id: str, output_format: str = "fasta"
         })
         return format_tool_response(result)
     except Exception as e:
-        return format_tool_response({"success": False, "error": str(e)})
+        return f"Tool execution failed: {str(e)}"
 
 @mcp.tool()
-async def download_alphafold_structure(uniprot_id: str, output_format: str = "pdb") -> List[TextContent]:
+async def download_alphafold_structure(uniprot_id: str, output_format: str = "pdb") -> str:
     try:
         result = await asyncio.to_thread(alphafold_structure_download_tool.invoke, {
             "uniprot_id": uniprot_id,
@@ -117,41 +129,41 @@ async def download_alphafold_structure(uniprot_id: str, output_format: str = "pd
         })
         return format_tool_response(result)
     except Exception as e:
-        return format_tool_response({"success": False, "error": str(e)})
+        return f"Tool execution failed: {str(e)}"
 
 @mcp.tool()
-async def extract_pdb_sequence(pdb_file_path: str) -> List[TextContent]:
+async def extract_pdb_sequence(pdb_file_path: str) -> str:
     try:
         result = await asyncio.to_thread(PDB_sequence_extraction_tool.invoke, {"pdb_file": pdb_file_path})
         return format_tool_response(result)
     except Exception as e:
-        return format_tool_response({"success": False, "error": str(e)})
+        return f"Tool execution failed: {str(e)}"
 
 @mcp.tool()
 async def predict_zero_shot_sequence(
     sequence: Optional[str] = None, 
     fasta_file: Optional[str] = None,
     model_name: str = "ESM2-650M"
-) -> List[TextContent]:
+) -> str:
     params = {"model_name": model_name}
     if fasta_file:
         params["fasta_file"] = fasta_file
     elif sequence:
         params["sequence"] = sequence
     else:
-        return format_tool_response({"success": False, "error": "Either sequence or fasta_file is required"})
+        return f"Tool execution failed: Either sequence or fasta_file is required"
         
     try:
         result = await asyncio.to_thread(zero_shot_sequence_prediction_tool.invoke, params)
         return format_tool_response(result)
     except Exception as e:
-        return format_tool_response({"success": False, "error": str(e)})
+        return f"Tool execution failed: {str(e)}"
 
 @mcp.tool()
 async def predict_zero_shot_structure(
     structure_file_path: str,
     model_name: str = "ESM-IF1"
-) -> List[TextContent]:
+) -> str:
     try:
         result = await asyncio.to_thread(zero_shot_structure_prediction_tool.invoke, {
             "structure_file": structure_file_path,
@@ -159,7 +171,7 @@ async def predict_zero_shot_structure(
         })
         return format_tool_response(result)
     except Exception as e:
-        return format_tool_response({"success": False, "error": str(e)})
+        return f"Tool execution failed: {str(e)}"
 
 @mcp.tool()
 async def predict_protein_function(
@@ -167,7 +179,7 @@ async def predict_protein_function(
     fasta_file: Optional[str] = None,
     model_name: str = "ESM2-650M",
     task: str = "Solubility"
-) -> List[TextContent]:
+) -> str:
     params = {
         "model_name": model_name,
         "task": task
@@ -177,13 +189,13 @@ async def predict_protein_function(
     elif sequence:
         params["sequence"] = sequence
     else:
-        return format_tool_response({"success": False, "error": "Either sequence or fasta_file is required"})
+        return f"Tool execution failed: Either sequence or fasta_file is required"
 
     try:
         result = await asyncio.to_thread(protein_function_prediction_tool.invoke, params)
         return format_tool_response(result)
     except Exception as e:
-        return format_tool_response({"success": False, "error": str(e)})
+        return f"Tool execution failed: {str(e)}"
 
 @mcp.tool()
 async def predict_functional_residue(
@@ -191,7 +203,7 @@ async def predict_functional_residue(
     fasta_file: Optional[str] = None,
     model_name: str = "ESM2-650M",
     task: str = "Activity Site"
-) -> List[TextContent]:
+) -> str:
     params = {
         "model_name": model_name,
         "task": task
@@ -201,20 +213,20 @@ async def predict_functional_residue(
     elif sequence:
         params["sequence"] = sequence
     else:
-        return format_tool_response({"success": False, "error": "Either sequence or fasta_file is required"})
+        return f"Tool execution failed: Either sequence or fasta_file is required"
 
     try:
         result = await asyncio.to_thread(functional_residue_prediction_tool.invoke, params)
         return format_tool_response(result)
     except Exception as e:
-        return format_tool_response({"success": False, "error": str(e)})
+        return f"Tool execution failed: {str(e)}"
 
 @mcp.tool()
 async def predict_protein_properties(
     sequence: Optional[str] = None,
     fasta_file: Optional[str] = None,
     task_name: str = "Physical and chemical properties"
-) -> List[TextContent]:
+) -> str:
     params = {
         "task_name": task_name
     }
@@ -223,20 +235,20 @@ async def predict_protein_properties(
     elif sequence:
         params["sequence"] = sequence
     else:
-        return format_tool_response({"success": False, "error": "Either sequence or fasta_file is required"})
+        return f"Tool execution failed: Either sequence or fasta_file is required"
 
     try:
         result = await asyncio.to_thread(protein_properties_generation_tool.invoke, params)
         return format_tool_response(result)
     except Exception as e:
-        return format_tool_response({"success": False, "error": str(e)})
+        return f"Tool execution failed: {str(e)}"
 
 @mcp.tool()
 async def generate_training_config(
     csv_file_path: str,
     test_csv_file_path: Optional[str] = None,
     output_name: str = "custom_training_config"
-) -> List[TextContent]:
+) -> str:
     try:
         result = await asyncio.to_thread(generate_training_config_tool.invoke, {
             "csv_file": csv_file_path,
@@ -245,13 +257,13 @@ async def generate_training_config(
         })
         return format_tool_response(result)
     except Exception as e:
-        return format_tool_response({"success": False, "error": str(e)})
+        return f"Tool execution failed: {str(e)}"
 
 @mcp.tool()
 async def execute_ai_code(
     task_description: str,
     input_files: List[str] = Field(default_factory=list)
-) -> List[TextContent]:
+) -> str:
     try:
         result = await asyncio.to_thread(ai_code_execution_tool.invoke, {
             "task_description": task_description,
@@ -259,10 +271,10 @@ async def execute_ai_code(
         })
         return format_tool_response(result)
     except Exception as e:
-        return format_tool_response({"success": False, "error": str(e)})
+        return f"Tool execution failed: {str(e)}"
 
 @mcp.tool()
-async def search_literature(query: str, max_results: int = 5) -> List[TextContent]:
+async def search_literature(query: str, max_results: int = 5) -> str:
     try:
         result = await asyncio.to_thread(literature_search_tool.invoke, {
             "query": query,
@@ -274,4 +286,4 @@ async def search_literature(query: str, max_results: int = 5) -> List[TextConten
 
 if __name__ == "__main__":    
     logger.info("VenusFactory MCP Server starting...")
-    mcp.run(transport="stdio")
+    mcp.run(transport="sse")
