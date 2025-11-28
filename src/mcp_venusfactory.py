@@ -32,7 +32,7 @@ from web.chat_tools import (
 UPLOAD_DIR = get_save_path("MCP_Server", "Uploads")
 OUTPUT_DIR = get_save_path("MCP_Server", "Outputs")
 
-default_port = int(os.getenv("MCP_HTTP_PORT", "8002"))
+default_port = int(os.getenv("MCP_HTTP_PORT", "8080"))
 default_host = os.getenv("MCP_HTTP_HOST", "0.0.0.0")
 
 logging.basicConfig(
