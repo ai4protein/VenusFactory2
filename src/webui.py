@@ -27,11 +27,7 @@ import uvicorn
 
 _fastapi_server_thread = None
 _fastapi_server_lock = threading.Lock()
-_fastapi_server = None
-
-mcp_server = FastApiMCP(fastapi_app)
-mcp_server.mount_http()
-mcp_server.mount_sse()  
+_fastapi_server = None  
 
 def start_fastapi_server(host: str = None, port: int = None) -> Tuple[str, int]:
     """Launch the FastAPI application in a background thread if not already running."""
@@ -277,8 +273,11 @@ if __name__ == "__main__":
         fastapi_host, fastapi_port = start_fastapi_server()
         print(f"[FastAPI] Background API available at http://{fastapi_host}:{fastapi_port}")
 
-        mcp_host, mcp_port = start_http_server()
-        print(f"[MCP] HTTP server available at http://{mcp_host}:{mcp_port}/mcp")
+        mcp_host, mcp_port = start_http_server() 
+
+        print(f"[MCP] HTTP server running.")
+        print(f"      SSE URL: http://{mcp_host}:{mcp_port}/MCP/Protein_Tool/sse")
+        print(f"      Msg URL: http://{mcp_host}:{mcp_port}/MCP/Protein_Tool/message")
 
         demo = create_ui()
         demo.queue().launch(
