@@ -42,20 +42,6 @@ logger = logging.getLogger(__name__)
 
 mcp = FastMCP("VenusFactory MCP Server")
 
-try:
-    if hasattr(mcp, "_http_app"):
-        mcp._http_app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
-        logger.info("✅ ProxyHeadersMiddleware added to _http_app")
-    elif hasattr(mcp, "app"):
-        mcp.app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
-        logger.info("✅ ProxyHeadersMiddleware added to app")
-    else:
-        os.environ["FORWARDED_ALLOW_IPS"] = "*"
-        logger.info("⚠️ Middleware object not found, using env var FORWARDED_ALLOW_IPS=*")
-except Exception as e:
-    logger.warning(f"Failed to add ProxyHeadersMiddleware: {e}")
-    os.environ["FORWARDED_ALLOW_IPS"] = "*"
-
 _http_server_thread: Optional[threading.Thread] = None
 _http_server_lock = threading.Lock()
 
@@ -67,30 +53,9 @@ def start_http_server(host: Optional[str] = None, port: Optional[int] = None) ->
 
     def _serve() -> None:
         try:
-            logger.info(f"🚀 VenusFactory MCP Server running on {host}:{port}")
-            mcp_asgi = getattr(mcp, "_http_app", getattr(mcp, "app", None))
-            
-            if not mcp_asgi:
-                logger.error("Could not find MCP ASGI app. Init failed.")
-                return
-            parent_app = FastAPI()
-            
-            mount_path = "/MCP/Protein_Tool"
-            
-            parent_app.mount(mount_path, mcp_asgi)
-            
-            logger.info(f"✅ MCP Mounted at: {mount_path}")
-            logger.info(f"📡 SSE URL: http://{host}:{port}{mount_path}/sse")
-            logger.info(f"📨 Message URL: http://{host}:{port}{mount_path}/message")
-
-
-            uvicorn.run(
-                parent_app, 
-                host=host, 
-                port=port, 
-                log_level="info",
-                access_log=False 
-            )
+            logger.info(f"🚀 VenusFactory MCP Server running internally on {host}:{port}")
+            logger.info(f"📡 SSE Endpoint: http://{host}:{port}/sse") 
+            mcp.run(transport="sse", host=host, port=port)
             
         except Exception as exc:
             logger.error("MCP HTTP server exited unexpectedly: %s", exc)
@@ -99,14 +64,13 @@ def start_http_server(host: Optional[str] = None, port: Optional[int] = None) ->
         if _http_server_thread and _http_server_thread.is_alive():
             logger.info("Server thread is already running.")
             return host, port
-
         thread = threading.Thread(target=_serve, name="MCPHttpServer", daemon=True)
         thread.start()
         _http_server_thread = thread
         time.sleep(2)
 
     return host, port
-
+    
 def format_tool_response(result: Any) -> str:
     try:
         if hasattr(result, 'content'):
