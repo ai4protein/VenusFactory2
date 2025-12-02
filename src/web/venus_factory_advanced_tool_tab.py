@@ -2,7 +2,6 @@ import os
 import sys
 import subprocess
 import time
-import zipfile
 import json
 import logging
 import logging
@@ -26,6 +25,14 @@ from web.utils.data_processors import *
 from web.utils.visualization import *
 from web.utils.prediction_runners import *
 from web.utils.venusmine import *
+from web.utils.label_mappers import map_labels
+from web.utils.ui_helpers import (
+    create_progress_html,
+    create_status_html,
+    handle_paste_fasta_detect,
+    handle_paste_pdb_detect,
+    update_dataset_choices_fixed,
+)
 from web.venus_factory_quick_tool_tab import *
 
 load_dotenv()
@@ -50,32 +57,55 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def create_progress_html(message: str = "Processing...") -> str:
-    """Create a breathing progress indicator HTML."""
-    return f"""
-    <div style="text-align: center; padding: 20px;">
-        <div style="display: inline-block;">
-            <div style="width: 60px; height: 60px; border: 4px solid #f3f3f3; border-top: 4px solid #3498db; 
-                        border-radius: 50%; animation: spin 1s linear infinite;"></div>
-            <p style="margin-top: 10px; color: #666; font-weight: 500;">{message}</p>
-        </div>
-        <style>
-            @keyframes spin {{
-                0% {{ transform: rotate(0deg); }}
-                100% {{ transform: rotate(360deg); }}
-            }}
-            @keyframes breathe {{
-                0%, 100% {{ opacity: 0.6; }}
-                50% {{ opacity: 1; }}
-            }}
-        </style>
-    </div>
-    """
+def truncate_sequence(seq):
+    """Truncate sequence if it's a string longer than 30 characters."""
+    if isinstance(seq, str) and len(seq) > 30:
+        return seq[:]
+    return seq
 
 
-def create_status_html(status: str, color: str = "#666") -> str:
-    """Create a status indicator HTML."""
-    return f"<div style='text-align: center; padding: 10px;'><span style='color: {color}; font-weight: 500;'>{status}</span></div>"
+def format_confidence(row, task):
+    """Format confidence score for display."""
+    score = row["Confidence Score"]
+    predicted_class = row["Predicted Class"]
+    
+    if isinstance(score, (float, int)) and score != 'N/A':
+        return round(float(score), 2)
+    elif isinstance(score, str) and score not in ['N/A', '']:
+        try:
+            if score.startswith('[') and score.endswith(']'):
+                prob_str = score.strip('[]')
+                probs = [float(x.strip()) for x in prob_str.split(',')]
+                
+                current_task = DATASET_TO_TASK_MAP.get(row.get('Dataset', ''), task)
+                
+                if current_task in REGRESSION_TASKS_FUNCTION:
+                    return predicted_class
+                else:
+                    labels_key = ("DeepLocMulti" if row.get('Dataset') == "DeepLocMulti" 
+                                 else "DeepLocBinary" if row.get('Dataset') == "DeepLocBinary" 
+                                 else current_task)
+                    labels = LABEL_MAPPING_FUNCTION.get(labels_key, [])
+                    
+                    if labels and predicted_class in labels:
+                        pred_index = labels.index(predicted_class)
+                        if 0 <= pred_index < len(probs):
+                            return round(probs[pred_index], 2)
+                    
+                    return round(max(probs), 2)
+            else:
+                return round(float(score), 2)
+        except (ValueError, IndexError):
+            return score
+    return score
+
+
+def handle_venus_pdb_upload(file):
+    """Handle PDB file upload for VenusMine viewer."""
+    return file if file else None
+
+
+# create_progress_html and create_status_html are now imported from utils.ui_helpers
 
 
 def handle_mutation_prediction_advance(
@@ -214,32 +244,32 @@ def handle_mutation_prediction_advance(
         progress(1.0, desc="Complete!")
     
     timestamp = str(int(time.time()))
-    session_dir = get_save_path("Zero_shot_result")
+    session_dir = get_save_path("Zero_Shot", "Result")
     csv_path = session_dir/ f"mut_res_{timestamp}.csv"
     heatmap_path = session_dir/ f"mut_map_{timestamp}.html"
     
     display_df.to_csv(csv_path, index=False)
     summary_fig.write_html(heatmap_path)
     
-    files_to_zip = {
+    files_to_tar = {
         str(csv_path): "prediction_results.csv", 
         str(heatmap_path): "prediction_heatmap.html"
     }
-    
+
     if not ai_summary.startswith("❌") and not ai_summary.startswith("AI Analysis"):
-        report_path = session_dir / f"ai_report.md"
+        report_path = session_dir / f"ai_report_{timestamp}.md"
         with open(report_path, 'w', encoding='utf-8') as f:
             f.write(ai_summary)
-        files_to_zip[str(report_path)] = "AI_Analysis_Report.md"
+        files_to_tar[str(report_path)] = "AI_Analysis_Report.md"
 
-    zip_path = session_dir / f"pred_mut.zip"
-    zip_path_str = create_zip_archive(files_to_zip, str(zip_path))
+    tar_path = session_dir / f"pred_mut_{timestamp}.tar.gz"
+    tar_path_str = create_tar_archive(files_to_tar, str(tar_path))
 
     final_status = status if not enable_ai else "✅ Prediction and AI analysis complete!"
     progress(1.0, desc="Complete!")
     yield (
         final_status, summary_fig, display_df, 
-        gr.update(visible=True, value=zip_path_str), zip_path_str, 
+        gr.update(visible=True, value=tar_path_str), tar_path_str, 
         gr.update(visible=total_residues > 20), display_df, expert_analysis
     )
 
@@ -261,7 +291,7 @@ def handle_protein_function_prediction_chat(
     final_datasets = datasets if datasets and len(datasets) > 0 else DATASET_MAPPING_FUNCTION.get(task, [])
     all_results_list = []
     timestamp = str(int(time.time()))
-    function_dir = get_save_path("Protein_Function")
+    function_dir = get_save_path("Protein_Function", "Result")
 
     for i, dataset in enumerate(final_datasets):
         try:
@@ -357,63 +387,10 @@ def handle_protein_function_prediction_chat(
             final_df = pd.concat(voted_results, ignore_index=True)
             final_df = final_df.drop(columns=['Dataset'], errors='ignore')
     display_df = final_df.copy()
-    def map_labels(row):
-        current_task = DATASET_TO_TASK_MAP.get(row.get('Dataset', ''), task)
-        
-        # Handle regression tasks
-        if current_task in REGRESSION_TASKS_FUNCTION: 
-            scaled_value = row.get("prediction")
-            if pd.notna(scaled_value) and scaled_value != 'N/A' :
-                try:
-                    scaled_value = float(scaled_value)
-                    if current_task in REGRESSION_TASKS_FUNCTION_MAX_MIN:
-                        min_val, max_val = REGRESSION_TASKS_FUNCTION_MAX_MIN[current_task]
-                        original_value = scaled_value * (max_val - min_val) + min_val
-                        return round(original_value, 2)
-                    else:
-                        return round(scaled_value, 2)
-                except (ValueError, TypeError):
-                    return scaled_value
-            return scaled_value
-
-        # Handle SortingSignal special case
-        if row.get('Dataset') == 'SortingSignal':
-            predictions_str = row.get('predicted_class')
-            if predictions_str:
-                try:
-                    predictions = json.loads(predictions_str) if isinstance(predictions_str, str) else predictions_str
-                    if all(p == 0 for p in predictions):
-                        return "No signal"
-                    signal_labels = ["CH", 'GPI', "MT", "NES", "NLS", "PTS", "SP", "TM", "TH"]
-                    active_labels = [signal_labels[i] for i, pred in enumerate(predictions) if pred == 1]
-                    return "_".join(active_labels) if active_labels else "None"
-                except:
-                    pass
-        
-        # Handle classification tasks
-        labels_key = ("DeepLocMulti" if row.get('Dataset') == "DeepLocMulti" 
-                     else "DeepLocBinary" if row.get('Dataset') == "DeepLocBinary" 
-                     else current_task)
-        labels = LABEL_MAPPING_FUNCTION.get(labels_key)
-        
-        pred_val = row.get("prediction", row.get("predicted_class"))
-        if pred_val is None or pred_val == "N/A":
-            return "N/A"
-            
-        try:
-            pred_val = int(float(pred_val))
-            if labels and 0 <= pred_val < len(labels): 
-                return labels[pred_val]
-        except (ValueError, TypeError):
-            pass
-        
-        return str(pred_val)
-
+    # map_labels is now imported from utils.label_mappers
+    
     # Apply label mapping
-    if "prediction" in display_df.columns:
-        display_df["predicted_class"] = display_df.apply(map_labels, axis=1)
-    elif "predicted_class" in display_df.columns:
-        display_df["predicted_class"] = display_df.apply(map_labels, axis=1)
+    display_df["predicted_class"] = display_df.apply(lambda row: map_labels(row, task), axis=1)
 
     # Remove raw prediction column if it exists
     if 'prediction' in display_df.columns and 'predicted_class' in display_df.columns:
@@ -486,7 +463,7 @@ def handle_protein_function_prediction_advance(
     all_results_list = []
 
     timestamp = str(int(time.time()))
-    function_dir = get_save_path("Protein_Function")
+    function_dir = get_save_path("Protein_Function", "Result")
 
     for i, dataset in enumerate(final_datasets):
         yield (
@@ -530,64 +507,7 @@ def handle_protein_function_prediction_advance(
     plot_fig = generate_plots_for_all_results(final_df)
     display_df = final_df.copy()
 
-    def map_labels(row):
-        current_task = DATASET_TO_TASK_MAP.get(row.get('Dataset', ''), task)
-        
-        if current_task in REGRESSION_TASKS_FUNCTION: 
-            scaled_value = row.get("prediction")
-            if pd.notna(scaled_value) and scaled_value != 'N/A' :
-                try:
-                    scaled_value = float(scaled_value)
-                    if current_task in REGRESSION_TASKS_FUNCTION_MAX_MIN:
-                        min_val, max_val = REGRESSION_TASKS_FUNCTION_MAX_MIN[current_task]
-                        original_value = scaled_value * (max_val - min_val) + min_val
-                        return round(original_value, 2)
-                    else:
-                        return round(scaled_value, 2)
-                except (ValueError, TypeError):
-                    return scaled_value
-
-            return scaled_value
-
-        if row.get('Dataset') == 'SortingSignal':
-            predictions_str = row['predicted_class']
-            predictions = json.loads(predictions_str)
-            if all(p == 0 for p in predictions):
-                return "No signal"
-            # Get labels for SortingSignal
-            signal_labels = ["CH", 'GPI', "MT", "NES", "NLS", "PTS", "SP", "TM", "TH"]
-            active_labels = []
-            # Find indices where prediction is 1 (active labels)
-            for i, pred in enumerate(predictions):
-                if pred == 1:
-                    active_labels.append(signal_labels[i])
-            print(predictions)
-            # Return concatenated labels or "None" if no active labels
-            return "_".join(active_labels) if active_labels else "None"
-        
-        labels_key = ("DeepLocMulti" if row.get('Dataset') == "DeepLocMulti" 
-                     else "DeepLocBinary" if row.get('Dataset') == "DeepLocBinary" 
-                     else current_task)
-        labels = LABEL_MAPPING_FUNCTION.get(labels_key)
-        
-        pred_val = row.get("prediction", row.get("predicted_class"))
-        if pred_val is None or pred_val == "N/A":
-            return "N/A"
-            
-        try:
-            pred_val = int(float(pred_val))
-            if labels and 0 <= pred_val < len(labels): 
-                return labels[pred_val]
-        except (ValueError, TypeError):
-            pass
-        
-        return str(pred_val)
-
-    if "prediction" in display_df.columns:
-        display_df["predicted_class"] = display_df.apply(map_labels, axis=1)
-    elif "predicted_class" in display_df.columns:
-        display_df["predicted_class"] = display_df.apply(map_labels, axis=1)
-
+    display_df["predicted_class"] = display_df.apply(lambda row: map_labels(row, task), axis=1)
     if 'prediction' in display_df.columns:
         display_df.drop(columns=['prediction'], inplace=True)
 
@@ -601,44 +521,10 @@ def handle_protein_function_prediction_advance(
     display_df.rename(columns=rename_map, inplace=True)
     
     if "Sequence" in display_df.columns:
-        display_df["Sequence"] = display_df["Sequence"].apply(lambda x: x[:] if isinstance(x, str) and len(x) > 30 else x)
+        display_df["Sequence"] = display_df["Sequence"].apply(truncate_sequence)
 
     if "Confidence Score" in display_df.columns and "Predicted Class" in display_df.columns:
-        def format_confidence(row):
-            score = row["Confidence Score"]
-            predicted_class = row["Predicted Class"]
-            
-            if isinstance(score, (float, int)) and score != 'N/A':
-                return round(float(score), 2)
-            elif isinstance(score, str) and score not in ['N/A', '']:
-                try:
-                    if score.startswith('[') and score.endswith(']'):
-                        prob_str = score.strip('[]')
-                        probs = [float(x.strip()) for x in prob_str.split(',')]
-                        
-                        current_task = DATASET_TO_TASK_MAP.get(row.get('Dataset', ''), task)
-                        
-                        if current_task in REGRESSION_TASKS_FUNCTION:
-                            return predicted_class
-                        else:
-                            labels_key = ("DeepLocMulti" if row.get('Dataset') == "DeepLocMulti" 
-                                         else "DeepLocBinary" if row.get('Dataset') == "DeepLocBinary" 
-                                         else current_task)
-                            labels = LABEL_MAPPING_FUNCTION.get(labels_key, [])
-                            
-                            if labels and predicted_class in labels:
-                                pred_index = labels.index(predicted_class)
-                                if 0 <= pred_index < len(probs):
-                                    return round(probs[pred_index], 2)
-                            
-                            return round(max(probs), 2)
-                    else:
-                        return round(float(score), 2)
-                except (ValueError, IndexError):
-                    return score
-            return score
-        
-        display_df["Confidence Score"] = display_df.apply(format_confidence, axis=1)
+        display_df["Confidence Score"] = display_df.apply(lambda row: format_confidence(row, task), axis=1)
 
     ai_summary = "AI Analysis disabled. Enable in settings to generate a report."
     expert_analysis = "<div style='height: 300px; display: flex; align-items: center; justify-content: center; color: #666;'>Analysis will appear here once prediction is complete...</div>"
@@ -658,35 +544,45 @@ def handle_protein_function_prediction_advance(
     else:
         progress(1.0, desc="Complete!")
     
-    zip_path_str = ""
+    tar_path_str = ""
     try:
         timestamp = str(int(time.time()))
-        zip_dir = get_save_path("Downloads_zip")
-        zip_dir.mkdir(parents=True, exist_ok=True)
+        archive_dir = get_save_path("Protein_Function", "Downloads_zip")
 
         processed_df_for_save = display_df.copy()
-        processed_df_for_save.to_csv(zip_dir / "Result_{timestamp}.csv", index=False)
-        
+        result_path = archive_dir / f"Result_{timestamp}.csv"
+        processed_df_for_save.to_csv(result_path, index=False)
+
         if plot_fig and hasattr(plot_fig, 'data') and plot_fig.data: 
-            plot_fig.write_html(str(zip_dir / "results_plot.html"))
-        
+            plot_path = archive_dir / "results_plot.html"
+            plot_fig.write_html(str(plot_path))
+        else:
+            plot_path = None
+
         if not ai_summary.startswith("❌") and not ai_summary.startswith("AI Analysis"):
-            with open(zip_dir / "AI_Report_{timestamp}.md", 'w', encoding='utf-8') as f: 
+            report_path = archive_dir / f"AI_Report_{timestamp}.md"
+            with open(report_path, 'w', encoding='utf-8') as f: 
                 f.write(f"# AI Report\n\n{ai_summary}")
-        
-        zip_path = function_dir / f"func_pred_{timestamp}.zip"
-        with zipfile.ZipFile(zip_path, 'w') as zf:
-            for file in zip_dir.glob("*"): 
-                zf.write(file, file.name)
-        zip_path_str = str(zip_path)
+        else:
+            report_path = None
+
+        files_to_tar = {str(result_path): result_path.name}
+        if plot_path and plot_path.exists():
+            files_to_tar[str(plot_path)] = plot_path.name
+        if report_path and report_path.exists():
+            files_to_tar[str(report_path)] = report_path.name
+
+        tar_path = function_dir / f"func_pred_{timestamp}.tar.gz"
+        tar_path_str = create_tar_archive(files_to_tar, str(tar_path))
     except Exception as e: 
-        print(f"Error creating zip file: {e}")
+        print(f"Error creating tar.gz file: {e}")
+        tar_path_str = ""
 
     final_status = "✅ All predictions completed!"
     if enable_ai and not ai_summary.startswith("❌"): 
         final_status += " AI analysis included."
     progress(1.0, desc="Complete!")
-    yield final_status, display_df, plot_fig, gr.update(visible=True, value=zip_path_str), expert_analysis
+    yield final_status, display_df, plot_fig, gr.update(visible=True, value=tar_path_str), expert_analysis
 
 
 def handle_protein_residue_function_prediction_chat(
@@ -728,8 +624,7 @@ def handle_protein_residue_function_prediction_chat(
 
     all_results_list = []
     timestamp = str(int(time.time()))
-    residue_save_dir = get_save_path("Residue_save")
-    residue_save_dir.mkdir(parents=True, exist_ok=True)
+    residue_save_dir = get_save_path("Protein_Function", "Residue_save")
 
     yield(
         f"⏳ Running prediction...", 
@@ -821,7 +716,7 @@ def handle_VenusMine(
     logger = logging.getLogger(__name__)
     start_time = time.time()
     
-    mmseqs_database_path = "/global/lhshare/uniref100.fasta"
+    mmseqs_database_path = "/home/lrzhang/VenusFactory/dataset/CATH.fasta"
 
     if not pdb_file:
         yield (
@@ -839,10 +734,8 @@ def handle_VenusMine(
     # Create session-specific directory with timestamp
     from datetime import datetime
     now = datetime.now()
+    session_dir = get_save_path("VenusMine", "Result")
     session_timestamp = now.strftime("%Y%m%d_%H%M%S")
-    session_dir = Path("temp_outputs") / now.strftime("%Y/%m/%d") / f"VenusMine_{session_timestamp}"
-    session_dir.mkdir(parents=True, exist_ok=True)
-    
     log_content = "🚀 Initializing VenusMine pipeline...\n"
     log_content += f"{'='*30}\n"
     log_content += f"Session ID: {session_timestamp}\n"
@@ -875,8 +768,7 @@ def handle_VenusMine(
             create_status_html("🔵 Step 1/9 - Setup", "#0d6efd")
         )
         protein_name = "protein"
-        foldseek_dir = session_dir / "FoldSeek_Search"
-        foldseek_dir.mkdir(parents=True, exist_ok=True)
+        foldseek_dir = get_save_path("VenusMine", "FoldSeek_Search")
         
         logger.info(f"Working directory: {foldseek_dir}")
         log_content += f"   ✓ Working directory created: {foldseek_dir}\n\n"
@@ -1021,8 +913,7 @@ def handle_VenusMine(
         
         mmseqs_prefix = foldseek_dir / f"{protein_name}_MEER"
         mmseqs_tsv = Path(str(mmseqs_prefix) + ".tsv")
-        tmp_dir = foldseek_dir / "tmp"
-        tmp_dir.mkdir(exist_ok=True)
+        tmp_dir = get_save_path("VenusMine", "tmp")
 
         cmd_search = [
             "mmseqs", "easy-search", 
@@ -1316,33 +1207,24 @@ def handle_VenusMine(
             except Exception as e:
                 log_content += f"   ⚠ Could not read labels: {e}\n"
         
-        # 创建ZIP文件
-        zip_path = None
+        # 创建 tar.gz 文件
+        tar_path = None
         try:
-            zip_path = session_dir / f"venusmine_results_{session_timestamp}.zip"
-            with zipfile.ZipFile(zip_path, 'w') as zf:
-                zf.write(plot_path, Path(plot_path).name)
-                zf.write(label_path, Path(label_path).name)
-                
-                # 添加参数记录
-                params_txt = Path(plot_path).parent / "parameters.txt"
-                with open(params_txt, 'w') as f:
-                    f.write(f"VenusMine Run Parameters\n")
-                    f.write(f"========================\n")
-                    f.write(f"Protected Region: {protect_start}-{protect_end}\n")
-                    f.write(f"Database: {mmseqs_database_path}\n")
-                    f.write(f"MMseqs Threads: {mmseqs_threads}\n")
-                    f.write(f"MMseqs Iterations: {mmseqs_iterations}\n")
-                    f.write(f"Max Sequences: {mmseqs_max_seqs}\n")
-                    f.write(f"Min Seq Identity: {cluster_min_seq_id}\n")
-                    f.write(f"Cluster Threads: {cluster_threads}\n")
-                    f.write(f"Top N: {top_n_threshold}\n")
-                    f.write(f"E-value: {evalue_threshold}\n")
-                zf.write(params_txt, params_txt.name)
-            
-            log_content += f"   ✓ Results packaged to: {zip_path.name}\n"
+            results_dir = get_save_path("VenusMine", "Result")
+            files_to_tar = {}
+            if plot_path and Path(plot_path).exists():
+                files_to_tar[str(plot_path)] = Path(plot_path).name
+            if label_path and Path(label_path).exists():
+                files_to_tar[str(label_path)] = Path(label_path).name
+
+            if files_to_tar:
+                tar_path = results_dir / f"venusmine_results_{session_timestamp}.tar.gz"
+                create_tar_archive(files_to_tar, str(tar_path))
+                log_content += f"   ✓ Results packaged to: {tar_path.name}\n"
+            else:
+                log_content += "   ⚠ No files available to package\n"
         except Exception as e:
-            log_content += f"   ⚠ Could not create ZIP: {e}\n"
+            log_content += f"   ⚠ Could not create tar.gz: {e}\n"
         
         # 最终日志
         log_content += f"\n{'='*60}\n"
@@ -1361,7 +1243,7 @@ def handle_VenusMine(
             labels_df,
             gr.update(visible=True, value=str(plot_path)),
             gr.update(visible=True, value=str(label_path)),
-            gr.update(visible=True, value=str(zip_path) if zip_path else None),
+            gr.update(visible=True, value=str(tar_path) if tar_path else None),
             gr.update(value="", visible=False),  # 隐藏进度指示器
             create_status_html("✅ Completed successfully!", "#198754")
         )
@@ -1395,7 +1277,7 @@ def handle_VenusMine(
 
 def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     sequence_models = ["VenusPLM", "ESM2-650M", "ESM-1v", "ESM-1b"]
-    structure_models = ["VenusREM (foldseek-based)", "ProSST-2048", "ProtSSN", "ESM-IF1", "SaProt", "MIF-ST"]
+    structure_models = ["VenusREM (foldseek-based)", "ProSST-2048", "ProtSSN", "ESM-IF1", "SaProt", "MIF-ST", "VenusREM"]
     function_models = list(MODEL_MAPPING_FUNCTION.keys())
     residue_function_models = list(MODEL_RESIDUE_MAPPING_FUNCTION.keys())
 
@@ -1707,42 +1589,28 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                                     label="Real-time Processing Log", lines=20, max_lines=25,
                                     interactive=False, autoscroll=True)
 
-        def clear_paste_content_pdb():
-            return "No file selected", "No file selected", gr.update(choices=["A"], value="A", visible=False), {}, "A", ""
-
-        def clear_paste_content_fasta():
-            return "No file selected", "No file selected", gr.update(choices=["Sequence_1"], value="Sequence_1", visible=False), {}, "Sequence_1", ""
+        # clear_paste_content_pdb and clear_paste_content_fasta are imported from file_handlers
         
-        def update_dataset_choices_fixed(task):
-            choices = DATASET_MAPPING_FUNCTION.get(task, [])
-            return gr.CheckboxGroup(choices=choices, value=choices)
+        # update_dataset_choices_fixed is now imported from utils.ui_helpers
         
-        def toggle_ai_section_simple(is_checked: bool):
-            return gr.update(visible=is_checked)
         
-        def on_ai_model_change_simple(ai_provider: str) -> tuple:
-            if ai_provider == "DeepSeek":
-                return gr.update(visible=False), gr.update(visible=True)
-            else:
-                return gr.update(visible=True), gr.update(visible=False)
-        
-        enable_ai_zshot_seq.change(fn=toggle_ai_section_simple, inputs=enable_ai_zshot_seq, outputs=ai_box_zshot_seq)
-        enable_ai_zshot_stru.change(fn=toggle_ai_section_simple, inputs=enable_ai_zshot_stru, outputs=ai_box_zshot_stru)
-        enable_ai_func.change(fn=toggle_ai_section_simple, inputs=enable_ai_func, outputs=ai_box_func)
-        enable_ai_residue_function.change(fn=toggle_ai_section_simple, inputs=enable_ai_residue_function, outputs=ai_box_residue_function)
+        enable_ai_zshot_seq.change(fn=toggle_ai_section, inputs=enable_ai_zshot_seq, outputs=ai_box_zshot_seq)
+        enable_ai_zshot_stru.change(fn=toggle_ai_section, inputs=enable_ai_zshot_stru, outputs=ai_box_zshot_stru)
+        enable_ai_func.change(fn=toggle_ai_section, inputs=enable_ai_func, outputs=ai_box_func)
+        enable_ai_residue_function.change(fn=toggle_ai_section, inputs=enable_ai_residue_function, outputs=ai_box_residue_function)
 
         ai_model_stru_zshot.change(
-            fn=on_ai_model_change_simple,
+            fn=on_ai_model_change,
             inputs=ai_model_stru_zshot,
             outputs=[api_key_in_stru_zshot, ai_status_stru_zshot]
         )
         ai_model_seq_zshot.change(
-            fn=on_ai_model_change_simple,
+            fn=on_ai_model_change,
             inputs=ai_model_seq_zshot,
             outputs=[api_key_in_seq_zshot, ai_status_seq_zshot]
         )
         ai_model_seq_func.change(
-            fn=on_ai_model_change_simple,
+            fn=on_ai_model_change,
             inputs=ai_model_seq_func,
             outputs=[api_key_in_seq_func, ai_status_seq_func]
         )
@@ -1769,34 +1637,11 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             outputs=[seq_paste_content_input, seq_protein_display, seq_sequence_selector, seq_sequence_state, seq_selected_sequence_state, seq_original_file_path_state]
         )
 
-        def handle_paste_fasta_detect(fasta_content):
-            result = parse_fasta_paste_content(fasta_content)
-            return result
-
         seq_paste_content_btn.click(
             fn=handle_paste_fasta_detect,
             inputs=seq_paste_content_input,
             outputs=[seq_protein_display, seq_sequence_selector, seq_sequence_state, seq_selected_sequence_state, seq_original_file_path_state, seq_original_paste_content_state]
         )
-
-        def handle_sequence_change_unified(selected_chain, chains_dict, original_file_path, original_paste_content):
-            # Check for None or empty file path
-            if not original_file_path:
-                return "No file selected", ""
-            
-            if original_file_path.endswith('.fasta'):
-                if original_paste_content:
-                    return handle_paste_sequence_selection(selected_chain, chains_dict, original_paste_content)
-                else:
-                    return handle_fasta_sequence_change(selected_chain, chains_dict, original_file_path)
-            elif original_file_path.endswith('.pdb'):
-                if original_paste_content:
-                    return handle_paste_chain_selection(selected_chain, chains_dict, original_paste_content)
-                else:
-                    return handle_pdb_chain_change(selected_chain, chains_dict, original_file_path)
-            else:
-                # Default case for no file selected
-                return "No file selected", ""
 
         seq_sequence_selector.change(
             fn=handle_sequence_change_unified,
@@ -1822,28 +1667,14 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             outputs=[struct_paste_content_input, struct_protein_display, struct_chain_selector, struct_chains_state, struct_selected_chain_state, struct_original_file_path_state]
         )
         
-        def handle_paste_detect(pdb_content):
-            result = parse_pdb_paste_content(pdb_content)
-            return result + (pdb_content,) 
-
         struct_paste_content_btn.click(
-            fn=handle_paste_detect,
+            fn=handle_paste_pdb_detect,
             inputs=struct_paste_content_input,
             outputs=[struct_protein_display, struct_chain_selector, struct_chains_state, struct_selected_chain_state, struct_original_file_path_state, struct_original_paste_content_state]
         )
 
-        def handle_chain_change_unified(selected_chain, chains_dict, original_file_path, original_paste_content):
-            # Check for None or empty file path
-            if not original_file_path:
-                return "No file selected", ""
-                
-            if original_paste_content:
-                return handle_paste_chain_selection(selected_chain, chains_dict, original_paste_content)
-            else:
-                return handle_pdb_chain_change(selected_chain, chains_dict, original_file_path)
-
         struct_chain_selector.change(
-            fn=handle_chain_change_unified,
+            fn=handle_sequence_change_unified,
             inputs=[struct_chain_selector, struct_chains_state, struct_original_file_path_state, struct_original_paste_content_state],
             outputs=[struct_protein_display, struct_current_file_state] 
         )
@@ -1876,8 +1707,8 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         )
         adv_func_task_dd.change(
             fn=update_dataset_choices_fixed,
-            inputs=[adv_func_task_dd], 
-            outputs=[adv_func_dataset_cbg]
+            inputs=adv_func_task_dd, 
+            outputs=adv_func_dataset_cbg
         )
         
         adv_residue_function_fasta_upload.upload(
@@ -1941,8 +1772,10 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             outputs=[function_status_textbox, function_results_df, function_ai_expert_html]
         )
 
+        # handle_venus_pdb_upload is now defined outside create_advanced_tool_tab
+        
         venus_pdb_upload.change(
-            fn=lambda file: file if file else None,
+            fn=handle_venus_pdb_upload,
             inputs=[venus_pdb_upload],
             outputs=[venus_pdb_viewer]
         )

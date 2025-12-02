@@ -6,60 +6,26 @@ import os
 import sys
 import subprocess
 import time
-import zipfile
+import tarfile
 from pathlib import Path
 from typing import Dict, Any, List, Generator, Optional, Tuple, Union
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import numpy as np
 import requests
-from dataclasses import dataclass
 import re
 import json
 
 # Import functions from the existing module
 from web.venus_factory_quick_tool_tab import *
+from web.utils.file_handlers import extract_sequence_from_pdb
+from web.utils.label_mappers import map_labels_individual
+from web.utils.ui_helpers import handle_paste_fasta_detect
+from web.utils.ai_helpers import get_api_key, call_ai_api, AIConfig
+from web.utils.common_utils import get_save_path
+from web.utils.constants import AI_MODELS
 from dotenv import load_dotenv
 load_dotenv()
-def extract_sequence_from_pdb(pdb_content: str) -> str:
-    """Extract FASTA sequence from PDB content."""
-    aa_map = {
-        'ALA': 'A', 'CYS': 'C', 'ASP': 'D', 'GLU': 'E', 'PHE': 'F',
-        'GLY': 'G', 'HIS': 'H', 'ILE': 'I', 'LYS': 'K', 'LEU': 'L',
-        'MET': 'M', 'ASN': 'N', 'PRO': 'P', 'GLN': 'Q', 'ARG': 'R',
-        'SER': 'S', 'THR': 'T', 'VAL': 'V', 'TRP': 'W', 'TYR': 'Y'
-    }
-    
-    sequence = []
-    seen_residues = set()
-    chain = None
-    
-    for line in pdb_content.strip().split('\n'):
-        if line.startswith("ATOM"):
-            chain_id = line[21]
-            if chain is None:
-                chain = chain_id
-            if chain_id != chain:
-                break
-            
-            res_id = (chain_id, int(line[22:26]))
-            if res_id not in seen_residues:
-                res_name = line[17:20].strip()
-                if res_name in aa_map:
-                    sequence.append(aa_map[res_name])
-                    seen_residues.add(res_id)
-    
-    return "".join(sequence)
-
-def get_save_path(subdir):
-    temp_dir = Path("temp_outputs")
-    now = datetime.now()
-    year = str(now.year)
-    month = str(now.month).zfill(2)
-    day = str(now.day).zfill(2)
-    temp_dir_ = temp_dir / year / month / day / subdir
-    temp_dir_.mkdir(parents=True, exist_ok=True)
-    return temp_dir_
 
 def generate_comprehensive_report(mutation_results: pd.DataFrame, function_results: pd.DataFrame) -> str:
     """Generate a comprehensive analysis report."""
@@ -219,7 +185,7 @@ def handle_individual_mutation_prediction(content, selected_chain, current_file,
         return "Error: Please provide protein sequence or upload a file."
    
     timestamp = str(int(time.time()))
-    input_data_dir = get_save_path("VenusScope_result")
+    input_data_dir = get_save_path("VenusScope", "Upload_data")
 
     is_pdb = content.strip().startswith('ATOM') or (current_file and current_file.endswith('.pdb'))
    
@@ -319,13 +285,16 @@ def handle_individual_mutation_prediction(content, selected_chain, current_file,
     except Exception as e:
         return f"Error in mutation prediction: {str(e)}"
 
+# map_labels_individual is now imported from utils.label_mappers
+
 def handle_individual_function_prediction(content, selected_chain, current_file, sequence_state, original_content):
     """Handle individual function prediction."""
     if not content.strip():
         return "Error: Please provide protein sequence or upload a file."
     
     timestamp = str(int(time.time()))
-    input_data_dir = get_save_path("VenusScope_result")
+    input_data_dir = get_save_path("VenusScope", "Upload_data")
+    output_data_dir = get_save_path("VenusScope", "Results")
     
     is_pdb = content.strip().startswith('ATOM') or (current_file and current_file.endswith('.pdb'))
     
@@ -362,7 +331,7 @@ def handle_individual_function_prediction(content, selected_chain, current_file,
             adapter_key = MODEL_ADAPTER_MAPPING_FUNCTION[model_key]
             script_path = Path("src") / "property" / f"{model_key}.py"
             adapter_path = Path("ckpt") / dataset / adapter_key
-            output_file = input_data_dir / f"temp_{dataset}_{model_name}_{timestamp}.csv"
+            output_file = output_data_dir / f"temp_{dataset}_{model_name}_{timestamp}.csv"
             
             if script_path.exists() and adapter_path.exists():
                 cmd = [
@@ -405,69 +374,8 @@ def handle_individual_function_prediction(content, selected_chain, current_file,
         dataset = row.get('Dataset', 'Unknown')
         current_task = DATASET_TO_TASK_MAP.get(dataset, '')
         
-        def map_labels_individual(row):
-            current_task = DATASET_TO_TASK_MAP.get(row.get('Dataset', ''), task)
-            
-            # For regression tasks, return the numeric value with denormalization
-            if current_task in REGRESSION_TASKS_FUNCTION: 
-                scaled_value = row.get("prediction", row.get("predicted_class"))
-                if pd.notna(scaled_value) and scaled_value != 'N/A':
-                    try:
-                        scaled_value = float(scaled_value)
-                        
-                        # Apply denormalization for specific tasks
-                        if current_task == "Stability" and current_task in REGRESSION_TASKS_FUNCTION_MAX_MIN:
-                            min_val, max_val = REGRESSION_TASKS_FUNCTION_MAX_MIN["Stability"]
-                            original_value = scaled_value * (max_val - min_val) + min_val
-                            return f"{round(original_value, 2)}"
-                        elif current_task == "Optimum temperature" and current_task in REGRESSION_TASKS_FUNCTION_MAX_MIN:
-                            min_val, max_val = REGRESSION_TASKS_FUNCTION_MAX_MIN["Optimum temperature"]
-                            original_value = scaled_value * (max_val - min_val) + min_val
-                            return f"{round(original_value, 1)}°C"
-                        else:
-                            return f"{round(scaled_value, 3)}"
-                    
-                    except (ValueError, TypeError):
-                        return str(scaled_value)
-
-                return str(scaled_value)
-
-            # Handle multi-label classification tasks
-            if row.get('Dataset') == 'SortingSignal':
-                predictions_str = row['predicted_class']
-                predictions = json.loads(predictions_str)
-                if all(p == 0 for p in predictions):
-                    return "No signal"
-                # Get labels for SortingSignal
-                signal_labels = ["CH", 'GPI', "MT", "NES", "NLS", "PTS", "SP", "TM", "TH"]
-                active_labels = []
-                # Find indices where prediction is 1 (active labels)
-                for i, pred in enumerate(predictions):
-                    if pred == 1:
-                        active_labels.append(signal_labels[i])
-                # Return concatenated labels or "None" if no active labels
-                return "_".join(active_labels) if active_labels else "None"
-
-            # For regular classification tasks, map to text labels
-            labels_key = ("DeepLocMulti" if row.get('Dataset') == "DeepLocMulti" 
-                        else "DeepLocBinary" if row.get('Dataset') == "DeepLocBinary" 
-                        else current_task)
-            labels = LABEL_MAPPING_FUNCTION.get(labels_key)
-            
-            pred_val = row.get("predicted_class")
-            if pred_val is None or pred_val == "N/A":
-                return "N/A"  
-            try:
-                pred_val = int(float(pred_val))
-                if labels and 0 <= pred_val < len(labels): 
-                    return labels[pred_val]
-            except (ValueError, TypeError):
-                pass
-            
-            return str(pred_val)
-        
         # Map prediction values to text labels
-        predicted_class = map_labels_individual(row)
+        predicted_class = map_labels_individual(row, current_task, REGRESSION_TASKS_FUNCTION_MAX_MIN)
         
         # Get confidence score
         confidence_score = row.get('probabilities', 0.5)
@@ -536,7 +444,8 @@ def handle_functional_residue_prediction(content, selected_chain, current_file, 
     
     # Prepare FASTA file for function prediction
     timestamp = str(int(time.time()))
-    input_data_dir = get_save_path("VenusScope_result")
+    input_data_dir = get_save_path("VenusScope", "Upload_data")
+    output_data_dir = get_save_path("VenusScope", "Results")
     
     is_pdb = content.strip().startswith('ATOM') or (current_file and current_file.endswith('.pdb'))
     
@@ -580,7 +489,7 @@ def handle_functional_residue_prediction(content, selected_chain, current_file, 
                 adapter_key = MODEL_ADAPTER_MAPPING_FUNCTION[model_key]
                 script_path = Path("src") / "property" / f"{model_key}.py"
                 adapter_path = Path("ckpt") / dataset / adapter_key
-                output_file = input_data_dir / f"temp_{dataset}_{model_name}_{timestamp}.csv"
+                output_file = output_data_dir / f"temp_{dataset}_{model_name}_{timestamp}.csv"
                 
                 if script_path.exists() and adapter_path.exists():
                     cmd = [
@@ -803,7 +712,8 @@ def handle_physical_chemical_properties(content, selected_chain, current_file, s
     
     # Prepare FASTA file for function prediction
     timestamp = str(int(time.time()))
-    input_data_dir = get_save_path("VenusScope_result")
+    input_data_dir = get_save_path("VenusScope", "Upload_data")
+    output_data_dir = get_save_path("VenusScope", "Results")
 
     is_pdb = content.strip().startswith('ATOM') or (current_file and current_file.endswith('.pdb'))
     
@@ -840,7 +750,7 @@ def handle_physical_chemical_properties(content, selected_chain, current_file, s
             file_type = 'fasta'
             
         # Run calculate_all_property.py as subprocess
-        output_file = input_data_dir / f"property_results_{timestamp}.json"
+        output_file = output_data_dir / f"property_results_{timestamp}.json"
         script_path = Path("src") / "property" / "calculate_all_property.py"
         cmd = [
             sys.executable, str(script_path),
@@ -871,112 +781,7 @@ def handle_physical_chemical_properties(content, selected_chain, current_file, s
     except Exception as e:
         return f"Error in property calculation: {str(e)}"
 
-@dataclass
-class AIConfig:
-    """Configuration for AI API calls."""
-    api_key: str
-    ai_model_name: str
-    api_base: str
-    model: str
-
-def get_api_key(ai_provider: str) -> Optional[str]:
-    """Get API key based on provider and user input."""
-    model_config = AI_MODELS.get(ai_provider, {})
-    env_key = model_config.get("env_key")
-    
-    if env_key:
-        env_api_key = os.getenv(env_key)
-        return env_api_key.strip()
-
-    return None
-
-def call_ai_api(config: AIConfig, prompt: str) -> str:
-    """Make API call to AI service."""
-    if config.ai_model_name == "ChatGPT":
-        headers = {
-            "Authorization": f"Bearer {config.api_key}",
-            "Content-Type": "application/json"
-        }
-        data = {
-            "model": config.model,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": "You are an expert protein scientist. Provide clear, structured, and insightful analysis based on the data provided. Do not ask interactive questions."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            "temperature": 0.3,
-            "max_tokens": 2000
-        }
-        endpoint = f"{config.api_base}/chat/completions"
-        
-    elif config.ai_model_name == "Gemini":
-        headers = {
-            "Content-Type": "application/json"
-        }
-        data = {
-            "contents": [{
-                "parts": [{
-                    "text": f"You are an expert protein scientist. {prompt}"
-                }]
-            }],
-            "generationConfig": {
-                "temperature": 0.3,
-                "maxOutputTokens": 2000
-            }
-        }
-        endpoint = f"{config.api_base}/models/{config.model}:generateContent?key={config.api_key}"
-        
-    else:
-        headers = {
-            "Authorization": f"Bearer {config.api_key}",
-            "Content-Type": "application/json"
-        }
-        data = {
-            "model": config.model,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": "You are an expert protein scientist. Provide clear, structured, and insightful analysis based on the data provided. Do not ask interactive questions."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            "temperature": 0.3,
-            "max_tokens": 2000
-        }
-        endpoint = f"{config.api_base}/chat/completions"
-    
-    try:
-        response = requests.post(
-            endpoint,
-            headers=headers,
-            json=data,
-            timeout=60
-        )
-        response.raise_for_status()
-        response_json = response.json()
-        
-        if config.ai_model_name == "Gemini":
-            if "candidates" in response_json and len(response_json["candidates"]) > 0:
-                return response_json["candidates"][0]["content"]["parts"][0]["text"]
-            else:
-                return "❌ Gemini API returned empty response"
-        else:
-            return response_json["choices"][0]["message"]["content"]
-            
-    except requests.exceptions.RequestException as e:
-        return f"❌ Network error: {str(e)}"
-    except KeyError as e:
-        return f"❌ API response format error: {str(e)}"
-    except Exception as e:
-        return f"❌ API call failed: {str(e)}"
+# AIConfig, get_api_key and call_ai_api are now imported from utils.ai_helpers
     
 
 def generate_expert_analysis_report(report: str) -> str:
@@ -999,9 +804,10 @@ def export_ai_report_to_html(ai_report_content):
         return None
     
     timestamp = str(int(time.time()))
-    input_data_dir = get_save_path("VenusScope_result")
+    input_data_dir = get_save_path("VenusScope", "Upload_data")
+    output_data_dir = get_save_path("VenusScope", "Results")
 
-    html_file = input_data_dir / f"venusfactory_ai_report_{timestamp}.html"
+    html_file = output_data_dir / f"venusfactory_ai_report_{timestamp}.html"
     
     try:
         # Convert markdown to HTML
@@ -1140,6 +946,175 @@ def export_ai_report_to_html(ai_report_content):
         print(f"HTML export failed: {e}")
         return None
 
+def handle_content_change_new(content):
+    """Handle content change in the main input area."""
+    if content.strip():
+        return parse_content_and_update_selector(content) + (content,)
+    else:
+        return "", gr.update(choices=["Sequence 1"], value="Sequence 1", visible=True), {}, "Sequence 1", "", ""
+
+def handle_chain_selection_new(selected_chain, sequences_dict, current_file, original_content):
+    """Handle chain/sequence selection change."""
+    if not sequences_dict or selected_chain not in sequences_dict:
+        return ""
+    
+    if current_file:
+        if current_file.endswith('.fasta'):
+            if original_content:
+                sequence, file_path = handle_paste_sequence_selection(selected_chain, sequences_dict, original_content)
+            else:
+                sequence, file_path = handle_fasta_sequence_change(selected_chain, sequences_dict, current_file)
+        elif current_file.endswith('.pdb'):
+            if original_content:
+                sequence, file_path = handle_paste_chain_selection(selected_chain, sequences_dict, original_content)
+            else:
+                sequence, file_path = handle_pdb_chain_change(selected_chain, sequences_dict, current_file)
+        else:
+            sequence = sequences_dict[selected_chain]
+            file_path = current_file
+        return sequence
+    else:
+        return sequences_dict[selected_chain]
+
+def generate_brief_report(sequence_dict, selected_chain, current_file, original_content, selected_analyses, progress=gr.Progress()):
+    """Generate a brief scientific report based on selected analyses."""
+    
+    if not sequence_dict or selected_chain not in sequence_dict:
+        return "Error: No valid sequence found. Please provide a protein sequence first."
+    
+    if not selected_analyses:
+        return "Please select at least one analysis type before generating the report."
+    
+    sequence = sequence_dict[selected_chain]
+    
+    # Determine content for analysis
+    if original_content and original_content.strip():
+        content_for_analysis = original_content
+    elif sequence and sequence.strip():
+        content_for_analysis = f">{selected_chain}\n{sequence}"
+    else:
+        return "Error: No valid sequence content available for analysis."
+    
+    # Generate scientific report header
+    report_sections = []
+    report_sections.append("# PROTEIN ANALYSIS REPORT")
+    report_sections.append("")
+    report_sections.append(f"**Sequence ID:** {selected_chain} ")
+    report_sections.append(f"**Sequence Length:** {len(sequence)} amino acid residues ")
+    report_sections.append(f"**Analysis Date:** {time.strftime('%Y-%m-%d %H:%M:%S')} ")
+    report_sections.append("")
+    report_sections.append("---")
+    report_sections.append("")
+    progress(0.1, desc="Analysising your input sequences...")
+    # Execute selected analyses with improved formatting
+    if "mutation" in selected_analyses:
+        report_sections.append("## 🧬 Mutation Prediction Analysis")
+        report_sections.append("")
+        try:
+            mutation_result = handle_individual_mutation_prediction(
+                content_for_analysis, selected_chain, current_file, sequence_dict, original_content
+            )
+            if not mutation_result.startswith("Error"):
+                report_sections.append(f"Deep mutational scanning identified Top 20 beneficial mutations:")
+                report_sections.append("")
+                report_sections.append(mutation_result)
+            else:
+                report_sections.append("No beneficial mutations identified in the analysis.")
+                report_sections.append("")
+
+        except Exception as e:
+            report_sections.append(f"❌ Mutation analysis failed: {str(e)}")
+            report_sections.append("")
+    progress(0.3, desc="Mutation prediction analysis...")
+    if "function" in selected_analyses:
+        report_sections.append("## 🔬 Protein Function Analysis")
+        report_sections.append("")
+        try:
+            function_result = handle_individual_function_prediction(
+                content_for_analysis, selected_chain, current_file, sequence_dict, original_content
+            )
+            if not function_result.startswith("Error"):
+                report_sections.append("")
+                report_sections.append(function_result)
+            else:
+                report_sections.append("❌ Function analysis could not be completed.")
+                report_sections.append("")
+            
+        except Exception as e:
+            report_sections.append(f"❌ Function analysis failed: {str(e)}")
+            report_sections.append("")
+    progress(0.5, desc="Protein function analysis...")
+    if "residue" in selected_analyses:
+        report_sections.append("## 🎯 Functional Residue Prediction")
+        report_sections.append("")
+        try:
+            residue_result = handle_functional_residue_prediction(
+                content_for_analysis, selected_chain, current_file, sequence_dict, original_content
+            )
+            if not residue_result.startswith("Error"):
+                # Parse residue prediction results more cleanly
+                lines = residue_result.split('\n')
+                current_dataset = None
+                
+                for line in lines:
+                    line = line.strip()
+                    report_sections.append(line)
+            else:
+                report_sections.append("❌ Functional residue analysis could not be completed.")
+                report_sections.append("")
+        except Exception as e:
+            report_sections.append(f"❌ Functional residue analysis failed: {str(e)}")
+            report_sections.append("")
+    progress(0.7, desc="Functional residue analysis...")
+    if "properties" in selected_analyses:
+        report_sections.append("## ⚗️ Physical & Chemical Properties")
+        report_sections.append("")
+        try:
+            properties_result = handle_physical_chemical_properties(
+                content_for_analysis, selected_chain, current_file, sequence_dict, original_content
+            )
+            if not properties_result.startswith("Error"):
+                # Extract and format key properties
+                lines = properties_result.split('\n')
+                
+                for line in lines:
+                    line = line.strip()
+                    if any(prop in line for prop in ["Molecular Weight:", "Theoretical pI ", "Instability Index:", "Aromaticity", "Total SASA:", "Exposed Residues:"]):
+                        if line.startswith("- "):
+                            report_sections.append(f"- {line[2:]}")
+                        elif ":" in line:
+                            prop_name, prop_value = line.split(":", 1)
+                            report_sections.append(f"- {prop_name.strip()}: {prop_value.strip()}")
+                
+                report_sections.append("")
+            else:
+                report_sections.append("❌ Physical/chemical property analysis could not be completed.")
+                report_sections.append("")
+        except Exception as e:
+            report_sections.append(f"❌ Property analysis failed: {str(e)}")
+            report_sections.append("")
+    progress(0.8, desc="Physical & chemical properties analysis...")
+    # Add conclusion with better formatting
+    report_sections.append("---")
+    report_sections.append("")
+    report_sections.append("## 💡 Conclusion")
+    report_sections.append("")
+    report_sections.append("✅ Analysis completed successfully. Results should be validated experimentally.")
+    report_sections.append("")
+    report_sections.append(f"*Report generated by VenusFactory v1.0 on {time.strftime('%Y-%m-%d at %H:%M:%S')}*")
+    progress(0.9, desc="Generating AI-based report")
+    # Add AI-based analysis
+    ai_report = generate_expert_analysis_report(report_sections)
+    html_path = export_ai_report_to_html(ai_report)
+    if html_path and os.path.exists(html_path):
+        download_update = gr.update(visible=True, value=html_path)
+    else:
+        download_update = gr.update(visible=False, value=None)
+    
+    return "\n".join(report_sections), ai_report, download_update, html_path
+
+# handle_paste_fasta_detect is now imported from utils.ui_helpers
+
 def create_comprehensive_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     """Create the comprehensive analysis tab with updated layout."""
     
@@ -1149,7 +1124,7 @@ def create_comprehensive_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             """
             <div style="text-align: center; margin-bottom: 2em;">
                 <div style="display: flex; justify-content: center; align-items: center; margin-bottom: 1em;">
-                    <img id="venusfactory-logo" src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venusfactory_logo.png" 
+                    <img id="venusfactory-logo" src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png" 
                          alt="VenusFactory Logo" style="height: 80px; margin-right: 15px;" />
                     <h1 style="font-size: 3.5em; font-weight: 900; margin: 0;">
                         Welcome to  VenusFactory</span>!
@@ -1159,7 +1134,7 @@ def create_comprehensive_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             <style>
                 @media (prefers-color-scheme: dark) {
                     #venusfactory-logo {
-                        content: url('https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venusfactory_logo_darkmode.png');
+                        content: url('https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png');
                     }
                 }
                 .main-container { 
@@ -1248,180 +1223,7 @@ def create_comprehensive_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 export_btn = gr.DownloadButton("📥 Export Report to HTML", visible=False)
                 export_btn_path_state = gr.State()
             
-        # Updated event handlers
-        def handle_content_change_new(content):
-            """Handle content change in the main input area."""
-            if content.strip():
-                return parse_content_and_update_selector(content) + (content,)
-            else:
-                return "", gr.update(choices=["Sequence 1"], value="Sequence 1", visible=True), {}, "Sequence 1", "", ""
-
-        def handle_chain_selection_new(selected_chain, sequences_dict, current_file, original_content):
-            """Handle chain/sequence selection change."""
-            if not sequences_dict or selected_chain not in sequences_dict:
-                return ""
-            
-            if current_file:
-                if current_file.endswith('.fasta'):
-                    if original_content:
-                        sequence, file_path = handle_paste_sequence_selection(selected_chain, sequences_dict, original_content)
-                    else:
-                        sequence, file_path = handle_fasta_sequence_change(selected_chain, sequences_dict, current_file)
-                elif current_file.endswith('.pdb'):
-                    if original_content:
-                        sequence, file_path = handle_paste_chain_selection(selected_chain, sequences_dict, original_content)
-                    else:
-                        sequence, file_path = handle_pdb_chain_change(selected_chain, sequences_dict, current_file)
-                else:
-                    sequence = sequences_dict[selected_chain]
-                    file_path = current_file
-                return sequence
-            else:
-                return sequences_dict[selected_chain]
-        
-        def generate_brief_report(sequence_dict, selected_chain, current_file, original_content, selected_analyses, progress=gr.Progress()):
-            """Generate a brief scientific report based on selected analyses."""
-            
-            if not sequence_dict or selected_chain not in sequence_dict:
-                return "Error: No valid sequence found. Please provide a protein sequence first."
-            
-            if not selected_analyses:
-                return "Please select at least one analysis type before generating the report."
-            
-            sequence = sequence_dict[selected_chain]
-            
-            # Determine content for analysis
-            if original_content and original_content.strip():
-                content_for_analysis = original_content
-            elif sequence and sequence.strip():
-                content_for_analysis = f">{selected_chain}\n{sequence}"
-            else:
-                return "Error: No valid sequence content available for analysis."
-            
-            # Generate scientific report header
-            report_sections = []
-            report_sections.append("# PROTEIN ANALYSIS REPORT")
-            report_sections.append("")
-            report_sections.append(f"**Sequence ID:** {selected_chain} ")
-            report_sections.append(f"**Sequence Length:** {len(sequence)} amino acid residues ")
-            report_sections.append(f"**Analysis Date:** {time.strftime('%Y-%m-%d %H:%M:%S')} ")
-            report_sections.append("")
-            report_sections.append("---")
-            report_sections.append("")
-            progress(0.1, desc="Analysising your input sequences...")
-            # Execute selected analyses with improved formatting
-            if "mutation" in selected_analyses:
-                report_sections.append("## 🧬 Mutation Prediction Analysis")
-                report_sections.append("")
-                try:
-                    mutation_result = handle_individual_mutation_prediction(
-                        content_for_analysis, selected_chain, current_file, sequence_dict, original_content
-                    )
-                    if not mutation_result.startswith("Error"):
-                        report_sections.append(f"Deep mutational scanning identified Top 20 beneficial mutations:")
-                        report_sections.append("")
-                        report_sections.append(mutation_result)
-                    else:
-                        report_sections.append("No beneficial mutations identified in the analysis.")
-                        report_sections.append("")
-
-                except Exception as e:
-                    report_sections.append(f"❌ Mutation analysis failed: {str(e)}")
-                    report_sections.append("")
-            progress(0.3, desc="Mutation prediction analysis...")
-            if "function" in selected_analyses:
-                report_sections.append("## 🔬 Protein Function Analysis")
-                report_sections.append("")
-                try:
-                    function_result = handle_individual_function_prediction(
-                        content_for_analysis, selected_chain, current_file, sequence_dict, original_content
-                    )
-                    if not function_result.startswith("Error"):
-                        report_sections.append("")
-                        report_sections.append(function_result)
-                    else:
-                        report_sections.append("❌ Function analysis could not be completed.")
-                        report_sections.append("")
-                    
-                except Exception as e:
-                    report_sections.append(f"❌ Function analysis failed: {str(e)}")
-                    report_sections.append("")
-            progress(0.5, desc="Protein function analysis...")
-            if "residue" in selected_analyses:
-                report_sections.append("## 🎯 Functional Residue Prediction")
-                report_sections.append("")
-                try:
-                    residue_result = handle_functional_residue_prediction(
-                        content_for_analysis, selected_chain, current_file, sequence_dict, original_content
-                    )
-                    if not residue_result.startswith("Error"):
-                        # Parse residue prediction results more cleanly
-                        lines = residue_result.split('\n')
-                        current_dataset = None
-                        
-                        for line in lines:
-                            line = line.strip()
-                            report_sections.append(line)
-                    else:
-                        report_sections.append("❌ Functional residue analysis could not be completed.")
-                        report_sections.append("")
-                except Exception as e:
-                    report_sections.append(f"❌ Functional residue analysis failed: {str(e)}")
-                    report_sections.append("")
-            progress(0.7, desc="Functional residue analysis...")
-            if "properties" in selected_analyses:
-                report_sections.append("## ⚗️ Physical & Chemical Properties")
-                report_sections.append("")
-                try:
-                    properties_result = handle_physical_chemical_properties(
-                        content_for_analysis, selected_chain, current_file, sequence_dict, original_content
-                    )
-                    if not properties_result.startswith("Error"):
-                        # Extract and format key properties
-                        lines = properties_result.split('\n')
-                        
-                        for line in lines:
-                            line = line.strip()
-                            if any(prop in line for prop in ["Molecular Weight:", "Theoretical pI ", "Instability Index:", "Aromaticity", "Total SASA:", "Exposed Residues:"]):
-                                if line.startswith("- "):
-                                    report_sections.append(f"- {line[2:]}")
-                                elif ":" in line:
-                                    prop_name, prop_value = line.split(":", 1)
-                                    report_sections.append(f"- {prop_name.strip()}: {prop_value.strip()}")
-                        
-                        report_sections.append("")
-                    else:
-                        report_sections.append("❌ Physical/chemical property analysis could not be completed.")
-                        report_sections.append("")
-                except Exception as e:
-                    report_sections.append(f"❌ Property analysis failed: {str(e)}")
-                    report_sections.append("")
-            progress(0.8, desc="Physical & chemical properties analysis...")
-            # Add conclusion with better formatting
-            report_sections.append("---")
-            report_sections.append("")
-            report_sections.append("## 💡 Conclusion")
-            report_sections.append("")
-            report_sections.append("✅ Analysis completed successfully. Results should be validated experimentally.")
-            report_sections.append("")
-            report_sections.append(f"*Report generated by VenusFactory v1.0 on {time.strftime('%Y-%m-%d at %H:%M:%S')}*")
-            progress(0.9, desc="Generating AI-based report")
-            # Add AI-based analysis
-            ai_report = generate_expert_analysis_report(report_sections)
-            html_path = export_ai_report_to_html(ai_report)
-            if html_path and os.path.exists(html_path):
-                download_update = gr.update(visible=True, value=html_path)
-            else:
-                download_update = gr.update(visible=False, value=None)
-            
-            return "\n".join(report_sections), ai_report, download_update, html_path
-        
-        def clear_paste_content_fasta():
-            return "", "", gr.update(choices=["Sequence 1"], value="Sequence 1", visible=False), {}, "Sequence 1", "", ""        
-        
-        def handle_paste_fasta_detect(fasta_content):
-            result = parse_fasta_paste_content(fasta_content)
-            return result + (fasta_content, )
+        # Event handlers are now defined outside create_comprehensive_tab
 
         # Connect event handlers
         comprehensive_file_upload.upload(
@@ -1444,24 +1246,7 @@ def create_comprehensive_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             outputs=[comprehensive_protein_display, comprehensive_sequence_selector, comprehensive_sequence_state, comprehensive_selected_sequence_state, comprehensive_original_file_path_state, comprehensive_original_paste_content_state]
         )
         
-        def handle_sequence_change_unified(selected_chain, chains_dict, original_file_path, original_paste_content):
-            # Check for None or empty file path
-            if not original_file_path:
-                return "No file selected", ""
-            
-            if original_file_path.endswith('.fasta'):
-                if original_paste_content:
-                    return handle_paste_sequence_selection(selected_chain, chains_dict, original_paste_content)
-                else:
-                    return handle_fasta_sequence_change(selected_chain, chains_dict, original_file_path)
-            elif original_file_path.endswith('.pdb'):
-                if original_paste_content:
-                    return handle_paste_chain_selection(selected_chain, chains_dict, original_paste_content)
-                else:
-                    return handle_pdb_chain_change(selected_chain, chains_dict, original_file_path)
-            else:
-                # Default case for no file selected
-                return "No file selected", ""
+        # handle_sequence_change_unified is imported from file_handlers
 
         comprehensive_sequence_selector.change(
             fn=handle_sequence_change_unified,

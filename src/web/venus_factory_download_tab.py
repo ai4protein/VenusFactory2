@@ -4,14 +4,13 @@ import subprocess
 import tempfile
 import json
 import hashlib
-import zipfile
+import tarfile
 import gradio as gr
 from pathlib import Path
 from datetime import datetime
-from datetime import datetime
 from gradio_molecule3d import Molecule3D
-from pathlib import Path
 from typing import Dict, Any, List, Tuple, Union
+from web.utils.common_utils import get_save_path
 
 # Maximum number of items to process in batch mode
 MAX_BATCH_ITEMS = 50
@@ -41,30 +40,21 @@ AF2_REPS =  [
     }
   ]
 
-def get_save_path():
-    temp_dir = Path("temp_outputs")
-    now = datetime.now()
-    year = str(now.year)
-    month = str(now.month).zfill(2)
-    day = str(now.day).zfill(2)
-    timestamp = str(int(time.time()))
-    temp_dir_ = temp_dir / year / month / day / "Download_data" / timestamp
-    temp_dir_.mkdir(parents=True, exist_ok=True)
-    return temp_dir_
 
-def zip_task_results(task_folder: str, task_type: str) -> str:
-    zip_dir_path = get_save_path()
-    zip_path = f"{zip_dir_path}/zips/{task_type}.zip"
-    os.makedirs(os.path.dirname(zip_path), exist_ok=True)
-    
-    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+def tar_task_results(task_folder: str, task_type: str) -> str:
+    timestamp = str(int(time.time()))
+    tar_dir_path = get_save_path(task_type, "Download_data")
+    tar_path = f"{tar_dir_path}/archives/{task_type}_{timestamp}.tar.gz"
+    os.makedirs(os.path.dirname(tar_path), exist_ok=True)
+
+    with tarfile.open(tar_path, "w:gz") as tar:
         for root, dirs, files in os.walk(task_folder):
             for file in files:
                 file_path = os.path.join(root, file)
                 arcname = os.path.relpath(file_path, task_folder)
-                zipf.write(file_path, arcname)
-                
-    return zip_path
+                tar.add(file_path, arcname=arcname)
+
+    return tar_path
 
 def create_download_tool_tab(constant: Dict[str, Any]):
     def run_download_script(script_name: str, **kwargs) -> str:
@@ -209,7 +199,8 @@ def create_download_tool_tab(constant: Dict[str, Any]):
 
     def handle_interpro_download(method: str, id_val: str, json_file, user_hash: str, error: bool) -> tuple:
         """Handles InterPro metadata download."""
-        task_folder = get_save_path()
+        timestamp = str(int(time.time()))
+        task_folder = get_save_path("Download_data", "InterPro")
         json_val = None
         if method == "From JSON" and json_file:
             data, preview = read_json_file(json_file.name)
@@ -220,15 +211,16 @@ def create_download_tool_tab(constant: Dict[str, Any]):
             "interpro_id": id_val if method == "Single ID" else None,
             "interpro_json": json_val,
             "out_dir": task_folder,
-            "error_file": f"{task_folder}/failed.txt" if error else None
+            "error_file": f"{task_folder}/{timestamp}_failed.txt" if error else None
         }
         download_result = run_download_script("metadata/download_interpro.py", **args)
-        zip_path = zip_task_results(task_folder, "interpro_metadata")
-        return download_result, gr.update(visible=True, value=zip_path)
+        tar_path = tar_task_results(task_folder, "interpro_metadata")
+        return download_result, gr.update(visible=True, value=tar_path)
 
     def handle_rcsb_download(method: str, id_val: str, file_val, user_hash: str, error: bool) -> tuple:
         """Handles RCSB metadata download."""
-        task_folder = get_save_path()
+        timestamp = str(int(time.time()))
+        task_folder = get_save_path("Download_data", "RCSB")
         
         file_path = None
         if method == "From File" and file_val:
@@ -240,15 +232,16 @@ def create_download_tool_tab(constant: Dict[str, Any]):
             "pdb_id": id_val if method == "Single ID" else None,
             "pdb_id_file": file_path,
             "out_dir": task_folder,
-            "error_file": f"{task_folder}/failed.txt" if error else None
+            "error_file": f"{task_folder}/{timestamp}_failed.txt" if error else None
         }
         download_result = run_download_script("metadata/download_rcsb.py", **args)
-        zip_path = zip_task_results(task_folder, "rcsb_metadata")
-        return download_result, gr.update(visible=True, value=zip_path)
+        tar_path = tar_task_results(task_folder, "rcsb_metadata")
+        return download_result, gr.update(visible=True, value=tar_path)
 
     def handle_uniprot_download(method: str, id_val: str, file_val, user_hash: str, merge: bool, error: bool) -> tuple:
         """Handles UniProt sequence download."""
-        task_folder = get_save_path()
+        timestamp = str(int(time.time()))
+        task_folder = get_save_path("Download_data", "UniProt")
         
         file_path = None
         if method == "From File" and file_val:
@@ -261,15 +254,16 @@ def create_download_tool_tab(constant: Dict[str, Any]):
             "file": file_path,
             "out_dir": task_folder,
             "merge": "--merge" if merge else None,
-            "error_file": f"{task_folder}/failed.txt" if error else None
+            "error_file": f"{task_folder}/{timestamp}_failed.txt" if error else None
         }
         download_result = run_download_script("sequence/download_uniprot_seq.py", **args)
-        zip_path = zip_task_results(task_folder, "uniprot_sequence")
-        return download_result, gr.update(visible=True, value=zip_path)
+        tar_path = tar_task_results(task_folder, "uniprot_sequence")
+        return download_result, gr.update(visible=True, value=tar_path)
 
     def handle_ncbi_download(method: str, id_val: str, file_val, user_hash: str, merge: bool, error: bool) -> tuple:
         """Handles NCBI sequence download."""
-        task_folder = get_save_path()
+        timestamp = str(int(time.time()))
+        task_folder = get_save_path("Download_data", "NCBI")
 
         file_path = None
         if method == "From File" and file_val:
@@ -285,12 +279,13 @@ def create_download_tool_tab(constant: Dict[str, Any]):
             "error_file": f"{task_folder}/failed.txt" if error else None
         }
         download_result = run_download_script("sequence/download_ncbi_seq.py", **args)
-        zip_path = zip_task_results(task_folder, "ncbi_sequence")
-        return download_result, gr.update(visible=True, value=zip_path)
+        tar_path = tar_task_results(task_folder, "ncbi_sequence")
+        return download_result, gr.update(visible=True, value=tar_path)
 
     def handle_struct_download(method: str, id_val: str, file_upload, user_hash: str, type_val: str, error: bool) -> tuple:
         """Handles RCSB structure download and updates the UI."""
-        task_folder = get_save_path()
+        timestamp = str(int(time.time()))
+        task_folder = get_save_path("Download_data", "RCSB")
         
         file_path = None
         if method == "From File" and file_upload:
@@ -308,7 +303,7 @@ def create_download_tool_tab(constant: Dict[str, Any]):
             error_file=f"{task_folder}/failed.txt" if error else None
         )
         viz_status = "Download finished."
-        zip_path = zip_task_results(task_folder, "rcsb_structure")
+        tar_path = tar_task_results(task_folder, "rcsb_structure")
         
         # Update viewer for single ID downloads
         viewer_update = gr.update()
@@ -324,11 +319,12 @@ def create_download_tool_tab(constant: Dict[str, Any]):
             viz_status = "Batch download complete. Select a single ID to view."
         else:
             viz_status = "Download failed."
-        return download_output, viz_status, viewer_update, gr.update(visible=True, value=zip_path)
+        return download_output, viz_status, viewer_update, gr.update(visible=True, value=tar_path)
 
     def handle_af_download(method: str, id_val: str, file_upload, user_hash: str, error: bool) -> tuple:
         """Handles AlphaFold structure download and updates the UI."""
-        task_folder = get_save_path()
+        timestamp = str(int(time.time()))
+        task_folder = get_save_path("Download_data", "AlphaFold")
         
         file_path = None
         if method == "From File" and file_upload:
@@ -340,10 +336,10 @@ def create_download_tool_tab(constant: Dict[str, Any]):
             "structure/download_alphafold.py",
             uniprot_id=id_val if method == "Single ID" else None,
             uniprot_id_file=file_path,
-            out_dir=task_folder, error_file=f"{task_folder}/failed.txt" if error else None
+            out_dir=task_folder, error_file=f"{task_folder}/{timestamp}_failed.txt" if error else None
         )
         viz_status = "Download finished."
-        zip_path = zip_task_results(task_folder, "AlphaFold_structure")
+        tar_path = tar_task_results(task_folder, "AlphaFold_structure")
         
         # Update viewer for single ID downloads
         viewer_update = gr.update()
@@ -359,7 +355,7 @@ def create_download_tool_tab(constant: Dict[str, Any]):
             viz_status = "Batch download complete. Select a single ID to view."
         else:
             viz_status = "Download failed."
-        return download_output, viz_status, viewer_update, gr.update(visible=True, value=zip_path)
+        return download_output, viz_status, viewer_update, gr.update(visible=True, value=tar_path)
 
     # --- Gradio UI Layout ---
     with gr.Blocks() as download_tab_content:
@@ -469,7 +465,7 @@ def create_download_tool_tab(constant: Dict[str, Any]):
                                 struct_method = gr.Radio(["Single ID", "From File"], label="Method", value="Single ID")
                                 struct_id = gr.Textbox(label="PDB ID", value="1a0j", placeholder="e.g., 1crn", visible=True, interactive=True)
                                 struct_type = gr.Dropdown(["pdb", "cif"], value="pdb", label="File Type")
-                                struct_unzip = gr.Checkbox(label="Unzip files", value=True)
+                                struct_untar = gr.Checkbox(label="Untar files", value=True)
                                 struct_error = gr.Checkbox(label="Save error log", value=True)
                                 with gr.Column(visible=False) as struct_file_column:
                                     struct_file_upload = gr.File(label="Upload PDB ID List", file_types=[".txt"])
@@ -504,7 +500,7 @@ def create_download_tool_tab(constant: Dict[str, Any]):
                                 gr.Markdown("#### Download from AlphaFold DB")
                                 af_method = gr.Radio(["Single ID", "From File"], label="Method", value="Single ID")
                                 af_id = gr.Textbox(label="UniProt ID", value="P00734", placeholder="e.g., P0DTD1", visible=True, interactive=True)
-                                af_unzip = gr.Checkbox(label="Unzip files", value=True) # Note: AF files are not zipped, so this may not be needed
+                                af_untar = gr.Checkbox(label="Untar files", value=True) # Note: AF files are not tarped, so this may not be needed
                                 af_error = gr.Checkbox(label="Save error log", value=True)
                                 with gr.Column(visible=False) as af_file_column:
                                     af_file_upload = gr.File(label="Upload AlphaFold DB ID List", file_types=[".txt"])

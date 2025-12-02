@@ -2,7 +2,7 @@
 
 import os
 import re
-import zipfile
+import tarfile
 from pathlib import Path
 from datetime import datetime
 from typing import Dict
@@ -15,16 +15,18 @@ def sanitize_filename(name: str) -> str:
     return re.sub(r'[^\w\-. ]', '_', name)
 
 
-def get_save_path(subdir: str) -> Path:
+def get_save_path(subdir1: str, subdir2: str | None = None) -> Path:
     """Get save path with date-based directory structure."""
-    temp_dir = Path("temp_outputs")
     now = datetime.now()
-    year = str(now.year)
-    month = str(now.month).zfill(2)
-    day = str(now.day).zfill(2)
-    temp_dir_ = temp_dir / year / month / day / subdir
-    temp_dir_.mkdir(parents=True, exist_ok=True)
-    return temp_dir_
+    date_path = Path("temp_outputs") / f"{now.year}/{now.month:02d}/{now.day:02d}"
+
+    if subdir2:
+        path = date_path / subdir1 / subdir2
+    else:
+        path = date_path / subdir1
+
+    path.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 def toggle_ai_section(is_checked: bool):
@@ -32,13 +34,22 @@ def toggle_ai_section(is_checked: bool):
     return gr.update(visible=is_checked)
 
 
-def create_zip_archive(files_to_zip: Dict[str, str], zip_filename: str) -> str:
-    """Create ZIP archive with specified files."""
-    with zipfile.ZipFile(zip_filename, 'w', zipfile.ZIP_DEFLATED) as zf:
-        for src, arc in files_to_zip.items():
+def create_tar_archive(files_to_archive: Dict[str, str], output_filename: str) -> str:
+    """
+    Create tar.gz archive with specified files.
+    
+    Args:
+        files_to_archive: Dict mapping source paths to archive names (internal paths)
+        output_filename: The output filename (e.g., 'archive.tar.gz')
+    """
+    with tarfile.open(output_filename, "w:gz") as tar:
+        for src, arcname in files_to_archive.items():
             if os.path.exists(src):
-                zf.write(src, arcname=arc)
-    return zip_filename
+                tar.add(src, arcname=arcname)
+            else:
+                print(f"Warning: File not found: {src}")
+                
+    return output_filename
 
 
 def format_physical_chemical_properties(data: dict) -> str:
@@ -70,8 +81,12 @@ def format_rsa_results(data: dict) -> str:
     result += f"Buried residues: {data['buried_residues']}\n"
     result += f"Total residues: {data['total_residues']}\n"
     
+    def get_residue_number_rsa(item):
+        """Get residue number from item for sorting."""
+        return int(item[0])
+    
     try:
-        sorted_residues = sorted(data['residue_rsa'].items(), key=lambda x: int(x[0]))
+        sorted_residues = sorted(data['residue_rsa'].items(), key=get_residue_number_rsa)
     except ValueError:
         sorted_residues = sorted(data['residue_rsa'].items())
     
@@ -91,8 +106,12 @@ def format_sasa_results(data: dict) -> str:
     for chain_id, chain_data in sorted(data['chains'].items()):
         result += f"--- Chain {chain_id} (Total SASA: {chain_data['total_sasa']:.2f} Ų) ---\n"
         
+        def get_residue_number_sasa(item):
+            """Get residue number from item for sorting."""
+            return int(item[0])
+        
         try:
-            sorted_residues = sorted(chain_data['residue_sasa'].items(), key=lambda x: int(x[0]))
+            sorted_residues = sorted(chain_data['residue_sasa'].items(), key=get_residue_number_sasa)
         except ValueError:
             sorted_residues = sorted(chain_data['residue_sasa'].items())
         
@@ -111,8 +130,12 @@ def format_secondary_structure_results(data: dict) -> str:
     result += f"Sheet (E): {data['ss_counts']['sheet']} ({data['ss_counts']['sheet']/len(data['aa_sequence'])*100:.1f}%)\n"
     result += f"Coil (C): {data['ss_counts']['coil']} ({data['ss_counts']['coil']/len(data['aa_sequence'])*100:.1f}%)\n"
     
+    def get_residue_number_ss(item):
+        """Get residue number from item for sorting."""
+        return int(item[0])
+    
     try:
-        sorted_residues = sorted(data['residue_ss'].items(), key=lambda x: int(x[0]))
+        sorted_residues = sorted(data['residue_ss'].items(), key=get_residue_number_ss)
     except ValueError:
         sorted_residues = sorted(data['residue_ss'].items())
     

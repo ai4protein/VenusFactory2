@@ -2,13 +2,6 @@
 import gradio as gr
 
 def create_index_tab(constant):
-    # Read gjf file content
-    try:
-        with open("img/Show1.gjf", "r") as f:
-            gjf_content = f.read()
-    except Exception:
-        gjf_content = "(Show1.gjf not found)"
-    
     return    f'''
                 <style>
                     
@@ -272,27 +265,34 @@ def create_index_tab(constant):
                        
                         <div class="manual-content">
 
-                    <!-- Top section: VenusFactory introduction -->
-                    
-                    
-
-                   <div class="manual-content">
-
-                        <div style="text-align:center; margin: 0px auto 40px auto; max-width: 100%;">
-                            <img src="https://raw.githubusercontent.com/ai4protein/VenusFactory/main/img/Index.png" ... /> 
-                                 
-                        </div>
-                        
-                    <div style="max-width: 1400px; margin: 0 auto; font-size: 1.2em; text-align: left;">
-                        <p style="font-size:1.2em; margin-bottom: 0.7em;"><b>VenusFactory</b> is a unified open-source platform for protein engineering, designed to simplify data acquisition, model fine-tuning, and functional analysis for both biologists and AI researchers.<br>
-                        The Web UI features four core modules:</p>
-                        <ul style="font-size:1.0em;">
-                            <li>🤖 <b>VenusAgent-0.1</b> is an integrated AI assistant that answers questions related to the platform and protein AI.</li>
-                            <li>🛠️ <b>Quick Tools</b> offers one-click protein analysis tools designed as a convenient method, making common tasks easy and accessible.</li>
-                            <li>⚡ <b>Advanced Tools</b> enables zero-shot prediction, function analysis, and advanced data options for experienced users.</li>
-                            <li>💾 <b>Download</b> allows you to get various protein data like AlphaFold2 Structures, RCSB PDB and InterPro.</li>
+                    <div class="manual-content">
+                    <div style="max-width: 1400px; margin: 20px auto 0 auto; padding: 20px 10px 10px 10px;">
+                    <div style="font-size: 1.2em; text-align: left; line-height: 1.6; color: var(--body-text-color);">
+                        <p style="margin-bottom: 1em; margin-top: 0;">
+                            VenusFactory is a unified open-source platform for protein engineering, designed to simplify data acquisition, model fine-tuning, and functional analysis for both biologists and AI researchers.
+                            <br>
+                            The Web UI features four core modules:
+                        </p>
+                        <ul style="list-style: none; padding-left: 0; margin-top: 10px;">
+                            <li style="margin-bottom: 10px; display: flex; align-items: baseline;">
+                                <span style="margin-right: 10px;">🤖</span>
+                                <span><b>VenusAgent-0.1</b> is an integrated AI assistant that answers questions related to the platform and protein AI.</span>
+                            </li>
+                            <li style="margin-bottom: 10px; display: flex; align-items: baseline;">
+                                <span style="margin-right: 10px;">🛠️</span>
+                                <span><b>Quick Tools</b> offers one-click protein analysis tools designed as a convenient method, making common tasks easy and accessible.</span>
+                            </li>
+                            <li style="margin-bottom: 10px; display: flex; align-items: baseline;">
+                                <span style="margin-right: 10px;">⚡</span>
+                                <span><b>Advanced Tools</b> enables zero-shot prediction, function analysis, and advanced data options for experienced users.</span>
+                            </li>
+                            <li style="margin-bottom: 10px; display: flex; align-items: baseline;">
+                                <span style="margin-right: 10px;">💾</span>
+                                <span><b>Download</b> allows you to get various protein data like AlphaFold2 Structures, RCSB PDB and InterPro.</span>
+                            </li>
                         </ul>
                     </div>
+                </div>
                     <hr style="margin: 40px 0; border: 1px solid var(--border-color);">
                     
                     <!-- Middle section: How to Use VenusFactory -->

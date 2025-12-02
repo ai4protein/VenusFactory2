@@ -16,7 +16,7 @@ def run_zero_shot_prediction(model_type: str, model_name: str, file_path: str) -
     """Run zero-shot mutation prediction."""
     try:
         timestamp = str(int(time.time()))
-        sequence_dir = get_save_path("Zero_shot_result")
+        sequence_dir = get_save_path("Zero_Shot", "Result")
         output_csv = sequence_dir / f"{model_type}_{timestamp}.csv"
         script_name = MODEL_MAPPING_ZERO_SHOT.get(model_name)
         
@@ -112,7 +112,7 @@ def run_protein_properties_prediction(task_type: str, file_path: str) -> Tuple[s
     """Run protein properties prediction."""
     try:
         timestamp = str(int(time.time()))
-        properties_dir = get_save_path("Protein_properties_result")
+        properties_dir = get_save_path("Protein_Properties", "Result")
         output_json = properties_dir / f"{task_type.replace(' ', '_').replace('(', '').replace(')', '')}_{timestamp}.json"
         script_name = PROTEIN_PROPERTIES_MAP_FUNCTION.get(task_type)
         if not script_name:

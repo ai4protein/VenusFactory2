@@ -20,6 +20,8 @@ from gradio_client import Client, handle_file
 import pandas as pd
 from langchain.tools import tool
 from pydantic import BaseModel, Field, validator
+from web.utils.common_utils import get_save_path
+from web.utils.literature import literature_search
 
 load_dotenv()
 
@@ -39,7 +41,7 @@ class FunctionPredictionInput(BaseModel):
     sequence: Optional[str] = Field(None, description="Protein sequence in single letter amino acid code")
     fasta_file: Optional[str] = Field(None, description="Path to FASTA file")
     model_name: str = Field(default="ESM2-650M", description="Model name for function prediction")
-    task: str = Field(default="Solubility", description="Task: Solubility, Localization, Metal ion binding, Stability, Sorting signal, Optimum temperature")
+    task: str = Field(default="Solubility", description="Task: Solubility, Subcellular Localization, Membrane Protein, Metal ion binding, Stability, Sortingsignal, Optimum temperature, Kcat, Optimal PH, Immunogenicity Prediction - Virus, Immunogenicity Prediction - Bacteria, Immunogenicity Prediction - Tumor")
 
 class ResidueFunctionPredictionInput(BaseModel):
     """Input for functional residue prediction"""
@@ -93,6 +95,12 @@ class PDBStructureInput(BaseModel):
     pdb_id: str = Field(..., description="PDB ID for protein structure download")
     output_format: str = Field(default="pdb", description="Output format: pdb, mmcif")
 
+class LiteratureSearchInput(BaseModel):
+    """Input for literature search"""
+    query: str = Field(..., description="Search query")
+    max_results: int = Field(5, description="Maximum number of results to return")
+
+
 # Langchain Tools
 @tool("zero_shot_sequence_prediction", args_schema=ZeroShotSequenceInput)
 def zero_shot_sequence_prediction_tool(sequence: Optional[str] = None, fasta_file: Optional[str] = None, model_name: str = "ESM2-650M") -> str:
@@ -135,7 +143,7 @@ def zero_shot_structure_prediction_tool(structure_file: str, model_name: str = "
             return f"Error: Structure file not found at path: {actual_file_path}"
         return call_zero_shot_structure_prediction_from_file(actual_file_path, model_name, api_key)
     except Exception as e:
-        return f"Zero-shot structure prediction error: {str(e)}"
+        return json.dumps({"success": False, "error": f"Zero-shot structure prediction error: {str(e)}"}, ensure_ascii=False)
 
 @tool("protein_function_prediction", args_schema=FunctionPredictionInput)
 def protein_function_prediction_tool(sequence: Optional[str] = None, fasta_file: Optional[str] = None, model_name: str = "ESM2-650M", task: str = "Solubility") -> str:
@@ -276,6 +284,25 @@ def alphafold_structure_download_tool(uniprot_id: str, output_format: str = "pdb
     except Exception as e:
         return f"AlphaFold structure download error: {str(e)}"
 
+
+@tool("literature_search", args_schema=LiteratureSearchInput)
+def literature_search_tool(query: str, max_results: int = 5) -> str:
+    """
+    Search for literature using MCP Tools: arXiv / PubMed / Google
+
+    Args:
+        query: The query to search for.
+        max_results: The maximum number of results to return.
+
+    Returns:
+        A JSON string containing the search results.
+    """
+    try:
+        refs = literature_search(query, max_results=max_results)
+        return json.dumps({"success": True, "references": refs}, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
 def call_zero_shot_sequence_prediction(
     sequence: str = None,
     fasta_file: str = None,
@@ -402,12 +429,18 @@ def call_protein_function_prediction(
     try:
         dataset_mapping = {
             "Solubility": ["DeepSol", "DeepSoluE", "ProtSolM"],
-            "Localization": ["DeepLocMulti"],
-            "Membrane Protein Identification": ["DeepLocBinary"],
-            "Metal ion binding": ["MetalIonBinding"], 
+            "Subcellular Localization": ["DeepLocMulti"],
+            "Membrane Protein": ["DeepLocBinary"],
+            "Metal Ion Binding": ["MetalIonBinding"], 
             "Stability": ["Thermostability"],
             "Sortingsignal": ["SortingSignal"], 
-            "Optimum temperature": ["DeepET_Topt"]
+            "Optimal Temperature": ["DeepET_Topt"],
+            "Kcat": ["DLKcat"],
+            "Optimal PH": ["EpHod"],
+            "Immunogenicity Prediction - Virus": ["VenusVaccine_VirusBinary"],
+            "Immunogenicity Prediction - Bacteria": ["VenusVaccine_BacteriaBinary"],
+            "Immunogenicity Prediction - Tumor": ["VenusVaccine_TumorBinary"],
+
         }
         datasets = dataset_mapping.get(task, ["DeepSol"])
 
@@ -615,14 +648,11 @@ def get_uniprot_sequence(uniprot_id):
 
 def download_pdb_structure_from_id(pdb_id: str, output_format: str = "pdb") -> str:
     try:
-        # Create temporary directory for output
-        temp_dir = Path("temp_outputs")
-        structure_dir = temp_dir / "pdb_structures"
-        os.makedirs(structure_dir, exist_ok=True)
-
+        structure_dir = get_save_path("Download_Data", "RCSB")
+        
         pdb_id = pdb_id.upper()
-        url = f"https://files.rcsb.org/download/{pdb_id}.pdb"
-
+        url = f"https://files.rcsb.org/download/{pdb_id}.{output_format}"
+        
         response = requests.get(url, timeout=30)
         response.raise_for_status()
         structure_text = response.text
@@ -687,10 +717,7 @@ def download_pdb_structure_from_id(pdb_id: str, output_format: str = "pdb") -> s
 def download_ncbi_sequence(accession_id: str, output_format: str = "fasta") -> str:
     """Download protein or nucleotide sequences from NCBI using existing crawler script."""
     try:
-        # Create temporary directory for output
-        temp_dir = Path("temp_outputs")
-        sequence_dir = temp_dir / "ncbi_sequences"
-        os.makedirs(sequence_dir, exist_ok=True)
+        sequence_dir = get_save_path("Download_Data", "NCBI")
         
         # Determine database type based on accession ID
         db_type = "protein" if accession_id.startswith(('NP_', 'XP_', 'YP_', 'WP_')) else "nuccore"
@@ -741,10 +768,7 @@ def download_ncbi_sequence(accession_id: str, output_format: str = "fasta") -> s
 def download_alphafold_structure(uniprot_id: str, output_format: str = "pdb") -> str:
     """Download protein structures from AlphaFold using existing crawler script."""
     try:
-        # Create temporary directory for output
-        temp_dir = Path("temp_outputs")
-        structure_dir = temp_dir / "alphafold_structures"
-        os.makedirs(structure_dir, exist_ok=True)
+        structure_dir = get_save_path("Download_Data", "AlphaFold")
         
         # Call the existing AlphaFold download script (not RCSB!)
         cmd = [
@@ -874,10 +898,7 @@ def generate_and_execute_code(task_description: str, input_files: List[str] = []
             primary_file = valid_files[0]
             output_directory = os.path.dirname(primary_file)
         else:
-            # Create temp output directory if no input files
-            temp_dir = Path("temp_outputs")
-            output_directory = str(temp_dir / "generated_outputs")
-            os.makedirs(output_directory, exist_ok=True)
+            output_directory = str(get_save_path("Code_Execution", "Generated_Outputs"))
 
         # Enhanced prompt with more context and flexibility
         code_prompt = f"""You are an expert Python programmer specializing in bioinformatics and data processing.
@@ -1066,11 +1087,9 @@ def process_csv_and_generate_config(csv_file: str, test_csv_file: Optional[str] 
         default_config = get_default_config(analysis)
         final_params = merge_configs(user_config, ai_config, default_config)
         config = create_comprehensive_config(csv_file, test_csv_file, final_params, analysis)
-        temp_dir = Path("temp_outputs")
-        sequence_dir = temp_dir / "training_configs"
-        os.makedirs(sequence_dir, exist_ok=True)
+        config_dir = get_save_path("training_pipeline", "configs")
         timestamp = int(time.time())
-        config_path = os.path.join(sequence_dir, f"{output_name}_{timestamp}.json")
+        config_path = os.path.join(config_dir, f"{output_name}_{timestamp}.json")
         with open(config_path, 'w') as f:
             json.dump(config, f, indent=2)
         message = f"Training configuration generated successfully! Config file: {config_path} The configuration is ready for use in the training interface."

@@ -3,6 +3,8 @@ import time
 import shutil
 import threading
 import os
+import asyncio
+from typing import Tuple
 import gradio as gr
 import datetime
 from pathlib import Path
@@ -17,6 +19,72 @@ from web.venus_factory_advanced_tool_tab import create_advanced_tool_tab
 from web.venus_factory_download_tab import create_download_tool_tab
 from web.venus_factory_quick_tool_tab import create_quick_tool_tab
 from web.venus_factory_comprehensive_tab import create_comprehensive_tab
+from fast_api import app as fastapi_app
+from mcp_venusfactory import start_http_server
+from fastapi_mcp import FastApiMCP
+import uvicorn
+
+
+_fastapi_server_thread = None
+_fastapi_server_lock = threading.Lock()
+_fastapi_server = None
+
+mcp_server = FastApiMCP(fastapi_app)
+mcp_server.mount_http()
+mcp_server.mount_sse()  
+
+def start_fastapi_server(host: str = None, port: int = None) -> Tuple[str, int]:
+    """Launch the FastAPI application in a background thread if not already running."""
+    global _fastapi_server_thread, _fastapi_server
+
+    default_host = os.getenv("FASTAPI_HOST", "0.0.0.0")
+    default_port = int(os.getenv("FASTAPI_PORT", "5000"))
+
+    host = host or default_host
+    port = port or default_port
+
+    with _fastapi_server_lock:
+        if _fastapi_server_thread and _fastapi_server_thread.is_alive():
+            return host, port
+
+        config = uvicorn.Config(
+            fastapi_app,
+            host=host,
+            port=port,
+            log_level=os.getenv("FASTAPI_LOG_LEVEL", "info"),
+            reload=False,
+            access_log=True,
+            loop="asyncio",
+            lifespan="auto",
+        )
+        config.handle_signals = False
+
+        server = uvicorn.Server(config)
+        _fastapi_server = server
+
+        def run_server():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                loop.run_until_complete(server.serve())
+            except Exception as exc:
+                print(f"[FastAPI] Server exited unexpectedly: {exc}")
+            finally:
+                loop.close()
+
+        thread = threading.Thread(target=run_server, name="FastAPIThread", daemon=True)
+        thread.start()
+        _fastapi_server_thread = thread
+
+    startup_timeout = float(os.getenv("FASTAPI_STARTUP_TIMEOUT", "5.0"))
+    start_time = time.time()
+    while getattr(server, "started", False) is False and thread.is_alive():
+        if time.time() - start_time > startup_timeout:
+            break
+        time.sleep(0.1)
+
+    print(f"[FastAPI] Serving on http://{host}:{port}")
+    return host, port
 
 def delete_old_files():
     try:
@@ -205,6 +273,13 @@ if __name__ == "__main__":
     try:
         cleanup_thread = threading.Thread(target=run_cleanup_schedule, daemon=True)
         cleanup_thread.start()
+
+        fastapi_host, fastapi_port = start_fastapi_server()
+        print(f"[FastAPI] Background API available at http://{fastapi_host}:{fastapi_port}")
+
+        mcp_host, mcp_port = start_http_server()
+        print(f"[MCP] HTTP server available at http://{mcp_host}:{mcp_port}/mcp")
+
         demo = create_ui()
         demo.queue().launch(
             server_port=7860, 
@@ -212,6 +287,7 @@ if __name__ == "__main__":
             allowed_paths=["img"],
             show_error=True,
             inbrowser=True,
+            mcp_server=True,
         )
 
     except Exception as e:

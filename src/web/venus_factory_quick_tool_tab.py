@@ -4,7 +4,6 @@ import os
 import sys
 import subprocess
 import time
-import zipfile
 from pathlib import Path
 from typing import Dict, Any, List, Generator, Optional, Tuple
 import plotly.graph_objects as go
@@ -19,6 +18,7 @@ from web.utils.ai_helpers import *
 from web.utils.data_processors import *
 from web.utils.visualization import *
 from web.utils.prediction_runners import *
+from web.utils.label_mappers import map_labels
 
 load_dotenv()
 
@@ -160,14 +160,14 @@ def handle_mutation_prediction_base(
         progress(1.0, desc="Complete!")
     
     timestamp = str(int(time.time()))
-    heatmap_dir = get_save_path("Zero_shot_result")
+    heatmap_dir = get_save_path("Zero_shot", "HeatMap")
     csv_path = heatmap_dir / f"mut_res_{timestamp}.csv"
     heatmap_path = heatmap_dir / f"mut_map_{timestamp}.html"
     
     display_df.to_csv(csv_path, index=False)
     summary_fig.write_html(heatmap_path)
     
-    files_to_zip = {
+    files_to_tar = {
         str(csv_path): f"prediction_results_{timestamp}.csv", 
         str(heatmap_path): f"prediction_heatmap_{timestamp}.html"
     }
@@ -176,27 +176,29 @@ def handle_mutation_prediction_base(
         report_path = heatmap_dir / f"ai_report_{timestamp}.md"
         with open(report_path, 'w', encoding='utf-8') as f:
             f.write(ai_summary)
-        files_to_zip[str(report_path)] = f"AI_Analysis_Report_{timestamp}.md"
+        files_to_tar[str(report_path)] = f"AI_Analysis_Report_{timestamp}.md"
 
-    zip_path = heatmap_dir / f"pred_mut_{timestamp}.zip"
-    zip_path_str = create_zip_archive(files_to_zip, str(zip_path))
+    tar_path = heatmap_dir / f"pred_mut_{timestamp}.tar.gz"
+    tar_path_str = create_tar_archive(files_to_tar, str(tar_path))
 
     final_status = status if not enable_ai else "✅ Prediction and AI analysis complete!"
     progress(1.0, desc="Complete!")
     yield (
         final_status, summary_fig, display_df, 
-        gr.update(visible=True, value=zip_path_str), zip_path_str, 
+        gr.update(visible=True, value=tar_path_str), tar_path_str, 
         gr.update(visible=total_residues > 20), display_df, expert_analysis
     )
 
 def generate_plots_for_all_results(results_df: pd.DataFrame) -> go.Figure:
     """Generate plots for function prediction results with consistent Dardana font and academic styling."""
     # Filter data
+    def is_non_regression_task(dataset):
+        """Check if dataset is not a regression task."""
+        return DATASET_TO_TASK_MAP.get(dataset) not in REGRESSION_TASKS_FUNCTION
+    
     plot_df = results_df[
         (results_df['header'] != "ERROR") & 
-        (results_df['Dataset'].apply(
-            lambda d: DATASET_TO_TASK_MAP.get(d) not in REGRESSION_TASKS_FUNCTION
-        ))
+        (results_df['Dataset'].apply(is_non_regression_task))
     ].copy()
 
     if plot_df.empty:
@@ -270,9 +272,13 @@ def generate_plots_for_all_results(results_df: pd.DataFrame) -> go.Figure:
                     for lbl in labels
                 ]
                 
+                def get_confidence(item):
+                    """Get confidence score from plot data item."""
+                    return item[1]
+                
                 plot_data = sorted(
                     zip(labels, confidences, colors), 
-                    key=lambda x: x[1], 
+                    key=get_confidence, 
                     reverse=True
                 )
                 sorted_labels, sorted_conf, sorted_colors = zip(*plot_data)
@@ -371,7 +377,7 @@ def handle_protein_function_prediction(
     
     all_results_list = []
     timestamp = str(int(time.time()))
-    function_dir = get_save_path("Protein_function_result")
+    function_dir = get_save_path("Protein_Function", "Result")
 
     # Run predictions for each dataset
     progress(0.1, desc="Running prediction...")
@@ -499,64 +505,10 @@ def handle_protein_function_prediction(
             final_df = final_df.drop(columns=['Dataset'], errors='ignore')
     display_df = final_df.copy()
     print(f"Using simplified processing, final_df shape: {final_df.shape}")
-    # Map predictions to human-readable labels
-    def map_labels(row):
-        current_task = DATASET_TO_TASK_MAP.get(row.get('Dataset', ''), task)
-        
-        # Handle regression tasks
-        if current_task in REGRESSION_TASKS_FUNCTION: 
-            scaled_value = row.get("prediction")
-            if pd.notna(scaled_value) and scaled_value != 'N/A' :
-                try:
-                    scaled_value = float(scaled_value)
-                    if current_task in REGRESSION_TASKS_FUNCTION_MAX_MIN:
-                        min_val, max_val = REGRESSION_TASKS_FUNCTION_MAX_MIN[current_task]
-                        original_value = scaled_value * (max_val - min_val) + min_val
-                        return round(original_value, 2)
-                    else:
-                        return round(scaled_value, 2)
-                except (ValueError, TypeError):
-                    return scaled_value
-            return scaled_value
-
-        # Handle SortingSignal special case
-        if row.get('Dataset') == 'SortingSignal':
-            predictions_str = row.get('predicted_class')
-            if predictions_str:
-                try:
-                    predictions = json.loads(predictions_str) if isinstance(predictions_str, str) else predictions_str
-                    if all(p == 0 for p in predictions):
-                        return "No signal"
-                    signal_labels = ["CH", 'GPI', "MT", "NES", "NLS", "PTS", "SP", "TM", "TH"]
-                    active_labels = [signal_labels[i] for i, pred in enumerate(predictions) if pred == 1]
-                    return "_".join(active_labels) if active_labels else "None"
-                except:
-                    pass
-        
-        # Handle classification tasks
-        labels_key = ("DeepLocMulti" if row.get('Dataset') == "DeepLocMulti" 
-                     else "DeepLocBinary" if row.get('Dataset') == "DeepLocBinary" 
-                     else current_task)
-        labels = LABEL_MAPPING_FUNCTION.get(labels_key)
-        
-        pred_val = row.get("prediction", row.get("predicted_class"))
-        if pred_val is None or pred_val == "N/A":
-            return "N/A"
-            
-        try:
-            pred_val = int(float(pred_val))
-            if labels and 0 <= pred_val < len(labels): 
-                return labels[pred_val]
-        except (ValueError, TypeError):
-            pass
-        
-        return str(pred_val)
-
+    # map_labels is now imported from utils.label_mappers
+    
     # Apply label mapping
-    if "prediction" in display_df.columns:
-        display_df["predicted_class"] = display_df.apply(map_labels, axis=1)
-    elif "predicted_class" in display_df.columns:
-        display_df["predicted_class"] = display_df.apply(map_labels, axis=1)
+    display_df["predicted_class"] = display_df.apply(lambda row: map_labels(row, task), axis=1)
 
     # Remove raw prediction column if it exists
     if 'prediction' in display_df.columns and 'predicted_class' in display_df.columns:
@@ -615,26 +567,25 @@ def handle_protein_function_prediction(
     else:
         progress(1.0, desc="Complete!")
     
-    zip_path_str = ""
+    tar_path_str = ""
     try:
         timestamp = str(int(time.time()))
-        zip_dir = get_save_path("Protein_function_result")
-        
+        tar_dir = get_save_path("Protein_Function", "Result")
+
         # Save only the processed results
         processed_df_for_save = display_df.copy()
-        csv_path = zip_dir / f"Result_{timestamp}.csv"
+        csv_path = tar_dir / f"Result_{timestamp}.csv"
         processed_df_for_save.to_csv(csv_path, index=False)
         print(f"Saved CSV to: {csv_path}")
-        
-        # Create simple zip with just the CSV file
-        zip_path = zip_dir / f"func_pred_{timestamp}.zip"
-        with zipfile.ZipFile(zip_path, 'w') as zf:
-            zf.write(csv_path, csv_path.name)
-        zip_path_str = str(zip_path)
-        print(f"Created zip file: {zip_path_str}")
+
+        # Create simple tar.gz with just the CSV file
+        files_to_tar = {str(csv_path): csv_path.name}
+        tar_path = tar_dir / f"func_pred_{timestamp}.tar.gz"
+        tar_path_str = create_tar_archive(files_to_tar, str(tar_path))
+        print(f"Created tar.gz file: {tar_path_str}")
     except Exception as e: 
-        print(f"Error creating zip file: {e}")
-        zip_path_str = ""
+        print(f"Error creating tar.gz file: {e}")
+        tar_path_str = ""
 
     final_status = "✅ All predictions completed!"
     if is_voting_run: 
@@ -644,7 +595,7 @@ def handle_protein_function_prediction(
     
     print(f"Final status: {final_status}")
     print(f"Display DF shape: {display_df.shape}")
-    print(f"Zip path: {zip_path_str}")
+    print(f"Archive path: {tar_path_str}")
     print(f"About to yield final results...")
     
     progress(1.0, desc="Complete!")
@@ -654,7 +605,7 @@ def handle_protein_function_prediction(
     yield (
         final_status, 
         display_df, 
-        gr.update(visible=True, value=zip_path_str) if zip_path_str else gr.update(visible=False), 
+        gr.update(visible=True, value=tar_path_str) if tar_path_str else gr.update(visible=False), 
         expert_analysis, ai_response
     )
     print("Final yield completed successfully!")
@@ -829,7 +780,7 @@ def handle_protein_residue_function_prediction(
 
     all_results_list = []
     timestamp = str(int(time.time()))
-    residue_save_dir = get_save_path("Residue_function_result")
+    residue_save_dir = get_save_path("Residue_Prediction", "Result")
 
     # Run predictions for each dataset
     progress(0.2, desc="Running Predicrtion...")
@@ -961,7 +912,7 @@ def run_protein_properties_prediction(task_type: str, file_path: str) -> Tuple[s
     """Run protein properties prediction"""
     try:
         timestamp = str(int(time.time()))
-        properties_dir = get_save_path("Protein_properties_result")
+        properties_dir = get_save_path("Protein_Properties", "Result")
         output_json = properties_dir / f"{task_type.replace(' ', '_').replace('(', '').replace(')', '')}_{timestamp}.json"
         script_name = PROTEIN_PROPERTIES_MAP_FUNCTION.get(task_type)
         if not script_name:
@@ -1044,8 +995,12 @@ def format_rsa_results(data: dict) -> str:
     result += f"Total residues: {data['total_residues']}\n"
     
     # Sort residues by number for display
+    def get_residue_number(item):
+        """Get residue number from item for sorting."""
+        return int(item[0])
+    
     try:
-        sorted_residues = sorted(data['residue_rsa'].items(), key=lambda x: int(x[0]))
+        sorted_residues = sorted(data['residue_rsa'].items(), key=get_residue_number)
     except ValueError:
         sorted_residues = sorted(data['residue_rsa'].items())
     
@@ -1066,8 +1021,12 @@ def format_sasa_results(data: dict) -> str:
         result += f"--- Chain {chain_id} (Total SASA: {chain_data['total_sasa']:.2f} Ų) ---\n"
         
         # Sort residues by number for display
+        def get_residue_number_sasa(item):
+            """Get residue number from item for sorting."""
+            return int(item[0])
+        
         try:
-            sorted_residues = sorted(chain_data['residue_sasa'].items(), key=lambda x: int(x[0]))
+            sorted_residues = sorted(chain_data['residue_sasa'].items(), key=get_residue_number_sasa)
         except ValueError:
             sorted_residues = sorted(chain_data['residue_sasa'].items())
         
@@ -1087,8 +1046,12 @@ def format_secondary_structure_results(data: dict) -> str:
     result += f"Coil (C): {data['ss_counts']['coil']} ({data['ss_counts']['coil']/len(data['aa_sequence'])*100:.1f}%)\n"
     
     # Sort residues by number for display
+    def get_residue_number_ss(item):
+        """Get residue number from item for sorting."""
+        return int(item[0])
+    
     try:
-        sorted_residues = sorted(data['residue_ss'].items(), key=lambda x: int(x[0]))
+        sorted_residues = sorted(data['residue_ss'].items(), key=get_residue_number_ss)
     except ValueError:
         sorted_residues = sorted(data['residue_ss'].items())
     
