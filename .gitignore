@@ -166,6 +166,9 @@ ckpt/*
 !ckpt/demo/demo_solubility*
 !ckpt/DeepSol/
 ckpt/DeepSol/ankh-base
+ckpt/DeepSol/ankh2-ext2
+ckpt/DeepSol/ankh3-large
+ckpt/DeepSol/ankh3-xl
 ckpt/DeepSol/ankh-large/ses-adapter*
 ckpt/DeepSol/esm2_t30_150M_UR50D
 ckpt/DeepSol/esm2_t33_650M_UR50D/ses-adapter*
@@ -174,6 +177,9 @@ ckpt/DeepSol/prot_t5_xl_uniref50/ses-adapter*
 
 !ckpt/DeepSoluE/
 ckpt/DeepSoluE/ankh-base
+ckpt/DeepSoluE/ankh2-ext2
+ckpt/DeepSoluE/ankh3-large
+ckpt/DeepSoluE/ankh3-xl
 ckpt/DeepSoluE/ankh-large/ses-adapter*
 ckpt/DeepSoluE/esm2_t30_150M_UR50D
 ckpt/DeepSoluE/esm2_t33_650M_UR50D/ses-adapter*
@@ -182,6 +188,9 @@ ckpt/DeepSoluE/prot_t5_xl_uniref50/ses-adapter*
 
 !ckpt/ProtSolM/
 ckpt/ProtSolM/ankh-base
+ckpt/ProtSolM/ankh2-ext2
+ckpt/ProtSolM/ankh3-large
+ckpt/ProtSolM/ankh3-xl
 ckpt/ProtSolM/ankh-large/ses-adapter*
 ckpt/ProtSolM/esm2_t30_150M_UR50D
 ckpt/ProtSolM/esm2_t33_650M_UR50D/ses-adapter*
@@ -190,6 +199,9 @@ ckpt/ProtSolM/prot_t5_xl_uniref50/ses-adapter*
 
 !ckpt/SortingSignal/
 ckpt/SortingSignal/ankh-base
+ckpt/SortingSignal/ankh2-ext2
+ckpt/SortingSignal/ankh3-large
+ckpt/SortingSignal/ankh3-xl
 ckpt/SortingSignal/ankh-large/ses-adapter*
 ckpt/SortingSignal/esm2_t30_150M_UR50D
 ckpt/SortingSignal/esm2_t33_650M_UR50D/ses-adapter*
@@ -199,6 +211,9 @@ ckpt/SortingSignal/prot_t5_xl_uniref50/ses-adapter*
 
 !ckpt/DeepET_Topt/
 ckpt/DeepET_Topt/ankh-base
+ckpt/DeepET_Topt/ankh2-ext2
+ckpt/DeepET_Topt/ankh3-large
+ckpt/DeepET_Topt/ankh3-xl
 ckpt/DeepET_Topt/ankh-large/ses-adapter*
 ckpt/DeepET_Topt/esm2_t30_150M_UR50D
 ckpt/DeepET_Topt/esm2_t33_650M_UR50D/ses-adapter*
@@ -207,6 +222,9 @@ ckpt/DeepET_Topt/prot_t5_xl_uniref50/ses-adapter*
 
 !ckpt/Thermostability/
 ckpt/Thermostability/ankh-base
+ckpt/Thermostability/ankh2-ext2
+ckpt/Thermostability/ankh3-large
+ckpt/Thermostability/ankh3-xl
 ckpt/Thermostability/ankh-large/ses-adapter*
 ckpt/Thermostability/esm2_t30_150M_UR50D
 ckpt/Thermostability/esm2_t33_650M_UR50D/ses-adapter*
@@ -215,6 +233,9 @@ ckpt/Thermostability/prot_t5_xl_uniref50/ses-adapter*
 
 !ckpt/DeepLocBinary/
 ckpt/DeepLocBinary/ankh-base
+ckpt/DeepLocBinary/ankh2-ext2
+ckpt/DeepLocBinary/ankh3-large
+ckpt/DeepLocBinary/ankh3-xl
 ckpt/DeepLocBinary/ankh-large/ses-adapter*
 ckpt/DeepLocBinary/esm2_t30_150M_UR50D
 ckpt/DeepLocBinary/esm2_t33_650M_UR50D/ses-adapter*
@@ -223,6 +244,9 @@ ckpt/DeepLocBinary/prot_t5_xl_uniref50/ses-adapter*
 
 !ckpt/DeepLocMulti/
 ckpt/DeepLocMulti/ankh-base
+ckpt/DeepLocMulti/ankh2-ext2
+ckpt/DeepLocMulti/ankh3-large
+ckpt/DeepLocMulti/ankh3-xl
 ckpt/DeepLocMulti/ankh-large/ses-adapter*
 ckpt/DeepLocMulti/esm2_t30_150M_UR50D
 ckpt/DeepLocMulti/esm2_t33_650M_UR50D/ses-adapter*
@@ -231,6 +255,9 @@ ckpt/DeepLocMulti/prot_t5_xl_uniref50/ses-adapter*
 
 !ckpt/MetalIonBinding/
 ckpt/MetalIonBinding/ankh-base
+ckpt/MetalIonBinding/ankh2-ext2
+ckpt/MetalIonBinding/ankh3-large
+ckpt/MetalIonBinding/ankh3-xl
 ckpt/MetalIonBinding/ankh-large/ses-adapter*
 ckpt/MetalIonBinding/esm2_t30_150M_UR50D
 ckpt/MetalIonBinding/esm2_t33_650M_UR50D/ses-adapter*
@@ -239,6 +266,9 @@ ckpt/MetalIonBinding/prot_t5_xl_uniref50/ses-adapter*
 
 !ckpt/DLKcat/
 ckpt/DLKcat/ankh-base
+ckpt/DLKcat/ankh2-ext2
+ckpt/DLKcat/ankh3-large
+ckpt/DLKcat/ankh3-xl
 ckpt/DLKcat/ankh-large/ses-adapter*
 ckpt/DLKcat/esm2_t30_150M_UR50D
 ckpt/DLKcat/esm2_t33_650M_UR50D/ses-adapter*
@@ -247,6 +277,9 @@ ckpt/DLKcat/prot_t5_xl_uniref50/ses-adapter*
 
 !ckpt/EpHod/
 ckpt/EpHod/ankh-base
+ckpt/EpHod/ankh2-ext2
+ckpt/EpHod/ankh3-large
+ckpt/EpHod/ankh3-xl
 ckpt/EpHod/ankh-large/ses-adapter*
 ckpt/EpHod/esm2_t30_150M_UR50D
 ckpt/EpHod/esm2_t33_650M_UR50D/ses-adapter*
@@ -256,27 +289,42 @@ ckpt/EpHod/prot_t5_xl_uniref50/ses-adapter*
 # VenusX
 !ckpt/VenusX_Res_Act_MP90/
 ckpt/VenusX_Res_Act_MP90/ankh-base
+ckpt/VenusX_Res_Act_MP90/ankh2-ext2
+ckpt/VenusX_Res_Act_MP90/ankh3-large
+ckpt/VenusX_Res_Act_MP90/ankh3-xl
 ckpt/VenusX_Res_Act_MP90/esm2_t30_150M_UR50D
 ckpt/VenusX_Res_Act_MP90/prot_bert
 
 !ckpt/VenusX_Res_BindI_MP90/
 ckpt/VenusX_Res_BindI_MP90/ankh-base
+ckpt/VenusX_Res_BindI_MP90/ankh2-ext2
+ckpt/VenusX_Res_BindI_MP90/ankh3-large
+ckpt/VenusX_Res_BindI_MP90/ankh3-xl
 ckpt/VenusX_Res_BindI_MP90/esm2_t30_150M_UR50D
 ckpt/VenusX_Res_BindI_MP90/prot_bert
 
 !ckpt/VenusX_Res_Motif_MP90/
 ckpt/VenusX_Res_Motif_MP90/ankh-base
+ckpt/VenusX_Res_Motif_MP90/ankh2-ext2
+ckpt/VenusX_Res_Motif_MP90/ankh3-large
+ckpt/VenusX_Res_Motif_MP90/ankh3-xl
 ckpt/VenusX_Res_Motif_MP90/esm2_t30_150M_UR50D
 ckpt/VenusX_Res_Motif_MP90/prot_bert
 
 !ckpt/VenusX_Res_Evo_MP90/
 ckpt/VenusX_Res_Evo_MP90/ankh-base
+ckpt/VenusX_Res_Evo_MP90/ankh2-ext2
+ckpt/VenusX_Res_Evo_MP90/ankh3-large
+ckpt/VenusX_Res_Evo_MP90/ankh3-xl
 ckpt/VenusX_Res_Evo_MP90/esm2_t30_150M_UR50D
 ckpt/VenusX_Res_Evo_MP90/prot_bert
 
 # VenusVaccine
 !ckpt/VenusVaccine_BacteriaBinary/
 ckpt/VenusVaccine_BacteriaBinary/ankh-base
+ckpt/VenusVaccine_BacteriaBinary/ankh2-ext2
+ckpt/VenusVaccine_BacteriaBinary/ankh3-large
+ckpt/VenusVaccine_BacteriaBinary/ankh3-xl
 ckpt/VenusVaccine_BacteriaBinary/ankh-large/ses-adapter*
 ckpt/VenusVaccine_BacteriaBinary/esm2_t30_150M_UR50D
 ckpt/VenusVaccine_BacteriaBinary/esm2_t33_650M_UR50D/ses-adapter*
@@ -285,6 +333,9 @@ ckpt/VenusVaccine_BacteriaBinary/prot_t5_xl_uniref50/ses-adapter*
 
 !ckpt/VenusVaccine_TumorBinary/
 ckpt/VenusVaccine_TumorBinary/ankh-base
+ckpt/VenusVaccine_TumorBinary/ankh2-ext2
+ckpt/VenusVaccine_TumorBinary/ankh3-large
+ckpt/VenusVaccine_TumorBinary/ankh3-xl
 ckpt/VenusVaccine_TumorBinary/ankh-large/ses-adapter*
 ckpt/VenusVaccine_TumorBinary/esm2_t30_150M_UR50D
 ckpt/VenusVaccine_TumorBinary/esm2_t33_650M_UR50D/ses-adapter*
@@ -293,6 +344,9 @@ ckpt/VenusVaccine_TumorBinary/prot_t5_xl_uniref50/ses-adapter*
 
 !ckpt/VenusVaccine_VirusBinary/
 ckpt/VenusVaccine_VirusBinary/ankh-base
+ckpt/VenusVaccine_VirusBinary/ankh2-ext2
+ckpt/VenusVaccine_VirusBinary/ankh3-large
+ckpt/VenusVaccine_VirusBinary/ankh3-xl
 ckpt/VenusVaccine_VirusBinary/ankh-large/ses-adapter*
 ckpt/VenusVaccine_VirusBinary/esm2_t30_150M_UR50D
 ckpt/VenusVaccine_VirusBinary/esm2_t33_650M_UR50D/ses-adapter*
