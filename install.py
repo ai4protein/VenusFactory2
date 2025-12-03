@@ -16,7 +16,5 @@ if args.env == 'system':
 else:
     script_name = f"{base_script}.py"
 
-print(f"Language: {lang}")
-print(f"Using script: {script_name}")
 
 subprocess.run([sys.executable, script_name] + remaining_args)
