@@ -75,7 +75,10 @@ CRITICAL RULES:
 1. For file-based tasks, extract file paths from the context summary and include them in tool_input.
 2. For ai_code_execution, always include "input_files" as a list of file paths.
 3. For data processing requests (splitting datasets, analysis), use ai_code_execution.
-4. Use "dependency:step_1:file_path" to extract file_path from JSON, and use "dependency:step_1" to use the entire output.
+4. DEPENDENCY SYNTAX (CRITICAL):
+   - To extract a specific field: "dependency:step_N:field_name" (e.g., "dependency:step_1:sequence")
+   - To use entire output: "dependency:step_N" (e.g., "dependency:step_1")
+   - Common fields: sequence, file_path, structure_file, uniprot_id
 5. If no tools are needed (e.g., simple chat or greeting), return an empty array [].
 6. Protein function prediction and residue-function prediction are based on sequence model, use sequence or FASTA as input.
 7. Recommand to use sequence-based model in order to save computation cost.
@@ -137,6 +140,33 @@ User asks to download AlphaFold structure:
     }}
   }}
 ]
+
+User asks to query UniProt P04040 and predict its stability:
+[
+  {{
+    "step": 1,
+    "task_description": "Query UniProt database for protein P04040",
+    "tool_name": "UniProt_query",
+    "tool_input": {{
+      "uniprot_id": "P04040"
+    }}
+  }},
+  {{
+    "step": 2,
+    "task_description": "Predict protein stability using sequence from step 1",
+    "tool_name": "protein_function_prediction",
+    "tool_input": {{
+      "sequence": "dependency:step_1:sequence",
+      "model_name": "ESM2-650M",
+      "task": "Stability"
+    }}
+  }}
+]
+
+CRITICAL DEPENDENCY NOTES:
+- Step 1 returns: {{"success": true, "uniprot_id": "P04040", "sequence": "MADSRD..."}}
+- Step 2 uses: "dependency:step_1:sequence" to extract ONLY the sequence field
+- This ensures step 2 receives the sequence string, not the entire JSON object
 """
 
 PLANNER_PROMPT = ChatPromptTemplate.from_messages([
@@ -152,23 +182,42 @@ WORKER_PROMPT = ChatPromptTemplate.from_messages([
 Tool description:
 {tool_description}
 
-MANDATORY RULES (follow exactly):
-1) Begin your response with a single short sentence describing what you will do, e.g., "I will now call the literature_search tool."
-2) DO NOT perform any analysis, reasoning, summarization, or interpretation of the tool output. Your job is to return the tool's raw structured output (pass-through).
-3) Immediately after the action sentence, output exactly ONE machine-parsable JSON object (and nothing else).
-   - Success case (generic tool): {{ "success": true, "result": <tool_raw_output> }}
-   - Success case (literature_search): {{ "success": true, "references": [ <ref_obj>, ... ], "resolved_name": "<optional>" }}
-   - Error case: {{ "success": false, "error": "short explanation" }}
-   Use double curly braces in this prompt to show literal JSON examples.
-4) For literature_search, each reference object MUST include: title, authors (list), year, source, url, doi, abstract. If a field is unknown, use empty string or empty list.
-5) Keep the JSON compact and valid. Do not include any extra prose after the JSON.
+EXECUTION WORKFLOW:
+1. Call the tool ONCE with the correct parameters
+2. Observe the tool's output (JSON format)
+3. If the output contains "success": true → Return the output as your Final Answer
+4. If the output contains "success": false → Return the error as your Final Answer
+5. DO NOT call the tool again after receiving output
 
-Examples (semantic description):
-- Action line:
-  I will now call the literature_search tool for "protein language model mutation".
-- JSON (example description):
-  success: true
-  references: list of reference objects as specified above
+CRITICAL: After the tool returns its result, you MUST immediately provide a Final Answer.
+The Final Answer should be the tool's JSON output, without any additional text.
+
+RESPONSE FORMAT:
+Step 1: State your action
+   Example: "I will now call the {tool_name} tool."
+
+Step 2: Call the tool
+   [Tool executes and returns result]
+
+Step 3: Provide Final Answer
+   After seeing the tool output, immediately respond with:
+   "Final Answer: <tool_output_json>"
+
+Example (correct workflow):
+User: "Query UniProt P04040"
+You: "I will now call the UniProt_query tool."
+Tool returns: {{"success": true, "uniprot_id": "P04040", "sequence": "MADSRD..."}}
+You: "Final Answer: {{"success": true, "uniprot_id": "P04040", "sequence": "MADSRD..."}}"
+
+Example (error case):
+Tool returns: {{"success": false, "error": "Not found"}}
+You: "Final Answer: {{"success": false, "error": "Not found"}}"
+
+IMPORTANT:
+- Always provide "Final Answer: <json>" after the tool executes
+- Do NOT call the tool multiple times
+- Do NOT add extra text before or after the JSON in Final Answer
+- The Final Answer signals task completion to the system
 """),
     ("human", "{input}"),
     ("placeholder", "{agent_scratchpad}"),
