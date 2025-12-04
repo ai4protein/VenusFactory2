@@ -254,7 +254,7 @@ def main():
     if os.path.exists("pyproject.toml"):
         print("\n📦 Synchronizing other regular dependencies...")
         run(
-            f"--index_url {pip_mirror["index_url"]} -r pyproject.toml",
+            f"--index-url {pip_mirror["index_url"]} -r pyproject.toml",
             "Install regular dependencies"
         )
 
