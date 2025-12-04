@@ -1,0 +1,14 @@
+services:
+  factory:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      tags:
+        - venusfactory/ce:${VENUS_FACTORY_CUDA_VARIANT:-cpu}-${VENUS_FACTORY_VERSION_NUMBER:-0.1.0}
+      args:
+        - VENUS_FACTORY_CUDA_VARIANT=${VENUS_FACTORY_CUDA_VARIANT:-cpu}
+    ports:
+      - "7860:7860" 
+      - "8080:8080" 
+    volumes:
+      - .env:/app/.env

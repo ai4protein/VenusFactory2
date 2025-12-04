@@ -20,6 +20,7 @@ from web.venus_factory_download_tab import create_download_tool_tab
 from web.venus_factory_quick_tool_tab import create_quick_tool_tab
 from web.venus_factory_comprehensive_tab import create_comprehensive_tab
 from fast_api import app as fastapi_app
+from mcp_venusfactory import start_http_server
 from fastapi_mcp import FastApiMCP
 import uvicorn
 
@@ -275,6 +276,9 @@ if __name__ == "__main__":
 
         fastapi_host, fastapi_port = start_fastapi_server()
         print(f"[FastAPI] Background API available at http://{fastapi_host}:{fastapi_port}")
+
+        mcp_host, mcp_port = start_http_server()
+        print(f"[MCP] HTTP server available at http://{mcp_host}:{mcp_port}/mcp")
 
         demo = create_ui()
         demo.queue().launch(

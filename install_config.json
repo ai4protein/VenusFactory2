@@ -1,0 +1,24 @@
+{
+  "torch_configs": {
+    "cu128": {
+      "torch_url": "https://download.pytorch.org/whl/cu128",
+      "torch_aug_url": "https://data.pyg.org/whl/torch-2.8.0+cu128.html"
+    },
+    "cpu": {
+      "torch_url": "https://download.pytorch.org/whl/cpu",
+      "torch_aug_url": "https://data.pyg.org/whl/torch-2.8.0+cpu.html"
+    }
+  },
+  "frpc_versions": {
+    "v0.3": {
+      "linux_amd64": "https://cdn-media.huggingface.co/frpc-gradio-0.3/frpc_linux_amd64",
+      "linux_arm64": "https://cdn-media.huggingface.co/frpc-gradio-0.3/frpc_linux_arm64",
+      "windows_amd64": "https://cdn-media.huggingface.co/frpc-gradio-0.3/frpc_windows_amd64.exe",
+      "darwin_amd64": "https://cdn-media.huggingface.co/frpc-gradio-0.3/frpc_darwin_amd64",
+      "darwin_arm64": "https://cdn-media.huggingface.co/frpc-gradio-0.3/frpc_darwin_arm64"
+    }
+  },
+  "pip_mirror": {
+    "index_url": "https://pypi.org/simple"
+  }
+}
