@@ -372,7 +372,33 @@ def get_cached_tool_result(session_state: dict, tool_name: str, tool_input: dict
     return None
 
 
-def save_cached_tool_result(session_state: dict, tool_name: str, tool_input: dict, outputs: Any) -> None:
+def save_cached_tool_result(session_state: dict, tool_name: str, tool_input: dict, outputs: Any) -> bool:
+    """Save tool result to cache only if execution was successful.
+    
+    Returns:
+        bool: True if result was cached, False if result indicates failure and was not cached
+    """
+    # Check if the output indicates success
+    is_success = True
+    if isinstance(outputs, dict):
+        # If output has 'success' field, use it to determine if we should cache
+        if 'success' in outputs:
+            is_success = outputs.get('success', False)
+    elif isinstance(outputs, str):
+        # Try to parse string output as JSON to check success field
+        try:
+            parsed = json.loads(outputs)
+            if isinstance(parsed, dict) and 'success' in parsed:
+                is_success = parsed.get('success', False)
+        except (json.JSONDecodeError, ValueError):
+            # If not JSON or no success field, assume success (for backward compatibility)
+            pass
+    
+    # Only cache successful results
+    if not is_success:
+        print(f"⚠ Tool execution failed, not caching result for {tool_name}")
+        return False
+    
     cache_key = generate_cache_key(tool_name, tool_input)
     cache = session_state.setdefault("tool_cache", {})
     
@@ -383,6 +409,8 @@ def save_cached_tool_result(session_state: dict, tool_name: str, tool_input: dic
         "timestamp": time.time(),
         "cache_key": cache_key
     }
+    print(f"✓ Cached successful result for {tool_name}")
+    return True
     
 
 
@@ -442,7 +470,7 @@ def create_worker_executor(llm: BaseChatModel, tools: List[BaseTool]):
         tools=tools,
         verbose=True,
         handle_parsing_errors=True,
-        max_iterations=3, 
+        max_iterations=3,  # Allow retries on errors, but agent should stop after successful tool call
         max_execution_time=300,
         return_intermediate_steps=True,
     )
@@ -459,7 +487,7 @@ def initialize_session_state() -> Dict[str, Any]:
 
     planner_chain = create_planner_chain(llm, all_tools)
     finalizer_chain = create_finalizer_chain(llm)
-    workers = {t.name: t for t in all_tools}
+    workers = {t.name: create_worker_executor(llm, [t]) for t in all_tools}
     
     return {
         'session_id': str(uuid.uuid4()),
@@ -634,28 +662,15 @@ async def send_message(history, message, session_state):
     try:
         # Async planner invocation
         plan = await asyncio.to_thread(session_state['planner'].invoke, planner_inputs)
+        print(json.dumps(plan, indent=2, ensure_ascii=False))
     except Exception as e:
-        # Fallback: if planning/parsing fails, try answering directly without tools
-        history[-1] = {"role": "assistant", "content": "🧭 Generating answers, please wait..."}
-        yield history, gr.MultimodalTextbox(value=None, interactive=False)
-        llm = session_state['llm']
-        # Add system prompt for direct chat
-        messages_with_system = [SystemMessage(content=CHAT_SYSTEM_PROMPT)] + session_state['memory'].chat_memory.messages + [HumanMessage(content=text)]
-        response = await llm.ainvoke(messages_with_system)
-        final_response = response.content
-        history[-1] = {"role": "assistant", "content": final_response}
-        session_state['history'].append({"role": "assistant", "content": final_response})
-        session_state['memory'].save_context({"input": display_text}, {"output": final_response})
-        yield history, gr.MultimodalTextbox(value=None, interactive=True, file_count="multiple")
-        return
+        plan = []
     
     # Ensure plan is a list; otherwise treat as empty (direct chat)
     if not isinstance(plan, list):
         plan = []
 
-    # Advisor refinement removed — use planner output directly as plan
-
-    # If plan is empty, just chat
+    # If plan is empty, just chat (unified handling for both planner failure and empty plan)
     if not plan:
         history[-1] = {"role": "assistant", "content": "🧭 Generating answers, please wait..."}
         yield history, gr.MultimodalTextbox(value=None, interactive=False)
@@ -665,6 +680,14 @@ async def send_message(history, message, session_state):
         messages_with_system = [SystemMessage(content=CHAT_SYSTEM_PROMPT)] + session_state['memory'].chat_memory.messages + [HumanMessage(content=text)]
         response = await llm.ainvoke(messages_with_system)
         final_response = response.content
+        
+        # Update history and memory
+        history[-1] = {"role": "assistant", "content": final_response}
+        session_state['history'].append({"role": "assistant", "content": final_response})
+        session_state['memory'].save_context({"input": display_text}, {"output": final_response})
+        
+        yield history, gr.MultimodalTextbox(value=None, interactive=True, file_count="multiple")
+        return
     else:
         # Execute Plan
         plan_text = "📋 **Plan Created:**\n" + "\n".join([f"**Step {p['step']}**: {p['task_description']}" for p in plan])
@@ -685,7 +708,28 @@ async def send_message(history, message, session_state):
             yield history, gr.MultimodalTextbox(value=None, interactive=False)
 
             try:
+                print(json.dumps(tool_input, indent=2, ensure_ascii=False))
                 merged_tool_input = _merge_tool_parameters_with_context(protein_ctx, tool_input)
+                print(json.dumps(merged_tool_input, indent=2, ensure_ascii=False))
+                
+                # CRITICAL: Resolve dependencies BEFORE cache check and tool execution
+                for key, value in merged_tool_input.items():
+                    if isinstance(value, str) and value.startswith("dependency:"):
+                        parts = value.split(':')
+                        dep_step = int(parts[1].replace('step_', '').replace('step', ''))
+                        dep_raw_output = step_results[dep_step]['raw_output']
+                        if len(parts) > 2:
+                            field_name = parts[2]
+                            try:
+                                parsed = json.loads(dep_raw_output) if isinstance(dep_raw_output, str) else dep_raw_output
+                                merged_tool_input[key] = parsed.get(field_name, dep_raw_output)
+                            except:
+                                merged_tool_input[key] = dep_raw_output
+                        else:
+                            merged_tool_input[key] = dep_raw_output
+                
+                print(json.dumps(merged_tool_input, indent=2, ensure_ascii=False))
+                
                 cached_entry = get_cached_tool_result(session_state, tool_name, merged_tool_input)
                 
                 if cached_entry:
@@ -719,39 +763,59 @@ async def send_message(history, message, session_state):
                     yield history, gr.MultimodalTextbox(value=None, interactive=False)
                     continue
 
-                for key, value in merged_tool_input.items():
-                    if isinstance(value, str) and value.startswith("dependency:"):
-                        parts = value.split(':')
-                        dep_step = int(parts[1].replace('step_', '').replace('step', ''))
-                        raw_output = step_results[dep_step]['raw_output']
-                        if len(parts) > 2:
-                            field_name = parts[2]
-                            try:
-                                parsed = json.loads(raw_output) if isinstance(raw_output, str) else raw_output
-                                merged_tool_input[key] = parsed.get(field_name, raw_output)
-                            except:
-                                merged_tool_input[key] = raw_output
+                # Dependencies already resolved above, proceed to tool execution
+                worker_executor = session_state['workers'].get(tool_name)
+                if not worker_executor:
+                    raise ValueError(f"Worker executor '{tool_name}' not found.")
+                inputs_json_str = json.dumps(merged_tool_input, ensure_ascii=False, indent=2)
+
+                agent_input_text = (
+                    f"Execute this task: {task_desc}\n\n"
+                    f"INPUT DATA (Use these parameters explicitly, DO NOT ASK for them):\n"
+                    f"```json\n{inputs_json_str}\n```\n"
+                    f"Command: Call the tool '{tool_name}' immediately using the data above."
+                )
+
+                executor_result = await asyncio.to_thread(
+                    worker_executor.invoke, 
+                    {
+                        "input": agent_input_text,
+                        **merged_tool_input
+                    }
+                )
+
+                # Extract tool output from intermediate_steps (the actual tool return value)
+                # intermediate_steps format: [(AgentAction, tool_output), ...]
+                raw_output = ''
+                if executor_result.get('intermediate_steps'):
+                    # Get the last tool execution result (should only be 1 with max_iterations=3)
+                    last_step = executor_result['intermediate_steps'][-1]
+                    if len(last_step) >= 2:
+                        tool_output = last_step[1]  # The tool's actual output
+                        # Ensure output is a string (tools may return dict or str)
+                        if isinstance(tool_output, str):
+                            raw_output = tool_output
                         else:
-                            merged_tool_input[key] = raw_output
-
-                tool_inst = session_state['workers'].get(tool_name)
-                if not tool_inst:
-                    raise ValueError(f"Tool '{tool_name}' not found.")
-
-                # Directly invoke the tool with merged input parameters
-                worker_result = await asyncio.to_thread(tool_inst.invoke, merged_tool_input)
-
-                # Normalize to string for consistent downstream handling and UI display
-                raw_output = worker_result if isinstance(worker_result, str) else json.dumps(worker_result, ensure_ascii=False)
+                            # Convert dict/object to JSON string
+                            raw_output = json.dumps(tool_output, ensure_ascii=False)
+                    else:
+                        raw_output = executor_result.get('output', '')
+                else:
+                    # Fallback to agent's text output if no intermediate steps
+                    raw_output = executor_result.get('output', '')
                 step_results[step_num] = {'raw_output': raw_output, 'cached': False}
 
+                # Try to parse and cache the result (only if successful)
                 try:
                     try:
                         parsed_output = json.loads(raw_output)
                     except Exception:
                         parsed_output = raw_output
 
-                    save_cached_tool_result(session_state, tool_name, merged_tool_input, parsed_output)
+                    # Only cache if the tool execution was successful
+                    cached = save_cached_tool_result(session_state, tool_name, merged_tool_input, parsed_output)
+                    if not cached:
+                        print(f"⚠ Step {step_num} result not cached due to execution failure")
 
                     # Collect references from parsed output if provided by the tool
                     try:
@@ -762,7 +826,9 @@ async def send_message(history, message, session_state):
                     except Exception:
                         pass
                 except Exception as e:
-                    print(f"Failed to cache result: {e}")
+                    print(f"Failed to process result: {e}")
+                
+                # Always record tool call in history (for tracking purposes, regardless of success/failure)
                 protein_ctx.add_tool_call(step_num, tool_name, merged_tool_input, raw_output, cached=False)
                 
                 # Parse tool output to update context
@@ -796,7 +862,9 @@ async def send_message(history, message, session_state):
                 step_detail = f"**Step {step_num}:** {task_desc}\n\n"
                 step_detail += f"**Tool:** {tool_name}\n"
                 step_detail += f"**Input:** {json.dumps(merged_tool_input, indent=2)}\n\n"
-                step_detail += f"**Output:**\n```\n{raw_output[:500]}{'...' if len(raw_output) > 500 else ''}\n```"
+                # Safely display output (ensure it's a string)
+                output_str = str(raw_output) if not isinstance(raw_output, str) else raw_output
+                step_detail += f"**Output:**\n```\n{output_str[:500]}{'...' if len(output_str) > 500 else ''}\n```"
                 
                 analysis_log += f"--- Analysis for Step {step_num}: {task_desc} ---\n\n"
                 analysis_log += f"Tool: {tool_name}\n"
@@ -833,8 +901,6 @@ async def send_message(history, message, session_state):
         session_state['memory'].save_context({"input": display_text}, {"output": final_response})
         
         yield history, gr.MultimodalTextbox(value=None, interactive=True, file_count="multiple")
-    
-    yield history, gr.MultimodalTextbox(value=None, interactive=True, file_count="multiple")
 
 
 def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:

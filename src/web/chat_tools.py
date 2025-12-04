@@ -78,7 +78,7 @@ class ProteinPropertiesInput(BaseModel):
 class CodeExecutionInput(BaseModel):
     """Input for AI-generated code execution"""
     task_description: str = Field(..., description="Description of the task to be accomplished")
-    input_files: List[str] = Field(default=[], description="List of input file paths")
+    input_files: Optional[List[str]] = Field(default=None, description="Optional list of input file paths")
 
 class NCBISequenceInput(BaseModel):
     """Input for NCBI sequence download"""
@@ -266,7 +266,10 @@ def ai_code_execution_tool(task_description: str, input_files: List[str] = []) -
     try:
         return generate_and_execute_code(task_description, input_files)
     except Exception as e:
-        return f"Code execution error: {str(e)}"
+        return json.dumps({
+            "success": False,
+            "error": f"Code execution error: {str(e)}"
+        }, ensure_ascii=False)
 
 @tool("ncbi_sequence_download", args_schema=NCBISequenceInput)
 def ncbi_sequence_download_tool(accession_id: str, output_format: str = "fasta") -> str:
@@ -870,28 +873,40 @@ def call_protein_properties_prediction(sequence: str = None, fasta_file: str = N
     except Exception as e:
         return f"Protein properties prediction error: {str(e)}"
 
-def generate_and_execute_code(task_description: str, input_files: List[str] = []) -> str:
+def generate_and_execute_code(task_description: str, input_files: Optional[List[str]] = None) -> str:
     """
-    Generate and execute Python code based on task description.
+    Generate and execute Python code for data processing, model training, and prediction.
+    Supports multi-turn conversations: train a model in one turn, use it for prediction in later turns.
     """
     script_path = None 
     try:
-        api_key = os.getenv("DEEPSEEK_API_KEY")
+        # Use same API configuration as chat_tab.py
+        chat_api_key = os.getenv("OPENAI_API_KEY")
+        if not chat_api_key:
+            return json.dumps({
+                "success": False,
+                "error": "Chat API key is not configured. Please set OPENAI_API_KEY."
+            })
+
+        chat_base_url = "https://www.dmxapi.com/v1"
+        chat_model_name = os.getenv("CHAT_MODEL_NAME", "gemini-2.5-pro")
+        max_tokens = int(os.getenv("CHAT_CODE_MAX_TOKENS", "10000"))  # Increased to prevent code truncation
         
         # Validate and prepare input files
         valid_files = []
         file_info = []
-        for file_path in input_files:
-            if os.path.exists(file_path):
-                valid_files.append(file_path)
-                # Get file info for better context
-                file_ext = os.path.splitext(file_path)[1]
-                file_size = os.path.getsize(file_path)
-                file_info.append({
-                    "path": file_path,
-                    "extension": file_ext,
-                    "size_kb": round(file_size / 1024, 2)
-                })
+        if input_files:
+            for file_path in input_files:
+                if os.path.exists(file_path):
+                    valid_files.append(os.path.abspath(file_path))  # Use absolute path
+                    # Get file info for better context
+                    file_ext = os.path.splitext(file_path)[1]
+                    file_size = os.path.getsize(file_path)
+                    file_info.append({
+                        "path": os.path.abspath(file_path),
+                        "extension": file_ext,
+                        "size_kb": round(file_size / 1024, 2)
+                    })
         
         # Determine output directory
         if valid_files:
@@ -899,82 +914,184 @@ def generate_and_execute_code(task_description: str, input_files: List[str] = []
             output_directory = os.path.dirname(primary_file)
         else:
             output_directory = str(get_save_path("Code_Execution", "Generated_Outputs"))
+        
+        # Ensure output_directory is absolute path
+        output_directory = os.path.abspath(output_directory)
+        
+        # Model registry directory for persistent storage
+        model_registry_dir = os.path.join(output_directory, "trained_models")
+        os.makedirs(model_registry_dir, exist_ok=True)
+        
+        # Get list of available trained models
+        available_models = []
+        if os.path.exists(model_registry_dir):
+            for item in os.listdir(model_registry_dir):
+                item_path = os.path.join(model_registry_dir, item)
+                if os.path.isdir(item_path):
+                    # Check if it contains model files
+                    model_files = [f for f in os.listdir(item_path) if f.endswith(('.pkl', '.joblib', '.h5', '.pt', '.pth'))]
+                    if model_files:
+                        available_models.append({
+                            "name": item,
+                            "path": item_path,
+                            "files": model_files
+                        })
 
-        # Enhanced prompt with more context and flexibility
-        code_prompt = f"""You are an expert Python programmer specializing in bioinformatics and data processing.
-Generate a complete, executable Python script to accomplish the following task.
+        # Enhanced prompt supporting both training and prediction
+        code_prompt = f"""Generate a COMPLETE, executable Python script for this task.
 
-**TASK DESCRIPTION:**
-{task_description}
+**TASK:** {task_description}
 
-**INPUT FILES:**
-{json.dumps(file_info, indent=2) if file_info else "No input files provided"}
+**INPUT FILES:** {json.dumps(file_info, indent=2) if file_info else "None"}
+**OUTPUT DIR:** {output_directory}
+**MODEL REGISTRY:** {model_registry_dir}
+**AVAILABLE TRAINED MODELS:** {json.dumps(available_models, indent=2) if available_models else "None"}
 
-**OUTPUT DIRECTORY:**
-{output_directory}
+**CRITICAL REQUIREMENTS:**
+1. Write COMPLETE code - DO NOT truncate or use placeholders like "# ... rest of code"
+2. Include ALL imports at the top
+3. Save all outputs to: {output_directory}
+4. Use try-except for error handling
+5. End with JSON output:
+   print(json.dumps({{"success": True/False, "output_files": [...], "summary": "...", "model_info": {{...}}, "details": {{...}}}})))
 
-**REQUIREMENTS:**
-1. Generate PRODUCTION-READY code with proper error handling
-2. If input files are provided, read and process them appropriately
-3. Save ALL output files to: {output_directory}
-   - Use descriptive filenames (e.g., 'mutant_A12R.fasta', 'analysis_results.csv')
-   - Use os.path.join('{output_directory}', 'filename.ext') for all output paths
-4. The script MUST be runnable standalone from command line
-5. Include ALL necessary imports at the top
-6. Add informative print statements for progress tracking
-7. At the end, print a JSON summary with:
-   - "success": true/false
-   - "output_files": list of created file paths
-   - "summary": brief description of what was done
-   - "details": any relevant metrics or information
+**TASK-SPECIFIC GUIDELINES:**
 
-**AVAILABLE LIBRARIES:**
-pandas, numpy, scikit-learn, biopython (Bio.SeqIO, Bio.Seq), json, os, shutil, pathlib, re, collections
+📊 CSV DATA SPLITTING:
+- Use train_test_split from sklearn.model_selection
+- Split ratios: 70% train, 15% validation, 15% test
+- Use stratify parameter for classification tasks
+- Save as: train.csv, val.csv, test.csv
 
-**COMMON TASK PATTERNS:**
+🤖 MODEL TRAINING (New Model):
+- Auto-detect task type (classification/regression)
+- Use models: LogisticRegression, RandomForestClassifier, RandomForestRegressor, XGBoost, LightGBM
+- Create a timestamped folder in MODEL REGISTRY: {model_registry_dir}/model_YYYYMMDD_HHMMSS/
+- Save model: joblib.dump(model, 'model.pkl')
+- Save metadata: JSON file with task type, features, metrics, training date
+- Save feature names and preprocessing info for later use
+- Report metrics: accuracy/F1 for classification, RMSE/R2 for regression
+- Return model_info with model path and name
 
-For SEQUENCE MUTATION:
-- Read FASTA file using Bio.SeqIO
-- Apply mutation (e.g., seq[position] = new_amino_acid)
-- Save mutant to new FASTA file
-- Example: A12R means position 12 (0-indexed: 11), Alanine → Arginine
+🔮 MODEL PREDICTION (Using Existing Model):
+- Check AVAILABLE TRAINED MODELS list
+- Load model: model = joblib.load(model_path)
+- Load metadata to understand feature requirements
+- Apply same preprocessing as training
+- Make predictions on new data
+- Save predictions to CSV
+- Report prediction statistics
 
-For DATA SPLITTING:
-- Use train_test_split from sklearn
-- Maintain label distribution with stratify parameter
-- Save as separate CSV files (train.csv, valid.csv, test.csv)
+🧬 SEQUENCE MUTATION:
+- Use Bio.SeqIO for FASTA files
+- Mutation format: A12R = position 12 (0-indexed: 11), Ala→Arg
+- Save mutant as new FASTA file
 
-For FILE MODIFICATION:
-- Read file, apply modifications, save with new name or overwrite
-- Always backup important files before modification
+**MULTI-TURN WORKFLOW EXAMPLE:**
 
-For ANALYSIS:
-- Generate statistics, visualizations, or reports
-- Save results to JSON or CSV format
+Turn 1 - Training:
+```python
+import joblib, json, os
+from sklearn.ensemble import RandomForestClassifier
+from datetime import datetime
 
-**CRITICAL:**
-- Return ONLY raw Python code (no markdown, no ```python blocks, no explanations)
-- Code must be immediately executable
-- Use try-except blocks for robust error handling
-- Final print must be valid JSON for parsing
+# Train model
+model = RandomForestClassifier()
+model.fit(X_train, y_train)
 
-**EXAMPLE FINAL OUTPUT:**
+# Save to registry
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+model_dir = os.path.join("{model_registry_dir}", f"model_{{timestamp}}")
+os.makedirs(model_dir, exist_ok=True)
+joblib.dump(model, os.path.join(model_dir, "model.pkl"))
+
+# Save metadata
+metadata = {{
+    "model_name": f"model_{{timestamp}}",
+    "task_type": "classification",
+    "features": list(X_train.columns),
+    "accuracy": 0.95,
+    "created_at": timestamp
+}}
+with open(os.path.join(model_dir, "metadata.json"), "w") as f:
+    json.dump(metadata, f)
+
 print(json.dumps({{
     "success": True,
-    "output_files": ["/path/to/output1.fasta", "/path/to/output2.csv"],
-    "summary": "Created A12R mutant from human insulin sequence",
-    "details": {{"original_length": 110, "mutation": "A12R", "position": 12}}
+    "model_info": {{
+        "name": f"model_{{timestamp}}",
+        "path": model_dir
+    }},
+    "summary": "Model trained and saved"
 }}))
+```
+
+Turn 2 - Prediction:
+```python
+import joblib, json, os
+
+# Load latest model or specified model
+model_dir = "{model_registry_dir}/model_20241203_140530"  # Use available model
+model = joblib.load(os.path.join(model_dir, "model.pkl"))
+
+# Load metadata
+with open(os.path.join(model_dir, "metadata.json")) as f:
+    metadata = json.load(f)
+
+# Make predictions
+predictions = model.predict(X_new)
+
+print(json.dumps({{
+    "success": True,
+    "output_files": ["predictions.csv"],
+    "summary": "Predictions completed",
+    "model_info": metadata
+}}))
+```
+
+**CODE STRUCTURE:**
+```python
+import json
+import os
+import joblib
+from datetime import datetime
+# ... other imports
+
+def main():
+    try:
+        # Your implementation here
+        
+        # Final JSON output
+        result = {{
+            "success": True,
+            "output_files": [],
+            "summary": "Task completed",
+            "model_info": {{}}  # Include if model training/prediction
+        }}
+        print(json.dumps(result))
+    except Exception as e:
+        print(json.dumps({{"success": False, "error": str(e)}}))
+
+if __name__ == "__main__":
+    main()
+```
+
+**IMPORTANT:** 
+- Return ONLY Python code (no markdown, no explanations)
+- Code must be complete and runnable
+- For training: ALWAYS save model to MODEL REGISTRY with metadata
+- For prediction: ALWAYS load model from MODEL REGISTRY
+- Include model_info in JSON output for tracking
 """
 
-        # Call DeepSeek API
+        # Call configured chat completion API
         headers = {
-            "Authorization": f"Bearer {api_key}",
+            "Authorization": f"Bearer {chat_api_key}",
             "Content-Type": "application/json"
         }
-        
+
         data = {
-            "model": "deepseek-chat",
+            "model": chat_model_name,
             "messages": [
                 {
                     "role": "system", 
@@ -985,12 +1102,13 @@ print(json.dumps({{
                     "content": code_prompt
                 }
             ],
-            "temperature": 0.1,
-            "max_tokens": 3000  # Increased for more complex code
+            "temperature": 0.2,  # Slightly higher for more creative solutions
+            "max_tokens": max_tokens
         }
-        
+
+        endpoint = f"{chat_base_url.rstrip('/')}/chat/completions"
         response = requests.post(
-            "https://api.deepseek.com/v1/chat/completions",
+            endpoint,
             headers=headers,
             json=data,
             timeout=60
@@ -1009,21 +1127,49 @@ print(json.dumps({{
         generated_code = re.sub(r'^```python\s*', '', generated_code)
         generated_code = re.sub(r'^```\s*', '', generated_code)
         generated_code = re.sub(r'\s*```$', '', generated_code)
+        generated_code = generated_code.strip()
         
-        # Save generated code for debugging
-        temp_script_name = f"generated_code_{uuid.uuid4().hex}.py"
-        script_path = os.path.join(tempfile.gettempdir(), temp_script_name)
+        # Check code completeness
+        if not generated_code:
+            return json.dumps({
+                "success": False,
+                "error": "Generated code is empty"
+            })
+        
+        # Basic completeness checks
+        has_imports = 'import' in generated_code
+        has_main = 'def main()' in generated_code or 'if __name__' in generated_code
+        has_json_output = 'json.dumps' in generated_code
+        
+        if not (has_imports and has_main and has_json_output):
+            return json.dumps({
+                "success": False,
+                "error": f"Generated code appears incomplete. Missing: {', '.join([x for x, y in [('imports', not has_imports), ('main function', not has_main), ('JSON output', not has_json_output)] if y])}",
+                "generated_code_preview": generated_code[:500]
+            })
+        
+        # Save generated code to temp_output directory structure
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        code_filename = f"generated_code_{timestamp}_{uuid.uuid4().hex[:8]}.py"
+        
+        # Use the same directory structure as other outputs
+        code_save_dir = os.path.join(output_directory, "generated_scripts")
+        os.makedirs(code_save_dir, exist_ok=True)
+        script_path = os.path.abspath(os.path.join(code_save_dir, code_filename))
         
         with open(script_path, 'w', encoding='utf-8') as f:
             f.write(generated_code)
         
-        # Execute the generated code
+        print(f"📝 Generated code saved to: {script_path}")
+        print(f"📂 Working directory: {output_directory}")
+        
+        # Execute the generated code with absolute path
         process = subprocess.run(
             [sys.executable, script_path],
             capture_output=True, 
             text=True,           
             timeout=120,
-            cwd=output_directory  # Run in output directory for relative paths
+            cwd=output_directory  # Run in output directory for file access
         )
 
         if process.returncode == 0:
@@ -1034,10 +1180,15 @@ print(json.dumps({{
                 json_match = re.search(r'\{.*\}', stdout, re.DOTALL)
                 if json_match:
                     result_json = json.loads(json_match.group())
-                    result_json["generated_code_path"] = script_path  # Keep for debugging
+                    result_json["generated_code_path"] = script_path
+                    result_json["success"] = True  # Ensure success flag is set
+                    
+                    # Keep the generated code since execution was successful
+                    print(f"✓ Code executed successfully. Saved to: {script_path}")
                     return json.dumps(result_json, indent=2)
                 else:
-                    # Fallback if no JSON found
+                    # Fallback if no JSON found but execution succeeded
+                    print(f"✓ Code executed but no JSON output found. Saved to: {script_path}")
                     return json.dumps({
                         "success": True,
                         "output": stdout,
@@ -1045,30 +1196,58 @@ print(json.dumps({{
                     }, indent=2)
             except json.JSONDecodeError:
                 # If JSON parsing fails, return raw output
+                print(f"✓ Code executed but JSON parsing failed. Saved to: {script_path}")
                 return json.dumps({
                     "success": True,
                     "output": stdout,
                     "generated_code_path": script_path
                 }, indent=2)
         else:
-            return json.dumps({
+            # Execution failed - prepare error message
+            stderr = process.stderr.strip()
+            stdout = process.stdout.strip()
+            
+            # Keep the failed code for debugging
+            print(f"✗ Code execution failed. Script saved for debugging: {script_path}")
+            print(f"Error output: {stderr[:500]}")
+            
+            error_result = json.dumps({
                 "success": False,
-                "error": process.stderr,
-                "stdout": process.stdout,
-                "generated_code_path": script_path
-            }, indent=2)
+                "error": stderr if stderr else "Code execution failed with no error message",
+                "stdout": stdout,
+                "generated_code_path": script_path,
+                "debug_info": {
+                    "working_directory": output_directory,
+                    "script_path": script_path,
+                    "return_code": process.returncode
+                }
+            }, indent=2, ensure_ascii=False)
+            
+            return error_result
             
     except subprocess.TimeoutExpired:
+        # Clean up timed-out script
+        if script_path and os.path.exists(script_path):
+            try:
+                os.remove(script_path)
+                print(f"✗ Code execution timed out. Deleted script: {script_path}")
+            except Exception:
+                pass
         return json.dumps({
             "success": False,
-            "error": "Code execution timed out (>120 seconds)",
-            "generated_code_path": script_path
+            "error": "Code execution timed out (>120 seconds)"
         })
     except Exception as e:
+        # Clean up on error
+        if script_path and os.path.exists(script_path):
+            try:
+                os.remove(script_path)
+                print(f"✗ Error occurred. Deleted script: {script_path}")
+            except Exception:
+                pass
         return json.dumps({
             "success": False,
-            "error": f"Unexpected error: {str(e)}",
-            "generated_code_path": script_path
+            "error": f"Unexpected error: {str(e)}"
         })
 
 
