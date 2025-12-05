@@ -8,6 +8,8 @@ version = "0.1.0"
 description = "venus-factory"
 readme = "README.md"
 requires-python = ">=3.12"
+
+
 dependencies = [
     "Authlib>=1.6.5",
     "Brotli>=1.1.0",
@@ -74,7 +76,7 @@ dependencies = [
     "gradio==5.44.1",
     "gradio_client==1.12.1",
     "gradio_molecule3d==0.0.7",
-    "greenlet>=3.2.4",
+    "greenlet==3.2.4",
     "groovy>=0.1.2",
     "h11>=0.16.0",
     "hf-xet>=1.1.9",
