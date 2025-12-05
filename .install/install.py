@@ -177,28 +177,6 @@ def ensure_uv_installed():
         print("❌ Automatic uv installation failed.")
         print("Please try manually running: pip install uv")
         sys.exit(1)
-        
-def ensure_pip_in_venv():
-    """
-    Check if pip exists in .venv.
-    """
-    print("\n🔍 Checking if pip exists in .venv...")
-    
-    if sys.platform == "win32":
-        pip_path = os.path.join(VENV_PATH, "Scripts", "pip.exe")
-    else:
-        pip_path = os.path.join(VENV_PATH, "bin", "pip")
-
-    if os.path.exists(pip_path):
-        print("✅ Detected pip already exists, no installation needed.")
-    else:
-        print("⚠️  .venv is missing pip (uv doesn't install by default), automatically installing...")
-        try:
-            subprocess.check_call(f"uv pip install -p {VENV_PATH} pip", shell=True)
-            print("✅ pip installation successful!")
-        except subprocess.CalledProcessError:
-            print("❌ pip installation failed!")
-            sys.exit(1)
             
 def run(cmd, step_name):
     print(f"\n🚀 [Step: {step_name}] Executing...")
@@ -256,8 +234,6 @@ def main():
     if not os.path.exists(VENV_PATH):
         print("📦 Creating virtual environment...")
         subprocess.check_call(f"uv venv --python 3.12.0 {VENV_PATH}", shell=True)
-    
-    ensure_pip_in_venv()
 
     # ==========================================
     # Step 1: Install PyTorch
