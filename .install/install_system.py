@@ -171,7 +171,7 @@ def ensure_uv_installed():
     print("⚠️  uv not found in current environment, automatically installing via pip...")
     
     try:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "uv"])
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "uv", "-i", pip_mirror["index_url"]])
         print("✅ uv installation successful!")
     except subprocess.CalledProcessError:
         print("❌ Automatic uv installation failed.")
