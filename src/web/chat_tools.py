@@ -343,35 +343,44 @@ def call_zero_shot_sequence_prediction(
         if 'temp_fasta_created' in locals() and temp_fasta_created:
             os.unlink(fasta_path)
 
+        # Extract tar path which contains heatmap
+        update_dict = result[3]
+        tar_file_path = update_dict['value']
+        
         # Limit mutation results to first 200 entries to avoid long context
         raw_result = result[2]
         try:
-            import json
-            # Check if raw_result is already a dict or needs to be parsed
-            if isinstance(raw_result, dict):
-                result_data = raw_result
-            else:
-                result_data = json.loads(raw_result)
-            
-            # Handle the data format with 'data' field containing mutations
             if isinstance(raw_result, dict) and 'data' in raw_result:
                 mutations_data = raw_result['data']
                 total_mutations = len(mutations_data)
-                if total_mutations > 1000:
-                    top_50 = mutations_data[:500]
-                    bottom_50 = mutations_data[-500:]
+                if total_mutations > 100:
+                    top_50 = mutations_data[:50]
                     separator_row = ['...', '...', '...']
-                    combined_data = top_50 + [separator_row] + bottom_50
+                    combined_data = top_50 + [separator_row]
                     raw_result['data'] = combined_data
                     raw_result['total_mutations'] = total_mutations
-                    raw_result['displayed_mutations'] = 1000
-                    raw_result['note'] = (f"Showing top 500 most beneficial and bottom 500 least beneficial mutations "
+                    raw_result['displayed_mutations'] = 50
+                    raw_result['note'] = (f"Showing top 50 most beneficial mutations "
                                           f"out of {total_mutations} total to avoid long context. "
                                           f"Results are separated by '...'.")
+            
+            # Add heatmap path to the result if available
+            if tar_file_path:
+                import tarfile
+                try:
+                    with tarfile.open(tar_file_path, 'r:gz') as tar:
+                        for member in tar.getmembers():
+                            if member.name.endswith('.html') and 'heatmap' in member.name.lower():
+                                heatmap_filename = os.path.basename(member.name)
+                                heatmap_dir = get_save_path("Zero_shot", "HeatMap")
+                                heatmap_path = str(heatmap_dir / heatmap_filename)
+                                raw_result['heatmap_path'] = heatmap_path
+                                break
+                except Exception as e:
+                    print(f"Warning: Could not extract heatmap path: {e}")
         
             return json.dumps(raw_result, indent=2)
         except (json.JSONDecodeError, KeyError, TypeError):
-            # If not JSON or doesn't have expected structure, return as is
             return raw_result
     except Exception as e:
         return f"Zero-shot sequence prediction error: {str(e)}"
@@ -389,27 +398,42 @@ def call_zero_shot_structure_prediction_from_file(structure_file: str, model_nam
             model_name=model_name,
             api_name="/handle_mutation_prediction_base"
         )
+        
+        # Extract tar path which contains heatmap
+        tar_path_str = result[3] if len(result) > 3 else None
+        
         # Limit mutation results to first 200 entries to avoid long context
         raw_result = result[2]
         try:
-            import json
-            result_data = json.loads(raw_result)
-            
-            # Handle the data format with 'data' field containing mutations
             if isinstance(raw_result, dict) and 'data' in raw_result:
                 mutations_data = raw_result['data']
                 total_mutations = len(mutations_data)
                 if total_mutations > 100:
                     top_50 = mutations_data[:50]
-                    bottom_50 = mutations_data[-50:]
                     separator_row = ['...', '...', '...']
-                    combined_data = top_50 + [separator_row] + bottom_50
+                    combined_data = top_50 + [separator_row]
                     raw_result['data'] = combined_data
                     raw_result['total_mutations'] = total_mutations
-                    raw_result['displayed_mutations'] = 100
-                    raw_result['note'] = (f"Showing top 50 most beneficial and bottom 50 least beneficial mutations "
+                    raw_result['displayed_mutations'] = 50
+                    raw_result['note'] = (f"Showing top 50 most beneficial mutations "
                                           f"out of {total_mutations} total to avoid long context. "
                                           f"Results are separated by '...'.")
+            
+            # Add heatmap path to the result if available
+            if tar_path_str:
+                import tarfile
+                try:
+                    with tarfile.open(tar_path_str, 'r:gz') as tar:
+                        for member in tar.getmembers():
+                            if member.name.endswith('.html') and 'heatmap' in member.name.lower():
+                                heatmap_filename = os.path.basename(member.name)
+                                heatmap_dir = get_save_path("Zero_shot", "HeatMap")
+                                heatmap_path = str(heatmap_dir / heatmap_filename)
+                                raw_result['heatmap_path'] = heatmap_path
+                                break
+                except Exception as e:
+                    print(f"Warning: Could not extract heatmap path: {e}")
+                
         
             return json.dumps(raw_result, indent=2)
         except (json.JSONDecodeError, KeyError, TypeError):
