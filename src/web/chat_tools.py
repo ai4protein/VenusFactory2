@@ -506,7 +506,13 @@ def call_protein_function_prediction(
         if temp_fasta_path:
             os.unlink(temp_fasta_path)
 
-        return result[1]
+        # Convert DataFrame to JSON string for MCP response
+        df = result[1]
+        if isinstance(df, pd.DataFrame):
+            # Convert DataFrame to JSON with records orientation
+            # This will output: [{"Protein Name": "...", "Sequence": "...", "Predicted Class": "...", ...}, ...]
+            return df.to_json(orient='records', force_ascii=False, indent=2)
+        return str(df)
     except Exception as e:
         return f"Function prediction error: {str(e)}"
 
