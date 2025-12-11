@@ -504,7 +504,7 @@ def handle_protein_function_prediction(
             final_df = pd.concat(voted_results, ignore_index=True)
             final_df = final_df.drop(columns=['Dataset'], errors='ignore')
     display_df = final_df.copy()
-    print(f"Using simplified processing, final_df shape: {final_df.shape}")
+    # print(f"Using simplified processing, final_df shape: {final_df.shape}")
     # map_labels is now imported from utils.label_mappers
     
     # Apply label mapping
@@ -538,8 +538,8 @@ def handle_protein_function_prediction(
         
         display_df.rename(columns={'Dataset': 'Dataset'}, inplace=True)
     
-    print(f"After simple rename, display_df columns: {list(display_df.columns)}")
-    print(f"Display_df shape: {display_df.shape}")
+    # print(f"After simple rename, display_df columns: {list(display_df.columns)}")
+    # print(f"Display_df shape: {display_df.shape}")
 
     ai_summary = "AI Analysis disabled. Enable in settings to generate a report."
     ai_response = "AI Analysis disabled." 
@@ -576,13 +576,13 @@ def handle_protein_function_prediction(
         processed_df_for_save = display_df.copy()
         csv_path = tar_dir / f"Result_{timestamp}.csv"
         processed_df_for_save.to_csv(csv_path, index=False)
-        print(f"Saved CSV to: {csv_path}")
+        # print(f"Saved CSV to: {csv_path}")
 
         # Create simple tar.gz with just the CSV file
         files_to_tar = {str(csv_path): csv_path.name}
         tar_path = tar_dir / f"func_pred_{timestamp}.tar.gz"
         tar_path_str = create_tar_archive(files_to_tar, str(tar_path))
-        print(f"Created tar.gz file: {tar_path_str}")
+        # print(f"Created tar.gz file: {tar_path_str}")
     except Exception as e: 
         print(f"Error creating tar.gz file: {e}")
         tar_path_str = ""
@@ -593,13 +593,13 @@ def handle_protein_function_prediction(
     if enable_ai and not ai_summary.startswith("❌"): 
         final_status += " AI analysis included."
     
-    print(f"Final status: {final_status}")
-    print(f"Display DF shape: {display_df.shape}")
-    print(f"Archive path: {tar_path_str}")
-    print(f"About to yield final results...")
+    # print(f"Final status: {final_status}")
+    # print(f"Display DF shape: {display_df.shape}")
+    # print(f"Archive path: {tar_path_str}")
+    # print(f"About to yield final results...")
     
     progress(1.0, desc="Complete!")
-    print("Progress set to 100%, about to yield...")
+    # print("Progress set to 100%, about to yield...")
     
     # Simple yield without try-catch to avoid any issues
     yield (
@@ -608,7 +608,7 @@ def handle_protein_function_prediction(
         gr.update(visible=True, value=tar_path_str) if tar_path_str else gr.update(visible=False), 
         expert_analysis, ai_response
     )
-    print("Final yield completed successfully!")
+    # print("Final yield completed successfully!")
 
 
 def generate_plots_for_residue_results(results_df: pd.DataFrame, task: str = "Functional Prediction") -> go.Figure:
