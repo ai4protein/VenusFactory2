@@ -364,7 +364,7 @@ def call_zero_shot_sequence_prediction(
                                           f"out of {total_mutations} total to avoid long context. "
                                           f"Results are separated by '...'.")
             
-            # Add heatmap path to the result if available
+            # Add heatmap and CSV paths to the result if available
             if tar_file_path:
                 import tarfile
                 try:
@@ -375,9 +375,13 @@ def call_zero_shot_sequence_prediction(
                                 heatmap_dir = get_save_path("Zero_shot", "HeatMap")
                                 heatmap_path = str(heatmap_dir / heatmap_filename)
                                 raw_result['heatmap_path'] = heatmap_path
-                                break
+                            elif member.name.endswith('.csv') and 'results' in member.name.lower():
+                                csv_filename = os.path.basename(member.name)
+                                csv_dir = get_save_path("Zero_shot", "HeatMap")
+                                csv_path = str(csv_dir / csv_filename)
+                                raw_result['csv_path'] = csv_path
                 except Exception as e:
-                    print(f"Warning: Could not extract heatmap path: {e}")
+                    print(f"Warning: Could not extract file paths: {e}")
         
             return json.dumps(raw_result, indent=2)
         except (json.JSONDecodeError, KeyError, TypeError):
@@ -419,7 +423,7 @@ def call_zero_shot_structure_prediction_from_file(structure_file: str, model_nam
                                           f"out of {total_mutations} total to avoid long context. "
                                           f"Results are separated by '...'.")
             
-            # Add heatmap path to the result if available
+            # Add heatmap and CSV paths to the result if available
             if tar_path_str:
                 import tarfile
                 try:
@@ -430,9 +434,13 @@ def call_zero_shot_structure_prediction_from_file(structure_file: str, model_nam
                                 heatmap_dir = get_save_path("Zero_shot", "HeatMap")
                                 heatmap_path = str(heatmap_dir / heatmap_filename)
                                 raw_result['heatmap_path'] = heatmap_path
-                                break
+                            elif member.name.endswith('.csv') and 'results' in member.name.lower():
+                                csv_filename = os.path.basename(member.name)
+                                csv_dir = get_save_path("Zero_shot", "HeatMap")
+                                csv_path = str(csv_dir / csv_filename)
+                                raw_result['csv_path'] = csv_path
                 except Exception as e:
-                    print(f"Warning: Could not extract heatmap path: {e}")
+                    print(f"Warning: Could not extract file paths: {e}")
                 
         
             return json.dumps(raw_result, indent=2)

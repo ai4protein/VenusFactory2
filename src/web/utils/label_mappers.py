@@ -43,16 +43,21 @@ def map_labels(row: pd.Series, task: str) -> Any:
 
     # Handle SortingSignal special case
     if row.get('Dataset') == 'SortingSignal':
-        predictions_str = row.get('predicted_class')
-        if predictions_str:
+        # Try to get prediction from either 'prediction' or 'predicted_class' column
+        predictions_str = row.get('prediction', row.get('predicted_class'))
+        if predictions_str is not None:
             try:
+                # Parse JSON if it's a string, otherwise use directly
                 predictions = json.loads(predictions_str) if isinstance(predictions_str, str) else predictions_str
-                if all(p == 0 for p in predictions):
-                    return "No signal"
-                signal_labels = ["CH", 'GPI', "MT", "NES", "NLS", "PTS", "SP", "TM", "TH"]
-                active_labels = [signal_labels[i] for i, pred in enumerate(predictions) if pred == 1]
-                return "_".join(active_labels) if active_labels else "None"
-            except Exception:
+                # Handle list of predictions
+                if isinstance(predictions, list):
+                    if all(p == 0 for p in predictions):
+                        return "No signal"
+                    signal_labels = ["CH", 'GPI', "MT", "NES", "NLS", "PTS", "SP", "TM", "TH"]
+                    active_labels = [signal_labels[i] for i, pred in enumerate(predictions) if pred == 1]
+                    return "_".join(active_labels) if active_labels else "None"
+            except Exception as e:
+                print(f"Error parsing SortingSignal prediction: {e}, value: {predictions_str}")
                 pass
     
     # Handle classification tasks
