@@ -635,15 +635,16 @@ def create_eval_tab(constant):
                     gr.update(value=config.get("label_column_name", "label"), interactive=False)
                 ]
         else:
-            # Custom dataset settings
+            # Custom dataset settings - make fields editable but don't reset values
+            # This allows config import to work correctly
             return [
                 gr.update(visible=False),  # eval_dataset_defined
                 gr.update(visible=True),   # eval_dataset_custom
-                gr.update(value="", interactive=True),
-                gr.update(value=2, interactive=True),
-                gr.update(value="", interactive=True),
-                gr.update(value="sequence", interactive=True),
-                gr.update(value="label", interactive=True)
+                gr.update(interactive=True),  # problem_type
+                gr.update(interactive=True),  # num_labels
+                gr.update(interactive=True),  # metrics
+                gr.update(interactive=True),  # sequence_column_name
+                gr.update(interactive=True)   # label_column_name
             ]
     
     is_custom_dataset.change(
@@ -894,6 +895,135 @@ def create_eval_tab(constant):
         fn=handle_eval_tab_abort,
         inputs=[],
         outputs=[eval_output, download_csv_btn]
+    )
+
+    # Configuration Import Handler
+    def handle_config_import(config_path: str):
+        """
+        Loads an evaluation configuration from a JSON file and updates the UI components.
+        """
+        try:
+            if not config_path or not config_path.strip():
+                gr.Warning("Please provide a configuration file path")
+                return [gr.update() for _ in range(13)]
+                
+            if not os.path.exists(config_path):
+                gr.Warning(f"Configuration file not found: {config_path}")
+                return [gr.update() for _ in range(13)]
+            
+            with open(config_path, "r", encoding='utf-8') as f:
+                config = json.load(f)
+            
+            def get_config_val(key, default):
+                return config.get(key, default)
+            
+            # Extract and validate model_path
+            model_path_value = get_config_val("model_path", "ckpt/demo/demo_solubility.pt")
+            
+            # Extract and map plm_model (config stores full path, UI uses key)
+            plm_model_path = get_config_val("plm_model", "")
+            plm_model_value = None
+            for key, path in plm_models.items():
+                if path == plm_model_path:
+                    plm_model_value = key
+                    break
+            if not plm_model_value and plm_models:
+                plm_model_value = list(plm_models.keys())[0]
+            
+            # Validate eval_method
+            eval_method_value = get_config_val("training_method", "freeze")
+            valid_eval_methods = ["full", "freeze", "ses-adapter", "plm-lora", "plm-qlora", "plm-adalora", "plm-dora", "plm-ia3"]
+            if eval_method_value not in valid_eval_methods:
+                eval_method_value = "freeze"
+            
+            # Validate pooling_method
+            pooling_method_value = get_config_val("pooling_method", "mean")
+            if pooling_method_value not in ["mean", "attention1d", "light_attention"]:
+                pooling_method_value = "mean"
+            
+            # Set to Custom Dataset and extract dataset path
+            dataset_selection_value = "Custom Dataset"
+            dataset_custom_value = get_config_val("dataset_custom", "")
+            
+            # Validate problem_type
+            problem_type_value = get_config_val("problem_type", "single_label_classification")
+            valid_problem_types = ["single_label_classification", "multi_label_classification", "regression", "residue_single_label_classification", "residue_regression"]
+            if problem_type_value not in valid_problem_types:
+                problem_type_value = "single_label_classification"
+            
+            # Extract num_labels
+            num_labels_value = get_config_val("num_labels", 2)
+            
+            # Handle metrics - ensure it's a list and values are valid
+            metrics_value = get_config_val("metrics", ["accuracy"])
+            if isinstance(metrics_value, str):
+                metrics_value = [m.strip() for m in metrics_value.split(",")]
+            valid_metrics = ["accuracy", "recall", "precision", "f1", "mcc", "auroc", "aupr", "f1_max", "f1_positive", "f1_negative", "spearman_corr", "mse"]
+            metrics_value = [m for m in metrics_value if m in valid_metrics]
+            if not metrics_value:
+                metrics_value = ["accuracy"]
+            
+            # Validate batch_mode
+            batch_mode_value = get_config_val("batch_mode", "Batch Size Mode")
+            if batch_mode_value not in ["Batch Size Mode", "Batch Token Mode"]:
+                batch_mode_value = "Batch Size Mode"
+            
+            # Extract batch_size and batch_token
+            batch_size_value = get_config_val("batch_size", 16)
+            batch_token_value = get_config_val("batch_token", 10000)
+            
+            # Extract sequence and label column names
+            sequence_column_value = get_config_val("sequence_column_name", "aa_seq")
+            label_column_value = get_config_val("label_column_name", "label")
+            
+            gr.Info(f"✅ Configuration successfully imported from {config_path}")
+            
+            return [
+                gr.update(value=model_path_value),
+                gr.update(value=plm_model_value),
+                gr.update(value=eval_method_value),
+                gr.update(value=pooling_method_value),
+                gr.update(value=dataset_selection_value),
+                gr.update(visible=False),  # eval_dataset_defined
+                gr.update(visible=True, value=dataset_custom_value),  # eval_dataset_custom
+                gr.update(value=problem_type_value, interactive=True),
+                gr.update(value=num_labels_value, interactive=True),
+                gr.update(value=metrics_value, interactive=True),
+                gr.update(value=batch_mode_value),
+                gr.update(visible=(batch_mode_value == "Batch Size Mode"), value=batch_size_value),
+                gr.update(visible=(batch_mode_value == "Batch Token Mode"), value=batch_token_value),
+                gr.update(value=sequence_column_value, interactive=True),
+                gr.update(value=label_column_value, interactive=True),
+            ]
+        
+        except (json.JSONDecodeError, KeyError) as e:
+            gr.Warning(f"❌ Error parsing configuration file: {str(e)}")
+            return [gr.update() for _ in range(15)]
+        except Exception as e:
+            gr.Warning(f"❌ An unexpected error occurred during import: {str(e)}")
+            return [gr.update() for _ in range(15)]
+    
+    # Bind import config button
+    import_config_button.click(
+        fn=handle_config_import,
+        inputs=[config_path_input],
+        outputs=[
+            eval_model_path,
+            eval_plm_model,
+            eval_method,
+            eval_pooling_method,
+            is_custom_dataset,
+            eval_dataset_defined,
+            eval_dataset_custom,
+            problem_type,
+            num_labels,
+            metrics,
+            batch_mode,
+            batch_size,
+            batch_token,
+            sequence_column_name,
+            label_column_name
+        ]
     )
 
     return {

@@ -388,11 +388,12 @@ def create_predict_tab(constant):
                 stderr_output = ""
                 if current_process and hasattr(current_process, 'stderr') and current_process.stderr:
                     stderr_output = current_process.stderr.read()
+                combined_error = f"{stderr_output}\n{result_output}"
                 yield gr.HTML(f"""
                 {get_css_style_tag('prediction_ui.css')}
                 {load_html_template('prediction_failed.html', 
                                   error_code=current_process.returncode if current_process else 'Unknown',
-                                  error_output=f"{stderr_output}\n{result_output}")}
+                                  error_output=combined_error)}
                 """), gr.update(visible=False)
         except Exception as e:
             # Update status
@@ -753,11 +754,15 @@ def create_predict_tab(constant):
                         yield gr.HTML(error_html), gr.update(value=output_path, visible=True)
                 else:
                     # Process failed
+                    return_code = current_process.returncode if current_process else 'Unknown'
+                    error_p = load_html_template('error_p.html', content=f'Process return code: {return_code}')
+                    error_pre = load_html_template('error_pre.html', content=result_output)
+                    error_details = f"{error_p}{error_pre}"
                     error_html = f"""
                     {get_css_style_tag('prediction_ui.css')}
                     {load_html_template('prediction_error_with_details.html', 
                                       error_message="Prediction failed to complete",
-                                      error_details=f"{load_html_template('error_p.html', content=f'Process return code: {current_process.returncode if current_process else 'Unknown'}')}{load_html_template('error_pre.html', content=result_output)}")}
+                                      error_details=error_details)}
                     """
                     yield gr.HTML(error_html), gr.update(visible=False)
             else:
@@ -1054,6 +1059,23 @@ def create_predict_tab(constant):
         # generate preview command
         preview_text = preview_predict_command(args_dict, is_batch=True)
         return gr.update(value=preview_text, visible=True)
+
+    # Configuration Import Section
+    with gr.Accordion("Import Prediction Configuration", open=False) as config_import_accordion:
+        gr.Markdown("### Import your prediction config")
+        with gr.Row():
+            with gr.Column(scale=4):
+                config_path_input = gr.Textbox(
+                    label="Configuration File Path",
+                    placeholder="Enter path to your prediction config JSON file (e.g., ./predict_config.json)",
+                    value=""
+                )
+            with gr.Column(scale=1):
+                import_config_button = gr.Button(
+                    "Import Config",
+                    variant="primary",
+                    elem_classes=["import-config-btn"]
+                )
 
     gr.Markdown("## Model Configuration")
     with gr.Group():
@@ -1399,6 +1421,87 @@ def create_predict_tab(constant):
         fn=update_components_based_on_model,
         inputs=[plm_model],
         outputs=[model_path, eval_method, pooling_method, num_labels, problem_type, otg_message]
+    )
+
+    # Configuration Import Handler
+    def handle_config_import(config_path: str):
+        """
+        Loads a prediction configuration from a JSON file and updates the UI components.
+        """
+        try:
+            if not config_path or not config_path.strip():
+                gr.Warning("Please provide a configuration file path")
+                return [gr.update() for _ in range(6)]
+                
+            if not os.path.exists(config_path):
+                gr.Warning(f"Configuration file not found: {config_path}")
+                return [gr.update() for _ in range(6)]
+            
+            with open(config_path, "r", encoding='utf-8') as f:
+                config = json.load(f)
+            
+            def get_config_val(key, default):
+                return config.get(key, default)
+            
+            # Extract and validate model_path
+            model_path_value = get_config_val("model_path", "ckpt/demo/demo_solubility.pt")
+            
+            # Extract and map plm_model (config stores full path, UI uses key)
+            plm_model_path = get_config_val("plm_model", "")
+            plm_model_value = None
+            # Try to find the key by matching the path value
+            for key, path in plm_models.items():
+                if path == plm_model_path:
+                    plm_model_value = key
+                    break
+            # If not found, use the first available model
+            if not plm_model_value and plm_models:
+                plm_model_value = list(plm_models.keys())[0]
+            
+            # Validate eval_method
+            eval_method_value = get_config_val("training_method", "freeze")
+            valid_eval_methods = ["full", "freeze", "ses-adapter", "plm-lora", "plm-qlora", "plm_adalora", "plm_dora", "plm_ia3"]
+            if eval_method_value not in valid_eval_methods:
+                eval_method_value = "freeze"
+            
+            # Validate pooling_method
+            pooling_method_value = get_config_val("pooling_method", "mean")
+            if pooling_method_value not in ["mean", "attention1d", "light_attention"]:
+                pooling_method_value = "mean"
+            
+            # Validate problem_type
+            problem_type_value = get_config_val("problem_type", "single_label_classification")
+            valid_problem_types = ["single_label_classification", "multi_label_classification", "regression", "residue_single_label_classification", "residue_regression"]
+            if problem_type_value not in valid_problem_types:
+                problem_type_value = "single_label_classification"
+            
+            
+            # Extract num_labels
+            num_labels_value = get_config_val("num_labels", 2)
+            
+            gr.Info(f"✅ Configuration successfully imported from {config_path}")
+            
+            return [
+                gr.update(value=model_path_value),
+                gr.update(value=plm_model_value),
+                gr.update(value=eval_method_value),
+                gr.update(value=pooling_method_value),
+                gr.update(value=problem_type_value),
+                gr.update(value=num_labels_value),
+            ]
+        
+        except (json.JSONDecodeError, KeyError) as e:
+            gr.Warning(f"❌ Error parsing configuration file: {str(e)}")
+            return [gr.update() for _ in range(6)]
+        except Exception as e:
+            gr.Warning(f"❌ An unexpected error occurred during import: {str(e)}")
+            return [gr.update() for _ in range(6)]
+    
+    # Bind import config button
+    import_config_button.click(
+        fn=handle_config_import,
+        inputs=[config_path_input],
+        outputs=[model_path, plm_model, eval_method, pooling_method, problem_type, num_labels]
     )
 
     return {

@@ -38,7 +38,9 @@ TOOL PARAMETER MAPPING:
 - functional_residue_prediction: sequence OR fasta_file, model_name, task (task must be one of: Activity Site, Binding Site, Conserved Site, Motif)
 - interpro_query: uniprot_id
 - UniProt_query: uniprot_id
-- generate_training_config: csv_file, test_csv_file (optional), output_name
+- generate_training_config: csv_file (required), valid_csv_file (optional for early stopping), test_csv_file (optional for final evaluation), output_name, user_requirements (optional)
+- train_protein_model: config_path (use "dependency:step_X:config_path" from generate_training_config)
+- predict_with_protein_model: config_path (use "dependency:step_X:config_path" from generate_training_config, NOT model_path), sequence OR csv_file
 - protein_properties_generation: sequence OR fasta_file, task_name
 - ai_code_execution: task_description, input_files (LIST of file paths)
 - ncbi_sequence_download: accession_id, output_format (for downloading NCBI sequences)
@@ -75,10 +77,7 @@ CRITICAL RULES:
 1. For file-based tasks, extract file paths from the context summary and include them in tool_input.
 2. For ai_code_execution, always include "input_files" as a list of file paths.
 3. For data processing requests (splitting datasets, analysis), use ai_code_execution.
-4. DEPENDENCY SYNTAX (CRITICAL):
-   - To extract a specific field: "dependency:step_N:field_name" (e.g., "dependency:step_1:sequence")
-   - To use entire output: "dependency:step_N" (e.g., "dependency:step_1")
-   - Common fields: sequence, file_path, structure_file, uniprot_id
+4. Use "dependency:step_1:file_path" to extract file_path from JSON, and use "dependency:step_1" to use the entire output.
 5. If no tools are needed (e.g., simple chat or greeting), return an empty array [].
 6. Protein function prediction and residue-function prediction are based on sequence model, use sequence or FASTA as input.
 7. Recommand to use sequence-based model in order to save computation cost.
@@ -140,33 +139,6 @@ User asks to download AlphaFold structure:
     }}
   }}
 ]
-
-User asks to query UniProt P04040 and predict its stability:
-[
-  {{
-    "step": 1,
-    "task_description": "Query UniProt database for protein P04040",
-    "tool_name": "UniProt_query",
-    "tool_input": {{
-      "uniprot_id": "P04040"
-    }}
-  }},
-  {{
-    "step": 2,
-    "task_description": "Predict protein stability using sequence from step 1",
-    "tool_name": "protein_function_prediction",
-    "tool_input": {{
-      "sequence": "dependency:step_1:sequence",
-      "model_name": "ESM2-650M",
-      "task": "Stability"
-    }}
-  }}
-]
-
-CRITICAL DEPENDENCY NOTES:
-- Step 1 returns: {{"success": true, "uniprot_id": "P04040", "sequence": "MADSRD..."}}
-- Step 2 uses: "dependency:step_1:sequence" to extract ONLY the sequence field
-- This ensures step 2 receives the sequence string, not the entire JSON object
 """
 
 PLANNER_PROMPT = ChatPromptTemplate.from_messages([
@@ -177,7 +149,7 @@ PLANNER_PROMPT = ChatPromptTemplate.from_messages([
 
 
 WORKER_PROMPT = ChatPromptTemplate.from_messages([
-    ("system", """You are VenusAgent, an expert tool executor. You will run a single tool per invocation: {tool_name}
+   ("system", """You are VenusAgent, an expert tool executor. You will run a single tool per invocation: {tool_name}
 
 Tool description:
 {tool_description}
@@ -224,10 +196,59 @@ IMPORTANT:
 ])
 
 ANALYZER_PROMPT_TEMPLATE = """
-You are VenusAgent, a computer scientist with strong expertise in biology. Your task is to generate a summary based on the subtask assigned by the Planner {sub_task_description} and the corresponding tool output {tool_output}.
-Please provide a concise analysis of this result. Your analysis should:
-In your response, begin with a clear and accurate conclusion that a biologist can immediately understand. Follow with a concise explaination
-Structure your response clearly in Markdown. Do NOT include a title like "Analysis Report".
+You are VenusAgent, a computer scientist with strong expertise in biology. Your task is to generate a comprehensive analysis based on the subtask {sub_task_description} and the tool output {tool_output}.
+
+CRITICAL ANALYSIS REQUIREMENTS:
+
+1. **Data Presentation** (if applicable):
+   - For training results: Present metrics in a markdown table format
+   - For prediction results: Show top predictions in a table
+   - For mutation effects: Display mutations with their predicted impacts in a table
+   - For any numerical data: Use tables for clarity
+
+2. **Comprehensive Analysis**:
+   - Provide SPECIFIC analysis, not generic statements
+   - For mutations: Analyze EACH mutation's predicted effect and biological implications
+   - For training: Analyze performance metrics, convergence, potential overfitting
+   - For predictions: Interpret confidence scores, discuss biological relevance
+   - For structure analysis: Discuss structural features and their functional implications
+
+3. **Three Potential Issues/Concerns**:
+   After your analysis, list exactly THREE potential issues or concerns:
+   - Issue 1: [Specific concern based on the data]
+   - Issue 2: [Another specific concern]
+   - Issue 3: [A third specific concern]
+   
+   These should be:
+   - Data-driven (based on actual results)
+   - Actionable (user can address them)
+   - Biologically relevant
+
+4. **Format Requirements**:
+   - Start with a clear conclusion (1-2 sentences)
+   - Use markdown tables for structured data
+   - Use bullet points for key findings
+   - Use bold for important terms
+   - Do NOT include a title like "Analysis Report"
+
+EXAMPLE (for mutation prediction):
+The analysis reveals that 3 out of 5 mutations are predicted to destabilize the protein structure.
+
+| Mutation | ΔΔG (kcal/mol) | Predicted Effect | Confidence |
+|----------|----------------|------------------|------------|
+| A123V    | +2.3          | Destabilizing    | High       |
+| L45P     | +3.1          | Destabilizing    | High       |
+| G78A     | -0.5          | Stabilizing      | Medium     |
+
+**Key Findings:**
+- **A123V**: The substitution from Ala to Val introduces steric clashes in the hydrophobic core
+- **L45P**: Proline substitution disrupts alpha-helix structure, causing significant destabilization
+- **G78A**: Minor stabilization due to increased hydrophobic packing
+
+**Potential Issues:**
+1. **High destabilization risk**: Two mutations (A123V, L45P) show ΔΔG > +2.0, suggesting significant structural disruption
+2. **Functional impact uncertainty**: Predictions focus on stability but don't account for functional site proximity
+3. **Experimental validation needed**: Medium confidence for G78A requires experimental confirmation
 """
 ANALYZER_PROMPT = ChatPromptTemplate.from_template(ANALYZER_PROMPT_TEMPLATE)
 
@@ -284,4 +305,5 @@ You can help with:
 - Use scientific terminology appropriately
 - Provide structured answers when helpful (use markdown formatting)
 - If you're unsure about something, acknowledge it and suggest how the user might find the answer
+- Response as the same language the user input
 """

@@ -22,8 +22,15 @@ from langchain.tools import tool
 from pydantic import BaseModel, Field, validator
 from web.utils.common_utils import get_save_path
 from web.utils.literature import literature_search
+from web.utils.command import build_command_list, build_predict_command_list
 
 load_dotenv()
+
+# Load constant.json for PLM model mappings
+CONSTANT_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "src", "constant.json")
+with open(CONSTANT_PATH, 'r', encoding='utf-8') as f:
+    CONSTANT = json.load(f)
+    PLM_MODELS = CONSTANT.get("plm_models", {})
 
 class ZeroShotSequenceInput(BaseModel):
     """Input for zero-shot sequence mutation prediction"""
@@ -66,9 +73,14 @@ class PDBSequenceExtractionInput(BaseModel):
 class CSVTrainingConfigInput(BaseModel):
     """Input for CSV training config generation"""
     csv_file: str = Field(..., description="Path to CSV file with training data")
-    test_csv_file: Optional[str] = Field(None, description="Optional path to test CSV file")
+    valid_csv_file: Optional[str] = Field(None, description="Optional path to validation CSV file for early stopping")
+    test_csv_file: Optional[str] = Field(None, description="Optional path to test CSV file for final evaluation")
     output_name: str = Field(default="custom_training_config", description="Name for the generated config")
-
+    user_requirements: Optional[Any] = Field(None, description="User-specified training requirements. Can be string (e.g., 'train for 2 epochs') or dict (e.g., {'epochs': 2, 'model_name': 'ESM2-8M'}). These will override AI suggestions.")
+    
+    class Config:
+        # Allow arbitrary types to accept both str and dict
+        arbitrary_types_allowed = True
 class ProteinPropertiesInput(BaseModel):
     """Input for protein properties generation"""
     sequence: Optional[str] = Field(None, description="Protein sequence in single letter amino acid code")
@@ -100,14 +112,22 @@ class LiteratureSearchInput(BaseModel):
     query: str = Field(..., description="Search query")
     max_results: int = Field(5, description="Maximum number of results to return")
 
+class ModelTrainingInput(BaseModel):
+    """Input for protein model training"""
+    config_path: str = Field(..., description="Path to training configuration JSON file")
+    
+class ModelPredictionInput(BaseModel):
+    """Input for protein model prediction/validation"""
+    config_path: str = Field(..., description="Path to prediction configuration JSON file")
+    sequence: Optional[str] = Field(None, description="Single protein sequence to predict (for single prediction)")
+    csv_file: Optional[str] = Field(None, description="Path to CSV file with sequences (for batch prediction)")
+
 
 # Langchain Tools
 @tool("zero_shot_sequence_prediction", args_schema=ZeroShotSequenceInput)
-def zero_shot_sequence_prediction_tool(sequence: Optional[str] = None, fasta_file: Optional[str] = None, model_name: str = "ESM2-650M") -> str:
+def zero_shot_sequence_prediction_tool(sequence: Optional[str] = None, fasta_file: Optional[str] = None, model_name: str = "ESM2-650M", api_key: Optional[str] = None) -> str:
     """Predict beneficial mutations using sequence-based zero-shot models. Use for mutation prediction with protein sequences."""
     try:
-        api_key = os.getenv("DEEPSEEK_API_KEY")
-        
         if fasta_file:
             if not os.path.exists(fasta_file):
                 return f"Error: FASTA file not found at path: {fasta_file}"
@@ -124,10 +144,9 @@ def zero_shot_sequence_prediction_tool(sequence: Optional[str] = None, fasta_fil
         return f"Zero-shot sequence prediction error: {str(e)}"
 
 @tool("zero_shot_structure_prediction", args_schema=ZeroShotStructureInput)
-def zero_shot_structure_prediction_tool(structure_file: str, model_name: str = "ESM-IF1") -> str:
+def zero_shot_structure_prediction_tool(structure_file: str, model_name: str = "ESM-IF1", api_key: Optional[str] = None) -> str:
     """Predict beneficial mutations using structure-based zero-shot models. Use for mutation prediction with PDB structure files."""
     try:
-        api_key = os.getenv("DEEPSEEK_API_KEY")
         actual_file_path = structure_file
         try:
             import json
@@ -146,10 +165,9 @@ def zero_shot_structure_prediction_tool(structure_file: str, model_name: str = "
         return json.dumps({"success": False, "error": f"Zero-shot structure prediction error: {str(e)}"}, ensure_ascii=False)
 
 @tool("protein_function_prediction", args_schema=FunctionPredictionInput)
-def protein_function_prediction_tool(sequence: Optional[str] = None, fasta_file: Optional[str] = None, model_name: str = "ESM2-650M", task: str = "Solubility") -> str:
+def protein_function_prediction_tool(sequence: Optional[str] = None, fasta_file: Optional[str] = None, model_name: str = "ESM2-650M", task: str = "Solubility", api_key: Optional[str] = None) -> str:
     """Predict protein functions like solubility, localization, metal ion binding, stability, sorting signal, and optimum temperature."""
     try:
-        api_key = os.getenv("DEEPSEEK_API_KEY")
         if fasta_file and os.path.exists(fasta_file):
             return call_protein_function_prediction(
                 fasta_file=fasta_file, model_name=model_name, task=task, api_key=api_key
@@ -164,9 +182,8 @@ def protein_function_prediction_tool(sequence: Optional[str] = None, fasta_file:
         return f"Function protein prediction error: {str(e)}"
 
 @tool("functional_residue_prediction", args_schema=ResidueFunctionPredictionInput)
-def functional_residue_prediction_tool(sequence: Optional[str] = None, fasta_file: Optional[str] = None, model_name: str = "ESM2-650M", task: str = "Activate") -> str:
+def functional_residue_prediction_tool(sequence: Optional[str] = None, fasta_file: Optional[str] = None, model_name: str = "ESM2-650M", task: str = "Activate", api_key: Optional[str] = None) -> str:
     try:
-        api_key = os.getenv("DEEPSEEK_API_KEY")
         if fasta_file and os.path.exists(fasta_file):
             return call_functional_residue_prediction(
                 fasta_file=fasta_file, model_name=model_name, task=task, api_key=api_key
@@ -231,19 +248,20 @@ def PDB_sequence_extraction_tool(pdb_file: str) -> str:
         return json.dumps({"success": False, "error": str(e)})
 
 @tool("generate_training_config", args_schema=CSVTrainingConfigInput)
-def generate_training_config_tool(csv_file: str, test_csv_file: Optional[str] = None, output_name: str = "custom_training_config") -> str:
+def generate_training_config_tool(csv_file: str, valid_csv_file: Optional[str] = None, test_csv_file: Optional[str] = None, output_name: str = "custom_training_config", user_requirements: Optional[str] = None) -> str:
     """Generate training JSON configuration from CSV files containing protein sequences and labels."""
     try:
-        return process_csv_and_generate_config(csv_file, test_csv_file, output_name)
+        return process_csv_and_generate_config(csv_file, valid_csv_file, test_csv_file, output_name, user_requirements=user_requirements)
     except Exception as e:
-        return f"Training config generation error: {str(e)}"
+        return json.dumps({
+            "success": False,
+            "error": f"Training config generation error: {str(e)}"
+        }, ensure_ascii=False)
 
 @tool("protein_properties_generation", args_schema=ProteinPropertiesInput)
-def protein_properties_generation_tool(sequence: Optional[str] = None, fasta_file: Optional[str] = None, task_name = "Physical and chemical properties" ) -> str:
+def protein_properties_generation_tool(sequence: Optional[str] = None, fasta_file: Optional[str] = None, task_name = "Physical and chemical properties", api_key: Optional[str] = None) -> str:
     """Predict the protein phyical, chemical, and structure properties."""
     try:
-        api_key = os.getenv("DEEPSEEK_API_KEY")
-        
         if fasta_file:
             if not os.path.exists(fasta_file):
                 return f"Error: FASTA file not found at path: {fasta_file}"
@@ -310,7 +328,7 @@ def call_zero_shot_sequence_prediction(
     sequence: str = None,
     fasta_file: str = None,
     model_name: str = "ESM2-650M",
-    api_key: str = None
+    api_key: Optional[str] = None
 ) -> str:
     """
     Call VenusFactory zero-shot sequence-based mutation prediction API.
@@ -389,7 +407,7 @@ def call_zero_shot_sequence_prediction(
     except Exception as e:
         return f"Zero-shot sequence prediction error: {str(e)}"
 
-def call_zero_shot_structure_prediction_from_file(structure_file: str, model_name: str = "ESM-IF1", api_key: str = None) -> str:
+def call_zero_shot_structure_prediction_from_file(structure_file: str, model_name: str = "ESM-IF1", api_key: Optional[str] = None) -> str:
     """Call VenusFactory zero-shot structure-based mutation prediction API"""
     try:
         client = Client("http://localhost:7860/")
@@ -455,7 +473,7 @@ def call_protein_function_prediction(
     fasta_file: str = None,
     model_name: str = "ProtT5-xl-uniref50",
     task: str = "Solubility",
-    api_key: str = None
+    api_key: Optional[str] = None
 ) -> str:
     """
     Call VenusFactory protein function prediction API.
@@ -521,7 +539,7 @@ def call_functional_residue_prediction(
     fasta_file: str = None,
     model_name: str = "ESM2-650M",
     task: str = "Activity",
-    api_key: str = None
+    api_key: Optional[str] = None
 ) -> str:
     """
     Call VenusFactory functional residue prediction API using either a sequence or a FASTA file.
@@ -880,7 +898,7 @@ def download_alphafold_structure(uniprot_id: str, output_format: str = "pdb") ->
             "error_message": f"Error downloading structure for {uniprot_id}: {str(e)}"
         })
 
-def call_protein_properties_prediction(sequence: str = None, fasta_file: str = None, task_name: str = "Physical and chemical properties", api_key: str = None) -> str:
+def call_protein_properties_prediction(sequence: str = None, fasta_file: str = None, task_name: str = "Physical and chemical properties", api_key: Optional[str] = None) -> str:
     """
     Predict protein properties from a sequence or a fasta file.
     If fasta_file is provided, use it directly; otherwise, use sequence (writes to temp fasta).
@@ -1289,31 +1307,77 @@ if __name__ == "__main__":
         })
 
 
-def process_csv_and_generate_config(csv_file: str, test_csv_file: Optional[str] = None, output_name: str = "custom_training_config", user_overrides: Optional[Dict] = None) -> str:
+def process_csv_and_generate_config(csv_file: str, valid_csv_file: Optional[str] = None, test_csv_file: Optional[str] = None, output_name: str = "custom_training_config", user_overrides: Optional[Dict] = None, user_requirements: Optional[str] = None) -> str:
     try:
         df = pd.read_csv(csv_file)
         required_columns = ['aa_seq', 'label']
         
         if not all(col in df.columns for col in required_columns):
             missing = [col for col in required_columns if col not in df.columns]
-            return f"Missing required columns: {missing}. Please ensure your CSV has 'aa_seq' and 'label' columns, then upload again."
+            return json.dumps({
+                "success": False,
+                "error": f"Missing required columns: {missing}. Please ensure your CSV has 'aa_seq' and 'label' columns."
+            }, ensure_ascii=False)
+        
+        # Validate additional files if provided
+        valid_samples = 0
+        test_samples = 0
+        if valid_csv_file:
+            try:
+                valid_df = pd.read_csv(valid_csv_file)
+                valid_samples = len(valid_df)
+            except Exception as e:
+                return json.dumps({
+                    "success": False,
+                    "error": f"Error reading validation file: {str(e)}"
+                }, ensure_ascii=False)
+        
+        if test_csv_file:
+            try:
+                test_df = pd.read_csv(test_csv_file)
+                test_samples = len(test_df)
+            except Exception as e:
+                return json.dumps({
+                    "success": False,
+                    "error": f"Error reading test file: {str(e)}"
+                }, ensure_ascii=False)
+        
         user_config = user_overrides or {}
-        analysis = analyze_dataset_for_ai(df, test_csv_file)
-        ai_config = generate_ai_training_config(analysis)
-        print(ai_config)
+        analysis = analyze_dataset_for_ai(df, valid_csv_file or test_csv_file)
+        # Pass user requirements to AI config generation
+        ai_config = generate_ai_training_config(analysis, user_requirements)
         default_config = get_default_config(analysis)
+        # User config has highest priority, then AI config, then default
         final_params = merge_configs(user_config, ai_config, default_config)
-        config = create_comprehensive_config(csv_file, test_csv_file, final_params, analysis)
+        config = create_comprehensive_config(csv_file, valid_csv_file, test_csv_file, final_params, analysis)
         config_dir = get_save_path("training_pipeline", "configs")
         timestamp = int(time.time())
         config_path = os.path.join(config_dir, f"{output_name}_{timestamp}.json")
         with open(config_path, 'w') as f:
             json.dump(config, f, indent=2)
-        message = f"Training configuration generated successfully! Config file: {config_path} The configuration is ready for use in the training interface."
-        return message
+        
+        # Return JSON format for consistency with other tools
+        result = {
+            "success": True,
+            "message": "Training configuration generated successfully!",
+            "config_path": config_path,
+            "config_name": f"{output_name}_{timestamp}.json",
+            "dataset_info": {
+                "train_samples": len(df),
+                "valid_samples": valid_samples,
+                "test_samples": test_samples,
+                "num_labels": analysis.get("unique_labels", 0),
+                "problem_type": final_params.get("problem_type", "unknown")
+            }
+        }
+        return json.dumps(result, ensure_ascii=False, indent=2)
 
     except Exception as e:
-        return f"Error processing CSV: {str(e)}"
+        return json.dumps({
+            "success": False,
+            "error": f"Error processing CSV: {str(e)}"
+        }, ensure_ascii=False)
+
 
 def merge_configs(user_config: dict, ai_config: dict, default_config: dict) -> dict:
     merged = default_config.copy()
@@ -1461,19 +1525,31 @@ def convert_to_serializable(obj):
     else:
         return obj
 
-def generate_ai_training_config(analysis: dict) -> dict:
+def generate_ai_training_config(analysis: dict, user_requirements: Optional[str] = None) -> dict:
     """Use DeepSeek AI to generate optimal training configuration"""
     try:
         api_key = os.getenv("DEEPSEEK_API_KEY")
         if not api_key:
             return get_default_config(analysis)
-        data = json.load(open("src/constant.json"))
+        
+        # Load constant.json for model options
+        constant_data = json.load(open("src/constant.json"))
+         # Build user requirements section
+        user_req_section = ""
+        if user_requirements:
+            user_req_section = f"""
+            USER REQUIREMENTS (MUST FOLLOW EXACTLY):
+            {user_requirements}
+            
+            CRITICAL: If user specifies num_epochs, learning_rate, batch_size, or any other parameter,
+            you MUST use their exact value. DO NOT override with your own suggestions.
+            """
 
         prompt = f"""You are VenusAgent, an expert in protein machine learning. Generate optimal training configuration following these STRICT rules:
 
             RULE 1 - USER REQUIREMENTS ARE ABSOLUTE LAW:
-            If user mentions ANY specific requirement (model name, training method, etc.), you MUST use exactly what they specified. No exceptions, no "better alternatives".
-
+            If user mentions ANY specific requirement (model name, training method, epochs, learning rate, etc.), you MUST use exactly what they specified. No exceptions, no "better alternatives".
+            {user_req_section}
             RULE 2 - EFFICIENCY FIRST FOR UNSPECIFIED PARAMETERS:
             For parameters not specified by user, choose the most efficient option that maintains good performance.
 
@@ -1492,12 +1568,20 @@ def generate_ai_training_config(analysis: dict) -> dict:
             - Test set: {analysis['has_test_set']}
 
             Available options:
-            - Models: {list(data["plm_models"].keys())}
+            - Models: {list(constant_data["plm_models"].keys())}
             - Training: ["full", "freeze", "ses-adapter", "plm-lora", "plm-qlora", "plm-adalora", "plm-dora", "plm-ia3"]
             - Problem: ["single_label_classification", "multi_label_classification", "regression", "residue_single_label_classification", "residue_regression"]
 
+            CRITICAL CONSTRAINT - DATASET COMPATIBILITY:
+            - **NEVER use "ses-adapter"** unless the dataset explicitly contains structure sequence columns (foldseek_seq, ss8_seq)
+            - For standard CSV datasets with only aa_seq and label columns, you MUST use: "freeze", "full", "plm-lora", "plm-qlora", "plm-adalora", "plm-dora", or "plm-ia3"
+            - ses-adapter requires additional structure information that is NOT available in basic CSV files
+            - Default safe choice: "freeze" (fastest, works with any dataset)
+
             EXAMPLES:
-            - User wants "ProtT5 + QLoRA" → Must use "prot-t5-xl" + "plm-qlora" (no alternatives!)
+            - User wants "ProtT5 + QLoRA" → Must use "ProtT5-xl-uniref50" + "plm-qlora" (no alternatives!)
+            - Dataset with structure columns → Can use "ses-adapter"
+            - User wants "2 epochs" → Must set num_epochs to 2 (not 80 or any other value!)
             - No user preference → Choose most efficient for dataset size
 
             Return ONLY valid JSON:
@@ -1510,10 +1594,10 @@ def generate_ai_training_config(analysis: dict) -> dict:
             "batch_size": optimal_number,
             "max_seq_len": {min(2048, int(analysis['sequence_stats']['max_length'] * 1.1))},
             "patience": 1-50,
-            "pooling_method": ["mean", "attention1d", "light_attention"],
-            "scheduler": ["linear", "cosine", "step", None],
-            "monitored_metrics": ["accuracy", "recall", "precision", "f1", "mcc", "auroc", "aupr", "f1_max", "f1_positive", "f1_negative", "spearman_corr", "mse"],
-            "monitored_strategy": ["max", "min"],
+            "pooling_method": "mean", "attention1d", "light_attention",
+            "scheduler": "linear", "cosine", "step", null,
+            "monitored_metrics": "accuracy", "recall", "precision", "f1", "mcc", "auroc", "aupr", "f1_max", "f1_positive", "f1_negative", "spearman_corr", "mse",
+            "monitored_strategy": "max", "min",
             "gradient_accumulation_steps": 1-32,
             "warmup_steps": 0-1000,
             "max_grad_norm": 0.1-10.0,
@@ -1590,29 +1674,41 @@ def get_default_config(analysis: dict) -> dict:
         "num_workers": 1
     }
 
-def create_comprehensive_config(csv_file: str, test_csv_file: Optional[str], params: dict, analysis: dict) -> dict:
-    """Create complete training configuration matching 1.py requirements"""
+def create_comprehensive_config(csv_file: str, valid_csv_file: Optional[str], test_csv_file: Optional[str], params: dict, analysis: dict) -> dict:
+    """Create complete training configuration matching 1.py requirements with train/valid/test split"""
     is_regression = analysis['data_type'] == 'regression'
     dataset_directory = os.path.dirname(csv_file)
+    
+    # Determine metrics based on problem type
+    if is_regression:
+        metrics_list = ["mse", "spearman_corr"]
+    else:
+        metrics_list = ["accuracy", "mcc", "f1", "precision", "recall", "auroc"]
+    
     config = {
         # Dataset configuration
         "dataset_selection": "Custom Dataset",
         "dataset_custom": dataset_directory,
         "problem_type": params["problem_type"],
         "num_labels": 1 if is_regression else analysis['unique_labels'],
-        "metrics": ["mse", "spearman_corr"] if is_regression else ["accuracy", "mcc", "f1"],
+        "metrics": metrics_list,
+        "sequence_column_name": "aa_seq",
+        "label_column_name": "label",
         
         # Model and training method from final params
         "plm_model": params["plm_model"],
         "training_method": params["training_method"],
         "pooling_method": params["pooling_method"],
         
+        # Batch mode configuration
+        "batch_mode": "Batch Size Mode",
+        "batch_size": int(params["batch_size"]),
+        
         # Training parameters from final params
         "learning_rate": float(params["learning_rate"]),
         "num_epochs": int(params["num_epochs"]),
         "max_seq_len": int(params["max_seq_len"]),
         "patience": int(params["patience"]),
-        "batch_size": int(params["batch_size"]),
         
         # Advanced parameters
         "gradient_accumulation_steps": int(params.get("gradient_accumulation_steps", 1)),
@@ -1626,10 +1722,16 @@ def create_comprehensive_config(csv_file: str, test_csv_file: Optional[str], par
         "monitored_strategy": params["monitored_strategy"],
         
         # Output
-        "output_model_name": f"model_{Path(csv_file).stem}",
-        "output_dir": "./outputs",
+        "output_model_name": f"model_{Path(csv_file).stem}.pt",
+        "output_dir": f"ckpt/{Path(csv_file).stem}",
         
         "wandb_enabled": False,
+        
+        # LoRA parameters (with defaults)
+        "lora_r": 8,
+        "lora_alpha": 32,
+        "lora_dropout": 0.1,
+        "lora_target_modules": "query,key,value",
     }
     
     if test_csv_file:
@@ -1637,3 +1739,336 @@ def create_comprehensive_config(csv_file: str, test_csv_file: Optional[str], par
     
     # Final conversion to ensure everything is serializable
     return convert_to_serializable(config)
+
+
+@tool("train_protein_model", args_schema=ModelTrainingInput)
+def train_protein_model_tool(config_path: str) -> str:
+    """Train a protein language model using a configuration file. This tool executes the training process and streams the training logs."""
+    try:
+        if not os.path.exists(config_path):
+            return json.dumps({
+                "success": False,
+                "error": f"Configuration file not found: {config_path}"
+            }, ensure_ascii=False)
+        
+        # Load configuration
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        # Extract only valid training parameters based on args.py
+        train_config = {}
+        
+        # Model parameters - map PLM model name to full path
+        if "plm_model" in config:
+            plm_model = config["plm_model"]
+            # If it's a short name (e.g., "ESM2-8M"), map it to full path
+            if plm_model in PLM_MODELS:
+                train_config["plm_model"] = PLM_MODELS[plm_model]
+            else:
+                # Already a full path or not in mapping, use as-is
+                train_config["plm_model"] = plm_model
+        if "pooling_method" in config:
+            train_config["pooling_method"] = config["pooling_method"]
+        if "training_method" in config:
+            train_config["training_method"] = config["training_method"]
+        
+        # Dataset parameters
+        dataset_selection = config.get("dataset_selection", "Custom Dataset")
+        if dataset_selection == "Pre-defined Dataset":
+            if "dataset_config" in config:
+                train_config["dataset_config"] = config["dataset_config"]
+        else:
+            # Custom dataset
+            if "dataset_custom" in config:
+                train_config["dataset"] = config["dataset_custom"]
+            if "problem_type" in config:
+                train_config["problem_type"] = config["problem_type"]
+            if "num_labels" in config:
+                train_config["num_labels"] = config["num_labels"]
+            if "metrics" in config:
+                metrics = config["metrics"]
+                if isinstance(metrics, list):
+                    train_config["metrics"] = ",".join(metrics)
+                else:
+                    train_config["metrics"] = metrics
+        
+        # Column names (for both predefined and custom)
+        if "sequence_column_name" in config:
+            train_config["sequence_column_name"] = config["sequence_column_name"]
+        if "label_column_name" in config:
+            train_config["label_column_name"] = config["label_column_name"]
+        
+        # Training parameters
+        if "learning_rate" in config:
+            train_config["learning_rate"] = config["learning_rate"]
+        if "num_epochs" in config:
+            train_config["num_epochs"] = config["num_epochs"]
+        if "max_seq_len" in config:
+            train_config["max_seq_len"] = config["max_seq_len"]
+        if "gradient_accumulation_steps" in config:
+            train_config["gradient_accumulation_steps"] = config["gradient_accumulation_steps"]
+        if "warmup_steps" in config:
+            train_config["warmup_steps"] = config["warmup_steps"]
+        if "scheduler" in config:
+            train_config["scheduler"] = config["scheduler"]
+        if "patience" in config:
+            train_config["patience"] = config["patience"]
+        if "num_workers" in config:
+            train_config["num_workers"] = config["num_workers"]
+        if "max_grad_norm" in config:
+            train_config["max_grad_norm"] = config["max_grad_norm"]
+        
+        # Monitored parameters
+        if "monitored_metrics" in config:
+            monitored = config["monitored_metrics"]
+            if isinstance(monitored, list):
+                train_config["monitor"] = monitored[0] if monitored else "accuracy"
+            else:
+                train_config["monitor"] = monitored
+        if "monitored_strategy" in config:
+            train_config["monitor_strategy"] = config["monitored_strategy"]
+        
+        # Batch parameters
+        batch_mode = config.get("batch_mode", "Batch Size Mode")
+        if batch_mode == "Batch Size Mode" and "batch_size" in config:
+            train_config["batch_size"] = config["batch_size"]
+        elif batch_mode == "Batch Token Mode" and "batch_token" in config:
+            train_config["batch_token"] = config["batch_token"]
+        
+        # Structure sequence (for ses-adapter)
+        training_method = config.get("training_method", "freeze")
+        if training_method == "ses-adapter" and "structure_seq" in config:
+            structure_seq = config["structure_seq"]
+            if isinstance(structure_seq, list):
+                train_config["structure_seq"] = ",".join(structure_seq)
+            else:
+                train_config["structure_seq"] = structure_seq
+        
+        # LoRA parameters (only for LoRA-based methods)
+        if training_method in ["plm-lora", "plm-qlora", "plm-adalora", "plm-dora", "plm-ia3"]:
+            if "lora_r" in config:
+                train_config["lora_r"] = config["lora_r"]
+            if "lora_alpha" in config:
+                train_config["lora_alpha"] = config["lora_alpha"]
+            if "lora_dropout" in config:
+                train_config["lora_dropout"] = config["lora_dropout"]
+            if "lora_target_modules" in config:
+                lora_modules = config["lora_target_modules"]
+                if isinstance(lora_modules, list):
+                    train_config["lora_target_modules"] = lora_modules
+                elif isinstance(lora_modules, str):
+                    # Already in correct format
+                    train_config["lora_target_modules"] = lora_modules.split(",")
+        
+        # Output parameters
+        if "output_model_name" in config:
+            train_config["output_model_name"] = config["output_model_name"]
+        if "output_dir" in config:
+            train_config["output_dir"] = config["output_dir"]
+        
+        # Wandb parameters
+        if config.get("wandb_enabled", False):
+            train_config["wandb"] = True
+            if "wandb_project" in config:
+                train_config["wandb_project"] = config["wandb_project"]
+            if "wandb_entity" in config:
+                train_config["wandb_entity"] = config["wandb_entity"]
+        
+        # Build training command
+        cmd = build_command_list(train_config)
+        cmd_str = " ".join(cmd)
+        
+        # Start training process
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+            universal_newlines=True
+        )
+        
+        # Collect logs
+        logs = []
+        max_log_lines = 100  # Limit log output to avoid overwhelming the chat
+        
+        for line in process.stdout:
+            line = line.strip()
+            if line:
+                logs.append(line)
+                # Keep only the last max_log_lines
+                if len(logs) > max_log_lines:
+                    logs.pop(0)
+        
+        # Wait for process to complete
+        return_code = process.wait()
+        
+        if return_code == 0:
+            # Extract output model path from config
+            output_dir = config.get("output_dir", "ckpt/custom_model")
+            output_model = config.get("output_model_name", "model.pt")
+            model_path = os.path.join(output_dir, output_model)
+            
+            result = {
+                "success": True,
+                "message": "Model training completed successfully!",
+                "model_path": model_path,
+                "output_dir": output_dir,
+                "command": cmd_str,
+                "logs": "\n".join(logs[-20:])  # Return last 20 lines of logs
+            }
+        else:
+            result = {
+                "success": False,
+                "error": f"Training failed with return code {return_code}",
+                "command": cmd_str,
+                "logs": "\n".join(logs[-20:])
+            }
+        
+        return json.dumps(result, ensure_ascii=False, indent=2)
+        
+    except Exception as e:
+        return json.dumps({
+            "success": False,
+            "error": f"Training error: {str(e)}"
+        }, ensure_ascii=False)
+
+
+@tool("predict_with_protein_model", args_schema=ModelPredictionInput)
+def predict_with_protein_model_tool(config_path: str, sequence: Optional[str] = None, csv_file: Optional[str] = None) -> str:
+    """Predict protein properties using a user trained model. Can perform single sequence prediction or batch prediction from CSV file."""
+    try:
+        if not os.path.exists(config_path):
+            return json.dumps({
+                "success": False,
+                "error": f"Configuration file not found: {config_path}"
+            }, ensure_ascii=False)
+        
+        # Load configuration
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+        
+        # Determine prediction mode
+        is_batch = csv_file is not None
+        
+        # Extract only prediction-relevant parameters
+        # Map PLM model name to full path
+        plm_model = config.get("plm_model", "")
+        if plm_model in PLM_MODELS:
+            plm_model = PLM_MODELS[plm_model]
+        
+        training_method = config.get("training_method", "freeze")
+        
+        predict_config = {
+            "model_path": config.get("model_path", config.get("output_dir", "") + "/" + config.get("output_model_name", "model.pt")),
+            "plm_model": plm_model,
+            "eval_method": training_method,
+            "pooling_method": config.get("pooling_method", "mean"),
+            "problem_type": config.get("problem_type", "single_label_classification"),
+            "num_labels": config.get("num_labels", 2),
+            "max_seq_len": config.get("max_seq_len", 1024),
+            "batch_size": config.get("batch_size", 16),
+        }
+        
+        # CRITICAL: Only use structure_seq if training method is ses-adapter
+        # Otherwise, the model won't have the required embedding layers
+        if training_method == "ses-adapter" and "structure_seq" in config:
+            structure_seq = config["structure_seq"]
+            if isinstance(structure_seq, list):
+                predict_config["structure_seq"] = ",".join(structure_seq)
+            else:
+                predict_config["structure_seq"] = structure_seq
+        
+        if is_batch:
+            if not os.path.exists(csv_file):
+                return json.dumps({
+                    "success": False,
+                    "error": f"CSV file not found: {csv_file}"
+                }, ensure_ascii=False)
+            
+            # Set batch prediction parameters
+            predict_config["input_file"] = csv_file
+            predict_config["output_dir"] = os.path.dirname(csv_file)
+            predict_config["output_file"] = "predictions.csv"
+            
+        elif sequence:
+            # Create temporary file for single sequence
+            temp_dir = tempfile.mkdtemp()
+            temp_csv = os.path.join(temp_dir, "temp_sequence.csv")
+            
+            # Create CSV with sequence
+            df = pd.DataFrame({"aa_seq": [sequence]})
+            df.to_csv(temp_csv, index=False)
+            
+            predict_config["input_file"] = temp_csv
+            predict_config["output_dir"] = temp_dir
+            predict_config["output_file"] = "predictions.csv"
+        else:
+            return json.dumps({
+                "success": False,
+                "error": "Either 'sequence' or 'csv_file' must be provided"
+            }, ensure_ascii=False)
+        
+        # Build prediction command
+        cmd = build_predict_command_list(predict_config, is_batch=True)
+        cmd_str = " ".join(cmd)
+        
+        # Start prediction process
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+            universal_newlines=True
+        )
+        
+        # Collect logs
+        logs = []
+        max_log_lines = 50
+        
+        for line in process.stdout:
+            line = line.strip()
+            if line:
+                logs.append(line)
+                if len(logs) > max_log_lines:
+                    logs.pop(0)
+        
+        # Wait for process to complete
+        return_code = process.wait()
+        
+        if return_code == 0:
+            # Try to read prediction results
+            output_file = os.path.join(predict_config["output_dir"], predict_config["output_file"])
+            
+            result = {
+                "success": True,
+                "message": "Prediction completed successfully!",
+                "output_file": output_file,
+                "command": cmd_str,
+                "logs": "\n".join(logs[-10:])
+            }
+            
+            # Try to load and preview results
+            if os.path.exists(output_file):
+                try:
+                    df = pd.read_csv(output_file)
+                    result["preview"] = df.head(10).to_dict(orient='records')
+                    result["total_predictions"] = len(df)
+                except Exception as e:
+                    result["preview_error"] = f"Could not load results: {str(e)}"
+        else:
+            result = {
+                "success": False,
+                "error": f"Prediction failed with return code {return_code}",
+                "command": cmd_str,
+                "logs": "\n".join(logs[-10:])
+            }
+        
+        return json.dumps(result, ensure_ascii=False, indent=2)
+        
+    except Exception as e:
+        return json.dumps({
+            "success": False,
+            "error": f"Prediction error: {str(e)}"
+        }, ensure_ascii=False)

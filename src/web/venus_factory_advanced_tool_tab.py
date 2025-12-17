@@ -280,7 +280,7 @@ def handle_protein_function_prediction_chat(
     datasets: List[str],
     enable_ai: bool,
     ai_model: str,
-    user_api_key: str
+    user_api_key: Optional[str] = None
 ) -> Generator:
     try:
         import requests
@@ -430,7 +430,7 @@ def handle_protein_function_prediction_advance(
     fasta_file: Any, 
     enable_ai: bool, 
     ai_model: str, 
-    user_api_key: str, 
+    user_api_key: Optional[str] = None, 
     model_name: Optional[str] = None, 
     datasets: Optional[List[str]] = None,
     progress=gr.Progress()
@@ -590,8 +590,8 @@ def handle_protein_residue_function_prediction_chat(
     fasta_file: Any,
     enable_ai: bool,
     ai_model: str,
-    user_api_key: str,
-    model_name: str,
+    user_api_key: Optional[str] = None,
+    model_name: Optional[str] = None,
     progress=gr.Progress()
 ) -> Generator:
     try:
