@@ -175,7 +175,7 @@ class Chat_LLM(BaseChatModel):
 
 
 class ProteinContextManager:
-    def __init__(self):
+    def __init__(self, max_tool_history=10):
         self.sequences = {}  # {sequence_id: {'sequence': str, 'timestamp': datetime}}
         self.files = {}      # {file_id: {'path': str, 'type': str, 'timestamp': datetime}}
         self.uniprot_ids = {} # {uniprot_id: timestamp}
@@ -186,6 +186,7 @@ class ProteinContextManager:
         self.last_structure = None
 
         self.tool_history = []
+        self.max_tool_history = max_tool_history  # Maximum number of tool calls to keep in history
 
     def add_tool_call(self, step: int, tool_name: str, inputs: dict, outputs: Any, cached: bool = False):
         merged_params = _merge_tool_parameters_with_context(self, inputs)
@@ -211,10 +212,18 @@ class ProteinContextManager:
             'cached': cached,
             'tool_record': tool_record,
         })
+        
+        # Limit history to max_tool_history entries (keep most recent)
+        if len(self.tool_history) > self.max_tool_history:
+            self.tool_history.pop(0)  # Remove oldest entry
 
-    def get_tool_records(self) -> List[Dict[str, Any]]:
+    def get_tool_records(self, limit: int = None) -> List[Dict[str, Any]]:
+        """Get tool call records, optionally limited to most recent N entries"""
         records = []
-        for call in self.tool_history:
+        # Apply limit if specified, otherwise return all
+        history_slice = self.tool_history[-limit:] if limit else self.tool_history
+        
+        for call in history_slice:
             rec = call.get('tool_record')
             if rec:
                 records.append(rec)
@@ -443,6 +452,8 @@ def get_tools():
         pdb_structure_download_tool,
         protein_properties_generation_tool,
         generate_training_config_tool,
+        train_protein_model_tool,
+        predict_with_protein_model_tool,
         ai_code_execution_tool,
         ncbi_sequence_download_tool,
         alphafold_structure_download_tool,
@@ -470,7 +481,7 @@ def create_worker_executor(llm: BaseChatModel, tools: List[BaseTool]):
         tools=tools,
         verbose=True,
         handle_parsing_errors=True,
-        max_iterations=3,  # Allow retries on errors, but agent should stop after successful tool call
+        max_iterations=2,
         max_execution_time=300,
         return_intermediate_steps=True,
     )
@@ -649,7 +660,7 @@ async def send_message(history, message, session_state):
             "outputs": call.get("outputs")[:500]
         })
 
-    tool_records = protein_ctx.get_tool_records()
+    tool_records = protein_ctx.get_tool_records(limit=10)  # Only send last 10 tool calls to Planner
 
     planner_inputs = {
         "input": text,
@@ -662,7 +673,6 @@ async def send_message(history, message, session_state):
     try:
         # Async planner invocation
         plan = await asyncio.to_thread(session_state['planner'].invoke, planner_inputs)
-        print(json.dumps(plan, indent=2, ensure_ascii=False))
     except Exception as e:
         plan = []
     
@@ -708,9 +718,7 @@ async def send_message(history, message, session_state):
             yield history, gr.MultimodalTextbox(value=None, interactive=False)
 
             try:
-                print(json.dumps(tool_input, indent=2, ensure_ascii=False))
                 merged_tool_input = _merge_tool_parameters_with_context(protein_ctx, tool_input)
-                print(json.dumps(merged_tool_input, indent=2, ensure_ascii=False))
                 
                 # CRITICAL: Resolve dependencies BEFORE cache check and tool execution
                 for key, value in merged_tool_input.items():
@@ -728,7 +736,6 @@ async def send_message(history, message, session_state):
                         else:
                             merged_tool_input[key] = dep_raw_output
                 
-                print(json.dumps(merged_tool_input, indent=2, ensure_ascii=False))
                 
                 cached_entry = get_cached_tool_result(session_state, tool_name, merged_tool_input)
                 
@@ -804,6 +811,20 @@ async def send_message(history, message, session_state):
                     # Fallback to agent's text output if no intermediate steps
                     raw_output = executor_result.get('output', '')
                 step_results[step_num] = {'raw_output': raw_output, 'cached': False}
+                
+                # Display training progress if this is a training tool
+                if tool_name == 'train_protein_model_tool':
+                    try:
+                        parsed_output = json.loads(raw_output) if isinstance(raw_output, str) else raw_output
+                        if isinstance(parsed_output, dict) and 'training_progress' in parsed_output:
+                            training_progress = parsed_output['training_progress']
+                            if training_progress:
+                                # Update the display with training progress
+                                progress_display = f"**Training Progress:**\n```\n{training_progress}\n```"
+                                history[-1] = {"role": "assistant", "content": f"{plan_text}\n\n---\n\n⏳ **Step {step_num}:** {task_desc}\n\n{progress_display}"}
+                                yield history, gr.MultimodalTextbox(value=None, interactive=False)
+                    except Exception as e:
+                        print(f"Could not parse training progress: {e}")
 
                 # Try to parse and cache the result (only if successful)
                 try:
@@ -862,9 +883,32 @@ async def send_message(history, message, session_state):
                 step_detail = f"**Step {step_num}:** {task_desc}\n\n"
                 step_detail += f"**Tool:** {tool_name}\n"
                 step_detail += f"**Input:** {json.dumps(merged_tool_input, indent=2)}\n\n"
-                # Safely display output (ensure it's a string)
-                output_str = str(raw_output) if not isinstance(raw_output, str) else raw_output
-                step_detail += f"**Output:**\n```\n{output_str[:500]}{'...' if len(output_str) > 500 else ''}\n```"
+                
+                # For training tool, show training progress prominently
+                if tool_name == 'train_protein_model_tool':
+                    try:
+                        parsed_output = json.loads(raw_output) if isinstance(raw_output, str) else raw_output
+                        if isinstance(parsed_output, dict):
+                            if parsed_output.get('success'):
+                                step_detail += f"✅ **Training Completed Successfully!**\n\n"
+                                if 'model_path' in parsed_output:
+                                    step_detail += f"**Model saved to:** `{parsed_output['model_path']}`\n\n"
+                                if 'training_progress' in parsed_output:
+                                    step_detail += f"**Training Progress:**\n```\n{parsed_output['training_progress']}\n```\n\n"
+                            else:
+                                step_detail += f"❌ **Training Failed**\n\n"
+                                if 'error' in parsed_output:
+                                    step_detail += f"**Error:** {parsed_output['error']}\n\n"
+                            if 'logs' in parsed_output:
+                                step_detail += f"**Recent Logs:**\n```\n{parsed_output['logs']}\n```"
+                    except Exception:
+                        # Fallback to default display
+                        output_str = str(raw_output) if not isinstance(raw_output, str) else raw_output
+                        step_detail += f"**Output:**\n```\n{output_str[:500]}{'...' if len(output_str) > 500 else ''}\n```"
+                else:
+                    # Safely display output (ensure it's a string)
+                    output_str = str(raw_output) if not isinstance(raw_output, str) else raw_output
+                    step_detail += f"**Output:**\n```\n{output_str[:500]}{'...' if len(output_str) > 500 else ''}\n```"
                 
                 analysis_log += f"--- Analysis for Step {step_num}: {task_desc} ---\n\n"
                 analysis_log += f"Tool: {tool_name}\n"

@@ -27,7 +27,7 @@ def handle_mutation_prediction_base(
     file_obj: Any, 
     enable_ai: bool, 
     ai_model: str, 
-    user_api_key: str, 
+    user_api_key: Optional[str] = None, 
     model_name: Optional[str] = None,
     progress=gr.Progress()
 ) -> Generator:
@@ -342,7 +342,7 @@ def handle_protein_function_prediction(
     fasta_file: Any, 
     enable_ai: bool, 
     ai_model: str, 
-    user_api_key: str, 
+    user_api_key: Optional[str] = None, 
     model_name: Optional[str] = None, 
     datasets: Optional[List[str]] = None,
     progress=gr.Progress()
@@ -755,7 +755,7 @@ def handle_protein_residue_function_prediction(
     fasta_file: Any,
     enable_ai: bool,
     ai_model: str,
-    user_api_key: str,
+    user_api_key: Optional[str] = None,
     model_name: Optional[str] = None,
     progress=gr.Progress()
 ) -> Generator:
