@@ -225,6 +225,110 @@ def save_selected_chain_pdb(original_pdb_content: str, selected_chain: str, outp
         f.write('\n'.join(new_pdb_lines))
 
 
+def extract_first_sequence_from_fasta_file(fasta_file_path: str) -> str:
+    """Extract first sequence from FASTA file and save as new file.
+    
+    Uses BioPython to read FASTA and extracts the first sequence.
+    Reuses save_selected_sequence_fasta() for actual sequence extraction.
+    
+    Args:
+        fasta_file_path: Path to original FASTA file
+        
+    Returns:
+        Path to processed FASTA file with only first sequence
+    """
+    try:
+        from Bio import SeqIO
+        
+        # Read FASTA file content
+        with open(fasta_file_path, 'r') as f:
+            fasta_content = f.read()
+        
+        # Use BioPython to parse sequences
+        sequences = list(SeqIO.parse(fasta_file_path, "fasta"))
+        
+        if not sequences:
+            return fasta_file_path  # No sequences found
+        
+        # If only one sequence, return original file
+        if len(sequences) == 1:
+            return fasta_file_path
+        
+        # Get first sequence header
+        first_seq_id = sequences[0].id
+        
+        # Create output path
+        output_dir = get_save_path("Upload_Data", "Processed_Data")
+        base_name = os.path.splitext(os.path.basename(fasta_file_path))[0]
+        output_path = os.path.join(output_dir, f"{base_name}_first_seq.fasta")
+        
+        # Save selected sequence using existing function
+        save_selected_sequence_fasta(fasta_content, first_seq_id, output_path)
+        
+        print(f"✓ Extracted first sequence '{first_seq_id}' from FASTA: {output_path}")
+        return output_path
+        
+    except Exception as e:
+        print(f"Warning: Could not process FASTA sequences: {e}")
+        return fasta_file_path  # Return original on error
+
+
+def extract_first_chain_from_pdb_file(pdb_file_path: str) -> str:
+    """Extract first chain from PDB file and save as new file.
+    
+    Uses BioPython to read PDB structure and extracts the first chain.
+    Reuses save_selected_chain_pdb() for actual chain extraction.
+    
+    Args:
+        pdb_file_path: Path to original PDB file
+        
+    Returns:
+        Path to processed PDB file with only first chain (renamed to chain A)
+    """
+    try:
+        from Bio.PDB import PDBParser
+        
+        # Read PDB file content
+        with open(pdb_file_path, 'r') as f:
+            pdb_content = f.read()
+        
+        # Use BioPython to parse structure and get chains
+        parser = PDBParser(QUIET=True)
+        structure = parser.get_structure("protein", pdb_file_path)
+        
+        # Get all chain IDs
+        chain_ids = []
+        for model in structure:
+            for chain in model:
+                chain_ids.append(chain.id)
+            break  # Only process first model
+        
+        if not chain_ids:
+            return pdb_file_path  # No chains found
+        
+        # If only one chain, return original file
+        if len(chain_ids) == 1:
+            return pdb_file_path
+        
+        # Get first chain
+        first_chain = chain_ids[0]
+        
+        # Create output path
+        output_dir = get_save_path("Upload_Data", "Processed_Data")
+        base_name = os.path.splitext(os.path.basename(pdb_file_path))[0]
+        output_path = os.path.join(output_dir, f"{base_name}_chain_{first_chain}.pdb")
+        
+        # Save selected chain using existing function
+        save_selected_chain_pdb(pdb_content, first_chain, output_path)
+        
+        print(f"✓ Extracted first chain '{first_chain}' from PDB: {output_path}")
+        return output_path
+        
+    except Exception as e:
+        print(f"Warning: Could not process PDB chains: {e}")
+        return pdb_file_path  # Return original on error
+
+
 def handle_paste_chain_selection(selected_chain: str, chains_dict: Dict, original_pdb_content: str) -> Tuple[str, str]:
     """Handle chain selection from pasted PDB content."""
     if not chains_dict or selected_chain not in chains_dict:
