@@ -234,21 +234,17 @@ CRITICAL ANALYSIS REQUIREMENTS:
 EXAMPLE (for mutation prediction):
 The analysis reveals that 3 out of 5 mutations are predicted to destabilize the protein structure.
 
-| Mutation | ΔΔG (kcal/mol) | Predicted Effect | Confidence |
-|----------|----------------|------------------|------------|
-| A123V    | +2.3          | Destabilizing    | High       |
-| L45P     | +3.1          | Destabilizing    | High       |
-| G78A     | -0.5          | Stabilizing      | Medium     |
+| Mutation | Rank           | Score            | 
+|----------|----------------|------------------|
+| A123V    | 1              | 1.0              |
+| L45P     | 2              | 0.91             |
+| G78A     | 3              | 0.91             |
 
 **Key Findings:**
 - **A123V**: The substitution from Ala to Val introduces steric clashes in the hydrophobic core
 - **L45P**: Proline substitution disrupts alpha-helix structure, causing significant destabilization
 - **G78A**: Minor stabilization due to increased hydrophobic packing
 
-**Potential Issues:**
-1. **High destabilization risk**: Two mutations (A123V, L45P) show ΔΔG > +2.0, suggesting significant structural disruption
-2. **Functional impact uncertainty**: Predictions focus on stability but don't account for functional site proximity
-3. **Experimental validation needed**: Medium confidence for G78A requires experimental confirmation
 """
 ANALYZER_PROMPT = ChatPromptTemplate.from_template(ANALYZER_PROMPT_TEMPLATE)
 

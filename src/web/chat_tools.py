@@ -20,6 +20,7 @@ from gradio_client import Client, handle_file
 import pandas as pd
 from langchain.tools import tool
 from pydantic import BaseModel, Field, validator
+from web.utils.file_handlers import extract_first_chain_from_pdb_file, extract_first_sequence_from_fasta_file
 from web.utils.common_utils import get_save_path
 from web.utils.literature import literature_search
 from web.utils.command import build_command_list, build_predict_command_list
@@ -131,6 +132,8 @@ def zero_shot_sequence_prediction_tool(sequence: Optional[str] = None, fasta_fil
         if fasta_file:
             if not os.path.exists(fasta_file):
                 return f"Error: FASTA file not found at path: {fasta_file}"
+            # Extract first sequence if multi-sequence FASTA
+            fasta_file = extract_first_sequence_from_fasta_file(fasta_file)
             return call_zero_shot_sequence_prediction(
                 fasta_file=fasta_file, model_name=model_name, api_key=api_key
                 )
@@ -169,6 +172,8 @@ def protein_function_prediction_tool(sequence: Optional[str] = None, fasta_file:
     """Predict protein functions like solubility, localization, metal ion binding, stability, sorting signal, and optimum temperature."""
     try:
         if fasta_file and os.path.exists(fasta_file):
+            # Extract first sequence if multi-sequence FASTA
+            fasta_file = extract_first_sequence_from_fasta_file(fasta_file)
             return call_protein_function_prediction(
                 fasta_file=fasta_file, model_name=model_name, task=task, api_key=api_key
                 )
@@ -185,6 +190,8 @@ def protein_function_prediction_tool(sequence: Optional[str] = None, fasta_file:
 def functional_residue_prediction_tool(sequence: Optional[str] = None, fasta_file: Optional[str] = None, model_name: str = "ESM2-650M", task: str = "Activate", api_key: Optional[str] = None) -> str:
     try:
         if fasta_file and os.path.exists(fasta_file):
+            # Extract first sequence if multi-sequence FASTA
+            fasta_file = extract_first_sequence_from_fasta_file(fasta_file)
             return call_functional_residue_prediction(
                 fasta_file=fasta_file, model_name=model_name, task=task, api_key=api_key
                 )
@@ -265,6 +272,13 @@ def protein_properties_generation_tool(sequence: Optional[str] = None, fasta_fil
         if fasta_file:
             if not os.path.exists(fasta_file):
                 return f"Error: FASTA file not found at path: {fasta_file}"
+            # Process file based on type
+            if fasta_file.lower().endswith('.pdb'):
+                # Extract first chain for PDB files
+                fasta_file = extract_first_chain_from_pdb_file(fasta_file)
+            elif fasta_file.lower().endswith(('.fasta', '.fa')):
+                # Extract first sequence for FASTA files
+                fasta_file = extract_first_sequence_from_fasta_file(fasta_file)
             return call_protein_properties_prediction(
                 fasta_file=fasta_file, task_name=task_name, api_key=api_key
                 )
@@ -410,10 +424,13 @@ def call_zero_shot_sequence_prediction(
 def call_zero_shot_structure_prediction_from_file(structure_file: str, model_name: str = "ESM-IF1", api_key: Optional[str] = None) -> str:
     """Call VenusFactory zero-shot structure-based mutation prediction API"""
     try:
+        # Extract first chain from PDB if multiple chains exist
+        processed_file = extract_first_chain_from_pdb_file(structure_file)
+        
         client = Client("http://localhost:7860/")
         result = client.predict(
             function_selection="Activity",
-            file_obj=handle_file(structure_file),
+            file_obj=handle_file(processed_file),
             enable_ai=False,
             ai_model="DeepSeek",
             user_api_key=api_key,
