@@ -35,9 +35,12 @@ def create_status_html(status: str, color: str = "#666") -> str:
 
 
 def handle_paste_fasta_detect(fasta_content: str) -> Tuple:
-    """Handle paste FASTA content detection."""
+    """Handle paste FASTA content detection with file upload component update."""
     result = parse_fasta_paste_content(fasta_content)
-    return result + (fasta_content, )
+    if len(result) >= 5:
+        temp_file_path = result[4]  # The temporary file path
+        return result + (temp_file_path,)
+    return result + ("",)
 
 
 def handle_paste_pdb_detect(pdb_content: str) -> Tuple:

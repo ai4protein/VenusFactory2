@@ -307,7 +307,11 @@ def handle_protein_function_prediction_chat(
             if not script_path.exists() or not adapter_path.exists():
                 raise FileNotFoundError(f"Required files not found for dataset {dataset}")
 
-            cmd = [sys.executable, str(script_path), "--fasta_file", str(Path(fasta_file.name)), "--adapter_path", str(adapter_path), "--output_csv", str(output_file)]
+            if isinstance(fasta_file, str):
+                file_path = fasta_file
+            else:
+                file_path = fasta_file.name
+            cmd = [sys.executable, str(script_path), "--fasta_file", str(Path(file_path)), "--adapter_path", str(adapter_path), "--output_csv", str(output_file)]
             subprocess.run(cmd, capture_output=True, text=True, check=True, encoding='utf-8', errors='ignore')
 
             if output_file.exists():
@@ -485,7 +489,11 @@ def handle_protein_function_prediction_advance(
             if not script_path.exists() or not adapter_path.exists():
                 raise FileNotFoundError(f"Required files not found: Script={script_path}, Adapter={adapter_path}")
             
-            cmd = [sys.executable, str(script_path), "--fasta_file", str(Path(fasta_file.name)), "--adapter_path", str(adapter_path), "--output_csv", str(output_file)]
+            if isinstance(fasta_file, str):
+                file_path = fasta_file
+            else:
+                file_path = fasta_file.name
+            cmd = [sys.executable, str(script_path), "--fasta_file", str(Path(file_path)), "--adapter_path", str(adapter_path), "--output_csv", str(output_file)]
             subprocess.run(cmd, capture_output=True, text=True, check=True, encoding='utf-8', errors='ignore')
             
             if output_file.exists():
@@ -1277,7 +1285,7 @@ def handle_VenusMine(
 
 def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     sequence_models = ["VenusPLM", "ESM2-650M", "ESM-1v", "ESM-1b"]
-    structure_models = ["VenusREM (foldseek-based)", "ProSST-2048", "ProtSSN", "ESM-IF1", "SaProt", "MIF-ST", "VenusREM"]
+    structure_models = ["VenusREM (foldseek-based)", "ProSST-2048", "ProtSSN", "ESM-IF1", "SaProt", "MIF-ST"]
     function_models = list(MODEL_MAPPING_FUNCTION.keys())
     residue_function_models = list(MODEL_RESIDUE_MAPPING_FUNCTION.keys())
 
@@ -1478,7 +1486,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                             with gr.TabItem("Paste FASTA Content"):
                                 adv_residue_function_paste_content_input = gr.Textbox(label="Paste FASTA Content", placeholder="Paste FASTA content here...", lines=8, max_lines=15)
                                 with gr.Row():
-                                    adv_residue_function_paste_content_btn = gr.Button("🔍 Detect & Save Content", variant="primary", size="m")
+                                    adv_residue_function_paste_content_btn = gr.Button("🔍 Detect Content", variant="primary", size="m")
                                     adv_residue_function_paste_clear_btn = gr.Button("🗑️ Clear", variant="primary", size="m")
                         
                         adv_residue_function_protein_display = gr.Textbox(label="Uploaded Protein Sequence", interactive=False, lines=3, max_lines=7)
@@ -1640,13 +1648,13 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         seq_paste_content_btn.click(
             fn=handle_paste_fasta_detect,
             inputs=seq_paste_content_input,
-            outputs=[seq_protein_display, seq_sequence_selector, seq_sequence_state, seq_selected_sequence_state, seq_original_file_path_state, seq_original_paste_content_state]
+            outputs=[seq_protein_display, seq_sequence_selector, seq_sequence_state, seq_selected_sequence_state, seq_original_file_path_state, seq_original_paste_content_state, seq_file_upload]
         )
 
         seq_sequence_selector.change(
             fn=handle_sequence_change_unified,
             inputs=[seq_sequence_selector, seq_sequence_state, seq_original_file_path_state, seq_original_paste_content_state],
-            outputs=[seq_protein_display, seq_current_file_state]
+            outputs=[seq_protein_display, seq_file_upload]
         )
 
 
@@ -1697,13 +1705,13 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         function_paste_content_btn.click(
             fn=handle_paste_fasta_detect,
             inputs=function_paste_content_input,
-            outputs=[function_protein_display, function_protein_selector, function_sequence_state, function_selected_sequence_state, function_original_file_path_state, function_original_paste_content_state]
+            outputs=[function_protein_display, function_protein_selector, function_sequence_state, function_selected_sequence_state, function_original_file_path_state, function_original_paste_content_state, function_fasta_upload]
         )
 
         function_protein_selector.change(
             fn=handle_sequence_change_unified,
             inputs=[function_protein_selector, function_sequence_state, function_original_file_path_state, function_original_paste_content_state],
-            outputs=[function_protein_display, function_current_file_state]
+            outputs=[function_protein_display, function_fasta_upload]
         )
         adv_func_task_dd.change(
             fn=update_dataset_choices_fixed,
@@ -1728,12 +1736,12 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         adv_residue_function_paste_content_btn.click(
             fn=handle_paste_fasta_detect,
             inputs=adv_residue_function_paste_content_input,
-            outputs=[adv_residue_function_protein_display, adv_residue_function_selector, adv_residue_function_sequence_state, adv_residue_function_selected_sequence_state, adv_residue_function_original_file_path_state, adv_residue_function_original_paste_content_state]
+            outputs=[adv_residue_function_protein_display, adv_residue_function_selector, adv_residue_function_sequence_state, adv_residue_function_selected_sequence_state, adv_residue_function_original_file_path_state, adv_residue_function_original_paste_content_state, adv_residue_function_fasta_upload]
         )
         adv_residue_function_selector.change(
             fn=handle_sequence_change_unified,
             inputs=[adv_residue_function_selector, adv_residue_function_sequence_state, adv_residue_function_original_file_path_state, adv_residue_function_original_paste_content_state],
-            outputs=[adv_residue_function_protein_display, adv_residue_function_current_file_state]
+            outputs=[adv_residue_function_protein_display, adv_residue_function_fasta_upload]
         )
         adv_residue_function_predict_btn.click(
             fn=handle_protein_residue_function_prediction,

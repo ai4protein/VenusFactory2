@@ -119,11 +119,16 @@ def predict(model, data_dict, device, args, plm_model):
                 "probabilities": probabilities
             }
         elif args.problem_type == "residue_single_label_classification":
-            probabilities = torch.nn.functional.softmax(outputs, dim=1)
-            predicted_class = torch.argmax(probabilities, dim=1).item()
-            class_probs = probabilities.squeeze().tolist()
+            probabilities = torch.nn.functional.softmax(outputs, dim=-1)
+            predictions = torch.argmax(probabilities, dim=-1).tolist()
+            probabilities = probabilities.tolist()
+            if not isinstance(predictions, list):
+                predictions = [predictions]
+            if not isinstance(probabilities, list):
+                probabilities = [probabilities]
+
             return {
-                "predicted_class": predicted_class,
+                "predicted_class": predictions,
                 "probabilities": probabilities
             }
 
