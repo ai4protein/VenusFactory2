@@ -24,6 +24,7 @@ from mcp_venusfactory import start_http_server
 from fastapi_mcp import FastApiMCP
 import uvicorn
 
+os.environ["HF_ENDPOINT"]="https://hf-mirror.com"
 
 _fastapi_server_thread = None
 _fastapi_server_lock = threading.Lock()
