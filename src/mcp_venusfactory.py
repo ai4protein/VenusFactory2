@@ -26,12 +26,13 @@ from web.chat_tools import (
     functional_residue_prediction_tool,
     protein_properties_generation_tool,
     literature_search_tool,
+    protein_structure_prediction_ESMFold_tool
 )
 
 UPLOAD_DIR = get_save_path("MCP_Server", "Uploads")
 OUTPUT_DIR = get_save_path("MCP_Server", "Outputs")
 
-default_port = int(os.getenv("MCP_HTTP_PORT", "8081"))
+default_port = int(os.getenv("MCP_HTTP_PORT", "8080"))
 default_host = os.getenv("MCP_HTTP_HOST", "0.0.0.0")
 
 logging.basicConfig(
@@ -267,6 +268,18 @@ class LiteratureSearchInput(BaseModel):
             raise ValueError("Query cannot be empty")
         return v.strip()
 
+class ProteinStructurePredictionESMFoldInput(BaseModel):
+    """Input validation for protein structure prediction using ESMFold."""
+    sequence: str = Field(..., description="Protein sequence in single letter amino acid code")
+    save_path: Optional[str] = Field(None, description="Path to save the predicted structure")
+    verbose: Optional[bool] = Field(default=True, description="Whether to print detailed information")
+    @field_validator('sequence')
+    @classmethod
+    def validate_sequence(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Sequence cannot be empty")
+        return v.strip()
+
 
 class MCPError(BaseModel):
     """Error information in MCP response."""
@@ -383,13 +396,20 @@ _http_server_lock = threading.Lock()
 def start_http_server(host: Optional[str] = None, port: Optional[int] = None) -> tuple[str, int]:
     global _http_server_thread
     host = host or os.getenv("MCP_HTTP_HOST", "0.0.0.0")
-    port = port or int(os.getenv("MCP_HTTP_PORT", "8081"))
+    port = port or int(os.getenv("MCP_HTTP_PORT", "8080"))
 
     def _serve() -> None:
         try:
             logger.info(f"🚀 VenusFactory MCP Server running internally on {host}:{port}")
             logger.info(f"📡 SSE Endpoint: http://{host}:{port}/sse") 
-            mcp.run(transport="sse", host=host, port=port)
+            app_with_route = mcp.sse_app()
+            uvicorn.run(
+                app_with_route,
+                host=host,
+                port=port,
+                root_path=os.getenv("MCP_ROOT_PATH", "/playground/MCP/ProteinTools")
+            )
+
             
         except Exception as exc:
             logger.error("MCP HTTP server exited unexpectedly: %s", exc)
@@ -408,7 +428,7 @@ def start_http_server(host: Optional[str] = None, port: Optional[int] = None) ->
 @mcp.tool()
 async def query_uniprot(uniprot_id: str) -> str:
     """
-    Query UniProt for protein information.
+    Retrieve protein amino acid sequence and metadata from UniProt database by accession ID.
     Args:
         uniprot_id (str): UniProt ID of the protein.
     Returns:
@@ -427,7 +447,7 @@ async def query_uniprot(uniprot_id: str) -> str:
 @mcp.tool()
 async def query_interpro(uniprot_id: str) -> str:
     """
-    Query InterPro for protein domain information.
+    Retrieve protein domain annotations, GO terms, and functional information from InterPro database.
     Args:
         uniprot_id (str): UniProt ID of the protein.
     Returns:
@@ -446,7 +466,7 @@ async def query_interpro(uniprot_id: str) -> str:
 @mcp.tool()
 async def download_pdb_structure(pdb_id: str, output_format: str = "pdb") -> str:
     """
-    Download PDB structure file.
+    Download experimental 3D protein structure from RCSB PDB database and save to local file.
     Args:
         pdb_id (str): PDB ID of the structure.
         output_format (str): Output the path of the structure file.
@@ -469,7 +489,7 @@ async def download_pdb_structure(pdb_id: str, output_format: str = "pdb") -> str
 @mcp.tool()
 async def download_ncbi_sequence(accession_id: str, output_format: str = "fasta") -> str:
     """
-    Download NCBI sequence file.
+    Download protein or nucleotide sequence from NCBI database and save as FASTA file.
     Args:
         accession_id (str): Accession ID of the sequence.
         output_format (str): Output the path of the sequence file.
@@ -492,7 +512,7 @@ async def download_ncbi_sequence(accession_id: str, output_format: str = "fasta"
 @mcp.tool()
 async def download_alphafold_structure(uniprot_id: str, output_format: str = "pdb") -> str:
     """
-    Download AlphaFold structure file.
+    Download AI-predicted 3D protein structure from AlphaFold database with confidence scores.
     Args:
         uniprot_id (str): UniProt ID of the protein.
         output_format (str): Output the path of the structure file.
@@ -515,7 +535,7 @@ async def download_alphafold_structure(uniprot_id: str, output_format: str = "pd
 @mcp.tool()
 async def extract_pdb_sequence(pdb_file_path: str) -> str:
     """
-    Extract sequence from PDB file.
+    Extract amino acid sequences from PDB structure file for all protein chains.
     Args:
         pdb_file_path (str): Path to the PDB file.
     Returns:
@@ -538,7 +558,7 @@ async def predict_zero_shot_sequence(
     model_name: str = "ESM2-650M"
 ) -> str:
     """
-    Predict zero-shot sequence.
+    Predict beneficial single-point mutations from protein sequence using pre-trained language models (no training data required).
     Args:
         sequence (Optional[str]): Protein sequence.
         fasta_file (Optional[str]): Path to the FASTA file.
@@ -573,7 +593,7 @@ async def predict_zero_shot_structure(
     model_name: str = "ESM-IF1"
 ) -> str:
     """
-    Predict zero-shot structure.
+    Predict beneficial single-point mutations from 3D protein structure using pre-trained models (no training data required).
     Args:
         structure_file_path (str): Path to the structure file.
         model_name (str): Model name for prediction. Supported models: VenusREM (foldseek-based), ProSST-2048, ProtSSN, ESM-IF1, SaProt, MIF-ST
@@ -604,7 +624,7 @@ async def predict_protein_function(
     task: str = "Solubility"
 ) -> str:
     """
-    Predict protein function.
+    Predict protein functional properties (solubility, localization, stability, etc.) from amino acid sequence.
     Args:
         sequence (Optional[str]): Protein sequence.
         fasta_file (Optional[str]): Path to the FASTA file.
@@ -646,7 +666,7 @@ async def predict_functional_residue(
     task: str = "Activity Site"
 ) -> str:
     """
-    Predict functional residue.
+    Identify functional residues (active sites, binding sites, conserved sites) in protein sequence.
     Args:
         sequence (Optional[str]): Protein sequence.
         fasta_file (Optional[str]): Path to the FASTA file.
@@ -687,7 +707,7 @@ async def predict_protein_properties(
     task_name: str = "Physical and chemical properties"
 ) -> str:
     """
-    Predict protein properties.
+    Calculate physical and chemical properties (molecular weight, pI, SASA, secondary structure) from protein sequence or structure.
     Args:
         sequence (Optional[str]): Protein sequence.
         fasta_file (Optional[str]): Path to the FASTA file.
@@ -722,7 +742,7 @@ async def predict_protein_properties(
 @mcp.tool()
 async def search_literature(query: str, max_results: int = 5) -> str:
     """
-    Search literature.
+    Search scientific literature databases (PubMed) for relevant research papers and publications.
     Args:
         query (str): Search query.
         max_results (int): Maximum number of results.
@@ -742,6 +762,32 @@ async def search_literature(query: str, max_results: int = 5) -> str:
     except Exception as e:
         return format_tool_response(None, error=e)
 
+@mcp.tool()
+async def predict_protein_structure_esmfold(sequence: str, save_path: Optional[str] = None, verbose: Optional[bool] = True) -> str:
+    """
+    Predict protein structure using ESMFold.
+    Args:
+        sequence (str): Protein sequence in single letter amino acid code.
+        save_path (Optional[str]): Path to save the predicted structure.
+        verbose (Optional[bool]): Whether to print detailed information.
+    Returns:
+        str: Prediction result.
+    """
+    try:
+        # Validate input using Pydantic
+        validated_input = ProteinStructurePredictionESMFoldInput(sequence=sequence, save_path=save_path, verbose=verbose)
+        result = await asyncio.to_thread(protein_structure_prediction_ESMFold_tool.invoke, {
+            "sequence": validated_input.sequence,
+            "save_path": validated_input.save_path,
+            "verbose": validated_input.verbose
+        })
+        return format_tool_response(result)
+    except ValueError as e:
+        return format_tool_response(None, error=e)
+    except Exception as e:
+        return format_tool_response(None, error=e)
+
+        
 if __name__ == "__main__":    
     logger.info("VenusFactory MCP Server starting...")
     mcp.run(transport="sse")

@@ -459,6 +459,8 @@ def get_tools():
         alphafold_structure_download_tool,
         PDB_sequence_extraction_tool,
         literature_search_tool,
+        deep_research_tool,
+        protein_structure_prediction_ESMFold_tool
     ]
 
 def create_planner_chain(llm: BaseChatModel, tools: List[BaseTool]):
@@ -857,7 +859,8 @@ async def send_message(history, message, session_state):
                     if tool_name in ['ncbi_sequence_download', 'alphafold_structure_download', 'uniprot_query', 'interpro_query',
                                      'protein_function_prediction', 'functional_residue_prediction',
                                      'protein_properties_generation', 'zero_shot_sequence_prediction', 'zero_shot_structure_prediction',
-                                     'PDB_sequence_extraction', 'PDB_structure_download', 'literature_search']:
+                                     'PDB_sequence_extraction', 'PDB_structure_download', 'literature_search', "deep_research",
+                                     'protein_structure_prediction_ESMFold']:
                         output_data = json.loads(raw_output)
                         # Structure downloads
                         if output_data.get('success') and 'file_path' in output_data:

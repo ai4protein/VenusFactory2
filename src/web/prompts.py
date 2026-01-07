@@ -38,7 +38,7 @@ TOOL PARAMETER MAPPING:
 - functional_residue_prediction: sequence OR fasta_file, model_name, task (task must be one of: Activity Site, Binding Site, Conserved Site, Motif)
 - interpro_query: uniprot_id
 - UniProt_query: uniprot_id
-- generate_training_config: csv_file (required), valid_csv_file (optional for early stopping), test_csv_file (optional for final evaluation), output_name, user_requirements (optional)
+- generate_training_config: csv_file OR dataset_path (at least one is required, dataset_path can be a local path or Hugging Face dataset path like 'username/dataset_name'), valid_csv_file (optional for early stopping), test_csv_file (optional for final evaluation), output_name, user_requirements (optional)
 - train_protein_model: config_path (use "dependency:step_X:config_path" from generate_training_config)
 - predict_with_protein_model: config_path (use "dependency:step_X:config_path" from generate_training_config, NOT model_path), sequence OR csv_file
 - protein_properties_generation: sequence OR fasta_file, task_name
@@ -47,9 +47,12 @@ TOOL PARAMETER MAPPING:
 - alphafold_structure_download: uniprot_id, output_format (for downloading AlphaFold structures)
 - PDB_sequence_extraction: pdb_file (for extracting sequence from PDB file, including the user uploaded PDB file and download PDB structures)
 - PDB_structure_download: pdb_id, output_format (for downloading PDB structures)
-- literature_search: protein name OR UniProt ID OR PDB ID, max_results (default 5)
+- literature_search: query, max_results (default 5) (for searching scientific papers and academic literature from arXiv and PubMed)
+- deep_research: query, max_results (default 5) (for general web search using Google)
+- protein_structure_prediction_ESMFold: sequence, save_path (for predicting protein structure using ESMFold), verbose (default True)
 
 When users mention a concept that does not exactly match a required parameter value (e.g., "localization"), infer the closest valid option from the allowed list (e.g., choose "Subcellular Localization") before emitting the plan.
+
 
 CONTEXT ANALYSIS:
 Parse the user's latest input (below) based on the conversation history (above) 
@@ -85,7 +88,8 @@ CRITICAL RULES:
 9. For the uploaded file, use the full path in the tool_input.
 10. When user asks a UniProt ID, you should search the literature using the literature_search tool.
 11. If a required parameter has a constrained option list, never echo the raw user wording blindly; instead pick the exact allowed value that best matches their intent and use that in the plan.
-
+12. For scientific research questions about proteins, genes, or biological concepts, use literature_search first.
+13. For general information, datasets, or non-academic resources, use deep_research.
 EXAMPLES:
 User uploads dataset.csv and asks to split it:
 [
@@ -234,17 +238,21 @@ CRITICAL ANALYSIS REQUIREMENTS:
 EXAMPLE (for mutation prediction):
 The analysis reveals that 3 out of 5 mutations are predicted to destabilize the protein structure.
 
-| Mutation | Rank           | Score            | 
-|----------|----------------|------------------|
-| A123V    | 1              | 1.0              |
-| L45P     | 2              | 0.91             |
-| G78A     | 3              | 0.91             |
+| Mutation | ΔΔG (kcal/mol) | Predicted Effect | Confidence |
+|----------|----------------|------------------|------------|
+| A123V    | +2.3          | Destabilizing    | High       |
+| L45P     | +3.1          | Destabilizing    | High       |
+| G78A     | -0.5          | Stabilizing      | Medium     |
 
 **Key Findings:**
 - **A123V**: The substitution from Ala to Val introduces steric clashes in the hydrophobic core
 - **L45P**: Proline substitution disrupts alpha-helix structure, causing significant destabilization
 - **G78A**: Minor stabilization due to increased hydrophobic packing
 
+**Potential Issues:**
+1. **High destabilization risk**: Two mutations (A123V, L45P) show ΔΔG > +2.0, suggesting significant structural disruption
+2. **Functional impact uncertainty**: Predictions focus on stability but don't account for functional site proximity
+3. **Experimental validation needed**: Medium confidence for G78A requires experimental confirmation
 """
 ANALYZER_PROMPT = ChatPromptTemplate.from_template(ANALYZER_PROMPT_TEMPLATE)
 
@@ -257,10 +265,11 @@ Follow these strict rules:
 3) Provide a brief, non-secretive "Rationale" paragraph for each conclusion (1–3 sentences) that explains why the evidence supports the conclusion — structured, inspectable reasoning (no internal chain-of-thought).
 4) Add a "Confidence & Caveats" section summarizing uncertainty and assumptions.
 5) Include a "Practical Recommendations" section with 1–4 clear next steps (experiments, checks, or analyses).
-6) If `{references}` or passed-in references exist (JSON string), parse them and append a `References` section listing each reference as a deduplicated list: [n] Title. Authors (if available). Year (if available). Source. URL. DOI. 
+6) If `{references}` or passed-in references exist (JSON string), parse them and include ONLY the references that were actually cited in your response. Append a `References` section listing each cited reference as a deduplicated list: [n] Title. Authors (if available). Year (if available). Source. URL. DOI. DO NOT include references that were not explicitly cited in your response. You need to reorder the references based on the citations in the analysis_log.
+6) If there are available OSS URLs in the analysis_log, include them in the References section at the end of the report. When exporting to Markdown, it is necessary to convert this URL into a clickable link, rather than the complete URL address. For example, it can be displayed as "click here to download the file"
 
 Formatting requirements:
-- Use Markdown with clear headings: `Conclusions`, `Supporting Evidence`, `Rationale`, `Confidence & Caveats`, `Practical Recommendations`, `References` (only if references exist).
+- Use Markdown with clear headings: `Conclusions`, `Supporting Evidence`, `Rationale`, `Confidence & Caveats`, `Practical Recommendations`, `References` (only if references exist and were cited).
 - Be concise and avoid speculative language; when making an inference, explicitly state the supporting evidence line.
 - If multiple questions are present, answer point-by-point (P1, P2, ...) within Conclusions and align corresponding evidence and rationale.
 """
@@ -285,10 +294,12 @@ You can help with:
 **Available Tools (when needed, the system will automatically use these):**
 - **Sequence Analysis**: Zero-shot sequence prediction, protein function prediction, functional residue prediction
 - **Structure Analysis**: Zero-shot structure prediction, structure property analysis
+- **Structure Prediction**: Protein structure prediction using ESMFold
 - **Database Queries**: UniProt query, InterPro query, NCBI sequence download, PDB structure download, AlphaFold structure download
-- **Literature Search**: Search scientific literature for protein-related information
+- **Literature Search**: Search academic literature (arXiv, PubMed) for scientific papers and research publications
+- **Deep Research**: Web search using Google for general information, datasets, and resources
 - **Data Processing**: AI code execution for custom data analysis tasks
-- **Training Config**: Generate training configurations for machine learning models
+- **Training Config**: Generate training configurations for machine learning models using CSV files or Hugging Face datasets
 
 **Important Notes:**
 - For complex analysis tasks (e.g., function prediction, stability analysis), users should provide protein sequences, UniProt IDs, or PDB IDs
