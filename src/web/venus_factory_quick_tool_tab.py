@@ -52,7 +52,7 @@ def handle_mutation_prediction_base(
         file_path = file_obj.name
 
     if file_path.lower().endswith((".fasta", ".fa")):
-        if model_name and model_name in ["ESM2-650M", "ESM-1v", "ESM-1b"]:
+        if model_name and model_name in ["VenusPLM", "ESM2-650M", "ESM-1v", "ESM-1b"]:
             model_type = "sequence"
         else:
             model_name, model_type = "ESM2-650M", "sequence"
@@ -67,7 +67,7 @@ def handle_mutation_prediction_base(
                 "Processing first sequence only..."
             )
     elif file_path.lower().endswith(".pdb"):
-        if model_name and model_name in ["ESM-IF1", "SaProt", "MIF-ST", "ProSST-2048", "ProtSSN"]:
+        if model_name and model_name in ["ESM-IF1", "SaProt", "MIF-ST", "ProSST-2048", "ProtSSN", "VenusREM (foldseek-based)"]:
             model_type = "structure"
         else:
             model_name, model_type = "ESM-IF1", "structure"

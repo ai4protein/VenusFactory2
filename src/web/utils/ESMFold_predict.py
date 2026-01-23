@@ -4,15 +4,13 @@ import base64
 import asyncio
 from typing import Dict, Any, Optional, Union, Tuple
 
-# MCP客户端导入
 from mcp.client.streamable_http import streamablehttp_client
 from mcp import ClientSession
-from .common_utils import get_save_path, sanitize_filename
+
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# 服务器URL
 DRUGSDA_MODEL_SERVER_URL = os.getenv("DRUGSDA_MODEL_SERVER_URL")
 DRUGSDA_TOOL_SERVER_URL = os.getenv("DRUGSDA_TOOL_SERVER_URL")
 
@@ -106,7 +104,7 @@ class DrugSDAClient:
 
 
 def base64_to_pdb_file(base64_string: str, file_name: str = "protein_structure.pdb", 
-                       save_dir: str = get_save_path("Protein_Structure", "ESMFold")) -> Optional[str]:
+                       save_dir: str = "./protein_structures") -> Optional[str]:
     """
     将Base64字符串转换为PDB文件并保存到本地
     
@@ -140,7 +138,7 @@ def base64_to_pdb_file(base64_string: str, file_name: str = "protein_structure.p
         return None
 
 
-async def predict_protein_structure(sequence: str, output_dir: str = get_save_path("Protein_Structure", "ESMFold"), 
+async def predict_protein_structure(sequence: str, output_dir: str = "./protein_structures", 
                                    verbose: bool = True) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
     """
     使用ESMFold预测蛋白质结构并保存为PDB文件
@@ -251,7 +249,7 @@ async def predict_protein_structure(sequence: str, output_dir: str = get_save_pa
         await model_client.disconnect(verbose=verbose)
 
 
-def predict_structure_sync(sequence: str, output_dir: str = get_save_path("Protein_Structure", "ESMFold"), 
+def predict_structure_sync(sequence: str, output_dir: str = "./protein_structures", 
                           verbose: bool = True) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
     """
     同步版本的蛋白质结构预测函数（用于非异步环境）
