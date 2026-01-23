@@ -16,7 +16,8 @@
 </div>
 
 最新消息：
-- [2025-08-10] 🎉 VenusFactory发布了免费使用的网站 [venusfactory.cn/playground/](http://www.venusfactory.cn/playground/).
+- [2026-01-23] 🚀 **更新:** 在VenusFactory中新增30+下游任务预测功能。
+- [2025-08-10] 🎉 VenusFactory发布了免费使用的网站 [venusfactory.cn/playground/](https://venusfactory.cn/playground/).
 - [2025-06-30] 🚀 **更新:** 新增突变零样本预测功能，支持结构和序列模型的高通量突变效应评分。
 - [2025-04-19] 🎉 **祝贺!** [VenusREM](https://github.com/ai4protein/VenusREM) 在 [ProteinGym](https://proteingym.org/benchmarks) 和 [VenusMutHub](https://lianglab.sjtu.edu.cn/muthub/) 排行榜中均取得第一名！
 - [2025-03-26] 新增 [VenusPLM-300M](https://huggingface.co/AI4Protein/VenusPLM-300M) 模型，基于**VenusPod**独立开发，由[**Hong Liang**](https://lianglab.sjtu.edu.cn/)课题组开发。
