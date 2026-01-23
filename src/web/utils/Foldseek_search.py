@@ -7,21 +7,8 @@ import tarfile
 from pathlib import Path
 from datetime import datetime
 import requests
+from .common_utils import get_save_path, sanitize_filename
 from typing import List, Optional, Tuple, Dict
-
-
-def get_save_path(subdir1: str, subdir2: str | None = None) -> Path:
-    """Get save path with date-based directory structure."""
-    now = datetime.now()
-    date_path = Path("temp_outputs") / f"{now.year}/{now.month:02d}/{now.day:02d}"
-
-    if subdir2:
-        path = date_path / subdir1 / subdir2
-    else:
-        path = date_path / subdir1
-
-    path.mkdir(parents=True, exist_ok=True)
-    return path
 
 SEQ_THRESHOLD = 1000
 FOLDSEEK_API_URL = "https://search.foldseek.com/api"
@@ -210,12 +197,12 @@ def get_foldseek_sequences(pdb_file_path: str, protect_start: int, protect_end: 
 
 
 if __name__ == "__main__":
-    example_pdb_path = r"D:/upload/VenusFactory/download/alphafold2_structures/A0A1B0GTW7.pdb"
+    example_pdb_path = r"download/alphafold2_structures/A0A1B0GTW7.pdb"
     
     foldseek_fasta, total_sequences = get_foldseek_sequences(example_pdb_path, 1, 10)
     
     if foldseek_fasta:
-        print(f"预测成功! PDB文件路径: {foldseek_fasta}")
-        print(f"结果信息: {total_sequences}")
+        print(f"Success! Fasta Path: {foldseek_fasta}")
+        print(f"Result Info: {total_sequences}")
     else:
-        print("预测失败!")
+        print("Failed!")
