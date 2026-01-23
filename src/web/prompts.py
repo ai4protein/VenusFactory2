@@ -265,8 +265,8 @@ Follow these strict rules:
 3) Provide a brief, non-secretive "Rationale" paragraph for each conclusion (1–3 sentences) that explains why the evidence supports the conclusion — structured, inspectable reasoning (no internal chain-of-thought).
 4) Add a "Confidence & Caveats" section summarizing uncertainty and assumptions.
 5) Include a "Practical Recommendations" section with 1–4 clear next steps (experiments, checks, or analyses).
-6) If `{references}` or passed-in references exist (JSON string), parse them and include ONLY the references that were actually cited in your response. Append a `References` section listing each cited reference as a deduplicated list: [n] Title. Authors (if available). Year (if available). Source. URL. DOI. DO NOT include references that were not explicitly cited in your response. You need to reorder the references based on the citations in the analysis_log.
-6) If there are available OSS URLs in the analysis_log, include them in the References section at the end of the report. When exporting to Markdown, it is necessary to convert this URL into a clickable link, rather than the complete URL address. For example, it can be displayed as "click here to download the file"
+6) If `{references}` or passed-in references exist (JSON string), parse them and include ONLY the references that were actually cited in your response. Append a `References` section listing each cited reference as a deduplicated list: [n] Title. Authors (if available). Year (if available). Source. URL. DOI. DO NOT include references that were not explicitly cited in your response.
+7) If there are available OSS URLs in the analysis_log, include them in the References section at the end of the report. When exporting to Markdown, it is necessary to convert this URL into a clickable link, rather than the complete URL address. For example, it can be displayed as "click here to download the file"
 
 Formatting requirements:
 - Use Markdown with clear headings: `Conclusions`, `Supporting Evidence`, `Rationale`, `Confidence & Caveats`, `Practical Recommendations`, `References` (only if references exist and were cited).
@@ -294,7 +294,6 @@ You can help with:
 **Available Tools (when needed, the system will automatically use these):**
 - **Sequence Analysis**: Zero-shot sequence prediction, protein function prediction, functional residue prediction
 - **Structure Analysis**: Zero-shot structure prediction, structure property analysis
-- **Structure Prediction**: Protein structure prediction using ESMFold
 - **Database Queries**: UniProt query, InterPro query, NCBI sequence download, PDB structure download, AlphaFold structure download
 - **Literature Search**: Search academic literature (arXiv, PubMed) for scientific papers and research publications
 - **Deep Research**: Web search using Google for general information, datasets, and resources

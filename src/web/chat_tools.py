@@ -28,13 +28,14 @@ from web.utils.common_utils import get_save_path
 from web.utils.literature import literature_search
 from web.utils.command import build_command_list, build_predict_command_list
 from web.utils.ESMFold_predict import predict_structure_sync
+from web.utils.Foldseek_search import get_foldseek_sequences
 from mcp.client.streamable_http import streamablehttp_client
 from mcp import ClientSession
 import asyncio
 from bs4 import BeautifulSoup
 load_dotenv()
 
-SCP_WORKFLOW_SERVER_URL = os.getenv("SCP_WORKFLOW_URL")
+SCP_WORKFLOW_SERVER_URL = "http://115.190.136.251:8080/mcp"
 class SCPWorkflowClient:
     def __init__(self, server_url: str = SCP_WORKFLOW_SERVER_URL):
         self.server_url = server_url
@@ -221,6 +222,12 @@ class NCBISequenceInput(BaseModel):
     accession_id: str = Field(..., description="NCBI accession ID (e.g., NP_001123456, NM_001234567)")
     output_format: str = Field(default="fasta", description="Output format: fasta, genbank")
 
+class FoldSeekSearchInput(BaseModel):
+    """Input for FoldSeek search"""
+    pdb_file_path: str = Field(..., description="Path to PDB structure file")
+    protect_start: int = Field(..., description="Start position of protected region")
+    protect_end: int = Field(..., description="End position of protected region")
+
 class AlphaFoldStructureInput(BaseModel):
     """Input for AlphaFold structure download"""
     uniprot_id: str = Field(..., description="UniProt ID for AlphaFold structure download")
@@ -388,6 +395,25 @@ def PDB_sequence_extraction_tool(pdb_file: str) -> str:
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)})
 
+
+@tool("foldseek_search", args_schema=FoldSeekSearchInput)
+def foldseek_search_tool(pdb_file_path: str, protect_start: int, protect_end: int) -> str:
+    """Search for protein structures using FoldSeek."""    
+    try:
+        fasta_file, total_sequences = get_foldseek_sequences(pdb_file_path, protect_start, protect_end)
+        fasta_file_oss_url = upload_file_to_oss_sync(fasta_file)
+        return json.dumps({
+            "success": True,
+            "fasta_file": fasta_file,
+            "fasta_file_oss_url": fasta_file_oss_url,
+            "total_sequences": total_sequences,
+        })
+    except Exception as e:
+        return json.dumps({
+            "success": False,
+            "error": str(e)
+        })
+
 @tool("generate_training_config", args_schema=CSVTrainingConfigInput)
 def generate_training_config_tool(csv_file: Optional[str] = None, dataset_path: Optional[str] = None, valid_csv_file: Optional[str] = None, test_csv_file: Optional[str] = None, output_name: str = "custom_training_config", user_requirements: Optional[str] = None) -> str:
     """Generate training JSON configuration from CSV files or Hugging Face datasets containing protein sequences and labels."""
@@ -498,11 +524,9 @@ def deep_research_tool(query: str, max_results: int = 10) -> str:
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36"
         }
         
-        # 1. 使用 DuckDuckGo 搜索引擎 (对爬虫更友好)
         encoded_query = urllib.parse.quote(query)
         search_url = f"https://duckduckgo.com/html/?q={encoded_query}"
         
-        # 初步搜索结果容器
         search_items = []
         
         try:
@@ -511,21 +535,17 @@ def deep_research_tool(query: str, max_results: int = 10) -> str:
             print(f"DuckDuckGo search status code: {response.status_code}")
             if response.status_code == 200:
                 soup = BeautifulSoup(response.text, 'html.parser')
-                # DuckDuckGo HTML 结果使用不同的类名
                 results_blocks = soup.select('div.result')
                 print(f"Found {len(results_blocks)} results on DuckDuckGo")
                 
                 for result in results_blocks[:max_results]:
-                    # DuckDuckGo 的结构
                     title_el = result.select_one('h2.result__title')
                     link_el = result.select_one('a.result__a')
                     desc_el = result.select_one('a.result__snippet')
                     
                     if title_el and link_el:
                         url = link_el.get('href')
-                        # DuckDuckGo 可能使用重定向
                         if url and '//duckduckgo.com/l/?' in url:
-                            # 尝试提取真实 URL
                             try:
                                 url_param = urllib.parse.parse_qs(urllib.parse.urlparse(url).query).get('uddg', [''])[0]
                                 if url_param:
@@ -543,10 +563,8 @@ def deep_research_tool(query: str, max_results: int = 10) -> str:
         except Exception as e:
             return json.dumps({"success": False, "error": f"Search failed: {str(e)}"})
 
-        # 2. 定义抓取单个网页内容的函数 (用于并发)
         def fetch_page_content(item):
             try:
-                # 设置较短的超时，避免卡死
                 page_resp = requests.get(item['url'], headers=headers, timeout=5)
                 if page_resp.status_code == 200:
                     page_soup = BeautifulSoup(page_resp.text, 'html.parser')
@@ -555,17 +573,14 @@ def deep_research_tool(query: str, max_results: int = 10) -> str:
                     for script in page_soup(["script", "style", "nav", "footer", "header", "iframe", "noscript"]):
                         script.extract()
                     
-                    # 提取主要文本
-                    # 优先抓取 p 标签，其次是 h 标签
                     paragraphs = page_soup.find_all(['p', 'h1', 'h2', 'h3'])
                     
                     content_parts = []
                     char_count = 0
-                    max_chars = 1000  # 限制每个网页提取的字数
+                    max_chars = 1000 
                     
                     for p in paragraphs:
                         text = p.get_text().strip()
-                        # 过滤太短的导航类文本
                         if len(text) > 30: 
                             content_parts.append(text)
                             char_count += len(text)
@@ -574,25 +589,19 @@ def deep_research_tool(query: str, max_results: int = 10) -> str:
                             
                     full_content = "\n".join(content_parts)
                     
-                    # 如果抓取到了正文，覆盖掉 Google 的简单摘要
                     if full_content:
                         item['content'] = full_content
                     else:
-                        item['content'] = item['description'] # 降级使用 Google 摘要
+                        item['content'] = item['description']
                 else:
                     item['content'] = item['description']
             except Exception:
-                # 抓取失败时保留基本信息
                 item['content'] = item['description']
             return item
 
-        # 3. 并发执行网页抓取 (关键步骤)
-        # 使用 ThreadPoolExecutor 同时抓取所有 URL
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-            # 将任务提交给线程池
             future_to_item = {executor.submit(fetch_page_content, item): item for item in search_items}
             
-            # 收集结果
             for future in concurrent.futures.as_completed(future_to_item):
                 try:
                     updated_item = future.result()
@@ -604,7 +613,7 @@ def deep_research_tool(query: str, max_results: int = 10) -> str:
         return json.dumps({
             "success": True,
             "query": query,
-            "results": results[:max_results] # 确保返回数量不超过请求数
+            "results": results[:max_results]
         }, ensure_ascii=False)
 
     except Exception as e:
