@@ -8,7 +8,7 @@ from pathlib import Path
 from datetime import datetime
 import requests
 from .common_utils import get_save_path, sanitize_filename
-
+from typing import List, Optional, Tuple, Dict
 
 SEQ_THRESHOLD = 1000
 FOLDSEEK_API_URL = "https://search.foldseek.com/api"
