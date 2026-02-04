@@ -4,6 +4,7 @@ import sys
 sys.path.append(os.getcwd())
 import json
 import argparse
+import pandas as pd
 import numpy as np
 import biotite.structure.io as bsio
 from tqdm import tqdm
@@ -52,9 +53,9 @@ def get_esm3_structure_seq(pdb_file, encoder, device="cuda:0"):
     _, structure_tokens = encoder.encode(coords, residue_index=residue_index)
     
     result = {
-        'name': pdb_file.split('/')[-1].split('.')[0], 
-        'esm3_structure_seq':structure_tokens.cpu().numpy().tolist()[0], 
-        'plddt':plddt
+        'name': pdb_file.split('/')[-1].split('.')[0],
+        'esm3_structure_seq': structure_tokens.cpu().numpy().tolist()[0],
+        'plddt': plddt
     }
     return result
 
@@ -62,13 +63,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--pdb_file", type=str, default=None)
     parser.add_argument("--pdb_dir", type=str, default=None)
-    parser.add_argument("--out_file", type=str, default='esm3_structure_seq.json')
+    parser.add_argument("--out_file", type=str, default='esm3_structure_seq.csv')
+    parser.add_argument("--out_format", type=str, default="csv", choices=["csv", "json"])
     args = parser.parse_args()
     
-    device="cuda:0"
+    device = "cuda:0"
     results = []
-    # result_dict = {'name':[], 'aa_seq':[], 'esm3_structure_seq':[], 'plddt':[], 'residue_index':[]}
-    
     encoder = ESM3_structure_encoder_v0(device)
     
     if args.pdb_file is not None:
@@ -80,6 +80,11 @@ if __name__ == "__main__":
         for pdb_file in tqdm(pdb_files):
             result = get_esm3_structure_seq(os.path.join(args.pdb_dir, pdb_file), encoder, device)
             results.append(result)
-            
-    with open(args.out_file, "w") as f:
-        f.write("\n".join([json.dumps(r) for r in results]))
+    
+    if args.out_format == "csv":
+        df = pd.DataFrame(results)
+        df["esm3_structure_seq"] = df["esm3_structure_seq"].apply(json.dumps)
+        df.to_csv(args.out_file, index=False)
+    else:
+        with open(args.out_file, "w") as f:
+            f.write("\n".join([json.dumps(r) for r in results]))

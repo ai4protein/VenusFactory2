@@ -1,6 +1,7 @@
 import os
 import argparse
 import json
+import pandas as pd
 from tqdm import tqdm
 
 # conda install -c conda-forge -c bioconda foldseek
@@ -34,8 +35,12 @@ if __name__ == '__main__':
     parser.add_argument("--pdb_dir", type=str, default=None)
     parser.add_argument("--out_file", type=str, default=None)
     parser.add_argument("--rm_tmp", type=bool, default=True)
+    parser.add_argument("--out_format", type=str, default="csv", choices=["csv", "json"])
     args = parser.parse_args()
     
     results = get_foldseek_structure_seq(args.pdb_dir, args.rm_tmp)
-    with open(args.out_file, "w") as f:
-        f.write("\n".join([json.dumps(r) for r in results]))
+    if args.out_format == "csv":
+        pd.DataFrame(results).to_csv(args.out_file, index=False)
+    else:
+        with open(args.out_file, "w") as f:
+            f.write("\n".join([json.dumps(r) for r in results]))

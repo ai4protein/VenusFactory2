@@ -10,6 +10,7 @@ from Bio import PDB
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from src.utils.data_utils import extract_seq_from_pdb
 
+# conda install conda-forge::dssp
 
 ss_alphabet = ['H', 'E', 'C']
 ss_alphabet_dic = {
@@ -65,6 +66,7 @@ if __name__ == '__main__':
     # save file
     parser.add_argument('--error_file', type=str, help='save error file')
     parser.add_argument('--out_file', type=str, help='save file')
+    parser.add_argument('--out_format', type=str, default='csv', choices=['csv', 'json'])
     args = parser.parse_args()
     
     out_dir = os.path.dirname(args.out_file)
@@ -102,17 +104,25 @@ if __name__ == '__main__':
         
         if error_pdbs:
             if args.error_file is None:
-                args.error_file = args.out_file.split(".")[0]+"_error.csv"
+                args.error_file = args.out_file.rsplit(".", 1)[0] + "_error.csv"
             error_dir = os.path.dirname(args.error_file)
             os.makedirs(error_dir, exist_ok=True)
             error_info = {"error_pdbs": error_pdbs, "error_messages": error_messages}
             pd.DataFrame(error_info).to_csv(args.error_file, index=False)
         
-        with open(args.out_file, "w") as f:
-            f.write("\n".join([json.dumps(r) for r in results]))
+        if args.out_format == "csv":
+            pd.DataFrame(results).to_csv(args.out_file, index=False)
+        else:
+            with open(args.out_file, "w") as f:
+                f.write("\n".join([json.dumps(r) for r in results]))
     
     elif args.pdb_file is not None:
         result, message = get_secondary_structure_seq(args.pdb_file)
-        with open(args.out_file, "w") as f:
-            json.dump(result, f)
+        if message is not None:
+            raise RuntimeError(f"Error processing {args.pdb_file}: {message}")
+        if args.out_format == "csv":
+            pd.DataFrame([result]).to_csv(args.out_file, index=False)
+        else:
+            with open(args.out_file, "w") as f:
+                json.dump(result, f)
     

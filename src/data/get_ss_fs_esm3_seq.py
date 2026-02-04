@@ -42,7 +42,7 @@ if __name__ == "__main__":
     
     if args.pdb_dir is not None:
         dir_name = os.path.basename(args.pdb_dir)
-        pdb_files = os.listdir(args.pdb_dir)
+        pdb_files = sorted([p for p in os.listdir(args.pdb_dir) if p.endswith('.pdb')])
         ss_results, esm3_results = [], []
         for pdb_file in tqdm(pdb_files):
             ss_result, error = get_secondary_structure_seq(os.path.join(args.pdb_dir, pdb_file))
@@ -54,40 +54,44 @@ if __name__ == "__main__":
             esm3_results.append(esm3_result)
             # clear cuda cache
             torch.cuda.empty_cache()
-        with open(os.path.join(args.out_dir, f"{dir_name}_ss.json"), "w") as f:
-            f.write("\n".join([json.dumps(r) for r in ss_results]))
-        with open(os.path.join(args.out_dir, f"{dir_name}_esm3.json"), "w") as f:
-            f.write("\n".join([json.dumps(r) for r in esm3_results]))
-        
+        ss_csv = os.path.join(args.out_dir, f"{dir_name}_ss.csv")
+        esm3_csv = os.path.join(args.out_dir, f"{dir_name}_esm3.csv")
+        fs_csv = os.path.join(args.out_dir, f"{dir_name}_fs.csv")
+        prosst_csv = os.path.join(args.out_dir, f"{dir_name}_prosst.csv")
+
+        pd.DataFrame(ss_results).to_csv(ss_csv, index=False)
+        esm3_df = pd.DataFrame(esm3_results)
+        esm3_df["esm3_structure_seq"] = esm3_df["esm3_structure_seq"].apply(json.dumps)
+        esm3_df.to_csv(esm3_csv, index=False)
+
         fs_results = get_foldseek_structure_seq(args.pdb_dir)
-        with open(os.path.join(args.out_dir, f"{dir_name}_fs.json"), "w") as f:
-            f.write("\n".join([json.dumps(r) for r in fs_results]))
-        prosst_tokens = get_prosst_token(args.pdb_dir)
-        with open(os.path.join(args.out_dir, f"{dir_name}_prosst.json"), "r") as f:
-            f.write("\n".join([json.dumps(r) for r in prosst_tokens]))
+        pd.DataFrame(fs_results).to_csv(fs_csv, index=False)
+
+        prosst_tokens = []
+        from src.data.prosst.structure.get_sst_seq import SSTPredictor
+        processor = SSTPredictor(structure_vocab_size=2048)
+        for pdb_file in tqdm(pdb_files, desc='ProSST'):
+            result, error = get_prosst_token(os.path.join(args.pdb_dir, pdb_file), processor, 2048)
+            if error is None:
+                prosst_tokens.append(result)
+        prosst_df = pd.DataFrame(prosst_tokens)
+        for col in prosst_df.columns:
+            if col != 'name' and col != 'aa_seq' and prosst_df[col].dtype == object:
+                prosst_df[col] = prosst_df[col].apply(lambda x: json.dumps(x) if isinstance(x, list) else x)
+        prosst_df.to_csv(prosst_csv, index=False)
 
         if args.merge_into == 'csv':
-            # read json files and merge to a single csv according to the same 'name' column
-            ss_json = os.path.join(args.out_dir, f"{dir_name}_ss.json")
-            esm3_json = os.path.join(args.out_dir, f"{dir_name}_esm3.json")
-            fs_json = os.path.join(args.out_dir, f"{dir_name}_fs.json")
-            prosst_json = os.path.join(args.out_dir, f"{dir_name}_prosst.json")
-            # load json line files
-            ss_df = pd.read_json(ss_json, lines=True)
-            esm3_df = pd.read_json(esm3_json, lines=True)
-            fs_df = pd.read_json(fs_json, lines=True)
-            prosst_json = os.path_join(prosst_json, lines=True)
-            # merge the three dataframes by the 'name' column
+            ss_df = pd.read_csv(ss_csv)
+            esm3_df = pd.read_csv(esm3_csv)
+            fs_df = pd.read_csv(fs_csv)
+            prosst_df = pd.read_csv(prosst_csv)
             df = pd.merge(ss_df, fs_df, on='name', how='inner')
             df = pd.merge(df, esm3_df, on='name', how='inner')
-            df = pd.merge(df, prosst_json, on='name', how='inner')
-            # sort by name
+            df = pd.merge(df, prosst_df, on='name', how='inner')
             df = df.sort_values(by='name')
             df.to_csv(os.path.join(args.out_dir, f"{dir_name}.csv"), index=False)
-            
+
             if not args.save_intermediate:
-                # remove intermediate files
-                os.remove(ss_json)
-                os.remove(esm3_json)
-                os.remove(fs_json)
-                os.remove(prosst_json)
+                for f in [ss_csv, esm3_csv, fs_csv, prosst_csv]:
+                    if os.path.exists(f):
+                        os.remove(f)
