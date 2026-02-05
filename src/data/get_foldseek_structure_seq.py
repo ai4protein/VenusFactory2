@@ -2,6 +2,7 @@ import os
 import shutil
 import argparse
 import json
+import secrets
 import pandas as pd
 from tqdm import tqdm
 
@@ -12,7 +13,7 @@ def get_foldseek_structure_seq(pdb_dir, rm_tmp=True):
     # foldseek convert2fasta tmp_db_ss OUTPUT_3di.fasta
     # use command to generate foldseek structure seq; tmp under workdir/.cache
     cache_root = os.path.join(os.getcwd(), ".cache")
-    tmp_db_dir = os.path.join(cache_root, "foldseek_tmp_db")
+    tmp_db_dir = os.path.join(cache_root, f"foldseek_tmp_db_{secrets.token_hex(4)}")
     os.makedirs(tmp_db_dir, exist_ok=True)
     os.system(f"foldseek createdb {pdb_dir} {tmp_db_dir}/tmp_db")
     os.system(f"foldseek lndb {tmp_db_dir}/tmp_db_h {tmp_db_dir}/tmp_db_ss_h")
