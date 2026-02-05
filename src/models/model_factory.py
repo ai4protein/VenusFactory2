@@ -280,6 +280,13 @@ def create_plm_and_tokenizer(args, qlora_config=None):
             plm_model = AutoModelForMaskedLM.from_pretrained(args.plm_model, trust_remote_code=True, quantization_config=qlora_config)
         else:
             plm_model = AutoModelForMaskedLM.from_pretrained(args.plm_model, trust_remote_code=True)
+    elif "SaProt" in args.plm_model:
+        # SaProt: ESM-style tokenizer + EsmForMaskedLM; input = uppercase aa + lowercase foldseek per residue
+        tokenizer = EsmTokenizer.from_pretrained(args.plm_model)
+        if qlora_config:
+            plm_model = AutoModelForMaskedLM.from_pretrained(args.plm_model, quantization_config=qlora_config)
+        else:
+            plm_model = AutoModelForMaskedLM.from_pretrained(args.plm_model)
     elif "Prime" in args.plm_model:
         tokenizer = AutoTokenizer.from_pretrained(args.plm_model, trust_remote_code=True, do_lower_case=False)
         if qlora_config:
@@ -307,6 +314,8 @@ def get_hidden_size(plm_model, model_type):
     elif "prot_t5" in model_type or "ankh" in model_type:
         return plm_model.config.d_model
     elif "ProSST" in model_type:
+        return plm_model.config.hidden_size
+    elif "SaProt" in model_type:
         return plm_model.config.hidden_size
     elif "Prime" in model_type:
         return plm_model.config.hidden_size

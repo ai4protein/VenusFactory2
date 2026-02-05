@@ -155,11 +155,14 @@ class AdapterModel(nn.Module):
                 outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask, ss_input_ids=structure_tokens, output_hidden_states=True)
             elif "Prime" in self.args.plm_model or "deep" in self.args.plm_model:
                 outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask, output_hidden_states=True)
+            elif "SaProt" in self.args.plm_model:
+                # EsmForMaskedLM returns MaskedLMOutput; need output_hidden_states=True
+                outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask, output_hidden_states=True)
             elif self.training and hasattr(self, 'args') and self.args.training_method == 'full':
                 outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask)
             else:
                 outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask)
-            if "ProSST" in self.args.plm_model or "Prime" in self.args.plm_model:
+            if "ProSST" in self.args.plm_model or "Prime" in self.args.plm_model or "SaProt" in self.args.plm_model:
                 seq_embeds = outputs.hidden_states[-1]
             else:
                 seq_embeds = outputs.last_hidden_state

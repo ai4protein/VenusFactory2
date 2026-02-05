@@ -46,7 +46,16 @@ class Collator:
         for e in examples:
             # Process sequences
             aa_seq = self.process_sequence(e[aa_seq_key])
-            aa_seqs.append(aa_seq)
+            if "SaProt" in self.plm_model:
+                # SaProt input = uppercase aa + lowercase foldseek per residue (from pdb_dir)
+                fs = e.get("foldseek_seq", "")
+                combined = "".join(
+                    aa_seq[i].upper() + (fs[i].lower() if i < len(fs) else "?")
+                    for i in range(len(aa_seq))
+                )
+                aa_seqs.append(combined)
+            else:
+                aa_seqs.append(aa_seq)
             if "ProSST" in self.plm_model:
                 stru_vocab = self.plm_model.split("-")[1]
                 stru_token = self.process_stru_tokens(e[f"stru_token_{stru_vocab}"])
@@ -74,9 +83,11 @@ class Collator:
             # Process labels
             labels.append(e[self.label_column_name])
 
-        # Tokenize sequences
+        # Tokenize sequences (SaProt uses combined aa+foldseek as single sequence, no extra structure)
         if "ProSST" in self.plm_model:
             batch = self.tokenize_sequences(aa_seqs, structure_seqs, str_tokens)
+        elif "SaProt" in self.plm_model:
+            batch = self.tokenize_sequences(aa_seqs, {}, None)
         else:
             batch = self.tokenize_sequences(aa_seqs, structure_seqs)
         

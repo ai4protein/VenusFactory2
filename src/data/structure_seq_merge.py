@@ -164,6 +164,9 @@ def get_required_structure_columns(args) -> List[Tuple[str, str]]:
     if "ProSST" in args.plm_model:
         vocab = args.plm_model.split("-")[1]
         required.append((f"stru_token_{vocab}", "prosst"))
+    if "SaProt" in args.plm_model:
+        # SaProt input = uppercase aa + lowercase foldseek per residue; need foldseek_seq from pdb_dir
+        required.append(("foldseek_seq", "foldseek"))
     for seq_type in (args.structure_seq or []):
         if seq_type == "foldseek_seq":
             required.append((seq_type, "foldseek"))
