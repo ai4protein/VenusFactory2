@@ -33,6 +33,7 @@ class Collator:
             aa_seqs, labels, str_tokens = [], [], []
         else:
             aa_seqs, labels = [], []
+        pdb_paths = [] if "ProtSSN" in self.plm_model else None
         structure_seqs = {
             seq_type: [] for seq_type in (self.structure_seq or [])
         }
@@ -44,6 +45,8 @@ class Collator:
         
         # Process each example
         for e in examples:
+            if "ProtSSN" in self.plm_model:
+                pdb_paths.append(e["pdb_path"])
             # Process sequences
             aa_seq = self.process_sequence(e[aa_seq_key])
             if "SaProt" in self.plm_model:
@@ -84,7 +87,11 @@ class Collator:
             labels.append(e[self.label_column_name])
 
         # Tokenize sequences (SaProt uses combined aa+foldseek as single sequence, no extra structure)
-        if "ProSST" in self.plm_model:
+        if "ProtSSN" in self.plm_model:
+            # ProtSSN uses pdb_path only; still tokenize for dataloader length / compatibility
+            batch = self.tokenize_sequences(aa_seqs, {}, None)
+            batch["pdb_path"] = pdb_paths
+        elif "ProSST" in self.plm_model:
             batch = self.tokenize_sequences(aa_seqs, structure_seqs, str_tokens)
         elif "SaProt" in self.plm_model:
             batch = self.tokenize_sequences(aa_seqs, {}, None)

@@ -11,7 +11,7 @@ from torch import Tensor
 import torch.nn.functional as F
 from scipy.spatial import transform
 
-from esm.data import Alphabet
+from src.mutation.models.esm.data import Alphabet
 
 from .features import DihedralFeatures
 from .gvp_encoder import GVPEncoder

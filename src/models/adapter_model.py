@@ -151,6 +151,8 @@ class AdapterModel(nn.Module):
     
     def plm_embedding(self, plm_model, aa_seq, attention_mask, structure_tokens=None):
         with torch.no_grad():
+            if "ProtSSN" in self.args.plm_model:
+                return None  # ProtSSN uses get_embeddings from batch in forward
             if "ProSST" in self.args.plm_model:
                 outputs = plm_model(input_ids=aa_seq, attention_mask=attention_mask, ss_input_ids=structure_tokens, output_hidden_states=True)
             elif "Prime" in self.args.plm_model or "deep" in self.args.plm_model:
@@ -171,6 +173,18 @@ class AdapterModel(nn.Module):
         return seq_embeds
     
     def forward(self, plm_model, batch):
+        if "ProtSSN" in self.args.plm_model:
+            pdb_paths = batch["pdb_path"]
+            protein_embeds, residue_embeds, prot_attention_mask = plm_model.get_embeddings(pdb_paths)
+            if "residue" in self.args.problem_type:
+                logits = self.classifier(residue_embeds, prot_attention_mask)
+            else:
+                # Protein-level: (B, H) -> (B, 1, H) and mask (B, 1) for pooling head
+                protein_embeds = protein_embeds.unsqueeze(1)
+                mask = torch.ones(protein_embeds.shape[0], 1, device=protein_embeds.device, dtype=torch.long)
+                logits = self.classifier(protein_embeds, mask)
+            return logits
+
         if "ProSST" in self.args.plm_model:
             aa_seq, attention_mask, stru_tokens = batch['aa_seq_input_ids'], batch['aa_seq_attention_mask'], batch['aa_seq_stru_tokens']
             seq_embeds = self.plm_embedding(plm_model, aa_seq, attention_mask, stru_tokens)

@@ -167,6 +167,9 @@ def get_required_structure_columns(args) -> List[Tuple[str, str]]:
     if "SaProt" in args.plm_model:
         # SaProt input = uppercase aa + lowercase foldseek per residue; need foldseek_seq from pdb_dir
         required.append(("foldseek_seq", "foldseek"))
+    if "ProtSSN" in args.plm_model:
+        # ProtSSN uses PDB files directly; need pdb_path per sample from pdb_dir
+        required.append(("pdb_path", "pdb_path"))
     for seq_type in (args.structure_seq or []):
         if seq_type == "foldseek_seq":
             required.append((seq_type, "foldseek"))
@@ -195,6 +198,17 @@ def _generate_prosst(pdb_dir: str, structure_vocab_size: int, **kwargs) -> pd.Da
 def _generate_foldseek(pdb_dir: str) -> pd.DataFrame:
     results = get_foldseek_structure_seq(pdb_dir)
     return pd.DataFrame(results)
+
+
+def _generate_pdb_paths(pdb_dir: str) -> pd.DataFrame:
+    """Build DataFrame with columns (name, pdb_path) for ProtSSN from pdb_dir."""
+    pairs = _list_pdb_files(pdb_dir)
+    abs_dir = os.path.abspath(pdb_dir)
+    rows = [
+        {"name": stem, "pdb_path": os.path.join(abs_dir, rel_path)}
+        for rel_path, stem in pairs
+    ]
+    return pd.DataFrame(rows)
 
 
 def _generate_ss8(pdb_dir: str, num_workers: int = 4) -> pd.DataFrame:
@@ -240,8 +254,10 @@ def generate_structure_data(
     args,
     logger=None,
     cleanup_temp_dir: bool = False,
+    original_pdb_dir: Optional[str] = None,
 ) -> Dict[str, pd.DataFrame]:
-    """Generate structure data for missing columns. Returns {column_name: DataFrame}."""
+    """Generate structure data for missing columns. Returns {column_name: DataFrame}.
+    When original_pdb_dir is set, pdb_path column uses it so paths stay valid after temp dir cleanup."""
     try:
         out = {}
         for col, gen_type in columns_to_generate:
@@ -262,6 +278,11 @@ def generate_structure_data(
                 out[col] = df[["name", col]]
             elif gen_type == "foldseek":
                 df = _generate_foldseek(pdb_dir)
+                out[col] = df[["name", col]]
+            elif gen_type == "pdb_path":
+                # Use original_pdb_dir so paths remain valid after temp dir is removed
+                dir_for_paths = original_pdb_dir if original_pdb_dir and os.path.isdir(original_pdb_dir) else pdb_dir
+                df = _generate_pdb_paths(dir_for_paths)
                 out[col] = df[["name", col]]
             elif gen_type == "ss8":
                 df = _generate_ss8(pdb_dir, num_workers=getattr(args, "num_workers", 4))
@@ -411,7 +432,7 @@ def ensure_structure_columns(
     if logger:
         logger.info(f"Generating {len(missing)} structure columns from {work_dir}")
     structure_dfs = generate_structure_data(
-        work_dir, missing, args, logger, cleanup_temp_dir=is_temp
+        work_dir, missing, args, logger, cleanup_temp_dir=is_temp, original_pdb_dir=pdb_dir
     )
     merged = merge_structure_into_dataset(
         dataset_dict, structure_dfs,

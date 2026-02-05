@@ -11,7 +11,7 @@ import re
 import shutil
 import torch
 from pathlib import Path
-from esm.constants import proteinseq_toks
+from .constants import proteinseq_toks
 
 RawMSA = Sequence[Tuple[str, str]]
 

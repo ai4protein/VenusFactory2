@@ -8,7 +8,7 @@ import numpy as np
 import torch
 from typing import Sequence, Tuple, List
 
-from esm.inverse_folding.util import (
+from src.mutation.models.esm.inverse_folding.util import (
     load_structure,
     extract_coords_from_structure,
     load_coords,

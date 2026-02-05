@@ -86,6 +86,16 @@ class Trainer:
         # Save args
         with open(os.path.join(self.args.output_dir, f'{self.args.output_model_name.split(".")[0]}.json'), 'w') as f:
             json.dump(self.args.__dict__, f)
+
+    def _batch_to_device(self, batch):
+        """Move batch to device; only tensors get .to(device), e.g. pdb_path (list) is left as-is."""
+        out = {}
+        for k, v in batch.items():
+            if isinstance(v, torch.Tensor):
+                out[k] = v.to(self.device)
+            else:
+                out[k] = v
+        return out
     
     def _log_column_override_info(self):
         """Log column name override information if available."""
@@ -181,8 +191,8 @@ class Trainer:
         return total_loss / total_samples
     
     def _training_step(self, batch):
-        # Move batch to device
-        batch = {k: v.to(self.device) for k, v in batch.items()}
+        # Move batch to device (skip non-tensors e.g. pdb_path for ProtSSN)
+        batch = self._batch_to_device(batch)
         
         # Store current batch for metrics update
         self.current_batch = batch
@@ -216,7 +226,7 @@ class Trainer:
         
         with torch.no_grad():
             for batch in tqdm(val_loader, desc="Validating"):
-                batch = {k: v.to(self.device) for k, v in batch.items()}
+                batch = self._batch_to_device(batch)
                 
                 # Store current batch for metrics update
                 self.current_batch = batch
@@ -281,7 +291,7 @@ class Trainer:
         with torch.no_grad():
             # Note the desc is "Testing" instead of "Validating"
             for batch in tqdm(test_loader, desc="Testing"):
-                batch = {k: v.to(self.device) for k, v in batch.items()}
+                batch = self._batch_to_device(batch)
                 
                 # Store current batch for metrics update
                 self.current_batch = batch
@@ -313,22 +323,17 @@ class Trainer:
         elif self.args.problem_type == 'multi_label_classification':
             return self.loss_fn(logits, labels.float())
         elif "residue" in self.args.problem_type:
-            # For residue-level classification, reshape logits and labels
-            # logits: [batch_size, seq_len, num_classes] -> [batch_size * seq_len, num_classes]
-            # labels: [batch_size, seq_len] -> [batch_size * seq_len]
-            batch_size, seq_len, num_classes = logits.shape
-            
-            # Ensure labels have the correct shape
+            # Labels are padded to token length (incl. [CLS] and [EOS]); strip so 1:1 with residues.
+            # ProtSSN logits have no CLS/EOS, so drop labels positions 0 and -1.
             if labels.dim() == 1:
-                # If labels is [batch_size], expand to [batch_size, seq_len]
-                labels = labels.unsqueeze(1).expand(-1, seq_len)
-            
-            logits_flat = logits.view(-1, num_classes)
-            labels_flat = labels.view(-1)
-            
-            # Ensure shapes match
-            assert logits_flat.size(0) == labels_flat.size(0), f"Logits and labels batch size mismatch: {logits_flat.size(0)} vs {labels_flat.size(0)}"
-            
+                labels = labels.unsqueeze(1)
+            if labels.shape[1] >= 2:
+                labels = labels[:, 1:-1]  # remove CLS (idx0) and EOS (idx -1)
+            batch_size, seq_len_logit, num_classes = logits.shape
+            seq_len_label = labels.shape[1]
+            seq_len = min(seq_len_logit, seq_len_label)
+            logits_flat = logits[:, :seq_len, :].contiguous().view(-1, num_classes)
+            labels_flat = labels[:, :seq_len].contiguous().view(-1)
             return self.loss_fn(logits_flat, labels_flat)
         else:
             return self.loss_fn(logits, labels)
@@ -343,12 +348,15 @@ class Trainer:
             elif self.args.problem_type == 'multi_label_classification':
                 metric(torch.sigmoid(logits), labels)
             elif "residue" in self.args.problem_type:
-                # For residue-level classification, pass attention mask if available
+                # Strip CLS/EOS from labels and align length with logits
+                if labels.shape[1] >= 2:
+                    labels = labels[:, 1:-1]
+                seq_len = min(logits.shape[1], labels.shape[1])
+                logits = logits[:, :seq_len, :]
+                labels = labels[:, :seq_len]
                 attention_mask = None
                 if "aa_seq_attention_mask" in self.current_batch:
-                    attention_mask = self.current_batch["aa_seq_attention_mask"]
-                
-                # Update residue-specific metrics
+                    attention_mask = self.current_batch["aa_seq_attention_mask"][:, 1:1+seq_len]
                 metric.update(logits, labels, attention_mask)
             else:
                 if self.args.num_labels == 2:

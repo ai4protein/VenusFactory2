@@ -49,6 +49,13 @@ def add_model_args(parser: argparse.ArgumentParser):
     model_group.add_argument('--pooling_method', type=str, default='mean',
                             choices=['mean', 'attention1d', 'light_attention'])
     model_group.add_argument('--pooling_dropout', type=float, default=0.1)
+    # ProtSSN (structure-based, freeze only)
+    model_group.add_argument('--gnn_config', type=str, default=None,
+                             help='Path to GNN config YAML (default: src/mutation/models/egnn/egnn.yaml)')
+    model_group.add_argument('--gnn_model_path', type=str, default=None,
+                             help='Directory containing ProtSSN GNN weights (e.g. protssn_k10_h512.pt)')
+    model_group.add_argument('--c_alpha_max_neighbors', type=int, default=10,
+                             help='ProtSSN graph K (c_alpha_max_neighbors)')
 
 def add_dataset_args(parser: argparse.ArgumentParser):
     """Add dataset-related arguments."""
@@ -150,7 +157,7 @@ def process_dataset_config(args: argparse.Namespace):
     # Update args with dataset config values if not already set
     for key in ['dataset', 'pdb_type', 'pdb_dir', 'train_file', 'valid_file', 'test_file',
                 'num_labels', 'problem_type', 'monitor', 'monitor_strategy', 
-                'metrics', 'normalize']:
+                'metrics', 'normalize', 'gnn_config', 'gnn_model_path', 'c_alpha_max_neighbors']:
         if getattr(args, key) is None and key in config:
             setattr(args, key, config[key])
     
