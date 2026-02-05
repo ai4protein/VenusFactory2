@@ -10,9 +10,9 @@ def parse_args() -> Dict[str, Any]:
     parser = create_argument_parser()
     args = parser.parse_args()
     
-    # Validate and process arguments
-    validate_args(args)
+    # Process dataset config first (may set structure_seq, pdb_dir from config)
     process_dataset_config(args)
+    validate_args(args)
     setup_output_dirs(args)
     setup_wandb_config(args)
     
@@ -61,10 +61,17 @@ def add_dataset_args(parser: argparse.ArgumentParser):
     data_group.add_argument('--sequence_column_name', type=str, default='aa_seq')
     data_group.add_argument('--label_column_name', type=str, default='label')
     data_group.add_argument('--pdb_type', type=str)
+    data_group.add_argument('--pdb_dir', type=str, default=None,
+                            help='PDB directory to generate missing structure_seq columns (stru_token, foldseek_seq, ss8_seq, etc.)')
     data_group.add_argument('--train_file', type=str)
     data_group.add_argument('--valid_file', type=str)
     data_group.add_argument('--test_file', type=str)
     data_group.add_argument('--metrics', type=str)
+    data_group.add_argument('--quick_test', action='store_true', default=False,
+                            help='Truncate dataset to max_train_samples, max_validation_samples, max_test_samples for quick test')
+    data_group.add_argument('--max_train_samples', type=int, default=50)
+    data_group.add_argument('--max_validation_samples', type=int, default=50)
+    data_group.add_argument('--max_test_samples', type=int, default=50)
 
 def add_training_args(parser: argparse.ArgumentParser):
     """Add training-related arguments."""
@@ -141,12 +148,23 @@ def process_dataset_config(args: argparse.Namespace):
     config = json.load(open(args.dataset_config))
     
     # Update args with dataset config values if not already set
-    for key in ['dataset', 'pdb_type', 'train_file', 'valid_file', 'test_file',
+    for key in ['dataset', 'pdb_type', 'pdb_dir', 'train_file', 'valid_file', 'test_file',
                 'num_labels', 'problem_type', 'monitor', 'monitor_strategy', 
                 'metrics', 'normalize']:
         if getattr(args, key) is None and key in config:
             setattr(args, key, config[key])
     
+    # structure_seq, pdb_dir, structure_merge_key, structure_merge_key_format from config
+    if 'structure_seq' in config and config['structure_seq']:
+        args.structure_seq = config['structure_seq'] if isinstance(config['structure_seq'], list) else config['structure_seq'].split(',')
+    if 'pdb_dir' in config and getattr(args, 'pdb_dir', None) is None:
+        args.pdb_dir = config['pdb_dir']
+    if 'structure_merge_key' in config:
+        args.structure_merge_key = config['structure_merge_key']
+    # VenusX: PDB files are interpro_id-uid, HF has uid and interpro_id as separate columns
+    if 'structure_merge_key_format' in config:
+        args.structure_merge_key_format = config['structure_merge_key_format']
+
     # Handle sequence and label column names specially - always override with config if present
     for key in ['sequence_column_name', 'label_column_name']:
         if key in config:

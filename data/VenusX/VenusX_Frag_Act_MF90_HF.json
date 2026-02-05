@@ -6,5 +6,6 @@
     "label_column_name": "interpro_label",
     "metrics": "accuracy,mcc,f1,precision,recall,auroc",
     "monitor": "mcc",
-    "monitor_strategy": "max"
+    "monitor_strategy": "max",
+    "structure_merge_key_format": "{interpro_id}-{uid}"
 }

@@ -5,6 +5,7 @@ from torch.utils.data import DataLoader
 from .collator import Collator
 from .batch_sampler import BatchSampler
 from .norm import normalize_dataset
+from .structure_seq_merge import ensure_structure_columns
 from torch.utils.data import Dataset
 from typing import Dict, Any, List, Union
 import pandas as pd
@@ -12,12 +13,34 @@ import pandas as pd
 def prepare_dataloaders(args, tokenizer, logger):
     """Prepare train, validation and test dataloaders."""
     aa_seq_key = args.sequence_column_name
-    # Process datasets
-    train_dataset = datasets.load_dataset(args.dataset)['train']
+    # Load datasets
+    dataset_dict = datasets.load_dataset(args.dataset)
+    
+    # Truncate dataset to max_train_samples, max_validation_samples, max_test_samples for quick test
+    if args.quick_test:
+        max_train_samples = getattr(args, 'max_train_samples', None)
+        max_validation_samples = getattr(args, 'max_validation_samples', None)
+        max_test_samples = getattr(args, 'max_test_samples', None)
+        if max_train_samples is not None and max_train_samples > 0 and 'train' in dataset_dict:
+            dataset_dict['train'] = dataset_dict['train'].select(range(max_train_samples))
+            if logger:
+                logger.info(f"Truncated train dataset to {max_train_samples} samples (max_train_samples={max_train_samples}) before structure merge")
+        if max_validation_samples is not None and max_validation_samples > 0 and 'validation' in dataset_dict:
+            dataset_dict['validation'] = dataset_dict['validation'].select(range(max_validation_samples))
+            if logger:
+                logger.info(f"Truncated validation dataset to {max_validation_samples} samples (max_validation_samples={max_validation_samples}) before structure merge")
+        if max_test_samples is not None and max_test_samples > 0 and 'test' in dataset_dict:
+            dataset_dict['test'] = dataset_dict['test'].select(range(max_test_samples))
+            if logger:
+                logger.info(f"Truncated test dataset to {max_test_samples} samples (max_test_samples={max_test_samples}) before structure merge")
+    
+    # Ensure structure columns are present
+    dataset_dict = ensure_structure_columns(dataset_dict, args, logger)
+    train_dataset = dataset_dict['train']
     train_dataset_token_lengths = [len(item[aa_seq_key]) for item in train_dataset]
-    val_dataset = datasets.load_dataset(args.dataset)['validation']
+    val_dataset = dataset_dict['validation']
     val_dataset_token_lengths = [len(item[aa_seq_key]) for item in val_dataset]
-    test_dataset = datasets.load_dataset(args.dataset)['test']
+    test_dataset = dataset_dict['test']
     test_dataset_token_lengths = [len(item[aa_seq_key]) for item in test_dataset]
     
     if args.normalize is not None:

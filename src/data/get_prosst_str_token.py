@@ -24,7 +24,7 @@ def convert_predict_results(predict_results, structure_vocab_size):
         out.append({
             "name": name,
             "aa_seq": aa_seq,
-            f"{structure_vocab_size}_struct_tokens": sst_seq,
+            f"stru_token_{structure_vocab_size}": sst_seq,
         })
     return out
 
@@ -33,10 +33,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='ProSST structure token generator')
     parser.add_argument('--pdb_dir', type=str, help='Directory containing PDB files')
     parser.add_argument('--pdb_file', type=str, help='Single PDB file path')
-    parser.add_argument('--structure_vocab_size', type=int, default=2048, help='Structure vocab size (20, 64, 128, 512, 1024, 2048, 4096)')
+    parser.add_argument('--structure_vocab_size', type=int, default=2048, 
+                        choices=[20, 64, 128, 512, 1024, 2048, 4096],
+                        help='Structure vocab size (20, 64, 128, 512, 1024, 2048, 4096)')
     # SSTPredictor init
-    parser.add_argument('--num_processes', type=int, default=12, help='Number of processes for subgraph building')
-    parser.add_argument('--num_threads', type=int, default=16, help='Number of threads for subgraph building')
+    parser.add_argument('--num_processes', type=int, default=6, help='Number of processes for subgraph building')
+    parser.add_argument('--num_threads', type=int, default=4, help='Number of threads for subgraph building')
     parser.add_argument('--max_batch_nodes', type=int, default=10000, help='Max nodes per batch')
     parser.add_argument('--max_distance', type=float, default=10, help='Max distance for edges')
     parser.add_argument('--device', type=str, default=None, help='Device (cuda/cpu), default auto')

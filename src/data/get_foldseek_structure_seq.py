@@ -1,4 +1,5 @@
 import os
+import shutil
 import argparse
 import json
 import pandas as pd
@@ -9,24 +10,25 @@ def get_foldseek_structure_seq(pdb_dir, rm_tmp=True):
     # foldseek createdb INPUT_dir_with_structures tmp_db
     # foldseek lndb tmp_db_h tmp_db_ss_h
     # foldseek convert2fasta tmp_db_ss OUTPUT_3di.fasta
-    # use command to generate foldseek structure seq
-    os.makedirs("tmp_db", exist_ok=True)
-    os.system(f"foldseek createdb {pdb_dir} tmp_db/tmp_db")
-    os.system(f"foldseek lndb tmp_db/tmp_db_h tmp_db/tmp_db_ss_h")
-    os.system(f"foldseek convert2fasta tmp_db/tmp_db_ss tmp_db/tmp_db_ss.fasta")
-    
+    # use command to generate foldseek structure seq; tmp under workdir/.cache
+    cache_root = os.path.join(os.getcwd(), ".cache")
+    tmp_db_dir = os.path.join(cache_root, "foldseek_tmp_db")
+    os.makedirs(tmp_db_dir, exist_ok=True)
+    os.system(f"foldseek createdb {pdb_dir} {tmp_db_dir}/tmp_db")
+    os.system(f"foldseek lndb {tmp_db_dir}/tmp_db_h {tmp_db_dir}/tmp_db_ss_h")
+    os.system(f"foldseek convert2fasta {tmp_db_dir}/tmp_db_ss {tmp_db_dir}/tmp_db_ss.fasta")
+
     results = []
-    # read fasta file
-    with open("tmp_db/tmp_db_ss.fasta", "r") as f:
+    with open(os.path.join(tmp_db_dir, "tmp_db_ss.fasta"), "r") as f:
         for line in tqdm(f):
             if line.startswith(">"):
                 name = line.split()[0][1:]
                 seq = next(f).strip()
-                results.append({"name":name.split('.')[0], "foldseek_seq":seq})
-    
+                results.append({"name": name.split('.')[0], "foldseek_seq": seq})
+
     if rm_tmp:
-        os.system("rm -rf tmp_db")
-        
+        shutil.rmtree(tmp_db_dir, ignore_errors=True)
+
     return results
     
     
