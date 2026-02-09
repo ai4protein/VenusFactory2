@@ -4,10 +4,13 @@ import logging
 import asyncio
 import threading
 import time
+import requests
+import uuid
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 from uuid import uuid4
+from urllib.parse import urlparse
 from pydantic import BaseModel, Field, validator, field_validator
 from fastmcp import FastMCP
 import uvicorn
@@ -26,7 +29,10 @@ from web.chat_tools import (
     functional_residue_prediction_tool,
     protein_properties_generation_tool,
     literature_search_tool,
-    protein_structure_prediction_ESMFold_tool
+    dataset_search_tool,
+    web_search_tool,
+    protein_structure_prediction_ESMFold_tool,
+    foldseek_search_tool,
 )
 
 UPLOAD_DIR = get_save_path("MCP_Server", "Uploads")
@@ -124,6 +130,36 @@ class PDBSequenceExtractionInput(BaseModel):
             raise ValueError("File must be a PDB structure file (.pdb, .cif, or .ent)")
         return str(path)
 
+class ProteinStructurePredictionInput(BaseModel):
+    """Input validation for protein structure prediction using ESMFold."""
+    sequence: str = Field(..., min_length=1, description="Protein sequence")
+    save_path: Optional[str] = Field(None, description="Path to save the predicted structure")
+    verbose: Optional[bool] = Field(default=True, description="Whether to print detailed information")
+    
+    @field_validator('sequence')
+    @classmethod
+    def validate_sequence(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Sequence cannot be empty")
+        return v.strip()
+
+class FoldSeekSearchInput(BaseModel):
+    """Input for FoldSeek search"""
+    pdb_file_path: str = Field(..., min_length=1, description="Path to PDB file")
+    protect_start: int = Field(..., description="Start position of the protected region")
+    protect_end: int = Field(..., description="End position of the protected region")
+
+    @field_validator('pdb_file_path')
+    @classmethod
+    def validate_file_path(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("File path cannot be empty")
+        path = Path(v.strip())
+        if not path.suffix.lower() in ['.pdb', '.cif', '.ent']:
+            raise ValueError("File must be a PDB structure file (.pdb, .cif, or .ent)")
+        return str(path)
+    
+
 class ZeroShotSequencePredictionInput(BaseModel):
     """Input validation for zero-shot sequence prediction."""
     sequence: Optional[str] = Field(None, description="Protein sequence")
@@ -153,7 +189,7 @@ class ZeroShotStructurePredictionInput(BaseModel):
     @field_validator('model_name')
     @classmethod
     def validate_model_name(cls, v: str) -> str:
-        allowed_models = ["VenusREM", "ProSST-2048", "ProtSSN", "ESM-IF1", "SaProt", "MIF-ST"]
+        allowed_models = ["VenusREM (foldseek-based)", "ProSST-2048", "ProtSSN", "ESM-IF1", "SaProt", "MIF-ST"]
         if v not in allowed_models:
             raise ValueError(f"Model must be one of: {', '.join(allowed_models)}")
         return v
@@ -260,7 +296,8 @@ class LiteratureSearchInput(BaseModel):
     """Input validation for literature search."""
     query: str = Field(..., min_length=1, description="Search query")
     max_results: int = Field(default=5, ge=1, le=100, description="Maximum number of results")
-    
+    source: str = Field(..., min_length=1, description="Source")
+
     @field_validator('query')
     @classmethod
     def validate_query(cls, v: str) -> str:
@@ -268,18 +305,31 @@ class LiteratureSearchInput(BaseModel):
             raise ValueError("Query cannot be empty")
         return v.strip()
 
-class ProteinStructurePredictionESMFoldInput(BaseModel):
-    """Input validation for protein structure prediction using ESMFold."""
-    sequence: str = Field(..., description="Protein sequence in single letter amino acid code")
-    save_path: Optional[str] = Field(None, description="Path to save the predicted structure")
-    verbose: Optional[bool] = Field(default=True, description="Whether to print detailed information")
-    @field_validator('sequence')
-    @classmethod
-    def validate_sequence(cls, v: str) -> str:
-        if not v or not v.strip():
-            raise ValueError("Sequence cannot be empty")
-        return v.strip()
+class DatasetSearchInput(BaseModel):
+    """Input validation for dataset search."""
+    query: str = Field(..., min_length=1, description="Search query")
+    max_results: int = Field(default=5, ge=1, le=100, description="Maximum number of results")
+    source: str = Field(..., min_length=1, description="Source")
 
+    @field_validator('query')
+    @classmethod
+    def validate_query(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Query cannot be empty")
+        return v.strip()
+    
+class WebSearchInput(BaseModel):
+    """Input validation for dataset search."""
+    query: str = Field(..., min_length=1, description="Search query")
+    max_results: int = Field(default=5, ge=1, le=100, description="Maximum number of results")
+    source: str = Field(..., min_length=1, description="Source")
+        
+    @field_validator('query')
+    @classmethod
+    def validate_query(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Query cannot be empty")
+        return v.strip()
 
 class MCPError(BaseModel):
     """Error information in MCP response."""
@@ -298,8 +348,7 @@ class MCPResponse(BaseModel):
     def to_json(self) -> str:
         """Convert response to JSON string."""
         return json.dumps(self.model_dump(exclude_none=True), ensure_ascii=False, indent=2)
-
-
+        
 def build_success_response(data: Any, request_id: Optional[str] = None) -> MCPResponse:
     """
     Build a successful MCP response.
@@ -342,6 +391,72 @@ def build_error_response(
         data=None,
         error=MCPError(code=code, message=message, detail=detail)
     )
+
+def download_file_from_url(url: str, target_dir: str = "Downloads") -> str:
+    """
+    Download file from URL to specified directory.
+    
+    Args:
+        url: URL to download from
+        target_dir: Target directory name (will be created under temp_outputs)
+    
+    Returns:
+        Local file path of downloaded file
+    
+    Raises:
+        Exception: If download fails
+    """
+    try:
+        # Parse URL to get filename
+        parsed_url = urlparse(url)
+        filename = os.path.basename(parsed_url.path)
+        
+        # If no filename in URL, generate one with .txt extension
+        if not filename or '.' not in filename:
+            filename = f"downloaded_file_{uuid.uuid4().hex[:8]}.txt"
+        
+        # Create target directory using get_save_path
+        save_dir = get_save_path("MCP_Server", target_dir)
+        file_path = save_dir / filename
+        
+        # Download file
+        logger.info(f"Downloading file from URL: {url}")
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+        
+        # Save file
+        with open(file_path, 'wb') as f:
+            f.write(response.content)
+        
+        logger.info(f"File downloaded successfully to: {file_path}")
+        return str(file_path)
+        
+    except Exception as e:
+        logger.error(f"Failed to download file from URL {url}: {str(e)}")
+        raise Exception(f"Failed to download file from URL: {str(e)}")
+
+def is_url(path: str) -> bool:
+    """Check if a string is a URL."""
+    try:
+        result = urlparse(path)
+        return all([result.scheme, result.netloc])
+    except:
+        return False
+
+def process_file_path(file_path: str, target_dir: str = "Downloads") -> str:
+    """
+    Process file path - if it's a URL, download it; otherwise return as is.
+    
+    Args:
+        file_path: File path or URL
+        target_dir: Target directory for downloads
+    
+    Returns:
+        Local file path
+    """
+    if is_url(file_path):
+        return download_file_from_url(file_path, target_dir)
+    return file_path
 
 def format_tool_response(result: Any, error: Optional[Exception] = None) -> str:
     """
@@ -406,10 +521,9 @@ def start_http_server(host: Optional[str] = None, port: Optional[int] = None) ->
             uvicorn.run(
                 app_with_route,
                 host=host,
-                port=port,
-                root_path=os.getenv("MCP_ROOT_PATH", "/playground/MCP/ProteinTools")
+                port=port
             )
-
+        
             
         except Exception as exc:
             logger.error("MCP HTTP server exited unexpectedly: %s", exc)
@@ -424,6 +538,7 @@ def start_http_server(host: Optional[str] = None, port: Optional[int] = None) ->
         time.sleep(2)
 
     return host, port
+
 
 @mcp.tool()
 async def query_uniprot(uniprot_id: str) -> str:
@@ -537,13 +652,16 @@ async def extract_pdb_sequence(pdb_file_path: str) -> str:
     """
     Extract amino acid sequences from PDB structure file for all protein chains.
     Args:
-        pdb_file_path (str): Path to the PDB file.
+        pdb_file_path (str): Path to the PDB file or URL.
     Returns:
         str: Extracted sequence.
     """
     try:
+        # Process file path (download if URL)
+        processed_file_path = process_file_path(pdb_file_path, "PDB_Files")
+        
         # Validate input using Pydantic
-        validated_input = PDBSequenceExtractionInput(pdb_file_path=pdb_file_path)
+        validated_input = PDBSequenceExtractionInput(pdb_file_path=processed_file_path)
         result = await asyncio.to_thread(PDB_sequence_extraction_tool.invoke, {"pdb_file": validated_input.pdb_file_path})
         return format_tool_response(result)
     except ValueError as e:
@@ -551,8 +669,61 @@ async def extract_pdb_sequence(pdb_file_path: str) -> str:
     except Exception as e:
         return format_tool_response(None, error=e)
 
+
 @mcp.tool()
-async def predict_zero_shot_sequence(
+async def foldseek_search(
+    pdb_file_path: str,
+    protect_start: int,
+    protect_end: int
+) -> str:
+    """
+    Search for protein structures using FoldSeek.
+    Args:
+        pdb_file_path (str): Path to the PDB file or URL.
+        protect_start (int): Start position of the protected region.
+        protect_end (int): End position of the protected region.
+    Returns:
+        str: FASTA file containing the sequences of the protected region.
+    """
+    try:
+        # Process file path (download if URL)
+        processed_file_path = process_file_path(pdb_file_path, "PDB_Files")
+        
+        # Validate input using Pydantic
+        validated_input = FoldSeekSearchInput(pdb_file_path=processed_file_path, protect_start=protect_start, protect_end=protect_end)
+        params = {
+            "pdb_file_path": validated_input.pdb_file_path,
+            "protect_start": validated_input.protect_start,
+            "protect_end": validated_input.protect_end
+        }
+        result = await asyncio.to_thread(foldseek_search_tool.invoke, params)
+        return format_tool_response(result)
+    except ValueError as e:
+        return format_tool_response(None, error=e)
+    except Exception as e:
+        return format_tool_response(None, error=e)
+
+@mcp.tool()
+async def Protein_structure_prediction_ESMFold(sequence: str) -> str:
+    """
+    Predict protein structure using ESMFold.
+    Args:
+        sequence (str): Protein sequence.
+    Returns:
+        str: Path to the predicted structure file.
+    """
+    try:
+        # Validate input using Pydantic
+        validated_input = ProteinStructurePredictionInput(sequence=sequence)
+        result = await asyncio.to_thread(protein_structure_prediction_ESMFold_tool.invoke, {"sequence": validated_input.sequence})
+        return format_tool_response(result)
+    except ValueError as e:
+        return format_tool_response(None, error=e)
+    except Exception as e:
+        return format_tool_response(None, error=e)
+
+@mcp.tool()
+async def zero_shot_sequence_prediction(
     sequence: Optional[str] = None, 
     fasta_file: Optional[str] = None,
     model_name: str = "ESM2-650M"
@@ -567,10 +738,15 @@ async def predict_zero_shot_sequence(
         str: Prediction result.
     """
     try:
+        # Process fasta_file if it's a URL
+        processed_fasta_file = None
+        if fasta_file:
+            processed_fasta_file = process_file_path(fasta_file, "FASTA_Files")
+        
         # Validate input using Pydantic
         validated_input = ZeroShotSequencePredictionInput(
             sequence=sequence,
-            fasta_file=fasta_file,
+            fasta_file=processed_fasta_file,
             model_name=model_name
         )
         
@@ -587,6 +763,7 @@ async def predict_zero_shot_sequence(
     except Exception as e:
         return format_tool_response(None, error=e)
 
+
 @mcp.tool()
 async def predict_zero_shot_structure(
     structure_file_path: str,
@@ -601,9 +778,12 @@ async def predict_zero_shot_structure(
         str: Prediction result.
     """
     try:
+        # Process structure file path (download if URL)
+        processed_structure_file = process_file_path(structure_file_path, "Structure_Files")
+        
         # Validate input using Pydantic
         validated_input = ZeroShotStructurePredictionInput(
-            structure_file_path=structure_file_path,
+            structure_file_path=processed_structure_file,
             model_name=model_name
         )
         result = await asyncio.to_thread(zero_shot_structure_prediction_tool.invoke, {
@@ -634,10 +814,15 @@ async def predict_protein_function(
         str: Prediction result.
     """
     try:
+        # Process fasta_file if it's a URL
+        processed_fasta_file = None
+        if fasta_file:
+            processed_fasta_file = process_file_path(fasta_file, "FASTA_Files")
+        
         # Validate input using Pydantic
         validated_input = ProteinFunctionPredictionInput(
             sequence=sequence,
-            fasta_file=fasta_file,
+            fasta_file=processed_fasta_file,
             model_name=model_name,
             task=task
         )
@@ -676,10 +861,15 @@ async def predict_functional_residue(
         str: Prediction result.
     """
     try:
+        # Process fasta_file if it's a URL
+        processed_fasta_file = None
+        if fasta_file:
+            processed_fasta_file = process_file_path(fasta_file, "FASTA_Files")
+        print("processed_fasta_file", processed_fasta_file)
         # Validate input using Pydantic
         validated_input = FunctionalResiduePredictionInput(
             sequence=sequence,
-            fasta_file=fasta_file,
+            fasta_file=processed_fasta_file,
             model_name=model_name,
             task=task
         )
@@ -710,16 +900,21 @@ async def predict_protein_properties(
     Calculate physical and chemical properties (molecular weight, pI, SASA, secondary structure) from protein sequence or structure.
     Args:
         sequence (Optional[str]): Protein sequence.
-        fasta_file (Optional[str]): Path to the FASTA file.
+        fasta_file (Optional[str]): Path to the PDB file.
         task_name (str): Task name for prediction. Support Task: Physical and chemical properties, Relative solvent accessible surface area (PDB only), SASA value (PDB only), Secondary structure (PDB only)
     Returns:
         str: Prediction result.
     """
     try:
+        # Process fasta_file if it's a URL
+        processed_fasta_file = None
+        if fasta_file:
+            processed_fasta_file = process_file_path(fasta_file, "Structure_Files")
+        
         # Validate input using Pydantic
         validated_input = ProteinPropertiesPredictionInput(
             sequence=sequence,
-            fasta_file=fasta_file,
+            fasta_file=processed_fasta_file,
             task_name=task_name
         )
         
@@ -740,21 +935,26 @@ async def predict_protein_properties(
 
 
 @mcp.tool()
-async def search_literature(query: str, max_results: int = 5) -> str:
+async def search_literature(query: str, max_results: int = 5, source: str = "arxiv") -> str:
     """
-    Search scientific literature databases (PubMed) for relevant research papers and publications.
+    Search for academic literature using arXiv and PubMed.
+    Use this tool for finding scientific papers, articles, and research publications.
+    
     Args:
-        query (str): Search query.
-        max_results (int): Maximum number of results.
+        query: The search query for academic literature (protein names, scientific concepts, etc.)
+        max_results: The maximum number of results to return.
+        source: The source to search: arxiv, pubmed, biorxiv, semantic_scholar 
+        
     Returns:
-        str: Search results.
+        A JSON string containing the academic literature search results.
     """
     try:
         # Validate input using Pydantic
-        validated_input = LiteratureSearchInput(query=query, max_results=max_results)
+        validated_input = LiteratureSearchInput(query=query, max_results=max_results, source=source)
         result = await asyncio.to_thread(literature_search_tool.invoke, {
             "query": validated_input.query,
-            "max_results": validated_input.max_results
+            "max_results": validated_input.max_results,
+            "source": validated_input.source
         })
         return format_tool_response(result)
     except ValueError as e:
@@ -763,23 +963,26 @@ async def search_literature(query: str, max_results: int = 5) -> str:
         return format_tool_response(None, error=e)
 
 @mcp.tool()
-async def predict_protein_structure_esmfold(sequence: str, save_path: Optional[str] = None, verbose: Optional[bool] = True) -> str:
+async def search_dataset(query: str, max_results: int = 5, source: str = "github") -> str:
     """
-    Predict protein structure using ESMFold.
+    Search for datasets using GitHub and Hugging Face.
+    Use this tool for finding datasets for model training.
+    
     Args:
-        sequence (str): Protein sequence in single letter amino acid code.
-        save_path (Optional[str]): Path to save the predicted structure.
-        verbose (Optional[bool]): Whether to print detailed information.
+        query: The search query for datasets (protein names, scientific concepts, etc.)
+        max_results: The maximum number of results to return.
+        source: The source to search: github, hugging_face, or all
+        
     Returns:
-        str: Prediction result.
+        A JSON string containing the dataset search results.
     """
     try:
         # Validate input using Pydantic
-        validated_input = ProteinStructurePredictionESMFoldInput(sequence=sequence, save_path=save_path, verbose=verbose)
-        result = await asyncio.to_thread(protein_structure_prediction_ESMFold_tool.invoke, {
-            "sequence": validated_input.sequence,
-            "save_path": validated_input.save_path,
-            "verbose": validated_input.verbose
+        validated_input = DatasetSearchInput(query=query, max_results=max_results, source=source)
+        result = await asyncio.to_thread(dataset_search_tool.invoke, {
+            "query": validated_input.query,
+            "max_results": validated_input.max_results,
+            "source": validated_input.source
         })
         return format_tool_response(result)
     except ValueError as e:
@@ -787,7 +990,34 @@ async def predict_protein_structure_esmfold(sequence: str, save_path: Optional[s
     except Exception as e:
         return format_tool_response(None, error=e)
 
+@mcp.tool()
+async def search_web(query: str, max_results: int = 5, source: str = "duckduckgo") -> str:
+    """
+    Search the web using DuckDuckGo and Tavily.
+    Use this tool for finding information on the web.
+    
+    Args:
+        query: The search query for the web (protein names, scientific concepts, etc.)
+        max_results: The maximum number of results to return.
+        source: The source to search: duckduckgo, tavily, or all
         
+    Returns:
+        A JSON string containing the web search results.
+    """
+    try:
+        # Validate input using Pydantic
+        validated_input = WebSearchInput(query=query, max_results=max_results, source=source)
+        result = await asyncio.to_thread(web_search_tool.invoke, {
+            "query": validated_input.query,
+            "max_results": validated_input.max_results,
+            "source": validated_input.source
+        })
+        return format_tool_response(result)
+    except ValueError as e:
+        return format_tool_response(None, error=e)
+    except Exception as e:
+        return format_tool_response(None, error=e)
+
 if __name__ == "__main__":    
     logger.info("VenusFactory MCP Server starting...")
     mcp.run(transport="sse")

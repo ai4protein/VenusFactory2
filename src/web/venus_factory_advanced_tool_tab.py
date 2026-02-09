@@ -312,6 +312,7 @@ def handle_protein_function_prediction_chat(
             else:
                 file_path = fasta_file.name
             cmd = [sys.executable, str(script_path), "--fasta_file", str(Path(file_path)), "--adapter_path", str(adapter_path), "--output_csv", str(output_file)]
+            print(cmd)
             subprocess.run(cmd, capture_output=True, text=True, check=True, encoding='utf-8', errors='ignore')
 
             if output_file.exists():
@@ -321,7 +322,7 @@ def handle_protein_function_prediction_chat(
                 os.remove(output_file)
         except Exception as e:
             error_detail = e.stderr if isinstance(e, subprocess.CalledProcessError) else str(e)
-            all_results_list.append(pd.DataFrame([{"Dataset": dataset, "header": "ERROR", "sequence": error_detail}]))
+            all_results_list.append(pd.DataFrame([{"Dataset": dataset, "header": "ERROR"}]))
 
     if not all_results_list:
         return "⚠️ No results generated.", pd.DataFrame(), "Prediction scripts produced no output."
@@ -423,9 +424,22 @@ def handle_protein_function_prediction_chat(
                 display_df.rename(columns={'probabilities': 'Confidence Score'}, inplace=True)
         
         display_df.rename(columns={'Dataset': 'Dataset'}, inplace=True)
+    # Save sequence data to separate CSV file before removing from display
+    sequence_csv_path = None
+    sequence_csv_path = function_dir / f"sequences_{timestamp}.csv"
+    display_df.to_csv(sequence_csv_path, index=False)
+    # Remove Sequence column from display dataframe
+    display_df = display_df.drop(columns=['Sequence'])
+    
+    # Sort by Confidence Score and keep only top 50 results
+    if 'Confidence Score' in display_df.columns:
+        # Sort by Confidence Score in descending order (highest confidence first)
+        display_df = display_df.sort_values('Confidence Score', ascending=False)
+        # Keep only top 50 results
+    display_df = display_df[0:50]
 
     final_status = "✅ All predictions completed!"
-    return final_status, display_df, ""
+    return final_status, display_df, sequence_csv_path
 
 
 
@@ -690,6 +704,7 @@ def handle_protein_residue_function_prediction_chat(
         'predicted_label': 'Predicted Label',
         'probability': 'Probability',
     }
+    
     display_df.rename(columns=column_rename, inplace=True)
     if 'Probability' in display_df.columns:
         display_df['Probability'] = display_df['Probability'].round(3)
