@@ -459,7 +459,8 @@ def get_tools():
         alphafold_structure_download_tool,
         PDB_sequence_extraction_tool,
         literature_search_tool,
-        deep_research_tool,
+        dataset_search_tool,
+        web_search_tool,
         protein_structure_prediction_ESMFold_tool
     ]
 
@@ -859,7 +860,7 @@ async def send_message(history, message, session_state):
                     if tool_name in ['ncbi_sequence_download', 'alphafold_structure_download', 'uniprot_query', 'interpro_query',
                                      'protein_function_prediction', 'functional_residue_prediction',
                                      'protein_properties_generation', 'zero_shot_sequence_prediction', 'zero_shot_structure_prediction',
-                                     'PDB_sequence_extraction', 'PDB_structure_download', 'literature_search', "deep_research",
+                                     'PDB_sequence_extraction', 'PDB_structure_download', 'literature_search', "dataset_search", "web_search"
                                      'protein_structure_prediction_ESMFold']:
                         output_data = json.loads(raw_output)
                         # Structure downloads

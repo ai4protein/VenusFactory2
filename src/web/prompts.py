@@ -47,8 +47,10 @@ TOOL PARAMETER MAPPING:
 - alphafold_structure_download: uniprot_id, output_format (for downloading AlphaFold structures)
 - PDB_sequence_extraction: pdb_file (for extracting sequence from PDB file, including the user uploaded PDB file and download PDB structures)
 - PDB_structure_download: pdb_id, output_format (for downloading PDB structures)
-- literature_search: query, max_results (default 5) (for searching scientific papers and academic literature from arXiv and PubMed)
-- deep_research: query, max_results (default 5) (for general web search using Google)
+- literature_search: query, max_results (default 5), source (for searching scientific papers and academic literature from arxiv, pubmed, biorxiv, semantic_scholar)
+- web_search: query, max_results (default 5), source (for general web search using DuckDuckGo and Tavily)
+- dataset_search: query, max_results (default 5), source (for searching datasets from Hugging Face or github)
+- deep_research: query, max_results (default 5), source (for general web search using Google)
 - protein_structure_prediction_ESMFold: sequence, save_path (for predicting protein structure using ESMFold), verbose (default True)
 
 When users mention a concept that does not exactly match a required parameter value (e.g., "localization"), infer the closest valid option from the allowed list (e.g., choose "Subcellular Localization") before emitting the plan.
