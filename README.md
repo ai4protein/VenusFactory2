@@ -739,28 +739,28 @@ Features:
 ### Format Conversion
 ```bash
 # Convert CIF format to PDB
-bash ./script/search/convert/maxit.sh
+bash ./script/tools/file/convert/maxit.sh
 ```
 
 ### Metadata Collection
 ```bash
 # Download metadata from RCSB PDB
-bash ./script/search/download/metadata/download_rcsb.sh
+bash ./script/tools/search/database/rcsb/download_rcsb_meta.sh
 ```
 
 ### Sequence Data
 ```bash
 # Download protein sequences from UniProt
-bash ./script/search/sequence/download_uniprot_seq.sh
+bash ./script/tools/search/database/uniprot/download_uniprot_seq.sh
 ```
 
 ### Structure Data
 ```bash
 # Download from AlphaFold2 Database
-bash ./script/search/download/structure/download_alphafold.sh
+bash ./script/tools/search/database/alphafold/download_alphafold_structure.sh
 
 # Download from RCSB PDB
-bash ./script/search/download/structure/download_rcsb.sh
+bash ./script/tools/search/database/rcsb/download_rcsb_structure.sh
 ```
 
 Features:
@@ -804,9 +804,7 @@ bash ./script/eval/eval.sh \
 ### Data Collection Example
 ```bash
 # Download structures for a list of UniProt IDs
-bash ./script/search/download/structure/download_alphafold.sh \
-    --input uniprot_ids.txt \
-    --output ./structures
+bash ./script/tools/search/database/alphafold/download_alphafold_structure.sh
 ```
 
 </details>

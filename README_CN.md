@@ -735,28 +735,28 @@ bash ./script/get_get_structure_seq/get_secondary_structure_seq.sh
 ### 格式转换
 ```bash
 # 将CIF格式转换为PDB
-bash ./script/search/convert/maxit.sh
+bash ./script/tools/file/convert/maxit.sh
 ```
 
 ### 元数据收集
 ```bash
 # 从RCSB PDB下载元数据
-bash ./script/search/download/metadata/download_rcsb.sh
+bash ./script/tools/search/database/rcsb/download_rcsb_meta.sh
 ```
 
 ### 序列数据
 ```bash
 # 从UniProt下载蛋白质序列
-bash ./script/search/sequence/download_uniprot_seq.sh
+bash ./script/tools/search/database/uniprot/download_uniprot_seq.sh
 ```
 
 ### 结构数据
 ```bash
 # 从AlphaFold2数据库下载
-bash ./script/search/download/structure/download_alphafold.sh
+bash ./script/tools/search/database/alphafold/download_alphafold_structure.sh
 
 # 从RCSB PDB下载
-bash ./script/search/download/structure/download_rcsb.sh
+bash ./script/tools/search/database/rcsb/download_rcsb_structure.sh
 ```
 
 特点：
@@ -800,9 +800,7 @@ bash ./script/eval/eval.sh \
 ### 数据收集示例
 ```bash
 # 下载UniProt ID列表对应的结构
-bash ./script/search/download/structure/download_alphafold.sh \
-    --input uniprot_ids.txt \
-    --output ./structures
+bash ./script/tools/search/database/alphafold/download_alphafold_structure.sh
 ```
 
 </details>
