@@ -1,0 +1,105 @@
+/* Chat dialog styles (chat bubble, avatar, role label) */
+.vf-chat-dialog-box {
+    border: none;
+    border-radius: 8px;
+    background: #fff;
+    padding: 14px 16px;
+    box-sizing: border-box;
+    min-height: 120px;
+}
+
+.vf-chat-container {
+    padding: 0;
+}
+
+.vf-chat-row {
+    margin-bottom: 12px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.vf-chat-user {
+    justify-content: flex-end;
+}
+
+.vf-chat-user .vf-chat-bubble,
+.vf-chat-user-bubble {
+    background: #fff;
+    color: #1a1a1a;
+    border: 1px solid #e8eaed;
+    border-radius: 14px 14px 4px 14px;
+}
+
+.vf-chat-assistant .vf-chat-bubble {
+    background: #fff;
+    color: #1a1a1a;
+    border: 1px solid #e8eaed;
+    border-radius: 14px 14px 14px 4px;
+}
+
+.vf-chat-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    object-fit: cover;
+}
+
+.vf-chat-bubble {
+    padding: 10px 14px;
+    max-width: 85%;
+    word-break: break-word;
+}
+
+.vf-chat-bubble p,
+.vf-chat-bubble ul,
+.vf-chat-bubble ol {
+    margin: 0.4em 0;
+}
+
+.vf-chat-bubble pre {
+    padding: 8px 10px;
+    border-radius: 8px;
+    overflow-x: auto;
+    background: #fff;
+    border: 1px solid #e8eaed;
+    margin: 6px 0;
+}
+
+.vf-chat-bubble code {
+    background: #fff;
+    border: 1px solid #e8eaed;
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.vf-chat-bubble pre code {
+    background: transparent;
+    border: none;
+    padding: 0;
+}
+
+.vf-chat-bubble h1,
+.vf-chat-bubble h2,
+.vf-chat-bubble h3 {
+    margin: 0.6em 0 0.3em;
+    font-size: 1em;
+}
+
+.vf-chat-bubble ul,
+.vf-chat-bubble ol {
+    padding-left: 1.2em;
+}
+
+.vf-chat-role-label {
+    color: #1565c0;
+    font-weight: 600;
+}
+
+.vf-chat-empty {
+    color: #5f6368;
+    padding: 20px;
+    font-size: 0.95em;
+}

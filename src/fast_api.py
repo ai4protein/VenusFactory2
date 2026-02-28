@@ -7,6 +7,9 @@ from typing import Optional, Dict, Any, List
 from datetime import datetime
 from uuid import uuid4
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form, BackgroundTasks
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,20 +18,20 @@ import uvicorn
 from web.utils.common_utils import get_save_path
 
 
-from web.chat_tools import (
-    PDB_sequence_extraction_tool,
-    uniprot_query_tool,
-    interpro_query_tool,
+from tools.tools_agent_hub import (
+    pdb_sequence_extraction_tool,
+    uniprot_sequence_download_tool,
+    interpro_lookup_tool,
     pdb_structure_download_tool,
     ncbi_sequence_download_tool,
     alphafold_structure_download_tool,
-    zero_shot_sequence_prediction_tool,
-    zero_shot_structure_prediction_tool,
+    zero_shot_mutation_sequence_prediction_tool,
+    zero_shot_mutation_structure_prediction_tool,
     protein_function_prediction_tool,
     functional_residue_prediction_tool,
-    protein_properties_generation_tool,
+    protein_property_prediction_tool,
     generate_training_config_tool,
-    ai_code_execution_tool,
+    agent_generated_code_tool,
     literature_search_tool,
 )
 
@@ -406,7 +409,7 @@ async def query_interpro(request: InterProRequest):
         logger.info(f"InterPro query: {request.uniprot_id}")
         
         # Call tool
-        result = interpro_query_tool.invoke({"uniprot_id": request.uniprot_id})
+        result = interpro_lookup_tool.invoke({"uniprot_id": request.uniprot_id})
         
         # Parse result
         parsed = parse_tool_result(result)
@@ -553,7 +556,7 @@ async def extract_pdb_sequence(
         temp_file = save_upload_file(file, subdir="pdb")
         
         # Call tool
-        result = PDB_sequence_extraction_tool.invoke({"pdb_file": temp_file})
+        result = pdb_sequence_extraction_tool.invoke({"pdb_file": temp_file})
         
         # Parse result
         parsed = parse_tool_result(result)
@@ -615,13 +618,13 @@ async def predict_zero_shot_sequence(
             temp_file = save_upload_file(file, subdir="fasta")
             
             # Call tool with file
-            result = zero_shot_sequence_prediction_tool.invoke({
+            result = zero_shot_mutation_sequence_prediction_tool.invoke({
                 "fasta_file": temp_file,
                 "model_name": model_name
             })
         else:
             # Call tool with sequence
-            result = zero_shot_sequence_prediction_tool.invoke({
+            result = zero_shot_mutation_sequence_prediction_tool.invoke({
                 "sequence": sequence,
                 "model_name": model_name
             })
@@ -677,7 +680,7 @@ async def predict_zero_shot_structure(
         temp_file = save_upload_file(file, subdir="structures")
         
         # Call tool
-        result = zero_shot_structure_prediction_tool.invoke({
+        result = zero_shot_mutation_structure_prediction_tool.invoke({
             "structure_file": temp_file,
             "model_name": model_name
         })
@@ -884,12 +887,12 @@ async def predict_protein_properties(
             validate_file(file, ALLOWED_EXTENSIONS["fasta"] + ALLOWED_EXTENSIONS["pdb"])
             temp_file = save_upload_file(file, subdir="fasta")
             
-            result = protein_properties_generation_tool.invoke({
+            result = protein_property_prediction_tool.invoke({
                 "fasta_file": temp_file,
                 "task_name": task_name
             })
         else:
-            result = protein_properties_generation_tool.invoke({
+            result = protein_property_prediction_tool.invoke({
                 "sequence": sequence,
                 "task_name": task_name
             })
@@ -984,9 +987,9 @@ async def generate_training_config(
 
 
 @app.post("/api/code/execute", response_model=StandardResponse)
-async def execute_ai_code(request: CodeExecutionRequest):
+async def execute_agent_generated_code(request: CodeExecutionRequest):
     """
-    Generate and execute Python code based on task description
+    Execute agent-generated Python code (sandboxed; malicious patterns blocked).
     
     Args:
         request: CodeExecutionRequest with task description and input files
@@ -995,7 +998,7 @@ async def execute_ai_code(request: CodeExecutionRequest):
         Execution results and generated output files
     """
     try:
-        logger.info(f"AI code execution: {request.task_description[:100]}...")
+        logger.info(f"Agent-generated code execution: {request.task_description[:100]}...")
         
         # Validate input files exist
         for file_path in request.input_files:
@@ -1006,7 +1009,7 @@ async def execute_ai_code(request: CodeExecutionRequest):
                 )
         
         # Call tool
-        result = ai_code_execution_tool.invoke({
+        result = agent_generated_code_tool.invoke({
             "task_description": request.task_description,
             "input_files": request.input_files
         })

@@ -16,9 +16,10 @@ def sanitize_filename(name: str) -> str:
 
 
 def get_save_path(subdir1: str, subdir2: str | None = None) -> Path:
-    """Get save path with date-based directory structure."""
+    """Get save path with date-based directory structure. Root from env TEMP_OUTPUTS_DIR."""
+    base = os.getenv("TEMP_OUTPUTS_DIR", "temp_outputs")
     now = datetime.now()
-    date_path = Path("temp_outputs") / f"{now.year}/{now.month:02d}/{now.day:02d}"
+    date_path = Path(base) / f"{now.year}/{now.month:02d}/{now.day:02d}"
 
     if subdir2:
         path = date_path / subdir1 / subdir2

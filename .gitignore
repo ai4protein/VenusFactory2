@@ -354,13 +354,15 @@ ckpt/VenusVaccine_VirusBinary/prot_bert/ses-adapter*
 ckpt/VenusVaccine_VirusBinary/prot_t5_xl_uniref50/ses-adapter*
 
 script_dev/
+script/*.py
 .gradio/
 configs/
 result/
 
-# ignore all files in src/data/weight except .keep
-src/data/weight/
-!src/data/weight/.keep
+
+# ignore all files in src/tools/train/data/weight except .keep
+src/tools/train/data/weight/
+!src/tools/train/data/weight/.keep
 
 tmp_db/
 log/

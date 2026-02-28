@@ -6,7 +6,7 @@ biotite==1.4.0
 datasets==4.0.0
 esm==3.0.3
 fake_useragent==1.5.1
-gradio==5.44.1
+gradio==6.6
 gradio_molecule3d==0.0.7
 joblib==1.4.2
 lxml==5.3.0

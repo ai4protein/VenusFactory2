@@ -6,17 +6,11 @@ from typing import Dict, Any
 from .index_tab import create_index_tab
 
 def create_manual_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
-    # Add CSS styles from external file
-    css_path = os.path.join(os.path.dirname(__file__), "assets", "css", "manual_ui.css")
-    custom_css = open(css_path, "r").read()
-    
-    js_path = os.path.join(os.path.dirname(__file__), "assets", "js", "manual_ui.js")
-    custom_js = open(js_path, "r").read()
-    
-    gr.HTML(f"<style>{custom_css}</style><script>{custom_js}</script>", visible=False)
-    
+    # manual_ui.css and manual_ui.js are loaded globally via webui's css_links
+    # (avoid duplicate hidden gr.HTML which can cause "Component with ID not found" in Gradio 6)
+
     # convert markdown to html
-    def markdown_to_html(markdown_content, base_path="src/web/manual"):
+    def markdown_to_html(markdown_content, base_path="docs/manual"):
         """Convert Markdown content to HTML, and embed images as base64 encoded"""
         # Process image paths, use base64 encoding to directly embed images
         def embed_image(match):
@@ -130,28 +124,28 @@ def create_manual_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     
 
     with gr.Tab("Index"): 
-        gr.HTML(create_index_tab(constant))
+        gr.HTML(create_index_tab(constant), padding=True)
 
-    with gr.Tab("VenusScope"):
+    with gr.Tab("Report"):
  
-        venusscope_content = load_manual_venussccope(language.value) 
-        toc_html, html_content = generate_toc_and_content(venusscope_content)
-        venusscope_md = gr.HTML(f"""
+        report_content = load_manual_report(language.value) 
+        toc_html, html_content = generate_toc_and_content(report_content)
+        report_md = gr.HTML(f"""
             <div class="manual-container">
                 {toc_html}
                 <div class="manual-content">{html_content}</div>
             </div>
-        """)
+        """, padding=True)
 
-    with gr.Tab("VenusAgent"):
-        venusagent_content = load_manual_venusagent(language.value)
-        toc_html, html_content = generate_toc_and_content(venusagent_content)
-        venusagent_md = gr.HTML(f"""
+    with gr.Tab("Agent"):
+        agent_content = load_manual_agent(language.value)
+        toc_html, html_content = generate_toc_and_content(agent_content)
+        agent_md = gr.HTML(f"""
             <div class="manual-container">
                 {toc_html}
                 <div class="manual-content">{html_content}</div>
             </div>
-        """)
+        """, padding=True)
 
 
     with gr.Tab("Training"):
@@ -162,7 +156,7 @@ def create_manual_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 {toc_html}
                 <div class="manual-content">{html_content}</div>
             </div>
-        """)
+        """, padding=True)
     
     with gr.Tab("Prediction"):
         prediction_content = load_manual_prediction(language.value)
@@ -172,7 +166,7 @@ def create_manual_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 {toc_html}
                 <div class="manual-content">{html_content}</div>
             </div>
-        """)
+        """, padding=True)
     
     with gr.Tab("Evaluation"):
         evaluation_content = load_manual_evaluation(language.value)
@@ -182,7 +176,7 @@ def create_manual_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 {toc_html}
                 <div class="manual-content">{html_content}</div>
             </div>
-        """)
+        """, padding=True)
 
     with gr.Tab("QuickTools"):
         quicktools_content = load_manual_quicktools(language.value)
@@ -192,7 +186,7 @@ def create_manual_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 {toc_html}
                 <div class="manual-content">{html_content}</div>
             </div>
-        """)
+        """, padding=True)
 
 
     with gr.Tab("AdvancedTools"):
@@ -203,7 +197,7 @@ def create_manual_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 {toc_html}
                 <div class="manual-content">{html_content}</div>
             </div>
-        """)
+        """, padding=True)
     
     with gr.Tab("Download"):
         download_content = load_manual_download(language.value)
@@ -213,7 +207,7 @@ def create_manual_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 {toc_html}
                 <div class="manual-content">{html_content}</div>
             </div>
-        """)
+        """, padding=True)
     
     with gr.Tab("FAQ"):
         faq_content = load_manual_faq(language.value)
@@ -223,17 +217,17 @@ def create_manual_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 {toc_html}
                 <div class="manual-content">{html_content}</div>
             </div>
-        """)
+        """, padding=True)
     
     # correctly bind language switch event
     language.change(
         fn=update_manual,
         inputs=[language],
-        outputs=[venusscope_md, venusagent_md, training_md, prediction_md, evaluation_md, quicktools_md, advancedtools_md, download_md, faq_md]
+        outputs=[report_md, agent_md, training_md, prediction_md, evaluation_md, quicktools_md, advancedtools_md, download_md, faq_md]
      )
 
-    return {"venusscope_md": venusscope_md,
-            "venusagent_md": venusagent_md,
+    return {"report_md": report_md,
+            "agent_md": agent_md,
             "training_md": training_md,
             "prediction_md": prediction_md,
             "evaluation_md": evaluation_md,
@@ -248,8 +242,8 @@ def update_manual(language):
     Args:
         language: language
     Returns:
-        venusscope_md: VenusScope manual
-        venusagent_md: VenusAgent manual
+        report_md: Report manual
+        agent_md: Agent manual
         training_md: training manual
         prediction_md: prediction manual
         evaluation_md: evaluation manual
@@ -265,12 +259,12 @@ def update_manual(language):
     download_content = load_manual_download(language)
     faq_content = load_manual_faq(language)
     quicktools_content = load_manual_quicktools(language)
-    venusagent_content = load_manual_venusagent(language)
-    venusscope_content = load_manual_venussccope(language)
+    agent_content = load_manual_agent(language)
+    report_content = load_manual_report(language)
     advancedtools_content = load_manual_advancedtools(language)
 
     # Use Python's markdown library to convert Markdown to HTML
-    def markdown_to_html(markdown_content, base_path="src/web/manual"):
+    def markdown_to_html(markdown_content, base_path="docs/manual"):
         """Convert Markdown content to HTML, and embed images as base64 encoded"""
         # Process image paths, use base64 encoding to directly embed images
         def embed_image(match):
@@ -386,8 +380,8 @@ def update_manual(language):
     download_toc, download_html = generate_toc_and_content(download_content)
     faq_toc, faq_html = generate_toc_and_content(faq_content)
     quicktools_toc, quicktools_html = generate_toc_and_content(quicktools_content)
-    venusagent_toc, venusagent_html = generate_toc_and_content(venusagent_content)
-    venusscope_toc, venusscope_html = generate_toc_and_content(venusscope_content)
+    venusagent_toc, venusagent_html = generate_toc_and_content(agent_content)
+    venusscope_toc, venusscope_html = generate_toc_and_content(report_content)
     advancedtools_toc, advancedtools_html = generate_toc_and_content(advancedtools_content)
     
     training_output = f"""
@@ -465,9 +459,9 @@ def update_manual(language):
 
 def load_manual_training(language):
     if language == 'Chinese':
-        manual_path = os.path.join("src/web/manual", "TrainingManual_ZH.md")
+        manual_path = os.path.join("docs/manual", "TrainingManual_ZH.md")
     else:
-        manual_path = os.path.join("src/web/manual", "TrainingManual_EN.md")
+        manual_path = os.path.join("docs/manual", "TrainingManual_EN.md")
     try:
         with open(manual_path, "r", encoding="utf-8") as f:
             return f.read()
@@ -476,9 +470,9 @@ def load_manual_training(language):
 
 def load_manual_prediction(language):
     if language == 'Chinese':
-        manual_path = os.path.join("src/web/manual", "PredictionManual_ZH.md")
+        manual_path = os.path.join("docs/manual", "PredictionManual_ZH.md")
     else:
-        manual_path = os.path.join("src/web/manual", "PredictionManual_EN.md")
+        manual_path = os.path.join("docs/manual", "PredictionManual_EN.md")
     try:
         with open(manual_path, "r", encoding="utf-8") as f:
             return f.read()
@@ -487,9 +481,9 @@ def load_manual_prediction(language):
 
 def load_manual_evaluation(language):
     if language == 'Chinese':
-        manual_path = os.path.join("src/web/manual", "EvaluationManual_ZH.md")
+        manual_path = os.path.join("docs/manual", "EvaluationManual_ZH.md")
     else:
-        manual_path = os.path.join("src/web/manual", "EvaluationManual_EN.md")
+        manual_path = os.path.join("docs/manual", "EvaluationManual_EN.md")
     try:
         with open(manual_path, "r", encoding="utf-8") as f:
             return f.read()
@@ -498,9 +492,9 @@ def load_manual_evaluation(language):
     
 def load_manual_download(language):
     if language == 'Chinese':
-        manual_path = os.path.join("src/web/manual", "DownloadManual_ZH.md")
+        manual_path = os.path.join("docs/manual", "DownloadManual_ZH.md")
     else:
-        manual_path = os.path.join("src/web/manual", "DownloadManual_EN.md")
+        manual_path = os.path.join("docs/manual", "DownloadManual_EN.md")
     try:
         with open(manual_path, "r", encoding="utf-8") as f:
             return f.read()
@@ -509,9 +503,9 @@ def load_manual_download(language):
 
 def load_manual_faq(language):
     if language == 'Chinese':
-        manual_path = os.path.join("src/web/manual", "QAManual_ZH.md")
+        manual_path = os.path.join("docs/manual", "QAManual_ZH.md")
     else:
-        manual_path = os.path.join("src/web/manual", "QAManual_EN.md")
+        manual_path = os.path.join("docs/manual", "QAManual_EN.md")
     try:
         with open(manual_path, "r", encoding="utf-8") as f:
             return f.read()
@@ -523,55 +517,55 @@ def load_manual_quicktools(language):
     Loads the QuickTools manual in the specified language (English or Chinese).
     """
     if language == 'Chinese':
-        manual_path = os.path.join("src/web/manual", "QuickTools_CN.md")
+        manual_path = os.path.join("docs/manual", "QuickTools_CN.md")
     else:
         # Default to English if language is not 'Chinese'
-        manual_path = os.path.join("src/web/manual", "QuickTools_EN.md")
+        manual_path = os.path.join("docs/manual", "QuickTools_EN.md")
     try:
         with open(manual_path, "r", encoding="utf-8") as f:
             return f.read()
     except Exception as e:
         return f"# Error loading QuickTools manual\n\n{str(e)}"
 
-def load_manual_venusagent(language):
+def load_manual_agent(language):
     """
-    Loads the VenusAgent manual in the specified language (English or Chinese).
+    Loads the Agent manual in the specified language (English or Chinese).
     """
     if language == 'Chinese':
-        manual_path = os.path.join("src/web/manual", "VenusAgentManual_CN.md")
+        manual_path = os.path.join("docs/manual", "AgentManual_CN.md")
     else:
         # Default to English if language is not 'Chinese'
-        manual_path = os.path.join("src/web/manual", "VenusAgentManual_EN.md")
+        manual_path = os.path.join("docs/manual", "AgentManual_EN.md")
     try:
         with open(manual_path, "r", encoding="utf-8") as f:
             return f.read()
     except Exception as e:
-        return f"# Error loading VenusAgent manual\n\n{str(e)}"
+        return f"# Error loading Agent manual\n\n{str(e)}"
 
-def load_manual_venussccope(language):
+def load_manual_report(language):
     """
-    Loads the VenusScope manual in the specified language (English or Chinese).
+    Loads the Report manual in the specified language (English or Chinese).
     """
     if language == 'Chinese':
-        manual_path = os.path.join("src/web/manual", "VenusScopeManual_CN.md")
+        manual_path = os.path.join("docs/manual", "ReportManual_CN.md")
     else:
         # Default to English if language is not 'Chinese'
-        manual_path = os.path.join("src/web/manual", "VenusScopeManual_EN.md")
+        manual_path = os.path.join("docs/manual", "ReportManual_EN.md")
     try:
         with open(manual_path, "r", encoding="utf-8") as f:
             return f.read()
     except Exception as e:
-        return f"# Error loading VenusScope manual\n\n{str(e)}"
+        return f"# Error loading Report manual\n\n{str(e)}"
 
 def load_manual_advancedtools(language):
     """
     Loads the AdvancedTools manual in the specified language (English or Chinese).
     """
     if language == 'Chinese':
-        manual_path = os.path.join("src/web/manual", "AdvancedToolsManual_CN.md")
+        manual_path = os.path.join("docs/manual", "AdvancedToolsManual_CN.md")
     else:
         # Default to English if language is not 'Chinese'
-        manual_path = os.path.join("src/web/manual", "AdvancedToolsManual_EN.md")
+        manual_path = os.path.join("docs/manual", "AdvancedToolsManual_EN.md")
     try:
         with open(manual_path, "r", encoding="utf-8") as f:
             return f.read()

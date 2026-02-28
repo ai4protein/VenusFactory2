@@ -19,8 +19,8 @@ class TrainingArgs:
         self.plm_model = plm_models[args_dict["plm_model"]]
         
         # Process dataset selection
-        self.dataset_selection = args_dict["dataset_selection"]  # "Custom Dataset" 或 "Pre-defined Dataset"
-        if self.dataset_selection == "Pre-defined Dataset":
+        self.dataset_selection = args_dict["dataset_selection"]  # "Custom" 或 "Pre-defined"
+        if self.dataset_selection == "Pre-defined":
             self.dataset_config = dataset_configs[args_dict["dataset_config"]]
             self.dataset_custom = None
             # load dataset config
@@ -62,9 +62,13 @@ class TrainingArgs:
         self.warmup_steps = args_dict["warmup_steps"]
         self.scheduler = args_dict["scheduler"]
 
-        # Output parameters
-        self.output_model_name = args_dict["output_model_name"]
-        self.output_dir = args_dict["output_dir"]
+        # Output parameters (ensure output_model_name ends with .pt)
+        raw_name = args_dict["output_model_name"]
+        self.output_model_name = raw_name if str(raw_name).strip().lower().endswith(".pt") else f"{str(raw_name).strip()}.pt"
+        od = args_dict.get("output_dir", "demo")
+        if od and not str(od).startswith("ckpt") and not os.path.isabs(str(od)):
+            od = "ckpt/" + str(od)
+        self.output_dir = od
         
         # Wandb parameters
         self.wandb_enabled = args_dict["wandb_enabled"]
@@ -77,6 +81,7 @@ class TrainingArgs:
         self.num_workers = args_dict["num_workers"]
         self.max_grad_norm = args_dict["max_grad_norm"]
         self.structure_seq = args_dict["structure_seq"]
+        self.pdb_dir = args_dict.get("pdb_dir", "") or ""
 
         # LoRA parameters
         self.lora_r = args_dict["lora_r"]
@@ -110,9 +115,11 @@ class TrainingArgs:
 
         if self.training_method == "ses-adapter" and self.structure_seq:
             args_dict["structure_seq"] = ",".join(self.structure_seq)
+        if self.pdb_dir and self.pdb_dir.strip():
+            args_dict["pdb_dir"] = self.pdb_dir.strip()
 
         # add dataset related parameters
-        if self.dataset_selection == "Pre-defined Dataset":
+        if self.dataset_selection == "Pre-defined":
             args_dict["dataset_config"] = self.dataset_config
         else:
             args_dict["dataset"] = self.dataset_custom
@@ -166,7 +173,6 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     gr.Markdown("## Model and Dataset Configuration")
 
     with gr.Accordion("Import Training Configuration", open=False) as config_import_accordion:
-        gr.Markdown("### Import your training config")
         with gr.Row():
             with gr.Column(scale=4):
                 config_path_input = gr.Textbox(
@@ -195,9 +201,9 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 
                     # add dataset selection method
                     is_custom_dataset = gr.Radio(
-                        choices=["Custom Dataset", "Pre-defined Dataset"],
+                        choices=["Custom", "Pre-defined"],
                         label="Dataset Selection",
-                        value="Pre-defined Dataset",
+                        value="Pre-defined",
                         scale=3
                     )
             
@@ -224,8 +230,8 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                     elem_classes="preview-button"
                 )
             
-        # add extra configuration options for custom dataset (in a separate row)
-        with gr.Group(visible=True) as custom_dataset_settings:
+        # add extra configuration options for custom dataset (hidden when Pre-defined)
+        with gr.Group(visible=False) as custom_dataset_settings:
             with gr.Row():
                 problem_type = gr.Dropdown(
                     choices=["single_label_classification", "multi_label_classification", "regression", "residue_single_label_classification", "residue_regression"],
@@ -289,6 +295,13 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                     multiselect=True,
                     visible=False
                 )
+        with gr.Row(visible=False) as pdb_dir_row:
+                pdb_dir = gr.Textbox(
+                    label="PDB Directory",
+                    placeholder="Path to PDB files (for ProSST, SaProt, ProtSSN, ses-adapter when dataset lacks structure)",
+                    value="",
+                    scale=3
+                )
 
         # ! add for plm-lora, plm-qlora, plm_adalora, plm_dora, plm_ia3
         with gr.Row(visible=False) as lora_params_row:
@@ -329,7 +342,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         with gr.Accordion("Dataset Preview", open=False) as preview_accordion:
             # data statistics area
             with gr.Row():
-                dataset_stats_md = gr.HTML("", elem_classes=["dataset-stats"])
+                dataset_stats_md = gr.HTML("", elem_classes=["dataset-stats"], padding=True)
             
             # table area
             with gr.Row():
@@ -359,12 +372,12 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 
                 with gr.Column(scale=2):
                     batch_size = gr.Slider(
-                        minimum=1, maximum=128, value=16,
+                        minimum=1, maximum=128, value=1,
                         step=1, label="Batch Size", visible=True
                     )
                     
                     batch_token = gr.Slider(
-                        minimum=1000, maximum=50000, value=10000,
+                        minimum=1000, maximum=50000, value=2000,
                         step=1000, label="Tokens per Batch", visible=False
                     )
 
@@ -421,24 +434,29 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         label="Max Sequence Length (-1 for unlimited)"
                     )
             
-            def update_train_tab_training_method_UI(method):
-                """Update the training method visibility for Gradio UI
-                Args:
-                    method: training method (ses-adapter, plm-lora, plm-qlora, plm-adalora, plm-dora, plm-ia3)
-                Returns:
-                    structure_seq: structure sequence input gr.Dropdown (visible or not)
-                    lora_params_row: lora parameters input gr.Row (visible or not)
-                """
+            def _plm_needs_structure(plm: str) -> bool:
+                """True if PLM requires structure (ProSST, SaProt, ProtSSN)."""
+                return bool(plm and (str(plm).startswith("ProSST") or str(plm).startswith("SaProt") or str(plm).startswith("ProtSSN")))
+
+            def update_train_tab_training_method_UI(method, plm):
+                """Update visibility for structure_seq, pdb_dir_row, lora_params_row."""
+                show_structure = (method == "ses-adapter") or _plm_needs_structure(plm)
                 return {
                     structure_seq: gr.update(visible=method == "ses-adapter"),
+                    pdb_dir_row: gr.update(visible=show_structure),
                     lora_params_row: gr.update(visible=method in ["plm-lora", "plm-qlora", "plm-adalora", "plm-dora", "plm-ia3"])
                 }
 
-            # Add training_method change event
+            # Add training_method and plm_model change events
             training_method.change(
                 fn=update_train_tab_training_method_UI,
-                inputs=[training_method],
-                outputs=[structure_seq, lora_params_row]
+                inputs=[training_method, plm_model],
+                outputs=[structure_seq, pdb_dir_row, lora_params_row]
+            )
+            plm_model.change(
+                fn=update_train_tab_training_method_UI,
+                inputs=[training_method, plm_model],
+                outputs=[structure_seq, pdb_dir_row, lora_params_row]
             )
 
             # Second row: Advanced training parameters
@@ -484,11 +502,10 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             gr.Markdown("## Output and Logging Settings")
             with gr.Row():
                 output_dir = gr.Textbox(
-                    label="Save Directory (Better under `ckpt` directory)",
+                    label="Save Directory",
                     value="ckpt/demo",
-                    placeholder="Path to save training results (relative to ckpt directory)"
+                    placeholder="e.g. ckpt/demo or ckpt/your_folder",
                 )
-                
                 output_model_name = gr.Textbox(
                     label="Output Model Name",
                     value="demo.pt",
@@ -528,19 +545,45 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             visible=False
         )
     
-    # Model Statistics Section
-    gr.Markdown("## Model Statistics")
+    # Model Statistics and Training Progress side by side
     with gr.Row():
-        model_stats = gr.Dataframe(
-            headers=["Model Type", "Total Parameters", "Trainable Parameters", "Percentage"],
-            value=[
-                ["Training Model", "-", "-", "-"],
-                ["Pre-trained Model", "-", "-", "-"],
-                ["Combined Model", "-", "-", "-"]
-            ],
-            interactive=False,
-            elem_classes=["center-table-content"]
-        )
+        with gr.Column(scale=1):
+            gr.Markdown("## Model Statistics")
+            model_stats = gr.Dataframe(
+                headers=["Model Type", "Total Parameters", "Trainable Parameters", "Percentage"],
+                value=[
+                    ["Training Model", "-", "-", "-"],
+                    ["Pre-trained Model", "-", "-", "-"],
+                    ["Combined Model", "-", "-", "-"]
+                ],
+                interactive=False,
+                elem_classes=["center-table-content"]
+            )
+
+        with gr.Column(scale=1):
+            gr.Markdown("## Training Progress")
+            with gr.Row():
+                progress_status = gr.HTML(
+                    value="""
+                    <div style="background-color: #f8f9fa; border-radius: 10px; padding: 20px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                            <div>
+                                <span style="font-weight: 600; font-size: 16px;">Training Status: </span>
+                                <span style="color: #1976d2; font-weight: 500; font-size: 16px;">Click Start to train your model</span>
+                            </div>
+                        </div>
+                    </div>
+                    """,
+                    label="Status",
+                    padding=True
+                )
+
+            with gr.Row():
+                best_model_info = gr.Textbox(
+                    value="Best Model: None",
+                    label="Best Model and Performance",
+                    interactive=False
+                )
 
     def format_to_millions(value):
         """Converts a number or a string with 'K'/'M' suffix to millions."""
@@ -592,36 +635,13 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             ["Combined Model", combined_total_m, combined_trainable_m, str(trainable_percentage)+"%"]
         ]
 
-    # Training Progress
-    gr.Markdown("## Training Progress")
-    with gr.Row():
-        progress_status = gr.HTML(
-            value="""
-            <div style="background-color: #f8f9fa; border-radius: 10px; padding: 20px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
-                    <div>
-                        <span style="font-weight: 600; font-size: 16px;">Training Status: </span>
-                        <span style="color: #1976d2; font-weight: 500; font-size: 16px;">Click Start to train your model</span>
-                    </div>
-                </div>
-            </div>
-            """,
-            label="Status"
-        )
-
-    with gr.Row():
-        best_model_info = gr.Textbox(
-            value="Best Model: None",
-            label="Best Model and Performance",
-            interactive=False
-        )
-
     # Add test results HTML display
     with gr.Row():
         test_results_html = gr.HTML(
             value="",
             label="Test Results",
-            visible=True
+            visible=True,
+            padding=True
         )
         
     with gr.Row():
@@ -1148,14 +1168,14 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         metrics, training_method, pooling_method, batch_mode, batch_size, batch_token,
         learning_rate, num_epochs, max_seq_len, gradient_accumulation_steps, warmup_steps, scheduler_type,
         output_model_name, output_dir, wandb_logging, wandb_project, wandb_entity,
-        patience, num_workers, max_grad_norm, structure_seq,
+        patience, num_workers, max_grad_norm, structure_seq, pdb_dir,
         lora_r, lora_alpha, lora_dropout, lora_target_modules, monitored_metrics, monitored_strategy,
         sequence_column_name, label_column_name
     ):
         """Handle the preview command button click event
         Args:
             plm_model: plm model name
-            is_custom_dataset: whether to Custom Dataset (Custom Dataset or Pre-defined Dataset)
+            is_custom_dataset: whether to Custom (Custom or Pre-defined)
             dataset_config: dataset config path
             dataset_custom: custom dataset path
             problem_type: problem type
@@ -1196,6 +1216,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             return gr.update(visible=False)
         
         # Create args dictionary directly from named parameters
+        # Create args dictionary directly from named parameters
         args_dict = {
             "plm_model": plm_model,
             "dataset_selection": is_custom_dataset,
@@ -1224,6 +1245,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             "num_workers": num_workers,
             "max_grad_norm": max_grad_norm,
             "structure_seq": structure_seq,
+            "pdb_dir": pdb_dir,
             "lora_r": lora_r,
             "lora_alpha": lora_alpha,
             "lora_dropout": lora_dropout,
@@ -1304,14 +1326,14 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         metrics, training_method, pooling_method, batch_mode, batch_size, batch_token,
         learning_rate, num_epochs, max_seq_len, gradient_accumulation_steps, warmup_steps, scheduler_type,
         output_model_name, output_dir, wandb_logging, wandb_project, wandb_entity,
-        patience, num_workers, max_grad_norm, structure_seq, 
+        patience, num_workers, max_grad_norm, structure_seq, pdb_dir,
         lora_r, lora_alpha, lora_dropout, lora_target_modules, 
         monitored_metrics, monitored_strategy, sequence_column_name, label_column_name
     ) -> Generator:
         """Handle the train command button click event
         Args:
             plm_model: plm model name
-            is_custom_dataset: whether to Custom Dataset (Custom Dataset or Pre-defined Dataset)
+            is_custom_dataset: whether to Custom (Custom or Pre-defined)
             dataset_config: dataset config path
             dataset_custom: custom dataset path
             problem_type: problem type
@@ -1441,6 +1463,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 "num_workers": num_workers,
                 "max_grad_norm": max_grad_norm,
                 "structure_seq": structure_seq,
+                "pdb_dir": pdb_dir,
                 "lora_r": lora_r,
                 "lora_alpha": lora_alpha,
                 "lora_dropout": lora_dropout,
@@ -1619,10 +1642,10 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
 
             update_dict[plm_model] = gr.update(value=get_config_val("plm_model", plm_model.value))
             
-            dataset_selection_value = get_config_val("dataset_selection", "Custom Dataset")
+            dataset_selection_value = get_config_val("dataset_selection", "Custom")
             update_dict[is_custom_dataset] = gr.update(value=dataset_selection_value)
             
-            if dataset_selection_value == "Pre-defined Dataset":
+            if dataset_selection_value == "Pre-defined":
                 dataset_config_value = get_config_val("dataset_config", "Demo_Solubility")
                 # Ensure the value is in the choices list
                 if dataset_config_value in list(dataset_configs.keys()):
@@ -1635,13 +1658,13 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 update_dict[dataset_config] = gr.update(visible=False)
                 
             update_dict[dataset_custom] = gr.update(
-                visible=(dataset_selection_value == "Custom Dataset"),
+                visible=(dataset_selection_value == "Custom"),
                 value=get_config_val("dataset_custom", "")
             )
 
-            is_interactive = (dataset_selection_value == "Custom Dataset")
+            is_interactive = (dataset_selection_value == "Custom")
             
-            update_dict[custom_dataset_settings] = gr.update(visible=True)
+            update_dict[custom_dataset_settings] = gr.update(visible=is_interactive)
             
             update_dict[problem_type] = gr.update(
                 value=get_config_val("problem_type", "single_label_classification"), 
@@ -1676,6 +1699,11 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 visible=(training_method_value == "ses-adapter"),
                 value=get_config_val("structure_seq", ["foldseek_seq", "ss8_seq"])
             )
+            plm_val = get_config_val("plm_model", "")
+            update_dict[pdb_dir] = gr.update(value=get_config_val("pdb_dir", ""))
+            update_dict[pdb_dir_row] = gr.update(
+                visible=(training_method_value == "ses-adapter") or (plm_val and (str(plm_val).startswith("ProSST") or str(plm_val).startswith("SaProt") or str(plm_val).startswith("ProtSSN")))
+            )
             update_dict[lora_params_row] = gr.update(
                 visible=(training_method_value in ["plm-lora", "plm-qlora", "plm-adalora", "plm-dora", "plm-ia3"])
             )
@@ -1686,11 +1714,11 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             update_dict[batch_mode] = gr.update(value=batch_mode_value)
             update_dict[batch_size] = gr.update(
                 visible=(batch_mode_value == "Batch Size Mode"), 
-                value=get_config_val("batch_size", 16)
+                value=get_config_val("batch_size", 1)
             )
             update_dict[batch_token] = gr.update(
                 visible=(batch_mode_value == "Batch Token Mode"), 
-                value=get_config_val("batch_token", 10000)
+                value=get_config_val("batch_token", 2000)
             )
 
             update_dict[learning_rate] = gr.update(value=get_config_val("learning_rate", 5e-4))
@@ -1701,7 +1729,10 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             update_dict[scheduler_type] = gr.update(value=get_config_val("scheduler", None))
             
             update_dict[output_model_name] = gr.update(value=get_config_val("output_model_name", "demo.pt"))
-            update_dict[output_dir] = gr.update(value=get_config_val("output_dir", "demo"))
+            od_val = get_config_val("output_dir", "demo")
+            if od_val and not str(od_val).startswith("ckpt") and not os.path.isabs(str(od_val)):
+                od_val = "ckpt/" + str(od_val)
+            update_dict[output_dir] = gr.update(value=od_val)
             
             wandb_enabled = get_config_val("wandb_enabled", False)
             update_dict[wandb_logging] = gr.update(value=wandb_enabled)
@@ -1757,6 +1788,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         num_workers,
         max_grad_norm,
         structure_seq,
+        pdb_dir,
         lora_r,
         lora_alpha,
         lora_dropout,
@@ -1801,13 +1833,13 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     def update_train_tab_dataset_preview_UI(dataset_type=None, dataset_name=None, custom_dataset=None):
         """Update dataset preview content for Gradio UI
         Args:
-            dataset_type: dataset type (Custom Dataset or Pre-defined Dataset)
+            dataset_type: dataset type (Custom or Pre-defined)
             dataset_name: predefined dataset name
             custom_dataset: custom dataset path
         Returns:
         """
         # Determine which dataset to use based on selection
-        if dataset_type == "Custom Dataset" and custom_dataset:
+        if dataset_type == "Custom" and custom_dataset:
             try:
                 # Try to load custom dataset
                 dataset = load_dataset(custom_dataset)
@@ -1847,7 +1879,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 return gr.update(value=error_html), gr.update(value=[["Error", str(e), "-"]], headers=["Error", "Message", "Status"]), gr.update(open=True)
         
         # Use predefined dataset
-        elif dataset_type == "Pre-defined Dataset" and dataset_name:
+        elif dataset_type == "Pre-defined" and dataset_name:
             try:
                 config_path = dataset_configs[dataset_name]
                 with open(config_path, 'r') as f:
@@ -1903,16 +1935,16 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     def update_train_tab_dataset_settings_UI(choice, dataset_name=None):
         """Update dataset settings for Gradio UI
         Args:
-            choice: dataset type (Custom Dataset or Pre-defined Dataset)
+            choice: dataset type (Custom or Pre-defined)
             dataset_name: predefined dataset name
         Returns:
         """
-        if choice == "Pre-defined Dataset":
-            # load dataset config from dataset_config
+        if choice == "Pre-defined":
+            # load dataset config from dataset_config; hide Problem Type etc.
             result = {
                 dataset_config: gr.update(visible=True),
                 dataset_custom: gr.update(visible=False),
-                custom_dataset_settings: gr.update(visible=True)
+                custom_dataset_settings: gr.update(visible=False)
             }
             
             # if a specific dataset is selected, automatically load the config
@@ -1939,8 +1971,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 })
             return result
         else:
-            # custom dataset settings, clear/set to default and editable
-            # provide default values for multi-select components
+            # Custom dataset: show Problem Type etc. and make editable
             default_metrics = ["accuracy", "mcc", "f1", "precision", "recall", "auroc"]
             default_monitored_metrics = ["accuracy"]
             default_monitored_strategy = ["max"]
@@ -1970,7 +2001,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             x: dataset config
         Returns:
         """
-        return update_train_tab_dataset_settings_UI("Pre-defined Dataset", x)
+        return update_train_tab_dataset_settings_UI("Pre-defined", x)
     
     dataset_config.change(
         fn=handle_dataset_config_change,
@@ -2009,6 +2040,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             "num_workers": num_workers,
             "max_grad_norm": max_grad_norm,
             "structure_seq": structure_seq,
+            "pdb_dir": pdb_dir,
             "lora_r": lora_r,
             "lora_alpha": lora_alpha,
             "lora_dropout": lora_dropout,

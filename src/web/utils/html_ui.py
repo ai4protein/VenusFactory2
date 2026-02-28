@@ -112,12 +112,26 @@ def generate_prediction_results_html(problem_type, prediction_data):
         probabilities_table = ""
     elif problem_type == "single_label_classification":
         problem_type_title = "Single-Label Classification Results"
+        # API may return predicted_class (scalar) or predicted_classes (list with one element)
+        predicted_class = prediction_data.get('predicted_class')
+        if predicted_class is None and 'predicted_classes' in prediction_data:
+            pcs = prediction_data['predicted_classes']
+            predicted_class = pcs[0] if isinstance(pcs, list) and pcs else 0
+        if predicted_class is None:
+            predicted_class = 0
         results_table = load_html_template("classification_results_table.html",
-                                         predicted_class=prediction_data['predicted_class'])
+                                         predicted_class=predicted_class)
         
-        # Create probability table
+        # Create probability table (API may return probabilities as list or list-of-lists for single seq)
         prob_rows = ""
-        if isinstance(prediction_data.get('probabilities'), list):
+        probs_raw = prediction_data.get('probabilities')
+        if isinstance(probs_raw, list) and probs_raw:
+            probs = probs_raw[0] if isinstance(probs_raw[0], list) else probs_raw
+            prob_rows = "".join([
+                f"<tr><td style='text-align:center'>Class {i}</td><td style='text-align:center'>{prob:.4f}</td></tr>"
+                for i, prob in enumerate(probs)
+            ])
+        elif isinstance(prediction_data.get('probabilities'), list):
             prob_rows = "".join([
                 f"<tr><td style='text-align:center'>Class {i}</td><td style='text-align:center'>{prob:.4f}</td></tr>"
                 for i, prob in enumerate(prediction_data['probabilities'])

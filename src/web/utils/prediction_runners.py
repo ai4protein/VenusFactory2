@@ -23,7 +23,7 @@ def run_zero_shot_prediction(model_type: str, model_name: str, file_path: str) -
         if not script_name:
             return f"Error: Model '{model_name}' has no script.", pd.DataFrame()
 
-        script_path = f"src/mutation/models/{script_name}.py"
+        script_path = f"src/tools/mutation/models/{script_name}.py"
         if not os.path.exists(script_path):
             return f"Script not found: {script_path}", pd.DataFrame()
         
@@ -72,7 +72,7 @@ def run_single_function_prediction(
             raise ValueError(f"Model key not found for {model}")
         
         adapter_key = adapter_mapping[model_key]
-        script_path = Path("src") / "property" / f"{model_key}.py"
+        script_path = Path("src") / "tools" / "predict" / "finetuned" / f"{model_key}.py"
         adapter_path = Path("ckpt") / dataset / adapter_key
         output_file = output_dir / f"temp_{dataset}_{model}.csv"
         
@@ -118,7 +118,7 @@ def run_protein_properties_prediction(task_type: str, file_path: str) -> Tuple[s
         if not script_name:
            return "", f"Error: Task '{task_type}' is not allowed"
        
-        script_path = f"src/property/{script_name}.py"
+        script_path = f"src/tools/predict/features/{script_name}.py"
         if not os.path.exists(script_path):
            return "", f"Script not found: {script_path}"
 

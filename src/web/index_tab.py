@@ -276,7 +276,7 @@ def create_index_tab(constant):
                         <ul style="list-style: none; padding-left: 0; margin-top: 10px;">
                             <li style="margin-bottom: 10px; display: flex; align-items: baseline;">
                                 <span style="margin-right: 10px;">🤖</span>
-                                <span><b>VenusAgent-0.1</b> is an integrated AI assistant that answers questions related to the platform and protein AI.</span>
+                                <span><b>Agent-0.1</b> is an integrated AI assistant that answers questions related to the platform and protein AI.</span>
                             </li>
                             <li style="margin-bottom: 10px; display: flex; align-items: baseline;">
                                 <span style="margin-right: 10px;">🛠️</span>
@@ -302,7 +302,7 @@ def create_index_tab(constant):
                         </h1>
                         <div style="font-size:1.2em;">
                             <p style="font-size:1.2em;">Depending on your needs, VenusFactory can provide different services.</p>
-                            <p style="font-size:1.2em;">If you want a quick answer about protein mutations, use VenusAgent-0.1. Upload your file, and the AI Assistant will give you a helpful reply.</p>
+                            <p style="font-size:1.2em;">If you want a quick answer about protein mutations, use Agent-0.1. Upload your file, and the AI Assistant will give you a helpful reply.</p>
                             <p style="font-size:1.2em;">If you want to know possible mutation methods or protein functions, go to Quick Tools, choose the task you need, and you will get the result in a few minutes.</p>
                             <p style="font-size:1.2em;">If you have some knowledge about different protein models, you can use the Advanced Tools tab. All major models are available to meet your needs.</p>
                             <p style="font-size:1.2em;">If you want to get some protein data files, click the download tab, input the PDB ID or UniProt ID, and download it for further research.</p>
@@ -310,10 +310,10 @@ def create_index_tab(constant):
                             <p style="font-size:1.2em; font-weight:bold; margin-top:2em;">Module Demonstrations:</p>
                             
                             <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-top: 1em;">
-                                <!-- VenusAgent-0.1 GIF -->
+                                <!-- Agent-0.1 GIF -->
                                 <div style="text-align: center;">
-                                    <h3 style="color: var(--accent-color); margin-bottom: 10px;">🤖 VenusAgent-0.1</h3>
-                                    <img src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/gif/agent.gif" alt="VenusAgent-0.1 Demo" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />
+                                    <h3 style="color: var(--accent-color); margin-bottom: 10px;">🤖 Agent-0.1</h3>
+                                    <img src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/gif/agent.gif" alt="Agent-0.1 Demo" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" />
                                 </div>
                                 
                                 <!-- Quick Tools GIF -->

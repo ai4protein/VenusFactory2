@@ -3,7 +3,7 @@
 from .constants import *
 from .common_utils import *
 from .file_handlers import *
-from .ai_helpers import *
+from .llm_helpers import *
 from .data_processors import *
 from .visualization import *
 from .prediction_runners import *
@@ -27,7 +27,7 @@ __all__ = [
     'REGRESSION_TASKS_FUNCTION',
     'REGRESSION_TASKS_FUNCTION_MAX_MIN',
     'DATASET_TO_TASK_MAP',
-    'AI_MODELS',
+    'LLM_MODELS',
     
     # Common utils
     'sanitize_filename',
@@ -56,12 +56,13 @@ __all__ = [
     'clear_paste_content_fasta',
     'handle_sequence_change_unified',
     
-    # AI helpers
-    'AIConfig',
+    # LLM helpers
+    'LLMConfig',
     'get_api_key',
-    'call_ai_api',
-    'check_ai_config_status',
-    'on_ai_model_change',
+    'get_chat_base_url',
+    'call_llm_api',
+    'check_llm_config_status',
+    'on_llm_change',
     'generate_expert_analysis_prompt_residue',
     'generate_expert_analysis_prompt',
     'format_expert_response',
@@ -103,6 +104,9 @@ __all__ = [
     'handle_paste_fasta_detect',
     'handle_paste_pdb_detect',
     'update_dataset_choices_fixed',
+    'wrap_upload_show_section',
+    'wrap_paste_show_section',
+    'wrap_clear_hide_section',
     
     # Sequence utils
     'extract_sequence_from_pdb',

@@ -272,7 +272,7 @@ def generate_plots_for_residue_results(results_df: pd.DataFrame, task: str = "Fu
     
     fig.update_layout(
         title=dict(
-            text=f"<b>Functional Residue Prediction</b> - {task}",
+            text=f"<b>Functional Residue </b> - {task}",
             x=0.02, y=0.95, xanchor='left', yanchor='top',
             font=dict(size=14, family="Arial", color="black")
         ),

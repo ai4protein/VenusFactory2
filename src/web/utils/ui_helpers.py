@@ -55,3 +55,29 @@ def update_dataset_choices_fixed(task: str):
     choices = DATASET_MAPPING_FUNCTION.get(task, [])
     return gr.CheckboxGroup(choices=choices, value=choices)
 
+
+def wrap_upload_show_section(result):
+    """Append sequence section visibility (show when valid). Used with handle_file_upload."""
+    display = result[0] if result else ""
+    has_valid = bool(display and display != "No file selected")
+    return list(result) + [gr.update(visible=has_valid)]
+
+
+def wrap_paste_show_section(result, truncate: int = None):
+    """Append sequence section visibility (show when valid). Used with paste detect handlers.
+    If truncate=N, only use first N items from result (e.g. comprehensive_tab uses truncate=6).
+    """
+    display = result[0] if result else ""
+    has_valid = bool(
+        display
+        and display not in ("No file selected", "No valid protein sequences found")
+        and not str(display).startswith("Error")
+    )
+    items = list(result)[:truncate] if truncate is not None else list(result)
+    return items + [gr.update(visible=has_valid)]
+
+
+def wrap_clear_hide_section(result):
+    """Append sequence section visibility (hide). Used with clear paste handlers."""
+    return list(result) + [gr.update(visible=False)]
+

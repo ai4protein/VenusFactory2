@@ -58,7 +58,7 @@ Recent News:
 - [Supported Training Approaches](#-supported-training-approaches)
 - [Supported Datasets](#-supported-datasets)
 - [Supported Metrics](#-supported-metrics)
-- [VenusAgent-0.1(Beta Version)](#-venusagent-01-your-ai-assistant)
+- [Agent-0.1(Beta Version)](#-venusagent-01-your-ai-assistant)
 - [Quick Tools](#-quick-tools-your-go-to-for-rapid-predictions)。
 - [Advanced Tools](#-advanced-tools-for-in-depth-protein-analysis)
 - [Requirements](#-requirements)
@@ -74,7 +74,7 @@ Recent News:
 
 🆒 With support for **local private deployment** and access to over 40 state-of-the-art deep learning models, VenusFactory lowers the barrier to scientific research and accelerates the application of AI in life sciences.
 
-- **AI-Powered Assistance**: `VenusAgent-0.1` acts as an intelligent AI assistant, providing expert answers and analysis for protein engineering tasks.
+- **AI-Powered Assistance**: `Agent-0.1` acts as an intelligent AI assistant, providing expert answers and analysis for protein engineering tasks.
 - **Efficient Workflows**: **Quick Tools** enables rapid, no-code predictions for common tasks like protein function and mutation effect scoring.
 - **Advanced Analysis**: **Advanced Tools** offers powerful, in-depth analysis for both sequence-based and structure-based zero-shot mutation predictions.
 - **Various protein language models**: Venus series, ESM series, ProtTrans series, Ankh series, etc.
@@ -351,14 +351,14 @@ Recent News:
 
 </details>
 
-## 🤖 VenusAgent-0.1: Your AI Assistant
+## 🤖 Agent-0.1: Your AI Assistant
 
-`VenusAgent-0.1` is an intelligent AI assistant integrated into the VenusFactory platform, designed to answer questions and provide in-depth analysis on protein engineering and bioinformatics. It acts as a specialized expert, helping both biologists and AI researchers streamline their research workflow.
+`Agent-0.1` is an intelligent AI assistant integrated into the VenusFactory platform, designed to answer questions and provide in-depth analysis on protein engineering and bioinformatics. It acts as a specialized expert, helping both biologists and AI researchers streamline their research workflow.
 
 #### Key Features:
 
 * **Zero-shot Prediction**: Directly utilize cutting-edge sequence-based (e.g., ESM-2, ESM-1v, ESM-1b) and structure-based models (e.g., SaProt, ProtSSN, ESM-IF1, MIF-ST, ProSST) to perform zero-shot mutation prediction.
-* **Protein Function Prediction**: Accurately predict various protein functions, including solubility, localization, metal ion binding, stability, sorting signal, and optimum temperature.
+* **Protein Function**: Accurately predict various protein functions, including solubility, localization, metal ion binding, stability, sorting signal, and optimum temperature.
 * **Clear Insights**: Always provides clear, actionable insights in response to your queries.
 
 > 💡 **Note**: This feature requires an API key to access and is currently in Beta.
@@ -370,7 +370,7 @@ Recent News:
 * **Directed Evolution: AI-Powered Mutation Prediction**
     This tool allows for the rapid scoring and analysis of protein mutations. Simply upload a PDB file or paste the PDB content, and the platform will provide insights into the effects of single or multiple mutations on the protein.
 
-* **Protein Function Prediction**
+* **Protein Function**
     Leveraging pre-trained models, this module predicts various protein functions from a given amino acid sequence. You can upload a FASTA file or paste the sequence directly to predict properties such as solubility, localization, and more.
 
 ## 🧪 Advanced Tools: For In-depth Protein Analysis
@@ -739,28 +739,28 @@ Features:
 ### Format Conversion
 ```bash
 # Convert CIF format to PDB
-bash ./crawler/convert/maxit.sh
+bash ./script/search/convert/maxit.sh
 ```
 
 ### Metadata Collection
 ```bash
 # Download metadata from RCSB PDB
-bash ./crawler/metadata/download_rcsb.sh
+bash ./script/search/download/metadata/download_rcsb.sh
 ```
 
 ### Sequence Data
 ```bash
 # Download protein sequences from UniProt
-bash ./crawler/sequence/download_uniprot_seq.sh
+bash ./script/search/sequence/download_uniprot_seq.sh
 ```
 
 ### Structure Data
 ```bash
 # Download from AlphaFold2 Database
-bash ./crawler/structure/download_alphafold.sh
+bash ./script/search/download/structure/download_alphafold.sh
 
 # Download from RCSB PDB
-bash ./crawler/structure/download_rcsb.sh
+bash ./script/search/download/structure/download_rcsb.sh
 ```
 
 Features:
@@ -804,7 +804,7 @@ bash ./script/eval/eval.sh \
 ### Data Collection Example
 ```bash
 # Download structures for a list of UniProt IDs
-bash ./crawler/structure/download_alphafold.sh \
+bash ./script/search/download/structure/download_alphafold.sh \
     --input uniprot_ids.txt \
     --output ./structures
 ```

@@ -19,7 +19,7 @@ from .common_utils import get_save_path
 
 # Import file handling functions from file_handlers to avoid duplication
 from .constants import (
-    AI_MODELS,
+    LLM_MODELS,
     MODEL_MAPPING_ZERO_SHOT,
     DATASET_TO_TASK_MAP,
     REGRESSION_TASKS_FUNCTION,
@@ -37,35 +37,27 @@ def load_constant():
 constant = load_constant()
 
 
-def get_api_key(ai_provider: str, user_input_key: str = "") -> Optional[str]:
-    """Get API key based on provider and user input."""
-    model_config = AI_MODELS.get(ai_provider, {})
-    env_key = model_config.get("env_key")
-    
-    if env_key:
-        env_api_key = os.getenv(env_key)
-        if env_api_key and env_api_key.strip():
-            return env_api_key.strip()
-        if user_input_key and user_input_key.strip():
-            return user_input_key.strip()
-        return None
-    
+def get_api_key(llm_provider: str, user_input_key: str = "") -> Optional[str]:
+    """Get API key from .env (OPENAI_API_KEY) or user input."""
+    env_api_key = os.getenv("OPENAI_API_KEY")
+    if env_api_key and env_api_key.strip():
+        return env_api_key.strip()
     if user_input_key and user_input_key.strip():
         return user_input_key.strip()
     return None
 
 
 @dataclass
-class AIConfig:
-    """Configuration for AI API calls."""
+class LLMConfig:
+    """Configuration for LLM API calls."""
     api_key: str
-    ai_model_name: str
+    llm_name: str
     api_base: str
     model: str
 
-def call_ai_api(config: AIConfig, prompt: str) -> str:
-    """Make API call to AI service."""
-    if config.ai_model_name == "ChatGPT":
+def call_llm_api(config: LLMConfig, prompt: str) -> str:
+    """Make API call to LLM service."""
+    if config.llm_name == "ChatGPT":
         headers = {
             "Authorization": f"Bearer {config.api_key}",
             "Content-Type": "application/json"
@@ -87,7 +79,7 @@ def call_ai_api(config: AIConfig, prompt: str) -> str:
         }
         endpoint = f"{config.api_base}/chat/completions"
         
-    elif config.ai_model_name == "Gemini":
+    elif config.llm_name == "Gemini":
         headers = {
             "Content-Type": "application/json"
         }
@@ -136,7 +128,7 @@ def call_ai_api(config: AIConfig, prompt: str) -> str:
         response.raise_for_status()
         response_json = response.json()
         
-        if config.ai_model_name == "Gemini":
+        if config.llm_name == "Gemini":
             if "candidates" in response_json and len(response_json["candidates"]) > 0:
                 return response_json["candidates"][0]["content"]["parts"][0]["text"]
             else:
@@ -151,24 +143,14 @@ def call_ai_api(config: AIConfig, prompt: str) -> str:
     except Exception as e:
         return f"❌ API call failed: {str(e)}"
     
-def check_ai_config_status(ai_provider: str, user_api_key: str) -> tuple[bool, str]:
+def check_llm_config_status(llm_provider: str, user_api_key: str) -> tuple[bool, str]:
     """Check AI configuration status and return validity and message."""
-    model_config = AI_MODELS.get(ai_provider, {})
-    env_key = model_config.get("env_key")
-    
-    if env_key:
-        env_api_key = os.getenv(env_key)
-        if env_api_key and env_api_key.strip():
-            return True, "✓ Using the Provided API Key"
-        elif user_api_key and user_api_key.strip():
-            return True, "✓ The server will not save your API Key"
-        else:
-            return False, "⚠ No API Key found in .env file"
-    else:
-        if user_api_key and user_api_key.strip():
-            return True, "✓ Manual API Key provided"
-        else:
-            return False, "⚠ Manual API Key required"  
+    env_api_key = os.getenv("OPENAI_API_KEY")
+    if env_api_key and env_api_key.strip():
+        return True, "✓ Using the Provided API Key"
+    if user_api_key and user_api_key.strip():
+        return True, "✓ The server will not save your API Key"
+    return False, "⚠ No API Key found in .env file"  
 
 def generate_expert_analysis_prompt_residue(results_df: pd.DataFrame, task: str) -> str:
     """
@@ -620,7 +602,7 @@ def generate_plots_for_residue_results(results_df: pd.DataFrame, task: str = "Fu
     
     fig.update_layout(
         title=dict(
-            text=f"<b>Functional Residue Prediction</b> - {task}",
+            text=f"<b>Functional Residue </b> - {task}",
             x=0.02, y=0.95, xanchor='left', yanchor='top',
             font=dict(size=14, family="Arial", color="black")
         ),

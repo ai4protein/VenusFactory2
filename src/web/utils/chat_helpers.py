@@ -17,10 +17,13 @@ def send_feedback_email(feedback_text: str) -> str:
     if not feedback_text.strip():
         return "❌ Please enter your feedback before submitting."
     
-    sender_email = "zmm.zlr@qq.com"
-    receiver_email = "zlr_zmm@163.com"
-    subject = "VenusFactory User Feedback"
+    sender_email = os.getenv("EMAIL_SENDER")
+    receiver_email = os.getenv("EMAIL_RECEIVER")
+    subject = os.getenv("EMAIL_SUBJECT", "VenusFactory User Feedback")
     password = os.getenv("EMAIL_PASSWORD")
+
+    if not all([sender_email, receiver_email, password]):
+        return "❌ Email config incomplete. Set EMAIL_SENDER, EMAIL_RECEIVER, EMAIL_PASSWORD in .env"
 
     server = None
     try:
@@ -63,7 +66,7 @@ Feedback:
 def handle_feedback_submit(feedback_text: str) -> tuple:
     """Handle feedback submission and return status updates."""
     result = send_feedback_email(feedback_text)
-    return "", result, gr.update(visible=True)
+    return "", gr.update(value=result, visible=True)
 
 
 def make_chat_html(path: Path, history_list: List[Dict[str, Any]]) -> None:
@@ -86,6 +89,13 @@ def make_chat_html(path: Path, history_list: List[Dict[str, Any]]) -> None:
         for msg in history_list:
             role = str(msg.get("role", "")).lower()
             content = str(msg.get("content", ""))
+            if role == "assistant" and msg.get("role_id"):
+                try:
+                    from agent.prompts import ROLE_DISPLAY_NAMES
+                    label = ROLE_DISPLAY_NAMES.get(msg["role_id"], msg["role_id"])
+                    content = f"{label}:\n\n{content}"
+                except Exception:
+                    pass
             ts = ""
             if isinstance(msg.get("timestamp"), str):
                 ts = msg.get("timestamp")
@@ -107,7 +117,7 @@ def export_chat_history_html(session_state_value: Dict[str, Any]) -> tuple:
     try:
         ss = session_state_value
         history_list = ss.get('history', [])
-        out_dir = get_save_path("VenusAgent", "Expert_Chat")
+        out_dir = get_save_path("Agent", "Expert_Chat")
         session_id = ss.get('session_id') or "anon"
         filename = out_dir / f"chat_history_{session_id}.html"
         make_chat_html(filename, history_list)
@@ -127,7 +137,7 @@ def save_chat_history_to_server(session_state_value: Dict[str, Any]) -> gr.updat
     """Return the path to the session-scoped HTML file for download; create it if missing."""
     try:
         ss = session_state_value
-        out_dir = get_save_path("VenusAgent", "Expert_Chat")
+        out_dir = get_save_path("Agent", "Expert_Chat")
         session_id = ss.get('session_id') or "anon"
         filename = out_dir / f"chat_history_{session_id}.html"
         # create file if not exists

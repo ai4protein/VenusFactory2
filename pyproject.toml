@@ -2,6 +2,9 @@
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
 [project]
 name = "venus-factory"
 version = "0.1.0"
@@ -73,9 +76,9 @@ dependencies = [
     "fsspec>=2024.6.1",
     "gitdb>=4.0.12",
     "gprofiler-official>=1.0.0",
-    "gradio==5.44.1",
-    "gradio_client==1.12.1",
-    "gradio_molecule3d==0.0.7",
+    "gradio>=6.0.0,<7",
+    "gradio_client>=1.8.0",
+    # gradio_molecule3d removed - not used in UI, was causing "Component with ID not found" in Gradio 6
     "greenlet==3.2.4",
     "groovy>=0.1.2",
     "h11>=0.16.0",
@@ -206,6 +209,7 @@ dependencies = [
     "wandb>=0.21.3",
     "wcwidth>=0.2.13",
     "websockets>=15.0.1",
+    "xhtml2pdf>=0.2.18",
     "xxhash>=3.5.0",
     "yarl>=1.20.1",
     "zstandard>=0.24.0",

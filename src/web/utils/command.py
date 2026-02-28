@@ -37,7 +37,7 @@ def save_arguments(args: Dict[str, Any], output_dir: str):
         json.dump(args, f, indent=2)
 
 def build_eval_command_list(args: Dict[str, Any]) -> list:
-    cmd = ["python", "src/eval.py"]
+    cmd = ["python", "src/evaluate.py"]
     
     for key, value in args.items():
         if value is None or value == "":
@@ -56,8 +56,7 @@ def preview_eval_command(args: Dict[str, Any]) -> str:
     return " ".join(cmd)
 
 def build_predict_command_list(args: Dict[str, Any], is_batch: bool = False) -> list:
-    script = "src/predict_batch.py" if is_batch else "src/predict.py"
-    cmd = ["python", script]
+    cmd = ["python", "src/predict.py"]
     
     for key, value in args.items():
         if value is None or value == "":

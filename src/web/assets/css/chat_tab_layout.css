@@ -1,0 +1,163 @@
+/* Agent tab layout CSS (used by webui.py when building global CSS) */
+.gradio-container {
+    max-width: 95% !important;
+}
+
+#vf-agent-page-row {
+    min-height: 85vh;
+    height: 100%;
+    align-items: stretch;
+    gap: 10px;
+    background: #fff !important;
+}
+
+div:has(> #vf-agent-page-row) {
+    background: #fff !important;
+    min-height: 85vh !important;
+}
+
+#vf-agent-main-column,
+#vf-agent-main-column > div,
+#vf-agent-main-column .wrap,
+#vf-agent-main-column .gr-box {
+    background: #fff !important;
+}
+
+#vf-agent-main-column {
+    height: 85vh !important;
+    min-height: 85vh;
+    overflow: hidden !important;
+    box-sizing: border-box;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+#vf-agent-main-column > div {
+    flex: 1 1 0 !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+}
+
+#vf-agent-main-group {
+    flex: 1 1 0 !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    background: #fff !important;
+}
+
+#vf-right-panel-root {
+    flex: 1 1 0 !important;
+    min-height: 77vh !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    background: #fff !important;
+    border: none !important;
+    border-bottom: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+#vf-right-panel-root .vf-right-panel,
+#vf-right-panel-root .vf-conversation-panel {
+    min-height: 73vh !important;
+    height: 100% !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+div:has(> #vf-right-panel-root),
+#vf-agent-main-column .gr-box:has(#vf-right-panel-root) {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+#vf-right-panel-root .html-container,
+#vf-right-panel-root .html-container.svelte-1jts93g,
+#vf-right-panel-root [id^="html-"] {
+    background: #fff !important;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+}
+
+#vf-agent-input-row {
+    flex: 0 0 auto !important;
+    margin-top: 0 !important;
+    padding-top: 8px !important;
+    border: none !important;
+    border-top: none !important;
+    outline: none !important;
+    background: #fff !important;
+}
+
+#vf-agent-main-group > *:first-child {
+    border-bottom: none !important;
+    background: #fff !important;
+}
+
+#vf-agent-input-row .gr-box,
+#vf-agent-input-row [class*="input"],
+#vf-agent-input-row textarea {
+    border-color: #e2e4e8 !important;
+    background: #fff !important;
+}
+
+#vf-agent-sidebar-column,
+#vf-agent-sidebar-column > div,
+#vf-agent-sidebar-column .wrap,
+#vf-agent-sidebar-column .gr-box {
+    background: #fff !important;
+}
+
+#vf-agent-sidebar-column {
+    min-height: 85vh;
+    height: 85vh;
+    overflow-y: auto;
+    padding: 4px 8px 8px 4px !important;
+    box-sizing: border-box;
+}
+
+#vf-agent-sidebar-column > div {
+    min-height: 100% !important;
+    gap: 6px !important;
+}
+
+#vf-agent-sidebar-column .gr-accordion {
+    margin-bottom: 4px !important;
+    border-radius: 8px !important;
+}
+
+#vf-agent-sidebar-column .gr-accordion .wrap,
+#vf-agent-sidebar-column [class*="accordion"] .wrap {
+    padding: 4px 6px !important;
+}
+
+#vf-agent-sidebar-column .gr-form,
+#vf-agent-sidebar-column .gr-box {
+    margin-bottom: 2px !important;
+    padding: 4px 6px !important;
+}
+
+#vf-agent-sidebar-column .gr-examples {
+    padding: 2px 0 !important;
+}
+
+#vf-agent-sidebar-column .gr-examples > div > div {
+    padding: 4px 6px !important;
+    margin: 2px 0 !important;
+}
+
+#vf-agent-sidebar-column .gr-markdown,
+#vf-agent-sidebar-column p {
+    margin: 2px 0 !important;
+    padding: 0 2px !important;
+    line-height: 1.35 !important;
+}

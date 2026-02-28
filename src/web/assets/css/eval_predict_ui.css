@@ -73,6 +73,25 @@
     color: #666;
 }
 
+/* Eval tip under Model and Dataset Configuration */
+.eval-tip {
+    font-size: 0.9em;
+    color: #666;
+    margin: -8px 0 12px 0;
+}
+
+/* Evaluation config sections - Model, Dataset, Batch Processing */
+.eval-config-section {
+    background-color: #fafafa;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+.eval-config-section > .wrap {
+    padding: 0 !important;
+}
+
 /* ========================================
    Progress Bar Styles
    ======================================== */

@@ -58,7 +58,7 @@
 - [支持的训练方法](#-支持的训练方法)
 - [支持的数据集](#-支持的数据集)
 - [支持的评估指标](#-支持的评估指标)
-- [VenusAgent-0.1: 您的AI助手](#-VenusAgent-0.1:您的AI助手)
+- [Agent-0.1: 您的AI助手](#-Agent-0.1:您的AI助手)
 - [快速工具：您的快速预测之选](#-快速工具：您的快速预测之选)
 - [高级工具：用于深度蛋白质分析](#-高级工具：用于深度蛋白质分析)
 - [环境要求](#-环境要求)
@@ -76,7 +76,7 @@
 
 -   **本地私有部署**：支持本地化私有部署，确保数据安全
 -   **领先模型集成**：集成了超过40种最先进的深度学习模型，降低了科研门槛，加速了人工智能在生命科学领域的应用
--   **AI 智能助手**：**VenusAgent-0.1** 作为一个智能AI助手，为蛋白质工程任务提供专业的解答和分析
+-   **AI 智能助手**：**Agent-0.1** 作为一个智能AI助手，为蛋白质工程任务提供专业的解答和分析
 -   **高效工作流**：**快速工具（Quick Tools）**为蛋白质功能和突变效果评分等常见任务提供快速、无代码的预测
 -   **深度分析**：**高级工具（Advanced Tools）**为基于序列和基于结构的零样本突变预测提供强大而深入的分析
 -   **多样化的蛋白质语言模型**：Venus系列、ESM系列、ProtTrans系列、Ankh系列等
@@ -343,9 +343,9 @@
 
 </details>
 
-## 🤖 VenusAgent-0.1: 您的AI助手
+## 🤖 Agent-0.1: 您的AI助手
 
-`VenusAgent-0.1` 是集成在 VenusFactory 平台中的智能AI助手，旨在回答有关蛋白质工程和生物信息学的问题，并提供深入分析。它扮演着专业专家的角色，帮助生物学家和AI研究人员简化他们的研究工作流程。
+`Agent-0.1` 是集成在 VenusFactory 平台中的智能AI助手，旨在回答有关蛋白质工程和生物信息学的问题，并提供深入分析。它扮演着专业专家的角色，帮助生物学家和AI研究人员简化他们的研究工作流程。
 
 ### 主要功能：
 
@@ -735,28 +735,28 @@ bash ./script/get_get_structure_seq/get_secondary_structure_seq.sh
 ### 格式转换
 ```bash
 # 将CIF格式转换为PDB
-bash ./crawler/convert/maxit.sh
+bash ./script/search/convert/maxit.sh
 ```
 
 ### 元数据收集
 ```bash
 # 从RCSB PDB下载元数据
-bash ./crawler/metadata/download_rcsb.sh
+bash ./script/search/download/metadata/download_rcsb.sh
 ```
 
 ### 序列数据
 ```bash
 # 从UniProt下载蛋白质序列
-bash ./crawler/sequence/download_uniprot_seq.sh
+bash ./script/search/sequence/download_uniprot_seq.sh
 ```
 
 ### 结构数据
 ```bash
 # 从AlphaFold2数据库下载
-bash ./crawler/structure/download_alphafold.sh
+bash ./script/search/download/structure/download_alphafold.sh
 
 # 从RCSB PDB下载
-bash ./crawler/structure/download_rcsb.sh
+bash ./script/search/download/structure/download_rcsb.sh
 ```
 
 特点：
@@ -800,7 +800,7 @@ bash ./script/eval/eval.sh \
 ### 数据收集示例
 ```bash
 # 下载UniProt ID列表对应的结构
-bash ./crawler/structure/download_alphafold.sh \
+bash ./script/search/download/structure/download_alphafold.sh \
     --input uniprot_ids.txt \
     --output ./structures
 ```

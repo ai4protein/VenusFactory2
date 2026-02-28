@@ -1,12 +1,12 @@
 import os
-os.environ["HF_ENDPOINT"]="https://hf-mirror.com"
+import sys
 import json
 import wandb
-from utils.args import parse_args
-from utils.logger import setup_logging, print_model_parameters
-from data.dataloader import prepare_dataloaders
-from models.model_factory import create_models, lora_factory
-from training.trainer import Trainer
+from tools.train.cli_utils.args import parse_args
+from tools.train.cli_utils.logger import setup_logging, print_model_parameters
+from tools.train.data.dataloader import prepare_dataloaders
+from tools.train.models.model_factory import create_models, lora_factory
+from tools.train.loop.trainer import Trainer
 
 def main():
     # Parse arguments

@@ -1,0 +1,44 @@
+/* Log panel styles (backend log sidebar) */
+.vf-log-panel {
+    min-height: 35px;
+    max-height: 35vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    border: 1px solid #dadce0;
+    border-radius: 8px;
+    background: #f8f9fa;
+    padding: 10px 12px;
+    font-size: 12px;
+    line-height: 1.4;
+    box-sizing: border-box;
+    font-family: ui-monospace, SFMono-Regular, Consolas, Monaco, monospace;
+}
+
+.vf-log-panel h3 {
+    margin: 0.4em 0 0.25em;
+    font-size: 0.95em;
+    color: #0d47a1;
+    font-weight: 600;
+}
+
+.vf-log-panel p,
+.vf-log-panel pre {
+    margin: 0.25em 0;
+}
+
+.vf-log-panel strong {
+    color: #1b5e20;
+}
+
+.vf-log-panel code {
+    background: #e3f2fd;
+    color: #0d47a1;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+
+.vf-log-panel em {
+    color: #5f6368;
+    font-style: normal;
+}

@@ -11,10 +11,109 @@ import pandas as pd
 import tempfile
 import traceback
 import re
+from pathlib import Path
 from web.utils.command import preview_predict_command
 from web.utils.html_ui import load_html_template, generate_prediction_status_html, generate_prediction_results_html, generate_batch_prediction_results_html, generate_table_rows
 from web.utils.css_loader import get_css_style_tag
+from web.utils.common_utils import get_save_path
 from datetime import datetime
+
+
+def _scan_folders_under(root: str, max_depth: int = 5) -> list:
+    """Scan root for subdirectories. Returns list of (display_label, full_path)."""
+    if not root or not os.path.isdir(root):
+        return []
+    result = []
+    root_path = Path(root)
+    for path in sorted(root_path.rglob("*")):
+        if not path.is_dir():
+            continue
+        try:
+            rel = path.relative_to(root_path)
+        except ValueError:
+            continue
+        if not rel.parts or len(rel.parts) > max_depth:
+            continue
+        path_str = str(path)
+        result.append((path_str, path_str))
+    return result
+
+
+def _scan_models_in_folder(folder_path: str) -> list:
+    """Scan folder for .pt model files. Returns list of (display_label, full_path)."""
+    if not folder_path or not os.path.isdir(folder_path):
+        return []
+    result = []
+    folder = Path(folder_path)
+    for pt_file in sorted(folder.rglob("*.pt")):
+        name = pt_file.stem
+        if any(s in name for s in ("_lora", "_qlora", "_dora", "_adalora", "_ia3")):
+            continue
+        result.append((str(pt_file.relative_to(folder)), str(pt_file)))
+    return result
+
+
+def _load_model_config(model_path: str) -> dict:
+    """Load config from model's .json file. Returns dict or empty dict."""
+    if not model_path or not str(model_path).endswith(".pt"):
+        return {}
+    config_path = os.path.join(os.path.dirname(model_path), Path(model_path).stem + ".json")
+    try:
+        with open(config_path, "r") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def _parse_fasta_sequences(content: str) -> list:
+    """Parse multi-FASTA from text. Returns list of (id, sequence) tuples."""
+    if not content or not content.strip():
+        return []
+    lines = content.splitlines()
+    records = []
+    current_id = ""
+    current_seq = []
+    for line in lines:
+        line = line.rstrip()
+        if not line:
+            continue
+        if line.startswith(">"):
+            if current_seq:
+                seq = "".join(current_seq).replace(" ", "")
+                if seq:
+                    records.append((current_id or f"seq{len(records)+1}", seq))
+            current_id = line[1:].strip().split()[0] if line[1:].strip() else f"seq{len(records)+1}"
+            current_seq = []
+        else:
+            if line.startswith("#"):
+                continue
+            current_seq.append(line)
+    if current_seq:
+        seq = "".join(current_seq).replace(" ", "")
+        if seq:
+            records.append((current_id or f"seq{len(records)+1}", seq))
+    if not records:
+        # No FASTA header: treat whole content as one sequence
+        seq = "".join(l.strip() for l in lines if l.strip() and not l.strip().startswith("#")).replace(" ", "")
+        if seq:
+            records = [("seq1", seq)]
+    return records
+
+
+def _parse_fasta_from_file(file_obj) -> list:
+    """Read and parse multi-FASTA from an uploaded file. Returns list of (id, sequence) tuples."""
+    if file_obj is None:
+        return []
+    path = file_obj.name if hasattr(file_obj, "name") else str(file_obj)
+    if not path or not os.path.isfile(path):
+        return []
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            content = f.read()
+    except Exception:
+        return []
+    return _parse_fasta_sequences(content)
+
 
 def create_single_prediction_csv(prediction_data, problem_type, aa_seq):
     """Create CSV file for single prediction results"""
@@ -55,9 +154,17 @@ def create_single_prediction_csv(prediction_data, problem_type, aa_seq):
                     temp_file.write(f"{pos + 1},{aa},{pred_value:.6f}\n")
                     
             elif problem_type == "single_label_classification":
-                # For single-label classification
-                predicted_class = prediction_data.get('predicted_class', 0)
-                probabilities = prediction_data.get('probabilities', [])
+                # For single-label classification (API may return predicted_class or predicted_classes)
+                predicted_class = prediction_data.get('predicted_class')
+                if predicted_class is None and 'predicted_classes' in prediction_data:
+                    pcs = prediction_data['predicted_classes']
+                    predicted_class = pcs[0] if isinstance(pcs, list) and pcs else 0
+                if predicted_class is None:
+                    predicted_class = 0
+                probs_raw = prediction_data.get('probabilities', [])
+                probabilities = probs_raw[0] if (isinstance(probs_raw, list) and probs_raw and isinstance(probs_raw[0], list)) else probs_raw
+                if not isinstance(probabilities, list):
+                    probabilities = [probabilities]
                 
                 # Write header
                 temp_file.write("Predicted_Class")
@@ -438,7 +545,7 @@ def create_predict_tab(constant):
             current_process = None
             stop_thread = False
 
-    def predict_batch(plm_model, model_path, eval_method, input_file, eval_structure_seq, pooling_method, problem_type, num_labels, batch_size):
+    def predict_batch(plm_model, model_path, eval_method, input_file, eval_structure_seq, pooling_method, problem_type, num_labels, batch_size, pdb_dir_val=None):
         """Batch predict multiple protein sequences"""
         nonlocal is_predicting, current_process, stop_thread, process_aborted
         
@@ -466,20 +573,23 @@ def create_predict_tab(constant):
             except queue.Empty:
                 break
         
-        # Initialize progress tracking with completely fresh state
+        # Initialize progress tracking (match Evaluation tab style)
+        start_time = time.time()
         progress_info = {
             "total": 0,
             "completed": 0,
             "current_step": "Initializing",
+            "stage": "Preparing",
+            "progress": 0,
+            "current": 0,
+            "total_samples": 0,
+            "elapsed_time": "00:00:00",
             "status": "running",
-            "lines": []  # Store lines for error handling
+            "lines": []
         }
         
-        # Generate completely empty initial progress display
-        initial_progress_html = f"""
-        {get_css_style_tag('prediction_ui.css')}
-        {load_html_template('batch_prediction_initializing.html')}
-        """
+        # Generate initial progress bar (same style as Evaluation)
+        initial_progress_html = _generate_prediction_progress_bar(progress_info)
         
         # Always ensure the download button is hidden when starting a new prediction
         yield gr.HTML(initial_progress_html), gr.update(visible=False)
@@ -520,12 +630,13 @@ def create_predict_tab(constant):
             
             # Update progress
             progress_info["current_step"] = "Preparing input file"
-            yield generate_progress_html(progress_info), gr.update(visible=False)
+            yield _generate_prediction_progress_bar(progress_info), gr.update(visible=False)
             
-            # Create temporary file to save uploaded file
-            temp_dir = tempfile.mkdtemp()
-            input_path = os.path.join(temp_dir, "input.csv")
-            output_dir = temp_dir  # Use the same temporary directory as output directory
+            # Use get_save_path (env TEMP_OUTPUTS_DIR) for output, create unique run subdir
+            base_dir = get_save_path("Prediction", "Results")
+            run_dir = tempfile.mkdtemp(dir=str(base_dir))
+            input_path = os.path.join(run_dir, "input.csv")
+            output_dir = run_dir
             output_file = "predictions.csv"
             output_path = os.path.join(output_dir, output_file)
             
@@ -555,9 +666,12 @@ def create_predict_tab(constant):
                 # Count sequences in input file
                 try:
                     df = pd.read_csv(input_path)
-                    progress_info["total"] = len(df)
-                    progress_info["current_step"] = f"Found {len(df)} sequences to process"
-                    yield generate_progress_html(progress_info), gr.update(visible=False)
+                    n_seqs = len(df)
+                    progress_info["total"] = n_seqs
+                    progress_info["total_samples"] = n_seqs
+                    progress_info["current_step"] = f"Found {n_seqs} sequences to process"
+                    progress_info["stage"] = "Preparing"
+                    yield _generate_prediction_progress_bar(progress_info), gr.update(visible=False)
                 except Exception as e:
                     is_predicting = False
                     yield gr.HTML(f"""
@@ -584,7 +698,7 @@ def create_predict_tab(constant):
             
             # Update progress
             progress_info["current_step"] = "Preparing model and parameters"
-            yield generate_progress_html(progress_info), gr.update(visible=False)
+            yield _generate_prediction_progress_bar(progress_info), gr.update(visible=False)
             
             # Prepare command
             args_dict = {
@@ -609,9 +723,11 @@ def create_predict_tab(constant):
                         args_dict["use_ss8"] = True
             else:
                 args_dict["structure_seq"] = None
+            if pdb_dir_val and str(pdb_dir_val).strip():
+                args_dict["pdb_dir"] = str(pdb_dir_val).strip()
             
             # Build command line
-            final_cmd = [sys.executable, "src/predict_batch.py"]
+            final_cmd = [sys.executable, "src/predict.py"]
             for k, v in args_dict.items():
                 if v is True:
                     final_cmd.append(f"--{k}")
@@ -621,7 +737,7 @@ def create_predict_tab(constant):
             
             # Update progress
             progress_info["current_step"] = "Starting batch prediction process"
-            yield generate_progress_html(progress_info), gr.update(visible=False)
+            yield _generate_prediction_progress_bar(progress_info), gr.update(visible=False)
             
             # Start prediction process
             try:
@@ -668,16 +784,18 @@ def create_predict_tab(constant):
                             progress_info["lines"].append(line)
                             
                             # Update progress based on output
-                            if "Predicting:" in line:
+                            if "Predicting:" in line or "it/s" in line:
                                 try:
-                                    # Extract progress from tqdm output
                                     match = re.search(r'(\d+)/(\d+)', line)
                                     if match:
-                                        current, total = map(int, match.groups())
-                                        progress_info["completed"] = current
-                                        progress_info["total"] = total
-                                        progress_info["current_step"] = f"Processing sequence {current}/{total}"
-                                except:
+                                        cur, tot = map(int, match.groups())
+                                        progress_info["completed"] = cur
+                                        progress_info["current"] = cur
+                                        progress_info["total"] = tot
+                                        progress_info["total_samples"] = tot
+                                        progress_info["current_step"] = f"Processing sequence {cur}/{tot}"
+                                        progress_info["stage"] = "Predicting"
+                                except Exception:
                                     pass
                             elif "Loading Model and Tokenizer" in line:
                                 progress_info["current_step"] = "Loading model and tokenizer"
@@ -691,11 +809,13 @@ def create_predict_tab(constant):
                     # Check if the process has been aborted before updating UI
                     if process_aborted:
                         break
-                        
-                    # Check if we need to update the UI
+                    elapsed = time.time() - start_time
+                    hours, remainder = divmod(int(elapsed), 3600)
+                    minutes, seconds = divmod(remainder, 60)
+                    progress_info["elapsed_time"] = f"{hours:02}:{minutes:02}:{seconds:02}"
                     current_time = time.time()
                     if new_lines or (current_time - last_update_time >= 0.5):
-                        yield generate_progress_html(progress_info), gr.update(visible=False)
+                        yield _generate_prediction_progress_bar(progress_info), gr.update(visible=False)
                         last_update_time = current_time
                     
                     # Small sleep to avoid busy waiting
@@ -793,30 +913,25 @@ def create_predict_tab(constant):
                 current_process = None
             process_aborted = False  # Reset abort flag
 
-    def generate_progress_html(progress_info):
-        """Generate HTML progress bar similar to eval_tab"""
-        current = progress_info.get("completed", 0)
-        total = max(progress_info.get("total", 1), 1)  # Avoid division by zero
-        percentage = min(100, int((current / total) * 100))
-        stage = progress_info.get("current_step", "Preparing")
-        
-        # ensure percentage is between 0-100
-        percentage = max(0, min(100, percentage))
-        
-        # prepare detailed information
-        total_sequences_detail = load_html_template('progress_detail_total.html', total=total) if total > 0 else ''
-        progress_detail = load_html_template('progress_detail_current.html', current=current, total=total) if current > 0 and total > 0 else ''
-        status_detail = load_html_template('progress_detail_status.html', status=progress_info.get("status", "").capitalize()) if "status" in progress_info else ''
-        
-        # create more modern progress bar - fully match eval_tab's style
+    def _generate_prediction_progress_bar(progress_info):
+        """Generate HTML progress bar matching Evaluation tab style (evaluation_progress.html)."""
+        stage = progress_info.get("stage", progress_info.get("current_step", "Preparing"))
+        current = progress_info.get("current", progress_info.get("completed", 0))
+        total = max(progress_info.get("total", progress_info.get("total_samples", 1)), 1)
+        progress = (current / total) * 100 if total > 0 else 0
+        progress = max(0, min(100, progress))
+        total_samples = progress_info.get("total_samples", total)
+        total_samples_detail = f'<div class="progress-detail-item progress-detail-total"><span style="font-weight: 500;">Total samples:</span> {total_samples}</div>' if total_samples > 0 else ''
+        progress_detail = f'<div class="progress-detail-item progress-detail-current"><span style="font-weight: 500;">Progress:</span> {current}/{total}</div>' if current > 0 and total > 0 else ''
+        time_detail = f'<div class="progress-detail-item progress-detail-time"><span style="font-weight: 500;">Time:</span> {progress_info.get("elapsed_time", "")}</div>' if progress_info.get("elapsed_time") else ''
         return f"""
-        {get_css_style_tag('prediction_ui.css')}
-        {load_html_template('prediction_progress.html',
+        {get_css_style_tag('eval_predict_ui.css')}
+        {load_html_template('evaluation_progress.html',
                           stage=stage,
-                          percentage=percentage,
-                          total_sequences_detail=total_sequences_detail,
+                          progress=progress,
+                          total_samples_detail=total_samples_detail,
                           progress_detail=progress_detail,
-                          status_detail=status_detail)}
+                          time_detail=time_detail)}
         """
 
     def generate_table_rows(df, max_rows=100):
@@ -985,27 +1100,22 @@ def create_predict_tab(constant):
         {load_html_template('status_success.html', message="Prediction successfully terminated! All prediction state has been reset.")}
         """), gr.update(visible=False)
 
-    def handle_predict_tab_command_preview(plm_model, model_path, eval_method, aa_seq, foldseek_seq, ss8_seq, eval_structure_seq, pooling_method, problem_type, num_labels):
-        """Handle the preview command button click event
-        Args:
-            plm_model: plm model name
-            model_path: model path
-            eval_method: evaluation method
-            aa_seq: amino acid sequence
-            foldseek_seq: foldseek sequence
-            ss8_seq: ss8 sequence
-            eval_structure_seq: structure sequence (foldseek_seq, ss8_seq)
-            pooling_method: pooling method (mean, attention1d, light_attention)
-            problem_type: problem type (single_label_classification, multi_label_classification, regression, residue_single_label_classification)
-            num_labels: number of labels
-        Returns:
-            command_preview: command preview
-        """
-        # 构建参数字典
+    def handle_predict_tab_command_preview(input_method_val, aa_seq_val, seq_file, plm_model, model_path, eval_method, foldseek_seq, ss8_seq, eval_structure_seq, pooling_method, problem_type, num_labels, predict_pdb_dir_val=None):
+        """Handle the preview command button click event. Resolve sequences from paste or upload."""
+        if input_method_val == "Upload file" and seq_file is not None:
+            records = _parse_fasta_from_file(seq_file)
+        else:
+            records = _parse_fasta_sequences((aa_seq_val or "").strip())
+        if records:
+            aa_seq_val = records[0][1][:80] + ("..." if len(records[0][1]) > 80 else "")
+            if len(records) > 1:
+                aa_seq_val = f"[{len(records)} sequences, first: {aa_seq_val}]"
+        else:
+            aa_seq_val = "(paste or upload FASTA)"
         args_dict = {
             "model_path": model_path,
             "plm_model": plm_models[plm_model],
-            "aa_seq": aa_seq,
+            "aa_seq": aa_seq_val,
             "foldseek_seq": foldseek_seq if foldseek_seq else "",
             "ss8_seq": ss8_seq if ss8_seq else "",
             "pooling_method": pooling_method,
@@ -1021,6 +1131,8 @@ def create_predict_tab(constant):
                     args_dict["use_foldseek"] = True
                 if "ss8_seq" in eval_structure_seq:
                     args_dict["use_ss8"] = True
+        if predict_pdb_dir_val and str(predict_pdb_dir_val).strip():
+            args_dict["pdb_dir"] = str(predict_pdb_dir_val).strip()
         
         # generate preview command
         preview_text = preview_predict_command(args_dict, is_batch=False)
@@ -1060,311 +1172,339 @@ def create_predict_tab(constant):
         preview_text = preview_predict_command(args_dict, is_batch=True)
         return gr.update(value=preview_text, visible=True)
 
-    # Configuration Import Section
-    with gr.Accordion("Import Prediction Configuration", open=False) as config_import_accordion:
-        gr.Markdown("### Import your prediction config")
-        with gr.Row():
-            with gr.Column(scale=4):
-                config_path_input = gr.Textbox(
-                    label="Configuration File Path",
-                    placeholder="Enter path to your prediction config JSON file (e.g., ./predict_config.json)",
-                    value=""
+    # Layout: left = Model Configuration, Data Input, Hyperparameter Settings, buttons; right = results (like quick tools)
+    _folder_choices = [(base, base) for base in ("ckpt",) if os.path.isdir(base)] + _scan_folders_under("ckpt")
+    with gr.Row(equal_height=False):
+        with gr.Column(scale=3):
+            gr.Markdown("💡 *Inference on unlabeled/unknown data.*")
+            gr.Markdown("## Model and Dataset Configuration")
+            with gr.Group():
+                with gr.Row():
+                    model_folder = gr.Dropdown(
+                        label="Model Folder Path",
+                        choices=_folder_choices,
+                        value=None,
+                        allow_custom_value=False
+                    )
+                    model_dropdown = gr.Dropdown(
+                        choices=[],
+                        label="Model Name",
+                        value=None,
+                        allow_custom_value=False
+                    )
+            with gr.Row(visible=False) as predict_pdb_dir_row:
+                predict_pdb_dir = gr.Textbox(
+                    label="PDB Directory",
+                    placeholder="Path to PDB files (required for ProSST/SaProt/ProtSSN; optional for ses-adapter)",
+                    value="",
+                    scale=3
                 )
-            with gr.Column(scale=1):
-                import_config_button = gr.Button(
-                    "Import Config",
-                    variant="primary",
-                    elem_classes=["import-config-btn"]
+            with gr.Row(visible=False):
+                plm_model = gr.Dropdown(choices=list(plm_models.keys()), value=list(plm_models.keys())[0] if plm_models else None)
+            with gr.Row(visible=False) as structure_seq_row:
+                structure_seq = gr.Dropdown(
+                    choices=["foldseek_seq", "ss8_seq"],
+                    label="Structure Sequences",
+                    multiselect=True,
+                    value=["foldseek_seq", "ss8_seq"]
                 )
-
-    gr.Markdown("## Model Configuration")
-    with gr.Group():
-        with gr.Row():
-            model_path = gr.Textbox(
-                label="Model Path",
-                value="ckpt/demo/demo_solubility.pt",
-                placeholder="Path to the trained model"
-            )
-            plm_model = gr.Dropdown(
-                choices=list(plm_models.keys()),
-                label="Protein Language Model"
-            )
-
-
-        with gr.Row():
-            eval_method = gr.Dropdown(
-                choices=["full", "freeze", "ses-adapter", "plm-lora", "plm-qlora", "plm_adalora", "plm_dora", "plm_ia3"],
-                label="Evaluation Method",
-                value="freeze"
-            )
-            pooling_method = gr.Dropdown(
-                choices=["mean", "attention1d", "light_attention"],
-                label="Pooling Method",
-                value="mean"
-            )
-
-
-        # Settings for different training methods
-        with gr.Row(visible=False) as structure_seq_row:
-            structure_seq = gr.Dropdown(
-                choices=["foldseek_seq", "ss8_seq"],
-                label="Structure Sequences",
-                multiselect=True,
-                value=["foldseek_seq", "ss8_seq"],
-                info="Select the structure sequences to use for prediction"
-            )
-
-        
-        with gr.Row():
-            problem_type = gr.Dropdown(
-                choices=["single_label_classification", "multi_label_classification", "regression", "residue_single_label_classification", "residue_regression"],
-                label="Problem Type",
-                value="single_label_classification"
-            )
-            num_labels = gr.Number(
-                value=2,
-                label="Number of Labels",
-                precision=0,
-                minimum=1
-            )
-
-        with gr.Row():
-            otg_message = gr.HTML(
-                f"""
-                {get_css_style_tag('prediction_ui.css')}
-                """,
-                visible=False
-            )
-                
-    with gr.Tabs():
-        with gr.Tab("Sequence Prediction"):
-            gr.Markdown("### Input Sequences")
-            with gr.Row():
-                aa_seq = gr.Textbox(
-                    label="Amino Acid Sequence",
-                    placeholder="Enter protein sequence",
-                    lines=3
+            with gr.Row(visible=False):
+                problem_type = gr.Dropdown(
+                    choices=["single_label_classification", "multi_label_classification", "regression", "residue_single_label_classification", "residue_regression"],
+                    value="single_label_classification"
                 )
-            # Put the structure input rows in a row with controllable visibility    
-            with gr.Row(visible=False) as structure_input_row:
-                foldseek_seq = gr.Textbox(
-                    label="Foldseek Sequence",
-                    placeholder="Enter foldseek sequence if available",
-                    lines=3
+                num_labels = gr.Number(value=2, precision=0, minimum=1)
+            with gr.Row(visible=False):
+                eval_method = gr.Dropdown(choices=["full", "freeze", "ses-adapter", "plm-lora", "plm-qlora", "plm-adalora", "plm-dora", "plm-ia3"], value="freeze")
+                pooling_method = gr.Dropdown(choices=["mean", "attention1d", "light_attention"], value="mean")
+            with gr.Row(visible=False):
+                otg_message = gr.HTML(f"{get_css_style_tag('prediction_ui.css')}", visible=False)
+
+            def _on_model_folder_change(folder_path):
+                if not folder_path:
+                    return [gr.update(choices=[], value=None)] + _on_model_selected(None)
+                choices = _scan_models_in_folder(folder_path)
+                if not choices:
+                    return [gr.update(choices=[], value=None)] + _on_model_selected(None)
+                first_path = choices[0][1]
+                cfg_upds = _on_model_selected(first_path)
+                return [gr.update(choices=choices, value=first_path)] + cfg_upds
+
+            def _on_model_selected(model_path_val):
+                cfg = _load_model_config(model_path_val) if model_path_val else {}
+                if not cfg:
+                    return [gr.update() for _ in range(6)] + [
+                        gr.update(visible=False), gr.update(visible=True),
+                        gr.update(visible=False), gr.update(visible=False)
+                    ]
+                plm_path = cfg.get("plm_model", "")
+                plm_key = None
+                for k, v in plm_models.items():
+                    if v == plm_path:
+                        plm_key = k
+                        break
+                if not plm_key and plm_models:
+                    plm_key = list(plm_models.keys())[0]
+                eval_m = cfg.get("training_method", "freeze")
+                if eval_m not in ["full", "freeze", "ses-adapter", "plm-lora", "plm-qlora", "plm-adalora", "plm-dora", "plm-ia3"]:
+                    eval_m = "freeze"
+                struct_seq = cfg.get("structure_seq", [])
+                if not isinstance(struct_seq, list):
+                    struct_seq = [struct_seq] if struct_seq else []
+                struct_seq = [s for s in struct_seq if s in ("foldseek_seq", "ss8_seq")] or ["foldseek_seq", "ss8_seq"]
+                is_structure = bool(plm_key and (str(plm_key).startswith("ProSST") or str(plm_key).startswith("SaProt") or str(plm_key).startswith("ProtSSN")))
+                is_ses = eval_m == "ses-adapter"
+                show_pdb = is_structure or is_ses
+                show_input = not is_structure
+                vis = (gr.update(visible=show_pdb), gr.update(visible=show_input),
+                       gr.update(visible=is_ses), gr.update(visible=is_ses))
+                return [
+                    gr.update(value=plm_key),
+                    gr.update(value=eval_m),
+                    gr.update(value=cfg.get("pooling_method", "mean")),
+                    gr.update(value=cfg.get("problem_type", "single_label_classification")),
+                    gr.update(value=int(cfg.get("num_labels", 2))),
+                    gr.update(value=struct_seq),
+                ] + list(vis)
+
+            gr.Markdown("## Input Data")
+            with gr.Column(visible=True) as input_data_column:
+                input_method = gr.Radio(
+                    choices=["Paste sequence", "Upload file", "Specify FASTA path"],
+                    label="Input Method",
+                    value="Paste sequence"
                 )
-                ss8_seq = gr.Textbox(
-                    label="SS8 Sequence",
-                    placeholder="Enter secondary structure sequence if available",
-                    lines=3
-                )
-            
+                with gr.Column(visible=True) as paste_seq_column:
+                    aa_seq = gr.Textbox(
+                        label="Input Amino Acid Sequence (FASTA format)",
+                        placeholder="Example: >seq1\nMVLSPADKTNVKAAWGKVGAHAGEYGAEALERMFLSKGPSSGFSGKGA",
+                        lines=3
+                    )
+                with gr.Column(visible=False) as upload_seq_column:
+                    seq_file_upload = gr.File(
+                        label="Upload FASTA or sequence file",
+                        file_types=[".fasta", ".fa", ".txt"],
+                        file_count="single"
+                    )
+                with gr.Column(visible=False) as path_seq_column:
+                    seq_path_input = gr.Textbox(
+                        label="FASTA file path",
+                        placeholder="Absolute or relative path to FASTA file",
+                        value=""
+                    )
+                with gr.Row(visible=False) as structure_input_row:
+                    foldseek_seq = gr.Textbox(
+                        label="Foldseek Sequence (FASTA format)",
+                        placeholder=">id\nFoldseek sequence per residue...",
+                        lines=2
+                    )
+                    ss8_seq = gr.Textbox(
+                        label="SS8 Sequence (FASTA format)",
+                        placeholder=">id\nHECGIBST secondary structure codes...",
+                        lines=2
+                    )
+
+            model_folder.change(
+                fn=_on_model_folder_change,
+                inputs=[model_folder],
+                outputs=[model_dropdown, plm_model, eval_method, pooling_method, problem_type, num_labels, structure_seq,
+                         predict_pdb_dir_row, input_data_column, structure_seq_row, structure_input_row]
+            )
+            model_dropdown.change(
+                fn=_on_model_selected,
+                inputs=[model_dropdown],
+                outputs=[plm_model, eval_method, pooling_method, problem_type, num_labels, structure_seq,
+                         predict_pdb_dir_row, input_data_column, structure_seq_row, structure_input_row]
+            )
+
+            with gr.Accordion("Hyperparameter Settings", open=False):
+                gr.Markdown("### Batch Processing Configuration")
+                with gr.Row(equal_height=True):
+                    with gr.Column(scale=1):
+                        batch_mode = gr.Radio(
+                            choices=["Batch Size Mode", "Batch Token Mode"],
+                            label="Batch Processing Mode",
+                            value="Batch Size Mode"
+                        )
+                    with gr.Column(scale=2):
+                        batch_size = gr.Slider(
+                            minimum=1,
+                            maximum=128,
+                            value=1,
+                            step=1,
+                            label="Batch Size",
+                            visible=True
+                        )
+                        batch_token = gr.Slider(
+                            minimum=1000,
+                            maximum=50000,
+                            value=2000,
+                            step=1000,
+                            label="Tokens per Batch",
+                            visible=False
+                        )
             with gr.Row():
                 preview_single_button = gr.Button("Preview Command", elem_classes=["preview-command-btn"])
                 predict_button = gr.Button("Start Prediction", variant="primary", elem_classes=["train-btn"])
                 abort_button = gr.Button("Abort Prediction", variant="stop", elem_classes=["abort-btn"])
-            
-            # add command preview area
+
+        with gr.Column(scale=3):
+            gr.Markdown("## Results")
             command_preview = gr.Code(
                 label="Command Preview",
                 language="shell",
                 interactive=False,
                 visible=False
             )
-            predict_output = gr.HTML(label="Prediction Results")
+            predict_output = gr.HTML(
+                value="<div style='padding: 15px; background-color: #f5f5f5; border-radius: 5px;'><p style='margin: 0;'>Click the 「Start Prediction」 button to run prediction</p></div>",
+                label="Prediction Results",
+                padding=True
+            )
             single_result_file = gr.DownloadButton(label="Download Results", visible=False)
-            
-            
-            
-            
-            predict_button.click(
-                fn=predict_sequence,
-                inputs=[
-                    plm_model,
-                    model_path,
-                    aa_seq,
-                    eval_method,
-                    structure_seq,
-                    pooling_method,
-                    problem_type,
-                    num_labels
-                ],
-                outputs=[predict_output, single_result_file]
-            )
-            
-            abort_button.click(
-                fn=handle_abort_single,
-                inputs=[],
-                outputs=[predict_output, single_result_file]
-            )
-        
-        with gr.Tab("Batch Prediction"):
-            gr.Markdown("### Batch Prediction")
-            # display CSV format information with improved styling
-            gr.HTML(f"""
-            {get_css_style_tag('prediction_ui.css')}
-            {load_html_template('csv_format_info.html')}
-            """)
-                
-            with gr.Row():
-                input_file = gr.UploadButton(
-                    label="Upload CSV File",
-                    file_types=[".csv"],
-                    file_count="single"
-                )
-            
-            # File preview accordion
-            with gr.Accordion("File Preview", open=False) as file_preview_accordion:
-                # File info area
-                with gr.Row():
-                    file_info = gr.HTML("", elem_classes=["dataset-stats"])
-                
-                # Table area
-                with gr.Row():
-                    file_preview = gr.Dataframe(
-                        headers=["name", "sequence"],
-                        value=[["No file uploaded", "-"]],
-                        wrap=True,
-                        interactive=False,
-                        row_count=5,
-                        elem_classes=["preview-table"]
-                    )
-            
-            # Add file preview function
-            def update_file_preview(file):
-                if file is None:
-                    return gr.update(value="<div class='file-info'>No file uploaded</div>"), gr.update(value=[["No file uploaded", "-"]], headers=["name", "sequence"]), gr.update(open=False)
-                try:
-                    df = pd.read_csv(file.name)
-                    info_html = f"""
-                    {get_css_style_tag('prediction_ui.css')}
-                    {load_html_template('file_preview_table.html', 
-                                      file_name=file.name.split('/')[-1],
-                                      total_sequences=len(df),
-                                      columns=', '.join(df.columns.tolist()))}
-                    """
-                    return gr.update(value=info_html), gr.update(value=df.head(5).values.tolist(), headers=df.columns.tolist()), gr.update(open=True)
-                except Exception as e:
-                    error_html = f"""
-                    {get_css_style_tag('prediction_ui.css')}
-                    {load_html_template('file_error.html', error_message=str(e))}
-                    """
-                    return gr.update(value=error_html), gr.update(value=[["Error", str(e)]], headers=["Error", "Message"]), gr.update(open=True)
-            
-            # Use upload event instead of click event
-            input_file.upload(
-                fn=update_file_preview,
-                inputs=[input_file],
-                outputs=[file_info, file_preview, file_preview_accordion]
-            )
-            with gr.Row():
-                with gr.Column(scale=1):
-                    batch_size = gr.Slider(
-                        minimum=1,
-                        maximum=32,
-                        value=8,
-                        step=1,
-                        label="Batch Size",
-                        info="Number of sequences to process at once"
-                    )
-            
-            with gr.Row():
-                preview_batch_button = gr.Button("Preview Command")
-                batch_predict_button = gr.Button("Start Batch Prediction", variant="primary")
-                batch_abort_button = gr.Button("Abort", variant="stop")
-            
-            # add command preview
-            batch_command_preview = gr.Code(
-                label="Command Preview",
-                language="shell",
-                interactive=False,
-                visible=False
-            )
-            batch_predict_output = gr.HTML(label="Prediction Progress")
-            result_file = gr.DownloadButton(label="Download Predictions", visible=False)
 
-            # add command preview visibility control
-            def toggle_preview(button_text):
-                """toggle command preview visibility"""
-                if "Preview" in button_text:
-                    return gr.update(visible=True)
-                return gr.update(visible=False)
-            
-            # connect preview button
-            preview_single_button.click(
-                fn=toggle_preview,
-                inputs=[preview_single_button],
-                outputs=[command_preview]
-            ).then(
-                fn=handle_predict_tab_command_preview,
-                inputs=[
-                    plm_model,
-                    model_path,
-                    eval_method,
-                    aa_seq,
-                    foldseek_seq,
-                    ss8_seq,
-                    structure_seq,
-                    pooling_method,
-                    problem_type,
-                    num_labels,
-                ],
-                outputs=[command_preview]
-            )
-            
-            # connect preview button
-            preview_batch_button.click(
-                fn=toggle_preview,
-                inputs=[preview_batch_button],
-                outputs=[batch_command_preview]
-            ).then(
-                fn=handle_batch_preview,
-                inputs=[
-                    plm_model,
-                    model_path,
-                    eval_method,
-                    input_file,
-                    structure_seq,
-                    pooling_method,
-                    problem_type,
-                    num_labels,
-                    batch_size,
-                ],
-                outputs=[batch_command_preview]
-            )
-            
-            batch_predict_button.click(
-                fn=predict_batch,
-                inputs=[
-                    plm_model,
-                    model_path,
-                    eval_method,
-                    input_file,
-                    structure_seq,
-                    pooling_method,
-                    problem_type,
-                    num_labels,
-                    batch_size,
-                ],
-                outputs=[batch_predict_output, result_file]
-            )
-            
-            batch_abort_button.click(
-                fn=handle_abort_batch,
-                inputs=[],
-                outputs=[batch_predict_output, result_file]
-            )
+    def toggle_input_method(method):
+        if method == "Upload file":
+            return gr.update(visible=False), gr.update(visible=True), gr.update(visible=False)
+        if method == "Specify FASTA path":
+            return gr.update(visible=False), gr.update(visible=False), gr.update(visible=True)
+        return gr.update(visible=True), gr.update(visible=False), gr.update(visible=False)
 
-    # Add this code after all UI components are defined
-    def update_eval_method(method):
-        return {
-            structure_seq_row: gr.update(visible=method == "ses-adapter"),
-            structure_input_row: gr.update(visible=method == "ses-adapter")
-        }
+    input_method.change(
+        fn=toggle_input_method,
+        inputs=[input_method],
+        outputs=[paste_seq_column, upload_seq_column, path_seq_column]
+    )
+
+    def resolve_sequence_then_predict(input_method_val, aa_seq_val, seq_file, seq_path_val, plm_model, model_path, eval_method, structure_seq, pooling_method, problem_type, num_labels, batch_size_val, predict_pdb_dir_val=None):
+        """Parse multi-FASTA from paste, file upload, or path, create CSV, run batch prediction. Must be a generator for Gradio."""
+        if input_method_val == "Upload file" and seq_file is not None:
+            records = _parse_fasta_from_file(seq_file)
+        elif input_method_val == "Specify FASTA path" and seq_path_val and os.path.isfile(str(seq_path_val).strip()):
+            records = _parse_fasta_from_file(type("PathLike", (), {"name": str(seq_path_val).strip()})())
+        else:
+            records = _parse_fasta_sequences((aa_seq_val or "").strip())
+        # Structure model with only pdb_dir: build minimal CSV from PDB files in directory
+        is_structure_plm = bool(plm_model and (str(plm_model).startswith("ProSST") or str(plm_model).startswith("SaProt") or str(plm_model).startswith("ProtSSN")))
+        if not records and is_structure_plm and predict_pdb_dir_val and os.path.isdir(str(predict_pdb_dir_val).strip()):
+            pdb_path = Path(str(predict_pdb_dir_val).strip())
+            records = [(p.stem, "") for p in sorted(pdb_path.rglob("*.pdb"))]
+        if not records:
+            yield (
+                f"""
+                {get_css_style_tag('prediction_ui.css')}
+                {load_html_template('prediction_error.html', error_message="Please paste one or more FASTA sequences, upload a FASTA file, specify a FASTA path, or (for structure models) provide a PDB directory.")}
+                """,
+                gr.update(visible=False)
+            )
+            return
+        temp_dir = tempfile.mkdtemp()
+        csv_path = os.path.join(temp_dir, "input.csv")
+        df = pd.DataFrame([{"id": rid, "aa_seq": seq} for rid, seq in records])
+        df.to_csv(csv_path, index=False)
+        file_like = type("FileLike", (), {"name": csv_path})()
+        yield from predict_batch(
+            plm_model, model_path, eval_method, file_like, structure_seq,
+            pooling_method, problem_type, num_labels, batch_size_val, predict_pdb_dir_val
+        )
+
+    def toggle_preview(button_text):
+        if "Preview" in button_text:
+            return gr.update(visible=True)
+        return gr.update(visible=False)
+
+    def toggle_batch_mode(mode):
+        if mode == "Batch Token Mode":
+            return gr.update(visible=False), gr.update(visible=True)
+        return gr.update(visible=True), gr.update(visible=False)
+
+    batch_mode.change(
+        fn=toggle_batch_mode,
+        inputs=[batch_mode],
+        outputs=[batch_size, batch_token]
+    )
+
+    preview_single_button.click(
+        fn=toggle_preview,
+        inputs=[preview_single_button],
+        outputs=[command_preview]
+    ).then(
+        fn=handle_predict_tab_command_preview,
+        inputs=[
+            input_method,
+            aa_seq,
+            seq_file_upload,
+            plm_model,
+            model_dropdown,
+            eval_method,
+            foldseek_seq,
+            ss8_seq,
+            structure_seq,
+            pooling_method,
+            problem_type,
+            num_labels,
+            predict_pdb_dir,
+        ],
+        outputs=[command_preview]
+    )
+    predict_button.click(
+        fn=resolve_sequence_then_predict,
+        inputs=[
+            input_method,
+            aa_seq,
+            seq_file_upload,
+            seq_path_input,
+            plm_model,
+            model_dropdown,
+            eval_method,
+            structure_seq,
+            pooling_method,
+            problem_type,
+            num_labels,
+            batch_size,
+            predict_pdb_dir
+        ],
+        outputs=[predict_output, single_result_file]
+    )
+    abort_button.click(
+        fn=handle_abort_single,
+        inputs=[],
+        outputs=[predict_output, single_result_file]
+    )
+
+    # Event handlers after UI components
+    def _predict_plm_needs_structure(plm: str) -> bool:
+        return bool(plm and (str(plm).startswith("ProSST") or str(plm).startswith("SaProt") or str(plm).startswith("ProtSSN")))
+
+    def update_predict_visibility(method, plm, pdb_dir_val=None):
+        is_structure = _predict_plm_needs_structure(plm)
+        is_ses = method == "ses-adapter"
+        show_pdb = is_structure or is_ses
+        show_input = not is_structure
+        show_structure_seq_row = is_ses
+        has_pdb = bool(pdb_dir_val and str(pdb_dir_val).strip())
+        show_structure_input = is_ses and not has_pdb
+        return (
+            gr.update(visible=show_pdb),
+            gr.update(visible=show_input),
+            gr.update(visible=show_structure_seq_row),
+            gr.update(visible=show_structure_input),
+        )
 
     eval_method.change(
-        fn=update_eval_method,
-        inputs=[eval_method],
-        outputs=[structure_seq_row, structure_input_row]
+        fn=lambda m, p: update_predict_visibility(m, p, None),
+        inputs=[eval_method, plm_model],
+        outputs=[predict_pdb_dir_row, input_data_column, structure_seq_row, structure_input_row]
+    )
+    plm_model.change(
+        fn=lambda m, p: update_predict_visibility(m, p, None),
+        inputs=[eval_method, plm_model],
+        outputs=[predict_pdb_dir_row, input_data_column, structure_seq_row, structure_input_row]
+    )
+    predict_pdb_dir.change(
+        fn=update_predict_visibility,
+        inputs=[eval_method, plm_model, predict_pdb_dir],
+        outputs=[predict_pdb_dir_row, input_data_column, structure_seq_row, structure_input_row]
     )
 
     # Add a new function to control the visibility of the structure sequence input boxes
@@ -1398,7 +1538,7 @@ def create_predict_tab(constant):
 
         if is_proprime:
             return {
-                model_path: gr.update(**update_params),
+                model_dropdown: gr.update(**update_params),
                 eval_method: gr.update(**update_params),
                 pooling_method: gr.update( **update_params),
                 num_labels: gr.update(value=1, **update_params),
@@ -1407,7 +1547,7 @@ def create_predict_tab(constant):
             }
         else:
             return {
-                model_path: gr.update(**update_params),
+                model_dropdown: gr.update(**update_params),
                 eval_method: gr.update(**update_params),
                 pooling_method: gr.update(**update_params),
                 num_labels: gr.update(**update_params),
@@ -1420,88 +1560,7 @@ def create_predict_tab(constant):
     plm_model.change(
         fn=update_components_based_on_model,
         inputs=[plm_model],
-        outputs=[model_path, eval_method, pooling_method, num_labels, problem_type, otg_message]
-    )
-
-    # Configuration Import Handler
-    def handle_config_import(config_path: str):
-        """
-        Loads a prediction configuration from a JSON file and updates the UI components.
-        """
-        try:
-            if not config_path or not config_path.strip():
-                gr.Warning("Please provide a configuration file path")
-                return [gr.update() for _ in range(6)]
-                
-            if not os.path.exists(config_path):
-                gr.Warning(f"Configuration file not found: {config_path}")
-                return [gr.update() for _ in range(6)]
-            
-            with open(config_path, "r", encoding='utf-8') as f:
-                config = json.load(f)
-            
-            def get_config_val(key, default):
-                return config.get(key, default)
-            
-            # Extract and validate model_path
-            model_path_value = get_config_val("model_path", "ckpt/demo/demo_solubility.pt")
-            
-            # Extract and map plm_model (config stores full path, UI uses key)
-            plm_model_path = get_config_val("plm_model", "")
-            plm_model_value = None
-            # Try to find the key by matching the path value
-            for key, path in plm_models.items():
-                if path == plm_model_path:
-                    plm_model_value = key
-                    break
-            # If not found, use the first available model
-            if not plm_model_value and plm_models:
-                plm_model_value = list(plm_models.keys())[0]
-            
-            # Validate eval_method
-            eval_method_value = get_config_val("training_method", "freeze")
-            valid_eval_methods = ["full", "freeze", "ses-adapter", "plm-lora", "plm-qlora", "plm_adalora", "plm_dora", "plm_ia3"]
-            if eval_method_value not in valid_eval_methods:
-                eval_method_value = "freeze"
-            
-            # Validate pooling_method
-            pooling_method_value = get_config_val("pooling_method", "mean")
-            if pooling_method_value not in ["mean", "attention1d", "light_attention"]:
-                pooling_method_value = "mean"
-            
-            # Validate problem_type
-            problem_type_value = get_config_val("problem_type", "single_label_classification")
-            valid_problem_types = ["single_label_classification", "multi_label_classification", "regression", "residue_single_label_classification", "residue_regression"]
-            if problem_type_value not in valid_problem_types:
-                problem_type_value = "single_label_classification"
-            
-            
-            # Extract num_labels
-            num_labels_value = get_config_val("num_labels", 2)
-            
-            gr.Info(f"✅ Configuration successfully imported from {config_path}")
-            
-            return [
-                gr.update(value=model_path_value),
-                gr.update(value=plm_model_value),
-                gr.update(value=eval_method_value),
-                gr.update(value=pooling_method_value),
-                gr.update(value=problem_type_value),
-                gr.update(value=num_labels_value),
-            ]
-        
-        except (json.JSONDecodeError, KeyError) as e:
-            gr.Warning(f"❌ Error parsing configuration file: {str(e)}")
-            return [gr.update() for _ in range(6)]
-        except Exception as e:
-            gr.Warning(f"❌ An unexpected error occurred during import: {str(e)}")
-            return [gr.update() for _ in range(6)]
-    
-    # Bind import config button
-    import_config_button.click(
-        fn=handle_config_import,
-        inputs=[config_path_input],
-        outputs=[model_path, plm_model, eval_method, pooling_method, problem_type, num_labels]
+        outputs=[model_dropdown, eval_method, pooling_method, num_labels, problem_type, otg_message]
     )
 
     return {

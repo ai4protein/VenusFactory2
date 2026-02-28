@@ -5,26 +5,25 @@ import threading
 import os
 import asyncio
 from typing import Tuple
+
 import gradio as gr
 import datetime
 from pathlib import Path
-from web.utils.monitor import TrainingMonitor
 from web.train_tab import create_train_tab
 from web.eval_tab import create_eval_tab
-from web.download_tab import create_download_tab
 from web.predict_tab import create_predict_tab
 from web.manual_tab import create_manual_tab
-from web.chat_tab import create_chat_tab
-from web.venus_factory_advanced_tool_tab import create_advanced_tool_tab
-from web.venus_factory_download_tab import create_download_tool_tab
-from web.venus_factory_quick_tool_tab import create_quick_tool_tab
-from web.venus_factory_comprehensive_tab import create_comprehensive_tab
+from web.chat_tab import create_chat_tab, AGENT_TAB_CSS
+from web.advanced_tool_tab import create_advanced_tool_tab
+from web.download_tool_tab import create_download_tool_tab
+from web.quick_tool_tab import create_quick_tool_tab
+from web.comprehensive_tab import create_comprehensive_tab
+from web.utils.monitor import TrainingMonitor
+from web.utils.html_ui import load_html_template
 from fast_api import app as fastapi_app
-from mcp_venusfactory import start_http_server
+from mcp_server import start_http_server
 from fastapi_mcp import FastApiMCP
 import uvicorn
-
-os.environ["HF_ENDPOINT"]="https://hf-mirror.com"
 
 _fastapi_server_thread = None
 _fastapi_server_lock = threading.Lock()
@@ -90,7 +89,7 @@ def start_fastapi_server(host: str = None, port: int = None) -> Tuple[str, int]:
 def delete_old_files():
     try:
         target_date = datetime.datetime.now() - datetime.timedelta(days=2)
-        base_path = Path("temp_outputs")
+        base_path = Path(os.getenv("TEMP_OUTPUTS_DIR", "temp_outputs"))
         dir_to_delete = base_path / target_date.strftime('%Y') / target_date.strftime('%m') / target_date.strftime('%d')
         if dir_to_delete.is_dir():
             shutil.rmtree(dir_to_delete)
@@ -150,125 +149,100 @@ def create_ui():
     custom_css = read_css_file(os.path.join(assets_dir,"css", "custom_ui.css"))
     manual_css = read_css_file(os.path.join(assets_dir, "css", "manual_ui.css"))
     manual_js = read_css_file(os.path.join(assets_dir, "js", "manual_ui.js"))
-    
-    # Combine all CSS
+
+    # Combine all CSS (Agent tab CSS lives in chat_tab.py)
     css_links = f"""
     <style>
     {custom_css}
     {manual_css}
+    {AGENT_TAB_CSS}
     {manual_js}
     </style>
     """
     
-    with gr.Blocks(css=css_links, title="VenusFactory") as demo:
+    # Gradio 6: css moved from Blocks() to launch()
+    with gr.Blocks(title="VenusFactory") as demo:
         # Header with GitHub icon
-        header_html = """
-        <div class="header-container" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
-            <div style="display: flex; align-items: center; gap: 15px;">
-                <h1 style="margin: 0; font-size: 2.5em; font-weight: 700; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
-                    VenusFactory
-                </h1>
-                <span style="font-size: 1.6em; color: #666; font-weight: 400;">The most powerful Open-source AI protein engineering platform</span>
-            </div>
-            <div style="display: flex; gap: 10px;">
-                <a href="https://github.com/ai4protein/VenusFactory" target="_blank" class="github-button" style="text-decoration: none; display: flex; align-items: center; padding: 10px 15px; background: #f4f4f4; color: #333; border: 2px solid #e0e0e0; border-radius: 8px; font-weight: 600; transition: all 0.3s ease; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="#333" style="margin-right: 8px;">
-                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-                    </svg>
-                    GitHub
-                </a>
-                <a href="https://huggingface.co/AI4Protein" target="_blank" class="huggingface-button" style="text-decoration: none; display: flex; align-items: center; padding: 10px 15px; background: #f4f4f4; color: #333; border: 2px solid #e0e0e0; border-radius: 8px; font-weight: 600; transition: all 0.3s ease; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-                    🤗 Hugging Face
-                </a>
-            </div>
-        </div>
-        """
-        gr.HTML(header_html)
+        header_html = load_html_template("header.html")
+        gr.HTML(header_html, padding=True)
         
         # Initialize train_components to None to handle potential creation errors
         train_components = None
 
         # --- Top-Level Tabs for Main Categories ---
         with gr.Tabs():
-            with gr.TabItem("📋 VenusScope"):
-                comprehensive_componsents = create_comprehensive_tab(constant)
-            
-            with gr.TabItem("🤖 VenusAgent"):
+            # Agent
+            with gr.Tab("🤖 Agent"):
                 try:
                     chat_components = create_chat_tab(constant)
                 except Exception as e:
                     gr.Markdown(f"**Error creating Chat tab:**\n```\n{e}\n```")
+            
+            # Report
+            with gr.Tab("📋 Report"):
+                comprehensive_componsents = create_comprehensive_tab(constant)
                     
             # Model Train and Prediction
-            with gr.TabItem("🚀 Model Train and Prediction"):
+            with gr.Tab("🚀 Model Train and Prediction"):
                 # Nested (Secondary) Tabs for sub-functions
                 with gr.Tabs():
-                    with gr.TabItem("Training"):
+                    with gr.Tab("Training"):
                         try:
                             # This function must return a dictionary with the required components
                             train_components = create_train_tab(constant) 
                         except Exception as e:
                             gr.Markdown(f"**Error creating Training tab:**\n```\n{e}\n```")
                     
-                    with gr.TabItem("Evaluation"):
+                    with gr.Tab("Evaluation"):
                         try:
                             eval_components = create_eval_tab(constant)
                         except Exception as e:
                             gr.Markdown(f"**Error creating Evaluation tab:**\n```\n{e}\n```")
 
-                    with gr.TabItem("Prediction"):
+                    with gr.Tab("Prediction"):
                         try:
                             predict_components = create_predict_tab(constant)
                         except Exception as e:
                             gr.Markdown(f"**Error creating Prediction tab:**\n```\n{e}\n```")
 
-            
-
             # Quick Tools
-            with gr.TabItem("🔧 Quick Tools "):
+            with gr.Tab("🔧 Quick Tools "):
                 try:
                     easy_use_components = create_quick_tool_tab(constant)
                 except Exception as e:
                     gr.Markdown(f"**Error creating Easy-Use tab:**\n```\n{e}\n```")
                 
             # Advanced Tools
-            with gr.TabItem("⚡ Advanced Tools"):
+            with gr.Tab("⚡ Advanced Tools"):
                 try:
                     advanced_tool_components = create_advanced_tool_tab(constant)
                 except Exception as e:
                     gr.Markdown(f"**Error creating Advanced Tools tab:**\n```\n{e}\n```")
 
             # Download
-            with gr.TabItem("💾 Download "):
+            with gr.Tab("💾 Download "):
                 try:
                     download_components = create_download_tool_tab(constant)
                 except Exception as e:
                     gr.Markdown(f"**Error creating Download tab:**\n```\n{e}\n```")
 
             # Manual (no nested tabs needed)
-            with gr.TabItem("📖 Manual "):
+            with gr.Tab("📖 Manual "):
                 try:
                     manual_components = create_manual_tab(constant)
                 except Exception as e:
                     gr.Markdown(f"**Error creating Manual tab:**\n```\n{e}\n```")
         
-        # Check if the training components were created successfully before setting up the monitor loop
-        if train_components and all(k in train_components for k in ["output_text", "loss_plot", "metrics_plot"]):
-            demo.load(
-                fn=update_output,
-                inputs=None,
-                outputs=[
-                    train_components["output_text"], 
-                    train_components["loss_plot"],
-                    train_components["metrics_plot"]
-                ],
-
-            )
-        else:
-            # This message will be printed to the console where the script is running
-            print("Warning: Training monitor components not found. The live update feature for training will be disabled.")
+        # Footer (visible on all pages)
+        footer_html = load_html_template("footer.html")
+        gr.HTML(footer_html)
+        
+        # NOTE: demo.load() disabled for Gradio 6 compatibility.
+        # In Gradio 6, components in inactive tabs (e.g. Training tab) may not be in the DOM yet
+        # when the load event fires, causing "Component with ID not found". Training monitor
+        # still works during actual training via progress callbacks.
             
-    return demo
+    return demo, css_links
 
 if __name__ == "__main__":
     try:
@@ -281,7 +255,7 @@ if __name__ == "__main__":
         mcp_host, mcp_port = start_http_server()
         print(f"[MCP] HTTP server available at http://{mcp_host}:{mcp_port}/mcp")
 
-        demo = create_ui()
+        demo, css_links = create_ui()
         demo.queue().launch(
             server_port=7860, 
             share=True, 
@@ -289,6 +263,7 @@ if __name__ == "__main__":
             show_error=True,
             inbrowser=True,
             mcp_server=True,
+            css=css_links,
         )
 
     except Exception as e:
