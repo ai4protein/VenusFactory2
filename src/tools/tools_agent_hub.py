@@ -1,7 +1,9 @@
 """
-aggregate tools_agent: mutation, predict, search, train, file.
+Aggregate tools_agent: mutation, predict, search, train, file.
 Hub for tools_agent submodules; only import and get_tools/FASTAPI_TOOLS/MCP_TOOLS, no tool implementation.
 Each series is a single list, then concatenated (no duplicate tool references).
+
+Usage: get_tools() -> all tools; get_pi_tools() -> search-only; FASTAPI_TOOLS/MCP_TOOLS -> filtered subsets.
 """
 from langchain.tools import BaseTool
 
@@ -21,6 +23,13 @@ from tools.search.tools_agent import (
     web_search_tool,
     foldseek_search_tool,
     interpro_lookup_tool,
+    uniprot_sequence_query_tool,
+    uniprot_meta_query_tool,
+    ncbi_sequence_query_tool,
+    ncbi_meta_query_tool,
+    rcsb_entry_query_tool,
+    rcsb_structure_query_tool,
+    alphafold_structure_query_tool,
     uniprot_sequence_download_tool,
     pdb_structure_download_tool,
     pdb_sequence_extraction_tool,
@@ -67,6 +76,13 @@ SEARCH_TOOLS: list[BaseTool] = [
     web_search_tool,
     foldseek_search_tool,
     interpro_lookup_tool,
+    uniprot_sequence_query_tool,
+    uniprot_meta_query_tool,
+    ncbi_sequence_query_tool,
+    ncbi_meta_query_tool,
+    rcsb_entry_query_tool,
+    rcsb_structure_query_tool,
+    alphafold_structure_query_tool,
     uniprot_sequence_download_tool,
     pdb_structure_download_tool,
     pdb_sequence_extraction_tool,
@@ -172,6 +188,13 @@ __all__ = [
     "web_search_tool",
     "foldseek_search_tool",
     "interpro_lookup_tool",
+    "uniprot_sequence_query_tool",
+    "uniprot_meta_query_tool",
+    "ncbi_sequence_query_tool",
+    "ncbi_meta_query_tool",
+    "rcsb_entry_query_tool",
+    "rcsb_structure_query_tool",
+    "alphafold_structure_query_tool",
     "uniprot_sequence_download_tool",
     "pdb_structure_download_tool",
     "pdb_sequence_extraction_tool",

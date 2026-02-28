@@ -1,4 +1,4 @@
-"""FASTA and UID list processing (extracted from search/download/utils)."""
+"""FASTA and UID list processing (extracted from search.database.utils)."""
 import os
 from typing import List, Optional
 

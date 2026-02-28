@@ -1,7 +1,18 @@
 """
-CLI for search tools: standard command-line invocation of local source/download scripts.
-No Gradio; runs tools.search.source.* (as module) and download/*.py (as script).
-Run from project root (e.g. PYTHONPATH=src python -m tools.search.tools_cmd).
+CLI for search tools: standard command-line invocation of local source/database scripts.
+No Gradio; runs scripts via _run_script.
+Run from project root: PYTHONPATH=src python -m tools.search.tools_cmd <command> [args]
+
+Usage:
+  literature   --query, --max_results, --source (arxiv,pubmed,...)
+  dataset      --query, --max_results, --source (github,hugging_face)
+  web-search   --query, --max_results, --source (duckduckgo,tavily)
+  foldseek     --pdb_file, --output_dir, --protect_start, --protect_end
+  uniprot      -i/--uniprot_id or -f/--file, -o/--out_dir, [-m/--merge], -e/--error_file
+  ncbi         -i/--id or -f/--file, -o/--out_dir, [-m/--merge], -e/--error_file
+  alphafold    -i/--uniprot_id or -f/--uniprot_id_file, -o/--out_dir, -e/--error_file
+  rcsb         -i/--pdb_id or -f/--pdb_id_file, -o/--out_dir, -t/--type, -u/--unzip, -e/--error_file
+  interpro     -i/--interpro_id or -f/--interpro_id_file, -o/--out_dir, -e/--error_file
 """
 import argparse
 import os
@@ -16,16 +27,11 @@ _SRC_DIR = _REPO_ROOT / "src"
 
 def _env_with_src():
     env = os.environ.copy()
-    # So that "python -m tools.search.source.literature" finds the tools package
+    # So that scripts find the tools package
     env["PYTHONPATH"] = str(_SRC_DIR)
     if os.environ.get("PYTHONPATH"):
         env["PYTHONPATH"] = os.environ["PYTHONPATH"] + os.pathsep + env["PYTHONPATH"]
     return env
-
-
-def _run_module(module: str, args: list[str]) -> int:
-    cmd = [sys.executable, "-m", module] + args
-    return subprocess.run(cmd, cwd=str(_REPO_ROOT), env=_env_with_src()).returncode
 
 
 def _run_script(script_rel: str, args: list[str]) -> int:
@@ -43,21 +49,21 @@ def cmd_literature(args: argparse.Namespace) -> int:
     q = getattr(args, "query", None) or "protein structure prediction"
     n = getattr(args, "max_results", 5)
     src = getattr(args, "source", "arxiv,pubmed")
-    return _run_module("tools.search.source.literature", ["--query", q, "--max_results", str(n), "--source", src])
+    return _run_script("src/tools/search/source/literature.py", ["--query", q, "--max_results", str(n), "--source", src])
 
 
 def cmd_dataset(args: argparse.Namespace) -> int:
     q = getattr(args, "query", None) or "protein dataset"
     n = getattr(args, "max_results", 5)
     src = getattr(args, "source", "github,hugging_face")
-    return _run_module("tools.search.source.dataset_search", ["--query", q, "--max_results", str(n), "--source", src])
+    return _run_script("src/tools/search/source/dataset_search.py", ["--query", q, "--max_results", str(n), "--source", src])
 
 
 def cmd_web_search(args: argparse.Namespace) -> int:
     q = getattr(args, "query", None) or "protein language model"
     n = getattr(args, "max_results", 5)
     src = getattr(args, "source", "duckduckgo")
-    return _run_module("tools.search.source.web_search", ["--query", q, "--max_results", str(n), "--source", src])
+    return _run_script("src/tools/search/source/web_search.py", ["--query", q, "--max_results", str(n), "--source", src])
 
 
 def cmd_foldseek(args: argparse.Namespace) -> int:
@@ -68,7 +74,7 @@ def cmd_foldseek(args: argparse.Namespace) -> int:
     out = getattr(args, "output_dir", "download/FoldSeek")
     start = getattr(args, "protect_start", 1)
     end = getattr(args, "protect_end", 10)
-    return _run_script("src/tools/search/download/foldseek_search.py", [
+    return _run_script("src/tools/search/database/foldseek/__main__.py", [
         "--pdb_file", pdb, "--output_dir", out,
         "--protect_start", str(start), "--protect_end", str(end),
     ])
@@ -92,7 +98,7 @@ def cmd_uniprot(args: argparse.Namespace) -> int:
         cmd_args += ["-n", str(args.num_workers)]
     if getattr(args, "error_file", None):
         cmd_args += ["-e", args.error_file]
-    return _run_script("src/tools/search/download/sequence/download_uniprot_seq.py", cmd_args)
+    return _run_script("src/tools/search/database/uniprot/uniprot_sequence.py", cmd_args)
 
 
 def cmd_ncbi(args: argparse.Namespace) -> int:
@@ -116,7 +122,7 @@ def cmd_ncbi(args: argparse.Namespace) -> int:
         cmd_args += ["-n", str(args.num_workers)]
     if getattr(args, "error_file", None):
         cmd_args += ["-e", args.error_file]
-    return _run_script("src/tools/search/download/sequence/download_ncbi_seq.py", cmd_args)
+    return _run_script("src/tools/search/database/ncbi/ncbi_sequence.py", cmd_args)
 
 
 def cmd_alphafold(args: argparse.Namespace) -> int:
@@ -135,7 +141,7 @@ def cmd_alphafold(args: argparse.Namespace) -> int:
         cmd_args += ["-e", args.error_file]
     if getattr(args, "num_workers", None) is not None:
         cmd_args += ["-n", str(args.num_workers)]
-    return _run_script("src/tools/search/download/structure/download_alphafold.py", cmd_args)
+    return _run_script("src/tools/search/database/alphafold/alphafold_structure.py", cmd_args)
 
 
 def cmd_rcsb(args: argparse.Namespace) -> int:
@@ -157,24 +163,27 @@ def cmd_rcsb(args: argparse.Namespace) -> int:
         cmd_args += ["-e", args.error_file]
     if getattr(args, "num_workers", None) is not None:
         cmd_args += ["-n", str(args.num_workers)]
-    return _run_script("src/tools/search/download/structure/download_rcsb.py", cmd_args)
+    return _run_script("src/tools/search/database/rcsb/rcsb_structure.py", cmd_args)
 
 
 def cmd_interpro(args: argparse.Namespace) -> int:
+    """Download InterPro entry metadata by InterPro ID(s). Use -i for single ID, -f for txt file."""
     i = getattr(args, "interpro_id", None)
-    j = getattr(args, "interpro_json", None)
-    if not i and not j:
-        print("Error: --interpro_id or --interpro_json required", file=sys.stderr)
+    f = getattr(args, "interpro_id_file", None)
+    if not i and not f:
+        print("Error: --interpro_id or --interpro_id_file required", file=sys.stderr)
         return 1
-    out = getattr(args, "out_dir", "download/interpro_domain")
-    cmd_args = ["--out_dir", out]
+    out = getattr(args, "out_dir", "download/interpro_metadata")
+    cmd_args = ["-o", out]
     if i:
-        cmd_args = ["--interpro_id", i] + cmd_args
+        cmd_args = ["-i", i] + cmd_args
     else:
-        cmd_args = ["--interpro_json", j] + cmd_args
+        cmd_args = ["-f", f] + cmd_args
     if getattr(args, "error_file", None):
-        cmd_args += ["--error_file", args.error_file]
-    return _run_script("src/tools/search/download/metadata/download_interpro.py", cmd_args)
+        cmd_args += ["-e", args.error_file]
+    if getattr(args, "num_workers", None) is not None:
+        cmd_args += ["-n", str(args.num_workers)]
+    return _run_script("src/tools/search/database/interpro/interpro_metadata.py", cmd_args)
 
 
 def main() -> int:
@@ -255,11 +264,12 @@ def main() -> int:
     p.set_defaults(run=cmd_rcsb)
 
     # interpro
-    p = sub.add_parser("interpro", help="Download InterPro metadata by InterPro ID(s)")
-    p.add_argument("--interpro_id", help="Single InterPro ID")
-    p.add_argument("--interpro_json", help="JSON file with InterPro IDs")
-    p.add_argument("--out_dir", default="download/interpro_domain", help="Output directory")
-    p.add_argument("--error_file", help="File to log failed IDs")
+    p = sub.add_parser("interpro", help="Download InterPro entry metadata by InterPro ID(s)")
+    p.add_argument("-i", "--interpro_id", help="Single InterPro ID")
+    p.add_argument("-f", "--interpro_id_file", help="Txt file with one InterPro ID per line")
+    p.add_argument("-o", "--out_dir", default="download/interpro_metadata", help="Output directory")
+    p.add_argument("-e", "--error_file", help="File to log failed IDs")
+    p.add_argument("-n", "--num_workers", type=int, default=12, help="Parallel workers")
     p.set_defaults(run=cmd_interpro)
 
     args = parser.parse_args()

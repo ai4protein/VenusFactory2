@@ -1,3 +1,15 @@
+"""
+Download tool tab: Gradio UI for database download (UniProt, NCBI, RCSB, AlphaFold, InterPro).
+Scripts: src/tools/search/database/{uniprot, ncbi, rcsb, alphafold, interpro}/*.py
+  - uniprot_sequence.py: -i/-f, -o, -m, -e
+  - ncbi_sequence.py: -i/-f, -o, -m, -e
+  - rcsb_metadata.py: -i/-f (pdb_id), -o, -e
+  - rcsb_structure.py: -i/-f, -o, -t, -u, -e
+  - alphafold_structure.py: -i/-f, -o, -e
+  - alphafold_metadata.py: -i/-f, -o, -e
+  - interpro_metadata.py: -i/-f, -o, -e
+  - interpro_proteins.py: --interpro_id/--interpro_json, --out_dir, --error_file
+"""
 import os
 import time
 import subprocess
@@ -65,9 +77,10 @@ def get_first_file_preview(task_folder: str, max_lines: int = 10) -> str:
         return f"Error: {str(e)[:80]}"
 
 def create_download_tool_tab(constant: Dict[str, Any]):
-    def run_download_script(script_name: str, **kwargs) -> str:
+    def run_download_script(script_path: str, **kwargs) -> str:
         """Runs an external Python script using subprocess."""
-        cmd = ["python", f"src/tools/search/download/{script_name}"]
+        script_full = script_path if script_path.startswith("src/") else f"src/tools/search/database/{script_path}"
+        cmd = ["python", script_full]
         for k, v in kwargs.items():
             if v is None: continue
             if isinstance(v, bool):
@@ -82,7 +95,7 @@ def create_download_tool_tab(constant: Dict[str, Any]):
         except subprocess.CalledProcessError as e:
             return f"Error during download script execution:\n{e.stderr}"
         except FileNotFoundError:
-            return f"Error: Script not found at 'src/tools/search/download/{script_name}'. Please check the path."
+            return f"Error: Script not found at '{script_full}'. Please check the path."
         except Exception as e:
             return f"An unexpected error occurred: {str(e)}"
 
@@ -205,23 +218,23 @@ def create_download_tool_tab(constant: Dict[str, Any]):
             json.dump(data, f, indent=2)
         return truncated_file_path
 
-    def handle_interpro_download(method: str, id_val: str, json_file, user_hash: str, error: bool) -> tuple:
-        """Handles InterPro metadata download."""
+    def handle_interpro_download(method: str, id_val: str, file_val, user_hash: str, error: bool) -> tuple:
+        """Handles InterPro entry metadata download by InterPro ID(s)."""
         timestamp = str(int(time.time()))
         task_folder = get_save_path("Download_data", "InterPro")
-        json_val = None
-        if method == "From JSON" and json_file:
-            data, preview = read_json_file(json_file.name)
-            if data:
-                json_val = save_truncated_json(data, task_folder)
-        
+        file_path = None
+        if method == "From File" and file_val:
+            lines, preview = read_uploaded_file(file_val.name)
+            if lines:
+                file_path = save_truncated_file(file_val.name, lines, task_folder)
+
         args = {
             "interpro_id": id_val if method == "Single ID" else None,
-            "interpro_json": json_val,
+            "interpro_id_file": file_path,
             "out_dir": task_folder,
             "error_file": f"{task_folder}/{timestamp}_failed.txt" if error else None
         }
-        download_result = run_download_script("metadata/download_interpro.py", **args)
+        download_result = run_download_script("interpro/interpro_metadata.py", **args)
         tar_path = tar_task_results(task_folder, "interpro_metadata")
         preview = get_first_file_preview(task_folder)
         return preview, download_result, gr.update(visible=True, value=tar_path)
@@ -243,7 +256,7 @@ def create_download_tool_tab(constant: Dict[str, Any]):
             "out_dir": task_folder,
             "error_file": f"{task_folder}/{timestamp}_failed.txt" if error else None
         }
-        download_result = run_download_script("metadata/download_rcsb.py", **args)
+        download_result = run_download_script("rcsb/rcsb_metadata.py", **args)
         tar_path = tar_task_results(task_folder, "rcsb_metadata")
         preview = get_first_file_preview(task_folder)
         return preview, download_result, gr.update(visible=True, value=tar_path)
@@ -266,7 +279,7 @@ def create_download_tool_tab(constant: Dict[str, Any]):
             "merge": "--merge" if merge else None,
             "error_file": f"{task_folder}/{timestamp}_failed.txt" if error else None
         }
-        download_result = run_download_script("sequence/download_uniprot_seq.py", **args)
+        download_result = run_download_script("uniprot/uniprot_sequence.py", **args)
         tar_path = tar_task_results(task_folder, "uniprot_sequence")
         preview = get_first_file_preview(task_folder)
         return preview, download_result, gr.update(visible=True, value=tar_path)
@@ -289,7 +302,7 @@ def create_download_tool_tab(constant: Dict[str, Any]):
             "merge": "--merge" if merge else None,
             "error_file": f"{task_folder}/failed.txt" if error else None
         }
-        download_result = run_download_script("sequence/download_ncbi_seq.py", **args)
+        download_result = run_download_script("ncbi/ncbi_sequence.py", **args)
         tar_path = tar_task_results(task_folder, "ncbi_sequence")
         preview = get_first_file_preview(task_folder)
         return preview, download_result, gr.update(visible=True, value=tar_path)
@@ -306,7 +319,7 @@ def create_download_tool_tab(constant: Dict[str, Any]):
                 file_path = save_truncated_file(file_upload.name, lines, task_folder)
         
         download_output = run_download_script(
-            "structure/download_rcsb.py",
+            "rcsb/rcsb_structure.py",
             pdb_id=id_val if method == "Single ID" else None,
             pdb_id_file=file_path,
             out_dir=task_folder, 
@@ -345,7 +358,7 @@ def create_download_tool_tab(constant: Dict[str, Any]):
                 file_path = save_truncated_file(file_upload.name, lines, task_folder)
         
         download_output = run_download_script(
-            "structure/download_alphafold.py",
+            "alphafold/alphafold_structure.py",
             uniprot_id=id_val if method == "Single ID" else None,
             uniprot_id_file=file_path,
             out_dir=task_folder, error_file=f"{task_folder}/{timestamp}_failed.txt" if error else None
@@ -614,12 +627,18 @@ def create_download_tool_tab(constant: Dict[str, Any]):
                     
                     # InterPro Metadata Download
                     with gr.Tab("InterPro Metadata"):
-                        gr.Markdown("#### Download protein domain, family, and Gene Ontology annotation metadata from InterPro")
+                        gr.Markdown("#### Download InterPro entry/family metadata by InterPro ID (e.g. IPR000001)")
                         with gr.Row(equal_height=False):
                             with gr.Column(scale=2):
-                                interpro_method = gr.Radio(["Single ID", "From JSON"], label="Download Method", value="Single ID")
+                                interpro_method = gr.Radio(["Single ID", "From File"], label="Download Method", value="Single ID")
                                 interpro_id = gr.Textbox(label="InterPro ID", value="IPR000001", visible=True, placeholder="e.g., IPR000001", interactive=True)
-                                interpro_json_upload = gr.File(label="Upload JSON File", file_types=[".json"], visible=False)
+                                with gr.Column(visible=False) as interpro_file_column:
+                                    interpro_file_upload = gr.File(label="Upload InterPro ID List (one per line)", file_types=[".txt"])
+                                    interpro_file_example = gr.Examples(
+                                        examples=[["./example/database/interpro/interpro.txt"]],
+                                        inputs=interpro_file_upload,
+                                        label="Click example to load"
+                                    )
                                 interpro_error = gr.Checkbox(label="Save error file", value=True)
                                 interpro_btn = gr.Button("Start Download", variant="primary")
                                 interpro_user = gr.Textbox(label="User Hash", value="default_user", visible=False)
@@ -631,21 +650,20 @@ def create_download_tool_tab(constant: Dict[str, Any]):
                         # Event handlers for InterPro
                         interpro_method.change(
                             lambda method: [
-                                gr.update(visible=(method == "Single ID"), interactive=(method == "Single ID")),
-                                gr.update(visible=(method == "From JSON")),
-                                gr.update(visible=(method == "From JSON")),
+                                gr.update(visible=(method == "From File")),
+                                gr.update(interactive=(method == "Single ID"))
                             ],
                             inputs=interpro_method,
-                            outputs=[interpro_id, interpro_json_upload, interpro_preview]
+                            outputs=[interpro_file_column, interpro_id]
                         )
-                        interpro_json_upload.change(
-                            lambda f: read_json_file(f.name if f else None)[1] if f else "",
-                            inputs=interpro_json_upload,
+                        interpro_file_upload.change(
+                            lambda f: read_uploaded_file(f.name if f else None)[1] if f else "",
+                            inputs=interpro_file_upload,
                             outputs=interpro_preview
                         )
                         interpro_btn.click(
-                            fn=handle_interpro_download, 
-                            inputs=[interpro_method, interpro_id, interpro_json_upload, interpro_user, interpro_error], 
+                            fn=handle_interpro_download,
+                            inputs=[interpro_method, interpro_id, interpro_file_upload, interpro_user, interpro_error],
                             outputs=[interpro_result_preview, interpro_output, interpro_download_btn]
                         )
             

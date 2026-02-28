@@ -1,4 +1,4 @@
-"""PDB parsing: sequences, chain A only, batch to FASTA, apo check (from search/download/utils and pdb_filter)."""
+"""PDB parsing: sequences, chain A only, batch to FASTA, apo check (from search.database.utils and pdb_filter)."""
 import os
 from typing import List
 

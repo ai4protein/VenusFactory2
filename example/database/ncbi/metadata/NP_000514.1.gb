@@ -1,0 +1,189 @@
+LOCUS       NP_000514                335 aa            linear   PRI 08-OCT-2006
+DEFINITION  homeobox D13 [Homo sapiens].
+ACCESSION   NP_000514
+VERSION     NP_000514.1
+DBSOURCE    REFSEQ: accession NM_000523.2
+KEYWORDS    RefSeq.
+SOURCE      Homo sapiens (human)
+  ORGANISM  Homo sapiens
+            Eukaryota; Metazoa; Chordata; Craniata; Vertebrata; Euteleostomi;
+            Mammalia; Eutheria; Euarchontoglires; Primates; Haplorrhini;
+            Catarrhini; Hominidae; Homo.
+REFERENCE   1  (residues 1 to 335)
+  AUTHORS   Palmqvist,L., Argiropoulos,B., Pineault,N., Abramovich,C.,
+            Sly,L.M., Krystal,G., Wan,A. and Humphries,R.K.
+  TITLE     The Flt3 receptor tyrosine kinase collaborates with NUP98-HOX
+            fusions in acute myeloid leukemia
+  JOURNAL   Blood 108 (3), 1030-1036 (2006)
+   PUBMED   16861351
+  REMARK    GeneRIF: synergism between NUP98-HOX and wt-Flt3 is the result of
+            the ability of Flt3 to increase proliferation of myeloid
+            progenitors blocked in differentiation by NUP98-HOX fusions,
+            revealing a direct role for wt-Flt3 in the pathobiology of AML.
+REFERENCE   2  (residues 1 to 335)
+  AUTHORS   Kan,S.H., Johnson,D., Giele,H. and Wilkie,A.O.
+  TITLE     An acceptor splice site mutation in HOXD13 results in variable
+            hand, but consistent foot malformations
+  JOURNAL   Am. J. Med. Genet. A 121 (1), 69-74 (2003)
+   PUBMED   12900906
+REFERENCE   3  (residues 1 to 335)
+  AUTHORS   Johnson,D., Kan,S.H., Oldridge,M., Trembath,R.C., Roche,P.,
+            Esnouf,R.M., Giele,H. and Wilkie,A.O.
+  TITLE     Missense mutations in the homeodomain of HOXD13 are associated with
+            brachydactyly types D and E
+  JOURNAL   Am. J. Hum. Genet. 72 (4), 984-997 (2003)
+   PUBMED   12649808
+  REMARK    GeneRIF: Missense mutations in this protein are associated with
+            brachydactyly types D and E.
+REFERENCE   4  (residues 1 to 335)
+  AUTHORS   Caronia,G., Goodman,F.R., McKeown,C.M., Scambler,P.J. and
+            Zappavigna,V.
+  TITLE     An I47L substitution in the HOXD13 homeodomain causes a novel human
+            limb malformation by producing a selective loss of function
+  JOURNAL   Development 130 (8), 1701-1712 (2003)
+   PUBMED   12620993
+  REMARK    GeneRIF: Data show that a mutant HOXD13 protein that recognizes
+            only a subset of sites recognized by the wild-type protein causes a
+            novel human limb malformation.
+            Erratum:[Development. 2003 May;130(10):2289]
+REFERENCE   5  (residues 1 to 335)
+  AUTHORS   Debeer,P., Bacchelli,C., Scambler,P.J., De Smet,L., Fryns,J.P. and
+            Goodman,F.R.
+  TITLE     Severe digital abnormalities in a patient heterozygous for both a
+            novel missense mutation in HOXD13 and a polyalanine tract expansion
+            in HOXA13
+  JOURNAL   J. Med. Genet. 39 (11), 852-856 (2002)
+   PUBMED   12414828
+REFERENCE   6  (residues 1 to 335)
+  AUTHORS   Goodman,F.R.
+  TITLE     Limb malformations and the human HOX genes
+  JOURNAL   Am. J. Med. Genet. 112 (3), 256-265 (2002)
+   PUBMED   12357469
+  REMARK    Review article
+REFERENCE   7  (residues 1 to 335)
+  AUTHORS   Kosaki,K., Kosaki,R., Suzuki,T., Yoshihashi,H., Takahashi,T.,
+            Sasaki,K., Tomita,M., McGinnis,W. and Matsuo,N.
+  TITLE     Complete mutation analysis panel of the 39 human HOX genes
+  JOURNAL   Teratology 65 (2), 50-62 (2002)
+   PUBMED   11857506
+REFERENCE   8  (residues 1 to 335)
+  AUTHORS   Goodman,F.R., Majewski,F., Collins,A.L. and Scambler,P.J.
+  TITLE     A 117-kb microdeletion removing HOXD9-HOXD13 and EVX2 causes
+            synpolydactyly
+  JOURNAL   Am. J. Hum. Genet. 70 (2), 547-555 (2002)
+   PUBMED   11778160
+  REMARK    GeneRIF: 117-kb microdeletion removing HOXD9-HOXD13 and EVX2 causes
+            synpolydactyly
+REFERENCE   9  (residues 1 to 335)
+  AUTHORS   Harrington,J.J., Sherf,B., Rundlett,S., Jackson,P.D., Perry,R.,
+            Cain,S., Leventhal,C., Thornton,M., Ramachandran,R.,
+            Whittington,J., Lerner,L., Costanzo,D., McElligott,K., Boozer,S.,
+            Mays,R., Smith,E., Veloso,N., Klika,A., Hess,J., Cothren,K., Lo,K.,
+            Offenbacher,J., Danzig,J. and Ducar,M.
+  TITLE     Creation of genome-wide protein expression libraries using random
+            activation of gene expression
+  JOURNAL   Nat. Biotechnol. 19 (5), 440-445 (2001)
+   PUBMED   11329013
+REFERENCE   10 (residues 1 to 335)
+  AUTHORS   Limongi,M.Z., Pelliccia,F., Gaddini,L. and Rocchi,A.
+  TITLE     Clustering of two fragile sites and seven homeobox genes in human
+            chromosome region 2q31-->q32.1
+  JOURNAL   Cytogenet. Cell Genet. 90 (1-2), 151-153 (2000)
+   PUBMED   11060466
+REFERENCE   11 (residues 1 to 335)
+  AUTHORS   Goodman,F., Giovannucci-Uzielli,M.L., Hall,C., Reardon,W.,
+            Winter,R. and Scambler,P.
+  TITLE     Deletions in HOXD13 segregate with an identical, novel foot
+            malformation in two unrelated families
+  JOURNAL   Am. J. Hum. Genet. 63 (4), 992-1000 (1998)
+   PUBMED   9758628
+REFERENCE   12 (residues 1 to 335)
+  AUTHORS   Johnson,R.L. and Tabin,C.J.
+  TITLE     Molecular models for vertebrate limb development
+  JOURNAL   Cell 90 (6), 979-990 (1997)
+   PUBMED   9323126
+  REMARK    Review article
+REFERENCE   13 (residues 1 to 335)
+  AUTHORS   Akarsu,A.N., Stoilov,I., Yilmaz,E., Sayli,B.S. and Sarfarazi,M.
+  TITLE     Genomic structure of HOXD13 gene: a nine polyalanine duplication
+            causes synpolydactyly in two unrelated families
+  JOURNAL   Hum. Mol. Genet. 5 (7), 945-952 (1996)
+   PUBMED   8817328
+  REMARK    GeneRIF: Gene Structure and Report of Nine Polyalanine Duplications
+            in Families with Synpolydactyly, Type II
+REFERENCE   14 (residues 1 to 335)
+  AUTHORS   D'Esposito,M., Morelli,F., Acampora,D., Migliaccio,E., Simeone,A.
+            and Boncinelli,E.
+  TITLE     EVX2, a human homeobox gene homologous to the even-skipped
+            segmentation gene, is localized at the 5' end of HOX4 locus on
+            chromosome 2
+  JOURNAL   Genomics 10 (1), 43-50 (1991)
+   PUBMED   1675198
+REFERENCE   15 (residues 1 to 335)
+  AUTHORS   Acampora,D., D'Esposito,M., Faiella,A., Pannese,M., Migliaccio,E.,
+            Morelli,F., Stornaiuolo,A., Nigro,V., Simeone,A. and Boncinelli,E.
+  TITLE     The human HOX gene family
+  JOURNAL   Nucleic Acids Res. 17 (24), 10385-10402 (1989)
+   PUBMED   2574852
+COMMENT     REVIEWED REFSEQ: This record has been curated by NCBI staff. The
+            reference sequence was derived from AF005220.1 and BG204577.1.
+            
+            [WARNING] On Oct 26, 2006 this sequence was replaced by
+            NP_000514.2.
+            
+            Summary: This gene belongs to the homeobox family of genes. The
+            homeobox genes encode a highly conserved family of transcription
+            factors that play an important role in morphogenesis in all
+            multicellular organisms. Mammals possess four similar homeobox gene
+            clusters, HOXA, HOXB, HOXC and HOXD, located on different
+            chromosomes, consisting of 9 to 11 genes arranged in tandem. This
+            gene is one of several homeobox HOXD genes located in a cluster on
+            chromosome 2. Deletions that remove the entire HOXD gene cluster or
+            the 5' end of this cluster have been associated with severe limb
+            and genital abnormalities. Mutations in this particular gene cause
+            synpolydactyly.
+FEATURES             Location/Qualifiers
+     source          1..335
+                     /organism="Homo sapiens"
+                     /db_xref="taxon:9606"
+                     /chromosome="2"
+                     /map="2q31.1"
+     Protein         1..335
+                     /product="homeobox D13"
+                     /note="homeo box 4I; homeo box D13"
+                     /calculated_mol_wt=35079
+     Region          <92..164
+                     /region_name="HoxA13_N"
+                     /note="Hox protein A13 N terminal; pfam12284"
+                     /db_xref="CDD:463521"
+     Region          269..325
+                     /region_name="Homeodomain"
+                     /note="pfam00046"
+                     /db_xref="CDD:459649"
+     CDS             1..335
+                     /gene="HOXD13"
+                     /gene_synonym="BDE; HOX4I; SPD"
+                     /coded_by="NM_000523.2:112..1119"
+                     /GO_component="GO:0005634 - nucleus [Evidence IEA]"
+                     /GO_function="GO:0043565 - sequence-specific DNA binding
+                     [Evidence IEA]; GO:0003700 - transcription factor activity
+                     [Evidence IEA]"
+                     /GO_process="GO:0007275 - development [Evidence TAS] [PMID
+                     9207113]; GO:0006355 - regulation of transcription,
+                     DNA-dependent [Evidence TAS] [PMID 9207113]; GO:0001501 -
+                     skeletal development [Evidence TAS] [PMID 8614804];
+                     GO:0006366 - transcription from RNA polymerase II promoter
+                     [Evidence TAS] [PMID 8614804]"
+                     /db_xref="CCDS:CCDS2264.1"
+                     /db_xref="GeneID:3239"
+                     /db_xref="HGNC:HGNC:5136"
+                     /db_xref="HPRD:00872"
+                     /db_xref="MIM:142989"
+ORIGIN      
+        1 mdglradggg aggapassss ssvaaaaasg qcrgflsapv fagthsgraa aaaaaaaaaa
+       61 aaasgfaypg tsertgssss ssssavvaar peappakecp aptpaaaaaa ppsapalgyg
+      121 yhfgngyysc rmshgvglqq nalkssphas lggfpvekym dvsglasssv panevparak
+      181 evsfyqgyts pyqhvpgyid mvstfgsgep rheayismeg yqswtlangw nsqvyctkdq
+      241 pqgshfwkss fpgdvalnqp dmcvyrrgrk krvpytklql keleneyain kfinkdkrrr
+      301 isaatnlser qvtiwfqnrr vkdkkivskl kdtvs
+//

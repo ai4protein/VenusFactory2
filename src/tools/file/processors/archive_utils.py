@@ -1,4 +1,4 @@
-"""Archive handling: unzip, ungzip (extracted from search/download/utils)."""
+"""Archive handling: unzip, ungzip (extracted from search.database.utils)."""
 import gzip
 import os
 import shutil

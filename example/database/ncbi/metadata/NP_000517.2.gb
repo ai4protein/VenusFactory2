@@ -1,0 +1,195 @@
+LOCUS       NP_000517                472 aa            linear   PRI 12-NOV-2018
+DEFINITION  keratin, type I cytoskeletal 14 [Homo sapiens].
+ACCESSION   NP_000517
+VERSION     NP_000517.2
+DBSOURCE    REFSEQ: accession NM_000526.4
+KEYWORDS    RefSeq.
+SOURCE      Homo sapiens (human)
+  ORGANISM  Homo sapiens
+            Eukaryota; Metazoa; Chordata; Craniata; Vertebrata; Euteleostomi;
+            Mammalia; Eutheria; Euarchontoglires; Primates; Haplorrhini;
+            Catarrhini; Hominidae; Homo.
+REFERENCE   1  (residues 1 to 472)
+  AUTHORS   Kocher T, Peking P, Klausegger A, Murauer EM, Hofbauer JP, Wally V,
+            Lettner T, Hainzl S, Ablinger M, Bauer JW, Reichelt J and Koller U.
+  TITLE     Cut and Paste: Efficient Homology-Directed Repair of a Dominant
+            Negative KRT14 Mutation via CRISPR/Cas9 Nickases
+  JOURNAL   Mol. Ther. 25 (11), 2585-2598 (2017)
+   PUBMED   28888469
+  REMARK    GeneRIF: Efficient homology-directed repair of a dominant negative
+            KRT14 mutation via CRISPR/Cas9 nickases in epidermolysis bullosa
+            simplex patients' keratinocytes has been reported.
+REFERENCE   2  (residues 1 to 472)
+  AUTHORS   Meng L, Du J, Li W, Lu G and Tan Y.
+  TITLE     [Study of a family with epidermolysis bullosa simplex resulting
+            from a novel mutation of KRT14 gene]
+  JOURNAL   Zhonghua Yi Xue Yi Chuan Xue Za Zhi 34 (4), 504-508 (2017)
+   PUBMED   28777847
+  REMARK    GeneRIF: The novel c.1234A>G(p.Ile412Val) mutation of the KRT14
+            gene is probably responsible for the disease.
+REFERENCE   3  (residues 1 to 472)
+  AUTHORS   Schweizer J, Bowden PE, Coulombe PA, Langbein L, Lane EB, Magin TM,
+            Maltais L, Omary MB, Parry DA, Rogers MA and Wright MW.
+  TITLE     New consensus nomenclature for mammalian keratins
+  JOURNAL   J. Cell Biol. 174 (2), 169-174 (2006)
+   PUBMED   16831889
+REFERENCE   4  (residues 1 to 472)
+  AUTHORS   Pfendner,E.G. and Bruckner,A.L.
+  TITLE     Epidermolysis Bullosa Simplex
+  JOURNAL   (in) Adam MP, Ardinger HH, Pagon RA, Wallace SE, Bean LJH, Stephens
+            K and Amemiya A (Eds.);
+            GENEREVIEWS((R));
+            (1993)
+   PUBMED   20301543
+REFERENCE   5  (residues 1 to 472)
+  AUTHORS   Coulombe PA, Hutton ME, Letai A, Hebert A, Paller AS and Fuchs E.
+  TITLE     Point mutations in human keratin 14 genes of epidermolysis bullosa
+            simplex patients: genetic and functional analyses
+  JOURNAL   Cell 66 (6), 1301-1311 (1991)
+   PUBMED   1717157
+REFERENCE   6  (residues 1 to 472)
+  AUTHORS   Rosenberg M, Fuchs E, Le Beau MM, Eddy RL and Shows TB.
+  TITLE     Three epidermal and one simple epithelial type II keratin genes map
+            to human chromosome 12
+  JOURNAL   Cytogenet. Cell Genet. 57 (1), 33-38 (1991)
+   PUBMED   1713141
+REFERENCE   7  (residues 1 to 472)
+  AUTHORS   Rosenberg M, RayChaudhury A, Shows TB, Le Beau MM and Fuchs E.
+  TITLE     A group of type I keratin genes on human chromosome 17:
+            characterization and expression
+  JOURNAL   Mol. Cell. Biol. 8 (2), 722-736 (1988)
+   PUBMED   2451124
+REFERENCE   8  (residues 1 to 472)
+  AUTHORS   Marchuk,D., McCrohon,S. and Fuchs,E.
+  TITLE     Complete sequence of a gene encoding a human type I keratin:
+            sequences homologous to enhancer elements in the regulatory region
+            of the gene
+  JOURNAL   Proc. Natl. Acad. Sci. U.S.A. 82 (6), 1609-1613 (1985)
+   PUBMED   2580298
+REFERENCE   9  (residues 1 to 472)
+  AUTHORS   Marchuk,D., McCrohon,S. and Fuchs,E.
+  TITLE     Remarkable conservation of structure among intermediate filament
+            genes
+  JOURNAL   Cell 39 (3 Pt 2), 491-498 (1984)
+   PUBMED   6210150
+REFERENCE   10 (residues 1 to 472)
+  AUTHORS   Hanukoglu,I. and Fuchs,E.
+  TITLE     The cDNA sequence of a human epidermal keratin: divergence of
+            sequence but conservation of structure among intermediate filament
+            proteins
+  JOURNAL   Cell 31 (1), 243-252 (1982)
+   PUBMED   6186381
+COMMENT     REVIEWED REFSEQ: This record has been curated by NCBI staff in
+            collaboration with Michael Rogers. The reference sequence was
+            derived from DB018715.1, BC019097.2, BC042437.1 and BC002690.2.
+            This sequence is a reference standard in the RefSeqGene project.
+            
+            [WARNING] On Nov 22, 2018 this sequence was replaced by
+            NP_000517.3.
+            
+            On Sep 5, 2001 this sequence version replaced NP_000517.1.
+            
+            Summary: This gene encodes a member of the keratin family, the most
+            diverse group of intermediate filaments. This gene product, a type
+            I keratin, is usually found as a heterotetramer with two keratin 5
+            molecules, a type II keratin. Together they form the cytoskeleton
+            of epithelial cells. Mutations in the genes for these keratins are
+            associated with epidermolysis bullosa simplex. At least one
+            pseudogene has been identified at 17p12-p11. [provided by RefSeq,
+            Jul 2008].
+            
+            Publication Note:  This RefSeq record includes a subset of the
+            publications that are available for this gene. Please see the Gene
+            record to access additional publications.
+            
+            ##Evidence-Data-START##
+            Transcript exon combination :: BC094830.1, BC019097.2 [ECO:0000332]
+            RNAseq introns              :: single sample supports all introns
+                                           SAMEA2145893, SAMEA2147596
+                                           [ECO:0000348]
+            ##Evidence-Data-END##
+FEATURES             Location/Qualifiers
+     source          1..472
+                     /organism="Homo sapiens"
+                     /db_xref="taxon:9606"
+                     /chromosome="17"
+                     /map="17q21.2"
+     Protein         1..472
+                     /product="keratin, type I cytoskeletal 14"
+                     /note="cytokeratin 14; keratin 14, type I"
+                     /calculated_mol_wt=51491
+     Region          1..114
+                     /region_name="Head"
+                     /experiment="experimental evidence, no additional details
+                     recorded"
+                     /note="propagated from UniProtKB/Swiss-Prot (P02533.4)"
+     Region          114..425
+                     /region_name="Filament"
+                     /note="Intermediate filament protein; pfam00038"
+                     /db_xref="CDD:459643"
+     Region          115..150
+                     /region_name="Coil 1A"
+                     /experiment="experimental evidence, no additional details
+                     recorded"
+                     /note="propagated from UniProtKB/Swiss-Prot (P02533.4)"
+     Region          151..168
+                     /region_name="Linker 1"
+                     /experiment="experimental evidence, no additional details
+                     recorded"
+                     /note="propagated from UniProtKB/Swiss-Prot (P02533.4)"
+     Region          169..260
+                     /region_name="Coil 1B"
+                     /experiment="experimental evidence, no additional details
+                     recorded"
+                     /note="propagated from UniProtKB/Swiss-Prot (P02533.4)"
+     Region          261..283
+                     /region_name="Linker 12"
+                     /experiment="experimental evidence, no additional details
+                     recorded"
+                     /note="propagated from UniProtKB/Swiss-Prot (P02533.4)"
+     Region          284..422
+                     /region_name="Coil 2"
+                     /experiment="experimental evidence, no additional details
+                     recorded"
+                     /note="propagated from UniProtKB/Swiss-Prot (P02533.4)"
+     Site            364
+                     /site_type="other"
+                     /experiment="experimental evidence, no additional details
+                     recorded"
+                     /note="Stutter; propagated from UniProtKB/Swiss-Prot
+                     (P02533.4)"
+     Region          423..472
+                     /region_name="Tail"
+                     /experiment="experimental evidence, no additional details
+                     recorded"
+                     /note="propagated from UniProtKB/Swiss-Prot (P02533.4)"
+     Region          425..472
+                     /region_name="Interaction with Type I keratins and keratin
+                     filaments"
+                     /experiment="experimental evidence, no additional details
+                     recorded"
+                     /note="propagated from UniProtKB/Swiss-Prot (P02533.4)"
+     Site            435
+                     /site_type="other"
+                     /experiment="experimental evidence, no additional details
+                     recorded"
+                     /note="Phosphoserine. {ECO:0000250|UniProtKB:Q61781};
+                     propagated from UniProtKB/Swiss-Prot (P02533.4)"
+     CDS             1..472
+                     /gene="KRT14"
+                     /gene_synonym="CK14; EBS3; EBS4; K14; NFJ"
+                     /coded_by="NM_000526.4:62..1480"
+                     /db_xref="CCDS:CCDS11400.1"
+                     /db_xref="GeneID:3861"
+                     /db_xref="HGNC:HGNC:6416"
+                     /db_xref="MIM:148066"
+ORIGIN      
+        1 mttcsrqfts sssmkgscgi gggigggssr issvlaggsc rapstygggl svsssrfssg
+       61 gayglgggyg ggfssssssf gsgfgggygg glgaglgggf gggfaggdgl lvgsekvtmq
+      121 nlndrlasyl dkvraleean adlevkirdw yqrqrpaeik dyspyfktie dlrnkiltat
+      181 vdnanvllqi dnarlaaddf rtkyetelnl rmsveading lrrvldeltl aradlemqie
+      241 slkeelaylk knheeemnal rgqvggdvnv emdaapgvdl srilnemrdq yekmaeknrk
+      301 daeewfftkt eelnrevatn selvqsgkse iselrrtmqn leielqsqls mkaslensle
+      361 etkgrycmql aqiqemigsv eeqlaqlrce meqqnqeyki lldvktrleq eiatyrrlle
+      421 gedahlsssq fssgsqssrd vtsssrqirt kvmdvhdgkv vstheqvlrt kn
+//

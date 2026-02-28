@@ -1,0 +1,1826 @@
+{
+  "entryType": "UniProtKB reviewed (Swiss-Prot)",
+  "primaryAccession": "A0A0C5B5G6",
+  "uniProtkbId": "MOTSC_HUMAN",
+  "entryAudit": {
+    "firstPublicDate": "2016-04-13",
+    "lastAnnotationUpdateDate": "2026-01-28",
+    "lastSequenceUpdateDate": "2015-04-29",
+    "entryVersion": 30,
+    "sequenceVersion": 1
+  },
+  "annotationScore": 5.0,
+  "organism": {
+    "scientificName": "Homo sapiens",
+    "commonName": "Human",
+    "taxonId": 9606,
+    "evidences": [
+      {
+        "evidenceCode": "ECO:0000312",
+        "source": "EMBL",
+        "id": "AJM13597.1"
+      }
+    ],
+    "lineage": [
+      "Eukaryota",
+      "Metazoa",
+      "Chordata",
+      "Craniata",
+      "Vertebrata",
+      "Euteleostomi",
+      "Mammalia",
+      "Eutheria",
+      "Euarchontoglires",
+      "Primates",
+      "Haplorrhini",
+      "Catarrhini",
+      "Hominidae",
+      "Homo"
+    ]
+  },
+  "proteinExistence": "1: Evidence at protein level",
+  "proteinDescription": {
+    "recommendedName": {
+      "fullName": {
+        "evidences": [
+          {
+            "evidenceCode": "ECO:0000303",
+            "source": "PubMed",
+            "id": "25738459"
+          }
+        ],
+        "value": "Mitochondrial-derived peptide MOTS-c"
+      }
+    },
+    "alternativeNames": [
+      {
+        "fullName": {
+          "evidences": [
+            {
+              "evidenceCode": "ECO:0000303",
+              "source": "PubMed",
+              "id": "25738459"
+            }
+          ],
+          "value": "Mitochondrial open reading frame of the 12S rRNA-c"
+        }
+      }
+    ]
+  },
+  "genes": [
+    {
+      "geneName": {
+        "evidences": [
+          {
+            "evidenceCode": "ECO:0000312",
+            "source": "HGNC",
+            "id": "HGNC:7470"
+          }
+        ],
+        "value": "MT-RNR1"
+      }
+    }
+  ],
+  "comments": [
+    {
+      "texts": [
+        {
+          "evidences": [
+            {
+              "evidenceCode": "ECO:0000269",
+              "source": "PubMed",
+              "id": "25738459"
+            },
+            {
+              "evidenceCode": "ECO:0000269",
+              "source": "PubMed",
+              "id": "29886458"
+            },
+            {
+              "evidenceCode": "ECO:0000269",
+              "source": "PubMed",
+              "id": "29983246"
+            },
+            {
+              "evidenceCode": "ECO:0000269",
+              "source": "PubMed",
+              "id": "30468456"
+            },
+            {
+              "evidenceCode": "ECO:0000269",
+              "source": "PubMed",
+              "id": "31081069"
+            },
+            {
+              "evidenceCode": "ECO:0000269",
+              "source": "PubMed",
+              "id": "33468709"
+            },
+            {
+              "evidenceCode": "ECO:0000269",
+              "source": "PubMed",
+              "id": "33554779"
+            }
+          ],
+          "value": "Regulates insulin sensitivity and metabolic homeostasis (PubMed:25738459, PubMed:33468709). Inhibits the folate cycle, thereby reducing de novo purine biosynthesis which leads to the accumulation of the de novo purine synthesis intermediate 5-aminoimidazole-4-carboxamide (AICAR) and the activation of the metabolic regulator 5'-AMP-activated protein kinase (AMPK) (PubMed:25738459). Protects against age-dependent and diet-induced insulin resistance as well as diet-induced obesity (PubMed:25738459). In response to metabolic stress, translocates to the nucleus where it binds to antioxidant response elements (ARE) present in the promoter regions of a number of genes and plays a role in regulating nuclear gene expression in an NFE2L2-dependent manner and increasing cellular resistance to metabolic stress (PubMed:29983246). Increases mitochondrial respiration and levels of CPT1A and cytokines IL1B, IL6, IL8, IL10 and TNF in senescent cells (PubMed:29886458). Increases activity of the serine/threonine protein kinase complex mTORC2 and reduces activity of the PTEN phosphatase, thus promoting phosphorylation of AKT (PubMed:33554779). This promotes AKT-mediated phosphorylation of transcription factor FOXO1 which reduces FOXO1 activity, leading to reduced levels of MSTN and promotion of skeletal muscle growth (PubMed:33554779). Promotes osteogenic differentiation of bone marrow mesenchymal stem cells via the TGFB/SMAD pathway (PubMed:30468456). Promotes osteoblast proliferation and osteoblast synthesis of type I collagens COL1A1 and COL1A2 via the TGFB/SMAD pathway (PubMed:31081069)"
+        }
+      ],
+      "commentType": "FUNCTION"
+    },
+    {
+      "texts": [
+        {
+          "evidences": [
+            {
+              "evidenceCode": "ECO:0000269",
+              "source": "PubMed",
+              "id": "29983246"
+            }
+          ],
+          "value": "Interacts with transcription factors ATF1 and NFE2L2/NRF2; the interactions occur in the nucleus following metabolic stress (PubMed:29983246). Also interacts with transcription factor NFE2L1/NRF1 (PubMed:29983246)"
+        }
+      ],
+      "commentType": "SUBUNIT"
+    },
+    {
+      "commentType": "SUBCELLULAR LOCATION",
+      "note": {
+        "texts": [
+          {
+            "evidences": [
+              {
+                "evidenceCode": "ECO:0000269",
+                "source": "PubMed",
+                "id": "29983246"
+              }
+            ],
+            "value": "Translocates to the nucleus in response to metabolic stress in an AMPK-dependent manner"
+          }
+        ]
+      },
+      "subcellularLocations": [
+        {
+          "location": {
+            "evidences": [
+              {
+                "evidenceCode": "ECO:0000269",
+                "source": "PubMed",
+                "id": "25738459"
+              }
+            ],
+            "value": "Secreted",
+            "id": "SL-0243"
+          }
+        },
+        {
+          "location": {
+            "evidences": [
+              {
+                "evidenceCode": "ECO:0000269",
+                "source": "PubMed",
+                "id": "29983246"
+              }
+            ],
+            "value": "Mitochondrion",
+            "id": "SL-0173"
+          }
+        },
+        {
+          "location": {
+            "evidences": [
+              {
+                "evidenceCode": "ECO:0000269",
+                "source": "PubMed",
+                "id": "29983246"
+              },
+              {
+                "evidenceCode": "ECO:0000269",
+                "source": "PubMed",
+                "id": "33473109"
+              }
+            ],
+            "value": "Nucleus",
+            "id": "SL-0191"
+          }
+        }
+      ]
+    },
+    {
+      "texts": [
+        {
+          "evidences": [
+            {
+              "evidenceCode": "ECO:0000269",
+              "source": "PubMed",
+              "id": "25738459"
+            },
+            {
+              "evidenceCode": "ECO:0000269",
+              "source": "PubMed",
+              "id": "32182209"
+            }
+          ],
+          "value": "Detected in plasma (at protein level) (PubMed:25738459, PubMed:32182209). Also expressed in skeletal muscle (at protein level) (PubMed:32182209)"
+        }
+      ],
+      "commentType": "TISSUE SPECIFICITY"
+    },
+    {
+      "texts": [
+        {
+          "evidences": [
+            {
+              "evidenceCode": "ECO:0000269",
+              "source": "PubMed",
+              "id": "32182209"
+            }
+          ],
+          "value": "Circulating plasma levels decrease with age while levels in skeletal muscle increase with age (at protein level)"
+        }
+      ],
+      "commentType": "DEVELOPMENTAL STAGE"
+    },
+    {
+      "texts": [
+        {
+          "evidences": [
+            {
+              "evidenceCode": "ECO:0000269",
+              "source": "PubMed",
+              "id": "29886458"
+            },
+            {
+              "evidenceCode": "ECO:0000269",
+              "source": "PubMed",
+              "id": "33473109"
+            }
+          ],
+          "value": "By exercise (PubMed:33473109). Up-regulated during cellular senescence (PubMed:29886458)"
+        }
+      ],
+      "commentType": "INDUCTION"
+    },
+    {
+      "texts": [
+        {
+          "evidences": [
+            {
+              "evidenceCode": "ECO:0000269",
+              "source": "PubMed",
+              "id": "29096170"
+            }
+          ],
+          "value": "Increases survival and decreases bacterial load in mice infected with methicillin-resistant Staphylococcus aureus (MRSA) (PubMed:29096170). Reduces serum levels of inflammatory cytokines such as TNF and IL6 and increases levels of the anti-inflammatory cytokine IL10 (PubMed:29096170). Enhances the phagocytic and bactericidal ability of macrophages and suppresses MAPK pathways while enhancing activation of STAT3 and AHR (PubMed:29096170)"
+        }
+      ],
+      "commentType": "MISCELLANEOUS"
+    },
+    {
+      "texts": [
+        {
+          "evidences": [
+            {
+              "evidenceCode": "ECO:0000269",
+              "source": "PubMed",
+              "id": "31931370"
+            }
+          ],
+          "value": "Protects mice against lipopolysaccharide-induced acute lung injury (PubMed:31931370). Reduces body weight loss and pulmonary edema, inhibits neutrophilic tissue infiltration in lung tissue, reduces inflammatory cytokine levels, increases levels of anti-inflammatory cytokines and superoxide dismutase and down-regulates the expression of chemokine CXCL1/CINC1 and adhesion molecule ICAM1 in lung tissues (PubMed:31931370)"
+        }
+      ],
+      "commentType": "MISCELLANEOUS"
+    },
+    {
+      "texts": [
+        {
+          "evidences": [
+            {
+              "evidenceCode": "ECO:0000269",
+              "source": "PubMed",
+              "id": "31109005"
+            }
+          ],
+          "value": "Promotes cold adaptation in mice following acute cold exposure (PubMed:31109005). Prevents acute cold-induced liver lipid deposition and increases brown fat activation and white fat browning upon acute cold exposure (PubMed:31109005). Also increases expression of thermogenic genes in vitro (PubMed:31109005)"
+        }
+      ],
+      "commentType": "MISCELLANEOUS"
+    },
+    {
+      "texts": [
+        {
+          "evidences": [
+            {
+              "evidenceCode": "ECO:0000269",
+              "source": "PubMed",
+              "id": "31369811"
+            }
+          ],
+          "value": "In a mouse osteolysis model, rescues bone loss, protects bone mass and alleviates inflammation (PubMed:31369811). Decreases TNFSF11/RANKL expression, increases TNFRSF11B/OPG expression and reduces the number of pro-inflammatory macrophages (PubMed:31369811)"
+        }
+      ],
+      "commentType": "MISCELLANEOUS"
+    },
+    {
+      "texts": [
+        {
+          "evidences": [
+            {
+              "evidenceCode": "ECO:0000269",
+              "source": "PubMed",
+              "id": "30725119"
+            }
+          ],
+          "value": "In ovarietomized mice, prevents body weight gain, reduces fat mass and adipocyte size, enhances brown fat function, decreases plasma lipid and hepatic triacylglycerol levels, and prevents insulin resistance"
+        }
+      ],
+      "commentType": "MISCELLANEOUS"
+    },
+    {
+      "texts": [
+        {
+          "evidences": [
+            {
+              "evidenceCode": "ECO:0000269",
+              "source": "PubMed",
+              "id": "33468709"
+            }
+          ],
+          "value": "Reduces weight gain in male mice fed a high-fat diet and enhances glucose clearance (PubMed:33468709). Does not reduce weight gain in females on a high-fat diet (PubMed:33468709)"
+        }
+      ],
+      "commentType": "MISCELLANEOUS"
+    },
+    {
+      "texts": [
+        {
+          "evidences": [
+            {
+              "evidenceCode": "ECO:0000269",
+              "source": "PubMed",
+              "id": "33473109"
+            }
+          ],
+          "value": "Improves physical performance in both young and aging mice and enhances skeletal muscle adaptation to metabolic stress in vitro"
+        }
+      ],
+      "commentType": "MISCELLANEOUS"
+    },
+    {
+      "texts": [
+        {
+          "evidences": [
+            {
+              "evidenceCode": "ECO:0000269",
+              "source": "PubMed",
+              "id": "31694019"
+            }
+          ],
+          "value": "Reduces vascular calcification (VC) in a rat VC model (PubMed:31694019). Reverses VC-induced reduction in AMPK phosphorylation and decreases expression of receptors AGTR1 and EDNRB (PubMed:31694019)"
+        }
+      ],
+      "commentType": "MISCELLANEOUS"
+    },
+    {
+      "texts": [
+        {
+          "evidences": [
+            {
+              "evidenceCode": "ECO:0000305",
+              "source": "PubMed",
+              "id": "25738459"
+            }
+          ],
+          "value": "This peptide has been shown to be biologically active but is the product of a mitochondrial gene. Usage of the mitochondrial genetic code yields tandem start and stop codons so translation must occur in the cytoplasm. The mechanisms allowing the production and secretion of the peptide remain unclear"
+        }
+      ],
+      "commentType": "CAUTION"
+    }
+  ],
+  "features": [
+    {
+      "type": "Chain",
+      "location": {
+        "start": {
+          "value": 1,
+          "modifier": "EXACT"
+        },
+        "end": {
+          "value": 16,
+          "modifier": "EXACT"
+        }
+      },
+      "description": "Mitochondrial-derived peptide MOTS-c",
+      "evidences": [
+        {
+          "evidenceCode": "ECO:0000305"
+        }
+      ],
+      "featureId": "PRO_0000435952"
+    },
+    {
+      "type": "Natural variant",
+      "location": {
+        "start": {
+          "value": 14,
+          "modifier": "EXACT"
+        },
+        "end": {
+          "value": 14,
+          "modifier": "EXACT"
+        }
+      },
+      "description": "specific to the Northeast Asian population; associated with increased susceptibility of sedentary males to type 2 diabetes; increased plasma levels of MOTS-c peptide",
+      "evidences": [
+        {
+          "evidenceCode": "ECO:0000269",
+          "source": "PubMed",
+          "id": "26289118"
+        },
+        {
+          "evidenceCode": "ECO:0000269",
+          "source": "PubMed",
+          "id": "33468709"
+        }
+      ],
+      "featureId": "VAR_075685",
+      "alternativeSequence": {
+        "originalSequence": "K",
+        "alternativeSequences": [
+          "Q"
+        ]
+      }
+    },
+    {
+      "type": "Mutagenesis",
+      "location": {
+        "start": {
+          "value": 5,
+          "modifier": "EXACT"
+        },
+        "end": {
+          "value": 5,
+          "modifier": "EXACT"
+        }
+      },
+      "description": "Lack of enhanced glycolytic response to glucose stimulation.",
+      "evidences": [
+        {
+          "evidenceCode": "ECO:0000269",
+          "source": "PubMed",
+          "id": "25738459"
+        }
+      ],
+      "alternativeSequence": {
+        "originalSequence": "E",
+        "alternativeSequences": [
+          "A"
+        ]
+      }
+    },
+    {
+      "type": "Mutagenesis",
+      "location": {
+        "start": {
+          "value": 7,
+          "modifier": "EXACT"
+        },
+        "end": {
+          "value": 7,
+          "modifier": "EXACT"
+        }
+      },
+      "description": "Lack of enhanced glycolytic response to glucose stimulation.",
+      "evidences": [
+        {
+          "evidenceCode": "ECO:0000269",
+          "source": "PubMed",
+          "id": "25738459"
+        }
+      ],
+      "alternativeSequence": {
+        "originalSequence": "G",
+        "alternativeSequences": [
+          "A"
+        ]
+      }
+    },
+    {
+      "type": "Mutagenesis",
+      "location": {
+        "start": {
+          "value": 11,
+          "modifier": "EXACT"
+        },
+        "end": {
+          "value": 14,
+          "modifier": "EXACT"
+        }
+      },
+      "description": "Abolishes nuclear localization and DNA-binding activity.",
+      "evidences": [
+        {
+          "evidenceCode": "ECO:0000269",
+          "source": "PubMed",
+          "id": "29983246"
+        }
+      ],
+      "alternativeSequence": {
+        "originalSequence": "YPRK",
+        "alternativeSequences": [
+          "AAAA"
+        ]
+      }
+    },
+    {
+      "type": "Mutagenesis",
+      "location": {
+        "start": {
+          "value": 13,
+          "modifier": "EXACT"
+        },
+        "end": {
+          "value": 16,
+          "modifier": "EXACT"
+        }
+      },
+      "description": "Does not affect nuclear localization or interaction with NFE2L2 but abolishes DNA-binding activity.",
+      "evidences": [
+        {
+          "evidenceCode": "ECO:0000269",
+          "source": "PubMed",
+          "id": "29983246"
+        }
+      ],
+      "alternativeSequence": {
+        "originalSequence": "RKLR",
+        "alternativeSequences": [
+          "AAAA"
+        ]
+      }
+    }
+  ],
+  "geneLocations": [
+    {
+      "geneEncodingType": "Mitochondrion"
+    }
+  ],
+  "keywords": [
+    {
+      "id": "KW-0238",
+      "category": "Molecular function",
+      "name": "DNA-binding"
+    },
+    {
+      "id": "KW-0496",
+      "category": "Cellular component",
+      "name": "Mitochondrion"
+    },
+    {
+      "id": "KW-0539",
+      "category": "Cellular component",
+      "name": "Nucleus"
+    },
+    {
+      "id": "KW-0892",
+      "category": "Biological process",
+      "name": "Osteogenesis"
+    },
+    {
+      "id": "KW-1185",
+      "category": "Technical term",
+      "name": "Reference proteome"
+    },
+    {
+      "id": "KW-0964",
+      "category": "Cellular component",
+      "name": "Secreted"
+    },
+    {
+      "id": "KW-0804",
+      "category": "Biological process",
+      "name": "Transcription"
+    },
+    {
+      "id": "KW-0805",
+      "category": "Biological process",
+      "name": "Transcription regulation"
+    }
+  ],
+  "references": [
+    {
+      "referenceNumber": 1,
+      "citation": {
+        "id": "25738459",
+        "citationType": "journal article",
+        "authors": [
+          "Lee C.",
+          "Zeng J.",
+          "Drew B.G.",
+          "Sallam T.",
+          "Martin-Montalvo A.",
+          "Wan J.",
+          "Kim S.-J.",
+          "Mehta H.",
+          "Hevener A.L.",
+          "de Cabo R.",
+          "Cohen P."
+        ],
+        "citationCrossReferences": [
+          {
+            "database": "PubMed",
+            "id": "25738459"
+          },
+          {
+            "database": "DOI",
+            "id": "10.1016/j.cmet.2015.02.009"
+          }
+        ],
+        "title": "The mitochondrial-derived peptide MOTS-c promotes metabolic homeostasis and reduces obesity and insulin resistance.",
+        "publicationDate": "2015",
+        "journal": "Cell Metab.",
+        "firstPage": "443",
+        "lastPage": "454",
+        "volume": "21"
+      },
+      "referencePositions": [
+        "NUCLEOTIDE SEQUENCE [GENOMIC DNA]",
+        "FUNCTION",
+        "SUBCELLULAR LOCATION",
+        "TISSUE SPECIFICITY",
+        "MUTAGENESIS OF GLU-5 AND GLY-7"
+      ],
+      "evidences": [
+        {
+          "evidenceCode": "ECO:0000312",
+          "source": "EMBL",
+          "id": "AJM13597.1"
+        }
+      ]
+    },
+    {
+      "referenceNumber": 2,
+      "citation": {
+        "id": "7219534",
+        "citationType": "journal article",
+        "authors": [
+          "Anderson S.",
+          "Bankier A.T.",
+          "Barrell B.G.",
+          "de Bruijn M.H.L.",
+          "Coulson A.R.",
+          "Drouin J.",
+          "Eperon I.C.",
+          "Nierlich D.P.",
+          "Roe B.A.",
+          "Sanger F.",
+          "Schreier P.H.",
+          "Smith A.J.H.",
+          "Staden R.",
+          "Young I.G."
+        ],
+        "citationCrossReferences": [
+          {
+            "database": "PubMed",
+            "id": "7219534"
+          },
+          {
+            "database": "DOI",
+            "id": "10.1038/290457a0"
+          }
+        ],
+        "title": "Sequence and organization of the human mitochondrial genome.",
+        "publicationDate": "1981",
+        "journal": "Nature",
+        "firstPage": "457",
+        "lastPage": "465",
+        "volume": "290"
+      },
+      "referencePositions": [
+        "NUCLEOTIDE SEQUENCE [LARGE SCALE GENOMIC DNA]"
+      ]
+    },
+    {
+      "referenceNumber": 3,
+      "citation": {
+        "id": "29096170",
+        "citationType": "journal article",
+        "authors": [
+          "Zhai D.",
+          "Ye Z.",
+          "Jiang Y.",
+          "Xu C.",
+          "Ruan B.",
+          "Yang Y.",
+          "Lei X.",
+          "Xiang A.",
+          "Lu H.",
+          "Zhu Z.",
+          "Yan Z.",
+          "Wei D.",
+          "Li Q.",
+          "Wang L.",
+          "Lu Z."
+        ],
+        "citationCrossReferences": [
+          {
+            "database": "PubMed",
+            "id": "29096170"
+          },
+          {
+            "database": "DOI",
+            "id": "10.1016/j.molimm.2017.10.017"
+          }
+        ],
+        "title": "MOTS-c peptide increases survival and decreases bacterial load in mice infected with MRSA.",
+        "publicationDate": "2017",
+        "journal": "Mol. Immunol.",
+        "firstPage": "151",
+        "lastPage": "160",
+        "volume": "92"
+      },
+      "referencePositions": [
+        "ROLE IN MRSA INFECTION"
+      ]
+    },
+    {
+      "referenceNumber": 4,
+      "citation": {
+        "id": "29886458",
+        "citationType": "journal article",
+        "authors": [
+          "Kim S.J.",
+          "Mehta H.H.",
+          "Wan J.",
+          "Kuehnemann C.",
+          "Chen J.",
+          "Hu J.F.",
+          "Hoffman A.R.",
+          "Cohen P."
+        ],
+        "citationCrossReferences": [
+          {
+            "database": "PubMed",
+            "id": "29886458"
+          },
+          {
+            "database": "DOI",
+            "id": "10.18632/aging.101463"
+          }
+        ],
+        "title": "Mitochondrial peptides modulate mitochondrial function during cellular senescence.",
+        "publicationDate": "2018",
+        "journal": "Aging (Albany NY)",
+        "firstPage": "1239",
+        "lastPage": "1256",
+        "volume": "10"
+      },
+      "referencePositions": [
+        "FUNCTION",
+        "INDUCTION"
+      ]
+    },
+    {
+      "referenceNumber": 5,
+      "citation": {
+        "id": "29983246",
+        "citationType": "journal article",
+        "authors": [
+          "Kim K.H.",
+          "Son J.M.",
+          "Benayoun B.A.",
+          "Lee C."
+        ],
+        "citationCrossReferences": [
+          {
+            "database": "PubMed",
+            "id": "29983246"
+          },
+          {
+            "database": "DOI",
+            "id": "10.1016/j.cmet.2018.06.008"
+          }
+        ],
+        "title": "The Mitochondrial-Encoded Peptide MOTS-c Translocates to the Nucleus to Regulate Nuclear Gene Expression in Response to Metabolic Stress.",
+        "publicationDate": "2018",
+        "journal": "Cell Metab.",
+        "firstPage": "516",
+        "lastPage": "524",
+        "volume": "28"
+      },
+      "referencePositions": [
+        "FUNCTION",
+        "INTERACTION WITH ATF1; NFE2L1 AND NFE2L2",
+        "SUBCELLULAR LOCATION",
+        "MUTAGENESIS OF 11-TYR--LYS-14 AND 13-ARG--ARG-16"
+      ]
+    },
+    {
+      "referenceNumber": 6,
+      "citation": {
+        "id": "30468456",
+        "citationType": "journal article",
+        "authors": [
+          "Hu B.T.",
+          "Chen W.Z."
+        ],
+        "citationCrossReferences": [
+          {
+            "database": "PubMed",
+            "id": "30468456"
+          },
+          {
+            "database": "DOI",
+            "id": "10.26355/eurrev_201811_16247"
+          }
+        ],
+        "title": "MOTS-c improves osteoporosis by promoting osteogenic differentiation of bone marrow mesenchymal stem cells via TGF-beta/Smad pathway.",
+        "publicationDate": "2018",
+        "journal": "Eur. Rev. Med. Pharmacol. Sci.",
+        "firstPage": "7156",
+        "lastPage": "7163",
+        "volume": "22"
+      },
+      "referencePositions": [
+        "FUNCTION"
+      ]
+    },
+    {
+      "referenceNumber": 7,
+      "citation": {
+        "id": "31081069",
+        "citationType": "journal article",
+        "authors": [
+          "Che N.",
+          "Qiu W.",
+          "Wang J.K.",
+          "Sun X.X.",
+          "Xu L.X.",
+          "Liu R.",
+          "Gu L."
+        ],
+        "citationCrossReferences": [
+          {
+            "database": "PubMed",
+            "id": "31081069"
+          },
+          {
+            "database": "DOI",
+            "id": "10.26355/eurrev_201904_17676"
+          }
+        ],
+        "title": "MOTS-c improves osteoporosis by promoting the synthesis of type I collagen in osteoblasts via TGF-beta/SMAD signaling pathway.",
+        "publicationDate": "2019",
+        "journal": "Eur. Rev. Med. Pharmacol. Sci.",
+        "firstPage": "3183",
+        "lastPage": "3189",
+        "volume": "23"
+      },
+      "referencePositions": [
+        "FUNCTION"
+      ]
+    },
+    {
+      "referenceNumber": 8,
+      "citation": {
+        "id": "31109005",
+        "citationType": "journal article",
+        "authors": [
+          "Lu H.",
+          "Tang S.",
+          "Xue C.",
+          "Liu Y.",
+          "Wang J.",
+          "Zhang W.",
+          "Luo W.",
+          "Chen J."
+        ],
+        "citationCrossReferences": [
+          {
+            "database": "PubMed",
+            "id": "31109005"
+          },
+          {
+            "database": "DOI",
+            "id": "10.3390/ijms20102456"
+          }
+        ],
+        "title": "Mitochondrial-Derived Peptide MOTS-c Increases Adipose Thermogenic Activation to Promote Cold Adaptation.",
+        "publicationDate": "2019",
+        "journal": "Int. J. Mol. Sci.",
+        "firstPage": "0",
+        "lastPage": "0",
+        "volume": "20"
+      },
+      "referencePositions": [
+        "ROLE IN COLD ADAPTATION"
+      ]
+    },
+    {
+      "referenceNumber": 9,
+      "citation": {
+        "id": "30725119",
+        "citationType": "journal article",
+        "authors": [
+          "Lu H.",
+          "Wei M.",
+          "Zhai Y.",
+          "Li Q.",
+          "Ye Z.",
+          "Wang L.",
+          "Luo W.",
+          "Chen J.",
+          "Lu Z."
+        ],
+        "citationCrossReferences": [
+          {
+            "database": "PubMed",
+            "id": "30725119"
+          },
+          {
+            "database": "DOI",
+            "id": "10.1007/s00109-018-01738-w"
+          }
+        ],
+        "title": "MOTS-c peptide regulates adipose homeostasis to prevent ovariectomy-induced metabolic dysfunction.",
+        "publicationDate": "2019",
+        "journal": "J. Mol. Med.",
+        "firstPage": "473",
+        "lastPage": "485",
+        "volume": "97"
+      },
+      "referencePositions": [
+        "ROLE IN ADIPOSE METABOLISM"
+      ]
+    },
+    {
+      "referenceNumber": 10,
+      "citation": {
+        "id": "31369811",
+        "citationType": "journal article",
+        "authors": [
+          "Yan Z.",
+          "Zhu S.",
+          "Wang H.",
+          "Wang L.",
+          "Du T.",
+          "Ye Z.",
+          "Zhai D.",
+          "Zhu Z.",
+          "Tian X.",
+          "Lu Z.",
+          "Cao X."
+        ],
+        "citationCrossReferences": [
+          {
+            "database": "PubMed",
+            "id": "31369811"
+          },
+          {
+            "database": "DOI",
+            "id": "10.1016/j.phrs.2019.104381"
+          }
+        ],
+        "title": "MOTS-c inhibits Osteolysis in the Mouse Calvaria by affecting osteocyte-osteoclast crosstalk and inhibiting inflammation.",
+        "publicationDate": "2019",
+        "journal": "Pharmacol. Res.",
+        "firstPage": "104381",
+        "lastPage": "104381",
+        "volume": "147"
+      },
+      "referencePositions": [
+        "ROLE IN OSTEOLYSIS"
+      ]
+    },
+    {
+      "referenceNumber": 11,
+      "citation": {
+        "id": "32182209",
+        "citationType": "journal article",
+        "authors": [
+          "D'Souza R.F.",
+          "Woodhead J.S.T.",
+          "Hedges C.P.",
+          "Zeng N.",
+          "Wan J.",
+          "Kumagai H.",
+          "Lee C.",
+          "Cohen P.",
+          "Cameron-Smith D.",
+          "Mitchell C.J.",
+          "Merry T.L."
+        ],
+        "citationCrossReferences": [
+          {
+            "database": "PubMed",
+            "id": "32182209"
+          },
+          {
+            "database": "DOI",
+            "id": "10.18632/aging.102944"
+          }
+        ],
+        "title": "Increased expression of the mitochondrial derived peptide, MOTS-c, inb skeletal muscle of healthy aging men is associated with myofiber composition.",
+        "publicationDate": "2020",
+        "journal": "Aging (Albany NY)",
+        "firstPage": "5244",
+        "lastPage": "5258",
+        "volume": "12"
+      },
+      "referencePositions": [
+        "TISSUE SPECIFICITY",
+        "DEVELOPMENTAL STAGE"
+      ]
+    },
+    {
+      "referenceNumber": 12,
+      "citation": {
+        "id": "31694019",
+        "citationType": "journal article",
+        "authors": [
+          "Wei M.",
+          "Gan L.",
+          "Liu Z.",
+          "Liu L.",
+          "Chang J.R.",
+          "Yin D.C.",
+          "Cao H.L.",
+          "Su X.L.",
+          "Smith W.W."
+        ],
+        "citationCrossReferences": [
+          {
+            "database": "PubMed",
+            "id": "31694019"
+          },
+          {
+            "database": "DOI",
+            "id": "10.1159/000503224"
+          }
+        ],
+        "title": "Mitochondrial-Derived Peptide MOTS-c Attenuates Vascular Calcification and Secondary Myocardial Remodeling via Adenosine Monophosphate-Activated Protein Kinase Signaling Pathway.",
+        "publicationDate": "2020",
+        "journal": "Cardiorenal Med.",
+        "firstPage": "42",
+        "lastPage": "50",
+        "volume": "10"
+      },
+      "referencePositions": [
+        "ROLE IN VASCULAR CALCIFICATION"
+      ]
+    },
+    {
+      "referenceNumber": 13,
+      "citation": {
+        "id": "31931370",
+        "citationType": "journal article",
+        "authors": [
+          "Xinqiang Y.",
+          "Quan C.",
+          "Yuanyuan J.",
+          "Hanmei X."
+        ],
+        "citationCrossReferences": [
+          {
+            "database": "PubMed",
+            "id": "31931370"
+          },
+          {
+            "database": "DOI",
+            "id": "10.1016/j.intimp.2019.106174"
+          }
+        ],
+        "title": "Protective effect of MOTS-c on acute lung injury induced by lipopolysaccharide in mice.",
+        "publicationDate": "2020",
+        "journal": "Int. Immunopharmacol.",
+        "firstPage": "106174",
+        "lastPage": "106174",
+        "volume": "80"
+      },
+      "referencePositions": [
+        "ROLE IN LUNG INJURY PROTECTION"
+      ]
+    },
+    {
+      "referenceNumber": 14,
+      "citation": {
+        "id": "33554779",
+        "citationType": "journal article",
+        "authors": [
+          "Kumagai H.",
+          "Coelho A.R.",
+          "Wan J.",
+          "Mehta H.",
+          "Yen K.",
+          "Huang A.",
+          "Zempo H.",
+          "Fuku N.",
+          "Maeda S.",
+          "Oliveira P.J.",
+          "Cohen P.",
+          "Kim S.J."
+        ],
+        "citationCrossReferences": [
+          {
+            "database": "PubMed",
+            "id": "33554779"
+          },
+          {
+            "database": "DOI",
+            "id": "10.1152/ajpendo.00275.2020"
+          }
+        ],
+        "title": "MOTS-c reduces myostatin and muscle atrophy signaling.",
+        "publicationDate": "2021",
+        "journal": "Am. J. Physiol.",
+        "firstPage": "E680",
+        "lastPage": "E690",
+        "volume": "320"
+      },
+      "referencePositions": [
+        "FUNCTION"
+      ]
+    },
+    {
+      "referenceNumber": 15,
+      "citation": {
+        "id": "33473109",
+        "citationType": "journal article",
+        "authors": [
+          "Reynolds J.C.",
+          "Lai R.W.",
+          "Woodhead J.S.T.",
+          "Joly J.H.",
+          "Mitchell C.J.",
+          "Cameron-Smith D.",
+          "Lu R.",
+          "Cohen P.",
+          "Graham N.A.",
+          "Benayoun B.A.",
+          "Merry T.L.",
+          "Lee C."
+        ],
+        "citationCrossReferences": [
+          {
+            "database": "PubMed",
+            "id": "33473109"
+          },
+          {
+            "database": "DOI",
+            "id": "10.1038/s41467-020-20790-0"
+          }
+        ],
+        "title": "MOTS-c is an exercise-induced mitochondrial-encoded regulator of age-dependent physical decline and muscle homeostasis.",
+        "publicationDate": "2021",
+        "journal": "Nat. Commun.",
+        "firstPage": "470",
+        "lastPage": "470",
+        "volume": "12"
+      },
+      "referencePositions": [
+        "SUBCELLULAR LOCATION",
+        "INDUCTION",
+        "ROLE IN PHYSICAL PERFORMANCE"
+      ]
+    },
+    {
+      "referenceNumber": 16,
+      "citation": {
+        "id": "26289118",
+        "citationType": "journal article",
+        "authors": [
+          "Fuku N.",
+          "Pareja-Galeano H.",
+          "Zempo H.",
+          "Alis R.",
+          "Arai Y.",
+          "Lucia A.",
+          "Hirose N."
+        ],
+        "citationCrossReferences": [
+          {
+            "database": "PubMed",
+            "id": "26289118"
+          },
+          {
+            "database": "DOI",
+            "id": "10.1111/acel.12389"
+          }
+        ],
+        "title": "The mitochondrial-derived peptide MOTS-c: a player in exceptional longevity?",
+        "publicationDate": "2015",
+        "journal": "Aging Cell",
+        "firstPage": "921",
+        "lastPage": "923",
+        "volume": "14"
+      },
+      "referencePositions": [
+        "VARIANT GLN-14"
+      ],
+      "evidences": [
+        {
+          "evidenceCode": "ECO:0000305"
+        }
+      ]
+    },
+    {
+      "referenceNumber": 17,
+      "citation": {
+        "id": "33468709",
+        "citationType": "journal article",
+        "authors": [
+          "Zempo H.",
+          "Kim S.J.",
+          "Fuku N.",
+          "Nishida Y.",
+          "Higaki Y.",
+          "Wan J.",
+          "Yen K.",
+          "Miller B.",
+          "Vicinanza R.",
+          "Miyamoto-Mikami E.",
+          "Kumagai H.",
+          "Naito H.",
+          "Xiao J.",
+          "Mehta H.H.",
+          "Lee C.",
+          "Hara M.",
+          "Patel Y.M.",
+          "Setiawan V.W.",
+          "Moore T.M.",
+          "Hevener A.L.",
+          "Sutoh Y.",
+          "Shimizu A.",
+          "Kojima K.",
+          "Kinoshita K.",
+          "Arai Y.",
+          "Hirose N.",
+          "Maeda S.",
+          "Tanaka K.",
+          "Cohen P."
+        ],
+        "citationCrossReferences": [
+          {
+            "database": "PubMed",
+            "id": "33468709"
+          },
+          {
+            "database": "DOI",
+            "id": "10.18632/aging.202529"
+          }
+        ],
+        "title": "A pro-diabetogenic mtDNA polymorphism in the mitochondrial-derived peptide, MOTS-c.",
+        "publicationDate": "2021",
+        "journal": "Aging (Albany NY)",
+        "firstPage": "1692",
+        "lastPage": "1717",
+        "volume": "13"
+      },
+      "referencePositions": [
+        "CHARACTERIZATION OF VARIANT GLN-14",
+        "FUNCTION",
+        "ROLE IN WEIGHT GAIN"
+      ]
+    }
+  ],
+  "uniProtKBCrossReferences": [
+    {
+      "database": "EMBL",
+      "id": "KP715230",
+      "properties": [
+        {
+          "key": "ProteinId",
+          "value": "AJM13597.1"
+        },
+        {
+          "key": "Status",
+          "value": "-"
+        },
+        {
+          "key": "MoleculeType",
+          "value": "Genomic_DNA"
+        }
+      ]
+    },
+    {
+      "database": "EMBL",
+      "id": "J01415",
+      "properties": [
+        {
+          "key": "ProteinId",
+          "value": "-"
+        },
+        {
+          "key": "Status",
+          "value": "NOT_ANNOTATED_CDS"
+        },
+        {
+          "key": "MoleculeType",
+          "value": "Genomic_DNA"
+        }
+      ]
+    },
+    {
+      "database": "AlphaFoldDB",
+      "id": "A0A0C5B5G6",
+      "properties": [
+        {
+          "key": "Description",
+          "value": "-"
+        }
+      ]
+    },
+    {
+      "database": "FunCoup",
+      "id": "A0A0C5B5G6",
+      "properties": [
+        {
+          "key": "Number of interactors",
+          "value": "23"
+        }
+      ]
+    },
+    {
+      "database": "BioMuta",
+      "id": "HGNC:7470",
+      "properties": [
+        {
+          "key": "Description",
+          "value": "-"
+        }
+      ]
+    },
+    {
+      "database": "AGR",
+      "id": "HGNC:7470",
+      "properties": [
+        {
+          "key": "Description",
+          "value": "-"
+        }
+      ]
+    },
+    {
+      "database": "GeneCards",
+      "id": "MT-RNR1",
+      "properties": [
+        {
+          "key": "Description",
+          "value": "-"
+        }
+      ]
+    },
+    {
+      "database": "HGNC",
+      "id": "HGNC:7470",
+      "properties": [
+        {
+          "key": "GeneName",
+          "value": "MT-RNR1"
+        }
+      ]
+    },
+    {
+      "database": "MalaCards",
+      "id": "MT-RNR1",
+      "properties": [
+        {
+          "key": "Description",
+          "value": "-"
+        }
+      ]
+    },
+    {
+      "database": "MIM",
+      "id": "561000",
+      "properties": [
+        {
+          "key": "Type",
+          "value": "gene"
+        }
+      ]
+    },
+    {
+      "database": "Orphanet",
+      "id": "551",
+      "properties": [
+        {
+          "key": "Disease",
+          "value": "MERRF"
+        }
+      ]
+    },
+    {
+      "database": "Orphanet",
+      "id": "90641",
+      "properties": [
+        {
+          "key": "Disease",
+          "value": "Rare mitochondrial non-syndromic sensorineural deafness"
+        }
+      ]
+    },
+    {
+      "database": "InParanoid",
+      "id": "A0A0C5B5G6",
+      "properties": [
+        {
+          "key": "Description",
+          "value": "-"
+        }
+      ]
+    },
+    {
+      "database": "PAN-GO",
+      "id": "A0A0C5B5G6",
+      "properties": [
+        {
+          "key": "Number of GO annotations",
+          "value": "3 GO annotations based on evolutionary models"
+        }
+      ]
+    },
+    {
+      "database": "ChiTaRS",
+      "id": "RNR1",
+      "properties": [
+        {
+          "key": "OrganismName",
+          "value": "human"
+        }
+      ]
+    },
+    {
+      "database": "Pharos",
+      "id": "A0A0C5B5G6",
+      "properties": [
+        {
+          "key": "DevelopmentLevel",
+          "value": "Tbio"
+        }
+      ]
+    },
+    {
+      "database": "PRO",
+      "id": "PR:A0A0C5B5G6",
+      "properties": [
+        {
+          "key": "Description",
+          "value": "-"
+        }
+      ]
+    },
+    {
+      "database": "Proteomes",
+      "id": "UP000005640",
+      "properties": [
+        {
+          "key": "Component",
+          "value": "Mitochondrion MT"
+        }
+      ]
+    },
+    {
+      "database": "GO",
+      "id": "GO:0005615",
+      "properties": [
+        {
+          "key": "GoTerm",
+          "value": "C:extracellular space"
+        },
+        {
+          "key": "GoEvidenceType",
+          "value": "IDA:UniProtKB"
+        }
+      ],
+      "evidences": [
+        {
+          "evidenceCode": "ECO:0000314",
+          "source": "PubMed",
+          "id": "25738459"
+        }
+      ]
+    },
+    {
+      "database": "GO",
+      "id": "GO:0005739",
+      "properties": [
+        {
+          "key": "GoTerm",
+          "value": "C:mitochondrion"
+        },
+        {
+          "key": "GoEvidenceType",
+          "value": "IDA:UniProtKB"
+        }
+      ],
+      "evidences": [
+        {
+          "evidenceCode": "ECO:0000314",
+          "source": "PubMed",
+          "id": "29983246"
+        }
+      ]
+    },
+    {
+      "database": "GO",
+      "id": "GO:0005634",
+      "properties": [
+        {
+          "key": "GoTerm",
+          "value": "C:nucleus"
+        },
+        {
+          "key": "GoEvidenceType",
+          "value": "IDA:UniProtKB"
+        }
+      ],
+      "evidences": [
+        {
+          "evidenceCode": "ECO:0000314",
+          "source": "PubMed",
+          "id": "29983246"
+        }
+      ]
+    },
+    {
+      "database": "GO",
+      "id": "GO:0003677",
+      "properties": [
+        {
+          "key": "GoTerm",
+          "value": "F:DNA binding"
+        },
+        {
+          "key": "GoEvidenceType",
+          "value": "IDA:UniProtKB"
+        }
+      ],
+      "evidences": [
+        {
+          "evidenceCode": "ECO:0000314",
+          "source": "PubMed",
+          "id": "29983246"
+        }
+      ]
+    },
+    {
+      "database": "GO",
+      "id": "GO:0140297",
+      "properties": [
+        {
+          "key": "GoTerm",
+          "value": "F:DNA-binding transcription factor binding"
+        },
+        {
+          "key": "GoEvidenceType",
+          "value": "IPI:UniProtKB"
+        }
+      ],
+      "evidences": [
+        {
+          "evidenceCode": "ECO:0000353",
+          "source": "PubMed",
+          "id": "29983246"
+        }
+      ]
+    },
+    {
+      "database": "GO",
+      "id": "GO:0032147",
+      "properties": [
+        {
+          "key": "GoTerm",
+          "value": "P:activation of protein kinase activity"
+        },
+        {
+          "key": "GoEvidenceType",
+          "value": "IDA:UniProtKB"
+        }
+      ],
+      "evidences": [
+        {
+          "evidenceCode": "ECO:0000314",
+          "source": "PubMed",
+          "id": "25738459"
+        }
+      ]
+    },
+    {
+      "database": "GO",
+      "id": "GO:2001145",
+      "properties": [
+        {
+          "key": "GoTerm",
+          "value": "P:negative regulation of phosphatidylinositol-3,4,5-trisphosphate 5-phosphatase activity"
+        },
+        {
+          "key": "GoEvidenceType",
+          "value": "IDA:UniProtKB"
+        }
+      ],
+      "evidences": [
+        {
+          "evidenceCode": "ECO:0000314",
+          "source": "PubMed",
+          "id": "33554779"
+        }
+      ]
+    },
+    {
+      "database": "GO",
+      "id": "GO:0001649",
+      "properties": [
+        {
+          "key": "GoTerm",
+          "value": "P:osteoblast differentiation"
+        },
+        {
+          "key": "GoEvidenceType",
+          "value": "IDA:UniProtKB"
+        }
+      ],
+      "evidences": [
+        {
+          "evidenceCode": "ECO:0000314",
+          "source": "PubMed",
+          "id": "30468456"
+        }
+      ]
+    },
+    {
+      "database": "GO",
+      "id": "GO:0033687",
+      "properties": [
+        {
+          "key": "GoTerm",
+          "value": "P:osteoblast proliferation"
+        },
+        {
+          "key": "GoEvidenceType",
+          "value": "IDA:UniProtKB"
+        }
+      ],
+      "evidences": [
+        {
+          "evidenceCode": "ECO:0000314",
+          "source": "PubMed",
+          "id": "31081069"
+        }
+      ]
+    },
+    {
+      "database": "GO",
+      "id": "GO:0071902",
+      "properties": [
+        {
+          "key": "GoTerm",
+          "value": "P:positive regulation of protein serine/threonine kinase activity"
+        },
+        {
+          "key": "GoEvidenceType",
+          "value": "IDA:UniProtKB"
+        }
+      ],
+      "evidences": [
+        {
+          "evidenceCode": "ECO:0000314",
+          "source": "PubMed",
+          "id": "33554779"
+        }
+      ]
+    },
+    {
+      "database": "GO",
+      "id": "GO:0072522",
+      "properties": [
+        {
+          "key": "GoTerm",
+          "value": "P:purine-containing compound biosynthetic process"
+        },
+        {
+          "key": "GoEvidenceType",
+          "value": "IDA:UniProtKB"
+        }
+      ],
+      "evidences": [
+        {
+          "evidenceCode": "ECO:0000314",
+          "source": "PubMed",
+          "id": "25738459"
+        }
+      ]
+    },
+    {
+      "database": "GO",
+      "id": "GO:0043610",
+      "properties": [
+        {
+          "key": "GoTerm",
+          "value": "P:regulation of carbohydrate utilization"
+        },
+        {
+          "key": "GoEvidenceType",
+          "value": "IDA:UniProtKB"
+        }
+      ],
+      "evidences": [
+        {
+          "evidenceCode": "ECO:0000314",
+          "source": "PubMed",
+          "id": "25738459"
+        }
+      ]
+    },
+    {
+      "database": "GO",
+      "id": "GO:0006357",
+      "properties": [
+        {
+          "key": "GoTerm",
+          "value": "P:regulation of transcription by RNA polymerase II"
+        },
+        {
+          "key": "GoEvidenceType",
+          "value": "IDA:UniProtKB"
+        }
+      ],
+      "evidences": [
+        {
+          "evidenceCode": "ECO:0000314",
+          "source": "PubMed",
+          "id": "29983246"
+        }
+      ]
+    },
+    {
+      "database": "GO",
+      "id": "GO:0048630",
+      "properties": [
+        {
+          "key": "GoTerm",
+          "value": "P:skeletal muscle tissue growth"
+        },
+        {
+          "key": "GoEvidenceType",
+          "value": "IDA:UniProtKB"
+        }
+      ],
+      "evidences": [
+        {
+          "evidenceCode": "ECO:0000314",
+          "source": "PubMed",
+          "id": "33554779"
+        }
+      ]
+    },
+    {
+      "database": "InterPro",
+      "id": "IPR054130",
+      "properties": [
+        {
+          "key": "EntryName",
+          "value": "MT-RNR1"
+        }
+      ]
+    },
+    {
+      "database": "Pfam",
+      "id": "PF21945",
+      "properties": [
+        {
+          "key": "EntryName",
+          "value": "MT-RNR1"
+        },
+        {
+          "key": "MatchStatus",
+          "value": "1"
+        }
+      ]
+    }
+  ],
+  "sequence": {
+    "value": "MRWQEMGYIFYPRKLR",
+    "length": 16,
+    "molWeight": 2175,
+    "crc64": "361DE748426DD505",
+    "md5": "AE72B6C4E87692429C0D558B92BD7B3D"
+  },
+  "extraAttributes": {
+    "countByCommentType": {
+      "FUNCTION": 1,
+      "SUBUNIT": 1,
+      "SUBCELLULAR LOCATION": 1,
+      "TISSUE SPECIFICITY": 1,
+      "DEVELOPMENTAL STAGE": 1,
+      "INDUCTION": 1,
+      "MISCELLANEOUS": 8,
+      "CAUTION": 1
+    },
+    "countByFeatureType": {
+      "Chain": 1,
+      "Natural variant": 1,
+      "Mutagenesis": 4
+    },
+    "uniParcId": "UPI0005D734FE"
+  }
+}

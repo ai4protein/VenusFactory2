@@ -1,7 +1,15 @@
 """
 Search: MCP infra only (SCP client + OSS upload).
 Backend: local (local paths only, no upload) vs pjlab (upload via SCP, return URLs).
-All data/API logic lives in download/* and source/*; this module only wires them + upload.
+All data/API logic lives in database/* and source/*; this module only wires them + upload.
+
+Functions:
+  get_uniprot_sequence(uniprot_id)           -> dict
+  call_interpro_function_query(uniprot_id)   -> str (InterPro/GO by UniProt)
+  download_pdb_structure_from_id(pdb_id, format, backend) -> str
+  download_ncbi_sequence(accession_id, format, backend)   -> str
+  download_alphafold_structure(uniprot_id, format, backend) -> str
+  upload_file_to_oss_sync(file_path, backend) -> url or None
 """
 import json
 import os
@@ -16,12 +24,12 @@ from mcp.client.streamable_http import streamablehttp_client
 from mcp import ClientSession
 
 from src.web.utils.common_utils import get_save_path
-from src.tools.search.download.sequence.download_uniprot_seq import download_uniprot_sequence
-from src.tools.search.download.metadata.interpro_uniprot_query import query_interpro_by_uniprot
-from src.tools.search.download.structure.download_rcsb import download_pdb_by_id
-from src.tools.search.download.utils.utils import get_chain_sequences_from_pdb
-from src.tools.search.download.sequence.download_ncbi_seq import download_ncbi_fasta
-from src.tools.search.download.structure.download_alphafold import download_single_alphafold
+from src.tools.search.database.uniprot.uniprot_sequence import download_uniprot_sequence
+from src.tools.search.database.interpro.interpro_proteins import query_interpro_by_uniprot
+from src.tools.search.database.rcsb.rcsb_structure import download_pdb_by_id
+from src.tools.search.database.utils.utils import get_chain_sequences_from_pdb
+from src.tools.search.database.ncbi.ncbi_sequence import download_ncbi_fasta
+from src.tools.search.database.alphafold.alphafold_structure import download_alphafold_structure
 
 # ---------- Backend and upload (shared with mutation/predict tools_mcp) ----------
 BACKEND_LOCAL = "local"
@@ -124,12 +132,12 @@ def upload_file_to_oss_sync(file_path: str, backend: str = None) -> Optional[str
 
 
 def get_uniprot_sequence(uniprot_id: str) -> dict:
-    """Fetch protein sequence for one UniProt ID (from download/sequence)."""
+    """Fetch protein sequence for one UniProt ID (from database/uniprot)."""
     return download_uniprot_sequence(uniprot_id)
 
 
 def call_interpro_function_query(uniprot_id: str) -> str:
-    """InterPro/GO query by UniProt ID (from download/metadata)."""
+    """InterPro/GO query by UniProt ID (from database/interpro)."""
     try:
         return query_interpro_by_uniprot(uniprot_id)
     except Exception as e:
@@ -188,7 +196,7 @@ def download_alphafold_structure(uniprot_id: str, output_format: str = "pdb", ba
     try:
         structure_dir = get_save_path("Download_Data", "AlphaFold")
         structure_dir.mkdir(parents=True, exist_ok=True)
-        ok, file_path = download_single_alphafold(uniprot_id, str(structure_dir))
+        ok, file_path = download_alphafold_structure(uniprot_id, str(structure_dir))
         if not ok or not file_path or not os.path.exists(file_path):
             return json.dumps({"success": False, "uniprot_id": uniprot_id, "error_message": "Download failed or file not found"})
         confidence_info = {}

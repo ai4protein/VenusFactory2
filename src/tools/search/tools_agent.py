@@ -1,4 +1,9 @@
-# search: @tool definitions for retrieval + data fetch; logic in .tools_mcp or source/download
+# search: @tool definitions for retrieval + data fetch; logic in .tools_mcp, .database, .source
+#
+# Query tools (return text, no file): interpro_lookup, uniprot_sequence_query, uniprot_meta_query,
+#   ncbi_sequence_query, ncbi_meta_query, rcsb_entry_query, rcsb_structure_query, alphafold_structure_query
+# Download tools (save to local/OSS): uniprot_sequence_download, pdb_structure_download, ncbi_sequence_download,
+#   alphafold_structure_download
 
 import json
 import os
@@ -10,7 +15,11 @@ from Bio.PDB import PDBParser
 from Bio.SeqUtils import seq1
 
 from web.utils.common_utils import get_save_path
-from .download.foldseek_search import get_foldseek_sequences
+from .database.foldseek import get_foldseek_sequences
+from .database.uniprot import query_uniprot_seq, query_uniprot_meta
+from .database.ncbi import query_ncbi_seq, query_ncbi_meta
+from .database.rcsb import query_rcsb_entry, query_rcsb_structure
+from .database.alphafold import query_alphafold_structure
 from .source.literature import literature_search
 from .source.web_search import web_search
 from .source.dataset_search import dataset_search
@@ -57,6 +66,20 @@ class NCBISequenceInput(BaseModel):
     backend: str = Field(default=DEFAULT_BACKEND, description="local: local path only; pjlab: upload via SCP")
 
 
+class RCSBEntryQueryInput(BaseModel):
+    pdb_id: str = Field(..., description="PDB ID for RCSB entry metadata query")
+
+
+class RCSBStructureQueryInput(BaseModel):
+    pdb_id: str = Field(..., description="PDB ID for RCSB structure query")
+    file_type: str = Field(default="pdb", description="Structure format: pdb, cif, pdb1, xml")
+
+
+class NCBIQueryInput(BaseModel):
+    ncbi_id: str = Field(..., description="NCBI accession ID")
+    db: str = Field(default="protein", description="NCBI database: protein, nuccore")
+
+
 class AlphaFoldStructureInput(BaseModel):
     uniprot_id: str = Field(..., description="UniProt ID for AlphaFold structure download")
     output_format: str = Field(default="pdb", description="Output format: pdb, mmcif")
@@ -89,6 +112,69 @@ def interpro_lookup_tool(uniprot_id: str) -> str:
         return call_interpro_function_query(uniprot_id)
     except Exception as e:
         return f"InterPro query error: {str(e)}"
+
+
+@tool("uniprot_sequence_query", args_schema=UniProtQueryInput)
+def uniprot_sequence_query_tool(uniprot_id: str) -> str:
+    """Query UniProt sequence by ID (returns FASTA text, no file download)."""
+    try:
+        return query_uniprot_seq(uniprot_id)
+    except Exception as e:
+        return f"UniProt sequence query error: {str(e)}"
+
+
+@tool("uniprot_meta_query", args_schema=UniProtQueryInput)
+def uniprot_meta_query_tool(uniprot_id: str) -> str:
+    """Query UniProt entry metadata by ID (returns JSON text, no file download)."""
+    try:
+        return query_uniprot_meta(uniprot_id)
+    except Exception as e:
+        return f"UniProt meta query error: {str(e)}"
+
+
+@tool("ncbi_sequence_query", args_schema=NCBIQueryInput)
+def ncbi_sequence_query_tool(ncbi_id: str, db: str = "protein") -> str:
+    """Query NCBI sequence by accession (returns FASTA text, no file download)."""
+    try:
+        return query_ncbi_seq(ncbi_id, db=db)
+    except Exception as e:
+        return f"NCBI sequence query error: {str(e)}"
+
+
+@tool("ncbi_meta_query", args_schema=NCBIQueryInput)
+def ncbi_meta_query_tool(ncbi_id: str, db: str = "protein") -> str:
+    """Query NCBI entry metadata by accession (returns GenBank text, no file download)."""
+    try:
+        return query_ncbi_meta(ncbi_id, db=db)
+    except Exception as e:
+        return f"NCBI meta query error: {str(e)}"
+
+
+@tool("rcsb_entry_query", args_schema=RCSBEntryQueryInput)
+def rcsb_entry_query_tool(pdb_id: str) -> str:
+    """Query RCSB PDB entry metadata by PDB ID (returns JSON text, no file download)."""
+    try:
+        return query_rcsb_entry(pdb_id)
+    except Exception as e:
+        return f"RCSB entry query error: {str(e)}"
+
+
+@tool("rcsb_structure_query", args_schema=RCSBStructureQueryInput)
+def rcsb_structure_query_tool(pdb_id: str, file_type: str = "pdb") -> str:
+    """Query RCSB PDB structure content by PDB ID (returns structure text, no file download)."""
+    try:
+        return query_rcsb_structure(pdb_id, file_type=file_type)
+    except Exception as e:
+        return f"RCSB structure query error: {str(e)}"
+
+
+@tool("alphafold_structure_query", args_schema=AlphaFoldStructureInput)
+def alphafold_structure_query_tool(uniprot_id: str) -> str:
+    """Query AlphaFold structure metadata by UniProt ID (returns JSON text, no file download)."""
+    try:
+        return query_alphafold_structure(uniprot_id)
+    except Exception as e:
+        return f"AlphaFold structure query error: {str(e)}"
 
 
 @tool("uniprot_sequence_download", args_schema=UniProtQueryInput)
