@@ -1174,7 +1174,7 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         with gr.Tabs():
                             with gr.Tab("Upload Protein File (.fasta, .fa, .pdb)"):
                                 easy_zshot_file_upload = gr.File(label="Upload Protein File (.fasta, .fa, .pdb)", file_types=[".fasta", ".fa", ".pdb"])
-                                easy_zshot_file_example = gr.Examples(examples=[["./example/download/P60002.fasta"]], inputs=easy_zshot_file_upload, label="Click example to load")
+                                easy_zshot_file_example = gr.Examples(examples=[["./example/database/P60002.fasta"]], inputs=easy_zshot_file_upload, label="Click example to load")
                             with gr.Tab("Paste Protein Content"):
                                 easy_zshot_paste_content_input =  gr.Textbox(label="Paste Protein Content", placeholder="Paste protein content here...", lines=8, max_lines=15)
                                 with gr.Row():
@@ -1241,7 +1241,7 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         with gr.Tabs():
                             with gr.Tab("Upload FASTA File"):
                                 base_function_fasta_upload = gr.File(label="Upload FASTA file", file_types=[".fasta", ".fa"])
-                                base_function_file_example = gr.Examples(examples=[["./example/download/P60002.fasta"]], inputs=base_function_fasta_upload, label="Click example to load")
+                                base_function_file_example = gr.Examples(examples=[["./example/database/P60002.fasta"]], inputs=base_function_fasta_upload, label="Click example to load")
                             with gr.Tab("Paste FASTA Content"):
                                 base_func_paste_content_input = gr.Textbox(label="Paste FASTA Content", placeholder="Paste FASTA content here...", lines=8, max_lines=15)
                                 with gr.Row():
@@ -1303,7 +1303,7 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         with gr.Tabs():
                             with gr.Tab("Upload FASTA File"):
                                 base_residue_function_fasta_upload = gr.File(label="Upload Fasta file", file_types=[".fasta", ".fa"])
-                                base_residue_function_file_exmaple = gr.Examples(examples=[["./example/download/P60002.fasta"]], inputs=base_residue_function_fasta_upload, label="Click example to load")
+                                base_residue_function_file_exmaple = gr.Examples(examples=[["./example/database/P60002.fasta"]], inputs=base_residue_function_fasta_upload, label="Click example to load")
                             with gr.Tab("Paste FASTA Content"):
                                 base_residue_function_paste_content_input = gr.Textbox(label="Paste FASTA Content", placeholder="Paste FASTA content here...", lines=8, max_lines=15)
                                 with gr.Row():
@@ -1370,7 +1370,7 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                             with gr.Tab("Upload Protein File (.fasta, .fa, .pdb)"):
                                 protein_properties_file_upload = gr.File(label="Upload Protein File (.fasta, .fa, .pdb)", file_types=[".fasta", ".fa", ".pdb"])
                                 
-                                protein_properties_file_example = gr.Examples(examples=[["./example/download/P60002.fasta"]], inputs=protein_properties_file_upload, label="Click example to load")
+                                protein_properties_file_example = gr.Examples(examples=[["./example/database/P60002.fasta"]], inputs=protein_properties_file_upload, label="Click example to load")
 
                             with gr.Tab("Paste Protein Content"):
                                 protein_properties_paste_content_input = gr.Textbox(label="Pasta Protein Content", placeholder="Paste protein content here...", lines=8, max_lines=15)

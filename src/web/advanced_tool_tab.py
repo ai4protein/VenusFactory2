@@ -1323,7 +1323,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                                 with gr.Tabs():
                                     with gr.Tab("Upload FASTA File"):
                                         seq_file_upload = gr.File(label="Upload FASTA file", file_types=[".fasta", ".fa"])
-                                        seq_file_example = gr.Examples(examples=[["./example/download/P60002.fasta"]], inputs=seq_file_upload, label="Click example to load")
+                                        seq_file_example = gr.Examples(examples=[["./example/database/P60002.fasta"]], inputs=seq_file_upload, label="Click example to load")
                                     with gr.Tab("Paste FASTA Content"):
                                         seq_paste_content_input = gr.Textbox(label="Paste FASTA Content", placeholder="Paste FASTA content here...", lines=8, max_lines=15)
                                         with gr.Row():
@@ -1510,7 +1510,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         with gr.Tabs():
                             with gr.Tab("Upload FASTA File"):
                                 function_fasta_upload = gr.File(label="Upload FASTA file", file_types=[".fasta", ".fa"])
-                                function_fasta_example = gr.Examples(examples=[["./example/download/P60002.fasta"]], inputs=function_fasta_upload, label="Click example to load")
+                                function_fasta_example = gr.Examples(examples=[["./example/database/P60002.fasta"]], inputs=function_fasta_upload, label="Click example to load")
                             with gr.Tab("Paste FASTA Content"):
                                 function_paste_content_input = gr.Textbox(label="Paste FASTA Content", placeholder="Paste FASTA content here...", lines=8, max_lines=15)
                                 with gr.Row():
@@ -1574,7 +1574,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         with gr.Tabs():
                             with gr.Tab("Upload FASTA File"):
                                 adv_residue_function_fasta_upload = gr.File(label="Upload Fasta file", file_types=[".fasta", ".fa"])
-                                adv_residue_function_file_exmaple = gr.Examples(examples=[["./example/download/P60002.fasta"]], inputs=adv_residue_function_fasta_upload, label="Click example to load")
+                                adv_residue_function_file_exmaple = gr.Examples(examples=[["./example/database/P60002.fasta"]], inputs=adv_residue_function_fasta_upload, label="Click example to load")
                             with gr.Tab("Paste FASTA Content"):
                                 adv_residue_function_paste_content_input = gr.Textbox(label="Paste FASTA Content", placeholder="Paste FASTA content here...", lines=8, max_lines=15)
                                 with gr.Row():

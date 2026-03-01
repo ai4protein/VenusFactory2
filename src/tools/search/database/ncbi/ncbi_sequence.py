@@ -42,24 +42,21 @@ def download_ncbi_seq(ncbi_id: str, out_dir: str, db: str = "protein") -> str:
 
 
 def download_ncbi_fasta(ncbi_id, db, outdir, merge_output=False):
-    """Legacy API: (ncbi_id, status_message, sequence_or_None)."""
-    if not merge_output:
-        out_path = os.path.join(outdir, f"{ncbi_id}.fasta")
-        if os.path.exists(out_path):
-            return ncbi_id, f"{ncbi_id}.fasta already exists, skipping", None
-    text = query_ncbi_seq(ncbi_id, db)
-    try:
-        data = json.loads(text)
-        if isinstance(data, dict) and data.get("success") is False:
-            return ncbi_id, f"{ncbi_id}.fasta failed, {data.get('error', 'unknown')}", None
-    except json.JSONDecodeError:
-        pass
+    """Legacy API: returns (ncbi_id, status_message, sequence_or_None). Delegates to download_ncbi_seq or query_ncbi_seq."""
     if merge_output:
+        text = query_ncbi_seq(ncbi_id, db)
+        try:
+            data = json.loads(text)
+            if isinstance(data, dict) and data.get("success") is False:
+                return ncbi_id, f"{ncbi_id}.fasta failed, {data.get('error', 'unknown')}", None
+        except json.JSONDecodeError:
+            pass
         return ncbi_id, f"{ncbi_id}.fasta successfully downloaded", text
-    os.makedirs(outdir, exist_ok=True)
-    out_path = os.path.join(outdir, f"{ncbi_id}.fasta")
-    with open(out_path, "w") as f:
-        f.write(text)
+    msg = download_ncbi_seq(ncbi_id, outdir, db)
+    if "failed" in msg:
+        return ncbi_id, msg, None
+    if "already exists" in msg:
+        return ncbi_id, f"{ncbi_id}.fasta already exists, skipping", None
     return ncbi_id, f"{ncbi_id}.fasta successfully downloaded", None
 
 

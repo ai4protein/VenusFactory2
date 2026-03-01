@@ -1037,7 +1037,7 @@ def create_comprehensive_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 with gr.Tabs():
                     with gr.Tab("📁 Upload File"):
                         comprehensive_file_upload = gr.File(label="Protein file (.fasta, .fa, .pdb)", file_types=[".fasta", ".fa", ".pdb"])
-                        comprehensive_file_example = gr.Examples(examples=[["./example/download/P60002.fasta"]], inputs=comprehensive_file_upload, label="Click example to load")
+                        comprehensive_file_example = gr.Examples(examples=[["./example/database/P60002.fasta"]], inputs=comprehensive_file_upload, label="Click example to load")
                     with gr.Tab("📋 Paste"):
                         comprehensive_paste_content_input = gr.Textbox(label="Paste protein content", placeholder="Paste FASTA/PDB or raw sequence...", lines=6, max_lines=12)
                         with gr.Row():
