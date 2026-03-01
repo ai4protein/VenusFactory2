@@ -7,6 +7,7 @@ from tqdm import tqdm
 """
 Install maxit first
 https://sw-tools.rcsb.org/apps/MAXIT/index.html
+conda install bioconda::maxit
 """
 
 def convert(file, maxit_o=1, out_dir=None, postfix=None):
@@ -18,10 +19,10 @@ def convert(file, maxit_o=1, out_dir=None, postfix=None):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--file", type=str)
-    parser.add_argument("--input_dir", type=str, default=None)
-    parser.add_argument("--strategy", type=str, choices=["pdb2cif", "cif2pdb", "cif2mmcif"], default=None)
-    parser.add_argument("--out_dir", type=str, default=None)
+    parser.add_argument('-f', "--file", type=str, default=None)
+    parser.add_argument('-i', "--input_dir", type=str, default=None)
+    parser.add_argument('-s', "--strategy", type=str, choices=["pdb2cif", "cif2pdb", "cif2mmcif"], default=None)
+    parser.add_argument('-o', "--out_dir", type=str, default=None)
     args = parser.parse_args()
     
     if args.out_dir:
