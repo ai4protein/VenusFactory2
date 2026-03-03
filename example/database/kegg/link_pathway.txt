@@ -1,0 +1,9 @@
+hsa:7535	path:hsa04014
+hsa:7535	path:hsa04064
+hsa:7535	path:hsa04650
+hsa:7535	path:hsa04658
+hsa:7535	path:hsa04659
+hsa:7535	path:hsa04660
+hsa:7535	path:hsa05135
+hsa:7535	path:hsa05235
+hsa:7535	path:hsa05340

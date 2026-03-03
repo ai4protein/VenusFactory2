@@ -1,0 +1,1 @@
+hsa:7535	ncbi-geneid:7535
