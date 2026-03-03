@@ -1,0 +1,43 @@
+{
+  "ec_number": "1.1.1.1",
+  "organisms": [
+    "Escherichia coli",
+    "Saccharomyces cerevisiae",
+    "Homo sapiens"
+  ],
+  "comparison": [
+    {
+      "organism": "Escherichia coli",
+      "ec_number": "1.1.1.1",
+      "data_points": 1,
+      "average_km": null,
+      "min_km": null,
+      "max_km": null,
+      "optimal_ph": null,
+      "optimal_temperature": null,
+      "temperature_range": null
+    },
+    {
+      "organism": "Saccharomyces cerevisiae",
+      "ec_number": "1.1.1.1",
+      "data_points": 49,
+      "average_km": null,
+      "min_km": null,
+      "max_km": null,
+      "optimal_ph": null,
+      "optimal_temperature": null,
+      "temperature_range": null
+    },
+    {
+      "organism": "Homo sapiens",
+      "ec_number": "1.1.1.1",
+      "data_points": 181,
+      "average_km": null,
+      "min_km": null,
+      "max_km": null,
+      "optimal_ph": null,
+      "optimal_temperature": null,
+      "temperature_range": null
+    }
+  ]
+}

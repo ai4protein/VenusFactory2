@@ -1,0 +1,297 @@
+{
+    'reaction': '(R)-mevalonate + NAD+ = mevaldate + NADH + H+',
+    'commentary': 'stereospecific insertion of hydride into C-5, hydride is added from the re-face of carbonyl group in 3R and 3S-isomers',
+    'literature': [
+        286553
+    ],
+    'organism': 'Sus scrofa',
+    'ecNumber': '1.1.1.1'
+}
+{
+    'reaction': '(R)-mevalonate + NAD+ = mevaldate + NADH + H+',
+    'commentary': 'formation of mevalonic acid is strongly favoured',
+    'literature': [
+        286554
+    ],
+    'organism': 'Sus scrofa',
+    'ecNumber': '1.1.1.1'
+}
+{
+    'reaction': '(R)-mevalonate + NAD+ = mevaldate + NADH + H+',
+    'commentary': 'formation of mevalonic acid is strongly favoured',
+    'literature': [
+        286555
+    ],
+    'organism': 'Sus scrofa',
+    'ecNumber': '1.1.1.1'
+}
+{
+    'reaction': '(R)-mevalonate + NAD+ = mevaldate + NADH + H+',
+    'commentary': None,
+    'literature': [
+        0
+    ],
+    'organism': None,
+    'ecNumber': '1.1.1.1'
+}
+{
+    'reaction': 'a primary alcohol + NAD+ = an aldehyde + NADH + H+',
+    'commentary': 'ordered bi bi mechanism with cofactor adding first to form a binary enzyme complex',
+    'literature': [
+        285578
+    ],
+    'organism': 'Homo sapiens',
+    'ecNumber': '1.1.1.1'
+}
+{
+    'reaction': 'a primary alcohol + NAD+ = an aldehyde + NADH + H+',
+    'commentary': 'isoenzyme EE and SS: ordered bi bi mechanism',
+    'literature': [
+        285590
+    ],
+    'organism': 'Equus caballus',
+    'ecNumber': '1.1.1.1'
+}
+{
+    'reaction': 'a primary alcohol + NAD+ = an aldehyde + NADH + H+',
+    'commentary': 'mechanism is predominantly ordered with ethanol, but partially random with butanol',
+    'literature': [
+        285646
+    ],
+    'organism': 'Saccharomyces cerevisiae',
+    'ecNumber': '1.1.1.1'
+}
+{
+    'reaction': 'a primary alcohol + NAD+ = an aldehyde + NADH + H+',
+    'commentary': 'mechanism is predominantly ordered with ethanol, but partially random with butanol',
+    'literature': [
+        285646
+    ],
+    'organism': 'Schizosaccharomyces pombe',
+    'ecNumber': '1.1.1.1'
+}
+{
+    'reaction': 'a primary alcohol + NAD+ = an aldehyde + NADH + H+',
+    'commentary': 'kinetic mechanism is random for ethanol oxidation and compulsory ordered for acetaldehyde reduction',
+    'literature': [
+        285596
+    ],
+    'organism': 'Equus caballus',
+    'ecNumber': '1.1.1.1'
+}
+{
+    'reaction': 'a primary alcohol + NAD+ = an aldehyde + NADH + H+',
+    'commentary': 'oxidizes ethanol in an ordered bi-bi mechanism with NAD+ as the first substrate fixed',
+    'literature': [
+        285640
+    ],
+    'organism': 'Meyerozyma guilliermondii',
+    'ecNumber': '1.1.1.1'
+}
+{
+    'reaction': 'a primary alcohol + NAD+ = an aldehyde + NADH + H+',
+    'commentary': 'compulsory-order mechanism with the rate-limiting step being the dissociation of the product enzyme-NAD+ complex',
+    'literature': [
+        285645
+    ],
+    'organism': 'Saccharomyces cerevisiae',
+    'ecNumber': '1.1.1.1'
+}
+{
+    'reaction': 'a primary alcohol + NAD+ = an aldehyde + NADH + H+',
+    'commentary': 'Theorell-Chance mechanism',
+    'literature': [
+        285593
+    ],
+    'organism': 'Scaptodrosophila lebanonensis',
+    'ecNumber': '1.1.1.1'
+}
+{
+    'reaction': 'a primary alcohol + NAD+ = an aldehyde + NADH + H+',
+    'commentary': 'Theorell-Chance mechanism',
+    'literature': [
+        285624
+    ],
+    'organism': 'Chlamydomonas moewusii',
+    'ecNumber': '1.1.1.1'
+}
+{
+    'reaction': 'a primary alcohol + NAD+ = an aldehyde + NADH + H+',
+    'commentary': 'Theorell-Chance mechanism',
+    'literature': [
+        285629
+    ],
+    'organism': 'Brassica napus',
+    'ecNumber': '1.1.1.1'
+}
+{
+    'reaction': 'a primary alcohol + NAD+ = an aldehyde + NADH + H+',
+    'commentary': 'ordered bi-bi mechanism',
+    'literature': [
+        285598
+    ],
+    'organism': 'Drosophila melanogaster',
+    'ecNumber': '1.1.1.1'
+}
+{
+    'reaction': 'a primary alcohol + NAD+ = an aldehyde + NADH + H+',
+    'commentary': 'ordered bi-bi mechanism',
+    'literature': [
+        285586
+    ],
+    'organism': 'Equus caballus',
+    'ecNumber': '1.1.1.1'
+}
+{
+    'reaction': 'a primary alcohol + NAD+ = an aldehyde + NADH + H+',
+    'commentary': 'rapid equilibrium random mechanism',
+    'literature': [
+        285618
+    ],
+    'organism': 'Drosophila melanogaster',
+    'ecNumber': '1.1.1.1'
+}
+{
+    'reaction': 'a primary alcohol + NAD+ = an aldehyde + NADH + H+',
+    'commentary': 'rapid equilibrium random mechanism',
+    'literature': [
+        285618
+    ],
+    'organism': 'Drosophila simulans',
+    'ecNumber': '1.1.1.1'
+}
+{
+    'reaction': 'a primary alcohol + NAD+ = an aldehyde + NADH + H+',
+    'commentary': 'ordered sequential bibi reaction mechanism, modeling of oxidation kinetic mechanism',
+    'literature': [
+        655233
+    ],
+    'organism': 'Equus caballus',
+    'ecNumber': '1.1.1.1'
+}
+{
+    'reaction': 'a primary alcohol + NAD+ = an aldehyde + NADH + H+',
+    'commentary': 'detailed determination of the reaction and kinetic mechanisms, active site structure and determination of amino acid residues involved in catalysis, 3 isozymes',
+    'literature': [
+        655649
+    ],
+    'organism': 'Saccharomyces cerevisiae',
+    'ecNumber': '1.1.1.1'
+}
+{
+    'reaction': 'a primary alcohol + NAD+ = an aldehyde + NADH + H+',
+    'commentary': 'class IV alcohol dehydrogenase also functions as retinol dehydrogenase, reaction and kinetic mechanism: asymmetric rapid equilibrium random mechanism with 2 dead-end ternary complexes fro retinol oxidation and a rapid equilibrium ordered mechanism with one dead-end ternary complex for retinal reduction, a unique mechanistic form fro zinc-containing ADH in the medium chain dehydrogenase/reductase superfamily of enzymes',
+    'literature': [
+        656058
+    ],
+    'organism': 'Homo sapiens',
+    'ecNumber': '1.1.1.1'
+}
+{
+    'reaction': 'a primary alcohol + NAD+ = an aldehyde + NADH + H+',
+    'commentary': "catalytic mechanism involves a proton relay modulated by the coupled ionization of the active site Lys155/Tyr151 pair, and a NAD+ ribose 2'-OH switch, other active site residues are Ser138 and Trp144, ionization properties, substrate binding, overview",
+    'literature': [
+        657317
+    ],
+    'organism': 'Scaptodrosophila lebanonensis',
+    'ecNumber': '1.1.1.1'
+}
+{
+    'reaction': 'a primary alcohol + NAD+ = an aldehyde + NADH + H+',
+    'commentary': 'reaction mechanism, His51 is involved, but not essential, in catalysis facilitating the deprotonation of the hydroxyl group of water or alcohol ligated to the catalytic zinc',
+    'literature': [
+        654743
+    ],
+    'organism': 'Equus caballus',
+    'ecNumber': '1.1.1.1'
+}
+{
+    'reaction': 'a primary alcohol + NAD+ = an aldehyde + NADH + H+',
+    'commentary': 'ordered bibi mechanism, structural and functional implications of amino acid residue 47',
+    'literature': [
+        654730
+    ],
+    'organism': 'Mus musculus',
+    'ecNumber': '1.1.1.1'
+}
+{
+    'reaction': 'a primary alcohol + NAD+ = an aldehyde + NADH + H+',
+    'commentary': 'the catalytic triad consists of Cys44, His67, and Cys154, active site structure',
+    'literature': [
+        657302
+    ],
+    'organism': 'Pseudomonas aeruginosa',
+    'ecNumber': '1.1.1.1'
+}
+{
+    'reaction': 'a primary alcohol + NAD+ = an aldehyde + NADH + H+',
+    'commentary': 'Ser48 is involved in catalysis, isozyme gamma(2)gamma(2)',
+    'literature': [
+        654727
+    ],
+    'organism': 'Homo sapiens',
+    'ecNumber': '1.1.1.1'
+}
+{
+    'reaction': 'a primary alcohol + NAD+ = an aldehyde + NADH + H+',
+    'commentary': 'active site structure',
+    'literature': [
+        656525
+    ],
+    'organism': 'Aeropyrum pernix',
+    'ecNumber': '1.1.1.1'
+}
+{
+    'reaction': 'a primary alcohol + NAD+ = an aldehyde + NADH + H+',
+    'commentary': 'sequential reaction mechanism',
+    'literature': [
+        655082
+    ],
+    'organism': 'Rhodococcus ruber',
+    'ecNumber': '1.1.1.1'
+}
+{
+    'reaction': 'a primary alcohol + NAD+ = an aldehyde + NADH + H+',
+    'commentary': 'oxidizes ethanol in an ordered bi-bi mechanism with NAD+ as the first substrate fixed',
+    'literature': [
+        0
+    ],
+    'organism': 'Meyerozyma guilliermondii B10-05',
+    'ecNumber': '1.1.1.1'
+}
+{
+    'reaction': 'a primary alcohol + NAD+ = an aldehyde + NADH + H+',
+    'commentary': 'the catalytic triad consists of Cys44, His67, and Cys154, active site structure',
+    'literature': [
+        0
+    ],
+    'organism': 'Pseudomonas aeruginosa PaADH',
+    'ecNumber': '1.1.1.1'
+}
+{
+    'reaction': 'a primary alcohol + NAD+ = an aldehyde + NADH + H+',
+    'commentary': 'sequential reaction mechanism',
+    'literature': [
+        0
+    ],
+    'organism': 'Rhodococcus ruber DSM 44541',
+    'ecNumber': '1.1.1.1'
+}
+{
+    'reaction': 'a primary alcohol + NAD+ = an aldehyde + NADH + H+',
+    'commentary': None,
+    'literature': [
+        0
+    ],
+    'organism': None,
+    'ecNumber': '1.1.1.1'
+}
+{
+    'reaction': 'a secondary alcohol + NAD+ = a ketone + NADH + H+',
+    'commentary': None,
+    'literature': [
+        0
+    ],
+    'organism': None,
+    'ecNumber': '1.1.1.1'
+}
