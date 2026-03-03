@@ -1,0 +1,9 @@
+{
+  "results": [
+    {
+      "from": "P43403",
+      "to": "hsa:7535"
+    }
+  ],
+  "failedIds": []
+}

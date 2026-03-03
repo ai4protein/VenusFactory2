@@ -45,13 +45,33 @@ def download_uniprot_meta(uniprot_id: str, out_dir: str) -> str:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("--test", action="store_true", help="Run tests for query_uniprot_meta, download_uniprot_meta; output under example/database/uniprot")
     parser.add_argument("-i", "--uniprot_id")
     parser.add_argument("-f", "--file")
-    parser.add_argument("-o", "--out_dir", required=True)
+    parser.add_argument("-o", "--out_dir")
     parser.add_argument("-n", "--num_workers", type=int, default=12)
     parser.add_argument("-e", "--error_file")
     args = parser.parse_args()
 
+    if args.test:
+        out_base = os.path.join("example", "database", "uniprot", "metadata")
+        os.makedirs(out_base, exist_ok=True)
+        test_id = "P43403"
+        print("Testing query_uniprot_meta(...)")
+        text = query_uniprot_meta(test_id)
+        sample_path = os.path.join(out_base, "query_meta_sample.json")
+        with open(sample_path, "w", encoding="utf-8") as f:
+            f.write(text)
+        print(f"  saved to {sample_path}")
+        print("Testing download_uniprot_meta(...)")
+        msg = download_uniprot_meta(test_id, out_base)
+        print(f"  {msg}")
+        print(f"Done. Output under {out_base}")
+        exit(0)
+
+    if not args.out_dir:
+        print("Error: -o/--out_dir required (or use --test)")
+        exit(1)
     if not args.uniprot_id and not args.file:
         print("Error: Must provide either uniprot_id or file")
         exit(1)
@@ -85,3 +105,6 @@ if __name__ == "__main__":
         with open(args.error_file, "w") as f:
             for p, m in zip(errors, messages):
                 f.write(f"{p} - {m}\n")
+
+    n_total = len(uids)
+    print(f"Done. Output: {args.out_dir} | Total: {n_total}, OK: {n_total - len(errors)}, Failed: {len(errors)}")
