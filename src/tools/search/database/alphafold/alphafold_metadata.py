@@ -47,6 +47,7 @@ if __name__ == "__main__":
     from tqdm import tqdm
 
     parser = argparse.ArgumentParser()
+    parser.add_argument("--test", action="store_true", help="Run tests for all non-helper functions (query_alphafold_metadata, download_alphafold_metadata); output under example/database/alphafold")
     parser.add_argument("-i", "--uniprot_id", type=str, help="Single UniProt ID")
     parser.add_argument("-f", "--uniprot_id_file", type=str, help="Input file containing a list of UniProt IDs")
     parser.add_argument("-o", "--out_dir", type=str, help="Output directory to save JSON files")
@@ -54,6 +55,28 @@ if __name__ == "__main__":
     parser.add_argument("-e", "--error_file", type=str, help="File to record failed IDs")
     parser.add_argument("-n", "--num_workers", type=int, default=12)
     args = parser.parse_args()
+
+    if args.test:
+        # Test all executable non-helper functions; output under example/database
+        test_id = "A0A1B0GTW7"
+        out_base = os.path.join("example", "database", "alphafold")
+        metadata_dir = os.path.join(out_base, "metadata")
+        os.makedirs(metadata_dir, exist_ok=True)
+        print("Testing query_alphafold_metadata(...)")
+        query_text = query_alphafold_metadata(test_id)
+        if len(query_text) > 500:
+            print(f"  (first 500 chars): {query_text[:500]}...")
+        else:
+            print(f"  result: {query_text}")
+        query_sample_path = os.path.join(out_base, "query_metadata_sample.json")
+        with open(query_sample_path, "w", encoding="utf-8") as f:
+            f.write(query_text)
+        print(f"  saved full result to {query_sample_path}")
+        print("Testing download_alphafold_metadata(...)")
+        msg = download_alphafold_metadata(test_id, metadata_dir)
+        print(f"  {msg}")
+        print(f"Done. Output under {out_base}")
+        exit(0)
 
     if not args.uniprot_id and not args.uniprot_id_file:
         print("Error: Must provide either uniprot_id or uniprot_id_file")
@@ -101,3 +124,6 @@ if __name__ == "__main__":
         if d:
             os.makedirs(d, exist_ok=True)
         pd.DataFrame({"protein": errors, "error": messages}).to_csv(args.error_file, index=False)
+
+    n_total = len(uids)
+    print(f"Done. Output: {args.out_dir} | Total: {n_total}, OK: {n_total - len(errors)}, Failed: {len(errors)}")
