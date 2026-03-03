@@ -45,13 +45,33 @@ if __name__ == "__main__":
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
     parser = argparse.ArgumentParser(description="InterPro entry metadata: query/download by InterPro ID")
+    parser.add_argument("--test", action="store_true", help="Run tests for query_interpro_metadata, download_interpro_metadata; output under example/database/interpro")
     parser.add_argument("-i", "--interpro_id", type=str, help="Single InterPro ID")
     parser.add_argument("-f", "--interpro_id_file", type=str, help="Input file containing a list of InterPro IDs")
-    parser.add_argument("-o", "--out_dir", type=str, required=True, help="Output directory to save JSON files")
+    parser.add_argument("-o", "--out_dir", type=str, help="Output directory to save JSON files")
     parser.add_argument("-e", "--error_file", type=str, help="File to record failed IDs")
     parser.add_argument("-n", "--num_workers", type=int, default=12)
     args = parser.parse_args()
 
+    if args.test:
+        out_base = os.path.join("example", "database", "interpro", "metadata")
+        os.makedirs(out_base, exist_ok=True)
+        test_id = "IPR001557"
+        print("Testing query_interpro_metadata(...)")
+        text = query_interpro_metadata(test_id)
+        sample_path = os.path.join(out_base, "query_metadata_sample.json")
+        with open(sample_path, "w", encoding="utf-8") as f:
+            f.write(text)
+        print(f"  saved to {sample_path}")
+        print("Testing download_interpro_metadata(...)")
+        msg = download_interpro_metadata(test_id, out_base)
+        print(f"  {msg}")
+        print(f"Done. Output under {out_base}")
+        exit(0)
+
+    if not args.out_dir:
+        print("Error: -o/--out_dir required (or use --test)")
+        exit(1)
     if not args.interpro_id and not args.interpro_id_file:
         print("Error: Must provide either interpro_id or interpro_id_file")
         exit(1)
@@ -85,3 +105,6 @@ if __name__ == "__main__":
         with open(args.error_file, "w") as f:
             for p, m in zip(errors, messages):
                 f.write(f"{p} - {m}\n")
+
+    n_total = len(ids)
+    print(f"Done. Output: {args.out_dir} | Total: {n_total}, OK: {n_total - len(errors)}, Failed: {len(errors)}")

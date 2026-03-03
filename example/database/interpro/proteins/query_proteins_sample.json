@@ -1,0 +1,303 @@
+{
+  "metadata": {
+    "accession": "IPR001557",
+    "num_proteins": 15
+  },
+  "results": [
+    {
+      "metadata": {
+        "accession": "A0A0S3QTC6",
+        "name": "Malate dehydrogenase",
+        "source_database": "reviewed",
+        "length": 315,
+        "source_organism": {
+          "taxId": "1298851",
+          "scientificName": "Thermosulfidibacter takaii (strain DSM 17441 / JCM 13301 / NBRC 103674 / ABI70S6)",
+          "fullName": "Thermosulfidibacter takaii (strain DSM 17441 / JCM 13301 / NBRC 103674 / ABI70S6)"
+        },
+        "gene": "mdh",
+        "in_alphafold": true,
+        "in_bfvd": false
+      },
+      "entries": [
+        {
+          "accession": "IPR001557",
+          "entry_protein_locations": [
+            {
+              "fragments": [
+                {
+                  "start": 3,
+                  "end": 306,
+                  "dc-status": "CONTINUOUS"
+                }
+              ],
+              "representative": false,
+              "model": null,
+              "score": null
+            }
+          ],
+          "protein_length": 315,
+          "source_database": "interpro",
+          "entry_type": "family",
+          "entry_integrated": null
+        }
+      ],
+      "extra_fields": {
+        "counters": {
+          "entries": 1,
+          "structures": 0,
+          "taxa": 1,
+          "proteomes": 1,
+          "sets": 0
+        }
+      }
+    },
+    {
+      "metadata": {
+        "accession": "A0A1F3",
+        "name": "L-lactate dehydrogenase A chain",
+        "source_database": "reviewed",
+        "length": 332,
+        "source_organism": {
+          "taxId": "30521",
+          "scientificName": "Bos mutus grunniens",
+          "fullName": "Bos mutus grunniens (Wild yak)"
+        },
+        "gene": "LDHA",
+        "in_alphafold": true,
+        "in_bfvd": false
+      },
+      "entries": [
+        {
+          "accession": "IPR001557",
+          "entry_protein_locations": [
+            {
+              "fragments": [
+                {
+                  "start": 20,
+                  "end": 329,
+                  "dc-status": "CONTINUOUS"
+                }
+              ],
+              "representative": false,
+              "model": null,
+              "score": null
+            }
+          ],
+          "protein_length": 332,
+          "source_database": "interpro",
+          "entry_type": "family",
+          "entry_integrated": null
+        }
+      ],
+      "extra_fields": {
+        "counters": {
+          "entries": 1,
+          "structures": 0,
+          "taxa": 1,
+          "proteomes": 1,
+          "sets": 0
+        }
+      }
+    },
+    {
+      "metadata": {
+        "accession": "A0AZ43",
+        "name": "Malate dehydrogenase",
+        "source_database": "reviewed",
+        "length": 328,
+        "source_organism": {
+          "taxId": "331272",
+          "scientificName": "Burkholderia cenocepacia (strain HI2424)",
+          "fullName": "Burkholderia cenocepacia (strain HI2424)"
+        },
+        "gene": "mdh",
+        "in_alphafold": true,
+        "in_bfvd": false
+      },
+      "entries": [
+        {
+          "accession": "IPR001557",
+          "entry_protein_locations": [
+            {
+              "fragments": [
+                {
+                  "start": 6,
+                  "end": 315,
+                  "dc-status": "CONTINUOUS"
+                }
+              ],
+              "representative": false,
+              "model": null,
+              "score": null
+            }
+          ],
+          "protein_length": 328,
+          "source_database": "interpro",
+          "entry_type": "family",
+          "entry_integrated": null
+        }
+      ],
+      "extra_fields": {
+        "counters": {
+          "entries": 1,
+          "structures": 0,
+          "taxa": 1,
+          "proteomes": 0,
+          "sets": 0
+        }
+      }
+    },
+    {
+      "metadata": {
+        "accession": "A0KG16",
+        "name": "Malate dehydrogenase",
+        "source_database": "reviewed",
+        "length": 311,
+        "source_organism": {
+          "taxId": "380703",
+          "scientificName": "Aeromonas hydrophila subsp. hydrophila (strain ATCC 7966 / DSM 30187 / BCRC 13018 / CCUG 14551 / JCM 1027 / KCTC 2358 / NCIMB 9240 / NCTC 8049)",
+          "fullName": "Aeromonas hydrophila subsp. hydrophila (strain ATCC 7966 / DSM 30187 / BCRC 13018 / CCUG 14551 / JCM 1027 / KCTC 2358 / NCIMB 9240 / NCTC 8049)"
+        },
+        "gene": "mdh",
+        "in_alphafold": true,
+        "in_bfvd": false
+      },
+      "entries": [
+        {
+          "accession": "IPR001557",
+          "entry_protein_locations": [
+            {
+              "fragments": [
+                {
+                  "start": 1,
+                  "end": 300,
+                  "dc-status": "CONTINUOUS"
+                }
+              ],
+              "representative": false,
+              "model": null,
+              "score": null
+            }
+          ],
+          "protein_length": 311,
+          "source_database": "interpro",
+          "entry_type": "family",
+          "entry_integrated": null
+        }
+      ],
+      "extra_fields": {
+        "counters": {
+          "entries": 1,
+          "structures": 0,
+          "taxa": 1,
+          "proteomes": 1,
+          "sets": 0
+        }
+      }
+    },
+    {
+      "metadata": {
+        "accession": "A0L113",
+        "name": "Malate dehydrogenase",
+        "source_database": "reviewed",
+        "length": 311,
+        "source_organism": {
+          "taxId": "94122",
+          "scientificName": "Shewanella sp. (strain ANA-3)",
+          "fullName": "Shewanella sp. (strain ANA-3)"
+        },
+        "gene": "mdh",
+        "in_alphafold": true,
+        "in_bfvd": false
+      },
+      "entries": [
+        {
+          "accession": "IPR001557",
+          "entry_protein_locations": [
+            {
+              "fragments": [
+                {
+                  "start": 1,
+                  "end": 298,
+                  "dc-status": "CONTINUOUS"
+                }
+              ],
+              "representative": false,
+              "model": null,
+              "score": null
+            }
+          ],
+          "protein_length": 311,
+          "source_database": "interpro",
+          "entry_type": "family",
+          "entry_integrated": null
+        }
+      ],
+      "extra_fields": {
+        "counters": {
+          "entries": 1,
+          "structures": 0,
+          "taxa": 1,
+          "proteomes": 0,
+          "sets": 0
+        }
+      }
+    },
+    {
+      "metadata": {
+        "accession": "A0L5T9",
+        "name": "Malate dehydrogenase",
+        "source_database": "reviewed",
+        "length": 327,
+        "source_organism": {
+          "taxId": "156889",
+          "scientificName": "Magnetococcus marinus (strain ATCC BAA-1437 / JCM 17883 / MC-1)",
+          "fullName": "Magnetococcus marinus (strain ATCC BAA-1437 / JCM 17883 / MC-1)"
+        },
+        "gene": "mdh",
+        "in_alphafold": true,
+        "in_bfvd": false
+      },
+      "entries": [
+        {
+          "accession": "IPR001557",
+          "entry_protein_locations": [
+            {
+              "fragments": [
+                {
+                  "start": 3,
+                  "end": 314,
+                  "dc-status": "CONTINUOUS"
+                }
+              ],
+              "representative": false,
+              "model": null,
+              "score": null
+            }
+          ],
+          "protein_length": 327,
+          "source_database": "interpro",
+          "entry_type": "family",
+          "entry_integrated": null
+        }
+      ],
+      "extra_fields": {
+        "counters": {
+          "entries": 1,
+          "structures": 0,
+          "taxa": 1,
+          "proteomes": 1,
+          "sets": 0
+        }
+      }
+    },
+    {
+      "metadata": {
+        "accession": "A0LFF8",
+        "name": "Malate dehydrogenase",
+        "source_database": "reviewed",
+        "length": 329,
+        "source_organism": {
+          "taxId": "335543",
+          "scie

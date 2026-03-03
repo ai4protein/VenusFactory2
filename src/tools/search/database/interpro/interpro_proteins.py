@@ -11,6 +11,7 @@ import argparse
 import requests
 from time import sleep
 from tqdm import tqdm
+from typing import Optional
 from urllib import request as url_request
 from urllib.error import HTTPError
 
@@ -87,31 +88,34 @@ def download_interpro_by_uniprot(uniprot_id: str, out_dir: str) -> str:
 
 # ----- By InterPro ID: protein list (reviewed) -----
 
-def _fetch_proteins_page(url: str) -> list:
+def _fetch_proteins_page(url: str, max_results: Optional[int] = None) -> list:
+    """Fetch protein list pages. If max_results is set, stop after that many (e.g. for tests)."""
     data_list = []
     while url:
         response = requests.get(url, timeout=30)
         data = response.json()
         data_list.extend(data.get("results", []))
+        if max_results is not None and len(data_list) >= max_results:
+            return data_list[:max_results]
         url = data.get("next")
         if url:
             time.sleep(1)
     return data_list
 
 
-def query_interpro_proteins(interpro_id: str, page_size: int = 200) -> str:
-    """Query protein list for an InterPro ID. Returns JSON string. No file save."""
+def query_interpro_proteins(interpro_id: str, page_size: int = 200, max_results: Optional[int] = None) -> str:
+    """Query protein list for an InterPro ID. Returns JSON string. No file save. max_results limits count (e.g. for tests)."""
     url = f"https://www.ebi.ac.uk/interpro/api/protein/reviewed/entry/InterPro/{interpro_id}/?extra_fields=counters&page_size={page_size}"
     try:
-        data_list = _fetch_proteins_page(url)
+        data_list = _fetch_proteins_page(url, max_results=max_results)
         meta = {"accession": interpro_id, "num_proteins": len(data_list)}
         return json.dumps({"metadata": meta, "results": data_list}, indent=2)
     except Exception as e:
         return json.dumps({"success": False, "interpro_id": interpro_id, "error": str(e)})
 
 
-def download_interpro_proteins(interpro_id: str, out_dir: str) -> str:
-    """Download family proteins for an InterPro ID: detail.json, meta.json, uids.txt. Returns message string."""
+def download_interpro_proteins(interpro_id: str, out_dir: str, max_results: Optional[int] = None) -> str:
+    """Download family proteins for an InterPro ID: detail.json, meta.json, uids.txt. max_results limits count (e.g. for tests)."""
     interpro_dir = os.path.join(out_dir, interpro_id)
     os.makedirs(interpro_dir, exist_ok=True)
 
@@ -121,7 +125,7 @@ def download_interpro_proteins(interpro_id: str, out_dir: str) -> str:
 
     url = f"https://www.ebi.ac.uk/interpro/api/protein/reviewed/entry/InterPro/{interpro_id}/?extra_fields=counters&page_size=20"
     try:
-        info_data = _fetch_proteins_page(url)
+        info_data = _fetch_proteins_page(url, max_results=max_results)
     except Exception:
         return f"Error downloading {interpro_id}"
 
@@ -154,8 +158,8 @@ def fetch_info_data(url: str) -> list:
 
 # ----- By InterPro ID: UniProt ID list (paginated, optional filter) -----
 
-def _fetch_uniprot_list_urllib(base_url: str, page_size: int = 200):
-    """Fetch all UniProt accessions for an InterPro entry via pagination (urllib)."""
+def _fetch_uniprot_list_urllib(base_url: str, page_size: int = 200, max_results: Optional[int] = None):
+    """Fetch UniProt accessions for an InterPro entry via pagination (urllib). If max_results is set, stop after that many (for tests)."""
     context = ssl._create_unverified_context()
     next_url = base_url
     names = []
@@ -178,6 +182,10 @@ def _fetch_uniprot_list_urllib(base_url: str, page_size: int = 200):
             attempts = 0
             for item in payload.get("results", []):
                 names.append(item["metadata"]["accession"])
+                if max_results is not None and len(names) >= max_results:
+                    return list(set(names))
+            if max_results is not None and len(names) >= max_results:
+                return list(set(names))
         except HTTPError as e:
             if e.code == 408:
                 sleep(61)
@@ -190,14 +198,19 @@ def _fetch_uniprot_list_urllib(base_url: str, page_size: int = 200):
     return list(set(names))
 
 
-def query_interpro_uniprot_list(interpro_id: str, filter_name: str = None, page_size: int = 200) -> str:
-    """Query UniProt ID list for an InterPro entry. Returns JSON string. No file save."""
+def query_interpro_uniprot_list(
+    interpro_id: str,
+    filter_name: str = None,
+    page_size: int = 200,
+    max_results: Optional[int] = None,
+) -> str:
+    """Query UniProt ID list for an InterPro entry. Returns JSON string. No file save. max_results limits count (e.g. for tests)."""
     if filter_name:
         base_url = f"https://www.ebi.ac.uk:443/interpro/api/protein/UniProt/entry/InterPro/{interpro_id}/{filter_name}/?page_size={page_size}"
     else:
         base_url = f"https://www.ebi.ac.uk:443/interpro/api/protein/UniProt/entry/InterPro/{interpro_id}/?page_size={page_size}"
     try:
-        names = _fetch_uniprot_list_urllib(base_url, page_size)
+        names = _fetch_uniprot_list_urllib(base_url, page_size, max_results=max_results)
         return json.dumps({"interpro_id": interpro_id, "accessions": names, "count": len(names)})
     except Exception as e:
         return json.dumps({"success": False, "interpro_id": interpro_id, "error": str(e)})
@@ -211,8 +224,9 @@ def download_interpro_uniprot_list(
     filter_name: str = None,
     page_size: int = 200,
     re_collect: bool = False,
+    max_results: Optional[int] = None,
 ) -> str:
-    """Download UniProt ID list for an InterPro entry: chunked txt files. Returns message string."""
+    """Download UniProt ID list for an InterPro entry: chunked txt files. Returns message string. max_results limits count (e.g. for tests)."""
     os.makedirs(out_dir, exist_ok=True)
     if filter_name:
         base_url = f"https://www.ebi.ac.uk:443/interpro/api/protein/UniProt/entry/InterPro/{interpro_id}/{filter_name}/?page_size={page_size}"
@@ -227,7 +241,7 @@ def download_interpro_uniprot_list(
                 except OSError:
                     pass
 
-    names = _fetch_uniprot_list_urllib(base_url, page_size)
+    names = _fetch_uniprot_list_urllib(base_url, page_size, max_results=max_results)
     length = len(names)
     max_i = (length // chunk_size) + 1 if chunk_size else 1
     prefix = protein_name or interpro_id
@@ -254,6 +268,7 @@ def output_list(args) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="InterPro family proteins: by-uniprot annotation, protein list, or uniprot list")
+    parser.add_argument("--test", action="store_true", help="Run tests for query_interpro_by_uniprot, download_interpro_by_uniprot, query_interpro_proteins, download_interpro_proteins, query_interpro_uniprot_list, download_interpro_uniprot_list; output under example/database/interpro")
     parser.add_argument("--interpro_id", type=str, default=None)
     parser.add_argument("--interpro_json", type=str, default=None)
     parser.add_argument("--out_dir", type=str, default="download/interpro_domain")
@@ -284,6 +299,38 @@ if __name__ == "__main__":
     p_list.add_argument("--re_collect", action="store_true")
 
     args = parser.parse_args()
+
+    if args.test:
+        out_base = os.path.join("example", "database", "interpro", "proteins")
+        os.makedirs(out_base, exist_ok=True)
+        test_uniprot = "P40925"
+        test_interpro = "IPR001557"
+        print("Testing query_interpro_by_uniprot(...)")
+        text = query_interpro_by_uniprot(test_uniprot)
+        with open(os.path.join(out_base, "query_by_uniprot_sample.json"), "w", encoding="utf-8") as f:
+            f.write(text[:12000] if len(text) > 12000 else text)
+        print("  saved query_by_uniprot_sample.json")
+        print("Testing download_interpro_by_uniprot(...)")
+        msg = download_interpro_by_uniprot(test_uniprot, out_base)
+        print(f"  {msg}")
+        print("Testing query_interpro_proteins(...) [max_results=15]")
+        text2 = query_interpro_proteins(test_interpro, page_size=10, max_results=15)
+        with open(os.path.join(out_base, "query_proteins_sample.json"), "w", encoding="utf-8") as f:
+            f.write(text2[:8000] if len(text2) > 8000 else text2)
+        print("  saved query_proteins_sample.json")
+        print("Testing download_interpro_proteins(...) [max_results=15]")
+        msg2 = download_interpro_proteins(test_interpro, out_base, max_results=15)
+        print(f"  {msg2}")
+        print("Testing query_interpro_uniprot_list(...) [max_results=30 to avoid long pagination]")
+        text3 = query_interpro_uniprot_list(test_interpro, page_size=20, max_results=30)
+        with open(os.path.join(out_base, "query_uniprot_list_sample.json"), "w", encoding="utf-8") as f:
+            f.write(text3)
+        print("  saved query_uniprot_list_sample.json")
+        print("Testing download_interpro_uniprot_list(...) [max_results=30]")
+        msg3 = download_interpro_uniprot_list(test_interpro, out_base, chunk_size=50, page_size=20, max_results=30)
+        print(f"  {msg3}")
+        print(f"Done. Output under {out_base}")
+        sys.exit(0)
 
     if args.cmd is None and (getattr(args, "interpro_id", None) or getattr(args, "interpro_json", None)):
         args.cmd = "proteins"
