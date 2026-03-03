@@ -73,6 +73,7 @@ def _download_one(pdb_id, out_dir, file_type, unzip):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("--test", action="store_true", help="Run tests for query_rcsb_structure, download_rcsb_structure; output under example/database/rcsb")
     parser.add_argument("-i", "--pdb_id")
     parser.add_argument("-f", "--pdb_id_file")
     parser.add_argument("-o", "--out_dir", default=".")
@@ -81,6 +82,27 @@ if __name__ == "__main__":
     parser.add_argument("-e", "--error_file")
     parser.add_argument("-n", "--num_workers", type=int, default=12)
     args = parser.parse_args()
+
+    if args.test:
+        out_base = os.path.join("example", "database", "rcsb", "structure")
+        os.makedirs(out_base, exist_ok=True)
+        test_id = "4HHB"
+        print("Testing query_rcsb_structure(...)")
+        text = query_rcsb_structure(test_id, file_type=args.type)
+        if text.strip().startswith("{"):
+            sample_path = os.path.join(out_base, "query_structure_sample.json")
+            with open(sample_path, "w", encoding="utf-8") as f:
+                f.write(text[:2000])
+        else:
+            sample_path = os.path.join(out_base, "query_structure_sample.txt")
+            with open(sample_path, "w", encoding="utf-8") as f:
+                f.write(text[:5000] if len(text) > 5000 else text)
+        print(f"  saved to {sample_path}")
+        print("Testing download_rcsb_structure(...)")
+        path = download_rcsb_structure(test_id, out_base, file_type=args.type, unzip=True)
+        print(f"  -> {path}")
+        print(f"Done. Output under {out_base}")
+        exit(0)
 
     if not args.pdb_id and not args.pdb_id_file:
         print("Error: Must provide either pdb_id or pdb_id_file")
@@ -102,3 +124,6 @@ if __name__ == "__main__":
         d = os.path.dirname(args.error_file)
         os.makedirs(d, exist_ok=True)
         pd.DataFrame({"protein": errors, "message": messages}).to_csv(args.error_file, index=False)
+
+    n_total = len(pdbs)
+    print(f"Done. Output: {args.out_dir} | Total: {n_total}, OK: {n_total - len(errors)}, Failed: {len(errors)}")

@@ -64,13 +64,33 @@ def download_single_pdb(pdb_id: str, out_dir: str) -> str:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("--test", action="store_true", help="Run tests for query_rcsb_entry, download_rcsb_entry; output under example/database/rcsb")
     parser.add_argument("--pdb_id_file", type=str, default=None)
     parser.add_argument("--pdb_id", type=str, default=None)
     parser.add_argument("--error_file", type=str, default=None)
-    parser.add_argument("--out_dir", type=str, required=True)
+    parser.add_argument("--out_dir", type=str, default=None)
     parser.add_argument("--num_workers", type=int, default=12)
     args = parser.parse_args()
 
+    if args.test:
+        out_base = os.path.join("example", "database", "rcsb", "metadata")
+        os.makedirs(out_base, exist_ok=True)
+        test_id = "4HHB"
+        print("Testing query_rcsb_entry(...)")
+        text = query_rcsb_entry(test_id)
+        sample_path = os.path.join(out_base, "query_entry_sample.json")
+        with open(sample_path, "w", encoding="utf-8") as f:
+            f.write(text)
+        print(f"  saved to {sample_path}")
+        print("Testing download_rcsb_entry(...)")
+        msg = download_rcsb_entry(test_id, out_base)
+        print(f"  {msg}")
+        print(f"Done. Output under {out_base}")
+        exit(0)
+
+    if not args.out_dir:
+        print("Error: --out_dir required (or use --test)")
+        exit(1)
     if not args.pdb_id and not args.pdb_id_file:
         print("Error: Must provide either pdb_id or pdb_id_file")
         exit(1)
@@ -109,3 +129,6 @@ if __name__ == "__main__":
         d = os.path.dirname(args.error_file)
         os.makedirs(d, exist_ok=True)
         pd.DataFrame({"protein": errors, "error": messages}).to_csv(args.error_file, index=False)
+
+    n_total = 1 if args.pdb_id else len(pdbs)
+    print(f"Done. Output: {args.out_dir} | Total: {n_total}, OK: {n_total - len(errors)}, Failed: {len(errors)}")

@@ -1,0 +1,62 @@
+HEADER    OXYGEN TRANSPORT                        07-MAR-84   4HHB              
+TITLE     THE CRYSTAL STRUCTURE OF HUMAN DEOXYHAEMOGLOBIN AT 1.74 ANGSTROMS     
+TITLE    2 RESOLUTION                                                           
+CAVEAT     4HHB    THR A 137 HAS WRONG CHIRALITY AT ATOM CB THR B 12 HAS WRONG  
+CAVEAT   2 4HHB    CHIRALITY AT ATOM CB THR B 50 HAS WRONG CHIRALITY AT ATOM    
+CAVEAT   3 4HHB    CB ASN C 78 HAS WRONG CHIRALITY AT ATOM CA THR C 118 HAS     
+CAVEAT   4 4HHB    WRONG CHIRALITY AT ATOM CB HIS D 2 HAS WRONG CHIRALITY AT    
+CAVEAT   5 4HHB    ATOM CA SER D 72 HAS WRONG CHIRALITY AT ATOM CA ASP D 73     
+CAVEAT   6 4HHB    HAS WRONG CHIRALITY AT ATOM CA LEU D 78 HAS WRONG CHIRALITY  
+CAVEAT   7 4HHB    AT ATOM CA LYS D 144 HAS WRONG CHIRALITY AT ATOM CA          
+COMPND    MOL_ID: 1;                                                            
+COMPND   2 MOLECULE: HEMOGLOBIN SUBUNIT ALPHA;                                  
+COMPND   3 CHAIN: A, C;                                                         
+COMPND   4 SYNONYM: ALPHA-GLOBIN,HEMOGLOBIN ALPHA CHAIN;                        
+COMPND   5 ENGINEERED: YES;                                                     
+COMPND   6 MOL_ID: 2;                                                           
+COMPND   7 MOLECULE: HEMOGLOBIN SUBUNIT BETA;                                   
+COMPND   8 CHAIN: B, D;                                                         
+COMPND   9 SYNONYM: BETA-GLOBIN,HEMOGLOBIN BETA CHAIN;                          
+COMPND  10 ENGINEERED: YES                                                      
+SOURCE    MOL_ID: 1;                                                            
+SOURCE   2 ORGANISM_SCIENTIFIC: HOMO SAPIENS;                                   
+SOURCE   3 ORGANISM_COMMON: HUMAN;                                              
+SOURCE   4 ORGANISM_TAXID: 9606;                                                
+SOURCE   5 GENE: HBA1, HBA2;                                                    
+SOURCE   6 MOL_ID: 2;                                                           
+SOURCE   7 ORGANISM_SCIENTIFIC: HOMO SAPIENS;                                   
+SOURCE   8 ORGANISM_COMMON: HUMAN;                                              
+SOURCE   9 ORGANISM_TAXID: 9606;                                                
+SOURCE  10 GENE: HBB                                                            
+KEYWDS    OXYGEN TRANSPORT                                                      
+EXPDTA    X-RAY DIFFRACTION                                                     
+AUTHOR    G.FERMI,M.F.PERUTZ                                                    
+REVDAT  10   22-MAY-24 4HHB    1       REMARK                                   
+REVDAT   9   15-MAR-23 4HHB    1       REMARK                                   
+REVDAT   8   08-FEB-23 4HHB    1       REMARK SCALE  MTRIX  ATOM                
+REVDAT   7   31-MAR-21 4HHB    1       REMARK ATOM                              
+REVDAT   6   17-JUN-20 4HHB    1       CAVEAT COMPND SOURCE DBREF               
+REVDAT   6 2                   1       ATOM                                     
+REVDAT   5   13-JUL-11 4HHB    1       VERSN                                    
+REVDAT   4   24-FEB-09 4HHB    1       VERSN                                    
+REVDAT   3   01-APR-03 4HHB    1       JRNL                                     
+REVDAT   2   15-OCT-89 4HHB    3       MTRIX                                    
+REVDAT   1   17-JUL-84 4HHB    0                                                
+SPRSDE     17-JUL-84 4HHB      1HHB                                             
+JRNL        AUTH   G.FERMI,M.F.PERUTZ,B.SHAANAN,R.FOURME                        
+JRNL        TITL   THE CRYSTAL STRUCTURE OF HUMAN DEOXYHAEMOGLOBIN AT 1.74 A    
+JRNL        TITL 2 RESOLUTION                                                   
+JRNL        REF    J.MOL.BIOL.                   V. 175   159 1984              
+JRNL        REFN                   ISSN 0022-2836                               
+JRNL        PMID   6726807                                                      
+JRNL        DOI    10.1016/0022-2836(84)90472-8                                 
+REMARK   1                                                                      
+REMARK   1 REFERENCE 1                                                          
+REMARK   1  AUTH   M.F.PERUTZ,S.S.HASNAIN,P.J.DUKE,J.L.SESSLER,J.E.HAHN         
+REMARK   1  TITL   STEREOCHEMISTRY OF IRON IN DEOXYHAEMOGLOBIN                  
+REMARK   1  REF    NATURE                        V. 295   535 1982              
+REMARK   1  REFN                   ISSN 0028-0836                               
+REMARK   1 REFERENCE 2                                                          
+REMARK   1  AUTH   G.FERMI,M.F.PERUTZ                                           
+REMARK   1  REF    HAEMOGLOBIN AND MYOGLOBIN.    V.   2       1981              
+REMARK   1  REF  2 ATLAS OF MOLECULAR                      
