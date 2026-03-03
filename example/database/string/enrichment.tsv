@@ -1,0 +1,343 @@
+category	term	number_of_genes	number_of_genes_in_background	ncbiTaxonId	inputGenes	preferredNames	p_value	fdr	description
+COMPARTMENTS	GOCC:0042101	4	15	9606	ZAP70,CD3D,CD3E,CD247	ZAP70,CD3D,CD3E,CD247	2.03e-10	4.66e-07	T cell receptor complex
+COMPARTMENTS	GOCC:0042105	3	6	9606	CD3D,CD3E,CD247	CD3D,CD3E,CD247	1.08e-08	1.25e-05	Alpha-beta T cell receptor complex
+COMPARTMENTS	GOCC:0098797	7	682	9606	CBL,ZAP70,CD3D,CD3E,CD247,SHC1,LCK	CBL,ZAP70,CD3D,CD3E,CD247,SHC1,LCK	1.81e-08	1.39e-05	Plasma membrane protein complex
+COMPARTMENTS	GOCC:0098802	5	255	9606	ZAP70,CD3D,CD3E,CD247,LCK	ZAP70,CD3D,CD3E,CD247,LCK	1.66e-07	9.57e-05	Plasma membrane signaling receptor complex
+COMPARTMENTS	GOCC:0005886	10	3535	9606	LCP2,TYROBP,CBL,ZAP70,CD3D,CD3E,CD247,LAT,SHC1,LCK	LCP2,TYROBP,CBL,ZAP70,CD3D,CD3E,CD247,LAT,SHC1,LCK	3.23e-07	0.00015	Plasma membrane
+COMPARTMENTS	GOCC:0001772	3	36	9606	ZAP70,LAT,LCK	ZAP70,LAT,LCK	1.17e-06	0.00038	Immunological synapse
+COMPARTMENTS	GOCC:0036398	2	3	9606	LCP2,ZAP70	LCP2,ZAP70	2.83e-06	0.00054	TCR signalosome
+COMPARTMENTS	GOCC:0045121	4	181	9606	LCP2,CBL,LAT,LCK	LCP2,CBL,LAT,LCK	2.36e-06	0.00054	Membrane raft
+COMPARTMENTS	GOCC:0042106	2	6	9606	CD3E,CD247	CD3E,CD247	7.91e-06	0.0014	Gamma-delta T cell receptor complex
+COMPARTMENTS	GOCC:0032991	9	5325	9606	LCP2,CBL,ZAP70,CD3D,CD3E,CD247,LAT,SHC1,LCK	LCP2,CBL,ZAP70,CD3D,CD3E,CD247,LAT,SHC1,LCK	0.00024	0.0375	Protein-containing complex
+Process	GO:0045321	10	574	9606	LCP2,TYROBP,CBL,ZAP70,CD3D,CD3E,CD247,LAT,VAV1,LCK	LCP2,TYROBP,CBL,ZAP70,CD3D,CD3E,CD247,LAT,VAV1,LCK	5.18e-15	8.12e-11	Leukocyte activation
+Process	GO:0002429	8	197	9606	LCP2,TYROBP,ZAP70,CD3D,CD3E,CD247,VAV1,LCK	LCP2,TYROBP,ZAP70,CD3D,CD3E,CD247,VAV1,LCK	1.92e-14	1.5e-10	Immune response-activating cell surface receptor signaling pathway
+Process	GO:0050852	6	103	9606	LCP2,ZAP70,CD3D,CD3E,CD247,LCK	LCP2,ZAP70,CD3D,CD3E,CD247,LCK	1.12e-11	2.2e-08	T cell receptor signaling pathway
+Process	GO:0007166	11	2040	9606	LCP2,TYROBP,CBL,ZAP70,CD3D,CD3E,CD247,LAT,SHC1,VAV1,LCK	LCP2,TYROBP,CBL,ZAP70,CD3D,CD3E,CD247,LAT,SHC1,VAV1,LCK	1.51e-11	2.64e-08	Cell surface receptor signaling pathway
+Process	GO:0006955	10	1321	9606	LCP2,TYROBP,CBL,ZAP70,CD3D,CD3E,CD247,LAT,VAV1,LCK	LCP2,TYROBP,CBL,ZAP70,CD3D,CD3E,CD247,LAT,VAV1,LCK	1.97e-11	3.1e-08	Immune response
+Process	GO:0042110	7	298	9606	ZAP70,CD3D,CD3E,CD247,LAT,VAV1,LCK	ZAP70,CD3D,CD3E,CD247,LAT,VAV1,LCK	6.21e-11	8.11e-08	T cell activation
+Process	GO:0007169	7	425	9606	LCP2,CBL,ZAP70,CD3E,SHC1,VAV1,LCK	LCP2,CBL,ZAP70,CD3E,SHC1,VAV1,LCK	7.08e-10	7.94e-07	Transmembrane receptor protein tyrosine kinase signaling pathway
+Process	GO:0048584	10	2131	9606	LCP2,TYROBP,CBL,ZAP70,CD3D,CD3E,CD247,SHC1,VAV1,LCK	LCP2,TYROBP,CBL,ZAP70,CD3D,CD3E,CD247,SHC1,VAV1,LCK	2.23e-09	1.96e-06	Positive regulation of response to stimulus
+Process	GO:0002682	9	1438	9606	LCP2,TYROBP,ZAP70,CD3D,CD3E,CD247,LAT,VAV1,LCK	LCP2,TYROBP,ZAP70,CD3D,CD3E,CD247,LAT,VAV1,LCK	2.91e-09	2.28e-06	Regulation of immune system process
+Process	GO:0030217	5	171	9606	ZAP70,CD3D,CD3E,VAV1,LCK	ZAP70,CD3D,CD3E,VAV1,LCK	2.37e-08	1.69e-05	T cell differentiation
+Process	GO:0002521	6	396	9606	TYROBP,ZAP70,CD3D,CD3E,VAV1,LCK	TYROBP,ZAP70,CD3D,CD3E,VAV1,LCK	2.94e-08	2e-05	Leukocyte differentiation
+Process	GO:0045059	3	11	9606	ZAP70,CD3D,CD3E	ZAP70,CD3D,CD3E	4.69e-08	3.07e-05	Positive thymic T cell selection
+Process	GO:0051249	6	508	9606	TYROBP,ZAP70,CD3E,LAT,VAV1,LCK	TYROBP,ZAP70,CD3E,LAT,VAV1,LCK	1.26e-07	7.92e-05	Regulation of lymphocyte activation
+Process	GO:0035556	8	1518	9606	LCP2,TYROBP,ZAP70,CD3E,LAT,SHC1,VAV1,LCK	LCP2,TYROBP,ZAP70,CD3E,LAT,SHC1,VAV1,LCK	1.69e-07	9.84e-05	Intracellular signal transduction
+Process	GO:0046631	4	97	9606	ZAP70,CD3D,CD3E,CD247	ZAP70,CD3D,CD3E,CD247	2.08e-07	0.00011	Alpha-beta T cell activation
+Process	GO:0038094	3	29	9606	CD247,VAV1,LCK	CD247,VAV1,LCK	6.36e-07	0.00027	Fc-gamma receptor signaling pathway
+Process	GO:0045576	3	29	9606	LCP2,CBL,LAT	LCP2,CBL,LAT	6.36e-07	0.00027	Mast cell activation
+Process	GO:0051251	5	336	9606	TYROBP,ZAP70,CD3E,VAV1,LCK	TYROBP,ZAP70,CD3E,VAV1,LCK	6.38e-07	0.00027	Positive regulation of lymphocyte activation
+Process	GO:0002250	5	359	9606	ZAP70,CD3D,CD3E,CD247,LAT	ZAP70,CD3D,CD3E,CD247,LAT	8.81e-07	0.00033	Adaptive immune response
+Process	GO:0002274	4	150	9606	LCP2,TYROBP,CBL,LAT	LCP2,TYROBP,CBL,LAT	1.13e-06	0.00039	Myeloid leukocyte activation
+Process	GO:0050863	5	376	9606	ZAP70,CD3E,LAT,VAV1,LCK	ZAP70,CD3E,LAT,VAV1,LCK	1.1e-06	0.00039	Regulation of T cell activation
+Process	GO:0031295	3	42	9606	CD3E,VAV1,LCK	CD3E,VAV1,LCK	1.81e-06	0.00058	T cell costimulation
+Process	GO:0048518	11	6207	9606	LCP2,TYROBP,CBL,ZAP70,CD3D,CD3E,CD247,LAT,SHC1,VAV1,LCK	LCP2,TYROBP,CBL,ZAP70,CD3D,CD3E,CD247,LAT,SHC1,VAV1,LCK	3.06e-06	0.00092	Positive regulation of biological process
+Process	GO:0002275	3	61	9606	TYROBP,CBL,LAT	TYROBP,CBL,LAT	5.29e-06	0.0015	Myeloid cell activation involved in immune response
+Process	GO:0050870	4	251	9606	ZAP70,CD3E,VAV1,LCK	ZAP70,CD3E,VAV1,LCK	8.41e-06	0.0023	Positive regulation of T cell activation
+Process	GO:0045060	2	11	9606	ZAP70,CD3E	ZAP70,CD3E	2.2e-05	0.0059	Negative thymic T cell selection
+Process	GO:0048522	10	5584	9606	LCP2,TYROBP,CBL,ZAP70,CD3E,CD247,LAT,SHC1,VAV1,LCK	LCP2,TYROBP,CBL,ZAP70,CD3E,CD247,LAT,SHC1,VAV1,LCK	2.75e-05	0.007	Positive regulation of cellular process
+Process	GO:0002252	4	375	9606	TYROBP,CBL,LAT,VAV1	TYROBP,CBL,LAT,VAV1	3.99e-05	0.0097	Immune effector process
+Process	GO:0046629	2	17	9606	CD3E,CD247	CD3E,CD247	4.82e-05	0.0114	Gamma-delta T cell activation
+Process	GO:2000010	2	18	9606	TYROBP,CD247	TYROBP,CD247	5.35e-05	0.0125	Positive regulation of protein localization to cell surface
+Process	GO:0048513	8	3246	9606	TYROBP,CBL,ZAP70,CD3D,CD3E,SHC1,VAV1,LCK	TYROBP,CBL,ZAP70,CD3D,CD3E,SHC1,VAV1,LCK	5.63e-05	0.013	Animal organ development
+Process	GO:0043303	2	25	9606	CBL,LAT	CBL,LAT	9.86e-05	0.0224	Mast cell degranulation
+Process	GO:0019722	3	169	9606	ZAP70,CD3E,LAT	ZAP70,CD3E,LAT	0.0001	0.0226	Calcium-mediated signaling
+Process	GO:0018108	3	176	9606	ZAP70,CD3E,LCK	ZAP70,CD3E,LCK	0.00012	0.0244	Peptidyl-tyrosine phosphorylation
+Process	GO:1902533	5	997	9606	CBL,ZAP70,CD3E,SHC1,LCK	CBL,ZAP70,CD3E,SHC1,LCK	0.00012	0.0249	Positive regulation of intracellular signal transduction
+Process	GO:0046641	2	29	9606	ZAP70,CD3E	ZAP70,CD3E	0.00013	0.0262	Positive regulation of alpha-beta T cell proliferation
+Process	GO:0007176	2	30	9606	CBL,SHC1	CBL,SHC1	0.00014	0.0276	Regulation of epidermal growth factor-activated receptor activity
+Process	GO:1902531	6	1726	9606	CBL,ZAP70,CD3E,SHC1,VAV1,LCK	CBL,ZAP70,CD3E,SHC1,VAV1,LCK	0.00014	0.028	Regulation of intracellular signal transduction
+Process	GO:0090322	2	31	9606	TYROBP,SHC1	TYROBP,SHC1	0.00015	0.0283	Regulation of superoxide metabolic process
+Process	GO:0001932	5	1108	9606	LCP2,CBL,CD3E,LAT,SHC1	LCP2,CBL,CD3E,LAT,SHC1	0.0002	0.0369	Regulation of protein phosphorylation
+Process	GO:0048731	8	3867	9606	TYROBP,CBL,ZAP70,CD3D,CD3E,SHC1,VAV1,LCK	TYROBP,CBL,ZAP70,CD3D,CD3E,SHC1,VAV1,LCK	0.00021	0.0381	System development
+Process	GO:0050850	2	42	9606	ZAP70,CD3E	ZAP70,CD3E	0.00026	0.0471	Positive regulation of calcium-mediated signaling
+Component	GO:0042101	4	14	9606	ZAP70,CD3D,CD3E,CD247	ZAP70,CD3D,CD3E,CD247	1.6e-10	3.28e-07	T cell receptor complex
+Component	GO:0001772	4	43	9606	ZAP70,CD3E,LAT,LCK	ZAP70,CD3E,LAT,LCK	9.25e-09	7.4e-06	Immunological synapse
+Component	GO:0042105	3	5	9606	CD3D,CD3E,CD247	CD3D,CD3E,CD247	7.23e-09	7.4e-06	Alpha-beta T cell receptor complex
+Component	GO:0098797	6	589	9606	CBL,ZAP70,CD3D,CD3E,CD247,SHC1	CBL,ZAP70,CD3D,CD3E,CD247,SHC1	3e-07	0.00015	Plasma membrane protein complex
+Component	GO:0005886	11	5544	9606	LCP2,TYROBP,CBL,ZAP70,CD3D,CD3E,CD247,LAT,SHC1,VAV1,LCK	LCP2,TYROBP,CBL,ZAP70,CD3D,CD3E,CD247,LAT,SHC1,VAV1,LCK	8.85e-07	0.00036	Plasma membrane
+Component	GO:0042106	2	3	9606	CD3E,CD247	CD3E,CD247	2.83e-06	0.00083	Gamma-delta T cell receptor complex
+Component	GO:0005911	5	499	9606	LCP2,ZAP70,CD3E,LAT,VAV1	LCP2,ZAP70,CD3E,LAT,VAV1	4.36e-06	0.00099	Cell-cell junction
+Component	GO:0045121	4	320	9606	LCP2,CBL,LAT,LCK	LCP2,CBL,LAT,LCK	2.16e-05	0.0041	Membrane raft
+Component	GO:0070161	6	1325	9606	LCP2,CBL,ZAP70,CD3E,LAT,VAV1	LCP2,CBL,ZAP70,CD3E,LAT,VAV1	3.22e-05	0.0051	Anchoring junction
+Component	GO:0098552	4	611	9606	ZAP70,CD3D,CD3E,LCK	ZAP70,CD3D,CD3E,LCK	0.00026	0.0355	Side of membrane
+Function	GO:0001784	5	46	9606	CBL,ZAP70,SHC1,VAV1,LCK	CBL,ZAP70,SHC1,VAV1,LCK	4.33e-11	2.14e-07	Phosphotyrosine residue binding
+Function	GO:0019901	6	702	9606	CBL,CD3E,CD247,LAT,SHC1,LCK	CBL,CD3E,CD247,LAT,SHC1,LCK	8.33e-07	0.001	Protein kinase binding
+Function	GO:0030159	3	52	9606	CD3E,LAT,SHC1	CD3E,LAT,SHC1	3.34e-06	0.0027	Signaling receptor complex adaptor activity
+Function	GO:0042608	2	10	9606	CD3E,LCK	CD3E,LCK	1.86e-05	0.0115	T cell receptor binding
+Function	GO:1990782	3	120	9606	CBL,CD247,SHC1	CBL,CD247,SHC1	3.77e-05	0.0207	Protein tyrosine kinase binding
+Function	GO:0005102	6	1499	9606	TYROBP,CBL,ZAP70,CD3E,SHC1,LCK	TYROBP,CBL,ZAP70,CD3E,SHC1,LCK	6.48e-05	0.032	Signaling receptor binding
+TISSUES	BTO:0000744	8	419	9606	LCP2,CBL,ZAP70,CD3D,CD3E,CD247,SHC1,LCK	LCP2,CBL,ZAP70,CD3D,CD3E,CD247,SHC1,LCK	7.09e-12	1.72e-08	Lymphocytic leukemia cell
+TISSUES	BTO:0001546	6	222	9606	LCP2,CBL,ZAP70,CD247,SHC1,LCK	LCP2,CBL,ZAP70,CD247,SHC1,LCK	9.88e-10	1.2e-06	Chronic lymphocytic leukemia cell
+TISSUES	BTO:0000089	8	1824	9606	LCP2,TYROBP,ZAP70,CD3D,CD3E,CD247,LAT,LCK	LCP2,TYROBP,ZAP70,CD3D,CD3E,CD247,LAT,LCK	7.01e-07	0.00034	Blood
+TISSUES	BTO:0000570	9	2755	9606	LCP2,TYROBP,ZAP70,CD3D,CD3E,CD247,LAT,VAV1,LCK	LCP2,TYROBP,ZAP70,CD3D,CD3E,CD247,LAT,VAV1,LCK	8.72e-07	0.00035	Hematopoietic system
+TISSUES	BTO:0002144	3	34	9606	ZAP70,CD247,LCK	ZAP70,CD247,LCK	9.94e-07	0.00035	Acute lymphoblastic leukemia cell line
+TISSUES	BTO:0000753	7	1600	9606	TYROBP,ZAP70,CD3E,CD247,LAT,VAV1,LCK	TYROBP,ZAP70,CD3E,CD247,LAT,VAV1,LCK	5.82e-06	0.0013	Lymphoid tissue
+TISSUES	BTO:0002504	2	18	9606	ZAP70,LCK	ZAP70,LCK	5.35e-05	0.0087	T-lymphoblastic leukemia cell line
+TISSUES	BTO:0001368	4	640	9606	CD3E,LAT,SHC1,LCK	CD3E,LAT,SHC1,LCK	0.00031	0.047	Thorax
+DISEASES	DOID:627	3	35	9606	ZAP70,CD3D,CD247	ZAP70,CD3D,CD247	1.08e-06	0.005	Severe combined immunodeficiency
+Keyword	KW-0727	5	110	9606	LCP2,ZAP70,SHC1,VAV1,LCK	LCP2,ZAP70,SHC1,VAV1,LCK	2.78e-09	1.87e-06	SH2 domain
+Keyword	KW-1064	5	168	9606	ZAP70,CD3D,CD3E,CD247,LAT	ZAP70,CD3D,CD3E,CD247,LAT	2.18e-08	7.31e-06	Adaptive immunity
+Keyword	KW-0391	6	537	9606	TYROBP,ZAP70,CD3D,CD3E,CD247,LAT	TYROBP,ZAP70,CD3D,CD3E,CD247,LAT	1.75e-07	3.91e-05	Immunity
+Keyword	KW-0597	11	8122	9606	LCP2,TYROBP,CBL,ZAP70,CD3D,CD3E,CD247,LAT,SHC1,VAV1,LCK	LCP2,TYROBP,CBL,ZAP70,CD3D,CD3E,CD247,LAT,SHC1,VAV1,LCK	5.88e-05	0.0099	Phosphoprotein
+Keyword	KW-0705	2	20	9606	ZAP70,CD3D	ZAP70,CD3D	6.5e-05	0.0099	SCID
+Keyword	KW-0656	3	225	9606	CBL,VAV1,LCK	CBL,VAV1,LCK	0.00024	0.0264	Proto-oncogene
+KEGG	hsa04660	7	100	9606	LCP2,ZAP70,CD3D,CD3E,CD247,VAV1,LCK	LCP2,ZAP70,CD3D,CD3E,CD247,VAV1,LCK	3.69e-14	1.24e-11	T cell receptor signaling pathway
+KEGG	hsa04650	7	120	9606	LCP2,TYROBP,ZAP70,CD247,SHC1,VAV1,LCK	LCP2,TYROBP,ZAP70,CD247,SHC1,VAV1,LCK	1.26e-13	2.12e-11	Natural killer cell mediated cytotoxicity
+KEGG	hsa04658	5	85	9606	ZAP70,CD3D,CD3E,CD247,LCK	ZAP70,CD3D,CD3E,CD247,LCK	8.02e-10	8.98e-08	Th1 and Th2 cell differentiation
+KEGG	hsa05235	5	87	9606	ZAP70,CD3D,CD3E,CD247,LCK	ZAP70,CD3D,CD3E,CD247,LCK	8.97e-10	8.98e-08	PD-L1 expression and PD-1 checkpoint pathway in cancer
+KEGG	hsa04659	5	99	9606	ZAP70,CD3D,CD3E,CD247,LCK	ZAP70,CD3D,CD3E,CD247,LCK	1.67e-09	1.12e-07	Th17 cell differentiation
+KEGG	hsa05340	4	37	9606	ZAP70,CD3D,CD3E,LCK	ZAP70,CD3D,CD3E,LCK	5.26e-09	2.95e-07	Primary immunodeficiency
+KEGG	hsa05135	4	124	9606	LCP2,ZAP70,VAV1,LCK	LCP2,ZAP70,VAV1,LCK	5.41e-07	2.59e-05	Yersinia infection
+KEGG	hsa05142	3	97	9606	CD3D,CD3E,CD247	CD3D,CD3E,CD247	2.03e-05	0.00085	Chagas disease
+KEGG	hsa04380	3	120	9606	LCP2,TYROBP,LCK	LCP2,TYROBP,LCK	3.77e-05	0.0014	Osteoclast differentiation
+KEGG	hsa05169	3	192	9606	CD3D,CD3E,CD247	CD3D,CD3E,CD247	0.00015	0.005	Epstein-Barr virus infection
+KEGG	hsa05170	3	203	9606	CD3D,CD3E,CD247	CD3D,CD3E,CD247	0.00017	0.0053	Human immunodeficiency virus 1 infection
+KEGG	hsa05166	3	210	9606	CD3D,CD3E,LCK	CD3D,CD3E,LCK	0.00019	0.0054	Human T-cell leukemia virus 1 infection
+KEGG	hsa04664	2	65	9606	LCP2,VAV1	LCP2,VAV1	0.00061	0.0159	Fc epsilon RI signaling pathway
+KEGG	hsa05100	2	70	9606	CBL,SHC1	CBL,SHC1	0.00071	0.017	Bacterial invasion of epithelial cells
+KEGG	hsa05220	2	75	9606	CBL,SHC1	CBL,SHC1	0.00081	0.0181	Chronic myeloid leukemia
+KEGG	hsa04012	2	81	9606	CBL,SHC1	CBL,SHC1	0.00094	0.0197	ErbB signaling pathway
+KEGG	hsa04640	2	90	9606	CD3D,CD3E	CD3D,CD3E	0.0012	0.0228	Hematopoietic cell lineage
+KEGG	hsa04064	2	101	9606	ZAP70,LCK	ZAP70,LCK	0.0014	0.0269	NF-kappa B signaling pathway
+KEGG	hsa04910	2	132	9606	CBL,SHC1	CBL,SHC1	0.0024	0.0429	Insulin signaling pathway
+KEGG	hsa05162	2	137	9606	CD3D,CD3E	CD3D,CD3E	0.0026	0.0438	Measles
+SMART	SM00252	5	112	9606	LCP2,ZAP70,SHC1,VAV1,LCK	LCP2,ZAP70,SHC1,VAV1,LCK	3.04e-09	2.49e-06	Src homology 2 domains
+SMART	SM00077	3	8	9606	CD3D,CD3E,CD247	CD3D,CD3E,CD247	2.13e-08	8.74e-06	Immunoreceptor tyrosine-based activation motif
+InterPro	IPR036860	6	115	9606	LCP2,CBL,ZAP70,SHC1,VAV1,LCK	LCP2,CBL,ZAP70,SHC1,VAV1,LCK	2.13e-11	1.53e-07	SH2 domain superfamily
+InterPro	IPR000980	5	111	9606	LCP2,ZAP70,SHC1,VAV1,LCK	LCP2,ZAP70,SHC1,VAV1,LCK	2.91e-09	1.04e-05	SH2 domain
+InterPro	IPR003110	3	9	9606	CD3D,CD3E,CD247	CD3D,CD3E,CD247	2.84e-08	6.79e-05	Phosphorylated immunoreceptor signalling ITAM
+InterPro	IPR015484	2	3	9606	CD3D,CD3E	CD3D,CD3E	2.83e-06	0.0051	CD3 protein, epsilon/gamma/delta subunit
+PMID	PMID:19909352	9	36	9606	LCP2,CBL,ZAP70,CD3D,CD247,LAT,SHC1,VAV1,LCK	LCP2,CBL,ZAP70,CD3D,CD247,LAT,SHC1,VAV1,LCK	3.93e-23	2.02e-16	(2009) Organization of proximal signal initiation at the TCR:CD3 complex.
+PMID	PMID:10662792	8	26	9606	LCP2,CBL,ZAP70,CD247,LAT,SHC1,VAV1,LCK	LCP2,CBL,ZAP70,CD247,LAT,SHC1,VAV1,LCK	5.29e-21	1.36e-14	(2000) Src-like adaptor protein (SLAP) is a negative regulator of T cell receptor signaling.
+PMID	PMID:22701458	8	37	9606	LCP2,CBL,ZAP70,CD3D,CD247,SHC1,VAV1,LCK	LCP2,CBL,ZAP70,CD3D,CD247,SHC1,VAV1,LCK	6.27e-20	1.08e-13	(2012) Lck, Membrane Microdomains, and TCR Triggering Machinery: Defining the New Rules of Engagement.
+PMID	PMID:10209041	8	40	9606	LCP2,CBL,ZAP70,CD247,LAT,SHC1,VAV1,LCK	LCP2,CBL,ZAP70,CD247,LAT,SHC1,VAV1,LCK	1.1e-19	1.41e-13	(1999) GrpL, a Grb2-related adaptor protein, interacts with SLP-76 to regulate nuclear factor of activated T cell activation.
+PMID	PMID:34169073	8	43	9606	LCP2,ZAP70,CD3D,CD247,LAT,SHC1,VAV1,LCK	LCP2,ZAP70,CD3D,CD247,LAT,SHC1,VAV1,LCK	1.85e-19	1.61e-13	(2021) Wiskott-Aldrich Syndrome Protein: Roles in Signal Transduction in T Cells.
+PMID	PMID:26043137	8	44	9606	LCP2,ZAP70,CD3D,CD247,LAT,SHC1,VAV1,LCK	LCP2,ZAP70,CD3D,CD247,LAT,SHC1,VAV1,LCK	2.19e-19	1.61e-13	(2015) Vav1 Regulates T-Cell Activation through a Feedback Mechanism and Crosstalk between the T-Cell Receptor and CD28.
+PMID	PMID:19909358	8	42	9606	LCP2,CBL,ZAP70,CD3D,LAT,SHC1,VAV1,LCK	LCP2,CBL,ZAP70,CD3D,LAT,SHC1,VAV1,LCK	1.56e-19	1.61e-13	(2009) Endocytic events in TCR signaling: focus on adapters in microclusters.
+PMID	PMID:23071622	8	47	9606	LCP2,CBL,ZAP70,CD3D,LAT,SHC1,VAV1,LCK	LCP2,CBL,ZAP70,CD3D,LAT,SHC1,VAV1,LCK	3.54e-19	2.28e-13	(2012) Quantitative phosphoproteomics reveals SLP-76 dependent regulation of PAG and Src family kinases in T cells.
+PMID	PMID:34592497	8	59	9606	LCP2,CBL,ZAP70,CD3D,CD247,LAT,VAV1,LCK	LCP2,CBL,ZAP70,CD3D,CD247,LAT,VAV1,LCK	1.89e-18	9.53e-13	(2022) The role of endocytic trafficking in antigen T cell receptor activation.
+PMID	PMID:36498890	8	58	9606	LCP2,CBL,ZAP70,CD3D,CD247,LAT,SHC1,LCK	LCP2,CBL,ZAP70,CD3D,CD247,LAT,SHC1,LCK	1.67e-18	9.53e-13	(2022) Joining Forces for Cancer Treatment: From TCR versus CAR to TCR and CAR.
+PMID	PMID:34149695	7	21	9606	LCP2,CBL,ZAP70,CD247,LAT,VAV1,LCK	LCP2,CBL,ZAP70,CD247,LAT,VAV1,LCK	1.7e-18	9.53e-13	(2021) Identification and Characterization of the Amphioxus Lck and Its Associated Tyrosine Phosphorylation-Dependent Inhibitory LRR Receptor.
+PMID	PMID:28473706	7	21	9606	LCP2,ZAP70,CD247,LAT,SHC1,VAV1,LCK	LCP2,ZAP70,CD247,LAT,SHC1,VAV1,LCK	1.7e-18	9.53e-13	(2017) Molecular mechanisms underlying the evolution of the slp76 signalosome.
+PMID	PMID:15303567	7	24	9606	LCP2,CBL,ZAP70,CD247,LAT,VAV1,LCK	LCP2,CBL,ZAP70,CD247,LAT,VAV1,LCK	3.77e-18	1.49e-12	(2004) T-lymphocyte signalling in systemic lupus erythematosus: a lipid raft perspective.
+PMID	PMID:11514605	7	27	9606	LCP2,CBL,ZAP70,CD3D,CD247,VAV1,LCK	LCP2,CBL,ZAP70,CD3D,CD247,VAV1,LCK	7.71e-18	2.83e-12	(2001) T cell development and T cell responses in mice with mutations affecting tyrosines 292 or 315 of the ZAP-70 protein tyrosine kinase.
+PMID	PMID:23514740	7	28	9606	LCP2,CBL,ZAP70,CD247,LAT,VAV1,LCK	LCP2,CBL,ZAP70,CD247,LAT,VAV1,LCK	9.64e-18	3.31e-12	(2013) TNFR-associated factor 6 regulates TCR signaling via interaction with and modification of LAT adapter.
+PMID	PMID:31440487	8	74	9606	LCP2,CBL,ZAP70,CD3D,CD247,LAT,VAV1,LCK	LCP2,CBL,ZAP70,CD3D,CD247,LAT,VAV1,LCK	1.03e-17	3.32e-12	(2019) Hematopoietic Stem Cell Transplantation in Primary Immunodeficiency Diseases: Current Status and Future Perspectives.
+PMID	PMID:34897277	9	161	9606	LCP2,CBL,ZAP70,CD3D,CD247,LAT,SHC1,VAV1,LCK	LCP2,CBL,ZAP70,CD3D,CD247,LAT,SHC1,VAV1,LCK	1.16e-17	3.5e-12	(2021) T cell receptor (TCR) signaling in health and disease.
+PMID	PMID:21776385	7	29	9606	LCP2,CBL,ZAP70,LAT,SHC1,VAV1,LCK	LCP2,CBL,ZAP70,LAT,SHC1,VAV1,LCK	1.2e-17	3.5e-12	(2011) Regulation and function of syk tyrosine kinase in mast cell signaling and beyond.
+PMID	PMID:15699071	7	29	9606	LCP2,ZAP70,CD247,LAT,SHC1,VAV1,LCK	LCP2,ZAP70,CD247,LAT,SHC1,VAV1,LCK	1.2e-17	3.5e-12	(2005) The adaptor molecules LAT and SLP-76 are specifically targeted by Yersinia to inhibit T cell activation.
+PMID	PMID:9687533	7	30	9606	LCP2,CBL,ZAP70,CD247,LAT,SHC1,LCK	LCP2,CBL,ZAP70,CD247,LAT,SHC1,LCK	1.48e-17	3.79e-12	(1998) T cell receptor (TCR) interacting molecule (TRIM), a novel disulfide-linked dimer associated with the TCR-CD3-zeta complex, recruits intracellular signaling proteins to the plasma membrane.
+PMID	PMID:25045209	7	32	9606	LCP2,TYROBP,ZAP70,CD247,LAT,SHC1,VAV1	LCP2,TYROBP,ZAP70,CD247,LAT,SHC1,VAV1	2.2e-17	5.4e-12	(2014) Functional roles of Syk in macrophage-mediated inflammatory responses.
+PMID	PMID:37759563	7	34	9606	LCP2,TYROBP,CBL,ZAP70,CD3D,LAT,LCK	LCP2,TYROBP,CBL,ZAP70,CD3D,LAT,LCK	3.22e-17	7.53e-12	(2023) A Story of Kinases and Adaptors: The Role of Lck, ZAP-70 and LAT in Switch Panel Governing T-Cell Development and Activation.
+PMID	PMID:29440364	7	34	9606	LCP2,CBL,ZAP70,CD247,LAT,SHC1,LCK	LCP2,CBL,ZAP70,CD247,LAT,SHC1,LCK	3.22e-17	7.53e-12	(2018) Rab6-dependent retrograde traffic of LAT controls immune synapse formation and T cell activation.
+PMID	PMID:25411776	7	34	9606	LCP2,TYROBP,ZAP70,LAT,SHC1,VAV1,LCK	LCP2,TYROBP,ZAP70,LAT,SHC1,VAV1,LCK	3.22e-17	7.53e-12	(2014) The C-type lectin OCILRP2 costimulates EL4 T cell activation via the DAP12-Raf-MAP kinase pathway.
+PMID	PMID:23377202	7	34	9606	LCP2,CBL,ZAP70,CD3D,CD247,VAV1,LCK	LCP2,CBL,ZAP70,CD3D,CD247,VAV1,LCK	3.22e-17	7.53e-12	(2013) Distinct TCR signaling pathways drive proliferation and cytokine production in T cells.
+PMID	PMID:22566884	7	37	9606	LCP2,CBL,ZAP70,LAT,SHC1,VAV1,LCK	LCP2,CBL,ZAP70,LAT,SHC1,VAV1,LCK	5.48e-17	1.09e-11	(2011) Transmembrane adaptor proteins in the high-affinity IgE receptor signaling.
+PMID	PMID:35061003	7	38	9606	LCP2,ZAP70,CD3D,CD247,LAT,VAV1,LCK	LCP2,ZAP70,CD3D,CD247,LAT,VAV1,LCK	6.49e-17	1.24e-11	(2022) Systems-level conservation of the proximal TCR signaling network of mice and humans.
+PMID	PMID:35014847	7	39	9606	LCP2,ZAP70,CD3E,CD247,LAT,VAV1,LCK	LCP2,ZAP70,CD3E,CD247,LAT,VAV1,LCK	7.66e-17	1.41e-11	(2022) SILAC Phosphoproteomics Reveals Unique Signaling Circuits in CAR-T Cells and the Inhibition of B Cell-Activating Phosphorylation in Target Cells.
+PMID	PMID:21887278	6	12	9606	LCP2,ZAP70,CD247,LAT,VAV1,LCK	LCP2,ZAP70,CD247,LAT,VAV1,LCK	1.05e-16	1.86e-11	(2011) Spatial association of signaling proteins and F-actin effects on cluster assembly analyzed via photoactivation localization microscopy in T cells.
+PMID	PMID:34012443	7	42	9606	LCP2,CBL,ZAP70,CD3D,CD247,VAV1,LCK	LCP2,CBL,ZAP70,CD3D,CD247,VAV1,LCK	1.23e-16	2.11e-11	(2021) Naturally Occurring Genetic Alterations in Proximal TCR Signaling and Implications for Cancer Immunotherapy.
+PMID	PMID:34456914	7	43	9606	LCP2,CBL,ZAP70,CD247,LAT,VAV1,LCK	LCP2,CBL,ZAP70,CD247,LAT,VAV1,LCK	1.43e-16	2.37e-11	(2021) The Clinical Aspect of Adaptor Molecules in T Cell Signaling: Lessons Learnt From Inborn Errors of Immunity.
+PMID	PMID:34429382	7	45	9606	LCP2,ZAP70,CD3D,CD247,LAT,SHC1,LCK	LCP2,ZAP70,CD3D,CD247,LAT,SHC1,LCK	1.91e-16	3.07e-11	(2021) Comparative analysis of TCR and CAR signaling informs CAR designs with superior antigen sensitivity and in vivo function.
+PMID	PMID:24119664	7	46	9606	LCP2,CBL,ZAP70,CD247,LAT,VAV1,LCK	LCP2,CBL,ZAP70,CD247,LAT,VAV1,LCK	2.2e-16	3.42e-11	(2014) Immune synapse: conductor of orchestrated organelle movement.
+PMID	PMID:22737151	6	14	9606	TYROBP,ZAP70,CD3D,CD3E,CD247,LCK	TYROBP,ZAP70,CD3D,CD3E,CD247,LCK	2.19e-16	3.42e-11	(2012) TCR Signaling Emerges from the Sum of Many Parts.
+PMID	PMID:17579062	6	14	9606	LCP2,ZAP70,CD247,LAT,VAV1,LCK	LCP2,ZAP70,CD247,LAT,VAV1,LCK	2.19e-16	3.42e-11	(2007) Recombinant anti-CD4 antibody 13B8.2 blocks membrane-proximal events by excluding the Zap70 molecule and downstream targets SLP-76, PLC gamma 1, and Vav-1 from the CD4-segregated Brij 98 detergent-resistant raft domains.
+PMID	PMID:33598461	8	112	9606	LCP2,TYROBP,CBL,ZAP70,CD247,LAT,VAV1,LCK	LCP2,TYROBP,CBL,ZAP70,CD247,LAT,VAV1,LCK	2.42e-16	3.46e-11	(2021) The Role of the Cytoskeleton in Regulating the Natural Killer Cell Immune Response in Health and Disease: From Signaling Dynamics to Function.
+PMID	PMID:21136199	7	48	9606	LCP2,TYROBP,CBL,ZAP70,LAT,VAV1,LCK	LCP2,TYROBP,CBL,ZAP70,LAT,VAV1,LCK	2.9e-16	4.03e-11	(2011) A tale of two TRAPs: LAT and LAB in the regulation of lymphocyte development, activation, and autoimmunity.
+PMID	PMID:19909357	7	53	9606	LCP2,TYROBP,ZAP70,CD247,LAT,VAV1,LCK	LCP2,TYROBP,ZAP70,CD247,LAT,VAV1,LCK	5.51e-16	7.46e-11	(2009) Regulation of lymphocyte development and activation by the LAT family of adapter proteins.
+PMID	PMID:23278738	6	17	9606	LCP2,CBL,ZAP70,LAT,VAV1,LCK	LCP2,CBL,ZAP70,LAT,VAV1,LCK	5.71e-16	7.53e-11	(2013) Super-resolution characterization of TCR-dependent signaling clusters.
+PMID	PMID:11038169	6	17	9606	LCP2,CBL,ZAP70,LAT,SHC1,LCK	LCP2,CBL,ZAP70,LAT,SHC1,LCK	5.71e-16	7.53e-11	(2000) Selective accumulation of raft-associated membrane protein LAT in T cell receptor signaling assemblies.
+PMID	PMID:9362531	6	17	9606	LCP2,CBL,ZAP70,LAT,VAV1,LCK	LCP2,CBL,ZAP70,LAT,VAV1,LCK	5.71e-16	7.53e-11	(1997) Regulation of ZAP-70 intracellular localization: visualization with the green fluorescent protein.
+PMID	PMID:19187548	7	54	9606	LCP2,CBL,ZAP70,CD247,SHC1,VAV1,LCK	LCP2,CBL,ZAP70,CD247,SHC1,VAV1,LCK	6.23e-16	7.62e-11	(2009) Nck adapter proteins: functional versatility in T cells.
+PMID	PMID:36045187	7	55	9606	LCP2,ZAP70,CD3D,CD247,SHC1,VAV1,LCK	LCP2,ZAP70,CD3D,CD247,SHC1,VAV1,LCK	7.02e-16	8.39e-11	(2022) Kinetic proofreading through the multi-step activation of the ZAP70 kinase underlies early T cell ligand discrimination.
+PMID	PMID:35346866	7	56	9606	LCP2,ZAP70,CD3D,CD247,LAT,VAV1,LCK	LCP2,ZAP70,CD3D,CD247,LAT,VAV1,LCK	7.89e-16	9.23e-11	(2022) Negative times negative equals positive, THEMIS sets the rule on thymic selection and peripheral T cell responses.
+PMID	PMID:38279272	7	57	9606	LCP2,ZAP70,CD247,LAT,SHC1,VAV1,LCK	LCP2,ZAP70,CD247,LAT,SHC1,VAV1,LCK	8.86e-16	1.01e-10	(2024) The Role of the CD28 Family Receptors in T-Cell Immunomodulation.
+PMID	PMID:30655520	6	19	9606	LCP2,CBL,ZAP70,CD3D,VAV1,LCK	LCP2,CBL,ZAP70,CD3D,VAV1,LCK	1e-15	1.12e-10	(2019) TCR microclusters form spatially segregated domains and sequentially assemble in calcium-dependent kinetic steps.
+PMID	PMID:19733910	6	19	9606	LCP2,CBL,ZAP70,CD3E,VAV1,LCK	LCP2,CBL,ZAP70,CD3E,VAV1,LCK	1e-15	1.12e-10	(2009) The Sts proteins target tyrosine phosphorylated, ubiquitinated proteins within TCR signaling pathways.
+PMID	PMID:27221707	6	20	9606	LCP2,TYROBP,CBL,ZAP70,VAV1,LCK	LCP2,TYROBP,CBL,ZAP70,VAV1,LCK	1.3e-15	1.39e-10	(2016) Suppressing the killer instinct.
+PMID	PMID:25990959	6	20	9606	LCP2,CBL,ZAP70,SHC1,VAV1,LCK	LCP2,CBL,ZAP70,SHC1,VAV1,LCK	1.3e-15	1.39e-10	(2015) The catalytic activity of the kinase ZAP-70 mediates basal signaling and negative feedback of the T cell receptor pathway.
+PMID	PMID:35124007	6	21	9606	LCP2,CBL,ZAP70,LAT,SHC1,VAV1	LCP2,CBL,ZAP70,LAT,SHC1,VAV1	1.67e-15	1.72e-10	(2022) In vitro reconstitution reveals cooperative mechanisms of adapter protein-mediated activation of phospholipase C-gamma1 in T cells.
+PMID	PMID:26163016	6	21	9606	LCP2,ZAP70,CD247,LAT,VAV1,LCK	LCP2,ZAP70,CD247,LAT,VAV1,LCK	1.67e-15	1.72e-10	(2015) T cell specific adaptor protein (TSAd) promotes interaction of Nck with Lck and SLP-76 in T cells.
+PMID	PMID:15314068	6	21	9606	LCP2,ZAP70,CD3D,CD247,VAV1,LCK	LCP2,ZAP70,CD3D,CD247,VAV1,LCK	1.67e-15	1.72e-10	(2004) T cell receptor antagonism interferes with MHC clustering and integrin patterning during immunological synapse formation.
+PMID	PMID:12515827	6	21	9606	LCP2,CBL,ZAP70,LAT,VAV1,LCK	LCP2,CBL,ZAP70,LAT,VAV1,LCK	1.67e-15	1.72e-10	(2003) Dynamic changes in the mobility of LAT in aggregated lipid rafts upon T cell activation.
+PMID	PMID:12093866	6	21	9606	LCP2,ZAP70,CD3D,CD247,LAT,LCK	LCP2,ZAP70,CD3D,CD247,LAT,LCK	1.67e-15	1.72e-10	(2002) Contributions of the T cell receptor-associated CD3gamma-ITAM to thymocyte selection.
+PMID	PMID:11489921	6	21	9606	LCP2,CBL,ZAP70,LAT,SHC1,VAV1	LCP2,CBL,ZAP70,LAT,SHC1,VAV1	1.67e-15	1.72e-10	(2001) High resolution mapping of mast cell membranes reveals primary and secondary domains of Fc(epsilon)RI and LAT.
+PMID	PMID:33929486	6	22	9606	LCP2,CBL,ZAP70,LAT,SHC1,VAV1	LCP2,CBL,ZAP70,LAT,SHC1,VAV1	2.13e-15	1.96e-10	(2021) PLCgamma1 promotes phase separation of T cell signaling components.
+PMID	PMID:34018748	6	22	9606	LCP2,ZAP70,CD3D,CD3E,CD247,LCK	LCP2,ZAP70,CD3D,CD3E,CD247,LCK	2.13e-15	1.96e-10	(2021) Ovalbumin Antigen-Specific Activation of Human T Cell Receptor Closely Resembles Soluble Antibody Stimulation as Revealed by BOOST Phosphotyrosine Proteomics.
+PMID	PMID:31334230	7	67	9606	LCP2,CBL,ZAP70,CD3D,CD247,VAV1,LCK	LCP2,CBL,ZAP70,CD3D,CD247,VAV1,LCK	2.56e-15	2.27e-10	(2019) Orchestration of Immunological Synapse Assembly by Vesicular Trafficking.
+PMID	PMID:35774508	6	23	9606	LCP2,ZAP70,CD3E,CD247,VAV1,LCK	LCP2,ZAP70,CD3E,CD247,VAV1,LCK	2.68e-15	2.34e-10	(2022) Identification of Immune-Related Hub Genes in Thymoma: Defects in CD247 and Characteristics of Paraneoplastic Syndrome.
+PMID	PMID:25636200	6	23	9606	LCP2,ZAP70,LAT,SHC1,VAV1,LCK	LCP2,ZAP70,LAT,SHC1,VAV1,LCK	2.68e-15	2.34e-10	(2015) GADS is required for TCR-mediated calcium influx and cytokine release, but not cellular adhesion, in human T cells.
+PMID	PMID:18566390	6	23	9606	LCP2,ZAP70,CD3D,CD247,LAT,LCK	LCP2,ZAP70,CD3D,CD247,LAT,LCK	2.68e-15	2.34e-10	(2008) The proline-rich sequence of CD3epsilon as an amplifier of low-avidity TCR signaling.
+PMID	PMID:19290927	7	71	9606	LCP2,ZAP70,CD247,LAT,SHC1,VAV1,LCK	LCP2,ZAP70,CD247,LAT,SHC1,VAV1,LCK	3.76e-15	3.12e-10	(2009) Abl tyrosine kinases in T-cell signaling.
+PMID	PMID:15238603	6	25	9606	LCP2,CBL,ZAP70,LAT,VAV1,LCK	LCP2,CBL,ZAP70,LAT,VAV1,LCK	4.16e-15	3.39e-10	(2004) Inactivation of c-Cbl reverses neonatal lethality and T cell developmental arrest of SLP-76-deficient mice.
+PMID	PMID:27692176	8	167	9606	LCP2,ZAP70,CD3D,CD247,LAT,SHC1,VAV1,LCK	LCP2,ZAP70,CD3D,CD247,LAT,SHC1,VAV1,LCK	5.3e-15	4.26e-10	(2016) Orchestrating Lymphocyte Polarity in Cognate Immune Cell-Cell Interactions.
+PMID	PMID:23946894	7	75	9606	LCP2,CBL,ZAP70,CD3D,CD247,VAV1,LCK	LCP2,CBL,ZAP70,CD3D,CD247,VAV1,LCK	5.4e-15	4.28e-10	(2012) T cell Receptor Signal Transduction in T lymphocytes.
+PMID	PMID:37564638	6	27	9606	LCP2,ZAP70,CD247,LAT,SHC1,LCK	LCP2,ZAP70,CD247,LAT,SHC1,LCK	6.25e-15	4.87e-10	(2023) Editorial: Community series in adaptor molecules in T cell signaling, volume II.
+PMID	PMID:9547330	6	27	9606	ZAP70,CD3D,CD247,LAT,VAV1,LCK	ZAP70,CD3D,CD247,LAT,VAV1,LCK	6.25e-15	4.87e-10	(1998) T cell receptor (TCR) engagement in apoptosis-defective, but interleukin 2 (IL-2)-producing, T cells results in impaired ZAP70CD3-zeta association.
+PMID	PMID:31253807	6	28	9606	LCP2,ZAP70,CD247,LAT,SHC1,LCK	LCP2,ZAP70,CD247,LAT,SHC1,LCK	7.59e-15	5.74e-10	(2019) Tethering of vesicles to the Golgi by GMAP210 controls LAT delivery to the immune synapse.
+PMID	PMID:10438919	5	6	9606	LCP2,ZAP70,LAT,VAV1,LCK	LCP2,ZAP70,LAT,VAV1,LCK	8.6e-15	6.41e-10	(1999) Phospho-LAT-independent activation of the ras-mitogen-activated protein kinase pathway: a differential recruitment model of TCR partial agonist signaling.
+PMID	PMID:34016623	6	29	9606	ZAP70,CD3D,CD3E,CD247,SHC1,LCK	ZAP70,CD3D,CD3E,CD247,SHC1,LCK	9.16e-15	6.73e-10	(2021) Quantitative Analysis of Tyrosine Phosphorylation from FFPE Tissues Reveals Patient-Specific Signaling Networks.
+PMID	PMID:32409824	6	29	9606	LCP2,TYROBP,ZAP70,CD247,VAV1,LCK	LCP2,TYROBP,ZAP70,CD247,VAV1,LCK	9.16e-15	6.73e-10	(2020) Enhancing network activation in natural killer cells: predictions from in silico modeling.
+PMID	PMID:18378687	6	29	9606	LCP2,CBL,ZAP70,LAT,VAV1,LCK	LCP2,CBL,ZAP70,LAT,VAV1,LCK	9.16e-15	6.73e-10	(2008) Inhibition of ZAP-70 kinase activity via an analog-sensitive allele blocks T cell receptor and CD28 superagonist signaling.
+PMID	PMID:33857631	6	30	9606	LCP2,CBL,CD247,LAT,VAV1,LCK	LCP2,CBL,CD247,LAT,VAV1,LCK	1.1e-14	7.74e-10	(2021) Building protein networks in synthetic systems from the bottom-up.
+PMID	PMID:29953390	7	84	9606	LCP2,TYROBP,CBL,ZAP70,CD247,VAV1,LCK	LCP2,TYROBP,CBL,ZAP70,CD247,VAV1,LCK	1.15e-14	7.74e-10	(2018) Strategies to enhance NK cell function for the treatment of tumors and infections.
+PMID	PMID:23150273	6	30	9606	LCP2,CBL,ZAP70,LAT,VAV1,LCK	LCP2,CBL,ZAP70,LAT,VAV1,LCK	1.1e-14	7.74e-10	(2013) The adaptor protein LAT serves as an integration node for signaling pathways that drive T cell activation.
+PMID	PMID:17998387	6	30	9606	LCP2,ZAP70,CD247,LAT,VAV1,LCK	LCP2,ZAP70,CD247,LAT,VAV1,LCK	1.1e-14	7.74e-10	(2007) Phosphoinositide 3-kinase gamma participates in T cell receptor-induced T cell activation.
+PMID	PMID:15365099	6	30	9606	LCP2,TYROBP,ZAP70,CD247,LAT,VAV1	LCP2,TYROBP,ZAP70,CD247,LAT,VAV1	1.1e-14	7.74e-10	(2004) Differential requirements for Vav proteins in DAP10- and ITAM-mediated NK cell cytotoxicity.
+PMID	PMID:37372093	7	85	9606	LCP2,ZAP70,CD3D,CD3E,CD247,VAV1,LCK	LCP2,ZAP70,CD3D,CD3E,CD247,VAV1,LCK	1.24e-14	8.2e-10	(2023) Intrinsic Immunogenic Tumor Cell Death Subtypes Delineate Prognosis and Responsiveness to Immunotherapy in Lung Adenocarcinoma.
+PMID	PMID:11696592	6	31	9606	LCP2,CBL,ZAP70,LAT,VAV1,LCK	LCP2,CBL,ZAP70,LAT,VAV1,LCK	1.31e-14	8.54e-10	(2001) Functional cloning of Src-like adapter protein-2 (SLAP-2), a novel inhibitor of antigen receptor signaling.
+PMID	PMID:23209318	6	32	9606	LCP2,CBL,ZAP70,LAT,VAV1,LCK	LCP2,CBL,ZAP70,LAT,VAV1,LCK	1.56e-14	1e-09	(2013) A phospholipase C-gamma1-independent, RasGRP1-ERK-dependent pathway drives lymphoproliferative disease in linker for activation of T cells-Y136F mutant mice.
+PMID	PMID:17043143	6	32	9606	LCP2,ZAP70,CD247,LAT,VAV1,LCK	LCP2,ZAP70,CD247,LAT,VAV1,LCK	1.56e-14	1e-09	(2006) T cell receptor for antigen induces linker for activation of T cell-dependent activation of a negative signaling complex involving Dok-2, SHIP-1, and Grb-2.
+PMID	PMID:10790433	6	32	9606	LCP2,ZAP70,LAT,SHC1,VAV1,LCK	LCP2,ZAP70,LAT,SHC1,VAV1,LCK	1.56e-14	1e-09	(2000) Phosphoprotein associated with glycosphingolipid-enriched microdomains (PAG), a novel ubiquitously expressed transmembrane adaptor protein, binds the protein tyrosine kinase csk and is involved in regulation of T cell activation.
+PMID	PMID:31776916	7	89	9606	LCP2,ZAP70,CD3D,CD247,SHC1,VAV1,LCK	LCP2,ZAP70,CD3D,CD247,SHC1,VAV1,LCK	1.69e-14	1.05e-09	(2020) T Cell Reprogramming Against Cancer.
+PMID	PMID:23874979	6	33	9606	LCP2,ZAP70,CD247,LAT,VAV1,LCK	LCP2,ZAP70,CD247,LAT,VAV1,LCK	1.84e-14	1.13e-09	(2013) ERK positive feedback regulates a widespread network of tyrosine phosphorylation sites across canonical T cell signaling and actin cytoskeletal proteins in Jurkat T cells.
+PMID	PMID:24222714	6	33	9606	LCP2,CBL,ZAP70,LAT,SHC1,LCK	LCP2,CBL,ZAP70,LAT,SHC1,LCK	1.84e-14	1.13e-09	(2013) The ability of Sos1 to oligomerize the adaptor protein LAT is separable from its guanine nucleotide exchange activity in vivo.
+PMID	PMID:22912825	6	33	9606	LCP2,CBL,ZAP70,CD247,VAV1,LCK	LCP2,CBL,ZAP70,CD247,VAV1,LCK	1.84e-14	1.13e-09	(2012) The adaptor protein SAP directly associates with CD3zeta chain and regulates T cell receptor signaling.
+PMID	PMID:23189081	6	33	9606	LCP2,ZAP70,CD3D,CD247,LAT,LCK	LCP2,ZAP70,CD3D,CD247,LAT,LCK	1.84e-14	1.13e-09	(2012) The integration of signaling and the spatial organization of the T cell synapse.
+PMID	PMID:22346772	6	34	9606	LCP2,CBL,ZAP70,LAT,VAV1,LCK	LCP2,CBL,ZAP70,LAT,VAV1,LCK	2.16e-14	1.26e-09	(2011) T cell receptor signaling that regulates the development of intrathymic natural regulatory T cells.
+PMID	PMID:18823547	6	34	9606	LCP2,ZAP70,CD247,LAT,VAV1,LCK	LCP2,ZAP70,CD247,LAT,VAV1,LCK	2.16e-14	1.26e-09	(2008) The small GTPase RhoH is an atypical regulator of haematopoietic cells.
+PMID	PMID:37078002	7	93	9606	LCP2,TYROBP,ZAP70,CD247,SHC1,VAV1,LCK	LCP2,TYROBP,ZAP70,CD247,SHC1,VAV1,LCK	2.27e-14	1.3e-09	(2022) Current state of NK cell-mediated immunotherapy in chronic lymphocytic leukemia.
+PMID	PMID:36480602	6	35	9606	ZAP70,CD247,LAT,SHC1,VAV1,LCK	ZAP70,CD247,LAT,SHC1,VAV1,LCK	2.53e-14	1.43e-09	(2022) Decoding CAR T cell phenotype using combinatorial signaling motif libraries and machine learning.
+PMID	PMID:27941787	6	35	9606	LCP2,CBL,ZAP70,CD247,VAV1,LCK	LCP2,CBL,ZAP70,CD247,VAV1,LCK	2.53e-14	1.43e-09	(2017) Recruitment of calcineurin to the TCR positively regulates T cell activation.
+PMID	PMID:25870599	6	35	9606	LCP2,ZAP70,CD247,LAT,SHC1,LCK	LCP2,ZAP70,CD247,LAT,SHC1,LCK	2.53e-14	1.43e-09	(2015) GRB2 Nucleates T Cell Receptor-Mediated LAT Clusters That Control PLC-gamma1 Activation and Cytokine Production.
+PMID	PMID:32509861	6	36	9606	LCP2,TYROBP,ZAP70,CD3D,CD3E,CD247	LCP2,TYROBP,ZAP70,CD3D,CD3E,CD247	2.96e-14	1.62e-09	(2020) Database Mining of Genes of Prognostic Value for the Prostate Adenocarcinoma Microenvironment Using the Cancer Gene Atlas.
+PMID	PMID:32290478	7	99	9606	LCP2,TYROBP,CBL,ZAP70,CD247,VAV1,LCK	LCP2,TYROBP,CBL,ZAP70,CD247,VAV1,LCK	3.45e-14	1.87e-09	(2020) Natural Killer Cells: Tumor Surveillance and Signaling.
+PMID	PMID:25477210	5	9	9606	LCP2,CBL,ZAP70,VAV1,LCK	LCP2,CBL,ZAP70,VAV1,LCK	3.72e-14	1.98e-09	(2015) Regulation of T cell development by c-Cbl: essential role of Lck.
+PMID	PMID:19132916	7	100	9606	LCP2,CBL,ZAP70,CD247,SHC1,VAV1,LCK	LCP2,CBL,ZAP70,CD247,SHC1,VAV1,LCK	3.69e-14	1.98e-09	(2009) T cell activation.
+PMID	PMID:11207267	5	9	9606	CBL,ZAP70,LAT,VAV1,LCK	CBL,ZAP70,LAT,VAV1,LCK	3.72e-14	1.98e-09	(2001) Single-cell analyses reveal two defects in peptide-specific activation of naive T cells from aged mice.
+PMID	PMID:9653163	5	9	9606	LCP2,ZAP70,CD247,LAT,VAV1	LCP2,ZAP70,CD247,LAT,VAV1	3.72e-14	1.98e-09	(1998) Altered peptide ligands induce quantitatively but not qualitatively different intracellular signals in primary thymocytes.
+PMID	PMID:36551835	6	40	9606	LCP2,CBL,ZAP70,CD247,VAV1,LCK	LCP2,CBL,ZAP70,CD247,VAV1,LCK	5.27e-14	2.71e-09	(2022) The Functional Properties and Physiological Roles of Signal-Transducing Adaptor Protein-2 in the Pathogenesis of Inflammatory and Immune Disorders.
+RCTM	HSA-202433	7	31	9606	LCP2,ZAP70,CD3D,CD3E,CD247,LAT,LCK	LCP2,ZAP70,CD3D,CD3E,CD247,LAT,LCK	1.81e-17	4.13e-14	Generation of second messenger molecules
+RCTM	HSA-202430	5	16	9606	ZAP70,CD3D,CD3E,CD247,LCK	ZAP70,CD3D,CD3E,CD247,LCK	3.78e-13	2.88e-10	Translocation of ZAP-70 to Immunological synapse
+RCTM	HSA-2424491	5	29	9606	LCP2,TYROBP,LAT,SHC1,LCK	LCP2,TYROBP,LAT,SHC1,LCK	5.15e-12	2.94e-09	DAP12 signaling
+RCTM	HSA-1280218	9	758	9606	LCP2,TYROBP,ZAP70,CD3D,CD3E,CD247,LAT,VAV1,LCK	LCP2,TYROBP,ZAP70,CD3D,CD3E,CD247,LAT,VAV1,LCK	1e-11	4.58e-09	Adaptive Immune System
+RCTM	HSA-168256	11	1979	9606	LCP2,TYROBP,CBL,ZAP70,CD3D,CD3E,CD247,LAT,SHC1,VAV1,LCK	LCP2,TYROBP,CBL,ZAP70,CD3D,CD3E,CD247,LAT,SHC1,VAV1,LCK	1.08e-11	4.58e-09	Immune System
+RCTM	HSA-388841	5	66	9606	CD3D,CD3E,CD247,VAV1,LCK	CD3D,CD3E,CD247,VAV1,LCK	2.39e-10	6.81e-08	Costimulation by the CD28 family
+RCTM	HSA-202427	4	19	9606	CD3D,CD3E,CD247,LCK	CD3D,CD3E,CD247,LCK	4.62e-10	1.17e-07	Phosphorylation of CD3 and TCR zeta chains
+RCTM	HSA-389948	4	20	9606	CD3D,CD3E,CD247,LCK	CD3D,CD3E,CD247,LCK	5.55e-10	1.27e-07	PD-1 signaling
+RCTM	HSA-114604	4	35	9606	LCP2,LAT,VAV1,LCK	LCP2,LAT,VAV1,LCK	4.27e-09	7.96e-07	GPVI-mediated activation cascade
+RCTM	HSA-2871796	4	34	9606	LCP2,LAT,SHC1,VAV1	LCP2,LAT,SHC1,VAV1	3.84e-09	7.96e-07	FCERI mediated MAPK activation
+RCTM	HSA-2871809	4	34	9606	LCP2,LAT,SHC1,VAV1	LCP2,LAT,SHC1,VAV1	3.84e-09	7.96e-07	FCERI mediated Ca+2 mobilization
+RCTM	HSA-202424	4	92	9606	CD3D,CD3E,CD247,LCK	CD3D,CD3E,CD247,LCK	1.7e-07	2.77e-05	Downstream TCR signaling
+RCTM	HSA-76002	5	260	9606	LCP2,LAT,SHC1,VAV1,LCK	LCP2,LAT,SHC1,VAV1,LCK	1.83e-07	2.78e-05	Platelet activation, signaling and aggregation
+RCTM	HSA-168249	7	1041	9606	LCP2,TYROBP,CD247,LAT,SHC1,VAV1,LCK	LCP2,TYROBP,CD247,LAT,SHC1,VAV1,LCK	3.22e-07	4.59e-05	Innate Immune System
+RCTM	HSA-198933	4	130	9606	TYROBP,CD3D,CD3E,CD247	TYROBP,CD3D,CD3E,CD247	6.5e-07	8.72e-05	Immunoregulatory interactions between a Lymphoid and a non-Lymphoid cell
+RCTM	HSA-1433557	3	43	9606	CBL,VAV1,LCK	CBL,VAV1,LCK	1.94e-06	0.00023	Signaling by SCF-KIT
+RCTM	HSA-512988	3	48	9606	CBL,SHC1,VAV1	CBL,SHC1,VAV1	2.65e-06	0.0003	Interleukin-3, Interleukin-5 and GM-CSF signaling
+RCTM	HSA-164944	2	8	9606	CD247,LCK	CD247,LCK	1.27e-05	0.0013	Nef and signal transduction
+RCTM	HSA-389359	2	12	9606	VAV1,LCK	VAV1,LCK	2.57e-05	0.0025	CD28 dependent Vav1 pathway
+RCTM	HSA-9020558	2	12	9606	SHC1,LCK	SHC1,LCK	2.57e-05	0.0025	Interleukin-2 signaling
+RCTM	HSA-9027284	2	14	9606	SHC1,VAV1	SHC1,VAV1	3.38e-05	0.0031	Erythropoietin activates RAS
+RCTM	HSA-5637810	2	15	9606	CBL,SHC1	CBL,SHC1	3.83e-05	0.0034	Constitutive Signaling by EGFRvIII
+RCTM	HSA-1433559	2	16	9606	CBL,LCK	CBL,LCK	4.31e-05	0.0035	Regulation of KIT signaling
+RCTM	HSA-1236382	2	19	9606	CBL,SHC1	CBL,SHC1	5.91e-05	0.0047	Constitutive Signaling by Ligand-Responsive EGFR Cancer Variants
+RCTM	HSA-5663202	4	430	9606	CBL,SHC1,VAV1,LCK	CBL,SHC1,VAV1,LCK	6.77e-05	0.005	Diseases of signal transduction by growth factor receptors and second messengers
+RCTM	HSA-912631	2	22	9606	CBL,VAV1	CBL,VAV1	7.76e-05	0.0055	Regulation of signaling by CBL
+RCTM	HSA-449147	4	453	9606	CBL,SHC1,VAV1,LCK	CBL,SHC1,VAV1,LCK	8.27e-05	0.0057	Signaling by Interleukins
+RCTM	HSA-9006934	4	521	9606	CBL,SHC1,VAV1,LCK	CBL,SHC1,VAV1,LCK	0.00014	0.0087	Signaling by Receptor Tyrosine Kinases
+RCTM	HSA-9680350	2	31	9606	CBL,SHC1	CBL,SHC1	0.00015	0.0089	Signaling by CSF1 (M-CSF) in myeloid cells
+RCTM	HSA-9013407	2	37	9606	ZAP70,LCK	ZAP70,LCK	0.00021	0.0118	RHOH GTPase cycle
+RCTM	HSA-9607240	2	38	9606	CBL,LCK	CBL,LCK	0.00022	0.0122	FLT3 Signaling
+RCTM	HSA-5654741	2	40	9606	CBL,SHC1	CBL,SHC1	0.00024	0.0131	Signaling by FGFR3
+RCTM	HSA-5654743	2	41	9606	CBL,SHC1	CBL,SHC1	0.00025	0.0134	Signaling by FGFR4
+RCTM	HSA-177929	2	50	9606	CBL,SHC1	CBL,SHC1	0.00037	0.0188	Signaling by EGFR
+RCTM	HSA-5654736	2	50	9606	CBL,SHC1	CBL,SHC1	0.00037	0.0188	Signaling by FGFR1
+RCTM	HSA-9664422	2	62	9606	CD247,VAV1	CD247,VAV1	0.00056	0.0266	FCGR3A-mediated phagocytosis
+RCTM	HSA-2029482	2	64	9606	CD247,VAV1	CD247,VAV1	0.0006	0.0267	Regulation of actin dynamics for phagocytic cup formation
+RCTM	HSA-5654738	2	73	9606	CBL,SHC1	CBL,SHC1	0.00077	0.0337	Signaling by FGFR2
+RCTM	HSA-2219530	2	78	9606	VAV1,LCK	VAV1,LCK	0.00087	0.0376	Constitutive Signaling by Aberrant PI3K in Cancer
+RCTM	HSA-6806834	2	79	9606	CBL,SHC1	CBL,SHC1	0.0009	0.0379	Signaling by MET
+RCTM	HSA-162582	6	2540	9606	CBL,ZAP70,LAT,SHC1,VAV1,LCK	CBL,ZAP70,LAT,SHC1,VAV1,LCK	0.0012	0.0478	Signal Transduction
+RCTM	HSA-5663205	4	917	9606	CBL,CD247,VAV1,LCK	CBL,CD247,VAV1,LCK	0.0012	0.0478	Infectious disease
+WikiPathways	WP69	10	90	9606	LCP2,CBL,ZAP70,CD3D,CD3E,CD247,LAT,SHC1,VAV1,LCK	LCP2,CBL,ZAP70,CD3D,CD3E,CD247,LAT,SHC1,VAV1,LCK	7.79e-23	6.09e-20	T-cell receptor signaling pathway
+WikiPathways	WP5072	8	61	9606	LCP2,ZAP70,CD3D,CD3E,CD247,LAT,VAV1,LCK	LCP2,ZAP70,CD3D,CD3E,CD247,LAT,VAV1,LCK	2.43e-18	9.47e-16	Modulators of TCR signaling and T cell activation
+WikiPathways	WP5098	7	88	9606	LCP2,ZAP70,CD3D,CD3E,CD247,LAT,LCK	LCP2,ZAP70,CD3D,CD3E,CD247,LAT,LCK	1.57e-14	4.08e-12	T-cell activation SARS-CoV-2
+WikiPathways	WP3863	6	62	9606	LCP2,CBL,ZAP70,CD3D,LAT,LCK	LCP2,CBL,ZAP70,CD3D,LAT,LCK	6.13e-13	1.2e-10	T-cell antigen receptor (TCR) pathway during Staphylococcus aureus infection
+WikiPathways	WP5130	6	69	9606	ZAP70,CD3D,CD3E,CD247,LAT,LCK	ZAP70,CD3D,CD3E,CD247,LAT,LCK	1.13e-12	1.76e-10	Th17 cell differentiation pathway
+WikiPathways	WP4884	4	21	9606	ZAP70,CD3E,CD247,LCK	ZAP70,CD3E,CD247,LCK	6.6e-10	8.59e-08	Pathogenesis of SARS-CoV-2 mediated by nsp9-nsp10 complex
+WikiPathways	WP4585	4	23	9606	ZAP70,CD3D,CD3E,LCK	ZAP70,CD3D,CD3E,LCK	9.15e-10	1.02e-07	Cancer immunotherapy by PD-1 blockade
+WikiPathways	WP585	4	54	9606	CBL,ZAP70,VAV1,LCK	CBL,ZAP70,VAV1,LCK	2.19e-08	2.14e-06	Interferon type I signaling pathways
+WikiPathways	WP2037	4	76	9606	CBL,ZAP70,SHC1,VAV1	CBL,ZAP70,SHC1,VAV1	8.12e-08	7.05e-06	Prolactin signaling pathway
+WikiPathways	WP23	4	97	9606	CBL,SHC1,VAV1,LCK	CBL,SHC1,VAV1,LCK	2.08e-07	1.63e-05	B cell receptor signaling pathway
+WikiPathways	WP3937	3	40	9606	TYROBP,LAT,VAV1	TYROBP,LAT,VAV1	1.58e-06	0.00011	Microglia pathogen phagocytosis pathway
+WikiPathways	WP49	3	42	9606	CBL,SHC1,LCK	CBL,SHC1,LCK	1.81e-06	0.00012	IL-2 signaling pathway
+WikiPathways	WP286	3	49	9606	CBL,SHC1,VAV1	CBL,SHC1,VAV1	2.82e-06	0.00017	IL-3 signaling pathway
+WikiPathways	WP304	3	59	9606	CBL,SHC1,VAV1	CBL,SHC1,VAV1	4.8e-06	0.00027	Kit receptor signaling pathway
+WikiPathways	WP5115	4	218	9606	ZAP70,CD3E,CD247,LCK	ZAP70,CD3E,CD247,LCK	4.86e-06	0.00027	Network map of SARS-CoV-2 signaling pathway
+WikiPathways	WP437	3	162	9606	CBL,SHC1,VAV1	CBL,SHC1,VAV1	9.05e-05	0.0044	EGF/EGFR signaling pathway
+WikiPathways	WP2583	2	28	9606	ZAP70,LCK	ZAP70,LCK	0.00012	0.0056	T cell receptor and co-stimulatory signaling
+WikiPathways	WP4223	3	181	9606	ZAP70,LAT,SHC1	ZAP70,LAT,SHC1	0.00012	0.0056	Ras signaling
+WikiPathways	WP453	2	30	9606	ZAP70,LCK	ZAP70,LCK	0.00014	0.0057	Inflammatory response pathway
+WikiPathways	WP2526	2	40	9606	SHC1,VAV1	SHC1,VAV1	0.00024	0.0094	PDGF pathway
+WikiPathways	WP364	2	43	9606	SHC1,VAV1	SHC1,VAV1	0.00028	0.0103	IL6 signaling pathway
+WikiPathways	WP395	2	54	9606	CBL,SHC1	CBL,SHC1	0.00043	0.0152	IL-4 signaling pathway
+WikiPathways	WP3680	2	65	9606	CBL,SHC1	CBL,SHC1	0.00061	0.0208	Physico-chemical features and toxicity-associated pathways
+WikiPathways	WP673	2	89	9606	CBL,SHC1	CBL,SHC1	0.0011	0.0367	ErbB signaling pathway
+HPO	HP:0025540	6	52	9606	ZAP70,CD3D,CD3E,CD247,LAT,LCK	ZAP70,CD3D,CD3E,CD247,LAT,LCK	2.27e-13	2.77e-09	Abnormal T cell subset distribution
+HPO	HP:0001888	6	114	9606	ZAP70,CD3D,CD3E,CD247,LAT,LCK	ZAP70,CD3D,CD3E,CD247,LAT,LCK	2.02e-11	6.17e-08	Lymphopenia
+HPO	HP:0001881	8	517	9606	TYROBP,CBL,ZAP70,CD3D,CD3E,CD247,LAT,LCK	TYROBP,CBL,ZAP70,CD3D,CD3E,CD247,LAT,LCK	3.7e-11	9.02e-08	Abnormal leukocyte morphology
+HPO	HP:0010987	8	517	9606	TYROBP,CBL,ZAP70,CD3D,CD3E,CD247,LAT,LCK	TYROBP,CBL,ZAP70,CD3D,CD3E,CD247,LAT,LCK	3.7e-11	9.02e-08	Abnormal cellular immune system morphology
+HPO	HP:0005401	4	13	9606	ZAP70,CD3D,CD3E,CD247	ZAP70,CD3D,CD3E,CD247	1.24e-10	1.52e-07	Recurrent candida infections
+HPO	HP:0011893	7	367	9606	CBL,ZAP70,CD3D,CD3E,CD247,LAT,LCK	CBL,ZAP70,CD3D,CD3E,CD247,LAT,LCK	2.59e-10	2.87e-07	Abnormal leukocyte count
+HPO	HP:0009098	4	17	9606	ZAP70,CD3D,CD3E,CD247	ZAP70,CD3D,CD3E,CD247	3.13e-10	3.18e-07	Chronic oral candidiasis
+HPO	HP:0031381	4	21	9606	ZAP70,CD3D,CD3E,CD247	ZAP70,CD3D,CD3E,CD247	6.6e-10	6.2e-07	Decreased lymphocyte proliferation in response to mitogen
+HPO	HP:0001974	5	95	9606	CBL,ZAP70,CD3D,CD3E,CD247	CBL,ZAP70,CD3D,CD3E,CD247	1.37e-09	1.19e-06	Leukocytosis
+HPO	HP:0032169	4	33	9606	CD3D,CD3E,CD247,LAT	CD3D,CD3E,CD247,LAT	3.43e-09	2.33e-06	Severe infection
+HPO	HP:0002014	6	309	9606	CBL,ZAP70,CD3D,CD3E,CD247,LCK	CBL,ZAP70,CD3D,CD3E,CD247,LCK	6.86e-09	4.19e-06	Diarrhea
+HPO	HP:0001433	5	136	9606	CBL,ZAP70,CD3D,CD3E,CD247	CBL,ZAP70,CD3D,CD3E,CD247	7.79e-09	4.52e-06	Hepatosplenomegaly
+HPO	HP:0002783	5	139	9606	ZAP70,CD3D,CD3E,CD247,LAT	ZAP70,CD3D,CD3E,CD247,LAT	8.66e-09	4.8e-06	Recurrent lower respiratory tract infections
+HPO	HP:0003460	3	6	9606	CD3D,CD3E,CD247	CD3D,CD3E,CD247	1.08e-08	5.75e-06	Decreased circulating total IgA
+HPO	HP:0008866	3	7	9606	CD3D,CD3E,CD247	CD3D,CD3E,CD247	1.55e-08	7.87e-06	Failure to thrive secondary to recurrent infections
+HPO	HP:0001880	4	50	9606	ZAP70,CD3D,CD3E,CD247	ZAP70,CD3D,CD3E,CD247	1.64e-08	7.99e-06	Eosinophilia
+HPO	HP:0020064	4	50	9606	ZAP70,CD3D,CD3E,CD247	ZAP70,CD3D,CD3E,CD247	1.64e-08	7.99e-06	Abnormal eosinophil count
+HPO	HP:0004313	5	169	9606	ZAP70,CD3D,CD3E,CD247,LAT	ZAP70,CD3D,CD3E,CD247,LAT	2.24e-08	9.76e-06	Decreased circulating antibody level
+HPO	HP:0001744	6	382	9606	CBL,ZAP70,CD3D,CD3E,CD247,LAT	CBL,ZAP70,CD3D,CD3E,CD247,LAT	2.38e-08	1e-05	Splenomegaly
+HPO	HP:0045080	3	10	9606	CD3D,CD3E,CD247	CD3D,CD3E,CD247	3.69e-08	1.36e-05	Decreased proportion of CD3-positive T cells
+HPO	HP:0002039	4	63	9606	CBL,CD3D,CD3E,CD247	CBL,CD3D,CD3E,CD247	3.95e-08	1.42e-05	Anorexia
+HPO	HP:0002721	5	192	9606	CD3D,CD3E,CD247,LAT,LCK	CD3D,CD3E,CD247,LAT,LCK	4.17e-08	1.45e-05	Immunodeficiency
+HPO	HP:0004385	3	11	9606	CD3D,CD3E,CD247	CD3D,CD3E,CD247	4.69e-08	1.59e-05	Protracted diarrhea
+HPO	HP:0002722	3	12	9606	CD3D,CD3E,CD247	CD3D,CD3E,CD247	5.86e-08	1.93e-05	Recurrent abscess formation
+HPO	HP:0002205	6	472	9606	ZAP70,CD3D,CD3E,CD247,LAT,LCK	ZAP70,CD3D,CD3E,CD247,LAT,LCK	8.22e-08	2.51e-05	Recurrent respiratory infections
+HPO	HP:0025408	6	475	9606	CBL,ZAP70,CD3D,CD3E,CD247,LAT	CBL,ZAP70,CD3D,CD3E,CD247,LAT	8.53e-08	2.54e-05	Abnormal spleen morphology
+HPO	HP:0002088	7	893	9606	CBL,ZAP70,CD3D,CD3E,CD247,LAT,LCK	CBL,ZAP70,CD3D,CD3E,CD247,LAT,LCK	1.14e-07	3.08e-05	Abnormal lung morphology
+HPO	HP:0032309	5	236	9606	CBL,ZAP70,CD3D,CD3E,CD247	CBL,ZAP70,CD3D,CD3E,CD247	1.14e-07	3.08e-05	Abnormal granulocyte count
+HPO	HP:0005353	3	16	9606	CD3D,CD3E,CD247	CD3D,CD3E,CD247	1.25e-07	3.17e-05	Recurrent herpes
+HPO	HP:0002090	5	245	9606	ZAP70,CD3D,CD3E,CD247,LAT	ZAP70,CD3D,CD3E,CD247,LAT	1.37e-07	3.28e-05	Pneumonia
+HPO	HP:0011947	6	556	9606	ZAP70,CD3D,CD3E,CD247,LAT,LCK	ZAP70,CD3D,CD3E,CD247,LAT,LCK	2.14e-07	5.02e-05	Respiratory tract infection
+HPO	HP:0012649	7	981	9606	CBL,ZAP70,CD3D,CD3E,CD247,LAT,LCK	CBL,ZAP70,CD3D,CD3E,CD247,LAT,LCK	2.15e-07	5.02e-05	Increased inflammatory response
+HPO	HP:0006532	4	100	9606	CD3D,CD3E,CD247,LAT	CD3D,CD3E,CD247,LAT	2.35e-07	5.11e-05	Recurrent pneumonia
+HPO	HP:0003271	6	614	9606	CBL,ZAP70,CD3D,CD3E,CD247,LAT	CBL,ZAP70,CD3D,CD3E,CD247,LAT	3.82e-07	7.88e-05	Visceromegaly
+HPO	HP:0012252	7	1067	9606	CBL,ZAP70,CD3D,CD3E,CD247,LAT,LCK	CBL,ZAP70,CD3D,CD3E,CD247,LAT,LCK	3.81e-07	7.88e-05	Abnormal respiratory system morphology
+HPO	HP:0002960	4	122	9606	ZAP70,CD247,LAT,LCK	ZAP70,CD247,LAT,LCK	5.07e-07	9.99e-05	Autoimmunity
+HPO	HP:0032101	6	748	9606	ZAP70,CD3D,CD3E,CD247,LAT,LCK	ZAP70,CD3D,CD3E,CD247,LAT,LCK	1.2e-06	0.00022	Unusual infection
+HPO	HP:0004325	7	1274	9606	CBL,ZAP70,CD3D,CD3E,CD247,LAT,LCK	CBL,ZAP70,CD3D,CD3E,CD247,LAT,LCK	1.26e-06	0.00023	Decreased body weight
+HPO	HP:0010978	7	1347	9606	CBL,ZAP70,CD3D,CD3E,CD247,LAT,LCK	CBL,ZAP70,CD3D,CD3E,CD247,LAT,LCK	1.84e-06	0.00033	Abnormality of immune system physiology
+HPO	HP:0005403	3	50	9606	ZAP70,CD247,LCK	ZAP70,CD247,LCK	2.98e-06	0.00052	T lymphocytopenia
+HPO	HP:0001019	3	52	9606	CD3D,CD3E,CD247	CD3D,CD3E,CD247	3.34e-06	0.00057	Erythroderma
+HPO	HP:0011123	5	479	9606	CBL,ZAP70,CD3D,CD3E,CD247	CBL,ZAP70,CD3D,CD3E,CD247	3.58e-06	0.0006	Inflammatory abnormality of the skin
+HPO	HP:0001508	6	949	9606	ZAP70,CD3D,CD3E,CD247,LAT,LCK	ZAP70,CD3D,CD3E,CD247,LAT,LCK	4.77e-06	0.00076	Failure to thrive
+HPO	HP:0004315	3	59	9606	CD3D,CD3E,CD247	CD3D,CD3E,CD247	4.8e-06	0.00076	Decreased circulating IgG level
+HPO	HP:0011122	5	524	9606	CBL,ZAP70,CD3D,CD3E,CD247	CBL,ZAP70,CD3D,CD3E,CD247	5.52e-06	0.00085	Abnormality of skin physiology
+HPO	HP:0025031	8	2389	9606	TYROBP,CBL,ZAP70,CD3D,CD3E,CD247,LAT,LCK	TYROBP,CBL,ZAP70,CD3D,CD3E,CD247,LAT,LCK	5.55e-06	0.00085	Abnormality of the digestive system
+HPO	HP:0010702	3	68	9606	CD3D,CD3E,CD247	CD3D,CD3E,CD247	7.24e-06	0.0011	Increased circulating antibody level
+HPO	HP:0012115	3	74	9606	CD3D,CD3E,CD247	CD3D,CD3E,CD247	9.25e-06	0.0013	Hepatitis
+HPO	HP:0025032	7	1763	9606	TYROBP,CBL,ZAP70,CD3D,CD3E,CD247,LCK	TYROBP,CBL,ZAP70,CD3D,CD3E,CD247,LCK	1.11e-05	0.0016	Abnormality of digestive system physiology
+HPO	HP:0001878	3	101	9606	ZAP70,CD247,LAT	ZAP70,CD247,LAT	2.28e-05	0.0032	Hemolytic anemia
+HPO	HP:0410042	5	715	9606	CBL,ZAP70,CD3D,CD3E,CD247	CBL,ZAP70,CD3D,CD3E,CD247	2.47e-05	0.0033	Abnormal liver morphology
+HPO	HP:0002716	3	136	9606	CBL,ZAP70,LAT	CBL,ZAP70,LAT	5.43e-05	0.0071	Lymphadenopathy
+HPO	HP:0002733	3	147	9606	CBL,ZAP70,LAT	CBL,ZAP70,LAT	6.82e-05	0.0088	Abnormal lymph node morphology
+HPO	HP:0001903	4	498	9606	CBL,ZAP70,CD247,LAT	CBL,ZAP70,CD247,LAT	0.00012	0.0151	Anemia
+HPO	HP:0012475	2	29	9606	ZAP70,CD247	ZAP70,CD247	0.00013	0.0163	Decreased circulating level of specific antibody
+HPO	HP:0004798	2	30	9606	ZAP70,CD3E	ZAP70,CD3E	0.00014	0.0172	Recurrent infection of the gastrointestinal tract
+HPO	HP:0032218	2	32	9606	LAT,LCK	LAT,LCK	0.00016	0.0192	Decreased proportion of CD4-positive T cells
+HPO	HP:0001890	2	33	9606	ZAP70,CD247	ZAP70,CD247	0.00017	0.0202	Autoimmune hemolytic anemia
+HPO	HP:0000388	3	203	9606	CD3D,CD3E,CD247	CD3D,CD3E,CD247	0.00017	0.0209	Otitis media
+HPO	HP:0001973	2	39	9606	ZAP70,LAT	ZAP70,LAT	0.00023	0.0264	Autoimmune thrombocytopenia
+HPO	HP:0004377	3	232	9606	TYROBP,CBL,ZAP70	TYROBP,CBL,ZAP70	0.00026	0.0293	Hematological neoplasm
+HPO	HP:0001945	3	238	9606	CD3D,CD3E,CD247	CD3D,CD3E,CD247	0.00028	0.0313	Fever
+HPO	HP:0002756	2	49	9606	TYROBP,CBL	TYROBP,CBL	0.00036	0.0398	Pathologic fracture
+NetworkNeighborAL	CL:17472	6	56	9606	LCP2,CBL,ZAP70,LAT,SHC1,VAV1	LCP2,CBL,ZAP70,LAT,SHC1,VAV1	3.45e-13	1.58e-09	Mixed, incl. GPVI-mediated activation cascade, and Insulin receptor binding
+NetworkNeighborAL	CL:17538	5	23	9606	LCP2,CBL,ZAP70,LAT,VAV1	LCP2,CBL,ZAP70,LAT,VAV1	1.82e-12	2.78e-09	FCERI mediated Ca+2 mobilization, and B-cell antigen receptor complex-associated protein alpha/beta chain
+NetworkNeighborAL	CL:15545	4	6	9606	CD3D,CD3E,CD247,LCK	CD3D,CD3E,CD247,LCK	1.1e-11	1.26e-08	Alpha-beta T cell receptor complex, and Pneumocystosis
+NetworkNeighborAL	CL:17540	2	16	9606	LCP2,VAV1	LCP2,VAV1	4.31e-05	0.011	FCERI mediated Ca+2 mobilization, and B-cell antigen receptor complex-associated protein alpha/beta chain
