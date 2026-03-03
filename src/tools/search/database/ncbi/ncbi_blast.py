@@ -17,13 +17,14 @@ except ImportError:
 BLAST_PROGRAMS = ("blastn", "blastp", "blastx", "tblastn", "tblastx")
 # Common DBs: nt, refseq_rna (nucleotide); nr, refseq_protein, pdb, swissprot (protein)
 DEFAULT_PROGRAM = "blastp"
-DEFAULT_DATABASE = "nr"
+BLAST_DATABASES = ("nt", "nr_cluster_seq", "refseq_select", "refseq_protein", "landmark", "swissprot", "nr", "pataa", "env_nr", "tsa_nr", "pdb")
+DEFAULT_DATABASE = "swissprot"
 
 
 def query_ncbi_blast(
     sequence: str,
-    program: str = DEFAULT_PROGRAM,
-    database: str = DEFAULT_DATABASE,
+    program: str = DEFAULT_PROGRAM, choices=BLAST_PROGRAMS,
+    database: str = DEFAULT_DATABASE, choices=BLAST_DATABASES,
     expect: float = 0.001,
     hitlist_size: int = 50,
     alignments: int = 25,
@@ -67,8 +68,8 @@ def query_ncbi_blast(
 def download_ncbi_blast(
     sequence: str,
     out_path: str,
-    program: str = DEFAULT_PROGRAM,
-    database: str = DEFAULT_DATABASE,
+    program: str = DEFAULT_PROGRAM, choices=BLAST_PROGRAMS,
+    database: str = DEFAULT_DATABASE, choices=BLAST_DATABASES,
     expect: float = 0.001,
     hitlist_size: int = 50,
     alignments: int = 25,
@@ -154,17 +155,47 @@ def parse_blast_xml(xml_content_or_path: str) -> list:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="NCBI BLAST: submit query and save result (requires Biopython)")
+    parser.add_argument("--test", action="store_true", help="Run tests for query_ncbi_blast, download_ncbi_blast, parse_blast_xml; output under example/database/ncbi")
     parser.add_argument("-i", "--sequence", help="Query: sequence string, FASTA, or accession")
     parser.add_argument("-f", "--fasta_file", help="FASTA file (single sequence used)")
-    parser.add_argument("-o", "--out", required=True, help="Output file path (e.g. result.xml)")
+    parser.add_argument("-o", "--out", help="Output file path (e.g. result.xml)")
     parser.add_argument("-p", "--program", default=DEFAULT_PROGRAM, choices=list(BLAST_PROGRAMS), help="BLAST program")
-    parser.add_argument("-d", "--database", default=DEFAULT_DATABASE, help="BLAST database (e.g. nr, nt)")
+    parser.add_argument("-d", "--database", default=DEFAULT_DATABASE, choices=list(BLAST_DATABASES), help="BLAST database (e.g. nr, nt)")
     parser.add_argument("-e", "--expect", type=float, default=0.001, help="E-value threshold")
     parser.add_argument("--hitlist_size", type=int, default=50, help="Max hits to return")
     parser.add_argument("--alignments", type=int, default=25, help="Max alignments to show")
     parser.add_argument("--entrez_query", default=None, help="Entrez query to filter (e.g. 'Mus musculus[Organism]')")
     args = parser.parse_args()
 
+    if args.test:
+        out_base = os.path.join("example", "database", "ncbi", "blast")
+        os.makedirs(out_base, exist_ok=True)
+        # Short peptide to keep BLAST test fast
+        test_seq = "MKTAYIAKQRQISFVKSHFSRQLEERLGLIEVQAPILSRVGDGTQDNLSGAEKAVQVKVKALPDAQFEVVHSLAKWKRQTLGQHDFSAGEGLYTHMKALRPDEDRLSPLHSVYVDQWDWERVMGDGERQFSTLKSTVEAIWAGIKATEAAVSEEFGLAPFLPDQIHFVHSQELLSRYPDLDAKGRERAIAKDLGAVFLVGIGGKLSDGHRHDVRAPDYDDWSTPSELGHAGLNGDILVWNPVLEDAFELSSMGIRVDADTLKHQLALTGDEDRLELEWHQALLRGEMPQTIGGGIGQSRLTMLLLQLPHIGQVQAGVWPAAVRESVPSLL"
+        print("Testing query_ncbi_blast(...) [short sequence]")
+        xml_result = query_ncbi_blast(test_seq, program="blastp", database="swissprot", hitlist_size=5, alignments=3)
+        if xml_result.strip().startswith("{"):
+            print("  BLAST returned error (e.g. rate limit):", xml_result[:200])
+        else:
+            out_xml = os.path.join(out_base, "blast_result_sample.xml")
+            with open(out_xml, "w", encoding="utf-8") as f:
+                f.write(xml_result[:50000] if len(xml_result) > 50000 else xml_result)
+            print(f"  saved to {out_xml}")
+            print("Testing parse_blast_xml(...)")
+            parsed = parse_blast_xml(xml_result)
+            print(f"  parsed {len(parsed)} record(s)")
+            with open(os.path.join(out_base, "blast_parsed_sample.json"), "w", encoding="utf-8") as f:
+                json.dump(parsed, f, indent=2, default=str)
+        print("Testing download_ncbi_blast(...)")
+        out_path = os.path.join(out_base, "blast_download_sample.xml")
+        msg = download_ncbi_blast(test_seq, out_path, program="blastp", database="swissprot", hitlist_size=5)
+        print(f"  {msg}")
+        print(f"Done. Output under {out_base}")
+        exit(0)
+
+    if not args.out:
+        print("Error: -o/--out required (or use --test)")
+        exit(1)
     if not args.sequence and not args.fasta_file:
         print("Error: provide -i/--sequence or -f/--fasta_file")
         exit(1)
@@ -189,3 +220,5 @@ if __name__ == "__main__":
         entrez_query=args.entrez_query,
     )
     print(msg)
+    if "successfully" in msg or os.path.isfile(args.out):
+        print(f"Done. Output: {args.out}")

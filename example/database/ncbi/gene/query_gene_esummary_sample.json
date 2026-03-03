@@ -1,0 +1,154 @@
+{
+  "header": {
+    "type": "esummary",
+    "version": "0.3"
+  },
+  "result": {
+    "uids": [
+      "672"
+    ],
+    "672": {
+      "uid": "672",
+      "name": "BRCA1",
+      "description": "BRCA1 DNA repair associated",
+      "status": "",
+      "currentid": "",
+      "chromosome": "17",
+      "geneticsource": "genomic",
+      "maplocation": "17q21.31",
+      "otheraliases": "BRCAI, BRCC1, BROVCA1, FANCS, IRIS, PNCA4, PPP1R53, PSCP, RNF53",
+      "otherdesignations": "breast cancer type 1 susceptibility protein|BRCA1/BRCA2-containing complex, subunit 1|Fanconi anemia, complementation group S|RING finger protein 53|breast and ovarian cancer susceptibility protein 1|breast cancer 1, early onset|early onset breast cancer 1|protein phosphatase 1, regulatory subunit 53",
+      "nomenclaturesymbol": "BRCA1",
+      "nomenclaturename": "BRCA1 DNA repair associated",
+      "nomenclaturestatus": "Official",
+      "mim": [
+        "113705"
+      ],
+      "genomicinfo": [
+        {
+          "chrloc": "17",
+          "chraccver": "NC_000017.11",
+          "chrstart": 43170326,
+          "chrstop": 43044294,
+          "exoncount": 31
+        }
+      ],
+      "geneweight": 173253,
+      "summary": "This gene encodes a 190 kD nuclear phosphoprotein that plays a role in maintaining genomic stability, and it also acts as a tumor suppressor. The BRCA1 gene contains 22 exons spanning about 110 kb of DNA. The encoded protein combines with other tumor suppressors, DNA damage sensors, and signal transducers to form a large multi-subunit protein complex known as the BRCA1-associated genome surveillance complex (BASC). This gene product associates with RNA polymerase II, and through the C-terminal domain, also interacts with histone deacetylase complexes. This protein thus plays a role in transcription, DNA repair of double-stranded breaks, and recombination. Mutations in this gene are responsible for approximately 40% of inherited breast cancers and more than 80% of inherited breast and ovarian cancers. Alternative splicing plays a role in modulating the subcellular localization and physiological function of this gene. Many alternatively spliced transcript variants, some of which are disease-associated mutations, have been described for this gene, but the full-length natures of only some of these variants has been described. A related pseudogene, which is also located on chromosome 17, has been identified. [provided by RefSeq, May 2020]",
+      "chrsort": "17",
+      "chrstart": 43044294,
+      "organism": {
+        "scientificname": "Homo sapiens",
+        "commonname": "human",
+        "taxid": 9606
+      },
+      "locationhist": [
+        {
+          "annotationrelease": "RS_2025_08",
+          "assemblyaccver": "GCF_000001405.40",
+          "chraccver": "NC_000017.11",
+          "chrstart": 43170326,
+          "chrstop": 43044294
+        },
+        {
+          "annotationrelease": "RS_2025_08",
+          "assemblyaccver": "GCF_009914755.1",
+          "chraccver": "NC_060941.1",
+          "chrstart": 44029083,
+          "chrstop": 43902856
+        },
+        {
+          "annotationrelease": "RS_2024_08",
+          "assemblyaccver": "GCF_000001405.40",
+          "chraccver": "NC_000017.11",
+          "chrstart": 43170326,
+          "chrstop": 43044294
+        },
+        {
+          "annotationrelease": "RS_2024_08",
+          "assemblyaccver": "GCF_009914755.1",
+          "chraccver": "NC_060941.1",
+          "chrstart": 44029083,
+          "chrstop": 43902856
+        },
+        {
+          "annotationrelease": "RS_2023_10",
+          "assemblyaccver": "GCF_000001405.40",
+          "chraccver": "NC_000017.11",
+          "chrstart": 43170326,
+          "chrstop": 43044294
+        },
+        {
+          "annotationrelease": "RS_2023_10",
+          "assemblyaccver": "GCF_009914755.1",
+          "chraccver": "NC_060941.1",
+          "chrstart": 44029083,
+          "chrstop": 43902856
+        },
+        {
+          "annotationrelease": "RS_2023_03",
+          "assemblyaccver": "GCF_000001405.40",
+          "chraccver": "NC_000017.11",
+          "chrstart": 43170326,
+          "chrstop": 43044294
+        },
+        {
+          "annotationrelease": "RS_2023_03",
+          "assemblyaccver": "GCF_009914755.1",
+          "chraccver": "NC_060941.1",
+          "chrstart": 44029083,
+          "chrstop": 43902856
+        },
+        {
+          "annotationrelease": "110",
+          "assemblyaccver": "GCF_000001405.40",
+          "chraccver": "NC_000017.11",
+          "chrstart": 43125363,
+          "chrstop": 43044294
+        },
+        {
+          "annotationrelease": "110",
+          "assemblyaccver": "GCF_009914755.1",
+          "chraccver": "NC_060941.1",
+          "chrstart": 43983995,
+          "chrstop": 43902856
+        },
+        {
+          "annotationrelease": "109.20211119",
+          "assemblyaccver": "GCF_000001405.39",
+          "chraccver": "NC_000017.11",
+          "chrstart": 43125363,
+          "chrstop": 43044294
+        },
+        {
+          "annotationrelease": "109.20210514",
+          "assemblyaccver": "GCF_000001405.39",
+          "chraccver": "NC_000017.11",
+          "chrstart": 43125363,
+          "chrstop": 43044294
+        },
+        {
+          "annotationrelease": "109.20210226",
+          "assemblyaccver": "GCF_000001405.39",
+          "chraccver": "NC_000017.11",
+          "chrstart": 43125363,
+          "chrstop": 43044294
+        },
+        {
+          "annotationrelease": "RS_2024_09",
+          "assemblyaccver": "GCF_000001405.25",
+          "chraccver": "NC_000017.10",
+          "chrstart": 41322343,
+          "chrstop": 41196311
+        },
+        {
+          "annotationrelease": "105.20220307",
+          "assemblyaccver": "GCF_000001405.25",
+          "chraccver": "NC_000017.10",
+          "chrstart": 41277380,
+          "chrstop": 41196311
+        },
+        {
+          "annotationrelease": "105",
+          "assemblyaccver": "GCF_000001405.25",
+          "chraccver": "NC_000017.1

@@ -62,17 +62,42 @@ def download_ncbi_fasta(ncbi_id, db, outdir, merge_output=False):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Download FASTA files from the NCBI database.")
+    parser.add_argument("--test", action="store_true", help="Run tests for query_ncbi_seq, download_ncbi_seq; output under example/database/ncbi")
     parser.add_argument("-i", "--id", dest="ncbi_id", help="Single NCBI ID to download")
     parser.add_argument("-f", "--file", help="Input file containing a list of NCBI IDs (one per line)")
-    parser.add_argument("-o", "--out_dir", required=True, help="Directory to save FASTA files")
+    parser.add_argument("-o", "--out_dir", help="Directory to save FASTA files")
     parser.add_argument("-d", "--db", default="protein", help="NCBI database to use (e.g., 'protein', 'nuccore')")
     parser.add_argument("-n", "--num_workers", type=int, default=10, help="Number of parallel workers for downloading")
     parser.add_argument("-m", "--merge", action="store_true", help="Merge all sequences into a single FASTA file named merged.fasta")
     parser.add_argument("-e", "--error_file", help="File to save failed download IDs and messages. If not provided, errors are printed to the console.")
     args = parser.parse_args()
 
+    if args.test:
+        out_base = os.path.join("example", "database", "ncbi", "sequence")
+        os.makedirs(out_base, exist_ok=True)
+        seq_dir = os.path.join(out_base, "sequence")
+        test_id = "NP_000483.1"
+        print("Testing query_ncbi_seq(...)")
+        text = query_ncbi_seq(test_id, db=args.db)
+        sample_path = os.path.join(out_base, "query_seq_sample.fasta")
+        with open(sample_path, "w", encoding="utf-8") as f:
+            f.write(text[:3000] if len(text) > 3000 else text)
+        print(f"  saved to {sample_path}")
+        print("Testing download_ncbi_seq(...)")
+        msg = download_ncbi_seq(test_id, seq_dir, db=args.db)
+        print(f"  {msg}")
+        print(f"Done. Output under {out_base}")
+        exit(0)
+
+    if not args.out_dir:
+        parser.error("Error: -o/--out_dir required (or use --test)")
     if not args.ncbi_id and not args.file:
         parser.error("Error: Must provide either a single NCBI ID with --id or a file with --file")
+
+    ids = [args.ncbi_id] if args.ncbi_id else [line.strip() for line in open(args.file) if line.strip()]
+    if not ids:
+        print("Error: no IDs to download (file empty or invalid)")
+        exit(1)
 
     os.makedirs(args.out_dir, exist_ok=True)
     error_entries = []
@@ -95,9 +120,6 @@ if __name__ == "__main__":
             all_sequences.append(sequence)
 
     elif args.file:
-        with open(args.file) as f:
-            ids = [line.strip() for line in f if line.strip()]
-
         with ThreadPoolExecutor(max_workers=args.num_workers) as executor:
             future_to_id = {executor.submit(download_ncbi_fasta, ncbi_id, args.db, args.out_dir, args.merge): ncbi_id for ncbi_id in ids}
 
@@ -129,3 +151,7 @@ if __name__ == "__main__":
             print("\n--- Failed Downloads ---")
             for entry, message in zip(error_entries, error_messages):
                 print(f"{entry} - {message}")
+
+    n_total = len(ids)
+    n_ok = n_total - len(error_entries)
+    print(f"Done. Output: {args.out_dir} | Total: {n_total}, OK: {n_ok}, Failed: {len(error_entries)}")
