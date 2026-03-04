@@ -1,23 +1,21 @@
 #!/usr/bin/env bash
-# Run tests for all AlphaFold tools (all non-helper functions in alphafold_structure + alphafold_metadata).
+# Run AlphaFold operations tests (query_* and download_* from alphafold_operations).
 # Output: example/database/alphafold/ (structure, metadata, query samples, logs).
-# Run from project root: ./script/tools/search/database/test_alphafold.sh
+# Run from project root: bash script/tools/search/database/test_alphafold.sh
 
 set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-ROOT="$(cd "$SCRIPT_DIR/../../../../" && pwd)"
+ROOT="$(cd "$SCRIPT_DIR/../../../../" 2>/dev/null && pwd)"
+if [ -z "$ROOT" ] || [ "$ROOT" = "/" ] || [ ! -d "${ROOT}/src" ]; then
+  ROOT="$(pwd)"
+fi
 cd "$ROOT"
 
-# All logs and intermediate output under example/
-OUT_DIR="${ROOT}/example/database/alphafold"
+OUT_DIR="example/database/alphafold"
 mkdir -p "$OUT_DIR"
 
-echo "=== alphafold_structure (query_alphafold_structure, download_alphafold_structure) ==="
-python src/tools/search/database/alphafold/alphafold_structure.py --test 2>&1 | tee "${OUT_DIR}/test_structure.log"
+echo "=== alphafold_operations (query_* and download_*) ==="
+python src/tools/search/database/alphafold/alphafold_operations.py --test 2>&1 | tee "${OUT_DIR}/test_alphafold_operations.log"
 
 echo ""
-echo "=== alphafold_metadata (query_alphafold_metadata, download_alphafold_metadata) ==="
-python src/tools/search/database/alphafold/alphafold_metadata.py --test 2>&1 | tee "${OUT_DIR}/test_metadata.log"
-
-echo ""
-echo "All AlphaFold tool tests finished. Output under example/database/alphafold"
+echo "AlphaFold operations tests finished. Output under example/database/alphafold"
