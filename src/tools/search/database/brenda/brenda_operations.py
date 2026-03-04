@@ -255,16 +255,16 @@ if __name__ == "__main__":
     print("  query_pathway_for_product(...)")
     print(query_pathway_for_product("lactate")[:200])
     print("=== download_* (save to file) ===")
-    print("  ", download_km_values(ec, os.path.join(out_base, "km_sample.json")))
-    print("  ", download_reactions(ec, os.path.join(out_base, "reactions_sample.txt")))
-    print("  ", download_compare_organisms(ec, organisms, os.path.join(out_base, "compare_organisms_sample.json")))
-    print("  ", download_environmental_parameters(ec, os.path.join(out_base, "environmental_sample.json")))
-    print("  ", download_enzymes_by_substrate(substrate, os.path.join(out_base, "enzymes_by_substrate_sample.json")))
+    print("  ", download_km_values(ec, os.path.join(out_base, "brenda_km_sample.json")))
+    print("  ", download_reactions(ec, os.path.join(out_base, "brenda_reactions_sample.txt")))
+    print("  ", download_compare_organisms(ec, organisms, os.path.join(out_base, "brenda_compare_organisms_sample.json")))
+    print("  ", download_environmental_parameters(ec, os.path.join(out_base, "brenda_environmental_sample.json")))
+    print("  ", download_enzymes_by_substrate(substrate, os.path.join(out_base, "brenda_enzymes_by_substrate_sample.json")))
     pathway_json = query_pathway_for_product("lactate")
     try:
         pathway = json.loads(pathway_json)
         if "steps" in pathway or "target" in pathway:
-            print("  ", download_pathway_report(pathway, os.path.join(out_base, "pathway_report_sample.txt")))
+            print("  ", download_pathway_report(pathway, os.path.join(out_base, "brenda_pathway_report_sample.txt")))
     except Exception as e:
         print("  ", f"pathway report: {e}")
     print(f"Done. Output under {out_base}")
