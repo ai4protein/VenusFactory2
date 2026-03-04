@@ -1,34 +1,22 @@
-# BRENDA: single public API via brenda_operations (query_* return text, download_* save to file).
+# BRENDA: single public API via brenda_operations (query_brenda_* / download_brenda_* return JSON).
 # Skill and references: src/agent/skills/brenda_database/
 
 from .brenda_operations import (
-    query_km_values,
-    query_reactions,
-    query_enzymes_by_substrate,
-    query_compare_organisms,
-    query_environmental_parameters,
-    query_pathway_for_product,
-    download_km_values,
-    download_reactions,
-    download_enzymes_by_substrate,
-    download_compare_organisms,
-    download_environmental_parameters,
-    download_kinetic_data,
-    download_pathway_report,
+    download_brenda_km_values_by_ec_number,
+    download_brenda_reactions_by_ec_number,
+    download_brenda_enzymes_by_substrate,
+    download_brenda_compare_organisms_by_ec_number,
+    download_brenda_environmental_parameters_by_ec_number,
+    download_brenda_kinetic_data_by_ec_number,
+    download_brenda_pathway_report,
 )
 
 __all__ = [
-    "query_km_values",
-    "query_reactions",
-    "query_enzymes_by_substrate",
-    "query_compare_organisms",
-    "query_environmental_parameters",
-    "query_pathway_for_product",
-    "download_km_values",
-    "download_reactions",
-    "download_enzymes_by_substrate",
-    "download_compare_organisms",
-    "download_environmental_parameters",
-    "download_kinetic_data",
-    "download_pathway_report",
+    "download_brenda_km_values_by_ec_number",
+    "download_brenda_reactions_by_ec_number",
+    "download_brenda_enzymes_by_substrate",
+    "download_brenda_compare_organisms_by_ec_number",
+    "download_brenda_environmental_parameters_by_ec_number",
+    "download_brenda_kinetic_data_by_ec_number",
+    "download_brenda_pathway_report",
 ]
