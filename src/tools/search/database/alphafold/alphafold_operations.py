@@ -1,16 +1,16 @@
 """
-AlphaFold operations: single exit for query (return JSON with content) and download (save to file, return JSON).
+AlphaFold operations: single exit for query and download; both return rich JSON.
 
-All public functions return JSON string with:
-- query_*: {"success": bool, "content": str}  (content is PDB/mmCIF or metadata JSON text)
-- download_*: {"success": bool, "file_path": str or null}
+Success: status, file_info (download) or content (query), content_preview, biological_metadata, execution_context.
+Error: status "error", error { type, message, suggestion }, file_info null.
 """
 
 import json
 import os
 import sys
+import time
 from pathlib import Path
-from typing import Literal, Optional, Tuple
+from typing import Any, Dict, Literal, Optional, Tuple
 
 try:
     from .alphafold_structure import (
@@ -38,19 +38,64 @@ except ImportError:
     )
 
 
-def _query_result(success: bool, content: Optional[str] = None, error: Optional[str] = None) -> str:
-    """Build JSON for query_* result: success, content (direct content for query)."""
-    out = {"success": success, "content": content}
-    if error is not None:
-        out["error"] = error
+_PREVIEW_LEN = 500
+_SOURCE_ALPHAFOLD = "AlphaFold DB"
+
+
+def _error_response(error_type: str, message: str, suggestion: Optional[str] = None) -> str:
+    """Build JSON for error: status error, error { type, message, suggestion }, file_info null."""
+    out: Dict[str, Any] = {
+        "status": "error",
+        "error": {"type": error_type, "message": message},
+        "file_info": None,
+    }
+    if suggestion:
+        out["error"]["suggestion"] = suggestion
     return json.dumps(out, ensure_ascii=False)
 
 
-def _download_result(success: bool, file_path: Optional[str] = None, error: Optional[str] = None) -> str:
-    """Build JSON for download_* result: success, file_path."""
-    out = {"success": success, "file_path": file_path}
-    if error is not None:
-        out["error"] = error
+def _download_success_response(
+    file_path: str,
+    content_preview: Optional[str] = None,
+    biological_metadata: Optional[Dict[str, Any]] = None,
+    download_time_ms: int = 0,
+    source: str = _SOURCE_ALPHAFOLD,
+) -> str:
+    """Build JSON for download success: status, file_info, content_preview, biological_metadata, execution_context."""
+    path = Path(file_path)
+    file_size = path.stat().st_size if path.exists() else 0
+    fmt = path.suffix.lstrip(".").lower() or "pdb"
+    out: Dict[str, Any] = {
+        "status": "success",
+        "file_info": {
+            "file_path": str(path.resolve()) if path.exists() else file_path,
+            "file_name": path.name,
+            "file_size": file_size,
+            "format": fmt,
+        },
+        "content_preview": (content_preview or "")[: _PREVIEW_LEN],
+        "biological_metadata": biological_metadata or {},
+        "execution_context": {"download_time_ms": download_time_ms, "source": source},
+    }
+    return json.dumps(out, ensure_ascii=False)
+
+
+def _query_success_response(
+    content: str,
+    content_preview: Optional[str] = None,
+    biological_metadata: Optional[Dict[str, Any]] = None,
+    query_time_ms: int = 0,
+    source: str = _SOURCE_ALPHAFOLD,
+) -> str:
+    """Build JSON for query success: status, content, content_preview, biological_metadata, execution_context."""
+    preview = (content_preview or content or "")[: _PREVIEW_LEN]
+    out: Dict[str, Any] = {
+        "status": "success",
+        "content": content,
+        "content_preview": preview,
+        "biological_metadata": biological_metadata or {},
+        "execution_context": {"query_time_ms": query_time_ms, "source": source},
+    }
     return json.dumps(out, ensure_ascii=False)
 
 
@@ -63,25 +108,39 @@ def query_alphafold_structure_by_uniprot_id(
     version: str = "v6",
     fragment: int = 1,
 ) -> str:
-    """Query AlphaFold structure by UniProt ID. Returns JSON: {success, content} (content is PDB/mmCIF text)."""
+    """Query AlphaFold structure by UniProt ID. Returns rich JSON: status, content, content_preview, biological_metadata, execution_context."""
+    t0 = time.perf_counter()
     raw = _query_structure(
         uniprot_id, format=format, version=version, fragment=fragment
     )
+    elapsed_ms = int((time.perf_counter() - t0) * 1000)
     if raw.strip().startswith(f"{uniprot_id} failed,") or raw.strip().startswith("failed"):
-        return _query_result(False, content=None, error=raw)
-    return _query_result(True, content=raw)
+        return _error_response(
+            "NotFound",
+            raw.strip(),
+            suggestion="Check UniProt ID or try a different AlphaFold version (v1, v2, v4, v6).",
+        )
+    meta = {"uniprot_id": uniprot_id, "format": format, "version": version, "fragment": fragment}
+    return _query_success_response(raw, content_preview=raw, biological_metadata=meta, query_time_ms=elapsed_ms)
 
 
 def query_alphafold_metadata_by_uniprot_id(uniprot_id: str) -> str:
-    """Query AlphaFold prediction metadata by UniProt ID. Returns JSON: {success, content} (content is metadata JSON text)."""
+    """Query AlphaFold prediction metadata by UniProt ID. Returns rich JSON: status, content, content_preview, biological_metadata, execution_context."""
+    t0 = time.perf_counter()
     raw = _query_metadata(uniprot_id)
+    elapsed_ms = int((time.perf_counter() - t0) * 1000)
     try:
         data = json.loads(raw)
         if isinstance(data, dict) and data.get("success") is False:
-            return _query_result(False, content=raw, error=data.get("error", "unknown"))
+            return _error_response(
+                "NotFound",
+                data.get("error", "unknown"),
+                suggestion="Check UniProt ID or try another accession.",
+            )
     except json.JSONDecodeError:
         pass
-    return _query_result(True, content=raw)
+    meta = {"uniprot_id": uniprot_id, "format": "json"}
+    return _query_success_response(raw, content_preview=raw, biological_metadata=meta, query_time_ms=elapsed_ms)
 
 
 # ---------- download_*: save to file, return JSON with success + file_path ----------
@@ -94,34 +153,62 @@ def download_alphafold_structure_by_uniprot_id(
     version: str = "v6",
     fragment: int = 1,
 ) -> str:
-    """Download AlphaFold structure to a file or directory. Returns JSON: {success, file_path}."""
+    """Download AlphaFold structure to a file or directory. Returns rich JSON: status, file_info, content_preview, biological_metadata, execution_context."""
     out_dir = str(out_dir).strip()
     if not out_dir:
-        return _download_result(False, file_path=None, error="invalid out_path")
+        return _error_response("ValidationError", "invalid out_path", suggestion="Provide a non-empty output directory.")
     if os.path.isdir(out_dir) or out_dir.endswith(os.sep):
         out_dir = out_dir.rstrip(os.sep)
         Path(out_dir).mkdir(parents=True, exist_ok=True)
+    t0 = time.perf_counter()
     success, path = _download_structure_impl(
         uniprot_id, out_dir, format=format, version=version, fragment=fragment
     )
+    elapsed_ms = int((time.perf_counter() - t0) * 1000)
     if not success or not path:
-        return _download_result(False, file_path=None, error=str(uniprot_id))
-    return _download_result(True, file_path=os.path.join(out_dir, f"{uniprot_id}.{format}"))
+        return _error_response(
+            "NotFound",
+            f"Failed to download structure for {uniprot_id}.",
+            suggestion="Check UniProt ID or try a different AlphaFold version (v1, v2, v4, v6).",
+        )
+    full_path = os.path.join(out_dir, f"{uniprot_id}.{format}")
+    content_preview = ""
+    try:
+        with open(full_path, "r", encoding="utf-8", errors="replace") as f:
+            content_preview = f.read(_PREVIEW_LEN)
+    except Exception:
+        pass
+    meta = {"uniprot_id": uniprot_id, "format": format, "version": version, "fragment": fragment}
+    return _download_success_response(
+        full_path, content_preview=content_preview, biological_metadata=meta, download_time_ms=elapsed_ms
+    )
 
 
 def download_alphafold_metadata_by_uniprot_id(uniprot_id: str, out_dir: str) -> str:
-    """Download AlphaFold metadata to a file or directory. Returns JSON: {success, file_path}."""
+    """Download AlphaFold metadata to a file or directory. Returns rich JSON: status, file_info, content_preview, biological_metadata, execution_context."""
     out_dir = str(out_dir).strip()
     if not out_dir:
-        return _download_result(False, file_path=None, error="invalid out_dir")
-    if os.path.isdir(out_dir) or out_dir.endswith(os.sep):
-        out_dir = out_dir.rstrip(os.sep)
-        Path(out_dir).mkdir(parents=True, exist_ok=True)
-        msg = _download_metadata(uniprot_id, out_dir)
-        if "failed" in msg.lower():
-            return _download_result(False, file_path=None, error=msg)
-        return _download_result(True, file_path=os.path.join(out_dir, f"{uniprot_id}.json"))
-    return _download_result(False, file_path=None, error="invalid out_dir")
+        return _error_response("ValidationError", "invalid out_dir", suggestion="Provide a non-empty output directory.")
+    out_dir = out_dir.rstrip(os.sep)
+    Path(out_dir).mkdir(parents=True, exist_ok=True)
+    t0 = time.perf_counter()
+    msg = _download_metadata(uniprot_id, out_dir)
+    elapsed_ms = int((time.perf_counter() - t0) * 1000)
+    if "failed" in msg.lower():
+        return _error_response(
+            "NotFound", msg, suggestion="Check UniProt ID or try another accession."
+        )
+    full_path = os.path.join(out_dir, f"{uniprot_id}.json")
+    content_preview = ""
+    try:
+        with open(full_path, "r", encoding="utf-8", errors="replace") as f:
+            content_preview = f.read(_PREVIEW_LEN)
+    except Exception:
+        pass
+    meta = {"uniprot_id": uniprot_id, "format": "json"}
+    return _download_success_response(
+        full_path, content_preview=content_preview, biological_metadata=meta, download_time_ms=elapsed_ms
+    )
 
 
 def _download_alphafold_structure_impl(

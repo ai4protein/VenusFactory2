@@ -1,14 +1,14 @@
 """
-BRENDA operations: single exit for query (return JSON with content) and download (save to file, return JSON).
+BRENDA operations: single exit for query and download; both return rich JSON.
 
-All public functions return JSON string with:
-- query_*: {"success": bool, "content": str}  (content is result data as JSON text)
-- download_*: {"success": bool, "file_path": str or null}
+Success: status, file_info (download) or content (query), content_preview, biological_metadata, execution_context.
+Error: status "error", error { type, message, suggestion }, file_info null.
 """
 
 import json
 import os
 import sys
+import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -47,23 +47,68 @@ except ImportError:
     )
 
 
-def _query_result(success: bool, content: Optional[str] = None, error: Optional[str] = None) -> str:
-    """Build JSON for query_* result: success, content (result data as JSON text)."""
-    out: Dict[str, Any] = {"success": success, "content": content}
-    if error is not None:
-        out["error"] = error
+_PREVIEW_LEN = 500
+_SOURCE_BRENDA = "BRENDA"
+
+
+def _error_response(error_type: str, message: str, suggestion: Optional[str] = None) -> str:
+    """Build JSON for error: status error, error { type, message, suggestion }, file_info null."""
+    out: Dict[str, Any] = {
+        "status": "error",
+        "error": {"type": error_type, "message": message},
+        "file_info": None,
+    }
+    if suggestion:
+        out["error"]["suggestion"] = suggestion
     return json.dumps(out, ensure_ascii=False)
 
 
-def _download_result(success: bool, file_path: Optional[str] = None, error: Optional[str] = None) -> str:
-    """Build JSON for download_* result: success, file_path."""
-    out: Dict[str, Any] = {"success": success, "file_path": file_path}
-    if error is not None:
-        out["error"] = error
+def _download_success_response(
+    file_path: str,
+    content_preview: Optional[str] = None,
+    biological_metadata: Optional[Dict[str, Any]] = None,
+    download_time_ms: int = 0,
+    source: str = _SOURCE_BRENDA,
+) -> str:
+    """Build JSON for download success: status, file_info, content_preview, biological_metadata, execution_context."""
+    path = Path(file_path)
+    file_size = path.stat().st_size if path.exists() else 0
+    fmt = path.suffix.lstrip(".").lower() or "json"
+    out: Dict[str, Any] = {
+        "status": "success",
+        "file_info": {
+            "file_path": str(path.resolve()) if path.exists() else file_path,
+            "file_name": path.name,
+            "file_size": file_size,
+            "format": fmt,
+        },
+        "content_preview": (content_preview or "")[: _PREVIEW_LEN],
+        "biological_metadata": biological_metadata or {},
+        "execution_context": {"download_time_ms": download_time_ms, "source": source},
+    }
     return json.dumps(out, ensure_ascii=False)
 
 
-# ---------- query_*: return JSON with success + content ----------
+def _query_success_response(
+    content: str,
+    content_preview: Optional[str] = None,
+    biological_metadata: Optional[Dict[str, Any]] = None,
+    query_time_ms: int = 0,
+    source: str = _SOURCE_BRENDA,
+) -> str:
+    """Build JSON for query success: status, content, content_preview, biological_metadata, execution_context."""
+    preview = (content_preview or content or "")[: _PREVIEW_LEN]
+    out: Dict[str, Any] = {
+        "status": "success",
+        "content": content,
+        "content_preview": preview,
+        "biological_metadata": biological_metadata or {},
+        "execution_context": {"query_time_ms": query_time_ms, "source": source},
+    }
+    return json.dumps(out, ensure_ascii=False)
+
+
+# ---------- query_*: return rich JSON (status, content, content_preview, biological_metadata, execution_context) ----------
 
 
 def query_brenda_km_values_by_ec_number(
@@ -71,56 +116,73 @@ def query_brenda_km_values_by_ec_number(
     organism: str = "*",
     substrate: str = "*",
 ) -> str:
-    """Query Km values by EC number. Returns JSON: {success, content} (content is result data)."""
+    """Query Km values by EC number. Returns rich JSON: status, content, content_preview, biological_metadata, execution_context."""
+    t0 = time.perf_counter()
     try:
         entries = get_km_values(ec_number, organism=organism, substrate=substrate)
         payload = {"ec_number": ec_number, "count": len(entries), "entries": entries or []}
-        return _query_result(True, content=json.dumps(payload, ensure_ascii=False))
+        content = json.dumps(payload, ensure_ascii=False)
+        elapsed_ms = int((time.perf_counter() - t0) * 1000)
+        meta = {"ec_number": ec_number, "organism": organism, "substrate": substrate, "entry_count": len(entries)}
+        return _query_success_response(content, content_preview=content, biological_metadata=meta, query_time_ms=elapsed_ms)
     except Exception as e:
-        return _query_result(False, content=None, error=str(e))
+        return _error_response("QueryError", str(e), suggestion="Check EC number and BRENDA_EMAIL/BRENDA_PASSWORD.")
 
 
 def query_brenda_reactions_by_ec_number(
     ec_number: str,
     organism: str = "*",
 ) -> str:
-    """Query reaction equations by EC number. Returns JSON: {success, content} (content is result data)."""
+    """Query reaction equations by EC number. Returns rich JSON: status, content, content_preview, biological_metadata, execution_context."""
+    t0 = time.perf_counter()
     try:
         entries = get_reactions(ec_number, organism=organism)
         payload = {"ec_number": ec_number, "count": len(entries), "entries": entries or []}
-        return _query_result(True, content=json.dumps(payload, ensure_ascii=False))
+        content = json.dumps(payload, ensure_ascii=False)
+        elapsed_ms = int((time.perf_counter() - t0) * 1000)
+        meta = {"ec_number": ec_number, "organism": organism, "entry_count": len(entries)}
+        return _query_success_response(content, content_preview=content, biological_metadata=meta, query_time_ms=elapsed_ms)
     except Exception as e:
-        return _query_result(False, content=None, error=str(e))
+        return _error_response("QueryError", str(e), suggestion="Check EC number and BRENDA credentials.")
 
 
 def query_brenda_enzymes_by_substrate(substrate: str, limit: int = 50) -> str:
-    """Query enzymes that act on a substrate. Returns JSON: {success, content} (content is result data)."""
+    """Query enzymes that act on a substrate. Returns rich JSON: status, content, content_preview, biological_metadata, execution_context."""
+    t0 = time.perf_counter()
     try:
         data = search_enzymes_by_substrate(substrate, limit=limit)
         content = json.dumps({"substrate": substrate, "count": len(data), "enzymes": data}, default=str, ensure_ascii=False)
-        return _query_result(True, content=content)
+        elapsed_ms = int((time.perf_counter() - t0) * 1000)
+        meta = {"substrate": substrate, "limit": limit, "enzyme_count": len(data)}
+        return _query_success_response(content, content_preview=content, biological_metadata=meta, query_time_ms=elapsed_ms)
     except Exception as e:
-        return _query_result(False, content=None, error=str(e))
+        return _error_response("QueryError", str(e), suggestion="Check substrate name and BRENDA credentials.")
 
 
 def query_brenda_compare_organisms_by_ec_number(ec_number: str, organisms: List[str]) -> str:
-    """Compare enzyme parameters across organisms by EC number. Returns JSON: {success, content} (content is result data)."""
+    """Compare enzyme parameters across organisms by EC number. Returns rich JSON: status, content, content_preview, biological_metadata, execution_context."""
+    t0 = time.perf_counter()
     try:
         data = compare_across_organisms(ec_number, organisms)
         content = json.dumps({"ec_number": ec_number, "organisms": organisms, "comparison": data}, default=str, ensure_ascii=False)
-        return _query_result(True, content=content)
+        elapsed_ms = int((time.perf_counter() - t0) * 1000)
+        meta = {"ec_number": ec_number, "organisms": organisms, "organism_count": len(organisms)}
+        return _query_success_response(content, content_preview=content, biological_metadata=meta, query_time_ms=elapsed_ms)
     except Exception as e:
-        return _query_result(False, content=None, error=str(e))
+        return _error_response("QueryError", str(e), suggestion="Check EC number and organism names.")
 
 
 def query_brenda_environmental_parameters_by_ec_number(ec_number: str) -> str:
-    """Query environmental parameters (pH, temperature) by EC number. Returns JSON: {success, content}."""
+    """Query environmental parameters (pH, temperature) by EC number. Returns rich JSON: status, content, content_preview, biological_metadata, execution_context."""
+    t0 = time.perf_counter()
     try:
         data = get_environmental_parameters(ec_number)
         content = json.dumps(data, default=str, ensure_ascii=False)
-        return _query_result(True, content=content)
+        elapsed_ms = int((time.perf_counter() - t0) * 1000)
+        meta = {"ec_number": ec_number}
+        return _query_success_response(content, content_preview=content, biological_metadata=meta, query_time_ms=elapsed_ms)
     except Exception as e:
-        return _query_result(False, content=None, error=str(e))
+        return _error_response("QueryError", str(e), suggestion="Check EC number and BRENDA credentials.")
 
 
 def query_brenda_pathway_by_product(
@@ -128,16 +190,28 @@ def query_brenda_pathway_by_product(
     max_steps: int = 3,
     starting_materials: Optional[List[str]] = None,
 ) -> str:
-    """Query pathway by product. Returns JSON: {success, content} (content is result data)."""
+    """Query pathway by product. Returns rich JSON: status, content, content_preview, biological_metadata, execution_context."""
+    t0 = time.perf_counter()
     try:
         data = find_pathway_for_product(product, max_steps=max_steps, starting_materials=starting_materials)
         content = json.dumps(data, default=str, ensure_ascii=False)
-        return _query_result(True, content=content)
+        elapsed_ms = int((time.perf_counter() - t0) * 1000)
+        meta = {"product": product, "max_steps": max_steps, "steps_count": len(data.get("steps", [])) if isinstance(data, dict) else 0}
+        return _query_success_response(content, content_preview=content, biological_metadata=meta, query_time_ms=elapsed_ms)
     except Exception as e:
-        return _query_result(False, content=None, error=str(e))
+        return _error_response("QueryError", str(e), suggestion="Check product name or try different max_steps.")
 
 
 # ---------- download_*: save to file, return JSON with success + file_path ----------
+
+
+def _read_preview(path: str, max_chars: int = _PREVIEW_LEN) -> str:
+    """Read first max_chars from file for content_preview."""
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            return f.read(max_chars)
+    except Exception:
+        return ""
 
 
 def download_brenda_km_values_by_ec_number(
@@ -146,7 +220,8 @@ def download_brenda_km_values_by_ec_number(
     organism: str = "*",
     substrate: str = "*",
 ) -> str:
-    """Download Km values by EC number to a text/JSON file. Returns JSON: {success, file_path}."""
+    """Download Km values by EC number to a text/JSON file. Returns rich JSON: status, file_info, content_preview, biological_metadata, execution_context."""
+    t0 = time.perf_counter()
     try:
         entries = get_km_values(ec_number, organism=organism, substrate=substrate)
         Path(out_path).parent.mkdir(parents=True, exist_ok=True)
@@ -156,13 +231,16 @@ def download_brenda_km_values_by_ec_number(
         else:
             with open(out_path, "w", encoding="utf-8") as f:
                 f.write("\n".join(entries) if entries else "")
-        return _download_result(True, file_path=out_path)
+        elapsed_ms = int((time.perf_counter() - t0) * 1000)
+        meta = {"ec_number": ec_number, "organism": organism, "substrate": substrate, "entry_count": len(entries)}
+        return _download_success_response(out_path, content_preview=_read_preview(out_path), biological_metadata=meta, download_time_ms=elapsed_ms)
     except Exception as e:
-        return _download_result(False, file_path=None, error=str(e))
+        return _error_response("DownloadError", str(e), suggestion="Check EC number and BRENDA_EMAIL/BRENDA_PASSWORD.")
 
 
 def download_brenda_reactions_by_ec_number(ec_number: str, out_path: str, organism: str = "*") -> str:
-    """Download reaction entries by EC number to file. Returns JSON: {success, file_path}."""
+    """Download reaction entries by EC number to file. Returns rich JSON: status, file_info, content_preview, biological_metadata, execution_context."""
+    t0 = time.perf_counter()
     try:
         entries = get_reactions(ec_number, organism=organism)
         Path(out_path).parent.mkdir(parents=True, exist_ok=True)
@@ -172,64 +250,81 @@ def download_brenda_reactions_by_ec_number(ec_number: str, out_path: str, organi
         else:
             with open(out_path, "w", encoding="utf-8") as f:
                 f.write("\n".join(entries) if entries else "")
-        return _download_result(True, file_path=out_path)
+        elapsed_ms = int((time.perf_counter() - t0) * 1000)
+        meta = {"ec_number": ec_number, "organism": organism, "entry_count": len(entries)}
+        return _download_success_response(out_path, content_preview=_read_preview(out_path), biological_metadata=meta, download_time_ms=elapsed_ms)
     except Exception as e:
-        return _download_result(False, file_path=None, error=str(e))
+        return _error_response("DownloadError", str(e), suggestion="Check EC number and BRENDA credentials.")
 
 
 def download_brenda_enzymes_by_substrate(substrate: str, out_path: str, limit: int = 50) -> str:
-    """Download enzyme-by-substrate search results to JSON. Returns JSON: {success, file_path}."""
+    """Download enzyme-by-substrate search results to JSON. Returns rich JSON: status, file_info, content_preview, biological_metadata, execution_context."""
+    t0 = time.perf_counter()
     try:
         data = search_enzymes_by_substrate(substrate, limit=limit)
         Path(out_path).parent.mkdir(parents=True, exist_ok=True)
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump({"substrate": substrate, "count": len(data), "enzymes": data}, f, indent=2, default=str)
-        return _download_result(True, file_path=out_path)
+        elapsed_ms = int((time.perf_counter() - t0) * 1000)
+        meta = {"substrate": substrate, "limit": limit, "enzyme_count": len(data)}
+        return _download_success_response(out_path, content_preview=_read_preview(out_path), biological_metadata=meta, download_time_ms=elapsed_ms)
     except Exception as e:
-        return _download_result(False, file_path=None, error=str(e))
+        return _error_response("DownloadError", str(e), suggestion="Check substrate name and BRENDA credentials.")
 
 
 def download_brenda_compare_organisms_by_ec_number(ec_number: str, organisms: List[str], out_path: str) -> str:
-    """Download organism comparison by EC number to JSON. Returns JSON: {success, file_path}."""
+    """Download organism comparison by EC number to JSON. Returns rich JSON: status, file_info, content_preview, biological_metadata, execution_context."""
+    t0 = time.perf_counter()
     try:
         data = compare_across_organisms(ec_number, organisms)
         Path(out_path).parent.mkdir(parents=True, exist_ok=True)
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump({"ec_number": ec_number, "organisms": organisms, "comparison": data}, f, indent=2, default=str)
-        return _download_result(True, file_path=out_path)
+        elapsed_ms = int((time.perf_counter() - t0) * 1000)
+        meta = {"ec_number": ec_number, "organisms": organisms, "organism_count": len(organisms)}
+        return _download_success_response(out_path, content_preview=_read_preview(out_path), biological_metadata=meta, download_time_ms=elapsed_ms)
     except Exception as e:
-        return _download_result(False, file_path=None, error=str(e))
+        return _error_response("DownloadError", str(e), suggestion="Check EC number and organism names.")
 
 
 def download_brenda_environmental_parameters_by_ec_number(ec_number: str, out_path: str) -> str:
-    """Download environmental parameters by EC number to JSON. Returns JSON: {success, file_path}."""
+    """Download environmental parameters by EC number to JSON. Returns rich JSON: status, file_info, content_preview, biological_metadata, execution_context."""
+    t0 = time.perf_counter()
     try:
         data = get_environmental_parameters(ec_number)
         Path(out_path).parent.mkdir(parents=True, exist_ok=True)
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, default=str)
-        return _download_result(True, file_path=out_path)
+        elapsed_ms = int((time.perf_counter() - t0) * 1000)
+        meta = {"ec_number": ec_number}
+        return _download_success_response(out_path, content_preview=_read_preview(out_path), biological_metadata=meta, download_time_ms=elapsed_ms)
     except Exception as e:
-        return _download_result(False, file_path=None, error=str(e))
+        return _error_response("DownloadError", str(e), suggestion="Check EC number and BRENDA credentials.")
 
 
 def download_brenda_kinetic_data_by_ec_number(ec_number: str, out_path: str, format: str = "json") -> str:
-    """Download kinetic data by EC number to file (csv/json). Returns JSON: {success, file_path}."""
+    """Download kinetic data by EC number to file (csv/json). Returns rich JSON: status, file_info, content_preview, biological_metadata, execution_context."""
+    t0 = time.perf_counter()
     try:
         export_kinetic_data(ec_number, format=format, filename=out_path)
-        return _download_result(True, file_path=out_path)
+        elapsed_ms = int((time.perf_counter() - t0) * 1000)
+        meta = {"ec_number": ec_number, "format": format}
+        return _download_success_response(out_path, content_preview=_read_preview(out_path), biological_metadata=meta, download_time_ms=elapsed_ms)
     except Exception as e:
-        return _download_result(False, file_path=None, error=str(e))
+        return _error_response("DownloadError", str(e), suggestion="Check EC number and BRENDA credentials.")
 
 
 def download_brenda_pathway_report(pathway: Dict[str, Any], out_path: str) -> str:
-    """Generate and save pathway report to file. Returns JSON: {success, file_path}."""
+    """Generate and save pathway report to file. Returns rich JSON: status, file_info, content_preview, biological_metadata, execution_context."""
+    t0 = time.perf_counter()
     try:
         Path(out_path).parent.mkdir(parents=True, exist_ok=True)
         generate_pathway_report(pathway, filename=out_path)
-        return _download_result(True, file_path=out_path)
+        elapsed_ms = int((time.perf_counter() - t0) * 1000)
+        meta = {"target": pathway.get("target") or pathway.get("product"), "steps": len(pathway.get("steps", []))}
+        return _download_success_response(out_path, content_preview=_read_preview(out_path), biological_metadata=meta, download_time_ms=elapsed_ms)
     except Exception as e:
-        return _download_result(False, file_path=None, error=str(e))
+        return _error_response("DownloadError", str(e), suggestion="Ensure pathway dict is valid (e.g. from query_brenda_pathway_by_product).")
 
 
 __all__ = [
@@ -282,15 +377,18 @@ if __name__ == "__main__":
 
     def _print_query(name: str, res: str) -> None:
         obj = json.loads(res)
-        print(f"  {name}: {res[:200]}..." if len(res) > 200 else f"  {name}: {res}")
-        if obj.get("content") and len(obj["content"]) > 500:
-            print(f"  (first 500 chars of content): {obj['content'][:500]}...")
-        elif obj.get("content"):
-            print(f"  content: {obj['content']}")
-        if obj.get("error"):
+        print(f"  {name}: status={obj.get('status')} ...")
+        if obj.get("status") == "success":
+            if obj.get("content") and len(obj["content"]) > 500:
+                print(f"  (content_preview): {obj.get('content_preview', '')[:200]}...")
+            elif obj.get("content"):
+                print(f"  content: {obj['content'][:200]}...")
+            if obj.get("execution_context"):
+                print(f"  execution_context: {obj['execution_context']}")
+        if obj.get("status") == "error" and obj.get("error"):
             print(f"  error: {obj['error']}")
 
-    print("=== query_* (return JSON: success + content) ===")
+    print("=== query_* (return rich JSON: status, content, content_preview, biological_metadata, execution_context) ===")
     res_km = query_brenda_km_values_by_ec_number(ec)
     _print_query("query_brenda_km_values_by_ec_number(...)", res_km)
     with open(os.path.join(out_base, "query_km_sample.txt"), "w", encoding="utf-8") as f:
@@ -311,7 +409,7 @@ if __name__ == "__main__":
     res_pathway = query_brenda_pathway_by_product("lactate")
     _print_query("query_brenda_pathway_by_product(...)", res_pathway)
 
-    print("=== download_* (return JSON: success + file_path) ===")
+    print("=== download_* (return rich JSON: status, file_info, content_preview, biological_metadata, execution_context) ===")
     for name, res in [
         ("download_brenda_km_values_by_ec_number", download_brenda_km_values_by_ec_number(ec, os.path.join(out_base, "brenda_km_sample.json"))),
         ("download_brenda_reactions_by_ec_number", download_brenda_reactions_by_ec_number(ec, os.path.join(out_base, "brenda_reactions_sample.txt"))),
@@ -332,7 +430,7 @@ if __name__ == "__main__":
         print(f"  {name}: {dl_obj}")
 
     pathway_obj = json.loads(res_pathway)
-    if pathway_obj.get("success") and pathway_obj.get("content"):
+    if pathway_obj.get("status") == "success" and pathway_obj.get("content"):
         try:
             pathway_data = json.loads(pathway_obj["content"])
             if isinstance(pathway_data, dict) and ("steps" in pathway_data or "target" in pathway_data):
