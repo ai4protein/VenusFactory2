@@ -1,7 +1,7 @@
 pathway          KEGG Pathway Database
-path             Release 117.0+/03-03, Mar 26
+path             Release 117.0+/03-05, Mar 26
                  Kanehisa Laboratories
-                 584 entries
+                 585 entries
 
 linked db        module
                  ko

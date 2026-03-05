@@ -1,18 +1,1 @@
-pathway          KEGG Pathway Database
-path             Release 117.0+/03-03, Mar 26
-                 Kanehisa Laboratories
-                 584 entries
-
-linked db        module
-                 ko
-                 <org>
-                 genome
-                 compound
-                 glycan
-                 reaction
-                 rclass
-                 enzyme
-                 network
-                 disease
-                 drug
-                 pubmed
+{"status": "success", "content": "{\"database\": \"pathway\", \"info\": \"pathway          KEGG Pathway Database\\npath             Release 117.0+/03-05, Mar 26\\n                 Kanehisa Laboratories\\n                 585 entries\\n\\nlinked db        module\\n                 ko\\n                 <org>\\n                 genome\\n                 compound\\n                 glycan\\n                 reaction\\n                 rclass\\n                 enzyme\\n                 network\\n                 disease\\n                 drug\\n                 pubmed\\n\"}", "content_preview": "{\"database\": \"pathway\", \"info\": \"pathway          KEGG Pathway Database\\npath             Release 117.0+/03-05, Mar 26\\n                 Kanehisa Laboratories\\n                 585 entries\\n\\nlinked db        module\\n                 ko\\n                 <org>\\n                 genome\\n                 compound\\n                 glycan\\n                 reaction\\n                 rclass\\n                 enzyme\\n                 network\\n                 disease\\n                 drug\\n         ", "biological_metadata": {"database": "pathway"}, "execution_context": {"query_time_ms": 1299, "source": "KEGG"}}

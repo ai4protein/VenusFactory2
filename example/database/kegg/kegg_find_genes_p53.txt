@@ -4144,23 +4144,26 @@ tacu:119946776	K04451 tumor protein p53 | TP53; (RefSeq) cellular tumor antigen 
 tacu:119946777	K23314 telomerase Cajal body protein 1 | WRAP53; (RefSeq) LOW QUALITY PROTEIN: telomerase Cajal body protein 1
 tacu:119947595	K27919 inactive ubiquitin carboxyl-terminal hydrolase 53 | USP53; (RefSeq) inactive ubiquitin carboxyl-terminal hydrolase 53
 gga:420232	TP53INP1; tumor protein p53-inducible nuclear protein 1
+gga:421329	TP53BP2; apoptosis-stimulating of p53 protein 2 isoform X3
+gga:421682	PERPB, PERP, PERP2; p53 apoptosis effector related to PMP-22
+gga:421683	PERPA, PERP, PERP1, PERPL; PERP, TP53 apoptosis effector
+gga:421977	TP53I3; quinone oxidoreductase PIG3 isoform X6
+gga:422680	USP53; inactive ubiquitin carboxyl-terminal hydrolase 53
+gga:426464	LRRC27; p53-induced death domain-containing protein 1
 gga:426399	TP53I11; tumor protein p53-inducible protein 11
-gga:416977	TRIAP1; TP53-regulated inhibitor of apoptosis 1
-gga:416662	CDIP1; cell death-inducing p53-target protein 1
-gga:421683	PERP1; PERP, TP53 apoptosis effector
-gga:421682	PERP2; p53 apoptosis effector related to PMP-22
-gga:421977	TP53I3; quinone oxidoreductase PIG3 isoform X1
 gga:423487	PPP1R13B; apoptosis-stimulating of p53 protein 1 isoform X1
-gga:426464	LRRC27; LOW QUALITY PROTEIN: p53-induced death domain-containing protein 1
+gga:419946	RPRM; protein reprimo
 gga:415589	TP53BP1; TP53-binding protein 1 isoform X1
-gga:107049993	GLTSCR2; ribosome biogenesis protein NOP53
-gga:419946	RPRML; protein reprimo
+gga:416662	CDIP1, C14H16orf5, C16ORF5, CDIP, I1, LITAFL; cell death-inducing p53-target protein 1 isoform 2
+gga:416977	TRIAP1; TP53-regulated inhibitor of apoptosis 1
 gga:769066	TP53INP2; tumor protein p53-inducible nuclear protein 2 isoform X1
-gga:771852	PDRG1; p53 and DNA damage-regulated protein 1
 gga:419181	TP53TG5; TP53-target gene 5 protein isoform X1
-gga:107056600	nucleoporin NUP35 isoform X1
-gga:421329	TP53BP2; apoptosis-stimulating of p53 protein 2
-gga:428145	TP53RK; EKC/KEOPS complex subunit TP53RK
+gga:428145	TP53RK; EKC/KEOPS complex subunit TP53RK isoform X1
+gga:771852	PDRG1; p53 and DNA damage-regulated protein 1
+gga:419711	EI24, EPG4, PIG8, TP53I8; etoposide-induced protein 2.4 homolog
+gga:107049993	GLTSCR2; ribosome biogenesis protein NOP53 isoform X1
+gga:121108908	WRAP53; telomerase Cajal body protein 1 isoform X1
+gga:396200	TP53; cellular tumor antigen p53
 pcoc:116225544	TP53BP1; TP53-binding protein 1 isoform X1
 pcoc:116226071	PDRG1; p53 and DNA damage-regulated protein 1 isoform X1
 pcoc:116227298	RPRM; protein reprimo
@@ -7321,30 +7324,33 @@ dre:568138	tp53bp2b; apoptosis-stimulating of p53 protein 2B
 dre:569441	tp53inp2b; tumor protein p53-inducible nuclear protein 2 isoform X1
 dre:436699	rprm3; reprimo, TP53 dependent G2 arrest mediator homolog 3
 dre:571033	pidd1; p53-induced death domain-containing protein 1 isoform X2
-daes:130230400	usp53b; (RefSeq) inactive ubiquitin carboxyl-terminal hydrolase 53
+daes:130230400	K27919 inactive ubiquitin carboxyl-terminal hydrolase 53 | usp53b; (RefSeq) inactive ubiquitin carboxyl-terminal hydrolase 53
 daes:130221659	cdip1; (RefSeq) cell death-inducing p53-target protein 1 isoform X1
-daes:130229093	tp53; (RefSeq) cellular tumor antigen p53 isoform X1
-daes:130232793	wrap53; (RefSeq) telomerase Cajal body protein 1 isoform X1
+daes:130229093	K04451 tumor protein p53 | tp53; (RefSeq) cellular tumor antigen p53 isoform X1
+daes:130232793	K23314 telomerase Cajal body protein 1 | wrap53; (RefSeq) telomerase Cajal body protein 1 isoform X1
 daes:130231919	tp53i11a; (RefSeq) tumor protein p53-inducible protein 11a
 daes:130232224	si:ch211-260e23.9; (RefSeq) tumor protein p53-inducible nuclear protein 2
-daes:130232271	tp53bp1; (RefSeq) TP53-binding protein 1 isoform X1
+daes:130232271	K20915 tumor suppressor p53-binding protein 1 | tp53bp1; (RefSeq) TP53-binding protein 1 isoform X1
+daes:130235026	K10128 reprimo, TP53-dependent G2 arrest mediator candidate | rprma; (RefSeq) protein reprimo A
 daes:130234652	wu:fc50b12; (RefSeq) p53-induced death domain-containing protein 1 isoform X1
-daes:130236315	triap1; (RefSeq) TP53-regulated inhibitor of apoptosis 1
+daes:130236315	K17968 TRIAP1/MDM35 family protein | triap1; (RefSeq) TP53-regulated inhibitor of apoptosis 1
 daes:130237305	pdrg1; (RefSeq) p53 and DNA damage-regulated protein 1
-daes:130237761	tp53rk; (RefSeq) EKC/KEOPS complex subunit TP53RK
+daes:130237761	K08851 TP53 regulating kinase and related kinases [EC:2.7.11.1] | tp53rk; (RefSeq) EKC/KEOPS complex subunit TP53RK
 daes:130237297	tp53inp2; (RefSeq) tumor protein p53-inducible nuclear protein 2
-daes:130239287	perp; (RefSeq) p53 apoptosis effector related to PMP-22
-daes:130239400	tp53bp2a; (RefSeq) apoptosis-stimulating of p53 protein 2a isoform X1
+daes:130239287	K10136 TP53 apoptosis effector | perp; (RefSeq) p53 apoptosis effector related to PMP-22
+daes:130239400	K16823 apoptosis-stimulating of p53 protein 2 | tp53bp2a; (RefSeq) apoptosis-stimulating of p53 protein 2a isoform X1
 daes:130242193	tp53i13; (RefSeq) uncharacterized protein tp53i13
-daes:130242318	nop53; (RefSeq) ribosome biogenesis protein NOP53
-daes:130243262	tp53inp1; (RefSeq) LOW QUALITY PROTEIN: tumor protein p53-inducible nuclear protein 1
-daes:130244520	tp53i3; (RefSeq) quinone oxidoreductase PIG3
+daes:130242318	K14840 nucleolar protein 53 | nop53; (RefSeq) ribosome biogenesis protein NOP53
+daes:130243262	K15310 tumor protein p53-inducible nuclear protein 1 | tp53inp1; (RefSeq) LOW QUALITY PROTEIN: tumor protein p53-inducible nuclear protein 1
+daes:130244291	K17554 apoptosis-stimulating of p53 protein 1 | ppp1r13ba; (RefSeq) protein phosphatase 1, regulatory subunit 13Ba isoform X1
+daes:130244520	K10133 NADPH:quinone reductase [EC:1.6.5.5] | tp53i3; (RefSeq) quinone oxidoreductase PIG3
 daes:130246005	tp53i11b; (RefSeq) tumor protein p53-inducible protein 11b
-daes:130214877	cfap53; (RefSeq) cilia- and flagella-associated protein 53
-daes:130215849	tp53bp2b; (RefSeq) apoptosis-stimulating of p53 protein 2b isoform X1
+daes:130247459	K17554 apoptosis-stimulating of p53 protein 1 | ppp1r13bb; (RefSeq) LOW QUALITY PROTEIN: protein phosphatase 1, regulatory subunit 13Bb
+daes:130214877	K24225 cilia- and flagella-associated protein 53 | cfap53; (RefSeq) cilia- and flagella-associated protein 53
+daes:130215849	K16823 apoptosis-stimulating of p53 protein 2 | tp53bp2b; (RefSeq) apoptosis-stimulating of p53 protein 2b isoform X1
 daes:130216779	rprm3; (RefSeq) reprimo, TP53 dependent G2 arrest mediator homolog 3
-daes:130216886	(RefSeq) tumor protein p53-inducible nuclear protein 2 isoform X1
-daes:130219405	pidd1; (RefSeq) p53-induced death domain-containing protein 1
+daes:130216886	tumor protein p53-inducible nuclear protein 2 isoform X1
+daes:130219405	K10130 leucine-rich repeats and death domain-containing protein | pidd1; (RefSeq) p53-induced death domain-containing protein 1
 srx:107709142	cell death-inducing p53-target protein 1-like isoform X1
 srx:107710429	tp53i3; quinone oxidoreductase PIG3
 srx:107713714	p53-induced death domain-containing protein 1-like
@@ -9992,9 +9998,3 @@ nfu:107388612	tp53i11; tumor protein p53-inducible protein 11
 nfu:107388679	pidd1; p53-induced death domain-containing protein 1
 nfu:107390098	rprm; protein reprimo
 nfu:107391027	tumor protein p53-inducible nuclear protein 2-like isoform X1
-nfu:107391028	tumor protein p53-inducible nuclear protein 2-like isoform X1
-nfu:107391996	tp53i3; quinone oxidoreductase PIG3 isoform X1
-nfu:107392571	apoptosis-stimulating of p53 protein 1-like
-nfu:107395799	nup35; nucleoporin NUP53
-kmr:108228351	tp53; cellular tumor antigen p53 isoform X1
-kmr:108229823	tp53i11b; tumor protein p53-inducible protein 11b isoform X1
