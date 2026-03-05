@@ -11,8 +11,6 @@ from .string_homology import string_homology
 from .string_version import string_version
 
 from .string_operations import (
-    query_string_version,
-    download_string_version,
     query_string_map_ids,
     download_string_map_ids,
     query_string_network,
@@ -30,8 +28,6 @@ from .string_operations import (
 )
 
 __all__ = [
-    "query_string_version",
-    "download_string_version",
     "query_string_map_ids",
     "download_string_map_ids",
     "query_string_network",
