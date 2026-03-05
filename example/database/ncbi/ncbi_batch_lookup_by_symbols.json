@@ -1,0 +1,22 @@
+[
+  {
+    "query_symbol": "BRCA1",
+    "gene_id": "672",
+    "symbol": "BRCA1",
+    "description": "BRCA1 DNA repair associated",
+    "organism": "Homo sapiens",
+    "chromosome": "17",
+    "map_location": "17q21.31",
+    "type": "genomic"
+  },
+  {
+    "query_symbol": "TP53",
+    "gene_id": "7157",
+    "symbol": "TP53",
+    "description": "tumor protein p53",
+    "organism": "Homo sapiens",
+    "chromosome": "17",
+    "map_location": "17p13.1",
+    "type": "genomic"
+  }
+]

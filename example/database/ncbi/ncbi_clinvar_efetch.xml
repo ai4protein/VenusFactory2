@@ -1,0 +1,381 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+                        
+<ClinVarResult-Set><VariationArchive RecordType="classified" VariationID="630903" VariationName="NM_000038.6(APC):c.7794C&gt;G (p.Thr2598=)" VariationType="single nucleotide variant" Accession="VCV000630903" Version="2" NumberOfSubmissions="2" NumberOfSubmitters="2" DateLastUpdated="2021-05-29" DateCreated="2019-05-20" MostRecentSubmission="2019-12-17">
+  <RecordStatus>previous</RecordStatus>
+  <Species>Homo sapiens</Species>
+  <ClassifiedRecord>
+    <SimpleAllele AlleleID="617266" VariationID="630903">
+      <GeneList>
+        <Gene Symbol="APC" FullName="APC regulator of WNT signaling pathway" GeneID="324" HGNC_ID="HGNC:583" Source="submitted" RelationshipType="within single gene">
+          <Location>
+            <CytogeneticLocation>5q22.2</CytogeneticLocation>
+            <SequenceLocation Assembly="GRCh38" AssemblyAccessionVersion="GCF_000001405.38" AssemblyStatus="current" Chr="5" Accession="NC_000005.10" start="112707498" stop="112846239" display_start="112707498" display_stop="112846239" Strand="+"/>
+            <SequenceLocation Assembly="GRCh37" AssemblyAccessionVersion="GCF_000001405.25" AssemblyStatus="previous" Chr="5" Accession="NC_000005.9" start="112043201" stop="112181935" display_start="112043201" display_stop="112181935" Strand="+"/>
+          </Location>
+          <OMIM>611731</OMIM>
+          <Haploinsufficiency last_evaluated="2012-07-06" ClinGen="https://www.ncbi.nlm.nih.gov/projects/dbvar/ISCA/isca_gene.cgi?sym=APC">Sufficient evidence for dosage pathogenicity</Haploinsufficiency>
+          <Triplosensitivity last_evaluated="2012-07-06" ClinGen="https://www.ncbi.nlm.nih.gov/projects/dbvar/ISCA/isca_gene.cgi?sym=APC">No evidence available</Triplosensitivity>
+          <Property>gene_acmg_incidental_2013</Property>
+        </Gene>
+      </GeneList>
+      <Name>NM_000038.6(APC):c.7794C&gt;G (p.Thr2598=)</Name>
+      <CanonicalSPDI>NC_000005.10:112843387:C:G</CanonicalSPDI>
+      <VariantType>single nucleotide variant</VariantType>
+      <Location>
+        <CytogeneticLocation>5q22.2</CytogeneticLocation>
+        <SequenceLocation Assembly="GRCh38" AssemblyAccessionVersion="GCF_000001405.38" forDisplay="true" AssemblyStatus="current" Chr="5" Accession="NC_000005.10" start="112843388" stop="112843388" display_start="112843388" display_stop="112843388" variantLength="1" positionVCF="112843388" referenceAlleleVCF="C" alternateAlleleVCF="G"/>
+        <SequenceLocation Assembly="GRCh37" AssemblyAccessionVersion="GCF_000001405.25" AssemblyStatus="previous" Chr="5" Accession="NC_000005.9" start="112179085" stop="112179085" display_start="112179085" display_stop="112179085" variantLength="1" positionVCF="112179085" referenceAlleleVCF="C" alternateAlleleVCF="G"/>
+      </Location>
+      <HGVSlist>
+        <HGVS Assembly="GRCh38" Type="genomic, top-level">
+          <NucleotideExpression sequenceAccessionVersion="NC_000005.10" sequenceAccession="NC_000005" sequenceVersion="10" change="g.112843388C&gt;G" Assembly="GRCh38">
+            <Expression>NC_000005.10:g.112843388C&gt;G</Expression>
+          </NucleotideExpression>
+        </HGVS>
+        <HGVS Assembly="GRCh37" Type="genomic, top-level">
+          <NucleotideExpression sequenceAccessionVersion="NC_000005.9" sequenceAccession="NC_000005" sequenceVersion="9" change="g.112179085C&gt;G" Assembly="GRCh37">
+            <Expression>NC_000005.9:g.112179085C&gt;G</Expression>
+          </NucleotideExpression>
+        </HGVS>
+        <HGVS Type="coding">
+          <NucleotideExpression sequenceAccessionVersion="NM_000038.6" sequenceAccession="NM_000038" sequenceVersion="6" change="c.7794C&gt;G">
+            <Expression>NM_000038.6:c.7794C&gt;G</Expression>
+          </NucleotideExpression>
+          <ProteinExpression sequenceAccessionVersion="NP_000029.2" sequenceAccession="NP_000029" sequenceVersion="2" change="p.Thr2598=">
+            <Expression>NP_000029.2:p.Thr2598=</Expression>
+          </ProteinExpression>
+          <MolecularConsequence ID="SO:0001819" Type="synonymous variant" DB="SO"/>
+        </HGVS>
+        <HGVS Type="coding">
+          <NucleotideExpression sequenceAccessionVersion="NM_001127510.3" sequenceAccession="NM_001127510" sequenceVersion="3" change="c.7794C&gt;G">
+            <Expression>NM_001127510.3:c.7794C&gt;G</Expression>
+          </NucleotideExpression>
+          <ProteinExpression sequenceAccessionVersion="NP_001120982.1" sequenceAccession="NP_001120982" sequenceVersion="1" change="p.Thr2598=">
+            <Expression>NP_001120982.1:p.Thr2598=</Expression>
+          </ProteinExpression>
+          <MolecularConsequence ID="SO:0001819" Type="synonymous variant" DB="SO"/>
+        </HGVS>
+        <HGVS Type="coding">
+          <NucleotideExpression sequenceAccessionVersion="NM_001127511.3" sequenceAccession="NM_001127511" sequenceVersion="3" change="c.7740C&gt;G">
+            <Expression>NM_001127511.3:c.7740C&gt;G</Expression>
+          </NucleotideExpression>
+          <ProteinExpression sequenceAccessionVersion="NP_001120983.2" sequenceAccession="NP_001120983" sequenceVersion="2" change="p.Thr2580=">
+            <Expression>NP_001120983.2:p.Thr2580=</Expression>
+          </ProteinExpression>
+          <MolecularConsequence ID="SO:0001819" Type="synonymous variant" DB="SO"/>
+        </HGVS>
+        <HGVS Type="coding">
+          <NucleotideExpression sequenceAccessionVersion="NM_001354895.2" sequenceAccession="NM_001354895" sequenceVersion="2" change="c.7794C&gt;G">
+            <Expression>NM_001354895.2:c.7794C&gt;G</Expression>
+          </NucleotideExpression>
+          <ProteinExpression sequenceAccessionVersion="NP_001341824.1" sequenceAccession="NP_001341824" sequenceVersion="1" change="p.Thr2598=">
+            <Expression>NP_001341824.1:p.Thr2598=</Expression>
+          </ProteinExpression>
+          <MolecularConsequence ID="SO:0001819" Type="synonymous variant" DB="SO"/>
+        </HGVS>
+        <HGVS Type="coding">
+          <NucleotideExpression sequenceAccessionVersion="NM_001354896.2" sequenceAccession="NM_001354896" sequenceVersion="2" change="c.7848C&gt;G">
+            <Expression>NM_001354896.2:c.7848C&gt;G</Expression>
+          </NucleotideExpression>
+          <ProteinExpression sequenceAccessionVersion="NP_001341825.1" sequenceAccession="NP_001341825" sequenceVersion="1" change="p.Thr2616=">
+            <Expression>NP_001341825.1:p.Thr2616=</Expression>
+          </ProteinExpression>
+          <MolecularConsequence ID="SO:0001819" Type="synonymous variant" DB="SO"/>
+        </HGVS>
+        <HGVS Type="coding">
+          <NucleotideExpression sequenceAccessionVersion="NM_001354897.2" sequenceAccession="NM_001354897" sequenceVersion="2" change="c.7824C&gt;G">
+            <Expression>NM_001354897.2:c.7824C&gt;G</Expression>
+          </NucleotideExpression>
+          <ProteinExpression sequenceAccessionVersion="NP_001341826.1" sequenceAccession="NP_001341826" sequenceVersion="1" change="p.Thr2608=">
+            <Expression>NP_001341826.1:p.Thr2608=</Expression>
+          </ProteinExpression>
+          <MolecularConsequence ID="SO:0001819" Type="synonymous variant" DB="SO"/>
+        </HGVS>
+        <HGVS Type="coding">
+          <NucleotideExpression sequenceAccessionVersion="NM_001354898.2" sequenceAccession="NM_001354898" sequenceVersion="2" change="c.7719C&gt;G">
+            <Expression>NM_001354898.2:c.7719C&gt;G</Expression>
+          </NucleotideExpression>
+          <ProteinExpression sequenceAccessionVersion="NP_001341827.1" sequenceAccession="NP_001341827" sequenceVersion="1" change="p.Thr2573=">
+            <Expression>NP_001341827.1:p.Thr2573=</Expression>
+          </ProteinExpression>
+          <MolecularConsequence ID="SO:0001819" Type="synonymous variant" DB="SO"/>
+        </HGVS>
+        <HGVS Type="coding">
+          <NucleotideExpression sequenceAccessionVersion="NM_001354899.2" sequenceAccession="NM_001354899" sequenceVersion="2" change="c.7710C&gt;G">
+            <Expression>NM_001354899.2:c.7710C&gt;G</Expression>
+          </NucleotideExpression>
+          <ProteinExpression sequenceAccessionVersion="NP_001341828.1" sequenceAccession="NP_001341828" sequenceVersion="1" change="p.Thr2570=">
+            <Expression>NP_001341828.1:p.Thr2570=</Expression>
+          </ProteinExpression>
+          <MolecularConsequence ID="SO:0001819" Type="synonymous variant" DB="SO"/>
+        </HGVS>
+        <HGVS Type="coding">
+          <NucleotideExpression sequenceAccessionVersion="NM_001354900.2" sequenceAccession="NM_001354900" sequenceVersion="2" change="c.7671C&gt;G">
+            <Expression>NM_001354900.2:c.7671C&gt;G</Expression>
+          </NucleotideExpression>
+          <ProteinExpression sequenceAccessionVersion="NP_001341829.1" sequenceAccession="NP_001341829" sequenceVersion="1" change="p.Thr2557=">
+            <Expression>NP_001341829.1:p.Thr2557=</Expression>
+          </ProteinExpression>
+          <MolecularConsequence ID="SO:0001819" Type="synonymous variant" DB="SO"/>
+        </HGVS>
+        <HGVS Type="coding">
+          <NucleotideExpression sequenceAccessionVersion="NM_001354901.2" sequenceAccession="NM_001354901" sequenceVersion="2" change="c.7617C&gt;G">
+            <Expression>NM_001354901.2:c.7617C&gt;G</Expression>
+          </NucleotideExpression>
+          <ProteinExpression sequenceAccessionVersion="NP_001341830.1" sequenceAccession="NP_001341830" sequenceVersion="1" change="p.Thr2539=">
+            <Expression>NP_001341830.1:p.Thr2539=</Expression>
+          </ProteinExpression>
+          <MolecularConsequence ID="SO:0001819" Type="synonymous variant" DB="SO"/>
+        </HGVS>
+        <HGVS Type="coding">
+          <NucleotideExpression sequenceAccessionVersion="NM_001354902.2" sequenceAccession="NM_001354902" sequenceVersion="2" change="c.7521C&gt;G">
+            <Expression>NM_001354902.2:c.7521C&gt;G</Expression>
+          </NucleotideExpression>
+          <ProteinExpression sequenceAccessionVersion="NP_001341831.1" sequenceAccession="NP_001341831" sequenceVersion="1" change="p.Thr2507=">
+            <Expression>NP_001341831.1:p.Thr2507=</Expression>
+          </ProteinExpression>
+          <MolecularConsequence ID="SO:0001819" Type="synonymous variant" DB="SO"/>
+        </HGVS>
+        <HGVS Type="coding">
+          <NucleotideExpression sequenceAccessionVersion="NM_001354903.2" sequenceAccession="NM_001354903" sequenceVersion="2" change="c.7491C&gt;G">
+            <Expression>NM_001354903.2:c.7491C&gt;G</Expression>
+          </NucleotideExpression>
+          <ProteinExpression sequenceAccessionVersion="NP_001341832.1" sequenceAccession="NP_001341832" sequenceVersion="1" change="p.Thr2497=">
+            <Expression>NP_001341832.1:p.Thr2497=</Expression>
+          </ProteinExpression>
+          <MolecularConsequence ID="SO:0001819" Type="synonymous variant" DB="SO"/>
+        </HGVS>
+        <HGVS Type="coding">
+          <NucleotideExpression sequenceAccessionVersion="NM_001354904.2" sequenceAccession="NM_001354904" sequenceVersion="2" change="c.7416C&gt;G">
+            <Expression>NM_001354904.2:c.7416C&gt;G</Expression>
+          </NucleotideExpression>
+          <ProteinExpression sequenceAccessionVersion="NP_001341833.1" sequenceAccession="NP_001341833" sequenceVersion="1" change="p.Thr2472=">
+            <Expression>NP_001341833.1:p.Thr2472=</Expression>
+          </ProteinExpression>
+          <MolecularConsequence ID="SO:0001819" Type="synonymous variant" DB="SO"/>
+        </HGVS>
+        <HGVS Type="coding">
+          <NucleotideExpression sequenceAccessionVersion="NM_001354905.2" sequenceAccession="NM_001354905" sequenceVersion="2" change="c.7314C&gt;G">
+            <Expression>NM_001354905.2:c.7314C&gt;G</Expression>
+          </NucleotideExpression>
+          <ProteinExpression sequenceAccessionVersion="NP_001341834.1" sequenceAccession="NP_001341834" sequenceVersion="1" change="p.Thr2438=">
+            <Expression>NP_001341834.1:p.Thr2438=</Expression>
+          </ProteinExpression>
+          <MolecularConsequence ID="SO:0001819" Type="synonymous variant" DB="SO"/>
+        </HGVS>
+        <HGVS Type="coding">
+          <NucleotideExpression sequenceAccessionVersion="NM_001354906.2" sequenceAccession="NM_001354906" sequenceVersion="2" change="c.6945C&gt;G">
+            <Expression>NM_001354906.2:c.6945C&gt;G</Expression>
+          </NucleotideExpression>
+          <ProteinExpression sequenceAccessionVersion="NP_001341835.1" sequenceAccession="NP_001341835" sequenceVersion="1" change="p.Thr2315=">
+            <Expression>NP_001341835.1:p.Thr2315=</Expression>
+          </ProteinExpression>
+          <MolecularConsequence ID="SO:0001819" Type="synonymous variant" DB="SO"/>
+        </HGVS>
+        <HGVS Type="genomic">
+          <NucleotideExpression sequenceAccessionVersion="NG_008481.4" sequenceAccession="NG_008481" sequenceVersion="4" change="g.155868C&gt;G">
+            <Expression>NG_008481.4:g.155868C&gt;G</Expression>
+          </NucleotideExpression>
+        </HGVS>
+        <HGVS Type="genomic">
+          <NucleotideExpression sequenceAccessionVersion="LRG_130" sequenceAccession="LRG_130" change="g.155868C&gt;G">
+            <Expression>LRG_130:g.155868C&gt;G</Expression>
+          </NucleotideExpression>
+        </HGVS>
+      </HGVSlist>
+      <XRefList>
+        <XRef Type="rs" ID="1554088662" DB="dbSNP"/>
+      </XRefList>
+    </SimpleAllele>
+    <RCVList>
+      <RCVAccession Title="NM_000038.6(APC):c.7794C&gt;G (p.Thr2598=) AND Hereditary cancer-predisposing syndrome" Accession="RCV000776922" Version="1">
+        <ClassifiedConditionList>
+          <ClassifiedCondition DB="MedGen" ID="C0027672">Hereditary cancer-predisposing syndrome</ClassifiedCondition>
+        </ClassifiedConditionList>
+        <RCVClassifications>
+          <GermlineClassification>
+            <ReviewStatus>criteria provided, single submitter</ReviewStatus>
+            <Description DateLastEvaluated="2017-11-26" SubmissionCount="1">Likely benign</Description>
+          </GermlineClassification>
+        </RCVClassifications>
+      </RCVAccession>
+      <RCVAccession Title="NM_000038.6(APC):c.7794C&gt;G (p.Thr2598=) AND not provided" Accession="RCV000862200" Version="1">
+        <ClassifiedConditionList>
+          <ClassifiedCondition DB="MedGen" ID="CN517202">not provided</ClassifiedCondition>
+        </ClassifiedConditionList>
+        <RCVClassifications>
+          <GermlineClassification>
+            <ReviewStatus>criteria provided, single submitter</ReviewStatus>
+            <Description DateLastEvaluated="2018-09-12" SubmissionCount="1">Likely benign</Description>
+          </GermlineClassification>
+        </RCVClassifications>
+      </RCVAccession>
+    </RCVList>
+    <Classifications>
+      <GermlineClassification DateLastEvaluated="2018-09-12" NumberOfSubmissions="2" NumberOfSubmitters="2" DateCreated="2019-05-20" MostRecentSubmission="2019-12-17">
+        <ReviewStatus>criteria provided, multiple submitters, no conflicts</ReviewStatus>
+        <Description>Likely benign</Description>
+        <ConditionList>
+          <TraitSet ID="13598" Type="Disease">
+            <Trait ID="18746" Type="Disease">
+              <Name>
+                <ElementValue Type="Alternate">Neoplastic Syndromes, Hereditary</ElementValue>
+                <XRef ID="D009386" DB="MeSH"/>
+              </Name>
+              <Name>
+                <ElementValue Type="Preferred">Hereditary cancer-predisposing syndrome</ElementValue>
+                <XRef ID="699346009" DB="SNOMED CT"/>
+              </Name>
+              <Name>
+                <ElementValue Type="Alternate">Tumor predisposition</ElementValue>
+              </Name>
+              <Name>
+                <ElementValue Type="Alternate">Cancer predisposition</ElementValue>
+                <XRef ID="Hereditary+Cancer/3345" DB="Genetic Alliance"/>
+              </Name>
+              <AttributeSet>
+                <Attribute Type="keyword">Neoplasm</Attribute>
+              </AttributeSet>
+              <AttributeSet>
+                <Attribute Type="keyword">Hereditary cancer syndrome</Attribute>
+              </AttributeSet>
+              <Citation Type="practice guideline" Abbrev="IARC, 2008">
+                <ID Source="pmc">3075918</ID>
+              </Citation>
+              <Citation Type="practice guideline" Abbrev="ACMG/NSGC, 2015">
+                <ID Source="PubMed">25394175</ID>
+              </Citation>
+              <XRef ID="C0027672" DB="MedGen"/>
+            </Trait>
+          </TraitSet>
+          <TraitSet ID="9460" Type="Disease">
+            <Trait ID="17556" Type="Disease">
+              <Name>
+                <ElementValue Type="Preferred">not provided</ElementValue>
+                <XRef ID="13DG0619" DB="Developmental Genetics Unit,King Faisal Specialist Hospital &amp; Research Centre"/>
+              </Name>
+              <AttributeSet>
+                <Attribute Type="public definition">The term 'not provided' is registered in MedGen to support identification of submissions to ClinVar for which no condition was named when assessing the variant. 'not provided' differs from 'not specified', which is used when a variant is asserted to be benign, likely benign, or of uncertain significance for conditions that have not been specified.</Attribute>
+              </AttributeSet>
+              <XRef ID="CN517202" DB="MedGen"/>
+            </Trait>
+          </TraitSet>
+        </ConditionList>
+      </GermlineClassification>
+    </Classifications>
+    <ClinicalAssertionList>
+      <ClinicalAssertion ID="1780545" SubmissionDate="2018-11-06" DateLastUpdated="2019-05-20" DateCreated="2019-05-20">
+        <ClinVarSubmissionID localKey="Db4KrQBSZeoE7-orUyypkTxHHmsMFBWoJf4NxTZzWrw|MedGen:C0027672" submittedAssembly="GRCh37"/>
+        <ClinVarAccession Accession="SCV000912590" DateUpdated="2019-05-20" DateCreated="2019-05-20" Type="SCV" Version="1" SubmitterName="Color" OrgID="505849" OrganizationCategory="laboratory"/>
+        <RecordStatus>current</RecordStatus>
+        <Classification DateLastEvaluated="2017-11-26">
+          <ReviewStatus>criteria provided, single submitter</ReviewStatus>
+          <GermlineClassification>Likely benign</GermlineClassification>
+        </Classification>
+        <Assertion>variation to disease</Assertion>
+        <AttributeSet>
+          <Attribute Type="AssertionMethod">ACMG Guidelines, 2015</Attribute>
+          <Citation>
+            <ID Source="PubMed">25741868</ID>
+          </Citation>
+        </AttributeSet>
+        <ObservedInList>
+          <ObservedIn>
+            <Sample>
+              <Origin>germline</Origin>
+              <Species TaxonomyId="9606">human</Species>
+              <AffectedStatus>unknown</AffectedStatus>
+            </Sample>
+            <Method>
+              <TypePlatform>NGS</TypePlatform>
+              <MethodType>clinical testing</MethodType>
+            </Method>
+            <ObservedData>
+              <Attribute Type="Description">not provided</Attribute>
+            </ObservedData>
+          </ObservedIn>
+        </ObservedInList>
+        <SimpleAllele>
+          <GeneList>
+            <Gene Symbol="APC"/>
+          </GeneList>
+          <VariantType>Variation</VariantType>
+          <AttributeSet>
+            <Attribute Type="HGVS">NM_000038.5:c.7794C&gt;G</Attribute>
+          </AttributeSet>
+        </SimpleAllele>
+        <TraitSet Type="Disease">
+          <Trait Type="Disease">
+            <Name>
+              <ElementValue Type="Preferred">Hereditary cancer-predisposing syndrome</ElementValue>
+            </Name>
+            <XRef DB="MedGen" ID="C0027672" Type="CUI"/>
+          </Trait>
+        </TraitSet>
+        <SubmissionNameList>
+          <SubmissionName>SUB4721021</SubmissionName>
+        </SubmissionNameList>
+      </ClinicalAssertion>
+      <ClinicalAssertion ID="1969281" SubmissionDate="2019-03-14" DateLastUpdated="2019-12-17" DateCreated="2019-12-17">
+        <ClinVarSubmissionID localKey="130899|MedGen:CN517202" submittedAssembly="GRCh37"/>
+        <ClinVarAccession Accession="SCV001002674" DateUpdated="2019-12-17" DateCreated="2019-12-17" Type="SCV" Version="1" SubmitterName="Invitae" OrgID="500031" OrganizationCategory="laboratory"/>
+        <RecordStatus>current</RecordStatus>
+        <Classification DateLastEvaluated="2018-09-12">
+          <ReviewStatus>criteria provided, single submitter</ReviewStatus>
+          <GermlineClassification>Likely benign</GermlineClassification>
+        </Classification>
+        <Assertion>variation to disease</Assertion>
+        <AttributeSet>
+          <Attribute Type="AssertionMethod">Nykamp K et al. (Genet Med 2017)</Attribute>
+          <Citation>
+            <ID Source="PubMed">28492532</ID>
+          </Citation>
+        </AttributeSet>
+        <ObservedInList>
+          <ObservedIn>
+            <Sample>
+              <Origin>germline</Origin>
+              <Species TaxonomyId="9606">human</Species>
+              <AffectedStatus>unknown</AffectedStatus>
+            </Sample>
+            <Method>
+              <MethodType>clinical testing</MethodType>
+            </Method>
+            <ObservedData>
+              <Attribute Type="Description">not provided</Attribute>
+            </ObservedData>
+          </ObservedIn>
+        </ObservedInList>
+        <SimpleAllele>
+          <GeneList>
+            <Gene Symbol="APC"/>
+          </GeneList>
+          <VariantType>Variation</VariantType>
+          <AttributeSet>
+            <Attribute Type="HGVS">NM_000038.5:c.7794C&gt;G</Attribute>
+          </AttributeSet>
+        </SimpleAllele>
+        <TraitSet Type="Disease">
+          <Trait Type="Disease">
+            <Name>
+              <ElementValue Type="Preferred">not provided</ElementValue>
+            </Name>
+            <XRef DB="MedGen" ID="CN517202" Type="CUI"/>
+          </Trait>
+        </TraitSet>
+        <SubmissionNameList>
+          <SubmissionName>SUB5321749</SubmissionName>
+        </SubmissionNameList>
+      </ClinicalAssertion>
+    </ClinicalAssertionList>
+    <TraitMappingList>
+      <TraitMapping ClinicalAssertionID="1969281" TraitType="Disease" MappingType="Name" MappingValue="not provided" MappingRef="Preferred">
+        <MedGen CUI="CN517202" Name="not provided"/>
+      </TraitMapping>
+      <TraitMapping ClinicalAssertionID="1780545" TraitType="Disease" MappingType="Name" MappingValue="Hereditary cancer-predisposing syndrome" MappingRef="Preferred">
+        <MedGen CUI="C0027672" Name="Hereditary cancer-predisposing syndrome"/>
+      </TraitMapping>
+    </TraitMappingList>
+  </ClassifiedRecord>
+</VariationArchive>
+</ClinVarResult-Set>

@@ -6,6 +6,7 @@ import json
 import os
 import time
 import argparse
+from typing import Literal
 
 try:
     from Bio.Blast import NCBIWWW, NCBIXML
@@ -23,8 +24,8 @@ DEFAULT_DATABASE = "swissprot"
 
 def query_ncbi_blast(
     sequence: str,
-    program: str = DEFAULT_PROGRAM, choices=BLAST_PROGRAMS,
-    database: str = DEFAULT_DATABASE, choices=BLAST_DATABASES,
+    program: Literal[BLAST_PROGRAMS] = DEFAULT_PROGRAM,
+    database: Literal[BLAST_DATABASES] = DEFAULT_DATABASE,
     expect: float = 0.001,
     hitlist_size: int = 50,
     alignments: int = 25,
@@ -68,8 +69,8 @@ def query_ncbi_blast(
 def download_ncbi_blast(
     sequence: str,
     out_path: str,
-    program: str = DEFAULT_PROGRAM, choices=BLAST_PROGRAMS,
-    database: str = DEFAULT_DATABASE, choices=BLAST_DATABASES,
+    program: Literal[BLAST_PROGRAMS] = DEFAULT_PROGRAM,
+    database: Literal[BLAST_DATABASES] = DEFAULT_DATABASE,
     expect: float = 0.001,
     hitlist_size: int = 50,
     alignments: int = 25,

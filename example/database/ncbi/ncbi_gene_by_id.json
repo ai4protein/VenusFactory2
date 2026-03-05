@@ -1,0 +1,1140 @@
+{
+  "reports": [
+    {
+      "gene": {
+        "gene_id": "672",
+        "symbol": "BRCA1",
+        "description": "BRCA1 DNA repair associated",
+        "tax_id": "9606",
+        "taxname": "Homo sapiens",
+        "common_name": "human",
+        "type": "PROTEIN_CODING",
+        "orientation": "minus",
+        "reference_standards": [
+          {
+            "gene_range": {
+              "accession_version": "NG_005905.2",
+              "range": [
+                {
+                  "begin": "92501",
+                  "end": "173689",
+                  "orientation": "plus"
+                }
+              ]
+            },
+            "type": "REFSEQ_GENE"
+          }
+        ],
+        "chromosomes": [
+          "17"
+        ],
+        "nomenclature_authority": {
+          "authority": "HGNC",
+          "identifier": "HGNC:1100"
+        },
+        "swiss_prot_accessions": [
+          "P38398"
+        ],
+        "ensembl_gene_ids": [
+          "ENSG00000012048"
+        ],
+        "omim_ids": [
+          "113705"
+        ],
+        "synonyms": [
+          "IRIS",
+          "PSCP",
+          "BRCAI",
+          "BRCC1",
+          "FANCS",
+          "PNCA4",
+          "RNF53",
+          "BROVCA1",
+          "PPP1R53"
+        ],
+        "annotations": [
+          {
+            "assembly_accession": "GCF_000001405.40",
+            "assembly_name": "GRCh38.p14",
+            "annotation_name": "GCF_000001405.40-RS_2025_08",
+            "annotation_release_date": "2025-08-01",
+            "genomic_locations": [
+              {
+                "genomic_accession_version": "NC_000017.11",
+                "sequence_name": "17",
+                "genomic_range": {
+                  "begin": "43044295",
+                  "end": "43170327",
+                  "orientation": "minus"
+                }
+              }
+            ]
+          },
+          {
+            "assembly_accession": "GCF_009914755.1",
+            "assembly_name": "T2T-CHM13v2.0",
+            "annotation_name": "GCF_009914755.1-RS_2025_08",
+            "annotation_release_date": "2025-08-01",
+            "genomic_locations": [
+              {
+                "genomic_accession_version": "NC_060941.1",
+                "sequence_name": "17",
+                "genomic_range": {
+                  "begin": "43902857",
+                  "end": "44029084",
+                  "orientation": "minus"
+                }
+              }
+            ]
+          }
+        ],
+        "transcript_count": 368,
+        "protein_count": 368,
+        "transcript_type_counts": [
+          {
+            "type": "PROTEIN_CODING",
+            "count": 368
+          }
+        ],
+        "gene_groups": [
+          {
+            "id": "672",
+            "method": "NCBI Ortholog"
+          }
+        ],
+        "summary": [
+          {
+            "description": "This gene encodes a 190 kD nuclear phosphoprotein that plays a role in maintaining genomic stability, and it also acts as a tumor suppressor. The BRCA1 gene contains 22 exons spanning about 110 kb of DNA. The encoded protein combines with other tumor suppressors, DNA damage sensors, and signal transducers to form a large multi-subunit protein complex known as the BRCA1-associated genome surveillance complex (BASC). This gene product associates with RNA polymerase II, and through the C-terminal domain, also interacts with histone deacetylase complexes. This protein thus plays a role in transcription, DNA repair of double-stranded breaks, and recombination. Mutations in this gene are responsible for approximately 40% of inherited breast cancers and more than 80% of inherited breast and ovarian cancers. Alternative splicing plays a role in modulating the subcellular localization and physiological function of this gene. Many alternatively spliced transcript variants, some of which are disease-associated mutations, have been described for this gene, but the full-length natures of only some of these variants has been described. A related pseudogene, which is also located on chromosome 17, has been identified. [provided by RefSeq, May 2020]"
+          }
+        ],
+        "gene_ontology": {
+          "molecular_functions": [
+            {
+              "name": "DNA binding",
+              "go_id": "GO:0003677",
+              "evidence_code": "IEA",
+              "qualifier": "enables"
+            },
+            {
+              "name": "DNA binding",
+              "go_id": "GO:0003677",
+              "evidence_code": "TAS",
+              "qualifier": "enables",
+              "reference": {
+                "pmids": [
+                  "9662397"
+                ]
+              }
+            },
+            {
+              "name": "RNA binding",
+              "go_id": "GO:0003723",
+              "evidence_code": "IDA",
+              "qualifier": "enables",
+              "reference": {
+                "pmids": [
+                  "12419249"
+                ]
+              }
+            },
+            {
+              "name": "RNA polymerase binding",
+              "go_id": "GO:0070063",
+              "evidence_code": "IDA",
+              "qualifier": "enables",
+              "reference": {
+                "pmids": [
+                  "9662397"
+                ]
+              }
+            },
+            {
+              "name": "damaged DNA binding",
+              "go_id": "GO:0003684",
+              "evidence_code": "IEA",
+              "qualifier": "enables"
+            },
+            {
+              "name": "enzyme binding",
+              "go_id": "GO:0019899",
+              "evidence_code": "IPI",
+              "qualifier": "enables",
+              "reference": {
+                "pmids": [
+                  "15965487"
+                ]
+              }
+            },
+            {
+              "name": "histone H2AK127 ubiquitin ligase activity",
+              "go_id": "GO:0140863",
+              "evidence_code": "TAS",
+              "qualifier": "enables",
+              "reference": {
+                "pmids": [
+                  "35351360"
+                ]
+              }
+            },
+            {
+              "name": "histone H2AK129 ubiquitin ligase activity",
+              "go_id": "GO:0140864",
+              "evidence_code": "TAS",
+              "qualifier": "enables",
+              "reference": {
+                "pmids": [
+                  "35351360"
+                ]
+              }
+            },
+            {
+              "name": "identical protein binding",
+              "go_id": "GO:0042802",
+              "evidence_code": "IPI",
+              "qualifier": "enables",
+              "reference": {
+                "pmids": [
+                  "8944023"
+                ]
+              }
+            },
+            {
+              "name": "metal ion binding",
+              "go_id": "GO:0046872",
+              "evidence_code": "IEA",
+              "qualifier": "enables"
+            },
+            {
+              "name": "p53 binding",
+              "go_id": "GO:0002039",
+              "evidence_code": "IDA",
+              "qualifier": "enables",
+              "reference": {
+                "pmids": [
+                  "15571721"
+                ]
+              }
+            },
+            {
+              "name": "protein binding",
+              "go_id": "GO:0005515",
+              "evidence_code": "IPI",
+              "qualifier": "enables",
+              "reference": {
+                "pmids": [
+                  "8944023"
+                ]
+              }
+            },
+            {
+              "name": "transcription cis-regulatory region binding",
+              "go_id": "GO:0000976",
+              "evidence_code": "IDA",
+              "qualifier": "enables",
+              "reference": {
+                "pmids": [
+                  "20820192"
+                ]
+              }
+            },
+            {
+              "name": "transcription cis-regulatory region binding",
+              "go_id": "GO:0000976",
+              "evidence_code": "IEA",
+              "qualifier": "enables"
+            },
+            {
+              "name": "transcription coactivator activity",
+              "go_id": "GO:0003713",
+              "evidence_code": "IDA",
+              "qualifier": "enables",
+              "reference": {
+                "pmids": [
+                  "20820192"
+                ]
+              }
+            },
+            {
+              "name": "transcription coactivator activity",
+              "go_id": "GO:0003713",
+              "evidence_code": "IEA",
+              "qualifier": "enables"
+            },
+            {
+              "name": "transcription coactivator activity",
+              "go_id": "GO:0003713",
+              "evidence_code": "IMP",
+              "qualifier": "enables",
+              "reference": {
+                "pmids": [
+                  "9662397"
+                ]
+              }
+            },
+            {
+              "name": "transferase activity",
+              "go_id": "GO:0016740",
+              "evidence_code": "IEA",
+              "qualifier": "enables"
+            },
+            {
+              "name": "tubulin binding",
+              "go_id": "GO:0015631",
+              "evidence_code": "NAS",
+              "qualifier": "enables",
+              "reference": {
+                "pmids": [
+                  "12214252"
+                ]
+              }
+            },
+            {
+              "name": "ubiquitin protein ligase activity",
+              "go_id": "GO:0061630",
+              "evidence_code": "IEA",
+              "qualifier": "enables"
+            },
+            {
+              "name": "ubiquitin protein ligase binding",
+              "go_id": "GO:0031625",
+              "evidence_code": "IPI",
+              "qualifier": "enables",
+              "reference": {
+                "pmids": [
+                  "17873885"
+                ]
+              }
+            },
+            {
+              "name": "ubiquitin-modified histone reader activity",
+              "go_id": "GO:0061649",
+              "evidence_code": "TAS",
+              "qualifier": "enables",
+              "reference": {
+                "pmids": [
+                  "35351360"
+                ]
+              }
+            },
+            {
+              "name": "ubiquitin-protein transferase activity",
+              "go_id": "GO:0004842",
+              "evidence_code": "IBA",
+              "qualifier": "enables"
+            },
+            {
+              "name": "ubiquitin-protein transferase activity",
+              "go_id": "GO:0004842",
+              "evidence_code": "IDA",
+              "qualifier": "enables",
+              "reference": {
+                "pmids": [
+                  "12890688"
+                ]
+              }
+            },
+            {
+              "name": "ubiquitin-protein transferase activity",
+              "go_id": "GO:0004842",
+              "evidence_code": "IEA",
+              "qualifier": "enables"
+            },
+            {
+              "name": "ubiquitin-protein transferase activity",
+              "go_id": "GO:0004842",
+              "evidence_code": "TAS",
+              "qualifier": "enables"
+            },
+            {
+              "name": "zinc ion binding",
+              "go_id": "GO:0008270",
+              "evidence_code": "IEA",
+              "qualifier": "enables"
+            },
+            {
+              "name": "zinc ion binding",
+              "go_id": "GO:0008270",
+              "evidence_code": "TAS",
+              "qualifier": "enables",
+              "reference": {
+                "pmids": [
+                  "8944023"
+                ]
+              }
+            }
+          ],
+          "biological_processes": [
+            {
+              "name": "DNA damage response",
+              "go_id": "GO:0006974",
+              "evidence_code": "IEA",
+              "qualifier": "involved_in"
+            },
+            {
+              "name": "DNA damage response",
+              "go_id": "GO:0006974",
+              "evidence_code": "NAS",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "16651405"
+                ]
+              }
+            },
+            {
+              "name": "DNA damage response",
+              "go_id": "GO:0006974",
+              "evidence_code": "TAS",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "10910365"
+                ]
+              }
+            },
+            {
+              "name": "DNA damage tolerance",
+              "go_id": "GO:0006301",
+              "evidence_code": "IDA",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "17349954"
+                ]
+              }
+            },
+            {
+              "name": "DNA recombination",
+              "go_id": "GO:0006310",
+              "evidence_code": "IEA",
+              "qualifier": "involved_in"
+            },
+            {
+              "name": "DNA repair",
+              "go_id": "GO:0006281",
+              "evidence_code": "IEA",
+              "qualifier": "involved_in"
+            },
+            {
+              "name": "DNA repair",
+              "go_id": "GO:0006281",
+              "evidence_code": "NAS",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "22369660"
+                ]
+              }
+            },
+            {
+              "name": "DNA strand resection involved in replication fork processing",
+              "go_id": "GO:0110025",
+              "evidence_code": "NAS",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "29709199"
+                ]
+              }
+            },
+            {
+              "name": "cellular response to indole-3-methanol",
+              "go_id": "GO:0071681",
+              "evidence_code": "IDA",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "10868478"
+                ]
+              }
+            },
+            {
+              "name": "cellular response to ionizing radiation",
+              "go_id": "GO:0071479",
+              "evidence_code": "IMP",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "14636569"
+                ]
+              }
+            },
+            {
+              "name": "cellular response to tumor necrosis factor",
+              "go_id": "GO:0071356",
+              "evidence_code": "IMP",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "23415688"
+                ]
+              }
+            },
+            {
+              "name": "chordate embryonic development",
+              "go_id": "GO:0043009",
+              "evidence_code": "IBA",
+              "qualifier": "involved_in"
+            },
+            {
+              "name": "chromatin remodeling",
+              "go_id": "GO:0006338",
+              "evidence_code": "TAS",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "35351360"
+                ]
+              }
+            },
+            {
+              "name": "chromosome segregation",
+              "go_id": "GO:0007059",
+              "evidence_code": "IMP",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "15965487"
+                ]
+              }
+            },
+            {
+              "name": "double-strand break repair",
+              "go_id": "GO:0006302",
+              "evidence_code": "IDA",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "22186889"
+                ]
+              }
+            },
+            {
+              "name": "double-strand break repair",
+              "go_id": "GO:0006302",
+              "evidence_code": "IEA",
+              "qualifier": "involved_in"
+            },
+            {
+              "name": "double-strand break repair",
+              "go_id": "GO:0006302",
+              "evidence_code": "IMP",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "17525340"
+                ]
+              }
+            },
+            {
+              "name": "double-strand break repair",
+              "go_id": "GO:0006302",
+              "evidence_code": "TAS",
+              "qualifier": "involved_in"
+            },
+            {
+              "name": "double-strand break repair via homologous recombination",
+              "go_id": "GO:0000724",
+              "evidence_code": "IBA",
+              "qualifier": "involved_in"
+            },
+            {
+              "name": "double-strand break repair via homologous recombination",
+              "go_id": "GO:0000724",
+              "evidence_code": "IDA",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "17349954"
+                ]
+              }
+            },
+            {
+              "name": "fatty acid biosynthetic process",
+              "go_id": "GO:0006633",
+              "evidence_code": "IEA",
+              "qualifier": "involved_in"
+            },
+            {
+              "name": "fatty acid metabolic process",
+              "go_id": "GO:0006631",
+              "evidence_code": "IEA",
+              "qualifier": "involved_in"
+            },
+            {
+              "name": "homologous recombination",
+              "go_id": "GO:0035825",
+              "evidence_code": "NAS",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "22369660"
+                ]
+              }
+            },
+            {
+              "name": "intrinsic apoptotic signaling pathway in response to DNA damage",
+              "go_id": "GO:0008630",
+              "evidence_code": "IDA",
+              "qualifier": "acts_upstream_of_or_within",
+              "reference": {
+                "pmids": [
+                  "14654789"
+                ]
+              }
+            },
+            {
+              "name": "lipid metabolic process",
+              "go_id": "GO:0006629",
+              "evidence_code": "IEA",
+              "qualifier": "involved_in"
+            },
+            {
+              "name": "mitotic G2 DNA damage checkpoint signaling",
+              "go_id": "GO:0007095",
+              "evidence_code": "IBA",
+              "qualifier": "involved_in"
+            },
+            {
+              "name": "mitotic G2 DNA damage checkpoint signaling",
+              "go_id": "GO:0007095",
+              "evidence_code": "IMP",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "17525340"
+                ]
+              }
+            },
+            {
+              "name": "mitotic G2/M transition checkpoint",
+              "go_id": "GO:0044818",
+              "evidence_code": "NAS",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "22369660"
+                ]
+              }
+            },
+            {
+              "name": "negative regulation of DNA-templated transcription",
+              "go_id": "GO:0045892",
+              "evidence_code": "IDA",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "16288014"
+                ]
+              }
+            },
+            {
+              "name": "negative regulation of cell cycle",
+              "go_id": "GO:0045786",
+              "evidence_code": "NAS",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "15159397"
+                ]
+              }
+            },
+            {
+              "name": "negative regulation of cell growth",
+              "go_id": "GO:0030308",
+              "evidence_code": "IMP",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "10518542"
+                ]
+              }
+            },
+            {
+              "name": "negative regulation of centriole replication",
+              "go_id": "GO:0046600",
+              "evidence_code": "NAS",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "12214252"
+                ]
+              }
+            },
+            {
+              "name": "negative regulation of extrinsic apoptotic signaling pathway via death domain receptors",
+              "go_id": "GO:1902042",
+              "evidence_code": "IMP",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "23415688"
+                ]
+              }
+            },
+            {
+              "name": "negative regulation of fatty acid biosynthetic process",
+              "go_id": "GO:0045717",
+              "evidence_code": "IMP",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "16326698"
+                ]
+              }
+            },
+            {
+              "name": "negative regulation of gene expression via chromosomal CpG island methylation",
+              "go_id": "GO:0044027",
+              "evidence_code": "IMP",
+              "qualifier": "acts_upstream_of_positive_effect",
+              "reference": {
+                "pmids": [
+                  "20820192"
+                ]
+              }
+            },
+            {
+              "name": "negative regulation of intracellular estrogen receptor signaling pathway",
+              "go_id": "GO:0033147",
+              "evidence_code": "IMP",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "17505062"
+                ]
+              }
+            },
+            {
+              "name": "negative regulation of reactive oxygen species metabolic process",
+              "go_id": "GO:2000378",
+              "evidence_code": "IMP",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "23415688"
+                ]
+              }
+            },
+            {
+              "name": "positive regulation of DNA repair",
+              "go_id": "GO:0045739",
+              "evidence_code": "IMP",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "17525340"
+                ]
+              }
+            },
+            {
+              "name": "positive regulation of DNA-templated transcription",
+              "go_id": "GO:0045893",
+              "evidence_code": "IDA",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "20160719"
+                ]
+              }
+            },
+            {
+              "name": "positive regulation of DNA-templated transcription",
+              "go_id": "GO:0045893",
+              "evidence_code": "IMP",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "12080089"
+                ]
+              }
+            },
+            {
+              "name": "positive regulation of angiogenesis",
+              "go_id": "GO:0045766",
+              "evidence_code": "IMP",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "23415688"
+                ]
+              }
+            },
+            {
+              "name": "positive regulation of gene expression",
+              "go_id": "GO:0010628",
+              "evidence_code": "IMP",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "23415688"
+                ]
+              }
+            },
+            {
+              "name": "positive regulation of transcription by RNA polymerase II",
+              "go_id": "GO:0045944",
+              "evidence_code": "IBA",
+              "qualifier": "involved_in"
+            },
+            {
+              "name": "positive regulation of transcription by RNA polymerase II",
+              "go_id": "GO:0045944",
+              "evidence_code": "IDA",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "16331276"
+                ]
+              }
+            },
+            {
+              "name": "positive regulation of transcription by RNA polymerase II",
+              "go_id": "GO:0045944",
+              "evidence_code": "IEA",
+              "qualifier": "involved_in"
+            },
+            {
+              "name": "positive regulation of transcription by RNA polymerase II",
+              "go_id": "GO:0045944",
+              "evidence_code": "IMP",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "20820192"
+                ]
+              }
+            },
+            {
+              "name": "positive regulation of vascular endothelial growth factor production",
+              "go_id": "GO:0010575",
+              "evidence_code": "IMP",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "23415688"
+                ]
+              }
+            },
+            {
+              "name": "protein K6-linked ubiquitination",
+              "go_id": "GO:0085020",
+              "evidence_code": "IDA",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "12890688"
+                ]
+              }
+            },
+            {
+              "name": "protein autoubiquitination",
+              "go_id": "GO:0051865",
+              "evidence_code": "IDA",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "12890688"
+                ]
+              }
+            },
+            {
+              "name": "protein ubiquitination",
+              "go_id": "GO:0016567",
+              "evidence_code": "IDA",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "17349954"
+                ]
+              }
+            },
+            {
+              "name": "protein ubiquitination",
+              "go_id": "GO:0016567",
+              "evidence_code": "IEA",
+              "qualifier": "involved_in"
+            },
+            {
+              "name": "regulation of DNA damage checkpoint",
+              "go_id": "GO:2000001",
+              "evidence_code": "NAS",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "14636569"
+                ]
+              }
+            },
+            {
+              "name": "regulation of DNA repair",
+              "go_id": "GO:0006282",
+              "evidence_code": "NAS",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "20656689"
+                ]
+              }
+            },
+            {
+              "name": "regulation of cell cycle",
+              "go_id": "GO:0051726",
+              "evidence_code": "IDA",
+              "qualifier": "acts_upstream_of",
+              "reference": {
+                "pmids": [
+                  "21102443"
+                ]
+              }
+            },
+            {
+              "name": "regulation of transcription by RNA polymerase II",
+              "go_id": "GO:0006357",
+              "evidence_code": "IMP",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "9662397"
+                ]
+              }
+            },
+            {
+              "name": "regulation of transcription by RNA polymerase II",
+              "go_id": "GO:0006357",
+              "evidence_code": "TAS",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "10910365"
+                ]
+              }
+            },
+            {
+              "name": "response to ionizing radiation",
+              "go_id": "GO:0010212",
+              "evidence_code": "IMP",
+              "qualifier": "involved_in",
+              "reference": {
+                "pmids": [
+                  "17525340"
+                ]
+              }
+            },
+            {
+              "name": "sex-chromosome dosage compensation",
+              "go_id": "GO:0007549",
+              "evidence_code": "IBA",
+              "qualifier": "involved_in"
+            }
+          ],
+          "cellular_components": [
+            {
+              "name": "BRCA1-A complex",
+              "go_id": "GO:0070531",
+              "evidence_code": "IBA",
+              "qualifier": "part_of"
+            },
+            {
+              "name": "BRCA1-A complex",
+              "go_id": "GO:0070531",
+              "evidence_code": "IDA",
+              "qualifier": "part_of",
+              "reference": {
+                "pmids": [
+                  "17525340"
+                ]
+              }
+            },
+            {
+              "name": "BRCA1-BARD1 complex",
+              "go_id": "GO:0031436",
+              "evidence_code": "IBA",
+              "qualifier": "part_of"
+            },
+            {
+              "name": "BRCA1-BARD1 complex",
+              "go_id": "GO:0031436",
+              "evidence_code": "IDA",
+              "qualifier": "part_of",
+              "reference": {
+                "pmids": [
+                  "12890688"
+                ]
+              }
+            },
+            {
+              "name": "XY body",
+              "go_id": "GO:0001741",
+              "evidence_code": "IEA",
+              "qualifier": "located_in"
+            },
+            {
+              "name": "chromosome",
+              "go_id": "GO:0005694",
+              "evidence_code": "IEA",
+              "qualifier": "located_in"
+            },
+            {
+              "name": "chromosome",
+              "go_id": "GO:0005694",
+              "evidence_code": "ISS",
+              "qualifier": "located_in"
+            },
+            {
+              "name": "condensed chromosome",
+              "go_id": "GO:0000793",
+              "evidence_code": "IEA",
+              "qualifier": "located_in"
+            },
+            {
+              "name": "condensed nuclear chromosome",
+              "go_id": "GO:0000794",
+              "evidence_code": "IEA",
+              "qualifier": "located_in"
+            },
+            {
+              "name": "cytoplasm",
+              "go_id": "GO:0005737",
+              "evidence_code": "IDA",
+              "qualifier": "located_in",
+              "reference": {
+                "pmids": [
+                  "20160719"
+                ]
+              }
+            },
+            {
+              "name": "cytoplasm",
+              "go_id": "GO:0005737",
+              "evidence_code": "IEA",
+              "qualifier": "located_in"
+            },
+            {
+              "name": "gamma-tubulin ring complex",
+              "go_id": "GO:0000931",
+              "evidence_code": "NAS",
+              "qualifier": "part_of",
+              "reference": {
+                "pmids": [
+                  "12214252"
+                ]
+              }
+            },
+            {
+              "name": "lateral element",
+              "go_id": "GO:0000800",
+              "evidence_code": "IDA",
+              "qualifier": "located_in",
+              "reference": {
+                "pmids": [
+                  "9774970"
+                ]
+              }
+            },
+            {
+              "name": "nuclear body",
+              "go_id": "GO:0016604",
+              "evidence_code": "IDA",
+              "qualifier": "located_in"
+            },
+            {
+              "name": "nucleoplasm",
+              "go_id": "GO:0005654",
+              "evidence_code": "IDA",
+              "qualifier": "located_in"
+            },
+            {
+              "name": "nucleoplasm",
+              "go_id": "GO:0005654",
+              "evidence_code": "IEA",
+              "qualifier": "located_in"
+            },
+            {
+              "name": "nucleoplasm",
+              "go_id": "GO:0005654",
+              "evidence_code": "TAS",
+              "qualifier": "located_in"
+            },
+            {
+              "name": "nucleus",
+              "go_id": "GO:0005634",
+              "evidence_code": "IDA",
+              "qualifier": "located_in",
+              "reference": {
+                "pmids": [
+                  "9342365"
+                ]
+              }
+            },
+            {
+              "name": "nucleus",
+              "go_id": "GO:0005634",
+              "evidence_code": "IEA",
+              "qualifier": "located_in"
+            },
+            {
+              "name": "nucleus",
+              "go_id": "GO:0005634",
+              "evidence_code": "NAS",
+              "qualifier": "located_in",
+              "reference": {
+                "pmids": [
+                  "18171670"
+                ]
+              }
+            },
+            {
+              "name": "plasma membrane",
+              "go_id": "GO:0005886",
+              "evidence_code": "IDA",
+              "qualifier": "located_in",
+              "reference": {
+                "pmids": [
+                  "21282464"
+                ]
+              }
+            },
+            {
+              "name": "protein-containing complex",
+              "go_id": "GO:0032991",
+              "evidence_code": "IDA",
+              "qualifier": "part_of",
+              "reference": {
+                "pmids": [
+                  "9774970"
+                ]
+              }
+            },
+            {
+              "name": "ribonucleoprotein complex",
+              "go_id": "GO:1990904",
+              "evidence_code": "IDA",
+              "qualifier": "part_of",
+              "reference": {
+                "pmids": [
+                  "18809582"
+                ]
+              }
+            },
+            {
+              "name": "ubiquitin ligase complex",
+              "go_id": "GO:0000151",
+              "evidence_code": "NAS",
+              "qualifier": "part_of",
+              "reference": {
+                "pmids": [
+                  "14976165"
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "query": [
+        "672"
+      ]
+    }
+  ],
+  "total_count": 1
+}
