@@ -238,25 +238,25 @@ Examples:
 
     if args.test:
         import os
-        out_base = os.path.join("example", "database", "ncbi", "gene")
-        os.makedirs(out_base, exist_ok=True)
+        out_dir = os.path.join("example", "database", "ncbi", "gene")
+        os.makedirs(out_dir, exist_ok=True)
         print("Testing esearch(...)")
         gene_ids = esearch("BRCA1[gene] AND human[organism]", retmax=5, api_key=args.api_key)
         print(f"  found IDs: {gene_ids}")
         if gene_ids:
             print("Testing esummary(...)")
             summaries = esummary(gene_ids[:3], api_key=args.api_key)
-            out_path = os.path.join(out_base, "query_gene_esummary_sample.json")
+            out_path = os.path.join(out_dir, "query_gene_esummary_sample.json")
             with open(out_path, "w", encoding="utf-8") as f:
                 f.write(json.dumps(summaries, indent=2)[:6000])
             print(f"  saved to {out_path}")
             print("Testing efetch(...)")
             raw = efetch(gene_ids[:1], retmode="xml", api_key=args.api_key)
-            out_xml = os.path.join(out_base, "query_gene_efetch_sample.xml")
+            out_xml = os.path.join(out_dir, "query_gene_efetch_sample.xml")
             with open(out_xml, "w", encoding="utf-8") as f:
                 f.write(raw[:5000] if len(raw) > 5000 else raw)
             print(f"  saved to {out_xml}")
-        print(f"Done. Output under {out_base}")
+        print(f"Done. Output under {out_dir}")
         sys.exit(0)
 
     if not args.search and not args.id:

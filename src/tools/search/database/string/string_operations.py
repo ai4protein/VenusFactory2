@@ -737,9 +737,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.test:
-        out_base = os.path.join("example", "database", "string")
-        os.makedirs(out_base, exist_ok=True)
-        meta_dir = os.path.join(out_base, "metadata")
+        out_dir = os.path.join("example", "database", "string")
+        os.makedirs(out_dir, exist_ok=True)
+        meta_dir = os.path.join(out_dir, "metadata")
         test_id = "P43403"
         species = 9606
 
@@ -765,29 +765,29 @@ if __name__ == "__main__":
 
         print("Testing query_string_network / download_string_network(...)")
         _print_res("query_string_network", query_string_network(test_id, species=species))
-        _print_res("download_string_network", download_string_network(test_id, out_base, species=species, filename="network.tsv"))
+        _print_res("download_string_network", download_string_network(test_id, out_dir, species=species, filename="network.tsv"))
 
         print("Testing query_string_network_image / download_string_network_image(...)")
         _print_res("query_string_network_image", query_string_network_image(test_id, species=species))
-        _print_res("download_string_network_image", download_string_network_image(test_id, out_base, species=species, filename="network.png"))
+        _print_res("download_string_network_image", download_string_network_image(test_id, out_dir, species=species, filename="network.png"))
 
         print("Testing query_string_interaction_partners / download_string_interaction_partners(...)")
         _print_res("query_string_interaction_partners", query_string_interaction_partners(test_id, species=species, limit=5))
-        _print_res("download_string_interaction_partners", download_string_interaction_partners(test_id, out_base, species=species, limit=5, filename="interaction_partners.tsv"))
+        _print_res("download_string_interaction_partners", download_string_interaction_partners(test_id, out_dir, species=species, limit=5, filename="interaction_partners.tsv"))
 
         print("Testing query_string_enrichment / download_string_enrichment(...)")
         _print_res("query_string_enrichment", query_string_enrichment(test_id, species=species))
-        _print_res("download_string_enrichment", download_string_enrichment(test_id, out_base, species=species, filename="enrichment.tsv"))
+        _print_res("download_string_enrichment", download_string_enrichment(test_id, out_dir, species=species, filename="enrichment.tsv"))
 
         print("Testing query_string_ppi_enrichment / download_string_ppi_enrichment(...)")
         _print_res("query_string_ppi_enrichment", query_string_ppi_enrichment(test_id, species=species))
-        _print_res("download_string_ppi_enrichment", download_string_ppi_enrichment(test_id, out_base, species=species, filename="ppi_enrichment.json"))
+        _print_res("download_string_ppi_enrichment", download_string_ppi_enrichment(test_id, out_dir, species=species, filename="ppi_enrichment.json"))
 
         print("Testing query_string_homology / download_string_homology(...)")
         _print_res("query_string_homology", query_string_homology(test_id, species=species))
-        _print_res("download_string_homology", download_string_homology(test_id, out_base, species=species, filename="homology.tsv"))
+        _print_res("download_string_homology", download_string_homology(test_id, out_dir, species=species, filename="homology.tsv"))
 
-        print(f"Done. Output under {out_base}")
+        print(f"Done. Output under {out_dir}")
         sys.exit(0)
 
     parser.print_help()

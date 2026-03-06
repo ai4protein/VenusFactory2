@@ -251,24 +251,24 @@ Examples:
 
     if args.test:
         import os
-        out_base = os.path.join("example", "database", "ncbi", "gene")
-        os.makedirs(out_base, exist_ok=True)
+        out_dir = os.path.join("example", "database", "ncbi", "gene")
+        os.makedirs(out_dir, exist_ok=True)
         print("Testing get_taxon_id(...)")
         taxon_id = get_taxon_id("human")
         print(f"  human -> {taxon_id}")
         print("Testing fetch_gene_by_id(...)")
         data = fetch_gene_by_id("672", api_key=args.api_key)
-        out_path = os.path.join(out_base, "fetch_gene_by_id_sample.json")
+        out_path = os.path.join(out_dir, "fetch_gene_by_id_sample.json")
         with open(out_path, "w", encoding="utf-8") as f:
             f.write(json.dumps(data, indent=2)[:8000])
         print(f"  saved to {out_path}")
         print("Testing fetch_gene_by_symbol(...)")
         data2 = fetch_gene_by_symbol("BRCA1", "human", api_key=args.api_key)
-        out_path2 = os.path.join(out_base, "fetch_gene_by_symbol_sample.json")
+        out_path2 = os.path.join(out_dir, "fetch_gene_by_symbol_sample.json")
         with open(out_path2, "w", encoding="utf-8") as f:
             f.write(json.dumps(data2, indent=2)[:8000])
         print(f"  saved to {out_path2}")
-        print(f"Done. Output under {out_base}")
+        print(f"Done. Output under {out_dir}")
         sys.exit(0)
 
     if not args.gene_id and not args.symbol:

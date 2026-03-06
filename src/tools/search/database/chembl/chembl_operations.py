@@ -317,8 +317,8 @@ if __name__ == "__main__":
         print("Use --test to run operations tests.")
         exit(0)
 
-    out_base = os.path.join("example", "database", "chembl")
-    os.makedirs(out_base, exist_ok=True)
+    out_dir = os.path.join("example", "database", "chembl")
+    os.makedirs(out_dir, exist_ok=True)
 
     def _print_result(name: str, res: str) -> None:
         obj = json.loads(res)
@@ -354,11 +354,11 @@ if __name__ == "__main__":
 
     print("=== download_chembl_* (return rich JSON: status, file_info, content_preview, biological_metadata, execution_context) ===")
     for name, res in [
-        ("download_chembl_molecule_by_id", download_chembl_molecule_by_id(args.mol_id, os.path.join(out_base, "chembl_molecule_sample.json"))),
-        ("download_chembl_similarity_by_smiles", download_chembl_similarity_by_smiles(args.smiles, os.path.join(out_base, "chembl_similarity_sample.json"), threshold=args.threshold)),
-        ("download_chembl_substructure_by_smiles", download_chembl_substructure_by_smiles("c1ccccc1", os.path.join(out_base, "chembl_substructure_sample.json"))),
-        ("download_chembl_drug_by_id", download_chembl_drug_by_id(args.mol_id, os.path.join(out_base, "chembl_drug_sample.json"))),
+        ("download_chembl_molecule_by_id", download_chembl_molecule_by_id(args.mol_id, os.path.join(out_dir, "chembl_molecule_sample.json"))),
+        ("download_chembl_similarity_by_smiles", download_chembl_similarity_by_smiles(args.smiles, os.path.join(out_dir, "chembl_similarity_sample.json"), threshold=args.threshold)),
+        ("download_chembl_substructure_by_smiles", download_chembl_substructure_by_smiles("c1ccccc1", os.path.join(out_dir, "chembl_substructure_sample.json"))),
+        ("download_chembl_drug_by_id", download_chembl_drug_by_id(args.mol_id, os.path.join(out_dir, "chembl_drug_sample.json"))),
     ]:
         _print_result(name, res)
 
-    print(f"Done. Output under {out_base}")
+    print(f"Done. Output under {out_dir}")

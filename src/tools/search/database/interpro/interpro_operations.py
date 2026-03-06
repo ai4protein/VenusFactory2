@@ -343,7 +343,7 @@ if __name__ == "__main__":
     parser.add_argument("--interpro_id", type=str, default="IPR001557", help="InterPro ID for test. Default IPR001557.")
     parser.add_argument("--uniprot_id", type=str, default="P40925", help="UniProt ID for test. Default P40925.")
     parser.add_argument(
-        "--out_base",
+        "--out_dir",
         type=str,
         default="example/database/interpro",
         help="Output directory. Default example/database/interpro.",
@@ -354,10 +354,10 @@ if __name__ == "__main__":
         print("Use --test to run operations tests.")
         sys.exit(0)
 
-    out_base = args.out_base
-    os.makedirs(out_base, exist_ok=True)
-    meta_dir = os.path.join(out_base, "metadata")
-    proteins_dir = os.path.join(out_base, "proteins")
+    out_dir = args.out_dir
+    os.makedirs(out_dir, exist_ok=True)
+    meta_dir = os.path.join(out_dir, "metadata")
+    proteins_dir = os.path.join(out_dir, "proteins")
     os.makedirs(meta_dir, exist_ok=True)
     os.makedirs(proteins_dir, exist_ok=True)
 
@@ -417,4 +417,4 @@ if __name__ == "__main__":
         dl_obj = json.loads(res)
         print(f"  {name}: {dl_obj}")
 
-    print(f"Done. Output under {out_base}")
+    print(f"Done. Output under {out_dir}")

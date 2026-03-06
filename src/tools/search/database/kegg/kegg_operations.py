@@ -378,7 +378,7 @@ if __name__ == "__main__":
         help="Run query_* and download_* samples; output under example/database/kegg",
     )
     parser.add_argument(
-        "--out_base",
+        "--out_dir",
         type=str,
         default="example/database/kegg",
         help="Output directory. Default example/database/kegg.",
@@ -389,8 +389,8 @@ if __name__ == "__main__":
         print("Use --test to run operations tests.")
         exit(0)
 
-    out_base = args.out_base
-    os.makedirs(out_base, exist_ok=True)
+    out_dir = args.out_dir
+    os.makedirs(out_dir, exist_ok=True)
 
     def _print_query(name: str, res: str) -> None:
         obj = json.loads(res)
@@ -410,14 +410,14 @@ if __name__ == "__main__":
     # 1. info
     res_info = query_kegg_info_by_database("pathway")
     _print_query("query_kegg_info_by_database('pathway')", res_info)
-    with open(os.path.join(out_base, "query_info_pathway_sample.txt"), "w", encoding="utf-8") as f:
+    with open(os.path.join(out_dir, "query_info_pathway_sample.txt"), "w", encoding="utf-8") as f:
         f.write(res_info)
-    print(f"  full JSON saved to {os.path.join(out_base, 'query_info_pathway_sample.txt')}")
+    print(f"  full JSON saved to {os.path.join(out_dir, 'query_info_pathway_sample.txt')}")
 
     # 2. list
     res_list = query_kegg_list_by_database("pathway", "hsa")
     _print_query("query_kegg_list_by_database('pathway', 'hsa')", res_list)
-    with open(os.path.join(out_base, "query_list_pathway_hsa_sample.txt"), "w", encoding="utf-8") as f:
+    with open(os.path.join(out_dir, "query_list_pathway_hsa_sample.txt"), "w", encoding="utf-8") as f:
         f.write(res_list)
 
     # 3. find
@@ -442,15 +442,15 @@ if __name__ == "__main__":
 
     print("=== download_* (return rich JSON: status, file_info, content_preview, biological_metadata, execution_context) ===")
     for name, res in [
-        ("download_kegg_info_by_database", download_kegg_info_by_database("pathway", os.path.join(out_base, "kegg_info_pathway.txt"))),
-        ("download_kegg_list_by_database", download_kegg_list_by_database("pathway", os.path.join(out_base, "kegg_list_pathway_hsa.txt"), "hsa")),
-        ("download_kegg_find_by_database", download_kegg_find_by_database("genes", "p53", os.path.join(out_base, "kegg_find_genes_p53.txt"))),
-        ("download_kegg_entry_by_id", download_kegg_entry_by_id("hsa:7535", os.path.join(out_base, "kegg_entry_hsa7535.txt"))),
-        ("download_kegg_conv_by_id", download_kegg_conv_by_id("ncbi-geneid", "hsa:7535", os.path.join(out_base, "kegg_conv_hsa7535.txt"))),
-        ("download_kegg_link_by_id", download_kegg_link_by_id("pathway", "hsa:7535", os.path.join(out_base, "kegg_link_hsa7535.txt"))),
-        ("download_kegg_ddi_by_id", download_kegg_ddi_by_id("D00001", os.path.join(out_base, "kegg_ddi_D00001.txt"))),
+        ("download_kegg_info_by_database", download_kegg_info_by_database("pathway", os.path.join(out_dir, "kegg_info_pathway.txt"))),
+        ("download_kegg_list_by_database", download_kegg_list_by_database("pathway", os.path.join(out_dir, "kegg_list_pathway_hsa.txt"), "hsa")),
+        ("download_kegg_find_by_database", download_kegg_find_by_database("genes", "p53", os.path.join(out_dir, "kegg_find_genes_p53.txt"))),
+        ("download_kegg_entry_by_id", download_kegg_entry_by_id("hsa:7535", os.path.join(out_dir, "kegg_entry_hsa7535.txt"))),
+        ("download_kegg_conv_by_id", download_kegg_conv_by_id("ncbi-geneid", "hsa:7535", os.path.join(out_dir, "kegg_conv_hsa7535.txt"))),
+        ("download_kegg_link_by_id", download_kegg_link_by_id("pathway", "hsa:7535", os.path.join(out_dir, "kegg_link_hsa7535.txt"))),
+        ("download_kegg_ddi_by_id", download_kegg_ddi_by_id("D00001", os.path.join(out_dir, "kegg_ddi_D00001.txt"))),
     ]:
         dl_obj = json.loads(res)
         print(f"  {name}: {dl_obj}")
 
-    print(f"Done. Output under {out_base}")
+    print(f"Done. Output under {out_dir}")

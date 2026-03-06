@@ -119,8 +119,8 @@ if __name__ == "__main__":
     if args.test:
         # Test all executable non-helper functions; output under example/database
         test_id = "A0A1B0GTW7"
-        out_base = os.path.join("example", "database", "alphafold")
-        structure_dir = os.path.join(out_base, "structure")
+        out_dir = os.path.join("example", "database", "alphafold")
+        structure_dir = os.path.join(out_dir, "structure")
         os.makedirs(structure_dir, exist_ok=True)
         print("Testing query_alphafold_structure(...)")
         query_text = query_alphafold_structure(test_id, format=args.format, version=args.version, fragment=args.fragment)
@@ -128,14 +128,14 @@ if __name__ == "__main__":
             print(f"  (first 800 chars): {query_text[:800]}...")
         else:
             print(f"  result: {query_text}")
-        query_sample_path = os.path.join(out_base, "query_structure_sample.txt")
+        query_sample_path = os.path.join(out_dir, "query_structure_sample.txt")
         with open(query_sample_path, "w", encoding="utf-8") as f:
             f.write(query_text)
         print(f"  saved full result to {query_sample_path}")
         print("Testing download_alphafold_structure(...)")
         ok, path = download_alphafold_structure(test_id, structure_dir, format=args.format, version=args.version, fragment=args.fragment)
         print(f"  success={ok}, path={path}")
-        print(f"Done. Output under {out_base}")
+        print(f"Done. Output under {out_dir}")
         exit(0)
 
     if not args.uniprot_id and not args.uniprot_id_file:

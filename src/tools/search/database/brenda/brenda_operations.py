@@ -358,7 +358,7 @@ if __name__ == "__main__":
     parser.add_argument("--ec", type=str, default="1.1.1.1", help="EC number for test. Default 1.1.1.1.")
     parser.add_argument("--substrate", type=str, default="glucose", help="Substrate for enzyme search. Default glucose.")
     parser.add_argument(
-        "--out_base",
+        "--out_dir",
         type=str,
         default="example/database/brenda",
         help="Output directory. Default example/database/brenda.",
@@ -369,8 +369,8 @@ if __name__ == "__main__":
         print("Use --test to run operations tests.")
         exit(0)
 
-    out_base = args.out_base
-    os.makedirs(out_base, exist_ok=True)
+    out_dir = args.out_dir
+    os.makedirs(out_dir, exist_ok=True)
     ec = args.ec
     substrate = args.substrate
     organisms = ["Escherichia coli", "Saccharomyces cerevisiae", "Homo sapiens"]
@@ -391,13 +391,13 @@ if __name__ == "__main__":
     print("=== query_* (return rich JSON: status, content, content_preview, biological_metadata, execution_context) ===")
     res_km = query_brenda_km_values_by_ec_number(ec)
     _print_query("query_brenda_km_values_by_ec_number(...)", res_km)
-    with open(os.path.join(out_base, "query_km_sample.txt"), "w", encoding="utf-8") as f:
+    with open(os.path.join(out_dir, "query_km_sample.txt"), "w", encoding="utf-8") as f:
         f.write(res_km)
-    print(f"  full JSON saved to {os.path.join(out_base, 'query_km_sample.txt')}")
+    print(f"  full JSON saved to {os.path.join(out_dir, 'query_km_sample.txt')}")
 
     res_reactions = query_brenda_reactions_by_ec_number(ec)
     _print_query("query_brenda_reactions_by_ec_number(...)", res_reactions)
-    with open(os.path.join(out_base, "query_reactions_sample.txt"), "w", encoding="utf-8") as f:
+    with open(os.path.join(out_dir, "query_reactions_sample.txt"), "w", encoding="utf-8") as f:
         f.write(res_reactions)
 
     res_compare = query_brenda_compare_organisms_by_ec_number(ec, organisms)
@@ -411,19 +411,19 @@ if __name__ == "__main__":
 
     print("=== download_* (return rich JSON: status, file_info, content_preview, biological_metadata, execution_context) ===")
     for name, res in [
-        ("download_brenda_km_values_by_ec_number", download_brenda_km_values_by_ec_number(ec, os.path.join(out_base, "brenda_km_sample.json"))),
-        ("download_brenda_reactions_by_ec_number", download_brenda_reactions_by_ec_number(ec, os.path.join(out_base, "brenda_reactions_sample.txt"))),
+        ("download_brenda_km_values_by_ec_number", download_brenda_km_values_by_ec_number(ec, os.path.join(out_dir, "brenda_km_sample.json"))),
+        ("download_brenda_reactions_by_ec_number", download_brenda_reactions_by_ec_number(ec, os.path.join(out_dir, "brenda_reactions_sample.txt"))),
         (
             "download_brenda_compare_organisms_by_ec_number",
-            download_brenda_compare_organisms_by_ec_number(ec, organisms, os.path.join(out_base, "brenda_compare_organisms_sample.json")),
+            download_brenda_compare_organisms_by_ec_number(ec, organisms, os.path.join(out_dir, "brenda_compare_organisms_sample.json")),
         ),
         (
             "download_brenda_environmental_parameters_by_ec_number",
-            download_brenda_environmental_parameters_by_ec_number(ec, os.path.join(out_base, "brenda_environmental_sample.json")),
+            download_brenda_environmental_parameters_by_ec_number(ec, os.path.join(out_dir, "brenda_environmental_sample.json")),
         ),
         (
             "download_brenda_enzymes_by_substrate",
-            download_brenda_enzymes_by_substrate(substrate, os.path.join(out_base, "brenda_enzymes_by_substrate_sample.json")),
+            download_brenda_enzymes_by_substrate(substrate, os.path.join(out_dir, "brenda_enzymes_by_substrate_sample.json")),
         ),
     ]:
         dl_obj = json.loads(res)
@@ -435,10 +435,10 @@ if __name__ == "__main__":
             pathway_data = json.loads(pathway_obj["content"])
             if isinstance(pathway_data, dict) and ("steps" in pathway_data or "target" in pathway_data):
                 dl_pathway = download_brenda_pathway_report(
-                    pathway_data, os.path.join(out_base, "brenda_pathway_report_sample.txt")
+                    pathway_data, os.path.join(out_dir, "brenda_pathway_report_sample.txt")
                 )
                 print(f"  download_brenda_pathway_report: {json.loads(dl_pathway)}")
         except (json.JSONDecodeError, TypeError):
             pass
 
-    print(f"Done. Output under {out_base}")
+    print(f"Done. Output under {out_dir}")

@@ -54,19 +54,19 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.test:
-        out_base = os.path.join("example", "database", "uniprot", "metadata")
-        os.makedirs(out_base, exist_ok=True)
+        out_dir = os.path.join("example", "database", "uniprot", "metadata")
+        os.makedirs(out_dir, exist_ok=True)
         test_id = "P43403"
         print("Testing query_uniprot_meta(...)")
         text = query_uniprot_meta(test_id)
-        sample_path = os.path.join(out_base, "query_meta_sample.json")
+        sample_path = os.path.join(out_dir, f"{test_id}.json")
         with open(sample_path, "w", encoding="utf-8") as f:
             f.write(text)
         print(f"  saved to {sample_path}")
         print("Testing download_uniprot_meta(...)")
-        msg = download_uniprot_meta(test_id, out_base)
+        msg = download_uniprot_meta(test_id, out_dir)
         print(f"  {msg}")
-        print(f"Done. Output under {out_base}")
+        print(f"Done. Output under {out_dir}")
         exit(0)
 
     if not args.out_dir:

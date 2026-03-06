@@ -177,18 +177,18 @@ if __name__ == "__main__":
     args = p.parse_args()
 
     if args.test:
-        out_base = os.path.join("example", "database", "uniprot", "search")
-        os.makedirs(out_base, exist_ok=True)
+        out_dir = os.path.join("example", "database", "uniprot", "search")
+        os.makedirs(out_dir, exist_ok=True)
         test_id = "P43403"
         print("Testing uniprot_search(...)", flush=True)
         out = uniprot_search("urate", frmt="tsv", columns="accession,gene_names,organism_name", limit=5)
         print(f"  {len(out)} chars")
-        with open(os.path.join(out_base, "uniprot_search_sample.tsv"), "w", encoding="utf-8") as f:
+        with open(os.path.join(out_dir, f"{test_id}_search_sample.tsv"), "w", encoding="utf-8") as f:
             f.write(out)
         print("Testing uniprot_retrieve(...)", flush=True)
         out2 = uniprot_retrieve(test_id, frmt="fasta")
         print(f"  {len(out2)} chars")
-        with open(os.path.join(out_base, "uniprot_retrieve_sample.fasta"), "w", encoding="utf-8") as f:
+        with open(os.path.join(out_dir, f"{test_id}_retrieve_sample.fasta"), "w", encoding="utf-8") as f:
             f.write(out2)
         print("Testing uniprot_mapping(...)", flush=True)
         # UniProt idmapping: valid 'to' from https://idmapping.uniprot.org (e.g. PDB, KEGG, RefSeq_Protein)
@@ -197,15 +197,15 @@ if __name__ == "__main__":
             out3 = ""
         out3_str = out3 if isinstance(out3, str) else json.dumps(out3)
         print(f"  {len(out3_str)} chars")
-        with open(os.path.join(out_base, "uniprot_mapping_sample.txt"), "w", encoding="utf-8") as f:
+        with open(os.path.join(out_dir, f"{test_id}_mapping_sample.txt"), "w", encoding="utf-8") as f:
             f.write(out3_str or "(no mapping or API error)")
         print("Testing uniprot_search_and_retrieve(...)", flush=True)
         # Use a narrow query to avoid slow pagination (no limit in search_and_retrieve)
         out4 = uniprot_search_and_retrieve("accession:P43403", retrieve_frmt="fasta")
         print(f"  {len(out4)} chars")
-        with open(os.path.join(out_base, "uniprot_search_and_retrieve_sample.fasta"), "w", encoding="utf-8") as f:
+        with open(os.path.join(out_dir, f"{test_id}_search_and_retrieve_sample.fasta"), "w", encoding="utf-8") as f:
             f.write(out4)
-        print(f"Done. Output under {out_base}")
+        print(f"Done. Output under {out_dir}")
         sys.exit(0)
 
     print("Testing registered tool: uniprot_search", flush=True)

@@ -834,8 +834,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.test:
-        out_base = os.path.join("example", "database", "brenda")
-        os.makedirs(out_base, exist_ok=True)
+        out_dir = os.path.join("example", "database", "brenda")
+        os.makedirs(out_dir, exist_ok=True)
         print("Testing brenda_queries (search_enzymes_by_substrate, compare_across_organisms, get_environmental_parameters, export_kinetic_data, ...)")
         try:
             if not os.environ.get("BRENDA_EMAIL") or not os.environ.get("BRENDA_PASSWORD"):
@@ -844,28 +844,28 @@ if __name__ == "__main__":
                 print("  1. search_enzymes_by_substrate(...)")
                 enzymes = search_enzymes_by_substrate(args.substrate, limit=args.limit)
                 print(f"     -> {len(enzymes)} enzymes")
-                with open(os.path.join(out_base, "search_enzymes_by_substrate_sample.json"), "w", encoding="utf-8") as f:
+                with open(os.path.join(out_dir, "search_enzymes_by_substrate_sample.json"), "w", encoding="utf-8") as f:
                     json.dump(enzymes[:10], f, indent=2, default=str)
 
                 print("  2. compare_across_organisms(...)")
                 organisms = ["Escherichia coli", "Saccharomyces cerevisiae", "Homo sapiens"]
                 comparison = compare_across_organisms(args.ec, organisms)
                 print(f"     -> {len(comparison)} organisms")
-                with open(os.path.join(out_base, "compare_across_organisms_sample.json"), "w", encoding="utf-8") as f:
+                with open(os.path.join(out_dir, "compare_across_organisms_sample.json"), "w", encoding="utf-8") as f:
                     json.dump(comparison, f, indent=2, default=str)
 
                 print("  3. get_environmental_parameters(...)")
                 params = get_environmental_parameters(args.ec)
                 print(f"     data_points: {params.get('data_points', 0)}")
-                with open(os.path.join(out_base, "environmental_parameters_sample.json"), "w", encoding="utf-8") as f:
+                with open(os.path.join(out_dir, "environmental_parameters_sample.json"), "w", encoding="utf-8") as f:
                     json.dump(params, f, indent=2, default=str)
 
                 print("  4. export_kinetic_data(...)")
-                out_csv = os.path.join(out_base, "kinetic_export_sample.csv")
+                out_csv = os.path.join(out_dir, "kinetic_export_sample.csv")
                 export_kinetic_data(args.ec, format="csv", filename=out_csv)
         except Exception as e:
             print(f"  Example failed: {e}")
-        print(f"Done. Output under {out_base}")
+        print(f"Done. Output under {out_dir}")
         exit(0)
 
     # Non-test: run one query by args

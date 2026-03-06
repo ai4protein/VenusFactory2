@@ -169,8 +169,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.test:
-        out_base = os.path.join("example", "database", "ncbi", "blast")
-        os.makedirs(out_base, exist_ok=True)
+        out_dir = os.path.join("example", "database", "ncbi", "blast")
+        os.makedirs(out_dir, exist_ok=True)
         # Short peptide to keep BLAST test fast
         test_seq = "MKTAYIAKQRQISFVKSHFSRQLEERLGLIEVQAPILSRVGDGTQDNLSGAEKAVQVKVKALPDAQFEVVHSLAKWKRQTLGQHDFSAGEGLYTHMKALRPDEDRLSPLHSVYVDQWDWERVMGDGERQFSTLKSTVEAIWAGIKATEAAVSEEFGLAPFLPDQIHFVHSQELLSRYPDLDAKGRERAIAKDLGAVFLVGIGGKLSDGHRHDVRAPDYDDWSTPSELGHAGLNGDILVWNPVLEDAFELSSMGIRVDADTLKHQLALTGDEDRLELEWHQALLRGEMPQTIGGGIGQSRLTMLLLQLPHIGQVQAGVWPAAVRESVPSLL"
         print("Testing query_ncbi_blast(...) [short sequence]")
@@ -178,20 +178,20 @@ if __name__ == "__main__":
         if xml_result.strip().startswith("{"):
             print("  BLAST returned error (e.g. rate limit):", xml_result[:200])
         else:
-            out_xml = os.path.join(out_base, "blast_result_sample.xml")
+            out_xml = os.path.join(out_dir, "blast_result_sample.xml")
             with open(out_xml, "w", encoding="utf-8") as f:
                 f.write(xml_result[:50000] if len(xml_result) > 50000 else xml_result)
             print(f"  saved to {out_xml}")
             print("Testing parse_blast_xml(...)")
             parsed = parse_blast_xml(xml_result)
             print(f"  parsed {len(parsed)} record(s)")
-            with open(os.path.join(out_base, "blast_parsed_sample.json"), "w", encoding="utf-8") as f:
+            with open(os.path.join(out_dir, "blast_parsed_sample.json"), "w", encoding="utf-8") as f:
                 json.dump(parsed, f, indent=2, default=str)
         print("Testing download_ncbi_blast(...)")
-        out_path = os.path.join(out_base, "blast_download_sample.xml")
+        out_path = os.path.join(out_dir, "blast_download_sample.xml")
         msg = download_ncbi_blast(test_seq, out_path, program="blastp", database="swissprot", hitlist_size=5)
         print(f"  {msg}")
-        print(f"Done. Output under {out_base}")
+        print(f"Done. Output under {out_dir}")
         exit(0)
 
     if not args.out:

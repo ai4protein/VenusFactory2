@@ -301,35 +301,35 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.test:
-        out_base = os.path.join("example", "database", "interpro", "proteins")
-        os.makedirs(out_base, exist_ok=True)
+        out_dir = os.path.join("example", "database", "interpro", "proteins")
+        os.makedirs(out_dir, exist_ok=True)
         test_uniprot = "P40925"
         test_interpro = "IPR001557"
         print("Testing query_interpro_by_uniprot(...)")
         text = query_interpro_by_uniprot(test_uniprot)
-        with open(os.path.join(out_base, "query_by_uniprot_sample.json"), "w", encoding="utf-8") as f:
+        with open(os.path.join(out_dir, "query_by_uniprot_sample.json"), "w", encoding="utf-8") as f:
             f.write(text[:12000] if len(text) > 12000 else text)
         print("  saved query_by_uniprot_sample.json")
         print("Testing download_interpro_by_uniprot(...)")
-        msg = download_interpro_by_uniprot(test_uniprot, out_base)
+        msg = download_interpro_by_uniprot(test_uniprot, out_dir)
         print(f"  {msg}")
         print("Testing query_interpro_proteins(...) [max_results=15]")
         text2 = query_interpro_proteins(test_interpro, page_size=10, max_results=15)
-        with open(os.path.join(out_base, "query_proteins_sample.json"), "w", encoding="utf-8") as f:
+        with open(os.path.join(out_dir, "query_proteins_sample.json"), "w", encoding="utf-8") as f:
             f.write(text2[:8000] if len(text2) > 8000 else text2)
         print("  saved query_proteins_sample.json")
         print("Testing download_interpro_proteins(...) [max_results=15]")
-        msg2 = download_interpro_proteins(test_interpro, out_base, max_results=15)
+        msg2 = download_interpro_proteins(test_interpro, out_dir, max_results=15)
         print(f"  {msg2}")
         print("Testing query_interpro_uniprot_list(...) [max_results=30 to avoid long pagination]")
         text3 = query_interpro_uniprot_list(test_interpro, page_size=20, max_results=30)
-        with open(os.path.join(out_base, "query_uniprot_list_sample.json"), "w", encoding="utf-8") as f:
+        with open(os.path.join(out_dir, "query_uniprot_list_sample.json"), "w", encoding="utf-8") as f:
             f.write(text3)
         print("  saved query_uniprot_list_sample.json")
         print("Testing download_interpro_uniprot_list(...) [max_results=30]")
-        msg3 = download_interpro_uniprot_list(test_interpro, out_base, chunk_size=50, page_size=20, max_results=30)
+        msg3 = download_interpro_uniprot_list(test_interpro, out_dir, chunk_size=50, page_size=20, max_results=30)
         print(f"  {msg3}")
-        print(f"Done. Output under {out_base}")
+        print(f"Done. Output under {out_dir}")
         sys.exit(0)
 
     if args.cmd is None and (getattr(args, "interpro_id", None) or getattr(args, "interpro_json", None)):

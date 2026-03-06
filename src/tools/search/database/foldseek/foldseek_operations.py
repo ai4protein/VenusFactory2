@@ -293,9 +293,9 @@ if __name__ == "__main__":
         print("Use --test to run operations tests.")
         sys.exit(0)
 
-    out_base = os.path.join("example", "database", "foldseek")
-    os.makedirs(out_base, exist_ok=True)
-    search_dir = os.path.join(out_base, "search")
+    out_dir = os.path.join("example", "database", "foldseek")
+    os.makedirs(out_dir, exist_ok=True)
+    search_dir = os.path.join(out_dir, "search")
     os.makedirs(search_dir, exist_ok=True)
     out_dir = args.out_dir or search_dir
     protect_start = args.protect_start
@@ -320,4 +320,4 @@ if __name__ == "__main__":
     )
     dl_obj = json.loads(res)
     print(f"  download_foldseek_results_by_pdb_file: {dl_obj}")
-    print(f"Done. Output under {out_base}")
+    print(f"Done. Output under {out_dir}")

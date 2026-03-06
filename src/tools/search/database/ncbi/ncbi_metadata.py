@@ -58,20 +58,20 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.test:
-        out_base = os.path.join("example", "database", "ncbi", "metadata")
-        os.makedirs(out_base, exist_ok=True)
-        meta_dir = os.path.join(out_base, "metadata")
+        out_dir = os.path.join("example", "database", "ncbi", "metadata")
+        os.makedirs(out_dir, exist_ok=True)
+        meta_dir = os.path.join(out_dir, "metadata")
         test_id = "NP_000483.1"
         print("Testing query_ncbi_meta(...)")
         text = query_ncbi_meta(test_id, db=args.db, rettype=args.rettype)
-        sample_path = os.path.join(out_base, "query_meta_sample." + ("gb" if args.rettype == "gb" else "xml"))
+        sample_path = os.path.join(out_dir, "query_meta_sample." + ("gb" if args.rettype == "gb" else "xml"))
         with open(sample_path, "w", encoding="utf-8") as f:
             f.write(text[:5000] if len(text) > 5000 else text)
         print(f"  saved to {sample_path}")
         print("Testing download_ncbi_meta(...)")
         msg = download_ncbi_meta(test_id, meta_dir, db=args.db, rettype=args.rettype)
         print(f"  {msg}")
-        print(f"Done. Output under {out_base}")
+        print(f"Done. Output under {out_dir}")
         exit(0)
 
     if not args.out_dir:

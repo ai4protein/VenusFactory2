@@ -84,24 +84,24 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.test:
-        out_base = os.path.join("example", "database", "rcsb", "structure")
-        os.makedirs(out_base, exist_ok=True)
+        out_dir = os.path.join("example", "database", "rcsb", "structure")
+        os.makedirs(out_dir, exist_ok=True)
         test_id = "4HHB"
         print("Testing query_rcsb_structure(...)")
         text = query_rcsb_structure(test_id, file_type=args.type)
         if text.strip().startswith("{"):
-            sample_path = os.path.join(out_base, "query_structure_sample.json")
+            sample_path = os.path.join(out_dir, "query_structure_sample.json")
             with open(sample_path, "w", encoding="utf-8") as f:
                 f.write(text[:2000])
         else:
-            sample_path = os.path.join(out_base, "query_structure_sample.txt")
+            sample_path = os.path.join(out_dir, "query_structure_sample.txt")
             with open(sample_path, "w", encoding="utf-8") as f:
                 f.write(text[:5000] if len(text) > 5000 else text)
         print(f"  saved to {sample_path}")
         print("Testing download_rcsb_structure(...)")
-        path = download_rcsb_structure(test_id, out_base, file_type=args.type, unzip=True)
+        path = download_rcsb_structure(test_id, out_dir, file_type=args.type, unzip=True)
         print(f"  -> {path}")
-        print(f"Done. Output under {out_base}")
+        print(f"Done. Output under {out_dir}")
         exit(0)
 
     if not args.pdb_id and not args.pdb_id_file:

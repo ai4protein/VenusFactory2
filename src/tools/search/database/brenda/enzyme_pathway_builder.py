@@ -1042,8 +1042,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.test:
-        out_base = os.path.join("example", "database", "brenda")
-        os.makedirs(out_base, exist_ok=True)
+        out_dir = os.path.join("example", "database", "brenda")
+        os.makedirs(out_dir, exist_ok=True)
         print("Testing enzyme_pathway_builder (find_pathway_for_product, build_retrosynthetic_tree, suggest_enzyme_substitutions, ...)")
         try:
             if not os.environ.get("BRENDA_EMAIL") or not os.environ.get("BRENDA_PASSWORD"):
@@ -1056,7 +1056,7 @@ if __name__ == "__main__":
                 print("  2. find_pathway_for_product(...)")
                 pathway = find_pathway_for_product(args.target, max_steps=3)
                 print(f"     steps: {len(pathway['steps'])}, confidence: {pathway['confidence']:.2f}")
-                with open(os.path.join(out_base, "pathway_sample.json"), "w", encoding="utf-8") as f:
+                with open(os.path.join(out_dir, "pathway_sample.json"), "w", encoding="utf-8") as f:
                     json.dump(pathway, f, indent=2, default=str)
 
                 print("  3. build_retrosynthetic_tree(...)")
@@ -1066,7 +1066,7 @@ if __name__ == "__main__":
                 print("  4. suggest_enzyme_substitutions(...)")
                 substitutions = suggest_enzyme_substitutions(args.ec)
                 print(f"     -> {len(substitutions)} suggestions")
-                with open(os.path.join(out_base, "substitutions_sample.json"), "w", encoding="utf-8") as f:
+                with open(os.path.join(out_dir, "substitutions_sample.json"), "w", encoding="utf-8") as f:
                     json.dump(substitutions[:5], f, indent=2, default=str)
 
                 print("  5. calculate_pathway_feasibility(...)")
@@ -1074,15 +1074,15 @@ if __name__ == "__main__":
                 print(f"     overall_score: {feasibility['overall_score']:.2f}")
 
                 print("  6. generate_pathway_report(...)")
-                report_file = os.path.join(out_base, "pathway_report_sample.txt")
+                report_file = os.path.join(out_dir, "pathway_report_sample.txt")
                 generate_pathway_report(pathway, filename=report_file)
 
                 print("  7. visualize_pathway(...)")
-                viz_file = os.path.join(out_base, "pathway_visualization_sample.png")
+                viz_file = os.path.join(out_dir, "pathway_visualization_sample.png")
                 visualize_pathway(pathway, save_path=viz_file)
         except Exception as e:
             print(f"  Example failed: {e}")
-        print(f"Done. Output under {out_base}")
+        print(f"Done. Output under {out_dir}")
         exit(0)
 
     out_dir = args.out_dir or "."

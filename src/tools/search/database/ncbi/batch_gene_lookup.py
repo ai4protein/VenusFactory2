@@ -268,18 +268,18 @@ Examples:
 
     if args.test:
         import os
-        out_base = os.path.join("example", "database", "ncbi", "gene")
-        os.makedirs(out_base, exist_ok=True)
+        out_dir = os.path.join("example", "database", "ncbi", "gene")
+        os.makedirs(out_dir, exist_ok=True)
         print("Testing batch_esearch(...)")
         symbol_to_id = batch_esearch(["BRCA1", "TP53"], organism="human", api_key=args.api_key)
         print(f"  {symbol_to_id}")
         print("Testing batch_lookup_by_ids(...)")
         results = batch_lookup_by_ids(["672", "7157"], api_key=args.api_key)
-        out_path = os.path.join(out_base, "batch_gene_lookup_sample.json")
+        out_path = os.path.join(out_dir, "batch_gene_lookup_sample.json")
         with open(out_path, "w", encoding="utf-8") as f:
             f.write(json.dumps(results, indent=2))
         print(f"  saved to {out_path}")
-        print(f"Done. Output under {out_base}")
+        print(f"Done. Output under {out_dir}")
         sys.exit(0)
 
     if not args.ids and not args.file:

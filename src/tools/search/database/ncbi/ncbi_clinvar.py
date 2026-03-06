@@ -398,9 +398,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.test:
-        out_base = os.path.join("example", "database", "ncbi", "clinvar")
-        os.makedirs(out_base, exist_ok=True)
-        clinvar_dir = os.path.join(out_base, "clinvar")
+        out_dir = os.path.join("example", "database", "ncbi", "clinvar")
+        os.makedirs(out_dir, exist_ok=True)
+        clinvar_dir = os.path.join(out_dir, "clinvar")
         os.makedirs(clinvar_dir, exist_ok=True)
         print("Testing build_clinvar_term(...)")
         term = build_clinvar_term(gene="BRCA1", clinical_significance="pathogenic")
@@ -421,7 +421,7 @@ if __name__ == "__main__":
         print("Testing get_clinvar_ftp_url(...)")
         url = get_clinvar_ftp_url("variant_summary")
         print(f"  variant_summary URL: {url[:80]}...")
-        print(f"Done. Output under {out_base}")
+        print(f"Done. Output under {out_dir}")
         exit(0)
 
     term = args.term or build_clinvar_term(

@@ -3,12 +3,7 @@
 # Output: example/database/kegg/ (logs and sample files).
 # Academic use only. Run from project root: ./script/tools/search/database/test_kegg.sh
 
-set -e
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-ROOT="$(cd "$SCRIPT_DIR/../../../../" && pwd)"
-cd "$ROOT"
-
-OUT_DIR="${ROOT}/example/database/kegg"
+OUT_DIR="example/database/kegg"
 mkdir -p "$OUT_DIR"
 
 echo "=== kegg_operations (query_kegg_info, download_kegg_info, query_kegg_list, download_kegg_list, query_kegg_find, download_kegg_find, query_kegg_get, download_kegg_get, query_kegg_conv, download_kegg_conv, query_kegg_link, download_kegg_link, query_kegg_ddi, download_kegg_ddi) ==="

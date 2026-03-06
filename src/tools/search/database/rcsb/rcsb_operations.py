@@ -242,7 +242,7 @@ if __name__ == "__main__":
     parser.add_argument("--pdb_id", type=str, default="4HHB", help="PDB ID for test. Default 4HHB.")
     parser.add_argument("--file_type", type=str, default="pdb", help="Structure file type (pdb, cif, xml). Default pdb.")
     parser.add_argument(
-        "--out_base",
+        "--out_dir",
         type=str,
         default="example/database/rcsb",
         help="Output directory. Default example/database/rcsb.",
@@ -253,8 +253,8 @@ if __name__ == "__main__":
         print("Use --test to run operations tests.")
         exit(0)
 
-    out_base = args.out_base
-    os.makedirs(out_base, exist_ok=True)
+    out_dir = args.out_dir
+    os.makedirs(out_dir, exist_ok=True)
     pdb_id = args.pdb_id
 
     def _print_result(name: str, res: str) -> None:
@@ -280,9 +280,9 @@ if __name__ == "__main__":
 
     print("=== download_rcsb_* (return rich JSON: status, file_info, content_preview, biological_metadata, execution_context) ===")
     for name, res in [
-        ("download_rcsb_entry_metadata_by_pdb_id", download_rcsb_entry_metadata_by_pdb_id(pdb_id, os.path.join(out_base, f"rcsb_entry_{pdb_id}.json"))),
-        ("download_rcsb_structure_by_pdb_id", download_rcsb_structure_by_pdb_id(pdb_id, out_base, file_type=args.file_type)),
+        ("download_rcsb_entry_metadata_by_pdb_id", download_rcsb_entry_metadata_by_pdb_id(pdb_id, os.path.join(out_dir, f"rcsb_entry_{pdb_id}.json"))),
+        ("download_rcsb_structure_by_pdb_id", download_rcsb_structure_by_pdb_id(pdb_id, out_dir, file_type=args.file_type)),
     ]:
         _print_result(name, res)
 
-    print(f"Done. Output under {out_base}")
+    print(f"Done. Output under {out_dir}")

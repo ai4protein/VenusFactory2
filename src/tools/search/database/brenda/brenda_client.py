@@ -251,8 +251,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.test:
-        out_base = os.path.join("example", "database", "brenda")
-        os.makedirs(out_base, exist_ok=True)
+        out_dir = os.path.join("example", "database", "brenda")
+        os.makedirs(out_dir, exist_ok=True)
         print("Testing get_km_values, get_reactions (require BRENDA_EMAIL, BRENDA_PASSWORD)")
         if not os.environ.get("BRENDA_EMAIL") or not os.environ.get("BRENDA_PASSWORD"):
             print("  Skip: set BRENDA_EMAIL and BRENDA_PASSWORD to run")
@@ -261,14 +261,14 @@ if __name__ == "__main__":
         print("  get_km_values(...)")
         km = get_km_values(ec, organism="*")
         print(f"    -> {len(km)} entries")
-        with open(os.path.join(out_base, "km_entries_sample.txt"), "w", encoding="utf-8") as f:
+        with open(os.path.join(out_dir, "km_entries_sample.txt"), "w", encoding="utf-8") as f:
             f.write("\n".join(km[:20]) if km else "no data")
         print("  get_reactions(...)")
         rx = get_reactions(ec, organism="*")
         print(f"    -> {len(rx)} entries")
-        with open(os.path.join(out_base, "reactions_entries_sample.txt"), "w", encoding="utf-8") as f:
+        with open(os.path.join(out_dir, "reactions_entries_sample.txt"), "w", encoding="utf-8") as f:
             f.write("\n".join(rx[:20]) if rx else "no data")
-        print(f"Done. Output under {out_base}")
+        print(f"Done. Output under {out_dir}")
         exit(0)
 
     if not os.environ.get("BRENDA_EMAIL") or not os.environ.get("BRENDA_PASSWORD"):
