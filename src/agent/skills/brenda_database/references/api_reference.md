@@ -207,7 +207,7 @@ Reactions use standard biochemical notation:
 
 ## Python Client Reference
 
-### brenda_client Module (`src/tools/search/database/brenda/brenda_client.py`)
+### brenda_client Module (`src/tools/database/brenda/brenda_client.py`)
 
 #### Core Functions
 
@@ -306,7 +306,7 @@ Reactions use standard biochemical notation:
 
 **Get all Km values for an enzyme:**
 ```python
-from src.tools.search.database.brenda import get_km_values
+from src.tools.database.brenda import get_km_values
 
 # Get all alcohol dehydrogenase Km values
 km_data = get_km_values("1.1.1.1")
@@ -358,7 +358,7 @@ glucose_km = get_km_values("1.1.1.1",
 
 **Get all reactions for an enzyme:**
 ```python
-from src.tools.search.database.brenda import get_reactions
+from src.tools.database.brenda import get_reactions
 
 reactions = get_reactions("1.1.1.1")
 ```
@@ -375,7 +375,7 @@ glucose_reactions = get_reactions("*", reaction="*glucose*")
 
 **Extract numeric Km values:**
 ```python
-from src.tools.search.database.brenda import parse_km_entry
+from src.tools.database.brenda import parse_km_entry
 
 km_data = get_km_values("1.1.1.1", substrate="ethanol")
 numeric_kms = []
@@ -394,7 +394,7 @@ if numeric_kms:
 
 **Compare enzyme properties across organisms:**
 ```python
-from src.tools.search.database.brenda import compare_across_organisms
+from src.tools.database.brenda import compare_across_organisms
 
 organisms = ["Escherichia coli", "Saccharomyces cerevisiae", "Homo sapiens"]
 comparison = compare_across_organisms("1.1.1.1", organisms)
@@ -408,7 +408,7 @@ for org_data in comparison:
 
 **Analyze substrate preferences:**
 ```python
-from src.tools.search.database.brenda import get_substrate_specificity
+from src.tools.database.brenda import get_substrate_specificity
 
 specificity = get_substrate_specificity("1.1.1.1")
 
@@ -422,7 +422,7 @@ for substrate_data in specificity[:5]:  # Top 5
 
 **Build enzymatic pathway:**
 ```python
-from src.tools.search.database.brenda import find_pathway_for_product
+from src.tools.database.brenda import find_pathway_for_product
 
 # Find pathway for lactate production
 pathway = find_pathway_for_product("lactate", max_steps=3)
@@ -436,7 +436,7 @@ for step in pathway['steps']:
 
 **Find thermostable variants:**
 ```python
-from src.tools.search.database.brenda import find_thermophilic_homologs
+from src.tools.database.brenda import find_thermophilic_homologs
 
 thermophilic = find_thermophilic_homologs("1.1.1.1", min_temp=50)
 
@@ -448,7 +448,7 @@ for enzyme in thermophilic:
 
 **Extract parameters for modeling:**
 ```python
-from src.tools.search.database.brenda import get_modeling_parameters
+from src.tools.database.brenda import get_modeling_parameters
 
 model_data = get_modeling_parameters("1.1.1.1", substrate="ethanol")
 

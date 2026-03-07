@@ -2,11 +2,11 @@
 
 ## Project Integration (VenusFactory)
 
-KEGG REST operations are implemented in **`src/tools/search/database/kegg/`**:
+KEGG REST operations are implemented in **`src/tools/database/kegg/`**:
 
-- **Entry point**: `kegg_api.py` re-exports all functions (use for backward compatibility: `from src.tools.search.database.kegg.kegg_api import kegg_info, ...`).
+- **Entry point**: `kegg_api.py` re-exports all functions (use for backward compatibility: `from src.tools.database.kegg.kegg_api import kegg_info, ...`).
 - **Atomic modules**: `kegg_rest.py` (base client), `kegg_info.py`, `kegg_list.py`, `kegg_find.py`, `kegg_get.py`, `kegg_conv.py`, `kegg_link.py`, `kegg_ddi.py`.
-- **Import**: `from src.tools.search.database.kegg import kegg_info, kegg_list, kegg_find, kegg_get, kegg_conv, kegg_link, kegg_ddi`.
+- **Import**: `from src.tools.database.kegg import kegg_info, kegg_list, kegg_find, kegg_get, kegg_conv, kegg_link, kegg_ddi`.
 
 See SKILL.md for the Project Tools table and usage.
 

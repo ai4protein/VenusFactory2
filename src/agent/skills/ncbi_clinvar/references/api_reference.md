@@ -2,7 +2,7 @@
 
 ## Project Integration (VenusFactory)
 
-The codebase implements ClinVar E-utilities and FTP access in **`src/tools/search/database/ncbi/ncbi_clinvar.py`**.
+The codebase implements ClinVar E-utilities and FTP access in **`src/tools/database/ncbi/ncbi_clinvar.py`**.
 
 | API | Python function | Notes |
 |-----|-----------------|--------|

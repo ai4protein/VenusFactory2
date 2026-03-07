@@ -27,10 +27,10 @@ This skill should be used when:
 ## Quick Start
 
 The skill provides:
-1. **Project tools**: All operations (query and download) are consolidated in `src/tools/search/database/string/string_operations.py`. They return rich JSON containing `status`, `content` (or `file_info` for downloads), and `execution_context`.
+1. **Project tools**: All operations (query and download) are consolidated in `src/tools/database/string/string_operations.py`. They return rich JSON containing `status`, `content` (or `file_info` for downloads), and `execution_context`.
 2. **Reference**: `references/string_reference.md` for API specs, parameters, and output formats.
 
-When users request STRING data, choose the operation and call the corresponding function from `src.tools.search.database.string`.
+When users request STRING data, choose the operation and call the corresponding function from `src.tools.database.string`.
 
 ## Project Tools (VenusFactory)
 
@@ -47,7 +47,7 @@ When users request STRING data, choose the operation and call the corresponding 
 
 **Import (preferred)**:
 ```python
-from src.tools.search.database.string import (
+from src.tools.database.string import (
     query_string_map_ids, download_string_map_ids,
     query_string_network, download_string_network,
     query_string_network_image, download_string_network_image,
@@ -69,7 +69,7 @@ Convert gene names, protein names, and external IDs to STRING identifiers.
 
 **Usage**:
 ```python
-from src.tools.search.database.string import query_string_map_ids
+from src.tools.database.string import query_string_map_ids
 
 # Map single protein
 result_json = query_string_map_ids('TP53', species=9606)
@@ -96,7 +96,7 @@ Get protein-protein interaction network data in tabular format.
 
 **Usage**:
 ```python
-from src.tools.search.database.string import query_string_network
+from src.tools.database.string import query_string_network
 
 # Get network for single protein
 network_json = query_string_network('9606.ENSP00000269305', species=9606)
@@ -131,7 +131,7 @@ Generate network visualization as PNG image.
 
 **Usage**:
 ```python
-from src.tools.search.database.string import download_string_network_image, query_string_network_image
+from src.tools.database.string import download_string_network_image, query_string_network_image
 
 # Download image to file
 proteins = ['TP53', 'MDM2', 'ATM', 'CHEK2', 'BRCA1']
@@ -160,7 +160,7 @@ Find all proteins that interact with given protein(s).
 
 **Usage**:
 ```python
-from src.tools.search.database.string import query_string_interaction_partners
+from src.tools.database.string import query_string_interaction_partners
 
 # Get top 10 interactors of TP53
 res_json = query_string_interaction_partners('TP53', species=9606, limit=10)
@@ -186,7 +186,7 @@ Perform enrichment analysis across Gene Ontology, KEGG pathways, Pfam domains, a
 
 **Usage**:
 ```python
-from src.tools.search.database.string import query_string_enrichment
+from src.tools.database.string import query_string_enrichment
 import json
 import pandas as pd
 import io
@@ -210,7 +210,7 @@ Test if a protein network has significantly more interactions than expected by c
 
 **Usage**:
 ```python
-from src.tools.search.database.string import query_string_ppi_enrichment
+from src.tools.database.string import query_string_ppi_enrichment
 import json
 
 # Test network connectivity
@@ -235,7 +235,7 @@ Retrieve protein similarity and homology information.
 
 **Usage**:
 ```python
-from src.tools.search.database.string import query_string_homology
+from src.tools.database.string import query_string_homology
 
 # Get homology between proteins
 proteins = ['TP53', 'TP63', 'TP73']  # p53 family
@@ -250,7 +250,7 @@ Get current STRING database version.
 
 **Usage**:
 ```python
-from src.tools.search.database.string import query_string_version
+from src.tools.database.string import query_string_version
 import json
 
 res = query_string_version()
@@ -296,7 +296,7 @@ Choose threshold based on analysis goals:
 
 ## Detailed Reference
 
-For comprehensive API documentation, complete parameter lists, output formats, and advanced usage, refer to `references/string_reference.md` (which also describes the project tools in `src/tools/search/database/string/`). That document includes:
+For comprehensive API documentation, complete parameter lists, output formats, and advanced usage, refer to `references/string_reference.md` (which also describes the project tools in `src/tools/database/string/`). That document includes:
 
 - Complete API endpoint specifications
 - All supported output formats (TSV, JSON, XML, PSI-MI)

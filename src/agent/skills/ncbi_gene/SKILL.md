@@ -19,7 +19,7 @@ This skill should be used when working with gene data including searching by gen
 ## Quick Start
 
 The skill provides:
-1. **Project modules** in `src/tools/search/database/ncbi/`: `fetch_gene_data.py` (Datasets API), `query_gene.py` (E-utilities), `batch_gene_lookup.py` (batch operations), `ncbi_operations.py` (query/download operations); gene download functions re-exported via package.
+1. **Project modules** in `src/tools/database/ncbi/`: `fetch_gene_data.py` (Datasets API), `query_gene.py` (E-utilities), `batch_gene_lookup.py` (batch operations), `ncbi_operations.py` (query/download operations); gene download functions re-exported via package.
 2. References: `references/api_reference.md`, `references/common_workflows.md`
 
 NCBI provides two main APIs:
@@ -80,7 +80,7 @@ Also available as general NCBI tools (useful in gene workflows):
 ### 1. Download Gene by ID (Datasets API)
 
 ```python
-from src.tools.search.database.ncbi import download_ncbi_gene_by_id
+from src.tools.database.ncbi import download_ncbi_gene_by_id
 
 result = download_ncbi_gene_by_id("672", "output/ncbi_gene_brca1.json")
 # Returns rich JSON with gene metadata, RefSeqs, GO annotations, etc.
@@ -89,7 +89,7 @@ result = download_ncbi_gene_by_id("672", "output/ncbi_gene_brca1.json")
 ### 2. Download Gene by Symbol (Datasets API)
 
 ```python
-from src.tools.search.database.ncbi import download_ncbi_gene_by_symbol
+from src.tools.database.ncbi import download_ncbi_gene_by_symbol
 
 result = download_ncbi_gene_by_symbol("BRCA1", "human", "output/ncbi_gene_brca1_by_symbol.json")
 result = download_ncbi_gene_by_symbol("TP53", "Homo sapiens", "output/ncbi_gene_tp53.json")
@@ -98,7 +98,7 @@ result = download_ncbi_gene_by_symbol("TP53", "Homo sapiens", "output/ncbi_gene_
 ### 3. Batch Lookup by Symbols
 
 ```python
-from src.tools.search.database.ncbi import download_ncbi_batch_lookup_by_symbols
+from src.tools.database.ncbi import download_ncbi_batch_lookup_by_symbols
 
 result = download_ncbi_batch_lookup_by_symbols(
     ["BRCA1", "TP53", "EGFR"], "human", "output/ncbi_genes_batch.json"
@@ -108,7 +108,7 @@ result = download_ncbi_batch_lookup_by_symbols(
 ### 4. E-utilities Workflow (programmatic)
 
 ```python
-from src.tools.search.database.ncbi.ncbi_operations import (
+from src.tools.database.ncbi.ncbi_operations import (
     query_ncbi_gene_esearch,
     download_ncbi_gene_esummary,
     download_ncbi_gene_efetch,
@@ -125,9 +125,9 @@ download_ncbi_gene_efetch(["672"], "output/gene_full_record.xml")
 ### 5. Low-Level Direct Access (programmatic)
 
 ```python
-from src.tools.search.database.ncbi.fetch_gene_data import fetch_gene_by_id, fetch_gene_by_symbol
-from src.tools.search.database.ncbi.query_gene import esearch, esummary, efetch
-from src.tools.search.database.ncbi.batch_gene_lookup import batch_lookup_by_symbols
+from src.tools.database.ncbi.fetch_gene_data import fetch_gene_by_id, fetch_gene_by_symbol
+from src.tools.database.ncbi.query_gene import esearch, esummary, efetch
+from src.tools.database.ncbi.batch_gene_lookup import batch_lookup_by_symbols
 
 # Datasets API
 gene_data = fetch_gene_by_id("672")
@@ -147,7 +147,7 @@ results = batch_lookup_by_symbols(["BRCA1", "TP53"], "human")
 ### Workflow 1: Gene Annotation (download)
 
 ```python
-from src.tools.search.database.ncbi import (
+from src.tools.database.ncbi import (
     download_ncbi_gene_by_symbol,
     download_ncbi_batch_lookup_by_symbols,
 )
@@ -164,7 +164,7 @@ download_ncbi_batch_lookup_by_symbols(
 ### Workflow 2: Gene Search and Retrieve (programmatic)
 
 ```python
-from src.tools.search.database.ncbi.ncbi_operations import (
+from src.tools.database.ncbi.ncbi_operations import (
     query_ncbi_gene_esearch,
     download_ncbi_gene_by_id,
 )
@@ -184,7 +184,7 @@ if parsed.get("status") == "success":
 ### Workflow 3: Cross-Database Integration
 
 ```python
-from src.tools.search.database.ncbi import (
+from src.tools.database.ncbi import (
     download_ncbi_gene_by_id,
     download_ncbi_sequence,
     download_ncbi_metadata,

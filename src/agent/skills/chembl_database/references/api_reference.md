@@ -1,6 +1,6 @@
 # ChEMBL Web Services API Reference
 
-Project modules: `src/tools/search/database/chembl/` (chembl_client, chembl_molecule, chembl_target, chembl_activity, chembl_similarity, chembl_substructure, chembl_drug, chembl_queries). Import: `from src.tools.search.database.chembl import get_molecule, filter_activities, ...`
+Project modules: `src/tools/database/chembl/` (chembl_client, chembl_molecule, chembl_target, chembl_activity, chembl_similarity, chembl_substructure, chembl_drug, chembl_queries). Import: `from src.tools.database.chembl import get_molecule, filter_activities, ...`
 
 ## Overview
 
@@ -86,7 +86,7 @@ molecules.filter(
 Find compounds similar to a query structure:
 
 ```python
-from src.tools.search.database.chembl import similarity_search
+from src.tools.database.chembl import similarity_search
 
 results = similarity_search("CC(=O)Oc1ccccc1C(=O)O", threshold=85)
 ```
@@ -95,7 +95,7 @@ results = similarity_search("CC(=O)Oc1ccccc1C(=O)O", threshold=85)
 Search for compounds containing a specific substructure using SMILES:
 
 ```python
-from src.tools.search.database.chembl import substructure_search
+from src.tools.database.chembl import substructure_search
 
 results = substructure_search("c1ccccc1")
 ```
@@ -104,21 +104,21 @@ results = substructure_search("c1ccccc1")
 
 ### Get Molecule by ChEMBL ID
 ```python
-from src.tools.search.database.chembl import get_molecule
+from src.tools.database.chembl import get_molecule
 
 molecule = get_molecule("CHEMBL25")
 ```
 
 ### Get Target Information
 ```python
-from src.tools.search.database.chembl import get_target
+from src.tools.database.chembl import get_target
 
 target = get_target("CHEMBL240")
 ```
 
 ### Get Activity Data
 ```python
-from src.tools.search.database.chembl import filter_activities
+from src.tools.database.chembl import filter_activities
 
 activities = filter_activities(
     target_chembl_id="CHEMBL240",
@@ -129,7 +129,7 @@ activities = filter_activities(
 
 ### Get Drug Information
 ```python
-from src.tools.search.database.chembl import get_drug
+from src.tools.database.chembl import get_drug
 
 drug = get_drug("CHEMBL1234")
 ```
@@ -210,7 +210,7 @@ Target data includes:
 
 ### Find Kinase Inhibitors
 ```python
-from src.tools.search.database.chembl import filter_targets, filter_activities, find_kinase_inhibitors
+from src.tools.database.chembl import filter_targets, filter_activities, find_kinase_inhibitors
 
 targets = filter_targets(target_type="SINGLE PROTEIN", pref_name__icontains="kinase")
 target_ids = [t["target_chembl_id"] for t in targets]
@@ -225,14 +225,14 @@ activities = find_kinase_inhibitors(max_ic50=100)
 
 ### Retrieve Drug Mechanisms
 ```python
-from src.tools.search.database.chembl import get_mechanisms
+from src.tools.database.chembl import get_mechanisms
 
 mechanisms = get_mechanisms("CHEMBL25")
 ```
 
 ### Get Compound Bioactivities
 ```python
-from src.tools.search.database.chembl import get_compound_bioactivities
+from src.tools.database.chembl import get_compound_bioactivities
 
 activities = get_compound_bioactivities("CHEMBL25")
 ```
@@ -242,7 +242,7 @@ activities = get_compound_bioactivities("CHEMBL25")
 ChEMBL can generate SVG images of molecular structures. Use the client directly:
 
 ```python
-from src.tools.search.database.chembl import get_client
+from src.tools.database.chembl import get_client
 
 client = get_client()
 svg = client.image.get("CHEMBL25")
@@ -253,7 +253,7 @@ svg = client.image.get("CHEMBL25")
 Results are paginated automatically. Use filter_activities and iterate:
 
 ```python
-from src.tools.search.database.chembl import filter_activities
+from src.tools.database.chembl import filter_activities
 
 activities = filter_activities(target_chembl_id="CHEMBL240")
 for activity in activities:

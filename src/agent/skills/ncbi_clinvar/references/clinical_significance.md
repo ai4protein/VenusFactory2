@@ -2,7 +2,7 @@
 
 ## Project Integration (VenusFactory)
 
-To search by clinical significance in code, use **`src/tools/search/database/ncbi/ncbi_clinvar.py`**:  
+To search by clinical significance in code, use **`src/tools/database/ncbi/ncbi_clinvar.py`**:  
 **`build_clinvar_term(clinical_significance="pathogenic", ...)`** produces a term with `[CLNSIG]`. Combine with gene, condition, or **`exclude_conflicting=True`** to filter out conflicting interpretations. Then call **`query_clinvar(term, ...)`** and **`parse_esearch_ids()`** / **`get_clinvar_summary()`** as needed.
 
 ## Overview

@@ -2,7 +2,7 @@
 
 ## Project Integration (VenusFactory)
 
-STRING REST operations are implemented as atomic Python modules under `src/tools/search/database/string/`:
+STRING REST operations are implemented as atomic Python modules under `src/tools/database/string/`:
 
 | API operation | Python function | Module |
 |---------------|-----------------|--------|
@@ -15,7 +15,7 @@ STRING REST operations are implemented as atomic Python modules under `src/tools
 | homology | `string_homology` | `string_homology.py` |
 | version | `string_version` | `string_version.py` |
 
-Shared HTTP helpers and base URL live in `string_rest.py`. Entry point with re-exports: `string_api.py`. Import via package: `from src.tools.search.database.string import string_map_ids, string_network, ...`. Skill documentation: `src/agent/skills/string_database/SKILL.md`.
+Shared HTTP helpers and base URL live in `string_rest.py`. Entry point with re-exports: `string_api.py`. Import via package: `from src.tools.database.string import string_map_ids, string_network, ...`. Skill documentation: `src/agent/skills/string_database/SKILL.md`.
 
 ## Overview
 

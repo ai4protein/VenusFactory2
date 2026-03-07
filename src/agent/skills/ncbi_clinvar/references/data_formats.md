@@ -6,7 +6,7 @@ ClinVar provides bulk data downloads in multiple formats to support different re
 
 ### Project Integration (VenusFactory)
 
-FTP URLs and downloads are available in **`src/tools/search/database/ncbi/ncbi_clinvar.py`**:
+FTP URLs and downloads are available in **`src/tools/database/ncbi/ncbi_clinvar.py`**:
 
 - **`get_clinvar_ftp_url(key)`** – Returns FTP URL for a known file. Keys: `variant_summary`, `vcf_grch37`, `vcf_grch38`, `vcf_grch37_tbi`, `vcf_grch38_tbi`, `xml_latest`, `var_citations`, `cross_references` (constants `FTP_VARIANT_SUMMARY`, `FTP_VCF_GRCH37`, etc.).
 - **`download_clinvar_ftp(url_or_key, out_dir, filename=None)`** – Downloads by key or full URL; uses urllib for ftp://, requests for http(s). Returns a message string.
