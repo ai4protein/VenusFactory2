@@ -1,8 +1,27 @@
+import json
 import logging
 import random
+import sys
 import time
+from pathlib import Path
 from typing import List, Optional
-from langchain_core.documents import Document as BaseDocument
+
+try:
+    from langchain_core.documents import Document as BaseDocument
+except ImportError:
+    class BaseDocument:
+        def __init__(self, page_content, metadata):
+            self.page_content = page_content
+            self.metadata = metadata
+
+try:
+    from .response_utils import error_response, query_success_response
+except ImportError:
+    _dir = Path(__file__).resolve().parent
+    if _dir.name == "deepsearch" and str(_dir.parents[3]) not in sys.path:
+        sys.path.insert(0, str(_dir.parents[3]))
+    from src.tools.search.deepsearch.response_utils import error_response, query_success_response
+
 from scholarly import scholarly, ProxyGenerator
 
 logger = logging.getLogger(__name__)
@@ -77,4 +96,33 @@ def _google_scholar_search(query: str, max_results: int = 5, api_key: str = "") 
 
     return papers
 
+
+def query_google_scholar(query: str, max_results: int = 5) -> str:
+    """
+    Execute Google Scholar search.
+    Returns rich JSON: status, content, execution_context.
+    """
+    t0 = time.perf_counter()
+    try:
+        docs = _google_scholar_search(query, max_results)
+        results = [doc.metadata if hasattr(doc, 'metadata') else doc for doc in docs]
+        payload = {"query": query, "count": len(results), "results": results}
+        content = json.dumps(payload, ensure_ascii=False, default=str)
+        elapsed_ms = int((time.perf_counter() - t0) * 1000)
+        return query_success_response(content, query_time_ms=elapsed_ms, source="google_scholar")
+    except Exception as e:
+        return error_response("QueryError", str(e), suggestion="Check network connection or scholarly proxy.")
+
+
+if __name__ == "__main__":
+    import argparse
+    logging.basicConfig(level=logging.INFO)
+    parser = argparse.ArgumentParser(description="Google Scholar Search")
+    parser.add_argument("--query", type=str, default="alphafold", help="Search query")
+    parser.add_argument("--max_results", type=int, default=2, help="Max results")
+    args = parser.parse_args()
+    
+    print(f"=== query_google_scholar(query='{args.query}', max_results={args.max_results}) ===")
+    res = query_google_scholar(args.query, max_results=args.max_results)
+    print(res)
 

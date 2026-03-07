@@ -1,13 +1,31 @@
-from typing import List, Optional, Dict, Any
+import json
 import logging
 import os
 import random
 import re
+import sys
 import time
 from datetime import datetime
+from pathlib import Path
+from typing import List, Optional, Dict, Any
 
 import requests
-from langchain_core.documents import Document as BaseDocument
+
+try:
+    from langchain_core.documents import Document as BaseDocument
+except ImportError:
+    class BaseDocument:
+        def __init__(self, page_content, metadata=None):
+            self.page_content = page_content
+            self.metadata = metadata or {}
+
+try:
+    from .response_utils import error_response, query_success_response
+except ImportError:
+    _dir = Path(__file__).resolve().parent
+    if _dir.name == "deepsearch" and str(_dir.parents[3]) not in sys.path:
+        sys.path.insert(0, str(_dir.parents[3]))
+    from src.tools.search.deepsearch.response_utils import error_response, query_success_response
 
 logger = logging.getLogger(__name__)
 
@@ -200,9 +218,39 @@ def _semantic_scholar_search(query: str, max_results: int = 5, max_content_lengt
                 "abstract": result.get("abstract")
             }
             
-            docs.append(BaseDocument(metadata=metadata))
+            docs.append(BaseDocument(page_content=result.get("abstract", ""), metadata=metadata))
             
         return docs
     except Exception as e:
         logger.error(f"Semantic Scholar search failed: {e}")
         return []
+
+
+def query_semantic_scholar(query: str, max_results: int = 5) -> str:
+    """
+    Execute Semantic Scholar search query.
+    Returns rich JSON: status, content, execution_context.
+    """
+    t0 = time.perf_counter()
+    try:
+        docs = _semantic_scholar_search(query, max_results)
+        results = [doc.metadata if hasattr(doc, 'metadata') else doc for doc in docs]
+        payload = {"query": query, "count": len(results), "results": results}
+        content = json.dumps(payload, ensure_ascii=False, default=str)
+        elapsed_ms = int((time.perf_counter() - t0) * 1000)
+        return query_success_response(content, query_time_ms=elapsed_ms, source="semantic_scholar")
+    except Exception as e:
+        return error_response("QueryError", str(e), suggestion="Check network connection or Semantic Scholar API limits.")
+
+
+if __name__ == "__main__":
+    import argparse
+    logging.basicConfig(level=logging.INFO)
+    parser = argparse.ArgumentParser(description="Semantic Scholar Search")
+    parser.add_argument("--query", type=str, default="transformers", help="Search query")
+    parser.add_argument("--max_results", type=int, default=2, help="Max results")
+    args = parser.parse_args()
+    
+    print(f"=== query_semantic_scholar(query='{args.query}', max_results={args.max_results}) ===")
+    res = query_semantic_scholar(args.query, max_results=args.max_results)
+    print(res)

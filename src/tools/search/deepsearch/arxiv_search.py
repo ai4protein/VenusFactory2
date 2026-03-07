@@ -1,13 +1,26 @@
 """
 arXiv search via the official API (http://export.arxiv.org/api/query).
-No LangChain dependency; returns list of dicts compatible with literature.py.
+No LangChain dependency; returns list of dicts compatible with literature_search.
 """
 from __future__ import annotations
 
+import json
+import sys
+import time
+from pathlib import Path
 from typing import Any, List
 from xml.etree import ElementTree as ET
 
 import requests
+
+try:
+    from .response_utils import error_response, query_success_response
+except ImportError:
+    _dir = Path(__file__).resolve().parent
+    if _dir.name == "deepsearch" and str(_dir.parents[3]) not in sys.path:
+        sys.path.insert(0, str(_dir.parents[3]))
+    from src.tools.search.deepsearch.response_utils import error_response, query_success_response
+
 
 ATOM_NS = "http://www.w3.org/2005/Atom"
 
@@ -31,7 +44,7 @@ def _arxiv_search(
 
     Returns:
         List of dicts with keys: source, title, url, authors, published, abstract.
-        Compatible with literature.py (used as item.metadata or as plain dict).
+        Compatible with literature_search (used as item.metadata or as plain dict).
     """
     out: List[dict[str, Any]] = []
     try:
@@ -90,3 +103,36 @@ def _arxiv_search(
             "abstract": abstract,
         })
     return out
+
+
+def query_arxiv(
+    query: str,
+    max_results: int = 5,
+    max_content_length: int = 10000,
+) -> str:
+    """
+    Query arXiv using the official export API.
+    Returns rich JSON: status, content, execution_context.
+    """
+    t0 = time.perf_counter()
+    try:
+        results = _arxiv_search(query, max_results, max_content_length)
+        payload = {"query": query, "count": len(results), "results": results}
+        content = json.dumps(payload, ensure_ascii=False)
+        elapsed_ms = int((time.perf_counter() - t0) * 1000)
+        return query_success_response(content, query_time_ms=elapsed_ms, source="arxiv")
+    except Exception as e:
+        return error_response("QueryError", str(e), suggestion="Check network connection or arXiv API status.")
+
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="arXiv literature search")
+    parser.add_argument("--query", type=str, default="protein structure prediction", help="Search query")
+    parser.add_argument("--max_results", type=int, default=5, help="Max results")
+    args = parser.parse_args()
+    
+    print(f"=== query_arxiv(query='{args.query}', max_results={args.max_results}) ===")
+    res = query_arxiv(args.query, max_results=args.max_results)
+    print(res)
+
