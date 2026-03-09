@@ -1369,7 +1369,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                                 with gr.Tabs():
                                     with gr.Tab("Upload PDB File"):
                                         struct_file_upload = gr.File(label="Upload PDB File", file_types=[".pdb"])
-                                        struct_file_example = gr.Examples(examples=[["./example/download/alphafold2_structures/A0A0C5B5G6.pdb"]], inputs=struct_file_upload, label="Click example to load")
+                                        struct_file_example = gr.Examples(examples=[["./example/database/alphafold/A0A1B0GTW7.pdb"]], inputs=struct_file_upload, label="Click example to load")
                                     with gr.Tab("Paste PDB Content"):
                                         struct_paste_content_input = gr.Textbox(label="Paste PDB Content", placeholder="Paste PDB content here...", lines=8, max_lines=15)
                                         with gr.Row():

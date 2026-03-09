@@ -12,63 +12,6 @@ from email.mime.multipart import MIMEMultipart
 from .common_utils import get_save_path
 
 
-def send_feedback_email(feedback_text: str) -> str:
-    """Send feedback email via SMTP"""
-    if not feedback_text.strip():
-        return "❌ Please enter your feedback before submitting."
-    
-    sender_email = os.getenv("EMAIL_SENDER")
-    receiver_email = os.getenv("EMAIL_RECEIVER")
-    subject = os.getenv("EMAIL_SUBJECT", "VenusFactory User Feedback")
-    password = os.getenv("EMAIL_PASSWORD")
-
-    if not all([sender_email, receiver_email, password]):
-        return "❌ Email config incomplete. Set EMAIL_SENDER, EMAIL_RECEIVER, EMAIL_PASSWORD in .env"
-
-    server = None
-    try:
-        msg = MIMEMultipart()
-        msg['From'] = sender_email
-        msg['To'] = receiver_email
-        msg['Subject'] = subject
-
-        body = f"""
-VenusFactory User Feedback
---------------------------
-Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-
-Feedback:
-{feedback_text}
---------------------------
-        """
-        msg.attach(MIMEText(body, 'plain', 'utf-8'))
-
-        smtp_server = "smtp.qq.com"
-        smtp_port = 465
-        
-        server = smtplib.SMTP_SSL(smtp_server, smtp_port)
-        server.login(sender_email, password)
-        server.send_message(msg)
-        
-        return "✅ Thank you for your feedback! Email sent successfully."
-
-    except Exception as e:
-        return f"❌ Failed to send feedback: {str(e)}"
-
-    finally:
-        if server:
-            try:
-                server.quit()
-            except Exception:
-                pass
-
-
-def handle_feedback_submit(feedback_text: str) -> tuple:
-    """Handle feedback submission and return status updates."""
-    result = send_feedback_email(feedback_text)
-    return "", gr.update(value=result, visible=True)
-
-
 def make_chat_html(path: Path, history_list: List[Dict[str, Any]]) -> None:
     """Create HTML file from chat history."""
     css = """

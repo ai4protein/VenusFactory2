@@ -15,7 +15,6 @@ import aiohttp
 from langchain_classic.agents import AgentExecutor, create_openai_tools_agent
 from langchain.tools import BaseTool
 from langchain_core.messages import ToolMessage
-from langchain_classic.memory import ConversationBufferWindowMemory
 from langchain_classic.schema import BaseMessage, HumanMessage, AIMessage, SystemMessage
 from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -24,6 +23,7 @@ from langchain_core.callbacks import CallbackManagerForLLMRun
 from dotenv import load_dotenv
 
 from tools.tools_agent_hub import get_tools, get_pi_tools
+from agent.skills import get_skills_metadata_string
 from agent.prompts import (
     PI_PROMPT,
     PI_RESEARCH_PROMPT,
@@ -32,12 +32,48 @@ from agent.prompts import (
     PI_FINAL_REPORT_PROMPT,
     PI_SUGGEST_STEPS_PROMPT,
     CB_PLANNER_PROMPT,
+    CB_STEP_PLANNING,
     MLS_PROMPT,
+    MLS_POST_STEP_CHECK,
+    MLS_DEBUG_PROMPT,
     CB_PROMPT,
     SC_PROMPT,
 )
 
 load_dotenv()
+
+
+class _ChatBufferWindowMemory:
+    """In-process chat history keeping last k message pairs (2k messages).
+    Replaces deprecated ConversationBufferWindowMemory; same interface for chat_memory.messages and save_context."""
+    __slots__ = ("_messages", "_k", "chat_memory")
+
+    def __init__(self, k: int = 10):
+        self._messages: List[BaseMessage] = []
+        self._k = k
+        self.chat_memory = _MessageListRef(self)
+
+    def save_context(self, inputs: Dict[str, Any], outputs: Dict[str, Any]) -> None:
+        user = inputs.get("input", "")
+        assistant = outputs.get("output", "")
+        self._messages.append(HumanMessage(content=user))
+        self._messages.append(AIMessage(content=assistant))
+        if self._k > 0:
+            self._messages = self._messages[-self._k * 2 :]
+
+
+class _MessageListRef:
+    """Exposes trimmed messages for compatibility with memory.chat_memory.messages."""
+    __slots__ = ("_parent",)
+
+    def __init__(self, parent: _ChatBufferWindowMemory):
+        self._parent = parent
+
+    @property
+    def messages(self) -> List[BaseMessage]:
+        m = self._parent._messages
+        k = self._parent._k
+        return m[-k * 2 :] if k > 0 else list(m)
 
 
 def _tools_to_openai_schema(tools: Sequence) -> List[Dict[str, Any]]:
@@ -473,13 +509,18 @@ def create_pi_research_agent(llm: BaseChatModel, pi_tools: List[BaseTool]):
     )
 
 
-def create_worker_executor(llm: BaseChatModel, tools: List[BaseTool]):
-    """Worker executes tools: use MLS (Machine Learning Specialist), not CB."""
+def create_worker_executor(llm: BaseChatModel, tools: List[BaseTool], all_tools: Optional[List[BaseTool]] = None):
+    """Worker executes tools: use MLS (Machine Learning Specialist), not CB. Pass all_tools so MLS sees full tool list and skills meta for self-check."""
     tool = tools[0] if isinstance(tools, list) and tools else None
     tool_desc = _format_tool_with_params(tool) if tool else "(no tool)"
+    available_tools_list = ", ".join(t.name for t in (all_tools or tools)) if (all_tools or tools) else "(none)"
+    available_skills_meta = get_skills_metadata_string()
     worker_prompt = MLS_PROMPT.partial(
         tool_name=(tool.name if tool else "tool"),
-        tool_description=(tool_desc if tool else "")
+        tool_description=(tool_desc if tool else ""),
+        available_tools_list=available_tools_list,
+        available_skills_meta=available_skills_meta,
+        machine_learning_specialist_post_step_check=MLS_POST_STEP_CHECK,
     )
     agent = create_openai_tools_agent(llm, tools, worker_prompt)
     return AgentExecutor(
@@ -489,6 +530,20 @@ def create_worker_executor(llm: BaseChatModel, tools: List[BaseTool]):
         handle_parsing_errors=True,
         max_iterations=2,
         max_execution_time=300,
+        return_intermediate_steps=True,
+    )
+
+
+def create_mls_debug_executor(llm: BaseChatModel, debug_tools: List[BaseTool]):
+    """MLS self-check with tools: may call read_skill, python_repl, agent_generated_code, etc. to diagnose/fix, then output retry_input or report_for_cb."""
+    agent = create_openai_tools_agent(llm, debug_tools, MLS_DEBUG_PROMPT)
+    return AgentExecutor(
+        agent=agent,
+        tools=debug_tools,
+        verbose=True,
+        handle_parsing_errors=True,
+        max_iterations=6,
+        max_execution_time=120,
         return_intermediate_steps=True,
     )
 
@@ -529,8 +584,20 @@ def create_cb_planner_chain(llm: BaseChatModel, tools_description: str):
         tools_description=tools_description,
         tool_name="(planning mode)",
         tool_description="(N/A)",
+        computational_biologist_step_planning=CB_STEP_PLANNING,
     )
     return prompt | llm | JsonOutputParser()
+
+
+def create_cb_planner_raw_chain(llm: BaseChatModel, tools_description: str):
+    """CB: same as planner but returns raw LLM output (for fallback parsing in chat_tab)."""
+    prompt = CB_PLANNER_PROMPT.partial(
+        tools_description=tools_description,
+        tool_name="(planning mode)",
+        tool_description="(N/A)",
+        computational_biologist_step_planning=CB_STEP_PLANNING,
+    )
+    return prompt | llm
 
 
 def run_pi_research_step(llm: BaseChatModel, pi_tools: List[BaseTool], messages: List) -> tuple:
@@ -595,8 +662,11 @@ def initialize_session_state() -> Dict[str, Any]:
     pi_final_report_chain = create_pi_final_report_chain(llm)
     pi_suggest_steps_chain = create_pi_suggest_steps_chain(llm)
     cb_planner_chain = create_cb_planner_chain(llm, tools_description)
+    cb_planner_raw_chain = create_cb_planner_raw_chain(llm, tools_description)
     pi_answer_chain = create_pi_answer_chain(llm, pi_tools_description)
-    workers = {t.name: create_worker_executor(llm, [t]) for t in all_tools}
+    workers = {t.name: create_worker_executor(llm, [t], all_tools=all_tools) for t in all_tools}
+    # MLS self-check may use read_skill, python_repl, agent_generated_code, or any other tool to fix the error
+    mls_debug_executor = create_mls_debug_executor(llm, all_tools)
     session_id = str(uuid.uuid4())
     base_dir = os.getenv("TEMP_OUTPUTS_DIR", "temp_outputs")
     agent_session_dir = os.path.join(base_dir, "agent_sessions", session_id)
@@ -612,11 +682,13 @@ def initialize_session_state() -> Dict[str, Any]:
         'pi_final_report': pi_final_report_chain,
         'pi_suggest_steps': pi_suggest_steps_chain,
         'cb_planner': cb_planner_chain,
+        'cb_planner_raw': cb_planner_raw_chain,
         'workers': workers,
+        'mls_debug_executor': mls_debug_executor,
         'finalizer': finalizer_chain,
         'pi_answer': pi_answer_chain,
         'llm': llm,
-        'memory': ConversationBufferWindowMemory(memory_key="chat_history", return_messages=True, k=10),
+        'memory': _ChatBufferWindowMemory(k=10),
         'history': [],
         'conversation_log': [],   # LangChain-managed: every user/assistant message for backend display
         'tool_executions': [],    # Every tool call (including PI literature_search) for backend display

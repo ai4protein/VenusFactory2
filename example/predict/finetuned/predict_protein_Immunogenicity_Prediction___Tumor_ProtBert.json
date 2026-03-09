@@ -1,0 +1,8 @@
+{
+  "status": "skipped",
+  "task": "Immunogenicity Prediction - Tumor",
+  "model_name": "ProtBert",
+  "resolved_adapter_path": "",
+  "adapter_exists": "",
+  "reason": "adapter_path not found"
+}

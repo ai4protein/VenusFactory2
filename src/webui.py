@@ -20,7 +20,7 @@ from web.quick_tool_tab import create_quick_tool_tab
 from web.comprehensive_tab import create_comprehensive_tab
 from web.utils.monitor import TrainingMonitor
 from web.utils.html_ui import load_html_template
-from fast_api import app as fastapi_app
+from api_server import app as fastapi_app
 from mcp_server import start_http_server
 from fastapi_mcp import FastApiMCP
 import uvicorn

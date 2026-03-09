@@ -1,0 +1,8 @@
+{
+  "status": "skipped",
+  "task": "Immunogenicity Prediction - Virus",
+  "model_name": "Ankh-large",
+  "resolved_adapter_path": "",
+  "adapter_exists": "",
+  "reason": "adapter_path not found"
+}

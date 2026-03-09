@@ -22,4 +22,6 @@ You **must read** each reference above and **cite it by number** when you use it
 
 5. **Two sections at the same heading level:** Use **## Sub-report** for the prose and **## References** for the reference list (same level, both ##). **Put each reference on its own line** in ## References (one line per reference, with a blank line between items if needed for readability). Format each as Markdown `[n] [Title](URL)` or `[n] [Title](URL) — Authors, Year`. Include title and URL at minimum; add authors/year when available. Do not omit any reference.
 
-Output only the sub-report with exactly two sections: **## Sub-report** (your prose analysis), then **## References** (one reference per line).
+6. **Short title:** Start your output with a single line in the form **Short title:** followed by one short phrase (about 5–15 words) that summarizes this sub-report (e.g. "CRISPR delivery methods and off-target effects"). This will be used as the heading for this sub-report, not the word "Sub-report". Then a blank line, then **## Sub-report** (your prose), then **## References** (one reference per line).
+
+Output format: first line **Short title:** &lt;summary phrase&gt;, then a blank line, then **## Sub-report** (prose), then **## References** (one per line). Use the same language as the user.

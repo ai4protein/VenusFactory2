@@ -12,7 +12,6 @@ from .duckduckgo_search import _duckduckgo_search
 from .tavily_search import _tavily_search
 from .github_search import _github_search
 from .hugging_face_search import _hugging_face_search
-from .google_scholar_search import _google_scholar_search
 
 __all__ = [
     "_arxiv_search",
@@ -24,5 +23,4 @@ __all__ = [
     "_tavily_search",
     "_github_search",
     "_hugging_face_search",
-    "_google_scholar_search",
 ]

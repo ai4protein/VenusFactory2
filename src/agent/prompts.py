@@ -74,29 +74,43 @@ PI_SECTIONS_PROMPT = ChatPromptTemplate.from_messages([
 PI_SUB_REPORT_TEMPLATE = _load_md("principal_investigator_sub_report")
 PI_SUB_REPORT_PROMPT = ChatPromptTemplate.from_messages([
     ("system", PI_SUB_REPORT_TEMPLATE),
-    ("human", "Section: {section_name} (focus: {focus}).\n\nSearch results:\n{search_results}\n\nWrite a long sub-report (3–5 paragraphs) that reads and analyzes each reference [1], [2], [3] with at least 1–2 sentences each, then synthesizes. Use two sections at the same level: ## Sub-report (prose), then ## References (one reference per line, format [n] [Title](URL)). Output only the sub-report:"),
+    ("human", "Section: {section_name} (focus: {focus}).\n\nSearch results:\n{search_results}\n\nWrite a long sub-report (3–5 paragraphs) that reads and analyzes each reference [1], [2], [3] with at least 1–2 sentences each, then synthesizes. Start with one line: **Short title:** followed by a short phrase (5–15 words) summarizing this sub-report; then a blank line; then ## Sub-report (prose), then ## References (one reference per line, format [n] [Title](URL)). Output only the sub-report:"),
 ])
 PI_FINAL_REPORT_TEMPLATE = _load_md("principal_investigator_final_report")
 PI_FINAL_REPORT_PROMPT = ChatPromptTemplate.from_messages([
     ("system", PI_FINAL_REPORT_TEMPLATE),
-    ("human", "References and sub-reports by section:\n{sub_reports}\n\nUser question: {input}\n\nOutput only the research draft with ## Abstract, ## Introduction, ## Related Work, and ## References. In ## References use one line per reference (line break after each [n] [Title](URL)); do not put multiple references on the same line. Use the same language as the user."),
+    ("human", "References and sub-reports by section:\n{sub_reports}\n\nUser question: {input}\n\nOutput only the research draft with ## Abstract, ## Introduction, ## Related Work, and ## References. In ## References put each reference on its own line—one reference per line; never put multiple references on the same line. Use the same language as the user."),
 ])
 # --- PI Suggest steps: draft + user input → Tools + Steps for CB/MLS (separate message) ---
 PI_SUGGEST_STEPS_TEMPLATE = _load_md("principal_investigator_suggest_steps")
 PI_SUGGEST_STEPS_PROMPT = ChatPromptTemplate.from_messages([
     ("system", PI_SUGGEST_STEPS_TEMPLATE),
-    ("human", "Draft:\n{draft_report}\n\nUser question: {input}\n\nOutput only the ## Suggest steps section (Tools + Steps) for CB/MLS:"),
+    ("human", "Draft:\n{draft_report}\n\nUser question: {input}\n\nOutput only the ## Suggest steps section (Suggested skills, Tools, Steps). Use only tools and skill_ids from the Available tools and Available skills lists in the system prompt."),
 ])
+
+# --- CB Step planning (fine-grained split, goals, goal verification) ---
+CB_STEP_PLANNING = _load_md("computational_biologist_step_planning")
+
+# --- MLS Post-step self-check (one step at a time, self-check on bugs/failure) ---
+MLS_POST_STEP_CHECK = _load_md("machine_learning_specialist_post_step_check")
 
 # --- CB Pipeline Planner: same computational_biologist prompt (Mode A); invoke with pi_report, pi_suggest_steps, ... ---
 CB_PLANNER_SYSTEM = _load_md("computational_biologist")
 CB_PLANNER_PROMPT = ChatPromptTemplate.from_messages([
     ("system", CB_PLANNER_SYSTEM),
-    ("human", "Turn the PI report and Suggest steps above into a concrete pipeline. Output only the JSON array."),
+    ("human", "Turn the PI report and Suggest steps above into a concrete pipeline. Suggest steps may be in any language. If it lists any tools or any numbered steps (1. 2. 3, etc.), you MUST output a non-empty JSON array (one object per step with step, task_description, tool_name, tool_input). Do NOT output the sentence 'No pipeline steps to run' or any other prose—output ONLY a JSON array (or [] if Suggest steps explicitly says no tools and no execution steps). No markdown code fence, no explanation."),
 ])
 
 # --- Machine Learning Specialist ---
 ML_WORKER_SYSTEM_TEMPLATE = _load_md("machine_learning_specialist")
+MLS_SELF_CHECK_TEMPLATE = _load_md("machine_learning_specialist_self_check")
+
+# MLS debug agent: may call read_skill, python_repl, agent_generated_code, etc. then output retry_input or report_for_cb
+MLS_DEBUG_PROMPT = ChatPromptTemplate.from_messages([
+    ("system", MLS_SELF_CHECK_TEMPLATE),
+    ("human", "{input}"),
+    ("placeholder", "{agent_scratchpad}"),
+])
 
 ML_WORKER_PROMPT = ChatPromptTemplate.from_messages([
     ("system", ML_WORKER_SYSTEM_TEMPLATE),

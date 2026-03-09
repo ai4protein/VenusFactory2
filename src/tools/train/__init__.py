@@ -1,1 +1,1 @@
-# tools.train: tools_agent, tools_mcp, data, models, pipeline
+# tools.train: tools_agent (calls train_operations), data, models, pipeline

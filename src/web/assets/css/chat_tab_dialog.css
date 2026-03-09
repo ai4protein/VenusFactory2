@@ -31,6 +31,30 @@
     border-radius: 14px 14px 4px 14px;
 }
 
+/* Assistant: left column = avatar, right column = role label above bubble */
+.vf-chat-row.vf-chat-assistant {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.vf-chat-assistant-side {
+    flex-shrink: 0;
+}
+
+.vf-chat-assistant-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.vf-chat-assistant .vf-chat-role-label {
+    margin: 0;
+    line-height: 1.3;
+}
+
 .vf-chat-assistant .vf-chat-bubble {
     background: #fff;
     color: #1a1a1a;
@@ -93,9 +117,11 @@
     padding-left: 1.2em;
 }
 
+/* Role label: above bubble, to the right of avatar */
 .vf-chat-role-label {
     color: #1565c0;
     font-weight: 600;
+    font-size: 0.95em;
 }
 
 .vf-chat-empty {

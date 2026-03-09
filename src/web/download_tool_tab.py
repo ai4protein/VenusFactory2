@@ -1,6 +1,6 @@
 """
 Download tool tab: Gradio UI for database download (UniProt, NCBI, RCSB, AlphaFold, InterPro).
-Scripts: src/tools/search/database/{uniprot, ncbi, rcsb, alphafold, interpro}/*.py
+Scripts: src/tools/database/{uniprot, ncbi, rcsb, alphafold, interpro}/*.py
   - uniprot_sequence.py: -i/-f, -o, -m, -e
   - ncbi_sequence.py: -i/-f, -o, -m, -e
   - rcsb_metadata.py: -i/-f (pdb_id), -o, -e
@@ -79,7 +79,7 @@ def get_first_file_preview(task_folder: str, max_lines: int = 10) -> str:
 def create_download_tool_tab(constant: Dict[str, Any]):
     def run_download_script(script_path: str, **kwargs) -> str:
         """Runs an external Python script using subprocess."""
-        script_full = script_path if script_path.startswith("src/") else f"src/tools/search/database/{script_path}"
+        script_full = script_path if script_path.startswith("src/") else f"src/tools/database/{script_path}"
         cmd = ["python", script_full]
         for k, v in kwargs.items():
             if v is None: continue
@@ -402,7 +402,7 @@ def create_download_tool_tab(constant: Dict[str, Any]):
                                 with gr.Column(visible=False) as uniprot_file_column:
                                     uniprot_file_upload = gr.File(label="Upload UniProt ID List", file_types=[".txt"])
                                     uniprot_file_example = gr.Examples(
-                                        examples=[["./example/download/uniprot.txt"]],
+                                        examples=[["./example/database/alphafold/uniprot.txt"]],
                                         inputs=uniprot_file_upload,
                                         label="Click example to load"
                                     )
@@ -445,7 +445,7 @@ def create_download_tool_tab(constant: Dict[str, Any]):
                                 with gr.Column(visible=False) as ncbi_file_column:
                                     ncbi_file_upload = gr.File(label="Upload NCBI ID List", file_types=[".txt"])
                                     ncbi_file_example = gr.Examples(
-                                        examples=[["./example/download/ncbi.txt"]],
+                                        examples=[["./example/database/ncbi/ncbi.txt"]],
                                         inputs=ncbi_file_upload,
                                         label="Click example to load"
                                     )
@@ -495,7 +495,7 @@ def create_download_tool_tab(constant: Dict[str, Any]):
                                 with gr.Column(visible=False) as struct_file_column:
                                     struct_file_upload = gr.File(label="Upload PDB ID List", file_types=[".txt"])
                                     struct_file_example = gr.Examples(
-                                        examples=[["./example/download/rcsb.txt"]],
+                                        examples=[["./example/database/rcsb/rcsb.txt"]],
                                         inputs=struct_file_upload,
                                         label="Click example to load"
                                     )
@@ -529,7 +529,7 @@ def create_download_tool_tab(constant: Dict[str, Any]):
                                 with gr.Column(visible=False) as af_file_column:
                                     af_file_upload = gr.File(label="Upload AlphaFold DB ID List", file_types=[".txt"])
                                     af_file_example = gr.Examples(
-                                        examples=[["./example/download/uniprot.txt"]],
+                                        examples=[["./example/database/alphafold/uniprot.txt"]],
                                         inputs=af_file_upload,
                                         label="Click example to load"
                                     )
@@ -599,7 +599,7 @@ def create_download_tool_tab(constant: Dict[str, Any]):
                                 with gr.Column(visible=False) as rcsb_file_column:
                                     rcsb_file_upload = gr.File(label="Upload PDB ID List", file_types=[".txt"])
                                     rcsb_file_example = gr.Examples(
-                                        examples=[["./example/download/rcsb.txt"]],
+                                        examples=[["./example/database/rcsb/rcsb.txt"]],
                                         inputs=rcsb_file_upload,
                                         label="Click example to load"
                                     )

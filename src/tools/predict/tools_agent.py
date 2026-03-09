@@ -1,4 +1,4 @@
-# predict: @tool definitions for physchem/structure property prediction; call_* in .tools_mcp
+# predict: LangChain @tool layer; calls features_operations, finetuned_operations, strcutrue_operations; returns status JSON.
 
 import json
 import os
@@ -6,164 +6,230 @@ from typing import Optional
 
 from langchain.tools import tool
 from pydantic import BaseModel, Field
-from web.utils.common_utils import get_save_path
-from web.utils.file_handlers import extract_first_chain_from_pdb_file, extract_first_sequence_from_fasta_file
-from tools.search.tools_mcp import DEFAULT_BACKEND
 
-from .tools_mcp import (
-    call_protein_properties_prediction,
-    call_protein_function_prediction,
-    call_functional_residue_prediction,
-    upload_file_to_oss_sync,
+# Operations (features, finetuned, structure)
+from .features.features_operations import (
+    calculate_physchem_from_fasta,
+    calculate_rsa_from_pdb,
+    calculate_sasa_from_pdb,
+    calculate_ss_from_pdb,
 )
-from src.tools.predict.structure.esmfold import (
-    predict_structure_sync,
-    _get_default_backend as get_esmfold_default_backend,
+from .finetuned.fintuned_operations import (
+    predict_protein_function as do_predict_protein_function,
+    predict_residue_function as do_predict_residue_function,
 )
+from .structure.strcutrue_operations import predict_structure_esmfold as do_predict_structure_esmfold
 
 
-class ProteinPropertiesInput(BaseModel):
-    sequence: Optional[str] = Field(None, description="Protein sequence in single letter amino acid code")
-    fasta_file: Optional[str] = Field(None, description="Path to PDB structure file or fasta file")
-    task_name: str = Field(default="Physical and chemical properties", description="Task name: Physical and chemical properties, Relative solvent accessible surface area (PDB only), SASA value (PDB only), Secondary structure (PDB only)")
-    backend: str = Field(default="local", description="local: local Gradio; pjlab: pjlab Gradio")
+# ---------- Features (features_operations) ----------
+class CalculatePhyschemInput(BaseModel):
+    fasta_file: str = Field(..., description="Path to FASTA file.")
+    output_file: Optional[str] = Field(default=None, description="Output JSON path. If omitted, written to out_dir.")
+    out_dir: Optional[str] = Field(default=None, description="Output directory.")
 
 
-class ProteinFunctionPredictionInput(BaseModel):
-    sequence: Optional[str] = Field(None, description="Protein sequence in single letter amino acid code")
-    fasta_file: Optional[str] = Field(None, description="Path to FASTA file")
-    model_name: str = Field(default="ESM2-650M", description="Model name for function prediction")
-    task: str = Field(default="Solubility", description="Task: Solubility, Subcellular Localization, Membrane Protein, Metal ion binding, Stability, Sortingsignal, Optimum temperature, Kcat, Optimal PH, Immunogenicity Prediction - Virus, Immunogenicity Prediction - Bacteria, Immunogenicity Prediction - Tumor")
-    backend: str = Field(default=DEFAULT_BACKEND, description="local: local Gradio; pjlab: pjlab Gradio + SCP upload")
+class CalculateRsaInput(BaseModel):
+    pdb_file: str = Field(..., description="Path to PDB file.")
+    chain_id: str = Field(default="A", description="Chain ID. Default A.")
+    output_file: Optional[str] = Field(default=None, description="Output JSON path.")
+    out_dir: Optional[str] = Field(default=None, description="Output directory.")
 
 
-class FunctionalResiduePredictionInput(BaseModel):
-    sequence: Optional[str] = Field(None, description="Protein sequence in single letter amino acid code")
-    fasta_file: Optional[str] = Field(None, description="Path to FASTA file")
-    model_name: str = Field(default="ESM2-650M", description="Model name for function prediction")
-    task: str = Field(default="Activity Site", description="Task: Activity Site, Binding Site, Conserved Site, Motif")
-    backend: str = Field(default=DEFAULT_BACKEND, description="local: local Gradio; pjlab: pjlab Gradio + SCP upload")
+class CalculateSasaInput(BaseModel):
+    pdb_file: str = Field(..., description="Path to PDB file.")
+    output_file: Optional[str] = Field(default=None, description="Output JSON path.")
+    out_dir: Optional[str] = Field(default=None, description="Output directory.")
 
 
-class ProteinStructurePredictionInput(BaseModel):
-    sequence: str = Field(..., description="Protein sequence in single letter amino acid code")
-    save_path: Optional[str] = Field(None, description="Path to save the predicted structure")
-    verbose: Optional[bool] = Field(default=True, description="Whether to print detailed information")
-    backend: Optional[str] = Field(default=None, description="local: GPU; pjlab: DrugSDA remote. Default from AGENT_ESMFOLD_DEFAULT_BACKEND")
+class CalculateSsInput(BaseModel):
+    pdb_file: str = Field(..., description="Path to PDB file.")
+    chain_id: str = Field(default="A", description="Chain ID. Default A.")
+    output_file: Optional[str] = Field(default=None, description="Output JSON path.")
+    out_dir: Optional[str] = Field(default=None, description="Output directory.")
 
 
-@tool("protein_property_prediction", args_schema=ProteinPropertiesInput)
-def protein_property_prediction_tool(sequence: Optional[str] = None, fasta_file: Optional[str] = None, task_name: str = "Physical and chemical properties", api_key: Optional[str] = None, backend: str = None) -> str:
-    """Predict the protein physical, chemical, and structure properties."""
-    try:
-        if fasta_file:
-            if not os.path.exists(fasta_file):
-                return f"Error: FASTA file not found at path: {fasta_file}"
-            if fasta_file.lower().endswith('.pdb'):
-                fasta_file = extract_first_chain_from_pdb_file(fasta_file)
-            elif fasta_file.lower().endswith(('.fasta', '.fa')):
-                fasta_file = extract_first_sequence_from_fasta_file(fasta_file)
-            return call_protein_properties_prediction(fasta_file=fasta_file, task_name=task_name, api_key=api_key, backend=backend or DEFAULT_BACKEND)
-        elif sequence:
-            return call_protein_properties_prediction(sequence=sequence, task_name=task_name, api_key=api_key, backend=backend or DEFAULT_BACKEND)
-        else:
-            return "Error: Either sequence or fasta_file must be provided"
-    except Exception as e:
-        return f"Protein properties prediction error: {str(e)}"
+class CalculateAllPropertiesInput(BaseModel):
+    input_file: str = Field(..., description="Path to FASTA or PDB file.")
+    file_type: str = Field(default="auto", description="fasta, pdb, or auto.")
+    chain_id: str = Field(default="A", description="Chain ID for PDB. Default A.")
+    output_file: Optional[str] = Field(default=None, description="Output JSON path.")
+    out_dir: Optional[str] = Field(default=None, description="Output directory.")
 
 
-@tool("protein_function_prediction", args_schema=ProteinFunctionPredictionInput)
-def protein_function_prediction_tool(
-    sequence: Optional[str] = None,
-    fasta_file: Optional[str] = None,
-    model_name: str = "ESM2-650M",
-    task: str = "Solubility",
-    api_key: Optional[str] = None,
-    backend: str = None,
+@tool("calculate_physchem_from_fasta", args_schema=CalculatePhyschemInput)
+def calculate_physchem_from_fasta_tool(
+    fasta_file: str,
+    output_file: Optional[str] = None,
+    out_dir: Optional[str] = None,
 ) -> str:
-    """Predict protein functions like solubility, localization, metal ion binding, stability, sorting signal, and optimum temperature."""
+    """Calculate physicochemical properties from FASTA. Returns status JSON with file_info."""
     try:
-        if fasta_file and os.path.exists(fasta_file):
-            fasta_file = extract_first_sequence_from_fasta_file(fasta_file)
-            return call_protein_function_prediction(
-                fasta_file=fasta_file,
-                model_name=model_name,
-                task=task,
-                api_key=api_key,
-                backend=backend or DEFAULT_BACKEND,
-            )
-        elif sequence:
-            return call_protein_function_prediction(
-                sequence=sequence,
-                model_name=model_name,
-                task=task,
-                api_key=api_key,
-                backend=backend or DEFAULT_BACKEND,
-            )
-        else:
-            return "Error: Either sequence or fasta_file must be provided"
+        if not os.path.exists(fasta_file):
+            return json.dumps({"status": "error", "error": {"type": "ValidationError", "message": f"File not found: {fasta_file}"}, "file_info": None})
+        return calculate_physchem_from_fasta(fasta_file, output_file=output_file, out_dir=out_dir)
     except Exception as e:
-        return f"Protein function prediction error: {str(e)}"
+        return json.dumps({"status": "error", "error": {"type": "ToolError", "message": str(e)}, "file_info": None}, ensure_ascii=False)
 
 
-@tool("functional_residue_prediction", args_schema=FunctionalResiduePredictionInput)
-def functional_residue_prediction_tool(
-    sequence: Optional[str] = None,
-    fasta_file: Optional[str] = None,
-    model_name: str = "ESM2-650M",
-    task: str = "Activity Site",
-    api_key: Optional[str] = None,
-    backend: str = None,
+@tool("calculate_rsa_from_pdb", args_schema=CalculateRsaInput)
+def calculate_rsa_from_pdb_tool(
+    pdb_file: str,
+    chain_id: str = "A",
+    output_file: Optional[str] = None,
+    out_dir: Optional[str] = None,
 ) -> str:
-    """Predict functional residues (activity/binding/conserved site, motif)."""
+    """Calculate RSA per residue from PDB. Returns status JSON with file_info."""
     try:
-        if fasta_file and os.path.exists(fasta_file):
-            fasta_file = extract_first_sequence_from_fasta_file(fasta_file)
-            return call_functional_residue_prediction(
-                fasta_file=fasta_file,
-                model_name=model_name,
-                task=task,
-                api_key=api_key,
-                backend=backend or DEFAULT_BACKEND,
-            )
-        elif sequence:
-            return call_functional_residue_prediction(
-                sequence=sequence,
-                model_name=model_name,
-                task=task,
-                api_key=api_key,
-                backend=backend or DEFAULT_BACKEND,
-            )
-        else:
-            return "Error: Either sequence or fasta_file must be provided"
+        if not os.path.exists(pdb_file):
+            return json.dumps({"status": "error", "error": {"type": "ValidationError", "message": f"File not found: {pdb_file}"}, "file_info": None})
+        return calculate_rsa_from_pdb(pdb_file, chain_id=chain_id, output_file=output_file, out_dir=out_dir)
     except Exception as e:
-        return f"Functional residue prediction error: {str(e)}"
+        return json.dumps({"status": "error", "error": {"type": "ToolError", "message": str(e)}, "file_info": None}, ensure_ascii=False)
 
 
-@tool("esmfold_structure_prediction", args_schema=ProteinStructurePredictionInput)
-def esmfold_structure_prediction_tool(sequence: str, save_path: Optional[str] = None, verbose: Optional[bool] = True, backend: Optional[str] = None) -> str:
-    """Predict protein structure using ESMFold."""
+@tool("calculate_sasa_from_pdb", args_schema=CalculateSasaInput)
+def calculate_sasa_from_pdb_tool(
+    pdb_file: str,
+    output_file: Optional[str] = None,
+    out_dir: Optional[str] = None,
+) -> str:
+    """Calculate SASA per residue from PDB. Returns status JSON with file_info."""
     try:
-        if not save_path:
-            output_dir = str(get_save_path("Agent", "ESMFold"))
-            output_file = None
-        elif save_path.lower().endswith((".pdb", ".cif")):
-            output_dir = str(get_save_path("Agent", "ESMFold"))
-            output_file = os.path.basename(save_path)
-        else:
-            output_dir = save_path
-            output_file = None
+        if not os.path.exists(pdb_file):
+            return json.dumps({"status": "error", "error": {"type": "ValidationError", "message": f"File not found: {pdb_file}"}, "file_info": None})
+        return calculate_sasa_from_pdb(pdb_file, output_file=output_file, out_dir=out_dir)
+    except Exception as e:
+        return json.dumps({"status": "error", "error": {"type": "ToolError", "message": str(e)}, "file_info": None}, ensure_ascii=False)
 
-        effective_backend = backend if backend is not None else get_esmfold_default_backend()
-        pdb_path, result_info = predict_structure_sync(
-            sequence, output_dir=output_dir, verbose=verbose, backend=effective_backend, output_file=output_file
+
+@tool("calculate_ss_from_pdb", args_schema=CalculateSsInput)
+def calculate_ss_from_pdb_tool(
+    pdb_file: str,
+    chain_id: str = "A",
+    output_file: Optional[str] = None,
+    out_dir: Optional[str] = None,
+) -> str:
+    """Calculate secondary structure per residue from PDB. Returns status JSON with file_info."""
+    try:
+        if not os.path.exists(pdb_file):
+            return json.dumps({"status": "error", "error": {"type": "ValidationError", "message": f"File not found: {pdb_file}"}, "file_info": None})
+        return calculate_ss_from_pdb(pdb_file, chain_id=chain_id, output_file=output_file, out_dir=out_dir)
+    except Exception as e:
+        return json.dumps({"status": "error", "error": {"type": "ToolError", "message": str(e)}, "file_info": None}, ensure_ascii=False)
+
+
+
+
+# ---------- Finetuned (fintuned_operations) ----------
+class PredictProteinFunctionInput(BaseModel):
+    fasta_file: str = Field(..., description="Path to FASTA file.")
+    task: str = Field(..., description="Task name (e.g. Solubility, Optimal Temperature). From constant.json dataset_mapping_function.")
+    model_name: str = Field(default="Ankh-large", description="Model: Ankh-large, ESM2-650M, ProtBert, ProtT5-xl-uniref50.")
+    adapter_path: Optional[str] = Field(default=None, description="Adapter dir. If omitted, ckpt/{dataset}/{model}.")
+    ckpt_base: str = Field(default="ckpt", description="Base dir for adapter. Default ckpt.")
+    output_file: Optional[str] = Field(default=None, description="Output CSV path.")
+    out_dir: Optional[str] = Field(default=None, description="Output directory.")
+
+
+class PredictResidueFunctionInput(BaseModel):
+    fasta_file: str = Field(..., description="Path to FASTA file.")
+    task: str = Field(..., description="Residue task: Activity Site, Binding Site, Conserved Site, Motif.")
+    model_name: str = Field(default="ESM2-650M", description="Model: ESM2-650M, Ankh-large, ProtT5-xl-uniref50.")
+    adapter_path: Optional[str] = Field(default=None, description="Adapter dir. If omitted, ckpt/{residue_dataset}/{model}.")
+    ckpt_base: str = Field(default="ckpt", description="Base dir. Default ckpt.")
+    output_file: Optional[str] = Field(default=None, description="Output CSV path.")
+    out_dir: Optional[str] = Field(default=None, description="Output directory.")
+
+
+@tool("predict_protein_function", args_schema=PredictProteinFunctionInput)
+def predict_protein_function_tool(
+    fasta_file: str,
+    task: str,
+    model_name: str = "Ankh-large",
+    adapter_path: Optional[str] = None,
+    ckpt_base: str = "ckpt",
+    output_file: Optional[str] = None,
+    out_dir: Optional[str] = None,
+) -> str:
+    """Run finetuned protein function prediction (task = e.g. Solubility, Optimal Temperature). Returns status JSON with file_info."""
+    try:
+        if not os.path.exists(fasta_file):
+            return json.dumps({"status": "error", "error": {"type": "ValidationError", "message": f"File not found: {fasta_file}"}, "file_info": None})
+        return do_predict_protein_function(
+            fasta_file=fasta_file,
+            task=task,
+            model_name=model_name,
+            adapter_path=adapter_path,
+            ckpt_base=ckpt_base,
+            output_file=output_file,
+            out_dir=out_dir,
         )
-        pdb_path_oss_url = upload_file_to_oss_sync(pdb_path, backend=effective_backend)
-        return json.dumps({
-            "success": True,
-            "pdb_path": pdb_path,
-            "pdb_path_oss_url": pdb_path_oss_url,
-            "result_info": result_info,
-        }, indent=2)
     except Exception as e:
-        return json.dumps({"success": False, "error": str(e)})
+        return json.dumps({"status": "error", "error": {"type": "ToolError", "message": str(e)}, "file_info": None}, ensure_ascii=False)
+
+
+@tool("predict_residue_function", args_schema=PredictResidueFunctionInput)
+def predict_residue_function_tool(
+    fasta_file: str,
+    task: str,
+    model_name: str = "ESM2-650M",
+    adapter_path: Optional[str] = None,
+    ckpt_base: str = "ckpt",
+    output_file: Optional[str] = None,
+    out_dir: Optional[str] = None,
+) -> str:
+    """Run finetuned residue prediction (Activity Site, Binding Site, Conserved Site, Motif). Returns status JSON with file_info."""
+    try:
+        if not os.path.exists(fasta_file):
+            return json.dumps({"status": "error", "error": {"type": "ValidationError", "message": f"File not found: {fasta_file}"}, "file_info": None})
+        return do_predict_residue_function(
+            fasta_file=fasta_file,
+            task=task,
+            model_name=model_name,
+            adapter_path=adapter_path,
+            ckpt_base=ckpt_base,
+            output_file=output_file,
+            out_dir=out_dir,
+        )
+    except Exception as e:
+        return json.dumps({"status": "error", "error": {"type": "ToolError", "message": str(e)}, "file_info": None}, ensure_ascii=False)
+
+
+# ---------- Structure (strcutrue_operations) ----------
+class PredictStructureEsmfoldInput(BaseModel):
+    sequence: str = Field(..., description="Protein sequence (one-letter). ESMFold local prediction.")
+    output_dir: Optional[str] = Field(default=None, description="Output directory for PDB.")
+    output_file: Optional[str] = Field(default=None, description="Output PDB filename.")
+    verbose: bool = Field(default=True, description="Verbose output.")
+
+
+@tool("predict_structure_esmfold", args_schema=PredictStructureEsmfoldInput)
+def predict_structure_esmfold_tool(
+    sequence: str,
+    output_dir: Optional[str] = None,
+    output_file: Optional[str] = None,
+    verbose: bool = True,
+) -> str:
+    """Predict protein structure with ESMFold (local). Returns status JSON with file_info (PDB path)."""
+    try:
+        if not sequence or not sequence.strip():
+            return json.dumps({"status": "error", "error": {"type": "ValidationError", "message": "Sequence is required."}, "file_info": None})
+        return do_predict_structure_esmfold(
+            sequence=sequence.strip(),
+            output_dir=output_dir,
+            output_file=output_file,
+            verbose=verbose,
+        )
+    except Exception as e:
+        return json.dumps({"status": "error", "error": {"type": "ToolError", "message": str(e)}, "file_info": None}, ensure_ascii=False)
+
+
+PREDICT_TOOLS = [
+    calculate_physchem_from_fasta_tool,
+    calculate_rsa_from_pdb_tool,
+    calculate_sasa_from_pdb_tool,
+    calculate_ss_from_pdb_tool,
+    predict_protein_function_tool,
+    predict_residue_function_tool,
+    predict_structure_esmfold_tool,
+]

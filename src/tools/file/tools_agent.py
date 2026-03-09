@@ -16,6 +16,7 @@ from .processors import (
     unzip_archive,
     ungzip_file,
     get_chain_sequences_from_pdb,
+    get_seq_from_pdb_chain_a,
     get_seqs_from_pdb_dir,
     is_apo_pdb,
     get_uniprot_id_from_rcsb_metadata,
@@ -230,6 +231,21 @@ def pdb_chain_sequences_tool(pdb_file: str) -> str:
         return _error_response("PDBError", str(e), suggestion="Check PDB file path and format.")
 
 
+class GetSeqFromPdbChainAInput(BaseModel):
+    pdb_file: str = Field(..., description="Path to PDB structure file. Required.")
+
+@tool("get_seq_from_pdb_chain_a", args_schema=GetSeqFromPdbChainAInput)
+def get_seq_from_pdb_chain_a_tool(pdb_file: str) -> str:
+    """Extract sequence of chain A from a PDB file. Returns status JSON."""
+    if not pdb_file or not os.path.exists(pdb_file):
+        return _error_response("PDBError", f"File not found: {pdb_file}")
+    try:
+        seq = get_seq_from_pdb_chain_a(pdb_file)
+        return _success_response(data={"seq": seq}, file_path=pdb_file)
+    except Exception as e:
+        return _error_response("PDBError", str(e), suggestion="Check PDB file path and format.")
+
+
 class PdbDirToFastaInput(BaseModel):
     pdb_dir: str = Field(..., description="Directory containing PDB files. Required.")
     out_fasta_path: str = Field(..., description="Output FASTA file path. Required.")
@@ -297,6 +313,7 @@ FILE_TOOLS = [
     uid_file_to_chunks_tool,
     unzip_archive_tool,
     ungzip_file_tool,
+    get_seq_from_pdb_chain_a_tool,
     pdb_chain_sequences_tool,
     pdb_dir_to_fasta_tool,
     check_pdb_apo_tool,
