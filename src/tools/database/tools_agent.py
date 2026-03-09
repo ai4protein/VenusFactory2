@@ -1,5 +1,7 @@
 import json
 import os
+import sys
+sys.path.append(os.getcwd())
 from typing import List, Optional, Literal
 from langchain.tools import tool
 from pydantic import BaseModel, Field
@@ -13,7 +15,6 @@ from .alphafold import (
 from .brenda import (
     download_brenda_km_values_by_ec_number,
     download_brenda_reactions_by_ec_number,
-    download_brenda_organisms_by_ec_number,
     download_brenda_enzymes_by_substrate,
     download_brenda_compare_organisms_by_ec_number,
     download_brenda_environmental_parameters_by_ec_number,
@@ -116,10 +117,8 @@ def download_brenda_km_values_by_ec_number_tool(
     """Download BRENDA Km values by EC number to file. Returns JSON: {success, file_path}."""
     try:
         return download_brenda_km_values_by_ec_number(ec_number, out_path, organism=organism, substrate=substrate)
-    except ImportError as e:
-        return json.dumps({"success": False, "error": f"BRENDA dependency missing: {e}"}, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+        return f"Download BRENDA Km values by EC number error: {str(e)}"
 
 # --- Download: Reactions by EC number ---
 class BrendaDownloadReactionsInput(BaseModel):
@@ -132,10 +131,8 @@ def download_brenda_reactions_by_ec_number_tool(ec_number: str, out_path: str, o
     """Download BRENDA reactions by EC number to file. Returns JSON: {success, file_path}."""
     try:
         return download_brenda_reactions_by_ec_number(ec_number, out_path, organism=organism)
-    except ImportError as e:
-        return json.dumps({"success": False, "error": f"BRENDA dependency missing: {e}"}, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+        return f"Download BRENDA reactions by EC number error: {str(e)}"
 
 # --- Download: Enzymes by substrate ---
 class BrendaDownloadEnzymesBySubstrateInput(BaseModel):
@@ -148,10 +145,8 @@ def download_brenda_enzymes_by_substrate_tool(substrate: str, out_path: str, lim
     """Download BRENDA enzyme-by-substrate search results to JSON file. Returns JSON: {success, file_path}."""
     try:
         return download_brenda_enzymes_by_substrate(substrate, out_path, limit=limit)
-    except ImportError as e:
-        return json.dumps({"success": False, "error": f"BRENDA dependency missing: {e}"}, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+        return f"Download BRENDA enzymes by substrate error: {str(e)}"
 
 # --- Download: Compare organisms by EC number ---
 class BrendaDownloadCompareOrganismsInput(BaseModel):
@@ -164,10 +159,8 @@ def download_brenda_compare_organisms_by_ec_number_tool(ec_number: str, organism
     """Download BRENDA organism comparison by EC number to JSON. Returns JSON: {success, file_path}."""
     try:
         return download_brenda_compare_organisms_by_ec_number(ec_number, organisms, out_path)
-    except ImportError as e:
-        return json.dumps({"success": False, "error": f"BRENDA dependency missing: {e}"}, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+        return f"Download BRENDA compare organisms by EC number error: {str(e)}"
 
 # --- Download: Environmental parameters by EC number ---
 class BrendaDownloadEnvironmentalParametersInput(BaseModel):
@@ -179,10 +172,8 @@ def download_brenda_environmental_parameters_by_ec_number_tool(ec_number: str, o
     """Download BRENDA environmental parameters by EC number to JSON. Returns JSON: {success, file_path}."""
     try:
         return download_brenda_environmental_parameters_by_ec_number(ec_number, out_path)
-    except ImportError as e:
-        return json.dumps({"success": False, "error": f"BRENDA dependency missing: {e}"}, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+        return f"Download BRENDA environmental parameters by EC number error: {str(e)}"
 
 # --- Download: Kinetic data by EC number ---
 class BrendaDownloadKineticDataInput(BaseModel):
@@ -197,10 +188,8 @@ def download_brenda_kinetic_data_by_ec_number_tool(
     """Download BRENDA kinetic data export by EC number to file. Returns JSON: {success, file_path}."""
     try:
         return download_brenda_kinetic_data_by_ec_number(ec_number, out_path, format=format)
-    except ImportError as e:
-        return json.dumps({"success": False, "error": f"BRENDA dependency missing: {e}"}, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+        return f"Download BRENDA kinetic data by EC number error: {str(e)}"
 
 # --- Download: Pathway report (from pathway data) ---
 class BrendaDownloadPathwayReportInput(BaseModel):
@@ -212,10 +201,8 @@ def download_brenda_pathway_report_tool(pathway: dict, out_path: str) -> str:
     """Generate and save BRENDA pathway report from pathway data to file. Returns JSON: {success, file_path}."""
     try:
         return download_brenda_pathway_report(pathway, out_path)
-    except ImportError as e:
-        return json.dumps({"success": False, "error": f"BRENDA dependency missing: {e}"}, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+        return f"Download BRENDA pathway report error: {str(e)}"
 
 # ---------- ChEMBL Database Tools ----------
 # All return rich JSON: status, content/file_info, content_preview, biological_metadata, execution_context.
@@ -228,10 +215,8 @@ def download_chembl_molecule_by_id_tool(mol_id: str, out_path: str) -> str:
     """Download ChEMBL molecule JSON by ChEMBL ID to file. Returns rich JSON: status, file_info, content_preview, biological_metadata, execution_context."""
     try:
         return download_chembl_molecule_by_id(mol_id, out_path)
-    except ImportError as e:
-        return json.dumps({"status": "error", "error": {"type": "ImportError", "message": str(e), "suggestion": "pip install chembl-webresource-client"}, "file_info": None}, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "DownloadError", "message": str(e)}, "file_info": None}, ensure_ascii=False)
+        return f"Download ChEMBL molecule by ID error: {str(e)}"
 
 class ChemblSimilarityDownloadInput(BaseModel):
     smiles: str = Field(..., description="SMILES string of the query molecule for Tanimoto similarity search. Required.")
@@ -249,10 +234,8 @@ def download_chembl_similarity_by_smiles_tool(
     """Download ChEMBL similarity search results to JSON file. Returns rich JSON: status, file_info, content_preview, biological_metadata, execution_context."""
     try:
         return download_chembl_similarity_by_smiles(smiles, out_path, threshold=threshold, max_results=max_results)
-    except ImportError as e:
-        return json.dumps({"status": "error", "error": {"type": "ImportError", "message": str(e), "suggestion": "pip install chembl-webresource-client"}, "file_info": None}, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "DownloadError", "message": str(e)}, "file_info": None}, ensure_ascii=False)
+        return f"Download ChEMBL similarity by SMILES error: {str(e)}"
 
 class ChemblSubstructureDownloadInput(BaseModel):
     smiles: str = Field(..., description="SMILES substructure to search for in ChEMBL molecules. Required.")
@@ -268,10 +251,8 @@ def download_chembl_substructure_by_smiles_tool(
     """Download ChEMBL substructure search results to JSON file. Returns rich JSON: status, file_info, content_preview, biological_metadata, execution_context."""
     try:
         return download_chembl_substructure_by_smiles(smiles, out_path, max_results=max_results)
-    except ImportError as e:
-        return json.dumps({"status": "error", "error": {"type": "ImportError", "message": str(e), "suggestion": "pip install chembl-webresource-client"}, "file_info": None}, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "DownloadError", "message": str(e)}, "file_info": None}, ensure_ascii=False)
+        return f"Download ChEMBL substructure by SMILES error: {str(e)}"
 
 class ChemblDrugDownloadInput(BaseModel):
     chembl_id: str = Field(..., description="ChEMBL drug/molecule ID (e.g. CHEMBL25). Required.")
@@ -287,10 +268,8 @@ def download_chembl_drug_by_id_tool(
     """Download ChEMBL drug info (drug, mechanisms, indications) to JSON file. Returns rich JSON: status, file_info, content_preview, biological_metadata, execution_context."""
     try:
         return download_chembl_drug_by_id(chembl_id, out_path, max_results=max_results)
-    except ImportError as e:
-        return json.dumps({"status": "error", "error": {"type": "ImportError", "message": str(e), "suggestion": "pip install chembl-webresource-client"}, "file_info": None}, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "DownloadError", "message": str(e)}, "file_info": None}, ensure_ascii=False)
+        return f"Download ChEMBL drug by ID error: {str(e)}"
 
 # foldseek
 
@@ -311,10 +290,8 @@ def download_foldseek_results_by_pdb_file_tool(
     try:
         out_dir = get_save_path("FoldSeek", "Download_data") if out_dir is None else out_dir
         return download_foldseek_results_by_pdb_file(pdb_file_path, protect_start, protect_end, out_dir=out_dir)
-    except ImportError as e:
-        return json.dumps({"status": "error", "error": {"type": "ImportError", "message": str(e)}, "file_info": None}, ensure_ascii=False)
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "PipelineError", "message": str(e)}, "file_info": None}, ensure_ascii=False)
+        return f"Download FoldSeek results by PDB file error: {str(e)}"
 
 # ---------- InterPro Database Tools (download only) ----------
 # All return rich JSON: status, file_info, content_preview, biological_metadata, execution_context.
@@ -330,7 +307,7 @@ def download_interpro_metadata_by_id_tool(interpro_id: str, out_dir: str) -> str
     try:
         return download_interpro_metadata_by_id(interpro_id, out_dir)
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "DownloadError", "message": str(e), "suggestion": "Check InterPro ID format (e.g. IPR001557)."}, "file_info": None}, ensure_ascii=False)
+        return f"Download InterPro entry metadata by ID error: {str(e)}"
 
 # --- Download: InterPro annotations by UniProt ID ---
 class InterProAnnotationsDownloadInput(BaseModel):
@@ -343,7 +320,7 @@ def download_interpro_annotations_by_uniprot_id_tool(uniprot_id: str, out_dir: s
     try:
         return download_interpro_annotations_by_uniprot_id(uniprot_id, out_dir)
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "DownloadError", "message": str(e), "suggestion": "Check UniProt ID format (e.g. P40925)."}, "file_info": None}, ensure_ascii=False)
+        return f"Download InterPro annotations by UniProt ID error: {str(e)}"
 
 # --- Download: InterPro family proteins by InterPro ID ---
 class InterProProteinsDownloadInput(BaseModel):
@@ -361,7 +338,7 @@ def download_interpro_proteins_by_id_tool(
     try:
         return download_interpro_proteins_by_id(interpro_id, out_dir, max_results=max_results)
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "DownloadError", "message": str(e), "suggestion": "Check InterPro ID format (e.g. IPR001557)."}, "file_info": None}, ensure_ascii=False)
+        return f"Download InterPro proteins by ID error: {str(e)}"
 
 # --- Download: UniProt ID list by InterPro ID ---
 class InterProUniprotListDownloadInput(BaseModel):
@@ -390,7 +367,7 @@ def download_interpro_uniprot_list_by_id_tool(
             filter_name=filter_name, page_size=page_size, max_results=max_results,
         )
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "DownloadError", "message": str(e), "suggestion": "Check InterPro ID format (e.g. IPR001557)."}, "file_info": None}, ensure_ascii=False)
+        return f"Download UniProt ID list by InterPro ID error: {str(e)}"
 
 # KEGG
 class KeggDownloadInfoInput(BaseModel):
@@ -433,7 +410,7 @@ def download_kegg_info_by_database_tool(database: str, out_path: str) -> str:
     try:
         return download_kegg_info_by_database(database, out_path)
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "DownloadError", "message": str(e), "suggestion": "Check KEGG database name (e.g. pathway, compound, gene)."}, "file_info": None}, ensure_ascii=False)
+        return f"Download KEGG database info by database name error: {str(e)}"
 
 @tool("download_kegg_list_by_database", args_schema=KeggDownloadListInput)
 def download_kegg_list_by_database_tool(database: str, out_path: str, org_or_ids: Optional[str] = None) -> str:
@@ -441,7 +418,7 @@ def download_kegg_list_by_database_tool(database: str, out_path: str, org_or_ids
     try:
         return download_kegg_list_by_database(database, out_path, org_or_ids=org_or_ids)
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "DownloadError", "message": str(e), "suggestion": "Check KEGG database and organism/ID."}, "file_info": None}, ensure_ascii=False)
+        return f"Download KEGG entry list by database name error: {str(e)}"
 
 @tool("download_kegg_find_by_database", args_schema=KeggDownloadFindInput)
 def download_kegg_find_by_database_tool(database: str, query: str, out_path: str, option: Optional[str] = None) -> str:
@@ -449,7 +426,7 @@ def download_kegg_find_by_database_tool(database: str, query: str, out_path: str
     try:
         return download_kegg_find_by_database(database, query, out_path, option=option)
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "DownloadError", "message": str(e), "suggestion": "Check KEGG database and query string."}, "file_info": None}, ensure_ascii=False)
+        return f"Download KEGG search results by database and query string error: {str(e)}"
 
 @tool("download_kegg_entry_by_id", args_schema=KeggDownloadEntryInput)
 def download_kegg_entry_by_id_tool(entry_id: str, out_path: str, format: Optional[str] = None) -> str:
@@ -457,7 +434,7 @@ def download_kegg_entry_by_id_tool(entry_id: str, out_path: str, format: Optiona
     try:
         return download_kegg_entry_by_id(entry_id, out_path, format=format)
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "DownloadError", "message": str(e), "suggestion": "Check KEGG entry ID."}, "file_info": None}, ensure_ascii=False)
+        return f"Download KEGG entry data by entry ID error: {str(e)}"
 
 @tool("download_kegg_conv_by_id", args_schema=KeggDownloadConvInput)
 def download_kegg_conv_by_id_tool(target_db: str, source_id: str, out_path: str) -> str:
@@ -465,7 +442,7 @@ def download_kegg_conv_by_id_tool(target_db: str, source_id: str, out_path: str)
     try:
         return download_kegg_conv_by_id(target_db, source_id, out_path)
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "DownloadError", "message": str(e), "suggestion": "Check target database and source IDs."}, "file_info": None}, ensure_ascii=False)
+        return f"Download KEGG ID conversion result by ID error: {str(e)}"
 
 @tool("download_kegg_link_by_id", args_schema=KeggDownloadLinkInput)
 def download_kegg_link_by_id_tool(target_db: str, source_id: str, out_path: str) -> str:
@@ -473,7 +450,7 @@ def download_kegg_link_by_id_tool(target_db: str, source_id: str, out_path: str)
     try:
         return download_kegg_link_by_id(target_db, source_id, out_path)
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "DownloadError", "message": str(e), "suggestion": "Check target database and source IDs."}, "file_info": None}, ensure_ascii=False)
+        return f"Download KEGG cross-reference links by ID error: {str(e)}"
 
 @tool("download_kegg_ddi_by_id", args_schema=KeggDownloadDdiInput)
 def download_kegg_ddi_by_id_tool(drug_id: str, out_path: str) -> str:
@@ -481,7 +458,7 @@ def download_kegg_ddi_by_id_tool(drug_id: str, out_path: str) -> str:
     try:
         return download_kegg_ddi_by_id(drug_id, out_path)
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "DownloadError", "message": str(e), "suggestion": "Check KEGG drug ID (e.g. D00001)."}, "file_info": None}, ensure_ascii=False)
+        return f"Download KEGG drug-drug interaction data by drug ID error: {str(e)}"
 
 # NCBI
 class NcbiSequenceDownloadInput(BaseModel):
@@ -495,6 +472,7 @@ class NcbiMetadataDownloadInput(BaseModel):
     db: str = Field(default="protein", description="NCBI database ('protein' or 'nuccore'). Default 'protein'.")
     rettype: str = Field(default="gb", description="Return format (e.g. 'gb', 'fasta'). Default 'gb'.")
 
+from .ncbi.ncbi_blast import BLAST_PROGRAMS, BLAST_DATABASES
 class NcbiBlastDownloadInput(BaseModel):
     sequence: str = Field(..., description="Protein or nucleotide sequence to BLAST. Required.")
     out_path: str = Field(..., description="Output file path to save BLAST XML. Required.")
@@ -530,7 +508,7 @@ def download_ncbi_sequence_tool(ncbi_id: str, out_path: str, db: str = "protein"
     try:
         return download_ncbi_sequence(ncbi_id, out_path, db=db)
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "DownloadError", "message": str(e)}, "file_info": None}, ensure_ascii=False)
+        return f"Download NCBI sequence by accession error: {str(e)}"
 
 @tool("download_ncbi_metadata", args_schema=NcbiMetadataDownloadInput)
 def download_ncbi_metadata_tool(ncbi_id: str, out_path: str, db: str = "protein", rettype: str = "gb") -> str:
@@ -538,7 +516,7 @@ def download_ncbi_metadata_tool(ncbi_id: str, out_path: str, db: str = "protein"
     try:
         return download_ncbi_metadata(ncbi_id, out_path, db=db, rettype=rettype)
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "DownloadError", "message": str(e)}, "file_info": None}, ensure_ascii=False)
+        return f"Download NCBI metadata by accession error: {str(e)}"
 
 @tool("download_ncbi_blast", args_schema=NcbiBlastDownloadInput)
 def download_ncbi_blast_tool(sequence: str, out_path: str, program: str = "blastp", database: str = "swissprot", hitlist_size: int = 50, alignments: int = 25, format_type: str = "XML", entrez_query: Optional[str] = None) -> str:
@@ -546,7 +524,7 @@ def download_ncbi_blast_tool(sequence: str, out_path: str, program: str = "blast
     try:
         return download_ncbi_blast(sequence, out_path, program=program, database=database, hitlist_size=hitlist_size, alignments=alignments, format_type=format_type, entrez_query=entrez_query)
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "DownloadError", "message": str(e)}, "file_info": None}, ensure_ascii=False)
+        return f"Submit sequence to NCBI BLAST and download XML error: {str(e)}"
 
 @tool("download_ncbi_clinvar_variants", args_schema=NcbiClinvarVariantsDownloadInput)
 def download_ncbi_clinvar_variants_tool(term: str, out_path: str, retmax: int = 20) -> str:
@@ -554,7 +532,7 @@ def download_ncbi_clinvar_variants_tool(term: str, out_path: str, retmax: int = 
     try:
         return download_ncbi_clinvar_variants(term, out_path, retmax=retmax)
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "DownloadError", "message": str(e)}, "file_info": None}, ensure_ascii=False)
+        return f"Search and download ClinVar variants by term error: {str(e)}"
 
 @tool("download_ncbi_gene_by_id", args_schema=NcbiGeneByIdDownloadInput)
 def download_ncbi_gene_by_id_tool(gene_id: str, out_path: str) -> str:
@@ -562,7 +540,7 @@ def download_ncbi_gene_by_id_tool(gene_id: str, out_path: str) -> str:
     try:
         return download_ncbi_gene_by_id(gene_id, out_path)
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "DownloadError", "message": str(e)}, "file_info": None}, ensure_ascii=False)
+        return f"Download NCBI Gene data by Gene ID error: {str(e)}"
 
 @tool("download_ncbi_gene_by_symbol", args_schema=NcbiGeneBySymbolDownloadInput)
 def download_ncbi_gene_by_symbol_tool(symbol: str, taxon: str, out_path: str) -> str:
@@ -570,7 +548,7 @@ def download_ncbi_gene_by_symbol_tool(symbol: str, taxon: str, out_path: str) ->
     try:
         return download_ncbi_gene_by_symbol(symbol, taxon, out_path)
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "DownloadError", "message": str(e)}, "file_info": None}, ensure_ascii=False)
+        return f"Download NCBI Gene data by Gene Symbol error: {str(e)}"
 
 @tool("download_ncbi_batch_lookup_by_symbols", args_schema=NcbiBatchLookupBySymbolsDownloadInput)
 def download_ncbi_batch_lookup_by_symbols_tool(gene_symbols: List[str], organism: str, out_path: str) -> str:
@@ -578,7 +556,7 @@ def download_ncbi_batch_lookup_by_symbols_tool(gene_symbols: List[str], organism
     try:
         return download_ncbi_batch_lookup_by_symbols(gene_symbols, organism, out_path)
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "DownloadError", "message": str(e)}, "file_info": None}, ensure_ascii=False)
+        return f"Download NCBI Gene batch lookup by symbols error: {str(e)}"
 
 # RCSB PDB
 class RCSBEntryDownloadInput(BaseModel):
@@ -597,7 +575,7 @@ def download_rcsb_entry_metadata_by_pdb_id_tool(pdb_id: str, out_path: str) -> s
         from .database.rcsb import download_rcsb_entry_metadata_by_pdb_id
         return download_rcsb_entry_metadata_by_pdb_id(pdb_id, out_path)
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "DownloadError", "message": str(e)}, "file_info": None}, ensure_ascii=False)
+        return f"Download RCSB PDB entry metadata by PDB ID error: {str(e)}"
 
 @tool("download_rcsb_structure_by_pdb_id", args_schema=RCSBStructureDownloadInput)
 def download_rcsb_structure_by_pdb_id_tool(pdb_id: str, out_dir: str, file_type: str = "pdb") -> str:
@@ -606,7 +584,7 @@ def download_rcsb_structure_by_pdb_id_tool(pdb_id: str, out_dir: str, file_type:
         from .database.rcsb import download_rcsb_structure_by_pdb_id
         return download_rcsb_structure_by_pdb_id(pdb_id, out_dir, file_type=file_type)
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "DownloadError", "message": str(e)}, "file_info": None}, ensure_ascii=False)
+        return f"Download RCSB PDB structure file by PDB ID error: {str(e)}"
 
 # ---------- STRING Database Tools ----------
 class StringMapIdsDownloadInput(BaseModel):
@@ -625,7 +603,7 @@ def download_string_map_ids_tool(identifiers: str, out_dir: str, species: int = 
         ids_list = [x.strip() for x in identifiers.split(",") if x.strip()]
         return download_string_map_ids(ids_list if len(ids_list) > 1 else identifiers.strip(), out_dir, species=species, limit=limit, echo_query=echo_query, filename=filename)
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "DownloadError", "message": str(e)}, "file_info": None}, ensure_ascii=False)
+        return f"Download STRING map_ids results to TSV file error: {str(e)}"
 
 class StringNetworkDownloadInput(BaseModel):
     identifiers: str = Field(..., description="Comma-separated gene or protein IDs. Required.")
@@ -644,7 +622,7 @@ def download_string_network_tool(identifiers: str, out_dir: str, species: int = 
         ids_list = [x.strip() for x in identifiers.split(",") if x.strip()]
         return download_string_network(ids_list if len(ids_list) > 1 else identifiers.strip(), out_dir, species=species, required_score=required_score, network_type=network_type, add_nodes=add_nodes, filename=filename)
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "DownloadError", "message": str(e)}, "file_info": None}, ensure_ascii=False)
+        return f"Download STRING PPI network to TSV file error: {str(e)}"
 
 class StringNetworkImageDownloadInput(BaseModel):
     identifiers: str = Field(..., description="Comma-separated gene or protein IDs. Required.")
@@ -663,7 +641,7 @@ def download_string_network_image_tool(identifiers: str, out_dir: str, species: 
         ids_list = [x.strip() for x in identifiers.split(",") if x.strip()]
         return download_string_network_image(ids_list if len(ids_list) > 1 else identifiers.strip(), out_dir, species=species, required_score=required_score, network_flavor=network_flavor, add_nodes=add_nodes, filename=filename)
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "DownloadError", "message": str(e)}, "file_info": None}, ensure_ascii=False)
+        return f"Download STRING network as a PNG image error: {str(e)}"
 
 class StringInteractionPartnersDownloadInput(BaseModel):
     identifiers: str = Field(..., description="Comma-separated gene or protein IDs. Required.")
@@ -681,7 +659,7 @@ def download_string_interaction_partners_tool(identifiers: str, out_dir: str, sp
         ids_list = [x.strip() for x in identifiers.split(",") if x.strip()]
         return download_string_interaction_partners(ids_list if len(ids_list) > 1 else identifiers.strip(), out_dir, species=species, required_score=required_score, limit=limit, filename=filename)
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "DownloadError", "message": str(e)}, "file_info": None}, ensure_ascii=False)
+        return f"Download STRING interaction partners to TSV file error: {str(e)}"
 
 class StringEnrichmentDownloadInput(BaseModel):
     identifiers: str = Field(..., description="Comma-separated gene or protein IDs. Required.")
@@ -697,7 +675,7 @@ def download_string_enrichment_tool(identifiers: str, out_dir: str, species: int
         ids_list = [x.strip() for x in identifiers.split(",") if x.strip()]
         return download_string_enrichment(ids_list if len(ids_list) > 1 else identifiers.strip(), out_dir, species=species, filename=filename)
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "DownloadError", "message": str(e)}, "file_info": None}, ensure_ascii=False)
+        return f"Download STRING functional enrichment (GO/KEGG/Pfam) to TSV file error: {str(e)}"
 
 class StringPpiEnrichmentDownloadInput(BaseModel):
     identifiers: str = Field(..., description="Comma-separated gene or protein IDs. Required.")
@@ -714,7 +692,7 @@ def download_string_ppi_enrichment_tool(identifiers: str, out_dir: str, species:
         ids_list = [x.strip() for x in identifiers.split(",") if x.strip()]
         return download_string_ppi_enrichment(ids_list if len(ids_list) > 1 else identifiers.strip(), out_dir, species=species, required_score=required_score, filename=filename)
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "DownloadError", "message": str(e)}, "file_info": None}, ensure_ascii=False)
+        return f"Download STRING PPI network enrichment stats to JSON file error: {str(e)}"
 
 class StringHomologyDownloadInput(BaseModel):
     identifiers: str = Field(..., description="Comma-separated gene or protein IDs. Required.")
@@ -730,7 +708,7 @@ def download_string_homology_tool(identifiers: str, out_dir: str, species: int =
         ids_list = [x.strip() for x in identifiers.split(",") if x.strip()]
         return download_string_homology(ids_list if len(ids_list) > 1 else identifiers.strip(), out_dir, species=species, filename=filename)
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "DownloadError", "message": str(e)}, "file_info": None}, ensure_ascii=False)
+        return f"Download STRING homology and similarity scores to TSV file error: {str(e)}"
 
 
 # Uniprot
@@ -749,7 +727,7 @@ def download_uniprot_search_by_query_tool(query: str, out_path: str, frmt: str =
         from .database.uniprot import download_uniprot_search_by_query
         return download_uniprot_search_by_query(query=query, out_path=out_path, frmt=frmt, columns=columns, limit=limit, database=database, **filters)
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "DownloadError", "message": str(e)}, "file_info": None}, ensure_ascii=False)
+        return f"Download UniProt search results error: {str(e)}"
 
 class UniprotRetrieveByIdInput(BaseModel):
     uniprot_id: str = Field(..., description="UniProtID or accession (e.g. P51451). Required.")
@@ -763,7 +741,7 @@ def download_uniprot_retrieve_by_id_tool(uniprot_id: str, out_path: str, frmt: s
         from .database.uniprot import download_uniprot_retrieve_by_id
         return download_uniprot_retrieve_by_id(uniprot_id=uniprot_id, out_path=out_path, frmt=frmt)
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "DownloadError", "message": str(e)}, "file_info": None}, ensure_ascii=False)
+        return f"Download single entry from UniProt error: {str(e)}"
 
 class UniprotMappingInput(BaseModel):
     fr: str = Field(..., description="From database name/ID (e.g., 'UniProtKB_AC-ID'). Required.")
@@ -778,7 +756,7 @@ def download_uniprot_mapping_tool(fr: str, to: str, query: str, out_path: str) -
         from .database.uniprot import download_uniprot_mapping
         return download_uniprot_mapping(fr=fr, to=to, query=query, out_path=out_path)
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "DownloadError", "message": str(e)}, "file_info": None}, ensure_ascii=False)
+        return f"Download mapped IDs across databases via UniProt ID Mapping error: {str(e)}"
 
 class UniprotSeqByIdInput(BaseModel):
     uniprot_id: str = Field(..., description="UniProt accession ID (e.g. P40925). Required.")
@@ -791,7 +769,7 @@ def download_uniprot_seq_by_id_tool(uniprot_id: str, out_path: str) -> str:
         from .database.uniprot import download_uniprot_seq_by_id
         return download_uniprot_seq_by_id(uniprot_id=uniprot_id, out_path=out_path)
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "DownloadError", "message": str(e)}, "file_info": None}, ensure_ascii=False)
+        return f"Download sequence (FASTA) from Uniprot error: {str(e)}"
 
 class UniprotMetaByIdInput(BaseModel):
     uniprot_id: str = Field(..., description="UniProt accession ID (e.g. P40925). Required.")
@@ -804,7 +782,7 @@ def download_uniprot_meta_by_id_tool(uniprot_id: str, out_path: str) -> str:
         from .database.uniprot import download_uniprot_meta_by_id
         return download_uniprot_meta_by_id(uniprot_id=uniprot_id, out_path=out_path)
     except Exception as e:
-        return json.dumps({"status": "error", "error": {"type": "DownloadError", "message": str(e)}, "file_info": None}, ensure_ascii=False)
+        return f"Download metadata (JSON) from Uniprot error: {str(e)}"
 
 # DATABASE_TOOLS: by-ID fetch (UniProt, NCBI, RCSB, AlphaFold, InterPro)
 DATABASE_TOOLS = [
@@ -858,7 +836,6 @@ DATABASE_TOOLS = [
     download_string_enrichment_tool,
     download_string_ppi_enrichment_tool,
     download_string_homology_tool,
-    download_string_version_tool,
     # Uniprot
     download_uniprot_search_by_query_tool,
     download_uniprot_retrieve_by_id_tool,
