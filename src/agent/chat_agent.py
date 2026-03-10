@@ -12,7 +12,7 @@ from copy import copy
 from typing import Dict, Any, List, Optional, Sequence
 
 import aiohttp
-from langchain_classic.agents import AgentExecutor, create_openai_tools_agent
+from langgraph.prebuilt import create_react_agent
 from langchain.tools import BaseTool
 from langchain_core.messages import ToolMessage
 from langchain_classic.schema import BaseMessage, HumanMessage, AIMessage, SystemMessage
@@ -200,14 +200,19 @@ class Chat_LLM(BaseChatModel):
         message_dicts = []
         for msg in messages:
             if isinstance(msg, HumanMessage):
-                role = "user"
-            elif isinstance(msg, AIMessage):
-                role = "assistant"
+                message_dicts.append({"role": "user", "content": msg.content or ""})
             elif isinstance(msg, SystemMessage):
-                role = "system"
+                message_dicts.append({"role": "system", "content": msg.content or ""})
+            elif isinstance(msg, AIMessage):
+                entry = {"role": "assistant", "content": msg.content or ""}
+                tool_calls = getattr(msg, "tool_calls", None) or msg.additional_kwargs.get("tool_calls") if hasattr(msg, "additional_kwargs") else None
+                if tool_calls:
+                    entry["tool_calls"] = [{"id": tc.get("id", ""), "type": "function", "function": {"name": tc.get("name", ""), "arguments": json.dumps(tc.get("args", {}))}} if isinstance(tc, dict) else {"id": getattr(tc, "id", ""), "type": "function", "function": {"name": getattr(tc, "name", ""), "arguments": json.dumps(getattr(tc, "args", {}) or {})}} for tc in tool_calls]
+                message_dicts.append(entry)
+            elif type(msg).__name__ == "ToolMessage":
+                message_dicts.append({"role": "tool", "tool_call_id": getattr(msg, "tool_call_id", ""), "content": getattr(msg, "content", "") or ""})
             else:
-                role = "user"
-            message_dicts.append({"role": role, "content": msg.content})
+                message_dicts.append({"role": "user", "content": str(getattr(msg, "content", msg))})
 
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -220,6 +225,8 @@ class Chat_LLM(BaseChatModel):
             "temperature": self.temperature,
             **kwargs,
         }
+        if getattr(self, "_bound_tools", None):
+            payload["tools"] = _tools_to_openai_schema(self._bound_tools)
 
         timeout = aiohttp.ClientTimeout(total=120)
         async with aiohttp.ClientSession(timeout=timeout) as session:
@@ -236,10 +243,18 @@ class Chat_LLM(BaseChatModel):
                 choice = result['choices'][0]
                 message_data = choice['message']
 
-                ai_message = AIMessage(
-                    content=message_data.get('content', ''),
-                    additional_kwargs=message_data,
-                )
+                content = message_data.get('content', '') or ''
+                tool_calls = message_data.get('tool_calls')
+                if tool_calls:
+                    tc_list = [{"id": tc.get("id"), "name": tc.get("function", {}).get("name"), "args": json.loads(tc.get("function", {}).get("arguments", "{}") or "{}")} for tc in tool_calls]
+                    ai_message = AIMessage(content=content if content is not None else "", additional_kwargs={**message_data, "tool_calls": tc_list})
+                    if hasattr(ai_message, "tool_calls"):
+                        try:
+                            ai_message.tool_calls = tc_list
+                        except Exception:
+                            pass
+                else:
+                    ai_message = AIMessage(content=content, additional_kwargs=message_data)
 
                 generation = ChatGeneration(message=ai_message)
                 return ChatResult(generations=[generation])
@@ -493,20 +508,62 @@ def create_planner_chain(llm: BaseChatModel, tools: List[BaseTool]):
     return planner_prompt_with_tools | llm | JsonOutputParser()
 
 
+class LangGraphAgentExecutorWrapper:
+    """Wrapper that adapts LangGraph's create_react_agent to match the legacy AgentExecutor interface."""
+    def __init__(self, llm, tools, prompt):
+        self.prompt_template = prompt
+        self.graph = create_react_agent(llm, tools=tools)
+
+    def invoke(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        inputs_for_prompt = {**inputs, "agent_scratchpad": []}
+        messages = self.prompt_template.invoke(inputs_for_prompt).to_messages()
+        
+        # Add recursion_limit to prevent runaway loops (e.g. agent repeatedly calling agent_generated_code)
+        config = {"recursion_limit": 10}
+        
+        try:
+            result = self.graph.invoke({"messages": messages}, config=config)
+        except Exception as e:
+            # If we hit GraphRecursionError, we catch it and use the messages we got so far
+            if type(e).__name__ == "GraphRecursionError":
+                print(f"[AgentExecutorWrapper] Caught GraphRecursionError: loop limit reached.")
+                # Fallback: trying to get messages from exception, though usually it's raised before updating state.
+                # If unavailable, we just return an error output
+                return {"output": "Agent Execution stopped: reached maximum step limit. The tool might have succeeded, but the agent was looping.", "intermediate_steps": []}
+            raise e
+        
+        intermediate_steps = []
+        out_messages = result["messages"]
+        new_messages = out_messages[len(messages):]
+        
+        class _AgentAction:
+            def __init__(self, tool, tool_input):
+                self.tool = tool
+                self.tool_input = tool_input
+
+        for i, msg in enumerate(new_messages):
+            if isinstance(msg, AIMessage) and getattr(msg, "tool_calls", None):
+                for tool_call in msg.tool_calls:
+                    action = _AgentAction(tool=tool_call["name"], tool_input=tool_call["args"])
+                    obs_str = ""
+                    for next_msg in new_messages[i+1:]:
+                        if type(next_msg).__name__ == "ToolMessage" and getattr(next_msg, "tool_call_id", "") == tool_call["id"]:
+                            obs_str = getattr(next_msg, "content", "")
+                            break
+                    intermediate_steps.append((action, obs_str))
+        
+        final_output = ""
+        if new_messages and isinstance(new_messages[-1], AIMessage) and not getattr(new_messages[-1], "tool_calls", None):
+            final_output = getattr(new_messages[-1], "content", "")
+
+        return {"output": final_output, "intermediate_steps": intermediate_steps}
+
+
 def create_pi_research_agent(llm: BaseChatModel, pi_tools: List[BaseTool]):
     """PI research phase: PI runs search tools (literature, web, dataset) itself in a multi-turn loop, then outputs the research report. Used before CB/MLS execution."""
     tools_description = _build_tools_description(pi_tools)
     prompt = PI_RESEARCH_PROMPT.partial(tools_description=tools_description)
-    agent = create_openai_tools_agent(llm, pi_tools, prompt)
-    return AgentExecutor(
-        agent=agent,
-        tools=pi_tools,
-        verbose=True,
-        handle_parsing_errors=True,
-        max_iterations=10,
-        max_execution_time=300,
-        return_intermediate_steps=True,
-    )
+    return LangGraphAgentExecutorWrapper(llm, pi_tools, prompt)
 
 
 def create_worker_executor(llm: BaseChatModel, tools: List[BaseTool], all_tools: Optional[List[BaseTool]] = None):
@@ -522,30 +579,12 @@ def create_worker_executor(llm: BaseChatModel, tools: List[BaseTool], all_tools:
         available_skills_meta=available_skills_meta,
         machine_learning_specialist_post_step_check=MLS_POST_STEP_CHECK,
     )
-    agent = create_openai_tools_agent(llm, tools, worker_prompt)
-    return AgentExecutor(
-        agent=agent,
-        tools=tools,
-        verbose=True,
-        handle_parsing_errors=True,
-        max_iterations=2,
-        max_execution_time=300,
-        return_intermediate_steps=True,
-    )
+    return LangGraphAgentExecutorWrapper(llm, tools, worker_prompt)
 
 
 def create_mls_debug_executor(llm: BaseChatModel, debug_tools: List[BaseTool]):
     """MLS self-check with tools: may call read_skill, python_repl, agent_generated_code, etc. to diagnose/fix, then output retry_input or report_for_cb."""
-    agent = create_openai_tools_agent(llm, debug_tools, MLS_DEBUG_PROMPT)
-    return AgentExecutor(
-        agent=agent,
-        tools=debug_tools,
-        verbose=True,
-        handle_parsing_errors=True,
-        max_iterations=6,
-        max_execution_time=120,
-        return_intermediate_steps=True,
-    )
+    return LangGraphAgentExecutorWrapper(llm, debug_tools, MLS_DEBUG_PROMPT)
 
 
 def create_finalizer_chain(llm: BaseChatModel):
@@ -578,24 +617,33 @@ def create_pi_suggest_steps_chain(llm: BaseChatModel):
     return PI_SUGGEST_STEPS_PROMPT | llm | StrOutputParser()
 
 
-def create_cb_planner_chain(llm: BaseChatModel, tools_description: str):
+def create_cb_planner_chain(llm: BaseChatModel, tools_description: str, all_tools: Optional[List[BaseTool]] = None):
     """CB: PI report → concrete JSON pipeline (same computational_biologist prompt, Mode A)."""
+    available_tools_list = ", ".join(t.name for t in all_tools) if all_tools else "(none)"
+    available_skills_meta = get_skills_metadata_string()
     prompt = CB_PLANNER_PROMPT.partial(
         tools_description=tools_description,
         tool_name="(planning mode)",
         tool_description="(N/A)",
+        available_tools_list=available_tools_list,
+        skills_metadata=available_skills_meta,
         computational_biologist_step_planning=CB_STEP_PLANNING,
+        machine_learning_specialist_post_step_check=MLS_POST_STEP_CHECK,
     )
     return prompt | llm | JsonOutputParser()
 
-
-def create_cb_planner_raw_chain(llm: BaseChatModel, tools_description: str):
+def create_cb_planner_raw_chain(llm: BaseChatModel, tools_description: str, all_tools: Optional[List[BaseTool]] = None):
     """CB: same as planner but returns raw LLM output (for fallback parsing in chat_tab)."""
+    available_tools_list = ", ".join(t.name for t in all_tools) if all_tools else "(none)"
+    available_skills_meta = get_skills_metadata_string()
     prompt = CB_PLANNER_PROMPT.partial(
         tools_description=tools_description,
         tool_name="(planning mode)",
         tool_description="(N/A)",
+        available_tools_list=available_tools_list,
+        skills_metadata=available_skills_meta,
         computational_biologist_step_planning=CB_STEP_PLANNING,
+        machine_learning_specialist_post_step_check=MLS_POST_STEP_CHECK,
     )
     return prompt | llm
 
@@ -661,15 +709,17 @@ def initialize_session_state() -> Dict[str, Any]:
     pi_sub_report_chain = create_pi_sub_report_chain(llm)
     pi_final_report_chain = create_pi_final_report_chain(llm)
     pi_suggest_steps_chain = create_pi_suggest_steps_chain(llm)
-    cb_planner_chain = create_cb_planner_chain(llm, tools_description)
-    cb_planner_raw_chain = create_cb_planner_raw_chain(llm, tools_description)
+    cb_planner_chain = create_cb_planner_chain(llm, tools_description, all_tools=all_tools)
+    cb_planner_raw_chain = create_cb_planner_raw_chain(llm, tools_description, all_tools=all_tools)
     pi_answer_chain = create_pi_answer_chain(llm, pi_tools_description)
     workers = {t.name: create_worker_executor(llm, [t], all_tools=all_tools) for t in all_tools}
     # MLS self-check may use read_skill, python_repl, agent_generated_code, or any other tool to fix the error
     mls_debug_executor = create_mls_debug_executor(llm, all_tools)
     session_id = str(uuid.uuid4())
     base_dir = os.getenv("TEMP_OUTPUTS_DIR", "temp_outputs")
-    agent_session_dir = os.path.join(base_dir, "agent_sessions", session_id)
+    now = datetime.now()
+    date_subdir = os.path.join(str(now.year), f"{now.month:02d}", f"{now.day:02d}", "Agent")
+    agent_session_dir = os.path.join(base_dir, date_subdir, session_id)
     os.makedirs(agent_session_dir, exist_ok=True)
     return {
         'session_id': session_id,

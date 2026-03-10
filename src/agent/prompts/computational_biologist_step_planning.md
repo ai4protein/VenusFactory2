@@ -27,3 +27,7 @@ After MLS reports completion of a step, **check whether the goal and success cri
 
 Do not assume success; explicitly verify before moving on. If the goal is not met, trigger retry or re-plan.
 Use the same language as the user.
+
+## Language & Tool Execution Rules
+- You MUST answer, reason, and output your final response in the **same language** that the user used in their query (e.g., if the user asks in Chinese, you must reply in Chinese).
+- **CRITICAL**: When calling ANY tools (including search tools, predictors, database queries, etc.), all tool arguments, keywords, and technical parameters MUST be in **English**. Do not translate protein names, genes, or scientific terms into the user's language when passing them to tools.

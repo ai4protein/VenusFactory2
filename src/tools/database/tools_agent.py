@@ -572,7 +572,7 @@ class RCSBStructureDownloadInput(BaseModel):
 def download_rcsb_entry_metadata_by_pdb_id_tool(pdb_id: str, out_path: str) -> str:
     """Download RCSB PDB entry metadata by PDB ID to JSON file. Returns rich JSON: status, file_info, content_preview, biological_metadata, execution_context."""
     try:
-        from .database.rcsb import download_rcsb_entry_metadata_by_pdb_id
+        from .rcsb import download_rcsb_entry_metadata_by_pdb_id
         return download_rcsb_entry_metadata_by_pdb_id(pdb_id, out_path)
     except Exception as e:
         return f"Download RCSB PDB entry metadata by PDB ID error: {str(e)}"
@@ -581,7 +581,7 @@ def download_rcsb_entry_metadata_by_pdb_id_tool(pdb_id: str, out_path: str) -> s
 def download_rcsb_structure_by_pdb_id_tool(pdb_id: str, out_dir: str, file_type: str = "pdb") -> str:
     """Download RCSB PDB structure file by PDB ID. Returns rich JSON: status, file_info, content_preview, biological_metadata, execution_context."""
     try:
-        from .database.rcsb import download_rcsb_structure_by_pdb_id
+        from .rcsb import download_rcsb_structure_by_pdb_id
         return download_rcsb_structure_by_pdb_id(pdb_id, out_dir, file_type=file_type)
     except Exception as e:
         return f"Download RCSB PDB structure file by PDB ID error: {str(e)}"
@@ -599,7 +599,7 @@ class StringMapIdsDownloadInput(BaseModel):
 def download_string_map_ids_tool(identifiers: str, out_dir: str, species: int = 9606, limit: int = 1, echo_query: int = 1, filename: str = "map_ids.tsv") -> str:
     """Download STRING map_ids results to TSV file. Returns rich JSON format."""
     try:
-        from .database.string import download_string_map_ids
+        from .string import download_string_map_ids
         ids_list = [x.strip() for x in identifiers.split(",") if x.strip()]
         return download_string_map_ids(ids_list if len(ids_list) > 1 else identifiers.strip(), out_dir, species=species, limit=limit, echo_query=echo_query, filename=filename)
     except Exception as e:
@@ -618,7 +618,7 @@ class StringNetworkDownloadInput(BaseModel):
 def download_string_network_tool(identifiers: str, out_dir: str, species: int = 9606, required_score: int = 400, network_type: str = "functional", add_nodes: int = 0, filename: str = "network.tsv") -> str:
     """Download STRING PPI network to TSV file. Returns rich JSON format."""
     try:
-        from .database.string import download_string_network
+        from .string import download_string_network
         ids_list = [x.strip() for x in identifiers.split(",") if x.strip()]
         return download_string_network(ids_list if len(ids_list) > 1 else identifiers.strip(), out_dir, species=species, required_score=required_score, network_type=network_type, add_nodes=add_nodes, filename=filename)
     except Exception as e:
@@ -637,7 +637,7 @@ class StringNetworkImageDownloadInput(BaseModel):
 def download_string_network_image_tool(identifiers: str, out_dir: str, species: int = 9606, required_score: int = 400, network_flavor: str = "evidence", add_nodes: int = 0, filename: str = "network.png") -> str:
     """Download STRING network as a PNG image. Returns rich JSON format."""
     try:
-        from .database.string import download_string_network_image
+        from .string import download_string_network_image
         ids_list = [x.strip() for x in identifiers.split(",") if x.strip()]
         return download_string_network_image(ids_list if len(ids_list) > 1 else identifiers.strip(), out_dir, species=species, required_score=required_score, network_flavor=network_flavor, add_nodes=add_nodes, filename=filename)
     except Exception as e:
@@ -655,7 +655,7 @@ class StringInteractionPartnersDownloadInput(BaseModel):
 def download_string_interaction_partners_tool(identifiers: str, out_dir: str, species: int = 9606, required_score: int = 400, limit: int = 10, filename: str = "interaction_partners.tsv") -> str:
     """Download STRING interaction partners to TSV file. Returns rich JSON format."""
     try:
-        from .database.string import download_string_interaction_partners
+        from .string import download_string_interaction_partners
         ids_list = [x.strip() for x in identifiers.split(",") if x.strip()]
         return download_string_interaction_partners(ids_list if len(ids_list) > 1 else identifiers.strip(), out_dir, species=species, required_score=required_score, limit=limit, filename=filename)
     except Exception as e:
@@ -671,7 +671,7 @@ class StringEnrichmentDownloadInput(BaseModel):
 def download_string_enrichment_tool(identifiers: str, out_dir: str, species: int = 9606, filename: str = "enrichment.tsv") -> str:
     """Download STRING functional enrichment (GO/KEGG/Pfam) to TSV file. Returns rich JSON format."""
     try:
-        from .database.string import download_string_enrichment
+        from .string import download_string_enrichment
         ids_list = [x.strip() for x in identifiers.split(",") if x.strip()]
         return download_string_enrichment(ids_list if len(ids_list) > 1 else identifiers.strip(), out_dir, species=species, filename=filename)
     except Exception as e:
@@ -688,7 +688,7 @@ class StringPpiEnrichmentDownloadInput(BaseModel):
 def download_string_ppi_enrichment_tool(identifiers: str, out_dir: str, species: int = 9606, required_score: int = 400, filename: str = "ppi_enrichment.json") -> str:
     """Download STRING PPI network enrichment stats to JSON file. Returns rich JSON format."""
     try:
-        from .database.string import download_string_ppi_enrichment
+        from .string import download_string_ppi_enrichment
         ids_list = [x.strip() for x in identifiers.split(",") if x.strip()]
         return download_string_ppi_enrichment(ids_list if len(ids_list) > 1 else identifiers.strip(), out_dir, species=species, required_score=required_score, filename=filename)
     except Exception as e:
@@ -704,7 +704,7 @@ class StringHomologyDownloadInput(BaseModel):
 def download_string_homology_tool(identifiers: str, out_dir: str, species: int = 9606, filename: str = "homology.tsv") -> str:
     """Download STRING homology and similarity scores to TSV file. Returns rich JSON format."""
     try:
-        from .database.string import download_string_homology
+        from .string import download_string_homology
         ids_list = [x.strip() for x in identifiers.split(",") if x.strip()]
         return download_string_homology(ids_list if len(ids_list) > 1 else identifiers.strip(), out_dir, species=species, filename=filename)
     except Exception as e:
@@ -724,7 +724,7 @@ class UniprotSearchByQueryInput(BaseModel):
 def download_uniprot_search_by_query_tool(query: str, out_path: str, frmt: str = "tsv", columns: Optional[str] = None, limit: Optional[int] = 100, database: str = "uniprotkb", **filters) -> str:
     """Download UniProt search results. Returns rich JSON format."""
     try:
-        from .database.uniprot import download_uniprot_search_by_query
+        from .uniprot import download_uniprot_search_by_query
         return download_uniprot_search_by_query(query=query, out_path=out_path, frmt=frmt, columns=columns, limit=limit, database=database, **filters)
     except Exception as e:
         return f"Download UniProt search results error: {str(e)}"
@@ -738,7 +738,7 @@ class UniprotRetrieveByIdInput(BaseModel):
 def download_uniprot_retrieve_by_id_tool(uniprot_id: str, out_path: str, frmt: str = "fasta") -> str:
     """Download single entry from UniProt. Returns rich JSON format."""
     try:
-        from .database.uniprot import download_uniprot_retrieve_by_id
+        from .uniprot import download_uniprot_retrieve_by_id
         return download_uniprot_retrieve_by_id(uniprot_id=uniprot_id, out_path=out_path, frmt=frmt)
     except Exception as e:
         return f"Download single entry from UniProt error: {str(e)}"
@@ -753,7 +753,7 @@ class UniprotMappingInput(BaseModel):
 def download_uniprot_mapping_tool(fr: str, to: str, query: str, out_path: str) -> str:
     """Download mapped IDs across databases via UniProt ID Mapping. Returns rich JSON format."""
     try:
-        from .database.uniprot import download_uniprot_mapping
+        from .uniprot import download_uniprot_mapping
         return download_uniprot_mapping(fr=fr, to=to, query=query, out_path=out_path)
     except Exception as e:
         return f"Download mapped IDs across databases via UniProt ID Mapping error: {str(e)}"
@@ -766,7 +766,7 @@ class UniprotSeqByIdInput(BaseModel):
 def download_uniprot_seq_by_id_tool(uniprot_id: str, out_path: str) -> str:
     """Download sequence (FASTA) from Uniprot. Returns rich JSON format."""
     try:
-        from .database.uniprot import download_uniprot_seq_by_id
+        from .uniprot import download_uniprot_seq_by_id
         return download_uniprot_seq_by_id(uniprot_id=uniprot_id, out_path=out_path)
     except Exception as e:
         return f"Download sequence (FASTA) from Uniprot error: {str(e)}"
@@ -779,7 +779,7 @@ class UniprotMetaByIdInput(BaseModel):
 def download_uniprot_meta_by_id_tool(uniprot_id: str, out_path: str) -> str:
     """Download metadata (JSON) from Uniprot. Returns rich JSON format."""
     try:
-        from .database.uniprot import download_uniprot_meta_by_id
+        from .uniprot import download_uniprot_meta_by_id
         return download_uniprot_meta_by_id(uniprot_id=uniprot_id, out_path=out_path)
     except Exception as e:
         return f"Download metadata (JSON) from Uniprot error: {str(e)}"

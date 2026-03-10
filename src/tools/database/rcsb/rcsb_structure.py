@@ -46,7 +46,8 @@ def download_rcsb_structure(pdb_id: str, out_dir: str, file_type: str = "pdb", u
         return final_path
     url = f"{RCSB_FILES_BASE}/{out_name}"
     try:
-        response = requests.get(url, stream=True)
+        # timeout: (connect, read) - 10s connect, 120s total read for large structure files
+        response = requests.get(url, stream=True, timeout=(10, 120))
         response.raise_for_status()
         with open(out_path, "wb") as f:
             for chunk in response.iter_content(8192):

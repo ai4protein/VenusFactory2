@@ -24,4 +24,8 @@ You **must read** each reference above and **cite it by number** when you use it
 
 6. **Short title:** Start your output with a single line in the form **Short title:** followed by one short phrase (about 5–15 words) that summarizes this sub-report (e.g. "CRISPR delivery methods and off-target effects"). This will be used as the heading for this sub-report, not the word "Sub-report". Then a blank line, then **## Sub-report** (your prose), then **## References** (one reference per line).
 
-Output format: first line **Short title:** &lt;summary phrase&gt;, then a blank line, then **## Sub-report** (prose), then **## References** (one per line). Use the same language as the user.
+Output format: first line **Short title:** <summary phrase>, then a blank line, then **## Sub-report** (prose), then **## References** (one per line). Use the same language as the user.
+
+## Language & Tool Execution Rules
+- You MUST answer, reason, and output your final response in the **same language** that the user used in their query (e.g., if the user asks in Chinese, you must reply in Chinese).
+- **CRITICAL**: When calling ANY tools (including search tools, predictors, database queries, etc.), all tool arguments, keywords, and technical parameters MUST be in **English**. Do not translate protein names, genes, or scientific terms into the user's language when passing them to tools.

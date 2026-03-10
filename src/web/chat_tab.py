@@ -44,581 +44,36 @@ from agent.chat_agent import (
 from web.utils.css_loader import load_css_file
 import threading
 
+from web.utils.chat_format_utils import (
+    _markdown_to_html, _embed_image_paths_in_content, _get_download_btn_update, _assistant_msg,
+    _avatar_data_url, _build_chat_html, _format_literature_citations, _format_literature_for_reading,
+    _format_web_citations, _format_web_for_reading, _format_dataset_citations, _format_pi_steps_for_report,
+    _clean_title, _short_topic_title, _format_search_preview, _format_search_summary,
+    _format_mls_code_for_display, _format_backend_log, _build_conversation_panel_html, _build_log_html
+)
+
+from agent.chat_agent_utils import (
+    AGENT_CHAT_MAX_MESSAGES, AGENT_CHAT_MAX_TOOL_CALLS, SEARCH_MAX_RESULTS,
+    MLS_SELF_CHECK_MSG, MLS_POST_STEP_SELF_CHECK_MSG, MAX_STEP_RETRIES, TOOL_EXECUTION_TIMEOUT,
+    PI_SEARCH_TOOL_NAMES, _tool_output_indicates_failure, _dedupe_references,
+    extract_sequence_from_message, extract_uniprot_id_from_message, _extract_download_file_from_output,
+    _get_output_file_path_from_raw, _read_output_file_preview, _extract_image_paths_from_tool_output,
+    _fetch_literature_for_pi, _refine_query_for_search, _mls_debug_step, _parse_mls_debug_output,
+    _run_mls_debug_executor_sync, _run_mls_debug_with_tools, _parse_mls_post_step_output,
+    _run_mls_post_step_verify, _output_looks_null_or_empty, _cb_post_step_check, _try_parse_json_array,
+    _find_json_array_end, _parse_cb_plan, _parse_sub_report_short_title, _extract_deepsearch_data,
+    _is_search_result_empty, _translate_user_query_to_english, _run_section_search, _fetch_search_for_pi_report
+)
+
+
 # Load chat tab CSS from assets (cached at module level)
-_CHAT_DIALOG_CSS = load_css_file("chat_tab_dialog.css")
-_CHAT_PANEL_CSS = load_css_file("chat_tab_panel.css")
-_CHAT_LOG_CSS = load_css_file("chat_tab_log.css")
 AGENT_TAB_CSS = load_css_file("chat_tab_layout.css")
 
-try:
-    import markdown
-except ImportErorr:
-    markdown = None
 load_dotenv()
-
-
-# Free-use limits per chat (from .env)
-AGENT_CHAT_MAX_MESSAGES = int(os.getenv("AGENT_CHAT_MAX_MESSAGES", "50"))
-AGENT_CHAT_MAX_TOOL_CALLS = int(os.getenv("AGENT_CHAT_MAX_TOOL_CALLS", "40"))
-# PI search: max results per literature/web/dataset call (from .env)
-SEARCH_MAX_RESULTS = int(os.getenv("SEARCH_MAX_RESULTS", "3"))
-# When a tool fails, MLS self-check bubble (new dialog)
-MLS_SELF_CHECK_MSG = "🔍 **MLS self-check:** Checking whether parameters can be adjusted and retried."
-# After every step execution, MLS post-step self-check (new dialog) — execution already happened, now verify output
-MLS_POST_STEP_SELF_CHECK_MSG = "🔍 **MLS self-check (post-step):** Step {step_num} executed; verifying output for technical errors before marking complete and proceeding."
-# Max step-level retries after MLS self-check (from .env; default 2)
-MAX_STEP_RETRIES = int(os.getenv("MAX_STEP_RETRIES", "2"))
-
-
-def _tool_output_indicates_failure(raw_output: Any) -> tuple[bool, str]:
-    """Detect if tool output indicates failure: top-level success:false, or nested result/data with success:false or error (e.g. BLAST timeout in result string). Returns (is_failure, error_message)."""
-    if raw_output is None:
-        return (False, "")
-    text = str(raw_output).strip()
-    if not text:
-        return (False, "")
-    # Top-level parse
-    try:
-        parsed = json.loads(text) if isinstance(raw_output, str) else raw_output
-    except Exception:
-        parsed = None
-    if not isinstance(parsed, dict):
-        return (False, "")
-
-    # 1) Top-level success is False
-    if parsed.get("success") is False:
-        err = parsed.get("error") or parsed.get("message") or str(parsed)
-        return (True, err[:500] if isinstance(err, str) else str(err)[:500])
-
-    # 2) Top-level success is True but nested payload indicates failure (e.g. result/data/output as JSON string or dict)
-    for key in ("result", "data", "output", "response", "body"):
-        val = parsed.get(key)
-        if val is None:
-            continue
-        if isinstance(val, dict):
-            if val.get("success") is False:
-                err = val.get("error") or val.get("message") or str(val)
-                return (True, (err[:500] if isinstance(err, str) else str(err)[:500]))
-            if val.get("error"):
-                return (True, str(val.get("error"))[:500])
-        if isinstance(val, str):
-            val_strip = val.strip()
-            if not val_strip or val_strip[0] not in ("{", "["):
-                if "timeout" in val_strip.lower() or "error" in val_strip.lower():
-                    return (True, val_strip[:500])
-                continue
-            try:
-                inner = json.loads(val_strip)
-                if isinstance(inner, dict) and inner.get("success") is False:
-                    err = inner.get("error") or inner.get("message") or val_strip
-                    return (True, (err[:500] if isinstance(err, str) else str(err)[:500]))
-                if isinstance(inner, dict) and inner.get("error"):
-                    return (True, str(inner.get("error"))[:500])
-            except Exception:
-                if "success\": false" in val_strip or '"success":false' in val_strip or "Timeout" in val_strip:
-                    return (True, val_strip[:500])
-    return (False, "")
-
-
-def _markdown_to_html(text: str) -> str:
-    """Convert Markdown to HTML for chat bubble display. Falls back to escaped plain text if markdown not available."""
-    if not (text or text.strip()):
-        return ""
-    if markdown is None:
-        return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
-    try:
-        html = markdown.markdown(
-            text,
-            extensions=["fenced_code", "tables"],
-        )
-        return html if html else text.replace("\n", "<br>")
-    except Exception:
-        return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
-
-
-# Agent logic (LLM, chains, session state, cache) lives in agent.chat_agent and agent.prompts.
-def _dedupe_references(refs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    seen = set()
-    out = []
-    for r in refs or []:
-        if not isinstance(r, dict):
-            continue
-        title = (r.get('title') or '').strip().lower()
-        doi = (r.get('doi') or '').strip().lower()
-        url = (r.get('url') or '').strip().lower()
-        key = (title, doi, url)
-        if key in seen:
-            continue
-        seen.add(key)
-        out.append(r)
-    return out
-
-def extract_sequence_from_message(message: str) -> Optional[str]:
-    """Extract protein sequence from user message"""
-
-    sequence_pattern = r'[ACDEFGHIKLMNPQRSTVWY]{20,}'
-
-    matches = re.findall(sequence_pattern, message.upper())
-
-    return matches[0] if matches else None
-
-
-def _extract_download_file_from_output(tool_name: str, output_data: dict) -> Optional[str]:
-    """Extract local file path from tool output for download. Returns path if file exists."""
-    if not isinstance(output_data, dict) or not output_data.get("success"):
-        return None
-    path = (
-        output_data.get("pdb_path") or output_data.get("pdb_file")
-        or output_data.get("structure_file") or output_data.get("fasta_file")
-        or output_data.get("file_path") or output_data.get("generated_code_path")
-        or output_data.get("model_path")
-    )
-    if path and isinstance(path, str) and os.path.isfile(path):
-        return path
-    return None
-
-
-def _get_output_file_path_from_raw(raw_output: Any, tool_name: str) -> Optional[str]:
-    """Get output file path from raw tool output for CB post-step verification (file existence + preview)."""
-    try:
-        data = json.loads(raw_output) if isinstance(raw_output, str) else raw_output
-        if not isinstance(data, dict):
-            return None
-        path = (
-            data.get("pdb_path") or data.get("pdb_file") or data.get("structure_file")
-            or data.get("fasta_file") or data.get("file_path") or data.get("generated_code_path")
-            or data.get("model_path")
-        )
-        if path and isinstance(path, str) and os.path.isfile(path):
-            return path
-    except Exception:
-        pass
-    return None
-
-
-def _read_output_file_preview(file_path: str, max_lines: int = 10, max_line_len: int = 200) -> str:
-    """Read first max_lines of a file for CB verification. Returns preview string or empty on error."""
-    if not file_path or not os.path.isfile(file_path):
-        return ""
-    try:
-        lines = []
-        with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-            for _ in range(max_lines):
-                line = f.readline()
-                if not line:
-                    break
-                lines.append(line.rstrip()[:max_line_len])
-        return "\n".join(lines) if lines else ""
-    except Exception:
-        return ""
-
-
-_IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".svg", ".webp")
-
-
-def _extract_image_paths_from_tool_output(raw_output: Any, tool_name: str) -> List[str]:
-    """Extract image file paths from tool output (e.g. plot_path, figure_path from agent_generated_code/python_repl). Returns list of absolute paths."""
-    paths: List[str] = []
-    try:
-        data = json.loads(raw_output) if isinstance(raw_output, str) else raw_output
-        if not isinstance(data, dict):
-            return paths
-        # Common keys for plot/figure output
-        for key in ("plot_path", "figure_path", "image_path", "plot_file", "figure_file", "output_path", "file_path", "saved_path"):
-            val = data.get(key)
-            if isinstance(val, str) and val.strip():
-                p = val.strip()
-                if os.path.isfile(p) and p.lower().endswith(_IMAGE_EXTENSIONS):
-                    paths.append(os.path.abspath(p))
-        # Nested result (e.g. result as JSON string)
-        for key in ("result", "data", "output"):
-            val = data.get(key)
-            if isinstance(val, str) and val.strip().startswith("{"):
-                try:
-                    inner = json.loads(val)
-                    if isinstance(inner, dict):
-                        for k in ("plot_path", "figure_path", "image_path", "file_path"):
-                            v = inner.get(k)
-                            if isinstance(v, str) and v.strip() and os.path.isfile(v.strip()) and v.strip().lower().endswith(_IMAGE_EXTENSIONS):
-                                paths.append(os.path.abspath(v.strip()))
-                except Exception:
-                    pass
-        # List of paths
-        for key in ("plot_paths", "figure_paths", "image_paths", "files"):
-            val = data.get(key)
-            if isinstance(val, list):
-                for v in val:
-                    if isinstance(v, str) and v.strip() and os.path.isfile(v.strip()) and v.strip().lower().endswith(_IMAGE_EXTENSIONS):
-                        paths.append(os.path.abspath(v.strip()))
-    except Exception:
-        pass
-    return paths
-
-
-def _embed_image_paths_in_content(content: str, image_paths: List[str], max_size_mb: float = 2.0) -> str:
-    """Append inline images (as base64 data URLs) to content so they show in the chat message. Skips files larger than max_size_mb."""
-    if not image_paths:
-        return content
-    max_bytes = int(max_size_mb * 1024 * 1024)
-    for path in image_paths:
-        if not path or not os.path.isfile(path):
-            continue
-        try:
-            size = os.path.getsize(path)
-            if size > max_bytes:
-                content += f"\n\n*[Image omitted: {os.path.basename(path)} exceeds {max_size_mb} MB]*"
-                continue
-            with open(path, "rb") as f:
-                b64 = base64.b64encode(f.read()).decode("ascii")
-            ext = os.path.splitext(path)[1].lower() or ".png"
-            mime = "image/png" if ext == ".png" else "image/jpeg" if ext in (".jpg", ".jpeg") else "image/svg+xml" if ext == ".svg" else "image/webp" if ext == ".webp" else "image/png"
-            content += f'\n\n<img src="data:{mime};base64,{b64}" alt="Plot" style="max-width:100%; height:auto; border-radius:8px;" />'
-        except Exception:
-            content += f"\n\n*[Could not load image: {os.path.basename(path)}]*"
-    return content
-
-
-def _get_download_btn_update(session_state: dict):
-    """Return gr.update for the tool output download button."""
-    path = session_state.get("latest_tool_output_file")
-    if path and os.path.isfile(path):
-        return gr.update(value=path, visible=True)
-    return gr.update(visible=False)
-
-def extract_uniprot_id_from_message(message: str) -> Optional[str]:
-    """Extract UniProt ID from user message"""
-    uniprot_pattern = r'\b[A-Z][A-Z0-9]{5}(?:[A-Z0-9]{4})?\b'
-    matches = re.findall(uniprot_pattern, message.upper())
-    return matches[0] if matches else None
-
-def _assistant_msg(content: str, role_id: str) -> Dict[str, Any]:
-    """Build assistant message with role label for display (separate dialog + avatar per agent)."""
-    label = ROLE_DISPLAY_NAMES.get(role_id, role_id)
-    display_content = f"**{label}**\n\n{content}"
-
-    return {"role": "assistant", "content": display_content, "role_id": role_id}
-
 
 # Cache role avatar as base64 data URL so we can embed in HTML (per-role avatar in chat)
 
 _AVATAR_B64_CACHE: Dict[str, str] = {}
-_DEFAULT_BOT_AVATAR_URL = "https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png"
-
-
-def _avatar_data_url(role_id: str) -> str:
-    """Return a data URL for the role avatar image (base64), or default URL if not found."""
-    if role_id in _AVATAR_B64_CACHE:
-        return _AVATAR_B64_CACHE[role_id]
-    path = get_role_avatar_path(role_id, fallback_to_first=True)
-    if path and os.path.isfile(path):
-        try:
-            with open(path, "rb") as f:
-                b64 = base64.b64encode(f.read()).decode("ascii")
-            ext = os.path.splitext(path)[1].lower() or ".png"
-            mime = "image/png" if ext == ".png" else "image/jpeg" if ext in (".jpg", ".jpeg") else "image/png"
-            data_url = f"data:{mime};base64,{b64}"
-            _AVATAR_B64_CACHE[role_id] = data_url
-            return data_url
-        except Exception:
-            pass
-
-    return _DEFAULT_BOT_AVATAR_URL
-
-
-
-
-
-def _build_chat_html(history_list: List[Dict[str, Any]]) -> str:
-    """Build HTML for the chat so each assistant message uses the correct role avatar (ROLE_AVATAR_FILES)."""
-    style_tag = f"<style>{_CHAT_DIALOG_CSS}</style>" if _CHAT_DIALOG_CSS else ""
-
-    if not history_list:
-        return f"{style_tag}<div class='vf-chat-dialog-box'><div class='vf-chat-container'><div class='vf-chat-empty'>No messages yet.</div></div></div>"
-    html_parts = []
-    for msg in history_list:
-        role = (msg.get("role") or "").lower()
-        content = msg.get("content") or ""
-        role_id = msg.get("role_id") or ""
-        content_html = _markdown_to_html(content)
-        if role == "user":
-            html_parts.append(
-                "<div class='vf-chat-row vf-chat-user'>"
-                "<div class='vf-chat-bubble vf-chat-user-bubble'>" + content_html + "</div>"
-                "</div>"
-            )
-
-        else:
-            avatar_url = _avatar_data_url(role_id) if role_id else _DEFAULT_BOT_AVATAR_URL
-            label = ROLE_DISPLAY_NAMES.get(role_id, role_id or "Assistant")
-            label_esc = label.replace("&", "&amp;").replace("<", "&lt;").replace("'", "&#39;")
-            # Strip leading "**RoleName**\n\n" from bubble so role is only shown above bubble
-            prefix = f"**{label}**"
-            content_for_bubble = content.strip()
-            if content_for_bubble.startswith(prefix):
-                content_for_bubble = content_for_bubble[len(prefix):].lstrip("\n\r ")
-            bubble_html = _markdown_to_html(content_for_bubble)
-            html_parts.append(
-                "<div class='vf-chat-row vf-chat-assistant'>"
-                "<div class='vf-chat-assistant-side'><img class='vf-chat-avatar' src='"
-                + avatar_url + "' alt='" + label_esc + "' /></div>"
-                "<div class='vf-chat-assistant-main'>"
-                "<div class='vf-chat-role-label'>" + label_esc + "</div>"
-                "<div class='vf-chat-bubble vf-chat-assistant-bubble'>" + bubble_html + "</div>"
-                "</div></div>"
-            )
-
-    return f"{style_tag}<div class='vf-chat-dialog-box'><div class='vf-chat-container'>" + "".join(html_parts) + "</div></div>"
-
-
-def _fetch_literature_for_pi(user_text: str, max_results: int = None) -> tuple:
-    """Run literature_search tool. Returns (formatted_str_for_prompt, tool_input_dict, raw_output_str) for logging."""
-    if max_results is None:
-        max_results = SEARCH_MAX_RESULTS
-    empty = ("", {}, "")
-    try:
-        from tools.tools_agent_hub import get_tools
-        tools = get_tools()
-        lit_tool = next((t for t in tools if getattr(t, "name", "") == "query_literature_by_keywords"), None)
-        if not lit_tool:
-            return empty
-
-        query = (user_text or "").strip()[:120]
-        
-        if not query:
-            return empty
-        tool_input = {"query": query, "max_results": max_results, "source": "pubmed"}
-        out = lit_tool.invoke(tool_input)
-        raw_out = out if isinstance(out, str) else json.dumps(out, ensure_ascii=False)
-        
-        if isinstance(out, str):
-            data = json.loads(out) if out.strip().startswith("{") else {}
-        else:
-            data = out if isinstance(out, dict) else {}
-        
-        if not data.get("success"):
-            return ("", tool_input, raw_out)
-        refs_raw = data.get("references", [])
-        
-        if isinstance(refs_raw, str):
-            try:
-                refs = json.loads(refs_raw)
-            except json.JSONDecodeError:
-                refs = []
-        else:
-            refs = refs_raw if isinstance(refs_raw, list) else []
-
-        lines = []
-        for i, r in enumerate(refs[:5], 1):
-            if not isinstance(r, dict):
-                continue
-
-            title = r.get("title") or r.get("citation") or "No title"
-            authors = r.get("authors") or r.get("author") or ""
-            if isinstance(authors, list):
-                authors = ", ".join(str(a) for a in authors[:5])
-            year = r.get("year") or r.get("published") or ""
-            url = r.get("url") or r.get("link") or ""
-            lines.append(f"[{i}] {title}. {authors}. {year}. {url}")
-        return ("\n".join(lines) if lines else "", tool_input, raw_out)
-
-    except Exception as e:
-        print(f"[PI answer] literature_search failed: {e}")
-        return empty
-
-def _format_literature_citations(refs: list, max_n: int = 5) -> list:
-    """Format literature references as [n] [title](url) for PI citations (Markdown link format)."""
-    out = []
-    for i, r in enumerate((refs or [])[:max_n], 1):
-        if not isinstance(r, dict):
-            continue
-        title = (r.get("title") or r.get("citation") or "No title").strip()
-        authors = r.get("authors") or r.get("author") or ""
-        if isinstance(authors, list):
-            authors = ", ".join(str(a) for a in authors[:5])
-        year = r.get("year") or r.get("published") or ""
-        url = r.get("url") or r.get("link") or ""
-        if url:
-            out.append(f"[{i}] [{title}]({url})" + (f" — {authors}, {year}" if authors or year else ""))
-        else:
-            out.append(f"[{i}] {title}" + (f" — {authors}, {year}" if authors or year else ""))
-    return out
-
-
-def _format_literature_for_reading(refs: list, max_n: int = 5, abstract_max: int = 400) -> list:
-    """Format literature with abstract so PI can read and cite. Each item: [n] [title](url) + Abstract."""
-    out = []
-    for i, r in enumerate((refs or [])[:max_n], 1):
-        if not isinstance(r, dict):
-            continue
-        title = (r.get("title") or r.get("citation") or "No title").strip()
-        authors = r.get("authors") or r.get("author") or ""
-        if isinstance(authors, list):
-            authors = ", ".join(str(a) for a in authors[:5])
-        year = r.get("year") or r.get("published") or ""
-        url = r.get("url") or r.get("link") or ""
-        if url:
-            line = f"[{i}] [{title}]({url})" + (f" — {authors}, {year}" if authors or year else "")
-        else:
-            line = f"[{i}] {title}" + (f" — {authors}, {year}" if authors or year else "")
-        abstract = (r.get("abstract") or "").strip()
-        if abstract:
-            ab = abstract[:abstract_max] + ("…" if len(abstract) > abstract_max else "")
-            line += f"\n  **Abstract:** {ab}"
-        out.append(line)
-    return out
-
-
-def _format_web_citations(results: list, max_n: int = 5) -> list:
-    """Format web search results as [n] [title](url) for PI citations (Markdown link format)."""
-    out = []
-    for i, r in enumerate((results or [])[:max_n], 1):
-        if isinstance(r, dict):
-            title = (r.get("title") or r.get("snippet") or str(r)).strip()
-            url = r.get("url") or ""
-            if url:
-                out.append(f"[{i}] [{title}]({url})")
-            else:
-                out.append(f"[{i}] {title}")
-        else:
-            out.append(f"[{i}] {str(r)}")
-    return out
-
-
-def _format_web_for_reading(results: list, max_n: int = 5, snippet_max: int = 300) -> list:
-    """Format web results with snippet so PI can read and cite. Each item: [n] [title](url)."""
-    out = []
-    for i, r in enumerate((results or [])[:max_n], 1):
-        if isinstance(r, dict):
-            title = (r.get("title") or "").strip()
-            snippet = (r.get("snippet") or "").strip()
-            url = r.get("url") or ""
-            if url:
-                line = f"[{i}] [{title or 'Link'}]({url})"
-            else:
-                line = f"[{i}] {title or str(r)}"
-            if snippet:
-                sn = snippet[:snippet_max] + ("…" if len(snippet) > snippet_max else "")
-                line += f"\n  **Snippet:** {sn}"
-            out.append(line)
-        else:
-            out.append(f"[{i}] {str(r)}")
-    return out
-
-
-def _format_dataset_citations(datasets: list, max_n: int = 5) -> list:
-    """Format dataset search results as [n] [title](url) for PI citations (Markdown link format)."""
-    out = []
-    for i, d in enumerate((datasets or [])[:max_n], 1):
-        if not isinstance(d, dict):
-            continue
-        title = (d.get("title") or "Untitled").strip()
-        url = d.get("url") or ""
-        src = d.get("source") or ""
-        if url:
-            out.append(f"[{i}] [{title}]({url})" + (f" — Source: {src}" if src else ""))
-        else:
-            out.append(f"[{i}] {title}" + (f" — Source: {src}" if src else ""))
-    return out
-
-
-def _format_pi_steps_for_report(intermediate_steps: list) -> str:
-    """Format PI agent intermediate_steps (list of (action, observation)) into a single string for pi_report_chain input."""
-    if not intermediate_steps:
-        return "No search results."
-    sections = []
-    for action, observation in intermediate_steps:
-        tname = getattr(action, "tool", None) or (action.get("tool") if isinstance(action, dict) else None)
-        tinputs = getattr(action, "tool_input", None) or (action.get("tool_input", {}) if isinstance(action, dict) else {})
-        query = (tinputs.get("query") or "") if isinstance(tinputs, dict) else ""
-        obs_str = observation if isinstance(observation, str) else json.dumps(observation, ensure_ascii=False)
-        try:
-            data = json.loads(obs_str) if obs_str.strip().startswith("{") else {}
-            if data.get("references"):
-                lines = _format_literature_citations(data["references"], max_n=5)
-                if lines:
-                    sections.append(f"**Literature ({tname})**\n" + "\n".join(lines))
-            elif data.get("results"):
-                lines = _format_web_citations(data["results"] if isinstance(data["results"], list) else [], max_n=5)
-                if lines:
-                    sections.append(f"**Web ({tname})**\n" + "\n".join(lines))
-            elif data.get("datasets"):
-                ds_list = data["datasets"]
-                if isinstance(ds_list, str):
-                    try:
-                        ds_list = json.loads(ds_list)
-                    except json.JSONDecodeError:
-                        ds_list = []
-                lines = _format_dataset_citations(ds_list, max_n=5)
-                if lines:
-                    sections.append(f"**Datasets ({tname})**\n" + "\n".join(lines))
-            else:
-                sections.append(f"**{tname}** (query: {query[:80]}…)\n{obs_str[:800]}…")
-        except Exception:
-            sections.append(f"**{tname}** (query: {query[:80]}…)\n{obs_str[:800]}…")
-    if not sections:
-        return "Search returned no structured results."
-    return "References from search (cite as [1], [2], etc.):\n\n" + "\n\n".join(sections)
-
-
-def _refine_query_for_search(user_text: str, max_len: int = 60) -> str:
-    """Extract short search keywords: protein/gene ID plus up to 3 words (no long sentence)."""
-    import re
-    t = (user_text or "").strip()
-    if not t:
-        return ""
-    # Protein/gene ID (e.g. P04040) then next 3 words only
-    id_match = re.search(r"\b(P\d{5}|[A-Z0-9]{5,6})\b", t, re.IGNORECASE)
-    if id_match:
-        pid = id_match.group(1).strip()
-        rest = re.sub(r"\s+", " ", t[id_match.end() :]).strip().split()[:3]
-        return (pid + " " + " ".join(rest)).strip()[:max_len]
-    words = re.sub(r"\s+", " ", t).strip().split()[:4]
-    return " ".join(words)[:max_len]
-
-
-def _mls_debug_step(llm, step_num: int, task_desc: str, tool_name: str, merged_tool_input: dict, error_str: str) -> tuple:
-    """Ask MLS to analyze the error (no tools). Returns (retry_input_dict or None, report_for_cb or None). Fallback when mls_debug_executor is not used."""
-    context = (
-        f"Step {step_num} failed during tool execution.\n\n"
-        f"**Task:** {task_desc}\n**Tool:** {tool_name}\n**Current input:** {json.dumps(merged_tool_input, ensure_ascii=False)}\n**Error:** {error_str}"
-    )
-    prompt = f"{context}\n\n{MLS_SELF_CHECK_TEMPLATE}"
-    try:
-        response = llm.invoke([HumanMessage(content=prompt)])
-        content = (response.content if hasattr(response, "content") else str(response)).strip()
-        return _parse_mls_debug_output(content)
-    except Exception:
-        return (None, None)
-
-
-def _parse_mls_debug_output(content: str) -> tuple:
-    """Parse MLS self-check final output for retry_input or report_for_cb. Returns (retry_input or None, report_for_cb or None)."""
-    if not (content or content.strip()):
-        return (None, None)
-    # Strip markdown code block if present
-    if "```" in content:
-        start = content.find("```")
-        if "json" in content[: start + 10]:
-            start = content.find("```") + 7
-        else:
-            start = content.find("```") + 3
-        end = content.find("```", start)
-        content = content[start: end if end > 0 else None].strip()
-    try:
-        data = json.loads(content)
-        retry = data.get("retry_input") if isinstance(data.get("retry_input"), dict) else None
-        report = data.get("report_for_cb") if isinstance(data.get("report_for_cb"), str) else None
-        return (retry, report)
-    except Exception:
-        return (None, None)
-
-
-def _run_mls_debug_executor_sync(executor, context: str) -> tuple[Any, list]:
-    """Run MLS debug executor synchronously. Returns (output_str, intermediate_steps)."""
-    result = executor.invoke({"input": context})
-    output = (result.get("output") or "").strip() if isinstance(result, dict) else ""
-    steps = result.get("intermediate_steps") or []
-    return (output, steps)
 
 
 async def _run_mls_debug_with_tools(
@@ -679,30 +134,6 @@ async def _run_mls_debug_with_tools(
         )
 
 
-def _parse_mls_post_step_output(content: str) -> tuple[bool, Optional[dict], Optional[str]]:
-    """Parse MLS post-step verify output. Returns (status_ok, retry_input or None, report_for_cb or None)."""
-    if not (content or content.strip()):
-        return (False, None, None)
-    raw = content
-    if "```" in raw:
-        start = raw.find("```")
-        if "json" in raw[: start + 10]:
-            start = raw.find("```") + 7
-        else:
-            start = raw.find("```") + 3
-        end = raw.find("```", start)
-        raw = raw[start: end if end > 0 else None].strip()
-    try:
-        data = json.loads(raw)
-        if isinstance(data, dict) and data.get("status") == "ok":
-            return (True, None, None)
-        retry = data.get("retry_input") if isinstance(data.get("retry_input"), dict) else None
-        report = data.get("report_for_cb") if isinstance(data.get("report_for_cb"), str) else None
-        return (False, retry, report)
-    except Exception:
-        return (False, None, None)
-
-
 async def _run_mls_post_step_verify(
     session_state: dict,
     step_num: int,
@@ -753,28 +184,6 @@ async def _run_mls_post_step_verify(
         return (True, None, None)
 
 
-def _output_looks_null_or_empty(raw_output: Any) -> bool:
-    """Heuristic: True if output has success but results/references/data is null or empty. Sequence/download outputs (sequence, file_path, etc.) count as non-empty."""
-    try:
-        parsed = json.loads(str(raw_output)) if isinstance(raw_output, str) else raw_output
-        if not isinstance(parsed, dict) or not parsed.get("success"):
-            return False
-        # Payload keys that indicate non-empty output (e.g. download_uniprot_sequence, download_ncbi_sequence, file downloads)
-        if parsed.get("sequence") and isinstance(parsed["sequence"], str) and parsed["sequence"].strip():
-            return False
-        if parsed.get("file_path") and isinstance(parsed["file_path"], str) and parsed["file_path"].strip():
-            return False
-        if parsed.get("sequences") and isinstance(parsed["sequences"], (list, dict)) and len(parsed["sequences"]) > 0:
-            return False
-        for key in ("results", "references", "data", "entries"):
-            val = parsed.get(key)
-            if val is None:
-                return True
-            if isinstance(val, (list, dict)) and len(val) == 0:
-                return True
-        return False
-    except Exception:
-        return False
 
 
 async def _cb_post_step_check(
@@ -838,477 +247,25 @@ async def _cb_post_step_check(
         return (True, "")
 
 
-def _try_parse_json_array(s: str) -> Optional[list]:
-    """Try to parse s as JSON array. Removes trailing commas before ] or } to tolerate LLM output. Returns list or None."""
-    if not s or not s.strip():
-        return None
-    s = s.strip()
-    # Remove trailing commas before ] or } (common in LLM-generated JSON)
-    s = re.sub(r",\s*]", "]", s)
-    s = re.sub(r",\s*}", "}", s)
-    try:
-        out = json.loads(s)
-        return out if isinstance(out, list) else None
-    except json.JSONDecodeError:
-        return None
-
-
-def _parse_cb_plan(raw_content: str) -> list:
-    """Extract pipeline (list of step dicts) from CB raw output. Tries JSON parse, then strip markdown, then find [...]. Returns [] on failure."""
-    if not raw_content or not isinstance(raw_content, str):
-        return []
-    text = raw_content.strip()
-    # 1) Direct JSON (with trailing-comma tolerance)
-    out = _try_parse_json_array(text)
-    if out is not None:
-        return out
-    # 2) Strip ```json ... ``` or ``` ... ```
-    for marker in ("```json", "```"):
-        if marker in text:
-            start = text.find(marker) + len(marker)
-            end = text.find("```", start)
-            if end == -1:
-                end = len(text)
-            chunk = text[start:end].strip()
-            # Remove trailing ``` if LLM put it inside the block
-            if chunk.endswith("```"):
-                chunk = chunk[:-3].strip()
-            out = _try_parse_json_array(chunk)
-            if out is not None:
-                return out
-            # Fallback: find first '[' and matching ']' within the chunk (handles extra text after array)
-            i = chunk.find("[")
-            if i != -1:
-                depth = 0
-                for j in range(i, len(chunk)):
-                    if chunk[j] == "[":
-                        depth += 1
-                    elif chunk[j] == "]":
-                        depth -= 1
-                        if depth == 0:
-                            out = _try_parse_json_array(chunk[i : j + 1])
-                            if out is not None:
-                                return out
-                            break
-    # 3) Find first '[' and matching ']' in full text (no string-awareness; best effort)
-    i = text.find("[")
-    if i == -1:
-        return []
-    depth = 0
-    for j in range(i, len(text)):
-        if text[j] == "[":
-            depth += 1
-        elif text[j] == "]":
-            depth -= 1
-            if depth == 0:
-                out = _try_parse_json_array(text[i : j + 1])
-                if out is not None:
-                    return out
-                break
-    return []
-
-
-def _format_mls_code_for_display(tool_name: str, merged_tool_input: dict, raw_output: Any, max_code_len: int = 3000) -> str:
-    """Extract MLS-written code for display in message. Returns markdown block or empty string."""
-    if tool_name == "python_repl":
-        code = (merged_tool_input or {}).get("query") or (merged_tool_input or {}).get("code") or ""
-        if code:
-            code_str = code.strip() if isinstance(code, str) else str(code)
-            if len(code_str) > max_code_len:
-                code_str = code_str[:max_code_len] + "\n# ... (truncated)"
-            return f"\n\n**Code:**\n```python\n{code_str}\n```"
-    if tool_name == "agent_generated_code":
-        try:
-            parsed = json.loads(raw_output) if isinstance(raw_output, str) else raw_output
-            path = parsed.get("generated_code_path") if isinstance(parsed, dict) else None
-            if path and isinstance(path, str) and os.path.isfile(path):
-                code_str = Path(path).read_text(encoding="utf-8").strip()
-                if len(code_str) > max_code_len:
-                    code_str = code_str[:max_code_len] + "\n# ... (truncated)"
-                return f"\n\n**Generated code:**\n```python\n{code_str}\n```"
-        except Exception:
-            pass
-    return ""
-
-
-def _clean_title(text: str, max_line: int = 120) -> str:
-    """Strip trailing ad/junk and truncate to max_line."""
-    if not text or not isinstance(text, str):
-        return ""
-    t = text.strip()
-    for junk in ("\n\nAd", "\nAd", " Ad", "— Ad", "Ad"):
-        if t.endswith(junk):
-            t = t[: -len(junk)].strip()
-    if len(t) > max_line:
-        t = t[: max_line].rstrip() + "…"
-    return t
-
-
-def _parse_sub_report_short_title(sub_report: str, fallback_title: str = "Sub-report") -> tuple[str, str]:
-    """Extract Short title: <phrase> from the first line of sub-report; return (title, body)."""
-    if not sub_report or not isinstance(sub_report, str):
-        return (fallback_title, sub_report or "")
-    raw = sub_report.strip()
-    if not raw:
-        return (fallback_title, raw)
-    first_line = raw.split("\n", 1)[0].strip()
-    prefix = "**Short title:**"
-    if first_line.startswith(prefix):
-        title = first_line[len(prefix) :].strip()
-        body = raw.split("\n", 1)[1].strip() if "\n" in raw else ""
-        return (title or fallback_title, body)
-    if first_line.lower().startswith("short title:"):
-        title = first_line[12:].strip()
-        body = raw.split("\n", 1)[1].strip() if "\n" in raw else ""
-        return (title or fallback_title, body)
-    return (fallback_title, raw)
-
-
-def _short_topic_title(user_text: str, max_len: int = 56) -> str:
-    """Condense user question into a short topic title for the research draft heading."""
-    if not user_text or not isinstance(user_text, str):
-        return "Research draft"
-    t = user_text.strip().replace("\n", " ").strip()
-    if not t:
-        return "Research draft"
-    if len(t) <= max_len:
-        return t
-    return t[: max_len].rstrip() + "…"
-
-
-def _format_search_preview(tool_name: str, observation_str: str, max_items: int = 5, max_line: int = 120) -> str:
-    """Format retrieved content for chat: one item per block, title + link on separate lines."""
-    try:
-        data = json.loads(observation_str) if isinstance(observation_str, str) and observation_str.strip().startswith("{") else {}
-    except Exception:
-        return ""
-    if not data.get("success"):
-        return ""
-    blocks = []
-    if tool_name == "query_literature_by_keywords":
-        refs = data.get("references") or []
-        if isinstance(refs, str):
-            try:
-                refs = json.loads(refs) if refs.strip().startswith("[") else []
-            except Exception:
-                refs = []
-        for i, r in enumerate((refs or [])[:max_items], 1):
-            if not isinstance(r, dict):
-                continue
-            title = _clean_title(r.get("title") or r.get("citation") or "No title", max_line)
-            url = (r.get("url") or r.get("link") or "").strip()
-            if url:
-                blocks.append(f"[{i}] [{title}]({url})")
-            else:
-                blocks.append(f"[{i}] {title}")
-    elif tool_name == "query_web_by_keywords":
-        res = data.get("results") or []
-        if isinstance(res, str):
-            try:
-                res = json.loads(res) if res.strip().startswith("[") else []
-            except Exception:
-                res = []
-        for i, r in enumerate((res or [])[:max_items], 1):
-            if isinstance(r, dict):
-                title = _clean_title(r.get("title") or r.get("snippet") or str(r), max_line)
-                url = (r.get("url") or r.get("link") or "").strip()
-                if url:
-                    blocks.append(f"[{i}] [{title or 'Link'}]({url})")
-                else:
-                    blocks.append(f"[{i}] {title}")
-            else:
-                blocks.append(f"[{i}] {_clean_title(str(r), max_line)}")
-    elif tool_name == "query_dataset_by_keywords":
-        ds = data.get("datasets") or []
-        if isinstance(ds, str):
-            try:
-                ds = json.loads(ds) if ds.strip().startswith("[") else []
-            except Exception:
-                ds = []
-        for i, d in enumerate((ds or [])[:max_items], 1):
-            if isinstance(d, dict):
-                title = _clean_title(d.get("title") or "Untitled", max_line)
-                url = (d.get("url") or d.get("link") or "").strip()
-                if url:
-                    blocks.append(f"[{i}] [{title}]({url})")
-                else:
-                    blocks.append(f"[{i}] {title}")
-    if not blocks:
-        return ""
-    return "**Retrieved:**\n\n" + "\n\n".join(blocks)
-
-
-def _format_search_summary(tool_name: str, tool_inputs: dict, observation_str: str) -> str:
-    """Human-like summary: what we searched (tool + source), what we searched for (query); no results vs brief reading."""
-    query = (tool_inputs.get("query") or "") if isinstance(tool_inputs, dict) else ""
-    source = (tool_inputs.get("source") or "") if isinstance(tool_inputs, dict) else ""
-    q = (query[:80] + "…") if len(query) > 80 else query
-    label = tool_name.replace("_", " ").title()
-    if source and source.lower() != "all":
-        label = f"{label} ({source})"
-    intro = f"**{label}** — searched for \"{q}\"." if q else f"**{label}**."
-    try:
-        data = json.loads(observation_str) if isinstance(observation_str, str) and observation_str.strip().startswith("{") else {}
-    except Exception:
-        return intro + " Error."
-    if not data.get("success"):
-        return intro + " Error."
-    if tool_name == "query_literature_by_keywords":
-        refs = data.get("references") or []
-        if isinstance(refs, str):
-            try:
-                refs = json.loads(refs) if refs.strip().startswith("[") else []
-            except Exception:
-                refs = []
-        refs = refs if isinstance(refs, list) else []
-        n = len(refs)
-        if not n:
-            return intro + " No results."
-        first = refs[0] if refs and isinstance(refs[0], dict) else {}
-        title = (first.get("title") or first.get("citation") or "")[:100]
-        if title:
-            return intro + f" Found {n} paper(s). e.g. {title}…"
-        return intro + f" Found {n} paper(s)."
-    if tool_name == "query_web_by_keywords":
-        res = data.get("results") or []
-        if isinstance(res, str):
-            try:
-                res = json.loads(res) if res.strip().startswith("[") else []
-            except Exception:
-                res = []
-        n = len(res) if isinstance(res, list) else (1 if isinstance(data.get("results"), str) and data.get("results") else 0)
-        if not n:
-            return intro + " No results."
-        if isinstance(res, list) and res and isinstance(res[0], dict):
-            first = res[0]
-            title = (first.get("title") or first.get("snippet") or str(first))[:100]
-            return intro + f" Found {n} result(s). e.g. {title}…"
-        return intro + f" Found {n} result(s)."
-    if tool_name == "query_dataset_by_keywords":
-        ds = data.get("datasets") or []
-        if isinstance(ds, str):
-            try:
-                ds = json.loads(ds) if ds.strip().startswith("[") else []
-            except Exception:
-                ds = []
-        n = len(ds) if isinstance(ds, list) else 0
-        if not n:
-            return intro + " No results."
-        return intro + f" Found {n} dataset(s)."
-    return intro + " Done."
-
-
-def _is_search_result_empty(tool_name: str, data: dict) -> bool:
-    """True if the search returned success but no usable results (empty refs/results/datasets)."""
-    if not data.get("success"):
-        return True
-    if tool_name == "query_literature_by_keywords":
-        refs = data.get("references") or []
-        if isinstance(refs, str):
-            try:
-                refs = json.loads(refs) if refs.strip().startswith("[") else []
-            except Exception:
-                refs = []
-        return not (isinstance(refs, list) and len(refs) > 0)
-    if tool_name == "query_web_by_keywords":
-        res = data.get("results") or []
-        return not (isinstance(res, list) and len(res) > 0) and not (isinstance(data.get("results"), str) and data.get("results"))
-    if tool_name == "query_dataset_by_keywords":
-        ds = data.get("datasets") or []
-        if isinstance(ds, str):
-            try:
-                ds = json.loads(ds)
-            except json.JSONDecodeError:
-                return True
-        return not (isinstance(ds, list) and len(ds) > 0)
-    return True
-
-
-def _run_section_search(query: str, max_results: int = None) -> tuple:
-    """Run literature_search and web_search for one section query. Returns (formatted_citation_str, list of (tool_name, inputs, raw_output))."""
-    if max_results is None:
-        max_results = SEARCH_MAX_RESULTS
-    query = (query or "").strip()[:80]
-    if not query:
-        return ("No query.", [])
-    try:
-        from tools.tools_agent_hub import get_tools
-        tools = get_tools()
-        lit_tool = next((t for t in tools if getattr(t, "name", "") == "query_literature_by_keywords"), None)
-        web_tool = next((t for t in tools if getattr(t, "name", "") == "query_web_by_keywords"), None)
-    except Exception:
-        return ("Search tools unavailable.", [])
-    sections = []
-    logged = []
-    if lit_tool:
-        for source in ("pubmed", "semantic_scholar", "arxiv"):
-            lit_input = {"query": query, "max_results": max_results, "source": source}
-            try:
-                print(f"\n[PI section] Invoking: `literature_search` with `{lit_input}`", flush=True)
-                lit_out = lit_tool.invoke(lit_input)
-                raw_lit = lit_out if isinstance(lit_out, str) else json.dumps(lit_out, ensure_ascii=False)
-                logged.append(("query_literature_by_keywords", lit_input, raw_lit))
-                data = json.loads(raw_lit) if isinstance(raw_lit, str) and raw_lit.strip().startswith("{") else {}
-                if data.get("success") and data.get("references"):
-                    refs = data["references"]
-                    if isinstance(refs, str):
-                        try:
-                            refs = json.loads(refs) if refs.strip().startswith("[") else []
-                        except Exception:
-                            refs = []
-                    refs = refs if isinstance(refs, list) else []
-                    lines = _format_literature_for_reading(refs, max_n=5, abstract_max=400)
-                    if lines:
-                        sections.append("**Literature**\n" + "\n".join(lines))
-                        break
-            except Exception as e:
-                logged.append(("query_literature_by_keywords", lit_input, json.dumps({"success": False, "error": str(e)})))
-    if web_tool:
-        for source in ("tavily", "duckduckgo"):
-            web_input = {"query": query, "max_results": max_results, "source": source}
-            try:
-                print(f"\n[PI section] Invoking: `web_search` with `{web_input}`", flush=True)
-                web_out = web_tool.invoke(web_input)
-                raw_web = web_out if isinstance(web_out, str) else json.dumps(web_out, ensure_ascii=False)
-                logged.append(("query_web_by_keywords", web_input, raw_web))
-                data = json.loads(raw_web) if isinstance(raw_web, str) and raw_web.strip().startswith("{") else {}
-                if data.get("success") and data.get("results"):
-                    res = data["results"]
-                    if isinstance(res, str):
-                        try:
-                            res = json.loads(res) if res.strip().startswith("[") else []
-                        except Exception:
-                            res = []
-                    if isinstance(res, list) and res:
-                        lines = _format_web_for_reading(res, max_n=5, snippet_max=300)
-                        if lines:
-                            sections.append("**Web**\n" + "\n".join(lines))
-                            break
-            except Exception as e:
-                logged.append(("query_web_by_keywords", web_input, json.dumps({"success": False, "error": str(e)})))
-    if not sections:
-        return ("No search results for this section.", logged)
-    return ("References (cite as [1], [2], etc.):\n\n" + "\n\n".join(sections), logged)
-
-
-def _fetch_search_for_pi_report(user_text: str, max_results: int = None) -> tuple:
-    """Run literature_search, web_search, dataset_search. Default sources: pubmed, tavily, github. When a search returns empty or fails, retry with another source (e.g. web: tavily → duckduckgo; literature: pubmed → semantic_scholar → arxiv). Returns (combined_str_with_citations, list of (tool_name, inputs, raw_output))."""
-    if max_results is None:
-        max_results = SEARCH_MAX_RESULTS
-    query = _refine_query_for_search(user_text, 80) or (user_text or "").strip()[:80]
-    if not query:
-        return ("", [])
-    try:
-        from tools.tools_agent_hub import get_tools
-        tools = get_tools()
-        lit_tool = next((t for t in tools if getattr(t, "name", "") == "query_literature_by_keywords"), None)
-        web_tool = next((t for t in tools if getattr(t, "name", "") == "query_web_by_keywords"), None)
-        dataset_tool = next((t for t in tools if getattr(t, "name", "") == "query_dataset_by_keywords"), None)
-        sections = []
-        logged = []
-
-        # Literature: default pubmed; if empty/fail try semantic_scholar, then arxiv
-        if lit_tool:
-            for source in ("pubmed", "semantic_scholar", "arxiv"):
-                lit_input = {"query": query, "max_results": max_results, "source": source}
-                try:
-                    print(f"\n[PI research] Invoking: `literature_search` with `{lit_input}`", flush=True)
-                    lit_out = lit_tool.invoke(lit_input)
-                    raw_lit = lit_out if isinstance(lit_out, str) else json.dumps(lit_out, ensure_ascii=False)
-                    logged.append(("query_literature_by_keywords", lit_input, raw_lit))
-                    data = json.loads(raw_lit) if isinstance(raw_lit, str) and raw_lit.strip().startswith("{") else {}
-                    if data.get("success") and data.get("references"):
-                        refs = data["references"] if isinstance(data["references"], list) else []
-                        lines = _format_literature_citations(refs, max_n=5)
-                        if lines:
-                            sections.append("**Literature (cite as [1], [2], ...)**\n" + "\n".join(lines))
-                            break
-                    if not _is_search_result_empty("query_literature_by_keywords", data):
-                        break
-                except Exception as e:
-                    print(f"[PI report] literature_search source={source} failed: {e}")
-                    logged.append(("query_literature_by_keywords", lit_input, json.dumps({"success": False, "error": str(e)})))
-
-        # Web: default tavily; if empty/fail try duckduckgo
-        if web_tool:
-            for source in ("tavily", "duckduckgo"):
-                web_input = {"query": query, "max_results": max_results, "source": source}
-                try:
-                    print(f"\n[PI research] Invoking: `web_search` with `{web_input}`", flush=True)
-                    web_out = web_tool.invoke(web_input)
-                    raw_web = web_out if isinstance(web_out, str) else json.dumps(web_out, ensure_ascii=False)
-                    logged.append(("query_web_by_keywords", web_input, raw_web))
-                    data = json.loads(raw_web) if isinstance(raw_web, str) and raw_web.strip().startswith("{") else {}
-                    if data.get("success") and data.get("results"):
-                        res = data["results"]
-                        if isinstance(res, list):
-                            lines = _format_web_citations(res, max_n=5)
-                            if lines:
-                                sections.append("**Web (cite as [1], [2], ...)**\n" + "\n".join(lines))
-                                break
-                        elif isinstance(res, str) and res.strip():
-                            sections.append("**Web**\n" + res[:1500])
-                            break
-                    if not _is_search_result_empty("query_web_by_keywords", data):
-                        break
-                except Exception as e:
-                    print(f"[PI report] web_search source={source} failed: {e}")
-                    logged.append(("query_web_by_keywords", web_input, json.dumps({"success": False, "error": str(e)})))
-
-        # Dataset: default github; if empty/fail try hugging_face
-        if dataset_tool:
-            for source in ("github", "hugging_face"):
-                ds_input = {"query": query, "max_results": max_results, "source": source}
-                try:
-                    print(f"\n[PI research] Invoking: `dataset_search` with `{ds_input}`", flush=True)
-                    ds_out = dataset_tool.invoke(ds_input)
-                    raw_ds = ds_out if isinstance(ds_out, str) else json.dumps(ds_out, ensure_ascii=False)
-                    logged.append(("query_dataset_by_keywords", ds_input, raw_ds))
-                    data = json.loads(raw_ds) if isinstance(raw_ds, str) and raw_ds.strip().startswith("{") else {}
-                    if data.get("success") and data.get("datasets"):
-                        ds_list = data["datasets"]
-                        if isinstance(ds_list, str):
-                            try:
-                                ds_list = json.loads(ds_list)
-                            except json.JSONDecodeError:
-                                ds_list = []
-                        if isinstance(ds_list, list):
-                            lines = _format_dataset_citations(ds_list, max_n=5)
-                            if lines:
-                                sections.append("**Datasets (cite as [1], [2], ...)**\n" + "\n".join(lines))
-                                break
-                    if not _is_search_result_empty("query_dataset_by_keywords", data):
-                        break
-                except Exception as e:
-                    print(f"[PI report] dataset_search source={source} failed: {e}")
-                    logged.append(("query_dataset_by_keywords", ds_input, json.dumps({"success": False, "error": str(e)})))
-        if not sections:
-            return ("No search results.", logged)
-        intro = "References from search (use [1], [2], etc. in your report):\n\n"
-        return (intro + "\n\n".join(sections), logged)
-    except Exception as e:
-        print(f"[PI report] search failed: {e}")
-        return ("", [])
-
-
-
 async def send_message(message, session_state):
     """Async message handler with Planner-Worker-Finalizer workflow"""
     if session_state is None:
         session_state = initialize_session_state()
-    # All agent execution files in one session-specific temp folder
-    agent_session_dir = session_state.get("agent_session_dir") or os.path.join(
-        os.getenv("TEMP_OUTPUTS_DIR", "temp_outputs"), "agent_sessions", session_state.get("session_id", str(uuid.uuid4()))
-    )
+    # All agent execution files under year/month/day/Agent/session_id
+    agent_session_dir = session_state.get("agent_session_dir")
+    if not agent_session_dir:
+        base_dir = os.getenv("TEMP_OUTPUTS_DIR", "temp_outputs")
+        session_id = session_state.get("session_id", str(uuid.uuid4()))
+        current_time = time.localtime()
+        date_subdir = os.path.join(
+            str(current_time.tm_year),
+            f"{current_time.tm_mon:02d}",
+            f"{current_time.tm_mday:02d}",
+            "Agent",
+        )
+        agent_session_dir = os.path.join(base_dir, date_subdir, session_id)
     os.makedirs(agent_session_dir, exist_ok=True)
-    current_time = time.localtime()
-    time_stamped_subdir = os.path.join(
-        str(current_time.tm_year),
-        f"{current_time.tm_mon:02d}",
-        f"{current_time.tm_mday:02d}",
-        f"{current_time.tm_hour:02d}_{current_time.tm_min:02d}_{current_time.tm_sec:02d}"
-    )
-    UPLOAD_DIR = os.path.join(agent_session_dir, time_stamped_subdir)
+    UPLOAD_DIR = agent_session_dir
     os.makedirs(UPLOAD_DIR, exist_ok=True)
 
     if not message or not message.get("text"):
@@ -1390,6 +347,7 @@ async def send_message(message, session_state):
     all_known_files = sorted(list(set(all_known_files)))
     if all_known_files:
         context_parts.append(f"Available uploaded files: {', '.join(all_known_files)}")
+    context_parts.append(f"Default output directory for tool outputs (use for out_dir, out_path): {agent_session_dir}")
     if protein_ctx.structure_files:
         struct_info = []
         for struct_id, struct_data in protein_ctx.structure_files.items():
@@ -1432,7 +390,7 @@ async def send_message(message, session_state):
     if current_tool_count >= AGENT_CHAT_MAX_TOOL_CALLS:
         report_instruction = (
             "Tool call limit reached. User question: " + text + "\n\n"
-            "Output a short research report: ## Abstract, ## Introduction, ## Related Work, ## Tools, ## Methods (steps for CB/MLS), ## References (list all [1], [2], … at the end). No JSON."
+            "Output a short research report: ## Abstract, ## Introduction, ## Related Work, ## Suggested approach (capabilities needed; CB will map to tools), ## Rough steps (feasible path), ## References (list all [1], [2], … at the end). No JSON."
         )
         pi_report_inputs = {
             "input": report_instruction,
@@ -1484,14 +442,25 @@ async def send_message(message, session_state):
                 sections_list = []
             else:
                 sections_list = sections_list[:5]
-                sections_list = [
-                    {
-                        "section_name": (s.get("section_name") or "Section").strip() or "Section",
-                        "search_query": (s.get("search_query") or text[:60]).strip() or text[:60],
-                        "focus": (s.get("focus") or "both").strip() or "both",
-                    }
-                    for s in sections_list
-                ]
+                parsed_sections = []
+                for s in sections_list:
+                    sec_name = (s.get("section_name") or "Section").strip() or "Section"
+                    focus = (s.get("focus") or "both").strip() or "both"
+                    # Support legacy single query or new array of queries
+                    queries = s.get("search_queries") or s.get("search_query") or []
+                    if isinstance(queries, str):
+                        queries = [queries]
+                    elif not isinstance(queries, list):
+                        queries = [text[:60]]
+                    queries = [q.strip() or text[:60] for q in queries if isinstance(q, str)]
+                    if not queries:
+                        queries = [text[:60]]
+                    parsed_sections.append({
+                        "section_name": sec_name,
+                        "search_queries": queries,
+                        "focus": focus,
+                    })
+                sections_list = parsed_sections
         except Exception as e:
             print(f"[PI sections] parse failed: {e}")
             sections_list = []
@@ -1507,23 +476,32 @@ async def send_message(message, session_state):
                 yield _build_conversation_panel_html(session_state["history"]), _build_log_html(session_state), gr.MultimodalTextbox(value=None, interactive=False), session_state
                 session_state["history"].append({"role": "assistant", "content": "🔍 **Searching…**", "role_id": "principal_investigator"})
                 yield _build_conversation_panel_html(session_state["history"]), _build_log_html(session_state), gr.MultimodalTextbox(value=None, interactive=False), session_state
-                search_results_str, search_logged = await asyncio.to_thread(_run_section_search, section["search_query"])
+                
+                all_search_results = []
+                for sq in getattr(section, "get", lambda k: section.get(k, []))("search_queries", []):
+                    search_results_str, search_logged = await asyncio.to_thread(_run_section_search, sq)
+                    all_search_results.append(search_results_str)
+                    
+                    for step_off, (tname, tinputs, toutputs) in enumerate(search_logged, start=len(protein_ctx.tool_history) + 1):
+                        if len(protein_ctx.tool_history) >= AGENT_CHAT_MAX_TOOL_CALLS:
+                            break
+                        protein_ctx.add_tool_call(step_off, tname, tinputs, toutputs, cached=False)
+                        session_state.setdefault("tool_executions", []).append({
+                            "step": step_off, "tool_name": tname, "inputs": tinputs,
+                            "outputs": (str(toutputs)[:1000] + "..." if len(str(toutputs)) > 1000 else str(toutputs)),
+                            "timestamp": datetime.now().isoformat(),
+                        })
+                        summary_msg = _format_search_summary(tname, tinputs, str(toutputs))
+                        preview = _format_search_preview(tname, str(toutputs))
+                        content = summary_msg + ("\n\n" + preview if preview else "")
+                        session_state["history"].append({"role": "assistant", "content": content, "role_id": "principal_investigator"})
+                        yield _build_conversation_panel_html(session_state["history"]), _build_log_html(session_state), gr.MultimodalTextbox(value=None, interactive=False), session_state
+                
+                # Unify the multiple rounds of search results into one block for the sub-report
+                search_results_str = "\n".join(all_search_results)
+                
                 if session_state["history"] and session_state["history"][-1].get("content") == "🔍 **Searching…**":
                     session_state["history"].pop()
-                for step_off, (tname, tinputs, toutputs) in enumerate(search_logged, start=len(protein_ctx.tool_history) + 1):
-                    if len(protein_ctx.tool_history) >= AGENT_CHAT_MAX_TOOL_CALLS:
-                        break
-                    protein_ctx.add_tool_call(step_off, tname, tinputs, toutputs, cached=False)
-                    session_state.setdefault("tool_executions", []).append({
-                        "step": step_off, "tool_name": tname, "inputs": tinputs,
-                        "outputs": (str(toutputs)[:1000] + "..." if len(str(toutputs)) > 1000 else str(toutputs)),
-                        "timestamp": datetime.now().isoformat(),
-                    })
-                    summary_msg = _format_search_summary(tname, tinputs, str(toutputs))
-                    preview = _format_search_preview(tname, str(toutputs))
-                    content = summary_msg + ("\n\n" + preview if preview else "")
-                    session_state["history"].append({"role": "assistant", "content": content, "role_id": "principal_investigator"})
-                    yield _build_conversation_panel_html(session_state["history"]), _build_log_html(session_state), gr.MultimodalTextbox(value=None, interactive=False), session_state
                 session_state["history"].append({"role": "assistant", "content": "✍️ **Writing sub-report…**", "role_id": "principal_investigator"})
                 yield _build_conversation_panel_html(session_state["history"]), _build_log_html(session_state), gr.MultimodalTextbox(value=None, interactive=False), session_state
                 try:
@@ -1644,7 +622,9 @@ async def send_message(message, session_state):
             if not intermediate_steps:
                 session_state["history"][-1] = {"role": "assistant", "content": "**Principal Investigator** is thinking (fallback search).", "role_id": "principal_investigator"}
                 yield _build_conversation_panel_html(session_state["history"]), _build_log_html(session_state), gr.MultimodalTextbox(value=None, interactive=False), session_state
-                search_results_str, search_logged = await asyncio.to_thread(_fetch_search_for_pi_report, text)
+                search_results_str, search_logged = await asyncio.to_thread(
+                    _fetch_search_for_pi_report, text, None, session_state.get("llm")
+                )
                 if search_logged:
                     session_state["history"].pop()
                 for step_off, (tname, tinputs, toutputs) in enumerate(search_logged, start=len(protein_ctx.tool_history) + 1):
@@ -1670,7 +650,7 @@ async def send_message(message, session_state):
                         "The references below are numbered [1], [2], [3], etc. You MUST cite them in your report.\n\n"
                         + search_results_str
                         + "\n\nUser question: " + text + "\n\n"
-                        "Output your research report with: ## Abstract, ## Introduction, ## Related Work (cite [1],[2],…), ## Tools, ## Methods (steps for CB/MLS), ## References (list all [1], [2], … at the end). No JSON."
+                        "Output your research report with: ## Abstract, ## Introduction, ## Related Work (cite [1],[2],…), ## Suggested approach (capabilities needed; CB will map to tools), ## Rough steps (feasible path), ## References (list all [1], [2], … at the end). No JSON."
                     )
                     try:
                         pi_report = await asyncio.to_thread(session_state["pi_report"].invoke, {
@@ -1688,7 +668,7 @@ async def send_message(message, session_state):
                     "The references below are numbered [1], [2], [3], etc. You MUST cite them in your report.\n\n"
                     + search_results_str
                     + "\n\nUser question: " + text + "\n\n"
-                    "Output your research report with: ## Abstract, ## Introduction, ## Related Work (cite [1],[2],…), ## Tools, ## Methods (steps for CB/MLS), ## References (list all [1], [2], … at the end). No JSON."
+                    "Output your research report with: ## Abstract, ## Introduction, ## Related Work (cite [1],[2],…), ## Suggested approach (capabilities needed; CB will map to tools), ## Rough steps (feasible path), ## References (list all [1], [2], … at the end). No JSON."
                 )
                 try:
                     pi_report = await asyncio.to_thread(session_state["pi_report"].invoke, {
@@ -1837,7 +817,12 @@ async def send_message(message, session_state):
                 "timestamp": datetime.now().isoformat(),
             })
             yield _build_conversation_panel_html(session_state["history"]), _build_log_html(session_state), gr.MultimodalTextbox(value=None, interactive=False), session_state
-        session_state['history'].append({"role": "assistant", "content": f"⏳ **Executing Step {step_num}:** {task_desc}", "role_id": "machine_learning_specialist"})
+        exec_msg = f"⏳ **Executing Step {step_num}:** {task_desc}"
+        session_state['history'].append({"role": "assistant", "content": exec_msg, "role_id": "machine_learning_specialist"})
+        session_state.setdefault("conversation_log", []).append({
+            "role": "assistant", "content": exec_msg, "role_id": "machine_learning_specialist",
+            "timestamp": datetime.now().isoformat(),
+        })
         yield _build_conversation_panel_html(session_state["history"]), _build_log_html(session_state), gr.MultimodalTextbox(value=None, interactive=False), session_state
         merged_tool_input = _merge_tool_parameters_with_context(protein_ctx, tool_input)
         # CRITICAL: Resolve dependencies BEFORE cache check and tool execution
@@ -1866,10 +851,12 @@ async def send_message(message, session_state):
                     raw_output = cached_entry.get("outputs", "")
                     step_results[step_num] = {'raw_output': raw_output, 'cached': True}
                     protein_ctx.add_tool_call(step_num, tool_name, merged_tool_input, raw_output, cached=True)
+                    out_path_cached = _get_output_file_path_from_raw(raw_output, tool_name)
                     session_state.setdefault("tool_executions", []).append({
                         "step": step_num, "tool_name": tool_name, "inputs": merged_tool_input,
                         "outputs": (str(raw_output)[:1000] + "..." if len(str(raw_output)) > 1000 else str(raw_output)),
                         "cached": True, "timestamp": datetime.now().isoformat(),
+                        "success": True, "output_file_path": out_path_cached,
                     })
 
                     # Collect references from cached outputs if present
@@ -1928,15 +915,30 @@ async def send_message(message, session_state):
                     out_path = _get_output_file_path_from_raw(raw_output, tool_name)
                     preview = _read_output_file_preview(out_path, max_lines=10) if out_path else ""
                     cb_match, cb_note = await _cb_post_step_check(session_state["llm"], step_num, task_desc, tool_name, raw_output, output_file_path=out_path, file_preview=preview if out_path else None)
+                    # Always show step result (success, output, file path) so user sees execution metadata
+                    step_complete_msg = f"✅ **Step {step_num} Complete (cached):** {task_desc}\n\n{step_detail}"
+                    session_state['history'].append({"role": "assistant", "content": step_complete_msg, "role_id": "machine_learning_specialist"})
+                    session_state.setdefault("conversation_log", []).append({
+                        "role": "assistant", "content": step_complete_msg, "role_id": "machine_learning_specialist",
+                        "timestamp": datetime.now().isoformat(),
+                    })
                     if cb_match:
-                        session_state['history'].append({"role": "assistant", "content": f"✅ **Step {step_num} Complete (cached):** {task_desc}\n\n{step_detail}", "role_id": "machine_learning_specialist"})
                         cb_msg = f"✓ **CB verified:** Step {step_num} complete (cached). Execution matches plan. Proceeding to next."
                         session_state['history'].append({"role": "assistant", "content": cb_msg, "role_id": "computational_biologist"})
+                        session_state.setdefault("conversation_log", []).append({
+                            "role": "assistant", "content": cb_msg, "role_id": "computational_biologist",
+                            "timestamp": datetime.now().isoformat(),
+                        })
                         yield _build_conversation_panel_html(session_state["history"]), _build_log_html(session_state), gr.MultimodalTextbox(value=None, interactive=False), session_state
                         step_done = True
                         break
-                    # CB says cached output does not match — discuss with MLS
-                    session_state["history"].append({"role": "assistant", "content": f"**CB:** Output does not match plan ({cb_note}). Re-execute with different parameters, another skill, or code.", "role_id": "computational_biologist"})
+                    # CB says cached output does not match — discuss with MLS (user already saw step result above)
+                    cb_mismatch_msg = f"**CB:** Output does not match plan ({cb_note}). Re-execute with different parameters, another skill, or code."
+                    session_state["history"].append({"role": "assistant", "content": cb_mismatch_msg, "role_id": "computational_biologist"})
+                    session_state.setdefault("conversation_log", []).append({
+                        "role": "assistant", "content": cb_mismatch_msg, "role_id": "computational_biologist",
+                        "timestamp": datetime.now().isoformat(),
+                    })
                     yield _build_conversation_panel_html(session_state["history"]), _build_log_html(session_state), gr.MultimodalTextbox(value=None, interactive=False), session_state
                     cb_retry, cb_report = await _run_mls_debug_with_tools(
                         session_state, step_num, task_desc, tool_name, merged_tool_input,
@@ -1974,13 +976,46 @@ async def send_message(message, session_state):
                 mls_report_for_cb = None
                 for attempt in range(2):
                     try:
-                        executor_result = await asyncio.to_thread(
-                            worker_executor.invoke,
-                            {
-                                "input": agent_input_text,
-                                **merged_tool_input
-                            }
+                        executor_result = await asyncio.wait_for(
+                            asyncio.to_thread(
+                                worker_executor.invoke,
+                                {
+                                    "input": agent_input_text,
+                                    **merged_tool_input
+                                }
+                            ),
+                            timeout=TOOL_EXECUTION_TIMEOUT,
                         )
+                        break
+                    except asyncio.TimeoutError as e:
+                        last_step_error = TimeoutError(
+                            f"Tool execution timed out after {TOOL_EXECUTION_TIMEOUT}s. The tool may be slow or stuck."
+                        )
+                        if attempt == 0:
+                            session_state["history"].append({"role": "assistant", "content": MLS_SELF_CHECK_MSG, "role_id": "machine_learning_specialist"})
+                            yield _build_conversation_panel_html(session_state["history"]), _build_log_html(session_state), gr.MultimodalTextbox(value=None, interactive=False), session_state
+                            retry_input, mls_report_for_cb = await _run_mls_debug_with_tools(
+                                session_state,
+                                step_num,
+                                task_desc,
+                                tool_name,
+                                merged_tool_input,
+                                str(last_step_error),
+                            )
+                            if session_state["history"] and session_state["history"][-1].get("content") == MLS_SELF_CHECK_MSG:
+                                session_state["history"].pop()
+                            if retry_input:
+                                merged_tool_input.update(retry_input)
+                                inputs_json_str = json.dumps(merged_tool_input, ensure_ascii=False, indent=2)
+                                agent_input_text = (
+                                    f"Execute this task: {task_desc}\n\n"
+                                    f"INPUT DATA (Use these parameters explicitly, DO NOT ASK for them):\n"
+                                    f"```json\n{inputs_json_str}\n```\n"
+                                    f"Command: Call the tool '{tool_name}' immediately using the data above."
+                                )
+                                session_state["history"].append({"role": "assistant", "content": f"🔧 **MLS debug:** Retrying Step {step_num} with corrected parameters.", "role_id": "machine_learning_specialist"})
+                                yield _build_conversation_panel_html(session_state["history"]), _build_log_html(session_state), gr.MultimodalTextbox(value=None, interactive=False), session_state
+                                continue
                         break
                     except Exception as e:
                         last_step_error = e
@@ -2013,6 +1048,10 @@ async def send_message(message, session_state):
                 if executor_result is None and last_step_error is not None:
                     error_message = f"❌ **Error in Step {step_num}:** {task_desc}\n`{str(last_step_error)}`"
                     session_state['history'].append({"role": "assistant", "content": error_message, "role_id": "machine_learning_specialist"})
+                    session_state.setdefault("conversation_log", []).append({
+                        "role": "assistant", "content": error_message, "role_id": "machine_learning_specialist",
+                        "timestamp": datetime.now().isoformat(),
+                    })
                     session_state["history"].append({"role": "assistant", "content": MLS_SELF_CHECK_MSG, "role_id": "machine_learning_specialist"})
                     yield _build_conversation_panel_html(session_state["history"]), _build_log_html(session_state), gr.MultimodalTextbox(value=None, interactive=False), session_state
                     retry_input, mls_report_for_cb = await _run_mls_debug_with_tools(
@@ -2059,7 +1098,12 @@ async def send_message(message, session_state):
                     output_failed, err_str = _tool_output_indicates_failure(raw_output)
                     if output_failed:
                         err_str = err_str or "Tool reported failure or error"
-                        session_state["history"].append({"role": "assistant", "content": f"❌ **Step {step_num} failed (tool reported error):** {task_desc}\n`{err_str[:300]}`", "role_id": "machine_learning_specialist"})
+                        fail_msg = f"❌ **Step {step_num} failed (tool reported error):** {task_desc}\n`{err_str[:300]}`"
+                        session_state["history"].append({"role": "assistant", "content": fail_msg, "role_id": "machine_learning_specialist"})
+                        session_state.setdefault("conversation_log", []).append({
+                            "role": "assistant", "content": fail_msg, "role_id": "machine_learning_specialist",
+                            "timestamp": datetime.now().isoformat(),
+                        })
                         session_state["history"].append({"role": "assistant", "content": MLS_SELF_CHECK_MSG, "role_id": "machine_learning_specialist"})
                         yield _build_conversation_panel_html(session_state["history"]), _build_log_html(session_state), gr.MultimodalTextbox(value=None, interactive=False), session_state
                         retry_input, mls_report_f = await _run_mls_debug_with_tools(
@@ -2152,10 +1196,20 @@ async def send_message(message, session_state):
 
                 # Always record tool call in history
                 protein_ctx.add_tool_call(step_num, tool_name, merged_tool_input, raw_output, cached=False)
+                out_path_for_log = _get_output_file_path_from_raw(raw_output, tool_name)
+                try:
+                    parsed_for_success = json.loads(raw_output) if isinstance(raw_output, str) else raw_output
+                    step_success = (
+                        parsed_for_success.get("success") is True
+                        or (isinstance(parsed_for_success, dict) and parsed_for_success.get("status") == "success")
+                    ) if isinstance(parsed_for_success, dict) else True
+                except Exception:
+                    step_success = True
                 session_state.setdefault("tool_executions", []).append({
                     "step": step_num, "tool_name": tool_name, "inputs": merged_tool_input,
                     "outputs": (str(raw_output)[:1000] + "..." if len(str(raw_output)) > 1000 else str(raw_output)),
                     "cached": False, "timestamp": datetime.now().isoformat(),
+                    "success": step_success, "output_file_path": out_path_for_log,
                 })
 
                 # Parse tool output to update context and download file
@@ -2232,15 +1286,30 @@ async def send_message(message, session_state):
                 out_path = _get_output_file_path_from_raw(raw_output, tool_name)
                 preview = _read_output_file_preview(out_path, max_lines=10) if out_path else ""
                 cb_match, cb_note = await _cb_post_step_check(session_state["llm"], step_num, task_desc, tool_name, raw_output, output_file_path=out_path, file_preview=preview if out_path else None)
+                # Always show step result (success, output, file path) so user and backend log see execution metadata
+                step_complete_msg = f"✅ **Step {step_num} Complete:** {task_desc}\n\n{step_detail}"
+                session_state['history'].append({"role": "assistant", "content": step_complete_msg, "role_id": "machine_learning_specialist"})
+                session_state.setdefault("conversation_log", []).append({
+                    "role": "assistant", "content": step_complete_msg, "role_id": "machine_learning_specialist",
+                    "timestamp": datetime.now().isoformat(),
+                })
                 if cb_match:
-                    session_state['history'].append({"role": "assistant", "content": f"✅ **Step {step_num} Complete:** {task_desc}\n\n{step_detail}", "role_id": "machine_learning_specialist"})
                     cb_msg = f"✓ **CB verified:** Step {step_num} complete. Execution matches plan. Proceeding to next."
                     session_state['history'].append({"role": "assistant", "content": cb_msg, "role_id": "computational_biologist"})
+                    session_state.setdefault("conversation_log", []).append({
+                        "role": "assistant", "content": cb_msg, "role_id": "computational_biologist",
+                        "timestamp": datetime.now().isoformat(),
+                    })
                     yield _build_conversation_panel_html(session_state["history"]), _build_log_html(session_state), gr.MultimodalTextbox(value=None, interactive=False), session_state
                     step_done = True
                     break
-                # CB says output does not match plan (null/empty/weird) — discuss with MLS and re-execute or report
-                session_state["history"].append({"role": "assistant", "content": f"**CB:** Output does not match plan ({cb_note}). Re-execute this step with different parameters, another skill, or code.", "role_id": "computational_biologist"})
+                # CB says output does not match plan (null/empty/weird) — discuss with MLS and re-execute or report (user already saw step result above)
+                cb_mismatch_msg = f"**CB:** Output does not match plan ({cb_note}). Re-execute this step with different parameters, another skill, or code."
+                session_state["history"].append({"role": "assistant", "content": cb_mismatch_msg, "role_id": "computational_biologist"})
+                session_state.setdefault("conversation_log", []).append({
+                    "role": "assistant", "content": cb_mismatch_msg, "role_id": "computational_biologist",
+                    "timestamp": datetime.now().isoformat(),
+                })
                 yield _build_conversation_panel_html(session_state["history"]), _build_log_html(session_state), gr.MultimodalTextbox(value=None, interactive=False), session_state
                 cb_retry, cb_report = await _run_mls_debug_with_tools(
                     session_state, step_num, task_desc, tool_name, merged_tool_input,
@@ -2261,6 +1330,10 @@ async def send_message(message, session_state):
             except Exception as e:
                 error_message = f"❌ **Error in Step {step_num}:** {task_desc}\n`{str(e)}`"
                 session_state['history'].append({"role": "assistant", "content": error_message, "role_id": "machine_learning_specialist"})
+                session_state.setdefault("conversation_log", []).append({
+                    "role": "assistant", "content": error_message, "role_id": "machine_learning_specialist",
+                    "timestamp": datetime.now().isoformat(),
+                })
                 session_state["history"].append({"role": "assistant", "content": MLS_SELF_CHECK_MSG, "role_id": "machine_learning_specialist"})
                 yield _build_conversation_panel_html(session_state["history"]), _build_log_html(session_state), gr.MultimodalTextbox(value=None, interactive=False), session_state
                 retry_input, mls_report_for_cb = await _run_mls_debug_with_tools(
@@ -2333,74 +1406,9 @@ async def send_message(message, session_state):
 
 
 
-def _format_backend_log(session_state: Dict[str, Any]) -> str:
-    """Format conversation_log and tool_executions for backend display (compact, clear structure)."""
-    if not session_state:
-        return "_No session._"
-    conv = session_state.get("conversation_log") or []
-    tools = session_state.get("tool_executions") or []
-    max_conv, max_tools = 20, 40
-    conv = conv[-max_conv:] if len(conv) > max_conv else conv
-    tools = tools[-max_tools:] if len(tools) > max_tools else tools
-    lines = ["*Last 20 messages, 40 tool runs.*", "", "### Conversation", ""]
-    for i, entry in enumerate(conv, 1):
-        role = entry.get("role", "")
-        role_id = entry.get("role_id", "")
-        ts = (entry.get("timestamp") or "")[:19]
-        content = entry.get("content") or ""
-        label = f"{role_id}" if role_id else role
-        lines.append(f"**{i}. [{ts}] {label}**")
-        lines.append("")
-        lines.append(content)
-        lines.append("")
-
-    lines.append("### Tool executions")
-    lines.append("")
-    for j, t in enumerate(tools, 1):
-        step = t.get("step", j)
-        name = t.get("tool_name", "")
-        cached = " (cached)" if t.get("cached") else ""
-        ts = (t.get("timestamp") or "")[:19]
-        inp = t.get("inputs", {})
-        inp_str = json.dumps(inp, ensure_ascii=False)
-        if len(inp_str) > 180:
-            inp_str = inp_str[:180] + "..."
-        out = str(t.get("outputs", ""))[:180] + ("..." if len(str(t.get("outputs", ""))) > 180 else "")
-        if name == "read_skill" and isinstance(inp, dict) and inp.get("skill_id"):
-            lines.append(f"**{j}.** 📖 **Loaded skill:** `{inp.get('skill_id')}`{cached} — {ts}")
-        else:
-            lines.append(f"**{j}.** `{name}`{cached} — {ts}")
-        lines.append(f"In: `{inp_str}`")
-        lines.append(f"Out: `{out}`")
-        lines.append("")
-    return "\n".join(lines).strip()
-
-def _build_conversation_panel_html(history_list: List[Dict[str, Any]]) -> str:
-    """Main panel HTML: conversation area above input. Large min-height so input sits near bottom, minimal whitespace below."""
-    panel_style_tag = f"<style>{_CHAT_PANEL_CSS}</style>" if _CHAT_PANEL_CSS else ""
-    if not history_list:
-        empty_html = (
-            '<div class="vf-empty-state">'
-            '<div class="vf-empty-title">No messages yet</div>'
-            '<div class="vf-empty-hint">Type below to start a conversation.</div>'
-            '</div>'
-        )
-        return f"{panel_style_tag}<div class=\"vf-right-panel\">{empty_html}</div>"
-    chat_html = _build_chat_html(history_list)
-    return (
-        f"{panel_style_tag}"
-        '<div class="vf-right-panel" style="height:100%;min-height:77vh;">'
-        f'<div class="vf-conversation-panel">{chat_html}</div>'
-        "</div>"
-    )
 
 
-def _build_log_html(session_state: Dict[str, Any]) -> str:
-    """Log panel HTML for sidebar. Styled with colors so it reads clearly as a log."""
-    log_style_tag = f"<style>{_CHAT_LOG_CSS}</style>" if _CHAT_LOG_CSS else ""
-    log_md = _format_backend_log(session_state or {})
-    log_html = _markdown_to_html(log_md)
-    return f"{log_style_tag}<div class=\"vf-log-panel\">{log_html}</div>"
+
 
 
 def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:

@@ -255,6 +255,7 @@ def generate_and_execute_code(task_description: str, input_files: Optional[List[
                     result_json = json.loads(json_match.group())
                     result_json["generated_code_path"] = script_path
                     result_json["success"] = True  # Ensure success flag is set
+                    result_json["SYSTEM_NOTE"] = "STOP EXECUTION NOW. The code has run successfully. Provide the Final Answer immediately."
                     
                     # Keep the generated code since execution was successful
                     print(f"✓ Code executed successfully. Saved to: {script_path}")
@@ -265,7 +266,8 @@ def generate_and_execute_code(task_description: str, input_files: Optional[List[
                     return json.dumps({
                         "success": True,
                         "output": stdout,
-                        "generated_code_path": script_path
+                        "generated_code_path": script_path,
+                        "SYSTEM_NOTE": "STOP EXECUTION NOW. The code has run successfully. Provide the Final Answer immediately."
                     }, indent=2)
             except json.JSONDecodeError:
                 # If JSON parsing fails, return raw output

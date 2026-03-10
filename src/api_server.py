@@ -17,6 +17,7 @@ from fastapi.responses import JSONResponse, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import uvicorn
+from contextlib import asynccontextmanager
 
 from web.utils.common_utils import get_save_path
 
@@ -35,12 +36,22 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("VenusFactory API server starting up...")
+    logger.info(f"Upload directory: {UPLOAD_DIR}")
+    logger.info(f"Output directory: {OUTPUT_DIR}")
+    yield
+    logger.info("VenusFactory API server shutting down...")
+
+
 app = FastAPI(
     title="VenusFactory API",
     description="API for protein sequence and structure analysis tools (tools_api layer)",
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -145,16 +156,6 @@ async def global_exception_handler(request, exc):
     )
 
 
-@app.on_event("startup")
-async def startup_event():
-    logger.info("VenusFactory API server starting up...")
-    logger.info(f"Upload directory: {UPLOAD_DIR}")
-    logger.info(f"Output directory: {OUTPUT_DIR}")
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    logger.info("VenusFactory API server shutting down...")
 
 
 if __name__ == "__main__":
