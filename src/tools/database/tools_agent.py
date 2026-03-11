@@ -63,6 +63,13 @@ from .uniprot import (
     download_uniprot_seq_by_id,
     download_uniprot_meta_by_id,
 )
+from .hpa import (
+    download_hpa_protein_by_gene,
+    download_hpa_subcellular_location_by_gene,
+    download_hpa_tissue_expression_by_gene,
+    download_hpa_single_cell_type_by_gene,
+    download_hpa_blood_expression_by_gene,
+)
 
 
 # AlphaFold Database Tools
@@ -784,6 +791,51 @@ def download_uniprot_meta_by_id_tool(uniprot_id: str, out_path: str) -> str:
     except Exception as e:
         return f"Download metadata (JSON) from Uniprot error: {str(e)}"
 
+# ---------- Human Protein Atlas (HPA) Tools ----------
+class HpaGeneDownloadInput(BaseModel):
+    gene_name: str = Field(..., description="Gene symbol (e.g. TP53, BRCA1) or Ensembl ID. Required.")
+    out_path: str = Field(..., description="Output JSON file path. Required.")
+
+@tool("download_hpa_protein_by_gene", args_schema=HpaGeneDownloadInput)
+def download_hpa_protein_by_gene_tool(gene_name: str, out_path: str) -> str:
+    """Download Human Protein Atlas full protein entry for a gene to JSON file. Includes tissue expression summary, subcellular location, pathology data, UniProt and Ensembl IDs. Returns rich JSON: status, file_info, content_preview, biological_metadata, execution_context."""
+    try:
+        return download_hpa_protein_by_gene(gene_name, out_path)
+    except Exception as e:
+        return f"Download HPA protein by gene error: {str(e)}"
+
+@tool("download_hpa_subcellular_location_by_gene", args_schema=HpaGeneDownloadInput)
+def download_hpa_subcellular_location_by_gene_tool(gene_name: str, out_path: str) -> str:
+    """Download Human Protein Atlas subcellular localization data for a gene to JSON file. Returns antibody-based and single-cell localization evidence with reliability scores. Returns rich JSON: status, file_info, content_preview, biological_metadata, execution_context."""
+    try:
+        return download_hpa_subcellular_location_by_gene(gene_name, out_path)
+    except Exception as e:
+        return f"Download HPA subcellular location by gene error: {str(e)}"
+
+@tool("download_hpa_tissue_expression_by_gene", args_schema=HpaGeneDownloadInput)
+def download_hpa_tissue_expression_by_gene_tool(gene_name: str, out_path: str) -> str:
+    """Download Human Protein Atlas RNA and protein tissue expression data for a gene to JSON file. Returns tissue-level RNA consensus values and immunohistochemistry expression levels. Returns rich JSON: status, file_info, content_preview, biological_metadata, execution_context."""
+    try:
+        return download_hpa_tissue_expression_by_gene(gene_name, out_path)
+    except Exception as e:
+        return f"Download HPA tissue expression by gene error: {str(e)}"
+
+@tool("download_hpa_single_cell_type_by_gene", args_schema=HpaGeneDownloadInput)
+def download_hpa_single_cell_type_by_gene_tool(gene_name: str, out_path: str) -> str:
+    """Download Human Protein Atlas RNA single cell type specificity data for a gene to JSON file. Returns per-cell-type nCPM expression values and cell type enrichment category (e.g. Astrocytes for GFAP, Hepatocytes for ALB). Returns rich JSON: status, file_info, content_preview, biological_metadata, execution_context."""
+    try:
+        return download_hpa_single_cell_type_by_gene(gene_name, out_path)
+    except Exception as e:
+        return f"Download HPA single cell type by gene error: {str(e)}"
+
+@tool("download_hpa_blood_expression_by_gene", args_schema=HpaGeneDownloadInput)
+def download_hpa_blood_expression_by_gene_tool(gene_name: str, out_path: str) -> str:
+    """Download Human Protein Atlas blood cell expression and serum concentration data for any gene. Returns per-blood-cell-type nTPM expression (T cells, B cells, NK cells, monocytes, neutrophils, etc.), blood lineage specificity, and measured serum/plasma protein concentration (immunoassay and mass spectrometry). Useful for antibody design, biomarker discovery, and immune cell targeting. Returns rich JSON: status, file_info, content_preview, biological_metadata, execution_context."""
+    try:
+        return download_hpa_blood_expression_by_gene(gene_name, out_path)
+    except Exception as e:
+        return f"Download HPA blood expression by gene error: {str(e)}"
+
 # DATABASE_TOOLS: by-ID fetch (UniProt, NCBI, RCSB, AlphaFold, InterPro)
 DATABASE_TOOLS = [
     # AlphaFold
@@ -842,4 +894,10 @@ DATABASE_TOOLS = [
     download_uniprot_mapping_tool,
     download_uniprot_seq_by_id_tool,
     download_uniprot_meta_by_id_tool,
+    # HPA
+    download_hpa_protein_by_gene_tool,
+    download_hpa_subcellular_location_by_gene_tool,
+    download_hpa_tissue_expression_by_gene_tool,
+    download_hpa_single_cell_type_by_gene_tool,
+    download_hpa_blood_expression_by_gene_tool,
 ]

@@ -72,6 +72,12 @@ from tools.database.tools_agent import (
     download_uniprot_mapping_tool,
     download_uniprot_seq_by_id_tool,
     download_uniprot_meta_by_id_tool,
+    # HPA
+    download_hpa_protein_by_gene_tool,
+    download_hpa_subcellular_location_by_gene_tool,
+    download_hpa_tissue_expression_by_gene_tool,
+    download_hpa_single_cell_type_by_gene_tool,
+    download_hpa_blood_expression_by_gene_tool,
 )
 
 from tools.mutation.tools_agent import (
@@ -207,6 +213,12 @@ DATABASE_TOOLS: list[BaseTool] = [
     download_uniprot_mapping_tool,
     download_uniprot_seq_by_id_tool,
     download_uniprot_meta_by_id_tool,
+    # HPA
+    download_hpa_protein_by_gene_tool,
+    download_hpa_subcellular_location_by_gene_tool,
+    download_hpa_tissue_expression_by_gene_tool,
+    download_hpa_single_cell_type_by_gene_tool,
+    download_hpa_blood_expression_by_gene_tool,
 ]
 
 TRAIN_TOOLS: list[BaseTool] = [

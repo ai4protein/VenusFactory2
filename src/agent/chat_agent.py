@@ -707,5 +707,7 @@ def update_llm_model(selected: str, state: Dict[str, Any]) -> Dict[str, Any]:
         "Claude-3.7": "claude-3-7-sonnet-20250219",
         "DeepSeek-R1": "deepseek-r1-0528"
     }
+    if not state or state.get('llm') is None:
+        return state
     state['llm'].model_name = mapping.get(selected, "gemini-2.5-pro")
     return state
