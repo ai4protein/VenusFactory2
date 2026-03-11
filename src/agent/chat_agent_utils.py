@@ -20,9 +20,9 @@ MAX_STEP_RETRIES = int(os.getenv("MAX_STEP_RETRIES", "2"))
 # Tool execution timeout in seconds (from .env; default 300 = 5 min); prevents indefinite hang
 TOOL_EXECUTION_TIMEOUT = int(os.getenv("TOOL_EXECUTION_TIMEOUT", "300"))
 PI_SEARCH_TOOL_NAMES = [
-    "query_literature_by_keywords", "query_pubmed", "query_semantic_scholar", "query_arxiv",
-    "query_web_by_keywords", "query_tavily", "query_duckduckgo",
-    "query_dataset_by_keywords", "query_github", "query_hugging_face"
+    "query_pubmed", "query_semantic_scholar", "query_arxiv",
+    "query_tavily", "query_duckduckgo",
+    "query_github", "query_hugging_face"
 ]
 
 def _tool_output_indicates_failure(raw_output: Any) -> tuple[bool, str]:

@@ -292,18 +292,30 @@ def _merge_tool_parameters_with_context(protein_ctx: "ProteinContextManager", ba
     return params
 
 
+def _format_tool_input_summary(tool_input: dict, max_len: int = 400) -> str:
+    """One-line summary of tool input for logging."""
+    if not tool_input:
+        return "{}"
+    try:
+        s = json.dumps(tool_input, ensure_ascii=False, sort_keys=True)
+        return s if len(s) <= max_len else s[:max_len] + "..."
+    except Exception:
+        return str(tool_input)[:max_len]
+
+
 def get_cached_tool_result(session_state: dict, tool_name: str, tool_input: dict) -> Optional[Dict[str, Any]]:
     cache_key = generate_cache_key(tool_name, tool_input)
     cache = session_state.get("tool_cache", {})
     cached_result = cache.get(cache_key)
+    inputs_summary = _format_tool_input_summary(tool_input)
     if cached_result:
         cached_inputs = cached_result.get("inputs", {})
         if cached_inputs == tool_input:
-            print(f"✓ Cache HIT (exact match): {cache_key}")
+            print(f"✓ Cache HIT: {tool_name} | key={cache_key} | inputs={inputs_summary}")
             return cached_result
-        print(f"⚠ Cache key collision detected for {cache_key}, inputs differ")
+        print(f"⚠ Cache key collision for {cache_key}, inputs differ")
         return None
-    print(f"✗ Cache MISS: {cache_key}")
+    print(f"✗ Cache MISS: {tool_name} | key={cache_key} | inputs={inputs_summary}")
     return None
 
 
@@ -335,7 +347,7 @@ def save_cached_tool_result(session_state: dict, tool_name: str, tool_input: dic
 
 
 class ProteinContextManager:
-    def __init__(self, max_tool_history=10):
+    def __init__(self, max_tool_history=200):
         self.sequences = {}
         self.files = {}
         self.uniprot_ids = {}
@@ -721,9 +733,15 @@ def initialize_session_state() -> Dict[str, Any]:
     date_subdir = os.path.join(str(now.year), f"{now.month:02d}", f"{now.day:02d}", "Agent")
     agent_session_dir = os.path.join(base_dir, date_subdir, session_id)
     os.makedirs(agent_session_dir, exist_ok=True)
+    available_tools_list = ", ".join(t.name for t in all_tools) if all_tools else "(none)"
+    skills_metadata = get_skills_metadata_string()
     return {
         'session_id': session_id,
         'agent_session_dir': agent_session_dir,
+        'tools_description': tools_description,
+        'skills_metadata': skills_metadata,
+        'available_tools_list': available_tools_list,
+        'all_tools': all_tools,
         'planner': planner_chain,
         'pi_research_agent': pi_research_agent,
         'pi_report': pi_report_chain,

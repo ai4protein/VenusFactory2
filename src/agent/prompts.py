@@ -79,7 +79,7 @@ PI_SUB_REPORT_PROMPT = ChatPromptTemplate.from_messages([
 PI_FINAL_REPORT_TEMPLATE = _load_md("principal_investigator_final_report")
 PI_FINAL_REPORT_PROMPT = ChatPromptTemplate.from_messages([
     ("system", PI_FINAL_REPORT_TEMPLATE),
-    ("human", "References and sub-reports by section:\n{sub_reports}\n\nUser question: {input}\n\nOutput only the research draft with ## Abstract, ## Introduction, ## Related Work, and ## References. In ## References put each reference on its own line—one reference per line; never put multiple references on the same line. Use the same language as the user."),
+    ("human", "References and sub-reports by section (you MUST summarize and synthesize every sub-report below into a LONG draft):\n{sub_reports}\n\nUser question: {input}\n\nWrite a LONG research draft. Output ## Abstract, ## Introduction (at least 3–5 paragraphs, summarizing all sub-reports), ## Related Work (at least 3–5 paragraphs, synthesizing all sub-reports), and ## References (one reference per line). Use the same language as the user."),
 ])
 # --- PI Suggest steps: draft + user input → Tools + Steps for CB/MLS (separate message) ---
 PI_SUGGEST_STEPS_TEMPLATE = _load_md("principal_investigator_suggest_steps")

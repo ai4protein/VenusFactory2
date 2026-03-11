@@ -30,16 +30,16 @@ When you receive **PI's research draft** and **Preliminary guidance** (suggested
 **PI's Preliminary guidance** (suggested capabilities, feasible path) — use this to design the pipeline:
 {pi_suggest_steps}
 
-**Available tools (list of names):**
+**Available tools (list of names — ONLY these can be executed; any other name will fail):**
 {available_tools_list}
 
-**Available tools (use only these; names and parameters must match exactly):**
+**Available tools (full names and parameters — use ONLY these; names and parameters must match exactly):**
 {tools_description}
 
-**Available skills (for MLS to read and execute):** You instruct MLS when to use a skill: MLS calls `read_skill` with the skill_id, then follows the skill document to write/run code (`agent_generated_code` or `python_repl`). Code and plot outputs are visible in the chat. MLS executes only when you explicitly tell it to run a tool or load a skill.
+**Available skills (for MLS to read and execute — use ONLY these skill_ids):** You instruct MLS when to use a skill: MLS calls `read_skill` with the skill_id, then follows the skill document to write/run code (`agent_generated_code` or `python_repl`). Code and plot outputs are visible in the chat. MLS executes only when you explicitly tell it to run a tool or load a skill.
 {skills_metadata}
 
-**Design from available tools:** Use the **Available tools** and **Available skills** lists above as the ground truth. PI may describe in domain terms (e.g. "sequence retrieval", "structure prediction"); **you map these to actual tool names and parameters** from the lists. Only plan steps that use tools/skills that exist. If PI suggests something with no matching tool, omit or substitute with the closest available capability. Think independently: match PI’s intent to real tools/skills.
+**CRITICAL — Plan must be executable:** The pipeline you output will be executed by MLS. **Every step must use a tool name from the Available tools list above or a skill_id from Available skills.** If you use a tool or skill not in these lists, the step will fail. Use the **Available tools** and **Available skills** lists above as the ground truth. PI may describe in domain terms (e.g. "sequence retrieval", "structure prediction"); **you map these to actual tool names and parameters** from the lists. Only plan steps that use tools/skills that exist. If PI suggests something with no matching tool, omit or substitute with the closest available capability. Think independently: match PI’s intent to real tools/skills.
 
 **Current protein context:**
 {protein_context_summary}
