@@ -10,810 +10,435 @@
 
 [![GitHub stars](https://img.shields.io/github/stars/AI4Protein/VenusFactory?style=flat-square)](https://github.com/AI4Protein/VenusFactory/stargazers) [![GitHub forks](https://img.shields.io/github/forks/AI4Protein/VenusFactory?style=flat-square)](https://github.com/AI4Protein/VenusFactory/network/members) [![GitHub issues](https://img.shields.io/github/issues/AI4Protein/VenusFactory?style=flat-square)](https://github.com/AI4Protein/VenusFactory/issues) [![GitHub license](https://img.shields.io/github/license/AI4Protein/VenusFactory?style=flat-square)](https://github.com/AI4Protein/VenusFactory/blob/main/LICENSE)
 
-[![Python Version](https://img.shields.io/badge/Python-3.12-blue?style=flat-square&logo=python)](https://www.python.org/) [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen?style=flat-square)](https://venusfactory.readthedocs.io/) [![Downloads](https://img.shields.io/github/downloads/AI4Protein/VenusFactory/total?style=flat-square)](https://github.com/AI4Protein/VenusFactory/releases) [![Youtube](https://img.shields.io/badge/Youtube-AI4Protein-red?style=flat-square&logo=youtube)](https://www.youtube.com/watch?v=MT6lPH5kgCc&ab_channel=BxinZhou) [![Demo on OpenBayes](https://img.shields.io/badge/Demo-OpenBayes贝式计算-blue)](https://openbayes.com/console/public/tutorials/O3RCA0XUKa0)
+[![Python Version](https://img.shields.io/badge/Python-3.12-blue?style=flat-square&logo=python)](https://www.python.org/) [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen?style=flat-square)](https://venusfactory.readthedocs.io/) [![Downloads](https://img.shields.io/github/downloads/AI4Protein/VenusFactory/total?style=flat-square)](https://github.com/AI4Protein/VenusFactory/releases) [![Youtube](https://img.shields.io/badge/Youtube-AI4Protein-red?style=flat-square&logo=youtube)](https://www.youtube.com/watch?v=MT6lPH5kgCc&ab_channel=BxinZhou) [![Demo](https://img.shields.io/badge/Demo-OpenBayes-blue)](https://openbayes.com/console/public/tutorials/O3RCA0XUKa0)
+
+**🤖 Agent-Driven Protein Engineering Platform**
+*One platform, three interfaces, infinite possibilities*
 
 </div>
- 
-Recent News:
-- [2026-01-23] 🚀 **Update:** Added 30+ downsteram tasks predictions in VenusFactory.
-- [2025-08-10] 🎉 VenusFactory releases a free website at [venusfactory.cn/playground/](https://venusfactory.cn/playground/).
-- [2025-06-30] 🚀 **Update:** Added mutation zero-shot prediction functionality, supporting structure-based and sequence-based models for high-throughput mutation effect scoring.
-- [2025-04-19] 🎉 **Congratulations!** [VenusREM](https://github.com/ai4protein/VenusREM) achieves 1st place in [ProteinGym](https://proteingym.org/benchmarks) and [VenusMutHub](https://lianglab.sjtu.edu.cn/muthub/) leaderboard!
-- [2025-03-26] Add [VenusPLM-300M](https://huggingface.co/AI4Protein/VenusPLM-300M) model, trained based on **VenusPod**, is a protein language model independently developed by Hong Liang's research group at Shanghai Jiao Tong University.
-- [2025-03-17] Add [Venus-PETA, Venus-ProPrime, Venus-ProSST models](https://huggingface.co/AI4Protein), for more details, please refer to [Supported Models](#-supported-models)
-- [2025-03-05] 🎉 Congratulation! Our latest research achievement, **VenusMutHub**, has been officially accepted by [**Acta Pharmaceutica Sinica B**](https://www.sciencedirect.com/science/article/pii/S2211383525001650) and is now featured in a series of [**leaderboards**](https://lianglab.sjtu.edu.cn/muthub/)!    
+
+---
+
+## 🌟 Recent News
+
+- [2026-01-23] 🚀 Added [VenusX](https://github.com/AI4Protein/VenusX) in VenusFactory
+- [2025-08-10] 🎉 Free website released at [venusfactory.cn/playground](https://venusfactory.cn/playground/)
+- [2025-04-19] 🎉 [VenusREM](https://github.com/ai4protein/VenusREM) #1 in [ProteinGym](https://proteingym.org/benchmarks) & [VenusMutHub](https://lianglab.sjtu.edu.cn/muthub/)!
 
 <details>
-<summary>📨 Welcome to join our WeChat Group</summary>
+<summary>📨 Join our WeChat Group / 📝 Share Your Feedback</summary>
+<p align="center">
+  <img src="img/wechat.png" width="60%" alt="WeChat Group">
+</p>
+</details>
+
+---
+
+## 🎯 What is VenusFactory?
+
+**VenusFactory** is an **Agent-driven protein engineering platform** combining 40+ AI models with 11 biological databases. Designed for everyone — from biologists to AI researchers.
 
 <p align="center">
-  <img src="img/wechat.png" width="80%" alt="WeChat Group">
+  <img src="https://img.shields.io/badge/🤖_Agent_Driven-Core-FF6B6B?style=for-the-badge">
+  <img src="https://img.shields.io/badge/Models-40+-4ECDC4?style=for-the-badge">
+  <img src="https://img.shields.io/badge/Databases-11+-95E1D3?style=for-the-badge">
+  <img src="https://img.shields.io/badge/Tools-9_Categories-F38181?style=for-the-badge">
 </p>
 
-</details>
+### 🚀 Why VenusFactory?
+
+| **🤖 Agent-First** | **🎯 Three Interfaces** | **⚡ Zero to Results** |
+|:------------------:|:----------------------:|:---------------------:|
+| Natural language → Multi-step automation | Web UI / REST API / CLI | Upload → Predict in seconds |
+| 40+ models + 11 databases | Same power, different styles | Or train custom models in minutes |
+
+### 💡 Capabilities at a Glance
+
+| Task | Solution | Time |
+|:-----|:---------|:-----|
+| 🧬 Mutation effects | ESM-2, ProSST, ProtSSN (zero-shot) | <1 min |
+| 🎯 Protein function | 30+ fine-tuned models | <30 sec |
+| 🔬 Custom training | 7 PEFT methods (LoRA, QLoRA, etc.) | 10-60 min |
+| 💾 Data download | AlphaFold, UniProt, RCSB, KEGG, etc. | Real-time |
+| 📚 Literature | AI-powered search & analysis | <2 min |
+
+---
+
+## ⚡ Quick Start
+
+### 1. Install
+```bash
+git clone https://github.com/AI4Protein/VenusFactory.git && cd VenusFactory
+conda create -n venus python=3.12 && conda activate venus
+pip install -r requirements.txt  # Detailed guide below ↓
+```
+
+### 2. Launch
+```bash
+# Web UI (Recommended)
+python src/webui.py  # → http://localhost:7860
+
+# REST API
+python src/api_server.py  # → http://localhost:5000/docs
+
+# CLI
+bash script/train/train_plm_lora.sh
+```
+
+### 3. Get Results
 
 <details>
-<summary>
-  📝 Your Feedback is Valuable! We invite you to complete our survey by scanning either QR code below.
-</summary>
-<div style="display: flex; justify-content: space-evenly; align-items: center; padding-top: 15px; text-align: center;">
-  
-  <div style="margin: 10px;">
-    <img src="img/Questionnaire/Google_QA.png" width="200" alt="Google Form QR Code">
-    <p style="margin-top: 5px; font-size: 14px;">Google Form</p>
-  </div>
-  
-  <div style="margin: 10px;">
-    <img src="img/Questionnaire/XWJ_QA.jpg" width="200" alt="Wenjuanxing Survey QR Code">
-    <p style="margin-top: 5px; font-size: 14px;">Wenjuanxing Survey</p>
-  </div>
+<summary><b>🤖 Try Agent-0.1 | ⚡ Quick Tools | 🔬 Train Models</b> (Click to expand examples)</summary>
 
-</div>
+**Agent-0.1 (Natural Language)**
+```
+Q: "Predict stability for sequence MKTAYIAKQRQISFV..."
+→ Agent auto-selects model → Runs prediction → Returns results + explanations
+```
+
+**Quick Mutation Scoring**
+```
+Upload: PDB/FASTA → Mutations: A23V, K45R → Get: Stability scores
+```
+
+**Train Your Model**
+```
+Model: ESM2-650M → Dataset: DeepSol → Method: LoRA → 15 min → Trained model ✓
+```
+
 </details>
 
-## ✏️ Table of Contents
-
-- [Features](#-features)
-- [Supported Models](#-supported-models)
-- [Supported Training Approaches](#-supported-training-approaches)
-- [Supported Datasets](#-supported-datasets)
-- [Supported Metrics](#-supported-metrics)
-- [Agent-0.1(Beta Version)](#-venusagent-01-your-ai-assistant)
-- [Quick Tools](#-quick-tools-your-go-to-for-rapid-predictions)。
-- [Advanced Tools](#-advanced-tools-for-in-depth-protein-analysis)
-- [Requirements](#-requirements)
-- [Installation Guide](#-installation-guide)
-- [Quick Start with Venus Web UI](#-quick-start-with-venus-web-ui)
-- [Code-line Usage](#-code-line-usage)
-- [Citation](#-citation)
-- [Acknowledgement](#-acknowledgement)
-
-## 📑 Features
-
-🙌 ***VenusFactory*** is a unified open platform for protein engineering, supporting both **graphical user interface (GUI)** and **command-line operations**. It enables **data retrieval, model training, evaluation, and deployment through a streamlined, no-code workflow**.
-
-🆒 With support for **local private deployment** and access to over 40 state-of-the-art deep learning models, VenusFactory lowers the barrier to scientific research and accelerates the application of AI in life sciences.
-
-- **AI-Powered Assistance**: `Agent-0.1` acts as an intelligent AI assistant, providing expert answers and analysis for protein engineering tasks.
-- **Efficient Workflows**: **Quick Tools** enables rapid, no-code predictions for common tasks like protein function and mutation effect scoring.
-- **Advanced Analysis**: **Advanced Tools** offers powerful, in-depth analysis for both sequence-based and structure-based zero-shot mutation predictions.
-- **Various protein language models**: Venus series, ESM series, ProtTrans series, Ankh series, etc.
-- **Comprehensive supervised datasets**: Localization, Fitness, Solubility, Stability, etc.
-- **Easy and quick data collector**: AlphaFold2 Database, RCSB, InterPro, UniProt, etc.
-- **Experiment monitors**: Wandb, Local
-- **Friendly interface**: Gradio UI
-
 <p align="center">
-  <video width="80%" controls>
+  <video width="70%" controls>
     <source src="./img/venusfactory.mp4" type="video/mp4">
-    Your browser does not support the video tag.
   </video>
 </p>
 
-## 🧬 Supported Models (Zero-shot prediction)
+---
 
-### Sequence-structure models
+## 🤖 Agent-0.1: The Brain
 
-[ProSST, NeurIPS2024](https://proceedings.neurips.cc/paper_files/paper/2024/file/3ed57b293db0aab7cc30c44f45262348-Paper-Conference.pdf), [ProtSSN, eLife2025](https://elifesciences.org/articles/98033), [MIF-ST, PEDS2022](https://academic.oup.com/peds/article-abstract/doi/10.1093/protein/gzad015/7330543?redirectedFrom=fulltext)
+**Agent-0.1** orchestrates all tools via natural language. Powered by LangGraph + LangChain.
 
-### Structure-only models
-
-[MIF, PEDS2022](https://academic.oup.com/peds/article-abstract/doi/10.1093/protein/gzad015/7330543?redirectedFrom=fulltext)
-
-### Sequence-only models
-
-[ESM2, Science2023](https://www.science.org/doi/10.1126/science.ade2574), [ESM-1v, NeurIPS2021](https://proceedings.neurips.cc/paper/2021/file/f51338d736f95dd42427296047067694-Paper.pdf)
-
-
-## 🤖 Supported Models (Training for supervised tasks)
-
-### Pre-training Protein Language Models
+```
+You: "Design thermostable mutations for PDB:1ABC"
+         ↓
+    🤖 Agent Planning
+         ↓
+  📥 Download → 🧬 Predict → 🎯 Score → 📊 Report
+  RCSB PDB     ESM-2 scan    Stability   Ranked list
+```
 
 <details>
-<summary>Venus Series Models (Published by Liang's Lab)</summary>
+<summary><b>✨ Agent Capabilities</b></summary>
 
-| Model | Size | Parameters | GPU Memory | Features | Template |
-|-------|------|------------|------------|----------|----------|
-| ProSST-20 | 20 | 110M | 4GB+ | Mutation | [AI4Protein/ProSST-20](https://huggingface.co/AI4Protein/ProSST-20) |
-| ProSST-128 | 128 | 110M | 4GB+ | Mutation | [AI4Protein/ProSST-128](https://huggingface.co/AI4Protein/ProSST-128) |
-| ProSST-512 | 512 | 110M | 4GB+ | Mutation | [AI4Protein/ProSST-512](https://huggingface.co/AI4Protein/ProSST-512) |
-| ProSST-1024	| 1024 | 110M	| 4GB+ |	Mutation | [AI4Protein/ProSST-1024](https://huggingface.co/AI4Protein/ProSST-1024)|
-| ProSST-2048 | 2048 | 110M | 4GB+ | Mutation | [AI4Protein/ProSST-2048](https://huggingface.co/AI4Protein/ProSST-2048) |
-| ProSST-4096 | 4096 | 110M | 4GB+ | Mutation | [AI4Protein/ProSST-4096](https://huggingface.co/AI4Protein/ProSST-4096) |
-| ProPrime-690M | 690M | 690M | 16GB+ | OGT-prediction | [AI4Protein/Prime_690M](https://huggingface.co/AI4Protein/Prime_690M) |
-| ProPrime-650M-OGT |	650M | 650M |	16GB+	| OGT-prediction | [AI4Protein/ProPrime-650M-OGT](AI4Protein/ProPrime-650M-OGT) |
-| VenusPLM-300M | 300M | 300M | 12GB+ | Protein-language | [AI4Protein/VenusPLM-300M](https://huggingface.co/AI4Protein/VenusPLM-300M) |
+| Category | Features |
+|:---------|:---------|
+| **🔬 Analysis** | Mutation prediction • Function/stability scoring • Structure analysis |
+| **💾 Data** | Multi-database search • Format conversion • Batch processing |
+| **🧠 Planning** | Multi-step automation • Tool orchestration • Error handling |
+| **📚 Research** | Literature mining • Family analysis • Report generation |
 
-> 💡 These models often excel in specific tasks or offer unique architectural benefits
 </details>
 
 <details>
-<summary>Venus-PETA Models: Tokenization variants</summary>
+<summary><b>💬 Example Conversations</b></summary>
 
-#### BPE Tokenization Series
-| Model | Vocab Size | Parameters | GPU Memory | Template |
-|-------|------------|------------|------------|----------|
-| PETA-base | base | 80M | 4GB+ | [AI4Protein/deep_base](https://huggingface.co/AI4Protein/deep_base) |
-| PETA-bpe-50 | 50 | 80M | 4GB+ | [AI4Protein/deep_bpe_50](https://huggingface.co/AI4Protein/deep_bpe_50) |
-| PETA-bpe-100 | 100 | 80M | 4GB+ | [AI4Protein/deep_bpe_100](https://huggingface.co/AI4Protein/deep_bpe_100) |
-| PETA-bpe-200 | 200 | 80M | 4GB+ | [AI4Protein/deep_bpe_200](https://huggingface.co/AI4Protein/deep_bpe_200) |
-| PETA-bpe-400 | 400 | 80M | 4GB+ | [AI4Protein/deep_bpe_400](https://huggingface.co/AI4Protein/deep_bpe_400) |
-| PETA-bpe-800 | 800 | 80M | 4GB+ | [AI4Protein/deep_bpe_800](https://huggingface.co/AI4Protein/deep_bpe_800) |
-| PETA-bpe-1600 | 1600 | 80M | 4GB+ | [AI4Protein/deep_bpe_1600](https://huggingface.co/AI4Protein/deep_bpe_1600) |
-| PETA-bpe-3200 | 3200 | 80M | 4GB+ | [AI4Protein/deep_bpe_3200](https://huggingface.co/AI4Protein/deep_bpe_3200) |
+**Mutation Design:**
+```
+You: "Improve thermostability of MKTAYIAKQR..."
+Agent: ✓ ESM-2 scanning... ✓ Stability scoring...
+→ Top 3: A5V (+2.8 kcal/mol), K9R (+1.9), T2S (+1.5)
+```
 
-#### Unigram Tokenization Series
-| Model | Vocab Size | Parameters | GPU Memory | Template |
-|-------|------------|------------|------------|----------|
-| PETA-unigram-50 | 50 | 80M | 4GB+ | [AI4Protein/deep_unigram_50](https://huggingface.co/AI4Protein/deep_unigram_50) |
-| PETA-unigram-100 | 100 | 80M | 4GB+ | [AI4Protein/deep_unigram_100](https://huggingface.co/AI4Protein/deep_unigram_100) |
-| PETA-unigram-200 | 200 | 80M | 4GB+ | [AI4Protein/deep_unigram_200](https://huggingface.co/AI4Protein/deep_unigram_200) |
-| PETA-unigram-400 | 400 | 80M | 4GB+ | [AI4Protein/deep_unigram_400](https://huggingface.co/AI4Protein/deep_unigram_400) |
-| PETA-unigram-800 | 800 | 80M | 4GB+ | [AI4Protein/deep_unigram_800](https://huggingface.co/AI4Protein/deep_unigram_800) |
-| PETA-unigram-1600 | 1600 | 80M | 4GB+ | [AI4Protein/deep_unigram_1600](https://huggingface.co/AI4Protein/deep_unigram_1600) |
-| PETA-unigram-3200 | 3200 | 80M | 4GB+ | [AI4Protein/deep_unigram_3200](https://huggingface.co/AI4Protein/deep_unigram_3200) |
+**Database Search:**
+```
+You: "Find lysozyme structures <2.0Å resolution"
+Agent: ✓ Searching RCSB... → Found 47 structures
+→ Downloaded to: temp_outputs/lysozyme_structures/
+```
 
-> 💡 Different tokenization strategies may be better suited for specific tasks
+</details>
+
+> 💡 **Note:** Requires API key (OpenAI/Anthropic). Currently in Beta.
+
+---
+
+## 🏗️ Architecture
+
+```
+🌐 Interfaces: Web UI | REST API | CLI
+        ↓
+   🤖 Agent Layer (LangGraph + LangChain)
+        ↓
+   🔧 Application: Train | Eval | Predict | Tools
+        ↓
+   🛠️ Core Tools: 9 categories (mutation, database, search, etc.)
+        ↓
+   📊 Resources: 40+ Models | 30+ Datasets | 11+ Databases
+```
+
+<details>
+<summary><b>📚 Integrated Resources</b></summary>
+
+**Models (40+):** ESM, ProtBert, ProtT5, Venus/PETA/ProSST series
+**Databases (11+):** AlphaFold • RCSB PDB • UniProt • NCBI • KEGG • STRING • BRENDA • ChEMBL • HPA • FDA • Foldseek
+**Datasets (30+):** Function • Localization • Stability • Solubility • Mutation fitness
+
 </details>
 
 <details>
-<summary>ESM Series Models: Meta AI's protein language models</summary>
+<summary><b>🔧 Tool Categories</b></summary>
 
-| Model | Size | Parameters | GPU Memory | Training Data | Template |
-|-------|------|------------|------------|---------------|----------|
-| ESM2-8M | 8M | 8M | 2GB+ | UR50/D | [facebook/esm2_t6_8M_UR50D](https://huggingface.co/facebook/esm2_t6_8M_UR50D) |
-| ESM2-35M | 35M | 35M | 4GB+ | UR50/D | [facebook/esm2_t12_35M_UR50D](https://huggingface.co/facebook/esm2_t12_35M_UR50D) |
-| ESM2-150M | 150M | 150M | 8GB+ | UR50/D | [facebook/esm2_t30_150M_UR50D](https://huggingface.co/facebook/esm2_t30_150M_UR50D) |
-| ESM2-650M | 650M | 650M | 16GB+ | UR50/D | [facebook/esm2_t33_650M_UR50D](https://huggingface.co/facebook/esm2_t33_650M_UR50D) |
-| ESM2-3B | 3B | 3B | 24GB+ | UR50/D | [facebook/esm2_t36_3B_UR50D](https://huggingface.co/facebook/esm2_t36_3B_UR50D) |
-| ESM2-15B | 15B | 15B | 40GB+ | UR50/D | [facebook/esm2_t48_15B_UR50D](https://huggingface.co/facebook/esm2_t48_15B_UR50D) |
-| ESM-1b | 650M | 650M | 16GB+ | UR50/S | [facebook/esm1b_t33_650M_UR50S](https://huggingface.co/facebook/esm1b_t33_650M_UR50S) |
-| ESM-1v-1 | 650M | 650M | 16GB+ | UR90/S | [facebook/esm1v_t33_650M_UR90S_1](https://huggingface.co/facebook/esm1v_t33_650M_UR90S_1) |
-| ESM-1v-2 | 650M | 650M | 16GB+ | UR90/S | [facebook/esm1v_t33_650M_UR90S_2](https://huggingface.co/facebook/esm1v_t33_650M_UR90S_2) |
-| ESM-1v-3 | 650M | 650M | 16GB+ | UR90/S | [facebook/esm1v_t33_650M_UR90S_3](https://huggingface.co/facebook/esm1v_t33_650M_UR90S_3) |
-| ESM-1v-4 | 650M | 650M | 16GB+ | UR90/S | [facebook/esm1v_t33_650M_UR90S_4](https://huggingface.co/facebook/esm1v_t33_650M_UR90S_4) |
-| ESM-1v-5 | 650M | 650M | 16GB+ | UR90/S | [facebook/esm1v_t33_650M_UR90S_5](https://huggingface.co/facebook/esm1v_t33_650M_UR90S_5) |
+| Tool | Description | Agent | CLI |
+|:-----|:------------|:-----:|:---:|
+| 🧬 Mutation | ESM-1v, ESM-2, ProSST, ProtSSN, MIF-ST | ✅ | ✅ |
+| 🎯 Prediction | 30+ fine-tuned models | ✅ | ✅ |
+| 💾 Database | 11 integrations | ✅ | ✅ |
+| 🔍 Search | PubMed, FDA, patents | ✅ | ✅ |
+| 🏋️ Training | LoRA, QLoRA, DoRA, etc. | ✅ | ✅ |
+| 📁 File | Format conversion | ✅ | ✅ |
+| 🔬 Denovo | Protein design | ✅ | ✅ |
+| 🧪 Discovery | Novel discovery | ✅ | ✅ |
+| 📊 Visualize | 3D viewer | ✅ | ✅ |
 
-> 💡 ESM2 models are the latest generation, offering better performance than ESM-1b/1v
 </details>
+
+---
+
+## 🧬 Supported Models
 
 <details>
-<summary>BERT-based Models: Transformer encoder architecture</summary>
+<summary><b>40+ Protein Language Models</b> (Click to expand)</summary>
 
-| Model | Size | Parameters | GPU Memory | Training Data | Template |
-|-------|------|------------|------------|---------------|----------|
-| ProtBert-Uniref100 | 420M | 420M | 12GB+ | UniRef100 | [Rostlab/prot_bert](https://huggingface.co/Rostlab/prot_bert) |
-| ProtBert-BFD | 420M | 420M | 12GB+ | BFD100 | [Rostlab/prot_bert_bfd](https://huggingface.co/Rostlab/prot_bert_bfd) |
-| IgBert | 420M | 420M | 12GB+ | Antibody | [Exscientia/IgBert](https://huggingface.co/Exscientia/IgBert) |
-| IgBert-unpaired | 420M | 420M | 12GB+ | Antibody | [Exscientia/IgBert_unpaired](https://huggingface.co/Exscientia/IgBert_unpaired) |
+**Venus Series (Liang's Lab):**
+ProSST-20/128/512/1024/2048/4096 (110M) • ProPrime-690M • VenusPLM-300M • PETA-base/bpe/unigram (80M)
 
-> 💡 BFD-trained models generally show better performance on structure-related tasks
-</details>
+**ESM Series (Meta AI):**
+ESM2: 8M, 35M, 150M, 650M, 3B, 15B • ESM-1v: 5 models (650M each)
 
-<details>
-<summary>T5-based Models: Encoder-decoder architecture</summary>
+**ProtBert & ProtT5:**
+ProtBert-Uniref100/BFD (420M) • IgBert (420M) • ProtT5-XL/XXL (3B-11B) • Ankh-base/large (450M-1.2B)
 
-| Model | Size | Parameters | GPU Memory | Training Data | Template |
-|-------|------|------------|------------|---------------|----------|
-| ProtT5-XL-UniRef50 | 3B | 3B | 24GB+ | UniRef50 | [Rostlab/prot_t5_xl_uniref50](https://huggingface.co/Rostlab/prot_t5_xl_uniref50) |
-| ProtT5-XXL-UniRef50 | 11B | 11B | 40GB+ | UniRef50 | [Rostlab/prot_t5_xxl_uniref50](https://huggingface.co/Rostlab/prot_t5_xxl_uniref50) |
-| ProtT5-XL-BFD | 3B | 3B | 24GB+ | BFD100 | [Rostlab/prot_t5_xl_bfd](https://huggingface.co/Rostlab/prot_t5_xl_bfd) |
-| ProtT5-XXL-BFD | 11B | 11B | 40GB+ | BFD100 | [Rostlab/prot_t5_xxl_bfd](https://huggingface.co/Rostlab/prot_t5_xxl_bfd) |
-| IgT5 | 3B | 3B | 24GB+ | Antibody | [Exscientia/IgT5](https://huggingface.co/Exscientia/IgT5) |
-| IgT5-unpaired | 3B | 3B | 24GB+ | Antibody | [Exscientia/IgT5_unpaired](https://huggingface.co/Exscientia/IgT5_unpaired) |
-| Ankh-base | 450M | 450M | 12GB+ | Encoder-decoder | [ElnaggarLab/ankh-base](https://huggingface.co/ElnaggarLab/ankh-base) |
-| Ankh-large | 1.2B | 1.2B | 20GB+ | Encoder-decoder | [ElnaggarLab/ankh-large](https://huggingface.co/ElnaggarLab/ankh-large) |
+**Selection Guide:**
+- GPU <8GB: ESM2-8M/35M, ProSST
+- GPU 8-16GB: ESM2-150M/650M, ProtBert
+- GPU 24GB+: ESM2-3B, ProtT5-XL
+- Multi-GPU: ESM2-15B, ProtT5-XXL
 
-> 💡 T5 models can be used for both encoding and generation tasks
-</details>
-
-### Model Selection Guide
-
-<details>
-<summary>How to choose the right model?</summary>
-
-1. **Based on Hardware Constraints:**
-   - Limited GPU (<8GB): ESM2-8M, ESM2-35M, ProSST
-   - Medium GPU (8-16GB): ESM2-150M, ESM2-650M, ProtBert series
-   - High-end GPU (24GB+): ESM2-3B, ProtT5-XL, Ankh-large
-   - Multiple GPUs: ESM2-15B, ProtT5-XXL
-
-2. **Based on Task Type:**
-   - Sequence classification: ESM2, ProtBert
-   - Structure prediction: ESM2, Ankh
-   - Generation tasks: ProtT5
-   - Antibody design: IgBert, IgT5
-   - Lightweight deployment: ProSST, PETA-base
-
-3. **Based on Training Data:**
-   - General protein tasks: ESM2, ProtBert
-   - Structure-aware tasks: Ankh
-   - Antibody-specific: IgBert, IgT5
-   - Custom tokenization needs: PETA series
+**By Task:**
+- Classification: ESM2, ProtBert
+- Structure: Ankh
+- Generation: ProtT5
+- Antibody: IgBert/IgT5
+- Lightweight: ProSST, PETA
 
 </details>
 
-> 🔍 All models are available through the Hugging Face Hub and can be easily loaded using their templates.
-
-## 🔬 Supported Training Approaches
-
-<details>
-<summary>Supported Training Approaches</summary>
-
-| Approach               | Full-tuning | Freeze-tuning      | SES-Adapter        | AdaLoRA            | QLoRA      | LoRA               | DoRA            | IA3              | 
-| ---------------------- | ----------- | ------------------ | ------------------ | ------------------ |----------- | ------------------ | -----------------| -----------------|
-| Supervised Fine-Tuning | ✅          | ✅                | ✅                 | ✅                |✅          | ✅                | ✅               | ✅              |
-
-</details>
+---
 
 ## 📚 Supported Datasets
 
-<details><summary>Pre-training datasets</summary>
+<details>
+<summary><b>30+ Supervised + Zero-Shot Datasets</b></summary>
 
-| dataset | data level | link |
-|------------|------|------|
-| CATH_V43_S40 | structures | [CATH_V43_S40](https://huggingface.co/datasets/tyang816/cath) |
-| AGO_family | structures | [AGO_family](https://huggingface.co/datasets/tyang816/Ago_database_PDB) |
+**Zero-Shot:** VenusMutHub • ProteinGym (217 DMS)
 
-</details>
+**Function:** EC • GO_BP • GO_CC • GO_MF
+**Localization:** DeepLocBinary • DeepLocMulti • DeepLoc2Multi
+**Stability:** Thermostability • TAPE_Stability
+**Solubility:** DeepSol • DeepSoluE • eSOL • ProtSolM • PETA_CHS/LGK/TEM_Sol
+**Mutation:** FLIP_AAV (7 splits) • FLIP_GB1 (5 splits) • TAPE_Fluorescence
+**Others:** DeepET_Topt • MetalIonBinding • SortingSignal • PaCRISPR
 
-<details><summary>Zero-shot datasets</summary>
-
-| dataset | task | link |
-|------------|------|------|
-| VenusMutHub | mutation effects prediction | [VenusMutHub](https://huggingface.co/datasets/AI4Protein/VenusMutHub) |
-| ProteinGym | mutation effects prediction | [ProteinGym](https://proteingym.org/) |
+All datasets available on [HuggingFace](https://huggingface.co/AI4Protein)
 
 </details>
 
-<details><summary>Supervised fine-tuning datasets (amino acid sequences/ foldseek sequences/ ss8 sequences)</summary>
+---
 
-| dataset | task | data level | problem type | link |
-|------------|------|----------|----------|------|
-| DeepLocBinary | localization | protein-wise | single_label_classification | [DeepLocBinary_AlphaFold2](https://huggingface.co/datasets/AI4Protein/DeepLocBinary_AlphaFold2), [DeepLocBinary_ESMFold](https://huggingface.co/datasets/AI4Protein/DeepLocBinary_ESMFold) |
-| DeepLocMulti | localization | protein-wise | multi_label_classification | [DeepLocMulti_AlphaFold2](https://huggingface.co/datasets/AI4Protein/DeepLocMulti_AlphaFold2), [DeepLocMulti_ESMFold](https://huggingface.co/datasets/AI4Protein/DeepLocMulti_ESMFold) |
-| DeepLoc2Multi | localization | protein-wise | single_label_classification | [DeepLoc2Multi_AlphaFold2](https://huggingface.co/datasets/AI4Protein/DeepLoc2Multi_AlphaFold2), [DeepLoc2Multi_ESMFold](https://huggingface.co/datasets/AI4Protein/DeepLoc2Multi_ESMFold) |
-| DeepSol | solubility | protein-wise | single_label_classification | [DeepSol_ESMFold](https://huggingface.co/datasets/AI4Protein/DeepSol_ESMFold) |
-| DeepSoluE | solubility | protein-wise | single_label_classification | [DeepSoluE_ESMFold](https://huggingface.co/datasets/AI4Protein/DeepSoluE_ESMFold) |
-| ProtSolM | solubility | protein-wise | single_label_classification | [ProtSolM_ESMFold](https://huggingface.co/datasets/AI4Protein/ProtSolM_ESMFold) |
-| eSOL | solubility | protein-wise | regression | [eSOL_AlphaFold2](https://huggingface.co/datasets/AI4Protein/eSOL_AlphaFold2), [eSOL_ESMFold](https://huggingface.co/datasets/AI4Protein/eSOL_ESMFold) |
-| DeepET_Topt | optimum temperature | protein-wise | regression | [DeepET_Topt_AlphaFold2](https://huggingface.co/datasets/AI4Protein/DeepET_Topt_AlphaFold2), [DeepET_Topt_ESMFold](https://huggingface.co/datasets/AI4Protein/DeepET_Topt_ESMFold) |
-| EC | function | protein-wise | multi_label_classification | [EC_AlphaFold2](https://huggingface.co/datasets/AI4Protein/EC_AlphaFold2), [EC_ESMFold](https://huggingface.co/datasets/AI4Protein/EC_ESMFold) |
-| GO_BP | function | protein-wise | multi_label_classification | [GO_BP_AlphaFold2](https://huggingface.co/datasets/AI4Protein/GO_BP_AlphaFold2), [GO_BP_ESMFold](https://huggingface.co/datasets/AI4Protein/GO_BP_ESMFold) |
-| GO_CC | function | protein-wise | multi_label_classification | [GO_CC_AlphaFold2](https://huggingface.co/datasets/AI4Protein/GO_CC_AlphaFold2), [GO_CC_ESMFold](https://huggingface.co/datasets/AI4Protein/GO_CC_ESMFold) |
-| GO_MF | function | protein-wise | multi_label_classification | [GO_MF_AlphaFold2](https://huggingface.co/datasets/AI4Protein/GO_MF_AlphaFold2), [GO_MF_ESMFold](https://huggingface.co/datasets/AI4Protein/GO_MF_ESMFold) |
-| MetalIonBinding | binding | protein-wise | single_label_classification | [MetalIonBinding_AlphaFold2](https://huggingface.co/datasets/AI4Protein/MetalIonBinding_AlphaFold2), [MetalIonBinding_ESMFold](https://huggingface.co/datasets/AI4Protein/MetalIonBinding_ESMFold) |
-| Thermostability | stability | protein-wise | regression | [Thermostability_AlphaFold2](https://huggingface.co/datasets/AI4Protein/Thermostability_AlphaFold2), [Thermostability_ESMFold](https://huggingface.co/datasets/AI4Protein/Thermostability_ESMFold) |
-
-> ✨ Only structural sequences are different for the same dataset, for example, ``DeepLocBinary_ESMFold`` and ``DeepLocBinary_AlphaFold2`` share the same amino acid sequences, this means if you only want to use the ``aa_seqs``, both are ok! 
-
-</details>
-
-<details><summary>Supervised fine-tuning datasets (amino acid sequences)</summary>
-
-| dataset | task | data level | problem type | link |
-|------------|------|----------|----------|------|
-| Demo_Solubility | solubility | protein-wise | single_label_classification | [Demo_Solubility](https://huggingface.co/datasets/AI4Protein/Demo_Solubility) |
-| DeepLocBinary | localization | protein-wise | single_label_classification | [DeepLocBinary](https://huggingface.co/datasets/AI4Protein/DeepLocBinary) |
-| DeepLocMulti | localization | protein-wise | multi_label_classification | [DeepLocMulti](https://huggingface.co/datasets/AI4Protein/DeepLocMulti) |
-| DeepLoc2Multi | localization | protein-wise | single_label_classification | [DeepLoc2Multi](https://huggingface.co/datasets/AI4Protein/DeepLoc2Multi) |
-| DeepSol | solubility | protein-wise | single_label_classification | [DeepSol](https://huggingface.co/datasets/AI4Protein/DeepSol) |
-| DeepSoluE | solubility | protein-wise | single_label_classification | [DeepSoluE](https://huggingface.co/datasets/AI4Protein/DeepSoluE) |
-| ProtSolM | solubility | protein-wise | single_label_classification | [ProtSolM](https://huggingface.co/datasets/AI4Protein/ProtSolM) |
-| eSOL | solubility | protein-wise | regression | [eSOL](https://huggingface.co/datasets/AI4Protein/eSOL) |
-| DeepET_Topt | optimum temperature | protein-wise | regression | [DeepET_Topt](https://huggingface.co/datasets/AI4Protein/DeepET_Topt) |
-| EC | function | protein-wise | multi_label_classification | [EC](https://huggingface.co/datasets/AI4Protein/EC) |
-| GO_BP | function | protein-wise | multi_label_classification | [GO_BP](https://huggingface.co/datasets/AI4Protein/GO_BP) |
-| GO_CC | function | protein-wise | multi_label_classification | [GO_CC](https://huggingface.co/datasets/AI4Protein/GO_CC) |
-| GO_MF | function | protein-wise | multi_label_classification | [GO_MF](https://huggingface.co/datasets/AI4Protein/GO_MF) |
-| MetalIonBinding | binding | protein-wise | single_label_classification | [MetalIonBinding](https://huggingface.co/datasets/AI4Protein/MetalIonBinding) |
-| Thermostability | stability | protein-wise | regression | [Thermostability](https://huggingface.co/datasets/AI4Protein/Thermostability) |
-| PaCRISPR | CRISPR | protein-wise | single_label_classification | [PaCRISPR](https://huggingface.co/datasets/AI4Protein/PaCRISPR) |
-| PETA_CHS_Sol | solubility | protein-wise | single_label_classification | [PETA_CHS_Sol](https://huggingface.co/datasets/AI4Protein/PETA_CHS_Sol) |
-| PETA_LGK_Sol | solubility | protein-wise | single_label_classification | [PETA_LGK_Sol](https://huggingface.co/datasets/AI4Protein/PETA_LGK_Sol) |
-| PETA_TEM_Sol | solubility | protein-wise | single_label_classification | [PETA_TEM_Sol](https://huggingface.co/datasets/AI4Protein/PETA_TEM_Sol) |
-| SortingSignal | sorting signal | protein-wise | single_label_classification | [SortingSignal](https://huggingface.co/datasets/AI4Protein/SortingSignal) |
-| FLIP_AAV | mutation | protein-site | regression |
-| FLIP_AAV_one-vs-rest | mutation | protein-site | single_label_classification | [FLIP_AAV_one-vs-rest](https://huggingface.co/datasets/AI4Protein/FLIP_AAV_one-vs-rest) |
-| FLIP_AAV_two-vs-rest | mutation | protein-site | single_label_classification | [FLIP_AAV_two-vs-rest](https://huggingface.co/datasets/AI4Protein/FLIP_AAV_two-vs-rest) |
-| FLIP_AAV_mut-des | mutation | protein-site | single_label_classification | [FLIP_AAV_mut-des](https://huggingface.co/datasets/AI4Protein/FLIP_AAV_mut-des) |
-| FLIP_AAV_des-mut | mutation | protein-site | single_label_classification | [FLIP_AAV_des-mut](https://huggingface.co/datasets/AI4Protein/FLIP_AAV_des-mut) |
-| FLIP_AAV_seven-vs-rest | mutation | protein-site | single_label_classification | [FLIP_AAV_seven-vs-rest](https://huggingface.co/datasets/AI4Protein/FLIP_AAV_seven-vs-rest) |
-| FLIP_AAV_low-vs-high | mutation | protein-site | single_label_classification | [FLIP_AAV_low-vs-high](https://huggingface.co/datasets/AI4Protein/FLIP_AAV_low-vs-high) |
-| FLIP_AAV_sampled | mutation | protein-site | single_label_classification | [FLIP_AAV_sampled](https://huggingface.co/datasets/AI4Protein/FLIP_AAV_sampled) |
-| FLIP_GB1 | mutation | protein-site | regression |
-| FLIP_GB1_one-vs-rest | mutation | protein-site | single_label_classification | [FLIP_GB1_one-vs-rest](https://huggingface.co/datasets/AI4Protein/FLIP_GB1_one-vs-rest) |
-| FLIP_GB1_two-vs-rest | mutation | protein-site | single_label_classification | [FLIP_GB1_two-vs-rest](https://huggingface.co/datasets/AI4Protein/FLIP_GB1_two-vs-rest) |
-| FLIP_GB1_three-vs-rest | mutation | protein-site | single_label_classification | [FLIP_GB1_three-vs-rest](https://huggingface.co/datasets/AI4Protein/FLIP_GB1_three-vs-rest) |
-| FLIP_GB1_low-vs-high | mutation | protein-site | single_label_classification | [FLIP_GB1_low-vs-high](https://huggingface.co/datasets/AI4Protein/FLIP_GB1_low-vs-high) |
-| FLIP_GB1_sampled | mutation | protein-site | single_label_classification | [FLIP_GB1_sampled](https://huggingface.co/datasets/AI4Protein/FLIP_GB1_sampled) |
-| TAPE_Fluorescence | fluorescence | protein-site | regression | [TAPE_Fluorescence](https://huggingface.co/datasets/AI4Protein/TAPE_Fluorescence) |
-| TAPE_Stability | stability | protein-site | regression | [TAPE_Stability](https://huggingface.co/datasets/AI4Protein/TAPE_Stability) |
-
-</details>
-
-## 📈 Supported Metrics
+## 📦 Installation
 
 <details>
-<summary>Supported Metrics</summary>
-
-| Name          | Torchmetrics     | Problem Type                                            |
-| ------------- | ---------------- | ------------------------------------------------------- |
-| accuracy      | Accuracy         | single_label_classification/ multi_label_classification |
-| recall        | Recall           | single_label_classification/ multi_label_classification |
-| precision     | Precision        | single_label_classification/ multi_label_classification |
-| f1            | F1Score          | single_label_classification/ multi_label_classification |
-| mcc           | MatthewsCorrCoef | single_label_classification/ multi_label_classification |
-| auc           | AUROC            | single_label_classification/ multi_label_classification |
-| f1_max        | F1ScoreMax       | multi_label_classification                              |
-| spearman_corr | SpearmanCorrCoef | regression                                              |
-| mse           | MeanSquaredError | regression                                              |
-
-</details>
-
-## 🤖 Agent-0.1: Your AI Assistant
-
-`Agent-0.1` is an intelligent AI assistant integrated into the VenusFactory platform, designed to answer questions and provide in-depth analysis on protein engineering and bioinformatics. It acts as a specialized expert, helping both biologists and AI researchers streamline their research workflow.
-
-#### Key Features:
-
-* **Zero-shot Prediction**: Directly utilize cutting-edge sequence-based (e.g., ESM-2, ESM-1v, ESM-1b) and structure-based models (e.g., SaProt, ProtSSN, ESM-IF1, MIF-ST, ProSST) to perform zero-shot mutation prediction.
-* **Protein Function**: Accurately predict various protein functions, including solubility, localization, metal ion binding, stability, sorting signal, and optimum temperature.
-* **Clear Insights**: Always provides clear, actionable insights in response to your queries.
-
-> 💡 **Note**: This feature requires an API key to access and is currently in Beta.
-
-## ⚡ Quick Tools: Your Go-to for Rapid Predictions
-
-`Quick Tools` is designed for users who need fast, efficient, and straightforward analysis without extensive configuration. It provides a no-code entry point to two key prediction tasks.
-
-* **Directed Evolution: AI-Powered Mutation Prediction**
-    This tool allows for the rapid scoring and analysis of protein mutations. Simply upload a PDB file or paste the PDB content, and the platform will provide insights into the effects of single or multiple mutations on the protein.
-
-* **Protein Function**
-    Leveraging pre-trained models, this module predicts various protein functions from a given amino acid sequence. You can upload a FASTA file or paste the sequence directly to predict properties such as solubility, localization, and more.
-
-## 🧪 Advanced Tools: For In-depth Protein Analysis
-
-`Advanced Tools` is built for researchers who require more granular control and deeper analysis. It offers powerful zero-shot prediction capabilities by allowing you to choose between two distinct model types.
-
-* **Sequence-based Model**
-    This submodule focuses on high-throughput mutation effect scoring using powerful sequence-only models like **ESM-2**. You can upload a FASTA file or paste a protein sequence to perform large-scale predictions and score mutations.
-
-* **Structure-based Model**
-    For tasks that require a deep understanding of protein 3D geometry, this tool utilizes **structure-aware models** like **ESM-IF1**. By uploading a PDB file or pasting its content, you can perform sophisticated zero-shot predictions that take the protein's spatial context into account.
-
-  
-## ✈️ Requirements
-
-### Hardware Requirements
-- Recommended: NVIDIA RTX 3090 (24GB) or better
-- Actual requirements depend on your chosen protein language model
-
-### Software Requirements
-- [Anaconda3](https://www.anaconda.com/download) or [Miniconda3](https://docs.conda.io/projects/miniconda/en/latest/)
-- Python 3.12
-
-## 📦 Installation Guide
-<details><summary> Git start with macOS</summary>
-
-## To achieve the best performance and experience, we recommend using ​Mac devices with M-series chips (such as M1, M2, M3, etc.).
-
-## 1️⃣ Clone the repository
-
-First, get the VenusFactory code:
+<summary><b>🍎 macOS (M1/M2/M3)</b></summary>
 
 ```bash
-git clone https://github.com/AI4Protein/VenusFactory.git
-cd VenusFactory
-```
-
-## 2️⃣ Create a Conda environment
-
-Ensure you have Anaconda or Miniconda installed. Then, create a new environment named `venus` with Python 3.12:
-
-```bash
-conda create -n venus python=3.12
-conda activate venus
-```
-
-## 3️⃣ Install Pytorch and PyG dependencies
-
-```bash
-# Install PyTorch
+git clone https://github.com/AI4Protein/VenusFactory.git && cd VenusFactory
+conda create -n venus python=3.12 && conda activate venus
 pip install --pre torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/nightly/cpu
-
-# Install PyG dependencies
 pip install torch_scatter torch-sparse torch-geometric -f https://data.pyg.org/whl/torch-2.8.0+cpu.html
-```
-
-## 4️⃣ Install remaining dependencies
-
-Install the remaining dependencies using `requirements_for_macOS.txt`:
-```bash
 pip install -r requirements_for_macOS.txt
 ```
+
 </details>
 
-<details><summary> Git start with Windows or Linux on CUDA 12.8</summary>
-
-## We recommend using CUDA 12.8
-
-
-## 1️⃣ Clone the repository
-
-First, get the VenusFactory code:
+<details>
+<summary><b>🪟 Windows / 🐧 Linux (CUDA 12.8)</b></summary>
 
 ```bash
-git clone https://github.com/AI4Protein/VenusFactory.git
-cd VenusFactory
-```
-
-## 2️⃣ Create a Conda environment
-
-Ensure you have Anaconda or Miniconda installed. Then, create a new environment named `venus` with Python 3.12:
-
-```bash
-conda create -n venus python=3.12
-conda activate venus
-```
-
-## 3️⃣ Install Pytorch and PyG dependencies
-
-```bash
-# Install PyTorch
+git clone https://github.com/AI4Protein/VenusFactory.git && cd VenusFactory
+conda create -n venus python=3.12 && conda activate venus
 pip install torch==2.8.0 torchvision --index-url https://download.pytorch.org/whl/cu128
-
-# Install PyG dependencies
 pip install torch_geometric
 pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.8.0+cu128.html
-```
-
-## 4️⃣ Install remaining dependencies
-
-Install the remaining dependencies using `requirements.txt`:
-```bash
 pip install -r requirements.txt
 ```
+
 </details>
 
-<details><summary> Git start with Windows or Linux on CUDA 11.x</summary>
-
-## We recommend using CUDA 11.8 or later versions, as they support higher versions of PyTorch, providing a better experience.
-
-
-## 1️⃣ Clone the repository
-
-First, get the VenusFactory code:
+<details>
+<summary><b>🪟 Windows / 🐧 Linux (CUDA 11.8)</b></summary>
 
 ```bash
-git clone https://github.com/AI4Protein/VenusFactory.git
-cd VenusFactory
-```
-
-## 2️⃣ Create a Conda environment
-
-Ensure you have Anaconda or Miniconda installed. Then, create a new environment named `venus` with Python 3.12:
-
-```bash
-conda create -n venus python=3.12
-conda activate venus
-```
-
-## 3️⃣ Install Pytorch and PyG dependencies
-
-```bash
-# Install PyTorch
+git clone https://github.com/AI4Protein/VenusFactory.git && cd VenusFactory
+conda create -n venus python=3.12 && conda activate venus
 pip install torch==2.7.0 --index-url https://download.pytorch.org/whl/cu118
-
-# Install PyG dependencies
 pip install torch_geometric
 pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.7.0+cu118.html
-```
-
-## 4️⃣ Install remaining dependencies
-
-Install the remaining dependencies using `requirements.txt`:
-```bash
 pip install -r requirements.txt
 ```
+
 </details>
 
-<details><summary> Git start with Windows or Linux on CPU</summary>
-
-## 1️⃣ Clone the repository
-
-First, get the VenusFactory code:
+<details>
+<summary><b>💻 CPU Only</b></summary>
 
 ```bash
-git clone https://github.com/AI4Protein/VenusFactory.git
-cd VenusFactory
-```
-
-## 2️⃣ Create a Conda environment
-
-Ensure you have Anaconda or Miniconda installed. Then, create a new environment named `venus` with Python 3.12:
-
-```bash
-conda create -n venus python=3.12
-conda activate venus
-```
-
-## 3️⃣ Install Pytorch and PyG dependencies
-
-```bash
-# Install PyTorch
+git clone https://github.com/AI4Protein/VenusFactory.git && cd VenusFactory
+conda create -n venus python=3.12 && conda activate venus
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
-
-# Install PyG dependencies
 pip install torch_geometric
 pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.8.0+cpu.html
-```
-
-## 4️⃣ Install remaining dependencies
-
-Install the remaining dependencies using `requirements.txt`:
-```bash
 pip install -r requirements.txt
 ```
+
 </details>
 
-## 🚀 Quick Start with Venus Web UI
+**Verify:** `python -c "import torch; print(torch.__version__)"`
 
-### Start Venus Web UI
+---
 
-Get started quickly with our intuitive graphical interface powered by [Gradio](https://github.com/gradio-app/gradio):
+## 🚀 Usage
+
+### Web UI
 
 ```bash
-python ./src/webui.py
+python src/webui.py  # → http://localhost:7860
 ```
 
-This will launch the Venus Web UI where you can:
-- Configure and run fine-tuning experiments
-- Monitor training progress
-- Evaluate models
-- Visualize results
-
-### Using Each Tab
-
-We provide a detailed guide to help you navigate through each tab of the Venus Web UI.
+| Tab | Purpose | Features |
+|:----|:--------|:---------|
+| **Training** | Train custom models | Model selection • PEFT methods • Real-time monitoring • Wandb |
+| **Evaluation** | Benchmark testing | Load model • Select metrics • CSV export |
+| **Prediction** | Inference | Single/batch prediction • Result visualization |
+| **Agent** | Natural language | Multi-step automation • Tool orchestration |
+| **Quick Tools** | Rapid prediction | Mutation scoring • Function prediction |
+| **Advanced** | Deep analysis | Sequence/structure-based models |
+| **Download** | Data retrieval | AlphaFold • UniProt • RCSB • InterPro |
+| **Manual** | Documentation | Guides & tutorials |
 
 <details>
-<summary>1. Training Tab: Train your own protein language model</summary>
+<summary><b>Screenshots</b></summary>
 
-![Model_Dataset_Config](img/Train/Model_Dataset_Config.png)
+![Training](img/Train/Model_Dataset_Config.png)
+![Evaluation](img/Eval/Model_Dataset_Config.png)
+![Prediction](img/Predict/Predict_Tab.png)
 
-Select a protein language model from the dropdown menu. Upload your dataset or select from available datasets and choose metrics appropriate for your problem type.
-
-![Training_Parameters](img/Train/Training_Parameters.png)
-Choose a training method (Freeze, SES-Adapter, LoRA, QLoRA etc.) and configure training parameters (batch size, learning rate, etc.).
-
-![Preview_Command](img/Train/Preview_Command.png)
-![Training_Progress](img/Train/Training_Progress.png)
-![Best_Model](img/Train/Best_Model.png)
-![Monitor_Figs](img/Train/Monitor_Figs.png)
-Click "Start Training" and monitor progress in real-time.
-
-<p align="center">
-  <img src="img/Train/Metric_Results.png" width="60%" alt="Metric_Results">
-</p>
-
-Click "Download CSV" to download the test metrics results.
 </details>
 
-<details>
-<summary>2. Evaluation Tab: Evaluate your trained model within a benchmark</summary>
-
-![Model_Dataset_Config](img/Eval/Model_Dataset_Config.png)
-
-Load your trained model by specifying the model path. Select the same protein language model and model configs used during training. Select a test dataset and configure batch size. Choose evaluation metrics appropriate for your problem type. Finally, click "Start Evaluation" to view performance metrics.
-</details>
+### CLI & API
 
 <details>
-<summary>3. Prediction Tab: Use your trained model to predict samples</summary>
+<summary><b>Command Line Examples</b></summary>
 
-![Predict_Tab](img/Predict/Predict_Tab.png)
-
-Load your trained model by specifying the model path. Select the same protein language model and model configs used during training.
-
-For single sequence: Enter a protein sequence in the text box.
-
-For batch prediction: Upload a CSV file with sequences.
-
-![Batch](img/Predict/Batch.png)
-
-Click "Predict" to generate and view results.
-</details>
-
-<details>
-<summary>4. Download Tab: Collect data from different sources with high efficiency</summary>
-
-- **AlphaFold2 Structures**: Enter UniProt IDs to download protein structures
-- **UniProt**: Search for protein information using keywords or IDs
-- **InterPro**: Retrieve protein family and domain information
-- **RCSB PDB**: Download experimental protein structures
-</details>
-
-<details>
-<summary>5. Manual Tab: Detailed documentation and guides</summary>
-
-Select a language (English/Chinese).
-
-Navigate through the documentation using the table of contents and find step-by-step guides.
-</details>
-
-## 🧬 Code-line Usage
-
-For users who prefer command-line interface, we provide comprehensive script solutions for different scenarios.
-
-<details>
-<summary>Training Methods: Various fine-tuning approaches for different needs</summary>
-
-### Full Model Fine-tuning
 ```bash
-# Freeze-tuning: Train only specific layers while freezing others
-bash ./script/train/train_plm_vanilla.sh
+# Train model
+bash script/train/train_plm_lora.sh \
+  --model facebook/esm2_t33_650M_UR50D \
+  --dataset DeepSol --batch_size 32
+
+# Evaluate
+bash script/eval/eval.sh \
+  --model_path ckpt/DeepSol/best_model \
+  --test_dataset DeepSol
+
+# Download data
+bash script/tools/database/alphafold/download_alphafold_structure.sh
+bash script/tools/database/uniprot/download_uniprot_seq.sh
+
+# Generate structure sequences
+bash script/get_structure_seq/get_esm3_structure_seq.sh
 ```
-
-### Parameter-Efficient Fine-tuning (PEFT)
-```bash
-# SES-Adapter: Selective and Efficient adapter fine-tuning
-bash ./script/train/train_plm_ses-adapter.sh
-
-# AdaLoRA: Adaptive Low-Rank Adaptation
-bash ./script/train/train_plm_adalora.sh
-
-# QLoRA: Quantized Low-Rank Adaptation
-bash ./script/train/train_plm_qlora.sh
-
-# LoRA: Low-Rank Adaptation
-bash ./script/train/train_plm_lora.sh
-
-# DoRA: Double Low-Rank Adaptation
-bash ./script/train/train_plm_dora.sh
-
-# IA3: Infused Adapter by Inhibiting and Amplifying Inner Activations
-bash ./script/train/train_plm_ia3.sh
-```
-
-#### Training Method Comparison
-| Method | Memory Usage | Training Speed | Performance |
-|--------|--------------|----------------|-------------|
-| Freeze | Low | Fast | Good |
-| SES-Adapter | Medium | Medium | Better |
-| AdaLoRA | Low | Medium | Better |
-| QLoRA | Very Low | Slower | Good |
-| LoRA | Low | Fast | Good |
-| DoRA | Low | Medium | Better |
-| IA3 | Very Low | Fast | Good |
 
 </details>
 
 <details>
-<summary>Model Evaluation: Comprehensive evaluation tools</summary>
+<summary><b>REST API Examples</b></summary>
 
-### Basic Evaluation
 ```bash
-# Evaluate model performance on test sets
-bash ./script/eval/eval.sh
+# Start server
+python src/api_server.py  # → http://localhost:5000/docs
+
+# Mutation prediction
+curl -X POST http://localhost:5000/api/mutation/predict \
+  -H "Content-Type: application/json" \
+  -d '{"sequence": "MKTAYIA...", "mutations": ["A23V", "K45R"]}'
+
+# Function prediction
+curl -X POST http://localhost:5000/api/predict/function \
+  -H "Content-Type: application/json" \
+  -d '{"sequence": "MKTAYIA...", "tasks": ["solubility", "stability"]}'
+
+# Database search
+curl http://localhost:5000/api/database/uniprot/search?query=lysozyme&limit=10
 ```
-
-### Available Metrics
-- Classification: accuracy, precision, recall, F1, MCC, AUC
-- Regression: MSE, Spearman correlation
-- Multi-label: F1-max
-
-### Visualization Tools
-- Training curves
-- Confusion matrices
-- ROC curves
-- Performance comparison plots
 
 </details>
 
 <details>
-<summary>Structure Sequence Tools: Process protein structure information</summary>
+<summary><b>Python API</b></summary>
 
-### ESM Structure Sequence
-```bash
-# Generate structure sequences using ESM-3
-bash ./script/get_get_structure_seq/get_esm3_structure_seq.sh
-```
+```python
+from src.tools.mutation import predict_mutation_effects
+from src.tools.predict import predict_protein_function
+from src.tools.database import download_alphafold_structure
 
-### Secondary Structure
-```bash
-# Predict protein secondary structure
-bash ./script/get_get_structure_seq/get_secondary_structure_seq.sh
-```
+# Mutations
+results = predict_mutation_effects(
+    sequence="MKTAYIAKQR...",
+    mutations=["A5V", "K9R"],
+    model="esm2"
+)
 
-Features:
-- Support for multiple sequence formats
-- Batch processing capability
-- Integration with popular structure prediction tools
+# Function
+predictions = predict_protein_function(
+    sequence="MKTAYIA...",
+    tasks=["solubility", "stability"]
+)
 
-</details>
-
-<details>
-<summary>Data Collection Tools: Multi-source protein data acquisition</summary>
-
-### Format Conversion
-```bash
-# Convert CIF format to PDB
-bash ./script/tools/file/convert/maxit.sh
-```
-
-### Metadata Collection
-```bash
-# Download metadata from RCSB PDB
-bash ./script/tools/search/database/rcsb/download_rcsb_meta.sh
-```
-
-### Sequence Data
-```bash
-# Download protein sequences from UniProt
-bash ./script/tools/search/database/uniprot/download_uniprot_seq.sh
-```
-
-### Structure Data
-```bash
-# Download from AlphaFold2 Database
-bash ./script/tools/search/database/alphafold/download_alphafold_structure.sh
-
-# Download from RCSB PDB
-bash ./script/tools/search/database/rcsb/download_rcsb_structure.sh
-```
-
-Features:
-- Automated batch downloading
-- Resume interrupted downloads
-- Data integrity verification
-- Multiple source support
-- Customizable search criteria
-
-#### Supported Databases
-| Database | Data Type | Access Method | Rate Limit |
-|----------|-----------|---------------|------------|
-| AlphaFold2 | Structures | REST API | Yes |
-| RCSB PDB | Structures | FTP/HTTP | No |
-| UniProt | Sequences | REST API | Yes |
-| InterPro | Domains | REST API | Yes |
-
-</details>
-
-<details>
-<summary>Usage Examples: Common scenarios and solutions</summary>
-
-### Training Example
-```bash
-# Train a protein solubility predictor using ESM2
-bash ./script/train/train_plm_lora.sh \
-    --model "facebook/esm2_t33_650M_UR50D" \
-    --dataset "DeepSol" \
-    --batch_size 32 \
-    --learning_rate 1e-4
-```
-
-### Evaluation Example
-```bash
-# Evaluate the trained model
-bash ./script/eval/eval.sh \
-    --model_path "path/to/your/model" \
-    --test_dataset "DeepSol_test"
-```
-
-### Data Collection Example
-```bash
-# Download structures for a list of UniProt IDs
-bash ./script/tools/search/database/alphafold/download_alphafold_structure.sh
+# Data
+pdb_file = download_alphafold_structure("P12345")
 ```
 
 </details>
 
-> 💡 All scripts support additional command-line arguments for customization. Use `--help` with any script to see available options.
+---
+
+## 📊 Training Methods
+
+| Method | Memory | Speed | Performance | Best For |
+|:-------|:------:|:-----:|:-----------:|:---------|
+| **LoRA** | Low | Fast | Good | General tasks |
+| **QLoRA** | Very Low | Slow | Good | Limited GPU |
+| **DoRA** | Low | Medium | Better | Improved LoRA |
+| **AdaLoRA** | Low | Medium | Better | Adaptive rank |
+| **SES-Adapter** | Medium | Medium | Better | Selective tuning |
+| **IA3** | Very Low | Fast | Good | Lightweight |
+| **Freeze** | Low | Fast | Good | Simple tuning |
+
+---
 
 ## 🙌 Citation
-
-Please cite our work if you have used our code or data.
 
 ```bibtex
 @inproceedings{tan2025venusfactory,
@@ -825,6 +450,20 @@ Please cite our work if you have used our code or data.
 }
 ```
 
+---
+
 ## 🎊 Acknowledgement
 
-Thanks the support of [Liang's Lab](https://ins.sjtu.edu.cn/people/lhong/index.html).
+Developed by [Liang's Lab](https://ins.sjtu.edu.cn/people/lhong/index.html) at Shanghai Jiao Tong University.
+
+**Resources:** [Docs](https://venusfactory.readthedocs.io/) • [YouTube](https://www.youtube.com/watch?v=MT6lPH5kgCc&ab_channel=BxinZhou) • [Playground](https://venusfactory.cn/playground/) • [Issues](https://github.com/AI4Protein/VenusFactory/issues)
+
+---
+
+<div align="center">
+
+**Made with ❤️ for the protein engineering community**
+
+[⭐ Star](https://github.com/AI4Protein/VenusFactory) • [🐛 Report Bug](https://github.com/AI4Protein/VenusFactory/issues) • [💡 Request Feature](https://github.com/AI4Protein/VenusFactory/issues)
+
+</div>
