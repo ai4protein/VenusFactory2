@@ -2,7 +2,9 @@
 
 ## 1. Introduction
 
-The VenusFactory Training Module is a powerful tool that allows you to train custom models using protein sequence data. These models can predict various protein properties such as subcellular localization, function, stability, and more. The training module provides an intuitive interface that enables biological researchers to train high-performance protein prediction models without programming knowledge.
+The Training Module helps you build custom prediction models for your specific protein analysis needs. Whether you want to predict protein solubility, localization, or any other property, this module guides you through the entire training process - from uploading your dataset to evaluating the final model.
+
+**You don't need to be a machine learning expert** - the interface walks you through each step with clear options and explanations. Simply prepare your protein sequences with labels, select a model type, and start training.
 
 ## 2. Supported Protein Language Models
 

@@ -2,7 +2,15 @@
 
 ## 1. Introduction
 
-Quick Tools is designed for users who need fast, efficient, and straightforward analysis without extensive configuration. It provides a no-code entry point to 4 key prediction tasks:
+Quick Tools is designed for fast, no-setup protein analysis. If you have a sequence and want quick predictions without configuring models or parameters, Quick Tools is your starting point.
+
+**Choose Quick Tools when you**:
+- Want results fast without learning complex settings
+- Need standard predictions (mutations, function, binding sites, properties)
+- Are exploring a new protein for the first time
+- Don't need to customize which models to use
+
+Quick Tools offers 4 ready-to-use analysis types:
 
 Directed Evolution: AI-Powered Mutation Prediction This tool allows for the rapid scoring and analysis of protein mutations. Simply upload a PDB file or paste the PDB content, and the platform will provide insights into the effects of single or multiple mutations on the protein.
 

@@ -2,7 +2,12 @@
 
 ### 1. Introduction
 
-**Report** is a comprehensive advanced analysis tool provided by the VenusFactory platform. It is designed to perform up to four key prediction and analysis tasks on a single protein sequence via **one-click operation**, integrating all results into a clear, comprehensive **"Comprehensive Protein Analysis Report"**. This tool significantly simplifies the user workflow, offering full insights from mutation optimization to physicochemical properties, making it the premier entry point for protein engineering and basic research.
+**Report** is a one-click analysis tool that gives you a complete overview of your protein in a single comprehensive report. Instead of running four separate analyses manually, Report automatically performs mutation prediction, function prediction, residue analysis, and physicochemical property calculations - then combines everything into one easy-to-read document with experimental recommendations.
+
+**When to use Report**:
+- You're starting to work with a new protein and want to understand it quickly
+- You need a comprehensive analysis without learning multiple tools
+- You want mutation suggestions along with functional insights in one place
 
 ---
 

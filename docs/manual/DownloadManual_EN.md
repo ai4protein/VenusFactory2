@@ -1,5 +1,13 @@
 # VenusFactory Download Tab User Guide
 
+The Download module helps you quickly retrieve protein data from major biological databases. Instead of visiting multiple database websites and downloading files one by one, use this tool to batch download sequences, structures, and metadata directly.
+
+**Common use cases**:
+- Download protein sequences from UniProt for a list of IDs
+- Get 3D structures from PDB or AlphaFold for your proteins
+- Retrieve domain information from InterPro
+- Batch download hundreds of files at once instead of clicking manually
+
 ## InterPro Metadata
 **Description**: Downloads protein domain information from InterPro database.
 

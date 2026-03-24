@@ -2,7 +2,15 @@
 
 ## 1\. Introduction to Advanced Tools
 
-**Advanced Tools** is a platform feature designed for users seeking high flexibility and customized prediction capabilities. Its core value lies in allowing users to **freely select the underlying Protein Language Model (PLM) and prediction datasets**, thus enabling precise control and optimization of the prediction process, moving beyond the preset configurations of Quick Tools.
+**Advanced Tools** gives you more control over your protein predictions. While Quick Tools uses pre-selected models for speed, Advanced Tools lets you choose exactly which models to use and compare results from different approaches.
+
+**Use Advanced Tools when you**:
+- Want to compare predictions from different models (ESM2, ProtBert, ProtT5, etc.)
+- Need structure-based analysis in addition to sequence-based
+- Are optimizing for a specific use case and want to test different model configurations
+- Want to validate results by cross-checking multiple datasets
+
+The tradeoff: more flexibility means more choices to make, but you get more customized and potentially more accurate results.
 
 ### 1.1 Directed Evolution
 
