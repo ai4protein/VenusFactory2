@@ -52,6 +52,8 @@
 | Natural language → Multi-step automation | Web UI / REST API / CLI | Upload → Predict in seconds |
 | 40+ models + 11 databases | Same power, different styles | Or train custom models in minutes |
 
+> **📖 Easy to Learn**: Designed for life science professionals with no programming background required. Intuitive Web UI, comprehensive bilingual documentation, rich examples and video tutorials help you quickly grow from beginner to protein AI expert.
+
 ### 💡 Capabilities at a Glance
 
 | Task | Solution | Time |
@@ -182,7 +184,9 @@ Agent: ✓ Searching RCSB... → Found 47 structures
 <summary><b>📚 Integrated Resources</b></summary>
 
 **Models (40+):** ESM, ProtBert, ProtT5, Venus/PETA/ProSST series
+
 **Databases (11+):** AlphaFold • RCSB PDB • UniProt • NCBI • KEGG • STRING • BRENDA • ChEMBL • HPA • FDA • Foldseek
+
 **Datasets (30+):** Function • Localization • Stability • Solubility • Mutation fitness
 
 </details>
