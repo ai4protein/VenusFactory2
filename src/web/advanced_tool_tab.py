@@ -23,7 +23,7 @@ from web.utils.llm_helpers import *
 from web.utils.data_processors import *
 from web.utils.visualization import *
 from web.utils.prediction_runners import *
-from src.tools.discovery.venusmine import *
+from tools.discovery.venusmine import *
 from web.utils.label_mappers import map_labels
 from web.utils.html_ui import load_html_template
 from web.utils.ui_helpers import (
@@ -449,12 +449,12 @@ def handle_protein_function_prediction_chat(
 
 
 def handle_protein_function_prediction_advance(
-    task: str, 
-    fasta_file: Any, 
-    enable_ai: bool, 
-    llm_model: str, 
-    user_api_key: Optional[str] = None, 
-    model_name: Optional[str] = None, 
+    task: str,
+    fasta_file: Any,
+    enable_ai: bool,
+    llm_model: str,
+    user_api_key: Optional[str] = None,
+    model_name: Optional[str] = None,
     datasets: Optional[List[str]] = None,
     progress=gr.Progress()
     ) -> Generator:
@@ -465,24 +465,26 @@ def handle_protein_function_prediction_advance(
         pass
     """Handle protein function prediction workflow."""
     model = model_name if model_name else "ESM2-650M"
+
+    # Built-in model logic
     if datasets is not None and len(datasets) > 0:
         final_datasets = datasets
     else:
         final_datasets = DATASET_MAPPING_FUNCTION.get(task, [])
     if not all([task, datasets, fasta_file]):
         yield (
-            "❌ Error: Task, Datasets, and FASTA file are required.", 
-            pd.DataFrame(), None, gr.update(visible=False), 
+            "❌ Error: Task, Datasets, and FASTA file are required.",
+            pd.DataFrame(), None, gr.update(visible=False),
             "Please provide all required inputs."
         )
         return
     progress(0.1, desc="Running prediction...")
     yield (
-        f"🚀 Starting predictions with {model}...", 
-        pd.DataFrame(), None, gr.update(visible=False), 
+        f"🚀 Starting predictions with {model}...",
+        pd.DataFrame(), None, gr.update(visible=False),
         "AI analysis will appear here..."
     )
-    
+
     all_results_list = []
 
     timestamp = str(int(time.time()))
@@ -490,11 +492,11 @@ def handle_protein_function_prediction_advance(
 
     for i, dataset in enumerate(final_datasets):
         yield (
-            f"⏳ Running prediction...", 
-            pd.DataFrame(), None, gr.update(visible=False), 
+            f"⏳ Running prediction...",
+            pd.DataFrame(), None, gr.update(visible=False),
             "AI analysis will appear here..."
         )
-        
+
         try:
             model_key = MODEL_MAPPING_FUNCTION.get(model)
             if not model_key:

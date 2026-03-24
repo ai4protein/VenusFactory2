@@ -63,7 +63,11 @@ class Trainer:
         
         # Setup loss function
         self.loss_fn = self._setup_loss_function()
-        
+
+        # Load initial model for transfer learning (before accelerator.prepare)
+        if hasattr(args, 'initial_model_path') and args.initial_model_path:
+            self.load_initial_model(args.initial_model_path)
+
         # Prepare for distributed training
         if self.args.training_method in ['full', 'plm-lora', 'plm-qlora', 'plm-dora', 'plm-adalora', 'plm-ia3']:
             self.model, self.plm_model, self.optimizer = self.accelerator.prepare(
@@ -419,6 +423,75 @@ class Trainer:
         else:
             model_state = {k: v.cpu() for k, v in self.model.state_dict().items()}
             torch.save(model_state, path)
+
+    def load_initial_model(self, model_path: str):
+        """
+        Load initial model weights for transfer learning.
+
+        This method loads a pre-trained model to start training from, enabling
+        transfer learning from an existing model to a new dataset or task.
+
+        Args:
+            model_path: Path to the pre-trained model checkpoint file
+        """
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(f"Initial model not found: {model_path}")
+
+        self.logger.info(f"Loading initial model from {model_path} for transfer learning")
+
+        try:
+            if self.args.training_method in ['full', 'lora']:
+                # Load both model and PLM weights
+                checkpoint = torch.load(model_path, map_location='cpu')
+                # Use strict=False to allow loading even if num_labels differs
+                self.model.load_state_dict(checkpoint['model_state_dict'], strict=False)
+                if 'plm_state_dict' in checkpoint:
+                    self.plm_model.load_state_dict(checkpoint['plm_state_dict'], strict=False)
+                self.logger.info("✓ Loaded model and PLM weights")
+
+            elif self.args.training_method in ['plm-lora', 'plm-qlora', 'plm-dora', 'plm-adalora', 'plm-ia3']:
+                # Load task head weights
+                checkpoint = torch.load(model_path, map_location='cpu')
+                self.model.load_state_dict(checkpoint, strict=False)
+
+                # Load LoRA adapter if exists
+                adapter_suffix_map = {
+                    'plm-lora': '_lora',
+                    'plm-qlora': '_qlora',
+                    'plm-dora': '_dora',
+                    'plm-adalora': '_adalora',
+                    'plm-ia3': '_ia3'
+                }
+                adapter_suffix = adapter_suffix_map.get(self.args.training_method, '_lora')
+                adapter_path = model_path.replace('.pt', adapter_suffix)
+
+                if os.path.exists(adapter_path):
+                    # Load adapter weights into the current PLM model
+                    self.plm_model = PeftModel.from_pretrained(
+                        self.plm_model,
+                        adapter_path,
+                        is_trainable=True  # Keep adapter trainable
+                    )
+                    self.logger.info(f"✓ Loaded LoRA adapter from {adapter_path}")
+                else:
+                    self.logger.warning(f"LoRA adapter not found at {adapter_path}, using only task head weights")
+
+            else:
+                # freeze, ses-adapter, etc. - only load task-specific model
+                checkpoint = torch.load(model_path, map_location='cpu')
+                self.model.load_state_dict(checkpoint, strict=False)
+                self.logger.info("✓ Loaded task model weights")
+
+            # Note: PLM freeze status is determined by training_method, not an additional parameter
+            # - 'freeze', 'ses-adapter': PLM not in optimizer, naturally frozen
+            # - 'full': PLM in optimizer, trainable
+            # - LoRA series: PLM base frozen, only adapter trainable
+
+            self.logger.info("✓ Initial model loaded successfully for continue training")
+
+        except Exception as e:
+            self.logger.error(f"Failed to load initial model: {str(e)}")
+            raise RuntimeError(f"Error loading initial model from {model_path}: {str(e)}")
 
     def _load_best_model(self):
         path = os.path.join(self.args.output_dir, self.args.output_model_name)

@@ -112,6 +112,17 @@ def add_training_args(parser: argparse.ArgumentParser):
     )
     train_group.add_argument('--structure_seq', type=str, default='')
 
+    # Transfer Learning / Continue Training parameters
+    transfer_group = parser.add_argument_group('Transfer Learning')
+    transfer_group.add_argument(
+        '--initial_model_path',
+        type=str,
+        default=None,
+        help='Path to pre-trained model checkpoint to start training from (e.g., ckpt/demo/best_model.pt). '
+             'Enables continue training from an existing model on new dataset. '
+             'The training_method will be loaded from the model config and cannot be changed.'
+    )
+
 def add_output_args(parser: argparse.ArgumentParser):
     """Add output-related arguments."""
     output_group = parser.add_argument_group('Output Configuration')

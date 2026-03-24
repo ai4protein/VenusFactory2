@@ -2,6 +2,7 @@ import os
 import json
 import gradio as gr
 import time
+from pathlib import Path
 from datasets import load_dataset
 from typing import Any, Dict, Generator, List
 from dataclasses import dataclass
@@ -159,25 +160,76 @@ class TrainingArgs:
 def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     # Create training monitor
     monitor = TrainingMonitor()
-    
+
     # Add missing variable declarations
     is_training = False
     current_process = None
     stop_thread = False
     process_aborted = False
-    
+
     plm_models = constant["plm_models"]
     dataset_configs = constant["dataset_configs"]
-    
+
+    # Create reverse mapping: full_path -> display_name
+    plm_models_reverse = {v: k for k, v in plm_models.items()}
+
+    # Helper functions for transfer learning model selection
+    def scan_folders_under(root: str, max_depth: int = 5) -> list:
+        """Scan for subdirectories under root."""
+        if not root or not os.path.isdir(root):
+            return []
+        result = []
+        root_path = Path(root)
+        for path in sorted(root_path.rglob("*")):
+            if not path.is_dir():
+                continue
+            try:
+                rel = path.relative_to(root_path)
+            except ValueError:
+                continue
+            if not rel.parts or len(rel.parts) > max_depth:
+                continue
+            path_str = str(path)
+            result.append((path_str, path_str))
+        return result
+
+    def scan_models_in_folder(folder_path: str) -> list:
+        """Scan folder for .pt model files."""
+        if not folder_path or not os.path.isdir(folder_path):
+            return []
+        result = []
+        folder = Path(folder_path)
+        for pt_file in sorted(folder.rglob("*.pt")):
+            name = pt_file.stem
+            # Skip LoRA auxiliary files
+            if any(s in name for s in ("_lora", "_qlora", "_dora", "_adalora", "_ia3")):
+                continue
+            result.append((str(pt_file.relative_to(folder)), str(pt_file)))
+        return result
+
+    def load_model_config(model_path: str) -> dict:
+        """Load config from model's .json file."""
+        if not model_path:
+            return {}
+        model_path = Path(model_path)
+        config_path = model_path.parent / f"{model_path.stem}.json"
+        if config_path.exists():
+            try:
+                with open(config_path, 'r') as f:
+                    return json.load(f)
+            except Exception:
+                return {}
+        return {}
+
     # Model and Dataset Selection
     gr.Markdown("## Model and Dataset Configuration")
 
-    with gr.Accordion("Import Training Configuration", open=False) as config_import_accordion:
+    with gr.Accordion("📥 Import Training Configuration", open=False) as config_import_accordion:
         with gr.Row():
             with gr.Column(scale=4):
                 config_path_input = gr.Textbox(
                     label="Configuration File Path",
-                    placeholder="Enter path to your training config JSON file (e.g., ./config.json)",
+                    placeholder="e.g., ./config.json",
                     value=""
                 )
             with gr.Column(scale=1):
@@ -187,26 +239,63 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                     elem_classes=["import-config-btn"]
                 )
 
-    # Original training interface components
+    # Scan available model folders for Continue Training
+    _folder_choices = [(base, base) for base in ("ckpt",) if os.path.isdir(base)] + scan_folders_under("ckpt")
+
+    # Main training interface
     with gr.Group():
+        # Training Mode and Model Selection
+        with gr.Row():
+            training_mode = gr.Radio(
+                choices=["From Scratch", "Continue Training"],
+                label="Training Mode",
+                value="From Scratch",
+                scale=1
+            )
+
+            plm_model = gr.Dropdown(
+                choices=list(plm_models.keys()),
+                label="Protein Language Model",
+                value=list(plm_models.keys())[0],
+                visible=True,
+                scale=2
+            )
+
+            transfer_model_folder = gr.Dropdown(
+                label="Model Folder Path",
+                choices=_folder_choices,
+                value=None,
+                allow_custom_value=False,
+                visible=False,
+                scale=1
+            )
+            transfer_model_dropdown = gr.Dropdown(
+                label="Model Name",
+                choices=[],
+                value=None,
+                allow_custom_value=False,
+                visible=False,
+                scale=1
+            )
+
+        # Model Info Display (visible when Continue Training)
+        with gr.Accordion("📊 Model Info", open=False, visible=False) as transfer_settings_row:
+            model_info_display = gr.JSON(
+                label="Configuration",
+                value={}
+            )
+
+        # Dataset Selection
         with gr.Row():
             with gr.Column(scale=4):
                 with gr.Row():
-                    plm_model = gr.Dropdown(
-                        choices=list(plm_models.keys()),
-                        label="Protein Language Model",
-                        value=list(plm_models.keys())[0],
-                        scale=2
-                    )
-                
-                    # add dataset selection method
                     is_custom_dataset = gr.Radio(
                         choices=["Custom", "Pre-defined"],
-                        label="Dataset Selection",
+                        label="Dataset",
                         value="Pre-defined",
-                        scale=3
+                        scale=1
                     )
-            
+
                     dataset_config = gr.Dropdown(
                         choices=list(dataset_configs.keys()),
                         label="Dataset Configuration",
@@ -214,24 +303,24 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         visible=True,
                         scale=2
                     )
-                    
+
                     dataset_custom = gr.Textbox(
-                        label="Dataset Path (Local Path or Huggingface path)",
-                        placeholder="Huggingface Dataset eg: user/dataset",
+                        label="Dataset Path",
+                        placeholder="Local path or Huggingface dataset",
                         visible=False,
                         scale=2
                     )
-            
-            # add preview button in a separate column and add style
-            with gr.Column(scale=1, elem_classes="preview-button-container"):
+
+            with gr.Column(scale=1, min_width=120, elem_classes="preview-button-container"):
                 dataset_preview_button = gr.Button(
-                    "Preview Dataset", 
-                    variant="primary", 
-                    elem_classes="preview-button"
+                    "Preview Dataset",
+                    variant="primary",
+                    size="lg",
+                    elem_classes=["preview-button"]
                 )
-            
-        # add extra configuration options for custom dataset (hidden when Pre-defined)
-        with gr.Group(visible=False) as custom_dataset_settings:
+
+    # Dataset configuration details (always visible, collapsed by default for Pre-defined)
+    with gr.Accordion("⚙️ Dataset Configuration Details", open=False) as custom_dataset_settings:
             with gr.Row():
                 problem_type = gr.Dropdown(
                     choices=["single_label_classification", "multi_label_classification", "regression", "residue_single_label_classification", "residue_regression"],
@@ -287,59 +376,58 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                     interactive=False
                 )
 
-        with gr.Row():
-                structure_seq = gr.Dropdown(
-                    label="Structure Sequence", 
-                    choices=["foldseek_seq", "ss8_seq"],
-                    value=["foldseek_seq", "ss8_seq"],
-                    multiselect=True,
-                    visible=False
-                )
-        with gr.Row(visible=False) as pdb_dir_row:
-                pdb_dir = gr.Textbox(
-                    label="PDB Directory",
-                    placeholder="Path to PDB files (for ProSST, SaProt, ProtSSN, ses-adapter when dataset lacks structure)",
-                    value="",
-                    scale=3
-                )
+    with gr.Row():
+        structure_seq = gr.Dropdown(
+            label="Structure Sequence",
+            choices=["foldseek_seq", "ss8_seq"],
+            value=["foldseek_seq", "ss8_seq"],
+            multiselect=True,
+            visible=False
+        )
 
-        # ! add for plm-lora, plm-qlora, plm_adalora, plm_dora, plm_ia3
-        with gr.Row(visible=False) as lora_params_row:
-            # gr.Markdown("#### LoRA Parameters")
-            with gr.Column():
-                lora_r = gr.Number(
-                    value=8,
-                    label="LoRA Rank",
-                    precision=0,
-                    minimum=1,
-                    maximum=128,
-                )
-            with gr.Column():
-                lora_alpha = gr.Number(
-                    value=32,
-                    label="LoRA Alpha",
-                    precision=0,
-                    minimum=1,
-                    maximum=128
-                )
-            with gr.Column():
-                lora_dropout = gr.Number(
-                    value=0.1,
-                    label="LoRA Dropout",
-                    minimum=0.0,
-                    maximum=1.0
-                )
-            with gr.Column():
-                lora_target_modules = gr.Textbox(
-                    value="query,key,value",
-                    label="LoRA Target Modules",
-                    placeholder="Comma-separated list of target modules",
-                    # info="LoRA will be applied to these modules"
-                )
+    with gr.Row(visible=False) as pdb_dir_row:
+        pdb_dir = gr.Textbox(
+            label="PDB Directory",
+            placeholder="Path to PDB files (for ProSST, SaProt, ProtSSN, ses-adapter when dataset lacks structure)",
+            value="",
+            scale=3
+        )
+
+    # LoRA parameters (shown when using LoRA-based training methods)
+    with gr.Row(visible=False) as lora_params_row:
+        with gr.Column():
+            lora_r = gr.Number(
+                value=8,
+                label="LoRA Rank",
+                precision=0,
+                minimum=1,
+                maximum=128,
+            )
+        with gr.Column():
+            lora_alpha = gr.Number(
+                value=32,
+                label="LoRA Alpha",
+                precision=0,
+                minimum=1,
+                maximum=128
+            )
+        with gr.Column():
+            lora_dropout = gr.Number(
+                value=0.1,
+                label="LoRA Dropout",
+                minimum=0.0,
+                maximum=1.0
+            )
+        with gr.Column():
+            lora_target_modules = gr.Textbox(
+                value="query,key,value",
+                label="LoRA Target Modules",
+                placeholder="Comma-separated list of target modules",
+            )
 
     # put data statistics and table into accordion panel
     with gr.Row():
-        with gr.Accordion("Dataset Preview", open=False) as preview_accordion:
+        with gr.Accordion("🔍 Dataset Preview", open=False) as preview_accordion:
             # data statistics area
             with gr.Row():
                 dataset_stats_md = gr.HTML("", elem_classes=["dataset-stats"], padding=True)
@@ -815,9 +903,11 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         # return updated components
         return status_html, best_info, test_html_update, loss_fig, metrics_fig, download_btn_update
 
-    def handle_train(*args) -> Generator:
+    # DEPRECATED: This old handle_train function is shadowed by the new one with explicit parameters (line ~1439)
+    # Kept for reference only - not executed
+    def handle_train_old(*args) -> Generator:
         nonlocal is_training, current_process, stop_thread, process_aborted, monitor
-        
+
         # If already training, return
         if is_training:
             yield None, None, None, None, None, None, None
@@ -875,7 +965,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         initial_status_html = load_html_template("status_initializing.html")
         
         # First yield to update UI with "initializing" state
-        yield initial_stats, initial_status_html, "Best Model: None", gr.update(value="", visible=False), None, None, gr.update(visible=False)
+        yield initial_stats, initial_status_html, "Best Model: None", gr.update(value="", visible=False), None, None, gr.update(visible=False), gr.update(visible=False), gr.update(value=""), gr.update(value="Custom"), gr.update(value=""), gr.update(value={}), gr.update(value="")
         
         try:
             # Parse training arguments
@@ -892,19 +982,19 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
             
             # Update status to "Preparing dataset"
             preparing_status_html = load_html_template("status_preparing.html")
-            yield initial_stats, preparing_status_html, "Best Model: None", gr.update(value="", visible=False), None, None, gr.update(visible=False)
-            
+            yield initial_stats, preparing_status_html, "Best Model: None", gr.update(value="", visible=False), None, None, gr.update(visible=False), gr.update(visible=False), gr.update(value=""), gr.update(value="Custom"), gr.update(value=""), gr.update(value={}), gr.update(value="")
+
             # Save arguments to file
             save_arguments(args_dict, args_dict.get('output_dir', 'ckpt'))
-            
+
             # Start training
             is_training = True
             process_aborted = False  # Reset abort flag
             monitor.start_training(args_dict)
             current_process = monitor.process  # Store the process reference
-            
+
             starting_status_html = load_html_template("status_starting.html")
-            yield initial_stats, starting_status_html, "Best Model: None", gr.update(value="", visible=False), None, None, gr.update(visible=False)
+            yield initial_stats, starting_status_html, "Best Model: None", gr.update(value="", visible=False), None, None, gr.update(visible=False), gr.update(visible=False), gr.update(value=""), gr.update(value="Custom"), gr.update(value=""), gr.update(value={}), gr.update(value="")
 
             # Add delay to ensure enough time for parsing initial statistics
             for i in range(3):
@@ -957,7 +1047,13 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                                 gr.update(value="", visible=False),
                                 None,
                                 None,
-                                gr.update(visible=False)
+                                gr.update(visible=False),
+                                gr.update(visible=False),
+                                gr.update(value=""),
+                                gr.update(value="Custom"),
+                                gr.update(value=""),
+                                gr.update(value={}),
+                                gr.update(value="")
                             )
                             return
                         else:
@@ -973,9 +1069,10 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         model_stats = initial_stats
                     
                     status_html, best_info, test_html_update, loss_fig, metrics_fig, download_btn_update = update_progress(progress_info)
-                    
-                    yield model_stats, status_html, best_info, test_html_update, loss_fig, metrics_fig, download_btn_update
-                    
+
+                    # During training, keep registration panel hidden
+                    yield model_stats, status_html, best_info, test_html_update, loss_fig, metrics_fig, download_btn_update, gr.update(visible=False), gr.update(value=""), gr.update(value="Custom"), gr.update(value=""), gr.update(value={}), gr.update(value="")
+
                 except Exception as e:
                     # Get complete output log
                     error_output = "\n".join(progress_info.get("lines", []))
@@ -985,7 +1082,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                     error_status_html = load_html_template("status_error.html", error_title="Error during training", error_message=str(e))
                     print(f"Error updating UI: {str(e)}")
                     traceback.print_exc()
-                    yield initial_stats, error_status_html, "Training error", gr.update(value="", visible=False), None, None, gr.update(visible=False)
+                    yield initial_stats, error_status_html, "Training error", gr.update(value="", visible=False), None, None, gr.update(visible=False), gr.update(visible=False), gr.update(value=""), gr.update(value="Custom"), gr.update(value=""), gr.update(value={}), gr.update(value="")
                     return
             
             # Check if aborted
@@ -993,7 +1090,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 is_training = False
                 current_process = None
                 aborted_status_html = load_html_template("status_aborted.html")
-                yield initial_stats, aborted_status_html, "Training aborted", gr.update(value="", visible=False), None, None, gr.update(visible=False)
+                yield initial_stats, aborted_status_html, "Training aborted", gr.update(value="", visible=False), None, None, gr.update(visible=False), gr.update(visible=False), gr.update(value=""), gr.update(value="Custom"), gr.update(value=""), gr.update(value={}), gr.update(value="")
                 return
             
             # Final update after training ends (only for normal completion)
@@ -1170,7 +1267,8 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         output_model_name, output_dir, wandb_logging, wandb_project, wandb_entity,
         patience, num_workers, max_grad_norm, structure_seq, pdb_dir,
         lora_r, lora_alpha, lora_dropout, lora_target_modules, monitored_metrics, monitored_strategy,
-        sequence_column_name, label_column_name
+        sequence_column_name, label_column_name,
+        training_mode, transfer_model_path
     ):
         """Handle the preview command button click event
         Args:
@@ -1310,9 +1408,9 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         
         empty_progress_status = load_html_template("status_empty.html")
         
-        # Return exactly 7 values matching the 7 output components
+        # Return exactly 13 values matching the 13 output components
         return (
-            empty_model_stats, 
+            empty_model_stats,
             empty_progress_status,
             "Best Model: None",
             gr.update(value="", visible=False),
@@ -1327,8 +1425,9 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         learning_rate, num_epochs, max_seq_len, gradient_accumulation_steps, warmup_steps, scheduler_type,
         output_model_name, output_dir, wandb_logging, wandb_project, wandb_entity,
         patience, num_workers, max_grad_norm, structure_seq, pdb_dir,
-        lora_r, lora_alpha, lora_dropout, lora_target_modules, 
-        monitored_metrics, monitored_strategy, sequence_column_name, label_column_name
+        lora_r, lora_alpha, lora_dropout, lora_target_modules,
+        monitored_metrics, monitored_strategy, sequence_column_name, label_column_name,
+        training_mode, transfer_model_path
     ) -> Generator:
         """Handle the train command button click event
         Args:
@@ -1431,7 +1530,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         initial_status_html = load_html_template("status_initializing.html")
         
         # First yield to update UI with "initializing" state
-        yield initial_stats, initial_status_html, "Best Model: None", gr.update(value="", visible=False), None, None, gr.update(visible=False)
+        yield initial_stats, initial_status_html, "Best Model: None", gr.update(value="", visible=False), None, None, gr.update(visible=False), gr.update(visible=False), gr.update(value=""), gr.update(value="Custom"), gr.update(value=""), gr.update(value={}), gr.update(value="")
         
         try:
             # Create args dictionary directly from named parameters
@@ -1473,34 +1572,53 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 "sequence_column_name": sequence_column_name,
                 "label_column_name": label_column_name,
             }
-            
+
             # Parse training arguments
             training_args = TrainingArgs(args_dict, plm_models, dataset_configs)
-            
+
             if training_args.training_method != "ses-adapter":
                 training_args.structure_seq = None
-            
+
             args_dict = training_args.to_dict()
-            
+
+            # Add transfer learning parameters AFTER to_dict() to ensure they are not lost
+            if training_mode == "Continue Training" and transfer_model_path:
+                # Load model config to check problem_type compatibility
+                model_config = load_model_config(transfer_model_path)
+                if model_config:
+                    model_problem_type = model_config.get("problem_type", "")
+                    dataset_problem_type = args_dict.get("problem_type", "")
+
+                    if model_problem_type and dataset_problem_type and model_problem_type != dataset_problem_type:
+                        error_msg = f"❌ Problem Type Mismatch!\n\nModel was trained with: {model_problem_type}\nNew dataset has: {dataset_problem_type}\n\nContinue training requires the same problem type."
+                        error_status_html = load_html_template("status_error.html",
+                                                               error_title="Problem Type Mismatch",
+                                                               error_message=error_msg,
+                                                               error_details="Please select a dataset with the same problem type as the model.")
+                        yield initial_stats, error_status_html, "Training failed", gr.update(value="", visible=False), None, None, gr.update(visible=False), gr.update(visible=False), gr.update(value=""), gr.update(value="Custom"), gr.update(value=""), gr.update(value={}), gr.update(value="")
+                        return
+
+                args_dict["initial_model_path"] = transfer_model_path
+
             # Save total epochs to monitor for use in progress_info
             total_epochs = args_dict.get('num_epochs', 100)
             monitor.current_progress['total_epochs'] = total_epochs
             
             # Update status to "Preparing dataset"
             preparing_status_html = load_html_template("status_preparing.html")
-            yield initial_stats, preparing_status_html, "Best Model: None", gr.update(value="", visible=False), None, None, gr.update(visible=False)
-            
+            yield initial_stats, preparing_status_html, "Best Model: None", gr.update(value="", visible=False), None, None, gr.update(visible=False), gr.update(visible=False), gr.update(value=""), gr.update(value="Custom"), gr.update(value=""), gr.update(value={}), gr.update(value="")
+
             # Save arguments to file
             save_arguments(args_dict, args_dict.get('output_dir', 'ckpt'))
-            
+
             # Start training
             is_training = True
             process_aborted = False  # Reset abort flag
             monitor.start_training(args_dict)
             current_process = monitor.process  # Store the process reference
-            
+
             starting_status_html = load_html_template("status_starting.html")
-            yield initial_stats, starting_status_html, "Best Model: None", gr.update(value="", visible=False), None, None, gr.update(visible=False)
+            yield initial_stats, starting_status_html, "Best Model: None", gr.update(value="", visible=False), None, None, gr.update(visible=False), gr.update(visible=False), gr.update(value=""), gr.update(value="Custom"), gr.update(value=""), gr.update(value={}), gr.update(value="")
 
             # Add delay to ensure enough time for parsing initial statistics
             for i in range(3):
@@ -1553,7 +1671,13 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                                 gr.update(value="", visible=False),
                                 None,
                                 None,
-                                gr.update(visible=False)
+                                gr.update(visible=False),
+                                gr.update(visible=False),
+                                gr.update(value=""),
+                                gr.update(value="Custom"),
+                                gr.update(value=""),
+                                gr.update(value={}),
+                                gr.update(value="")
                             )
                             return
                         else:
@@ -1569,9 +1693,10 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         model_stats = initial_stats
                     
                     status_html, best_info, test_html_update, loss_fig, metrics_fig, download_btn_update = update_progress(progress_info)
-                    
-                    yield model_stats, status_html, best_info, test_html_update, loss_fig, metrics_fig, download_btn_update
-                    
+
+                    # During training, keep registration panel hidden
+                    yield model_stats, status_html, best_info, test_html_update, loss_fig, metrics_fig, download_btn_update, gr.update(visible=False), gr.update(value=""), gr.update(value="Custom"), gr.update(value=""), gr.update(value={}), gr.update(value="")
+
                 except Exception as e:
                     # Get complete output log
                     error_output = "\n".join(progress_info.get("lines", []))
@@ -1581,7 +1706,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                     error_status_html = load_html_template("status_error.html", error_title="Error during training", error_message=str(e))
                     print(f"Error updating UI: {str(e)}")
                     traceback.print_exc()
-                    yield initial_stats, error_status_html, "Training error", gr.update(value="", visible=False), None, None, gr.update(visible=False)
+                    yield initial_stats, error_status_html, "Training error", gr.update(value="", visible=False), None, None, gr.update(visible=False), gr.update(visible=False), gr.update(value=""), gr.update(value="Custom"), gr.update(value=""), gr.update(value={}), gr.update(value="")
                     return
             
             # Check if aborted
@@ -1589,7 +1714,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 is_training = False
                 current_process = None
                 aborted_status_html = load_html_template("status_aborted.html")
-                yield initial_stats, aborted_status_html, "Training aborted", gr.update(value="", visible=False), None, None, gr.update(visible=False)
+                yield initial_stats, aborted_status_html, "Training aborted", gr.update(value="", visible=False), None, None, gr.update(visible=False), gr.update(visible=False), gr.update(value=""), gr.update(value="Custom"), gr.update(value=""), gr.update(value={}), gr.update(value="")
                 return
             
             # Final update after training ends (only for normal completion)
@@ -1606,16 +1731,19 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         model_stats = initial_stats
                     
                     status_html, best_info, test_html_update, loss_fig, metrics_fig, download_btn_update = update_progress(progress_info)
-                    
-                    yield model_stats, status_html, best_info, test_html_update, loss_fig, metrics_fig, download_btn_update
+
+                    # Training completed successfully
+                    yield (
+                        model_stats, status_html, best_info, test_html_update, loss_fig, metrics_fig, download_btn_update
+                    )
                 except Exception as e:
                     error_output = "\n".join(progress_info.get("lines", []))
                     if not error_output:
                         error_output = "No output captured from the training process"
-                    
+
                     error_status_html = load_html_template("status_error.html", error_title="Error in final update", error_message=str(e))
                     yield initial_stats, error_status_html, "Error in final update", gr.update(value="", visible=False), None, None, gr.update(visible=False)
-            
+
         except Exception as e:
             # Initialization error, may not have output log
             error_status_html = load_html_template("status_error.html", error_title="Training initialization failed", error_message=str(e))
@@ -1797,6 +1925,8 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         monitored_strategy,
         sequence_column_name,
         label_column_name,
+        training_mode,
+        transfer_model_dropdown,
     ]
     import_config_button.click(
         fn=handle_config_import,
@@ -1811,11 +1941,15 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     
     train_button.click(
         fn=reset_train_tab_UI,
-        outputs=[model_stats, progress_status, best_model_info, test_results_html, loss_plot, metrics_plot, download_csv_btn]
+        outputs=[
+            model_stats, progress_status, best_model_info, test_results_html, loss_plot, metrics_plot, download_csv_btn
+        ]
     ).then(
-        fn=handle_train, 
+        fn=handle_train,
         inputs=input_components,
-        outputs=[model_stats, progress_status, best_model_info, test_results_html, loss_plot, metrics_plot, download_csv_btn]
+        outputs=[
+            model_stats, progress_status, best_model_info, test_results_html, loss_plot, metrics_plot, download_csv_btn
+        ]
     )
 
     # bind abort button
@@ -1940,23 +2074,23 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         Returns:
         """
         if choice == "Pre-defined":
-            # load dataset config from dataset_config; hide Problem Type etc.
+            # Pre-defined: Accordion visible but collapsed, fields read-only
             result = {
                 dataset_config: gr.update(visible=True),
                 dataset_custom: gr.update(visible=False),
-                custom_dataset_settings: gr.update(visible=False)
+                custom_dataset_settings: gr.update(visible=True, open=False)  # Collapsed
             }
-            
+
             # if a specific dataset is selected, automatically load the config
             if dataset_name and dataset_name in dataset_configs:
                 with open(dataset_configs[dataset_name], 'r') as f:
                     config = json.load(f)
-                
+
                 # process metrics, convert string to list to fit multi-select components
                 metrics_value = config.get("metrics", "accuracy,mcc,f1,precision,recall,auroc")
                 if isinstance(metrics_value, str):
                     metrics_value = metrics_value.split(",")
-                
+
                 # process monitored_metrics, single select
                 monitored_metrics_value = config.get("monitor", "accuracy")
                 monitored_strategy_value = config.get("monitor_strategy", "max")
@@ -1971,14 +2105,14 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 })
             return result
         else:
-            # Custom dataset: show Problem Type etc. and make editable
+            # Custom dataset: Accordion visible and open, fields editable
             default_metrics = ["accuracy", "mcc", "f1", "precision", "recall", "auroc"]
             default_monitored_metrics = ["accuracy"]
             default_monitored_strategy = ["max"]
             return {
                 dataset_config: gr.update(visible=False),
                 dataset_custom: gr.update(visible=True),
-                custom_dataset_settings: gr.update(visible=True),
+                custom_dataset_settings: gr.update(visible=True, open=True),  # Expanded
                 problem_type: gr.update(value="single_label_classification", interactive=True),
                 num_labels: gr.update(value=2, interactive=True),
                 metrics: gr.update(value=default_metrics, interactive=True),
@@ -1995,6 +2129,210 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         outputs=[dataset_config, dataset_custom, custom_dataset_settings, problem_type, num_labels, metrics, monitored_metrics, monitored_strategy, sequence_column_name, label_column_name]
     )
 
+    # Transfer Learning UI handlers
+    def update_training_mode_ui(mode):
+        """Update UI based on training mode selection"""
+        is_continue = (mode == "Continue Training")
+        return {
+            plm_model: gr.update(visible=not is_continue),
+            transfer_model_folder: gr.update(visible=is_continue),
+            transfer_model_dropdown: gr.update(visible=is_continue),
+            transfer_settings_row: gr.update(visible=is_continue),
+        }
+
+    def on_transfer_folder_change(folder_path):
+        """Update model dropdown when folder changes"""
+        if not folder_path:
+            return gr.update(choices=[], value=None), {}
+
+        choices = scan_models_in_folder(folder_path)
+        if not choices:
+            return gr.update(choices=[], value=None), {}
+
+        # Auto-select first model and load its info
+        first_model_path = choices[0][1]
+        model_info = load_model_config(first_model_path)
+
+        return (
+            gr.update(choices=choices, value=first_model_path),
+            model_info
+        )
+
+    def on_transfer_model_change(model_path):
+        """Update model info and hyperparameters when model changes"""
+        if not model_path:
+            return [gr.update()] + [{}] + [gr.update()] * 15  # Return empty updates
+
+        config = load_model_config(model_path)
+        if not config:
+            return [gr.update()] + [{}] + [gr.update()] * 15
+
+        # Get PLM model from config (full path like "facebook/esm2_t30_150M_UR50D")
+        plm_model_full_path = config.get("plm_model", "facebook/esm2_t6_8M_UR50D")
+
+        # Reverse mapping: convert full path to display name (e.g., "ESM2-150M")
+        plm_model_value = plm_models_reverse.get(plm_model_full_path, "ESM2-8M")
+
+        # Determine batch mode based on config
+        has_batch_size = config.get("batch_size") is not None
+        has_batch_token = config.get("batch_token") is not None
+        batch_mode_value = "Batch Size Mode" if has_batch_size else "Batch Token Mode"
+
+        # Check if training method is LoRA-based
+        training_method_value = config.get("training_method", "freeze")
+        is_lora_method = training_method_value in ["plm-lora", "plm-qlora", "plm-adalora", "plm-dora", "plm-ia3"]
+
+        return [
+            gr.update(value=plm_model_value),  # plm_model (update value even though hidden)
+            config,  # model_info_display
+            gr.update(value=training_method_value, interactive=False),  # training_method (read-only)
+            gr.update(value=config.get("pooling_method", "mean"), interactive=False),  # pooling_method (read-only)
+            gr.update(value=config.get("learning_rate", 5e-4)),  # learning_rate
+            gr.update(value=config.get("num_epochs", 20)),  # num_epochs
+            gr.update(value=batch_mode_value),  # batch_mode
+            gr.update(value=config.get("batch_size", 8)),  # batch_size
+            gr.update(value=config.get("batch_token", 4096)),  # batch_token
+            gr.update(value=config.get("max_seq_len", -1)),  # max_seq_len
+            gr.update(value=config.get("gradient_accumulation_steps", 1)),  # gradient_accumulation_steps
+            gr.update(value=config.get("warmup_steps", 0)),  # warmup_steps
+            gr.update(value=config.get("scheduler", None)),  # scheduler_type
+            gr.update(value=config.get("lora_r", 8) if is_lora_method else 8),  # lora_r
+            gr.update(value=config.get("lora_alpha", 32) if is_lora_method else 32),  # lora_alpha
+            gr.update(value=config.get("lora_dropout", 0.1) if is_lora_method else 0.1),  # lora_dropout
+            gr.update(value=config.get("lora_target_modules", "query,key,value") if is_lora_method else "query,key,value"),  # lora_target_modules
+        ]
+
+    def browse_trained_models_old():
+        """[DEPRECATED] Browse trained models in ckpt directory"""
+        import os
+        from pathlib import Path
+
+        models = []
+        ckpt_root = Path("ckpt")
+
+        if ckpt_root.exists():
+            # Search for best_model.pt files
+            for model_file in ckpt_root.rglob("best_model.pt"):
+                try:
+                    # Get model directory info
+                    model_dir = model_file.parent
+                    relative_path = str(model_file.relative_to(Path.cwd()))
+
+                    # Try to read config if exists
+                    config_files = list(model_dir.glob("*.json"))
+                    model_name = model_dir.name
+
+                    if config_files:
+                        with open(config_files[0], 'r') as f:
+                            config = json.load(f)
+                            dataset_name = config.get('dataset', 'Unknown')
+                            model_name = f"{model_dir.name} ({dataset_name})"
+
+                    models.append({
+                        "name": model_name,
+                        "path": relative_path,
+                        "size_mb": round(model_file.stat().st_size / (1024*1024), 2),
+                        "modified": time.strftime("%Y-%m-%d %H:%M", time.localtime(model_file.stat().st_mtime))
+                    })
+                except Exception:
+                    continue
+
+        # Sort by modification time (newest first)
+        models.sort(key=lambda x: x.get("modified", ""), reverse=True)
+
+        if models:
+            # Return as formatted choices
+            return gr.update(
+                choices=[m["path"] for m in models],
+                value=models[0]["path"] if models else ""
+            )
+        else:
+            return gr.update(choices=[], value="")
+
+    def load_model_info(model_path):
+        """Load and display model information"""
+        if not model_path or not os.path.exists(model_path):
+            return gr.update(visible=False), {}
+
+        try:
+            import torch
+
+            # Try to load checkpoint info
+            checkpoint = torch.load(model_path, map_location='cpu')
+
+            info = {
+                "model_path": model_path,
+                "file_size_mb": round(os.path.getsize(model_path) / (1024*1024), 2)
+            }
+
+            # Try to load config from same directory
+            model_dir = Path(model_path).parent
+            config_files = list(model_dir.glob("*.json"))
+
+            if config_files:
+                with open(config_files[0], 'r') as f:
+                    config = json.load(f)
+                    info.update({
+                        "plm_model": config.get("plm_model", "Unknown"),
+                        "training_method": config.get("training_method", "Unknown"),
+                        "problem_type": config.get("problem_type", "Unknown"),
+                        "num_labels": config.get("num_labels", "Unknown"),
+                        "dataset": config.get("dataset", "Unknown")
+                    })
+
+            # Check for LoRA adapters
+            has_adapter = False
+            for suffix in ['_lora', '_qlora', '_dora', '_adalora', '_ia3']:
+                adapter_path = model_path.replace('.pt', suffix)
+                if os.path.exists(adapter_path):
+                    has_adapter = True
+                    info["adapter_path"] = adapter_path
+                    break
+
+            info["has_adapter"] = has_adapter
+
+            return gr.update(visible=True), info
+
+        except Exception as e:
+            return gr.update(visible=False), {"error": str(e)}
+
+    # Bind training mode events
+    training_mode.change(
+        fn=update_training_mode_ui,
+        inputs=[training_mode],
+        outputs=[plm_model, transfer_model_folder, transfer_model_dropdown, transfer_settings_row]
+    )
+
+    transfer_model_folder.change(
+        fn=on_transfer_folder_change,
+        inputs=[transfer_model_folder],
+        outputs=[transfer_model_dropdown, model_info_display]
+    )
+
+    transfer_model_dropdown.change(
+        fn=on_transfer_model_change,
+        inputs=[transfer_model_dropdown],
+        outputs=[
+            plm_model,  # Update PLM model from config (even though hidden)
+            model_info_display,
+            training_method,
+            pooling_method,
+            learning_rate,
+            num_epochs,
+            batch_mode,
+            batch_size,
+            batch_token,
+            max_seq_len,
+            gradient_accumulation_steps,
+            warmup_steps,
+            scheduler_type,
+            lora_r,
+            lora_alpha,
+            lora_dropout,
+            lora_target_modules,
+        ]
+    )
+
     def handle_dataset_config_change(x):
         """Handle dataset config change event
         Args:
@@ -2002,7 +2340,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
         Returns:
         """
         return update_train_tab_dataset_settings_UI("Pre-defined", x)
-    
+
     dataset_config.change(
         fn=handle_dataset_config_change,
         inputs=[dataset_config],
