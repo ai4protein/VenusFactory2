@@ -3,7 +3,7 @@ name: string_database
 description: Query STRING API for protein-protein interactions (59M proteins, 20B interactions). Network analysis, GO/KEGG enrichment, interaction discovery, 5000+ species, for systems biology.
 license: Unknown
 metadata:
-    skill-author: VenusFactory.
+    skill-author: VenusFactory2.
 ---
 
 # STRING Database
@@ -32,7 +32,7 @@ The skill provides:
 
 When users request STRING data, choose the operation and call the corresponding function from `src.tools.database.string`.
 
-## Project Tools (VenusFactory)
+## Project Tools (VenusFactory2)
 
 | Operation | Query Function (Returns content JSON) | Download Function (Returns file_info JSON) | Purpose |
 |-----------|----------------------------------------|---------------------------------------------|---------|

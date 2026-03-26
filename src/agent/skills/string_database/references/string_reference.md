@@ -1,6 +1,6 @@
 # STRING Database API Reference
 
-## Project Integration (VenusFactory)
+## Project Integration (VenusFactory2)
 
 STRING REST operations are implemented as atomic Python modules under `src/tools/database/string/`:
 

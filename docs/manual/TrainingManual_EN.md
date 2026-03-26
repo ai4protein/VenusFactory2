@@ -1,4 +1,4 @@
-# VenusFactory Training Module User Guide
+# VenusFactory2 Training Module User Guide
 
 ## 1. Introduction
 
@@ -8,7 +8,7 @@ The Training Module helps you build custom prediction models for your specific p
 
 ## 2. Supported Protein Language Models
 
-VenusFactory supports various advanced protein language models. You can choose the appropriate model based on your task requirements and computational resources.
+VenusFactory2 supports various advanced protein language models. You can choose the appropriate model based on your task requirements and computational resources.
 
 | Model Name                                                    | Model Parameter Size     | Number of Models | Model Example                   |
 | ------------------------------------------------------------ | ----------------------- | ---------------- | ------------------------------- |
@@ -31,7 +31,7 @@ VenusFactory supports various advanced protein language models. You can choose t
 
 ## 3. Supported Fine-tuning Methods
 
-VenusFactory provides multiple training methods, each with specific advantages and applicable scenarios.
+VenusFactory2 provides multiple training methods, each with specific advantages and applicable scenarios.
 
 | Fine-tuning Method | Description | Data Type |
 |---------|------|------------|
@@ -46,7 +46,7 @@ VenusFactory provides multiple training methods, each with specific advantages a
 
 ## 4. Supported Evaluation Metrics
 
-VenusFactory provides multiple evaluation metrics to assess model performance.
+VenusFactory2 provides multiple evaluation metrics to assess model performance.
 
 | Abbreviation | Metric Name | Applicable Problem Types | Description | Optimization Direction |
 |---------|------|------------|------|---------|
@@ -222,7 +222,7 @@ The training interface is divided into several main sections, each containing sp
 
 ## 6. Training Process Guide
 
-Below is a complete guide to using the VenusFactory training module, from data preparation to model evaluation.
+Below is a complete guide to using the VenusFactory2 training module, from data preparation to model evaluation.
 
 ### 6.1 Preparing the Dataset
 
@@ -365,4 +365,4 @@ Q9LSD8,MPEEDLVELKFRLYDGSDVGPFQYSPTATVSMLKERIVSEWPKDKKIVPKSASDIKLINAGKILENGKTVAQC
 ![HF3](/img/HuggingFace/HF3.png)
 ![HF4](/img/HuggingFace/HF4.png)
 
-After uploading, use `Owner/Dataset name` as the Custom Path in VenusFactory
+After uploading, use `Owner/Dataset name` as the Custom Path in VenusFactory2

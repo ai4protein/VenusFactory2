@@ -1,6 +1,6 @@
 # ClinVar API and Data Access Reference
 
-## Project Integration (VenusFactory)
+## Project Integration (VenusFactory2)
 
 The codebase implements ClinVar E-utilities and FTP access in **`src/tools/database/ncbi/ncbi_clinvar.py`**.
 

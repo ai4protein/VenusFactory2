@@ -1,6 +1,6 @@
 # Training Scripts
 
-This directory contains shell scripts for training protein language models (PLMs) and structure-aware PLMs in VenusFactory. All scripts call `src/train.py` with different configurations.
+This directory contains shell scripts for training protein language models (PLMs) and structure-aware PLMs in VenusFactory2. All scripts call `src/train.py` with different configurations.
 
 ---
 

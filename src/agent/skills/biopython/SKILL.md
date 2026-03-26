@@ -3,7 +3,7 @@ name: biopython
 description: Comprehensive molecular biology toolkit. Use for sequence manipulation, file parsing (FASTA/GenBank/PDB), phylogenetics, and programmatic NCBI/PubMed access (Bio.Entrez). Best for batch processing, custom bioinformatics pipelines, BLAST automation.
 license: Unknown
 metadata:
-    skill-author: VenusFactory.
+    skill-author: VenusFactory2.
 ---
 
 # Biopython: Computational Molecular Biology in Python

@@ -1,4 +1,4 @@
-# VenusFactory Prediction Module User Guide
+# VenusFactory2 Prediction Module User Guide
 
 ## Table of Contents
 1. Introduction

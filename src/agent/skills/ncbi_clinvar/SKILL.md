@@ -3,7 +3,7 @@ name: ncbi_clinvar
 description: Query NCBI ClinVar for variant clinical significance. Search by gene/condition/CLNSIG, interpret pathogenicity, use E-utilities or FTP; annotate VCFs. Use project tools in src.tools.database.ncbi.
 license: Unknown
 metadata:
-    skill-author: VenusFactory
+    skill-author: VenusFactory2
 ---
 
 # ClinVar Database (NCBI)

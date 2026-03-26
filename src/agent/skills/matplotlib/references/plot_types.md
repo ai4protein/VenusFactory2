@@ -1,7 +1,7 @@
 # Matplotlib Plot Types Guide
 
 > [!TIP]
-> **Use VenusFactory Tools First:** Before writing boilerplate plotting code, check if `src/tools/visualize/matplotlib/plot_template.py` meets your needs. It provides ready-to-use, publication-quality templates for standard plots (lines, scatters, bars, histograms, heatmaps, contours, boxes, violins, and 3D plots).
+> **Use VenusFactory2 Tools First:** Before writing boilerplate plotting code, check if `src/tools/visualize/matplotlib/plot_template.py` meets your needs. It provides ready-to-use, publication-quality templates for standard plots (lines, scatters, bars, histograms, heatmaps, contours, boxes, violins, and 3D plots).
 
 Comprehensive guide to different plot types in matplotlib with examples and use cases.
 

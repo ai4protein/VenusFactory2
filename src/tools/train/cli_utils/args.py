@@ -135,7 +135,7 @@ def add_wandb_args(parser: argparse.ArgumentParser):
     wandb_group = parser.add_argument_group('Wandb Configuration')
     wandb_group.add_argument('--wandb', action='store_true')
     wandb_group.add_argument('--wandb_entity', type=str)
-    wandb_group.add_argument('--wandb_project', type=str, default='VenusFactory')
+    wandb_group.add_argument('--wandb_project', type=str, default='VenusFactory2')
     wandb_group.add_argument('--wandb_run_name', type=str)
 
 def validate_args(args: argparse.Namespace):
@@ -213,6 +213,6 @@ def setup_wandb_config(args: argparse.Namespace):
     """Setup wandb configuration."""
     if args.wandb:
         if args.wandb_run_name is None:
-            args.wandb_run_name = f"VenusFactory-{args.dataset}"
+            args.wandb_run_name = f"VenusFactory2-{args.dataset}"
         if args.output_model_name is None:
             args.output_model_name = f"{args.wandb_run_name}.pt" 

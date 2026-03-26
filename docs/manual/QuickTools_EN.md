@@ -1,4 +1,4 @@
-# VenusFactory Quick Tools User Guide
+# VenusFactory2 Quick Tools User Guide
 
 ## 1. Introduction
 

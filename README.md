@@ -3,14 +3,14 @@
 </div>
 
 <p align="center">
-  <img src="img/banner_2503.png" width="70%" alt="VenusFactory Banner">
+  <img src="img/banner_2503.png" width="70%" alt="VenusFactory2 Banner">
 </p>
 
 <div align="center">
 
-[![GitHub stars](https://img.shields.io/github/stars/AI4Protein/VenusFactory?style=flat-square)](https://github.com/AI4Protein/VenusFactory/stargazers) [![GitHub forks](https://img.shields.io/github/forks/AI4Protein/VenusFactory?style=flat-square)](https://github.com/AI4Protein/VenusFactory/network/members) [![GitHub issues](https://img.shields.io/github/issues/AI4Protein/VenusFactory?style=flat-square)](https://github.com/AI4Protein/VenusFactory/issues) [![GitHub license](https://img.shields.io/github/license/AI4Protein/VenusFactory?style=flat-square)](https://github.com/AI4Protein/VenusFactory/blob/main/LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/AI4Protein/VenusFactory2?style=flat-square)](https://github.com/AI4Protein/VenusFactory2/stargazers) [![GitHub forks](https://img.shields.io/github/forks/AI4Protein/VenusFactory2?style=flat-square)](https://github.com/AI4Protein/VenusFactory2/network/members) [![GitHub issues](https://img.shields.io/github/issues/AI4Protein/VenusFactory2?style=flat-square)](https://github.com/AI4Protein/VenusFactory2/issues) [![GitHub license](https://img.shields.io/github/license/AI4Protein/VenusFactory2?style=flat-square)](https://github.com/AI4Protein/VenusFactory2/blob/main/LICENSE)
 
-[![Python Version](https://img.shields.io/badge/Python-3.12-blue?style=flat-square&logo=python)](https://www.python.org/) [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen?style=flat-square)](https://venusfactory.readthedocs.io/) [![Downloads](https://img.shields.io/github/downloads/AI4Protein/VenusFactory/total?style=flat-square)](https://github.com/AI4Protein/VenusFactory/releases) [![Youtube](https://img.shields.io/badge/Youtube-AI4Protein-red?style=flat-square&logo=youtube)](https://www.youtube.com/watch?v=MT6lPH5kgCc&ab_channel=BxinZhou) [![Demo](https://img.shields.io/badge/Demo-OpenBayes-blue)](https://openbayes.com/console/public/tutorials/O3RCA0XUKa0)
+[![Python Version](https://img.shields.io/badge/Python-3.12-blue?style=flat-square&logo=python)](https://www.python.org/) [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen?style=flat-square)](https://venusfactory.readthedocs.io/) [![Downloads](https://img.shields.io/github/downloads/AI4Protein/VenusFactory2/total?style=flat-square)](https://github.com/AI4Protein/VenusFactory2/releases) [![Youtube](https://img.shields.io/badge/Youtube-AI4Protein-red?style=flat-square&logo=youtube)](https://www.youtube.com/watch?v=MT6lPH5kgCc&ab_channel=BxinZhou) [![Demo](https://img.shields.io/badge/Demo-OpenBayes-blue)](https://openbayes.com/console/public/tutorials/O3RCA0XUKa0)
 
 **🤖 Agent-Driven Protein Engineering Platform**
 *One platform, three interfaces, infinite possibilities*
@@ -21,7 +21,7 @@
 
 ## 🌟 Recent News
 
-- [2026-01-23] 🚀 Added [VenusX](https://github.com/AI4Protein/VenusX) in VenusFactory
+- [2026-01-23] 🚀 Added [VenusX](https://github.com/AI4Protein/VenusX) in VenusFactory2
 - [2025-08-10] 🎉 Free website released at [venusfactory.cn/playground](https://venusfactory.cn/playground/)
 - [2025-04-19] 🎉 [VenusREM](https://github.com/ai4protein/VenusREM) #1 in [ProteinGym](https://proteingym.org/benchmarks) & [VenusMutHub](https://lianglab.sjtu.edu.cn/muthub/)!
 
@@ -34,9 +34,9 @@
 
 ---
 
-## 🎯 What is VenusFactory?
+## 🎯 What is VenusFactory2?
 
-**VenusFactory** is an **Agent-driven protein engineering platform** combining 40+ AI models with 11 biological databases. Designed for everyone — from biologists to AI researchers.
+**VenusFactory2** is an **Agent-driven protein engineering platform** combining 40+ AI models with 11 biological databases. Designed for everyone — from biologists to AI researchers.
 
 <p align="center">
   <img src="https://img.shields.io/badge/🤖_Agent_Driven-Core-FF6B6B?style=for-the-badge">
@@ -45,7 +45,7 @@
   <img src="https://img.shields.io/badge/Tools-9_Categories-F38181?style=for-the-badge">
 </p>
 
-### 🚀 Why VenusFactory?
+### 🚀 Why VenusFactory2?
 
 | **🤖 Agent-First** | **🎯 Three Interfaces** | **⚡ Zero to Results** |
 |:------------------:|:----------------------:|:---------------------:|
@@ -70,7 +70,7 @@
 
 ### 1. Install
 ```bash
-git clone https://github.com/AI4Protein/VenusFactory.git && cd VenusFactory
+git clone https://github.com/AI4Protein/VenusFactory2.git && cd VenusFactory2
 conda create -n venus python=3.12 && conda activate venus
 pip install -r requirements.txt  # Detailed guide below ↓
 ```
@@ -267,7 +267,7 @@ All datasets available on [HuggingFace](https://huggingface.co/AI4Protein)
 <summary><b>🍎 macOS (M1/M2/M3)</b></summary>
 
 ```bash
-git clone https://github.com/AI4Protein/VenusFactory.git && cd VenusFactory
+git clone https://github.com/AI4Protein/VenusFactory2.git && cd VenusFactory2
 conda create -n venus python=3.12 && conda activate venus
 pip install --pre torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/nightly/cpu
 pip install torch_scatter torch-sparse torch-geometric -f https://data.pyg.org/whl/torch-2.8.0+cpu.html
@@ -280,7 +280,7 @@ pip install -r requirements_for_macOS.txt
 <summary><b>🪟 Windows / 🐧 Linux (CUDA 12.8)</b></summary>
 
 ```bash
-git clone https://github.com/AI4Protein/VenusFactory.git && cd VenusFactory
+git clone https://github.com/AI4Protein/VenusFactory2.git && cd VenusFactory2
 conda create -n venus python=3.12 && conda activate venus
 pip install torch==2.8.0 torchvision --index-url https://download.pytorch.org/whl/cu128
 pip install torch_geometric
@@ -294,7 +294,7 @@ pip install -r requirements.txt
 <summary><b>🪟 Windows / 🐧 Linux (CUDA 11.8)</b></summary>
 
 ```bash
-git clone https://github.com/AI4Protein/VenusFactory.git && cd VenusFactory
+git clone https://github.com/AI4Protein/VenusFactory2.git && cd VenusFactory2
 conda create -n venus python=3.12 && conda activate venus
 pip install torch==2.7.0 --index-url https://download.pytorch.org/whl/cu118
 pip install torch_geometric
@@ -308,7 +308,7 @@ pip install -r requirements.txt
 <summary><b>💻 CPU Only</b></summary>
 
 ```bash
-git clone https://github.com/AI4Protein/VenusFactory.git && cd VenusFactory
+git clone https://github.com/AI4Protein/VenusFactory2.git && cd VenusFactory2
 conda create -n venus python=3.12 && conda activate venus
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 pip install torch_geometric
@@ -460,7 +460,7 @@ pdb_file = download_alphafold_structure("P12345")
 
 Developed by [Liang's Lab](https://ins.sjtu.edu.cn/people/lhong/index.html) at Shanghai Jiao Tong University.
 
-**Resources:** [Docs](https://venusfactory.readthedocs.io/) • [YouTube](https://www.youtube.com/watch?v=MT6lPH5kgCc&ab_channel=BxinZhou) • [Playground](https://venusfactory.cn/playground/) • [Issues](https://github.com/AI4Protein/VenusFactory/issues)
+**Resources:** [Docs](https://venusfactory.readthedocs.io/) • [YouTube](https://www.youtube.com/watch?v=MT6lPH5kgCc&ab_channel=BxinZhou) • [Playground](https://venusfactory.cn/playground/) • [Issues](https://github.com/AI4Protein/VenusFactory2/issues)
 
 ---
 
@@ -468,6 +468,6 @@ Developed by [Liang's Lab](https://ins.sjtu.edu.cn/people/lhong/index.html) at S
 
 **Made with ❤️ for the protein engineering community**
 
-[⭐ Star](https://github.com/AI4Protein/VenusFactory) • [🐛 Report Bug](https://github.com/AI4Protein/VenusFactory/issues) • [💡 Request Feature](https://github.com/AI4Protein/VenusFactory/issues)
+[⭐ Star](https://github.com/AI4Protein/VenusFactory2) • [🐛 Report Bug](https://github.com/AI4Protein/VenusFactory2/issues) • [💡 Request Feature](https://github.com/AI4Protein/VenusFactory2/issues)
 
 </div>

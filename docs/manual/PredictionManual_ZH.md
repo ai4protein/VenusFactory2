@@ -1,4 +1,4 @@
-# VenusFactory 预测模块使用指南
+# VenusFactory2 预测模块使用指南
 
 ## 1. 简介
 

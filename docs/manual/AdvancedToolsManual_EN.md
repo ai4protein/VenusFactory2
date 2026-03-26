@@ -1,4 +1,4 @@
-# VenusFactory Advanced Tools User Guide
+# VenusFactory2 Advanced Tools User Guide
 
 ## 1\. Introduction to Advanced Tools
 

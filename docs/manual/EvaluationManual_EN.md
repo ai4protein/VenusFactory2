@@ -1,4 +1,4 @@
-# VenusFactory Evaluation Module User Guide
+# VenusFactory2 Evaluation Module User Guide
 
 ## 1. Introduction
 
@@ -14,7 +14,7 @@ You can evaluate models on pre-defined benchmark datasets or your own custom tes
 
 ## 2. Supported Evaluation Metrics
 
-VenusFactory provides multiple evaluation metrics to assess model performance. Different metrics are applicable depending on the problem type.
+VenusFactory2 provides multiple evaluation metrics to assess model performance. Different metrics are applicable depending on the problem type.
 
 | Abbreviation | Metric Name | Applicable Problem Types | Description | Optimization Direction |
 |---------|------|------------|------|---------|
@@ -168,7 +168,7 @@ The evaluation interface is divided into several main sections, each containing 
 
 ## 4. Evaluation Process Guide
 
-Below is a complete guide to using the VenusFactory evaluation module, from model preparation to result analysis.
+Below is a complete guide to using the VenusFactory2 evaluation module, from model preparation to result analysis.
 
 ### 4.1 Preparing Models and Datasets
 

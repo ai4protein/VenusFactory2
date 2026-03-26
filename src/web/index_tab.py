@@ -250,8 +250,8 @@ def create_index_tab(constant):
                          
                         <div class="manual-nav">
                             <ul>
-                                <li><a href="#welcome" class="nav-h2">Welcome to VenusFactory</a></li>
-                                <li><a href="#how-to-use" class="nav-h2">How to Use VenusFactory</a></li>
+                                <li><a href="#welcome" class="nav-h2">Welcome to VenusFactory2</a></li>
+                                <li><a href="#how-to-use" class="nav-h2">How to Use VenusFactory2</a></li>
                                 <li><a href="#questionnaires" class="nav-h2">Research Questionnaires</a></li>
                                 <li><a href="#partners" class="nav-h2">Partner Institutions</a></li>
                                 <li><a href="#developer" class="nav-h2">Developer Information</a></li>
@@ -269,7 +269,7 @@ def create_index_tab(constant):
                     <div style="max-width: 1400px; margin: 20px auto 0 auto; padding: 20px 10px 10px 10px;">
                     <div style="font-size: 1.2em; text-align: left; line-height: 1.6; color: var(--body-text-color);">
                         <p style="margin-bottom: 1em; margin-top: 0;">
-                            VenusFactory is a unified open-source platform for protein engineering, designed to simplify data acquisition, model fine-tuning, and functional analysis for both biologists and AI researchers.
+                            VenusFactory2 is a unified open-source platform for protein engineering, designed to simplify data acquisition, model fine-tuning, and functional analysis for both biologists and AI researchers.
                             <br>
                             The Web UI features four core modules:
                         </p>
@@ -295,13 +295,13 @@ def create_index_tab(constant):
                 </div>
                     <hr style="margin: 40px 0; border: 1px solid var(--border-color);">
                     
-                    <!-- Middle section: How to Use VenusFactory -->
+                    <!-- Middle section: How to Use VenusFactory2 -->
                     <div id="how-to-use" style="text-align: left; max-width: 1400px; margin: 0 auto;">
                         <h1 style="font-size:2.2em; font-weight:900; color:var(--text-primary); margin-bottom: 0.7em;">
-                            How to Use VenusFactory
+                            How to Use VenusFactory2
                         </h1>
                         <div style="font-size:1.2em;">
-                            <p style="font-size:1.2em;">Depending on your needs, VenusFactory can provide different services.</p>
+                            <p style="font-size:1.2em;">Depending on your needs, VenusFactory2 can provide different services.</p>
                             <p style="font-size:1.2em;">If you want a quick answer about protein mutations, use Agent-0.1. Upload your file, and the AI Assistant will give you a helpful reply.</p>
                             <p style="font-size:1.2em;">If you want to know possible mutation methods or protein functions, go to Quick Tools, choose the task you need, and you will get the result in a few minutes.</p>
                             <p style="font-size:1.2em;">If you have some knowledge about different protein models, you can use the Advanced Tools tab. All major models are available to meet your needs.</p>

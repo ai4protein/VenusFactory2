@@ -1,4 +1,4 @@
-# VenusFactory Download Tab User Guide
+# VenusFactory2 Download Tab User Guide
 
 The Download module helps you quickly retrieve protein data from major biological databases. Instead of visiting multiple database websites and downloading files one by one, use this tool to batch download sequences, structures, and metadata directly.
 

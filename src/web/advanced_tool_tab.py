@@ -746,7 +746,7 @@ def handle_VenusMine(
     logger = logging.getLogger(__name__)
     start_time = time.time()
     
-    mmseqs_database_path = "/home/lrzhang/VenusFactory/dataset/CATH.fasta"
+    mmseqs_database_path = "/home/lrzhang/VenusFactory2/dataset/CATH.fasta"
 
     if not pdb_file:
         yield (
