@@ -322,9 +322,7 @@ async def send_message(message, session_state):
         protein_ctx.add_file(fp)
 
     # --- Phase: LangGraph Orchestration ---
-    # Add initial feedback
-    session_state['history'].append({"role": "assistant", "content": "🤔 Thinking... Initializing research plan...", "role_id": "principal_investigator"})
-    yield _build_conversation_panel_html(session_state["history"]), _build_log_html(session_state), gr.MultimodalTextbox(value=None, interactive=False), session_state
+    # Don't add initial feedback here - let the graph decide what to show based on the input type
 
     initial_state = {
         "messages": [HumanMessage(content=display_text)],
@@ -349,15 +347,16 @@ async def send_message(message, session_state):
     }
 
     graph = create_agent_graph()
-    config = {"configurable": {"chains": session_state, "session_id": session_state["session_id"]}}
+    config = {"configurable": {"chains": session_state, "session_id": session_state["session_id"]}, "recursion_limit": 100}
     
     async for event in graph.astream(initial_state, config=config):
         for node, updates in event.items():
             # Update session state with the latest graph state
-            for key, val in updates.items():
-                if key in ("history", "conversation_log", "tool_executions", "status", "pi_report", "plan", "protein_context"):
-                    session_state[key] = val
-                
+            if updates:  # updates can be None or empty dict
+                for key, val in updates.items():
+                    if key in ("history", "conversation_log", "tool_executions", "status", "pi_report", "pi_suggest_steps", "plan", "protein_context", "current_step_index", "step_results", "research_sections", "research_idx", "search_idx", "current_search_results", "research_sub_reports"):
+                        session_state[key] = val
+
         yield _build_conversation_panel_html(session_state["history"]), _build_log_html(session_state), gr.MultimodalTextbox(value=None, interactive=False), session_state
 
     # Sync memory (simplified final step)

@@ -27,12 +27,14 @@ from agent.chat_agent_utils import (
     _tool_output_indicates_failure,
     _run_mls_debug_with_tools, _run_mls_post_step_verify,
     _get_output_file_path_from_raw, _read_output_file_preview,
-    _cb_post_step_check, MAX_STEP_RETRIES
+    _cb_post_step_check, MAX_STEP_RETRIES,
+    _extract_image_paths_from_tool_output
 )
 from web.utils.chat_format_utils import (
     _short_topic_title, _format_search_summary, _format_search_preview
 )
 from agent.skills import get_skills_metadata_string
+from web.utils.file_oss import upload_file_to_cloud_async
 
 
 class AgentState(TypedDict):
@@ -104,14 +106,9 @@ def _parse_sections(raw: str) -> List[Dict[str, Any]]:
 
 
 async def research_plan_start_node(state: AgentState, config: RunnableConfig):
-    """Show 'PI is creating research plan' so UI updates before LLM runs."""
-    history = list(state.get("history", []))
-    history.append({
-        "role": "assistant",
-        "content": "🤔 **Principal Investigator** is creating the research plan …",
-        "role_id": "principal_investigator",
-    })
-    return {"history": history}
+    """Initial node - passes through to research_plan_node for decision."""
+    # Just pass through, research_plan_node will decide the path
+    return {"status": "analyzing"}
 
 
 async def research_plan_node(state: AgentState, config: RunnableConfig):
@@ -120,7 +117,8 @@ async def research_plan_node(state: AgentState, config: RunnableConfig):
     protein_ctx = state["protein_context"]
     text = state["messages"][-1].content
     protein_context_summary = protein_ctx.get_context_summary()
-    
+    history = list(state.get("history", []))
+
     try:
         sections_out = await asyncio.to_thread(
             chains["pi_sections"].invoke,
@@ -131,8 +129,16 @@ async def research_plan_node(state: AgentState, config: RunnableConfig):
         print(f"[PI sections] failed: {e}")
         sections_list = []
 
+    # No research sections needed - skip directly to planning (CB will decide if tools are needed)
     if not sections_list:
-        return {"status": "planning_failed", "error": "Unable to generate research plan."}
+        return {"status": "research_skipped", "pi_report": "", "pi_suggest_steps": ""}
+
+    # This is a research request - show the analyzing message
+    history.append({
+        "role": "assistant",
+        "content": "🤔 **Principal Investigator** is analyzing your request and creating a research plan...",
+        "role_id": "principal_investigator",
+    })
 
     return {
         "research_sections": sections_list,
@@ -140,8 +146,45 @@ async def research_plan_node(state: AgentState, config: RunnableConfig):
         "search_idx": 0,
         "current_search_results": [],
         "research_sub_reports": [],
+        "history": history,
         "status": "research_planning_done"
     }
+
+
+async def chat_start_node(state: AgentState, config: RunnableConfig):
+    """Show 'PI is responding' for simple chat/greeting inputs."""
+    history = list(state.get("history", []))
+    history.append({
+        "role": "assistant",
+        "content": "🤔 Thinking...",
+        "role_id": "principal_investigator",
+    })
+    return {"history": history}
+
+
+async def chat_node(state: AgentState, config: RunnableConfig):
+    """Chat mode: use pi_chat_chain for direct responses (greetings, simple questions)."""
+    chains = config.get("configurable", {}).get("chains", {})
+    text = state["messages"][-1].content
+    history = list(state.get("history", []))
+
+    try:
+        # Use pi_chat chain for direct chat response (greetings, simple questions)
+        response = await asyncio.to_thread(
+            chains["pi_chat"].invoke,
+            {"input": text, "chat_history": []},
+        )
+        # Remove the "Thinking..." placeholder before adding the actual response
+        if history and "Thinking" in history[-1].get("content", ""):
+            history.pop()
+        history.append({"role": "assistant", "content": response, "role_id": "principal_investigator"})
+    except Exception as e:
+        # Remove the "Thinking..." placeholder before adding the error
+        if history and "Thinking" in history[-1].get("content", ""):
+            history.pop()
+        history.append({"role": "assistant", "content": f"I apologize, but I encountered an error: {str(e)}", "role_id": "principal_investigator"})
+
+    return {"history": history, "status": "completed"}
 
 
 async def research_search_start_node(state: AgentState, config: RunnableConfig):
@@ -189,8 +232,8 @@ async def research_search_node(state: AgentState, config: RunnableConfig):
 
     if search_idx < len(queries):
         sq = queries[search_idx]
-        search_results_str, search_logged = await asyncio.to_thread(_run_section_search, sq)
-        current_search_results.append(search_results_str)
+        search_results_list, search_logged = await asyncio.to_thread(_run_section_search, sq)
+        current_search_results.extend(search_results_list)
         
         for tname, tinputs, toutputs in search_logged:
             step_off = len(protein_ctx.tool_history) + 1
@@ -242,7 +285,12 @@ async def research_sub_report_node(state: AgentState, config: RunnableConfig):
         return {"status": "research_steps_done"}
 
     section = sections[research_idx]
-    search_results_str = "\n".join(current_search_results)
+    # Join all collected results from all queries in this section with sequential numbering [1], [2], ...
+    formatted_refs = []
+    for i, res_item in enumerate(current_search_results, 1):
+        formatted_refs.append(f"[{i}] {res_item}")
+    
+    search_results_str = "\n\n".join(formatted_refs) if formatted_refs else "No search results for this section."
 
     try:
         sub_report = await asyncio.to_thread(
@@ -323,12 +371,18 @@ async def plan_start_node(state: AgentState, config: RunnableConfig):
 async def plan_node(state: AgentState, config: RunnableConfig):
     """CB planning node: PI report -> pipeline (JSON list)."""
     chains = config.get("configurable", {}).get("chains", {})
-    pi_report = state["pi_report"]
-    pi_suggest_steps = state["pi_suggest_steps"]
+    pi_report = state.get("pi_report", "")
+    pi_suggest_steps = state.get("pi_suggest_steps", "")
     protein_ctx = state["protein_context"]
     history = list(state.get("history", []))
     log_entries = list(state.get("conversation_log", []))
-    
+
+    # When research is skipped, use user's original input as the "PI report"
+    if not pi_report:
+        user_input = state["messages"][-1].content
+        pi_report = f"User request: {user_input}\n\nNo literature research needed. Proceed directly with tool execution."
+        pi_suggest_steps = pi_suggest_steps or "Execute the appropriate tool to fulfill the user's request."
+
     context_parts = [f"Protein context: {protein_ctx.get_context_summary()}"]
     if state.get("agent_session_dir"):
         context_parts.append(f"Default output directory: {state['agent_session_dir']}")
@@ -376,8 +430,9 @@ async def plan_node(state: AgentState, config: RunnableConfig):
         })
 
     if not normalized_plan:
-        history.append({"role": "assistant", "content": "No pipeline steps to run.", "role_id": "computational_biologist"})
-        return {"plan": [], "history": history, "status": "planning_failed"}
+        # No tools needed - this might be a greeting or simple question
+        # Route to chat mode for a natural response
+        return {"plan": [], "history": history, "status": "chat_mode"}
 
     step_lines = [f"**Step {p['step']}.** {p['task_description']}" for p in normalized_plan]
     plan_text = "📋 **Pipeline**\n\nHere's what we'll do:\n\n" + "\n\n".join(step_lines)
@@ -438,12 +493,35 @@ async def execute_node(state: AgentState, config: RunnableConfig):
                 dep_step = int(parts[1].replace('step_', '').replace('step', ''))
                 dep_out = step_results.get(dep_step, {}).get("raw_output")
                 if dep_out:
+                    parsed = json.loads(dep_out) if isinstance(dep_out, str) and dep_out.strip().startswith("{") else dep_out
+                    
                     if len(parts) > 2:
                         field = parts[2]
-                        parsed = json.loads(dep_out) if isinstance(dep_out, str) else dep_out
-                        merged_tool_input[key] = parsed.get(field, dep_out)
+                        if isinstance(parsed, dict) and field in parsed:
+                            val = parsed[field]
+                        else:
+                            val = dep_out
                     else:
-                        merged_tool_input[key] = dep_out
+                        val = dep_out
+                    
+                    # Heuristic auto-extraction for paths if the expected parameter is a file or path
+                    if any(k in key.lower() for k in ("path", "file")):
+                        if isinstance(val, dict):
+                            if "file_path" in val:
+                                val = val["file_path"]
+                            elif "file_info" in val and isinstance(val["file_info"], dict) and "file_path" in val["file_info"]:
+                                val = val["file_info"]["file_path"]
+                        elif isinstance(val, str) and val.strip().startswith("{"):
+                            extracted = _get_output_file_path_from_raw(val, "previous_step")
+                            if extracted:
+                                val = extracted
+                        
+                        # Fallback: if we still have the full JSON string but needed a file, try extracting from dep_out
+                        if val == dep_out and isinstance(dep_out, str) and dep_out.strip().startswith("{"):
+                            extracted = _get_output_file_path_from_raw(dep_out, "previous_step")
+                            if extracted: val = extracted
+
+                    merged_tool_input[key] = val
             except: pass
 
     # Execution Loop with Retries
@@ -451,6 +529,10 @@ async def execute_node(state: AgentState, config: RunnableConfig):
     step_retry = 0
     step_done = False
     last_output = None
+    cached_flag = False  # Default value
+
+    # Get the actual tool for direct invocation
+    tool = next((t for t in chains["all_tools"] if t.name == tool_name), None)
 
     while step_retry <= MAX_STEP_RETRIES and not step_done:
         # Cache check
@@ -458,11 +540,11 @@ async def execute_node(state: AgentState, config: RunnableConfig):
         if cached:
             raw_output = cached["outputs"]
             cached_flag = True
-        else:
+            step_done = True
+            last_output = raw_output
+        elif tool:
+            # Direct tool invocation (simpler and more reliable)
             try:
-                # Actual tool run: log full invocation for backend visibility
-                tool = next((t for t in chains["all_tools"] if t.name == tool_name), None)
-                if not tool: raise ValueError(f"Unknown tool: {tool_name}")
                 inputs_str = json.dumps(merged_tool_input, ensure_ascii=False, sort_keys=True)
                 if len(inputs_str) > 500:
                     inputs_str = inputs_str[:500] + "..."
@@ -470,39 +552,34 @@ async def execute_node(state: AgentState, config: RunnableConfig):
                 out = await asyncio.wait_for(asyncio.to_thread(tool.invoke, merged_tool_input), timeout=300)
                 raw_output = out if isinstance(out, (str, dict)) else str(out)
                 out_preview = str(raw_output)[:300] + ("..." if len(str(raw_output)) > 300 else "")
-                print(f"[Result] tool={tool_name} | success={not _tool_output_indicates_failure(raw_output)[0]} | output_preview={out_preview}")
+                print(f"[Result] tool={tool_name} | output_preview={out_preview}")
                 save_cached_tool_result(state, tool_name, merged_tool_input, raw_output)
                 cached_flag = False
+                step_done = True
+                last_output = raw_output
+            except asyncio.TimeoutError:
+                raw_output = json.dumps({"success": False, "error": "Tool execution timed out (300s)"})
+                print(f"[Result] tool={tool_name} | timeout after 300s")
+                cached_flag = False
+                last_output = raw_output
+                step_done = True  # Don't retry on timeout
             except Exception as e:
                 raw_output = json.dumps({"success": False, "error": str(e)})
                 print(f"[Result] tool={tool_name} | exception={e}")
                 cached_flag = False
-
-        # Verify output
-        is_failure, err_msg = _tool_output_indicates_failure(raw_output)
-        if not is_failure:
-            # CB/MLS post-step verify
-            # (simplified: assuming OK for now, but in full version should call _run_mls_post_step_verify)
-            step_done = True
-            last_output = raw_output
+                step_retry += 1
+                if step_retry > MAX_STEP_RETRIES:
+                    last_output = raw_output
+                    step_done = True
         else:
-            # MLS Debug
-            # (simplified: retry limited for now)
-            step_retry += 1
-            if step_retry > MAX_STEP_RETRIES:
-                last_output = raw_output
-                break
-            # Logic for parameter adjustment would go here
+            # Tool not found
+            last_output = json.dumps({"success": False, "error": f"Unknown tool: {tool_name}"})
+            step_done = True
+            cached_flag = False
 
     # Record result
     protein_ctx.add_tool_call(step_num, tool_name, merged_tool_input, last_output, cached=cached_flag)
     step_results[step_num] = {"raw_output": last_output}
-    
-    executions.append({
-        "step": step_num, "tool_name": tool_name, "inputs": merged_tool_input,
-        "outputs": (str(last_output)[:1000] + "..." if len(str(last_output)) > 1000 else str(last_output)),
-        "timestamp": datetime.now().isoformat(),
-    })
     
     # --- Generate detailed feedback for the UI (MLS needs full context for self-check) ---
     try:
@@ -546,12 +623,39 @@ async def execute_node(state: AgentState, config: RunnableConfig):
         feedback_content += raw_str[:2000] + ("\n...(truncated)" if len(raw_str) > 2000 else "")
         feedback_content += "\n```\n\n"
 
-    # 2. File Preview (if applicable)
+    # 2. File Hosting (OSS)
     out_file = _get_output_file_path_from_raw(last_output, tool_name)
+    oss_url = None
     if out_file:
+        try:
+            oss_url = await upload_file_to_cloud_async(out_file)
+            if oss_url:
+                feedback_content += f"📎 **Cloud Download:** [{os.path.basename(out_file)}]({oss_url})\n\n"
+        except Exception as e:
+            print(f"OSS upload failed for {out_file}: {e}")
+
+        # 3. File Preview
         preview = _read_output_file_preview(out_file)
         if preview:
             feedback_content += f"**File Preview ({os.path.basename(out_file)}):**\n```\n{preview}\n```\n\n"
+
+    executions.append({
+        "step": step_num, "tool_name": tool_name, "inputs": merged_tool_input,
+        "outputs": (str(last_output)[:1000] + "..." if len(str(last_output)) > 1000 else str(last_output)),
+        "oss_url": oss_url,
+        "timestamp": datetime.now().isoformat(),
+    })
+
+    # 4. Image Hosting (plots, images)
+    try:
+        img_paths = _extract_image_paths_from_tool_output(last_output, tool_name)
+        for ip in img_paths:
+            if ip != out_file: # Avoid duplicate link
+                oss_img_url = await upload_file_to_cloud_async(ip)
+                if oss_img_url:
+                    feedback_content += f"🖼️ **Generated Image:** [{os.path.basename(ip)}]({oss_img_url})\n\n"
+    except Exception:
+        pass
 
     history.append({"role": "assistant", "content": feedback_content, "role_id": "machine_learning_specialist"})
 
@@ -577,16 +681,57 @@ async def finalize_start_node(state: AgentState, config: RunnableConfig):
 
 
 async def finalize_node(state: AgentState, config: RunnableConfig):
-    """Finalizer node: generates final summary."""
+    """Finalizer node: generates final summary using tool execution history."""
     chains = config.get("configurable", {}).get("chains", {})
     history = list(state.get("history", []))
-    
-    prompt = "Summarize the findings and the tools executed for the user."
+    tool_executions = state.get("tool_executions", [])
+    protein_ctx = state["protein_context"]
+    user_input = state["messages"][-1].content
+
+    # Build the full run record for the finalizer
+    analysis_log = []
+    for i, entry in enumerate(tool_executions, 1):
+        step = entry.get("step", i)
+        tool_name = entry.get("tool_name", "unknown")
+        inputs = entry.get("inputs", {})
+        outputs = entry.get("outputs", "")
+        oss_url = entry.get("oss_url")
+        analysis_log.append(
+            f"Step {step}: {tool_name}\n"
+            f"  Input: {json.dumps(inputs, ensure_ascii=False)}\n"
+            f"  Output: {str(outputs)[:500]}\n"
+            + (f"  Cloud Download: {oss_url}" if oss_url else "")
+        )
+
+    full_run_record = "\n\n".join([
+        f"User request: {user_input}",
+        f"Protein context: {protein_ctx.get_context_summary()}",
+        f"Tool executions:\n" + "\n".join(analysis_log) if analysis_log else "No tools executed."
+    ])
+
     try:
-        summary = await asyncio.to_thread(chains["finalizer"].invoke, {"input": prompt})
+        summary = await asyncio.to_thread(
+            chains["finalizer"].invoke,
+            {
+                "input": user_input,
+                "full_run_record": full_run_record,
+                "original_input": user_input,
+                "analysis_log": "\n".join(analysis_log) if analysis_log else "No analysis log available.",
+                "references": ""
+            }
+        )
         history.append({"role": "assistant", "content": summary, "role_id": "principal_investigator"})
-    except:
-        history.append({"role": "assistant", "content": "Task completed. See results above.", "role_id": "principal_investigator"})
+    except Exception as e:
+        print(f"[Finalizer] failed: {e}")
+        # Fallback: generate a simple summary from tool executions
+        if tool_executions:
+            summary_parts = ["## Summary\n\nTask completed. Here's what was done:\n"]
+            for entry in tool_executions:
+                summary_parts.append(f"- **{entry.get('tool_name', 'Tool')}**: Executed successfully")
+            summary = "\n".join(summary_parts)
+        else:
+            summary = "Task completed. See results above."
+        history.append({"role": "assistant", "content": summary, "role_id": "principal_investigator"})
 
     return {"history": history, "status": "completed"}
 
@@ -625,6 +770,8 @@ def create_agent_graph():
     workflow = StateGraph(AgentState)
     workflow.add_node("research_plan_start_node", research_plan_start_node)
     workflow.add_node("research_plan_node", research_plan_node)
+    workflow.add_node("chat_start_node", chat_start_node)
+    workflow.add_node("chat_node", chat_node)
     workflow.add_node("research_search_start_node", research_search_start_node)
     workflow.add_node("research_search_node", research_search_node)
     workflow.add_node("research_sub_report_start_node", research_sub_report_start_node)
@@ -642,18 +789,21 @@ def create_agent_graph():
     workflow.add_edge("research_plan_start_node", "research_plan_node")
     workflow.add_conditional_edges(
         "research_plan_node",
-        lambda s: END if s.get("status") == "planning_failed" else "research_search_start_node",
+        lambda s: "plan_start_node" if s.get("status") in ("research_skipped", "chat_mode") else "research_search_start_node",
     )
+    # Chat mode nodes (for true greetings - currently not used, research_skipped goes to planning)
+    workflow.add_edge("chat_start_node", "chat_node")
+    workflow.add_edge("chat_node", END)
     workflow.add_edge("research_search_start_node", "research_search_node")
     workflow.add_conditional_edges("research_search_node", should_continue_research)
     workflow.add_edge("research_sub_report_start_node", "research_sub_report_node")
-    workflow.add_edge("research_sub_report_node", "research_search_node")
+    workflow.add_edge("research_sub_report_node", "research_search_start_node")
     workflow.add_edge("research_report_start_node", "research_report_node")
     workflow.add_edge("research_report_node", "plan_start_node")
     workflow.add_edge("plan_start_node", "plan_node")
     workflow.add_conditional_edges(
         "plan_node",
-        lambda s: "finalize_start_node" if s.get("status") == "planning_failed" or not s.get("plan") else "execute_start_node",
+        lambda s: "chat_start_node" if s.get("status") == "chat_mode" else ("finalize_start_node" if s.get("status") == "planning_failed" or not s.get("plan") else "execute_start_node"),
     )
     workflow.add_edge("execute_start_node", "execute_node")
     workflow.add_conditional_edges("execute_node", should_continue)

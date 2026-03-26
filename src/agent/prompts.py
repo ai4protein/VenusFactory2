@@ -71,6 +71,14 @@ PI_SECTIONS_PROMPT = ChatPromptTemplate.from_messages([
     ("system", PI_SECTIONS_TEMPLATE),
     ("human", "Output only the JSON array of sections (max 5). No other text."),
 ])
+
+# --- PI Chat mode: direct responses for greetings and simple questions ---
+PI_CHAT_TEMPLATE = _load_md("principal_investigator_chat")
+PI_CHAT_PROMPT = ChatPromptTemplate.from_messages([
+    ("system", PI_CHAT_TEMPLATE),
+    MessagesPlaceholder(variable_name="chat_history"),
+    ("human", "{input}"),
+])
 PI_SUB_REPORT_TEMPLATE = _load_md("principal_investigator_sub_report")
 PI_SUB_REPORT_PROMPT = ChatPromptTemplate.from_messages([
     ("system", PI_SUB_REPORT_TEMPLATE),

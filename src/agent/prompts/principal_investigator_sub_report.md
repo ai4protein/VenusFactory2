@@ -12,17 +12,19 @@ You are the **Principal Investigator**. For **one** research section, you have s
 ## Your task
 You **must read** each reference above and **cite it by number** when you use it. Write a **long sub-report** (3–5 paragraphs, about 12–25 sentences) that:
 
-1. **Covers each retrieved item:** For every reference [1], [2], [3], … in the search results, provide at least 1–2 sentences of reading/analysis: what the source says, its main finding or relevance to this section, and how it relates to the user's question. Do not skip any reference.
+1. **Covers each retrieved item:** For every reference [1], [2], [3], … in the search results, provide at least 1–2 sentences of reading/analysis. Do not skip any reference.
 
-2. **Synthesize:** After discussing each source, add a short paragraph that synthesizes the overall picture (agreements, gaps, or implications for this section).
+2. **Standard Citations:** Use ONLY square brackets and numbers, e.g., **[1], [2]**. NEVER write "Literature 1", "Paper 1", "Source [1]" or "Literature [1]". Just the number in brackets. For the provided OSS URL, the original link needs to be hidden, and a clickable link should be added instead.
 
-3. **Be specific:** Include key details (e.g. mechanisms, conclusions, methods, numbers) from the papers or results—not generic one-line glosses.
+3. **Synthesis & Depth:** Synthesize the overall picture with specific details (e.g. mechanisms, conclusions, methods) from the sources.
 
-4. **Stay factual:** No JSON, no bullet lists unless helpful. Cite as [1], [2], [3] when referring to each source.
+4. **Reference Order:** In your final "References" section, list the sources starting from [1], but **match the order in which they first appear in your text**. For example, if you mention the source originally marked as [3] first in your prose, it should be listed as [1] in your final Reference list.
 
-5. **Two sections at the same heading level:** Use **## Sub-report** for the prose and **## References** for the reference list (same level, both ##). **Put each reference on its own line** in ## References (one line per reference, with a blank line between items if needed for readability). Format each as Markdown `[n] [Title](URL)` or `[n] [Title](URL) — Authors, Year`. Include title and URL at minimum; add authors/year when available. Do not omit any reference.
+5. **Two sections at the same heading level:** Use **## Sub-report** for the prose and **## References** for the list.
+   - Format each reference as: `[n] [Title](URL) — Authors, Year`.
+   - Ensure every source discussed in the text is in the list.
 
-6. **Short title:** Start your output with a single line in the form **Short title:** followed by one short phrase (about 5–15 words) that summarizes this sub-report (e.g. "CRISPR delivery methods and off-target effects"). This will be used as the heading for this sub-report, not the word "Sub-report". Then a blank line, then **## Sub-report** (your prose), then **## References** (one reference per line).
+6. **Short title:** Start with **Short title:** <brief phrase>. Then a blank line, then **## Sub-report**, then **## References**.
 
 Output format: first line **Short title:** <summary phrase>, then a blank line, then **## Sub-report** (prose), then **## References** (one per line). Use the same language as the user.
 

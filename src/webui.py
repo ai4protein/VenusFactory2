@@ -1,3 +1,4 @@
+import argparse
 import json
 import time
 import shutil
@@ -24,6 +25,21 @@ from api_server import app as fastapi_app
 from mcp_server import start_http_server
 from fastapi_mcp import FastApiMCP
 import uvicorn
+
+
+def parse_args():
+    """Parse command line arguments for startup mode."""
+    parser = argparse.ArgumentParser(
+        description="VenusFactory - Unified platform for protein engineering"
+    )
+    parser.add_argument(
+        "--mode",
+        type=str,
+        choices=["mcp", "fastapi", "server", "all"],
+        default="all",
+        help="Startup mode: mcp (MCP server only), fastapi (FastAPI only), server (Gradio only), all (all three servers, default)"
+    )
+    return parser.parse_args()
 
 _fastapi_server_thread = None
 _fastapi_server_lock = threading.Lock()
@@ -244,27 +260,71 @@ def create_ui():
             
     return demo, css_links
 
+def run_mcp_server(host: str = None, port: int = None):
+    """Run MCP server in foreground (blocking)."""
+    host = host or os.getenv("MCP_HTTP_HOST", "0.0.0.0")
+    port = port or int(os.getenv("MCP_HTTP_PORT", "8080"))
+    print(f"[MCP] Starting server on http://{host}:{port}/mcp")
+    from mcp_server import mcp
+    app_with_route = mcp.http_app()
+    uvicorn.run(app_with_route, host=host, port=port)
+
+
+def run_fastapi_server(host: str = None, port: int = None):
+    """Run FastAPI server in foreground (blocking)."""
+    host = host or os.getenv("FASTAPI_HOST", "0.0.0.0")
+    port = port or int(os.getenv("FASTAPI_PORT", "5000"))
+    print(f"[FastAPI] Starting server on http://{host}:{port}")
+    uvicorn.run(
+        fastapi_app,
+        host=host,
+        port=port,
+        log_level=os.getenv("FASTAPI_LOG_LEVEL", "info"),
+    )
+
+
+def run_gradio_server():
+    """Run Gradio server in foreground (blocking)."""
+    demo, css_links = create_ui()
+    demo.queue().launch(
+        server_port=7860,
+        share=True,
+        allowed_paths=["img"],
+        show_error=True,
+        inbrowser=True,
+        mcp_server=True,
+        css=css_links,
+    )
+
+
 if __name__ == "__main__":
+    args = parse_args()
+
     try:
-        cleanup_thread = threading.Thread(target=run_cleanup_schedule, daemon=True)
-        cleanup_thread.start()
+        if args.mode == "mcp":
+            run_mcp_server()
 
-        fastapi_host, fastapi_port = start_fastapi_server()
-        print(f"[FastAPI] Background API available at http://{fastapi_host}:{fastapi_port}")
+        elif args.mode == "fastapi":
+            run_fastapi_server()
 
-        mcp_host, mcp_port = start_http_server()
-        print(f"[MCP] HTTP server available at http://{mcp_host}:{mcp_port}/mcp")
+        elif args.mode == "server":
+            run_gradio_server()
 
-        demo, css_links = create_ui()
-        demo.queue().launch(
-            server_port=7860, 
-            share=True, 
-            allowed_paths=["img"],
-            show_error=True,
-            inbrowser=True,
-            mcp_server=True,
-            css=css_links,
-        )
+        elif args.mode == "all":
+            # Start cleanup thread
+            cleanup_thread = threading.Thread(target=run_cleanup_schedule, daemon=True)
+            cleanup_thread.start()
+
+            # Start FastAPI in background thread
+            fastapi_host, fastapi_port = start_fastapi_server()
+            print(f"[FastAPI] Background API available at http://{fastapi_host}:{fastapi_port}")
+
+            # Start MCP in background thread
+            mcp_host, mcp_port = start_http_server()
+            print(f"[MCP] HTTP server available at http://{mcp_host}:{mcp_port}/mcp")
+
+            # Run Gradio in main thread
+            run_gradio_server()
 
     except Exception as e:
-        print(f"Failed to launch UI: {str(e)}")
+        print(f"Failed to launch: {str(e)}")

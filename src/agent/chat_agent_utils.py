@@ -705,7 +705,7 @@ from web.utils.chat_format_utils import (
 )
 
 def _run_section_search(query: str, max_results: int = None) -> tuple:
-    """Run literature_search and web_search for one section query. Returns (formatted_citation_str, list of (tool_name, inputs, raw_output))."""
+    """Run literature_search and web_search for one section query. Returns (list_of_result_strings, list of (tool_name, inputs, raw_output))."""
     if max_results is None:
         max_results = SEARCH_MAX_RESULTS
     query = (query or "").strip()[:80]
@@ -745,7 +745,7 @@ def _run_section_search(query: str, max_results: int = None) -> tuple:
                 refs = refs if isinstance(refs, list) else []
                 lines = _format_literature_for_reading(refs, max_n=5, abstract_max=400)
                 if lines:
-                    sections.append("**Literature**\n" + "\n".join(lines))
+                    sections.extend(lines)
                     break
         except Exception as e:
             logged.append((tool_name, lit_input, json.dumps({"success": False, "error": str(e)})))
@@ -773,13 +773,13 @@ def _run_section_search(query: str, max_results: int = None) -> tuple:
                 if isinstance(res, list) and res:
                     lines = _format_web_for_reading(res, max_n=5, snippet_max=300)
                     if lines:
-                        sections.append("**Web**\n" + "\n".join(lines))
+                        sections.extend(lines)
                         break
         except Exception as e:
             logged.append((tool_name, web_input, json.dumps({"success": False, "error": str(e)})))
     if not sections:
-        return ("No search results for this section.", logged)
-    return ("References (cite as [1], [2], etc.):\n\n" + "\n\n".join(sections), logged)
+        return ([], logged)
+    return (sections, logged)
 
 def _fetch_search_for_pi_report(user_text: str, max_results: int = None, llm=None) -> tuple:
     """Run literature_search, web_search, dataset_search. Default sources: pubmed, tavily, github. When a search returns empty or fails, retry with another source (e.g. web: tavily → duckduckgo; literature: pubmed → semantic_scholar → arxiv). Returns (combined_str_with_citations, list of (tool_name, inputs, raw_output))."""

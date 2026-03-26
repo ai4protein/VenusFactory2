@@ -26,6 +26,7 @@
     background: #fff;
     box-sizing: border-box;
     padding: 12px 14px;
+    scroll-behavior: smooth;
 }
 
 .vf-empty-state {

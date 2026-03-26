@@ -131,39 +131,65 @@ def _build_chat_html(history_list: List[Dict[str, Any]]) -> str:
     return f"{style_tag}<div class='vf-chat-dialog-box'><div class='vf-chat-container'>" + "".join(html_parts) + "</div></div>"
 
 def _format_literature_citations(refs: list, max_n: int = 5) -> list:
-    """Format literature references as [n] [title](url) for PI citations (Markdown link format)."""
+    """Format literature references as [n] [title](url) for PI citations (Markdown link format).
+    Only shows available fields, no NA or empty values.
+    """
     out = []
     for i, r in enumerate((refs or [])[:max_n], 1):
         if not isinstance(r, dict):
             continue
         title = (r.get("title") or r.get("citation") or "No title").strip()
+
+        # Build metadata parts, only include non-empty values
         authors = r.get("authors") or r.get("author") or ""
         if isinstance(authors, list):
-            authors = ", ".join(str(a) for a in authors[:5])
+            authors = ", ".join(str(a) for a in authors[:5] if a)
         year = r.get("year") or r.get("published") or ""
+
+        # Build metadata string with only available fields
+        meta_parts = []
+        if authors:
+            meta_parts.append(authors)
+        if year:
+            meta_parts.append(str(year))
+        meta_str = f" — {', '.join(meta_parts)}" if meta_parts else ""
+
         url = r.get("url") or r.get("link") or ""
         if url:
-            out.append(f"[{i}] [{title}]({url})" + (f" — {authors}, {year}" if authors or year else ""))
+            out.append(f"[{i}] [{title}]({url}){meta_str}")
         else:
-            out.append(f"[{i}] {title}" + (f" — {authors}, {year}" if authors or year else ""))
+            out.append(f"[{i}] {title}{meta_str}")
     return out
 
 def _format_literature_for_reading(refs: list, max_n: int = 5, abstract_max: int = 400) -> list:
-    """Format literature with abstract so PI can read and cite. Each item: [n] [title](url) + Abstract."""
+    """Format literature with abstract so PI can read and cite. Each item: [title](url) — authors, year.
+    Only shows available fields, no NA or empty values.
+    """
     out = []
     for i, r in enumerate((refs or [])[:max_n], 1):
         if not isinstance(r, dict):
             continue
         title = (r.get("title") or r.get("citation") or "No title").strip()
+
+        # Build metadata parts, only include non-empty values
         authors = r.get("authors") or r.get("author") or ""
         if isinstance(authors, list):
-            authors = ", ".join(str(a) for a in authors[:5])
+            authors = ", ".join(str(a) for a in authors[:5] if a)
         year = r.get("year") or r.get("published") or ""
+
+        meta_parts = []
+        if authors:
+            meta_parts.append(authors)
+        if year:
+            meta_parts.append(str(year))
+        meta_str = f" — {', '.join(meta_parts)}" if meta_parts else ""
+
         url = r.get("url") or r.get("link") or ""
         if url:
-            line = f"[{i}] [{title}]({url})" + (f" — {authors}, {year}" if authors or year else "")
+            line = f"[{title}]({url}){meta_str}"
         else:
-            line = f"[{i}] {title}" + (f" — {authors}, {year}" if authors or year else "")
+            line = f"{title}{meta_str}"
+
         abstract = (r.get("abstract") or "").strip()
         if abstract:
             ab = abstract[:abstract_max] + ("…" if len(abstract) > abstract_max else "")
@@ -195,9 +221,9 @@ def _format_web_for_reading(results: list, max_n: int = 5, snippet_max: int = 30
             snippet = (r.get("snippet") or "").strip()
             url = r.get("url") or ""
             if url:
-                line = f"[{i}] [{title or 'Link'}]({url})"
+                line = f"[{title or 'Link'}]({url})"
             else:
-                line = f"[{i}] {title or str(r)}"
+                line = f"{title or str(r)}"
             if snippet:
                 sn = snippet[:snippet_max] + ("…" if len(snippet) > snippet_max else "")
                 line += f"\n  **Snippet:** {sn}"
@@ -222,7 +248,9 @@ def _format_dataset_citations(datasets: list, max_n: int = 5) -> list:
     return out
 
 def _format_pi_steps_for_report(intermediate_steps: list) -> str:
-    """Format PI agent intermediate_steps (list of (action, observation)) into a single string for pi_report_chain input."""
+    """Format PI agent intermediate_steps (list of (action, observation)) into a single string for pi_report_chain input.
+    References are numbered and each on a separate line.
+    """
     if not intermediate_steps:
         return "No search results."
     sections = []
@@ -236,6 +264,7 @@ def _format_pi_steps_for_report(intermediate_steps: list) -> str:
             if data.get("references"):
                 lines = _format_literature_citations(data["references"], max_n=5)
                 if lines:
+                    # Each reference on its own line with proper line breaks
                     sections.append(f"**Literature ({tname})**\n" + "\n".join(lines))
             elif data.get("results"):
                 lines = _format_web_citations(data["results"] if isinstance(data["results"], list) else [], max_n=5)
@@ -484,10 +513,24 @@ def _build_conversation_panel_html(history_list: List[Dict[str, Any]]) -> str:
         )
         return f"{panel_style_tag}<div class=\"vf-right-panel\">{empty_html}</div>"
     chat_html = _build_chat_html(history_list)
+    # Auto-scroll script: scroll to bottom anchor on each update
+    scroll_script = '''
+    <div id="vf-chat-bottom-anchor"></div>
+    <script>
+    (function() {
+        setTimeout(function() {
+            var anchor = document.getElementById('vf-chat-bottom-anchor');
+            if (anchor) {
+                anchor.scrollIntoView({ behavior: 'smooth', block: 'end' });
+            }
+        }, 50);
+    })();
+    </script>
+    '''
     return (
         f"{panel_style_tag}"
         '<div class="vf-right-panel" style="height:100%;min-height:77vh;">'
-        f'<div class="vf-conversation-panel">{chat_html}</div>'
+        f'<div class="vf-conversation-panel">{chat_html}{scroll_script}</div>'
         "</div>"
     )
 

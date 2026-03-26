@@ -28,6 +28,7 @@ from agent.prompts import (
     PI_PROMPT,
     PI_RESEARCH_PROMPT,
     PI_SECTIONS_PROMPT,
+    PI_CHAT_PROMPT,
     PI_SUB_REPORT_PROMPT,
     PI_FINAL_REPORT_PROMPT,
     PI_SUGGEST_STEPS_PROMPT,
@@ -707,6 +708,11 @@ def create_pi_answer_chain(llm: BaseChatModel, tools_description: str = "(Answer
     return planner_prompt_partial | llm | StrOutputParser()
 
 
+def create_pi_chat_chain(llm: BaseChatModel):
+    """Chain for PI chat mode: direct responses for greetings and simple conversations."""
+    return PI_CHAT_PROMPT | llm | StrOutputParser()
+
+
 def initialize_session_state() -> Dict[str, Any]:
     llm = Chat_LLM(temperature=0.1)
     all_tools = get_tools()
@@ -724,6 +730,7 @@ def initialize_session_state() -> Dict[str, Any]:
     cb_planner_chain = create_cb_planner_chain(llm, tools_description, all_tools=all_tools)
     cb_planner_raw_chain = create_cb_planner_raw_chain(llm, tools_description, all_tools=all_tools)
     pi_answer_chain = create_pi_answer_chain(llm, pi_tools_description)
+    pi_chat_chain = create_pi_chat_chain(llm)
     workers = {t.name: create_worker_executor(llm, [t], all_tools=all_tools) for t in all_tools}
     # MLS self-check may use read_skill, python_repl, agent_generated_code, or any other tool to fix the error
     mls_debug_executor = create_mls_debug_executor(llm, all_tools)
@@ -755,6 +762,7 @@ def initialize_session_state() -> Dict[str, Any]:
         'mls_debug_executor': mls_debug_executor,
         'finalizer': finalizer_chain,
         'pi_answer': pi_answer_chain,
+        'pi_chat': pi_chat_chain,
         'llm': llm,
         'memory': _ChatBufferWindowMemory(k=10),
         'history': [],

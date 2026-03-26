@@ -27,10 +27,10 @@ logger = logging.getLogger(__name__)
 
 # Single FastMCP app that mounts all tool domains
 mcp = FastMCP("VenusFactory MCP Server")
-mcp.mount(mutation_mcp, namespace="mutation")
-mcp.mount(predict_mcp, namespace="predict")
-mcp.mount(search_mcp, namespace="search")
-mcp.mount(database_mcp, namespace="database")
+mcp.mount(mutation_mcp)
+mcp.mount(predict_mcp)
+mcp.mount(search_mcp)
+mcp.mount(database_mcp)
 
 _http_server_thread: Optional[threading.Thread] = None
 _http_server_lock = threading.Lock()

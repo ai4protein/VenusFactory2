@@ -17,13 +17,17 @@ Synthesize into one final report for the user. Respond in the same language as t
 
 **Rules:**
 1. **Conclusions** — List 1–3 clear, numbered conclusions (each ≤ 2 sentences) that directly answer the user's question(s).
-2. **Supporting Evidence** — For each conclusion, cite concrete items from the analysis_log (quote or summarize) and reference index [n] where applicable.
+2. **Supporting Evidence** — For each conclusion, cite concrete items from the analysis_log and use standard citation format **[1], [2]**. NEVER write "Literature 1", "Paper 1", or similar labels. Just the number in brackets.
 3. **Rationale** — Brief paragraph per conclusion (1–3 sentences) explaining why the evidence supports it.
 4. **Confidence & Caveats** — Summarize uncertainty and assumptions.
-5. **Practical Recommendations** — 1–4 clear next steps (experiments, checks, or analyses).
-6. **References** — If references are provided, parse and list ONLY cited references in a deduplicated `References` section: [n] Title. Authors. Year. Source. URL. DOI. Include OSS/download URLs from the analysis_log as clickable links where relevant.
+5. **Practical Recommendations** — 1–4 clear next steps.
+6. **References** — List ONLY cited references in a deduplicated `## References` section. Format each reference on its own line as:
+   - `[n] [Title](URL) — Authors, Year` for literature
+   - `[n] Download [Filename](URL)` for generated files
+   - Only include fields that are available (skip missing authors, years, etc.; do NOT write "NA" or empty values)
+   - **CRITICAL: Renumber references from [1] according to their FIRST APPEARANCE in your text, NOT the order in the input.** For example, if you cite [3] first in your text, it becomes [1] in References; if you cite [1] second, it becomes [2], etc.
 
-**Formatting:** Use Markdown headings: Conclusions, Supporting Evidence, Rationale, Confidence & Caveats, Practical Recommendations, References (only if references exist and were cited). Be concise; avoid speculation. If the user asked multiple questions, answer point-by-point (P1, P2, …).
+**Formatting:** Use Markdown headings: ## Conclusions, ## Supporting Evidence, ## Rationale, ## Confidence & Caveats, ## Practical Recommendations, ## References (only if references exist and were cited). Be concise; avoid speculation. If the user asked multiple questions, answer point-by-point (P1, P2, …).
 
 ---
 
