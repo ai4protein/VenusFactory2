@@ -1,14 +1,20 @@
-# VenusFactory Evaluation Module User Guide
+# VenusFactory2 Evaluation Module User Guide
 
 ## 1. Introduction
 
-The VenusFactory evaluation module is a powerful tool that allows you to comprehensively assess the performance of trained protein analysis models. Through this module, you can test a model's predictive capabilities on various datasets, obtain detailed evaluation metrics, and analyze the model's strengths and weaknesses. Evaluation results can help you compare the performance of different models, select the most suitable model for specific tasks, and guide further model improvements.
+The Evaluation Module helps you test how well your trained model actually works. After training, you need to know: "Is this model accurate enough for my research?" This module answers that question by running your model on test data and calculating performance metrics.
 
-The evaluation module supports the assessment of various model fine-tuning approaches. You can use predefined datasets or custom datasets for evaluation and select multiple evaluation metrics to gain a comprehensive understanding of model performance.
+**What you'll learn from evaluation**:
+- How accurate is your model? (Accuracy, F1 score, etc.)
+- Does it work well on all types of proteins or just some?
+- Is it better than other models you've tried?
+- Should you adjust your training parameters and try again?
+
+You can evaluate models on pre-defined benchmark datasets or your own custom test data.
 
 ## 2. Supported Evaluation Metrics
 
-VenusFactory provides multiple evaluation metrics to assess model performance. Different metrics are applicable depending on the problem type.
+VenusFactory2 provides multiple evaluation metrics to assess model performance. Different metrics are applicable depending on the problem type.
 
 | Abbreviation | Metric Name | Applicable Problem Types | Description | Optimization Direction |
 |---------|------|------------|------|---------|
@@ -162,7 +168,7 @@ The evaluation interface is divided into several main sections, each containing 
 
 ## 4. Evaluation Process Guide
 
-Below is a complete guide to using the VenusFactory evaluation module, from model preparation to result analysis.
+Below is a complete guide to using the VenusFactory2 evaluation module, from model preparation to result analysis.
 
 ### 4.1 Preparing Models and Datasets
 

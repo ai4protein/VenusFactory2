@@ -3,7 +3,7 @@ name: kegg_database
 description: Direct REST API access to KEGG (academic use only). Pathway analysis, gene-pathway mapping, metabolic pathways, drug interactions, ID conversion. Use this for direct HTTP/REST work or KEGG-specific control.
 license: Non-academic use of KEGG requires a commercial license
 metadata:
-    skill-author: VenusFactory.
+    skill-author: VenusFactory2.
 ---
 
 # KEGG Database

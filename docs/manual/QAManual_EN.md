@@ -1,8 +1,8 @@
-# ProFactory Frequently Asked Questions (FAQ)
+# VenusFactory2 Frequently Asked Questions (FAQ)
 
 ## Installation and Environment Configuration Issues
 
-### Q1: How to properly install ProFactory?
+### Q1: How to properly install VenusFactory2?
 
 **Answer**: You can find the installation step in README.md at the root directory.
 
@@ -89,7 +89,7 @@
 3. **Upload to Hugging Face**:
    - Create a dataset repository on Hugging Face
    - Upload your CSV file
-   - Reference it in ProFactory using the `username/dataset_name` format
+   - Reference it in VenusFactory2 using the `username/dataset_name` format
 
 4. **Create dataset configuration**: The configuration should include the problem type (regression or classification), number of labels, and evaluation metrics.
 

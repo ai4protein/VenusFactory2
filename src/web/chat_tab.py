@@ -372,7 +372,7 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
     """Create the chat tab: left = main area (conversation + input at bottom); right = sidebar (examples, tips, log)."""
     session_state = gr.State(value=None)  # Lazy-init in send_message (State cannot deepcopy LLM/chains)
     gr.Markdown("""
-    💡 *This is a academic demo version of VenusFactory (Max PI search 3, Max tools 40), please [local deployment](https://github.com/AI4Protein/VenusFactory) to unlock the full features or visit [project version](https://venusfactory.cn).*
+    💡 *This is a academic demo version of VenusFactory2 (Max PI search 3, Max tools 40), please [local deployment](https://github.com/AI4Protein/VenusFactory2) to unlock the full features or visit [project version](https://venusfactory.cn).*
     """)
     with gr.Row(equal_height=True, elem_id="vf-agent-page-row"):
         # Left (main): conversation area + input row at bottom
@@ -400,7 +400,7 @@ def create_chat_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                         inputs=chat_input,
                         label=None
                     )
-                with gr.Accordion("✨ Tips for Prompting VenusFactory", open=True):
+                with gr.Accordion("✨ Tips for Prompting VenusFactory2", open=True):
                     gr.Markdown("""
 **Capabilities**: Sequence/structure analysis, function prediction, mutation impact, DB queries (UniProt/PDB/NCBI).
 

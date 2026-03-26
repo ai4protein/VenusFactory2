@@ -1,8 +1,8 @@
-# ProFactory 常见问题解答 (FAQ)
+# VenusFactory2 常见问题解答 (FAQ)
 
 ## 安装与环境配置问题
 
-### Q1: 如何正确安装ProFactory？
+### Q1: 如何正确安装VenusFactory2？
 
 **回答**：你可以在根目录的README.md文件中找到安装的步骤。
 
@@ -89,7 +89,7 @@
 3. **上传到Hugging Face**：
    - 在Hugging Face上创建数据集仓库
    - 上传您的CSV文件
-   - 在ProFactory中使用`用户名/数据集名`格式引用它
+   - 在VenusFactory2中使用`用户名/数据集名`格式引用它
 
 4. **创建数据集配置**：配置应包含问题类型（回归或分类）、标签数量和评估指标等信息。
 

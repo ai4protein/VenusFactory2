@@ -1,6 +1,6 @@
 # KEGG Database Reference
 
-## Project Integration (VenusFactory)
+## Project Integration (VenusFactory2)
 
 KEGG REST operations are implemented in **`src/tools/database/kegg/`**:
 

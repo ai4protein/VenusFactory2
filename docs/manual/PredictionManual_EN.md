@@ -1,4 +1,4 @@
-# VenusFactory Prediction Module User Guide
+# VenusFactory2 Prediction Module User Guide
 
 ## Table of Contents
 1. Introduction
@@ -9,7 +9,11 @@
 
 ## 1. Introduction
 
-The VenusFactory prediction module allows researchers to use trained models to predict the functions of new protein sequences, supporting quick predictions for single sequences and efficient processing for batch sequences, providing important computational assistance for protein function research and drug development. The prediction module is closely integrated with the training module, ensuring consistency between model training and prediction processes, while providing an intuitive user interface that allows biologists to obtain high-quality prediction results without needing to delve into the details of machine learning techniques.
+The Prediction Module lets you apply trained models to new protein sequences to predict their properties. After training a model (or using a pre-trained one), you can quickly predict properties for single sequences or process hundreds of sequences in batch mode.
+
+**Two main use cases**:
+- **Single sequence prediction**: Get instant results for one protein - ideal for quick checks or interactive exploration
+- **Batch prediction**: Upload a CSV file with many sequences and get predictions for all of them at once - perfect for screening large protein libraries
 
 ## 2. Overview of the Prediction Interface
 

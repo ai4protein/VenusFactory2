@@ -3,7 +3,7 @@ name: matplotlib
 description: Low-level plotting library for full customization. Use when you need fine-grained control over every plot element, creating novel plot types, or integrating with specific scientific workflows. Export to PNG/PDF/SVG for publication. For quick statistical plots use seaborn; for interactive plots use plotly; for publication-ready multi-panel figures with journal styling, use scientific-visualization.
 license: https://github.com/matplotlib/matplotlib/tree/main/LICENSE
 metadata:
-    skill-author: VenusFactory.
+    skill-author: VenusFactory2.
 ---
 
 # Matplotlib
@@ -305,7 +305,7 @@ fig, ax = create_analysis_plot(my_data, 'My Analysis')
 plt.savefig('analysis.png', dpi=300, bbox_inches='tight')
 ```
 
-## Project Tools (VenusFactory)
+## Project Tools (VenusFactory2)
 
 Helper modules live in **`src/tools/visualize/matplotlib/`**. Run from project root (or with `PYTHONPATH` set):
 

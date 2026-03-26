@@ -1,8 +1,16 @@
-# VenusFactory Advanced Tools 用户指南
+# VenusFactory2 Advanced Tools 用户指南
 
 ## 1. Advanced Tools 简介
 
-**Advanced Tools (高级工具)** 是为寻求高灵活性和定制化预测能力的用户设计的平台功能。其核心价值在于允许用户**自由选择底层蛋白质语言模型 (PLM) 和预测数据集**，从而实现对预测过程的精确控制和优化，超越 Quick Tools 的预设配置。
+**Advanced Tools (高级工具)** 让您对蛋白质预测有更多控制权。Quick Tools 为了速度使用预选模型，而 Advanced Tools 让您准确选择使用哪些模型，并比较不同方法的结果。
+
+**在以下情况使用 Advanced Tools**：
+- 想比较不同模型的预测结果（ESM2、ProtBert、ProtT5 等）
+- 除了基于序列的分析外，还需要基于结构的分析
+- 正在为特定用例优化，想测试不同的模型配置
+- 想通过交叉检查多个数据集来验证结果
+
+权衡：更多灵活性意味着更多选择，但您会获得更定制化、可能更准确的结果。
 
 ### 1.1 智能定向进化
 

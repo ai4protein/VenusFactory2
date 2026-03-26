@@ -38,15 +38,15 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("VenusFactory API server starting up...")
+    logger.info("VenusFactory2 API server starting up...")
     logger.info(f"Upload directory: {UPLOAD_DIR}")
     logger.info(f"Output directory: {OUTPUT_DIR}")
     yield
-    logger.info("VenusFactory API server shutting down...")
+    logger.info("VenusFactory2 API server shutting down...")
 
 
 app = FastAPI(
-    title="VenusFactory API",
+    title="VenusFactory2 API",
     description="API for protein sequence and structure analysis tools (tools_api layer)",
     version="1.0.0",
     docs_url="/docs",

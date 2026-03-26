@@ -105,7 +105,7 @@ im = ax.imshow(data, cmap=cmap, norm=norm)
 ## Style Sheets
 
 > [!TIP]
-> **Use VenusFactory Tools:** For pre-configured publication, presentation, web, dark, and minimal styles, consider using `src/tools/visualize/matplotlib/style_configurator.py` (see `SKILL.md`). It handles sizing, fonts, and layout best practices automatically.
+> **Use VenusFactory2 Tools:** For pre-configured publication, presentation, web, dark, and minimal styles, consider using `src/tools/visualize/matplotlib/style_configurator.py` (see `SKILL.md`). It handles sizing, fonts, and layout best practices automatically.
 
 ### Using Built-in Styles
 
@@ -499,7 +499,7 @@ plt.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.1,
 ## Professional Publication Style
 
 > [!TIP]
-> **Use VenusFactory Tools:** You can automatically apply these settings by using the `publication` preset from `src/tools/visualize/matplotlib/style_configurator.py`.
+> **Use VenusFactory2 Tools:** You can automatically apply these settings by using the `publication` preset from `src/tools/visualize/matplotlib/style_configurator.py`.
 
 Example configuration for publication-quality figures:
 

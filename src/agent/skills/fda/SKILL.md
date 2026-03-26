@@ -3,7 +3,7 @@ name: fda-database
 description: Query openFDA API for drugs, devices, adverse events, recalls, regulatory submissions (510k, PMA), substance identification (UNII), for FDA regulatory data analysis and safety research.
 license: Unknown
 metadata:
-    skill-author: VenusFactory.
+    skill-author: VenusFactory2.
 ---
 
 # FDA Database Access

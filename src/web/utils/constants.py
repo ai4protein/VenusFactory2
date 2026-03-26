@@ -1,4 +1,4 @@
-"""Constants and configuration mappings for VenusFactory. Loaded from src/constant.json."""
+"""Constants and configuration mappings for VenusFactory2. Loaded from src/constant.json."""
 
 import json
 from pathlib import Path

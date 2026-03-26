@@ -3,7 +3,7 @@ name: alphafold_database
 description: Access AlphaFold 200M+ AI-predicted protein structures. Retrieve structures by UniProt ID, download PDB/mmCIF files, analyze confidence metrics (pLDDT, PAE), for drug discovery and structural biology.
 license: Unknown
 metadata:
-    skill-author: VenusFactory.
+    skill-author: VenusFactory2.
 ---
 
 # AlphaFold Database
@@ -12,7 +12,7 @@ metadata:
 
 AlphaFold DB is a public repository of AI-predicted 3D protein structures for over 200 million proteins, maintained by DeepMind and EMBL-EBI. Access structure predictions with confidence metrics, download coordinate files, retrieve bulk datasets, and integrate predictions into computational workflows.
 
-## Project Tools (VenusFactory)
+## Project Tools (VenusFactory2)
 
 **Only the following two agent tools are exposed** for AlphaFold in this codebase. Query tools that return structure/metadata text into the conversation are **not** exposed, because they would put large PDB/mmCIF or JSON payloads into the context and cause context explosion. Use the download tools instead: they write to disk and return only `{success, file_path}` in JSON.
 

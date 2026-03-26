@@ -1,17 +1,18 @@
-## Agent: AI Assistant and Automated Workflow Engine
+## Agent: Your AI Assistant for Protein Engineering
 
-**Agent** is a powerful engine built on a **Multi-Agent architecture** that transforms the traditional prediction interface into a **conversational workflow**. Using a **Planner**, **Workers**, and **Analysis modules**, it helps users manage, execute, and interpret complex protein engineering tasks via natural language.
+**Agent** is an AI-powered conversation interface that lets you analyze proteins using natural language. Instead of clicking through multiple tools and tabs, simply describe what you want to do in plain English (or Chinese), and Agent will automatically select the right models, run the analyses, and synthesize the results for you.
 
 ---
 
-## 1. Introduction and Core Functionality
+## 1. What Can Agent Do For You?
 
-The core value of **Agent** lies in automating experimental design and supporting complex, cross-module workflows.
+Agent is designed to help you complete protein engineering tasks quickly without needing to learn complex tool configurations:
 
-- **Multi-Agent Architecture**: Features a **Planner** for task decomposition, **Workers** for executing specific prediction models, and **Analysis modules** for result synthesis.
-- **Multi-Task Integration**: Capable of integrating all key VenusFactory prediction functionalities: **Function Prediction**, **Residue Prediction**, **Mutation Prediction**, and **Physicochemical Analysis**.
-- **Contextual Memory**: Retains memory of previous steps and data within the same conversation thread.
-- **Data Integration**: Supports direct file upload and referencing (**FASTA**, **PDB**).
+- **Ask questions in plain language**: "What is the solubility of this protein?" or "Find mutations to improve stability"
+- **Upload your data easily**: Paste sequences, upload FASTA/PDB files, or provide UniProt IDs
+- **Get comprehensive answers**: Agent automatically combines predictions from multiple models and explains the results in simple terms
+- **Work conversationally**: Ask follow-up questions without re-uploading data - Agent remembers your conversation context
+- **Save time**: Instead of running multiple separate analyses, Agent does it all in one conversation
 
 ---
 

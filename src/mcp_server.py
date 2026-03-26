@@ -26,11 +26,19 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Single FastMCP app that mounts all tool domains
+<<<<<<< HEAD
 mcp = FastMCP("VenusFactory MCP Server")
 mcp.mount(mutation_mcp)
 mcp.mount(predict_mcp)
 mcp.mount(search_mcp)
 mcp.mount(database_mcp)
+=======
+mcp = FastMCP("VenusFactory2 MCP Server")
+mcp.mount(mutation_mcp, namespace="mutation")
+mcp.mount(predict_mcp, namespace="predict")
+mcp.mount(search_mcp, namespace="search")
+mcp.mount(database_mcp, namespace="database")
+>>>>>>> da9286c86c409271692e011942c42af9223cea4f
 
 _http_server_thread: Optional[threading.Thread] = None
 _http_server_lock = threading.Lock()
@@ -44,7 +52,7 @@ def start_http_server(host: Optional[str] = None, port: Optional[int] = None) ->
 
     def _serve() -> None:
         try:
-            logger.info("VenusFactory MCP Server running on %s:%s", host, port)
+            logger.info("VenusFactory2 MCP Server running on %s:%s", host, port)
             logger.info("MCP endpoint: http://%s:%s/mcp", host, port)
             app_with_route = mcp.http_app()
             uvicorn.run(app_with_route, host=host, port=port)
@@ -63,5 +71,5 @@ def start_http_server(host: Optional[str] = None, port: Optional[int] = None) ->
 
 
 if __name__ == "__main__":
-    logger.info("VenusFactory MCP Server starting...")
+    logger.info("VenusFactory2 MCP Server starting...")
     start_http_server()

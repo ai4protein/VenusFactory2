@@ -28,7 +28,7 @@ def make_chat_html(path: Path, history_list: List[Dict[str, Any]]) -> None:
         f.write("<!doctype html><html><head><meta charset='utf-8'><title>Chat Export</title>")
         f.write(f"<style>{css}</style></head><body>")
         f.write("<div class='chat-container'>")
-        f.write("<h2>VenusFactory Chat Export</h2>\n")
+        f.write("<h2>VenusFactory2 Chat Export</h2>\n")
         for msg in history_list:
             role = str(msg.get("role", "")).lower()
             content = str(msg.get("content", ""))

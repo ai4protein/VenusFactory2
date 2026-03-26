@@ -1,5 +1,5 @@
 """
-LangGraph orchestration for the VenusFactory Agent.
+LangGraph orchestration for the VenusFactory2 Agent.
 Decouples agent logic (PI -> CB -> MLS) from the UI (chat_tab.py).
 """
 import json

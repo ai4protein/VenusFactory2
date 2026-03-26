@@ -4,7 +4,7 @@ This document provides comprehensive technical documentation for programmatic ac
 
 ## Project Integration
 
-VenusFactory implements AlphaFold access in `src/tools/database/alphafold/`:
+VenusFactory2 implements AlphaFold access in `src/tools/database/alphafold/`:
 
 - **Metadata:** `query_alphafold_metadata(uniprot_id)` returns JSON from `/api/prediction/{uniprot_id}`; `download_alphafold_metadata(uniprot_id, out_dir)` saves it to a file.
 - **Structure:** `query_alphafold_structure(uniprot_id, format, version, fragment)` and `download_alphafold_structure(uniprot_id, out_dir, format, version, fragment)` use the file URL pattern below. Default `version` is `v4`; `format` is `pdb` or `cif`.

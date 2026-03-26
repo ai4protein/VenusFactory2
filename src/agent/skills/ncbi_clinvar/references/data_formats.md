@@ -4,7 +4,7 @@
 
 ClinVar provides bulk data downloads in multiple formats to support different research workflows. Data is distributed via FTP and updated on regular schedules.
 
-### Project Integration (VenusFactory)
+### Project Integration (VenusFactory2)
 
 FTP URLs and downloads are available in **`src/tools/database/ncbi/ncbi_clinvar.py`**:
 

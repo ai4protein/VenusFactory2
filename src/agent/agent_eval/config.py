@@ -5,15 +5,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Input and Output file paths
-INPUT_FILE = "VenusFactory_compared_performance.csv"
-OUTPUT_FILE = "VenusFactory_compared_performance_all_model_Hard.csv"
+INPUT_FILE = "VenusFactory2_compared_performance.csv"
+OUTPUT_FILE = "VenusFactory2_compared_performance_all_model_Hard.csv"
 
 # API Key
 API_KEY = os.getenv("OPENAI_API_KEY")
 
 # List of model columns in the CSV
 MODEL_COLUMNS = [
-    "VenusFactory",
+    "VenusFactory2",
     "SciToolAgent (gpt-4o)",
     "ProtAgent (gpt-4o)",
     "DeepSeek-V3.2-Thinking",

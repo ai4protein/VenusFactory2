@@ -177,7 +177,7 @@ def create_ui():
     """
     
     # Gradio 6: css moved from Blocks() to launch()
-    with gr.Blocks(title="VenusFactory") as demo:
+    with gr.Blocks(title="VenusFactory2") as demo:
         # Header with GitHub icon
         header_html = load_html_template("header.html")
         gr.HTML(header_html, padding=True)
