@@ -307,7 +307,7 @@ if __name__ == "__main__":
         elif args.mode == "fastapi":
             run_fastapi_server()
 
-        elif args.mode == "server":
+        elif args.mode == "web":
             run_gradio_server()
 
         elif args.mode == "all":
