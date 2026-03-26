@@ -78,7 +78,7 @@ pip install -r requirements.txt  # Detailed guide below ↓
 ### 2. Launch
 ```bash
 # Web UI (Recommended)
-python src/webui.py  # → http://localhost:7860
+python src/webui.py --mode web  # → http://localhost:7860
 
 # REST API
 python src/api_server.py  # → http://localhost:5000/docs
