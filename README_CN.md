@@ -75,10 +75,24 @@ conda create -n venus python=3.12 && conda activate venus
 pip install -r requirements.txt  # 详细指南见下方 ↓
 ```
 
-### 2. 启动
+### 2. 构建前端（WebUI v2 必需）
 ```bash
-# 网页界面（推荐）
-python src/webui.py --mode web  # → http://localhost:7860
+cd frontend
+npm install
+npm run build
+cd ..
+```
+
+### 3. 启动
+```bash
+# Web UI v1（传统 Gradio，本地模式）
+python src/webui.py --mode all  # → http://localhost:7860
+
+# Web UI v2（FastAPI + React，本地模式）
+python src/webui_v2.py --host 0.0.0.0 --port 7861  # → http://localhost:7861
+
+# Web UI v2（FastAPI + React，在线模式）
+python src/webui_v2.py --host 0.0.0.0 --port 7861 --online
 
 # REST API
 python src/api_server.py  # → http://localhost:5000/docs
@@ -87,7 +101,7 @@ python src/api_server.py  # → http://localhost:5000/docs
 bash script/train/train_plm_lora.sh
 ```
 
-### 3. 获取结果
+### 4. 获取结果
 
 <details>
 <summary><b>🤖 试试Agent-0.1 | ⚡ 快速工具 | 🔬 训练模型</b> (点击展开示例)</summary>
@@ -324,8 +338,23 @@ pip install -r requirements.txt
 
 ### 网页界面
 
+> WebUI v2 在生产模式下会从 `frontend/dist` 提供静态资源，因此启动 `src/webui_v2.py` 前请先在 `frontend/` 中执行 `npm run build`。
+
 ```bash
-python src/webui.py  # → http://localhost:7860
+# 先构建 WebUI v2 前端资源
+cd frontend && npm run build && cd ..
+
+# v1（传统 Gradio）- 本地模式
+python src/webui.py --mode all  # → http://localhost:7860
+
+# v1（传统 Gradio）- 在线兼容模式（功能受限）
+WEBUI_V2_MODE=online python src/webui.py --mode all  # → http://localhost:7860
+
+# v2（FastAPI + React）- 本地模式
+python src/webui_v2.py --host 0.0.0.0 --port 7861  # → http://localhost:7861
+
+# v2（FastAPI + React）- 在线模式
+python src/webui_v2.py --host 0.0.0.0 --port 7861 --online  # → http://localhost:7861
 ```
 
 | 标签页 | 用途 | 功能 |

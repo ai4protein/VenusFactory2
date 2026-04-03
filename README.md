@@ -75,12 +75,26 @@ conda create -n venus python=3.12 && conda activate venus
 pip install -r requirements.txt  # Detailed guide below ↓
 ```
 
-### 2. Launch
+### 2. Build Frontend (WebUI v2 required)
 ```bash
-# Web UI (Recommended)
-python src/webui.py --mode web  # → http://localhost:7860
+cd frontend
+npm install
+npm run build
+cd ..
+```
 
-# REST API
+### 3. Launch
+```bash
+# Web UI v1 (legacy Gradio, local mode)
+python src/webui.py --mode all  # → http://localhost:7860
+
+# Web UI v2 (FastAPI + React, local mode)
+python src/webui_v2.py --host 0.0.0.0 --port 7861  # → http://localhost:7861
+
+# Web UI v2 (FastAPI + React, online mode)
+python src/webui_v2.py --host 0.0.0.0 --port 7861 --online
+
+# REST API only
 python src/api_server.py  # → http://localhost:5000/docs
 
 # CLI
@@ -326,8 +340,23 @@ pip install -r requirements.txt
 
 ### Web UI
 
+> WebUI v2 serves static files from `frontend/dist` in production mode, so run `npm run build` in `frontend/` before starting `src/webui_v2.py`.
+
 ```bash
-python src/webui.py  # → http://localhost:7860
+# Build WebUI v2 frontend assets first
+cd frontend && npm run build && cd ..
+
+# v1 (legacy Gradio) - local mode
+python src/webui.py --mode all  # → http://localhost:7860
+
+# v1 (legacy Gradio) - online-compatible mode (feature-limited)
+WEBUI_V2_MODE=online python src/webui.py --mode all  # → http://localhost:7860
+
+# v2 (FastAPI + React) - local mode
+python src/webui_v2.py --host 0.0.0.0 --port 7861  # → http://localhost:7861
+
+# v2 (FastAPI + React) - online mode
+python src/webui_v2.py --host 0.0.0.0 --port 7861 --online  # → http://localhost:7861
 ```
 
 | Tab | Purpose | Features |
