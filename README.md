@@ -45,6 +45,14 @@
   <img src="https://img.shields.io/badge/Tools-9_Categories-F38181?style=for-the-badge">
 </p>
 
+<p align="center">
+  <img src="img/web_v2/train.png" width="90%" alt="VenusFactory2 Training Interface">
+</p>
+
+<p align="center">
+  <img src="img/web_v2/agent.png" width="90%" alt="VenusFactory2 Agent Interface">
+</p>
+
 ### 🚀 Why VenusFactory2?
 
 | **🤖 Agent-First** | **🎯 Three Interfaces** | **⚡ Zero to Results** |

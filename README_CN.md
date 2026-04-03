@@ -45,6 +45,14 @@
   <img src="https://img.shields.io/badge/工具-9大类-F38181?style=for-the-badge">
 </p>
 
+<p align="center">
+  <img src="img/web_v2/train.png" width="90%" alt="VenusFactory2 训练界面">
+</p>
+
+<p align="center">
+  <img src="img/web_v2/agent.png" width="90%" alt="VenusFactory2 Agent 界面">
+</p>
+
 ### 🚀 为什么选择VenusFactory2？
 
 | **🤖 Agent优先** | **🎯 三种接口** | **⚡ 从零到结果** |
