@@ -60,6 +60,8 @@ Recent tool outputs (most recent first):
 - You MUST include file paths in the tool_input when tools require file inputs.
 - For data processing tasks (like dataset splitting), always use the agent_generated_code tool with input_files parameter.
 - File path format: Use the exact file paths provided in the context summary.
+- For any write/download tool, NEVER use `"."` or `"./"` as output path/dir.
+- Prefer session-scoped output targets under `<agent_session_dir>` (for example `<agent_session_dir>/<tool_name>/...`).
 
 ## TOOL DISTINCTION RULES
 Use **exact tool names** from the Available tools list below. Common mappings:
@@ -183,6 +185,7 @@ When users mention a concept that does not exactly match a required parameter va
 ]
 ```
 Note: Use the default output directory from context for out_path and fasta_file.
+Do not use `./` as output directory in examples or plans.
 
 User uploads dataset.csv and asks to split it:
 ```json
@@ -251,3 +254,5 @@ User asks to download AlphaFold structure:
 ## Language & Tool Execution Rules
 - You MUST answer, reason, and output your final response in the **same language** as the user's query.
 - **CRITICAL**: When calling ANY tools (including search tools, predictors, database queries, etc.), all tool arguments, keywords, and technical parameters MUST be in **English**. Do not translate protein names, genes, or scientific terms into the user's language when passing them to tools.
+- User-visible prose/report text must be fully in the user's language; avoid mixing Chinese-English within the same sentence unless the token is a technical identifier.
+- Keep technical identifiers in English exactly as required (tool names, parameter keys, dependency tokens, model IDs, file extensions).

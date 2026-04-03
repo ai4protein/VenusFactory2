@@ -21,6 +21,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.callbacks import CallbackManagerForLLMRun
 from dotenv import load_dotenv
+from web.utils.common_utils import get_web_v2_area_dir
 
 from tools.tools_agent_hub import get_tools, get_pi_tools
 from agent.skills import get_skills_metadata_string
@@ -42,6 +43,36 @@ from agent.prompts import (
 )
 
 load_dotenv()
+
+_ONLINE_DISABLED_AGENT_TOOL_NAMES = {
+    # Training-related tools
+    "generate_training_config",
+    "train_protein_model",
+    "protein_model_predict",
+    # Protein-discovery related tools
+    "download_foldseek_results_by_pdb_file",
+    "query_foldseek_search_by_pdb_file",
+}
+
+
+def _is_online_mode() -> bool:
+    return os.getenv("WEBUI_V2_MODE", "local").strip().lower() == "online"
+
+
+def _filter_agent_tools_for_runtime_mode(tools: List[BaseTool]) -> tuple[List[BaseTool], List[str]]:
+    """Filter agent tools by runtime mode and return (enabled_tools, disabled_tool_names)."""
+    if not _is_online_mode():
+        return tools, []
+
+    disabled: List[str] = []
+    enabled: List[BaseTool] = []
+    for tool in tools:
+        name = getattr(tool, "name", "") or ""
+        if name in _ONLINE_DISABLED_AGENT_TOOL_NAMES or "foldseek" in name.lower():
+            disabled.append(name)
+            continue
+        enabled.append(tool)
+    return enabled, sorted(set(disabled))
 
 
 class _ChatBufferWindowMemory:
@@ -276,9 +307,28 @@ def generate_cache_key(tool_name: str, tool_input: dict) -> str:
     return f"{tool_name}_{params_hash}"
 
 
-def _merge_tool_parameters_with_context(protein_ctx: "ProteinContextManager", base_params: Dict[str, Any]) -> Dict[str, Any]:
+def _merge_tool_parameters_with_context(protein_ctx: "ProteinContextManager", base_params: Any) -> Dict[str, Any]:
     """Merge tool input parameters with current protein context (files/sequence/UniProt)."""
-    params = dict(base_params or {})
+    if isinstance(base_params, dict):
+        params = dict(base_params)
+    elif isinstance(base_params, str):
+        text = base_params.strip()
+        parsed = None
+        if text.startswith("{") and text.endswith("}"):
+            try:
+                parsed = json.loads(text)
+            except Exception:
+                parsed = None
+        if isinstance(parsed, dict):
+            params = dict(parsed)
+        else:
+            params = {"input": base_params}
+    elif isinstance(base_params, (list, tuple)):
+        params = {"items": list(base_params)}
+    elif base_params is None:
+        params = {}
+    else:
+        params = {"input": base_params}
     try:
         params.setdefault("last_sequence", getattr(protein_ctx, "last_sequence", None))
         params.setdefault("last_uniprot_id", getattr(protein_ctx, "last_uniprot_id", None))
@@ -321,18 +371,13 @@ def get_cached_tool_result(session_state: dict, tool_name: str, tool_input: dict
 
 
 def save_cached_tool_result(session_state: dict, tool_name: str, tool_input: dict, outputs: Any) -> bool:
-    is_success = True
-    if isinstance(outputs, dict) and 'success' in outputs:
-        is_success = outputs.get('success', False)
-    elif isinstance(outputs, str):
-        try:
-            parsed = json.loads(outputs)
-            if isinstance(parsed, dict) and 'success' in parsed:
-                is_success = parsed.get('success', False)
-        except (json.JSONDecodeError, ValueError):
-            pass
-    if not is_success:
+    from agent.chat_agent_utils import _tool_output_indicates_failure
+
+    is_failure, reason = _tool_output_indicates_failure(outputs)
+    if is_failure:
         print(f"⚠ Tool execution failed, not caching result for {tool_name}")
+        if reason:
+            print(f"  ↳ reason: {reason}")
         return False
     cache_key = generate_cache_key(tool_name, tool_input)
     cache = session_state.setdefault("tool_cache", {})
@@ -715,8 +760,11 @@ def create_pi_chat_chain(llm: BaseChatModel):
 
 def initialize_session_state() -> Dict[str, Any]:
     llm = Chat_LLM(temperature=0.1)
-    all_tools = get_tools()
+    all_tools_raw = get_tools()
+    all_tools, disabled_tool_names = _filter_agent_tools_for_runtime_mode(all_tools_raw)
     pi_tools = get_pi_tools()  # PI can execute only search tools (no download / train / etc.)
+    if disabled_tool_names:
+        pi_tools = [t for t in pi_tools if getattr(t, "name", "") not in set(disabled_tool_names)]
     tools_description = _build_tools_description(all_tools)
     pi_tools_description = _build_tools_description(pi_tools)
     planner_chain = create_planner_chain(llm, all_tools)
@@ -735,10 +783,7 @@ def initialize_session_state() -> Dict[str, Any]:
     # MLS self-check may use read_skill, python_repl, agent_generated_code, or any other tool to fix the error
     mls_debug_executor = create_mls_debug_executor(llm, all_tools)
     session_id = str(uuid.uuid4())
-    base_dir = os.getenv("TEMP_OUTPUTS_DIR", "temp_outputs")
-    now = datetime.now()
-    date_subdir = os.path.join(str(now.year), f"{now.month:02d}", f"{now.day:02d}", "Agent")
-    agent_session_dir = os.path.join(base_dir, date_subdir, session_id)
+    agent_session_dir = str(get_web_v2_area_dir("sessions", tool="chat", session_id=session_id))
     os.makedirs(agent_session_dir, exist_ok=True)
     available_tools_list = ", ".join(t.name for t in all_tools) if all_tools else "(none)"
     skills_metadata = get_skills_metadata_string()
@@ -749,6 +794,7 @@ def initialize_session_state() -> Dict[str, Any]:
         'skills_metadata': skills_metadata,
         'available_tools_list': available_tools_list,
         'all_tools': all_tools,
+        'disabled_tool_names': disabled_tool_names,
         'planner': planner_chain,
         'pi_research_agent': pi_research_agent,
         'pi_report': pi_report_chain,
@@ -771,6 +817,9 @@ def initialize_session_state() -> Dict[str, Any]:
         'protein_context': ProteinContextManager(),
         'temp_files': [],
         'tool_cache': {},
+        'execution_failed': False,
+        'failed_step': None,
+        'failed_reason': None,
         'latest_tool_output_file': None,
         'created_at': datetime.now()
     }

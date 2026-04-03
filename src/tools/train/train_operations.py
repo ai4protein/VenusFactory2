@@ -13,7 +13,7 @@ from typing import Dict, Any, List, Optional, Tuple
 import requests
 import pandas as pd
 from dotenv import load_dotenv
-from web.utils.common_utils import get_save_path
+from web.utils.common_utils import get_save_path, to_project_relative_path
 from web.utils.command import build_command_list, build_predict_command_list
 
 load_dotenv()
@@ -99,12 +99,13 @@ def generate_and_execute_code(task_description: str, input_files: Optional[List[
         if input_files:
             for file_path in input_files:
                 if os.path.exists(file_path):
-                    valid_files.append(os.path.abspath(file_path))  # Use absolute path
+                    normalized_input = str(Path(file_path).expanduser().resolve())
+                    valid_files.append(normalized_input)
                     # Get file info for better context
                     file_ext = os.path.splitext(file_path)[1]
                     file_size = os.path.getsize(file_path)
                     file_info.append({
-                        "path": os.path.abspath(file_path),
+                        "path": to_project_relative_path(normalized_input),
                         "extension": file_ext,
                         "size_kb": round(file_size / 1024, 2)
                     })
@@ -117,7 +118,7 @@ def generate_and_execute_code(task_description: str, input_files: Optional[List[
             output_directory = str(get_save_path("Code_Execution", "Generated_Outputs"))
         
         # Ensure output_directory is absolute path
-        output_directory = os.path.abspath(output_directory)
+        output_directory = str(Path(output_directory).expanduser().resolve())
         
         # Model registry directory for persistent storage
         model_registry_dir = os.path.join(output_directory, "trained_models")
@@ -134,7 +135,7 @@ def generate_and_execute_code(task_description: str, input_files: Optional[List[
                     if model_files:
                         available_models.append({
                             "name": item,
-                            "path": item_path,
+                            "path": to_project_relative_path(item_path),
                             "files": model_files
                         })
 
@@ -143,8 +144,8 @@ def generate_and_execute_code(task_description: str, input_files: Optional[List[
             "train_agent_generated_code",
             task_description=task_description,
             file_info=json.dumps(file_info, indent=2) if file_info else "None",
-            output_directory=output_directory,
-            model_registry_dir=model_registry_dir,
+            output_directory=to_project_relative_path(output_directory),
+            model_registry_dir=to_project_relative_path(model_registry_dir),
             available_models=json.dumps(available_models, indent=2) if available_models else "None",
         )
 
@@ -228,13 +229,13 @@ def generate_and_execute_code(task_description: str, input_files: Optional[List[
         # Use the same directory structure as other outputs
         code_save_dir = os.path.join(output_directory, "generated_scripts")
         os.makedirs(code_save_dir, exist_ok=True)
-        script_path = os.path.abspath(os.path.join(code_save_dir, code_filename))
+        script_path = str((Path(code_save_dir) / code_filename).resolve())
         
         with open(script_path, 'w', encoding='utf-8') as f:
             f.write(generated_code)
         
-        print(f"📝 Generated code saved to: {script_path}")
-        print(f"📂 Working directory: {output_directory}")
+        print(f"📝 Generated code saved to: {to_project_relative_path(script_path)}")
+        print("📂 Working directory prepared")
         
         # Execute the generated code with absolute path
         process = subprocess.run(
@@ -253,29 +254,29 @@ def generate_and_execute_code(task_description: str, input_files: Optional[List[
                 json_match = re.search(r'\{.*\}', stdout, re.DOTALL)
                 if json_match:
                     result_json = json.loads(json_match.group())
-                    result_json["generated_code_path"] = script_path
+                    result_json["generated_code_path"] = to_project_relative_path(script_path)
                     result_json["success"] = True  # Ensure success flag is set
                     result_json["SYSTEM_NOTE"] = "STOP EXECUTION NOW. The code has run successfully. Provide the Final Answer immediately."
                     
                     # Keep the generated code since execution was successful
-                    print(f"✓ Code executed successfully. Saved to: {script_path}")
+                    print(f"✓ Code executed successfully. Saved to: {to_project_relative_path(script_path)}")
                     return json.dumps(result_json, indent=2)
                 else:
                     # Fallback if no JSON found but execution succeeded
-                    print(f"✓ Code executed but no JSON output found. Saved to: {script_path}")
+                    print(f"✓ Code executed but no JSON output found. Saved to: {to_project_relative_path(script_path)}")
                     return json.dumps({
                         "success": True,
                         "output": stdout,
-                        "generated_code_path": script_path,
+                        "generated_code_path": to_project_relative_path(script_path),
                         "SYSTEM_NOTE": "STOP EXECUTION NOW. The code has run successfully. Provide the Final Answer immediately."
                     }, indent=2)
             except json.JSONDecodeError:
                 # If JSON parsing fails, return raw output
-                print(f"✓ Code executed but JSON parsing failed. Saved to: {script_path}")
+                print(f"✓ Code executed but JSON parsing failed. Saved to: {to_project_relative_path(script_path)}")
                 return json.dumps({
                     "success": True,
                     "output": stdout,
-                    "generated_code_path": script_path
+                    "generated_code_path": to_project_relative_path(script_path)
                 }, indent=2)
         else:
             # Execution failed - prepare error message
@@ -283,17 +284,17 @@ def generate_and_execute_code(task_description: str, input_files: Optional[List[
             stdout = process.stdout.strip()
             
             # Keep the failed code for debugging
-            print(f"✗ Code execution failed. Script saved for debugging: {script_path}")
+            print(f"✗ Code execution failed. Script saved for debugging: {to_project_relative_path(script_path)}")
             print(f"Error output: {stderr[:500]}")
             
             error_result = json.dumps({
                 "success": False,
                 "error": stderr if stderr else "Code execution failed with no error message",
                 "stdout": stdout,
-                "generated_code_path": script_path,
+                "generated_code_path": to_project_relative_path(script_path),
                 "debug_info": {
-                    "working_directory": output_directory,
-                    "script_path": script_path,
+                    "working_directory": to_project_relative_path(output_directory),
+                    "script_path": to_project_relative_path(script_path),
                     "return_code": process.returncode
                 }
             }, indent=2, ensure_ascii=False)
@@ -305,7 +306,7 @@ def generate_and_execute_code(task_description: str, input_files: Optional[List[
         if script_path and os.path.exists(script_path):
             try:
                 os.remove(script_path)
-                print(f"✗ Code execution timed out. Deleted script: {script_path}")
+                print(f"✗ Code execution timed out. Deleted script: {to_project_relative_path(script_path)}")
             except Exception:
                 pass
         return json.dumps({
@@ -317,7 +318,7 @@ def generate_and_execute_code(task_description: str, input_files: Optional[List[
         if script_path and os.path.exists(script_path):
             try:
                 os.remove(script_path)
-                print(f"✗ Error occurred. Deleted script: {script_path}")
+                print(f"✗ Error occurred. Deleted script: {to_project_relative_path(script_path)}")
             except Exception:
                 pass
         return json.dumps({

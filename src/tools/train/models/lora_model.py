@@ -23,7 +23,8 @@ class LoraModel(nn.Module):
                 args.hidden_size, args.num_labels, args.pooling_dropout
             )
         elif args.pooling_method == "mean":
-            if "PPI" in args.dataset:
+            dataset_name = str(getattr(args, "dataset", "") or "")
+            if "PPI" in dataset_name:
                 self.pooling = MeanPooling()
                 self.projection = MeanPoolingProjection(
                     args.hidden_size, args.num_labels, args.pooling_dropout

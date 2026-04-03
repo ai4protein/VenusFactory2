@@ -5,10 +5,12 @@
 # Uses FastMCP; each tool calls core download logic directly (no Agent layer).
 # Explicit tool names for the model; each tool returns the core status dict as-is.
 """
-import os
 import sys
+from pathlib import Path
 
-sys.path.insert(0, os.getcwd())
+_REPO_ROOT = next((p for p in Path(__file__).absolute().parents if (p / "src").is_dir()), Path(__file__).absolute().parent)
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 from typing import Any, Dict, List, Optional
 

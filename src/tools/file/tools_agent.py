@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from src.tools.path_sanitizer import to_client_file_path
 
 from langchain.tools import tool
 from pydantic import BaseModel, Field
@@ -46,7 +47,7 @@ def _success_response(
     if file_path:
         path = Path(file_path)
         out["file_info"] = {
-            "file_path": str(path.resolve()) if path.exists() else file_path,
+            "file_path": to_client_file_path(path if path.exists() else file_path),
             "file_name": file_name or path.name,
             "file_size": path.stat().st_size if path.exists() else 0,
         }

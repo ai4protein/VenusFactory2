@@ -520,6 +520,59 @@ def process_fasta_file(file_path: str) -> str:
     return str(new_file_path)
 
 
+def validate_and_normalize_fasta_content(fasta_content: str) -> str:
+    """Validate FASTA text and normalize it into clean single-line sequences.
+
+    Rules:
+    - First non-empty line must start with '>'.
+    - Every record must have a non-empty header and non-empty sequence.
+    - Sequence keeps alphabetic characters only and is uppercased.
+    """
+    if not fasta_content or not fasta_content.strip():
+        raise ValueError("FASTA content is empty.")
+
+    raw_lines = [line.strip() for line in fasta_content.splitlines() if line.strip()]
+    if not raw_lines:
+        raise ValueError("FASTA content is empty.")
+    if not raw_lines[0].startswith(">"):
+        raise ValueError("FASTA must include header line starting with >")
+
+    normalized_lines = []
+    current_header = None
+    current_sequence_parts = []
+
+    for line in raw_lines:
+        if line.startswith(">"):
+            if len(line) <= 1:
+                raise ValueError("FASTA header cannot be empty.")
+            if current_header is not None:
+                sequence = "".join(current_sequence_parts)
+                if not sequence:
+                    raise ValueError(f"Sequence under header '{current_header[1:]}' is empty.")
+                normalized_lines.append(current_header)
+                normalized_lines.append(sequence)
+            current_header = line
+            current_sequence_parts = []
+            continue
+
+        if current_header is None:
+            raise ValueError("FASTA must include header line starting with >")
+
+        sequence_chunk = "".join(char for char in line.upper() if char.isalpha())
+        current_sequence_parts.append(sequence_chunk)
+
+    if current_header is None:
+        raise ValueError("FASTA must include header line starting with >")
+
+    sequence = "".join(current_sequence_parts)
+    if not sequence:
+        raise ValueError(f"Sequence under header '{current_header[1:]}' is empty.")
+    normalized_lines.append(current_header)
+    normalized_lines.append(sequence)
+
+    return "\n".join(normalized_lines) + "\n"
+
+
 def clear_paste_content_pdb() -> Tuple:
     """Clear pasted PDB content."""
     return "", "", gr.update(choices=["A"], value="A", visible=False), {}, "A", ""

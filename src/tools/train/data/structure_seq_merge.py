@@ -13,6 +13,7 @@ are separate columns. Only PDB files matching dataset samples are processed.
 import os
 import re
 import tempfile
+from pathlib import Path
 import shutil
 import pandas as pd
 from typing import Dict, List, Tuple, Optional, Set
@@ -22,6 +23,8 @@ from .get_foldseek_structure_seq import get_foldseek_structure_seq
 from .get_secondary_structure_seq import get_secondary_structure_seq
 from .get_prosst_str_token import convert_predict_results
 from .prosst.structure.get_sst_seq import SSTPredictor
+
+_REPO_ROOT = next((p for p in Path(__file__).absolute().parents if (p / "src").is_dir()), Path(__file__).absolute().parent)
 
 
 def _pdb_stem(name: str) -> str:
@@ -138,13 +141,12 @@ def _make_filtered_pdb_dir(
         if logger:
             logger.info(f"Using full pdb_dir ({len(all_stems)} files)")
         return pdb_dir, False
-    cache_root = os.path.join(os.getcwd(), ".cache")
+    cache_root = os.path.join(str(_REPO_ROOT), ".cache")
     os.makedirs(cache_root, exist_ok=True)
     tmp = tempfile.mkdtemp(prefix="venusfactory_pdb_", dir=cache_root)
-    abs_pdb_dir = os.path.abspath(pdb_dir)
     for rel_path, stem in all_pairs:
         if stem in to_include:
-            src = os.path.join(abs_pdb_dir, rel_path)
+            src = os.path.join(pdb_dir, rel_path)
             dst = os.path.join(tmp, rel_path)
             d = os.path.dirname(dst)
             if d:
@@ -203,9 +205,8 @@ def _generate_foldseek(pdb_dir: str) -> pd.DataFrame:
 def _generate_pdb_paths(pdb_dir: str) -> pd.DataFrame:
     """Build DataFrame with columns (name, pdb_path) for ProtSSN from pdb_dir."""
     pairs = _list_pdb_files(pdb_dir)
-    abs_dir = os.path.abspath(pdb_dir)
     rows = [
-        {"name": stem, "pdb_path": os.path.join(abs_dir, rel_path)}
+        {"name": stem, "pdb_path": os.path.join(pdb_dir, rel_path)}
         for rel_path, stem in pairs
     ]
     return pd.DataFrame(rows)

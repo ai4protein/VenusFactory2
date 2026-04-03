@@ -266,6 +266,7 @@ async def send_message(message, session_state):
         return
 
     text = message["text"]
+    is_zh = any("\u4e00" <= ch <= "\u9fff" for ch in str(text))
     files = message.get("files", [])
 
 
@@ -294,13 +295,18 @@ async def send_message(message, session_state):
     display_text = text
     if file_paths:
         file_names = ", ".join([os.path.basename(f) for f in file_paths])
-        display_text += f"\n📎 *Attached: {file_names}*"
+        attached_label = "已附加" if is_zh else "Attached"
+        display_text += f"\n📎 *{attached_label}: {file_names}*"
    
 
     # Free-use limit: max conversation messages per chat
     history_len = len(session_state.get("history") or [])
     if history_len >= AGENT_CHAT_MAX_MESSAGES:
-        limit_msg = f"**Limit reached.** This chat has reached the maximum of {AGENT_CHAT_MAX_MESSAGES} messages. Start a new chat to continue."
+        limit_msg = (
+            f"**已达上限。** 本会话最多允许 {AGENT_CHAT_MAX_MESSAGES} 条消息，请新建会话继续。"
+            if is_zh else
+            f"**Limit reached.** This chat has reached the maximum of {AGENT_CHAT_MAX_MESSAGES} messages. Start a new chat to continue."
+        )
         session_state["history"].append({"role": "assistant", "content": limit_msg, "role_id": "principal_investigator"})
         yield _build_conversation_panel_html(session_state["history"]), _build_log_html(session_state), gr.MultimodalTextbox(value=None, interactive=True, file_count="multiple"), session_state
         return
@@ -332,6 +338,7 @@ async def send_message(message, session_state):
         "history": list(session_state['history']),
         "conversation_log": list(session_state.get("conversation_log", [])),
         "tool_executions": list(session_state.get("tool_executions", [])),
+        "tool_cache": dict(session_state.get("tool_cache", {})),
         "status": "started",
         "pi_report": "",
         "pi_suggest_steps": "",
@@ -343,7 +350,10 @@ async def send_message(message, session_state):
         "research_idx": 0,
         "search_idx": 0,
         "current_search_results": [],
-        "research_sub_reports": []
+        "research_sub_reports": [],
+        "execution_failed": bool(session_state.get("execution_failed", False)),
+        "failed_step": session_state.get("failed_step"),
+        "failed_reason": session_state.get("failed_reason"),
     }
 
     graph = create_agent_graph()
@@ -354,7 +364,7 @@ async def send_message(message, session_state):
             # Update session state with the latest graph state
             if updates:  # updates can be None or empty dict
                 for key, val in updates.items():
-                    if key in ("history", "conversation_log", "tool_executions", "status", "pi_report", "pi_suggest_steps", "plan", "protein_context", "current_step_index", "step_results", "research_sections", "research_idx", "search_idx", "current_search_results", "research_sub_reports"):
+                    if key in ("history", "conversation_log", "tool_executions", "status", "pi_report", "pi_suggest_steps", "plan", "protein_context", "current_step_index", "step_results", "research_sections", "research_idx", "search_idx", "current_search_results", "research_sub_reports", "tool_cache", "execution_failed", "failed_step", "failed_reason"):
                         session_state[key] = val
 
         yield _build_conversation_panel_html(session_state["history"]), _build_log_html(session_state), gr.MultimodalTextbox(value=None, interactive=False), session_state

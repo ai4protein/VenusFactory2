@@ -14,6 +14,7 @@ import json
 import time
 from pathlib import Path
 from typing import Any, Dict, Optional
+from src.tools.path_sanitizer import to_client_file_path
 
 from .esmfold import predict_structure_sync
 
@@ -47,7 +48,7 @@ def _download_success_response(
     out: Dict[str, Any] = {
         "status": "success",
         "file_info": {
-            "file_path": str(path.resolve()) if path.exists() else file_path,
+            "file_path": to_client_file_path(path if path.exists() else file_path),
             "file_name": path.name,
             "file_size": file_size,
             "format": fmt,

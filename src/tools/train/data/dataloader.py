@@ -1,6 +1,7 @@
 import json
 import torch
 import datasets
+from pathlib import Path
 from torch.utils.data import DataLoader
 from .collator import Collator
 from .batch_sampler import BatchSampler
@@ -10,11 +11,50 @@ from torch.utils.data import Dataset
 from typing import Dict, Any, List, Union
 import pandas as pd
 
+def _load_split_file(file_path: str) -> datasets.Dataset:
+    """Load a local split file into a HuggingFace Dataset."""
+    path = Path(file_path)
+    suffix = path.suffix.lower()
+
+    if suffix in {".csv", ".tsv"}:
+        sep = "\t" if suffix == ".tsv" else ","
+        df = pd.read_csv(path, sep=sep)
+        return datasets.Dataset.from_pandas(df, preserve_index=False)
+    if suffix in {".xlsx", ".xls"}:
+        df = pd.read_excel(path)
+        return datasets.Dataset.from_pandas(df, preserve_index=False)
+    if suffix == ".json":
+        df = pd.read_json(path)
+        return datasets.Dataset.from_pandas(df, preserve_index=False)
+
+    raise ValueError(f"Unsupported training file format: {path.name}")
+
+def _load_dataset_dict(args) -> datasets.DatasetDict:
+    """Load dataset from uploaded files first; fallback to HF/local dataset name/path."""
+    split_paths = {
+        "train": getattr(args, "train_file", None),
+        "validation": getattr(args, "valid_file", None),
+        "test": getattr(args, "test_file", None),
+    }
+    split_paths = {k: str(v).strip() for k, v in split_paths.items() if str(v or "").strip()}
+
+    if split_paths:
+        loaded = {split: _load_split_file(path) for split, path in split_paths.items()}
+        if "train" not in loaded:
+            raise ValueError("Custom file training requires train_file.")
+        if "validation" not in loaded:
+            loaded["validation"] = loaded["train"]
+        if "test" not in loaded:
+            loaded["test"] = loaded["validation"]
+        return datasets.DatasetDict(loaded)
+
+    return datasets.load_dataset(args.dataset)
+
 def prepare_dataloaders(args, tokenizer, logger):
     """Prepare train, validation and test dataloaders."""
     aa_seq_key = args.sequence_column_name
     # Load datasets
-    dataset_dict = datasets.load_dataset(args.dataset)
+    dataset_dict = _load_dataset_dict(args)
     
     # Truncate dataset to max_train_samples, max_validation_samples, max_test_samples for quick test
     if args.quick_test:

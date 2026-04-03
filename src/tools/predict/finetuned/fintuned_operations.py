@@ -13,6 +13,7 @@ import time
 from argparse import Namespace
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from src.tools.path_sanitizer import to_client_file_path
 
 # Ensure repo root on path when script is run directly (avoid "relative import with no known parent package")
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent
@@ -21,15 +22,24 @@ if str(_REPO_ROOT) not in sys.path:
 
 _PREVIEW_LEN = 500
 _SOURCE = "Predict_Finetuned"
-# Backend module names: protein function allowed set; _GET_MODULE_KEYS = all loadable modules for _get_module
-_MODEL_KEYS = ("esm2")
-# ---------- Residue (residue_mapping_function, model_residue_mapping_function) ----------
-_RESIDUE_MODEL_KEYS = ("esm2")  # model_residue_mapping_function has no ProtBert
+# Backend module names: _GET_MODULE_KEYS = all loadable modules for _get_module.
+# Keep _MODEL_KEYS aligned with available loaders and model_mapping_function in constant.json.
 _GET_MODULE_KEYS = ("protbert", "prott5", "ankh", "esm2")
+_MODEL_KEYS = _GET_MODULE_KEYS
+# ---------- Residue (residue_mapping_function, model_residue_mapping_function) ----------
+_RESIDUE_MODEL_KEYS = ("esm2",)  # Current residue runtime supports esm2 only.
 # Default base path for adapter: ckpt/{dataset_name}/{model_adapter_folder}, e.g. ckpt/DeepET_Topt/ankh-large
 _CKPT_BASE = "ckpt"
 
 _CONSTANT_PATH = Path(__file__).resolve().parent.parent.parent.parent / "constant.json"
+
+
+def _default_agent_out_dir() -> str:
+    """Default output directory for agent/tool calls when out_dir is omitted."""
+    base = Path(os.getenv("TEMP_OUTPUTS_DIR", "temp_outputs")).resolve()
+    target = base / "agent" / "predict_finetuned"
+    target.mkdir(parents=True, exist_ok=True)
+    return str(target)
 
 
 def _load_constant() -> Dict[str, Any]:
@@ -73,7 +83,7 @@ def _residue_task_to_dataset(task: str) -> Optional[str]:
 
 
 def _get_residue_model_choices() -> List[str]:
-    """Model names for residue prediction from model_residue_mapping_function (ESM2-650M, Ankh-large, ProtT5-xl-uniref50)."""
+    """Model names exposed by model_residue_mapping_function in constant.json."""
     const = _load_constant()
     mapping = const.get("model_residue_mapping_function", {})
     return list(mapping.keys()) if mapping else []
@@ -169,7 +179,7 @@ def _download_success_response(
     out: Dict[str, Any] = {
         "status": "success",
         "file_info": {
-            "file_path": str(path.resolve()) if path.exists() else file_path,
+            "file_path": to_client_file_path(path if path.exists() else file_path),
             "file_name": path.name,
             "file_size": file_size,
             "format": fmt,
@@ -238,7 +248,8 @@ def predict_protein_function(
 
         config_path = os.path.join(resolved_adapter, "lr5e-4_bt12k_ga8.json")
         default_out = f"predict_protein_function_{task.replace(' ', '_')}_{model_key}.csv"
-        out_path = output_file or (os.path.join(out_dir, default_out) if out_dir else default_out)
+        target_out_dir = out_dir or _default_agent_out_dir()
+        out_path = output_file or os.path.join(target_out_dir, default_out)
         args = Namespace(adapter_path=resolved_adapter, output_csv=out_path)
         if os.path.exists(config_path):
             with open(config_path, "r", encoding="utf-8") as f:
@@ -274,7 +285,7 @@ def predict_protein_function(
             "sequence_count": len(all_results),
         }
 
-        os.makedirs(os.path.dirname(os.path.abspath(out_path)) or ".", exist_ok=True)
+        Path(out_path).parent.mkdir(parents=True, exist_ok=True)
         with open(out_path, "w", newline="", encoding="utf-8") as csvfile:
             if all_results:
                 fieldnames = list(all_results[0].keys())
@@ -320,7 +331,11 @@ def predict_residue_function(
         return _error_response("ValidationError", f"task must be one of: {residue_choices}.", suggestion="Use a task from constant.json residue_mapping_function.")
     model_key = _model_name_to_residue_key(model_name)
     if model_key not in _RESIDUE_MODEL_KEYS:
-        return _error_response("ValidationError", f"model_name must map to one of {_RESIDUE_MODEL_KEYS}.", suggestion="Use e.g. ESM2-650M, Ankh-large, ProtT5-xl-uniref50 (see model_residue_mapping_function).")
+        return _error_response(
+            "ValidationError",
+            f"model_name must map to one of {_RESIDUE_MODEL_KEYS}.",
+            suggestion="Use ESM2-650M for residue prediction in current runtime.",
+        )
     resolved_adapter = _resolve_residue_adapter_path(task, model_name, adapter_path, ckpt_base)
     if not resolved_adapter or not Path(resolved_adapter).exists():
         return _error_response("ValidationError", f"Adapter path not found: {resolved_adapter}.", suggestion="Set adapter_path or ensure ckpt_base/residue_dataset/model dir exists (e.g. ckpt/VenusX_Res_Act_MP90/ankh-large).")
@@ -333,7 +348,8 @@ def predict_residue_function(
 
         config_path = os.path.join(resolved_adapter, "lr5e-4_bt12k_ga8.json")
         default_out = f"predict_residue_function_{task.replace(' ', '_')}_{model_key}.csv"
-        out_path = output_file or (os.path.join(out_dir, default_out) if out_dir else default_out)
+        target_out_dir = out_dir or _default_agent_out_dir()
+        out_path = output_file or os.path.join(target_out_dir, default_out)
         args = Namespace(adapter_path=resolved_adapter, output_csv=out_path)
         if os.path.exists(config_path):
             with open(config_path, "r", encoding="utf-8") as f:
@@ -369,7 +385,7 @@ def predict_residue_function(
             "sequence_count": len(all_results),
         }
 
-        os.makedirs(os.path.dirname(os.path.abspath(out_path)) or ".", exist_ok=True)
+        Path(out_path).parent.mkdir(parents=True, exist_ok=True)
         with open(out_path, "w", newline="", encoding="utf-8") as csvfile:
             if all_results:
                 fieldnames = list(all_results[0].keys())

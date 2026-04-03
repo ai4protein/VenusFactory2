@@ -7,8 +7,11 @@ import argparse
 from datetime import datetime
 
 import sys
-import os
-sys.path.append(os.getcwd())
+from pathlib import Path
+
+_REPO_ROOT = next((p for p in Path(__file__).absolute().parents if (p / "src").is_dir()), Path(__file__).absolute().parent)
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 from src.tools.search.deepsearch.duckduckgo_search import _duckduckgo_search
 from src.tools.search.deepsearch.tavily_search import _tavily_search
 

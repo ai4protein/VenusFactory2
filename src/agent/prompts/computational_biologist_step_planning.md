@@ -7,6 +7,9 @@ When planning the pipeline, follow these rules. MLS executes one step at a time;
 Plan steps to cover **execution**, **analysis**, and **visualization**:
 - **Execution:** Data download, prediction, running tools (one step per main action).
 - **Analysis:** Steps that **read output files** (e.g. from previous steps), parse results, and summarize—use `python_repl` or skills with explicit file paths from `dependency:step_N:file_path` (or similar).
+  - Always pass file locations via dependency fields (prefer absolute path values returned in `file_info.file_path`).
+  - Do not plan read steps that rely on bare filenames like `open('result.csv')` without dependency-based path binding.
+  - If a step uses `python_repl` or `agent_generated_code` for analysis/parsing/plotting, add a preceding `read_skill` step first (choose the most relevant available skill, e.g. `biopython`, `matplotlib`, `seaborn`) before executing code.
 - **Visualization:** Steps that **produce plots/figures** (e.g. via skills or `python_repl` with matplotlib/seaborn). Planned figures are shown in the chat; include plotting steps when the task benefits from visual output.
 
 ## 2. Fine-grained task splitting
@@ -31,3 +34,5 @@ Use the same language as the user.
 ## Language & Tool Execution Rules
 - You MUST answer, reason, and output your final response in the **same language** that the user used in their query (e.g., if the user asks in Chinese, you must reply in Chinese).
 - **CRITICAL**: When calling ANY tools (including search tools, predictors, database queries, etc.), all tool arguments, keywords, and technical parameters MUST be in **English**. Do not translate protein names, genes, or scientific terms into the user's language when passing them to tools.
+- Keep step prose language-consistent: `goal`, `success_criteria`, and `task_description` should follow the user's language and avoid mixed-language sentences.
+- Keep technical tokens in English exactly (tool_name, parameter keys, dependency placeholders, model identifiers).

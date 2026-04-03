@@ -1,6 +1,7 @@
 import gradio as gr
 import os
 import re
+from pathlib import Path
 import markdown
 from typing import Dict, Any
 from .index_tab import create_index_tab
@@ -28,9 +29,9 @@ def create_manual_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                     img_path = img_path[1:]
                 
                 # Get the absolute path
-                current_dir = os.path.dirname(os.path.abspath(__file__))
-                project_root = os.path.dirname(os.path.dirname(current_dir))
-                abs_img_path = os.path.join(project_root, img_path)
+                current_dir = Path(__file__).resolve().parent
+                project_root = current_dir.parent.parent
+                abs_img_path = str(project_root / img_path)
                 
                 # Read the image and convert it to base64
                 import base64
@@ -282,9 +283,9 @@ def update_manual(language):
                     img_path = img_path[1:]
                 
                 # Get the absolute path
-                current_dir = os.path.dirname(os.path.abspath(__file__))
-                project_root = os.path.dirname(os.path.dirname(current_dir))
-                abs_img_path = os.path.join(project_root, img_path)
+                current_dir = Path(__file__).resolve().parent
+                project_root = current_dir.parent.parent
+                abs_img_path = str(project_root / img_path)
                 
                 # Read the image and convert it to base64
                 import base64

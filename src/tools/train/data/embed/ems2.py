@@ -3,7 +3,11 @@ import torch
 import argparse
 import os
 import sys
-sys.path.append(os.getcwd())
+from pathlib import Path
+
+_REPO_ROOT = next((p for p in Path(__file__).absolute().parents if (p / "src").is_dir()), Path(__file__).absolute().parent)
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm

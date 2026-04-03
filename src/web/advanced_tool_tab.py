@@ -39,6 +39,7 @@ from web.utils.ui_helpers import (
 from web.quick_tool_tab import *
 
 load_dotenv()
+PROJECT_ROOT = get_project_root()
 
 
 RCSB_REPS =  [
@@ -58,6 +59,31 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+
+def resolve_venusmine_mmseqs_database_path() -> Tuple[Path, str]:
+    """Resolve MMseqs DB path with priority: env > constant.json > defaults."""
+    env_candidates = [
+        ("VENUSMINE_MMSEQS_DATABASE_PATH", os.getenv("VENUSMINE_MMSEQS_DATABASE_PATH")),
+        ("MMSEQS_DATABASE_PATH", os.getenv("MMSEQS_DATABASE_PATH")),
+    ]
+    for env_key, env_val in env_candidates:
+        if env_val:
+            return Path(env_val).expanduser().resolve(), f"env:{env_key}"
+
+    config_val = VENUSMINE_CONFIG.get("mmseqs_database_path")
+    if isinstance(config_val, str) and config_val.strip():
+        cfg_path = Path(config_val).expanduser()
+        return (cfg_path if cfg_path.is_absolute() else PROJECT_ROOT / cfg_path).resolve(), "constant.json:venusmine.mmseqs_database_path"
+
+    default_candidates = [
+        PROJECT_ROOT / "dataset" / "CATH.fasta",
+        PROJECT_ROOT / "data" / "VenusMine" / "CATH.fasta",
+    ]
+    for candidate in default_candidates:
+        if candidate.exists():
+            return candidate.resolve(), "default:auto-detected"
+    return default_candidates[0].resolve(), "default:dataset/CATH.fasta"
 
 
 def truncate_sequence(seq):
@@ -114,7 +140,7 @@ def handle_venus_pdb_upload(file):
 
 
 def handle_mutation_prediction_advance(
-    function_selection: str, 
+    function_selection: Optional[str], 
     file_obj: Any, 
     enable_ai: bool, 
     llm_model: str, 
@@ -128,12 +154,14 @@ def handle_mutation_prediction_advance(
     except Exception:
         pass
     """Handle mutation prediction workflow."""
-    if not file_obj or not function_selection:
+    effective_function_selection = (function_selection or "Model-guided optimization").strip() or "Model-guided optimization"
+
+    if not file_obj:
         yield (
-            "❌ Error: Function and file are required.", 
+            "❌ Error: Input file is required.", 
             None, None, gr.update(visible=False), None, 
             gr.update(visible=False), None, 
-            "Please select a function and upload a file."
+            "Please upload a valid sequence or structure file."
         )
         return
 
@@ -241,7 +269,7 @@ def handle_mutation_prediction_advance(
                 get_chat_base_url(),
                 LLM_MODELS.get(llm_model, "")
             )
-            prompt = generate_mutation_ai_prompt(display_df, model_name, function_selection)
+            prompt = generate_mutation_ai_prompt(display_df, model_name, effective_function_selection)
             ai_summary = call_llm_api(llm_config, prompt)
             expert_analysis = format_expert_response(ai_summary)
         progress(0.9, desc="Finalizing AI analysis...")
@@ -305,8 +333,8 @@ def handle_protein_function_prediction_chat(
                 raise ValueError(f"Model key not found for {model}")
 
             adapter_key = MODEL_ADAPTER_MAPPING_FUNCTION[model_key]
-            script_path = Path("src") / "tools" / "predict" / "finetuned" / f"{model_key}.py"
-            adapter_path = Path("ckpt") / dataset / adapter_key
+            script_path = PROJECT_ROOT / "src" / "tools" / "predict" / "finetuned" / f"{model_key}.py"
+            adapter_path = PROJECT_ROOT / "ckpt" / dataset / adapter_key
             output_file = function_dir/ f"temp_{dataset}_{model}_{timestamp}.csv"
 
             if not script_path.exists() or not adapter_path.exists():
@@ -503,8 +531,8 @@ def handle_protein_function_prediction_advance(
                 raise ValueError(f"Model key not found for {model}")
             
             adapter_key = MODEL_ADAPTER_MAPPING_FUNCTION[model_key]
-            script_path = Path("src") / "tools" / "predict" / "finetuned" / f"{model_key}.py"
-            adapter_path = Path("ckpt") / dataset / adapter_key
+            script_path = PROJECT_ROOT / "src" / "tools" / "predict" / "finetuned" / f"{model_key}.py"
+            adapter_path = PROJECT_ROOT / "ckpt" / dataset / adapter_key
             output_file = function_dir / f"temp_{dataset}_{model}_{timestamp}.csv"
             
             if not script_path.exists() or not adapter_path.exists():
@@ -675,8 +703,8 @@ def handle_protein_residue_function_prediction_chat(
         raise ValueError(f"No datasets found for task: {task}")
     
     for dataset in datasets:
-        script_path = Path("src") / "tools" / "predict" / "finetuned" / f"{model_key}.py"
-        adapter_path = Path("ckpt") / dataset / adapter_key
+        script_path = PROJECT_ROOT / "src" / "tools" / "predict" / "finetuned" / f"{model_key}.py"
+        adapter_path = PROJECT_ROOT / "ckpt" / dataset / adapter_key
         output_file = residue_save_dir/ f"{dataset}_{model}_{timestamp}.csv"
 
         if not script_path.exists() or not adapter_path.exists():
@@ -746,7 +774,7 @@ def handle_VenusMine(
     logger = logging.getLogger(__name__)
     start_time = time.time()
     
-    mmseqs_database_path = "/home/lrzhang/VenusFactory2/dataset/CATH.fasta"
+    mmseqs_database_path, db_source = resolve_venusmine_mmseqs_database_path()
 
     if not pdb_file:
         yield (
@@ -771,6 +799,7 @@ def handle_VenusMine(
     log_content += f"Session ID: {session_timestamp}\n"
     log_content += f"Output Directory: {session_dir}\n"
     log_content += f"Protected Region: {protect_start}-{protect_end}\n"
+    log_content += f"MMseqs Database: {mmseqs_database_path} ({db_source})\n"
     log_content += f"{'='*30}\n\n"
     
     yield (
@@ -926,8 +955,12 @@ def handle_VenusMine(
         
         
         # Check if database exists
-        if not Path(mmseqs_database_path).exists():
+        if not mmseqs_database_path.exists():
             log_content += f"   ❌ Database file not found: {mmseqs_database_path}\n"
+            log_content += (
+                "   💡 Configure database path by setting VENUSMINE_MMSEQS_DATABASE_PATH\n"
+                "      or adding venusmine.mmseqs_database_path in src/constant.json\n"
+            )
             yield (
                 log_content,
                 None,
@@ -958,7 +991,7 @@ def handle_VenusMine(
             "--search-type", "1"
         ]
         
-        log_content += f"   • Database: {Path(mmseqs_database_path).name}\n"
+        log_content += f"   • Database: {mmseqs_database_path.name} ({db_source})\n"
         log_content += f"   • Threads: {mmseqs_threads}, Iterations: {mmseqs_iterations}\n"
         log_content += f"   • Max sequences: {mmseqs_max_seqs}\n"
         
@@ -1173,9 +1206,9 @@ def handle_VenusMine(
             create_status_html("⏳ Processing EC dataset...", "#0d6efd")
         )
         
-        ec_fasta = Path("data/VenusMine/ec_dataset.fasta")
-        ec_pkl = Path("data/VenusMine/ec.pkl")
-        ec_csv = Path("data/VenusMine/ec_dataset.csv")
+        ec_fasta = PROJECT_ROOT / "data" / "VenusMine" / "ec_dataset.fasta"
+        ec_pkl = PROJECT_ROOT / "data" / "VenusMine" / "ec.pkl"
+        ec_csv = PROJECT_ROOT / "data" / "VenusMine" / "ec_dataset.csv"
         
         if not ec_pkl.exists():
             log_content += f"   • EC embeddings not found, computing...\n"

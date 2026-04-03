@@ -23,6 +23,7 @@ from web.utils.html_ui import load_html_template
 from web.utils.ui_helpers import wrap_upload_show_section, wrap_paste_show_section, wrap_clear_hide_section
 
 load_dotenv()
+PROJECT_ROOT = get_project_root()
 
 
 def handle_mutation_prediction_base(
@@ -163,7 +164,7 @@ def handle_mutation_prediction_base(
         progress(1.0, desc="Complete!")
     
     timestamp = str(int(time.time()))
-    heatmap_dir = get_save_path("Zero_shot", "HeatMap")
+    heatmap_dir = get_save_path("Zero_Shot", "Result")
     csv_path = heatmap_dir / f"mut_res_{timestamp}.csv"
     heatmap_path = heatmap_dir / f"mut_map_{timestamp}.html"
     
@@ -399,8 +400,8 @@ def handle_protein_function_prediction(
                 raise ValueError(f"Model key not found for {model}")
             
             adapter_key = MODEL_ADAPTER_MAPPING_FUNCTION[model_key]
-            script_path = Path("src") / "tools" / "predict" / "finetuned" / f"{model_key}.py"
-            adapter_path = Path("ckpt") / dataset / adapter_key
+            script_path = PROJECT_ROOT / "src" / "tools" / "predict" / "finetuned" / f"{model_key}.py"
+            adapter_path = PROJECT_ROOT / "ckpt" / dataset / adapter_key
             output_file = function_dir / f"{dataset}_{model}_{timestamp}.csv"
             
             if not script_path.exists() or not adapter_path.exists():
@@ -783,7 +784,7 @@ def handle_protein_residue_function_prediction(
 
     all_results_list = []
     timestamp = str(int(time.time()))
-    residue_save_dir = get_save_path("Residue_Prediction", "Result")
+    residue_save_dir = get_save_path("Protein_Function", "Residue_save")
 
     # Run predictions for each dataset
     progress(0.2, desc="Running Predicrtion...")
@@ -808,8 +809,8 @@ def handle_protein_residue_function_prediction(
             raise ValueError(f"No datasets found for task: {task}")
         
         for dataset in datasets:
-            script_path = Path("src") / "tools" / "predict" / "finetuned" / f"{model_key}.py"
-            adapter_path = Path("ckpt") / dataset / adapter_key
+            script_path = PROJECT_ROOT / "src" / "tools" / "predict" / "finetuned" / f"{model_key}.py"
+            adapter_path = PROJECT_ROOT / "ckpt" / dataset / adapter_key
             output_file = residue_save_dir/ f"{dataset}_{model}_{timestamp}.csv"
 
             if not script_path.exists() or not adapter_path.exists():
@@ -921,15 +922,15 @@ def run_protein_properties_prediction(task_type: str, file_path: str) -> Tuple[s
         if not script_name:
            return "", f"Error: Task '{task_type}' is not allowed"
        
-        script_path = f"src/tools/predict/features/{script_name}.py"
-        if not os.path.exists(script_path):
+        script_path = PROJECT_ROOT / "src" / "tools" / "predict" / "features" / f"{script_name}.py"
+        if not script_path.exists():
            return "", f"Script not found: {script_path}"
 
         # Determine file argument based on file extension
         file_argument = "--fasta_file" if file_path.lower().endswith((".fasta", ".fa")) else "--pdb_file"
        
         cmd_save = [
-           sys.executable, script_path,
+           sys.executable, str(script_path),
            file_argument, file_path,
            "--chain_id", "A",
            "--output_file", str(output_json)

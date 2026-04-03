@@ -1,15 +1,13 @@
 import argparse
 import json
 import time
-import shutil
 import threading
 import os
 import asyncio
 from typing import Tuple
+from pathlib import Path
 
 import gradio as gr
-import datetime
-from pathlib import Path
 from web.train_tab import create_train_tab
 from web.eval_tab import create_eval_tab
 from web.predict_tab import create_predict_tab
@@ -102,22 +100,6 @@ def start_fastapi_server(host: str = None, port: int = None) -> Tuple[str, int]:
     print(f"[FastAPI] Serving on http://{host}:{port}")
     return host, port
 
-def delete_old_files():
-    try:
-        target_date = datetime.datetime.now() - datetime.timedelta(days=2)
-        base_path = Path(os.getenv("TEMP_OUTPUTS_DIR", "temp_outputs"))
-        dir_to_delete = base_path / target_date.strftime('%Y') / target_date.strftime('%m') / target_date.strftime('%d')
-        if dir_to_delete.is_dir():
-            shutil.rmtree(dir_to_delete)
-
-    except Exception as e:
-        print(f"Clean file error: {e}")
-
-def run_cleanup_schedule():
-    while True:
-        delete_old_files()
-        time.sleep(60 * 60)
-
 def load_constant():
     """Load constant values from config files"""
     try:
@@ -158,13 +140,13 @@ def create_ui():
             return ""
     
     # Get the directory of this file
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    assets_dir = os.path.join(current_dir, "web", "assets")
+    current_dir = Path(__file__).resolve().parent
+    assets_dir = current_dir / "web" / "assets"
     
     # Read CSS files
-    custom_css = read_css_file(os.path.join(assets_dir,"css", "custom_ui.css"))
-    manual_css = read_css_file(os.path.join(assets_dir, "css", "manual_ui.css"))
-    manual_js = read_css_file(os.path.join(assets_dir, "js", "manual_ui.js"))
+    custom_css = read_css_file(str(assets_dir / "css" / "custom_ui.css"))
+    manual_css = read_css_file(str(assets_dir / "css" / "manual_ui.css"))
+    manual_js = read_css_file(str(assets_dir / "js" / "manual_ui.js"))
 
     # Combine all CSS (Agent tab CSS lives in chat_tab.py)
     css_links = f"""
@@ -311,10 +293,6 @@ if __name__ == "__main__":
             run_gradio_server()
 
         elif args.mode == "all":
-            # Start cleanup thread
-            cleanup_thread = threading.Thread(target=run_cleanup_schedule, daemon=True)
-            cleanup_thread.start()
-
             # Start FastAPI in background thread
             fastapi_host, fastapi_port = start_fastapi_server()
             print(f"[FastAPI] Background API available at http://{fastapi_host}:{fastapi_port}")

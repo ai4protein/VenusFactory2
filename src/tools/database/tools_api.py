@@ -2,10 +2,12 @@
 Database API outer layer: FastAPI routes only, calling core download logic from each submodule.
 Routes return the core result directly (status dict with file_info, etc.).
 """
-import os
 import sys
+from pathlib import Path
 
-sys.path.insert(0, os.getcwd())
+_REPO_ROOT = next((p for p in Path(__file__).absolute().parents if (p / "src").is_dir()), Path(__file__).absolute().parent)
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 from typing import List, Optional
 

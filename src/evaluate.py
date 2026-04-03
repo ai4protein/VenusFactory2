@@ -80,6 +80,7 @@ if __name__ == '__main__':
     parser.add_argument('--pooling_dropout', type=float, default=0.25, help='pooling dropout')
     
     # dataset
+    parser.add_argument('--dataset_config', type=str, default=None, help='dataset config json path')
     parser.add_argument('--dataset', type=str, default=None, help='dataset name')
     parser.add_argument('--problem_type', type=str, default=None, help='problem type')
     parser.add_argument('--sequence_column_name', type=str, default=None, help='sequence column name')
@@ -104,6 +105,33 @@ if __name__ == '__main__':
     parser.add_argument('--pdb_dir', type=str, default=None, help='PDB directory (for structure models when dataset lacks structure)')
     parser.add_argument('--training_method', type=str, default="freeze", help='training method')
     args = parser.parse_args()
+
+    if args.dataset_config:
+        if not os.path.exists(args.dataset_config):
+            raise FileNotFoundError(f"dataset_config file not found: {args.dataset_config}")
+        with open(args.dataset_config, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+
+        if not args.dataset:
+            args.dataset = cfg.get("dataset")
+        if not args.test_file:
+            args.test_file = cfg.get("test_file") or cfg.get("dataset")
+        if not args.split:
+            args.split = cfg.get("split")
+        if args.problem_type is None:
+            args.problem_type = cfg.get("problem_type")
+        if args.sequence_column_name is None:
+            args.sequence_column_name = cfg.get("sequence_column_name")
+        if args.label_column_name is None:
+            args.label_column_name = cfg.get("label_column_name")
+        if args.metrics is None:
+            cfg_metrics = cfg.get("metrics")
+            if isinstance(cfg_metrics, list):
+                args.metrics = ",".join([str(m).strip() for m in cfg_metrics if str(m).strip()])
+            elif isinstance(cfg_metrics, str):
+                args.metrics = cfg_metrics
+        if "--num_labels" not in sys.argv and cfg.get("num_labels") is not None:
+            args.num_labels = cfg.get("num_labels")
     
     if 'foldseek_seq' in args.structure_seq:
         args.use_foldseek = True
@@ -112,6 +140,13 @@ if __name__ == '__main__':
         args.use_ss8 = True
         print("Enabled ss8_seq based on structure_seq parameter")
     
+    if args.test_file is None:
+        raise ValueError("test_file is required (can be provided directly or via --dataset_config)")
+    if args.metrics is None:
+        raise ValueError("metrics is required (can be provided directly or via --dataset_config)")
+    if args.test_result_dir is None:
+        raise ValueError("test_result_dir is required")
+
     os.makedirs(args.test_result_dir, exist_ok=True)
     model, plm_model, tokenizer, device = load_inference_model(args)
 

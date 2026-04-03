@@ -771,7 +771,7 @@ class A3MMSADataset(Dataset):
         aligned_msa = [[char for char in seq if (char.isupper() or char == '-') and not char == '.'] for seq in parsed_msa]
         aligned_msa = [''.join(seq) for seq in aligned_msa]
 
-        # with open('/home/t-nthakkar/msa_' + str(idx) + '.txt', 'a') as f:
+        # with open('tmp/msa_' + str(idx) + '.txt', 'a') as f:
         #     for seq in aligned_msa:
         #         f.write(seq)
         #         f.write('\n')

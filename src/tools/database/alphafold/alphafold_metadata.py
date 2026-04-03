@@ -5,6 +5,7 @@ import json
 import os
 import argparse
 import requests
+from pathlib import Path
 
 BASE_URL = "https://alphafold.ebi.ac.uk/api/prediction"
 
@@ -88,7 +89,7 @@ if __name__ == "__main__":
         msg = download_alphafold_metadata(args.uniprot_id, out_dir)
         if "failed" not in msg:
             src = os.path.join(out_dir, f"{args.uniprot_id}.json")
-            if os.path.exists(src) and os.path.abspath(src) != os.path.abspath(args.output):
+            if os.path.exists(src) and Path(src).resolve() != Path(args.output).resolve():
                 import shutil
                 shutil.move(src, args.output)
         print(msg)

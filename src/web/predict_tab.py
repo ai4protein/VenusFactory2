@@ -15,8 +15,10 @@ from pathlib import Path
 from web.utils.command import preview_predict_command
 from web.utils.html_ui import load_html_template, generate_prediction_status_html, generate_prediction_results_html, generate_batch_prediction_results_html, generate_table_rows
 from web.utils.css_loader import get_css_style_tag
-from web.utils.common_utils import get_save_path
+from web.utils.common_utils import get_project_root, get_save_path
 from datetime import datetime
+
+PROJECT_ROOT = get_project_root()
 
 
 def _scan_folders_under(root: str, max_depth: int = 5) -> list:
@@ -330,7 +332,7 @@ def create_predict_tab(constant):
                 args_dict["use_ss8"] = False
             
             # Build command line
-            final_cmd = [sys.executable, "src/predict.py"]
+            final_cmd = [sys.executable, str(PROJECT_ROOT / "src" / "predict.py")]
             for k, v in args_dict.items():
                 if v is True:
                     final_cmd.append(f"--{k}")
@@ -727,7 +729,7 @@ def create_predict_tab(constant):
                 args_dict["pdb_dir"] = str(pdb_dir_val).strip()
             
             # Build command line
-            final_cmd = [sys.executable, "src/predict.py"]
+            final_cmd = [sys.executable, str(PROJECT_ROOT / "src" / "predict.py")]
             for k, v in args_dict.items():
                 if v is True:
                     final_cmd.append(f"--{k}")
@@ -1144,7 +1146,7 @@ def create_predict_tab(constant):
             return gr.update(value="Please upload a file first", visible=True)
         
         # create temporary directory as output directory
-        temp_dir = "temp_predictions"
+        temp_dir = str(get_save_path("Prediction", "Results"))
         output_file = "predictions.csv"
         
         args_dict = {
@@ -1173,7 +1175,8 @@ def create_predict_tab(constant):
         return gr.update(value=preview_text, visible=True)
 
     # Layout: left = Model Configuration, Data Input, Hyperparameter Settings, buttons; right = results (like quick tools)
-    _folder_choices = [(base, base) for base in ("ckpt",) if os.path.isdir(base)] + _scan_folders_under("ckpt")
+    ckpt_root = PROJECT_ROOT / "ckpt"
+    _folder_choices = [(str(ckpt_root), str(ckpt_root)) for _ in [0] if ckpt_root.is_dir()] + _scan_folders_under(str(ckpt_root))
     with gr.Row(equal_height=False):
         with gr.Column(scale=3):
             gr.Markdown("💡 *Inference on unlabeled/unknown data.*")
@@ -1398,7 +1401,7 @@ def create_predict_tab(constant):
                 gr.update(visible=False)
             )
             return
-        temp_dir = tempfile.mkdtemp()
+        temp_dir = tempfile.mkdtemp(dir=str(get_save_path("Prediction", "Results")))
         csv_path = os.path.join(temp_dir, "input.csv")
         df = pd.DataFrame([{"id": rid, "aa_seq": seq} for rid, seq in records])
         df.to_csv(csv_path, index=False)

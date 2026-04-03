@@ -2216,7 +2216,7 @@ def create_train_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                 try:
                     # Get model directory info
                     model_dir = model_file.parent
-                    relative_path = str(model_file.relative_to(Path.cwd()))
+                    relative_path = str(model_file.relative_to(ckpt_root.resolve().parent))
 
                     # Try to read config if exists
                     config_files = list(model_dir.glob("*.json"))

@@ -3,8 +3,11 @@ Dataset search: GitHub, Hugging Face.
 CLI: python src/tools/search/source/dataset_search.py --query "..." [--max_results 5] [--source github,hugging_face]
 """
 import sys
-import os
-sys.path.append(os.getcwd())
+from pathlib import Path
+
+_REPO_ROOT = next((p for p in Path(__file__).absolute().parents if (p / "src").is_dir()), Path(__file__).absolute().parent)
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 import json
 import argparse
 

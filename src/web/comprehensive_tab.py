@@ -27,6 +27,7 @@ from web.utils.constants import LLM_MODELS
 from web.utils.html_ui import load_html_template
 from dotenv import load_dotenv
 load_dotenv()
+PROJECT_ROOT = get_project_root()
 
 def generate_comprehensive_report(mutation_results: pd.DataFrame, function_results: pd.DataFrame) -> str:
     """Generate a comprehensive analysis report."""
@@ -330,8 +331,8 @@ def handle_individual_function_prediction(content, selected_chain, current_file,
             model_name = "ESM2-650M"
             model_key = MODEL_MAPPING_FUNCTION.get(model_name)
             adapter_key = MODEL_ADAPTER_MAPPING_FUNCTION[model_key]
-            script_path = Path("src") / "tools" / "predict" / "finetuned" / f"{model_key}.py"
-            adapter_path = Path("ckpt") / dataset / adapter_key
+            script_path = PROJECT_ROOT / "src" / "tools" / "predict" / "finetuned" / f"{model_key}.py"
+            adapter_path = PROJECT_ROOT / "ckpt" / dataset / adapter_key
             output_file = output_data_dir / f"temp_{dataset}_{model_name}_{timestamp}.csv"
             
             if script_path.exists() and adapter_path.exists():
@@ -488,8 +489,8 @@ def handle_functional_residue_prediction(content, selected_chain, current_file, 
                 model_name = "ESM2-650M"
                 model_key = MODEL_MAPPING_FUNCTION.get(model_name)
                 adapter_key = MODEL_ADAPTER_MAPPING_FUNCTION[model_key]
-                script_path = Path("src") / "tools" / "predict" / "finetuned" / f"{model_key}.py"
-                adapter_path = Path("ckpt") / dataset / adapter_key
+                script_path = PROJECT_ROOT / "src" / "tools" / "predict" / "finetuned" / f"{model_key}.py"
+                adapter_path = PROJECT_ROOT / "ckpt" / dataset / adapter_key
                 output_file = output_data_dir / f"temp_{dataset}_{model_name}_{timestamp}.csv"
                 
                 if script_path.exists() and adapter_path.exists():
@@ -752,7 +753,7 @@ def handle_physical_chemical_properties(content, selected_chain, current_file, s
             
         # Run calculate_all_property.py as subprocess
         output_file = output_data_dir / f"property_results_{timestamp}.json"
-        script_path = Path("src") / "tools" / "predict" / "features" / "calculate_all_property.py"
+        script_path = PROJECT_ROOT / "src" / "tools" / "predict" / "features" / "calculate_all_property.py"
         cmd = [
             sys.executable, str(script_path),
             "--input_file", str(input_file),

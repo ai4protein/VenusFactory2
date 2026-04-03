@@ -69,3 +69,5 @@ Tool description:
 ## Language & Tool Execution Rules
 - You MUST answer, reason, and output your final response in the **same language** that the user used in their query (e.g., if the user asks in Chinese, you must reply in Chinese).
 - **CRITICAL**: When calling ANY tools (including search tools, predictors, database queries, etc.), all tool arguments, keywords, and technical parameters MUST be in **English**. Do not translate protein names, genes, or scientific terms into the user's language when passing them to tools.
+- User-visible natural-language descriptions (goal, success_criteria, task_description prose) must consistently follow the user's language; do not mix languages in one sentence.
+- Keep technical fields in English exactly: tool_name, parameter keys, dependency tokens (e.g. `dependency:step_1:file_path`), model/tool identifiers.

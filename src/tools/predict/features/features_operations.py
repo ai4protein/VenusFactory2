@@ -29,10 +29,19 @@ except ImportError:
     from src.tools.predict.features.calculate_sasa import calculate_sasa_from_pdb as _do_sasa
     from src.tools.predict.features.calculate_secondary_structure import calculate_ss_from_pdb as _do_ss
     from src.tools.predict.features.calculate_all_property import calculate_all_properties as _do_all_properties
+from src.tools.path_sanitizer import to_client_file_path
 
 
 _PREVIEW_LEN = 500
 _SOURCE = "Predict_Features"
+
+
+def _default_agent_out_dir() -> str:
+    """Default output directory for agent/tool calls when out_dir is omitted."""
+    base = Path(os.getenv("TEMP_OUTPUTS_DIR", "temp_outputs")).resolve()
+    target = base / "agent" / "predict_features"
+    target.mkdir(parents=True, exist_ok=True)
+    return str(target)
 
 
 def _error_response(error_type: str, message: str, suggestion: Optional[str] = None) -> str:
@@ -59,7 +68,7 @@ def _download_success_response(
     out: Dict[str, Any] = {
         "status": "success",
         "file_info": {
-            "file_path": str(path.resolve()) if path.exists() else file_path,
+            "file_path": to_client_file_path(path if path.exists() else file_path),
             "file_name": path.name,
             "file_size": file_size,
             "format": fmt,
@@ -74,10 +83,9 @@ def _download_success_response(
 def _default_output_path(input_path: str, suffix: str, out_dir: Optional[str] = None) -> str:
     stem = Path(input_path).stem
     name = f"{stem}{suffix}"
-    if out_dir:
-        os.makedirs(out_dir, exist_ok=True)
-        return os.path.join(out_dir, name)
-    return name
+    target_dir = out_dir or _default_agent_out_dir()
+    os.makedirs(target_dir, exist_ok=True)
+    return os.path.join(target_dir, name)
 
 
 def calculate_physchem_from_fasta(

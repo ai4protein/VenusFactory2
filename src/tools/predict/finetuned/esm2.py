@@ -1,7 +1,10 @@
 import sys
 import os
+from pathlib import Path
 
-sys.path.append(os.getcwd())
+_REPO_ROOT = next((p for p in Path(__file__).absolute().parents if (p / "src").is_dir()), Path(__file__).absolute().parent)
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 from src.tools.train.models.adapter_model import AdapterModel
 import argparse
@@ -9,7 +12,6 @@ import torch
 import json
 import warnings
 import csv
-from pathlib import Path
 from tqdm import tqdm
 from transformers import EsmModel, EsmTokenizer
 from typing import List, Tuple, Optional

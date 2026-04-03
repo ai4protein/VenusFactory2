@@ -2,19 +2,68 @@ import argparse
 import json
 import os
 import warnings
+import time
 from typing import Dict, Any
 from time import localtime, strftime
+
+_DEBUG_LOG_PATH = os.getenv("TRAIN_ARGS_DEBUG_LOG_PATH", "").strip()
+
+
+def _debug_log(hypothesis_id: str, location: str, message: str, data: Dict[str, Any], run_id: str = "pre-fix") -> None:
+    if not _DEBUG_LOG_PATH:
+        return
+    payload = {
+        "sessionId": "029b38",
+        "runId": run_id,
+        "hypothesisId": hypothesis_id,
+        "location": location,
+        "message": message,
+        "data": data,
+        "timestamp": int(time.time() * 1000),
+    }
+    try:
+        with open(_DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
+            f.write(json.dumps(payload, ensure_ascii=True) + "\n")
+    except Exception:
+        pass
 
 def parse_args() -> Dict[str, Any]:
     """Parse and validate command line arguments."""
     parser = create_argument_parser()
     args = parser.parse_args()
+    # region agent log
+    _debug_log(
+        "H3",
+        "src/tools/train/cli_utils/args.py:parse_args:after_parse",
+        "raw parsed args",
+        {
+            "dataset": getattr(args, "dataset", None),
+            "dataset_config": getattr(args, "dataset_config", None),
+            "train_file": getattr(args, "train_file", None),
+            "valid_file": getattr(args, "valid_file", None),
+            "test_file": getattr(args, "test_file", None),
+        },
+    )
+    # endregion
     
     # Process dataset config first (may set structure_seq, pdb_dir from config)
     process_dataset_config(args)
     validate_args(args)
     setup_output_dirs(args)
     setup_wandb_config(args)
+    # region agent log
+    _debug_log(
+        "H3",
+        "src/tools/train/cli_utils/args.py:parse_args:after_process",
+        "processed args",
+        {
+            "dataset": getattr(args, "dataset", None),
+            "dataset_config": getattr(args, "dataset_config", None),
+            "structure_seq_len": len(getattr(args, "structure_seq", [])),
+            "problem_type": getattr(args, "problem_type", None),
+        },
+    )
+    # endregion
     
     return args
 

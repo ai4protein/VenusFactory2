@@ -2,7 +2,11 @@ import esm
 import torch
 import os
 import sys
-sys.path.append(os.getcwd())
+from pathlib import Path
+
+_REPO_ROOT = next((p for p in Path(__file__).absolute().parents if (p / "src").is_dir()), Path(__file__).absolute().parent)
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 import argparse
 from tqdm import tqdm
 from esm.inverse_folding.util import CoordBatchConverter
@@ -70,7 +74,7 @@ def create_args():
     parser = argparse.ArgumentParser(description='Extract embeddings from ESM_if')
     parser.add_argument('--model_name_or_path', type=str, default='esm_if1_gvp4_t16_142M_UR50', help='model name or path')
     parser.add_argument('--batch_size', type=int, default=32, help='batch size')
-    parser.add_argument('--pdb_dir', type=str, default='/home/user4/data/swiss_prot_pdb/', help='path to pdb directory')
+    parser.add_argument('--pdb_dir', type=str, default='dataset/database/swiss_prot_pdb', help='path to pdb directory')
     parser.add_argument('--output_dir', type=str, default='dataset/database/embed', help='path to output file')
     parser.add_argument('--embed_type', type=str, default='last_hidden_state', help='last_hidden_state or mean_hidden_state')
     parser.add_argument('--chunck_id', type=int, default=0, help='chunck_id id')

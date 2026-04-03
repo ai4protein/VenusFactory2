@@ -5,11 +5,12 @@ from pathlib import Path
 
 _CONSTANT_PATH = Path(__file__).resolve().parent.parent.parent / "constant.json"
 _WEB_UI = {}
+_RAW_CONSTANT = {}
 
 if _CONSTANT_PATH.exists():
     with open(_CONSTANT_PATH, "r", encoding="utf-8") as f:
-        _data = json.load(f)
-    _WEB_UI = _data.get("web_ui", {})
+        _RAW_CONSTANT = json.load(f)
+    _WEB_UI = _RAW_CONSTANT.get("web_ui", {})
 
 MODEL_MAPPING_ZERO_SHOT = _WEB_UI.get("model_mapping_zero_shot", {})
 DATASET_MAPPING_ZERO_SHOT = _WEB_UI.get("dataset_mapping_zero_shot", [])
@@ -25,6 +26,7 @@ RESIDUE_MAPPING_FUNCTION = _WEB_UI.get("residue_mapping_function", {})
 REGRESSION_TASKS_FUNCTION = _WEB_UI.get("regression_tasks_function", [])
 REGRESSION_TASKS_FUNCTION_MAX_MIN = _WEB_UI.get("regression_tasks_function_max_min", {})
 LLM_MODELS = _WEB_UI.get("llm_models", {})
+VENUSMINE_CONFIG = _RAW_CONSTANT.get("venusmine", {})
 
 # Derived from DATASET_MAPPING_FUNCTION
 DATASET_TO_TASK_MAP = {

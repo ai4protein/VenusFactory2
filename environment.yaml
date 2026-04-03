@@ -16,6 +16,8 @@ dependencies:
   - libxcb=1.17.0=h9b100fa_0
   - ncurses=6.5=h7934f7d_0
   - openssl=3.0.17=h5eee18b_0
+  - nodejs=25
+  - npm=11
   - pip=25.1=pyhc872135_2
   - pthread-stubs=0.3=h0ce48e5_1
   - python=3.12.0=h996f2a0_0

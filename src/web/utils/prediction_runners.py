@@ -9,7 +9,10 @@ from pathlib import Path
 from typing import Tuple
 
 from .constants import MODEL_MAPPING_ZERO_SHOT, PROTEIN_PROPERTIES_MAP_FUNCTION
-from .common_utils import get_save_path
+from .common_utils import get_project_root, get_save_path
+
+
+PROJECT_ROOT = get_project_root()
 
 
 def run_zero_shot_prediction(model_type: str, model_name: str, file_path: str) -> Tuple[str, pd.DataFrame]:
@@ -23,13 +26,13 @@ def run_zero_shot_prediction(model_type: str, model_name: str, file_path: str) -
         if not script_name:
             return f"Error: Model '{model_name}' has no script.", pd.DataFrame()
 
-        script_path = f"src/tools/mutation/models/{script_name}.py"
-        if not os.path.exists(script_path):
+        script_path = PROJECT_ROOT / "src" / "tools" / "mutation" / "models" / f"{script_name}.py"
+        if not script_path.exists():
             return f"Script not found: {script_path}", pd.DataFrame()
         
         file_argument = "--pdb_file" if model_type == "structure" else "--fasta_file"
         cmd = [
-            sys.executable, script_path, 
+            sys.executable, str(script_path),
             file_argument, file_path, 
             "--output_csv", str(output_csv)
         ]
@@ -72,8 +75,8 @@ def run_single_function_prediction(
             raise ValueError(f"Model key not found for {model}")
         
         adapter_key = adapter_mapping[model_key]
-        script_path = Path("src") / "tools" / "predict" / "finetuned" / f"{model_key}.py"
-        adapter_path = Path("ckpt") / dataset / adapter_key
+        script_path = PROJECT_ROOT / "src" / "tools" / "predict" / "finetuned" / f"{model_key}.py"
+        adapter_path = PROJECT_ROOT / "ckpt" / dataset / adapter_key
         output_file = output_dir / f"temp_{dataset}_{model}.csv"
         
         if not script_path.exists() or not adapter_path.exists():
@@ -118,15 +121,15 @@ def run_protein_properties_prediction(task_type: str, file_path: str) -> Tuple[s
         if not script_name:
            return "", f"Error: Task '{task_type}' is not allowed"
        
-        script_path = f"src/tools/predict/features/{script_name}.py"
-        if not os.path.exists(script_path):
+        script_path = PROJECT_ROOT / "src" / "tools" / "predict" / "features" / f"{script_name}.py"
+        if not script_path.exists():
            return "", f"Script not found: {script_path}"
 
         # Determine file argument based on file extension
         file_argument = "--fasta_file" if file_path.lower().endswith((".fasta", ".fa")) else "--pdb_file"
        
         cmd_save = [
-           sys.executable, script_path,
+           sys.executable, str(script_path),
            file_argument, file_path,
            "--chain_id", "A",
            "--output_file", str(output_json)

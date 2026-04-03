@@ -27,26 +27,42 @@ def _use_importlib_metadata_for_version() -> None:
     sys.modules["pkg_resources"] = stub
 
 
-try:
-    if _HAS_IMPORTLIB_METADATA:
-        _use_importlib_metadata_for_version()
-    from chembl_webresource_client.settings import Settings
-    # Avoid hanging: library default NEW_CLIENT_TIMEOUT is None (no timeout)
-    Settings.Instance().NEW_CLIENT_TIMEOUT = 30
-    from chembl_webresource_client.new_client import new_client
-    _client: Any = new_client
-    CLIENT_AVAILABLE = True
-except ImportError:
-    _client = None
-    CLIENT_AVAILABLE = False
+_client: Any = None
+_client_error: str = ""
+CLIENT_AVAILABLE = False
+
+
+def _ensure_client_initialized() -> None:
+    """Lazily initialize ChEMBL client so API server can start without network."""
+    global _client, _client_error, CLIENT_AVAILABLE
+    if _client is not None:
+        return
+    if _client_error:
+        return
+    try:
+        if _HAS_IMPORTLIB_METADATA:
+            _use_importlib_metadata_for_version()
+        from chembl_webresource_client.settings import Settings
+        # Avoid hanging: library default NEW_CLIENT_TIMEOUT is None (no timeout)
+        Settings.Instance().NEW_CLIENT_TIMEOUT = 30
+        from chembl_webresource_client.new_client import new_client
+
+        _client = new_client
+        CLIENT_AVAILABLE = True
+    except Exception as e:
+        _client = None
+        CLIENT_AVAILABLE = False
+        _client_error = str(e)
 
 
 def get_client():
     """Return the ChEMBL new_client. Raises ImportError if chembl_webresource_client not installed."""
-    if not CLIENT_AVAILABLE:
-        raise ImportError(
-            "chembl_webresource_client is required. Install with: uv pip install chembl_webresource_client"
-        )
+    _ensure_client_initialized()
+    if _client is None:
+        hint = "chembl_webresource_client is required. Install with: uv pip install chembl_webresource_client"
+        if _client_error:
+            hint = f"ChEMBL client unavailable: {_client_error}"
+        raise RuntimeError(hint)
     return _client
 
 

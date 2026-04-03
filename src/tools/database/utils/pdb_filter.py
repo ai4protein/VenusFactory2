@@ -4,9 +4,12 @@ import os
 import sys
 import shutil
 import warnings
+from pathlib import Path
 
 warnings.filterwarnings("ignore")
-sys.path.append(os.getcwd())
+_REPO_ROOT = next((p for p in Path(__file__).absolute().parents if (p / "src").is_dir()), Path(__file__).absolute().parent)
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 from tqdm import tqdm
 from Bio.PDB import PDBParser, PPBuilder
 

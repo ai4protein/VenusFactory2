@@ -2,13 +2,62 @@ import json
 import os
 import re
 import asyncio
+import csv
 from typing import Dict, Any, List, Optional
 from langchain_classic.schema import HumanMessage
 from agent.prompts import MLS_SELF_CHECK_TEMPLATE
+from web.utils.common_utils import (
+    get_project_root,
+    get_temp_outputs_base_dir,
+    get_web_v2_root_dir,
+    to_project_relative_path,
+)
 
-# Free-use limits per chat (from .env)
-AGENT_CHAT_MAX_MESSAGES = int(os.getenv("AGENT_CHAT_MAX_MESSAGES", "50"))
-AGENT_CHAT_MAX_TOOL_CALLS = int(os.getenv("AGENT_CHAT_MAX_TOOL_CALLS", "40"))
+_PROJECT_ROOT = str(get_project_root().resolve())
+
+
+def _resolve_existing_path(path: str) -> Optional[str]:
+    if not path or not isinstance(path, str):
+        return None
+    raw = path.strip()
+    if not raw:
+        return None
+    if os.path.isfile(raw):
+        return os.path.abspath(raw)
+    candidate = os.path.join(_PROJECT_ROOT, raw)
+    if os.path.isfile(candidate):
+        return os.path.abspath(candidate)
+
+    try:
+        temp_root = str(get_temp_outputs_base_dir().resolve())
+        candidate = os.path.join(temp_root, raw)
+        if os.path.isfile(candidate):
+            return os.path.abspath(candidate)
+    except Exception:
+        pass
+
+    try:
+        web_v2_root = str(get_web_v2_root_dir().resolve())
+        candidate = os.path.join(web_v2_root, raw)
+        if os.path.isfile(candidate):
+            return os.path.abspath(candidate)
+    except Exception:
+        pass
+    return None
+
+def _is_online_mode() -> bool:
+    return os.getenv("WEBUI_V2_MODE", "local").strip().lower() == "online"
+
+
+def _resolve_agent_chat_limits() -> tuple[float, float]:
+    """Return mode-based chat limits (online fixed, local unlimited)."""
+    if _is_online_mode():
+        return 200.0, 500.0
+    return float("inf"), float("inf")
+
+
+# Agent chat limits (mode-based): online has fixed caps, local is unlimited.
+AGENT_CHAT_MAX_MESSAGES, AGENT_CHAT_MAX_TOOL_CALLS = _resolve_agent_chat_limits()
 # PI search: max results per literature/web/dataset call (from .env)
 SEARCH_MAX_RESULTS = int(os.getenv("SEARCH_MAX_RESULTS", "3"))
 # When a tool fails, MLS self-check bubble (new dialog)
@@ -127,8 +176,10 @@ def _extract_download_file_from_output(tool_name: str, output_data: dict) -> Opt
     )
     if not path and isinstance(output_data.get("file_info"), dict):
         path = output_data["file_info"].get("file_path")
-    if path and isinstance(path, str) and os.path.isfile(path):
-        return path
+    if path and isinstance(path, str):
+        resolved = _resolve_existing_path(path)
+        if resolved:
+            return resolved
     return None
 
 def _get_output_file_path_from_raw(raw_output: Any, tool_name: str) -> Optional[str]:
@@ -144,8 +195,10 @@ def _get_output_file_path_from_raw(raw_output: Any, tool_name: str) -> Optional[
         )
         if not path and isinstance(data.get("file_info"), dict):
             path = data["file_info"].get("file_path")
-        if path and isinstance(path, str) and os.path.isfile(path):
-            return path
+        if path and isinstance(path, str):
+            resolved = _resolve_existing_path(path)
+            if resolved:
+                return resolved
     except Exception:
         pass
     return None
@@ -292,7 +345,7 @@ def _mls_debug_step(llm, step_num: int, task_desc: str, tool_name: str, merged_t
 
 def _parse_mls_debug_output(content: str) -> tuple:
     """Parse MLS self-check final output for retry_input or report_for_cb. Returns (retry_input or None, report_for_cb or None)."""
-    if not (content or content.strip()):
+    if content is None or not str(content).strip():
         return (None, None)
     # Strip markdown code block if present
     if "```" in content:
@@ -377,7 +430,7 @@ async def _run_mls_debug_with_tools(
 
 def _parse_mls_post_step_output(content: str) -> tuple[bool, Optional[dict], Optional[str]]:
     """Parse MLS post-step verify output. Returns (status_ok, retry_input or None, report_for_cb or None)."""
-    if not (content or content.strip()):
+    if content is None or not str(content).strip():
         return (False, None, None)
     raw = content
     if "```" in raw:
@@ -451,7 +504,10 @@ def _output_looks_null_or_empty(raw_output: Any) -> bool:
     """Heuristic: True if output has success but results/references/data is null or empty. Sequence/download outputs (sequence, file_path, etc.) count as non-empty."""
     try:
         parsed = json.loads(str(raw_output)) if isinstance(raw_output, str) else raw_output
-        if not isinstance(parsed, dict) or not parsed.get("success"):
+        if not isinstance(parsed, dict):
+            return False
+        is_success = parsed.get("success") is True or parsed.get("status") == "success"
+        if not is_success:
             return False
         # Payload keys that indicate non-empty output (e.g. download_uniprot_sequence, download_ncbi_sequence, file downloads)
         if parsed.get("sequence") and isinstance(parsed["sequence"], str) and parsed["sequence"].strip():
@@ -482,6 +538,26 @@ async def _cb_post_step_check(
 ) -> tuple[bool, str]:
     """CB verifies: (1) execution matches plan, (2) output not null/empty/weird, (3) if file produced, exists and preview correct. Returns (matches, note)."""
     try:
+        # Deterministic guard for finetuned function prediction outputs.
+        # Avoids LLM false negatives when CSV already contains a valid prediction value.
+        if tool_name == "predict_protein_function" and output_file_path and os.path.isfile(output_file_path):
+            try:
+                parsed = json.loads(str(raw_output)) if isinstance(raw_output, str) else raw_output
+                status_ok = isinstance(parsed, dict) and (
+                    parsed.get("success") is True or parsed.get("status") == "success"
+                )
+                if status_ok:
+                    with open(output_file_path, "r", encoding="utf-8", errors="replace", newline="") as f:
+                        reader = csv.DictReader(f)
+                        fieldnames = [str(x).strip().lower() for x in (reader.fieldnames or [])]
+                        if "prediction" in fieldnames:
+                            for row in reader:
+                                v = str(row.get("prediction", "")).strip()
+                                if v and v.lower() not in {"nan", "none", "null"}:
+                                    return (True, "")
+            except Exception:
+                pass
+
         out_str = str(raw_output) if raw_output is not None else ""
         if len(out_str) > 500:
             out_str = out_str[:500] + "..."

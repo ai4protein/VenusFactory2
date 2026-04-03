@@ -1,0 +1,12 @@
+node_modules/
+dist/
+
+# local env files
+.env
+.env.local
+.env.*.local
+
+# package manager logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
