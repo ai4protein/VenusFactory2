@@ -381,9 +381,9 @@ python src/webui_v2.py --host 0.0.0.0 --port 7861 --online  # → http://localho
 <details>
 <summary><b>Screenshots</b></summary>
 
-![Training](img/Train/Model_Dataset_Config.png)
-![Evaluation](img/Eval/Model_Dataset_Config.png)
-![Prediction](img/Predict/Predict_Tab.png)
+![Training](img/web_v1/Train/Model_Dataset_Config.png)
+![Evaluation](img/web_v1/Eval/Model_Dataset_Config.png)
+![Prediction](img/web_v1/Predict/Predict_Tab.png)
 
 </details>
 

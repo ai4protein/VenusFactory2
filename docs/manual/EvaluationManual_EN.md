@@ -32,7 +32,7 @@ VenusFactory2 provides multiple evaluation metrics to assess model performance. 
 
 The evaluation interface is divided into several main sections, each containing specific configuration options. Below is a detailed description of the functionality and settings for each section.
 
-![Model_Dataset_Config](/img/Eval/Model_Dataset_Config.png)
+![Model_Dataset_Config](/img/web_v1/Eval/Model_Dataset_Config.png)
 
 ### 3.1 Model and Dataset Configuration
 

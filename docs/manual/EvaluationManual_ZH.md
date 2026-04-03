@@ -32,7 +32,7 @@ VenusFactory2 提供多种评估指标，用于评估模型性能。根据问题
 
 评估界面分为几个主要部分，每个部分包含特定的配置选项。下面将详细介绍每个部分的功能和设置。
 
-![Model_Dataset_Config](/img/Eval/Model_Dataset_Config.png)
+![Model_Dataset_Config](/img/web_v1/Eval/Model_Dataset_Config.png)
 
 ### 3.1 模型和数据集配置
 
