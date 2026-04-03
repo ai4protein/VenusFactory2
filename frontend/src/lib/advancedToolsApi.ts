@@ -168,7 +168,7 @@ async function runAdvancedToolStream(options: StreamRunOptions): Promise<Record<
 
 export async function fetchAdvancedToolsMeta(): Promise<AdvancedToolsMeta> {
   try {
-    return await requestJSON<AdvancedToolsMeta>("/api/v2/advanced-tools/meta");
+    return await requestJSON<AdvancedToolsMeta>("/api/advanced-tools/meta");
   } catch {
     return DEFAULT_META;
   }
@@ -177,18 +177,18 @@ export async function fetchAdvancedToolsMeta(): Promise<AdvancedToolsMeta> {
 export async function uploadAdvancedToolFile(file: File): Promise<UploadResponse> {
   const form = new FormData();
   form.append("file", file);
-  return requestJSON<UploadResponse>("/api/v2/advanced-tools/upload", {
+  return requestJSON<UploadResponse>("/api/advanced-tools/upload", {
     method: "POST",
     body: form
   });
 }
 
 export async function loadAdvancedDefaultExample(kind: "fasta" | "pdb" = "fasta"): Promise<UploadResponse> {
-  return requestJSON<UploadResponse>(`/api/v2/advanced-tools/default-example?kind=${kind}`);
+  return requestJSON<UploadResponse>(`/api/advanced-tools/default-example?kind=${kind}`);
 }
 
 export async function runAdvancedDirectedEvolution(body: DirectedEvolutionRequest) {
-  return requestJSON<Record<string, unknown>>("/api/v2/advanced-tools/directed-evolution/run", {
+  return requestJSON<Record<string, unknown>>("/api/advanced-tools/directed-evolution/run", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)
@@ -200,14 +200,14 @@ export async function runAdvancedDirectedEvolutionStream(
   onProgress?: (evt: AdvancedToolProgressEvent) => void
 ) {
   return runAdvancedToolStream({
-    url: "/api/v2/advanced-tools/directed-evolution/run/stream",
+    url: "/api/advanced-tools/directed-evolution/run/stream",
     body: body as unknown as Record<string, unknown>,
     onProgress
   });
 }
 
 export async function runAdvancedProteinFunction(body: ProteinFunctionRequest) {
-  return requestJSON<Record<string, unknown>>("/api/v2/advanced-tools/protein-function/run", {
+  return requestJSON<Record<string, unknown>>("/api/advanced-tools/protein-function/run", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)
@@ -219,14 +219,14 @@ export async function runAdvancedProteinFunctionStream(
   onProgress?: (evt: AdvancedToolProgressEvent) => void
 ) {
   return runAdvancedToolStream({
-    url: "/api/v2/advanced-tools/protein-function/run/stream",
+    url: "/api/advanced-tools/protein-function/run/stream",
     body: body as unknown as Record<string, unknown>,
     onProgress
   });
 }
 
 export async function runAdvancedFunctionalResidue(body: FunctionalResidueRequest) {
-  return requestJSON<Record<string, unknown>>("/api/v2/advanced-tools/functional-residue/run", {
+  return requestJSON<Record<string, unknown>>("/api/advanced-tools/functional-residue/run", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)
@@ -238,14 +238,14 @@ export async function runAdvancedFunctionalResidueStream(
   onProgress?: (evt: AdvancedToolProgressEvent) => void
 ) {
   return runAdvancedToolStream({
-    url: "/api/v2/advanced-tools/functional-residue/run/stream",
+    url: "/api/advanced-tools/functional-residue/run/stream",
     body: body as unknown as Record<string, unknown>,
     onProgress
   });
 }
 
 export async function runAdvancedProteinDiscovery(body: ProteinDiscoveryRequest) {
-  return requestJSON<Record<string, unknown>>("/api/v2/advanced-tools/protein-discovery/run", {
+  return requestJSON<Record<string, unknown>>("/api/advanced-tools/protein-discovery/run", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)
@@ -257,14 +257,14 @@ export async function runAdvancedProteinDiscoveryStream(
   onProgress?: (evt: AdvancedToolProgressEvent) => void
 ) {
   return runAdvancedToolStream({
-    url: "/api/v2/advanced-tools/protein-discovery/run/stream",
+    url: "/api/advanced-tools/protein-discovery/run/stream",
     body: body as unknown as Record<string, unknown>,
     onProgress
   });
 }
 
 export async function requestAdvancedAiSummary(body: AdvancedAiSummaryRequest) {
-  return requestJSON<{ summary: string; provider: string; model: string }>("/api/v2/advanced-tools/ai-summary", {
+  return requestJSON<{ summary: string; provider: string; model: string }>("/api/advanced-tools/ai-summary", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)
@@ -329,7 +329,7 @@ export function splitNormalizedFastaRecords(normalized: string): Array<{ header:
 
 export function getAdvancedDownloadUrl(filePath: string, inline = false): string {
   const inlinePart = inline ? "&inline=1" : "";
-  return `/api/v2/advanced-tools/download?file_path=${encodeURIComponent(filePath)}${inlinePart}`;
+  return `/api/advanced-tools/download?file_path=${encodeURIComponent(filePath)}${inlinePart}`;
 }
 
 export function extractAdvancedDownloadPath(payload: Record<string, unknown> | null): string {

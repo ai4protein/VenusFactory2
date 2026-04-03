@@ -404,26 +404,37 @@ button:disabled {
   box-shadow: 0 0 0 5px rgba(143, 127, 106, 0.13);
 }
 
-.runtime-mode-badge-wrap {
-  position: fixed;
-  top: 14px;
-  right: 18px;
-  z-index: 40;
+.runtime-mode-badge-wrap--sidebar {
+  margin: 8px 10px 0;
   pointer-events: none;
 }
 
+.runtime-mode-badge-wrap--sidebar .run-status-bar {
+  width: 100%;
+  justify-content: flex-start;
+  padding: 6px 10px;
+  border-radius: 10px;
+}
+
+.runtime-mode-badge-wrap--sidebar .run-status-text {
+  font-size: 0.8rem;
+}
+
+.vf2-sidebar.collapsed .runtime-mode-badge-wrap--sidebar {
+  display: none;
+}
+
 @media (max-width: 760px) {
-  .runtime-mode-badge-wrap {
-    top: 10px;
-    right: 12px;
+  .runtime-mode-badge-wrap--sidebar {
+    margin: 7px 8px 0;
   }
 
-  .runtime-mode-badge-wrap .run-status-bar {
-    padding: 5px 10px;
+  .runtime-mode-badge-wrap--sidebar .run-status-bar {
+    padding: 5px 8px;
   }
 
-  .runtime-mode-badge-wrap .run-status-text {
-    font-size: 0.78rem;
+  .runtime-mode-badge-wrap--sidebar .run-status-text {
+    font-size: 0.76rem;
   }
 }
 

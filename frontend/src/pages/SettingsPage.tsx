@@ -76,7 +76,7 @@ export function SettingsPage({ readonly = false }: SettingsPageProps) {
     setError("");
     setLoading(true);
     try {
-      const res = await fetch("/api/v2/settings/env");
+      const res = await fetch("/api/settings/env");
       if (!res.ok) throw new Error(`Load failed (${res.status})`);
       const data = (await res.json()) as {
         entries: EnvEntry[];
@@ -121,7 +121,7 @@ export function SettingsPage({ readonly = false }: SettingsPageProps) {
     setMessage("");
     setSaving(true);
     try {
-      const res = await fetch("/api/v2/settings/env", {
+      const res = await fetch("/api/settings/env", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ entries })

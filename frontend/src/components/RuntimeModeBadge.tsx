@@ -2,6 +2,7 @@ type RuntimeMode = "unknown" | "local" | "online";
 
 type RuntimeModeBadgeProps = {
   runtimeMode: RuntimeMode;
+  placement?: "floating" | "sidebar";
 };
 
 function getBadgeMeta(runtimeMode: RuntimeMode): { statusClass: "running" | "stopped"; text: string } {
@@ -14,10 +15,10 @@ function getBadgeMeta(runtimeMode: RuntimeMode): { statusClass: "running" | "sto
   return { statusClass: "stopped", text: "Mode: Checking..." };
 }
 
-export function RuntimeModeBadge({ runtimeMode }: RuntimeModeBadgeProps) {
+export function RuntimeModeBadge({ runtimeMode, placement = "floating" }: RuntimeModeBadgeProps) {
   const meta = getBadgeMeta(runtimeMode);
   return (
-    <div className="runtime-mode-badge-wrap" aria-live="polite">
+    <div className={`runtime-mode-badge-wrap runtime-mode-badge-wrap--${placement}`} aria-live="polite">
       <div className={`run-status-bar ${meta.statusClass}`}>
         <span className="run-status-dot" />
         <span className="run-status-text">{meta.text}</span>

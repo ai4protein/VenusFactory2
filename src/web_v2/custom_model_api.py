@@ -35,7 +35,7 @@ from web.utils.common_utils import (
 )
 
 
-router = APIRouter(prefix="/api/v2/custom-model", tags=["custom-model-v2"])
+router = APIRouter(prefix="/api/custom-model", tags=["custom-model-v2"])
 
 _CONSTANT_PATH = Path(__file__).resolve().parent.parent / "constant.json"
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent

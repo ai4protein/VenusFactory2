@@ -118,7 +118,7 @@ if WEBUI_V2_MODE == "local":
 _frontend_dist = Path(os.getenv("WEBUI_V2_FRONTEND_DIST", "frontend/dist"))
 if _frontend_dist.exists():
     app.mount(
-        "/v2/assets",
+        "/assets",
         StaticFiles(directory=str(_frontend_dist / "assets")),
         name="webui_v2_assets",
     )
@@ -181,7 +181,7 @@ async def health_check():
         return create_response(success=False, error=f"Health check failed: {str(e)}")
 
 
-@app.get("/api/v2/runtime-config")
+@app.get("/api/runtime-config")
 async def runtime_config():
     return {"mode": WEBUI_V2_MODE}
 
@@ -210,7 +210,7 @@ async def download_file(file_path: str):
         raise HTTPException(status_code=500, detail="Failed to download file")
 
 
-@app.get("/v2", response_class=HTMLResponse)
+@app.get("/", response_class=HTMLResponse)
 async def webui_v2_entry():
     frontend_dev_mode = os.getenv("WEBUI_V2_DEV_MODE", "0") == "1"
     frontend_dev_url = os.getenv("WEBUI_V2_FRONTEND_DEV_URL", "http://127.0.0.1:5173")
@@ -237,7 +237,7 @@ async def webui_v2_entry():
     )
 
 
-@app.get("/v2/{full_path:path}", response_class=HTMLResponse)
+@app.get("/{full_path:path}", response_class=HTMLResponse)
 async def webui_v2_spa_fallback(full_path: str):
     frontend_dev_mode = os.getenv("WEBUI_V2_DEV_MODE", "0") == "1"
     frontend_dev_url = os.getenv("WEBUI_V2_FRONTEND_DEV_URL", "http://127.0.0.1:5173")

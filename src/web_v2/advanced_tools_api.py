@@ -35,7 +35,7 @@ from web.utils.file_handlers import validate_and_normalize_fasta_content
 from web.utils.llm_helpers import LLMConfig, call_llm_api, get_api_key, get_chat_base_url
 
 
-router = APIRouter(prefix="/api/v2/advanced-tools", tags=["advanced-tools-v2"])
+router = APIRouter(prefix="/api/advanced-tools", tags=["advanced-tools-v2"])
 
 _CONSTANT_PATH = Path(__file__).resolve().parent.parent / "constant.json"
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent

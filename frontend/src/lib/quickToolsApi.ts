@@ -110,7 +110,7 @@ async function runQuickToolStream(options: StreamRunOptions): Promise<Record<str
 
 export async function fetchQuickToolsMeta(): Promise<QuickToolsMeta> {
   try {
-    return await requestJSON<QuickToolsMeta>("/api/v2/quick-tools/meta");
+    return await requestJSON<QuickToolsMeta>("/api/quick-tools/meta");
   } catch {
     return DEFAULT_META;
   }
@@ -119,7 +119,7 @@ export async function fetchQuickToolsMeta(): Promise<QuickToolsMeta> {
 export async function uploadQuickToolFile(file: File): Promise<UploadResponse> {
   const form = new FormData();
   form.append("file", file);
-  return requestJSON<UploadResponse>("/api/v2/quick-tools/upload", {
+  return requestJSON<UploadResponse>("/api/quick-tools/upload", {
     method: "POST",
     body: form
   });
@@ -168,7 +168,7 @@ export function validateFastaWithHeader(content: string): string {
 }
 
 export async function loadQuickToolDefaultExample(kind: "fasta" | "pdb" = "fasta"): Promise<UploadResponse> {
-  return requestJSON<UploadResponse>(`/api/v2/quick-tools/default-example?kind=${kind}`);
+  return requestJSON<UploadResponse>(`/api/quick-tools/default-example?kind=${kind}`);
 }
 
 export function normalizePastedFastaForDisplay(content: string): string {
@@ -200,7 +200,7 @@ export async function runMutationTool(args: {
         fasta_file: args.uploadedPath || "",
         model_name: args.modelName
       };
-  return requestJSON<Record<string, unknown>>("/api/v2/quick-tools/run/mutation", {
+  return requestJSON<Record<string, unknown>>("/api/quick-tools/run/mutation", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)
@@ -231,7 +231,7 @@ export async function runMutationToolStream(
         model_name: args.modelName
       };
   return runQuickToolStream({
-    url: "/api/v2/quick-tools/run/mutation/stream",
+    url: "/api/quick-tools/run/mutation/stream",
     body,
     onProgress
   });
@@ -241,7 +241,7 @@ export async function runProteinFunctionTool(args: {
   fastaFile: string;
   task: string;
 }) {
-  return requestJSON<Record<string, unknown>>("/api/v2/quick-tools/run/protein-function", {
+  return requestJSON<Record<string, unknown>>("/api/quick-tools/run/protein-function", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -260,7 +260,7 @@ export async function runProteinFunctionToolStream(
   onProgress?: (evt: QuickToolProgressEvent) => void
 ) {
   return runQuickToolStream({
-    url: "/api/v2/quick-tools/run/protein-function/stream",
+    url: "/api/quick-tools/run/protein-function/stream",
     body: {
       fasta_file: args.fastaFile,
       task: args.task,
@@ -274,7 +274,7 @@ export async function runFunctionalResidueTool(args: {
   fastaFile: string;
   task: string;
 }) {
-  return requestJSON<Record<string, unknown>>("/api/v2/quick-tools/run/residue-function", {
+  return requestJSON<Record<string, unknown>>("/api/quick-tools/run/residue-function", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -293,7 +293,7 @@ export async function runFunctionalResidueToolStream(
   onProgress?: (evt: QuickToolProgressEvent) => void
 ) {
   return runQuickToolStream({
-    url: "/api/v2/quick-tools/run/residue-function/stream",
+    url: "/api/quick-tools/run/residue-function/stream",
     body: {
       fasta_file: args.fastaFile,
       task: args.task,
@@ -308,7 +308,7 @@ export async function runPropertiesTool(args: {
   uploadedPath: string;
   chainId: string;
 }) {
-  return requestJSON<Record<string, unknown>>("/api/v2/quick-tools/run/properties", {
+  return requestJSON<Record<string, unknown>>("/api/quick-tools/run/properties", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -328,7 +328,7 @@ export async function runPropertiesToolStream(
   onProgress?: (evt: QuickToolProgressEvent) => void
 ) {
   return runQuickToolStream({
-    url: "/api/v2/quick-tools/run/properties/stream",
+    url: "/api/quick-tools/run/properties/stream",
     body: {
       task: args.task,
       file_path: args.uploadedPath,
@@ -340,7 +340,7 @@ export async function runPropertiesToolStream(
 
 export function getDownloadUrl(filePath: string, inline = false): string {
   const inlinePart = inline ? "&inline=1" : "";
-  return `/api/v2/quick-tools/download?file_path=${encodeURIComponent(filePath)}${inlinePart}`;
+  return `/api/quick-tools/download?file_path=${encodeURIComponent(filePath)}${inlinePart}`;
 }
 
 export function extractDownloadPath(payload: Record<string, unknown> | null): string {
@@ -360,7 +360,7 @@ export async function requestQuickToolAiSummary(args: {
   userApiKey: string;
   resultPayload: Record<string, unknown>;
 }) {
-  return requestJSON<{ summary: string; provider: string; model: string }>("/api/v2/quick-tools/ai-summary", {
+  return requestJSON<{ summary: string; provider: string; model: string }>("/api/quick-tools/ai-summary", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

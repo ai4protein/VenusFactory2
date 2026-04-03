@@ -30,7 +30,7 @@ async function parseError(res: Response): Promise<string> {
 }
 
 export async function runDownloadTask(endpoint: string, body: DownloadTaskBody): Promise<DownloadTaskResponse> {
-  const res = await fetch(`/api/v2/download/${endpoint}`, {
+  const res = await fetch(`/api/download/${endpoint}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)

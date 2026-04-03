@@ -50,7 +50,7 @@ export function QuickToolsPage() {
   async function ensureMeta() {
     if (metaLoaded) return;
     try {
-      const res = await fetch("/api/v2/quick-tools/meta");
+      const res = await fetch("/api/quick-tools/meta");
       if (!res.ok) return;
       const data = (await res.json()) as MetaResponse;
       setMeta(data);
@@ -85,7 +85,7 @@ export function QuickToolsPage() {
   async function uploadFileAndGetPath(file: File) {
     const form = new FormData();
     form.append("file", file);
-    const res = await fetch("/api/v2/quick-tools/upload", { method: "POST", body: form });
+    const res = await fetch("/api/quick-tools/upload", { method: "POST", body: form });
     if (!res.ok) throw new Error(`Upload failed (${res.status})`);
     return (await res.json()) as { file_path: string; suffix: string };
   }

@@ -20,7 +20,7 @@ from web.utils.common_utils import (
 )
 
 
-router = APIRouter(prefix="/api/v2/download", tags=["download-v2"])
+router = APIRouter(prefix="/api/download", tags=["download-v2"])
 
 ONLINE_MAX_BATCH_ITEMS = 50
 WEB_V2_RESULTS_ROOT = get_web_v2_area_dir("results")

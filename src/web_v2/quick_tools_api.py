@@ -62,7 +62,7 @@ except ModuleNotFoundError:
     )
 
 
-router = APIRouter(prefix="/api/v2/quick-tools", tags=["quick-tools-v2"])
+router = APIRouter(prefix="/api/quick-tools", tags=["quick-tools-v2"])
 
 _CONSTANT_PATH = Path(__file__).resolve().parent.parent / "constant.json"
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent

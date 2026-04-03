@@ -83,7 +83,7 @@ export function ChatPage() {
   }, [snapshot]);
 
   async function fetchSessions() {
-    const res = await fetch("/api/v2/chat/sessions");
+    const res = await fetch("/api/chat/sessions");
     if (!res.ok) {
       return [] as SessionMeta[];
     }
@@ -176,7 +176,7 @@ export function ChatPage() {
       }
 
       await streamSSEFromPost(
-        `/api/v2/chat/sessions/${encodeURIComponent(activeSessionId)}/messages/stream`,
+        `/api/chat/sessions/${encodeURIComponent(activeSessionId)}/messages/stream`,
         {
           text: message,
           model: selectedModel,
@@ -225,7 +225,7 @@ export function ChatPage() {
     abortRef.current = new AbortController();
     try {
       await streamSSEFromPost(
-        `/api/v2/chat/sessions/${encodeURIComponent(sessionId)}/messages/retry/stream`,
+        `/api/chat/sessions/${encodeURIComponent(sessionId)}/messages/retry/stream`,
         {},
         ({ event, data }) => {
           if (event === "state" && data) {
@@ -255,7 +255,7 @@ export function ChatPage() {
     setRunStatus("stopping");
     if (sessionId) {
       try {
-        await fetch(`/api/v2/chat/sessions/${encodeURIComponent(sessionId)}/cancel`, {
+        await fetch(`/api/chat/sessions/${encodeURIComponent(sessionId)}/cancel`, {
           method: "POST"
         });
       } catch {

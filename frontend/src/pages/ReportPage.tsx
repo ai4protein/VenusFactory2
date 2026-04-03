@@ -52,7 +52,7 @@ export function ReportPage() {
     setError("");
     setActivePhase("example");
     try {
-      const res = await fetch("/api/v2/report/default-input");
+      const res = await fetch("/api/report/default-input");
       if (!res.ok) {
         throw new Error(`Load default example failed (${res.status})`);
       }
@@ -81,7 +81,7 @@ export function ReportPage() {
         inputMode === "upload"
           ? { file_path: uploadedPath, content: "" }
           : { content: pasteContent, file_path: "" };
-      const res = await fetch("/api/v2/report/parse-input", {
+      const res = await fetch("/api/report/parse-input", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body)
@@ -106,7 +106,7 @@ export function ReportPage() {
     try {
       const form = new FormData();
       form.append("file", file);
-      const res = await fetch("/api/v2/report/upload", {
+      const res = await fetch("/api/report/upload", {
         method: "POST",
         body: form
       });
@@ -144,7 +144,7 @@ export function ReportPage() {
     setPdfUrl("");
     try {
       await streamSSEFromPost(
-        "/api/v2/report/generate/stream",
+        "/api/report/generate/stream",
         {
           sequence_map: parsed.sequence_map,
           selected_chain: selectedChain,

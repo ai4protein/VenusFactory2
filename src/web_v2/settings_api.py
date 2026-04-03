@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 
-router = APIRouter(prefix="/api/v2/settings", tags=["settings-v2"])
+router = APIRouter(prefix="/api/settings", tags=["settings-v2"])
 _ENV_PATH = Path(".env")
 _ENV_EXAMPLE_PATH = Path(".env.example")
 _KEY_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")

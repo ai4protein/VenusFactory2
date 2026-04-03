@@ -118,7 +118,7 @@ export default function App() {
     let alive = true;
     void (async () => {
       try {
-        const res = await fetch("/api/v2/runtime-config");
+        const res = await fetch("/api/runtime-config");
         if (!res.ok) {
           if (!alive) return;
           setRuntimeMode("online");
@@ -365,10 +365,10 @@ export default function App() {
           >
             <span className="vf2-nav-label">Settings</span>
           </NavLink>
+          <RuntimeModeBadge runtimeMode={runtimeMode} placement="sidebar" />
         </nav>
       </aside>
       <main className="vf2-main">
-        <RuntimeModeBadge runtimeMode={runtimeMode} />
         <Routes>
           <Route path="/" element={<Navigate to="/chat" replace />} />
           <Route path="/chat" element={<ChatPage />} />

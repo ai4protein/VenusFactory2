@@ -71,20 +71,20 @@ async function requestJSON<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 export async function fetchCustomModelMeta() {
-  return requestJSON<CustomModelMeta>("/api/v2/custom-model/meta");
+  return requestJSON<CustomModelMeta>("/api/custom-model/meta");
 }
 
 export async function fetchModelFolders(root = "ckpt") {
-  return requestJSON<{ folders: string[] }>(`/api/v2/custom-model/models/folders?root=${encodeURIComponent(root)}`);
+  return requestJSON<{ folders: string[] }>(`/api/custom-model/models/folders?root=${encodeURIComponent(root)}`);
 }
 
 export async function fetchModelsInFolder(folder: string) {
-  return requestJSON<{ models: ModelOption[] }>(`/api/v2/custom-model/models?folder=${encodeURIComponent(folder)}`);
+  return requestJSON<{ models: ModelOption[] }>(`/api/custom-model/models?folder=${encodeURIComponent(folder)}`);
 }
 
 export async function fetchModelConfig(modelPath: string) {
   return requestJSON<{ config: Record<string, unknown> }>(
-    `/api/v2/custom-model/models/config?model_path=${encodeURIComponent(modelPath)}`
+    `/api/custom-model/models/config?model_path=${encodeURIComponent(modelPath)}`
   );
 }
 
@@ -96,7 +96,7 @@ export async function previewDataset(payload: {
   valid_file?: string;
   test_file?: string;
 }) {
-  return requestJSON<DatasetPreviewResult>("/api/v2/custom-model/dataset/preview", {
+  return requestJSON<DatasetPreviewResult>("/api/custom-model/dataset/preview", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
@@ -106,7 +106,7 @@ export async function previewDataset(payload: {
 export async function uploadCustomModelDatasetFile(file: File) {
   const form = new FormData();
   form.append("file", file);
-  const res = await fetch("/api/v2/custom-model/upload", {
+  const res = await fetch("/api/custom-model/upload", {
     method: "POST",
     body: form
   });
@@ -120,7 +120,7 @@ export async function uploadCustomModelDatasetFile(file: File) {
 export async function uploadCustomModelPredictBatchFile(file: File) {
   const form = new FormData();
   form.append("file", file);
-  const res = await fetch("/api/v2/custom-model/predict/upload", {
+  const res = await fetch("/api/custom-model/predict/upload", {
     method: "POST",
     body: form
   });
@@ -132,7 +132,7 @@ export async function uploadCustomModelPredictBatchFile(file: File) {
 }
 
 export async function uploadCustomModelPredictBatchText(text: string, filename = "batch_input.fasta") {
-  return requestJSON<UploadedDatasetFile>("/api/v2/custom-model/predict/text-upload", {
+  return requestJSON<UploadedDatasetFile>("/api/custom-model/predict/text-upload", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, filename })
@@ -141,12 +141,12 @@ export async function uploadCustomModelPredictBatchText(text: string, filename =
 
 export async function fetchDatasetConfigDefaults(datasetConfig: string) {
   return requestJSON<DatasetConfigDefaults>(
-    `/api/v2/custom-model/dataset/config-values?dataset_config=${encodeURIComponent(datasetConfig)}`
+    `/api/custom-model/dataset/config-values?dataset_config=${encodeURIComponent(datasetConfig)}`
   );
 }
 
 export async function previewTraining(args: Record<string, unknown>) {
-  return requestJSON<{ command: string; args: Record<string, unknown> }>("/api/v2/custom-model/training/preview", {
+  return requestJSON<{ command: string; args: Record<string, unknown> }>("/api/custom-model/training/preview", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ args })
@@ -154,7 +154,7 @@ export async function previewTraining(args: Record<string, unknown>) {
 }
 
 export async function previewEvaluation(args: Record<string, unknown>) {
-  return requestJSON<{ command: string; args: Record<string, unknown> }>("/api/v2/custom-model/evaluation/preview", {
+  return requestJSON<{ command: string; args: Record<string, unknown> }>("/api/custom-model/evaluation/preview", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ args })
@@ -162,7 +162,7 @@ export async function previewEvaluation(args: Record<string, unknown>) {
 }
 
 export async function previewPredict(args: Record<string, unknown>) {
-  return requestJSON<{ command: string; args: Record<string, unknown> }>("/api/v2/custom-model/predict/preview", {
+  return requestJSON<{ command: string; args: Record<string, unknown> }>("/api/custom-model/predict/preview", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ args })
@@ -170,15 +170,15 @@ export async function previewPredict(args: Record<string, unknown>) {
 }
 
 export async function abortTraining() {
-  return requestJSON<{ aborted: boolean }>("/api/v2/custom-model/training/abort", { method: "POST" });
+  return requestJSON<{ aborted: boolean }>("/api/custom-model/training/abort", { method: "POST" });
 }
 
 export async function abortEvaluation() {
-  return requestJSON<{ aborted: boolean }>("/api/v2/custom-model/evaluation/abort", { method: "POST" });
+  return requestJSON<{ aborted: boolean }>("/api/custom-model/evaluation/abort", { method: "POST" });
 }
 
 export async function abortPredict() {
-  return requestJSON<{ aborted: boolean }>("/api/v2/custom-model/predict/abort", { method: "POST" });
+  return requestJSON<{ aborted: boolean }>("/api/custom-model/predict/abort", { method: "POST" });
 }
 
 function parseEventData(data: string) {
@@ -196,7 +196,7 @@ export async function startTrainingStream(
   signal?: AbortSignal
 ) {
   await streamSSEFromPost(
-    "/api/v2/custom-model/training/start",
+    "/api/custom-model/training/start",
     { args },
     ({ event, data }) => {
       const payload = parseEventData(data);
@@ -218,7 +218,7 @@ export async function startEvaluationStream(
   signal?: AbortSignal
 ) {
   await streamSSEFromPost(
-    "/api/v2/custom-model/evaluation/start",
+    "/api/custom-model/evaluation/start",
     { args },
     ({ event, data }) => {
       const payload = parseEventData(data);
@@ -238,7 +238,7 @@ export async function startPredictStream(
   signal?: AbortSignal
 ) {
   await streamSSEFromPost(
-    "/api/v2/custom-model/predict/start",
+    "/api/custom-model/predict/start",
     { args },
     ({ event, data }) => {
       const payload = parseEventData(data);
@@ -253,5 +253,5 @@ export async function startPredictStream(
 }
 
 export function buildArtifactDownloadUrl(path: string) {
-  return `/api/v2/custom-model/artifacts/download?path=${encodeURIComponent(path)}`;
+  return `/api/custom-model/artifacts/download?path=${encodeURIComponent(path)}`;
 }

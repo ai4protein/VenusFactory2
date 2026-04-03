@@ -27,7 +27,7 @@ from web.utils.common_utils import (
 )
 
 
-router = APIRouter(prefix="/api/v2/chat", tags=["chat-v2"])
+router = APIRouter(prefix="/api/chat", tags=["chat-v2"])
 
 _SESSIONS: Dict[str, Dict[str, Any]] = {}
 _SESSION_LOCKS: Dict[str, asyncio.Lock] = {}

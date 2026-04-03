@@ -33,7 +33,7 @@ from web.utils.common_utils import (
 from web.utils.file_handlers import extract_sequence_from_pdb
 
 
-router = APIRouter(prefix="/api/v2/report", tags=["report-v2"])
+router = APIRouter(prefix="/api/report", tags=["report-v2"])
 
 _REPORT_UPLOAD_DIR = get_web_v2_area_dir("uploads", tool="report")
 _REPORT_RESULTS_ROOT = get_web_v2_area_dir("results")

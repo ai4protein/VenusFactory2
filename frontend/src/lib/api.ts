@@ -25,7 +25,7 @@ export type ChatQuota = {
 const API_ROOT = "";
 
 export async function createChatSession() {
-  const res = await fetch(`${API_ROOT}/api/v2/chat/sessions`, { method: "POST" });
+  const res = await fetch(`${API_ROOT}/api/chat/sessions`, { method: "POST" });
   if (!res.ok) {
     throw new Error(`Create session failed: ${res.status}`);
   }
@@ -33,7 +33,7 @@ export async function createChatSession() {
 }
 
 export async function getChatSession(sessionId: string) {
-  const res = await fetch(`${API_ROOT}/api/v2/chat/sessions/${encodeURIComponent(sessionId)}`);
+  const res = await fetch(`${API_ROOT}/api/chat/sessions/${encodeURIComponent(sessionId)}`);
   if (!res.ok) {
     throw new Error(`Fetch session failed: ${res.status}`);
   }
@@ -44,7 +44,7 @@ export async function uploadFiles(sessionId: string, files: File[]) {
   const form = new FormData();
   files.forEach((file) => form.append("files", file));
   const res = await fetch(
-    `${API_ROOT}/api/v2/chat/sessions/${encodeURIComponent(sessionId)}/attachments`,
+    `${API_ROOT}/api/chat/sessions/${encodeURIComponent(sessionId)}/attachments`,
     {
       method: "POST",
       body: form
@@ -57,7 +57,7 @@ export async function uploadFiles(sessionId: string, files: File[]) {
 }
 
 export async function getChatQuota() {
-  const res = await fetch(`${API_ROOT}/api/v2/chat/quota`);
+  const res = await fetch(`${API_ROOT}/api/chat/quota`);
   if (!res.ok) {
     throw new Error(`Fetch chat quota failed: ${res.status}`);
   }
