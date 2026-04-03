@@ -29,6 +29,29 @@ const AVATAR_BY_ROLE: Record<string, string> = {
   scientific_critic: "/img/agent_role/scientific_critic.png"
 };
 
+const ROLE_ALIAS_TO_CANONICAL: Record<string, string> = {
+  pi: "principal_investigator",
+  principalinvestigator: "principal_investigator",
+  principal_investigator: "principal_investigator",
+  cb: "computational_biologist",
+  computationalbiologist: "computational_biologist",
+  computational_biologist: "computational_biologist",
+  mls: "machine_learning_specialist",
+  machinelearningspecialist: "machine_learning_specialist",
+  machine_learning_specialist: "machine_learning_specialist",
+  sc: "scientific_critic",
+  scientificcritic: "scientific_critic",
+  scientific_critic: "scientific_critic"
+};
+
+function normalizeRoleId(roleId?: string, role?: string): string {
+  const raw = (roleId || role || "").trim();
+  if (!raw || raw === "assistant" || raw === "user") return "";
+  const normalized = raw.toLowerCase().replace(/[\s-]+/g, "_");
+  const compact = normalized.replace(/_/g, "");
+  return ROLE_ALIAS_TO_CANONICAL[normalized] || ROLE_ALIAS_TO_CANONICAL[compact] || normalized;
+}
+
 function roleDisplayName(roleId: string, isUser: boolean) {
   if (isUser) return "User";
   if (!roleId) return "Assistant";
@@ -53,7 +76,7 @@ export function ChatTimeline({ items }: { items: ChatHistoryItem[] }) {
       )}
       {items.map((item, idx) => {
         const isUser = item.role === "user";
-        const roleId = item.role_id || "";
+        const roleId = normalizeRoleId(item.role_id, item.role);
         const roleLabel = roleDisplayName(roleId, isUser);
         const avatar = roleAvatar(roleId, isUser);
         return (
