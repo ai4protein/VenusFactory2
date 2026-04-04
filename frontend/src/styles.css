@@ -257,6 +257,35 @@ body {
   overflow-wrap: anywhere;
 }
 
+.chat-header-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.chat-mode-online-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(143, 127, 106, 0.28);
+  background: rgba(255, 255, 255, 0.76);
+  color: #5a4d3e;
+  font-size: 0.76rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: help;
+}
+
+.chat-online-local-hint {
+  margin: 4px 0 0;
+  font-size: 0.76rem;
+  color: #7a6853;
+  line-height: 1.35;
+}
+
 .chat-header p {
   margin: 4px 0 0;
   color: var(--muted);

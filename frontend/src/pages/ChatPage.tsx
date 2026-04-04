@@ -294,7 +294,22 @@ export function ChatPage() {
     <div className="chat-page">
       <header className="chat-header">
         <div>
-          <h2>Agent</h2>
+          <div className="chat-header-title-row">
+            <h2>Agent</h2>
+            {chatQuota?.enforced && (
+              <span
+                className="chat-mode-online-pill"
+                title={`Mode: Online. Per-IP daily limit: ${chatQuota.limit ?? 10} chats.`}
+              >
+                Mode: Online
+              </span>
+            )}
+          </div>
+          {chatQuota?.enforced && (
+            <p className="chat-online-local-hint">
+              For unlimited and more efficient usage, local deployment is recommended.
+            </p>
+          )}
           <div className="chat-header-subrow">
             <p>Chat with the AI assistant for protein engineering workflows and analysis.</p>
           </div>
