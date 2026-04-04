@@ -11,6 +11,7 @@ import {
 } from "../../lib/quickToolsApi";
 import { QuickToolsLayout } from "./QuickToolsLayout";
 import { QuickToolResultPanel } from "./QuickToolResultPanel";
+import { WorkspaceFilePicker } from "../../components/WorkspaceFilePicker";
 
 const DEFAULT_META: QuickToolsMeta = {
   dataset_mapping_zero_shot: ["Activity", "Binding", "Expression", "Organismal Fitness", "Stability"],
@@ -21,7 +22,11 @@ const DEFAULT_META: QuickToolsMeta = {
   llm_models: ["DeepSeek", "ChatGPT", "Gemini"]
 };
 
-export function DirectedEvolutionPage() {
+type DirectedEvolutionPageProps = {
+  workspaceEnabled?: boolean;
+};
+
+export function DirectedEvolutionPage({ workspaceEnabled = false }: DirectedEvolutionPageProps) {
   const [meta, setMeta] = useState<QuickToolsMeta>(DEFAULT_META);
   const [functionTask, setFunctionTask] = useState(DEFAULT_META.dataset_mapping_zero_shot[0]);
   const [sequence, setSequence] = useState("");
@@ -154,11 +159,26 @@ export function DirectedEvolutionPage() {
               />
             </label>
             <p className="quick-ai-note">Directed Evolution supports one protein per run (sequence or structure).</p>
-            <div className="custom-file-example-row">
-              <label className="left-controls custom-file-picker-field">
-                Select File
-                <input type="file" accept=".fasta,.fa,.pdb" onChange={(e) => void onUpload(e.target.files?.[0] || null)} />
-              </label>
+            <div className="custom-file-example-row upload-source-stack">
+              <div className="file-source-inline">
+                <label className="left-controls custom-file-picker-field">
+                  Select File
+                  <input type="file" accept=".fasta,.fa,.pdb" onChange={(e) => void onUpload(e.target.files?.[0] || null)} />
+                </label>
+                <WorkspaceFilePicker
+                  workspaceEnabled={workspaceEnabled}
+                  disabled={running}
+                  acceptedCategories={["sequence", "structure"]}
+                  buttonLabel="From Workspace"
+                  onPick={(picked) => {
+                    const selected = picked[0];
+                    if (!selected) return;
+                    setUploadedPath(selected.storage_path);
+                    setUploadedSuffix(selected.suffix);
+                    setSequence("");
+                  }}
+                />
+              </div>
               <button type="button" className="custom-btn-secondary" onClick={() => void onUseExample()}>
                 Use Example FASTA
               </button>

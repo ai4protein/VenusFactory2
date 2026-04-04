@@ -14,6 +14,7 @@ import {
 } from "../lib/customModelApi";
 import { SegmentedSwitch } from "../components/SegmentedSwitch";
 import { PageFooter } from "../components/PageFooter";
+import { WorkspaceFilePicker } from "../components/WorkspaceFilePicker";
 
 const STRUCTURE_MODELS = ["protssn", "prosst", "saprot"];
 const SES_STRUCTURE_COLUMNS = ["foldseek_seq", "ss8_seq"];
@@ -25,9 +26,10 @@ function isNotFoundLikeError(message: string): boolean {
 
 type CustomModelPredictPageProps = {
   readonly?: boolean;
+  workspaceEnabled?: boolean;
 };
 
-export function CustomModelPredictPage({ readonly = false }: CustomModelPredictPageProps) {
+export function CustomModelPredictPage({ readonly = false, workspaceEnabled = false }: CustomModelPredictPageProps) {
   const [meta, setMeta] = useState<CustomModelMeta | null>(null);
   const [predictionMode, setPredictionMode] = useState<"single" | "batch">("single");
   const [batchInputSource, setBatchInputSource] = useState<"upload" | "paste" | "path">("upload");
@@ -350,6 +352,13 @@ export function CustomModelPredictPage({ readonly = false }: CustomModelPredictP
     }
   }
 
+  async function onUseBatchExample() {
+    if (readonly) return;
+    const content = ">seq1\nMKTAYIAKQRQISFVKSHFSRQ\n>seq2\nGAVLILKKKGHHEAELKPLAQSHATKHKIPIKYLEFISEAIIHVLHSR\n";
+    const file = new File([content], "predict_example.fasta", { type: "text/plain" });
+    await onUploadBatchFile(file);
+  }
+
   async function resolveBatchInputFile() {
     if (readonly) return inputFile.trim();
     if (predictionMode !== "batch") return inputFile;
@@ -494,7 +503,7 @@ export function CustomModelPredictPage({ readonly = false }: CustomModelPredictP
                     {batchInputSource === "upload" ? (
                       <div className="custom-upload-dropzone-wrap custom-field-span-2 predict-batch-input-row">
                         <div className="custom-upload-dropzone-grid">
-                          <div className="custom-upload-item">
+                          <div className="custom-upload-item upload-source-stack">
                             <span className="custom-upload-item-label">File</span>
                             <label className="custom-upload-trigger">
                               <input
@@ -504,6 +513,26 @@ export function CustomModelPredictPage({ readonly = false }: CustomModelPredictP
                               />
                               Choose File
                             </label>
+                            <WorkspaceFilePicker
+                              workspaceEnabled={workspaceEnabled}
+                              disabled={readonly || running}
+                              acceptedCategories={["table_or_text", "sequence"]}
+                              buttonLabel="From Workspace"
+                              onPick={(picked) => {
+                                const selected = picked[0];
+                                if (!selected) return;
+                                setInputFile(selected.storage_path);
+                                setBatchColumns([]);
+                              }}
+                            />
+                            <button
+                              type="button"
+                              className="custom-btn-secondary"
+                              onClick={() => void onUseBatchExample()}
+                              disabled={readonly || running}
+                            >
+                              Use Example
+                            </button>
                             <span className="custom-upload-file-chip">{displayUploadedName(inputFile)}</span>
                             <button type="button" className="custom-upload-clear-btn" onClick={clearBatchInputFile}>
                               Clear

@@ -45,6 +45,47 @@ This module allows users to select specific PLM models for high-precision locali
 
 -----
 
+## 6. Sequence Design
+
+This module exposes **ProteinMPNN** with full inference controls for structure-conditioned sequence generation.
+
+### 6.1 Input and core controls
+
+- **Structure input:** Upload a `.pdb` file (or use the example PDB).
+- **Model Family selector:** `Soluble` / `Vanilla` / `CA` (manual choice with recommendation).
+  - **Soluble**: recommended for protein discovery and general sequence design.
+  - **Vanilla**: recommended for membrane proteins.
+  - **CA**: only for C-alpha-only coarse-grained coordinates.
+- **Designed chains / fixed chains:** Configure redesign targets and fixed context chains.
+- **Fixed residues (text syntax):** Pin selected positions using readable syntax like `A12,C13` or `A:12,13;B:5-8`.
+- **Homomer mode:** Enable tied-position constraints for symmetric design.
+- **Number of sequences / temperatures:** Configure sampling count and diversity.
+
+### 6.2 Full ProteinMPNN inference options
+
+Advanced Sequence Design provides explicit fields for core and advanced options, including:
+
+- **Model & sampling:** `model_name`, `omit_aas` (backbone noise is auto-mapped from selected model)
+- **Runtime controls:** `seed`, `batch_size`, `max_length`
+- **Optional advanced rules (text):** tied positions, omit-AA rules, AA bias, bias-by-residue, and PSSM rules entered as text; backend auto-converts to JSONL
+- **PSSM numeric controls:** `pssm_multi`, `pssm_threshold`, `pssm_log_odds_flag`, `pssm_bias_flag`
+
+Model recommendation:
+- **Default first choice:** `v_48_020` (auto uses 0.20A noise policy)
+- **High-resolution native structures only:** `v_48_002` (auto uses 0.02A noise policy)
+
+### 6.3 Results
+
+- **Summary status:** Completion state and run summary.
+- **Table:** FASTA preview rows (header, sequence, length, score fields when available).
+- **Raw:** Full response payload for automation or downstream parsing.
+- **Download Result:** Generated FASTA file from ProteinMPNN.
+
+### 6.4 Recommended usage
+
+Use this module when you need explicit control over ProteinMPNN inference behavior for design experiments, benchmarking, or reproducible protocol development.  
+If you prefer default-safe settings with fewer decisions, use **Quick Tools / Sequence Design**.
+
 ## 2\. Advanced Tools Configuration and Results
 
 ### 2.1 Model Configuration and Data Input Area

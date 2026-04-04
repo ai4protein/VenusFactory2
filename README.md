@@ -368,6 +368,13 @@ python src/webui_v2.py --host 0.0.0.0 --port 7861  # → http://localhost:7861
 python src/webui_v2.py --host 0.0.0.0 --port 7861 --online  # → http://localhost:7861
 ```
 
+### Configuration Entry
+
+- Main runtime configuration template: `.env.example`
+- Typical flow: `cp .env.example .env` then adjust required keys for your mode.
+- Minimal local setup: keep defaults, set `OPENAI_API_KEY` only if you use LLM-backed features.
+- Minimal online setup: set `WEBUI_V2_MODE=online`, `WEBUI_V2_SESSION_TOKEN_SECRET`, and review all `WEBUI_V2_*_LIMIT` values.
+
 | Tab | Purpose | Features |
 |:----|:--------|:---------|
 | **Training** | Train custom models | Model selection • PEFT methods • Real-time monitoring • Wandb |

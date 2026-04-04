@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PageFooter } from "../components/PageFooter";
 
 type EnvEntry = {
   key: string;
   value: string;
+  section?: string | null;
 };
 
 type ImportanceLevel = "sensitive" | "important" | "normal";
@@ -66,6 +67,8 @@ export function SettingsPage({ readonly = false }: SettingsPageProps) {
   const [importanceFilter, setImportanceFilter] = useState<"all" | ImportanceLevel>("all");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [activeSection, setActiveSection] = useState("");
+  const rowsContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (readonly) return;
@@ -145,9 +148,8 @@ export function SettingsPage({ readonly = false }: SettingsPageProps) {
     return { total: entries.length, nonEmpty, keyCount, configCount: entries.length - keyCount };
   }, [entries]);
 
-  const groupedEntries = useMemo(() => {
-    const config: Array<{ entry: EnvEntry; idx: number }> = [];
-    const key: Array<{ entry: EnvEntry; idx: number }> = [];
+  const filteredEntries = useMemo(() => {
+    const rows: Array<{ entry: EnvEntry; idx: number; isKey: boolean }> = [];
     const query = searchText.trim().toUpperCase();
     entries.forEach((entry, idx) => {
       const isKey = isPlatformKey(entry.key);
@@ -156,17 +158,82 @@ export function SettingsPage({ readonly = false }: SettingsPageProps) {
       const importanceMatched = importanceFilter === "all" || importance === importanceFilter;
       const searchMatched = !query || entry.key.toUpperCase().includes(query);
       if (!(typeMatched && importanceMatched && searchMatched)) return;
-      if (isKey) key.push({ entry, idx });
-      else config.push({ entry, idx });
+      rows.push({ entry, idx, isKey });
     });
-    return { config, key };
+    return rows;
   }, [entries, importanceFilter, searchText, typeFilter]);
+
+  const sectionedEntries = useMemo(() => {
+    const order: string[] = [];
+    const buckets = new Map<string, Array<{ entry: EnvEntry; idx: number; isKey: boolean }>>();
+    filteredEntries.forEach((row) => {
+      const section = (row.entry.section || "General").trim() || "General";
+      if (!buckets.has(section)) {
+        buckets.set(section, []);
+        order.push(section);
+      }
+      buckets.get(section)?.push(row);
+    });
+    return order.map((section) => ({ section, rows: buckets.get(section) || [] }));
+  }, [filteredEntries]);
 
   const allVisible = useMemo(() => {
     const keyEntries = entries.filter((entry) => isPlatformKey(entry.key));
     if (keyEntries.length === 0) return false;
     return keyEntries.every((entry) => visibility[entry.key]);
   }, [entries, visibility]);
+
+  useEffect(() => {
+    if (sectionedEntries.length === 0) {
+      setActiveSection("");
+      return;
+    }
+    if (!activeSection || !sectionedEntries.some((s) => s.section === activeSection)) {
+      setActiveSection(sectionedEntries[0].section);
+    }
+  }, [activeSection, sectionedEntries]);
+
+  function toSectionId(section: string) {
+    return `settings-section-${section.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "")}`;
+  }
+
+  function jumpToSection(section: string) {
+    setActiveSection(section);
+    const el = document.getElementById(toSectionId(section));
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  useEffect(() => {
+    const container = rowsContainerRef.current;
+    if (!container || sectionedEntries.length === 0) return;
+
+    const syncActiveSectionByScroll = () => {
+      const containerTop = container.getBoundingClientRect().top;
+      const threshold = 42;
+      let next = sectionedEntries[0].section;
+
+      for (const group of sectionedEntries) {
+        const el = document.getElementById(toSectionId(group.section));
+        if (!el) continue;
+        const relativeTop = el.getBoundingClientRect().top - containerTop;
+        if (relativeTop <= threshold) {
+          next = group.section;
+        } else {
+          break;
+        }
+      }
+
+      setActiveSection((prev) => (prev === next ? prev : next));
+    };
+
+    syncActiveSectionByScroll();
+    container.addEventListener("scroll", syncActiveSectionByScroll, { passive: true });
+    window.addEventListener("resize", syncActiveSectionByScroll);
+    return () => {
+      container.removeEventListener("scroll", syncActiveSectionByScroll);
+      window.removeEventListener("resize", syncActiveSectionByScroll);
+    };
+  }, [sectionedEntries]);
 
   function toggleShowAll() {
     setVisibility((prev) => {
@@ -216,6 +283,7 @@ export function SettingsPage({ readonly = false }: SettingsPageProps) {
               <ul>
                 <li><strong>Config</strong>: system/runtime configuration and limits.</li>
                 <li><strong>Key</strong>: platform API credentials and access tokens.</li>
+                <li>Sections follow <code>.env.example</code> heading groups.</li>
                 <li>Filters support type, importance, and key search.</li>
               </ul>
             </div>
@@ -269,79 +337,77 @@ export function SettingsPage({ readonly = false }: SettingsPageProps) {
             </button>
           </div>
 
-          <div className="settings-rows">
+          <div className="settings-rows" ref={rowsContainerRef}>
             {entries.length === 0 && <div className="chat-empty">No variables found in .env.example / .env.</div>}
-            {entries.length > 0 && groupedEntries.config.length === 0 && groupedEntries.key.length === 0 && (
+            {entries.length > 0 && filteredEntries.length === 0 && (
               <div className="chat-empty">No variables match current search/filter.</div>
             )}
-            {groupedEntries.config.length > 0 && <h4 className="settings-group-title">Config</h4>}
-            {groupedEntries.config.map(({ entry, idx }) => (
-              <div className="settings-row settings-row-inline" key={`${idx}-${entry.key}`}>
-                <div className="settings-key-block">
-                  <label className="settings-key-label">{entry.key}</label>
-                  <span className="settings-key-tag normal">Config</span>
-                </div>
-                <div className="settings-row-value">
-                  {parseBooleanLiteral(entry.value) == null ? (
-                    <input
-                      className="settings-value-input"
-                      type="text"
-                      value={entry.value}
-                      placeholder="value"
-                      onChange={(e) => updateEntryValue(idx, e.target.value)}
-                    />
-                  ) : (
-                    <label className="settings-bool-toggle">
-                      <input
-                        type="checkbox"
-                        checked={Boolean(parseBooleanLiteral(entry.value))}
-                        onChange={(e) => updateBooleanEntry(idx, e.target.checked)}
-                      />
-                      <span className="settings-bool-slider" aria-hidden="true" />
-                      <span className="settings-bool-label">{parseBooleanLiteral(entry.value) ? "True" : "False"}</span>
-                    </label>
-                  )}
+            {sectionedEntries.length > 0 && (
+              <div className="settings-layout">
+                <aside className="settings-sections-nav" aria-label="Settings sections">
+                  <h4 className="settings-group-title">Sections</h4>
+                  {sectionedEntries.map(({ section, rows }) => (
+                    <button
+                      key={section}
+                      type="button"
+                      className={`settings-section-nav-btn ${activeSection === section ? "active" : ""}`}
+                      onClick={() => jumpToSection(section)}
+                    >
+                      <span>{section}</span>
+                      <span className="settings-section-count">{rows.length}</span>
+                    </button>
+                  ))}
+                </aside>
+                <div className="settings-sections-list">
+                  {sectionedEntries.map(({ section, rows }) => (
+                    <section id={toSectionId(section)} className="settings-section-block" key={section}>
+                      <h5 className="settings-subgroup-title">{section}</h5>
+                      {rows.map(({ entry, idx, isKey }) => (
+                        <div className="settings-row settings-row-inline" key={`${idx}-${entry.key}`}>
+                          <div className="settings-key-block">
+                            <label className="settings-key-label">{entry.key}</label>
+                            <span className={`settings-key-tag ${isKey ? "secret" : "normal"}`}>{isKey ? "Key" : "Config"}</span>
+                          </div>
+                          <div className="settings-row-value">
+                            {parseBooleanLiteral(entry.value) == null ? (
+                              <input
+                                className="settings-value-input"
+                                type={isKey && !visibility[entry.key] ? "password" : "text"}
+                                value={entry.value}
+                                placeholder="value"
+                                onChange={(e) => updateEntryValue(idx, e.target.value)}
+                              />
+                            ) : (
+                              <label className="settings-bool-toggle">
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(parseBooleanLiteral(entry.value))}
+                                  onChange={(e) => updateBooleanEntry(idx, e.target.checked)}
+                                />
+                                <span className="settings-bool-slider" aria-hidden="true" />
+                                <span className="settings-bool-label">{parseBooleanLiteral(entry.value) ? "True" : "False"}</span>
+                              </label>
+                            )}
+                          </div>
+                          {isKey ? (
+                            <button
+                              type="button"
+                              className="settings-eye-btn"
+                              onClick={() => toggleVisibility(entry.key)}
+                              title={visibility[entry.key] ? "Hide value" : "Show value"}
+                            >
+                              {visibility[entry.key] ? "Hide" : "Show"}
+                            </button>
+                          ) : (
+                            <div />
+                          )}
+                        </div>
+                      ))}
+                    </section>
+                  ))}
                 </div>
               </div>
-            ))}
-            {groupedEntries.key.length > 0 && <h4 className="settings-group-title">Key</h4>}
-            {groupedEntries.key.map(({ entry, idx }) => (
-              <div className="settings-row settings-row-inline" key={`${idx}-${entry.key}`}>
-                <div className="settings-key-block">
-                  <label className="settings-key-label">{entry.key}</label>
-                  <span className="settings-key-tag secret">Key</span>
-                </div>
-                <div className="settings-row-value">
-                  {parseBooleanLiteral(entry.value) == null ? (
-                    <input
-                      className="settings-value-input"
-                      type={visibility[entry.key] ? "text" : "password"}
-                      value={entry.value}
-                      placeholder="value"
-                      onChange={(e) => updateEntryValue(idx, e.target.value)}
-                    />
-                  ) : (
-                    <label className="settings-bool-toggle">
-                      <input
-                        type="checkbox"
-                        checked={Boolean(parseBooleanLiteral(entry.value))}
-                        onChange={(e) => updateBooleanEntry(idx, e.target.checked)}
-                      />
-                      <span className="settings-bool-slider" aria-hidden="true" />
-                      <span className="settings-bool-label">{parseBooleanLiteral(entry.value) ? "True" : "False"}</span>
-                    </label>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  className="settings-eye-btn"
-                  onClick={() => toggleVisibility(entry.key)}
-                  title={visibility[entry.key] ? "Hide value" : "Show value"}
-                >
-                  {visibility[entry.key] ? "Hide" : "Show"}
-                </button>
-              </div>
-            ))}
+            )}
           </div>
 
           {message && <div className="settings-success">{message}</div>}

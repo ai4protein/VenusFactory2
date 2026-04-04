@@ -17,6 +17,7 @@ import {
 } from "../lib/customModelApi";
 import { SegmentedSwitch } from "../components/SegmentedSwitch";
 import { PageFooter } from "../components/PageFooter";
+import { WorkspaceFilePicker } from "../components/WorkspaceFilePicker";
 
 const DEFAULT_METRICS = ["accuracy", "mcc", "f1", "precision", "recall", "auroc"];
 const STRUCTURE_MODELS = ["protssn", "prosst", "saprot"];
@@ -29,9 +30,10 @@ function isNotFoundLikeError(message: string): boolean {
 
 type CustomModelEvaluationPageProps = {
   readonly?: boolean;
+  workspaceEnabled?: boolean;
 };
 
-export function CustomModelEvaluationPage({ readonly = false }: CustomModelEvaluationPageProps) {
+export function CustomModelEvaluationPage({ readonly = false, workspaceEnabled = false }: CustomModelEvaluationPageProps) {
   const [meta, setMeta] = useState<CustomModelMeta | null>(null);
   const [datasetSelection, setDatasetSelection] = useState<"Custom" | "Pre-defined">("Pre-defined");
   const [customDataSourceMode, setCustomDataSourceMode] = useState<"hf_local" | "upload">("hf_local");
@@ -346,6 +348,13 @@ export function CustomModelEvaluationPage({ readonly = false }: CustomModelEvalu
     }
   }
 
+  async function onUseTestExample() {
+    if (readonly) return;
+    const content = "aa_seq,label\nMKTAYIAKQRQISFVKSHFSRQ,1\nGAVLILKKKGHHEAELKPLAQSHATKHKIPIKYLEFISEAIIHVLHSR,0\n";
+    const file = new File([content], "test_example.csv", { type: "text/csv" });
+    await onUploadTestFile(file);
+  }
+
   function displayUploadedName(pathValue: string) {
     const normalized = String(pathValue || "").trim();
     if (!normalized) return "No file selected";
@@ -528,7 +537,7 @@ export function CustomModelEvaluationPage({ readonly = false }: CustomModelEvalu
                       ) : (
                         <div className="custom-upload-dropzone-wrap">
                           <div className="custom-upload-dropzone-grid custom-upload-dropzone-grid-single">
-                            <div className="custom-upload-item">
+                            <div className="custom-upload-item upload-source-stack">
                               <span className="custom-upload-item-label">Test</span>
                               <label className="custom-upload-trigger">
                                 <input
@@ -538,6 +547,25 @@ export function CustomModelEvaluationPage({ readonly = false }: CustomModelEvalu
                                 />
                                 Choose File
                               </label>
+                              <WorkspaceFilePicker
+                                workspaceEnabled={workspaceEnabled}
+                                disabled={readonly || running}
+                                acceptedCategories={["table_or_text"]}
+                                buttonLabel="From Workspace"
+                                onPick={(picked) => {
+                                  const selected = picked[0];
+                                  if (!selected) return;
+                                  setTestFile(selected.storage_path);
+                                }}
+                              />
+                              <button
+                                type="button"
+                                className="custom-btn-secondary"
+                                onClick={() => void onUseTestExample()}
+                                disabled={readonly || running}
+                              >
+                                Use Example
+                              </button>
                               <span className="custom-upload-file-chip custom-upload-file-name" title={displayUploadedName(testFile)}>
                                 {displayUploadedName(testFile)}
                               </span>

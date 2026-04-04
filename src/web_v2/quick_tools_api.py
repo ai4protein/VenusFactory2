@@ -1,11 +1,12 @@
 import json
+import math
 import os
 import mimetypes
 import re
 import uuid
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 from fastapi import APIRouter, File, HTTPException, UploadFile
@@ -44,6 +45,7 @@ try:
         calculate_sasa_from_pdb,
         calculate_ss_from_pdb,
     )
+    from src.tools.denovo.proteinmpnn.protein_mpnn_function import proteinmpnn_design
 except ModuleNotFoundError:
     from tools.mutation.models.mutation_operations import (
         zero_shot_mutation_sequence_prediction,
@@ -60,6 +62,7 @@ except ModuleNotFoundError:
         calculate_sasa_from_pdb,
         calculate_ss_from_pdb,
     )
+    from tools.denovo.proteinmpnn.protein_mpnn_function import proteinmpnn_design
 
 
 router = APIRouter(prefix="/api/quick-tools", tags=["quick-tools-v2"])
@@ -80,7 +83,17 @@ _ALLOWED_DOWNLOAD_EXT = {
     ".gz",
     ".tar.gz",
 }
-_ONLINE_FASTA_LIMIT = 50
+def _env_int(name: str, default: int, *, minimum: int = 1) -> int:
+    raw = os.getenv(name, str(default)).strip()
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return default
+    return value if value >= minimum else default
+
+
+_ONLINE_FASTA_LIMIT = _env_int("WEBUI_V2_ONLINE_FASTA_LIMIT", 50, minimum=1)
+_ONLINE_SEQUENCE_DESIGN_LIMIT = _env_int("WEBUI_V2_ONLINE_SEQUENCE_DESIGN_LIMIT", 50, minimum=1)
 
 _WEB_V2_RESULTS_ROOT = get_web_v2_area_dir("results")
 _SUBCELLULAR_LABELS_DEEPLOCMULTI = [
@@ -271,6 +284,56 @@ def _as_json_dict(payload: Any) -> Dict[str, Any]:
     return {"status": "error", "error": {"type": "TypeError", "message": "Unsupported response payload."}, "file_info": None}
 
 
+def _parse_fasta_preview_rows(fasta_path: Path, max_records: int = 200) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    if not fasta_path.exists() or not fasta_path.is_file():
+        return rows
+    header = ""
+    seq_parts: list[str] = []
+
+    def _flush() -> None:
+        nonlocal header, seq_parts
+        if not header:
+            return
+        sequence = "".join(seq_parts)
+        score = ""
+        global_score = ""
+        header_text = header[1:] if header.startswith(">") else header
+        m_score = re.search(r"score=([\-0-9.]+)", header_text)
+        m_global = re.search(r"global_score=([\-0-9.]+)", header_text)
+        if m_score:
+            score = m_score.group(1)
+        if m_global:
+            global_score = m_global.group(1)
+        rows.append(
+            {
+                "header": header_text,
+                "sequence": sequence,
+                "length": len(sequence),
+                "score": score,
+                "global_score": global_score,
+            }
+        )
+        header = ""
+        seq_parts = []
+
+    with open(fasta_path, "r", encoding="utf-8") as f:
+        for raw in f:
+            line = raw.strip()
+            if not line:
+                continue
+            if line.startswith(">"):
+                _flush()
+                header = line
+                if len(rows) >= max_records:
+                    break
+            else:
+                seq_parts.append(line)
+        if len(rows) < max_records:
+            _flush()
+    return rows
+
+
 def _normalize_key(value: str) -> str:
     return re.sub(r"[\s._-]+", "", (value or "").strip().lower())
 
@@ -378,6 +441,7 @@ async def quick_tools_meta():
         "llm_models": list(LLM_MODELS.keys()),
         "mode": _runtime_mode(),
         "online_fasta_limit": _ONLINE_FASTA_LIMIT,
+        "online_sequence_design_limit": _ONLINE_SEQUENCE_DESIGN_LIMIT,
         "online_limit_enabled": _online_fasta_limit_enabled(),
     }
 
@@ -515,6 +579,139 @@ class MutationRunBody(BaseModel):
     model_name: str = Field(default="ESM2-650M", description="Model name.")
     backend: str = Field(default=DEFAULT_BACKEND, description="Backend key.")
     api_key: str = Field(default="", description="Optional API key.")
+
+
+class SequenceDesignRunBody(BaseModel):
+    structure_file: str = Field(..., description="PDB file path for ProteinMPNN sequence design.")
+    model_family: str = Field(default="soluble", description="soluble | vanilla | ca")
+    designed_chains: List[str] = Field(default_factory=list, description="Optional designed chain ids.")
+    fixed_residues_text: str = Field(default="", description="Optional fixed residues text, e.g. A12,C13 or A:12,13;B:5-8")
+    num_sequences: int = Field(default=8, ge=1, le=512, description="Number of designed sequences.")
+    model_name: str = Field(default="v_48_020", description="ProteinMPNN model checkpoint name.")
+    backbone_noise: float = Field(default=0.2, description="Backbone Gaussian noise.")
+    use_soluble_model: bool = Field(default=True, description="Use soluble-only weights.")
+    ca_only: bool = Field(default=False, description="Use CA-only model.")
+    temperatures: List[float] = Field(default_factory=lambda: [0.1], description="Sampling temperatures.")
+
+
+def _parse_fixed_residues_text(text: str) -> dict[str, list[int]]:
+    raw = (text or "").strip()
+    if not raw:
+        return {}
+    result: dict[str, set[int]] = {}
+
+    def _add(chain: str, start: int, end: int) -> None:
+        if start <= 0 or end <= 0:
+            raise HTTPException(status_code=400, detail="Invalid fixed_residues_text: residue index must be >= 1")
+        if end < start:
+            raise HTTPException(status_code=400, detail=f"Invalid fixed_residues_text: invalid range {start}-{end}")
+        key = chain.strip().upper()
+        if not re.fullmatch(r"[A-Z0-9]", key):
+            raise HTTPException(status_code=400, detail=f"Invalid fixed_residues_text: invalid chain '{chain}'")
+        bucket = result.setdefault(key, set())
+        bucket.update(range(start, end + 1))
+
+    if ":" in raw:
+        groups = [g.strip() for g in raw.split(";") if g.strip()]
+        for group in groups:
+            if ":" not in group:
+                raise HTTPException(status_code=400, detail=f"Invalid fixed_residues_text: expected A:12,13 in '{group}'")
+            chain, positions_text = group.split(":", 1)
+            if not positions_text.strip():
+                raise HTTPException(status_code=400, detail=f"Invalid fixed_residues_text: missing residues for chain '{chain}'")
+            for token in [t.strip() for t in positions_text.split(",") if t.strip()]:
+                if "-" in token:
+                    start_str, end_str = token.split("-", 1)
+                    if not start_str.isdigit() or not end_str.isdigit():
+                        raise HTTPException(status_code=400, detail=f"Invalid fixed_residues_text: invalid range '{token}'")
+                    _add(chain, int(start_str), int(end_str))
+                else:
+                    if not token.isdigit():
+                        raise HTTPException(status_code=400, detail=f"Invalid fixed_residues_text: invalid residue '{token}'")
+                    idx = int(token)
+                    _add(chain, idx, idx)
+    else:
+        tokens = [t.strip() for t in raw.split(",") if t.strip()]
+        for token in tokens:
+            m = re.fullmatch(r"([A-Za-z0-9])(\d+)(?:-(\d+))?", token)
+            if not m:
+                raise HTTPException(status_code=400, detail=f"Invalid fixed_residues_text token '{token}', use A12 or A12-15")
+            chain = m.group(1)
+            start = int(m.group(2))
+            end = int(m.group(3) or start)
+            _add(chain, start, end)
+
+    return {chain: sorted(values) for chain, values in result.items()}
+
+
+@router.post("/run/sequence-design")
+async def run_quick_tool_sequence_design(body: SequenceDesignRunBody):
+    input_path = _resolve_upload_input(body.structure_file)
+    if not input_path.lower().endswith(".pdb"):
+        raise HTTPException(status_code=400, detail="Sequence Design only supports .pdb input.")
+    if _online_fasta_limit_enabled() and body.num_sequences > _ONLINE_SEQUENCE_DESIGN_LIMIT:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Online mode supports up to {_ONLINE_SEQUENCE_DESIGN_LIMIT} designed sequences per run. "
+                f"Received {body.num_sequences}."
+            ),
+        )
+
+    run_id = build_run_id_utc()
+    designed_chains = [c.strip().upper() for c in body.designed_chains if str(c).strip()]
+    fixed_residues = _parse_fixed_residues_text(body.fixed_residues_text)
+    temperatures = body.temperatures or [0.1]
+    if body.ca_only and body.use_soluble_model:
+        raise HTTPException(status_code=400, detail="Invalid ProteinMPNN config: CA-only cannot be combined with Soluble.")
+    if not math.isfinite(float(body.backbone_noise)):
+        raise HTTPException(status_code=400, detail="backbone_noise must be a finite number.")
+    try:
+        fasta_path = proteinmpnn_design(
+            pdb_path=input_path,
+            designed_chains=designed_chains or None,
+            fixed_residues=fixed_residues or None,
+            num_sequences=body.num_sequences,
+            temperatures=temperatures,
+            omit_aas="X",
+            model_name=body.model_name or "v_48_020",
+            backbone_noise=float(body.backbone_noise),
+            ca_only=bool(body.ca_only),
+            use_soluble_model=bool(body.use_soluble_model),
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"ProteinMPNN sequence design failed: {exc}") from exc
+
+    staged_path = _stage_result_file(Path(fasta_path), "quick_tools", run_id, "sequence_design")
+    rows = _parse_fasta_preview_rows(staged_path)
+    return {
+        "status": "success",
+        "message": "Sequence design completed.",
+        "table": rows,
+        "data": {
+            "rows": rows,
+            "total_sequences": len(rows),
+            "fasta_path": to_web_v2_public_path(staged_path),
+            "download_url": build_web_v2_download_url(staged_path),
+            "effective_config": {
+                "model_family": body.model_family,
+                "model_name": body.model_name,
+                "backbone_noise": body.backbone_noise,
+                "use_soluble_model": body.use_soluble_model,
+                "ca_only": body.ca_only,
+                "num_sequences": body.num_sequences,
+                "temperatures": temperatures,
+                "fixed_residues": fixed_residues,
+            },
+        },
+        "file_info": {
+            "file_path": to_web_v2_public_path(staged_path),
+            "file_name": staged_path.name,
+            "format": "fasta",
+            "download_url": build_web_v2_download_url(staged_path),
+            "run_id": run_id,
+        },
+    }
 
 
 @router.post("/run/mutation")
@@ -771,6 +968,28 @@ async def run_quick_tool_mutation_stream(body: MutationRunBody):
                 yield chunk
         except Exception as exc:
             for chunk in _stream_error(f"Directed Evolution failed: {exc}", status_code=500):
+                yield chunk
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+@router.post("/run/sequence-design/stream")
+async def run_quick_tool_sequence_design_stream(body: SequenceDesignRunBody):
+    async def event_stream():
+        start = time.perf_counter()
+        yield _sse("progress", {"progress": 0.08, "message": "Validating structure input..."})
+        try:
+            yield _sse("progress", {"progress": 0.35, "message": "Running ProteinMPNN sequence design..."})
+            payload = await run_quick_tool_sequence_design(body)
+            elapsed_ms = int((time.perf_counter() - start) * 1000)
+            for chunk in _stream_success(payload, final_message=f"Sequence Design completed in {elapsed_ms} ms."):
+                yield chunk
+        except HTTPException as exc:
+            message = str(exc.detail) if exc.detail else "Sequence Design failed."
+            for chunk in _stream_error(message, status_code=exc.status_code):
+                yield chunk
+        except Exception as exc:
+            for chunk in _stream_error(f"Sequence Design failed: {exc}", status_code=500):
                 yield chunk
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")

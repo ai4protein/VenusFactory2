@@ -2,7 +2,7 @@ import re
 import os
 import shutil
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -12,11 +12,13 @@ router = APIRouter(prefix="/api/settings", tags=["settings-v2"])
 _ENV_PATH = Path(".env")
 _ENV_EXAMPLE_PATH = Path(".env.example")
 _KEY_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_SECTION_PATTERN = re.compile(r"^#\s*=+\s*(.*?)\s*=+\s*$")
 
 
 class EnvEntry(BaseModel):
     key: str = Field(min_length=1)
     value: str = ""
+    section: Optional[str] = None
 
 
 class UpdateEnvRequest(BaseModel):
@@ -45,21 +47,35 @@ def _parse_env_map(raw: str) -> Dict[str, str]:
 
 
 def _template_keys() -> List[str]:
+    return [key for _, key in _template_entries()]
+
+
+def _template_entries() -> List[Tuple[str, str]]:
     if not _ENV_EXAMPLE_PATH.exists():
         return []
-    keys: List[str] = []
+    entries: List[Tuple[str, str]] = []
     seen = set()
+    section = "General"
     raw = _ENV_EXAMPLE_PATH.read_text(encoding="utf-8", errors="ignore")
     for line in raw.splitlines():
         stripped = line.strip()
-        if not stripped or stripped.startswith("#") or "=" not in line:
+        if not stripped:
+            continue
+        if stripped.startswith("#"):
+            heading_match = _SECTION_PATTERN.match(stripped)
+            if heading_match:
+                heading = heading_match.group(1).strip()
+                if heading:
+                    section = heading
+            continue
+        if "=" not in line:
             continue
         key = line.split("=", 1)[0].strip()
         if not key or key in seen or not _KEY_PATTERN.match(key):
             continue
         seen.add(key)
-        keys.append(key)
-    return keys
+        entries.append((section, key))
+    return entries
 
 
 def _required_template_keys() -> List[str]:
@@ -88,6 +104,8 @@ def _ensure_settings_access(request: Request) -> None:
 async def get_env_entries(request: Request):
     _ensure_settings_access(request)
     keys = _required_template_keys()
+    template_entries = _template_entries()
+    section_map = {key: section for section, key in template_entries}
     created_from_example = False
     if not _ENV_PATH.exists() and _ENV_EXAMPLE_PATH.exists():
         shutil.copyfile(_ENV_EXAMPLE_PATH, _ENV_PATH)
@@ -100,11 +118,13 @@ async def get_env_entries(request: Request):
         }
     raw = _ENV_PATH.read_text(encoding="utf-8", errors="ignore")
     env_values = _parse_env_map(raw)
-    entries = [EnvEntry(key=k, value=env_values.get(k, "")) for k in keys]
+    entries = [EnvEntry(key=k, value=env_values.get(k, ""), section=section_map.get(k, "General")) for k in keys]
     return {
         "entries": [e.model_dump() for e in entries],
         "exists": True,
         "created_from_example": created_from_example,
+        "path": str(_ENV_PATH),
+        "source": str(_ENV_EXAMPLE_PATH),
     }
 
 
@@ -131,4 +151,4 @@ async def save_env_entries(payload: UpdateEnvRequest, request: Request):
     lines = [f"{k}={entry_map.get(k, '')}" for k in allowed_keys]
     content = "\n".join(lines).rstrip() + "\n"
     _ENV_PATH.write_text(content, encoding="utf-8")
-    return {"success": True, "count": len(clean_entries)}
+    return {"success": True, "count": len(clean_entries), "path": str(_ENV_PATH)}

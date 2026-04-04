@@ -94,6 +94,41 @@ Quick Tools 提供 4 种即用型分析：
 
 ---
 
+## 7. Sequence Design（序列设计）
+
+### 7.1 工具说明
+
+Quick Tools 的 Sequence Design 提供面向生物实验用户的 **ProteinMPNN 结构条件序列生成**简化入口。  
+设计目标是“少参数、可直接运行”，避免复杂推理配置。
+
+### 7.2 输入与简化参数
+
+* **结构输入：** 支持上传 **.pdb** 文件、从 Workspace 选择，或使用示例 PDB。
+* **Model Family：** `Soluble` / `Vanilla` / `CA`。
+  * **Soluble：** 用于蛋白发现与大多数序列设计任务（推荐）。
+  * **Vanilla：** 用于膜蛋白设计。
+  * **CA：** 仅在你只有 Cα 粗粒化坐标时使用。
+* **Designed Chains（可选）：** 输入链 ID，例如 `A` 或 `A,B`；留空表示对全部链进行设计。
+* **Fixed Residues（可选）：** 使用可读语法，例如 `A12,C13` 或 `A:12,13;B:5-8`。
+* **Number of Designed Sequences：** 设置生成候选序列数量。
+* **Design Diversity：** 低 / 中 / 高 三档，内部映射到 ProteinMPNN 的采样温度。
+
+Quick 默认组合为 **`v_48_020` + `backbone_noise=0.20`**，适用于绝大多数常规场景（AI 生成骨架、AlphaFold 结构、常规重设计）。
+
+### 7.3 输出结果
+
+* **Table：** 预览生成序列（header、sequence、length，以及可用时的 score 字段）。
+* **Raw：** 返回完整 JSON 结果，便于后续流程集成。
+* **AI Expert：** 若启用 AI Summary，会生成结果解读。
+* **Download Result：** 下载本次运行生成的 FASTA 文件。
+
+### 7.4 适用场景
+
+当你希望基于结构快速获得可实验验证的候选序列时，优先使用 Quick Sequence Design。  
+若需要完整 ProteinMPNN 推理参数控制，请使用 **Advanced Tools / Sequence Design**。
+
+---
+
 ## 4. Protein Function (蛋白质功能预测)
 
 ### 4.1 任务选择与序列输入

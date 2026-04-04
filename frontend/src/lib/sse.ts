@@ -1,8 +1,9 @@
 type EventHandler = (event: { event: string; data: string }) => void;
 
-function redactAbsolutePath(detail: string): string {
-  if (!detail) return "";
-  return detail.replace(/\/(?:home|Users|tmp|var|opt|mnt|data)(?:\/[^\s'"]+)+/g, "<redacted-path>");
+function redactAbsolutePath(detail: unknown): string {
+  const text = typeof detail === "string" ? detail : String(detail || "");
+  if (!text) return "";
+  return text.replace(/\/(?:home|Users|tmp|var|opt|mnt|data)(?:\/[^\s'"]+)+/g, "<redacted-path>");
 }
 
 function normalizeErrorText(raw: unknown): string {
@@ -44,11 +45,12 @@ export async function streamSSEFromPost(
   url: string,
   body: unknown,
   onEvent: EventHandler,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  headers?: Record<string, string>
 ) {
   const response = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(headers || {}) },
     body: JSON.stringify(body),
     signal
   });
@@ -56,8 +58,19 @@ export async function streamSSEFromPost(
   if (!response.ok) {
     let detail = "";
     try {
-      const maybeJson = (await response.json()) as { detail?: string; error?: string; message?: string };
-      detail = maybeJson?.detail || maybeJson?.error || maybeJson?.message || "";
+      const maybeJson = (await response.json()) as {
+        detail?: string | { message?: string };
+        error?: string;
+        message?: string;
+      };
+      const detailValue = maybeJson?.detail;
+      if (typeof detailValue === "string") {
+        detail = detailValue;
+      } else if (detailValue && typeof detailValue === "object" && typeof detailValue.message === "string") {
+        detail = detailValue.message;
+      } else {
+        detail = maybeJson?.error || maybeJson?.message || "";
+      }
     } catch {
       try {
         detail = await response.text();

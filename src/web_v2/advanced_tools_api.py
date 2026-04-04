@@ -1,5 +1,8 @@
+import argparse
 import json
+import math
 import os
+import re
 import tarfile
 import time
 import uuid
@@ -33,19 +36,39 @@ from web.utils.common_utils import (
 from web.utils.constants import LLM_MODELS
 from web.utils.file_handlers import validate_and_normalize_fasta_content
 from web.utils.llm_helpers import LLMConfig, call_llm_api, get_api_key, get_chat_base_url
+try:
+    from src.tools.denovo.proteinmpnn.protein_mpnn_run import proteinmpnn_run
+    from src.tools.denovo.proteinmpnn.protein_mpnn_utils import parse_PDB
+except ModuleNotFoundError:
+    from tools.denovo.proteinmpnn.protein_mpnn_run import proteinmpnn_run
+    from tools.denovo.proteinmpnn.protein_mpnn_utils import parse_PDB
 
 
 router = APIRouter(prefix="/api/advanced-tools", tags=["advanced-tools-v2"])
 
 _CONSTANT_PATH = Path(__file__).resolve().parent.parent / "constant.json"
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+_PROTEINMPNN_CKPT_ROOT = _REPO_ROOT / "ckpt" / "ProteinMPNN"
+_PROTEINMPNN_VANILLA_DIR = _PROTEINMPNN_CKPT_ROOT / "vanilla_model_weights"
+_PROTEINMPNN_SOLUBLE_DIR = _PROTEINMPNN_CKPT_ROOT / "soluble_model_weights"
+_PROTEINMPNN_CA_DIR = _PROTEINMPNN_CKPT_ROOT / "ca_model_weights"
 _WEB_V2_ROOT = get_web_v2_root_dir().resolve()
 _TEMP_OUTPUTS_ROOT = get_temp_outputs_base_dir().resolve()
 _WEB_V2_RESULTS_ROOT = get_web_v2_area_dir("results")
 _STAGE_ALLOWED_SOURCE_ROOTS = [_REPO_ROOT.resolve(), _WEB_V2_ROOT, _TEMP_OUTPUTS_ROOT]
 _DEFAULT_FASTA_EXAMPLE = _REPO_ROOT / "example" / "database" / "P60002.fasta"
 _DEFAULT_PDB_EXAMPLE = _REPO_ROOT / "example" / "database" / "alphafold" / "A0A1B0GTW7.pdb"
-_ONLINE_FASTA_LIMIT = 50
+def _env_int(name: str, default: int, *, minimum: int = 1) -> int:
+    raw = os.getenv(name, str(default)).strip()
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return default
+    return value if value >= minimum else default
+
+
+_ONLINE_FASTA_LIMIT = _env_int("WEBUI_V2_ONLINE_FASTA_LIMIT", 50, minimum=1)
+_ONLINE_SEQUENCE_DESIGN_LIMIT = _env_int("WEBUI_V2_ONLINE_SEQUENCE_DESIGN_LIMIT", 50, minimum=1)
 _ALLOWED_DOWNLOAD_EXT = {
     ".json",
     ".csv",
@@ -193,6 +216,34 @@ class ProteinDiscoveryBody(BaseModel):
     cluster_threads: int = Field(default=96)
     top_n_threshold: int = Field(default=10)
     evalue_threshold: float = Field(default=1e-5)
+
+
+class SequenceDesignBody(BaseModel):
+    structure_file: str = Field(..., description="PDB file path.")
+    model_family: str = Field(default="soluble", description="soluble | vanilla | ca")
+    designed_chains: List[str] = Field(default_factory=list)
+    fixed_chains: List[str] = Field(default_factory=list)
+    fixed_residues_text: str = Field(default="")
+    homomer: bool = Field(default=False)
+    num_sequences: int = Field(default=8, ge=1, le=512)
+    temperatures: List[float] = Field(default_factory=lambda: [0.1])
+    omit_aas: str = Field(default="X")
+    model_name: str = Field(default="v_48_020")
+    backbone_noise: float = Field(default=0.2)
+    ca_only: bool = Field(default=False)
+    use_soluble_model: bool = Field(default=True)
+    seed: int = Field(default=0)
+    batch_size: int = Field(default=1, ge=1)
+    max_length: int = Field(default=200000, ge=1)
+    tied_positions_text: str = Field(default="")
+    omit_aa_rules_text: str = Field(default="")
+    aa_bias_text: str = Field(default="")
+    bias_by_residue_text: str = Field(default="")
+    pssm_rules_text: str = Field(default="")
+    pssm_multi: float = Field(default=0.0)
+    pssm_threshold: float = Field(default=0.0)
+    pssm_log_odds_flag: int = Field(default=0)
+    pssm_bias_flag: int = Field(default=0)
 
 
 class AdvancedAiSummaryBody(BaseModel):
@@ -405,6 +456,251 @@ def _merge_sequence_row(
     return merged
 
 
+def _parse_fasta_preview_rows(fasta_path: Path, max_records: int = 200) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    if not fasta_path.exists() or not fasta_path.is_file():
+        return rows
+    header = ""
+    seq_parts: list[str] = []
+
+    def _flush() -> None:
+        nonlocal header, seq_parts
+        if not header:
+            return
+        sequence = "".join(seq_parts)
+        score = ""
+        global_score = ""
+        header_text = header[1:] if header.startswith(">") else header
+        m_score = re.search(r"score=([\-0-9.]+)", header_text)
+        m_global = re.search(r"global_score=([\-0-9.]+)", header_text)
+        if m_score:
+            score = m_score.group(1)
+        if m_global:
+            global_score = m_global.group(1)
+        rows.append(
+            {
+                "header": header_text,
+                "sequence": sequence,
+                "length": len(sequence),
+                "score": score,
+                "global_score": global_score,
+            }
+        )
+        header = ""
+        seq_parts = []
+
+    with open(fasta_path, "r", encoding="utf-8") as f:
+        for raw in f:
+            line = raw.strip()
+            if not line:
+                continue
+            if line.startswith(">"):
+                _flush()
+                header = line
+                if len(rows) >= max_records:
+                    break
+            else:
+                seq_parts.append(line)
+        if len(rows) < max_records:
+            _flush()
+    return rows
+
+
+def _proteinmpnn_default_namespace(**kwargs: Any) -> argparse.Namespace:
+    defaults: dict[str, Any] = {
+        "suppress_print": 1,
+        "ca_only": False,
+        "use_soluble_model": False,
+        "path_to_model_weights": "",
+        "model_name": "v_48_020",
+        "seed": 0,
+        "save_score": 0,
+        "save_probs": 0,
+        "score_only": 0,
+        "path_to_fasta": "",
+        "conditional_probs_only": 0,
+        "conditional_probs_only_backbone": 0,
+        "unconditional_probs_only": 0,
+        "backbone_noise": 0.0,
+        "num_seq_per_target": 8,
+        "batch_size": 1,
+        "max_length": 200000,
+        "sampling_temp": "0.1",
+        "out_folder": "",
+        "pdb_path": "",
+        "pdb_path_chains": "",
+        "jsonl_path": "",
+        "chain_id_jsonl": "",
+        "fixed_positions_jsonl": "",
+        "omit_AAs": "X",
+        "bias_AA_jsonl": "",
+        "bias_by_res_jsonl": "",
+        "omit_AA_jsonl": "",
+        "pssm_jsonl": "",
+        "pssm_multi": 0.0,
+        "pssm_threshold": 0.0,
+        "pssm_log_odds_flag": 0,
+        "pssm_bias_flag": 0,
+        "tied_positions_jsonl": "",
+    }
+    defaults.update(kwargs)
+    return argparse.Namespace(**defaults)
+
+
+def _proteinmpnn_latest_design_fasta(out_folder: Path, pdb_path: str) -> Path:
+    pdb_name = Path(pdb_path).stem
+    seqs_dir = out_folder / "seqs"
+    matches = list(seqs_dir.glob(f"*_{pdb_name}.fasta"))
+    if not matches:
+        raise FileNotFoundError(f"ProteinMPNN output FASTA not found in {seqs_dir}")
+    return max(matches, key=os.path.getmtime)
+
+
+def _write_jsonl_record(path: Path, value: dict[str, Any]) -> str:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(f"{json.dumps(value, ensure_ascii=False)}\n", encoding="utf-8")
+    return str(path)
+
+
+def _raise_rule_error(field: str, message: str) -> None:
+    raise HTTPException(status_code=400, detail=f"Invalid {field}: {message}")
+
+
+def _parse_fixed_residues_text(text: str) -> dict[str, list[int]]:
+    raw = (text or "").strip()
+    if not raw:
+        return {}
+    result: dict[str, set[int]] = {}
+
+    def _add(chain: str, start: int, end: int) -> None:
+        if start <= 0 or end <= 0:
+            _raise_rule_error("fixed_residues_text", "residue index must be >= 1")
+        if end < start:
+            _raise_rule_error("fixed_residues_text", f"invalid range {start}-{end}")
+        key = chain.strip().upper()
+        if not re.fullmatch(r"[A-Z0-9]", key):
+            _raise_rule_error("fixed_residues_text", f"invalid chain '{chain}'")
+        bucket = result.setdefault(key, set())
+        bucket.update(range(start, end + 1))
+
+    if ":" in raw:
+        groups = [g.strip() for g in raw.split(";") if g.strip()]
+        for group in groups:
+            if ":" not in group:
+                _raise_rule_error("fixed_residues_text", f"expected chain group like A:12,13 in '{group}'")
+            chain, positions_text = group.split(":", 1)
+            if not positions_text.strip():
+                _raise_rule_error("fixed_residues_text", f"missing residues for chain '{chain}'")
+            for token in [t.strip() for t in positions_text.split(",") if t.strip()]:
+                if "-" in token:
+                    start_str, end_str = token.split("-", 1)
+                    if not start_str.isdigit() or not end_str.isdigit():
+                        _raise_rule_error("fixed_residues_text", f"invalid range '{token}'")
+                    _add(chain, int(start_str), int(end_str))
+                else:
+                    if not token.isdigit():
+                        _raise_rule_error("fixed_residues_text", f"invalid residue '{token}'")
+                    idx = int(token)
+                    _add(chain, idx, idx)
+    else:
+        tokens = [t.strip() for t in raw.split(",") if t.strip()]
+        for token in tokens:
+            m = re.fullmatch(r"([A-Za-z0-9])(\d+)(?:-(\d+))?", token)
+            if not m:
+                _raise_rule_error("fixed_residues_text", f"invalid token '{token}', use A12 or A12-15")
+            chain = m.group(1)
+            start = int(m.group(2))
+            end = int(m.group(3) or start)
+            _add(chain, start, end)
+
+    return {chain: sorted(values) for chain, values in result.items()}
+
+
+def _parse_tied_positions_text(text: str) -> list[dict[str, list[int]]]:
+    raw = (text or "").strip()
+    if not raw:
+        return []
+    groups: list[dict[str, list[int]]] = []
+    tokens = [t.strip() for t in raw.split(";") if t.strip()]
+    for token in tokens:
+        parts = [p.strip() for p in token.split("=") if p.strip()]
+        if len(parts) < 2:
+            _raise_rule_error("tied_positions_text", f"'{token}' must tie at least two positions, e.g. A12=B12")
+        group: dict[str, list[int]] = {}
+        for part in parts:
+            m = re.fullmatch(r"([A-Za-z0-9])(\d+)", part)
+            if not m:
+                _raise_rule_error("tied_positions_text", f"invalid position '{part}'")
+            chain = m.group(1).upper()
+            idx = int(m.group(2))
+            group[chain] = [idx]
+        groups.append(group)
+    return groups
+
+
+def _parse_aa_bias_text(text: str) -> dict[str, float]:
+    raw = (text or "").strip()
+    if not raw:
+        return {}
+    result: dict[str, float] = {}
+    for token in [t.strip() for t in raw.split(",") if t.strip()]:
+        if ":" not in token:
+            _raise_rule_error("aa_bias_text", f"invalid token '{token}', use A:-1.1,F:0.7")
+        aa, value = token.split(":", 1)
+        aa = aa.strip().upper()
+        if not re.fullmatch(r"[A-Z]", aa):
+            _raise_rule_error("aa_bias_text", f"invalid amino acid '{aa}'")
+        try:
+            result[aa] = float(value.strip())
+        except ValueError:
+            _raise_rule_error("aa_bias_text", f"invalid bias value '{value}'")
+    return result
+
+
+def _parse_optional_json_object(field: str, text: str) -> dict[str, Any]:
+    raw = (text or "").strip()
+    if not raw:
+        return {}
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        _raise_rule_error(field, "must be valid JSON object text")
+    if not isinstance(payload, dict):
+        _raise_rule_error(field, "must be a JSON object")
+    return payload
+
+
+def _build_homomer_tied_positions(pdb_path: str, chains: list[str]) -> list[dict[str, list[int]]]:
+    chain_list = chains
+    if not chain_list:
+        pdb_dict_list = parse_PDB(pdb_path)
+        chain_list = sorted([k[-1:] for k in pdb_dict_list[0] if k.startswith("seq_chain_")])
+    if not chain_list:
+        return []
+    pdb_dict_list = parse_PDB(pdb_path, input_chain_list=chain_list)
+    chain_length = len(pdb_dict_list[0][f"seq_chain_{chain_list[0]}"])
+    return [{chain: [idx] for chain in chain_list} for idx in range(1, chain_length + 1)]
+
+
+def _list_proteinmpnn_model_names(directory: Path) -> list[str]:
+    if not directory.exists() or not directory.is_dir():
+        return []
+    names = sorted({p.stem for p in directory.glob("*.pt")})
+    return names
+
+
+def _proteinmpnn_model_options() -> dict[str, list[str]]:
+    vanilla = _list_proteinmpnn_model_names(_PROTEINMPNN_VANILLA_DIR)
+    soluble = _list_proteinmpnn_model_names(_PROTEINMPNN_SOLUBLE_DIR)
+    ca = _list_proteinmpnn_model_names(_PROTEINMPNN_CA_DIR)
+    fallback = ["v_48_020", "v_48_002"]
+    return {
+        "vanilla": vanilla or fallback,
+        "soluble": soluble or fallback,
+        "ca": ca or fallback,
+    }
+
+
 @router.get("/meta")
 async def advanced_tools_meta():
     if not _CONSTANT_PATH.exists():
@@ -412,6 +708,7 @@ async def advanced_tools_meta():
     data = json.loads(_CONSTANT_PATH.read_text(encoding="utf-8"))
     web_ui = data.get("web_ui", {})
 
+    mpnn_options = _proteinmpnn_model_options()
     return {
         "dataset_mapping_zero_shot": web_ui.get("dataset_mapping_zero_shot", []),
         "sequence_model_options": ["VenusPLM", "ESM2-650M", "ESM-1v", "ESM-1b"],
@@ -423,7 +720,9 @@ async def advanced_tools_meta():
         "llm_models": list(LLM_MODELS.keys()),
         "mode": _runtime_mode(),
         "online_fasta_limit": _ONLINE_FASTA_LIMIT,
+        "online_sequence_design_limit": _ONLINE_SEQUENCE_DESIGN_LIMIT,
         "online_limit_enabled": _online_fasta_limit_enabled(),
+        "proteinmpnn_model_options": mpnn_options,
     }
 
 
@@ -641,6 +940,132 @@ async def run_functional_residue(body: FunctionalResidueBody):
         "download_path": download_path,
         "download_url": build_web_v2_download_url(download_path) if download_path else "",
         "ai_summary": ai_summary,
+    }
+
+
+@router.post("/sequence-design/run")
+async def run_sequence_design(body: SequenceDesignBody):
+    safe_pdb_file = _resolve_upload_file(body.structure_file)
+    if not safe_pdb_file.lower().endswith(".pdb"):
+        raise HTTPException(status_code=400, detail="Sequence Design only supports .pdb input.")
+    if _online_fasta_limit_enabled() and body.num_sequences > _ONLINE_SEQUENCE_DESIGN_LIMIT:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Online mode supports up to {_ONLINE_SEQUENCE_DESIGN_LIMIT} designed sequences per run. "
+                f"Received {body.num_sequences}."
+            ),
+        )
+    if body.ca_only and body.use_soluble_model:
+        raise HTTPException(status_code=400, detail="Invalid ProteinMPNN config: CA-only cannot be combined with Soluble.")
+    if not math.isfinite(float(body.backbone_noise)):
+        raise HTTPException(status_code=400, detail="backbone_noise must be a finite number.")
+
+    active_family = "ca" if body.ca_only else ("soluble" if body.use_soluble_model else "vanilla")
+    options = _proteinmpnn_model_options().get(active_family, [])
+    if body.model_name not in options:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported model_name '{body.model_name}' for {active_family} family. Available: {', '.join(options)}",
+        )
+
+    run_id = build_run_id_utc()
+    out_folder = get_web_v2_area_dir("results", tool="advanced_tools", run_id=run_id) / "proteinmpnn"
+    out_folder.mkdir(parents=True, exist_ok=True)
+    aux_dir = get_web_v2_area_dir("uploads", tool="advanced_tools", run_id=run_id) / "proteinmpnn_jsonl"
+    aux_dir.mkdir(parents=True, exist_ok=True)
+
+    designed_chains = [str(c).strip().upper() for c in body.designed_chains if str(c).strip()]
+    fixed_chains = [str(c).strip().upper() for c in body.fixed_chains if str(c).strip()]
+    temperatures = body.temperatures or [0.1]
+    pdb_name = Path(safe_pdb_file).stem
+
+    fixed_residues = _parse_fixed_residues_text(body.fixed_residues_text)
+    chain_id_jsonl = ""
+    fixed_positions_jsonl = ""
+    tied_positions_jsonl = ""
+    omit_aa_jsonl = ""
+    bias_aa_jsonl = ""
+    bias_by_res_jsonl = ""
+    pssm_jsonl = ""
+
+    if designed_chains and fixed_chains:
+        chain_id_jsonl = _write_jsonl_record(aux_dir / "chain_id.jsonl", {pdb_name: [designed_chains, fixed_chains]})
+    if fixed_residues:
+        fixed_positions_jsonl = _write_jsonl_record(aux_dir / "fixed_positions.jsonl", {pdb_name: fixed_residues})
+
+    tied_positions = _parse_tied_positions_text(body.tied_positions_text)
+    if body.homomer and not tied_positions:
+        tied_positions = _build_homomer_tied_positions(safe_pdb_file, designed_chains)
+    if tied_positions:
+        tied_positions_jsonl = _write_jsonl_record(aux_dir / "tied_positions.jsonl", {pdb_name: tied_positions})
+
+    omit_aa_rules = _parse_optional_json_object("omit_aa_rules_text", body.omit_aa_rules_text)
+    if omit_aa_rules:
+        omit_aa_jsonl = _write_jsonl_record(aux_dir / "omit_aa_rules.jsonl", {pdb_name: omit_aa_rules})
+
+    aa_bias = _parse_aa_bias_text(body.aa_bias_text)
+    if aa_bias:
+        bias_aa_jsonl = _write_jsonl_record(aux_dir / "aa_bias.jsonl", aa_bias)
+
+    bias_by_residue = _parse_optional_json_object("bias_by_residue_text", body.bias_by_residue_text)
+    if bias_by_residue:
+        bias_by_res_jsonl = _write_jsonl_record(aux_dir / "bias_by_residue.jsonl", {pdb_name: bias_by_residue})
+
+    pssm_rules = _parse_optional_json_object("pssm_rules_text", body.pssm_rules_text)
+    if pssm_rules:
+        pssm_jsonl = _write_jsonl_record(aux_dir / "pssm_rules.jsonl", {pdb_name: pssm_rules})
+
+    args = _proteinmpnn_default_namespace(
+        pdb_path=safe_pdb_file,
+        out_folder=str(out_folder),
+        model_name=body.model_name or "v_48_020",
+        omit_AAs=body.omit_aas or "X",
+        backbone_noise=body.backbone_noise,
+        ca_only=bool(body.ca_only),
+        use_soluble_model=bool(body.use_soluble_model),
+        seed=body.seed,
+        num_seq_per_target=body.num_sequences,
+        batch_size=body.batch_size,
+        max_length=body.max_length,
+        sampling_temp=" ".join(str(t) for t in temperatures),
+        pdb_path_chains=" ".join(designed_chains) if designed_chains and not fixed_chains else "",
+        chain_id_jsonl=chain_id_jsonl,
+        fixed_positions_jsonl=fixed_positions_jsonl,
+        tied_positions_jsonl=tied_positions_jsonl,
+        omit_AA_jsonl=omit_aa_jsonl,
+        bias_AA_jsonl=bias_aa_jsonl,
+        bias_by_res_jsonl=bias_by_res_jsonl,
+        pssm_jsonl=pssm_jsonl,
+        pssm_multi=body.pssm_multi,
+        pssm_threshold=body.pssm_threshold,
+        pssm_log_odds_flag=body.pssm_log_odds_flag,
+        pssm_bias_flag=body.pssm_bias_flag,
+    )
+
+    try:
+        proteinmpnn_run(args)
+        fasta_path = _proteinmpnn_latest_design_fasta(out_folder, safe_pdb_file)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"ProteinMPNN sequence design failed: {exc}") from exc
+
+    staged_fasta = _stage_download_result(str(fasta_path), "sequence_design")
+    rows = _parse_fasta_preview_rows(Path(resolve_web_v2_client_path(staged_fasta, allowed_areas=("results",))))
+    return {
+        "status": f"ProteinMPNN sequence design completed ({len(rows)} sequences preview).",
+        "table": rows,
+        "download_path": staged_fasta,
+        "download_url": build_web_v2_download_url(staged_fasta) if staged_fasta else "",
+        "effective_config": {
+            "model_family": active_family,
+            "model_name": body.model_name,
+            "backbone_noise": body.backbone_noise,
+            "use_soluble_model": body.use_soluble_model,
+            "ca_only": body.ca_only,
+            "num_sequences": body.num_sequences,
+            "temperatures": temperatures,
+            "fixed_residues": fixed_residues,
+        },
     }
 
 
@@ -882,6 +1307,28 @@ async def run_functional_residue_stream(body: FunctionalResidueBody):
                 yield chunk
         except Exception as exc:
             for chunk in _stream_error(f"Functional Residue failed: {exc}", status_code=500):
+                yield chunk
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+@router.post("/sequence-design/run/stream")
+async def run_sequence_design_stream(body: SequenceDesignBody):
+    async def event_stream():
+        start = time.perf_counter()
+        yield _sse("progress", {"progress": 0.08, "message": "Validating ProteinMPNN structure input..."})
+        try:
+            yield _sse("progress", {"progress": 0.4, "message": "Running ProteinMPNN sequence design..."})
+            payload = await run_sequence_design(body)
+            elapsed_ms = int((time.perf_counter() - start) * 1000)
+            for chunk in _stream_success(payload, final_message=f"Sequence Design completed in {elapsed_ms} ms."):
+                yield chunk
+        except HTTPException as exc:
+            message = str(exc.detail) if exc.detail else "Sequence Design failed."
+            for chunk in _stream_error(message, status_code=exc.status_code):
+                yield chunk
+        except Exception as exc:
+            for chunk in _stream_error(f"Sequence Design failed: {exc}", status_code=500):
                 yield chunk
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")

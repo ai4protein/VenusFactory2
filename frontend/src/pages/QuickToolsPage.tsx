@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { CopyableTextBlock } from "../components/CommandPreviewCard";
 import { SegmentedSwitch } from "../components/SegmentedSwitch";
+import { WorkspaceFilePicker } from "../components/WorkspaceFilePicker";
+import { loadQuickToolDefaultExample } from "../lib/quickToolsApi";
 
 type MetaResponse = {
   dataset_mapping_zero_shot: string[];
@@ -25,7 +27,11 @@ const DEFAULT_META: MetaResponse = {
   ]
 };
 
-export function QuickToolsPage() {
+type QuickToolsPageProps = {
+  workspaceEnabled?: boolean;
+};
+
+export function QuickToolsPage({ workspaceEnabled = false }: QuickToolsPageProps) {
   const [tab, setTab] = useState<ToolTab>("mutation");
   const [meta, setMeta] = useState<MetaResponse>(DEFAULT_META);
   const [metaLoaded, setMetaLoaded] = useState(false);
@@ -88,6 +94,24 @@ export function QuickToolsPage() {
     const res = await fetch("/api/quick-tools/upload", { method: "POST", body: form });
     if (!res.ok) throw new Error(`Upload failed (${res.status})`);
     return (await res.json()) as { file_path: string; suffix: string };
+  }
+
+  async function onUseExample() {
+    setError("");
+    setLoading(true);
+    try {
+      const needPdb = tab === "properties" && selectedPropertyTask.includes("(PDB only)");
+      const data = await loadQuickToolDefaultExample(needPdb ? "pdb" : "fasta");
+      setUploadedPath(data.file_path);
+      setUploadedSuffix(data.suffix);
+      if (!needPdb && data.content) {
+        setSequence(data.content);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load example.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function runMutation() {
@@ -259,7 +283,26 @@ export function QuickToolsPage() {
             onChange={(e) => setSequence(e.target.value)}
             placeholder="Paste sequence here (optional for mutation/function/residue)..."
           />
-          <input type="file" accept=".fasta,.fa,.pdb" onChange={(e) => void onUpload(e.target.files?.[0] || null)} />
+          <div className="upload-source-stack">
+            <div className="file-source-inline">
+              <input type="file" accept=".fasta,.fa,.pdb" onChange={(e) => void onUpload(e.target.files?.[0] || null)} />
+              <WorkspaceFilePicker
+                workspaceEnabled={workspaceEnabled}
+                disabled={loading}
+                acceptedCategories={["sequence", "structure"]}
+                buttonLabel="From Workspace"
+                onPick={(picked) => {
+                  const selected = picked[0];
+                  if (!selected) return;
+                  setUploadedPath(selected.storage_path);
+                  setUploadedSuffix(selected.suffix);
+                }}
+              />
+            </div>
+            <button type="button" className="custom-btn-secondary" onClick={() => void onUseExample()} disabled={loading}>
+              Use Example
+            </button>
+          </div>
           {uploadedPath && <div className="report-preview">Uploaded: {uploadedPath}</div>}
 
           {tab === "mutation" && (

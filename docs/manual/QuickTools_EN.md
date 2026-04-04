@@ -96,6 +96,41 @@ This module displays the prediction results upon task completion and provides op
 
 **Download Results:** Users can click this button to **download all detailed prediction data** from the table to their local computer for further data processing and archival.
 
+-----
+
+## 7. Sequence Design
+
+### 7.1 What this tool does
+
+Quick Tools Sequence Design provides a simplified entry for **ProteinMPNN-based sequence generation** from structure input.  
+It is designed for wet-lab users who want direct outputs without tuning many inference switches.
+
+### 7.2 Inputs and simple controls
+
+- **Structure input:** Upload a **.pdb** file, pick from Workspace, or use the built-in example.
+- **Model Family:** `Soluble` / `Vanilla` / `CA`.
+  - Use **Soluble** for protein discovery and most sequence design tasks.
+  - Use **Vanilla** for membrane-protein design.
+  - Use **CA** only when you only have C-alpha coarse-grained coordinates.
+- **Designed Chains (optional):** Enter chain IDs like `A` or `A,B`. Leave blank to design all chains.
+- **Fixed Residues (optional):** Use readable syntax like `A12,C13` or `A:12,13;B:5-8`.
+- **Number of Designed Sequences:** Choose how many candidate sequences to generate.
+- **Design Diversity:** Choose low / medium / high. This maps internally to ProteinMPNN sampling temperatures.
+
+Quick defaults use **`v_48_020` + `backbone_noise=0.20`**, which is recommended for most practical structures (AI-generated backbones, AlphaFold structures, and routine redesign).
+
+### 7.3 Outputs
+
+- **Table tab:** Preview designed sequence records (header, sequence, length, score fields when available).
+- **Raw tab:** Full JSON payload for downstream integration.
+- **AI Expert tab:** Optional interpretation if AI summary is enabled.
+- **Download Result:** Downloads the generated FASTA file from the run.
+
+### 7.4 When to use Quick Sequence Design
+
+Use this module when you need fast candidate sequence generation from a structure and prefer minimal parameter decisions.  
+If you need full ProteinMPNN parameter-level control, use **Advanced Tools / Sequence Design**.
+
 
 I will first translate the Chinese text into English, removing any redundant phrases. Then, I will structure the entire translated text using the requested code-like format.
 

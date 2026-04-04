@@ -9,6 +9,7 @@ import {
 import { AdvancedToolsLayout } from "./AdvancedToolsLayout";
 import { AdvancedResultPanel } from "./AdvancedResultPanel";
 import { SegmentedSwitch } from "../../components/SegmentedSwitch";
+import { WorkspaceFilePicker } from "../../components/WorkspaceFilePicker";
 
 const DEFAULT_META: AdvancedToolsMeta = {
   dataset_mapping_zero_shot: ["Activity", "Binding", "Expression", "Organismal Fitness", "Stability"],
@@ -21,7 +22,11 @@ const DEFAULT_META: AdvancedToolsMeta = {
   llm_models: ["DeepSeek", "ChatGPT", "Gemini"]
 };
 
-export function AdvancedDirectedEvolutionPage() {
+type AdvancedDirectedEvolutionPageProps = {
+  workspaceEnabled: boolean;
+};
+
+export function AdvancedDirectedEvolutionPage({ workspaceEnabled }: AdvancedDirectedEvolutionPageProps) {
   const [meta, setMeta] = useState<AdvancedToolsMeta>(DEFAULT_META);
   const [inputMode, setInputMode] = useState<"sequence" | "structure">("sequence");
   const [modelName, setModelName] = useState(DEFAULT_META.sequence_model_options[0]);
@@ -167,15 +172,28 @@ export function AdvancedDirectedEvolutionPage() {
               </label>
             )}
             <p className="advanced-ai-note">Directed Evolution supports one protein per run (sequence or structure).</p>
-            <div className="custom-file-example-row">
-              <label className="left-controls custom-file-picker-field">
-                Select File
-                <input
-                  type="file"
-                  accept={inputMode === "sequence" ? ".fasta,.fa,.txt" : ".pdb"}
-                  onChange={(e) => void onUpload(e.target.files?.[0] || null)}
+            <div className="custom-file-example-row upload-source-stack">
+              <div className="file-source-inline">
+                <label className="left-controls custom-file-picker-field">
+                  Select File
+                  <input
+                    type="file"
+                    accept={inputMode === "sequence" ? ".fasta,.fa,.txt" : ".pdb"}
+                    onChange={(e) => void onUpload(e.target.files?.[0] || null)}
+                  />
+                </label>
+                <WorkspaceFilePicker
+                  workspaceEnabled={workspaceEnabled}
+                  disabled={running}
+                  acceptedCategories={inputMode === "sequence" ? ["sequence"] : ["structure"]}
+                  buttonLabel="From Workspace"
+                  onPick={(picked) => {
+                    const selected = picked[0];
+                    if (!selected) return;
+                    setUploadedPath(selected.storage_path);
+                  }}
                 />
-              </label>
+              </div>
               <button type="button" className="custom-btn-secondary" onClick={() => void onUseExample()}>
                 {inputMode === "structure" ? "Use Example PDB" : "Use Example FASTA"}
               </button>

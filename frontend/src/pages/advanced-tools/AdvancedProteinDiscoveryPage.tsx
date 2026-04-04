@@ -6,12 +6,14 @@ import {
 } from "../../lib/advancedToolsApi";
 import { AdvancedToolsLayout } from "./AdvancedToolsLayout";
 import { AdvancedResultPanel } from "./AdvancedResultPanel";
+import { WorkspaceFilePicker } from "../../components/WorkspaceFilePicker";
 
 type AdvancedProteinDiscoveryPageProps = {
   readonly?: boolean;
+  workspaceEnabled?: boolean;
 };
 
-export function AdvancedProteinDiscoveryPage({ readonly = false }: AdvancedProteinDiscoveryPageProps) {
+export function AdvancedProteinDiscoveryPage({ readonly = false, workspaceEnabled = false }: AdvancedProteinDiscoveryPageProps) {
   const [uploadedPath, setUploadedPath] = useState("");
   const [protectStart, setProtectStart] = useState(1);
   const [protectEnd, setProtectEnd] = useState(100);
@@ -98,11 +100,24 @@ export function AdvancedProteinDiscoveryPage({ readonly = false }: AdvancedProte
           <fieldset className="readonly-fieldset advanced-discovery-fieldset" disabled={readonly}>
             <section className="custom-section-card">
               <h3>PDB Input</h3>
-              <div className="custom-file-example-row">
-                <label className="left-controls custom-file-picker-field">
-                  Select File
-                  <input type="file" accept=".pdb" onChange={(e) => void onUpload(e.target.files?.[0] || null)} />
-                </label>
+              <div className="custom-file-example-row upload-source-stack">
+                <div className="file-source-inline">
+                  <label className="left-controls custom-file-picker-field">
+                    Select File
+                    <input type="file" accept=".pdb" onChange={(e) => void onUpload(e.target.files?.[0] || null)} />
+                  </label>
+                  <WorkspaceFilePicker
+                    workspaceEnabled={workspaceEnabled}
+                    disabled={running || readonly}
+                    acceptedCategories={["structure"]}
+                    buttonLabel="From Workspace"
+                    onPick={(picked) => {
+                      const selected = picked[0];
+                      if (!selected) return;
+                      setUploadedPath(selected.storage_path);
+                    }}
+                  />
+                </div>
                 <button type="button" className="custom-btn-secondary" onClick={() => void onUseExample()}>
                   Use Example PDB
                 </button>

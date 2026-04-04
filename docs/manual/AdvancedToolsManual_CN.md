@@ -136,6 +136,49 @@
 
 ---
 
+## 6. Sequence Design
+
+该模块在 Advanced Tools 中明确提供 **ProteinMPNN**，并开放完整推理参数，支持结构条件序列设计。
+
+### 6.1 输入与核心配置
+
+* **结构输入：** 上传 `.pdb` 文件（或使用示例 PDB）。
+* **Model Family 选择：** `Soluble` / `Vanilla` / `CA`（手动选择 + 推荐引导）。
+  * **Soluble：** 蛋白发现与常规序列设计推荐。
+  * **Vanilla：** 膜蛋白设计推荐。
+  * **CA：** 仅用于只有 Cα 粗粒化坐标的场景。
+* **Designed Chains / Fixed Chains：** 分别定义要设计的链和作为上下文固定的链。
+* **Fixed Residues（文本语法）：** 使用可读语法指定固定位点，例如 `A12,C13` 或 `A:12,13;B:5-8`。
+* **Homomer 模式：** 为同源多聚体启用 tied-position 约束。
+* **Number of Sequences / Temperatures：** 设置生成数量与采样多样性。
+
+### 6.2 ProteinMPNN 全参数控制
+
+Advanced Sequence Design 页面提供完整参数入口，包含：
+
+* **模型与采样：** `model_name`, `omit_aas`（`backbone_noise` 由模型自动映射）
+* **运行控制：** `seed`, `batch_size`, `max_length`
+* **可选高级规则（文本输入）：** tied positions、omit-AA、AA bias、bias-by-residue、PSSM 规则，后端自动转换为 JSONL
+* **PSSM 数值控制：** `pssm_multi`, `pssm_threshold`, `pssm_log_odds_flag`, `pssm_bias_flag`
+
+模型推荐：
+* **常规首选：** `v_48_020`（自动使用 0.20A 噪音策略）
+* **仅高分辨率天然结构：** `v_48_002`（自动使用 0.02A 噪音策略）
+
+### 6.3 结果输出
+
+* **Summary：** 运行状态与完成信息。
+* **Table：** FASTA 预览（header、sequence、length，以及可用时的 score 字段）。
+* **Raw：** 完整 JSON 结果，便于自动化处理。
+* **Download Result：** 下载 ProteinMPNN 生成的 FASTA 文件。
+
+### 6.4 使用建议
+
+当你需要对 ProteinMPNN 推理行为进行精细控制（例如方法学对比、参数扫描、可复现实验流程）时，请使用该模块。  
+如果你更希望快速得到默认配置结果，请使用 **Quick Tools / Sequence Design**。
+
+---
+
 ## 4. Advanced Tools - 蛋白质功能预测
 
 该模块允许用户**自由选择底层 PLM 模型**并同时选择**多个已微调数据集**，以执行多维度预测，获取更可靠的结果。

@@ -1,8 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { buildArchiveDownloadUrl, runDownloadTask, type DownloadMethod, type DownloadTaskResponse } from "../../lib/downloadApi";
 import { DownloadLayout } from "./DownloadLayout";
 import { CopyableTextBlock } from "../../components/CommandPreviewCard";
 import { SegmentedSwitch } from "../../components/SegmentedSwitch";
+import { WorkspaceFilePicker } from "../../components/WorkspaceFilePicker";
+import { readWorkspaceTextFile } from "../../lib/workspaceApi";
 
 type DownloadTaskConfig = {
   title: string;
@@ -32,6 +34,30 @@ export function DownloadTaskPage({ config }: DownloadTaskPageProps) {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<DownloadTaskResponse | null>(null);
+  const [runtimeMode, setRuntimeMode] = useState<"unknown" | "local" | "online">("unknown");
+
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      try {
+        const res = await fetch("/api/runtime-config");
+        if (!res.ok) {
+          if (!alive) return;
+          setRuntimeMode("online");
+          return;
+        }
+        const data = (await res.json()) as { mode?: string };
+        if (!alive) return;
+        setRuntimeMode(data.mode === "online" ? "online" : "local");
+      } catch {
+        if (!alive) return;
+        setRuntimeMode("online");
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const archiveUrl = useMemo(() => {
     if (!result?.archive_relative_path) return "";
@@ -75,6 +101,23 @@ export function DownloadTaskPage({ config }: DownloadTaskPageProps) {
       preview += `\n... and ${lines.length - 20} more entries (showing first 20)`;
     }
     setFilePreview(preview);
+  }
+
+  function onUseExampleIds() {
+    const base =
+      config.endpoint === "interpro-metadata"
+        ? ["IPR000001", "IPR000008"]
+        : config.endpoint === "ncbi"
+          ? ["NP_000517.1", "NP_000518.1"]
+          : config.endpoint === "rcsb-structure" || config.endpoint === "rcsb-metadata"
+            ? ["1a0j", "1ubq"]
+            : config.endpoint === "alphafold-structure"
+              ? ["P00734", "P69905"]
+              : ["P00734", "P69905"];
+    const text = `${base.join("\n")}\n`;
+    setMethod("From File");
+    setFileContent(text);
+    setFilePreview(base.join("\n"));
   }
 
   async function onRun() {
@@ -131,13 +174,53 @@ export function DownloadTaskPage({ config }: DownloadTaskPageProps) {
                 />
               </label>
             ) : (
-              <div className="left-controls download-field">
-                <input
-                  className="download-file-input"
-                  type="file"
-                  accept=".txt"
-                  onChange={(e) => void onUpload(e.target.files?.[0] || null)}
-                />
+              <div className="left-controls download-field upload-source-stack">
+                <div className="file-source-inline">
+                  <input
+                    className="download-file-input"
+                    type="file"
+                    accept=".txt"
+                    onChange={(e) => void onUpload(e.target.files?.[0] || null)}
+                  />
+                  <WorkspaceFilePicker
+                    workspaceEnabled={runtimeMode === "local"}
+                    disabled={running}
+                    acceptedCategories={["table_or_text"]}
+                    buttonLabel="From Workspace"
+                    onPick={(picked) => {
+                      const selected = picked[0];
+                      if (!selected) return;
+                      void (async () => {
+                        try {
+                          setError("");
+                          const loaded = await readWorkspaceTextFile(selected.storage_path, {
+                            maxLines: 5000,
+                            maxChars: 200000
+                          });
+                          setFileContent(loaded.content);
+                          const lines = loaded.content
+                            .split(/\r?\n/)
+                            .map((item) => item.trim())
+                            .filter(Boolean);
+                          const previewLines = lines.slice(0, 20);
+                          let preview = previewLines.join("\n");
+                          if (lines.length > 20) {
+                            preview += `\n... and ${lines.length - 20} more entries (showing first 20)`;
+                          }
+                          if (loaded.truncated) {
+                            preview += "\n\n(Workspace file was truncated for preview limits.)";
+                          }
+                          setFilePreview(preview);
+                        } catch (err) {
+                          setError(err instanceof Error ? err.message : "Failed to load workspace file.");
+                        }
+                      })();
+                    }}
+                  />
+                </div>
+                <button type="button" className="custom-btn-secondary" onClick={onUseExampleIds} disabled={running}>
+                  Use Example
+                </button>
                 <small>{config.fileHint}</small>
                 <pre className="download-file-preview">{filePreview || "Upload a .txt file with one ID per line."}</pre>
               </div>

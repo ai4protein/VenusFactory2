@@ -366,6 +366,13 @@ python src/webui_v2.py --host 0.0.0.0 --port 7861  # → http://localhost:7861
 python src/webui_v2.py --host 0.0.0.0 --port 7861 --online  # → http://localhost:7861
 ```
 
+### 配置入口
+
+- 运行时配置模板：`.env.example`
+- 推荐流程：先 `cp .env.example .env`，再按部署模式修改必需项。
+- 本地最小配置：保持默认即可；仅在使用 LLM 功能时设置 `OPENAI_API_KEY`。
+- 在线最小配置：设置 `WEBUI_V2_MODE=online`、`WEBUI_V2_SESSION_TOKEN_SECRET`，并检查所有 `WEBUI_V2_*_LIMIT` 限制项。
+
 | 标签页 | 用途 | 功能 |
 |:-------|:-----|:-----|
 | **训练** | 训练定制模型 | 模型选择 • PEFT方法 • 实时监控 • Wandb |

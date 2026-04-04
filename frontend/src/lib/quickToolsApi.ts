@@ -17,6 +17,19 @@ export type QuickToolProgressEvent = {
   message: string;
 };
 
+export type QuickSequenceDesignRequest = {
+  structureFile: string;
+  modelFamily?: "soluble" | "vanilla" | "ca";
+  designedChains?: string[];
+  fixedResiduesText?: string;
+  numSequences: number;
+  modelName?: string;
+  backboneNoise?: number;
+  useSolubleModel?: boolean;
+  caOnly?: boolean;
+  temperatures?: number[];
+};
+
 type UploadResponse = {
   file_path: string;
   name: string;
@@ -333,6 +346,28 @@ export async function runPropertiesToolStream(
       task: args.task,
       file_path: args.uploadedPath,
       chain_id: args.chainId
+    },
+    onProgress
+  });
+}
+
+export async function runSequenceDesignToolStream(
+  args: QuickSequenceDesignRequest,
+  onProgress?: (evt: QuickToolProgressEvent) => void
+) {
+  return runQuickToolStream({
+    url: "/api/quick-tools/run/sequence-design/stream",
+    body: {
+      structure_file: args.structureFile,
+      model_family: args.modelFamily ?? "soluble",
+      designed_chains: args.designedChains ?? [],
+      fixed_residues_text: args.fixedResiduesText ?? "",
+      num_sequences: args.numSequences,
+      model_name: args.modelName ?? "v_48_020",
+      backbone_noise: args.backboneNoise ?? 0.2,
+      use_soluble_model: args.useSolubleModel ?? true,
+      ca_only: args.caOnly ?? false,
+      temperatures: args.temperatures ?? [0.1]
     },
     onProgress
   });

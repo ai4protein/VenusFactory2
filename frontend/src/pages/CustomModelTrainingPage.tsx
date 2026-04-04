@@ -17,6 +17,7 @@ import {
 } from "../lib/customModelApi";
 import { SegmentedSwitch } from "../components/SegmentedSwitch";
 import { PageFooter } from "../components/PageFooter";
+import { WorkspaceFilePicker } from "../components/WorkspaceFilePicker";
 
 const DEFAULT_METRICS = ["accuracy", "mcc", "f1", "precision", "recall", "auroc"];
 const METRIC_COLORS = ["#4f77b3", "#4e9d76", "#b57a42", "#8b63a8", "#af4f6f", "#7a7a7a", "#2f8fdd", "#b07a1f"];
@@ -237,9 +238,10 @@ function SimpleLineChart({
 
 type CustomModelTrainingPageProps = {
   readonly?: boolean;
+  workspaceEnabled?: boolean;
 };
 
-export function CustomModelTrainingPage({ readonly = false }: CustomModelTrainingPageProps) {
+export function CustomModelTrainingPage({ readonly = false, workspaceEnabled = false }: CustomModelTrainingPageProps) {
   const [meta, setMeta] = useState<CustomModelMeta | null>(null);
   const [trainingMode, setTrainingMode] = useState<"From Scratch" | "Continue Training">("From Scratch");
   const [datasetSelection, setDatasetSelection] = useState<"Custom" | "Pre-defined">("Pre-defined");
@@ -544,6 +546,13 @@ export function CustomModelTrainingPage({ readonly = false }: CustomModelTrainin
     } catch (err) {
       setError(err instanceof Error ? err.message : "File upload failed.");
     }
+  }
+
+  async function onUseDatasetExample(kind: "train" | "valid" | "test") {
+    if (readonly) return;
+    const content = "aa_seq,label\nMKTAYIAKQRQISFVKSHFSRQ,1\nGAVLILKKKGHHEAELKPLAQSHATKHKIPIKYLEFISEAIIHVLHSR,0\n";
+    const file = new File([content], `${kind}_example.csv`, { type: "text/csv" });
+    await onUploadDatasetFile(file, kind);
   }
 
   function displayUploadedName(pathValue: string) {
@@ -1005,7 +1014,7 @@ export function CustomModelTrainingPage({ readonly = false }: CustomModelTrainin
                       ) : (
                         <div className="custom-upload-dropzone-wrap">
                           <div className="custom-upload-dropzone-grid">
-                            <div className="custom-upload-item">
+                            <div className="custom-upload-item upload-source-stack">
                               <span className="custom-upload-item-label">Train</span>
                               <label className="custom-upload-trigger">
                                 <input
@@ -1015,11 +1024,30 @@ export function CustomModelTrainingPage({ readonly = false }: CustomModelTrainin
                                 />
                                 Choose File
                               </label>
+                              <WorkspaceFilePicker
+                                workspaceEnabled={workspaceEnabled}
+                                disabled={readonly || running}
+                                acceptedCategories={["table_or_text"]}
+                                buttonLabel="From Workspace"
+                                onPick={(picked) => {
+                                  const selected = picked[0];
+                                  if (!selected) return;
+                                  setTrainFile(selected.storage_path);
+                                }}
+                              />
+                              <button
+                                type="button"
+                                className="custom-btn-secondary"
+                                onClick={() => void onUseDatasetExample("train")}
+                                disabled={readonly || running}
+                              >
+                                Use Example
+                              </button>
                               <span className="custom-upload-file-chip custom-upload-file-name" title={displayUploadedName(trainFile)}>
                                 {displayUploadedName(trainFile)}
                               </span>
                             </div>
-                            <div className="custom-upload-item">
+                            <div className="custom-upload-item upload-source-stack">
                               <span className="custom-upload-item-label">Valid</span>
                               <label className="custom-upload-trigger">
                                 <input
@@ -1029,11 +1057,30 @@ export function CustomModelTrainingPage({ readonly = false }: CustomModelTrainin
                                 />
                                 Choose File
                               </label>
+                              <WorkspaceFilePicker
+                                workspaceEnabled={workspaceEnabled}
+                                disabled={readonly || running}
+                                acceptedCategories={["table_or_text"]}
+                                buttonLabel="From Workspace"
+                                onPick={(picked) => {
+                                  const selected = picked[0];
+                                  if (!selected) return;
+                                  setValidFile(selected.storage_path);
+                                }}
+                              />
+                              <button
+                                type="button"
+                                className="custom-btn-secondary"
+                                onClick={() => void onUseDatasetExample("valid")}
+                                disabled={readonly || running}
+                              >
+                                Use Example
+                              </button>
                               <span className="custom-upload-file-chip custom-upload-file-name" title={displayUploadedName(validFile)}>
                                 {displayUploadedName(validFile)}
                               </span>
                             </div>
-                            <div className="custom-upload-item">
+                            <div className="custom-upload-item upload-source-stack">
                               <span className="custom-upload-item-label">Test</span>
                               <label className="custom-upload-trigger">
                                 <input
@@ -1043,6 +1090,25 @@ export function CustomModelTrainingPage({ readonly = false }: CustomModelTrainin
                                 />
                                 Choose File
                               </label>
+                              <WorkspaceFilePicker
+                                workspaceEnabled={workspaceEnabled}
+                                disabled={readonly || running}
+                                acceptedCategories={["table_or_text"]}
+                                buttonLabel="From Workspace"
+                                onPick={(picked) => {
+                                  const selected = picked[0];
+                                  if (!selected) return;
+                                  setTestFile(selected.storage_path);
+                                }}
+                              />
+                              <button
+                                type="button"
+                                className="custom-btn-secondary"
+                                onClick={() => void onUseDatasetExample("test")}
+                                disabled={readonly || running}
+                              >
+                                Use Example
+                              </button>
                               <span className="custom-upload-file-chip custom-upload-file-name" title={displayUploadedName(testFile)}>
                                 {displayUploadedName(testFile)}
                               </span>

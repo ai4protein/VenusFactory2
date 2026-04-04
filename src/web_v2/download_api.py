@@ -22,7 +22,7 @@ from web.utils.common_utils import (
 
 router = APIRouter(prefix="/api/download", tags=["download-v2"])
 
-ONLINE_MAX_BATCH_ITEMS = 50
+DEFAULT_ONLINE_MAX_BATCH_ITEMS = 50
 WEB_V2_RESULTS_ROOT = get_web_v2_area_dir("results")
 DOWNLOAD_EXPORT_DIR = get_web_v2_area_dir("results", tool="download")
 DOWNLOAD_EXPORT_DIR.mkdir(parents=True, exist_ok=True)
@@ -33,18 +33,26 @@ def _runtime_mode() -> str:
     return mode if mode in {"local", "online"} else "local"
 
 
-def _local_batch_limit() -> int:
-    raw = os.getenv("WEBUI_V2_LOCAL_DOWNLOAD_BATCH_LIMIT", "0").strip()
+def _env_int(name: str, default: int, *, minimum: int = 0) -> int:
+    raw = os.getenv(name, str(default)).strip()
     try:
         value = int(raw)
     except ValueError:
-        value = 0
-    return max(0, value)
+        return default
+    return value if value >= minimum else default
+
+
+def _online_batch_limit() -> int:
+    return _env_int("WEBUI_V2_ONLINE_DOWNLOAD_BATCH_LIMIT", DEFAULT_ONLINE_MAX_BATCH_ITEMS, minimum=1)
+
+
+def _local_batch_limit() -> int:
+    return _env_int("WEBUI_V2_LOCAL_DOWNLOAD_BATCH_LIMIT", 0, minimum=0)
 
 
 def _effective_batch_limit() -> int | None:
     if _runtime_mode() == "online":
-        return ONLINE_MAX_BATCH_ITEMS
+        return _online_batch_limit()
     local_limit = _local_batch_limit()
     return local_limit if local_limit > 0 else None
 
@@ -211,7 +219,7 @@ async def download_meta():
     return {
         "mode": mode,
         "max_batch_items": max_batch_items,
-        "online_max_batch_items": ONLINE_MAX_BATCH_ITEMS,
+        "online_max_batch_items": _online_batch_limit(),
         "local_max_batch_items": _local_batch_limit() or None,
         "methods": ["Single ID", "From File"],
         "structure_file_types": ["pdb", "cif"],

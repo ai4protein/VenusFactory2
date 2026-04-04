@@ -4,6 +4,7 @@ import { marked } from "marked";
 import { streamSSEFromPost } from "../lib/sse";
 import { SegmentedSwitch } from "../components/SegmentedSwitch";
 import { PageFooter } from "../components/PageFooter";
+import { WorkspaceFilePicker } from "../components/WorkspaceFilePicker";
 
 type ParsedPayload = {
   sequence_map: Record<string, string>;
@@ -25,7 +26,11 @@ function renderMarkdown(text: string) {
   return DOMPurify.sanitize(html);
 }
 
-export function ReportPage() {
+type ReportPageProps = {
+  workspaceEnabled: boolean;
+};
+
+export function ReportPage({ workspaceEnabled }: ReportPageProps) {
   const [activePhase, setActivePhase] = useState<"idle" | "example" | "upload" | "parse" | "generate">("idle");
   const [inputMode, setInputMode] = useState<"paste" | "upload">("upload");
   const [pasteContent, setPasteContent] = useState("");
@@ -44,7 +49,6 @@ export function ReportPage() {
 
   const isExampleLoading = activePhase === "example";
   const isUploadLoading = activePhase === "upload";
-  const isParseLoading = activePhase === "parse";
   const isGenerateLoading = activePhase === "generate";
   const hasActiveTask = activePhase !== "idle";
 
@@ -68,32 +72,6 @@ export function ReportPage() {
       setSelectedChain(data.parse.selected_chain);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load default example.");
-    } finally {
-      setActivePhase("idle");
-    }
-  }
-
-  async function parseInput() {
-    setError("");
-    setActivePhase("parse");
-    try {
-      const body =
-        inputMode === "upload"
-          ? { file_path: uploadedPath, content: "" }
-          : { content: pasteContent, file_path: "" };
-      const res = await fetch("/api/report/parse-input", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
-      });
-      if (!res.ok) {
-        throw new Error(`Parse failed (${res.status})`);
-      }
-      const data = (await res.json()) as ParsedPayload;
-      setParsed(data);
-      setSelectedChain(data.selected_chain);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to parse input.");
     } finally {
       setActivePhase("idle");
     }
@@ -219,110 +197,120 @@ export function ReportPage() {
 
       <section className="report-grid">
         <aside className="chat-panel left report-control-panel">
-          <h3 className="report-block-title">Input</h3>
-          <button
-            type="button"
-            className="report-btn report-btn-soft"
-            onClick={() => void loadDefaultExample()}
-            disabled={hasActiveTask}
-          >
-            {isExampleLoading ? "Loading Example..." : "Use Default Example"}
-          </button>
-          <div className="report-mode-row">
-            <SegmentedSwitch
-              value={inputMode}
-              onChange={setInputMode}
-              ariaLabel="Report input mode"
-              className="report-segment-switch"
-              options={[
-                { value: "paste", label: "Paste" },
-                { value: "upload", label: "Upload" }
-              ]}
-            />
-          </div>
-
-          {inputMode === "paste" ? (
-            <textarea
-              className="report-input-textarea"
-              rows={10}
-              value={pasteContent}
-              onChange={(e) => setPasteContent(e.target.value)}
-              placeholder="Paste FASTA/PDB/raw sequence..."
-            />
-          ) : (
-            <input
-              className="report-file-input"
-              type="file"
-              accept=".fasta,.fa,.pdb"
-              onChange={(e) => void onUploadFile(e.target.files?.[0] || null)}
-            />
-          )}
-
-          <button
-            type="button"
-            className="report-btn report-btn-soft"
-            onClick={() => void parseInput()}
-            disabled={hasActiveTask}
-          >
-            {isParseLoading ? "Detecting..." : "Detect Sequence"}
-          </button>
-
-          {parsed && (
-            <>
-              <label className="left-controls">
-                Chain/Sequence
-                <select value={selectedChain} onChange={(e) => setSelectedChain(e.target.value)}>
-                  {Object.keys(parsed.sequence_map).map((k) => (
-                    <option key={k} value={k}>
-                      {k}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="report-preview">Preview: {parsed.preview}</div>
-            </>
-          )}
-
-          <h3 className="report-block-title">Analysis Types</h3>
-          <div className="report-options">
-            {ANALYSIS_OPTIONS.map((opt) => (
-              <label key={opt.key} className="report-option-item">
-                <input
-                  type="checkbox"
-                  checked={selectedAnalyses.includes(opt.key)}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setSelectedAnalyses((prev) => [...prev, opt.key]);
-                    } else {
-                      setSelectedAnalyses((prev) => prev.filter((x) => x !== opt.key));
-                    }
-                  }}
-                />
-                <span>{opt.label}</span>
-              </label>
-            ))}
-          </div>
-
-          <button
-            type="button"
-            className="report-btn report-btn-primary"
-            onClick={() => void generateReport()}
-            disabled={hasActiveTask}
-          >
-            {isGenerateLoading ? "Generating..." : "Generate Report"}
-          </button>
-          <div className="report-progress-wrap">
-            <div className="report-progress-text">
-              <span>{progressMessage}</span>
-              <strong>{Math.round(progress * 100)}%</strong>
-            </div>
-            <div className="report-progress-track">
-              <div
-                className="report-progress-bar"
-                style={{ width: `${Math.round(progress * 100)}%` }}
+          <section className="custom-section-card">
+            <h3 className="report-block-title">Input</h3>
+            <div className="report-mode-row">
+              <SegmentedSwitch
+                value={inputMode}
+                onChange={setInputMode}
+                ariaLabel="Report input mode"
+                className="report-segment-switch"
+                options={[
+                  { value: "paste", label: "Paste" },
+                  { value: "upload", label: "Upload" }
+                ]}
               />
             </div>
-          </div>
+
+            {inputMode === "paste" ? (
+              <textarea
+                className="report-input-textarea"
+                rows={10}
+                value={pasteContent}
+                onChange={(e) => setPasteContent(e.target.value)}
+                placeholder="Paste FASTA/PDB/raw sequence..."
+              />
+            ) : (
+              <div className="upload-source-stack">
+                <div className="file-source-inline">
+                  <input
+                    className="report-file-input"
+                    type="file"
+                    accept=".fasta,.fa,.pdb"
+                    onChange={(e) => void onUploadFile(e.target.files?.[0] || null)}
+                  />
+                  <WorkspaceFilePicker
+                    workspaceEnabled={workspaceEnabled}
+                    disabled={hasActiveTask}
+                    acceptedCategories={["sequence", "structure"]}
+                    buttonLabel="From Workspace"
+                    onPick={(picked) => {
+                      const selected = picked[0];
+                      if (!selected) return;
+                      setUploadedPath(selected.storage_path);
+                    }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  className="custom-btn-secondary"
+                  onClick={() => void loadDefaultExample()}
+                  disabled={hasActiveTask}
+                >
+                  {isExampleLoading ? "Loading Example..." : "Use Default Example"}
+                </button>
+              </div>
+            )}
+
+            {parsed && (
+              <>
+                <label className="left-controls">
+                  Chain/Sequence
+                  <select value={selectedChain} onChange={(e) => setSelectedChain(e.target.value)}>
+                    {Object.keys(parsed.sequence_map).map((k) => (
+                      <option key={k} value={k}>
+                        {k}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="report-preview">Preview: {parsed.preview}</div>
+              </>
+            )}
+          </section>
+
+          <section className="custom-section-card">
+            <h3 className="report-block-title">Analysis Types</h3>
+            <div className="report-options">
+              {ANALYSIS_OPTIONS.map((opt) => (
+                <label key={opt.key} className="report-option-item">
+                  <input
+                    type="checkbox"
+                    checked={selectedAnalyses.includes(opt.key)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedAnalyses((prev) => [...prev, opt.key]);
+                      } else {
+                        setSelectedAnalyses((prev) => prev.filter((x) => x !== opt.key));
+                      }
+                    }}
+                  />
+                  <span>{opt.label}</span>
+                </label>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              className="report-btn report-btn-primary"
+              onClick={() => void generateReport()}
+              disabled={hasActiveTask}
+            >
+              {isGenerateLoading ? "Generating..." : "Generate Report"}
+            </button>
+            <div className="report-progress-wrap">
+              <div className="report-progress-text">
+                <span>{progressMessage}</span>
+                <strong>{Math.round(progress * 100)}%</strong>
+              </div>
+              <div className="report-progress-track">
+                <div
+                  className="report-progress-bar"
+                  style={{ width: `${Math.round(progress * 100)}%` }}
+                />
+              </div>
+            </div>
+          </section>
 
           {error && <div className="error-box">{error}</div>}
         </aside>

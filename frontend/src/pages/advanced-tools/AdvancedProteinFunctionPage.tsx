@@ -8,6 +8,7 @@ import {
 } from "../../lib/advancedToolsApi";
 import { AdvancedToolsLayout } from "./AdvancedToolsLayout";
 import { AdvancedResultPanel } from "./AdvancedResultPanel";
+import { WorkspaceFilePicker } from "../../components/WorkspaceFilePicker";
 
 const DEFAULT_META: AdvancedToolsMeta = {
   dataset_mapping_zero_shot: [],
@@ -20,7 +21,11 @@ const DEFAULT_META: AdvancedToolsMeta = {
   llm_models: ["DeepSeek", "ChatGPT", "Gemini"]
 };
 
-export function AdvancedProteinFunctionPage() {
+type AdvancedProteinFunctionPageProps = {
+  workspaceEnabled: boolean;
+};
+
+export function AdvancedProteinFunctionPage({ workspaceEnabled }: AdvancedProteinFunctionPageProps) {
   const [meta, setMeta] = useState<AdvancedToolsMeta>(DEFAULT_META);
   const [task, setTask] = useState("Solubility");
   const [modelName, setModelName] = useState("ESM2-650M");
@@ -215,11 +220,25 @@ export function AdvancedProteinFunctionPage() {
                 Online mode supports up to {meta.online_fasta_limit ?? 50} FASTA sequences per run.
               </p>
             )}
-            <div className="custom-file-example-row">
-              <label className="left-controls custom-file-picker-field">
-                Select File
-                <input type="file" accept=".fasta,.fa,.txt" onChange={(e) => void onUpload(e.target.files?.[0] || null)} />
-              </label>
+            <div className="custom-file-example-row upload-source-stack">
+              <div className="file-source-inline">
+                <label className="left-controls custom-file-picker-field">
+                  Select File
+                  <input type="file" accept=".fasta,.fa,.txt" onChange={(e) => void onUpload(e.target.files?.[0] || null)} />
+                </label>
+                <WorkspaceFilePicker
+                  workspaceEnabled={workspaceEnabled}
+                  disabled={running}
+                  acceptedCategories={["sequence"]}
+                  buttonLabel="From Workspace"
+                  onPick={(picked) => {
+                    const selected = picked[0];
+                    if (!selected) return;
+                    setUploadedPath(selected.storage_path);
+                    setSequence("");
+                  }}
+                />
+              </div>
               <button type="button" className="custom-btn-secondary" onClick={() => void onUseExample()}>
                 Use Example FASTA
               </button>

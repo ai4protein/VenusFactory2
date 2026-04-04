@@ -1,15 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChatTimeline } from "../components/ChatTimeline";
 import {
+  cancelChatSession,
   createChatSession,
   getChatQuota,
   getChatSession,
+  getChatSessionAuthHeaders,
+  listChatSessions,
   type ChatQuota,
   type ChatSnapshot,
   uploadFiles
 } from "../lib/api";
 import { streamSSEFromPost } from "../lib/sse";
 import { PageFooter } from "../components/PageFooter";
+import { WorkspaceFilePicker } from "../components/WorkspaceFilePicker";
+import { type WorkspaceFile } from "../lib/workspaceApi";
 
 type SessionMeta = {
   session_id: string;
@@ -22,12 +27,17 @@ type SessionMeta = {
 const MODELS = ["Gemini-2.5-Pro", "ChatGPT-4o", "Claude-3.7", "DeepSeek-R1"];
 type RunStatus = "running" | "stopping" | "stopped";
 
-export function ChatPage() {
+type ChatPageProps = {
+  workspaceEnabled?: boolean;
+};
+
+export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   const [sessionId, setSessionId] = useState<string>("");
   const [snapshot, setSnapshot] = useState<ChatSnapshot | null>(null);
   const [sessions, setSessions] = useState<SessionMeta[]>([]);
   const [message, setMessage] = useState("");
   const [files, setFiles] = useState<File[]>([]);
+  const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>([]);
   const [running, setRunning] = useState(false);
   const [runStatus, setRunStatus] = useState<RunStatus>("stopped");
   const [error, setError] = useState<string>("");
@@ -36,6 +46,9 @@ export function ChatPage() {
   const abortRef = useRef<AbortController | null>(null);
   const timelineRef = useRef<HTMLDivElement | null>(null);
   const SESSION_STORAGE_KEY = "vf2_active_session_id";
+  const SESSION_CACHE_KEY = "vf2_session_list_cache";
+  const COPY_HINT_MS = 1200;
+  const [copiedSessionId, setCopiedSessionId] = useState("");
 
   useEffect(() => {
     void bootstrapSession();
@@ -83,13 +96,10 @@ export function ChatPage() {
   }, [snapshot]);
 
   async function fetchSessions() {
-    const res = await fetch("/api/chat/sessions");
-    if (!res.ok) {
-      return [] as SessionMeta[];
-    }
-    const data = (await res.json()) as { sessions: SessionMeta[] };
+    const data = await listChatSessions();
     const list = data.sessions || [];
     setSessions(list);
+    localStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(list));
     return list;
   }
 
@@ -116,7 +126,24 @@ export function ChatPage() {
   async function bootstrapSession() {
     setError("");
     await refreshChatQuota();
-    const list = await fetchSessions();
+    let list: SessionMeta[] = [];
+    try {
+      const raw = localStorage.getItem(SESSION_CACHE_KEY);
+      if (raw) {
+        const cached = JSON.parse(raw) as SessionMeta[];
+        if (Array.isArray(cached) && cached.length > 0) {
+          setSessions(cached);
+          list = cached;
+        }
+      }
+    } catch {
+      // best effort cache read
+    }
+    try {
+      list = await fetchSessions();
+    } catch {
+      // keep cached list if server refresh fails
+    }
     if (!list.length) {
       setSessionId("");
       setSnapshot(null);
@@ -148,10 +175,10 @@ export function ChatPage() {
 
   async function sendMessage() {
     if (running) return;
-    if (!message.trim() && files.length === 0) return;
+    if (!message.trim() && files.length === 0 && workspaceFiles.length === 0) return;
     if (chatQuota?.enforced && (chatQuota.remaining ?? 0) <= 0) {
       const limit = chatQuota.limit ?? 10;
-      setError(`Online mode limit reached: up to ${limit} chats per IP per day.`);
+      setError(`Online mode limit reached: up to ${limit} chats per user per day.`);
       return;
     }
     setError("");
@@ -174,6 +201,9 @@ export function ChatPage() {
         const uploaded = await uploadFiles(activeSessionId, files);
         attachmentPaths = uploaded.files.map((f) => f.path);
       }
+      if (workspaceFiles.length > 0) {
+        attachmentPaths = [...attachmentPaths, ...workspaceFiles.map((item) => item.storage_path)];
+      }
 
       await streamSSEFromPost(
         `/api/chat/sessions/${encodeURIComponent(activeSessionId)}/messages/stream`,
@@ -188,7 +218,8 @@ export function ChatPage() {
             setSnapshot(payload);
           }
         },
-        abortRef.current.signal
+        abortRef.current.signal,
+        getChatSessionAuthHeaders(activeSessionId)
       );
       await fetchSessions();
       await refreshChatQuota();
@@ -204,6 +235,7 @@ export function ChatPage() {
       setRunning(false);
       setMessage("");
       setFiles([]);
+      setWorkspaceFiles([]);
       abortRef.current = null;
     }
   }
@@ -212,7 +244,7 @@ export function ChatPage() {
     if (!sessionId || running) return;
     if (chatQuota?.enforced && (chatQuota.remaining ?? 0) <= 0) {
       const limit = chatQuota.limit ?? 10;
-      setError(`Online mode limit reached: up to ${limit} chats per IP per day.`);
+      setError(`Online mode limit reached: up to ${limit} chats per user per day.`);
       return;
     }
     if (!snapshot?.history?.some((h) => h.role === "user")) {
@@ -233,7 +265,8 @@ export function ChatPage() {
             setSnapshot(payload);
           }
         },
-        abortRef.current.signal
+        abortRef.current.signal,
+        getChatSessionAuthHeaders(sessionId)
       );
       await fetchSessions();
       await refreshChatQuota();
@@ -255,9 +288,7 @@ export function ChatPage() {
     setRunStatus("stopping");
     if (sessionId) {
       try {
-        await fetch(`/api/chat/sessions/${encodeURIComponent(sessionId)}/cancel`, {
-          method: "POST"
-        });
+        await cancelChatSession(sessionId);
       } catch {
         // best effort cancellation
       }
@@ -268,6 +299,16 @@ export function ChatPage() {
     setTimeout(() => {
       void refreshCurrentSession();
     }, 600);
+  }
+
+  async function copySessionId(value: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedSessionId(value);
+      window.setTimeout(() => setCopiedSessionId(""), COPY_HINT_MS);
+    } catch {
+      setError("Failed to copy session id.");
+    }
   }
 
   function onComposerKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -295,11 +336,11 @@ export function ChatPage() {
       <header className="chat-header">
         <div>
           <div className="chat-header-title-row">
-            <h2>Agent</h2>
+            <h2>Chat</h2>
             {chatQuota?.enforced && (
               <span
                 className="chat-mode-online-pill"
-                title={`Mode: Online. Per-IP daily limit: ${chatQuota.limit ?? 10} chats.`}
+                title={`Mode: Online. Per-user daily limit: ${chatQuota.limit ?? 10} chats.`}
               >
                 Mode: Online
               </span>
@@ -336,7 +377,11 @@ export function ChatPage() {
               <button
                 key={s.session_id}
                 className={s.session_id === sessionId ? "session-item active" : "session-item"}
-                onClick={() => void refreshCurrentSession(s.session_id)}
+                onClick={() => {
+                  void refreshCurrentSession(s.session_id);
+                  void copySessionId(s.session_id);
+                }}
+                title={s.session_id}
               >
                 <span>{s.session_id.slice(0, 8)}</span>
                 <small>{new Date(s.created_at).toLocaleString()}</small>
@@ -344,6 +389,16 @@ export function ChatPage() {
             ))}
             {sessions.length === 0 && <div className="session-empty">No sessions yet.</div>}
           </div>
+          {sessionId && (
+            <button
+              type="button"
+              className="session-copy-btn"
+              onClick={() => void copySessionId(sessionId)}
+              title="Copy full session id"
+            >
+              {copiedSessionId === sessionId ? "Session ID copied" : "Copy Session ID"}
+            </button>
+          )}
         </aside>
 
         <section className="chat-panel center">
@@ -352,10 +407,10 @@ export function ChatPage() {
           </div>
           <div className="composer">
             {chatQuota?.enforced && (
-              <div className="chat-quota-hint" title={`Per-IP daily limit in online mode: ${chatQuota.limit ?? 10}`}>
+              <div className="chat-quota-hint" title={`Per-user daily limit in online mode: ${chatQuota.limit ?? 10}`}>
                 {quotaExhausted
                   ? `Online mode quota reached (${chatQuota.used}/${chatQuota.limit ?? 10}).`
-                  : `Online mode quota: ${chatQuota.remaining ?? 0}/${chatQuota.limit ?? 10} remaining for this IP today.`}
+                  : `Online mode quota: ${chatQuota.remaining ?? 0}/${chatQuota.limit ?? 10} remaining for this user today.`}
               </div>
             )}
             <textarea
@@ -374,12 +429,21 @@ export function ChatPage() {
                   </option>
                 ))}
               </select>
-              <input
-                type="file"
-                multiple
-                onChange={(e) => setFiles(Array.from(e.target.files || []))}
-                disabled={running || quotaExhausted}
-              />
+              <div className="file-source-inline">
+                <input
+                  type="file"
+                  multiple
+                  onChange={(e) => setFiles(Array.from(e.target.files || []))}
+                  disabled={running || quotaExhausted}
+                />
+                <WorkspaceFilePicker
+                  workspaceEnabled={workspaceEnabled}
+                  disabled={running || quotaExhausted}
+                  allowMultiple
+                  buttonLabel="From Workspace"
+                  onPick={(picked) => setWorkspaceFiles(picked)}
+                />
+              </div>
               <button onClick={() => void sendMessage()} disabled={running || quotaExhausted} title={sendTooltip}>
                 {running ? "Running..." : "Send"}
               </button>
@@ -390,10 +454,13 @@ export function ChatPage() {
                 Stop
               </button>
             </div>
-            {files.length > 0 && (
+            {(files.length > 0 || workspaceFiles.length > 0) && (
               <div className="file-preview">
                 {files.map((f) => (
                   <span key={f.name}>{f.name}</span>
+                ))}
+                {workspaceFiles.map((f) => (
+                  <span key={f.id}>{f.display_name} (workspace)</span>
                 ))}
               </div>
             )}

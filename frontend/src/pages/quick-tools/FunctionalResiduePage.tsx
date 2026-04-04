@@ -12,6 +12,7 @@ import {
 } from "../../lib/quickToolsApi";
 import { QuickToolsLayout } from "./QuickToolsLayout";
 import { QuickToolResultPanel } from "./QuickToolResultPanel";
+import { WorkspaceFilePicker } from "../../components/WorkspaceFilePicker";
 
 const DEFAULT_META: QuickToolsMeta = {
   dataset_mapping_zero_shot: [],
@@ -22,7 +23,11 @@ const DEFAULT_META: QuickToolsMeta = {
   llm_models: ["DeepSeek", "ChatGPT", "Gemini"]
 };
 
-export function FunctionalResiduePage() {
+type FunctionalResiduePageProps = {
+  workspaceEnabled?: boolean;
+};
+
+export function FunctionalResiduePage({ workspaceEnabled = false }: FunctionalResiduePageProps) {
   const [meta, setMeta] = useState<QuickToolsMeta>(DEFAULT_META);
   const [task, setTask] = useState(DEFAULT_META.residue_mapping_function[0]);
   const [sequence, setSequence] = useState("");
@@ -151,11 +156,25 @@ export function FunctionalResiduePage() {
                 Online mode supports up to {meta.online_fasta_limit ?? 50} FASTA sequences per run.
               </p>
             )}
-            <div className="custom-file-example-row">
-              <label className="left-controls custom-file-picker-field">
-                Select File
-                <input type="file" accept=".fasta,.fa" onChange={(e) => void onUpload(e.target.files?.[0] || null)} />
-              </label>
+            <div className="custom-file-example-row upload-source-stack">
+              <div className="file-source-inline">
+                <label className="left-controls custom-file-picker-field">
+                  Select File
+                  <input type="file" accept=".fasta,.fa" onChange={(e) => void onUpload(e.target.files?.[0] || null)} />
+                </label>
+                <WorkspaceFilePicker
+                  workspaceEnabled={workspaceEnabled}
+                  disabled={running}
+                  acceptedCategories={["sequence"]}
+                  buttonLabel="From Workspace"
+                  onPick={(picked) => {
+                    const selected = picked[0];
+                    if (!selected) return;
+                    setUploadedPath(selected.storage_path);
+                    setSequence("");
+                  }}
+                />
+              </div>
               <button type="button" className="custom-btn-secondary" onClick={() => void onUseExample()}>
                 Use Example FASTA
               </button>

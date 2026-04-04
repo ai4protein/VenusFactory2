@@ -163,6 +163,7 @@ dataset/
 data/*.ipynb
 wandb/
 ckpt/*
+!ckpt/ProteinMPNN/
 !ckpt/demo/demo_solubility*
 !ckpt/DeepSol/
 ckpt/DeepSol/ankh-base

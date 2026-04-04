@@ -104,6 +104,7 @@ def proteinmpnn_design(
     model_name: str = "v_48_020",
     backbone_noise: float = 0.0,
     ca_only: bool = False,
+    use_soluble_model: bool = False,
 ) -> str:
     """
     ProteinMPNN sequence design covering all scenarios. Returns the output FASTA path.
@@ -131,6 +132,7 @@ def proteinmpnn_design(
     model_name      : Model weights name, e.g. 'v_48_020'
     backbone_noise  : Gaussian noise std added to backbone coordinates
     ca_only         : Use the CA-only model
+    use_soluble_model : Use soluble ProteinMPNN weights
     """
     if temperatures is None:
         temperatures = [0.1]
@@ -148,6 +150,7 @@ def proteinmpnn_design(
             model_name=model_name,
             backbone_noise=backbone_noise,
             ca_only=ca_only,
+            use_soluble_model=use_soluble_model,
         )
 
         # interface design: binder (designed) + target (fixed) -> chain_id_jsonl

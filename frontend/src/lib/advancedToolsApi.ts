@@ -9,6 +9,11 @@ export type AdvancedToolsMeta = {
   dataset_mapping_function: Record<string, string[]>;
   residue_mapping_function: Record<string, string[]>;
   llm_models: string[];
+  proteinmpnn_model_options?: {
+    vanilla: string[];
+    soluble: string[];
+    ca: string[];
+  };
   mode?: "local" | "online";
   online_fasta_limit?: number;
   online_limit_enabled?: boolean;
@@ -80,6 +85,34 @@ type ProteinDiscoveryRequest = {
   evalue_threshold: number;
 };
 
+export type AdvancedSequenceDesignRequest = {
+  structure_file: string;
+  model_family?: "soluble" | "vanilla" | "ca";
+  designed_chains?: string[];
+  fixed_chains?: string[];
+  fixed_residues_text?: string;
+  homomer?: boolean;
+  num_sequences?: number;
+  temperatures?: number[];
+  omit_aas?: string;
+  model_name?: string;
+  backbone_noise?: number;
+  ca_only?: boolean;
+  use_soluble_model?: boolean;
+  seed?: number;
+  batch_size?: number;
+  max_length?: number;
+  tied_positions_text?: string;
+  omit_aa_rules_text?: string;
+  aa_bias_text?: string;
+  bias_by_residue_text?: string;
+  pssm_rules_text?: string;
+  pssm_multi?: number;
+  pssm_threshold?: number;
+  pssm_log_odds_flag?: number;
+  pssm_bias_flag?: number;
+};
+
 const DEFAULT_META: AdvancedToolsMeta = {
   dataset_mapping_zero_shot: ["Activity", "Binding", "Expression", "Organismal Fitness", "Stability"],
   sequence_model_options: ["VenusPLM", "ESM2-650M", "ESM-1v", "ESM-1b"],
@@ -89,6 +122,11 @@ const DEFAULT_META: AdvancedToolsMeta = {
   dataset_mapping_function: { Solubility: ["DeepSol"] },
   residue_mapping_function: { "Activity Site": ["Protein_Mutation"] },
   llm_models: ["DeepSeek", "ChatGPT", "Gemini"],
+  proteinmpnn_model_options: {
+    vanilla: ["v_48_020", "v_48_002"],
+    soluble: ["v_48_020", "v_48_002"],
+    ca: ["v_48_020", "v_48_002"]
+  },
   mode: "local",
   online_fasta_limit: 50,
   online_limit_enabled: false
@@ -258,6 +296,17 @@ export async function runAdvancedProteinDiscoveryStream(
 ) {
   return runAdvancedToolStream({
     url: "/api/advanced-tools/protein-discovery/run/stream",
+    body: body as unknown as Record<string, unknown>,
+    onProgress
+  });
+}
+
+export async function runAdvancedSequenceDesignStream(
+  body: AdvancedSequenceDesignRequest,
+  onProgress?: (evt: AdvancedToolProgressEvent) => void
+) {
+  return runAdvancedToolStream({
+    url: "/api/advanced-tools/sequence-design/run/stream",
     body: body as unknown as Record<string, unknown>,
     onProgress
   });

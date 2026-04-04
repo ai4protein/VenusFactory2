@@ -38,6 +38,9 @@ def proteinmpnn_run(args):
     # project root: protein_mpnn_run.py -> proteinmpnn -> denovo -> tools -> src -> root
     _PROJECT_ROOT = Path(__file__).resolve().parents[4]
     _CKPT_ROOT = _PROJECT_ROOT / "ckpt" / "ProteinMPNN"
+    _VANILLA_CKPT_ROOT = _CKPT_ROOT / "vanilla_model_weights"
+    _SOLUBLE_CKPT_ROOT = _CKPT_ROOT / "soluble_model_weights"
+    _CA_CKPT_ROOT = _CKPT_ROOT / "ca_model_weights"
 
     if args.path_to_model_weights:
         model_folder_path = Path(args.path_to_model_weights)
@@ -47,9 +50,12 @@ def proteinmpnn_run(args):
             if args.use_soluble_model:
                 print("WARNING: CA-SolubleMPNN is not available yet")
                 sys.exit()
-        if args.use_soluble_model:
+            model_folder_path = _CA_CKPT_ROOT
+        elif args.use_soluble_model:
             print("Using ProteinMPNN trained on soluble proteins only!")
-        model_folder_path = _CKPT_ROOT
+            model_folder_path = _SOLUBLE_CKPT_ROOT
+        else:
+            model_folder_path = _VANILLA_CKPT_ROOT
 
     checkpoint_path = str(Path(model_folder_path) / f"{args.model_name}.pt")
     folder_for_outputs = args.out_folder

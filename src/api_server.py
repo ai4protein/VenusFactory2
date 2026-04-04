@@ -41,6 +41,7 @@ try:
     from src.web_v2.advanced_tools_api import router as advanced_tools_v2_router
     from src.web_v2.download_api import router as download_v2_router
     from src.web_v2.settings_api import router as settings_v2_router
+    from src.web_v2.workspace_api import router as workspace_v2_router
 except ModuleNotFoundError:
     # Works when running from `python src/webui_v2.py` (sys.path rooted at src/)
     from tools.mutation.tools_api import router as mutation_router
@@ -54,6 +55,7 @@ except ModuleNotFoundError:
     from web_v2.advanced_tools_api import router as advanced_tools_v2_router
     from web_v2.download_api import router as download_v2_router
     from web_v2.settings_api import router as settings_v2_router
+    from web_v2.workspace_api import router as workspace_v2_router
 
 WEB_V2_ROOT = get_web_v2_root_dir()
 WEB_V2_UPLOAD_ROOT = get_web_v2_area_dir("uploads")
@@ -111,6 +113,7 @@ app.include_router(report_v2_router)
 app.include_router(quick_tools_v2_router)
 app.include_router(advanced_tools_v2_router)
 app.include_router(download_v2_router)
+app.include_router(workspace_v2_router)
 if WEBUI_V2_MODE == "local":
     app.include_router(custom_model_v2_router)
     app.include_router(settings_v2_router)

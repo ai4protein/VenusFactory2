@@ -1,9 +1,12 @@
 import asyncio
+import hashlib
+import hmac
 import json
 import os
+import secrets
 import shutil
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -47,6 +50,75 @@ def _parse_daily_chat_limit() -> int:
 
 
 _ONLINE_DAILY_CHAT_LIMIT = _parse_daily_chat_limit()
+def _parse_session_token_ttl_hours() -> int:
+    raw = os.getenv("WEBUI_V2_SESSION_TOKEN_TTL_HOURS", "24").strip()
+    try:
+        value = int(raw)
+    except ValueError:
+        value = 24
+    return max(1, value)
+
+
+_SESSION_TOKEN_TTL_HOURS = _parse_session_token_ttl_hours()
+_SESSION_TOKEN_SECRET = os.getenv("WEBUI_V2_SESSION_TOKEN_SECRET", "").strip() or secrets.token_hex(32)
+
+
+def _runtime_mode() -> str:
+    mode = os.getenv("WEBUI_V2_MODE", "local").strip().lower()
+    return mode if mode in {"local", "online"} else "local"
+
+
+def _extract_user_agent(request: Request) -> str:
+    return (request.headers.get("user-agent", "") or "").strip().lower()
+
+
+def _extract_origin(request: Request) -> str:
+    return (request.headers.get("origin", "") or "").strip().lower()
+
+
+def _build_owner_fingerprint(request: Request) -> str:
+    ip = _extract_client_ip(request)
+    ua = _extract_user_agent(request)
+    origin = _extract_origin(request)
+    raw = f"{ip}|{ua}|{origin}"
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _session_owner_key_for_request(request: Request) -> str:
+    if _runtime_mode() != "online":
+        return "local"
+    return _build_owner_fingerprint(request)
+
+
+def _hash_session_token(raw_token: str) -> str:
+    return hmac.new(_SESSION_TOKEN_SECRET.encode("utf-8"), raw_token.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def _issue_session_access_token(state: Dict[str, Any], request: Request) -> tuple[str, str]:
+    raw_token = secrets.token_urlsafe(48)
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=_SESSION_TOKEN_TTL_HOURS)
+    state["session_token_hash"] = _hash_session_token(raw_token)
+    state["token_expires_at"] = expires_at.isoformat()
+    state["owner_key"] = _session_owner_key_for_request(request)
+    return raw_token, state["token_expires_at"]
+
+
+def _extract_session_token(request: Request) -> str:
+    custom = (request.headers.get("x-session-access-token", "") or "").strip()
+    if custom:
+        return custom
+    auth = (request.headers.get("authorization", "") or "").strip()
+    if auth.lower().startswith("bearer "):
+        return auth[7:].strip()
+    return ""
+
+
+async def get_visible_session_ids(request: Request) -> set[str]:
+    owner_key = _session_owner_key_for_request(request)
+    async with _SESSIONS_GUARD:
+        if _runtime_mode() != "online":
+            return set(_SESSIONS.keys())
+        return {sid for sid, state in _SESSIONS.items() if str(state.get("owner_key", "")) == owner_key}
 
 
 def _is_zh_text(text: str) -> bool:
@@ -58,6 +130,8 @@ class CreateSessionResponse(BaseModel):
     session_id: str
     created_at: str
     model_name: str
+    session_access_token: str = ""
+    token_expires_at: str = ""
 
 
 class SessionStateResponse(BaseModel):
@@ -109,6 +183,43 @@ async def _get_session_or_404(session_id: str) -> Dict[str, Any]:
     return state
 
 
+def _assert_session_access(state: Dict[str, Any], request: Request) -> None:
+    if _runtime_mode() != "online":
+        return
+    expected_owner = _session_owner_key_for_request(request)
+    actual_owner = str(state.get("owner_key", ""))
+    if actual_owner != expected_owner:
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "SESSION_OWNER_MISMATCH", "message": "You do not have access to this session."},
+        )
+    token = _extract_session_token(request)
+    if not token:
+        raise HTTPException(
+            status_code=401,
+            detail={"code": "SESSION_TOKEN_REQUIRED", "message": "Session access token is required."},
+        )
+    expected_hash = str(state.get("session_token_hash", ""))
+    if not expected_hash or not hmac.compare_digest(expected_hash, _hash_session_token(token)):
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "SESSION_TOKEN_INVALID", "message": "Session access token is invalid."},
+        )
+    expires_raw = str(state.get("token_expires_at", "")).strip()
+    if expires_raw:
+        try:
+            expires_at = datetime.fromisoformat(expires_raw.replace("Z", "+00:00"))
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+        except ValueError:
+            expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+        if datetime.now(timezone.utc) >= expires_at:
+            raise HTTPException(
+                status_code=401,
+                detail={"code": "SESSION_TOKEN_EXPIRED", "message": "Session access token has expired."},
+            )
+
+
 async def _get_lock(session_id: str) -> asyncio.Lock:
     async with _SESSIONS_GUARD:
         if session_id not in _SESSION_LOCKS:
@@ -141,18 +252,21 @@ async def _consume_online_chat_quota_or_429(request: Request) -> None:
     if os.getenv("WEBUI_V2_MODE", "local").strip().lower() != "online":
         return
 
-    ip = _extract_client_ip(request)
+    owner_key = _session_owner_key_for_request(request)
     today = datetime.now().strftime("%Y-%m-%d")
     async with _IP_USAGE_GUARD:
-        usage = _IP_DAILY_CHAT_USAGE.get(ip)
+        usage = _IP_DAILY_CHAT_USAGE.get(owner_key)
         if not usage or usage.get("date") != today:
             usage = {"date": today, "count": 0}
-            _IP_DAILY_CHAT_USAGE[ip] = usage
+            _IP_DAILY_CHAT_USAGE[owner_key] = usage
 
         if int(usage.get("count", 0)) >= _ONLINE_DAILY_CHAT_LIMIT:
             raise HTTPException(
                 status_code=429,
-                detail=f"今日对话次数已达上限（{_ONLINE_DAILY_CHAT_LIMIT}次），请明天再来。",
+                detail={
+                    "code": "CHAT_DAILY_LIMIT_REACHED",
+                    "message": f"Online mode limit reached: up to {_ONLINE_DAILY_CHAT_LIMIT} chats per user per day.",
+                },
             )
         usage["count"] = int(usage.get("count", 0)) + 1
 
@@ -168,13 +282,13 @@ async def _get_online_chat_quota_status(request: Request) -> Dict[str, Any]:
             "remaining": None,
         }
 
-    ip = _extract_client_ip(request)
+    owner_key = _session_owner_key_for_request(request)
     today = datetime.now().strftime("%Y-%m-%d")
     async with _IP_USAGE_GUARD:
-        usage = _IP_DAILY_CHAT_USAGE.get(ip)
+        usage = _IP_DAILY_CHAT_USAGE.get(owner_key)
         if not usage or usage.get("date") != today:
             usage = {"date": today, "count": 0}
-            _IP_DAILY_CHAT_USAGE[ip] = usage
+            _IP_DAILY_CHAT_USAGE[owner_key] = usage
         used = int(usage.get("count", 0))
     return {
         "mode": mode,
@@ -185,10 +299,11 @@ async def _get_online_chat_quota_status(request: Request) -> Dict[str, Any]:
     }
 
 
-def _normalize_uploaded_file(
+async def _normalize_uploaded_file(
     src_path: str,
     agent_session_dir: str,
     temp_files: List[str],
+    owner_key: str,
 ) -> Optional[str]:
     if not src_path:
         return None
@@ -200,6 +315,19 @@ def _normalize_uploaded_file(
             return None
     if not src_file.is_file():
         return None
+    if _runtime_mode() == "online":
+        try:
+            rel_path = to_web_v2_public_path(src_file)
+        except Exception:
+            rel_path = ""
+        if rel_path.startswith("sessions/"):
+            parts = [p for p in rel_path.split("/") if p]
+            source_session_id = parts[1] if len(parts) > 1 else ""
+            if source_session_id:
+                async with _SESSIONS_GUARD:
+                    source_session = _SESSIONS.get(source_session_id)
+                if not source_session or str(source_session.get("owner_key", "")) != owner_key:
+                    return None
     os.makedirs(agent_session_dir, exist_ok=True)
     existing = len([p for p in Path(agent_session_dir).glob("u_*__*") if p.is_file()])
     dst_name = make_web_v2_upload_name(existing + 1, src_file.name)
@@ -228,7 +356,12 @@ async def _stream_graph(
 
     valid_attachments: List[str] = []
     for p in attachment_paths or []:
-        normalized = _normalize_uploaded_file(p, agent_session_dir, state.setdefault("temp_files", []))
+        normalized = await _normalize_uploaded_file(
+            p,
+            agent_session_dir,
+            state.setdefault("temp_files", []),
+            str(state.get("owner_key", "")),
+        )
         if normalized:
             valid_attachments.append(normalized)
 
@@ -361,8 +494,9 @@ async def _stream_graph(
 
 
 @router.post("/sessions", response_model=CreateSessionResponse)
-async def create_session():
+async def create_session(request: Request):
     state = initialize_session_state()
+    token, token_expires_at = _issue_session_access_token(state, request)
     session_id = state["session_id"]
     async with _SESSIONS_GUARD:
         _SESSIONS[session_id] = state
@@ -372,11 +506,14 @@ async def create_session():
         session_id=session_id,
         created_at=str(state.get("created_at", "")),
         model_name=getattr(state.get("llm"), "model_name", ""),
+        session_access_token=token,
+        token_expires_at=token_expires_at,
     )
 
 
 @router.get("/sessions")
-async def list_sessions():
+async def list_sessions(request: Request):
+    visible = await get_visible_session_ids(request)
     async with _SESSIONS_GUARD:
         data = [
             {
@@ -387,20 +524,27 @@ async def list_sessions():
                 "status": s.get("status", ""),
             }
             for sid, s in _SESSIONS.items()
+            if sid in visible
         ]
     return {"sessions": data}
 
 
 @router.get("/sessions/{session_id}", response_model=SessionStateResponse)
-async def get_session(session_id: str):
+async def get_session(session_id: str, request: Request):
     state = await _get_session_or_404(session_id)
+    _assert_session_access(state, request)
     snap = _snapshot(state)
     return SessionStateResponse(**snap)
 
 
 @router.post("/sessions/{session_id}/attachments")
-async def upload_attachments(session_id: str, files: List[UploadFile] = File(default_factory=list)):
+async def upload_attachments(
+    session_id: str,
+    request: Request,
+    files: List[UploadFile] = File(default_factory=list),
+):
     state = await _get_session_or_404(session_id)
+    _assert_session_access(state, request)
     target_dir = state.get("agent_session_dir")
     os.makedirs(target_dir, exist_ok=True)
     stored = []
@@ -428,6 +572,7 @@ async def upload_attachments(session_id: str, files: List[UploadFile] = File(def
 @router.post("/sessions/{session_id}/messages/stream")
 async def stream_message(session_id: str, payload: ChatStreamRequest, request: Request):
     state = await _get_session_or_404(session_id)
+    _assert_session_access(state, request)
     await _consume_online_chat_quota_or_429(request)
     await _set_cancel(session_id, False)
     if payload.model:
@@ -449,6 +594,7 @@ async def stream_message(session_id: str, payload: ChatStreamRequest, request: R
 @router.post("/sessions/{session_id}/messages/retry/stream")
 async def stream_retry(session_id: str, request: Request):
     state = await _get_session_or_404(session_id)
+    _assert_session_access(state, request)
     await _consume_online_chat_quota_or_429(request)
     await _set_cancel(session_id, False)
     lock = await _get_lock(session_id)
@@ -472,8 +618,9 @@ async def get_chat_quota(request: Request):
 
 
 @router.post("/sessions/{session_id}/cancel")
-async def cancel_session_run(session_id: str):
+async def cancel_session_run(session_id: str, request: Request):
     state = await _get_session_or_404(session_id)
+    _assert_session_access(state, request)
     state["status"] = "stopping"
     await _set_cancel(session_id, True)
     return {"success": True, "status": "stopping"}
