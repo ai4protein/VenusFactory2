@@ -21,9 +21,10 @@
 
 ## 🌟 最新消息
 
-- [2026-01-23] 🚀 [VenusX](https://github.com/AI4Protein/VenusX) 新增 VenusFactory2
-- [2025-08-10] 🎉 免费网站发布 [venusfactory.cn/playground](https://venusfactory.cn/playground/)
-- [2025-04-19] 🎉 [VenusREM](https://github.com/ai4protein/VenusREM) 在 [ProteinGym](https://proteingym.org/benchmarks) & [VenusMutHub](https://lianglab.sjtu.edu.cn/muthub/) 排名第一！
+- [2026-01-23] 🚀 [VenusX (ICLR2026)](https://openreview.net/forum?id=zcmL592XRG) 新增 VenusFactory2
+- [2026-04-01] 🎉 新网站发布 [venusfactory.cn/playground](https://venusfactory.cn/playground/)
+- [2026-03-27] 🚀 VenusFactory2 技术报告发布 [arXiv:2603.27303](https://arxiv.org/abs/2603.27303)
+- [2025-04-19] 🎉 [VenusREM (ISMB/ECCB2025)](https://github.com/ai4protein/VenusREM) 排名第一于 [ProteinGym](https://proteingym.org/benchmarks) & [VenusMutHub](https://lianglab.sjtu.edu.cn/muthub/)!
 
 <details>
 <summary>📨 加入微信群 / 📝 分享反馈</summary>
@@ -480,6 +481,13 @@ pdb_file = download_alphafold_structure("P12345")
 ## 🙌 引用
 
 ```bibtex
+@article{tan2026venusfactory2,
+  title={Self-evolving AI agents for protein discovery and directed evolution},
+  author={Tan, Yang and Zhang, Lingrong and Li, Mingchen and Yu, Yuanxi and Zhong, Bozitao and Zhou, Bingxin and Dong, Nanqing and Hong, Liang},
+  journal={arXiv preprint arXiv:2603.27303},
+  year={2026}
+}
+
 @inproceedings{tan2025venusfactory,
   title={VenusFactory: An Integrated System for Protein Engineering with Data Retrieval and Language Model Fine-Tuning},
   author={Tan, Yang and Liu, Chen and Gao, Jingyuan and Banghao, Wu and Li, Mingchen and Wang, Ruilin and Zhang, Lingrong and Yu, Huiqun and Fan, Guisheng and Hong, Liang and others},
