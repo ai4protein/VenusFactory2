@@ -4,9 +4,12 @@ import shutil
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from fastapi import APIRouter, HTTPException, Request
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
+from web_v2.analytics_store import analytics_store, normalize_time_range
 
 router = APIRouter(prefix="/api/settings", tags=["settings-v2"])
 _ENV_PATH = Path(".env")
@@ -23,6 +26,15 @@ class EnvEntry(BaseModel):
 
 class UpdateEnvRequest(BaseModel):
     entries: List[EnvEntry] = Field(default_factory=list)
+
+
+def _insights_payload(*, from_iso: str, to_iso: str, filters_applied: Dict[str, Optional[str]], data: Dict[str, object]):
+    return {
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "time_range": {"from": from_iso, "to": to_iso},
+        "filters_applied": filters_applied,
+        "data": data,
+    }
 
 
 def _parse_env_lines(raw: str) -> List[EnvEntry]:
@@ -100,6 +112,13 @@ def _ensure_settings_access(request: Request) -> None:
     )
 
 
+def _ensure_insights_access(request: Request) -> None:
+    mode = os.getenv("WEBUI_V2_MODE", "local").strip().lower()
+    if mode == "online":
+        return
+    _ensure_settings_access(request)
+
+
 @router.get("/env")
 async def get_env_entries(request: Request):
     _ensure_settings_access(request)
@@ -152,3 +171,91 @@ async def save_env_entries(payload: UpdateEnvRequest, request: Request):
     content = "\n".join(lines).rstrip() + "\n"
     _ENV_PATH.write_text(content, encoding="utf-8")
     return {"success": True, "count": len(clean_entries), "path": str(_ENV_PATH)}
+
+
+@router.get("/insights/overview")
+async def insights_overview(
+    request: Request,
+    from_value: Optional[str] = Query(default=None, alias="from"),
+    to_value: Optional[str] = Query(default=None, alias="to"),
+):
+    _ensure_insights_access(request)
+    from_iso, to_iso = normalize_time_range(from_value, to_value)
+    data = analytics_store.query_overview(from_iso, to_iso)
+    return _insights_payload(
+        from_iso=from_iso,
+        to_iso=to_iso,
+        filters_applied={"from": from_value, "to": to_value},
+        data=data,
+    )
+
+
+@router.get("/insights/tool-calls")
+async def insights_tool_calls(
+    request: Request,
+    group_by: str = Query(default="day", pattern="^(tool|day|hour)$"),
+    from_value: Optional[str] = Query(default=None, alias="from"),
+    to_value: Optional[str] = Query(default=None, alias="to"),
+):
+    _ensure_insights_access(request)
+    from_iso, to_iso = normalize_time_range(from_value, to_value)
+    rows = analytics_store.query_tool_calls(from_iso, to_iso, group_by)
+    return _insights_payload(
+        from_iso=from_iso,
+        to_iso=to_iso,
+        filters_applied={"group_by": group_by, "from": from_value, "to": to_value},
+        data={"group_by": group_by, "rows": rows},
+    )
+
+
+@router.get("/insights/ip-distribution")
+async def insights_ip_distribution(
+    request: Request,
+    level: str = Query(default="country", pattern="^(country|region)$"),
+    from_value: Optional[str] = Query(default=None, alias="from"),
+    to_value: Optional[str] = Query(default=None, alias="to"),
+):
+    _ensure_insights_access(request)
+    from_iso, to_iso = normalize_time_range(from_value, to_value)
+    rows = analytics_store.query_ip_distribution(from_iso, to_iso, level)
+    return _insights_payload(
+        from_iso=from_iso,
+        to_iso=to_iso,
+        filters_applied={"level": level, "from": from_value, "to": to_value},
+        data={"level": level, "rows": rows},
+    )
+
+
+@router.get("/insights/token-usage")
+async def insights_token_usage(
+    request: Request,
+    group_by: str = Query(default="day", pattern="^(model|tool|day)$"),
+    from_value: Optional[str] = Query(default=None, alias="from"),
+    to_value: Optional[str] = Query(default=None, alias="to"),
+):
+    _ensure_insights_access(request)
+    from_iso, to_iso = normalize_time_range(from_value, to_value)
+    rows = analytics_store.query_token_usage(from_iso, to_iso, group_by)
+    return _insights_payload(
+        from_iso=from_iso,
+        to_iso=to_iso,
+        filters_applied={"group_by": group_by, "from": from_value, "to": to_value},
+        data={"group_by": group_by, "rows": rows},
+    )
+
+
+@router.get("/insights/map")
+async def insights_map(
+    request: Request,
+    from_value: Optional[str] = Query(default=None, alias="from"),
+    to_value: Optional[str] = Query(default=None, alias="to"),
+):
+    _ensure_insights_access(request)
+    from_iso, to_iso = normalize_time_range(from_value, to_value)
+    rows = analytics_store.query_map(from_iso, to_iso)
+    return _insights_payload(
+        from_iso=from_iso,
+        to_iso=to_iso,
+        filters_applied={"from": from_value, "to": to_value},
+        data={"rows": rows},
+    )

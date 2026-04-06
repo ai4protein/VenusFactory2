@@ -11,6 +11,7 @@ import { ProteinFunctionPage } from "./pages/quick-tools/ProteinFunctionPage";
 import { FunctionalResiduePage } from "./pages/quick-tools/FunctionalResiduePage";
 import { PhysicochemicalPropertyPage } from "./pages/quick-tools/PhysicochemicalPropertyPage";
 import { SequenceDesignPage } from "./pages/quick-tools/SequenceDesignPage";
+import { ProteinDiscoveryPage } from "./pages/quick-tools/ProteinDiscoveryPage";
 import { AdvancedDirectedEvolutionPage } from "./pages/advanced-tools/AdvancedDirectedEvolutionPage";
 import { AdvancedProteinDiscoveryPage } from "./pages/advanced-tools/AdvancedProteinDiscoveryPage";
 import { AdvancedProteinFunctionPage } from "./pages/advanced-tools/AdvancedProteinFunctionPage";
@@ -23,6 +24,7 @@ import { AlphaFoldDownloadPage } from "./pages/download/AlphaFoldDownloadPage";
 import { RcsbMetadataDownloadPage } from "./pages/download/RcsbMetadataDownloadPage";
 import { InterProDownloadPage } from "./pages/download/InterProDownloadPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { SettingsInsightsPage } from "./pages/SettingsInsightsPage";
 import { ManualLayout } from "./pages/manual/ManualLayout";
 import { ManualIndexPage } from "./pages/manual/ManualIndexPage";
 import { ManualDocPage } from "./pages/manual/ManualDocPage";
@@ -54,6 +56,7 @@ const CUSTOM_MODEL_MODULES = [
 const QUICK_TOOL_MODULES = [
   { path: "/quick-tools/directed-evolution", label: "Directed Evolution", status: "Available" },
   { path: "/quick-tools/sequence-design", label: "Sequence Design", status: "Available" },
+  { path: "/quick-tools/protein-discovery", label: "Protein Discovery", status: "Available" },
   { path: "/quick-tools/protein-function", label: "Protein Function", status: "Available" },
   { path: "/quick-tools/functional-residue", label: "Functional Residue", status: "Available" },
   { path: "/quick-tools/physicochemical-property", label: "Physicochemical Property", status: "Available" }
@@ -89,6 +92,11 @@ const MANUAL_MODULES = [
   { path: "/manual/faq", label: "FAQ", status: "Available" }
 ];
 
+const SETTINGS_MODULES = [
+  { path: "/settings/env", label: "Env Settings", status: "Available" },
+  { path: "/settings/insights", label: "Insights", status: "Available" }
+];
+
 export default function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [customModelExpanded, setCustomModelExpanded] = useState(false);
@@ -96,6 +104,7 @@ export default function App() {
   const [advancedToolsExpanded, setAdvancedToolsExpanded] = useState(false);
   const [downloadExpanded, setDownloadExpanded] = useState(false);
   const [manualExpanded, setManualExpanded] = useState(false);
+  const [settingsExpanded, setSettingsExpanded] = useState(false);
   const [agentExpanded, setAgentExpanded] = useState(true);
   const [runtimeMode, setRuntimeMode] = useState<"unknown" | "local" | "online">("unknown");
   const location = useLocation();
@@ -116,6 +125,9 @@ export default function App() {
   const manualRouteActive = MANUAL_MODULES.some((m) =>
     location.pathname.startsWith(m.path)
   );
+  const settingsRouteActive = SETTINGS_MODULES.some((m) =>
+    location.pathname.startsWith(m.path)
+  );
   const showCustomModelChildren =
     !sidebarCollapsed && (customModelExpanded || customModelRouteActive);
   const showQuickToolChildren =
@@ -126,6 +138,8 @@ export default function App() {
     !sidebarCollapsed && (downloadExpanded || downloadRouteActive);
   const showManualChildren =
     !sidebarCollapsed && (manualExpanded || manualRouteActive);
+  const showSettingsChildren =
+    !sidebarCollapsed && (settingsExpanded || settingsRouteActive);
   const showAgentChildren = !sidebarCollapsed && (agentExpanded || agentRouteActive);
   const localFeaturesEnabled = runtimeMode === "local";
   const workspaceEnabled = localFeaturesEnabled;
@@ -405,13 +419,34 @@ export default function App() {
               ))}
           </div>
 
-          <NavLink
-            to="/settings"
-            className={({ isActive }) => `vf2-nav-item ${isActive ? "active" : ""}`}
-            title="Settings"
-          >
-            <span className="vf2-nav-label">Settings</span>
-          </NavLink>
+          <div className="vf2-nav-group">
+            <button
+              type="button"
+              className={`vf2-nav-item vf2-nav-parent ${settingsRouteActive ? "active" : ""}`}
+              title="Settings"
+              onClick={() => setSettingsExpanded((v) => !v)}
+              aria-expanded={showSettingsChildren}
+            >
+              <span className="vf2-nav-label">Settings</span>
+              {!sidebarCollapsed && (
+                <span className={`vf2-nav-caret ${showSettingsChildren ? "expanded" : ""}`}>
+                  ▾
+                </span>
+              )}
+            </button>
+
+            {showSettingsChildren &&
+              SETTINGS_MODULES.map((item) => (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  className={({ isActive }) => `vf2-nav-item vf2-nav-subitem ${isActive ? "active" : ""}`}
+                  title={item.label}
+                >
+                  <span className="vf2-nav-label">{item.label}</span>
+                </NavLink>
+              ))}
+          </div>
           <RuntimeModeBadge runtimeMode={runtimeMode} placement="sidebar" />
         </nav>
       </aside>
@@ -425,10 +460,16 @@ export default function App() {
             <Route path="workspace" element={<WorkspacePage workspaceEnabled={workspaceEnabled} />} />
           </Route>
           <Route path="/report" element={<ReportPage workspaceEnabled={workspaceEnabled} />} />
-          <Route path="/settings" element={<SettingsPage readonly={!localFeaturesEnabled} />} />
+          <Route path="/settings" element={<Navigate to="/settings/env" replace />} />
+          <Route path="/settings/env" element={<SettingsPage readonly={!localFeaturesEnabled} />} />
+          <Route path="/settings/insights" element={<SettingsInsightsPage />} />
           <Route path="/quick-tools" element={<Navigate to="/quick-tools/directed-evolution" replace />} />
           <Route path="/quick-tools/directed-evolution" element={<DirectedEvolutionPage workspaceEnabled={workspaceEnabled} />} />
           <Route path="/quick-tools/sequence-design" element={<SequenceDesignPage workspaceEnabled={workspaceEnabled} />} />
+          <Route
+            path="/quick-tools/protein-discovery"
+            element={<ProteinDiscoveryPage readonly={!localFeaturesEnabled} workspaceEnabled={workspaceEnabled} />}
+          />
           <Route path="/quick-tools/protein-function" element={<ProteinFunctionPage workspaceEnabled={workspaceEnabled} />} />
           <Route path="/quick-tools/functional-residue" element={<FunctionalResiduePage workspaceEnabled={workspaceEnabled} />} />
           <Route path="/quick-tools/physicochemical-property" element={<PhysicochemicalPropertyPage workspaceEnabled={workspaceEnabled} />} />

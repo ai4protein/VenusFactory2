@@ -42,6 +42,7 @@ try:
     from src.web_v2.download_api import router as download_v2_router
     from src.web_v2.settings_api import router as settings_v2_router
     from src.web_v2.workspace_api import router as workspace_v2_router
+    from src.web_v2.analytics_store import analytics_store
 except ModuleNotFoundError:
     # Works when running from `python src/webui_v2.py` (sys.path rooted at src/)
     from tools.mutation.tools_api import router as mutation_router
@@ -56,6 +57,7 @@ except ModuleNotFoundError:
     from web_v2.download_api import router as download_v2_router
     from web_v2.settings_api import router as settings_v2_router
     from web_v2.workspace_api import router as workspace_v2_router
+    from web_v2.analytics_store import analytics_store
 
 WEB_V2_ROOT = get_web_v2_root_dir()
 WEB_V2_UPLOAD_ROOT = get_web_v2_area_dir("uploads")
@@ -75,6 +77,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     logger.info("VenusFactory2 API server starting up...")
     logger.info("Web v2 storage roots initialized")
+    analytics_store.ensure_initialized()
     logger.info("Web v2 cleanup: disabled (no automatic deletion)")
     yield
     logger.info("VenusFactory2 API server shutting down...")
@@ -114,9 +117,9 @@ app.include_router(quick_tools_v2_router)
 app.include_router(advanced_tools_v2_router)
 app.include_router(download_v2_router)
 app.include_router(workspace_v2_router)
+app.include_router(settings_v2_router)
 if WEBUI_V2_MODE == "local":
     app.include_router(custom_model_v2_router)
-    app.include_router(settings_v2_router)
 
 _frontend_dist = Path(os.getenv("WEBUI_V2_FRONTEND_DIST", "frontend/dist"))
 if _frontend_dist.exists():

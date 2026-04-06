@@ -30,6 +30,16 @@ from web.utils.file_handlers import validate_and_normalize_fasta_content
 from web.utils.prediction_runners import run_zero_shot_prediction
 from web.utils.function_prediction import prepare_top_residue_heatmap_data, generate_plotly_heatmap
 try:
+    from src.web_v2.advanced_tools_api import (
+        ProteinDiscoveryBody as AdvancedProteinDiscoveryBody,
+        run_protein_discovery as run_advanced_protein_discovery,
+    )
+except ModuleNotFoundError:
+    from web_v2.advanced_tools_api import (
+        ProteinDiscoveryBody as AdvancedProteinDiscoveryBody,
+        run_protein_discovery as run_advanced_protein_discovery,
+    )
+try:
     from src.tools.mutation.models.mutation_operations import (
         zero_shot_mutation_sequence_prediction,
         zero_shot_mutation_structure_prediction,
@@ -594,6 +604,10 @@ class SequenceDesignRunBody(BaseModel):
     temperatures: List[float] = Field(default_factory=lambda: [0.1], description="Sampling temperatures.")
 
 
+class ProteinDiscoveryRunBody(BaseModel):
+    pdb_file: str = Field(..., description="PDB file path for VenusMine protein discovery.")
+
+
 def _parse_fixed_residues_text(text: str) -> dict[str, list[int]]:
     raw = (text or "").strip()
     if not raw:
@@ -712,6 +726,13 @@ async def run_quick_tool_sequence_design(body: SequenceDesignRunBody):
             "run_id": run_id,
         },
     }
+
+
+@router.post("/run/protein-discovery")
+async def run_quick_tool_protein_discovery(body: ProteinDiscoveryRunBody):
+    # Reuse advanced VenusMine backend and keep all advanced parameters server-side defaults.
+    advanced_payload = AdvancedProteinDiscoveryBody(pdb_file=body.pdb_file)
+    return await run_advanced_protein_discovery(advanced_payload)
 
 
 @router.post("/run/mutation")
@@ -990,6 +1011,28 @@ async def run_quick_tool_sequence_design_stream(body: SequenceDesignRunBody):
                 yield chunk
         except Exception as exc:
             for chunk in _stream_error(f"Sequence Design failed: {exc}", status_code=500):
+                yield chunk
+
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+@router.post("/run/protein-discovery/stream")
+async def run_quick_tool_protein_discovery_stream(body: ProteinDiscoveryRunBody):
+    async def event_stream():
+        start = time.perf_counter()
+        yield _sse("progress", {"progress": 0.08, "message": "Validating Protein Discovery input..."})
+        try:
+            yield _sse("progress", {"progress": 0.4, "message": "Running VenusMine pipeline..."})
+            payload = await run_quick_tool_protein_discovery(body)
+            elapsed_ms = int((time.perf_counter() - start) * 1000)
+            for chunk in _stream_success(payload, final_message=f"Protein Discovery completed in {elapsed_ms} ms."):
+                yield chunk
+        except HTTPException as exc:
+            message = str(exc.detail) if exc.detail else "Protein Discovery failed."
+            for chunk in _stream_error(message, status_code=exc.status_code):
+                yield chunk
+        except Exception as exc:
+            for chunk in _stream_error(f"Protein Discovery failed: {exc}", status_code=500):
                 yield chunk
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")

@@ -10,9 +10,11 @@ Quick Tools is designed for fast, no-setup protein analysis. If you have a seque
 - Are exploring a new protein for the first time
 - Don't need to customize which models to use
 
-Quick Tools offers 4 ready-to-use analysis types:
+Quick Tools offers 5 ready-to-use analysis types:
 
 Directed Evolution: AI-Powered Mutation Prediction This tool allows for the rapid scoring and analysis of protein mutations. Simply upload a PDB file or paste the PDB content, and the platform will provide insights into the effects of single or multiple mutations on the protein.
+
+Protein Discovery: A quick-entry VenusMine workflow for structure homolog search and clustering. In Quick Tools, this module keeps only PDB input and one-click start. Advanced parameters are handled by backend defaults.
 
 Protein Function: Leveraging pre-trained models, this module predicts various protein functions from a given amino acid sequence. You can upload a FASTA file or paste the sequence directly to predict properties such as solubility, localization, and more.
 
@@ -98,14 +100,14 @@ This module displays the prediction results upon task completion and provides op
 
 -----
 
-## 7. Sequence Design
+## 4. Sequence Design
 
-### 7.1 What this tool does
+### 4.1 What this tool does
 
 Quick Tools Sequence Design provides a simplified entry for **ProteinMPNN-based sequence generation** from structure input.  
 It is designed for wet-lab users who want direct outputs without tuning many inference switches.
 
-### 7.2 Inputs and simple controls
+### 4.2 Inputs and simple controls
 
 - **Structure input:** Upload a **.pdb** file, pick from Workspace, or use the built-in example.
 - **Model Family:** `Soluble` / `Vanilla` / `CA`.
@@ -119,26 +121,47 @@ It is designed for wet-lab users who want direct outputs without tuning many inf
 
 Quick defaults use **`v_48_020` + `backbone_noise=0.20`**, which is recommended for most practical structures (AI-generated backbones, AlphaFold structures, and routine redesign).
 
-### 7.3 Outputs
+### 4.3 Outputs
 
 - **Table tab:** Preview designed sequence records (header, sequence, length, score fields when available).
 - **Raw tab:** Full JSON payload for downstream integration.
 - **AI Expert tab:** Optional interpretation if AI summary is enabled.
 - **Download Result:** Downloads the generated FASTA file from the run.
 
-### 7.4 When to use Quick Sequence Design
+### 4.4 When to use Quick Sequence Design
 
 Use this module when you need fast candidate sequence generation from a structure and prefer minimal parameter decisions.  
 If you need full ProteinMPNN parameter-level control, use **Advanced Tools / Sequence Design**.
+
+-----
+
+## 5. Protein Discovery
+
+### 5.1 Positioning in Quick Tools
+
+Quick Protein Discovery is a lightweight entry of **Advanced Tools / Protein Discovery**.  
+It is designed for minimal setup: provide a `.pdb` file and click **Start VenusMine Discovery**.
+
+### 5.2 Inputs and run behavior
+
+- **PDB Input:** Upload `.pdb`, select from Workspace, or use the example PDB.
+- **One-click Start:** Launches VenusMine Discovery directly.
+- **Backend defaults:** Advanced controls (such as protected region and MMseqs parameters) are not exposed in Quick mode and are filled by backend defaults.
+
+### 5.3 Outputs and mode notes
+
+- Result output remains compatible with the advanced backend artifacts (tree/labels/archive download fields).
+- In **online mode**, this page stays view-only (greyed out) to match deployment policy.
+- If you need parameter tuning, switch to **Advanced Tools / Protein Discovery**.
 
 
 I will first translate the Chinese text into English, removing any redundant phrases. Then, I will structure the entire translated text using the requested code-like format.
 
 -----
 
-## 4\. Protein Function
+## 6. Protein Function
 
-### 4.1 Task Selection and Sequence Input
+### 6.1 Task Selection and Sequence Input
 
 **Model Configuration:** The core of this module is the **Select Task** drop-down menu, where the user must choose the specific goal for the protein function prediction:
 
@@ -158,14 +181,14 @@ I will first translate the Chinese text into English, removing any redundant phr
 
 **Configure AI Analysis (Optional):** Users can choose to enable **Enable AI Summary** to receive a **textual evaluation** of the results from a professional **AI biology expert** after the prediction is complete.
 
-### 4.2 Execute Prediction
+### 6.2 Execute Prediction
 
 1.  **Ensure all model configuration parameters are set correctly.**
 2.  Click the **"Start Prediction"** button to start the prediction process.
 3.  The system will display **prediction progress and status information.**
 4.  To abort the prediction, click the **"Abort"** button.
 
-### 4.3 Results Display Features
+### 6.3 Results Display Features
 
 **Status:** Provides **real-time feedback** on prediction progress. An example status shown is: **"All predictions completed\! Results were aggregated using soft voting."**
 
@@ -182,9 +205,9 @@ I will first translate the Chinese text into English, removing any redundant phr
 
 -----
 
-## 5. Functional Residue 
+## 7. Functional Residue 
 
-### 5.1 Task Selection and Sequence Input
+### 7.1 Task Selection and Sequence Input
 
 **Model Configuration:** The core of this module is the **Select Task** drop-down menu, where the user selects the type of protein functional residue to predict:
 * **Activity Site:** Predicts key residue positions in the protein sequence responsible for **catalytic or biological function**.
@@ -200,14 +223,14 @@ I will first translate the Chinese text into English, removing any redundant phr
 
 **Configure AI Analysis (Optional):** Users can choose to enable **Enable AI Summary** to receive a **textual evaluation** of the results from a professional **AI biology expert** after the prediction is complete.
 
-### 5.2 Execute Prediction
+### 7.2 Execute Prediction
 
 1.  **Ensure all model configuration parameters are set correctly.**
 2.  Click the **"Start Prediction"** button to start the prediction process.
 3.  The system will display **prediction progress and status information.**
 4.  To abort the prediction, click the **"Abort"** button.
 
-### 5.3 Results Display Features
+### 7.3 Results Display Features
 
 **Status:** Provides **real-time feedback** on prediction progress. An example status shown is: **"All predictions completed! Results were aggregated using soft voting."**
 
@@ -230,9 +253,9 @@ I will first translate the Chinese text into English, removing all redundant phr
 
 -----
 
-## 6. Physicochemical Property
+## 8. Physicochemical Property
 
-### 6.1 Task Selection and Sequence Input
+### 8.1 Task Selection and Sequence Input
 
 **Task Configuration:** The core of this module is the **Select Properties of Protein** drop-down menu, where the user selects the type of physicochemical property analysis to perform:
 * **Relative solvent accessible surface area (PDB only):** Calculates the relative surface area of each residue exposed to the solvent. **Note:** This analysis requires a **PDB structure file** as input.
@@ -244,14 +267,14 @@ I will first translate the Chinese text into English, removing all redundant phr
 
 **Uploaded Protein Sequence:** This area displays the **raw amino acid sequence** read from the input file (FASTA or PDB).
 
-### 6.2 Execute Prediction
+### 8.2 Execute Prediction
 
 1.  **Ensure all model configuration parameters are set correctly.**
 2.  Click the **"Start Prediction"** button to start the prediction process.
 3.  The system will display **prediction progress and status information.**
 4.  To abort the prediction, click the **"Abort"** button.
 
-### 6.3 Results Display Features
+### 8.3 Results Display Features
 
 **Status:** Provides **real-time feedback** on prediction progress. The status typically indicates that the task has completed successfully and the results have been saved as a JSON file.
 

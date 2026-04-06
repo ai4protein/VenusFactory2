@@ -57,6 +57,15 @@ export function SequenceDesignPage({ workspaceEnabled = false }: SequenceDesignP
   const [llmProvider, setLlmProvider] = useState(DEFAULT_META.llm_models[0]);
   const [progress, setProgress] = useState(0);
   const [progressMessage, setProgressMessage] = useState("Idle");
+  const onlineSequenceDesignLimit = meta.online_limit_enabled ? Math.max(1, meta.online_sequence_design_limit ?? 50) : 512;
+  const baseSequenceOptions = [4, 8, 16, 32];
+  const sequenceOptions = (
+    meta.online_limit_enabled
+      ? Array.from(
+          new Set([...baseSequenceOptions.filter((count) => count <= onlineSequenceDesignLimit), onlineSequenceDesignLimit])
+        )
+      : baseSequenceOptions
+  ).sort((a, b) => a - b);
 
   useEffect(() => {
     void (async () => {
@@ -65,6 +74,12 @@ export function SequenceDesignPage({ workspaceEnabled = false }: SequenceDesignP
       if (loaded.llm_models.length > 0) setLlmProvider(loaded.llm_models[0]);
     })();
   }, []);
+
+  useEffect(() => {
+    if (numSequences > onlineSequenceDesignLimit) {
+      setNumSequences(onlineSequenceDesignLimit);
+    }
+  }, [numSequences, onlineSequenceDesignLimit]);
 
   async function onUpload(file: File | null) {
     if (!file) return;
@@ -99,6 +114,9 @@ export function SequenceDesignPage({ workspaceEnabled = false }: SequenceDesignP
     try {
       if (!uploadedPath) {
         throw new Error("Please upload or pick a PDB file first.");
+      }
+      if (meta.online_limit_enabled && numSequences > onlineSequenceDesignLimit) {
+        throw new Error(`Online mode supports up to ${onlineSequenceDesignLimit} designed sequences per run.`);
       }
       const payload = await runSequenceDesignToolStream(
         {
@@ -181,7 +199,7 @@ export function SequenceDesignPage({ workspaceEnabled = false }: SequenceDesignP
               <label className="left-controls" style={{ flex: 1, minWidth: 0 }}>
                 Number of sequences
                 <select value={numSequences} onChange={(e) => setNumSequences(Number(e.target.value))}>
-                  {[4, 8, 16, 32].map((count) => (
+                  {sequenceOptions.map((count) => (
                     <option key={count} value={count}>
                       {count}
                     </option>
@@ -197,6 +215,9 @@ export function SequenceDesignPage({ workspaceEnabled = false }: SequenceDesignP
                 </select>
               </label>
             </div>
+            {meta.online_limit_enabled && (
+              <p className="quick-ai-note">Online mode supports up to {onlineSequenceDesignLimit} designed sequences per run.</p>
+            )}
           </section>
 
           <section className="custom-section-card">

@@ -38,6 +38,7 @@ from web.utils.chat_format_utils import (
 from web.utils.common_utils import get_project_root, to_project_relative_path
 from agent.skills import get_skills_metadata_string
 from web.utils.file_oss import upload_file_to_cloud_async
+from web_v2.analytics_store import analytics_store
 
 
 class AgentState(TypedDict):
@@ -81,6 +82,35 @@ def _detect_ui_lang(text: str) -> str:
     if isinstance(text, str) and re.search(r"[\u4e00-\u9fff]", text):
         return "zh"
     return "en"
+
+
+def _extract_usage_from_output(raw_output: Any) -> tuple[int, int, int, bool]:
+    data = None
+    if isinstance(raw_output, dict):
+        data = raw_output
+    elif isinstance(raw_output, str):
+        text = raw_output.strip()
+        if text.startswith("{") and text.endswith("}"):
+            try:
+                parsed = json.loads(text)
+                if isinstance(parsed, dict):
+                    data = parsed
+            except Exception:
+                data = None
+    if not isinstance(data, dict):
+        return 0, 0, 0, True
+    usage = data.get("usage")
+    if isinstance(usage, dict):
+        prompt = int(usage.get("prompt_tokens") or usage.get("input_tokens") or 0)
+        completion = int(usage.get("completion_tokens") or usage.get("output_tokens") or 0)
+        total = int(usage.get("total_tokens") or (prompt + completion))
+        return prompt, completion, total, False
+    prompt = int(data.get("prompt_tokens") or data.get("input_tokens") or 0)
+    completion = int(data.get("completion_tokens") or data.get("output_tokens") or 0)
+    total = int(data.get("total_tokens") or (prompt + completion))
+    if prompt == 0 and completion == 0 and total == 0:
+        return 0, 0, 0, True
+    return prompt, completion, total, False
 
 
 def _ui_text(lang: str, key: str, **kwargs) -> str:
@@ -1143,6 +1173,7 @@ async def execute_node(state: AgentState, config: RunnableConfig):
             merged_tool_input[key] = val
 
     # Execution Loop with Retries
+    execute_started = time.time()
     step_retry = 0
     step_done = False
     last_output = None
@@ -1509,6 +1540,25 @@ async def execute_node(state: AgentState, config: RunnableConfig):
         "oss_url": oss_url,
         "timestamp": datetime.now().isoformat(),
     })
+
+    try:
+        input_tokens, output_tokens, total_tokens, usage_missing = _extract_usage_from_output(last_output)
+        analytics_store.record_tool_call(
+            ts=datetime.now().isoformat(),
+            session_id=str(state.get("session_id", "")),
+            tool_name=tool_name,
+            status="failed" if is_failure else "success",
+            latency_ms=int((time.time() - execute_started) * 1000),
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            total_tokens=total_tokens,
+            usage_missing=usage_missing,
+            model=getattr(chains.get("llm"), "model_name", "") if chains.get("llm") else "",
+            owner_key=str(config.get("configurable", {}).get("chains", {}).get("owner_key", state.get("owner_key", ""))),
+            ip=str(state.get("client_ip", "")),
+        )
+    except Exception:
+        pass
 
     # 4. Image Hosting (plots, images)
     try:

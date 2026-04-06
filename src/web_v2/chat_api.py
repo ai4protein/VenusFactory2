@@ -28,6 +28,7 @@ from web.utils.common_utils import (
     resolve_web_v2_client_path,
     to_web_v2_public_path,
 )
+from web_v2.analytics_store import analytics_store
 
 
 router = APIRouter(prefix="/api/chat", tags=["chat-v2"])
@@ -299,6 +300,19 @@ async def _get_online_chat_quota_status(request: Request) -> Dict[str, Any]:
     }
 
 
+def _record_access_event(request: Request, endpoint: str) -> None:
+    try:
+        analytics_store.record_access_event(
+            ts=datetime.now(timezone.utc).isoformat(),
+            endpoint=endpoint,
+            owner_key=_session_owner_key_for_request(request),
+            ip=_extract_client_ip(request),
+            user_agent=_extract_user_agent(request),
+        )
+    except Exception:
+        pass
+
+
 async def _normalize_uploaded_file(
     src_path: str,
     agent_session_dir: str,
@@ -495,8 +509,11 @@ async def _stream_graph(
 
 @router.post("/sessions", response_model=CreateSessionResponse)
 async def create_session(request: Request):
+    _record_access_event(request, "/api/chat/sessions:create")
     state = initialize_session_state()
     token, token_expires_at = _issue_session_access_token(state, request)
+    state["client_ip"] = _extract_client_ip(request)
+    state["owner_key"] = _session_owner_key_for_request(request)
     session_id = state["session_id"]
     async with _SESSIONS_GUARD:
         _SESSIONS[session_id] = state
@@ -513,6 +530,7 @@ async def create_session(request: Request):
 
 @router.get("/sessions")
 async def list_sessions(request: Request):
+    _record_access_event(request, "/api/chat/sessions:list")
     visible = await get_visible_session_ids(request)
     async with _SESSIONS_GUARD:
         data = [
@@ -531,6 +549,7 @@ async def list_sessions(request: Request):
 
 @router.get("/sessions/{session_id}", response_model=SessionStateResponse)
 async def get_session(session_id: str, request: Request):
+    _record_access_event(request, "/api/chat/sessions/{id}:get")
     state = await _get_session_or_404(session_id)
     _assert_session_access(state, request)
     snap = _snapshot(state)
@@ -543,6 +562,7 @@ async def upload_attachments(
     request: Request,
     files: List[UploadFile] = File(default_factory=list),
 ):
+    _record_access_event(request, "/api/chat/sessions/{id}/attachments")
     state = await _get_session_or_404(session_id)
     _assert_session_access(state, request)
     target_dir = state.get("agent_session_dir")
@@ -571,10 +591,13 @@ async def upload_attachments(
 
 @router.post("/sessions/{session_id}/messages/stream")
 async def stream_message(session_id: str, payload: ChatStreamRequest, request: Request):
+    _record_access_event(request, "/api/chat/sessions/{id}/messages/stream")
     state = await _get_session_or_404(session_id)
     _assert_session_access(state, request)
     await _consume_online_chat_quota_or_429(request)
     await _set_cancel(session_id, False)
+    state["client_ip"] = _extract_client_ip(request)
+    state["owner_key"] = _session_owner_key_for_request(request)
     if payload.model:
         update_llm_model(payload.model, state)
     lock = await _get_lock(session_id)
@@ -593,10 +616,13 @@ async def stream_message(session_id: str, payload: ChatStreamRequest, request: R
 
 @router.post("/sessions/{session_id}/messages/retry/stream")
 async def stream_retry(session_id: str, request: Request):
+    _record_access_event(request, "/api/chat/sessions/{id}/messages/retry/stream")
     state = await _get_session_or_404(session_id)
     _assert_session_access(state, request)
     await _consume_online_chat_quota_or_429(request)
     await _set_cancel(session_id, False)
+    state["client_ip"] = _extract_client_ip(request)
+    state["owner_key"] = _session_owner_key_for_request(request)
     lock = await _get_lock(session_id)
     last_text = state.get("last_user_text", "")
     last_paths = state.get("last_attachment_paths", [])
@@ -614,11 +640,13 @@ async def stream_retry(session_id: str, request: Request):
 
 @router.get("/quota")
 async def get_chat_quota(request: Request):
+    _record_access_event(request, "/api/chat/quota")
     return await _get_online_chat_quota_status(request)
 
 
 @router.post("/sessions/{session_id}/cancel")
 async def cancel_session_run(session_id: str, request: Request):
+    _record_access_event(request, "/api/chat/sessions/{id}/cancel")
     state = await _get_session_or_404(session_id)
     _assert_session_access(state, request)
     state["status"] = "stopping"

@@ -43,6 +43,7 @@ type AdvancedSequenceDesignPageProps = {
 };
 
 export function AdvancedSequenceDesignPage({ workspaceEnabled }: AdvancedSequenceDesignPageProps) {
+  const [toolsMeta, setToolsMeta] = useState<AdvancedToolsMeta | null>(null);
   const [modelOptionsByFamily, setModelOptionsByFamily] = useState(DEFAULT_MPNN_OPTIONS);
   const [uploadedPath, setUploadedPath] = useState("");
   const [designedChainsText, setDesignedChainsText] = useState("");
@@ -73,6 +74,8 @@ export function AdvancedSequenceDesignPage({ workspaceEnabled }: AdvancedSequenc
   const [resultPayload, setResultPayload] = useState<Record<string, unknown> | null>(null);
   const [progress, setProgress] = useState(0);
   const [progressMessage, setProgressMessage] = useState("Idle");
+  const onlineSequenceDesignLimit =
+    toolsMeta?.online_limit_enabled ? Math.max(1, toolsMeta.online_sequence_design_limit ?? 50) : 512;
 
   useEffect(() => {
     setError("");
@@ -82,6 +85,7 @@ export function AdvancedSequenceDesignPage({ workspaceEnabled }: AdvancedSequenc
     void (async () => {
       try {
         const meta = await fetchAdvancedToolsMeta();
+        setToolsMeta(meta);
         if (meta.proteinmpnn_model_options) {
           setModelOptionsByFamily(meta.proteinmpnn_model_options);
         }
@@ -106,6 +110,12 @@ export function AdvancedSequenceDesignPage({ workspaceEnabled }: AdvancedSequenc
       setModelName(modelOptions[0] || "v_48_020");
     }
   }, [modelFamily, modelOptions, modelName]);
+
+  useEffect(() => {
+    if (numSequences > onlineSequenceDesignLimit) {
+      setNumSequences(onlineSequenceDesignLimit);
+    }
+  }, [numSequences, onlineSequenceDesignLimit]);
 
   function resetToDefaults() {
     setDesignedChainsText("");
@@ -164,6 +174,9 @@ export function AdvancedSequenceDesignPage({ workspaceEnabled }: AdvancedSequenc
     try {
       if (!uploadedPath) throw new Error("Please upload a PDB file first.");
       if (parsedTemperatures.length === 0) throw new Error("Temperatures must include at least one numeric value.");
+      if (numSequences > onlineSequenceDesignLimit) {
+        throw new Error(`Online mode supports up to ${onlineSequenceDesignLimit} designed sequences per run.`);
+      }
 
       const body: AdvancedSequenceDesignRequest = {
         structure_file: uploadedPath,
@@ -255,11 +268,20 @@ export function AdvancedSequenceDesignPage({ workspaceEnabled }: AdvancedSequenc
               <input
                 type="number"
                 min={1}
-                max={512}
+                max={onlineSequenceDesignLimit}
                 value={numSequences}
-                onChange={(e) => setNumSequences(Number(e.target.value))}
+                onChange={(e) =>
+                  setNumSequences(
+                    Math.max(1, Math.min(onlineSequenceDesignLimit, Number(e.target.value) || 1))
+                  )
+                }
               />
             </label>
+            {toolsMeta?.online_limit_enabled && (
+              <p className="advanced-ai-note">
+                Online mode supports up to {onlineSequenceDesignLimit} designed sequences per run.
+              </p>
+            )}
             <label className="left-controls">
               Fixed Residues (optional)
               <textarea

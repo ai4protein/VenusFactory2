@@ -9,6 +9,7 @@ export type QuickToolsMeta = {
   llm_models: string[];
   mode?: "local" | "online";
   online_fasta_limit?: number;
+  online_sequence_design_limit?: number;
   online_limit_enabled?: boolean;
 };
 
@@ -51,6 +52,7 @@ const DEFAULT_META: QuickToolsMeta = {
   llm_models: ["DeepSeek", "ChatGPT", "Gemini"],
   mode: "local",
   online_fasta_limit: 50,
+  online_sequence_design_limit: 50,
   online_limit_enabled: false
 };
 
@@ -368,6 +370,21 @@ export async function runSequenceDesignToolStream(
       use_soluble_model: args.useSolubleModel ?? true,
       ca_only: args.caOnly ?? false,
       temperatures: args.temperatures ?? [0.1]
+    },
+    onProgress
+  });
+}
+
+export async function runProteinDiscoveryToolStream(
+  args: {
+    pdbFile: string;
+  },
+  onProgress?: (evt: QuickToolProgressEvent) => void
+) {
+  return runQuickToolStream({
+    url: "/api/quick-tools/run/protein-discovery/stream",
+    body: {
+      pdb_file: args.pdbFile
     },
     onProgress
   });

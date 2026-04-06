@@ -16,6 +16,7 @@ export type AdvancedToolsMeta = {
   };
   mode?: "local" | "online";
   online_fasta_limit?: number;
+  online_sequence_design_limit?: number;
   online_limit_enabled?: boolean;
 };
 
@@ -129,6 +130,7 @@ const DEFAULT_META: AdvancedToolsMeta = {
   },
   mode: "local",
   online_fasta_limit: 50,
+  online_sequence_design_limit: 50,
   online_limit_enabled: false
 };
 

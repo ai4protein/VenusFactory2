@@ -22,6 +22,80 @@ export type ChatQuota = {
   remaining: number | null;
 };
 
+export type InsightsMeta = {
+  generated_at: string;
+  time_range: { from: string; to: string };
+  filters_applied: Record<string, string | null>;
+};
+
+export type InsightsOverview = InsightsMeta & {
+  data: {
+    total_calls: number;
+    successful_calls: number;
+    failed_calls: number;
+    success_rate: number;
+    active_owners: number;
+    unique_ips: number;
+    input_tokens: number;
+    output_tokens: number;
+    total_tokens: number;
+    estimated_cost_usd: number;
+  };
+};
+
+export type InsightsToolCalls = InsightsMeta & {
+  data: {
+    group_by: string;
+    rows: Array<{
+      bucket: string;
+      tool_name?: string;
+      calls: number;
+      successful_calls: number;
+      failed_calls: number;
+      avg_latency_ms: number;
+      total_tokens: number;
+    }>;
+  };
+};
+
+export type InsightsIpDistribution = InsightsMeta & {
+  data: {
+    level: string;
+    rows: Array<{
+      country_code: string;
+      region: string;
+      pv: number;
+      uv: number;
+    }>;
+  };
+};
+
+export type InsightsTokenUsage = InsightsMeta & {
+  data: {
+    group_by: string;
+    rows: Array<{
+      bucket: string;
+      model: string;
+      tool_name: string;
+      input_tokens: number;
+      output_tokens: number;
+      total_tokens: number;
+      estimated_cost_usd: number;
+    }>;
+  };
+};
+
+export type InsightsMap = InsightsMeta & {
+  data: {
+    rows: Array<{
+      country_code: string;
+      pv: number;
+      uv: number;
+      intensity: number;
+    }>;
+  };
+};
+
 const API_ROOT = "";
 const CHAT_SESSION_TOKEN_MAP_KEY = "vf2_chat_session_token_map";
 
@@ -168,4 +242,59 @@ export async function getChatQuota() {
     throw new Error(`Fetch chat quota failed: ${res.status}`);
   }
   return res.json() as Promise<ChatQuota>;
+}
+
+function withTimeRange(fromIso: string, toIso: string) {
+  const params = new URLSearchParams();
+  params.set("from", fromIso);
+  params.set("to", toIso);
+  return params;
+}
+
+export async function getInsightsOverview(fromIso: string, toIso: string) {
+  const params = withTimeRange(fromIso, toIso);
+  const res = await fetch(`${API_ROOT}/api/settings/insights/overview?${params.toString()}`);
+  if (!res.ok) {
+    throw new Error(`Fetch insights overview failed: ${res.status}`);
+  }
+  return res.json() as Promise<InsightsOverview>;
+}
+
+export async function getInsightsToolCalls(fromIso: string, toIso: string, groupBy: "tool" | "day" | "hour") {
+  const params = withTimeRange(fromIso, toIso);
+  params.set("group_by", groupBy);
+  const res = await fetch(`${API_ROOT}/api/settings/insights/tool-calls?${params.toString()}`);
+  if (!res.ok) {
+    throw new Error(`Fetch tool calls failed: ${res.status}`);
+  }
+  return res.json() as Promise<InsightsToolCalls>;
+}
+
+export async function getInsightsIpDistribution(fromIso: string, toIso: string, level: "country" | "region") {
+  const params = withTimeRange(fromIso, toIso);
+  params.set("level", level);
+  const res = await fetch(`${API_ROOT}/api/settings/insights/ip-distribution?${params.toString()}`);
+  if (!res.ok) {
+    throw new Error(`Fetch IP distribution failed: ${res.status}`);
+  }
+  return res.json() as Promise<InsightsIpDistribution>;
+}
+
+export async function getInsightsTokenUsage(fromIso: string, toIso: string, groupBy: "model" | "tool" | "day") {
+  const params = withTimeRange(fromIso, toIso);
+  params.set("group_by", groupBy);
+  const res = await fetch(`${API_ROOT}/api/settings/insights/token-usage?${params.toString()}`);
+  if (!res.ok) {
+    throw new Error(`Fetch token usage failed: ${res.status}`);
+  }
+  return res.json() as Promise<InsightsTokenUsage>;
+}
+
+export async function getInsightsMap(fromIso: string, toIso: string) {
+  const params = withTimeRange(fromIso, toIso);
+  const res = await fetch(`${API_ROOT}/api/settings/insights/map?${params.toString()}`);
+  if (!res.ok) {
+    throw new Error(`Fetch map data failed: ${res.status}`);
+  }
+  return res.json() as Promise<InsightsMap>;
 }

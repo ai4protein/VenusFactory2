@@ -252,7 +252,7 @@ export function SettingsPage({ readonly = false }: SettingsPageProps) {
     <div className={`settings-page ${readonly ? "readonly-mode" : ""}`}>
       <header className="chat-header">
         <div>
-          <h2>Settings</h2>
+          <h2>Env Settings</h2>
           <p>View and edit runtime environment variables in a form-based editor.</p>
         </div>
       </header>
