@@ -1,6 +1,11 @@
 import json
 import os
-import sqlite3
+try:
+    import sqlite3
+    _SQLITE_IMPORT_ERROR = None
+except Exception as exc:
+    sqlite3 = None  # type: ignore[assignment]
+    _SQLITE_IMPORT_ERROR = exc
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -117,8 +122,18 @@ class AnalyticsStore:
         self._db_path = Path(db_path).expanduser()
         self._lock = Lock()
         self._initialized = False
+        self._disabled_warning_printed = False
         self._geo = OfflineGeoIpResolver(os.getenv("WEBUI_V2_GEOIP_MMDB_PATH", ""))
         self._price_table = self._load_price_table()
+
+    def _enabled(self) -> bool:
+        return sqlite3 is not None
+
+    def _warn_disabled(self) -> None:
+        if self._disabled_warning_printed:
+            return
+        self._disabled_warning_printed = True
+        print(f"[analytics] disabled: sqlite3 is unavailable ({_SQLITE_IMPORT_ERROR})")
 
     def _load_price_table(self) -> Dict[str, Dict[str, float]]:
         raw = os.getenv("WEBUI_V2_TOKEN_PRICE_JSON", "").strip()
@@ -142,6 +157,8 @@ class AnalyticsStore:
 
     @contextmanager
     def _conn(self):
+        if sqlite3 is None:
+            raise RuntimeError(f"sqlite3 is unavailable: {_SQLITE_IMPORT_ERROR}")
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(str(self._db_path))
         conn.row_factory = sqlite3.Row
@@ -154,6 +171,10 @@ class AnalyticsStore:
     def ensure_initialized(self) -> None:
         with self._lock:
             if self._initialized:
+                return
+            if not self._enabled():
+                self._warn_disabled()
+                self._initialized = True
                 return
             with self._conn() as conn:
                 conn.execute(
@@ -253,6 +274,8 @@ class AnalyticsStore:
 
     def record_access_event(self, *, ts: str, endpoint: str, owner_key: str, ip: str, user_agent: str) -> None:
         self.ensure_initialized()
+        if not self._enabled():
+            return
         stamp = ts or _utc_now_iso()
         geo = self.resolve_geo(ip)
         date = stamp[:10]
@@ -307,6 +330,8 @@ class AnalyticsStore:
         ip: str,
     ) -> None:
         self.ensure_initialized()
+        if not self._enabled():
+            return
         stamp = ts or _utc_now_iso()
         geo = self.resolve_geo(ip)
         date = stamp[:10]
@@ -358,11 +383,26 @@ class AnalyticsStore:
 
     def _fetch_rows(self, sql: str, params: Iterable[Any]) -> List[Dict[str, Any]]:
         self.ensure_initialized()
+        if not self._enabled():
+            return []
         with self._conn() as conn:
             rows = conn.execute(sql, tuple(params)).fetchall()
         return [dict(row) for row in rows]
 
     def query_overview(self, from_iso: str, to_iso: str) -> Dict[str, Any]:
+        if not self._enabled():
+            return {
+                "total_calls": 0,
+                "successful_calls": 0,
+                "failed_calls": 0,
+                "success_rate": 0.0,
+                "active_owners": 0,
+                "unique_ips": 0,
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "total_tokens": 0,
+                "estimated_cost_usd": 0.0,
+            }
         rows = self._fetch_rows(
             """
             SELECT
