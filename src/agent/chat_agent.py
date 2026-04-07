@@ -811,6 +811,7 @@ def initialize_session_state() -> Dict[str, Any]:
         'pi_chat': pi_chat_chain,
         'llm': llm,
         'memory': _ChatBufferWindowMemory(k=10),
+        'dialogue_memory': [],
         'history': [],
         'conversation_log': [],   # LangChain-managed: every user/assistant message for backend display
         'tool_executions': [],    # Every tool call (including PI literature_search) for backend display

@@ -8,6 +8,7 @@ If the user's question is **simple**, output **only** `[]` (empty array). No sea
 - **Greetings or small talk** (e.g. "Hi", "Hello", "Thanks").
 - **Clarification or meta-questions** (e.g. "What can you do?", "Explain yourself").
 - **Single-concept factual question** that does not require literature or multi-step research (e.g. "What is SOD1?", "What is AlphaFold?").
+- **Questions unrelated to biology, protein engineering, or bioinformatics** (e.g. math, coding, writing, general knowledge, travel, daily-life questions). Output `[]` so the chat responder can answer directly instead of forcing a biology research workflow.
 - **User explicitly says** they do not need research, search, or a report.
 
 For any question that **does** require literature, data, or a structured report (e.g. "analyze P04040 and suggest mutations", "search for stability-related papers"), output one or more sections as below.
@@ -30,6 +31,11 @@ Output **only** a JSON array. No other text. Each element has:
 
 Current Protein Context Summary:
 {protein_context_summary}
+
+---
+
+Recent conversation history:
+{conversation_history}
 
 ---
 

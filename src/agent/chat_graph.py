@@ -58,6 +58,7 @@ class AgentState(TypedDict):
     # UI compatibility (for yielding partial updates)
     history: List[Dict[str, Any]]
     conversation_log: List[Dict[str, Any]]
+    dialogue_memory: List[Dict[str, Any]]
     tool_executions: List[Dict[str, Any]]
     tool_cache: Dict[str, Any]
     
@@ -198,6 +199,64 @@ def _parse_sections(raw: str) -> List[Dict[str, Any]]:
         return []
 
 
+def _get_chat_history_messages(chains: Dict[str, Any], history: List[Dict[str, Any]], current_input: str = "") -> List[BaseMessage]:
+    """Return dialogue context for prompts: previous user turns plus final model reports only."""
+    dialogue_memory = chains.get("dialogue_memory") if isinstance(chains, dict) else None
+    if isinstance(dialogue_memory, list) and dialogue_memory:
+        out: List[BaseMessage] = []
+        current = (current_input or "").strip()
+        for item in dialogue_memory[-10:]:
+            if not isinstance(item, dict):
+                continue
+            user = str(item.get("user") or item.get("input") or "").strip()
+            assistant = str(item.get("assistant") or item.get("output") or "").strip()
+            if user and not (current and user == current):
+                out.append(HumanMessage(content=user))
+            if assistant:
+                out.append(AIMessage(content=assistant))
+        if out:
+            return out
+
+    memory = chains.get("memory") if isinstance(chains, dict) else None
+    try:
+        messages = list(memory.chat_memory.messages) if memory is not None else []
+    except Exception:
+        messages = []
+    if messages:
+        return messages
+
+    current = (current_input or "").strip()
+    out: List[BaseMessage] = []
+    for item in list(history or [])[-20:]:
+        role = str(item.get("role") or "").strip().lower()
+        content = str(item.get("content") or "").strip()
+        if not content:
+            continue
+        if role == "user" and current and content == current:
+            continue
+        if role == "user":
+            out.append(HumanMessage(content=content))
+    return out
+
+
+def _format_conversation_history(chains: Dict[str, Any], history: List[Dict[str, Any]], current_input: str = "", limit: int = 10) -> str:
+    rows = []
+    for msg in _get_chat_history_messages(chains, history, current_input)[-limit:]:
+        content = str(getattr(msg, "content", "") or "").strip()
+        if not content:
+            continue
+        role = str(getattr(msg, "type", "") or getattr(msg, "role", "") or "").strip().lower()
+        if not role:
+            name = type(msg).__name__.lower()
+            role = "user" if "human" in name else "assistant" if "ai" in name else "message"
+        if role == "human":
+            role = "user"
+        elif role == "ai":
+            role = "assistant"
+        rows.append(f"{role}: {content}")
+    return "\n".join(rows) if rows else "No previous conversation."
+
+
 def _normalize_tool_input(raw_input: Any) -> Dict[str, Any]:
     if isinstance(raw_input, dict):
         return dict(raw_input)
@@ -216,6 +275,30 @@ def _normalize_tool_input(raw_input: Any) -> Dict[str, Any]:
     if isinstance(raw_input, (list, tuple)):
         return {"items": list(raw_input)}
     return {"input": raw_input}
+
+
+def _normalize_step_number(raw_step: Any, fallback: int) -> int:
+    try:
+        if isinstance(raw_step, str):
+            match = re.search(r"\d+", raw_step)
+            if match:
+                return int(match.group(0))
+        if raw_step is not None:
+            return int(raw_step)
+    except Exception:
+        pass
+    return fallback
+
+
+def _get_step_raw_output(step_results: Optional[Dict[Any, Any]], step_no: Any) -> Any:
+    if not isinstance(step_results, dict):
+        return None
+    normalized = _normalize_step_number(step_no, -1)
+    for key in (normalized, str(normalized), f"step_{normalized}", f"step{normalized}"):
+        item = step_results.get(key)
+        if isinstance(item, dict) and "raw_output" in item:
+            return item.get("raw_output")
+    return None
 
 
 def _get_tool_allowed_param_names(tool: Any) -> Optional[set]:
@@ -372,7 +455,7 @@ def _sanitize_tool_invoke_input(
                 dep_step = int(dep_token)
             except ValueError:
                 return None
-            dep_raw = (step_results or {}).get(dep_step, {}).get("raw_output") if isinstance(step_results, dict) else None
+            dep_raw = _get_step_raw_output(step_results, dep_step)
             if dep_raw is None:
                 return None
 
@@ -435,8 +518,8 @@ def _sanitize_tool_invoke_input(
             if key_l == "files" and isinstance(value, list):
                 candidate_paths.extend([v for v in value if isinstance(v, str)])
         if isinstance(step_results, dict) and step_results:
-            for step_no in sorted(step_results.keys(), reverse=True):
-                raw_output = step_results.get(step_no, {}).get("raw_output")
+            for step_no in sorted(step_results.keys(), key=lambda x: _normalize_step_number(x, 0), reverse=True):
+                raw_output = _get_step_raw_output(step_results, step_no)
                 if raw_output is None:
                     continue
                 extracted = _get_output_file_path_from_raw(raw_output, "dependency_step")
@@ -695,20 +778,26 @@ async def research_plan_node(state: AgentState, config: RunnableConfig):
     ui_lang = _detect_ui_lang(text)
     protein_context_summary = protein_ctx.get_context_summary()
     history = list(state.get("history", []))
+    conversation_history = _format_conversation_history(chains, history, text)
 
     try:
         sections_out = await asyncio.to_thread(
             chains["pi_sections"].invoke,
-            {"input": text, "protein_context_summary": protein_context_summary},
+            {
+                "input": text,
+                "protein_context_summary": protein_context_summary,
+                "conversation_history": conversation_history,
+            },
         )
         sections_list = _parse_sections(sections_out)
     except Exception as e:
         print(f"[PI sections] failed: {e}")
         sections_list = []
 
-    # No research sections needed - skip directly to planning (CB will decide if tools are needed)
+    # PI_SECTIONS_PROMPT is the routing authority here: [] means answer directly in chat mode,
+    # without handing the turn to CB/MLS.
     if not sections_list:
-        return {"status": "research_skipped", "pi_report": "", "pi_suggest_steps": "", "ui_lang": ui_lang}
+        return {"status": "chat_mode", "pi_report": "", "pi_suggest_steps": "", "ui_lang": ui_lang}
 
     # This is a research request - show the analyzing message
     history.append({
@@ -751,10 +840,11 @@ async def chat_node(state: AgentState, config: RunnableConfig):
     history = list(state.get("history", []))
 
     try:
+        chat_history = _get_chat_history_messages(chains, history, text)
         # Use pi_chat chain for direct chat response (greetings, simple questions)
         response = await asyncio.to_thread(
             chains["pi_chat"].invoke,
-            {"input": text, "chat_history": []},
+            {"input": text, "chat_history": chat_history},
         )
         # Remove the "Thinking..." placeholder before adding the actual response
         if history and ("Thinking" in history[-1].get("content", "") or "思考中" in history[-1].get("content", "")):
@@ -1035,7 +1125,7 @@ async def plan_node(state: AgentState, config: RunnableConfig):
         tname = p.get("tool_name") or p.get("tool") or ""
         if not tname or tname in PI_SEARCH_TOOL_NAMES: continue
         normalized_plan.append({
-            "step": p.get("step") or (i + 1),
+            "step": _normalize_step_number(p.get("step"), i + 1),
             "task_description": p.get("task_description") or p.get("task") or "",
             "tool_name": tname.strip(),
             "tool_input": _normalize_tool_input(p.get("tool_input") or p.get("input"))
@@ -1079,7 +1169,7 @@ async def execute_start_node(state: AgentState, config: RunnableConfig):
     if idx >= len(plan):
         return {}
     step = plan[idx]
-    step_num = step.get("step", idx + 1)
+    step_num = _normalize_step_number(step.get("step"), idx + 1)
     task_desc = step.get("task_description", "…")
     history.append({
         "role": "assistant",
@@ -1102,7 +1192,7 @@ async def execute_node(state: AgentState, config: RunnableConfig):
     step_results = dict(state.get("step_results", {}))
     ui_lang = state.get("ui_lang") or _detect_ui_lang(state["messages"][-1].content)
 
-    step_num = step["step"]
+    step_num = _normalize_step_number(step.get("step"), idx + 1)
     task_desc = step["task_description"]
     tool_name = step["tool_name"]
     tool_input = step["tool_input"]
@@ -1110,22 +1200,41 @@ async def execute_node(state: AgentState, config: RunnableConfig):
 
     # Resolve dependencies
     merged_tool_input = _merge_tool_parameters_with_context(protein_ctx, tool_input)
+    dependency_resolution_failed = False
+    dependency_failure_reason = ""
     for key, value in list(merged_tool_input.items()):
         if isinstance(value, str) and value.startswith("dependency:"):
             parts = value.split(":")
             if len(parts) < 2:
-                print(f"[Dependency resolve] invalid token for key={key}: {value}")
+                dependency_failure_reason = f"Invalid dependency token for `{key}`: {value}"
+                print(f"[Dependency resolve] {dependency_failure_reason}")
+                dependency_resolution_failed = True
                 continue
             dep_token = parts[1].replace("step_", "").replace("step", "").strip()
             try:
                 dep_step = int(dep_token)
             except ValueError:
-                print(f"[Dependency resolve] invalid step token for key={key}: {value}")
+                dependency_failure_reason = f"Invalid dependency step token for `{key}`: {value}"
+                print(f"[Dependency resolve] {dependency_failure_reason}")
+                dependency_resolution_failed = True
                 continue
 
-            dep_out = step_results.get(dep_step, {}).get("raw_output")
+            dep_out = _get_step_raw_output(step_results, dep_step)
             if dep_out is None:
-                print(f"[Dependency resolve] missing output for dependency step {dep_step} (key={key})")
+                dependency_failure_reason = f"Missing output for dependency step {dep_step} (key={key})"
+                print(f"[Dependency resolve] {dependency_failure_reason}")
+                dependency_resolution_failed = True
+                continue
+
+            dep_failed, dep_reason = _tool_output_indicates_failure(dep_out)
+            if dep_failed:
+                dependency_failure_reason = (
+                    f"Dependency step {dep_step} failed"
+                    + (f": {dep_reason}" if dep_reason else "")
+                    + f" (needed for `{key}`)"
+                )
+                print(f"[Dependency resolve] {dependency_failure_reason}")
+                dependency_resolution_failed = True
                 continue
 
             parsed: Any = dep_out
@@ -1180,14 +1289,26 @@ async def execute_node(state: AgentState, config: RunnableConfig):
     cached_flag = False  # Default value
     failure_reason = ""
 
+    if dependency_resolution_failed:
+        failure_reason = dependency_failure_reason or "Dependency resolution failed."
+        last_output = json.dumps(
+            {
+                "status": "error",
+                "error": {"type": "DependencyResolutionError", "message": failure_reason},
+                "file_info": None,
+            },
+            ensure_ascii=False,
+        )
+        step_done = True
+
     # Hard precondition: code tools require at least one successful read_skill step beforehand.
     if tool_name in {"python_repl", "agent_generated_code"}:
         has_successful_skill = False
         for prev in plan[:idx]:
             if str(prev.get("tool_name") or "").strip() != "read_skill":
                 continue
-            prev_step = prev.get("step")
-            prev_raw = step_results.get(prev_step, {}).get("raw_output")
+            prev_step = _normalize_step_number(prev.get("step"), 0)
+            prev_raw = _get_step_raw_output(step_results, prev_step)
             if prev_raw is None:
                 continue
             prev_failed, _prev_reason = _tool_output_indicates_failure(prev_raw)
@@ -1338,8 +1459,8 @@ async def execute_node(state: AgentState, config: RunnableConfig):
                 )
             except Exception:
                 pass
-            for dep_step in sorted(step_results.keys(), reverse=True):
-                dep_raw = step_results.get(dep_step, {}).get("raw_output")
+            for dep_step in sorted(step_results.keys(), key=lambda x: _normalize_step_number(x, 0), reverse=True):
+                dep_raw = _get_step_raw_output(step_results, dep_step)
                 if dep_raw is None:
                     continue
                 dep_path = _get_output_file_path_from_raw(dep_raw, "dependency_step")
@@ -1739,9 +1860,9 @@ def create_agent_graph():
     workflow.add_edge("research_plan_start_node", "research_plan_node")
     workflow.add_conditional_edges(
         "research_plan_node",
-        lambda s: "plan_start_node" if s.get("status") in ("research_skipped", "chat_mode") else "research_search_start_node",
+        lambda s: "chat_start_node" if s.get("status") == "chat_mode" else ("plan_start_node" if s.get("status") == "research_skipped" else "research_search_start_node"),
     )
-    # Chat mode nodes (for true greetings - currently not used, research_skipped goes to planning)
+    # Chat mode nodes for direct answers when PI sections returns [].
     workflow.add_edge("chat_start_node", "chat_node")
     workflow.add_edge("chat_node", END)
     workflow.add_edge("research_search_start_node", "research_search_node")

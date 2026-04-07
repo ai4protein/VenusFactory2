@@ -168,7 +168,9 @@ async function extractErrorDetail(res: Response): Promise<string> {
 }
 
 export async function createChatSession() {
-  const res = await fetch(`${API_ROOT}/api/chat/sessions`, { method: "POST" });
+  const res = await fetch(`${API_ROOT}/api/chat/sessions`, {
+    method: "POST"
+  });
   if (!res.ok) {
     const detail = await extractErrorDetail(res);
     throw new Error(parseErrorStatus(res.status, detail));
@@ -204,6 +206,18 @@ export async function getChatSession(sessionId: string) {
     throw new Error(parseErrorStatus(res.status, detail));
   }
   return res.json() as Promise<ChatSnapshot>;
+}
+
+export async function deleteChatSession(sessionId: string) {
+  const res = await fetch(`${API_ROOT}/api/chat/sessions/${encodeURIComponent(sessionId)}`, {
+    method: "DELETE",
+    headers: getChatSessionAuthHeaders(sessionId)
+  });
+  if (!res.ok) {
+    const detail = await extractErrorDetail(res);
+    throw new Error(parseErrorStatus(res.status, detail));
+  }
+  return res.json() as Promise<{ success: boolean; session_id: string }>;
 }
 
 export async function uploadFiles(sessionId: string, files: File[]) {

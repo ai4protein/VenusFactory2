@@ -16,6 +16,43 @@ from web.utils.common_utils import (
 _PROJECT_ROOT = str(get_project_root().resolve())
 
 
+def _find_existing_file_by_name(file_name: str) -> Optional[str]:
+    """Find a generated artifact by basename under controlled output roots."""
+    if not file_name or not isinstance(file_name, str):
+        return None
+    raw = file_name.strip()
+    if not raw or os.path.basename(raw) != raw:
+        return None
+    roots = []
+    try:
+        roots.append(str(get_temp_outputs_base_dir().resolve()))
+    except Exception:
+        pass
+    try:
+        roots.append(str(get_web_v2_root_dir().resolve()))
+    except Exception:
+        pass
+    roots.append(os.path.join(_PROJECT_ROOT, "temp_outputs"))
+
+    matches = []
+    seen = set()
+    for root in roots:
+        if not root or root in seen or not os.path.isdir(root):
+            continue
+        seen.add(root)
+        for dirpath, _, filenames in os.walk(root):
+            if raw in filenames:
+                candidate = os.path.abspath(os.path.join(dirpath, raw))
+                try:
+                    matches.append((os.path.getmtime(candidate), candidate))
+                except OSError:
+                    matches.append((0.0, candidate))
+    if not matches:
+        return None
+    matches.sort(reverse=True)
+    return matches[0][1]
+
+
 def _resolve_existing_path(path: str) -> Optional[str]:
     if not path or not isinstance(path, str):
         return None
@@ -43,6 +80,10 @@ def _resolve_existing_path(path: str) -> Optional[str]:
             return os.path.abspath(candidate)
     except Exception:
         pass
+
+    found = _find_existing_file_by_name(raw)
+    if found:
+        return found
     return None
 
 def _is_online_mode() -> bool:
@@ -175,7 +216,9 @@ def _extract_download_file_from_output(tool_name: str, output_data: dict) -> Opt
         or output_data.get("model_path")
     )
     if not path and isinstance(output_data.get("file_info"), dict):
-        path = output_data["file_info"].get("file_path")
+        path = output_data["file_info"].get("file_path") or output_data["file_info"].get("file_name")
+    if not path:
+        path = output_data.get("file_name")
     if path and isinstance(path, str):
         resolved = _resolve_existing_path(path)
         if resolved:
@@ -194,7 +237,9 @@ def _get_output_file_path_from_raw(raw_output: Any, tool_name: str) -> Optional[
             or data.get("model_path")
         )
         if not path and isinstance(data.get("file_info"), dict):
-            path = data["file_info"].get("file_path")
+            path = data["file_info"].get("file_path") or data["file_info"].get("file_name")
+        if not path:
+            path = data.get("file_name")
         if path and isinstance(path, str):
             resolved = _resolve_existing_path(path)
             if resolved:
@@ -540,7 +585,7 @@ async def _cb_post_step_check(
     try:
         # Deterministic guard for finetuned function prediction outputs.
         # Avoids LLM false negatives when CSV already contains a valid prediction value.
-        if tool_name == "predict_protein_function" and output_file_path and os.path.isfile(output_file_path):
+        if tool_name in {"predict_protein_function", "predict_residue_function"} and output_file_path and os.path.isfile(output_file_path):
             try:
                 parsed = json.loads(str(raw_output)) if isinstance(raw_output, str) else raw_output
                 status_ok = isinstance(parsed, dict) and (
@@ -550,10 +595,11 @@ async def _cb_post_step_check(
                     with open(output_file_path, "r", encoding="utf-8", errors="replace", newline="") as f:
                         reader = csv.DictReader(f)
                         fieldnames = [str(x).strip().lower() for x in (reader.fieldnames or [])]
-                        if "prediction" in fieldnames:
+                        prediction_columns = [c for c in ("prediction", "predicted_class", "probabilities") if c in fieldnames]
+                        if prediction_columns:
                             for row in reader:
-                                v = str(row.get("prediction", "")).strip()
-                                if v and v.lower() not in {"nan", "none", "null"}:
+                                values = [str(row.get(c, "")).strip() for c in prediction_columns]
+                                if any(v and v.lower() not in {"nan", "none", "null", "[]", "{}"} for v in values):
                                     return (True, "")
             except Exception:
                 pass

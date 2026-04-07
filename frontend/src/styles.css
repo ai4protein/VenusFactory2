@@ -3015,6 +3015,61 @@ input[type="file"]::file-selector-button:hover {
   cursor: pointer;
 }
 
+.session-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.session-panel-head h3 {
+  margin: 0;
+}
+
+.session-panel-head button {
+  min-height: 32px;
+  padding: 6px 10px;
+}
+
+.session-item {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.58);
+  padding: 4px;
+}
+
+.session-select-btn {
+  min-width: 0;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+  padding: 6px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.session-select-btn:hover {
+  transform: none;
+  box-shadow: none;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.session-select-btn span,
+.session-select-btn small {
+  overflow-wrap: anywhere;
+}
+
+.session-select-btn small {
+  color: var(--muted);
+}
+
 .workspace-upload-btn input {
   display: none;
 }

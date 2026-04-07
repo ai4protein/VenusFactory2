@@ -37,8 +37,8 @@ _SESSIONS: Dict[str, Dict[str, Any]] = {}
 _SESSION_LOCKS: Dict[str, asyncio.Lock] = {}
 _SESSION_CANCEL_FLAGS: Dict[str, bool] = {}
 _SESSIONS_GUARD = asyncio.Lock()
-_IP_DAILY_CHAT_USAGE: Dict[str, Dict[str, Any]] = {}
-_IP_USAGE_GUARD = asyncio.Lock()
+_OWNER_DAILY_CHAT_USAGE: Dict[str, Dict[str, Any]] = {}
+_OWNER_USAGE_GUARD = asyncio.Lock()
 
 
 def _parse_daily_chat_limit() -> int:
@@ -176,6 +176,23 @@ def _snapshot(state: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _append_dialogue_memory(state: Dict[str, Any], user_input: str, final_output: str) -> None:
+    user = (user_input or "").strip()
+    assistant = (final_output or "").strip()
+    if not user or not assistant:
+        return
+    memory = state.setdefault("dialogue_memory", [])
+    memory.append(
+        {
+            "user": user,
+            "assistant": assistant,
+            "timestamp": datetime.now().isoformat(),
+        }
+    )
+    if len(memory) > 10:
+        del memory[:-10]
+
+
 async def _get_session_or_404(session_id: str) -> Dict[str, Any]:
     async with _SESSIONS_GUARD:
         state = _SESSIONS.get(session_id)
@@ -255,11 +272,11 @@ async def _consume_online_chat_quota_or_429(request: Request) -> None:
 
     owner_key = _session_owner_key_for_request(request)
     today = datetime.now().strftime("%Y-%m-%d")
-    async with _IP_USAGE_GUARD:
-        usage = _IP_DAILY_CHAT_USAGE.get(owner_key)
+    async with _OWNER_USAGE_GUARD:
+        usage = _OWNER_DAILY_CHAT_USAGE.get(owner_key)
         if not usage or usage.get("date") != today:
             usage = {"date": today, "count": 0}
-            _IP_DAILY_CHAT_USAGE[owner_key] = usage
+            _OWNER_DAILY_CHAT_USAGE[owner_key] = usage
 
         if int(usage.get("count", 0)) >= _ONLINE_DAILY_CHAT_LIMIT:
             raise HTTPException(
@@ -285,11 +302,11 @@ async def _get_online_chat_quota_status(request: Request) -> Dict[str, Any]:
 
     owner_key = _session_owner_key_for_request(request)
     today = datetime.now().strftime("%Y-%m-%d")
-    async with _IP_USAGE_GUARD:
-        usage = _IP_DAILY_CHAT_USAGE.get(owner_key)
+    async with _OWNER_USAGE_GUARD:
+        usage = _OWNER_DAILY_CHAT_USAGE.get(owner_key)
         if not usage or usage.get("date") != today:
             usage = {"date": today, "count": 0}
-            _IP_DAILY_CHAT_USAGE[owner_key] = usage
+            _OWNER_DAILY_CHAT_USAGE[owner_key] = usage
         used = int(usage.get("count", 0))
     return {
         "mode": mode,
@@ -431,6 +448,7 @@ async def _stream_graph(
         "agent_session_dir": agent_session_dir,
         "history": list(state["history"]),
         "conversation_log": list(state.get("conversation_log", [])),
+        "dialogue_memory": list(state.get("dialogue_memory", [])),
         "tool_executions": list(state.get("tool_executions", [])),
         "tool_cache": dict(state.get("tool_cache", {})),
         "status": "started",
@@ -498,6 +516,11 @@ async def _stream_graph(
         yield f"event: state\ndata: {_to_json(_snapshot(state))}\n\n"
 
     final_content = state["history"][-1]["content"] if state.get("history") else ""
+    _append_dialogue_memory(state, display_text, final_content)
+    if final_content:
+        state.setdefault("conversation_log", []).append(
+            {"role": "assistant", "content": final_content, "timestamp": datetime.now().isoformat()}
+        )
     try:
         state["memory"].save_context({"input": display_text}, {"output": final_content})
     except Exception:
@@ -554,6 +577,34 @@ async def get_session(session_id: str, request: Request):
     _assert_session_access(state, request)
     snap = _snapshot(state)
     return SessionStateResponse(**snap)
+
+
+@router.delete("/sessions/{session_id}")
+async def delete_session(session_id: str, request: Request):
+    _record_access_event(request, "/api/chat/sessions/{id}:delete")
+    state = await _get_session_or_404(session_id)
+    _assert_session_access(state, request)
+    lock = await _get_lock(session_id)
+    if lock.locked():
+        raise HTTPException(status_code=409, detail="Session is currently running.")
+
+    async with lock:
+        async with _SESSIONS_GUARD:
+            current = _SESSIONS.get(session_id)
+            if current is None:
+                raise HTTPException(status_code=404, detail=f"Session not found: {session_id}")
+            _assert_session_access(current, request)
+            _SESSIONS.pop(session_id, None)
+            _SESSION_LOCKS.pop(session_id, None)
+            _SESSION_CANCEL_FLAGS.pop(session_id, None)
+
+        session_dir = state.get("agent_session_dir")
+        if session_dir:
+            try:
+                shutil.rmtree(session_dir, ignore_errors=True)
+            except Exception:
+                pass
+    return {"success": True, "session_id": session_id}
 
 
 @router.post("/sessions/{session_id}/attachments")

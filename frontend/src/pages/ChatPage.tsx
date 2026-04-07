@@ -3,6 +3,7 @@ import { ChatTimeline } from "../components/ChatTimeline";
 import {
   cancelChatSession,
   createChatSession,
+  deleteChatSession,
   getChatQuota,
   getChatSession,
   getChatSessionAuthHeaders,
@@ -113,14 +114,37 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   }
 
   async function createAndActivateSession() {
+    if (running) return;
     setError("");
     const created = await createChatSession();
     setSessionId(created.session_id);
-    localStorage.setItem(SESSION_STORAGE_KEY, created.session_id);
+    sessionStorage.setItem(SESSION_STORAGE_KEY, created.session_id);
     setSelectedModel(modelLabelFromInternal(created.model_name));
     const s = await getChatSession(created.session_id);
     setSnapshot(s);
     await fetchSessions();
+  }
+
+  async function deleteAndSelectNextSession(targetId: string) {
+    if (running && targetId === sessionId) return;
+    setError("");
+    try {
+      await deleteChatSession(targetId);
+      if (targetId === sessionId) {
+        sessionStorage.removeItem(SESSION_STORAGE_KEY);
+        setSessionId("");
+        setSnapshot(null);
+      }
+      const list = await fetchSessions();
+      if (targetId !== sessionId) return;
+
+      const next = list.find((item) => item.session_id !== targetId);
+      if (next) {
+        await refreshCurrentSession(next.session_id);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete session.");
+    }
   }
 
   async function bootstrapSession() {
@@ -150,7 +174,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       return;
     }
 
-    const remembered = localStorage.getItem(SESSION_STORAGE_KEY);
+    const remembered = sessionStorage.getItem(SESSION_STORAGE_KEY);
     const target =
       (remembered && list.find((item) => item.session_id === remembered)?.session_id) ||
       list[0].session_id;
@@ -170,10 +194,11 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     const s = await getChatSession(sid);
     setSnapshot(s);
     setSessionId(sid);
-    localStorage.setItem(SESSION_STORAGE_KEY, sid);
+    sessionStorage.setItem(SESSION_STORAGE_KEY, sid);
   }
 
   async function sendMessage() {
+    const composedText = message;
     if (running) return;
     if (!message.trim() && files.length === 0 && workspaceFiles.length === 0) return;
     if (chatQuota?.enforced && (chatQuota.remaining ?? 0) <= 0) {
@@ -184,6 +209,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     setError("");
     setRunning(true);
     setRunStatus("running");
+    setMessage("");
     abortRef.current = new AbortController();
 
     try {
@@ -192,7 +218,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         const created = await createChatSession();
         activeSessionId = created.session_id;
         setSessionId(activeSessionId);
-        localStorage.setItem(SESSION_STORAGE_KEY, activeSessionId);
+        sessionStorage.setItem(SESSION_STORAGE_KEY, activeSessionId);
         setSelectedModel(modelLabelFromInternal(created.model_name));
       }
 
@@ -208,7 +234,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       await streamSSEFromPost(
         `/api/chat/sessions/${encodeURIComponent(activeSessionId)}/messages/stream`,
         {
-          text: message,
+          text: composedText,
           model: selectedModel,
           attachment_paths: attachmentPaths
         },
@@ -228,6 +254,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         setRunStatus("stopped");
         return;
       }
+      setMessage(composedText);
       setError(err instanceof Error ? err.message : "Failed to stream message.");
       await refreshChatQuota();
       setRunStatus("stopped");
@@ -366,26 +393,34 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
           </div>
           <button onClick={() => void createAndActivateSession()}>New Session</button>
           <button onClick={() => void fetchSessions()}>Refresh Sessions</button>
+          <button onClick={() => void deleteAndSelectNextSession(sessionId)} disabled={!sessionId || running}>
+            Delete Session
+          </button>
         </div>
       </header>
 
       <section className="chat-grid">
         <aside className="chat-panel left">
-          <h3>Sessions</h3>
+          <div className="session-panel-head">
+            <h3>Sessions</h3>
+          </div>
           <div className="session-list">
             {sessions.map((s) => (
-              <button
+              <div
                 key={s.session_id}
                 className={s.session_id === sessionId ? "session-item active" : "session-item"}
-                onClick={() => {
-                  void refreshCurrentSession(s.session_id);
-                  void copySessionId(s.session_id);
-                }}
-                title={s.session_id}
               >
-                <span>{s.session_id.slice(0, 8)}</span>
-                <small>{new Date(s.created_at).toLocaleString()}</small>
-              </button>
+                <button
+                  className="session-select-btn"
+                  onClick={() => void refreshCurrentSession(s.session_id)}
+                  disabled={running && s.session_id === sessionId}
+                  title={s.session_id}
+                >
+                  <span>{s.session_id.slice(0, 8)}</span>
+                  <small>{new Date(s.created_at).toLocaleString()}</small>
+                  <small>{s.status || "idle"} - {s.history_size} messages</small>
+                </button>
+              </div>
             ))}
             {sessions.length === 0 && <div className="session-empty">No sessions yet.</div>}
           </div>
