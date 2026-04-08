@@ -43,7 +43,15 @@
 * **描述:** 专注于识别单个氨基酸残基的功能角色，例如**活性位点**或**结合位点**。
 * **应用场景:** 通过选择最优 PLM，用户可以**准确标记功能位点**并获得**残基级别预测概率**，有助于建立精确的结构-功能图谱。
 
+### 1.4 蛋白质酶挖掘
+该模块基于用户提供的蛋白质结构或序列信息，在大规模蛋白质数据库中进行功能相似酶的系统性挖掘与筛选，用于发现潜在同源或类功能酶分子。
+
+**核心优势：** 用户可以自己设置 **实验参数**，一键进行蛋白质酶挖掘。
+
+* **描述：** VenusMine通过结合结构比对、序列相似性搜索与功能特征匹配，实现多层级的酶筛选。
+* **应用场景：** 酶功能发现，从未知结构中挖掘潜在功能相似酶；酶工程设计，为蛋白质定向进化提供候选模版；
 ---
+
 
 ## 2. Advanced Tools 配置与结果
 
@@ -136,11 +144,11 @@
 
 ---
 
-## 6. Sequence Design
+## 4. Sequence Design
 
 该模块在 Advanced Tools 中明确提供 **ProteinMPNN**，并开放完整推理参数，支持结构条件序列设计。
 
-### 6.1 输入与核心配置
+### 4.1 输入与核心配置
 
 * **结构输入：** 上传 `.pdb` 文件（或使用示例 PDB）。
 * **Model Family 选择：** `Soluble` / `Vanilla` / `CA`（手动选择 + 推荐引导）。
@@ -152,7 +160,7 @@
 * **Homomer 模式：** 为同源多聚体启用 tied-position 约束。
 * **Number of Sequences / Temperatures：** 设置生成数量与采样多样性。
 
-### 6.2 ProteinMPNN 全参数控制
+### 4.2 ProteinMPNN 全参数控制
 
 Advanced Sequence Design 页面提供完整参数入口，包含：
 
@@ -165,25 +173,25 @@ Advanced Sequence Design 页面提供完整参数入口，包含：
 * **常规首选：** `v_48_020`（自动使用 0.20A 噪音策略）
 * **仅高分辨率天然结构：** `v_48_002`（自动使用 0.02A 噪音策略）
 
-### 6.3 结果输出
+### 4.3 结果输出
 
 * **Summary：** 运行状态与完成信息。
 * **Table：** FASTA 预览（header、sequence、length，以及可用时的 score 字段）。
 * **Raw：** 完整 JSON 结果，便于自动化处理。
 * **Download Result：** 下载 ProteinMPNN 生成的 FASTA 文件。
 
-### 6.4 使用建议
+### 4.4 使用建议
 
 当你需要对 ProteinMPNN 推理行为进行精细控制（例如方法学对比、参数扫描、可复现实验流程）时，请使用该模块。  
 如果你更希望快速得到默认配置结果，请使用 **Quick Tools / Sequence Design**。
 
 ---
 
-## 4. Advanced Tools - 蛋白质功能预测
+## 5. Advanced Tools - 蛋白质功能预测
 
 该模块允许用户**自由选择底层 PLM 模型**并同时选择**多个已微调数据集**，以执行多维度预测，获取更可靠的结果。
 
-### 4.1 任务配置与序列输入
+### 5.1 任务配置与序列输入
 
 **Model Configuration (模型配置):**
 
@@ -204,14 +212,14 @@ Advanced Sequence Design 页面提供完整参数入口，包含：
 
 * 用户可选择启用 **Enable AI Summary**，在预测完成后获得专业 **AI 生物专家**的文本评估。
 
-### 4.2 执行预测
+### 5.2 执行预测
 
 1.  **Ensure all model configuration parameters are set correctly (确保所有模型配置参数设置正确)**。
 2.  Click the **"Start Prediction"** button to start the prediction process (点击“Start Prediction”按钮开始预测流程)。
 3.  The system will display **prediction progress and status information** (系统将显示预测进度和状态信息)。
 4.  To abort the prediction, click the **"Abort"** button (如需中止预测，点击“Abort”按钮)。
 
-### 4.3 结果展示功能
+### 5.3 结果展示功能
 
 **Status (状态):** 提供实时反馈 (例如：“All predictions completed!”)。
 
@@ -225,13 +233,59 @@ Advanced Sequence Design 页面提供完整参数入口，包含：
 
 **Download Results (下载结果):** 允许用户下载所有详细预测数据。
 
+## 6. Protein Discovery (VenusMine)
+
+VenusMine 用于从一个已知蛋白结构出发，在大规模结构与序列数据库中发现潜在同源、相似结构或功能相关的候选蛋白。该模块适合用于酶挖掘、功能相似蛋白发现、候选模板筛选，以及为后续定向进化或序列设计提供起始序列集合。
+
+### 6.1 输入与核心配置
+
+**Input Configuration（输入配置）：**
+
+* **Upload PDB Structure：** 上传待分析的 `.pdb` 结构文件。VenusMine 以结构为起点，先通过 FoldSeek 执行结构相似性搜索，再进入序列层面的扩展筛选。
+* **Protected Region（保护区域）：** 设置需要保留或重点关注的结构/功能片段位置。
+  * **Start Position：** 保护区域起始残基位置，默认 `1`。
+  * **End Position：** 保护区域结束残基位置，默认 `100`。
+  * 系统会优先保留 FoldSeek 命中中覆盖该区域的序列，因此该参数适合用于保护活性口袋、结合片段或关键结构域。
+
+**MMseqs2 Search Parameters（MMseqs2 搜索参数）：**
+
+* **Threads：** MMseqs2 搜索使用的线程数，默认 `96`。如果机器资源较少，可适当降低。
+* **Iterations：** 迭代搜索轮数，默认 `3`。更高的迭代数可能发现更远缘的序列，但耗时更长。
+* **Max Sequences：** 每轮最多保留的命中序列数量，默认 `100`，可在 `100-5000` 范围内调整。
+* **Database：** 默认数据库为 **UniRef90**。如果没有显式配置数据库路径，系统会尝试自动下载到 `data/VenusMine/uniref90.fasta.gz`。
+
+
+**Clustering Parameters（聚类参数）：**
+
+* **Min Sequence Identity：** MMseqs2 聚类的最低序列一致性阈值，默认 `0.5`。数值越高，聚类越严格，冗余去除越保守。
+* **Threads：** 聚类阶段使用的线程数，默认 `96`。
+
+**Tree Building Parameters（进化树构建参数）：**
+
+* **Top N Results：** 最终用于树构建和展示的候选序列数量，默认 `10`。如果想查看更大范围的候选序列，可提高该值。
+* **E-value Threshold：** 用于过滤序列搜索结果的 E-value 阈值，默认 `1e-5`。阈值越小，结果越严格。
+
+
+### 6.2 结果展示
+
+**Structure Visualization（结构可视化）：** 显示上传结构的占位或结构查看区域，帮助确认当前分析对象。
+
+**Phylogenetic Tree（系统发育树）：** 展示候选蛋白与参考序列之间的层次聚类关系。用户可以通过该图快速观察候选序列是否形成明显分支、是否靠近参考功能序列，以及哪些序列可能值得优先验证。
+
+**Sequence Labels（序列标签）：** 以表格形式列出发现的序列、来源类型、标签和聚类信息。该表格适合用于后续人工筛选、候选序列整理或导出到其他分析流程。
+
+**Complete Results（完整结果）：** 提供 ZIP 下载，包含本次 VenusMine 运行产生的主要文件，例如树图、标签表、中间 FASTA、搜索结果和日志等。
+
+**Processing Log（处理日志）：** 实时显示 VenusMine 各步骤状态、数据库路径、命中数量、聚类结果和错误信息。若运行失败，应优先查看此处定位问题，例如 MMseqs2 未安装、UniRef90 数据库缺失、FoldSeek 下载失败或保护区域没有匹配序列。
+
+
 ---
 
-## 5. Functional Residue 
+## 7. Functional Residue
 
 该模块允许用户**自由选择底层 PLM 模型**，以高精度定位和预测蛋白质序列中的关键功能残基。
 
-### 5.1 任务配置与序列输入
+### 7.1 任务配置与序列输入
 
 **Model Configuration (模型配置):**
 
@@ -250,14 +304,14 @@ Advanced Sequence Design 页面提供完整参数入口，包含：
 
 * 用户可选择启用 **Enable AI Summary**，在预测完成后获得专业 **AI 生物专家**的文本评估。
 
-### 5.2 执行预测
+### 7.2 执行预测
 
 1.  **Ensure all model configuration parameters are set correctly (确保所有模型配置参数设置正确)**。
 2.  Click the **"Start Prediction"** button to start the prediction process (点击“Start Prediction”按钮开始预测流程)。
 3.  The system will display **prediction progress and status information** (系统将显示预测进度和状态信息)。
 4.  To abort the prediction, click the **"Abort"** button (如需中止预测，点击“Abort”按钮)。
 
-### 5.3 结果展示功能
+### 7.3 结果展示功能
 
 **Status (状态):** 提供实时反馈。
 

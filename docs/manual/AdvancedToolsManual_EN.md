@@ -43,48 +43,16 @@ This module allows users to select specific PLM models for high-precision locali
   * **Description:** Focuses on identifying the functional role of individual amino acid residues in the protein sequence, such as **Activity Site** or **Binding Site**.
   * **Application Scenario:** By selecting the optimal PLM, users can **accurately label functional sites** and obtain **residue-level prediction probabilities**, aiding in the establishment of a precise structure-function map.
 
+### 1.4 Protein Discovery
+
+This module starts from a user-provided protein structure and searches large-scale structure and sequence databases for potentially homologous, structurally similar, or functionally related candidate proteins.
+
+**Core Advantage:** Users can configure the key discovery parameters and run a full VenusMine pipeline for enzyme/protein discovery.
+
+  * **Description:** VenusMine combines structural alignment, sequence similarity search, redundancy reduction, representation-based ranking, and phylogenetic tree construction to support multi-stage candidate screening.
+  * **Application Scenario:** Suitable for enzyme function discovery, mining functionally similar proteins from unknown structures, and preparing candidate templates for protein engineering, directed evolution, or sequence design.
+
 -----
-
-## 6. Sequence Design
-
-This module exposes **ProteinMPNN** with full inference controls for structure-conditioned sequence generation.
-
-### 6.1 Input and core controls
-
-- **Structure input:** Upload a `.pdb` file (or use the example PDB).
-- **Model Family selector:** `Soluble` / `Vanilla` / `CA` (manual choice with recommendation).
-  - **Soluble**: recommended for protein discovery and general sequence design.
-  - **Vanilla**: recommended for membrane proteins.
-  - **CA**: only for C-alpha-only coarse-grained coordinates.
-- **Designed chains / fixed chains:** Configure redesign targets and fixed context chains.
-- **Fixed residues (text syntax):** Pin selected positions using readable syntax like `A12,C13` or `A:12,13;B:5-8`.
-- **Homomer mode:** Enable tied-position constraints for symmetric design.
-- **Number of sequences / temperatures:** Configure sampling count and diversity.
-
-### 6.2 Full ProteinMPNN inference options
-
-Advanced Sequence Design provides explicit fields for core and advanced options, including:
-
-- **Model & sampling:** `model_name`, `omit_aas` (backbone noise is auto-mapped from selected model)
-- **Runtime controls:** `seed`, `batch_size`, `max_length`
-- **Optional advanced rules (text):** tied positions, omit-AA rules, AA bias, bias-by-residue, and PSSM rules entered as text; backend auto-converts to JSONL
-- **PSSM numeric controls:** `pssm_multi`, `pssm_threshold`, `pssm_log_odds_flag`, `pssm_bias_flag`
-
-Model recommendation:
-- **Default first choice:** `v_48_020` (auto uses 0.20A noise policy)
-- **High-resolution native structures only:** `v_48_002` (auto uses 0.02A noise policy)
-
-### 6.3 Results
-
-- **Summary status:** Completion state and run summary.
-- **Table:** FASTA preview rows (header, sequence, length, score fields when available).
-- **Raw:** Full response payload for automation or downstream parsing.
-- **Download Result:** Generated FASTA file from ProteinMPNN.
-
-### 6.4 Recommended usage
-
-Use this module when you need explicit control over ProteinMPNN inference behavior for design experiments, benchmarking, or reproducible protocol development.  
-If you prefer default-safe settings with fewer decisions, use **Quick Tools / Sequence Design**.
 
 ## 2\. Advanced Tools Configuration and Results
 
@@ -178,11 +146,53 @@ This module allows users to utilize a **freely selected Protein Language Model (
 
 -----
 
-## 4\. Advanced Tools - Protein Function
+## 4. Sequence Design
+
+This module exposes **ProteinMPNN** with full inference controls for structure-conditioned sequence generation.
+
+### 4.1 Input and core controls
+
+- **Structure input:** Upload a `.pdb` file (or use the example PDB).
+- **Model Family selector:** `Soluble` / `Vanilla` / `CA` (manual choice with recommendation).
+  - **Soluble**: recommended for protein discovery and general sequence design.
+  - **Vanilla**: recommended for membrane proteins.
+  - **CA**: only for C-alpha-only coarse-grained coordinates.
+- **Designed chains / fixed chains:** Configure redesign targets and fixed context chains.
+- **Fixed residues (text syntax):** Pin selected positions using readable syntax like `A12,C13` or `A:12,13;B:5-8`.
+- **Homomer mode:** Enable tied-position constraints for symmetric design.
+- **Number of sequences / temperatures:** Configure sampling count and diversity.
+
+### 4.2 Full ProteinMPNN inference options
+
+Advanced Sequence Design provides explicit fields for core and advanced options, including:
+
+- **Model & sampling:** `model_name`, `omit_aas` (backbone noise is auto-mapped from selected model)
+- **Runtime controls:** `seed`, `batch_size`, `max_length`
+- **Optional advanced rules (text):** tied positions, omit-AA rules, AA bias, bias-by-residue, and PSSM rules entered as text; backend auto-converts to JSONL
+- **PSSM numeric controls:** `pssm_multi`, `pssm_threshold`, `pssm_log_odds_flag`, `pssm_bias_flag`
+
+Model recommendation:
+- **Default first choice:** `v_48_020` (auto uses 0.20A noise policy)
+- **High-resolution native structures only:** `v_48_002` (auto uses 0.02A noise policy)
+
+### 4.3 Results
+
+- **Summary status:** Completion state and run summary.
+- **Table:** FASTA preview rows (header, sequence, length, score fields when available).
+- **Raw:** Full response payload for automation or downstream parsing.
+- **Download Result:** Generated FASTA file from ProteinMPNN.
+
+### 4.4 Recommended usage
+
+Use this module when you need explicit control over ProteinMPNN inference behavior for design experiments, benchmarking, or reproducible protocol development.  
+If you prefer default-safe settings with fewer decisions, use **Quick Tools / Sequence Design**.
+
+
+## 5\. Advanced Tools - Protein Function
 
 This module allows users to **freely select the underlying PLM model** and simultaneously select **multiple fine-tuned datasets** to perform multi-dimensional predictions of the protein's overall function and properties, aiming for more reliable prediction results.
 
-### 4.1 Task Configuration and Sequence Input
+### 5.1 Task Configuration and Sequence Input
 
 **Model Configuration:**
 
@@ -203,14 +213,14 @@ This module allows users to **freely select the underlying PLM model** and simul
 
   * Users can choose to enable **Enable AI Summary** to receive a **textual evaluation** of the results from a professional **AI biology expert** after the prediction is complete.
 
-### 4.2 Execute Prediction
+### 5.2 Execute Prediction
 
 1.  **Ensure all model configuration parameters are set correctly.**
 2.  Click the **"Start Prediction"** button to start the prediction process.
 3.  The system will display **prediction progress and status information.**
 4.  To abort the prediction, click the **"Abort"** button.
 
-### 4.3 Results Display Functionality
+### 5.3 Results Display Functionality
 
 **Status:** Provides **real-time feedback** on prediction progress (e.g., "All predictions completed\!").
 
@@ -226,11 +236,79 @@ This module allows users to **freely select the underlying PLM model** and simul
 
 -----
 
-## 5\. Functional Residue 
+## 6\. Protein Discovery (VenusMine)
+
+VenusMine is used to start from a known protein structure and discover candidate proteins from large-scale structure and sequence databases. It is suitable for enzyme mining, functionally similar protein discovery, candidate template screening, and preparing starting sequence sets for downstream directed evolution or sequence design.
+
+### 6.1 Input and Core Configuration
+
+**Input Configuration:**
+
+  * **Upload PDB Structure:** Upload the `.pdb` structure file to analyze. VenusMine uses the structure as the entry point, first running a FoldSeek structural similarity search and then expanding the candidate set through sequence-level search.
+  * **Protected Region:** Define the structure or functional segment that should be retained or emphasized.
+      * **Start Position:** Start residue position of the protected region. Default: `1`.
+      * **End Position:** End residue position of the protected region. Default: `100`.
+      * The system preferentially keeps FoldSeek hits that cover this region, making this useful for preserving active pockets, binding segments, or key structural domains.
+
+**MMseqs2 Search Parameters:**
+
+  * **Threads:** Number of threads for the MMseqs2 search. Default: `96`. Lower this value if your machine has fewer available CPU resources.
+  * **Iterations:** Number of iterative search rounds. Default: `3`. More iterations may find more distant sequence relationships but will take longer.
+  * **Max Sequences:** Maximum number of hit sequences retained per search round. Default: `100`; configurable from `100` to `5000`.
+  * **Database:** The default database is **UniRef90**. If no database path is configured, VenusMine will try to auto-download it to `data/VenusMine/uniref90.fasta.gz`.
+
+
+**Clustering Parameters:**
+
+  * **Min Sequence Identity:** Minimum sequence identity threshold for MMseqs2 clustering. Default: `0.5`. Higher values make clustering stricter and remove redundancy more conservatively.
+  * **Threads:** Number of threads used during clustering. Default: `96`.
+
+**Tree Building Parameters:**
+
+  * **Top N Results:** Number of candidate sequences used for final tree construction and display. Default: `10`. Increase this value to inspect a broader candidate set.
+  * **E-value Threshold:** E-value cutoff for filtering sequence search results. Default: `1e-5`. Smaller values make the results stricter.
+
+### 6.2 Execution Workflow
+
+After clicking **Start VenusMine Pipeline**, the system runs the following workflow:
+
+1. **Set up output directories:** Create the result directory for this VenusMine run and record the protected region, database path, and run parameters.
+2. **FoldSeek structural search:** Submit the uploaded PDB to FoldSeek and search structure-related databases such as AFDB, Swiss-Prot, CATH, MGnify, and PDB.
+3. **Parse FoldSeek hits:** Read the downloaded `.m8` alignment files and extract candidate sequences that cover the protected region.
+4. **MMseqs2 sequence search:** Use the FoldSeek-derived candidate sequences as queries to search UniRef90 or a user-specified database for additional similar sequences.
+5. **Convert TSV to FASTA:** Convert MMseqs2 search results to FASTA for downstream clustering and embedding calculation.
+6. **MMseqs2 clustering and redundancy reduction:** Remove overly similar candidate sequences according to the configured minimum sequence identity threshold and keep representative sequences.
+7. **ProstT5 representation calculation:** Compute protein representation vectors for candidate and reference sequences for distance-based ranking and tree construction.
+8. **Candidate filtering and tree construction:** Filter representative sequences using representation distance, Top N, and E-value settings, then build a hierarchical clustering or phylogenetic tree.
+9. **Package results:** Generate the tree image, sequence label table, complete result archive, and processing log.
+
+### 6.3 Result Display
+
+**Structure Visualization:** Displays the uploaded structure viewer area or placeholder to help confirm the current analysis target.
+
+**Phylogenetic Tree:** Shows hierarchical relationships between candidate proteins and reference sequences. Use this plot to see whether candidates form clear branches, whether they are close to known functional references, and which sequences may be worth prioritizing for validation.
+
+**Sequence Labels:** Lists discovered sequences, source types, labels, and cluster information in a table. This is useful for manual screening, candidate sequence organization, and exporting to downstream analysis workflows.
+
+**Complete Results:** Provides a ZIP download containing the main files generated in the VenusMine run, such as the tree image, label table, intermediate FASTA files, search results, and logs.
+
+**Processing Log:** Shows real-time status for each VenusMine step, including database path, hit counts, clustering results, and error messages. If a run fails, check this tab first for issues such as missing MMseqs2, missing UniRef90 database, FoldSeek download failure, or no sequences matching the protected region.
+
+### 6.4 Recommended Usage
+
+  * The first run may take a long time if UniRef90 needs to be auto-downloaded, and it requires sufficient disk space. For production use, prepare the database in advance and set `VENUSMINE_MMSEQS_DATABASE_PATH`.
+  * If no sequences match the protected region, relax the **Start Position / End Position** range or choose a more conserved key segment.
+  * If too few candidate sequences are found, increase **Max Sequences**, increase **Iterations**, or relax the **E-value Threshold**.
+  * If the candidate set is too redundant, adjust **Min Sequence Identity** or lower the final **Top N Results**.
+  * VenusMine provides candidate discovery and prioritization results. Use the output together with downstream function prediction, structural inspection, and experimental validation.
+
+-----
+
+## 7\. Functional Residue
 
 This module allows users to **freely select the underlying PLM model** for high-precision localization and prediction of critical functional residues within the protein sequence.
 
-### 5.1 Task Configuration and Sequence Input
+### 7.1 Task Configuration and Sequence Input
 
 **Model Configuration:**
 
@@ -252,14 +330,14 @@ This module allows users to **freely select the underlying PLM model** for high-
 
   * Users can choose to enable **Enable AI Summary** to receive a **textual evaluation** of the results from a professional **AI biology expert** after the prediction is complete.
 
-### 5.2 Execute Prediction
+### 7.2 Execute Prediction
 
 1.  **Ensure all model configuration parameters are set correctly.**
 2.  Click the **"Start Prediction"** button to start the prediction process.
 3.  The system will display **prediction progress and status information.**
 4.  To abort the prediction, click the **"Abort"** button.
 
-### 5.3 Results Display Functionality
+### 7.3 Results Display Functionality
 
 **Status:** Provides **real-time feedback** on prediction progress.
 

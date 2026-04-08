@@ -6,6 +6,7 @@ import json
 import logging
 import logging
 import shutil
+import urllib.request
 import torch
 import numpy as np
 import gradio as gr
@@ -60,9 +61,29 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+UNIREF90_FASTA_URL = os.getenv(
+    "VENUSMINE_UNIREF90_FASTA_URL",
+    "https://ftp.uniprot.org/pub/databases/uniprot/uniref/uniref90/uniref90.fasta.gz",
+).strip()
+UNIREF90_DEFAULT_PATH = PROJECT_ROOT / "data" / "VenusMine" / "uniref90.fasta.gz"
+
+
+def _download_file_atomic(url: str, destination: Path) -> None:
+    """Download a large file via a temporary .part file, then atomically publish it."""
+    if not url:
+        raise ValueError("UniRef90 download URL is empty.")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = destination.with_suffix(destination.suffix + ".part")
+    if temp_path.exists():
+        temp_path.unlink()
+    logger.info("Downloading VenusMine UniRef90 MMseqs database from %s to %s", url, destination)
+    with urllib.request.urlopen(url, timeout=60) as response, open(temp_path, "wb") as out:
+        shutil.copyfileobj(response, out, length=1024 * 1024)
+    os.replace(temp_path, destination)
+
 
 def resolve_venusmine_mmseqs_database_path() -> Tuple[Path, str]:
-    """Resolve MMseqs DB path with priority: env > constant.json > defaults."""
+    """Resolve MMseqs DB path with priority: env > constant.json > UniRef90 default."""
     env_candidates = [
         ("VENUSMINE_MMSEQS_DATABASE_PATH", os.getenv("VENUSMINE_MMSEQS_DATABASE_PATH")),
         ("MMSEQS_DATABASE_PATH", os.getenv("MMSEQS_DATABASE_PATH")),
@@ -76,14 +97,11 @@ def resolve_venusmine_mmseqs_database_path() -> Tuple[Path, str]:
         cfg_path = Path(config_val).expanduser()
         return (cfg_path if cfg_path.is_absolute() else PROJECT_ROOT / cfg_path).resolve(), "constant.json:venusmine.mmseqs_database_path"
 
-    default_candidates = [
-        PROJECT_ROOT / "dataset" / "CATH.fasta",
-        PROJECT_ROOT / "data" / "VenusMine" / "CATH.fasta",
-    ]
-    for candidate in default_candidates:
-        if candidate.exists():
-            return candidate.resolve(), "default:auto-detected"
-    return default_candidates[0].resolve(), "default:dataset/CATH.fasta"
+    uniref90_path = UNIREF90_DEFAULT_PATH.resolve()
+    if uniref90_path.exists():
+        return uniref90_path, "default:cached-uniref90"
+    _download_file_atomic(UNIREF90_FASTA_URL, uniref90_path)
+    return uniref90_path, "default:auto-downloaded-uniref90"
 
 
 def truncate_sequence(seq):
@@ -773,8 +791,6 @@ def handle_VenusMine(
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     logger = logging.getLogger(__name__)
     start_time = time.time()
-    
-    mmseqs_database_path, db_source = resolve_venusmine_mmseqs_database_path()
 
     if not pdb_file:
         yield (
@@ -799,7 +815,7 @@ def handle_VenusMine(
     log_content += f"Session ID: {session_timestamp}\n"
     log_content += f"Output Directory: {session_dir}\n"
     log_content += f"Protected Region: {protect_start}-{protect_end}\n"
-    log_content += f"MMseqs Database: {mmseqs_database_path} ({db_source})\n"
+    log_content += "MMseqs Database: resolving UniRef90...\n"
     log_content += f"{'='*30}\n\n"
     
     yield (
@@ -812,6 +828,39 @@ def handle_VenusMine(
         gr.update(value="", visible=False),
         create_status_html("🔵 Initializing...", "#0d6efd")
     )
+
+    try:
+        mmseqs_database_path, db_source = resolve_venusmine_mmseqs_database_path()
+        log_content += f"   OK: MMseqs database ready: {mmseqs_database_path} ({db_source})\n\n"
+        yield (
+            log_content,
+            None,
+            pd.DataFrame(),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(value="", visible=False),
+            create_status_html("MMseqs database ready", "#0d6efd")
+        )
+    except Exception as e:
+        log_content += f"   ERROR: Failed to prepare UniRef90 database: {str(e)[:500]}\n"
+        log_content += (
+            "   Tip: Configure database path by setting VENUSMINE_MMSEQS_DATABASE_PATH\n"
+            "      or adding venusmine.mmseqs_database_path in src/constant.json.\n"
+            "      The default auto-download URL can be overridden with VENUSMINE_UNIREF90_FASTA_URL.\n"
+        )
+        yield (
+            log_content,
+            None,
+            pd.DataFrame(),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(visible=False),
+            gr.update(value="UniRef90 download failed"),
+            gr.update(visible=True, value="*UniRef90 database preparation failed*"),
+            gr.update(value="**Status:** UniRef90 database failed")
+        )
+        return
 
     try:
         # ==================== Step 1: Setup Directories ====================
@@ -958,8 +1007,9 @@ def handle_VenusMine(
         if not mmseqs_database_path.exists():
             log_content += f"   ❌ Database file not found: {mmseqs_database_path}\n"
             log_content += (
-                "   💡 Configure database path by setting VENUSMINE_MMSEQS_DATABASE_PATH\n"
-                "      or adding venusmine.mmseqs_database_path in src/constant.json\n"
+                "   Tip: Configure database path by setting VENUSMINE_MMSEQS_DATABASE_PATH\n"
+                "      or adding venusmine.mmseqs_database_path in src/constant.json.\n"
+                "      By default, VenusMine auto-downloads UniRef90 to data/VenusMine/uniref90.fasta.gz.\n"
             )
             yield (
                 log_content,

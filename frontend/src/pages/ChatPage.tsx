@@ -28,6 +28,13 @@ type SessionMeta = {
 const MODELS = ["Gemini-2.5-Pro", "ChatGPT-4o", "Claude-3.7", "DeepSeek-R1"];
 type RunStatus = "running" | "stopping" | "stopped";
 
+function createPageInstanceId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 type ChatPageProps = {
   workspaceEnabled?: boolean;
 };
@@ -46,8 +53,10 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   const [chatQuota, setChatQuota] = useState<ChatQuota | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const timelineRef = useRef<HTMLDivElement | null>(null);
-  const SESSION_STORAGE_KEY = "vf2_active_session_id";
-  const SESSION_CACHE_KEY = "vf2_session_list_cache";
+  const pageInstanceIdRef = useRef(createPageInstanceId());
+  const SESSION_STORAGE_KEY = `vf2_active_session_id__${pageInstanceIdRef.current}`;
+  const SESSION_CACHE_KEY = `vf2_session_list_cache__${pageInstanceIdRef.current}`;
+  const SESSION_OWNED_KEY = `vf2_session_ids__${pageInstanceIdRef.current}`;
   const COPY_HINT_MS = 1200;
   const [copiedSessionId, setCopiedSessionId] = useState("");
 
@@ -98,10 +107,40 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
 
   async function fetchSessions() {
     const data = await listChatSessions();
-    const list = data.sessions || [];
+    const list = filterOwnedSessions(data.sessions || []);
     setSessions(list);
-    localStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(list));
+    sessionStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(list));
     return list;
+  }
+
+  function readOwnedSessionIds(): string[] {
+    try {
+      const parsed = JSON.parse(sessionStorage.getItem(SESSION_OWNED_KEY) || "[]") as unknown;
+      return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string" && Boolean(item)) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function writeOwnedSessionIds(ids: string[]) {
+    sessionStorage.setItem(SESSION_OWNED_KEY, JSON.stringify(Array.from(new Set(ids.filter(Boolean)))));
+  }
+
+  function rememberOwnedSession(nextSessionId: string) {
+    if (!nextSessionId) return;
+    writeOwnedSessionIds([...readOwnedSessionIds(), nextSessionId]);
+  }
+
+  function forgetOwnedSession(targetSessionId: string) {
+    writeOwnedSessionIds(readOwnedSessionIds().filter((item) => item !== targetSessionId));
+  }
+
+  function filterOwnedSessions(list: SessionMeta[]) {
+    const owned = new Set(readOwnedSessionIds());
+    if (sessionId) {
+      owned.add(sessionId);
+    }
+    return list.filter((item) => owned.has(item.session_id));
   }
 
   async function refreshChatQuota() {
@@ -117,6 +156,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     if (running) return;
     setError("");
     const created = await createChatSession();
+    rememberOwnedSession(created.session_id);
     setSessionId(created.session_id);
     sessionStorage.setItem(SESSION_STORAGE_KEY, created.session_id);
     setSelectedModel(modelLabelFromInternal(created.model_name));
@@ -130,6 +170,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     setError("");
     try {
       await deleteChatSession(targetId);
+      forgetOwnedSession(targetId);
       if (targetId === sessionId) {
         sessionStorage.removeItem(SESSION_STORAGE_KEY);
         setSessionId("");
@@ -152,7 +193,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     await refreshChatQuota();
     let list: SessionMeta[] = [];
     try {
-      const raw = localStorage.getItem(SESSION_CACHE_KEY);
+      const raw = sessionStorage.getItem(SESSION_CACHE_KEY);
       if (raw) {
         const cached = JSON.parse(raw) as SessionMeta[];
         if (Array.isArray(cached) && cached.length > 0) {
@@ -168,17 +209,13 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     } catch {
       // keep cached list if server refresh fails
     }
-    if (!list.length) {
-      setSessionId("");
-      setSnapshot(null);
+    const remembered = sessionStorage.getItem(SESSION_STORAGE_KEY);
+    if (remembered && list.find((item) => item.session_id === remembered)) {
+      await refreshCurrentSession(remembered);
       return;
     }
 
-    const remembered = sessionStorage.getItem(SESSION_STORAGE_KEY);
-    const target =
-      (remembered && list.find((item) => item.session_id === remembered)?.session_id) ||
-      list[0].session_id;
-    await refreshCurrentSession(target);
+    await createAndActivateSession();
   }
 
   function modelLabelFromInternal(modelName: string) {
@@ -217,6 +254,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       if (!activeSessionId) {
         const created = await createChatSession();
         activeSessionId = created.session_id;
+        rememberOwnedSession(activeSessionId);
         setSessionId(activeSessionId);
         sessionStorage.setItem(SESSION_STORAGE_KEY, activeSessionId);
         setSelectedModel(modelLabelFromInternal(created.model_name));
