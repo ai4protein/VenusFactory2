@@ -288,6 +288,10 @@ export function getPlanConfirmUrl(sessionId: string): string {
   return `${API_ROOT}/api/chat/sessions/${encodeURIComponent(sessionId)}/plan/confirm/stream`;
 }
 
+export function getSubReportDecideUrl(sessionId: string): string {
+  return `${API_ROOT}/api/chat/sessions/${encodeURIComponent(sessionId)}/sub-report/decide/stream`;
+}
+
 export function getExperimentReportUrl(sessionId: string): string {
   return `${API_ROOT}/api/chat/sessions/${encodeURIComponent(sessionId)}/report`;
 }

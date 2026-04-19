@@ -219,7 +219,6 @@ class StorageConfig:
 # ---------------------------------------------------------------------------
 
 @dataclass(frozen=True)
-@dataclass(frozen=True)
 class FeedbackConfig:
     webhook_url: str = ""
     webhook_secret: str = ""

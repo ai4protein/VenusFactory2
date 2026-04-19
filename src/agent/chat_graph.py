@@ -138,6 +138,8 @@ class AgentState(TypedDict):
     failed_step: int | None
     failed_reason: str | None
     ui_lang: str | None
+    sub_report_rewrite_comment: str
+    auto_execute: bool
 
 
 def _detect_ui_lang(text: str) -> str:
@@ -201,6 +203,7 @@ def _ui_text(lang: str, key: str, **kwargs) -> str:
         "plan_confirmation_title": "📋 **Computational Biologist** 已制定以下执行计划，请确认或编辑后再执行：\n\n{steps}",
         "iteration_prompt": "🔄 **Principal Investigator** 结果已汇总完毕。请选择下一步操作：",
         "step_checkpoint": "🔍 **第 {step_num} 步已完成。** 请查看上方结果，并决定是否继续执行下一步（第 {next_step} 步：{next_desc}）。",
+        "sub_report_checkpoint": "📄 **小报告 \"{section}\" 已完成。** 还有 {remaining} 个小节待调研。请查看结果并决定是否继续。",
     }
     en = {
         "pipeline_title": "📋 **Pipeline**\n\nHere's what we'll do:\n\n{steps}",
@@ -226,6 +229,7 @@ def _ui_text(lang: str, key: str, **kwargs) -> str:
         "plan_confirmation_title": "📋 **Computational Biologist** has designed the following pipeline. Please review and confirm before execution:\n\n{steps}",
         "iteration_prompt": "🔄 **Principal Investigator** Results have been summarized. Please choose what to do next:",
         "step_checkpoint": "🔍 **Step {step_num} complete.** Review the results above and decide whether to continue to the next step (Step {next_step}: {next_desc}).",
+        "sub_report_checkpoint": "📄 **Sub-report \"{section}\" complete.** {remaining} section(s) remaining. Review the results and decide whether to continue.",
     }
     bundle = zh if lang == "zh" else en
     template = bundle.get(key, key)
@@ -913,6 +917,14 @@ async def router_node(state: AgentState, config: RunnableConfig):
         return {"status": "resume_execution"}
     elif waiting_for == "step_abort":
         return {"status": "resume_finalize"}
+    elif waiting_for == "sub_report_continue":
+        return {"status": "resume_research"}
+    elif waiting_for == "sub_report_skip":
+        return {"status": "resume_report"}
+    elif waiting_for == "sub_report_rewrite":
+        return {"status": "resume_sub_report_rewrite"}
+    elif waiting_for == "skip_to_plan":
+        return {"status": "resume_plan"}
     return {"status": "new_request"}
 
 
@@ -1179,6 +1191,31 @@ async def research_sub_report_node(state: AgentState, config: RunnableConfig):
 
     search_results_str = "\n\n".join(formatted_refs) if formatted_refs else ("该小节没有检索结果。" if ui_lang == "zh" else "No search results for this section.")
 
+    rewrite_comment = state.get("sub_report_rewrite_comment", "")
+    rewrite_mode = False
+    if rewrite_comment:
+        rewrite_mode = True
+        prev_sub_report = ""
+        for item in reversed(history):
+            c = item.get("content", "")
+            if item.get("role_id") == "principal_investigator" and c.startswith("# "):
+                prev_sub_report = c
+                break
+        if ui_lang == "zh":
+            search_results_str = (
+                f"[用户已审阅之前的小报告并提出修改意见]\n\n"
+                f"之前的小报告：\n{prev_sub_report}\n\n"
+                f"用户修改意见：\n{rewrite_comment}\n\n"
+                f"请根据用户的修改意见重写小报告。"
+            )
+        else:
+            search_results_str = (
+                f"[User reviewed the previous sub-report and provided revision feedback]\n\n"
+                f"Previous sub-report:\n{prev_sub_report}\n\n"
+                f"User feedback:\n{rewrite_comment}\n\n"
+                f"Please revise the sub-report based on the user's feedback."
+            )
+
     if history and ("撰写小报告" in history[-1].get("content", "") or "writing sub-report" in history[-1].get("content", "").lower()):
         history.pop()
 
@@ -1190,16 +1227,41 @@ async def research_sub_report_node(state: AgentState, config: RunnableConfig):
         )
         title, body = _parse_sub_report_short_title((sub_report or "").strip(), fallback_title=section["section_name"])
         history.append({"role": "assistant", "content": f"# {title}\n\n{body}", "role_id": "principal_investigator"})
-        sub_reports.append(f"### {title}\n\n**References:**\n{search_results_str}\n\n**Sub-report:**\n{body}")
+        if rewrite_mode:
+            sub_reports.append(f"### {title}\n\n**Sub-report (revised):**\n{body}")
+        else:
+            sub_reports.append(f"### {title}\n\n**References:**\n{search_results_str}\n\n**Sub-report:**\n{body}")
     except Exception as e:
         sub_reports.append(_ui_text(ui_lang, "sub_report_failed", section=section["section_name"], error=str(e)))
+
+    next_research_idx = research_idx + 1
+    has_more_sections = next_research_idx < len(sections)
+
+    if has_more_sections:
+        remaining = len(sections) - next_research_idx
+        history.append({
+            "role": "assistant",
+            "content": _ui_text(ui_lang, "sub_report_checkpoint", section=section["section_name"], remaining=remaining),
+            "role_id": "principal_investigator",
+        })
+        return {
+            "history": history,
+            "research_sub_reports": sub_reports,
+            "research_idx": next_research_idx,
+            "search_idx": 0,
+            "current_search_results": [],
+            "sub_report_rewrite_comment": "",
+            "status": "waiting_for_sub_report_review",
+            "waiting_for": "sub_report_review",
+        }
 
     return {
         "history": history,
         "research_sub_reports": sub_reports,
-        "research_idx": research_idx + 1,
+        "research_idx": next_research_idx,
         "search_idx": 0,
         "current_search_results": [],
+        "sub_report_rewrite_comment": "",
         "status": "research_step_done"
     }
 
@@ -1741,28 +1803,43 @@ async def execute_node(state: AgentState, config: RunnableConfig):
                 file_preview=file_preview,
             )
             if not cb_match:
-                if step_retry < MAX_STEP_RETRIES:
-                    debug_retry_input, _debug_report = await _run_mls_debug_with_tools(
-                        session_state_for_check,
-                        step_num,
-                        task_desc,
-                        tool_name,
-                        invoke_input,
-                        cb_note or ("CB 后置校验不一致。" if ui_lang == "zh" else "CB post-step check mismatch."),
+                tool_itself_succeeded = False
+                try:
+                    _parsed = json.loads(str(raw_output)) if isinstance(raw_output, str) else raw_output
+                    if isinstance(_parsed, dict) and (_parsed.get("success") is True or _parsed.get("status") == "success"):
+                        tool_itself_succeeded = True
+                except Exception:
+                    pass
+
+                if tool_itself_succeeded:
+                    _logger.info(
+                        "CB post-step mismatch for step %s (%s) but tool returned success — "
+                        "treating as non-fatal (empty results). CB note: %s",
+                        step_num, tool_name, cb_note,
                     )
-                    history = session_state_for_check.get("history", history)
-                    log_entries = session_state_for_check.get("conversation_log", log_entries)
-                    if isinstance(debug_retry_input, dict):
-                        step_retry += 1
-                        invoke_input = _merge_retry_input(invoke_input, debug_retry_input)
-                        _logger.info("CB retry: tool=%s, step=%s, retry=%s", tool_name, step_num, step_retry)
-                        continue
-                is_failure = True
-                failure_reason = cb_note or ("CB 后置校验不一致。" if ui_lang == "zh" else "CB post-step check mismatch.")
-                raw_output = json.dumps(
-                    {"status": "error", "error": {"type": "CBPostStepMismatch", "message": failure_reason}},
-                    ensure_ascii=False,
-                )
+                else:
+                    if step_retry < MAX_STEP_RETRIES:
+                        debug_retry_input, _debug_report = await _run_mls_debug_with_tools(
+                            session_state_for_check,
+                            step_num,
+                            task_desc,
+                            tool_name,
+                            invoke_input,
+                            cb_note or ("CB 后置校验不一致。" if ui_lang == "zh" else "CB post-step check mismatch."),
+                        )
+                        history = session_state_for_check.get("history", history)
+                        log_entries = session_state_for_check.get("conversation_log", log_entries)
+                        if isinstance(debug_retry_input, dict):
+                            step_retry += 1
+                            invoke_input = _merge_retry_input(invoke_input, debug_retry_input)
+                            _logger.info("CB retry: tool=%s, step=%s, retry=%s", tool_name, step_num, step_retry)
+                            continue
+                    is_failure = True
+                    failure_reason = cb_note or ("CB 后置校验不一致。" if ui_lang == "zh" else "CB post-step check mismatch.")
+                    raw_output = json.dumps(
+                        {"status": "error", "error": {"type": "CBPostStepMismatch", "message": failure_reason}},
+                        ensure_ascii=False,
+                    )
 
         # Runtime failures: attempt MLS debug retry before marking terminal failure.
         if is_failure and step_retry < MAX_STEP_RETRIES:
@@ -1907,10 +1984,12 @@ async def execute_node(state: AgentState, config: RunnableConfig):
     next_idx = idx + 1
     has_more_steps = next_idx < len(plan)
 
+    auto_execute = state.get("auto_execute", False)
+
     if is_failure:
         status = "execution_failed"
         waiting_for_val = None
-    elif has_more_steps:
+    elif has_more_steps and not auto_execute:
         next_step = plan[next_idx]
         next_step_num = _normalize_step_number(next_step.get("step"), next_idx + 1)
         next_desc = next_step.get("task_description", "…")
@@ -2084,6 +2163,12 @@ def _route_from_router(state: AgentState):
         return "execute_start_node"
     if status == "resume_finalize":
         return "finalize_start_node"
+    if status == "resume_report":
+        return "research_report_start_node"
+    if status == "resume_plan":
+        return "plan_start_node"
+    if status == "resume_sub_report_rewrite":
+        return "research_sub_report_start_node"
     return "research_plan_start_node"
 
 
@@ -2143,7 +2228,10 @@ def create_agent_graph():
     workflow.add_edge("research_search_start_node", "research_search_node")
     workflow.add_conditional_edges("research_search_node", should_continue_research)
     workflow.add_edge("research_sub_report_start_node", "research_sub_report_node")
-    workflow.add_edge("research_sub_report_node", "research_search_start_node")
+    workflow.add_conditional_edges(
+        "research_sub_report_node",
+        lambda s: END if s.get("status") == "waiting_for_sub_report_review" else "research_search_start_node",
+    )
     workflow.add_edge("research_report_start_node", "research_report_node")
     workflow.add_edge("research_report_node", "plan_start_node")
 

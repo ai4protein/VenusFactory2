@@ -3,7 +3,7 @@ import type { PlanStep } from "../lib/api";
 
 type Props = {
   plan: PlanStep[];
-  onConfirm: (plan: PlanStep[]) => void;
+  onConfirm: (plan: PlanStep[], autoExecute: boolean) => void;
   disabled?: boolean;
 };
 
@@ -81,10 +81,18 @@ export function PlanEditor({ plan, onConfirm, disabled }: Props) {
       <div className="plan-editor-actions">
         <button
           className="plan-editor-confirm"
-          onClick={() => onConfirm(steps)}
+          onClick={() => onConfirm(steps, false)}
           disabled={disabled || steps.length === 0}
         >
           Confirm Plan
+        </button>
+        <button
+          className="plan-editor-auto-execute"
+          onClick={() => onConfirm(steps, true)}
+          disabled={disabled || steps.length === 0}
+          title="Confirm and execute all steps automatically without pausing"
+        >
+          Confirm & Auto-execute
         </button>
       </div>
     </div>

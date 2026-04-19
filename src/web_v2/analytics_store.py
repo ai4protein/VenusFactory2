@@ -117,9 +117,10 @@ class OfflineGeoIpResolver:
 
 class AnalyticsStore:
     def __init__(self) -> None:
-        default_path = Path("src/data/analytics.db")
-        db_path = os.getenv("WEBUI_V2_ANALYTICS_DB_PATH", str(default_path))
-        self._db_path = Path(db_path).expanduser()
+        project_root = Path(__file__).resolve().parent.parent.parent
+        default_path = project_root / "src" / "data" / "analytics.db"
+        db_path = os.getenv("WEBUI_V2_ANALYTICS_DB_PATH", "").strip() or str(default_path)
+        self._db_path = Path(db_path).expanduser().resolve()
         self._lock = Lock()
         self._initialized = False
         self._disabled_warning_printed = False

@@ -5,6 +5,7 @@ import { ClarificationForm } from "../components/ClarificationForm";
 import { IterationDecision } from "../components/IterationDecision";
 import { PlanEditor } from "../components/PlanEditor";
 import { StepCheckpoint } from "../components/StepCheckpoint";
+import { SubReportCheckpoint } from "../components/SubReportCheckpoint";
 import {
   cancelChatSession,
   createChatSession,
@@ -16,6 +17,7 @@ import {
   getClarificationRespondUrl,
   getPlanConfirmUrl,
   getStepDecideUrl,
+  getSubReportDecideUrl,
   iterationDecide,
   listChatSessions,
   type ChatQuota,
@@ -47,6 +49,45 @@ function createPageInstanceId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+function friendlyErrorHint(msg: string): string {
+  const m = msg.toLowerCase();
+  if (m.includes("quota") || m.includes("limit reached"))
+    return "You've reached the daily usage limit for online mode. Try again tomorrow, or deploy locally for unlimited access.";
+  if (m.includes("timeout") || m.includes("timed out"))
+    return "The request took too long. This can happen with complex tasks or heavy server load. Please try again.";
+  if (m.includes("network") || m.includes("fetch") || m.includes("failed to fetch"))
+    return "A network issue occurred. Please check your connection and try again.";
+  if (m.includes("401") || m.includes("unauthorized") || m.includes("auth"))
+    return "Authentication failed. Your session may have expired — try refreshing the page.";
+  if (m.includes("403") || m.includes("forbidden") || m.includes("access denied"))
+    return "Access was denied. You may not have permission for this action.";
+  if (m.includes("429") || m.includes("rate") || m.includes("too many"))
+    return "Too many requests in a short time. Please wait a moment and try again.";
+  if (m.includes("500") || m.includes("internal server"))
+    return "The server encountered an internal error. This is usually temporary — please retry shortly.";
+  if (m.includes("model") || m.includes("llm") || m.includes("api key"))
+    return "There was an issue with the AI model service. The model may be temporarily unavailable.";
+  if (m.includes("session") || m.includes("not found"))
+    return "The session could not be found. It may have expired — try creating a new session.";
+  return "Something went wrong. This is usually temporary — please try again or start a new session.";
+}
+
+function ErrorAlert({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  return (
+    <div className="error-box">
+      <div className="error-box-header">
+        <span className="error-box-icon">!</span>
+        <span className="error-box-hint">{friendlyErrorHint(message)}</span>
+        <button className="error-box-dismiss" onClick={onDismiss} title="Dismiss">&times;</button>
+      </div>
+      <details className="error-box-details">
+        <summary>Details</summary>
+        <pre className="error-box-raw">{message}</pre>
+      </details>
+    </div>
+  );
+}
+
 type ChatPageProps = {
   workspaceEnabled?: boolean;
 };
@@ -72,6 +113,10 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   const SESSION_OWNED_KEY = `vf2_session_ids__${pageInstanceIdRef.current}`;
   const COPY_HINT_MS = 1200;
   const [copiedSessionId, setCopiedSessionId] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [sessionsCollapsed, setSessionsCollapsed] = useState(false);
+  const [logsCollapsed, setLogsCollapsed] = useState(false);
 
   useEffect(() => {
     void bootstrapSession();
@@ -90,7 +135,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   useEffect(() => {
     const s = (snapshot?.status || "").toLowerCase();
     if (!s) return;
-    if (s === "stopped" || s === "waiting_for_clarification" || s === "waiting_for_plan_confirmation" || s === "waiting_for_iteration" || s === "waiting_for_step_review") {
+    if (s === "stopped" || s === "waiting_for_clarification" || s === "waiting_for_plan_confirmation" || s === "waiting_for_iteration" || s === "waiting_for_step_review" || s === "waiting_for_sub_report_review") {
       setRunStatus("stopped");
       return;
     }
@@ -101,25 +146,22 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     setRunStatus("stopped");
   }, [snapshot?.status]);
 
-  const logsPreview = useMemo(() => {
-    if (!snapshot) return "No logs yet.";
-    const conv = snapshot.conversation_log.slice(-6);
-    const tools = snapshot.tool_executions.slice(-12);
-    const lines = [
-      `status: ${snapshot.status}`,
-      `messages: ${snapshot.history.length}`,
-      `tool_runs: ${snapshot.tool_executions.length}`,
-      "",
-      "recent conversation:"
-    ];
-    conv.forEach((entry, idx) => {
-      lines.push(`${idx + 1}. ${(entry.role as string) || "unknown"}: ${(entry.content as string) || ""}`);
-    });
-    lines.push("", "recent tools:");
-    tools.forEach((entry, idx) => {
-      lines.push(`${idx + 1}. ${String(entry.tool_name || "tool")} (${String(entry.timestamp || "")})`);
-    });
-    return lines.join("\n");
+  const terminalData = useMemo(() => {
+    if (!snapshot) return null;
+    return {
+      status: snapshot.status || "idle",
+      messages: snapshot.history.length,
+      toolRuns: snapshot.tool_executions.length,
+      conv: snapshot.conversation_log.slice(-6).map((e) => ({
+        role: (e.role as string) || "unknown",
+        content: ((e.content as string) || "").slice(0, 200),
+      })),
+      tools: snapshot.tool_executions.slice(-12).map((e) => ({
+        name: String(e.tool_name || "tool"),
+        ts: String(e.timestamp || ""),
+        status: String(e.status || ""),
+      })),
+    };
   }, [snapshot]);
 
   async function fetchSessions() {
@@ -450,7 +492,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     }
   }
 
-  async function confirmPlan(plan: PlanStep[]) {
+  async function confirmPlan(plan: PlanStep[], autoExecute: boolean) {
     if (!sessionId || running) return;
     setError("");
     setRunning(true);
@@ -459,7 +501,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     try {
       await streamSSEFromPost(
         getPlanConfirmUrl(sessionId),
-        { plan },
+        { plan, auto_execute: autoExecute },
         handleStreamEvent,
         abortRef.current.signal,
         getChatSessionAuthHeaders(sessionId)
@@ -533,6 +575,35 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     }
   }
 
+  async function handleSubReportDecision(action: "continue" | "skip" | "rewrite", comment?: string) {
+    if (!sessionId || running) return;
+    setError("");
+    setRunning(true);
+    setRunStatus("running");
+    abortRef.current = new AbortController();
+    try {
+      await streamSSEFromPost(
+        getSubReportDecideUrl(sessionId),
+        { action, comment: comment || "" },
+        handleStreamEvent,
+        abortRef.current.signal,
+        getChatSessionAuthHeaders(sessionId)
+      );
+      await fetchSessions();
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        setRunStatus("stopped");
+        return;
+      }
+      setError(err instanceof Error ? err.message : "Failed to process sub-report decision.");
+      setRunStatus("stopped");
+    } finally {
+      setRunning(false);
+      setStreamingIdx(-1);
+      abortRef.current = null;
+    }
+  }
+
   async function copySessionId(value: string) {
     try {
       await navigator.clipboard.writeText(value);
@@ -561,7 +632,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     void sendMessage();
   }
 
-  const isWaitingForInteraction = snapshot?.status === "waiting_for_clarification" || snapshot?.status === "waiting_for_plan_confirmation" || snapshot?.status === "waiting_for_iteration" || snapshot?.status === "waiting_for_step_review";
+  const isWaitingForInteraction = snapshot?.status === "waiting_for_clarification" || snapshot?.status === "waiting_for_plan_confirmation" || snapshot?.status === "waiting_for_iteration" || snapshot?.status === "waiting_for_step_review" || snapshot?.status === "waiting_for_sub_report_review";
   const hasReportData = Boolean(snapshot && (snapshot.tool_executions.length > 0 || snapshot.plan.length > 0));
   const quotaExhausted = Boolean(chatQuota?.enforced && (chatQuota.remaining ?? 0) <= 0);
   const sendTooltip = chatQuota?.enforced
@@ -595,9 +666,6 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
               For unlimited and more efficient usage, local deployment is recommended.
             </p>
           )}
-          <div className="chat-header-subrow">
-            <p>Chat with the AI assistant for protein engineering workflows and analysis.</p>
-          </div>
         </div>
         <div className="chat-header-actions">
           <div className={`run-status-bar ${runStatus}`}>
@@ -626,12 +694,15 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         </div>
       </header>
 
-      <section className="chat-grid">
-        <aside className="chat-panel left">
-          <div className="session-panel-head">
-            <h3>Sessions</h3>
+      <section className={`chat-grid${sessionsCollapsed ? " left-collapsed" : ""}${logsCollapsed ? " right-collapsed" : ""}`}>
+        <aside
+          className={`chat-panel left${sessionsCollapsed ? " collapsed" : ""}`}
+          onClick={sessionsCollapsed ? () => setSessionsCollapsed(false) : undefined}
+        >
+          <div className="session-panel-head" onClick={() => setSessionsCollapsed(!sessionsCollapsed)}>
+            <h3>Sessions <span className="panel-toggle-icon">{sessionsCollapsed ? "+" : "-"}</span></h3>
           </div>
-          <div className="session-list">
+          <div className="session-list" style={sessionsCollapsed ? { display: "none" } : undefined}>
             {sessions.map((s) => (
               <div
                 key={s.session_id}
@@ -651,7 +722,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
             ))}
             {sessions.length === 0 && <div className="session-empty">No sessions yet.</div>}
           </div>
-          {sessionId && (
+          {sessionId && !sessionsCollapsed && (
             <button
               type="button"
               className="session-copy-btn"
@@ -665,18 +736,49 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
 
         <section className="chat-panel center">
           <div className="timeline-wrap" ref={timelineRef}>
-            {snapshot && running && (
-              <PipelineProgress
-                status={snapshot.status}
-                plan={snapshot.plan || []}
-                toolExecutions={snapshot.tool_executions || []}
-              />
-            )}
+            <div className="timeline-sticky-header">
+              {snapshot && running && (
+                <PipelineProgress
+                  status={snapshot.status}
+                  plan={snapshot.plan || []}
+                  toolExecutions={snapshot.tool_executions || []}
+                />
+              )}
+              {(snapshot?.history?.length ?? 0) > 0 && (
+                <div className="timeline-toolbar">
+                  <button
+                    className={`timeline-search-toggle${searchOpen ? " active" : ""}`}
+                    onClick={() => { setSearchOpen(!searchOpen); if (searchOpen) setSearchQuery(""); }}
+                    title="Search messages"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+                    </svg>
+                  </button>
+                  {searchOpen && (
+                    <input
+                      className="timeline-search-input"
+                      type="text"
+                      placeholder="Search messages..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      autoFocus
+                    />
+                  )}
+                </div>
+              )}
+            </div>
             <ChatTimeline
               items={snapshot?.history || []}
               streamingIndex={streamingIdx}
               onSuggestedPrompt={(text) => setMessage(text)}
               sessionId={sessionId}
+              searchQuery={searchQuery}
+              onQuoteReply={(text) => {
+                const lines = text.split("\n").slice(0, 3);
+                const quoted = lines.map((l) => `> ${l}`).join("\n");
+                setMessage((prev) => `${quoted}\n\n${prev}`);
+              }}
             />
             {snapshot?.status === "waiting_for_clarification" &&
               snapshot.clarification_questions?.length > 0 && (
@@ -722,6 +824,26 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                   </div>
                 </div>
               )}
+            {snapshot?.status === "waiting_for_sub_report_review" && (
+              <div className="chat-msg assistant with-avatar">
+                <img
+                  className="chat-msg-avatar"
+                  src="/img/agent_role/principal_investigator.png"
+                  alt="Principal Investigator"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src =
+                      "https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png";
+                  }}
+                />
+                <div className="chat-msg-content">
+                  <div className="chat-msg-role">Principal Investigator</div>
+                  <SubReportCheckpoint
+                    onDecide={handleSubReportDecision}
+                    disabled={running}
+                  />
+                </div>
+              </div>
+            )}
             {snapshot?.status === "waiting_for_step_review" && (
               <div className="chat-msg assistant with-avatar">
                 <img
@@ -822,13 +944,70 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                 ))}
               </div>
             )}
-            {error && <div className="error-box">{error}</div>}
+            {error && <ErrorAlert message={error} onDismiss={() => setError("")} />}
           </div>
         </section>
 
-        <aside className="chat-panel right">
-          <h3>Execution Status</h3>
-          <pre>{logsPreview}</pre>
+        <aside
+          className={`chat-panel right${logsCollapsed ? " collapsed" : ""}`}
+          onClick={logsCollapsed ? () => setLogsCollapsed(false) : undefined}
+        >
+          <div className="panel-toggle-head term-head" onClick={() => setLogsCollapsed(!logsCollapsed)}>
+            <span className="term-head-dots">
+              <span className="term-dot dot-red" />
+              <span className="term-dot dot-yellow" />
+              <span className="term-dot dot-green" />
+            </span>
+            <span className="term-head-title">Execution Status</span>
+            <span className="panel-toggle-icon">{logsCollapsed ? "+" : "-"}</span>
+          </div>
+          {!logsCollapsed && (
+            <div className="term-body">
+              {!terminalData ? (
+                <div className="term-line"><span className="term-muted">$ waiting for session...</span></div>
+              ) : (
+                <>
+                  <div className="term-section">
+                    <div className="term-line">
+                      <span className="term-prompt">$</span>
+                      <span className="term-cmd">status</span>
+                      <span className={`term-status-badge ${terminalData.status === "completed" ? "st-done" : runStatus === "running" ? "st-run" : "st-idle"}`}>
+                        {terminalData.status}
+                      </span>
+                    </div>
+                    <div className="term-line">
+                      <span className="term-prompt">$</span>
+                      <span className="term-cmd">info</span>
+                      <span className="term-val">{terminalData.messages} messages, {terminalData.toolRuns} tool runs</span>
+                    </div>
+                  </div>
+                  {terminalData.tools.length > 0 && (
+                    <div className="term-section">
+                      <div className="term-line"><span className="term-prompt">$</span><span className="term-cmd">tools --recent</span></div>
+                      {terminalData.tools.map((t, i) => (
+                        <div key={i} className="term-line term-indent">
+                          <span className={`term-tool-dot ${t.status === "failed" ? "dot-fail" : "dot-ok"}`} />
+                          <span className="term-tool-name">{t.name}</span>
+                          {t.ts && <span className="term-ts">{t.ts.split("T")[1]?.slice(0, 8) || t.ts}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {terminalData.conv.length > 0 && (
+                    <div className="term-section">
+                      <div className="term-line"><span className="term-prompt">$</span><span className="term-cmd">log --tail 6</span></div>
+                      {terminalData.conv.map((c, i) => (
+                        <div key={i} className="term-line term-indent term-log-line">
+                          <span className={`term-role ${c.role === "user" ? "role-user" : "role-agent"}`}>{c.role}</span>
+                          <span className="term-log-content">{c.content || "(empty)"}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </aside>
       </section>
       <PageFooter />

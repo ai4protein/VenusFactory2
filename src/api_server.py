@@ -186,6 +186,13 @@ async def runtime_config():
     return {"mode": WEBUI_V2_MODE}
 
 
+_INLINE_MEDIA_TYPES: dict[str, str] = {
+    ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+    ".gif": "image/gif", ".webp": "image/webp", ".svg": "image/svg+xml",
+    ".bmp": "image/bmp", ".ico": "image/x-icon", ".tiff": "image/tiff",
+    ".tif": "image/tiff",
+}
+
 @app.get("/api/download/{file_path:path}")
 async def download_file(file_path: str):
     try:
@@ -198,10 +205,12 @@ async def download_file(file_path: str):
                 break
         if full_path is None:
             raise HTTPException(status_code=403, detail="Access denied")
+        ext = full_path.suffix.lower()
+        media_type = _INLINE_MEDIA_TYPES.get(ext, "application/octet-stream")
         return FileResponse(
             path=str(full_path),
             filename=full_path.name,
-            media_type="application/octet-stream",
+            media_type=media_type,
         )
     except HTTPException:
         raise

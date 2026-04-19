@@ -68,7 +68,10 @@ function roleAvatar(roleId: string, isUser: boolean) {
 
 function renderMarkdown(text: string) {
   const html = marked.parse(text || "", { async: false }) as string;
-  return DOMPurify.sanitize(html);
+  return DOMPurify.sanitize(html, {
+    ADD_TAGS: ["img"],
+    ADD_ATTR: ["src", "alt", "style", "width", "height", "loading"],
+  });
 }
 
 function fallbackCopy(text: string): boolean {
@@ -118,6 +121,7 @@ type RichAttachment =
 const RE_DOWNLOAD = /📎\s*\*\*Cloud Download:\*\*\s*\[([^\]]+)\]\(([^)]+)\)/g;
 const RE_IMAGE = /🖼️\s*\*\*Generated Image:\*\*\s*\[([^\]]+)\]\(([^)]+)\)/g;
 const RE_FILE_PREVIEW = /\*\*File Preview\s*\(([^)]+)\):\*\*\s*```[^\n]*\n([\s\S]*?)```/g;
+const IMAGE_EXT_RE = /\.(?:png|jpe?g|gif|webp|bmp|svg|tiff?)$/i;
 
 function parseCSVLike(text: string): { headers: string[]; rows: string[][] } | null {
   const lines = text.trim().split("\n").filter((l) => l.trim());
@@ -134,7 +138,8 @@ function extractRichAttachments(text: string): { cleanText: string; attachments:
   let cleanText = text;
 
   for (const m of text.matchAll(RE_DOWNLOAD)) {
-    attachments.push({ type: "download", filename: m[1], url: m[2] });
+    const isImg = IMAGE_EXT_RE.test(m[1]) || IMAGE_EXT_RE.test(m[2]);
+    attachments.push({ type: isImg ? "image" : "download", filename: m[1], url: m[2] });
     cleanText = cleanText.replace(m[0], "");
   }
 
@@ -289,7 +294,7 @@ function FeedbackButtons({
   );
 
   return (
-    <div className="chat-feedback-buttons">
+    <>
       <button
         className={`feedback-btn feedback-like${rating === "like" ? " active" : ""}`}
         onClick={() => handleRate("like")}
@@ -310,7 +315,7 @@ function FeedbackButtons({
           <path d="M17 14V2" /><path d="M9 18.12L10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22h0a3.13 3.13 0 0 1-3-3.88Z" />
         </svg>
       </button>
-    </div>
+    </>
   );
 }
 
@@ -351,11 +356,37 @@ function ChatMessageBody({ html }: { html: string }) {
   );
 }
 
+function formatTime(ts: number): string {
+  const d = new Date(ts);
+  return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
+}
+
+function formatDuration(ms: number): string | null {
+  if (ms < 1500) return null;
+  const secs = Math.round(ms / 1000);
+  if (secs < 60) return `${secs}s`;
+  return `${Math.floor(secs / 60)}m ${secs % 60}s`;
+}
+
+function QuoteButton({ content, onQuote }: { content: string; onQuote: (t: string) => void }) {
+  return (
+    <button
+      className="feedback-btn quote-btn"
+      title="Quote reply"
+      onClick={() => onQuote(content)}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 21c3-3 6-6 6-12H3V3h6" /><path d="M15 21c3-3 6-6 6-12h-6V3h6" />
+      </svg>
+    </button>
+  );
+}
+
 const SUGGESTED_PROMPTS = [
-  "Predict the structure of sequence MVLSPADKTNVKAAWGKVGAHAGEYGAEALERMFLSFPTTK",
-  "Search UniProt for human insulin receptor protein",
-  "Analyze zero-shot mutation predictions for ESM2 on my uploaded FASTA",
-  "What protein engineering strategies can improve enzyme thermostability?",
+  "Search PubMed for recent PETase engineering studies, download PDB 5XJH, and use ProteinMPNN to redesign the active-site region for improved thermostability",
+  "Download AlphaFold structure for human EGFR (P00533), predict beneficial mutations with ESM2 and ProtSSN, and identify top 10 stabilizing candidates",
+  "Query BRENDA for lipase EC 3.1.1.3 kinetics across thermophilic organisms, find the most thermostable homolog on UniProt, and predict its solubility",
+  "Predict the function of protein P04637, find its interaction partners on STRING, and check tissue expression from Human Protein Atlas",
 ];
 
 interface ChatTimelineProps {
@@ -363,9 +394,45 @@ interface ChatTimelineProps {
   streamingIndex?: number;
   onSuggestedPrompt?: (text: string) => void;
   sessionId?: string;
+  searchQuery?: string;
+  onQuoteReply?: (text: string) => void;
 }
 
-export function ChatTimeline({ items, streamingIndex = -1, onSuggestedPrompt, sessionId }: ChatTimelineProps) {
+export function ChatTimeline({ items, streamingIndex = -1, onSuggestedPrompt, sessionId, searchQuery, onQuoteReply }: ChatTimelineProps) {
+  const msgTimesRef = useRef<Map<number, number>>(new Map());
+  const prevSessionRef = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (prevSessionRef.current !== sessionId) {
+      msgTimesRef.current.clear();
+      prevSessionRef.current = sessionId;
+    }
+    items.forEach((_, idx) => {
+      if (!msgTimesRef.current.has(idx)) {
+        msgTimesRef.current.set(idx, Date.now());
+      }
+    });
+  }, [items.length, sessionId]);
+
+  const getDuration = useCallback(
+    (idx: number): string | null => {
+      const item = items[idx];
+      if (item.role === "user") return null;
+      const nextIdx = idx + 1;
+      if (nextIdx < items.length && items[nextIdx].role !== "user") return null;
+      let userIdx = idx - 1;
+      while (userIdx >= 0 && items[userIdx].role !== "user") userIdx--;
+      if (userIdx < 0) return null;
+      const userTime = msgTimesRef.current.get(userIdx);
+      const assistantTime = msgTimesRef.current.get(idx);
+      if (!userTime || !assistantTime) return null;
+      return formatDuration(assistantTime - userTime);
+    },
+    [items]
+  );
+
+  const queryLower = (searchQuery || "").toLowerCase();
+
   return (
     <div className="chat-timeline">
       {items.length === 0 && (
@@ -404,8 +471,14 @@ export function ChatTimeline({ items, streamingIndex = -1, onSuggestedPrompt, se
           : extractRichAttachments(rawContent);
         const structurePaths = isUser ? [] : extractStructurePaths(rawContent);
         const statusCls = isUser ? "" : statusMsgClass(rawContent);
+        const msgTime = msgTimesRef.current.get(idx);
+        const duration = getDuration(idx);
+        const dimmed = queryLower && !rawContent.toLowerCase().includes(queryLower);
         return (
-          <div key={idx} className={`chat-msg ${isUser ? "user" : "assistant"} with-avatar${isStreaming ? " streaming" : ""}${statusCls ? ` ${statusCls}` : ""}`}>
+          <div
+            key={idx}
+            className={`chat-msg ${isUser ? "user" : "assistant"} with-avatar${isStreaming ? " streaming" : ""}${statusCls ? ` ${statusCls}` : ""}${dimmed ? " search-dimmed" : ""}`}
+          >
             <img
               className="chat-msg-avatar"
               src={avatar}
@@ -415,7 +488,11 @@ export function ChatTimeline({ items, streamingIndex = -1, onSuggestedPrompt, se
               }}
             />
             <div className="chat-msg-content">
-              <div className="chat-msg-role">{roleLabel}</div>
+              <div className="chat-msg-role">
+                {roleLabel}
+                {msgTime && <span className="chat-msg-time">{formatTime(msgTime)}</span>}
+                {duration && <span className="chat-msg-duration">{duration}</span>}
+              </div>
               <ChatMessageBody html={renderMarkdown(cleanText)} />
               <RichAttachmentList attachments={attachments} />
               {structurePaths.length > 0 && (
@@ -429,8 +506,13 @@ export function ChatTimeline({ items, streamingIndex = -1, onSuggestedPrompt, se
                   ))}
                 </div>
               )}
-              {!isUser && !isStreaming && sessionId && (
-                <FeedbackButtons sessionId={sessionId} messageIndex={idx} />
+              {!isUser && !isStreaming && (sessionId || onQuoteReply) && (
+                <div className="chat-feedback-buttons">
+                  {sessionId && <FeedbackButtons sessionId={sessionId} messageIndex={idx} />}
+                  {onQuoteReply && (
+                    <QuoteButton content={rawContent} onQuote={onQuoteReply} />
+                  )}
+                </div>
               )}
             </div>
           </div>

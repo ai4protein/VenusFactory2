@@ -16,12 +16,11 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 from src.tools.path_sanitizer import to_client_file_path
 
-from .esmfold import predict_structure_sync
+from .esmfold import predict_structure_sync, _get_default_backend
 
 
 _PREVIEW_LEN = 500
 _SOURCE = "Predict_Structure"
-_LOCAL_BACKEND = "local"
 
 
 def _error_response(error_type: str, message: str, suggestion: Optional[str] = None) -> str:
@@ -66,7 +65,7 @@ def predict_structure_esmfold(
     output_file: Optional[str] = None,
     verbose: bool = True,
 ) -> str:
-    """Predict protein structure with ESMFold (local only). Returns rich JSON with file_info (PDB path). MCP: tools_mcp mcp_predict_structure_esmfold."""
+    """Predict protein structure with ESMFold. Backend chosen by ESMFOLD_BACKEND env var (local/pjlab). Returns rich JSON with file_info (PDB path)."""
     t0 = time.perf_counter()
     if not sequence or not sequence.strip():
         return _error_response("ValidationError", "Sequence is required.", suggestion="Provide a non-empty protein sequence.")
@@ -75,7 +74,7 @@ def predict_structure_esmfold(
             sequence.strip(),
             output_dir=output_dir or "./protein_structures",
             verbose=verbose,
-            backend=_LOCAL_BACKEND,
+            backend=_get_default_backend(),
             output_file=output_file,
         )
         if not pdb_path:
@@ -97,7 +96,7 @@ def predict_structure_esmfold(
         return _error_response(
             "PredictionError",
             str(e),
-            suggestion="Check sequence, output_dir, and local ESMFold (GPU).",
+            suggestion="Check sequence, output_dir, and ESMFold backend (ESMFOLD_BACKEND).",
         )
 
 

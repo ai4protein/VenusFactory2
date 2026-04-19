@@ -4,7 +4,7 @@ Two backends: local (on-device GPU) and pjlab (DrugSDA remote API).
 Usage (from project root):
   python src/tools/esmfold.py --backend local --sequence ... --out_file ...
   python src/tools/esmfold.py --backend pjlab --sequence ...
-Default endpoint is read from AGENT_ESMFOLD_DEFAULT_BACKEND in .env (local or pjlab).
+Default endpoint is read from ESMFOLD_BACKEND in .env (local or pjlab).
 """
 import os
 import json
@@ -39,7 +39,7 @@ def _get_default_backend() -> str:
         load_dotenv()
     except ImportError:
         pass
-    backend = os.getenv("AGENT_ESMFOLD_DEFAULT_BACKEND", "local").strip().lower()
+    backend = os.getenv("ESMFOLD_BACKEND", "local").strip().lower()
     return backend if backend in ("local", "pjlab") else "local"
 
 
@@ -310,7 +310,7 @@ def predict_structure_sync(sequence: str, output_dir: str = "./protein_structure
                           output_file: Optional[str] = None) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
     """
     Synchronous structure prediction. Supports local (GPU) and pjlab (DrugSDA remote).
-    If backend is None, uses AGENT_ESMFOLD_DEFAULT_BACKEND from .env.
+    If backend is None, uses ESMFOLD_BACKEND from .env.
     """
     output_dir = output_dir or _get_default_output_dir()
     if output_dir == "./protein_structures":
@@ -416,7 +416,7 @@ if __name__ == "__main__":
     default_backend = _get_default_backend()
     parser = argparse.ArgumentParser(description="ESMFold structure prediction: local (GPU) / pjlab (remote)")
     parser.add_argument("--backend", type=str, default=None, choices=["local", "pjlab"],
-                        help=f"Backend (default from AGENT_ESMFOLD_DEFAULT_BACKEND={default_backend})")
+                        help=f"Backend (default from ESMFOLD_BACKEND={default_backend})")
     parser.add_argument("--sequence", type=str, default=None)
     parser.add_argument("--fasta_file", type=str, default=None)
     parser.add_argument("--fasta_chunk_num", type=int, default=None)

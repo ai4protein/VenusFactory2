@@ -401,9 +401,29 @@ def _format_search_summary(tool_name: str, tool_inputs: dict, observation_str: s
         if not n:
             return intro + " No results."
         first = refs[0] if refs and isinstance(refs[0], dict) else {}
-        title = (first.get("title") or first.get("citation") or "")[:100]
+        title = (first.get("title") or first.get("citation") or "")[:120]
         if title:
-            return intro + f" Found {n} paper(s). e.g. {title}…"
+            eg_parts = [f"*{title}*"]
+            authors = first.get("authors") or first.get("author") or ""
+            year = first.get("year") or first.get("publication_date") or ""
+            url = first.get("url") or first.get("link") or first.get("doi") or ""
+            if isinstance(authors, list):
+                a0 = authors[0] if authors else ""
+                if isinstance(a0, dict):
+                    a0 = a0.get("name") or a0.get("authorId") or ""
+                if a0:
+                    suffix = " et al." if len(authors) > 1 else ""
+                    yr = f", {str(year)[:4]}" if year else ""
+                    eg_parts.append(f"({a0}{suffix}{yr})")
+                elif year:
+                    eg_parts.append(f"({str(year)[:4]})")
+            elif year:
+                eg_parts.append(f"({str(year)[:4]})")
+            if url:
+                if not str(url).startswith("http"):
+                    url = f"https://doi.org/{url}"
+                eg_parts.append(f"[link]({url})")
+            return intro + f" Found {n} paper(s). e.g. " + " ".join(eg_parts)
         return intro + f" Found {n} paper(s)."
     if tool_name in ("query_tavily", "query_duckduckgo", "query_web_by_keywords"):
         res = data.get("results") or data or []
@@ -417,8 +437,19 @@ def _format_search_summary(tool_name: str, tool_inputs: dict, observation_str: s
             return intro + " No results."
         if isinstance(res, list) and res and isinstance(res[0], dict):
             first = res[0]
-            title = (first.get("title") or first.get("snippet") or str(first))[:100]
-            return intro + f" Found {n} result(s). e.g. {title}…"
+            title = (first.get("title") or "")[:100]
+            url = first.get("url") or first.get("link") or first.get("href") or ""
+            snippet = (first.get("snippet") or first.get("content") or first.get("description") or "")[:120]
+            if title and url:
+                eg = f"[{title}]({url})"
+                if snippet:
+                    eg += f" — {snippet}…"
+                return intro + f" Found {n} result(s). e.g. {eg}"
+            elif title:
+                eg = title
+                if snippet:
+                    eg += f" — {snippet}…"
+                return intro + f" Found {n} result(s). e.g. {eg}"
         return intro + f" Found {n} result(s)."
     if tool_name in ("query_github", "query_hugging_face", "query_dataset_by_keywords"):
         ds = data.get("datasets") or data.get("results") or data or []
@@ -430,6 +461,14 @@ def _format_search_summary(tool_name: str, tool_inputs: dict, observation_str: s
         n = len(ds) if isinstance(ds, list) else 0
         if not n:
             return intro + " No results."
+        if isinstance(ds, list) and ds and isinstance(ds[0], dict):
+            first = ds[0]
+            title = (first.get("title") or first.get("name") or first.get("id") or "")[:100]
+            url = first.get("url") or first.get("link") or first.get("href") or ""
+            if title and url:
+                return intro + f" Found {n} dataset(s). e.g. [{title}]({url})"
+            elif title:
+                return intro + f" Found {n} dataset(s). e.g. {title}"
         return intro + f" Found {n} dataset(s)."
     return intro + " Done."
 

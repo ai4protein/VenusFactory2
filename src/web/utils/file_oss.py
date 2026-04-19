@@ -10,7 +10,7 @@ from mcp import ClientSession
 
 load_dotenv()
 
-SCP_WORKFLOW_SERVER_URL = "http://115.190.136.251:8080/mcp"
+SCP_WORKFLOW_SERVER_URL = os.getenv("SCP_WORKFLOW_SERVER_URL", "http://115.190.136.251:8080/mcp")
 
 class SCPWorkflowClient:
     def __init__(self, server_url: str = SCP_WORKFLOW_SERVER_URL):

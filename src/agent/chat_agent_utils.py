@@ -248,9 +248,22 @@ def _get_output_file_path_from_raw(raw_output: Any, tool_name: str) -> str | Non
         pass
     return None
 
+_BINARY_EXTENSIONS = frozenset((
+    ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tiff", ".tif",
+    ".webp", ".ico", ".svg",
+    ".pdf", ".zip", ".gz", ".tar", ".bz2", ".xz", ".7z", ".rar",
+    ".pkl", ".pickle", ".pt", ".pth", ".bin", ".npy", ".npz",
+    ".h5", ".hdf5", ".ckpt", ".safetensors",
+    ".mp3", ".mp4", ".wav", ".avi", ".mov",
+    ".exe", ".dll", ".so", ".dylib",
+))
+
 def _read_output_file_preview(file_path: str, max_lines: int = 10, max_line_len: int = 200) -> str:
-    """Read first max_lines of a file for CB verification. Returns preview string or empty on error."""
+    """Read first max_lines of a file for CB verification. Returns preview string or empty on error. Skips binary files."""
     if not file_path or not os.path.isfile(file_path):
+        return ""
+    ext = os.path.splitext(file_path)[1].lower()
+    if ext in _BINARY_EXTENSIONS:
         return ""
     try:
         lines = []

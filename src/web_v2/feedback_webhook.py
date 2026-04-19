@@ -44,14 +44,18 @@ async def dispatch_webhook(event_type: str, data: Dict[str, Any]) -> bool:
                 return False
             return True
     except ImportError:
+        import asyncio
         import urllib.request
 
-        req = urllib.request.Request(
-            cfg.webhook_url, data=payload, headers=headers, method="POST"
-        )
-        try:
+        def _sync_post():
+            req = urllib.request.Request(
+                cfg.webhook_url, data=payload, headers=headers, method="POST"
+            )
             with urllib.request.urlopen(req, timeout=cfg.webhook_timeout) as resp:
                 return resp.status < 400
+
+        try:
+            return await asyncio.to_thread(_sync_post)
         except Exception as e:
             _logger.warning("Webhook %s failed (urllib): %s", event_type, e)
             return False
