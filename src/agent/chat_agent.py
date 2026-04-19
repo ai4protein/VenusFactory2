@@ -31,6 +31,7 @@ from agent.prompts import (
     MLS_POST_STEP_CHECK,
     MLS_PROMPT,
     PI_CHAT_PROMPT,
+    PI_CLARIFICATION_PROMPT,
     PI_FINAL_REPORT_PROMPT,
     PI_PROMPT,
     PI_RESEARCH_PROMPT,
@@ -703,6 +704,11 @@ def create_pi_sections_chain(llm: BaseChatModel):
     return PI_SECTIONS_PROMPT | llm | StrOutputParser()
 
 
+def create_pi_clarification_chain(llm: BaseChatModel):
+    """PI: user question + sections → JSON array of 2-4 clarification questions."""
+    return PI_CLARIFICATION_PROMPT | llm | StrOutputParser()
+
+
 def create_pi_sub_report_chain(llm: BaseChatModel):
     """PI: one section name + focus + search results → one paragraph sub-report (with citations [1], [2])."""
     return PI_SUB_REPORT_PROMPT | llm | StrOutputParser()
@@ -815,6 +821,7 @@ def initialize_session_state() -> dict[str, Any]:
     pi_research_agent = create_pi_research_agent(llm, pi_tools)
     pi_report_chain = create_pi_report_chain(llm, pi_tools_description)
     pi_sections_chain = create_pi_sections_chain(llm)
+    pi_clarification_chain = create_pi_clarification_chain(llm)
     pi_sub_report_chain = create_pi_sub_report_chain(llm)
     pi_final_report_chain = create_pi_final_report_chain(llm)
     pi_suggest_steps_chain = create_pi_suggest_steps_chain(llm)
@@ -842,6 +849,7 @@ def initialize_session_state() -> dict[str, Any]:
         'pi_research_agent': pi_research_agent,
         'pi_report': pi_report_chain,
         'pi_sections': pi_sections_chain,
+        'pi_clarification': pi_clarification_chain,
         'pi_sub_report': pi_sub_report_chain,
         'pi_final_report': pi_final_report_chain,
         'pi_suggest_steps': pi_suggest_steps_chain,

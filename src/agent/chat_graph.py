@@ -124,6 +124,13 @@ class AgentState(TypedDict):
     current_search_results: list[str]
     research_sub_reports: list[str]
 
+    # Clarification state
+    clarification_questions: list[dict[str, Any]]
+    clarification_answers: list[dict[str, Any]]
+
+    # Interactive flow control
+    waiting_for: str | None
+
     # Control flags
     status: str
     error: str | None
@@ -190,6 +197,9 @@ def _ui_text(lang: str, key: str, **kwargs) -> str:
         "tool_executed": "- **{tool}**：已执行",
         "task_ended": "任务已结束。详见上方结果。",
         "sub_report_failed": "(小报告生成失败：{section}，错误：{error})",
+        "clarification_title": "🤔 **Principal Investigator** 在开始研究之前，有几个问题需要确认：",
+        "plan_confirmation_title": "📋 **Computational Biologist** 已制定以下执行计划，请确认或编辑后再执行：\n\n{steps}",
+        "iteration_prompt": "🔄 **Principal Investigator** 结果已汇总完毕。请选择下一步操作：",
     }
     en = {
         "pipeline_title": "📋 **Pipeline**\n\nHere's what we'll do:\n\n{steps}",
@@ -211,6 +221,9 @@ def _ui_text(lang: str, key: str, **kwargs) -> str:
         "tool_executed": "- **{tool}**: executed",
         "task_ended": "Task ended. See results above.",
         "sub_report_failed": "(Sub-report failed for {section}: {error})",
+        "clarification_title": "🤔 **Principal Investigator** Before starting the research, I have a few questions to clarify your needs:",
+        "plan_confirmation_title": "📋 **Computational Biologist** has designed the following pipeline. Please review and confirm before execution:\n\n{steps}",
+        "iteration_prompt": "🔄 **Principal Investigator** Results have been summarized. Please choose what to do next:",
     }
     bundle = zh if lang == "zh" else en
     template = bundle.get(key, key)
@@ -252,6 +265,72 @@ def _parse_sections(raw: str) -> list[dict[str, Any]]:
         return parsed
     except:
         return []
+
+
+def _parse_clarification_questions(raw: str) -> list[dict[str, Any]]:
+    try:
+        raw = raw.strip()
+        if "```" in raw:
+            start = raw.find("```")
+            if "json" in raw[: start + 10]:
+                start = raw.find("```") + 7
+            else:
+                start = raw.find("```") + 3
+            end = raw.find("```", start)
+            raw = raw[start:end if end > 0 else None].strip()
+        i = raw.find("[")
+        if i >= 0:
+            depth = 0
+            for j in range(i, len(raw)):
+                if raw[j] == "[":
+                    depth += 1
+                elif raw[j] == "]":
+                    depth -= 1
+                    if depth == 0:
+                        raw = raw[i : j + 1]
+                        break
+        questions = json.loads(raw)
+        if not isinstance(questions, list):
+            return []
+        parsed = []
+        for q in questions[:4]:
+            if not isinstance(q, dict):
+                continue
+            question = (q.get("question") or "").strip()
+            options = q.get("options") or []
+            if isinstance(options, str):
+                options = [options]
+            if not question or not options:
+                continue
+            parsed.append({
+                "question": question,
+                "options": [str(o) for o in options],
+                "allow_multiple": bool(q.get("allow_multiple", False)),
+            })
+        return parsed if len(parsed) >= 2 else []
+    except Exception:
+        return []
+
+
+def _format_clarification_answers(questions: list[dict], answers: list[dict]) -> str:
+    parts = []
+    for i, ans in enumerate(answers):
+        if i >= len(questions):
+            break
+        q = questions[i]
+        selected = ans.get("selected_options", [])
+        custom = (ans.get("custom_text") or "").strip()
+        option_texts = []
+        for idx in selected:
+            if isinstance(idx, int) and 0 <= idx < len(q.get("options", [])):
+                opt = q["options"][idx]
+                if opt.lower() not in ("other", "其他"):
+                    option_texts.append(opt)
+        if custom:
+            option_texts.append(custom)
+        if option_texts:
+            parts.append(f"Q: {q['question']}\nA: {', '.join(option_texts)}")
+    return "\n\n".join(parts)
 
 
 def _get_chat_history_messages(chains: dict[str, Any], history: list[dict[str, Any]], current_input: str = "") -> list[BaseMessage]:
@@ -819,6 +898,18 @@ def _enforce_skill_first_plan(
     return enforced
 
 
+async def router_node(state: AgentState, config: RunnableConfig):
+    """Entry node: routes to the appropriate phase based on resume state."""
+    waiting_for = state.get("waiting_for")
+    if waiting_for == "clarification_answered":
+        return {"status": "resume_research"}
+    elif waiting_for == "plan_confirmed":
+        return {"status": "resume_execution"}
+    elif waiting_for == "iteration_rerun":
+        return {"status": "resume_execution"}
+    return {"status": "new_request"}
+
+
 async def research_plan_start_node(state: AgentState, config: RunnableConfig):
     """Initial node - passes through to research_plan_node for decision."""
     # Just pass through, research_plan_node will decide the path
@@ -849,12 +940,9 @@ async def research_plan_node(state: AgentState, config: RunnableConfig):
         _logger.warning("PI sections failed: %s", e)
         sections_list = []
 
-    # PI_SECTIONS_PROMPT is the routing authority here: [] means answer directly in chat mode,
-    # without handing the turn to CB/MLS.
     if not sections_list:
         return {"status": "chat_mode", "pi_report": "", "pi_suggest_steps": "", "ui_lang": ui_lang}
 
-    # This is a research request - show the analyzing message
     history.append({
         "role": "assistant",
         "content": "🤔 **Principal Investigator** 正在分析你的请求并制定研究计划..."
@@ -910,6 +998,65 @@ async def chat_node(state: AgentState, config: RunnableConfig):
         history.append({"role": "assistant", "content": err_msg, "role_id": "principal_investigator"})
 
     return {"history": history, "status": "completed"}
+
+
+async def clarification_start_node(state: AgentState, config: RunnableConfig):
+    """Show 'PI is preparing clarification questions'."""
+    history = list(state.get("history", []))
+    ui_lang = state.get("ui_lang") or _detect_ui_lang(state["messages"][-1].content)
+    if history and ("分析你的请求" in history[-1].get("content", "") or "analyzing your request" in history[-1].get("content", "").lower()):
+        history.pop()
+    return {"history": history, "ui_lang": ui_lang}
+
+
+async def clarification_node(state: AgentState, config: RunnableConfig):
+    """PI generates 2-4 clarification questions for the user to answer."""
+    chains = config.get("configurable", {}).get("chains", {})
+    text = state["messages"][-1].content
+    ui_lang = state.get("ui_lang") or _detect_ui_lang(text)
+    protein_ctx = state["protein_context"]
+    history = list(state.get("history", []))
+    sections = state.get("research_sections", [])
+    conversation_history = _format_conversation_history(chains, history, text)
+    sections_str = json.dumps(sections, ensure_ascii=False)
+
+    questions = []
+    try:
+        raw = await asyncio.to_thread(
+            chains["pi_clarification"].invoke,
+            {
+                "input": text,
+                "protein_context_summary": protein_ctx.get_context_summary(),
+                "conversation_history": conversation_history,
+                "research_sections": sections_str,
+            },
+        )
+        questions = _parse_clarification_questions(raw)
+    except Exception as e:
+        _logger.warning("PI clarification generation failed: %s", e)
+
+    if not questions:
+        return {
+            "clarification_questions": [],
+            "waiting_for": None,
+            "status": "resume_research",
+            "ui_lang": ui_lang,
+        }
+
+    title = _ui_text(ui_lang, "clarification_title")
+    history.append({
+        "role": "assistant",
+        "content": title,
+        "role_id": "principal_investigator",
+    })
+
+    return {
+        "clarification_questions": questions,
+        "waiting_for": "clarification",
+        "history": history,
+        "ui_lang": ui_lang,
+        "status": "waiting_for_clarification",
+    }
 
 
 async def research_search_start_node(state: AgentState, config: RunnableConfig):
@@ -1194,15 +1341,13 @@ async def plan_node(state: AgentState, config: RunnableConfig):
     normalized_plan = _enforce_skill_first_plan(normalized_plan, available_tools_list, skills_metadata, ui_lang)
 
     if not normalized_plan:
-        # No tools needed - this might be a greeting or simple question
-        # Route to chat mode for a natural response
         return {"plan": [], "history": history, "status": "chat_mode"}
 
     step_lines = [
         (f"**第 {p['step']} 步。** {p['task_description']}" if ui_lang == "zh" else f"**Step {p['step']}.** {p['task_description']}")
         for p in normalized_plan
     ]
-    plan_text = _ui_text(ui_lang, "pipeline_title", steps="\n\n".join(step_lines))
+    plan_text = _ui_text(ui_lang, "plan_confirmation_title", steps="\n\n".join(step_lines))
     history.append({"role": "assistant", "content": plan_text, "role_id": "computational_biologist"})
     log_entries.append({"role": "assistant", "content": plan_text, "role_id": "computational_biologist", "timestamp": datetime.now().isoformat()})
 
@@ -1216,7 +1361,8 @@ async def plan_node(state: AgentState, config: RunnableConfig):
         "failed_step": None,
         "failed_reason": None,
         "ui_lang": ui_lang,
-        "status": "planned"
+        "waiting_for": "plan_confirmation",
+        "status": "waiting_for_plan_confirmation"
     }
 
 
@@ -1861,7 +2007,12 @@ async def finalize_node(state: AgentState, config: RunnableConfig):
             summary = _ui_text(ui_lang, "task_ended")
         history.append({"role": "assistant", "content": summary, "role_id": "principal_investigator"})
 
-    return {"history": history, "status": "completed"}
+    history.append({
+        "role": "assistant",
+        "content": _ui_text(ui_lang, "iteration_prompt"),
+        "role_id": "principal_investigator",
+    })
+    return {"history": history, "status": "waiting_for_iteration", "waiting_for": "iteration"}
 
 
 def should_continue_research(state: AgentState):
@@ -1896,10 +2047,38 @@ def should_continue(state: AgentState):
     return "finalize_start_node"
 
 
+def _route_from_router(state: AgentState):
+    status = state.get("status", "")
+    if status == "resume_research":
+        return "research_search_start_node"
+    if status == "resume_execution":
+        return "execute_start_node"
+    return "research_plan_start_node"
+
+
+def _route_from_clarification(state: AgentState):
+    if state.get("status") == "resume_research":
+        return "research_search_start_node"
+    return END
+
+
+def _route_from_plan(state: AgentState):
+    status = state.get("status", "")
+    if status == "chat_mode":
+        return "chat_start_node"
+    if status == "planning_failed" or not state.get("plan"):
+        return "finalize_start_node"
+    return END
+
+
 def create_agent_graph():
     workflow = StateGraph(AgentState)
+
+    workflow.add_node("router_node", router_node)
     workflow.add_node("research_plan_start_node", research_plan_start_node)
     workflow.add_node("research_plan_node", research_plan_node)
+    workflow.add_node("clarification_start_node", clarification_start_node)
+    workflow.add_node("clarification_node", clarification_node)
     workflow.add_node("chat_start_node", chat_start_node)
     workflow.add_node("chat_node", chat_node)
     workflow.add_node("research_search_start_node", research_search_start_node)
@@ -1915,26 +2094,31 @@ def create_agent_graph():
     workflow.add_node("finalize_start_node", finalize_start_node)
     workflow.add_node("finalize_node", finalize_node)
 
-    workflow.add_edge(START, "research_plan_start_node")
+    workflow.add_edge(START, "router_node")
+    workflow.add_conditional_edges("router_node", _route_from_router)
+
     workflow.add_edge("research_plan_start_node", "research_plan_node")
     workflow.add_conditional_edges(
         "research_plan_node",
-        lambda s: "chat_start_node" if s.get("status") == "chat_mode" else ("plan_start_node" if s.get("status") == "research_skipped" else "research_search_start_node"),
+        lambda s: "chat_start_node" if s.get("status") == "chat_mode" else "clarification_start_node",
     )
-    # Chat mode nodes for direct answers when PI sections returns [].
+
+    workflow.add_edge("clarification_start_node", "clarification_node")
+    workflow.add_conditional_edges("clarification_node", _route_from_clarification)
+
     workflow.add_edge("chat_start_node", "chat_node")
     workflow.add_edge("chat_node", END)
+
     workflow.add_edge("research_search_start_node", "research_search_node")
     workflow.add_conditional_edges("research_search_node", should_continue_research)
     workflow.add_edge("research_sub_report_start_node", "research_sub_report_node")
     workflow.add_edge("research_sub_report_node", "research_search_start_node")
     workflow.add_edge("research_report_start_node", "research_report_node")
     workflow.add_edge("research_report_node", "plan_start_node")
+
     workflow.add_edge("plan_start_node", "plan_node")
-    workflow.add_conditional_edges(
-        "plan_node",
-        lambda s: "chat_start_node" if s.get("status") == "chat_mode" else ("finalize_start_node" if s.get("status") == "planning_failed" or not s.get("plan") else "execute_start_node"),
-    )
+    workflow.add_conditional_edges("plan_node", _route_from_plan)
+
     workflow.add_edge("execute_start_node", "execute_node")
     workflow.add_conditional_edges("execute_node", should_continue)
     workflow.add_edge("finalize_start_node", "finalize_node")

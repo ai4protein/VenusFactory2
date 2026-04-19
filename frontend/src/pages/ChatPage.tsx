@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChatTimeline } from "../components/ChatTimeline";
+import { PipelineProgress } from "../components/PipelineProgress";
+import { ClarificationForm } from "../components/ClarificationForm";
+import { IterationDecision } from "../components/IterationDecision";
+import { PlanEditor } from "../components/PlanEditor";
 import {
   cancelChatSession,
   createChatSession,
@@ -7,9 +11,14 @@ import {
   getChatQuota,
   getChatSession,
   getChatSessionAuthHeaders,
+  getClarificationRespondUrl,
+  getPlanConfirmUrl,
+  iterationDecide,
   listChatSessions,
   type ChatQuota,
   type ChatSnapshot,
+  type ClarificationAnswer,
+  type PlanStep,
   uploadFiles
 } from "../lib/api";
 import { streamSSEFromPost } from "../lib/sse";
@@ -78,7 +87,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   useEffect(() => {
     const s = (snapshot?.status || "").toLowerCase();
     if (!s) return;
-    if (s === "stopped") {
+    if (s === "stopped" || s === "waiting_for_clarification" || s === "waiting_for_plan_confirmation" || s === "waiting_for_iteration") {
       setRunStatus("stopped");
       return;
     }
@@ -409,6 +418,89 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     }, 600);
   }
 
+  async function submitClarification(answers: ClarificationAnswer[]) {
+    if (!sessionId || running) return;
+    setError("");
+    setRunning(true);
+    setRunStatus("running");
+    abortRef.current = new AbortController();
+    try {
+      await streamSSEFromPost(
+        getClarificationRespondUrl(sessionId),
+        { answers },
+        handleStreamEvent,
+        abortRef.current.signal,
+        getChatSessionAuthHeaders(sessionId)
+      );
+      await fetchSessions();
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        setRunStatus("stopped");
+        return;
+      }
+      setError(err instanceof Error ? err.message : "Failed to submit clarification.");
+      setRunStatus("stopped");
+    } finally {
+      setRunning(false);
+      setStreamingIdx(-1);
+      abortRef.current = null;
+    }
+  }
+
+  async function confirmPlan(plan: PlanStep[]) {
+    if (!sessionId || running) return;
+    setError("");
+    setRunning(true);
+    setRunStatus("running");
+    abortRef.current = new AbortController();
+    try {
+      await streamSSEFromPost(
+        getPlanConfirmUrl(sessionId),
+        { plan },
+        handleStreamEvent,
+        abortRef.current.signal,
+        getChatSessionAuthHeaders(sessionId)
+      );
+      await fetchSessions();
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        setRunStatus("stopped");
+        return;
+      }
+      setError(err instanceof Error ? err.message : "Failed to confirm plan.");
+      setRunStatus("stopped");
+    } finally {
+      setRunning(false);
+      setStreamingIdx(-1);
+      abortRef.current = null;
+    }
+  }
+
+  async function handleIterationDecision(action: "satisfied" | "modify_plan" | "continue") {
+    if (!sessionId || running) return;
+    setError("");
+    try {
+      const result = await iterationDecide(sessionId, action);
+      if (result.status === "waiting_for_plan_confirmation" && result.plan) {
+        setSnapshot(prev => prev ? {
+          ...prev,
+          status: "waiting_for_plan_confirmation",
+          waiting_for: "plan_confirmation",
+          plan: result.plan!,
+        } : prev);
+      } else {
+        setSnapshot(prev => prev ? {
+          ...prev,
+          status: result.status,
+          waiting_for: "",
+        } : prev);
+      }
+      await refreshCurrentSession();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to process iteration decision.");
+    }
+  }
+
   async function copySessionId(value: string) {
     try {
       await navigator.clipboard.writeText(value);
@@ -427,6 +519,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     void sendMessage();
   }
 
+  const isWaitingForInteraction = snapshot?.status === "waiting_for_clarification" || snapshot?.status === "waiting_for_plan_confirmation" || snapshot?.status === "waiting_for_iteration";
   const quotaExhausted = Boolean(chatQuota?.enforced && (chatQuota.remaining ?? 0) <= 0);
   const sendTooltip = chatQuota?.enforced
     ? quotaExhausted
@@ -519,7 +612,82 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
 
         <section className="chat-panel center">
           <div className="timeline-wrap" ref={timelineRef}>
-            <ChatTimeline items={snapshot?.history || []} streamingIndex={streamingIdx} />
+            {snapshot && running && (
+              <PipelineProgress
+                status={snapshot.status}
+                plan={snapshot.plan || []}
+                toolExecutions={snapshot.tool_executions || []}
+              />
+            )}
+            <ChatTimeline
+              items={snapshot?.history || []}
+              streamingIndex={streamingIdx}
+              onSuggestedPrompt={(text) => setMessage(text)}
+            />
+            {snapshot?.status === "waiting_for_clarification" &&
+              snapshot.clarification_questions?.length > 0 && (
+                <div className="chat-msg assistant with-avatar">
+                  <img
+                    className="chat-msg-avatar"
+                    src="/img/agent_role/principal_investigator.png"
+                    alt="Principal Investigator"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src =
+                        "https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png";
+                    }}
+                  />
+                  <div className="chat-msg-content">
+                    <div className="chat-msg-role">Principal Investigator</div>
+                    <ClarificationForm
+                      questions={snapshot.clarification_questions}
+                      onSubmit={submitClarification}
+                      disabled={running}
+                    />
+                  </div>
+                </div>
+              )}
+            {snapshot?.status === "waiting_for_plan_confirmation" &&
+              snapshot.plan?.length > 0 && (
+                <div className="chat-msg assistant with-avatar">
+                  <img
+                    className="chat-msg-avatar"
+                    src="/img/agent_role/computational_biologist.png"
+                    alt="Computational Biologist"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src =
+                        "https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png";
+                    }}
+                  />
+                  <div className="chat-msg-content">
+                    <div className="chat-msg-role">Computational Biologist</div>
+                    <PlanEditor
+                      plan={snapshot.plan}
+                      onConfirm={confirmPlan}
+                      disabled={running}
+                    />
+                  </div>
+                </div>
+              )}
+            {snapshot?.status === "waiting_for_iteration" && (
+              <div className="chat-msg assistant with-avatar">
+                <img
+                  className="chat-msg-avatar"
+                  src="/img/agent_role/principal_investigator.png"
+                  alt="Principal Investigator"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src =
+                      "https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png";
+                  }}
+                />
+                <div className="chat-msg-content">
+                  <div className="chat-msg-role">Principal Investigator</div>
+                  <IterationDecision
+                    onDecide={handleIterationDecision}
+                    disabled={running}
+                  />
+                </div>
+              </div>
+            )}
           </div>
           <div className="composer">
             {chatQuota?.enforced && (
@@ -534,8 +702,8 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={onComposerKeyDown}
-              placeholder="Ask anything about AI protein engineering..."
-              disabled={running || quotaExhausted}
+              placeholder={isWaitingForInteraction ? "Please respond to the form above..." : "Ask anything about AI protein engineering..."}
+              disabled={running || quotaExhausted || isWaitingForInteraction}
             />
             <div className="composer-row">
               <select value={selectedModel} onChange={(e) => setSelectedModel(e.target.value)} aria-label="Model">

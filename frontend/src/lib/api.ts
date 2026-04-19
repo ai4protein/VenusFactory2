@@ -4,6 +4,25 @@ export type ChatHistoryItem = {
   role_id?: string;
 };
 
+export type ClarificationQuestion = {
+  question: string;
+  options: string[];
+  allow_multiple: boolean;
+};
+
+export type ClarificationAnswer = {
+  question_index: number;
+  selected_options: number[];
+  custom_text: string;
+};
+
+export type PlanStep = {
+  step: number;
+  task_description: string;
+  tool_name: string;
+  tool_input: Record<string, unknown>;
+};
+
 export type ChatSnapshot = {
   session_id: string;
   model_name: string;
@@ -12,6 +31,9 @@ export type ChatSnapshot = {
   conversation_log: Array<Record<string, unknown>>;
   tool_executions: Array<Record<string, unknown>>;
   status: string;
+  clarification_questions: ClarificationQuestion[];
+  plan: PlanStep[];
+  waiting_for: string;
 };
 
 export type ChatQuota = {
@@ -256,6 +278,36 @@ export async function getChatQuota() {
     throw new Error(`Fetch chat quota failed: ${res.status}`);
   }
   return res.json() as Promise<ChatQuota>;
+}
+
+export function getClarificationRespondUrl(sessionId: string): string {
+  return `${API_ROOT}/api/chat/sessions/${encodeURIComponent(sessionId)}/clarification/respond/stream`;
+}
+
+export function getPlanConfirmUrl(sessionId: string): string {
+  return `${API_ROOT}/api/chat/sessions/${encodeURIComponent(sessionId)}/plan/confirm/stream`;
+}
+
+export async function iterationDecide(
+  sessionId: string,
+  action: "satisfied" | "modify_plan" | "continue"
+) {
+  const res = await fetch(
+    `${API_ROOT}/api/chat/sessions/${encodeURIComponent(sessionId)}/iteration/decide`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...getChatSessionAuthHeaders(sessionId),
+      },
+      body: JSON.stringify({ action }),
+    }
+  );
+  if (!res.ok) {
+    const detail = await extractErrorDetail(res);
+    throw new Error(parseErrorStatus(res.status, detail));
+  }
+  return res.json() as Promise<{ success: boolean; status: string; plan?: PlanStep[] }>;
 }
 
 function withTimeRange(fromIso: string, toIso: string) {

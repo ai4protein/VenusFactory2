@@ -21,7 +21,7 @@ from agent.chat_agent_utils import (
     extract_sequence_from_message,
     extract_uniprot_id_from_message,
 )
-from agent.chat_graph import create_agent_graph
+from agent.chat_graph import _format_clarification_answers, create_agent_graph
 from config import get_config
 from logger import get_logger
 from web.utils.common_utils import (
@@ -126,12 +126,34 @@ class SessionStateResponse(BaseModel):
     history: list[dict[str, Any]]
     conversation_log: list[dict[str, Any]]
     tool_executions: list[dict[str, Any]]
+    status: str = ""
+    clarification_questions: list[dict[str, Any]] = Field(default_factory=list)
+    plan: list[dict[str, Any]] = Field(default_factory=list)
+    waiting_for: str = ""
 
 
 class ChatStreamRequest(BaseModel):
     text: str = Field(default="")
     model: Optional[str] = Field(default=None)
     attachment_paths: list[str] = Field(default_factory=list)
+
+
+class ClarificationAnswer(BaseModel):
+    question_index: int = 0
+    selected_options: list[int] = Field(default_factory=list)
+    custom_text: str = ""
+
+
+class ClarificationResponseRequest(BaseModel):
+    answers: list[ClarificationAnswer] = Field(default_factory=list)
+
+
+class PlanConfirmRequest(BaseModel):
+    plan: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class IterationDecideRequest(BaseModel):
+    action: str = Field(default="satisfied")
 
 
 def _to_json(data: dict[str, Any]) -> str:
@@ -157,6 +179,9 @@ def _snapshot(state: dict[str, Any]) -> dict[str, Any]:
         "conversation_log": _redact_obj(list(state.get("conversation_log", []))),
         "tool_executions": _redact_obj(list(state.get("tool_executions", []))),
         "status": state.get("status", ""),
+        "clarification_questions": list(state.get("clarification_questions", [])),
+        "plan": list(state.get("plan", [])),
+        "waiting_for": state.get("waiting_for", ""),
     }
 
 
@@ -449,6 +474,9 @@ async def _stream_graph(
         "execution_failed": bool(state.get("execution_failed", False)),
         "failed_step": state.get("failed_step"),
         "failed_reason": state.get("failed_reason"),
+        "clarification_questions": [],
+        "clarification_answers": [],
+        "waiting_for": None,
     }
     graph = create_agent_graph()
     config = {
@@ -465,6 +493,7 @@ async def _stream_graph(
         "research_idx", "search_idx", "current_search_results",
         "research_sub_reports", "tool_cache", "execution_failed",
         "failed_step", "failed_reason",
+        "clarification_questions", "clarification_answers", "waiting_for",
     }
 
     async for stream_mode, data in graph.astream(
@@ -494,17 +523,20 @@ async def _stream_graph(
                             state[key] = val
             yield f"event: state\ndata: {_to_json(_snapshot(state))}\n\n"
 
-    final_content = state["history"][-1]["content"] if state.get("history") else ""
-    _append_dialogue_memory(state, display_text, final_content)
-    if final_content:
-        state.setdefault("conversation_log", []).append(
-            {"role": "assistant", "content": final_content, "timestamp": datetime.now().isoformat()}
-        )
-    try:
-        state["memory"].save_context({"input": display_text}, {"output": final_content})
-    except Exception:
-        pass
-    state["status"] = "completed"
+    final_status = state.get("status", "")
+    _WAITING_STATUSES = ("waiting_for_clarification", "waiting_for_plan_confirmation", "waiting_for_iteration")
+    if final_status not in _WAITING_STATUSES:
+        final_content = state["history"][-1]["content"] if state.get("history") else ""
+        _append_dialogue_memory(state, display_text, final_content)
+        if final_content:
+            state.setdefault("conversation_log", []).append(
+                {"role": "assistant", "content": final_content, "timestamp": datetime.now().isoformat()}
+            )
+        try:
+            state["memory"].save_context({"input": display_text}, {"output": final_content})
+        except Exception:
+            pass
+        state["status"] = "completed"
     yield f"event: state\ndata: {_to_json(_snapshot(state))}\n\n"
     yield "event: done\ndata: {}\n\n"
 
@@ -682,3 +714,275 @@ async def cancel_session_run(session_id: str, request: Request):
     state["status"] = "stopping"
     await _set_cancel(session_id, True)
     return {"success": True, "status": "stopping"}
+
+
+async def _stream_graph_resume(
+    state: dict[str, Any],
+    waiting_for: str,
+    extra_state: dict[str, Any] | None = None,
+):
+    """Resume a graph run from a checkpoint (clarification answered or plan confirmed)."""
+    if await _is_cancelled(state["session_id"]):
+        state["status"] = "stopped"
+        yield f"event: state\ndata: {_to_json(_snapshot(state))}\n\n"
+        yield "event: done\ndata: {}\n\n"
+        return
+
+    agent_session_dir = state.get("agent_session_dir")
+    if not agent_session_dir:
+        raise RuntimeError("Agent session directory is missing.")
+
+    protein_ctx = state["protein_context"]
+    is_zh = _is_zh_text(state.get("last_user_text", ""))
+    original_text = state.get("last_user_text", "")
+
+    initial_state = {
+        "messages": [HumanMessage(content=original_text)],
+        "protein_context": protein_ctx,
+        "session_id": state["session_id"],
+        "agent_session_dir": agent_session_dir,
+        "history": list(state["history"]),
+        "conversation_log": list(state.get("conversation_log", [])),
+        "dialogue_memory": list(state.get("dialogue_memory", [])),
+        "tool_executions": list(state.get("tool_executions", [])),
+        "tool_cache": dict(state.get("tool_cache", {})),
+        "status": "started",
+        "pi_report": state.get("pi_report", ""),
+        "pi_suggest_steps": state.get("pi_suggest_steps", ""),
+        "plan": list(state.get("plan", [])),
+        "current_step_index": state.get("current_step_index", 0),
+        "step_results": dict(state.get("step_results", {})),
+        "error": None,
+        "research_sections": list(state.get("research_sections", [])),
+        "research_idx": 0,
+        "search_idx": 0,
+        "current_search_results": [],
+        "research_sub_reports": list(state.get("research_sub_reports", [])),
+        "execution_failed": False,
+        "failed_step": None,
+        "failed_reason": None,
+        "clarification_questions": list(state.get("clarification_questions", [])),
+        "clarification_answers": list(state.get("clarification_answers", [])),
+        "waiting_for": waiting_for,
+    }
+    if extra_state:
+        initial_state.update(extra_state)
+
+    graph = create_agent_graph()
+    config = {
+        "configurable": {"chains": state, "session_id": state["session_id"]},
+        "recursion_limit": 100,
+    }
+
+    state["status"] = "started"
+    yield f"event: state\ndata: {_to_json(_snapshot(state))}\n\n"
+
+    _STREAM_STATE_KEYS = {
+        "history", "conversation_log", "tool_executions", "status",
+        "pi_report", "pi_suggest_steps", "plan", "protein_context",
+        "current_step_index", "step_results", "research_sections",
+        "research_idx", "search_idx", "current_search_results",
+        "research_sub_reports", "tool_cache", "execution_failed",
+        "failed_step", "failed_reason",
+        "clarification_questions", "clarification_answers", "waiting_for",
+    }
+
+    async for stream_mode, data in graph.astream(
+        initial_state, config=config, stream_mode=["updates", "custom"]
+    ):
+        if await _is_cancelled(state["session_id"]):
+            state["status"] = "stopped"
+            state.setdefault("history", []).append({
+                "role": "assistant",
+                "content": "用户已停止本次运行。" if is_zh else "Run stopped by user.",
+                "role_id": "principal_investigator",
+            })
+            yield f"event: state\ndata: {_to_json(_snapshot(state))}\n\n"
+            yield "event: done\ndata: {}\n\n"
+            return
+
+        if stream_mode == "custom":
+            event_type = data.get("type", "token") if isinstance(data, dict) else "token"
+            yield f"event: {event_type}\ndata: {_to_json(data)}\n\n"
+        elif stream_mode == "updates":
+            for _, updates in data.items():
+                if updates:
+                    for key, val in updates.items():
+                        if key in _STREAM_STATE_KEYS:
+                            state[key] = val
+            yield f"event: state\ndata: {_to_json(_snapshot(state))}\n\n"
+
+    final_status = state.get("status", "")
+    _WAITING_STATUSES = ("waiting_for_clarification", "waiting_for_plan_confirmation", "waiting_for_iteration")
+    if final_status not in _WAITING_STATUSES:
+        final_content = state["history"][-1]["content"] if state.get("history") else ""
+        _append_dialogue_memory(state, original_text, final_content)
+        if final_content:
+            state.setdefault("conversation_log", []).append({
+                "role": "assistant", "content": final_content,
+                "timestamp": datetime.now().isoformat(),
+            })
+        try:
+            state["memory"].save_context({"input": original_text}, {"output": final_content})
+        except Exception:
+            pass
+        state["status"] = "completed"
+
+    yield f"event: state\ndata: {_to_json(_snapshot(state))}\n\n"
+    yield "event: done\ndata: {}\n\n"
+
+
+@router.post("/sessions/{session_id}/clarification/respond/stream")
+async def stream_clarification_response(
+    session_id: str,
+    payload: ClarificationResponseRequest,
+    request: Request,
+):
+    _record_access_event(request, "/api/chat/sessions/{id}/clarification/respond/stream")
+    state = await _get_session_or_404(session_id)
+    _assert_session_access(state, request)
+    await _set_cancel(session_id, False)
+
+    if state.get("waiting_for") != "clarification" and state.get("status") != "waiting_for_clarification":
+        raise HTTPException(status_code=400, detail="Session is not waiting for clarification.")
+
+    questions = state.get("clarification_questions", [])
+    answers_data = [a.model_dump() for a in payload.answers]
+    state["clarification_answers"] = answers_data
+
+    answers_summary = _format_clarification_answers(questions, answers_data)
+    is_zh = _is_zh_text(state.get("last_user_text", ""))
+    state["history"].append({
+        "role": "user",
+        "content": ("📝 **需求补充说明：**\n\n" if is_zh else "📝 **Clarification Details:**\n\n") + answers_summary,
+    })
+
+    original_text = state.get("last_user_text", "")
+    enriched_text = f"{original_text}\n\n[Clarification Details]\n{answers_summary}"
+    state["last_user_text"] = enriched_text
+
+    lock = await _get_lock(session_id)
+
+    async def event_gen():
+        async with lock:
+            async for chunk in _stream_graph_resume(
+                state,
+                waiting_for="clarification_answered",
+            ):
+                yield chunk
+
+    return StreamingResponse(event_gen(), media_type="text/event-stream")
+
+
+@router.post("/sessions/{session_id}/plan/confirm/stream")
+async def stream_plan_confirmation(
+    session_id: str,
+    payload: PlanConfirmRequest,
+    request: Request,
+):
+    _record_access_event(request, "/api/chat/sessions/{id}/plan/confirm/stream")
+    state = await _get_session_or_404(session_id)
+    _assert_session_access(state, request)
+    await _set_cancel(session_id, False)
+
+    if state.get("waiting_for") != "plan_confirmation" and state.get("status") != "waiting_for_plan_confirmation":
+        raise HTTPException(status_code=400, detail="Session is not waiting for plan confirmation.")
+
+    confirmed_plan = payload.plan
+    state["plan"] = confirmed_plan
+
+    is_zh = _is_zh_text(state.get("last_user_text", ""))
+    state["history"].append({
+        "role": "user",
+        "content": "✅ 已确认执行计划。" if is_zh else "✅ Plan confirmed.",
+    })
+
+    lock = await _get_lock(session_id)
+
+    async def event_gen():
+        async with lock:
+            async for chunk in _stream_graph_resume(
+                state,
+                waiting_for="plan_confirmed",
+                extra_state={
+                    "plan": confirmed_plan,
+                    "current_step_index": 0,
+                    "step_results": {},
+                },
+            ):
+                yield chunk
+
+    return StreamingResponse(event_gen(), media_type="text/event-stream")
+
+
+@router.post("/sessions/{session_id}/iteration/decide")
+async def iteration_decide(
+    session_id: str,
+    payload: IterationDecideRequest,
+    request: Request,
+):
+    _record_access_event(request, "/api/chat/sessions/{id}/iteration/decide")
+    state = await _get_session_or_404(session_id)
+    _assert_session_access(state, request)
+
+    if state.get("waiting_for") != "iteration" and state.get("status") != "waiting_for_iteration":
+        raise HTTPException(status_code=400, detail="Session is not waiting for iteration decision.")
+
+    action = payload.action
+    is_zh = _is_zh_text(state.get("last_user_text", ""))
+
+    if action == "modify_plan":
+        state["status"] = "waiting_for_plan_confirmation"
+        state["waiting_for"] = "plan_confirmation"
+        state["history"].append({
+            "role": "user",
+            "content": "🔄 希望修改计划并重新执行。" if is_zh else "🔄 I'd like to modify the plan and re-execute.",
+        })
+        return {
+            "success": True,
+            "status": "waiting_for_plan_confirmation",
+            "plan": list(state.get("plan", [])),
+        }
+
+    if action == "continue":
+        state["status"] = "completed"
+        state["waiting_for"] = None
+        state["history"].append({
+            "role": "user",
+            "content": "➕ 继续分析，我有新的指令。" if is_zh else "➕ Continue analysis with new instructions.",
+        })
+        original_text = state.get("last_user_text", "")
+        final_content = ""
+        for item in reversed(state.get("history", [])):
+            if item.get("role") == "assistant" and item.get("role_id") == "principal_investigator":
+                content = item.get("content", "")
+                if "iteration_prompt" not in content and "请选择下一步" not in content and "Please choose" not in content:
+                    final_content = content
+                    break
+        _append_dialogue_memory(state, original_text, final_content)
+        try:
+            state["memory"].save_context({"input": original_text}, {"output": final_content})
+        except Exception:
+            pass
+        return {"success": True, "status": "completed"}
+
+    state["status"] = "completed"
+    state["waiting_for"] = None
+    state["history"].append({
+        "role": "user",
+        "content": "✅ 对结果满意，任务完成。" if is_zh else "✅ Satisfied with the results. Task complete.",
+    })
+    original_text = state.get("last_user_text", "")
+    final_content = ""
+    for item in reversed(state.get("history", [])):
+        if item.get("role") == "assistant" and item.get("role_id") == "principal_investigator":
+            content = item.get("content", "")
+            if "iteration_prompt" not in content and "请选择下一步" not in content and "Please choose" not in content:
+                final_content = content
+                break
+    _append_dialogue_memory(state, original_text, final_content)
+    try:
+        state["memory"].save_context({"input": original_text}, {"output": final_content})
+    except Exception:
+        pass
+    return {"success": True, "status": "completed"}

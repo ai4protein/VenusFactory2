@@ -72,6 +72,13 @@ PI_SECTIONS_PROMPT = ChatPromptTemplate.from_messages([
     ("human", "Output only the JSON array of sections (max 5). No other text."),
 ])
 
+# --- PI Clarification: ask 2-4 questions before research ---
+PI_CLARIFICATION_TEMPLATE = _load_md("principal_investigator_clarification")
+PI_CLARIFICATION_PROMPT = ChatPromptTemplate.from_messages([
+    ("system", PI_CLARIFICATION_TEMPLATE),
+    ("human", "Output only the JSON array of clarification questions (2-4 questions). No other text."),
+])
+
 # --- PI Chat mode: direct responses for greetings and simple questions ---
 PI_CHAT_TEMPLATE = _load_md("principal_investigator_chat")
 PI_CHAT_PROMPT = ChatPromptTemplate.from_messages([

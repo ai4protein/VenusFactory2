@@ -210,6 +210,43 @@ async def download_file(file_path: str):
         raise HTTPException(status_code=500, detail="Failed to download file") from e
 
 
+_STRUCTURE_EXTENSIONS = {".pdb", ".cif", ".mmcif", ".ent", ".mol", ".sdf", ".mol2"}
+
+@app.get("/api/structure/content")
+async def get_structure_content(path: str, download: int = 0):
+    """Serve structure file content for inline Molstar visualization."""
+    import os as _os
+
+    project_root = Path(__file__).resolve().parent.parent
+    temp_base = Path(_os.getenv("TEMP_OUTPUTS_DIR", "temp_outputs"))
+    if not temp_base.is_absolute():
+        temp_base = project_root / temp_base
+    temp_base = temp_base.resolve()
+
+    candidate = (project_root / path).resolve()
+    allowed_roots = [temp_base, WEB_V2_RESULTS_ROOT, WEB_V2_UPLOAD_ROOT]
+    if not ensure_within_roots(candidate, allowed_roots):
+        raise HTTPException(status_code=403, detail="Access denied")
+    if not candidate.exists() or not candidate.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    if candidate.suffix.lower() not in _STRUCTURE_EXTENSIONS:
+        raise HTTPException(status_code=400, detail=f"Unsupported format: {candidate.suffix}")
+
+    if download:
+        return FileResponse(
+            path=str(candidate),
+            filename=candidate.name,
+            media_type="application/octet-stream",
+        )
+
+    content = candidate.read_text(encoding="utf-8", errors="replace")
+    return {
+        "content": content,
+        "filename": candidate.name,
+        "format": candidate.suffix.lstrip(".").lower(),
+    }
+
+
 @app.get("/", response_class=HTMLResponse)
 async def webui_v2_entry():
     frontend_dev_mode = _cfg.server.dev_mode
