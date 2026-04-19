@@ -288,6 +288,36 @@ export function getPlanConfirmUrl(sessionId: string): string {
   return `${API_ROOT}/api/chat/sessions/${encodeURIComponent(sessionId)}/plan/confirm/stream`;
 }
 
+export function getExperimentReportUrl(sessionId: string): string {
+  return `${API_ROOT}/api/chat/sessions/${encodeURIComponent(sessionId)}/report`;
+}
+
+export async function downloadExperimentReport(sessionId: string) {
+  const res = await fetch(getExperimentReportUrl(sessionId), {
+    headers: getChatSessionAuthHeaders(sessionId),
+  });
+  if (!res.ok) {
+    const detail = await extractErrorDetail(res);
+    throw new Error(parseErrorStatus(res.status, detail));
+  }
+  const disposition = res.headers.get("Content-Disposition") || "";
+  const filenameMatch = disposition.match(/filename="?([^"]+)"?/);
+  const filename = filenameMatch?.[1] || `experiment_report_${sessionId.slice(0, 8)}.md`;
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+export function getStepDecideUrl(sessionId: string): string {
+  return `${API_ROOT}/api/chat/sessions/${encodeURIComponent(sessionId)}/step/decide/stream`;
+}
+
 export async function iterationDecide(
   sessionId: string,
   action: "satisfied" | "modify_plan" | "continue"
@@ -308,6 +338,30 @@ export async function iterationDecide(
     throw new Error(parseErrorStatus(res.status, detail));
   }
   return res.json() as Promise<{ success: boolean; status: string; plan?: PlanStep[] }>;
+}
+
+export async function submitFeedback(
+  sessionId: string,
+  messageIndex: number,
+  rating: "like" | "dislike",
+  comment: string = ""
+) {
+  const res = await fetch(
+    `${API_ROOT}/api/chat/sessions/${encodeURIComponent(sessionId)}/feedback`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...getChatSessionAuthHeaders(sessionId),
+      },
+      body: JSON.stringify({ message_index: messageIndex, rating, comment }),
+    }
+  );
+  if (!res.ok) {
+    const detail = await extractErrorDetail(res);
+    throw new Error(parseErrorStatus(res.status, detail));
+  }
+  return res.json() as Promise<{ success: boolean; session_id: string; message_index: number }>;
 }
 
 function withTimeRange(fromIso: string, toIso: string) {

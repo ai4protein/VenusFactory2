@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
 import type { ChatHistoryItem } from "../lib/api";
+import { submitFeedback } from "../lib/api";
 import { MolstarViewer } from "./MolstarViewer";
 
 const DEFAULT_AVATAR = "https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png";
@@ -261,6 +262,58 @@ function RichAttachmentList({ attachments }: { attachments: RichAttachment[] }) 
   );
 }
 
+function FeedbackButtons({
+  sessionId,
+  messageIndex,
+}: {
+  sessionId: string;
+  messageIndex: number;
+}) {
+  const [rating, setRating] = useState<"like" | "dislike" | null>(null);
+  const [sending, setSending] = useState(false);
+
+  const handleRate = useCallback(
+    async (value: "like" | "dislike") => {
+      if (sending || rating === value) return;
+      setSending(true);
+      try {
+        await submitFeedback(sessionId, messageIndex, value);
+        setRating(value);
+      } catch {
+        // silently ignore
+      } finally {
+        setSending(false);
+      }
+    },
+    [sessionId, messageIndex, rating, sending]
+  );
+
+  return (
+    <div className="chat-feedback-buttons">
+      <button
+        className={`feedback-btn feedback-like${rating === "like" ? " active" : ""}`}
+        onClick={() => handleRate("like")}
+        disabled={sending}
+        title="Helpful"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M7 10v12" /><path d="M15 5.88L14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z" />
+        </svg>
+      </button>
+      <button
+        className={`feedback-btn feedback-dislike${rating === "dislike" ? " active" : ""}`}
+        onClick={() => handleRate("dislike")}
+        disabled={sending}
+        title="Not helpful"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M17 14V2" /><path d="M9 18.12L10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22h0a3.13 3.13 0 0 1-3-3.88Z" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
 function ChatMessageBody({ html }: { html: string }) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -309,9 +362,10 @@ interface ChatTimelineProps {
   items: ChatHistoryItem[];
   streamingIndex?: number;
   onSuggestedPrompt?: (text: string) => void;
+  sessionId?: string;
 }
 
-export function ChatTimeline({ items, streamingIndex = -1, onSuggestedPrompt }: ChatTimelineProps) {
+export function ChatTimeline({ items, streamingIndex = -1, onSuggestedPrompt, sessionId }: ChatTimelineProps) {
   return (
     <div className="chat-timeline">
       {items.length === 0 && (
@@ -374,6 +428,9 @@ export function ChatTimeline({ items, streamingIndex = -1, onSuggestedPrompt }: 
                     />
                   ))}
                 </div>
+              )}
+              {!isUser && !isStreaming && sessionId && (
+                <FeedbackButtons sessionId={sessionId} messageIndex={idx} />
               )}
             </div>
           </div>

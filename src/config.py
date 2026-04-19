@@ -219,6 +219,24 @@ class StorageConfig:
 # ---------------------------------------------------------------------------
 
 @dataclass(frozen=True)
+@dataclass(frozen=True)
+class FeedbackConfig:
+    webhook_url: str = ""
+    webhook_secret: str = ""
+    collect_conversations: bool = True
+    webhook_timeout: int = 10
+
+    @classmethod
+    def from_env(cls) -> FeedbackConfig:
+        return cls(
+            webhook_url=_env("VENUS_FEEDBACK_WEBHOOK_URL"),
+            webhook_secret=_env("VENUS_FEEDBACK_WEBHOOK_SECRET"),
+            collect_conversations=_env_bool("VENUS_FEEDBACK_COLLECT_CONVERSATIONS", True),
+            webhook_timeout=_env_int("VENUS_FEEDBACK_WEBHOOK_TIMEOUT", 10),
+        )
+
+
+@dataclass(frozen=True)
 class MCPConfig:
     host: str = "0.0.0.0"
     port: int = 8080
@@ -247,6 +265,7 @@ class VenusConfig:
     online_limits: OnlineLimitsConfig = field(default_factory=OnlineLimitsConfig)
     storage: StorageConfig = field(default_factory=StorageConfig)
     mcp: MCPConfig = field(default_factory=MCPConfig)
+    feedback: FeedbackConfig = field(default_factory=FeedbackConfig)
 
     @classmethod
     def from_env(cls) -> VenusConfig:
@@ -258,6 +277,7 @@ class VenusConfig:
             online_limits=OnlineLimitsConfig.from_env(),
             storage=StorageConfig.from_env(),
             mcp=MCPConfig.from_env(),
+            feedback=FeedbackConfig.from_env(),
         )
 
 

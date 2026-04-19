@@ -2722,6 +2722,56 @@ button:disabled {
   padding-left: 10px;
 }
 
+/* ── Feedback Buttons ── */
+.chat-feedback-buttons {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.chat-msg:hover .chat-feedback-buttons,
+.chat-feedback-buttons:focus-within {
+  opacity: 1;
+}
+.chat-feedback-buttons .feedback-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-soft);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+  padding: 0;
+}
+.chat-feedback-buttons .feedback-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.chat-feedback-buttons .feedback-btn:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.chat-feedback-buttons .feedback-like.active {
+  background: #e8f5e9;
+  border-color: #4caf50;
+  color: #2e7d32;
+  opacity: 1;
+}
+.chat-feedback-buttons .feedback-dislike.active {
+  background: #fce4ec;
+  border-color: #ef5350;
+  color: #c62828;
+  opacity: 1;
+}
+.chat-feedback-buttons .feedback-btn.active {
+  opacity: 1;
+}
+
 @media (max-width: 760px) {
   .pipeline-step-label {
     display: none;
@@ -6787,4 +6837,58 @@ input[type="file"]::file-selector-button:hover {
 .iteration-btn-hint {
   font-size: 0.75rem;
   color: var(--muted);
+}
+
+/* Step Checkpoint */
+.step-checkpoint {
+  margin-top: 8px;
+}
+.step-checkpoint-options {
+  display: flex;
+  gap: 10px;
+}
+.step-checkpoint-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: all 0.18s;
+}
+.step-checkpoint-btn:hover:not(:disabled) {
+  border-color: var(--primary);
+  background: var(--surface-strong);
+}
+.step-checkpoint-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.step-checkpoint-btn-icon {
+  font-size: 0.9rem;
+}
+.step-checkpoint-btn-continue { color: var(--text); }
+.step-checkpoint-btn-abort { color: var(--muted); }
+
+/* Report Download Button */
+.report-download-btn {
+  background: linear-gradient(135deg, #e6d5bb 0%, #dcc4a2 100%);
+  border: 1px solid rgba(144, 119, 88, 0.4);
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+.report-download-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #ebddc7 0%, #dfcaaa 100%);
+}
+.report-download-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }

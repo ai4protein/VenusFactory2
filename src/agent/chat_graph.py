@@ -200,6 +200,7 @@ def _ui_text(lang: str, key: str, **kwargs) -> str:
         "clarification_title": "🤔 **Principal Investigator** 在开始研究之前，有几个问题需要确认：",
         "plan_confirmation_title": "📋 **Computational Biologist** 已制定以下执行计划，请确认或编辑后再执行：\n\n{steps}",
         "iteration_prompt": "🔄 **Principal Investigator** 结果已汇总完毕。请选择下一步操作：",
+        "step_checkpoint": "🔍 **第 {step_num} 步已完成。** 请查看上方结果，并决定是否继续执行下一步（第 {next_step} 步：{next_desc}）。",
     }
     en = {
         "pipeline_title": "📋 **Pipeline**\n\nHere's what we'll do:\n\n{steps}",
@@ -224,6 +225,7 @@ def _ui_text(lang: str, key: str, **kwargs) -> str:
         "clarification_title": "🤔 **Principal Investigator** Before starting the research, I have a few questions to clarify your needs:",
         "plan_confirmation_title": "📋 **Computational Biologist** has designed the following pipeline. Please review and confirm before execution:\n\n{steps}",
         "iteration_prompt": "🔄 **Principal Investigator** Results have been summarized. Please choose what to do next:",
+        "step_checkpoint": "🔍 **Step {step_num} complete.** Review the results above and decide whether to continue to the next step (Step {next_step}: {next_desc}).",
     }
     bundle = zh if lang == "zh" else en
     template = bundle.get(key, key)
@@ -907,6 +909,10 @@ async def router_node(state: AgentState, config: RunnableConfig):
         return {"status": "resume_execution"}
     elif waiting_for == "iteration_rerun":
         return {"status": "resume_execution"}
+    elif waiting_for == "step_continue":
+        return {"status": "resume_execution"}
+    elif waiting_for == "step_abort":
+        return {"status": "resume_finalize"}
     return {"status": "new_request"}
 
 
@@ -1898,9 +1904,29 @@ async def execute_node(state: AgentState, config: RunnableConfig):
 
     history.append({"role": "assistant", "content": feedback_content, "role_id": "machine_learning_specialist"})
 
-    status = "execution_failed" if is_failure else "executing"
+    next_idx = idx + 1
+    has_more_steps = next_idx < len(plan)
+
+    if is_failure:
+        status = "execution_failed"
+        waiting_for_val = None
+    elif has_more_steps:
+        next_step = plan[next_idx]
+        next_step_num = _normalize_step_number(next_step.get("step"), next_idx + 1)
+        next_desc = next_step.get("task_description", "…")
+        history.append({
+            "role": "assistant",
+            "content": _ui_text(ui_lang, "step_checkpoint", step_num=step_num, next_step=next_step_num, next_desc=next_desc),
+            "role_id": "machine_learning_specialist",
+        })
+        status = "waiting_for_step_review"
+        waiting_for_val = "step_review"
+    else:
+        status = "executing"
+        waiting_for_val = None
+
     return {
-        "current_step_index": idx + 1,
+        "current_step_index": next_idx,
         "step_results": step_results,
         "history": history,
         "conversation_log": log_entries,
@@ -1910,6 +1936,7 @@ async def execute_node(state: AgentState, config: RunnableConfig):
         "execution_failed": is_failure,
         "failed_step": step_num if is_failure else None,
         "failed_reason": failure_reason if is_failure else None,
+        "waiting_for": waiting_for_val,
         "ui_lang": ui_lang,
     }
 
@@ -2038,6 +2065,8 @@ def should_continue(state: AgentState):
         return END
     if state.get("execution_failed"):
         return "finalize_start_node"
+    if state.get("status") == "waiting_for_step_review":
+        return END
 
     plan = state.get("plan", [])
     current_idx = state.get("current_step_index", 0)
@@ -2053,6 +2082,8 @@ def _route_from_router(state: AgentState):
         return "research_search_start_node"
     if status == "resume_execution":
         return "execute_start_node"
+    if status == "resume_finalize":
+        return "finalize_start_node"
     return "research_plan_start_node"
 
 

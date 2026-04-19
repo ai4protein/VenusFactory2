@@ -252,12 +252,46 @@ class AnalyticsStore:
                     )
                     """
                 )
+                conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS chat_feedback (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        ts TEXT NOT NULL,
+                        session_id TEXT NOT NULL,
+                        message_index INTEGER NOT NULL,
+                        rating TEXT NOT NULL,
+                        comment TEXT NOT NULL DEFAULT '',
+                        owner_key TEXT NOT NULL DEFAULT '',
+                        ip TEXT NOT NULL DEFAULT '',
+                        country_code TEXT NOT NULL DEFAULT 'UNKNOWN',
+                        model_name TEXT NOT NULL DEFAULT ''
+                    )
+                    """
+                )
+                conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS chat_conversations (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        ts TEXT NOT NULL,
+                        session_id TEXT NOT NULL UNIQUE,
+                        model_name TEXT NOT NULL DEFAULT '',
+                        messages TEXT NOT NULL DEFAULT '[]',
+                        message_count INTEGER NOT NULL DEFAULT 0,
+                        owner_key TEXT NOT NULL DEFAULT '',
+                        ip TEXT NOT NULL DEFAULT '',
+                        country_code TEXT NOT NULL DEFAULT 'UNKNOWN'
+                    )
+                    """
+                )
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_tool_calls_ts ON tool_calls(ts)")
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_tool_calls_tool_name ON tool_calls(tool_name)")
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_tool_calls_model ON tool_calls(model)")
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_tool_calls_country ON tool_calls(country_code)")
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_access_events_ts ON access_events(ts)")
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_access_events_country ON access_events(country_code)")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_feedback_ts ON chat_feedback(ts)")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_feedback_session ON chat_feedback(session_id)")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_conversations_ts ON chat_conversations(ts)")
             self._initialized = True
 
     def estimate_cost_usd(self, model: str, input_tokens: int, output_tokens: int) -> float:
@@ -380,6 +414,110 @@ class AnalyticsStore:
                 """,
                 (date, model or "", tool_name, input_tokens, output_tokens, total_tokens, estimated_cost),
             )
+
+    def record_feedback(
+        self,
+        *,
+        ts: str,
+        session_id: str,
+        message_index: int,
+        rating: str,
+        comment: str = "",
+        owner_key: str = "",
+        ip: str = "",
+        model_name: str = "",
+    ) -> None:
+        self.ensure_initialized()
+        if not self._enabled():
+            return
+        stamp = ts or _utc_now_iso()
+        geo = self.resolve_geo(ip)
+        with self._conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO chat_feedback (ts, session_id, message_index, rating, comment, owner_key, ip, country_code, model_name)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (stamp, session_id, message_index, rating, comment, owner_key or "", ip or "", geo.country_code, model_name),
+            )
+
+    def record_conversation(
+        self,
+        *,
+        ts: str,
+        session_id: str,
+        model_name: str,
+        messages: str,
+        message_count: int,
+        owner_key: str = "",
+        ip: str = "",
+    ) -> None:
+        self.ensure_initialized()
+        if not self._enabled():
+            return
+        stamp = ts or _utc_now_iso()
+        geo = self.resolve_geo(ip)
+        with self._conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO chat_conversations (ts, session_id, model_name, messages, message_count, owner_key, ip, country_code)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(session_id) DO UPDATE SET
+                    ts = excluded.ts,
+                    messages = excluded.messages,
+                    message_count = excluded.message_count
+                """,
+                (stamp, session_id, model_name, messages, message_count, owner_key or "", ip or "", geo.country_code),
+            )
+
+    def query_feedback(self, from_iso: str, to_iso: str) -> List[Dict[str, Any]]:
+        return self._fetch_rows(
+            """
+            SELECT id, ts, session_id, message_index, rating, comment, owner_key, country_code, model_name
+            FROM chat_feedback
+            WHERE ts >= ? AND ts <= ?
+            ORDER BY ts DESC
+            """,
+            (from_iso, to_iso),
+        )
+
+    def query_feedback_summary(self, from_iso: str, to_iso: str) -> Dict[str, Any]:
+        if not self._enabled():
+            return {"total": 0, "likes": 0, "dislikes": 0, "like_rate": 0.0, "with_comment": 0}
+        rows = self._fetch_rows(
+            """
+            SELECT
+              COUNT(*) AS total,
+              SUM(CASE WHEN rating = 'like' THEN 1 ELSE 0 END) AS likes,
+              SUM(CASE WHEN rating = 'dislike' THEN 1 ELSE 0 END) AS dislikes,
+              SUM(CASE WHEN comment != '' THEN 1 ELSE 0 END) AS with_comment
+            FROM chat_feedback
+            WHERE ts >= ? AND ts <= ?
+            """,
+            (from_iso, to_iso),
+        )
+        row = rows[0] if rows else {}
+        total = _coerce_int(row.get("total"))
+        likes = _coerce_int(row.get("likes"))
+        return {
+            "total": total,
+            "likes": likes,
+            "dislikes": _coerce_int(row.get("dislikes")),
+            "like_rate": (likes / total * 100.0) if total > 0 else 0.0,
+            "with_comment": _coerce_int(row.get("with_comment")),
+        }
+
+    def query_conversations(self, from_iso: str, to_iso: str, limit: int = 50) -> List[Dict[str, Any]]:
+        return self._fetch_rows(
+            """
+            SELECT id, ts, session_id, model_name, messages, message_count, owner_key, country_code
+            FROM chat_conversations
+            WHERE ts >= ? AND ts <= ?
+            ORDER BY ts DESC
+            LIMIT ?
+            """,
+            (from_iso, to_iso, limit),
+        )
 
     def _fetch_rows(self, sql: str, params: Iterable[Any]) -> List[Dict[str, Any]]:
         self.ensure_initialized()

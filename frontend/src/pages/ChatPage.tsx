@@ -4,15 +4,18 @@ import { PipelineProgress } from "../components/PipelineProgress";
 import { ClarificationForm } from "../components/ClarificationForm";
 import { IterationDecision } from "../components/IterationDecision";
 import { PlanEditor } from "../components/PlanEditor";
+import { StepCheckpoint } from "../components/StepCheckpoint";
 import {
   cancelChatSession,
   createChatSession,
   deleteChatSession,
+  downloadExperimentReport,
   getChatQuota,
   getChatSession,
   getChatSessionAuthHeaders,
   getClarificationRespondUrl,
   getPlanConfirmUrl,
+  getStepDecideUrl,
   iterationDecide,
   listChatSessions,
   type ChatQuota,
@@ -87,7 +90,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   useEffect(() => {
     const s = (snapshot?.status || "").toLowerCase();
     if (!s) return;
-    if (s === "stopped" || s === "waiting_for_clarification" || s === "waiting_for_plan_confirmation" || s === "waiting_for_iteration") {
+    if (s === "stopped" || s === "waiting_for_clarification" || s === "waiting_for_plan_confirmation" || s === "waiting_for_iteration" || s === "waiting_for_step_review") {
       setRunStatus("stopped");
       return;
     }
@@ -501,6 +504,35 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     }
   }
 
+  async function handleStepDecision(action: "continue" | "abort") {
+    if (!sessionId || running) return;
+    setError("");
+    setRunning(true);
+    setRunStatus("running");
+    abortRef.current = new AbortController();
+    try {
+      await streamSSEFromPost(
+        getStepDecideUrl(sessionId),
+        { action },
+        handleStreamEvent,
+        abortRef.current.signal,
+        getChatSessionAuthHeaders(sessionId)
+      );
+      await fetchSessions();
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        setRunStatus("stopped");
+        return;
+      }
+      setError(err instanceof Error ? err.message : "Failed to process step decision.");
+      setRunStatus("stopped");
+    } finally {
+      setRunning(false);
+      setStreamingIdx(-1);
+      abortRef.current = null;
+    }
+  }
+
   async function copySessionId(value: string) {
     try {
       await navigator.clipboard.writeText(value);
@@ -508,6 +540,16 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       window.setTimeout(() => setCopiedSessionId(""), COPY_HINT_MS);
     } catch {
       setError("Failed to copy session id.");
+    }
+  }
+
+  async function handleDownloadReport() {
+    if (!sessionId) return;
+    setError("");
+    try {
+      await downloadExperimentReport(sessionId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to download report.");
     }
   }
 
@@ -519,7 +561,8 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     void sendMessage();
   }
 
-  const isWaitingForInteraction = snapshot?.status === "waiting_for_clarification" || snapshot?.status === "waiting_for_plan_confirmation" || snapshot?.status === "waiting_for_iteration";
+  const isWaitingForInteraction = snapshot?.status === "waiting_for_clarification" || snapshot?.status === "waiting_for_plan_confirmation" || snapshot?.status === "waiting_for_iteration" || snapshot?.status === "waiting_for_step_review";
+  const hasReportData = Boolean(snapshot && (snapshot.tool_executions.length > 0 || snapshot.plan.length > 0));
   const quotaExhausted = Boolean(chatQuota?.enforced && (chatQuota.remaining ?? 0) <= 0);
   const sendTooltip = chatQuota?.enforced
     ? quotaExhausted
@@ -570,6 +613,16 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
           <button onClick={() => void deleteAndSelectNextSession(sessionId)} disabled={!sessionId || running}>
             Delete Session
           </button>
+          {hasReportData && (
+            <button
+              className="report-download-btn"
+              onClick={() => void handleDownloadReport()}
+              disabled={running}
+              title="Download structured experiment report"
+            >
+              Report
+            </button>
+          )}
         </div>
       </header>
 
@@ -623,6 +676,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
               items={snapshot?.history || []}
               streamingIndex={streamingIdx}
               onSuggestedPrompt={(text) => setMessage(text)}
+              sessionId={sessionId}
             />
             {snapshot?.status === "waiting_for_clarification" &&
               snapshot.clarification_questions?.length > 0 && (
@@ -668,6 +722,26 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                   </div>
                 </div>
               )}
+            {snapshot?.status === "waiting_for_step_review" && (
+              <div className="chat-msg assistant with-avatar">
+                <img
+                  className="chat-msg-avatar"
+                  src="/img/agent_role/machine_learning_specialist.png"
+                  alt="Machine Learning Specialist"
+                  onError={(e) => {
+                    (e.currentTarget as HTMLImageElement).src =
+                      "https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png";
+                  }}
+                />
+                <div className="chat-msg-content">
+                  <div className="chat-msg-role">Machine Learning Specialist</div>
+                  <StepCheckpoint
+                    onDecide={handleStepDecision}
+                    disabled={running}
+                  />
+                </div>
+              </div>
+            )}
             {snapshot?.status === "waiting_for_iteration" && (
               <div className="chat-msg assistant with-avatar">
                 <img

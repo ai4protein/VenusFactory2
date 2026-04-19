@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, List, Optional
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from langchain_core.messages import HumanMessage
 from pydantic import BaseModel, Field
 
@@ -31,6 +31,7 @@ from web.utils.common_utils import (
     to_web_v2_public_path,
 )
 from web_v2.analytics_store import analytics_store
+from web_v2.feedback_webhook import dispatch_webhook
 
 _logger = get_logger("web_v2.chat_api")
 _cfg = get_config()
@@ -154,6 +155,16 @@ class PlanConfirmRequest(BaseModel):
 
 class IterationDecideRequest(BaseModel):
     action: str = Field(default="satisfied")
+
+
+class StepDecideRequest(BaseModel):
+    action: str = Field(default="continue")
+
+
+class FeedbackRequest(BaseModel):
+    message_index: int = Field(ge=0)
+    rating: str = Field(pattern="^(like|dislike)$")
+    comment: str = Field(default="")
 
 
 def _to_json(data: dict[str, Any]) -> str:
@@ -336,6 +347,37 @@ def _record_access_event(request: Request, endpoint: str) -> None:
         )
     except Exception:
         pass
+
+
+async def _archive_conversation(state: dict[str, Any]) -> None:
+    if not _cfg.feedback.collect_conversations:
+        return
+    try:
+        history = state.get("history", [])
+        if not history:
+            return
+        session_id = state.get("session_id", "")
+        model_name = getattr(state.get("llm"), "model_name", "")
+        messages_json = json.dumps(
+            _redact_obj(list(history)), ensure_ascii=False, default=str
+        )
+        analytics_store.record_conversation(
+            ts=datetime.now(UTC).isoformat(),
+            session_id=session_id,
+            model_name=model_name,
+            messages=messages_json,
+            message_count=len(history),
+            owner_key=str(state.get("owner_key", "")),
+            ip=str(state.get("client_ip", "")),
+        )
+        asyncio.create_task(dispatch_webhook("conversation_archived", {
+            "session_id": session_id,
+            "model_name": model_name,
+            "message_count": len(history),
+            "messages": _redact_obj(list(history)),
+        }))
+    except Exception:
+        _logger.debug("Failed to archive conversation", exc_info=True)
 
 
 async def _normalize_uploaded_file(
@@ -524,7 +566,7 @@ async def _stream_graph(
             yield f"event: state\ndata: {_to_json(_snapshot(state))}\n\n"
 
     final_status = state.get("status", "")
-    _WAITING_STATUSES = ("waiting_for_clarification", "waiting_for_plan_confirmation", "waiting_for_iteration")
+    _WAITING_STATUSES = ("waiting_for_clarification", "waiting_for_plan_confirmation", "waiting_for_iteration", "waiting_for_step_review")
     if final_status not in _WAITING_STATUSES:
         final_content = state["history"][-1]["content"] if state.get("history") else ""
         _append_dialogue_memory(state, display_text, final_content)
@@ -537,6 +579,7 @@ async def _stream_graph(
         except Exception:
             pass
         state["status"] = "completed"
+        await _archive_conversation(state)
     yield f"event: state\ndata: {_to_json(_snapshot(state))}\n\n"
     yield "event: done\ndata: {}\n\n"
 
@@ -813,7 +856,7 @@ async def _stream_graph_resume(
             yield f"event: state\ndata: {_to_json(_snapshot(state))}\n\n"
 
     final_status = state.get("status", "")
-    _WAITING_STATUSES = ("waiting_for_clarification", "waiting_for_plan_confirmation", "waiting_for_iteration")
+    _WAITING_STATUSES = ("waiting_for_clarification", "waiting_for_plan_confirmation", "waiting_for_iteration", "waiting_for_step_review")
     if final_status not in _WAITING_STATUSES:
         final_content = state["history"][-1]["content"] if state.get("history") else ""
         _append_dialogue_memory(state, original_text, final_content)
@@ -827,6 +870,7 @@ async def _stream_graph_resume(
         except Exception:
             pass
         state["status"] = "completed"
+        await _archive_conversation(state)
 
     yield f"event: state\ndata: {_to_json(_snapshot(state))}\n\n"
     yield "event: done\ndata: {}\n\n"
@@ -986,3 +1030,247 @@ async def iteration_decide(
     except Exception:
         pass
     return {"success": True, "status": "completed"}
+
+
+@router.post("/sessions/{session_id}/step/decide/stream")
+async def stream_step_decide(
+    session_id: str,
+    payload: StepDecideRequest,
+    request: Request,
+):
+    _record_access_event(request, "/api/chat/sessions/{id}/step/decide/stream")
+    state = await _get_session_or_404(session_id)
+    _assert_session_access(state, request)
+    await _set_cancel(session_id, False)
+
+    if state.get("waiting_for") != "step_review" and state.get("status") != "waiting_for_step_review":
+        raise HTTPException(status_code=400, detail="Session is not waiting for step review.")
+
+    action = payload.action
+    is_zh = _is_zh_text(state.get("last_user_text", ""))
+
+    if action == "abort":
+        state["history"].append({
+            "role": "user",
+            "content": "⏹️ 跳过剩余步骤，直接汇总。" if is_zh else "⏹️ Skip remaining steps and go to summary.",
+        })
+        waiting_for = "step_abort"
+    else:
+        state["history"].append({
+            "role": "user",
+            "content": "▶️ 继续执行下一步。" if is_zh else "▶️ Continue to the next step.",
+        })
+        waiting_for = "step_continue"
+
+    lock = await _get_lock(session_id)
+
+    async def event_gen():
+        async with lock:
+            async for chunk in _stream_graph_resume(
+                state,
+                waiting_for=waiting_for,
+            ):
+                yield chunk
+
+    return StreamingResponse(event_gen(), media_type="text/event-stream")
+
+
+@router.post("/sessions/{session_id}/feedback")
+async def submit_feedback(
+    session_id: str,
+    payload: FeedbackRequest,
+    request: Request,
+):
+    _record_access_event(request, "/api/chat/sessions/{id}/feedback")
+    state = await _get_session_or_404(session_id)
+    _assert_session_access(state, request)
+
+    history = state.get("history", [])
+    if payload.message_index >= len(history):
+        raise HTTPException(status_code=400, detail="Invalid message index.")
+    msg = history[payload.message_index]
+    if msg.get("role") == "user":
+        raise HTTPException(status_code=400, detail="Cannot rate user messages.")
+
+    model_name = getattr(state.get("llm"), "model_name", "")
+    ip = _extract_client_ip(request)
+    owner_key = _session_owner_key_for_request(request)
+
+    analytics_store.record_feedback(
+        ts=datetime.now(UTC).isoformat(),
+        session_id=session_id,
+        message_index=payload.message_index,
+        rating=payload.rating,
+        comment=payload.comment,
+        owner_key=owner_key,
+        ip=ip,
+        model_name=model_name,
+    )
+
+    webhook_data = {
+        "session_id": session_id,
+        "message_index": payload.message_index,
+        "rating": payload.rating,
+        "comment": payload.comment,
+        "message_content": msg.get("content", "")[:500],
+        "model_name": model_name,
+        "owner_key": owner_key,
+    }
+    asyncio.create_task(dispatch_webhook("feedback_submitted", webhook_data))
+
+    return {"success": True, "session_id": session_id, "message_index": payload.message_index}
+
+
+def _generate_experiment_report(state: dict[str, Any]) -> str:
+    """Build a structured Markdown experiment report from session state."""
+    is_zh = _is_zh_text(state.get("last_user_text", ""))
+    model_name = getattr(state.get("llm"), "model_name", "unknown")
+    session_id = state.get("session_id", "unknown")
+    created_at = str(state.get("created_at", ""))
+    generated_at = datetime.now().isoformat()
+
+    lines: list[str] = []
+
+    lines.append("# " + ("实验报告" if is_zh else "Experiment Report"))
+    lines.append("")
+    lines.append(f"| {'字段' if is_zh else 'Field'} | {'值' if is_zh else 'Value'} |")
+    lines.append("|---|---|")
+    lines.append(f"| Session ID | `{session_id}` |")
+    lines.append(f"| {'模型' if is_zh else 'Model'} | {model_name} |")
+    lines.append(f"| {'创建时间' if is_zh else 'Created'} | {created_at} |")
+    lines.append(f"| {'报告生成时间' if is_zh else 'Report Generated'} | {generated_at} |")
+    lines.append(f"| {'状态' if is_zh else 'Status'} | {state.get('status', '')} |")
+    lines.append("")
+
+    protein_ctx = state.get("protein_context")
+    if protein_ctx:
+        ctx_summary = protein_ctx.get_context_summary()
+        if ctx_summary and ctx_summary != "No protein data in memory":
+            lines.append("## " + ("蛋白质上下文" if is_zh else "Protein Context"))
+            lines.append("")
+            lines.append(redact_path_text(ctx_summary))
+            lines.append("")
+
+    original_text = state.get("last_user_text", "")
+    if original_text:
+        lines.append("## " + ("用户请求" if is_zh else "User Request"))
+        lines.append("")
+        lines.append(redact_path_text(original_text))
+        lines.append("")
+
+    questions = state.get("clarification_questions", [])
+    answers = state.get("clarification_answers", [])
+    if questions and answers:
+        lines.append("## " + ("需求澄清" if is_zh else "Clarification"))
+        lines.append("")
+        formatted = _format_clarification_answers(questions, answers)
+        if formatted:
+            lines.append(redact_path_text(formatted))
+            lines.append("")
+
+    sections = state.get("research_sections", [])
+    if sections:
+        lines.append("## " + ("研究计划" if is_zh else "Research Plan"))
+        lines.append("")
+        for i, sec in enumerate(sections, 1):
+            name = sec.get("section_name", f"Section {i}")
+            queries = sec.get("search_queries", [])
+            lines.append(f"### {i}. {name}")
+            if queries:
+                for q in queries:
+                    lines.append(f"- {q}")
+            lines.append("")
+
+    pi_report = state.get("pi_report", "")
+    if pi_report:
+        lines.append("## " + ("调研报告" if is_zh else "Research Report"))
+        lines.append("")
+        lines.append(redact_path_text(pi_report))
+        lines.append("")
+
+    plan = state.get("plan", [])
+    if plan:
+        lines.append("## " + ("执行计划" if is_zh else "Execution Plan"))
+        lines.append("")
+        lines.append(f"| {'步骤' if is_zh else 'Step'} | {'工具' if is_zh else 'Tool'} | {'描述' if is_zh else 'Description'} |")
+        lines.append("|---|---|---|")
+        for step in plan:
+            step_num = step.get("step", "?")
+            tool = step.get("tool_name", "?")
+            desc = step.get("task_description", "").replace("|", "\\|")
+            lines.append(f"| {step_num} | `{tool}` | {desc} |")
+        lines.append("")
+
+    tool_executions = state.get("tool_executions", [])
+    if tool_executions:
+        lines.append("## " + ("执行结果" if is_zh else "Execution Results"))
+        lines.append("")
+        for entry in tool_executions:
+            step = entry.get("step", "?")
+            tool = entry.get("tool_name", "unknown")
+            ts = entry.get("timestamp", "")
+            inputs = entry.get("inputs", {})
+            outputs = entry.get("outputs", "")
+            oss_url = entry.get("oss_url")
+
+            lines.append(f"### Step {step}: `{tool}`")
+            lines.append("")
+            if ts:
+                lines.append(f"**{'时间' if is_zh else 'Timestamp'}:** {ts}")
+                lines.append("")
+
+            if inputs:
+                lines.append(f"**{'输入参数' if is_zh else 'Input Parameters'}:**")
+                lines.append("```json")
+                lines.append(redact_path_text(json.dumps(inputs, ensure_ascii=False, indent=2)))
+                lines.append("```")
+                lines.append("")
+
+            if outputs:
+                output_str = redact_path_text(str(outputs))
+                lines.append(f"**{'输出' if is_zh else 'Output'}:**")
+                lines.append("```")
+                lines.append(output_str[:2000] + ("..." if len(output_str) > 2000 else ""))
+                lines.append("```")
+                lines.append("")
+
+            if oss_url:
+                name = os.path.basename(oss_url)
+                lines.append(f"**{'云端下载' if is_zh else 'Cloud Download'}:** [{name}]({oss_url})")
+                lines.append("")
+
+    history = state.get("history", [])
+    final_summary = ""
+    skip_markers = ("iteration_prompt", "请选择下一步", "Please choose", "正在分析", "is analyzing", "正在汇总", "is summarizing")
+    for item in reversed(history):
+        if item.get("role") == "assistant" and item.get("role_id") == "principal_investigator":
+            content = item.get("content", "")
+            if not any(m in content for m in skip_markers) and len(content) > 50:
+                final_summary = content
+                break
+    if final_summary:
+        lines.append("## " + ("最终总结" if is_zh else "Final Summary"))
+        lines.append("")
+        lines.append(redact_path_text(final_summary))
+        lines.append("")
+
+    lines.append("---")
+    lines.append(f"*{'由 VenusFactory 自动生成' if is_zh else 'Auto-generated by VenusFactory'}*")
+    lines.append("")
+
+    return "\n".join(lines)
+
+
+@router.get("/sessions/{session_id}/report")
+async def get_experiment_report(session_id: str, request: Request):
+    _record_access_event(request, "/api/chat/sessions/{id}/report")
+    state = await _get_session_or_404(session_id)
+    _assert_session_access(state, request)
+
+    report = _generate_experiment_report(state)
+    filename = f"experiment_report_{session_id[:8]}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
+    return Response(
+        content=report,
+        media_type="text/markdown; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

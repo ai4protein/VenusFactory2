@@ -244,6 +244,42 @@ async def insights_token_usage(
     )
 
 
+@router.get("/insights/feedback")
+async def insights_feedback(
+    request: Request,
+    from_value: Optional[str] = Query(default=None, alias="from"),
+    to_value: Optional[str] = Query(default=None, alias="to"),
+):
+    _ensure_insights_access(request)
+    from_iso, to_iso = normalize_time_range(from_value, to_value)
+    summary = analytics_store.query_feedback_summary(from_iso, to_iso)
+    items = analytics_store.query_feedback(from_iso, to_iso)
+    return _insights_payload(
+        from_iso=from_iso,
+        to_iso=to_iso,
+        filters_applied={"from": from_value, "to": to_value},
+        data={"summary": summary, "items": items},
+    )
+
+
+@router.get("/insights/conversations")
+async def insights_conversations(
+    request: Request,
+    from_value: Optional[str] = Query(default=None, alias="from"),
+    to_value: Optional[str] = Query(default=None, alias="to"),
+    limit: int = Query(default=50, ge=1, le=500),
+):
+    _ensure_insights_access(request)
+    from_iso, to_iso = normalize_time_range(from_value, to_value)
+    rows = analytics_store.query_conversations(from_iso, to_iso, limit)
+    return _insights_payload(
+        from_iso=from_iso,
+        to_iso=to_iso,
+        filters_applied={"from": from_value, "to": to_value, "limit": str(limit)},
+        data={"rows": rows, "count": len(rows)},
+    )
+
+
 @router.get("/insights/map")
 async def insights_map(
     request: Request,
