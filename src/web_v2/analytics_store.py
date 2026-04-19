@@ -293,6 +293,16 @@ class AnalyticsStore:
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_feedback_ts ON chat_feedback(ts)")
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_feedback_session ON chat_feedback(session_id)")
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_conversations_ts ON chat_conversations(ts)")
+                conn.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS chat_ip_daily_quota (
+                        date TEXT NOT NULL,
+                        ip TEXT NOT NULL,
+                        chat_count INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY (date, ip)
+                    )
+                    """
+                )
             self._initialized = True
 
     def estimate_cost_usd(self, model: str, input_tokens: int, output_tokens: int) -> float:
@@ -470,6 +480,37 @@ class AnalyticsStore:
                 """,
                 (stamp, session_id, model_name, messages, message_count, owner_key or "", ip or "", geo.country_code),
             )
+
+    def get_ip_chat_usage(self, ip: str, date: str) -> int:
+        self.ensure_initialized()
+        if not self._enabled():
+            return 0
+        with self._conn() as conn:
+            row = conn.execute(
+                "SELECT chat_count FROM chat_ip_daily_quota WHERE date = ? AND ip = ?",
+                (date, ip),
+            ).fetchone()
+        return int(row["chat_count"]) if row else 0
+
+    def increment_ip_chat_usage(self, ip: str, date: str) -> int:
+        self.ensure_initialized()
+        if not self._enabled():
+            return 0
+        with self._conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO chat_ip_daily_quota (date, ip, chat_count)
+                VALUES (?, ?, 1)
+                ON CONFLICT(date, ip)
+                DO UPDATE SET chat_count = chat_count + 1
+                """,
+                (date, ip),
+            )
+            row = conn.execute(
+                "SELECT chat_count FROM chat_ip_daily_quota WHERE date = ? AND ip = ?",
+                (date, ip),
+            ).fetchone()
+        return int(row["chat_count"]) if row else 1
 
     def query_feedback(self, from_iso: str, to_iso: str) -> List[Dict[str, Any]]:
         return self._fetch_rows(

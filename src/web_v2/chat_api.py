@@ -43,8 +43,6 @@ _SESSIONS: dict[str, dict[str, Any]] = {}
 _SESSION_LOCKS: dict[str, asyncio.Lock] = {}
 _SESSION_CANCEL_FLAGS: dict[str, bool] = {}
 _SESSIONS_GUARD = asyncio.Lock()
-_OWNER_DAILY_CHAT_USAGE: dict[str, dict[str, Any]] = {}
-_OWNER_USAGE_GUARD = asyncio.Lock()
 
 _ONLINE_DAILY_CHAT_LIMIT = _cfg.online_limits.daily_chat_limit
 _SESSION_TOKEN_TTL_HOURS = _cfg.online_limits.session_token_ttl_hours
@@ -296,23 +294,19 @@ async def _consume_online_chat_quota_or_429(request: Request) -> None:
     if not _cfg.server.is_online:
         return
 
-    owner_key = _session_owner_key_for_request(request)
+    ip = _extract_client_ip(request)
     today = datetime.now().strftime("%Y-%m-%d")
-    async with _OWNER_USAGE_GUARD:
-        usage = _OWNER_DAILY_CHAT_USAGE.get(owner_key)
-        if not usage or usage.get("date") != today:
-            usage = {"date": today, "count": 0}
-            _OWNER_DAILY_CHAT_USAGE[owner_key] = usage
 
-        if int(usage.get("count", 0)) >= _ONLINE_DAILY_CHAT_LIMIT:
-            raise HTTPException(
-                status_code=429,
-                detail={
-                    "code": "CHAT_DAILY_LIMIT_REACHED",
-                    "message": f"Online mode limit reached: up to {_ONLINE_DAILY_CHAT_LIMIT} chats per user per day.",
-                },
-            )
-        usage["count"] = int(usage.get("count", 0)) + 1
+    current = analytics_store.get_ip_chat_usage(ip, today)
+    if current >= _ONLINE_DAILY_CHAT_LIMIT:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "code": "CHAT_DAILY_LIMIT_REACHED",
+                "message": f"Online mode limit reached: up to {_ONLINE_DAILY_CHAT_LIMIT} chats per IP per day.",
+            },
+        )
+    analytics_store.increment_ip_chat_usage(ip, today)
 
 
 async def _get_online_chat_quota_status(request: Request) -> dict[str, Any]:
@@ -326,14 +320,9 @@ async def _get_online_chat_quota_status(request: Request) -> dict[str, Any]:
             "remaining": None,
         }
 
-    owner_key = _session_owner_key_for_request(request)
+    ip = _extract_client_ip(request)
     today = datetime.now().strftime("%Y-%m-%d")
-    async with _OWNER_USAGE_GUARD:
-        usage = _OWNER_DAILY_CHAT_USAGE.get(owner_key)
-        if not usage or usage.get("date") != today:
-            usage = {"date": today, "count": 0}
-            _OWNER_DAILY_CHAT_USAGE[owner_key] = usage
-        used = int(usage.get("count", 0))
+    used = analytics_store.get_ip_chat_usage(ip, today)
     return {
         "mode": mode,
         "enforced": True,

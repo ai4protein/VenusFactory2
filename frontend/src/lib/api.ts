@@ -130,7 +130,14 @@ type ChatSessionTokenMap = Record<string, ChatSessionTokenEntry>;
 
 function loadTokenMap(): ChatSessionTokenMap {
   try {
-    const raw = sessionStorage.getItem(CHAT_SESSION_TOKEN_MAP_KEY);
+    let raw = localStorage.getItem(CHAT_SESSION_TOKEN_MAP_KEY);
+    if (!raw) {
+      raw = sessionStorage.getItem(CHAT_SESSION_TOKEN_MAP_KEY);
+      if (raw) {
+        localStorage.setItem(CHAT_SESSION_TOKEN_MAP_KEY, raw);
+        sessionStorage.removeItem(CHAT_SESSION_TOKEN_MAP_KEY);
+      }
+    }
     if (!raw) return {};
     const parsed = JSON.parse(raw) as ChatSessionTokenMap;
     return parsed && typeof parsed === "object" ? parsed : {};
@@ -140,7 +147,7 @@ function loadTokenMap(): ChatSessionTokenMap {
 }
 
 function saveTokenMap(map: ChatSessionTokenMap) {
-  sessionStorage.setItem(CHAT_SESSION_TOKEN_MAP_KEY, JSON.stringify(map));
+  localStorage.setItem(CHAT_SESSION_TOKEN_MAP_KEY, JSON.stringify(map));
 }
 
 function persistSessionToken(sessionId: string, token: string, expiresAt: string) {

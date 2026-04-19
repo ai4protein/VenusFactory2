@@ -273,22 +273,18 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       // keep cached list if server refresh fails
     }
     const remembered = sessionStorage.getItem(SESSION_STORAGE_KEY);
-    if (remembered && list.find((item) => item.session_id === remembered)) {
-      try {
-        await refreshCurrentSession(remembered);
-      } catch {
-        await createAndActivateSession();
-      }
-      return;
-    }
+    const candidates = remembered
+      ? [remembered, ...list.filter((s) => s.session_id !== remembered).map((s) => s.session_id)]
+      : list.map((s) => s.session_id);
 
-    if (list.length > 0) {
+    for (const sid of candidates) {
+      if (!list.find((s) => s.session_id === sid)) continue;
       try {
-        await refreshCurrentSession(list[0].session_id);
+        await refreshCurrentSession(sid);
+        return;
       } catch {
-        await createAndActivateSession();
+        // inaccessible session — already cleaned up by refreshCurrentSession, try next
       }
-      return;
     }
 
     await createAndActivateSession();
@@ -304,10 +300,24 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   async function refreshCurrentSession(targetId?: string) {
     const sid = targetId || sessionId;
     if (!sid) return;
-    const s = await getChatSession(sid);
-    setSnapshot(s);
-    setSessionId(sid);
-    sessionStorage.setItem(SESSION_STORAGE_KEY, sid);
+    try {
+      const s = await getChatSession(sid);
+      setSnapshot(s);
+      setSessionId(sid);
+      sessionStorage.setItem(SESSION_STORAGE_KEY, sid);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.includes("401") || msg.includes("403") || msg.includes("authentication") || msg.includes("token") || msg.includes("access")) {
+        forgetOwnedSession(sid);
+        if (sid === sessionId) {
+          setSessionId("");
+          setSnapshot(null);
+          sessionStorage.removeItem(SESSION_STORAGE_KEY);
+        }
+        setSessions((prev) => prev.filter((s) => s.session_id !== sid));
+      }
+      throw err;
+    }
   }
 
   function handleStreamEvent({ event, data }: { event: string; data: string }) {
