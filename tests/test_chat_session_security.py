@@ -1,6 +1,7 @@
 import os
 import unittest
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from src.web_v2 import chat_api
 
@@ -17,14 +18,11 @@ class _FakeRequest:
 
 class ChatSessionSecurityTests(unittest.TestCase):
     def setUp(self):
-        self.prev_mode = os.getenv("WEBUI_V2_MODE")
-        os.environ["WEBUI_V2_MODE"] = "online"
+        self._mode_patcher = patch.object(chat_api, "_runtime_mode", return_value="online")
+        self._mode_patcher.start()
 
     def tearDown(self):
-        if self.prev_mode is None:
-            os.environ.pop("WEBUI_V2_MODE", None)
-        else:
-            os.environ["WEBUI_V2_MODE"] = self.prev_mode
+        self._mode_patcher.stop()
 
     def test_issue_and_verify_token(self):
         state = {}

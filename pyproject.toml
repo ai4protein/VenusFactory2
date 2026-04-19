@@ -215,3 +215,64 @@ dependencies = [
     "zstandard>=0.24.0",
     "zstd>=1.5.7.2",
 ]
+
+# ---------------------------------------------------------------------------
+# Ruff – linter & formatter
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E402",  # module-level-import-not-at-top (load_dotenv() before imports)
+    "E501",  # line-too-long (handled by formatter)
+    "B008",  # function-call-in-default-argument (common in FastAPI)
+    "B905",  # zip-without-explicit-strict
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["agent", "tools", "web", "web_v2", "config", "logger", "exceptions"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# ---------------------------------------------------------------------------
+# Pytest
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+# ---------------------------------------------------------------------------
+# Coverage
+# ---------------------------------------------------------------------------
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "src/tools/train/data/*",
+    "src/tools/mutation/models/*",
+    "src/web/*",
+]
+
+[tool.coverage.report]
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+    "raise NotImplementedError",
+    "pass$",
+]

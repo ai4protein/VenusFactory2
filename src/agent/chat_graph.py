@@ -2,80 +2,135 @@
 LangGraph orchestration for the VenusFactory2 Agent.
 Decouples agent logic (PI -> CB -> MLS) from the UI (chat_tab.py).
 """
+import asyncio
 import json
 import os
-import time
-import asyncio
-import shutil
 import re
-from pathlib import Path
+import time
 from datetime import datetime
-from typing import Dict, Any, List, Optional, TypedDict, Annotated, Sequence
+from pathlib import Path
+from typing import Any, TypedDict
 
-from langgraph.graph import StateGraph, START, END
-from langgraph.checkpoint.memory import MemorySaver
-from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, SystemMessage, ToolMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
+from langgraph.config import get_stream_writer
+from langgraph.graph import END, START, StateGraph
 
 from agent.chat_agent import (
-    Chat_LLM, ProteinContextManager, 
-    _merge_tool_parameters_with_context, 
-    get_cached_tool_result, save_cached_tool_result
+    ProteinContextManager,
+    _merge_tool_parameters_with_context,
+    get_cached_tool_result,
+    save_cached_tool_result,
 )
 from agent.chat_agent_utils import (
-    AGENT_CHAT_MAX_TOOL_CALLS, AGENT_CHAT_MAX_MESSAGES,
-    PI_SEARCH_TOOL_NAMES, _run_section_search, _parse_cb_plan,
+    AGENT_CHAT_MAX_TOOL_CALLS,
+    MAX_STEP_RETRIES,
+    PI_SEARCH_TOOL_NAMES,
+    TOOL_EXECUTION_TIMEOUT,
+    _cb_post_step_check,
+    _extract_image_paths_from_tool_output,
+    _get_output_file_path_from_raw,
+    _parse_cb_plan,
     _parse_sub_report_short_title,
+    _read_output_file_preview,
+    _run_mls_debug_with_tools,
+    _run_mls_post_step_verify,
+    _run_section_search,
     _tool_output_indicates_failure,
-    _run_mls_debug_with_tools, _run_mls_post_step_verify,
-    _get_output_file_path_from_raw, _read_output_file_preview,
-    _cb_post_step_check, MAX_STEP_RETRIES, TOOL_EXECUTION_TIMEOUT,
-    _extract_image_paths_from_tool_output
 )
-from web.utils.chat_format_utils import (
-    _short_topic_title, _format_search_summary, _format_search_preview
-)
-from web.utils.common_utils import get_project_root, to_project_relative_path
 from agent.skills import get_skills_metadata_string
+from logger import get_logger
+from web.utils.chat_format_utils import _format_search_preview, _format_search_summary
+from web.utils.common_utils import get_project_root, to_project_relative_path
 from web.utils.file_oss import upload_file_to_cloud_async
 from web_v2.analytics_store import analytics_store
+
+_logger = get_logger("agent.graph")
+
+
+async def _stream_chain(chain, inputs: dict[str, Any], role_id: str = "principal_investigator") -> str:
+    """Invoke a chain with token-level streaming via get_stream_writer().
+
+    Runs chain.stream() in a thread, pipes tokens through a queue to the
+    async stream writer so they reach the SSE connection in real-time.
+    Falls back to non-streaming invoke on error.
+    """
+    import queue as _queue
+
+    writer = get_stream_writer()
+    writer({"type": "stream_start", "role_id": role_id})
+    token_q: _queue.Queue[str | None] = _queue.Queue()
+
+    def _produce() -> str:
+        full = ""
+        try:
+            for chunk in chain.stream(inputs):
+                text = chunk if isinstance(chunk, str) else getattr(chunk, "content", str(chunk))
+                if text:
+                    full += text
+                    token_q.put(text)
+        except Exception:
+            _logger.debug("stream fallback to invoke for chain")
+            full = chain.invoke(inputs)
+            if full:
+                token_q.put(full)
+        finally:
+            token_q.put(None)
+        return full
+
+    loop = asyncio.get_running_loop()
+    future = loop.run_in_executor(None, _produce)
+
+    while True:
+        try:
+            token = token_q.get_nowait()
+        except _queue.Empty:
+            if future.done():
+                break
+            await asyncio.sleep(0.02)
+            continue
+        if token is None:
+            break
+        writer({"type": "token", "content": token, "role_id": role_id})
+
+    return await future
 
 
 class AgentState(TypedDict):
     # Core state
-    messages: List[BaseMessage]
+    messages: list[BaseMessage]
     protein_context: ProteinContextManager
     session_id: str
     agent_session_dir: str
-    
+
     # Process management
     pi_report: str
     pi_suggest_steps: str
-    plan: List[Dict[str, Any]]
+    plan: list[dict[str, Any]]
     current_step_index: int
-    step_results: Dict[int, Any]
-    
+    step_results: dict[int, Any]
+
     # UI compatibility (for yielding partial updates)
-    history: List[Dict[str, Any]]
-    conversation_log: List[Dict[str, Any]]
-    dialogue_memory: List[Dict[str, Any]]
-    tool_executions: List[Dict[str, Any]]
-    tool_cache: Dict[str, Any]
-    
+    history: list[dict[str, Any]]
+    conversation_log: list[dict[str, Any]]
+    dialogue_memory: list[dict[str, Any]]
+    tool_executions: list[dict[str, Any]]
+    tool_cache: dict[str, Any]
+
     # Internal research state
-    research_sections: List[Dict[str, Any]]
+    research_sections: list[dict[str, Any]]
     research_idx: int
     search_idx: int
-    current_search_results: List[str]
-    research_sub_reports: List[str]
-    
+    current_search_results: list[str]
+    research_sub_reports: list[str]
+
     # Control flags
     status: str
-    error: Optional[str]
+    error: str | None
     execution_failed: bool
-    failed_step: Optional[int]
-    failed_reason: Optional[str]
-    ui_lang: Optional[str]
+    failed_step: int | None
+    failed_reason: str | None
+    ui_lang: str | None
 
 
 def _detect_ui_lang(text: str) -> str:
@@ -162,7 +217,7 @@ def _ui_text(lang: str, key: str, **kwargs) -> str:
     return template.format(**kwargs)
 
 
-def _parse_sections(raw: str) -> List[Dict[str, Any]]:
+def _parse_sections(raw: str) -> list[dict[str, Any]]:
     try:
         raw = raw.strip()
         if "```" in raw:
@@ -199,11 +254,11 @@ def _parse_sections(raw: str) -> List[Dict[str, Any]]:
         return []
 
 
-def _get_chat_history_messages(chains: Dict[str, Any], history: List[Dict[str, Any]], current_input: str = "") -> List[BaseMessage]:
+def _get_chat_history_messages(chains: dict[str, Any], history: list[dict[str, Any]], current_input: str = "") -> list[BaseMessage]:
     """Return dialogue context for prompts: previous user turns plus final model reports only."""
     dialogue_memory = chains.get("dialogue_memory") if isinstance(chains, dict) else None
     if isinstance(dialogue_memory, list) and dialogue_memory:
-        out: List[BaseMessage] = []
+        out: list[BaseMessage] = []
         current = (current_input or "").strip()
         for item in dialogue_memory[-10:]:
             if not isinstance(item, dict):
@@ -226,7 +281,7 @@ def _get_chat_history_messages(chains: Dict[str, Any], history: List[Dict[str, A
         return messages
 
     current = (current_input or "").strip()
-    out: List[BaseMessage] = []
+    out: list[BaseMessage] = []
     for item in list(history or [])[-20:]:
         role = str(item.get("role") or "").strip().lower()
         content = str(item.get("content") or "").strip()
@@ -239,7 +294,7 @@ def _get_chat_history_messages(chains: Dict[str, Any], history: List[Dict[str, A
     return out
 
 
-def _format_conversation_history(chains: Dict[str, Any], history: List[Dict[str, Any]], current_input: str = "", limit: int = 10) -> str:
+def _format_conversation_history(chains: dict[str, Any], history: list[dict[str, Any]], current_input: str = "", limit: int = 10) -> str:
     rows = []
     for msg in _get_chat_history_messages(chains, history, current_input)[-limit:]:
         content = str(getattr(msg, "content", "") or "").strip()
@@ -257,7 +312,7 @@ def _format_conversation_history(chains: Dict[str, Any], history: List[Dict[str,
     return "\n".join(rows) if rows else "No previous conversation."
 
 
-def _normalize_tool_input(raw_input: Any) -> Dict[str, Any]:
+def _normalize_tool_input(raw_input: Any) -> dict[str, Any]:
     if isinstance(raw_input, dict):
         return dict(raw_input)
     if raw_input is None:
@@ -290,7 +345,7 @@ def _normalize_step_number(raw_step: Any, fallback: int) -> int:
     return fallback
 
 
-def _get_step_raw_output(step_results: Optional[Dict[Any, Any]], step_no: Any) -> Any:
+def _get_step_raw_output(step_results: dict[Any, Any] | None, step_no: Any) -> Any:
     if not isinstance(step_results, dict):
         return None
     normalized = _normalize_step_number(step_no, -1)
@@ -301,7 +356,7 @@ def _get_step_raw_output(step_results: Optional[Dict[Any, Any]], step_no: Any) -
     return None
 
 
-def _get_tool_allowed_param_names(tool: Any) -> Optional[set]:
+def _get_tool_allowed_param_names(tool: Any) -> set | None:
     """Best-effort extraction of accepted parameter names from LangChain tools."""
     try:
         args_schema = getattr(tool, "args_schema", None)
@@ -330,10 +385,10 @@ def _get_tool_allowed_param_names(tool: Any) -> Optional[set]:
 def _sanitize_tool_invoke_input(
     tool_name: str,
     tool: Any,
-    merged_input: Dict[str, Any],
+    merged_input: dict[str, Any],
     agent_session_dir: str = "",
-    step_results: Optional[Dict[int, Any]] = None,
-) -> Dict[str, Any]:
+    step_results: dict[int, Any] | None = None,
+) -> dict[str, Any]:
     """Filter merged input by tool schema to avoid strict parameter-validation failures."""
     if not isinstance(merged_input, dict):
         return _normalize_tool_input(merged_input)
@@ -381,9 +436,9 @@ def _sanitize_tool_invoke_input(
                 break
 
         if filtered and mapped_from:
-            print(f"[Input sanitize] tool={tool_name} | mapped `{mapped_from}` -> `{only_key}`")
+            _logger.debug("Input sanitize: tool=%s, mapped %s -> %s", tool_name, mapped_from, only_key)
 
-    def _coerce_sequence(value: Any) -> Optional[str]:
+    def _coerce_sequence(value: Any) -> str | None:
         if isinstance(value, str):
             seq = value.strip()
             return seq or None
@@ -444,7 +499,7 @@ def _sanitize_tool_invoke_input(
         if tool_name != "python_repl" or not isinstance(query, str):
             return query
 
-        def _resolve_dependency_token(token: str) -> Optional[str]:
+        def _resolve_dependency_token(token: str) -> str | None:
             if not isinstance(token, str) or not token.startswith("dependency:"):
                 return None
             parts = token.split(":")
@@ -508,7 +563,7 @@ def _sanitize_tool_invoke_input(
             if resolved:
                 rewritten = rewritten.replace(token, resolved)
 
-        candidate_paths: List[str] = []
+        candidate_paths: list[str] = []
         for key, value in merged_input.items():
             key_l = str(key).lower()
             if isinstance(value, str) and any(tok in key_l for tok in ("path", "file", "dir")):
@@ -526,7 +581,7 @@ def _sanitize_tool_invoke_input(
                 if extracted:
                     candidate_paths.append(extracted)
 
-        basename_to_abs: Dict[str, str] = {}
+        basename_to_abs: dict[str, str] = {}
         for raw_path in candidate_paths:
             resolved = _maybe_resolve_local_path(raw_path)
             if not isinstance(resolved, str):
@@ -581,7 +636,7 @@ def _sanitize_tool_invoke_input(
         filtered["query"] = _rewrite_python_query_paths(filtered["query"])
 
     if not filtered and merged_input:
-        print(f"[Input sanitize] tool={tool_name} | kept none of {list(merged_input.keys())} by allowed={sorted(list(allowed))}")
+        _logger.debug("Input sanitize: tool=%s, kept none of %s by allowed=%s", tool_name, list(merged_input.keys()), sorted(list(allowed)))
     return filtered
 
 
@@ -608,9 +663,9 @@ def _is_write_like_tool(tool_name: str) -> bool:
 def _normalize_output_paths(
     tool_name: str,
     tool: Any,
-    invoke_input: Dict[str, Any],
+    invoke_input: dict[str, Any],
     agent_session_dir: str,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Rewrite output paths to session-scoped destinations (avoid repo-root writes)."""
     if not isinstance(invoke_input, dict):
         return invoke_input
@@ -637,7 +692,7 @@ def _normalize_output_paths(
             abs_path = Path(raw).expanduser().resolve()
             if _is_write_like_tool(tool_name) and not _is_within_session(abs_path):
                 fallback = Path(run_base) if is_dir else Path(run_base) / f"{tool_name}_{timestamp}.json"
-                print(f"[Output normalize] unsafe absolute output path `{raw}`; fallback to `{fallback}`")
+                _logger.warning("Output normalize: unsafe absolute path %s; fallback to %s", raw, fallback)
                 return str(fallback)
             return str(abs_path)
 
@@ -649,7 +704,7 @@ def _normalize_output_paths(
             resolved = (session_root / raw).resolve()
         if _is_write_like_tool(tool_name) and not _is_within_session(resolved):
             fallback = Path(run_base) if is_dir else Path(run_base) / f"{tool_name}_{timestamp}.json"
-            print(f"[Output normalize] output path escapes session `{raw}`; fallback to `{fallback}`")
+            _logger.warning("Output normalize: path escapes session %s; fallback to %s", raw, fallback)
             return str(fallback)
         return str(resolved)
 
@@ -680,19 +735,19 @@ def _normalize_output_paths(
     return out
 
 
-def _collect_output_fields(data: Dict[str, Any]) -> Dict[str, Any]:
+def _collect_output_fields(data: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(data, dict):
         return {}
     keys = ("out_dir", "output_dir", "out_path", "output_file")
     return {k: data.get(k) for k in keys if k in data}
 
 
-def _extract_skill_ids_from_metadata(skills_metadata: str) -> List[str]:
+def _extract_skill_ids_from_metadata(skills_metadata: str) -> list[str]:
     if not isinstance(skills_metadata, str) or not skills_metadata.strip():
         return []
     ids = re.findall(r"skill_id:\s*`([^`]+)`", skills_metadata)
     seen = set()
-    out: List[str] = []
+    out: list[str] = []
     for s in ids:
         sid = str(s).strip()
         if not sid or sid in seen:
@@ -702,11 +757,11 @@ def _extract_skill_ids_from_metadata(skills_metadata: str) -> List[str]:
     return out
 
 
-def _pick_skill_for_code_step(task_desc: str, available_skill_ids: List[str]) -> Optional[str]:
+def _pick_skill_for_code_step(task_desc: str, available_skill_ids: list[str]) -> str | None:
     if not available_skill_ids:
         return None
     lower = (task_desc or "").lower()
-    preferred: List[str] = []
+    preferred: list[str] = []
     if any(k in lower for k in ("plot", "figure", "visual", "chart", "draw")):
         preferred = ["matplotlib", "seaborn", "biopython"]
     elif any(k in lower for k in ("fasta", "sequence", "pdb", "structure", "mutation")):
@@ -720,11 +775,11 @@ def _pick_skill_for_code_step(task_desc: str, available_skill_ids: List[str]) ->
 
 
 def _enforce_skill_first_plan(
-    normalized_plan: List[Dict[str, Any]],
+    normalized_plan: list[dict[str, Any]],
     available_tools_list: str,
     skills_metadata: str,
     ui_lang: str,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     if not normalized_plan:
         return normalized_plan
     available_tools = {t.strip() for t in str(available_tools_list or "").split(",") if t.strip()}
@@ -738,7 +793,7 @@ def _enforce_skill_first_plan(
     code_tools = {"python_repl", "agent_generated_code"}
     existing_steps = [p.get("step") for p in normalized_plan if isinstance(p.get("step"), int)]
     next_aux_step = (max(existing_steps) + 1) if existing_steps else 1
-    enforced: List[Dict[str, Any]] = []
+    enforced: list[dict[str, Any]] = []
 
     for p in normalized_plan:
         tname = str(p.get("tool_name") or "").strip()
@@ -791,7 +846,7 @@ async def research_plan_node(state: AgentState, config: RunnableConfig):
         )
         sections_list = _parse_sections(sections_out)
     except Exception as e:
-        print(f"[PI sections] failed: {e}")
+        _logger.warning("PI sections failed: %s", e)
         sections_list = []
 
     # PI_SECTIONS_PROMPT is the routing authority here: [] means answer directly in chat mode,
@@ -839,21 +894,18 @@ async def chat_node(state: AgentState, config: RunnableConfig):
     ui_lang = state.get("ui_lang") or _detect_ui_lang(text)
     history = list(state.get("history", []))
 
+    if history and ("Thinking" in history[-1].get("content", "") or "思考中" in history[-1].get("content", "")):
+        history.pop()
+
     try:
         chat_history = _get_chat_history_messages(chains, history, text)
-        # Use pi_chat chain for direct chat response (greetings, simple questions)
-        response = await asyncio.to_thread(
-            chains["pi_chat"].invoke,
+        response = await _stream_chain(
+            chains["pi_chat"],
             {"input": text, "chat_history": chat_history},
+            role_id="principal_investigator",
         )
-        # Remove the "Thinking..." placeholder before adding the actual response
-        if history and ("Thinking" in history[-1].get("content", "") or "思考中" in history[-1].get("content", "")):
-            history.pop()
         history.append({"role": "assistant", "content": response, "role_id": "principal_investigator"})
     except Exception as e:
-        # Remove the "Thinking..." placeholder before adding the error
-        if history and ("Thinking" in history[-1].get("content", "") or "思考中" in history[-1].get("content", "")):
-            history.pop()
         err_msg = f"抱歉，我遇到了错误：{str(e)}" if ui_lang == "zh" else f"I apologize, but I encountered an error: {str(e)}"
         history.append({"role": "assistant", "content": err_msg, "role_id": "principal_investigator"})
 
@@ -897,13 +949,13 @@ async def research_search_node(state: AgentState, config: RunnableConfig):
     ui_lang = state.get("ui_lang") or _detect_ui_lang(state["messages"][-1].content)
     executions = list(state.get("tool_executions", []))
     current_search_results = list(state.get("current_search_results", []))
-    
+
     if research_idx >= len(sections) or len(protein_ctx.tool_history) >= AGENT_CHAT_MAX_TOOL_CALLS:
         return {"status": "research_steps_done"}
 
     section = sections[research_idx]
     queries = section.get("search_queries", [])
-    
+
     if search_idx == 0:
         section_title = f"**第 {research_idx + 1} 节：** {section['section_name']}" if ui_lang == "zh" else f"**Section {research_idx + 1}:** {section['section_name']}"
         history.append({"role": "assistant", "content": section_title, "role_id": "principal_investigator"})
@@ -912,7 +964,7 @@ async def research_search_node(state: AgentState, config: RunnableConfig):
         sq = queries[search_idx]
         search_results_list, search_logged = await asyncio.to_thread(_run_section_search, sq)
         current_search_results.extend(search_results_list)
-        
+
         for tname, tinputs, toutputs in search_logged:
             step_off = len(protein_ctx.tool_history) + 1
             protein_ctx.add_tool_call(step_off, tname, tinputs, toutputs, cached=False)
@@ -924,7 +976,7 @@ async def research_search_node(state: AgentState, config: RunnableConfig):
             summary_msg = _format_search_summary(tname, tinputs, str(toutputs))
             preview = _format_search_preview(tname, str(toutputs))
             history.append({"role": "assistant", "content": summary_msg + ("\n\n" + preview if preview else ""), "role_id": "principal_investigator"})
-    
+
     return {
         "history": history,
         "tool_executions": executions,
@@ -962,7 +1014,7 @@ async def research_sub_report_node(state: AgentState, config: RunnableConfig):
     ui_lang = state.get("ui_lang") or _detect_ui_lang(state["messages"][-1].content)
     current_search_results = state.get("current_search_results", [])
     sub_reports = list(state.get("research_sub_reports", []))
-    
+
     if research_idx >= len(sections):
         return {"status": "research_steps_done"}
 
@@ -971,13 +1023,17 @@ async def research_sub_report_node(state: AgentState, config: RunnableConfig):
     formatted_refs = []
     for i, res_item in enumerate(current_search_results, 1):
         formatted_refs.append(f"[{i}] {res_item}")
-    
+
     search_results_str = "\n\n".join(formatted_refs) if formatted_refs else ("该小节没有检索结果。" if ui_lang == "zh" else "No search results for this section.")
 
+    if history and ("撰写小报告" in history[-1].get("content", "") or "writing sub-report" in history[-1].get("content", "").lower()):
+        history.pop()
+
     try:
-        sub_report = await asyncio.to_thread(
-            chains["pi_sub_report"].invoke,
+        sub_report = await _stream_chain(
+            chains["pi_sub_report"],
             {"section_name": section["section_name"], "focus": section["focus"], "search_results": search_results_str},
+            role_id="principal_investigator",
         )
         title, body = _parse_sub_report_short_title((sub_report or "").strip(), fallback_title=section["section_name"])
         history.append({"role": "assistant", "content": f"# {title}\n\n{body}", "role_id": "principal_investigator"})
@@ -1017,10 +1073,14 @@ async def research_report_node(state: AgentState, config: RunnableConfig):
     ui_lang = state.get("ui_lang") or _detect_ui_lang(text)
     history = list(state.get("history", []))
 
+    if history and ("撰写研究草案" in history[-1].get("content", "") or "writing the draft report" in history[-1].get("content", "").lower()):
+        history.pop()
+
     try:
-        final_report = await asyncio.to_thread(
-            chains["pi_final_report"].invoke,
+        final_report = await _stream_chain(
+            chains["pi_final_report"],
             {"input": text, "sub_reports": sub_reports_text},
+            role_id="principal_investigator",
         )
         history.append({"role": "assistant", "content": final_report, "role_id": "principal_investigator"})
     except Exception as e:
@@ -1115,7 +1175,7 @@ async def plan_node(state: AgentState, config: RunnableConfig):
         content = getattr(raw_msg, "content", None) or str(raw_msg) or ""
         plan = _parse_cb_plan(content)
     except Exception as e:
-        print(f"[CB planner] failed: {e}")
+        _logger.warning("CB planner failed: %s", e)
         plan = []
 
     # Filter and normalize plan
@@ -1207,7 +1267,7 @@ async def execute_node(state: AgentState, config: RunnableConfig):
             parts = value.split(":")
             if len(parts) < 2:
                 dependency_failure_reason = f"Invalid dependency token for `{key}`: {value}"
-                print(f"[Dependency resolve] {dependency_failure_reason}")
+                _logger.info("Dependency resolve: %s", dependency_failure_reason)
                 dependency_resolution_failed = True
                 continue
             dep_token = parts[1].replace("step_", "").replace("step", "").strip()
@@ -1215,14 +1275,14 @@ async def execute_node(state: AgentState, config: RunnableConfig):
                 dep_step = int(dep_token)
             except ValueError:
                 dependency_failure_reason = f"Invalid dependency step token for `{key}`: {value}"
-                print(f"[Dependency resolve] {dependency_failure_reason}")
+                _logger.info("Dependency resolve: %s", dependency_failure_reason)
                 dependency_resolution_failed = True
                 continue
 
             dep_out = _get_step_raw_output(step_results, dep_step)
             if dep_out is None:
                 dependency_failure_reason = f"Missing output for dependency step {dep_step} (key={key})"
-                print(f"[Dependency resolve] {dependency_failure_reason}")
+                _logger.info("Dependency resolve: %s", dependency_failure_reason)
                 dependency_resolution_failed = True
                 continue
 
@@ -1233,7 +1293,7 @@ async def execute_node(state: AgentState, config: RunnableConfig):
                     + (f": {dep_reason}" if dep_reason else "")
                     + f" (needed for `{key}`)"
                 )
-                print(f"[Dependency resolve] {dependency_failure_reason}")
+                _logger.info("Dependency resolve: %s", dependency_failure_reason)
                 dependency_resolution_failed = True
                 continue
 
@@ -1258,9 +1318,7 @@ async def execute_node(state: AgentState, config: RunnableConfig):
                     val = cursor
                 else:
                     val = dep_out
-                    print(
-                        f"[Dependency resolve] field path `{'/'.join(field_path)}` not found in step {dep_step} output; using raw output"
-                    )
+                    _logger.debug("Dependency resolve: field path %s not found in step %s output; using raw output", "/".join(field_path), dep_step)
             else:
                 val = dep_out
 
@@ -1350,12 +1408,9 @@ async def execute_node(state: AgentState, config: RunnableConfig):
         invoke_input = _normalize_output_paths(tool_name, tool, invoke_input, agent_session_dir)
     normalized_output_fields = _collect_output_fields(invoke_input)
     if raw_output_fields or normalized_output_fields:
-        print(
-            f"[Output normalize] tool={tool_name} | raw={json.dumps(raw_output_fields, ensure_ascii=False)}"
-            f" -> normalized={json.dumps(normalized_output_fields, ensure_ascii=False)}"
-        )
+        _logger.debug("Output normalize: tool=%s, raw=%s -> normalized=%s", tool_name, json.dumps(raw_output_fields, ensure_ascii=False), json.dumps(normalized_output_fields, ensure_ascii=False))
 
-    def _merge_retry_input(base_input: Dict[str, Any], retry_input: Dict[str, Any]) -> Dict[str, Any]:
+    def _merge_retry_input(base_input: dict[str, Any], retry_input: dict[str, Any]) -> dict[str, Any]:
         candidate = dict(base_input)
         candidate.update(retry_input)
         if tool:
@@ -1364,8 +1419,8 @@ async def execute_node(state: AgentState, config: RunnableConfig):
                 candidate = _normalize_output_paths(tool_name, tool, candidate, agent_session_dir)
         return candidate
 
-    def _extract_output_artifact_paths(raw_output: Any) -> List[str]:
-        paths: List[str] = []
+    def _extract_output_artifact_paths(raw_output: Any) -> list[str]:
+        paths: list[str] = []
         primary = _get_output_file_path_from_raw(raw_output, tool_name)
         if primary:
             paths.append(primary)
@@ -1387,7 +1442,7 @@ async def execute_node(state: AgentState, config: RunnableConfig):
         except Exception:
             pass
 
-        unique: List[str] = []
+        unique: list[str] = []
         seen = set()
         for p in paths:
             norm = os.path.abspath(p)
@@ -1405,7 +1460,7 @@ async def execute_node(state: AgentState, config: RunnableConfig):
                     protein_ctx.add_structure_file(file_path, source=tool_name, uniprot_id=protein_ctx.last_uniprot_id)
                 protein_ctx.add_file(file_path)
             except Exception as e:
-                print(f"[Artifact register] failed for {file_path}: {e}")
+                _logger.warning("Artifact register failed for %s: %s", file_path, e)
 
     while step_retry <= MAX_STEP_RETRIES and not step_done:
         # Cache check
@@ -1419,22 +1474,22 @@ async def execute_node(state: AgentState, config: RunnableConfig):
                 inputs_str = json.dumps(invoke_input, ensure_ascii=False, sort_keys=True)
                 if len(inputs_str) > 500:
                     inputs_str = inputs_str[:500] + "..."
-                print(f"[Execute] tool={tool_name} | input={inputs_str}")
+                _logger.info("Execute: tool=%s, input=%s", tool_name, inputs_str)
                 out = await asyncio.wait_for(asyncio.to_thread(tool.invoke, invoke_input), timeout=TOOL_EXECUTION_TIMEOUT)
                 raw_output = out if isinstance(out, (str, dict)) else str(out)
                 out_preview = str(raw_output)[:300] + ("..." if len(str(raw_output)) > 300 else "")
-                print(f"[Result] tool={tool_name} | output_preview={out_preview}")
+                _logger.info("Result: tool=%s, output_preview=%s", tool_name, out_preview)
                 cached_flag = False
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 raw_output = json.dumps(
                     {"success": False, "error": f"Tool execution timed out ({TOOL_EXECUTION_TIMEOUT}s)"},
                     ensure_ascii=False,
                 )
-                print(f"[Result] tool={tool_name} | timeout after {TOOL_EXECUTION_TIMEOUT}s")
+                _logger.warning("Result: tool=%s, timeout after %ss", tool_name, TOOL_EXECUTION_TIMEOUT)
                 cached_flag = False
             except Exception as e:
                 raw_output = json.dumps({"success": False, "error": str(e)})
-                print(f"[Result] tool={tool_name} | exception={e}")
+                _logger.error("Result: tool=%s, exception=%s", tool_name, e)
                 cached_flag = False
         else:
             # Tool not found
@@ -1486,7 +1541,7 @@ async def execute_node(state: AgentState, config: RunnableConfig):
                 if isinstance(new_query, str) and isinstance(old_query, str) and new_query != old_query:
                     step_retry += 1
                     invoke_input = _merge_retry_input(invoke_input, rebound_input)
-                    print(f"[FileNotFound retry] tool={tool_name} | step={step_num} | retry={step_retry}")
+                    _logger.info("FileNotFound retry: tool=%s, step=%s, retry=%s", tool_name, step_num, step_retry)
                     continue
 
         # MLS post-step verify for semantic/format errors (compat-first: try retry_input first)
@@ -1512,7 +1567,7 @@ async def execute_node(state: AgentState, config: RunnableConfig):
             if isinstance(post_retry_input, dict) and step_retry < MAX_STEP_RETRIES:
                 step_retry += 1
                 invoke_input = _merge_retry_input(invoke_input, post_retry_input)
-                print(f"[Post-step retry] tool={tool_name} | step={step_num} | retry={step_retry}")
+                _logger.info("Post-step retry: tool=%s, step=%s, retry=%s", tool_name, step_num, step_retry)
                 continue
             is_failure = True
             failure_reason = post_reason
@@ -1548,7 +1603,7 @@ async def execute_node(state: AgentState, config: RunnableConfig):
                     if isinstance(debug_retry_input, dict):
                         step_retry += 1
                         invoke_input = _merge_retry_input(invoke_input, debug_retry_input)
-                        print(f"[CB retry] tool={tool_name} | step={step_num} | retry={step_retry}")
+                        _logger.info("CB retry: tool=%s, step=%s, retry=%s", tool_name, step_num, step_retry)
                         continue
                 is_failure = True
                 failure_reason = cb_note or ("CB 后置校验不一致。" if ui_lang == "zh" else "CB post-step check mismatch.")
@@ -1572,7 +1627,7 @@ async def execute_node(state: AgentState, config: RunnableConfig):
             if isinstance(debug_retry_input, dict):
                 step_retry += 1
                 invoke_input = _merge_retry_input(invoke_input, debug_retry_input)
-                print(f"[Failure retry] tool={tool_name} | step={step_num} | retry={step_retry}")
+                _logger.info("Failure retry: tool=%s, step=%s, retry=%s", tool_name, step_num, step_retry)
                 continue
             if debug_report_for_cb:
                 failure_reason = debug_report_for_cb
@@ -1589,12 +1644,12 @@ async def execute_node(state: AgentState, config: RunnableConfig):
             if not out_failed:
                 _register_artifacts_to_context(last_output)
         except Exception as e:
-            print(f"[Artifact register] skipped due to error: {e}")
+            _logger.warning("Artifact register skipped: %s", e)
 
     # Record result
     protein_ctx.add_tool_call(step_num, tool_name, merged_tool_input, last_output, cached=cached_flag)
     step_results[step_num] = {"raw_output": last_output}
-    
+
     # --- Generate detailed feedback for the UI (MLS needs full context for self-check) ---
     is_failure, parsed_failure_reason = _tool_output_indicates_failure(last_output)
     if not failure_reason:
@@ -1648,7 +1703,7 @@ async def execute_node(state: AgentState, config: RunnableConfig):
             if oss_url:
                 feedback_content += _ui_text(ui_lang, "cloud_download", name=os.path.basename(out_file), url=oss_url) + "\n\n"
         except Exception as e:
-            print(f"OSS upload failed for {out_file}: {e}")
+            _logger.warning("OSS upload failed for %s: %s", out_file, e)
 
         # 3. File Preview
         preview = _read_output_file_preview(out_file)
@@ -1752,23 +1807,27 @@ async def finalize_node(state: AgentState, config: RunnableConfig):
     full_run_record = "\n\n".join([
         f"User request: {user_input}",
         f"Protein context: {protein_ctx.get_context_summary()}",
-        f"Tool executions:\n" + "\n".join(analysis_log) if analysis_log else "No tools executed."
+        "Tool executions:\n" + "\n".join(analysis_log) if analysis_log else "No tools executed."
     ])
 
+    if history and ("Summarizing" in history[-1].get("content", "") or "正在总结" in history[-1].get("content", "") or "汇总" in history[-1].get("content", "")):
+        history.pop()
+
     try:
-        summary = await asyncio.to_thread(
-            chains["finalizer"].invoke,
+        summary = await _stream_chain(
+            chains["finalizer"],
             {
                 "input": user_input,
                 "full_run_record": full_run_record,
                 "original_input": user_input,
                 "analysis_log": "\n".join(analysis_log) if analysis_log else "No analysis log available.",
                 "references": ""
-            }
+            },
+            role_id="principal_investigator",
         )
         history.append({"role": "assistant", "content": summary, "role_id": "principal_investigator"})
     except Exception as e:
-        print(f"[Finalizer] failed: {e}")
+        _logger.warning("Finalizer failed: %s", e)
         # Fallback: derive status directly from recorded executions.
         if tool_executions:
             summary_parts = [_ui_text(ui_lang, "final_summary_title")]
@@ -1808,11 +1867,11 @@ async def finalize_node(state: AgentState, config: RunnableConfig):
 def should_continue_research(state: AgentState):
     if state.get("status") == "planning_failed" or state.get("error"):
         return END
-    
+
     research_idx = state.get("research_idx", 0)
     search_idx = state.get("search_idx", 0)
     sections = state.get("research_sections", [])
-    
+
     if research_idx < len(sections):
         section = sections[research_idx]
         queries = section.get("search_queries", [])
@@ -1828,10 +1887,10 @@ def should_continue(state: AgentState):
         return END
     if state.get("execution_failed"):
         return "finalize_start_node"
-    
+
     plan = state.get("plan", [])
     current_idx = state.get("current_step_index", 0)
-    
+
     if current_idx < len(plan):
         return "execute_start_node"
     return "finalize_start_node"

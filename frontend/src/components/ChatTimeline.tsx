@@ -68,7 +68,7 @@ function renderMarkdown(text: string) {
   return DOMPurify.sanitize(html);
 }
 
-export function ChatTimeline({ items }: { items: ChatHistoryItem[] }) {
+export function ChatTimeline({ items, streamingIndex = -1 }: { items: ChatHistoryItem[]; streamingIndex?: number }) {
   return (
     <div className="chat-timeline">
       {items.length === 0 && (
@@ -79,8 +79,9 @@ export function ChatTimeline({ items }: { items: ChatHistoryItem[] }) {
         const roleId = normalizeRoleId(item.role_id, item.role);
         const roleLabel = roleDisplayName(roleId, isUser);
         const avatar = roleAvatar(roleId, isUser);
+        const isStreaming = idx === streamingIndex;
         return (
-          <div key={idx} className={`chat-msg ${isUser ? "user" : "assistant"} with-avatar`}>
+          <div key={idx} className={`chat-msg ${isUser ? "user" : "assistant"} with-avatar${isStreaming ? " streaming" : ""}`}>
             <img
               className="chat-msg-avatar"
               src={avatar}

@@ -2,76 +2,71 @@
 API server: FastAPI app that mounts all tools_api routers (mutation, predict, search, database)
 and provides health and file download. Started by webui or run directly.
 """
-import os
-import logging
-from pathlib import Path
-from typing import Optional, Dict, Any
+from __future__ import annotations
+
+import importlib
 from datetime import datetime
+from pathlib import Path
+from typing import Any
 from uuid import uuid4
 
 from dotenv import load_dotenv
+
 load_dotenv()
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
-import uvicorn
 from contextlib import asynccontextmanager
 
+import uvicorn
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
+
+from config import get_config
+from exceptions import RateLimitError, SessionNotFoundError, VenusFactoryError
+from logger import get_logger, setup_logging
 from web.utils.common_utils import (
-    redact_path_text,
     ensure_within_roots,
-    get_web_v2_root_dir,
     get_web_v2_area_dir,
+    get_web_v2_root_dir,
+    redact_path_text,
 )
 
-# Mount all tools_api routers
-try:
-    # Works when importing as `src.api_server`
-    from src.tools.mutation.tools_api import router as mutation_router
-    from src.tools.predict.tools_api import router as predict_router
-    from src.tools.search.tools_api import router as search_router
-    from src.tools.database.tools_api import router as database_router
-    from src.web_v2.chat_api import router as chat_v2_router
-    from src.web_v2.report_api import router as report_v2_router
-    from src.web_v2.quick_tools_api import router as quick_tools_v2_router
-    from src.web_v2.custom_model_api import router as custom_model_v2_router
-    from src.web_v2.advanced_tools_api import router as advanced_tools_v2_router
-    from src.web_v2.download_api import router as download_v2_router
-    from src.web_v2.settings_api import router as settings_v2_router
-    from src.web_v2.workspace_api import router as workspace_v2_router
-    from src.web_v2.analytics_store import analytics_store
-except ModuleNotFoundError:
-    # Works when running from `python src/webui_v2.py` (sys.path rooted at src/)
-    from tools.mutation.tools_api import router as mutation_router
-    from tools.predict.tools_api import router as predict_router
-    from tools.search.tools_api import router as search_router
-    from tools.database.tools_api import router as database_router
-    from web_v2.chat_api import router as chat_v2_router
-    from web_v2.report_api import router as report_v2_router
-    from web_v2.quick_tools_api import router as quick_tools_v2_router
-    from web_v2.custom_model_api import router as custom_model_v2_router
-    from web_v2.advanced_tools_api import router as advanced_tools_v2_router
-    from web_v2.download_api import router as download_v2_router
-    from web_v2.settings_api import router as settings_v2_router
-    from web_v2.workspace_api import router as workspace_v2_router
-    from web_v2.analytics_store import analytics_store
+setup_logging()
+logger = get_logger(__name__)
+
+# Unified import helper: resolves both `src.X` and `X` import paths.
+def _import_attr(module_path: str, attr: str) -> Any:
+    for prefix in ("src.", ""):
+        try:
+            mod = importlib.import_module(f"{prefix}{module_path}")
+            return getattr(mod, attr)
+        except (ModuleNotFoundError, AttributeError):
+            continue
+    raise ImportError(f"Cannot import '{attr}' from '{module_path}'")
+
+mutation_router = _import_attr("tools.mutation.tools_api", "router")
+predict_router = _import_attr("tools.predict.tools_api", "router")
+search_router = _import_attr("tools.search.tools_api", "router")
+database_router = _import_attr("tools.database.tools_api", "router")
+chat_v2_router = _import_attr("web_v2.chat_api", "router")
+report_v2_router = _import_attr("web_v2.report_api", "router")
+quick_tools_v2_router = _import_attr("web_v2.quick_tools_api", "router")
+custom_model_v2_router = _import_attr("web_v2.custom_model_api", "router")
+advanced_tools_v2_router = _import_attr("web_v2.advanced_tools_api", "router")
+download_v2_router = _import_attr("web_v2.download_api", "router")
+settings_v2_router = _import_attr("web_v2.settings_api", "router")
+workspace_v2_router = _import_attr("web_v2.workspace_api", "router")
+analytics_store = _import_attr("web_v2.analytics_store", "analytics_store")
+
+_cfg = get_config()
 
 WEB_V2_ROOT = get_web_v2_root_dir()
 WEB_V2_UPLOAD_ROOT = get_web_v2_area_dir("uploads")
 WEB_V2_RESULTS_ROOT = get_web_v2_area_dir("results")
 WEB_V2_MANIFESTS_ROOT = get_web_v2_area_dir("manifests")
-WEBUI_V2_MODE = os.getenv("WEBUI_V2_MODE", "local").strip().lower()
-if WEBUI_V2_MODE not in {"local", "online"}:
-    WEBUI_V2_MODE = "local"
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
-logger = logging.getLogger(__name__)
+WEBUI_V2_MODE = _cfg.server.mode
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -92,11 +87,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-_cors_origins_raw = os.getenv(
-    "WEBUI_V2_CORS_ORIGINS",
-    "http://127.0.0.1:7861,http://localhost:7861,http://127.0.0.1:5173,http://localhost:5173",
-)
-_cors_origins = [origin.strip() for origin in _cors_origins_raw.split(",") if origin.strip()]
+_cors_origins = _cfg.server.cors_origins or [
+    "http://127.0.0.1:7861", "http://localhost:7861",
+    "http://127.0.0.1:5173", "http://localhost:5173",
+]
 _allow_credentials = "*" not in _cors_origins
 
 app.add_middleware(
@@ -121,7 +115,7 @@ app.include_router(settings_v2_router)
 if WEBUI_V2_MODE == "local":
     app.include_router(custom_model_v2_router)
 
-_frontend_dist = Path(os.getenv("WEBUI_V2_FRONTEND_DIST", "frontend/dist"))
+_frontend_dist = Path(_cfg.server.frontend_dist)
 if _frontend_dist.exists():
     app.mount(
         "/assets",
@@ -141,9 +135,9 @@ if _manual_docs_dir.exists():
 # ---------- Shared models and helpers ----------
 class StandardResponse(BaseModel):
     success: bool
-    data: Optional[Any] = None
-    message: Optional[str] = None
-    error: Optional[str] = None
+    data: Any | None = None
+    message: str | None = None
+    error: str | None = None
     timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
     request_id: str = Field(default_factory=lambda: str(uuid4()))
 
@@ -151,9 +145,9 @@ class StandardResponse(BaseModel):
 def create_response(
     success: bool,
     data: Any = None,
-    message: str = None,
-    error: str = None,
-) -> Dict[str, Any]:
+    message: str | None = None,
+    error: str | None = None,
+) -> dict[str, Any]:
     return {
         "success": success,
         "data": data,
@@ -196,7 +190,7 @@ async def runtime_config():
 async def download_file(file_path: str):
     try:
         candidate_roots = [WEB_V2_RESULTS_ROOT, WEB_V2_MANIFESTS_ROOT]
-        full_path: Optional[Path] = None
+        full_path: Path | None = None
         for root in candidate_roots:
             candidate = (root / file_path).resolve()
             if ensure_within_roots(candidate, [root]) and candidate.exists() and candidate.is_file():
@@ -213,13 +207,13 @@ async def download_file(file_path: str):
         raise
     except Exception as e:
         logger.error(f"File download error: {redact_path_text(str(e))}")
-        raise HTTPException(status_code=500, detail="Failed to download file")
+        raise HTTPException(status_code=500, detail="Failed to download file") from e
 
 
 @app.get("/", response_class=HTMLResponse)
 async def webui_v2_entry():
-    frontend_dev_mode = os.getenv("WEBUI_V2_DEV_MODE", "0") == "1"
-    frontend_dev_url = os.getenv("WEBUI_V2_FRONTEND_DEV_URL", "http://127.0.0.1:5173")
+    frontend_dev_mode = _cfg.server.dev_mode
+    frontend_dev_url = _cfg.server.frontend_dev_url
     dist_index = _frontend_dist / "index.html"
 
     if frontend_dev_mode:
@@ -245,8 +239,8 @@ async def webui_v2_entry():
 
 @app.get("/{full_path:path}", response_class=HTMLResponse)
 async def webui_v2_spa_fallback(full_path: str):
-    frontend_dev_mode = os.getenv("WEBUI_V2_DEV_MODE", "0") == "1"
-    frontend_dev_url = os.getenv("WEBUI_V2_FRONTEND_DEV_URL", "http://127.0.0.1:5173")
+    frontend_dev_mode = _cfg.server.dev_mode
+    frontend_dev_url = _cfg.server.frontend_dev_url
     dist_index = _frontend_dist / "index.html"
 
     if full_path.startswith("api/"):
@@ -267,18 +261,47 @@ async def webui_v2_spa_fallback(full_path: str):
     raise HTTPException(status_code=404, detail="WebUI v2 route not available")
 
 
-# ---------- Exception handlers and lifecycle ----------
+# ---------- Exception handlers ----------
 @app.exception_handler(HTTPException)
-async def http_exception_handler(request, exc):
+async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
     return JSONResponse(
         status_code=exc.status_code,
         content=create_response(success=False, error=exc.detail),
     )
 
 
+@app.exception_handler(RateLimitError)
+async def rate_limit_handler(request: Request, exc: RateLimitError) -> JSONResponse:
+    headers = {}
+    if exc.retry_after is not None:
+        headers["Retry-After"] = str(int(exc.retry_after))
+    return JSONResponse(
+        status_code=429,
+        content=create_response(success=False, error=str(exc)),
+        headers=headers,
+    )
+
+
+@app.exception_handler(SessionNotFoundError)
+async def session_not_found_handler(request: Request, exc: SessionNotFoundError) -> JSONResponse:
+    return JSONResponse(
+        status_code=404,
+        content=create_response(success=False, error=str(exc)),
+    )
+
+
+@app.exception_handler(VenusFactoryError)
+async def venus_error_handler(request: Request, exc: VenusFactoryError) -> JSONResponse:
+    logger.warning("VenusFactoryError: %s (context=%s)", exc, exc.context)
+    return JSONResponse(
+        status_code=400,
+        content=create_response(success=False, error=str(exc)),
+    )
+
+
 @app.exception_handler(Exception)
-async def global_exception_handler(request, exc):
-    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.error("Unhandled exception: %s", exc, exc_info=True)
     return JSONResponse(
         status_code=500,
         content=create_response(

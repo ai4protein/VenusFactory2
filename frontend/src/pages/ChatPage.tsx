@@ -48,6 +48,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>([]);
   const [running, setRunning] = useState(false);
   const [runStatus, setRunStatus] = useState<RunStatus>("stopped");
+  const [streamingIdx, setStreamingIdx] = useState(-1);
   const [error, setError] = useState<string>("");
   const [selectedModel, setSelectedModel] = useState(MODELS[0]);
   const [chatQuota, setChatQuota] = useState<ChatQuota | null>(null);
@@ -64,11 +65,15 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     void bootstrapSession();
   }, []);
 
+  const lastContentLen = snapshot?.history?.[snapshot.history.length - 1]?.content?.length ?? 0;
   useEffect(() => {
-    if (timelineRef.current) {
-      timelineRef.current.scrollTop = timelineRef.current.scrollHeight;
+    const el = timelineRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (distanceFromBottom < 150) {
+      el.scrollTop = el.scrollHeight;
     }
-  }, [snapshot?.history.length]);
+  }, [snapshot?.history.length, lastContentLen]);
 
   useEffect(() => {
     const s = (snapshot?.status || "").toLowerCase();
@@ -234,6 +239,52 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     sessionStorage.setItem(SESSION_STORAGE_KEY, sid);
   }
 
+  function handleStreamEvent({ event, data }: { event: string; data: string }) {
+    if (event === "state" && data) {
+      const payload = JSON.parse(data) as ChatSnapshot;
+      setSnapshot(payload);
+      setStreamingIdx(-1);
+    } else if (event === "stream_start" && data) {
+      const info = JSON.parse(data) as { role_id?: string };
+      setSnapshot(prev => {
+        if (!prev) return prev;
+        const history = [...prev.history];
+        const last = history[history.length - 1];
+        if (last && last.role === "assistant" && (
+          last.content.includes("Thinking") || last.content.includes("思考中") ||
+          last.content.includes("Summarizing") || last.content.includes("正在总结") ||
+          last.content.includes("汇总") || last.content.includes("撰写小报告") ||
+          last.content.includes("writing sub-report") ||
+          last.content.includes("撰写研究草案") ||
+          last.content.includes("writing the draft report")
+        )) {
+          history[history.length - 1] = { role: "assistant", content: "", role_id: info.role_id || last.role_id };
+        } else {
+          history.push({ role: "assistant", content: "", role_id: info.role_id });
+        }
+        setStreamingIdx(history.length - 1);
+        return { ...prev, history };
+      });
+    } else if (event === "token" && data) {
+      const token = JSON.parse(data) as { content?: string; role_id?: string };
+      if (token.content) {
+        setSnapshot(prev => {
+          if (!prev) return prev;
+          const history = [...prev.history];
+          const last = history[history.length - 1];
+          if (last && last.role === "assistant") {
+            history[history.length - 1] = { ...last, content: last.content + token.content };
+            setStreamingIdx(history.length - 1);
+          } else {
+            history.push({ role: "assistant", content: token.content || "", role_id: token.role_id });
+            setStreamingIdx(history.length - 1);
+          }
+          return { ...prev, history };
+        });
+      }
+    }
+  }
+
   async function sendMessage() {
     const composedText = message;
     if (running) return;
@@ -276,12 +327,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
           model: selectedModel,
           attachment_paths: attachmentPaths
         },
-        ({ event, data }) => {
-          if (event === "state" && data) {
-            const payload = JSON.parse(data) as ChatSnapshot;
-            setSnapshot(payload);
-          }
-        },
+        handleStreamEvent,
         abortRef.current.signal,
         getChatSessionAuthHeaders(activeSessionId)
       );
@@ -298,6 +344,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       setRunStatus("stopped");
     } finally {
       setRunning(false);
+      setStreamingIdx(-1);
       setMessage("");
       setFiles([]);
       setWorkspaceFiles([]);
@@ -324,12 +371,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       await streamSSEFromPost(
         `/api/chat/sessions/${encodeURIComponent(sessionId)}/messages/retry/stream`,
         {},
-        ({ event, data }) => {
-          if (event === "state" && data) {
-            const payload = JSON.parse(data) as ChatSnapshot;
-            setSnapshot(payload);
-          }
-        },
+        handleStreamEvent,
         abortRef.current.signal,
         getChatSessionAuthHeaders(sessionId)
       );
@@ -345,6 +387,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       setRunStatus("stopped");
     } finally {
       setRunning(false);
+      setStreamingIdx(-1);
       abortRef.current = null;
     }
   }
@@ -476,7 +519,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
 
         <section className="chat-panel center">
           <div className="timeline-wrap" ref={timelineRef}>
-            <ChatTimeline items={snapshot?.history || []} />
+            <ChatTimeline items={snapshot?.history || []} streamingIndex={streamingIdx} />
           </div>
           <div className="composer">
             {chatQuota?.enforced && (

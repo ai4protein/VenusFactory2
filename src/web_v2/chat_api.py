@@ -6,9 +6,9 @@ import os
 import secrets
 import shutil
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
@@ -22,6 +22,8 @@ from agent.chat_agent_utils import (
     extract_uniprot_id_from_message,
 )
 from agent.chat_graph import create_agent_graph
+from config import get_config
+from logger import get_logger
 from web.utils.common_utils import (
     make_web_v2_upload_name,
     redact_path_text,
@@ -30,43 +32,25 @@ from web.utils.common_utils import (
 )
 from web_v2.analytics_store import analytics_store
 
+_logger = get_logger("web_v2.chat_api")
+_cfg = get_config()
 
 router = APIRouter(prefix="/api/chat", tags=["chat-v2"])
 
-_SESSIONS: Dict[str, Dict[str, Any]] = {}
-_SESSION_LOCKS: Dict[str, asyncio.Lock] = {}
-_SESSION_CANCEL_FLAGS: Dict[str, bool] = {}
+_SESSIONS: dict[str, dict[str, Any]] = {}
+_SESSION_LOCKS: dict[str, asyncio.Lock] = {}
+_SESSION_CANCEL_FLAGS: dict[str, bool] = {}
 _SESSIONS_GUARD = asyncio.Lock()
-_OWNER_DAILY_CHAT_USAGE: Dict[str, Dict[str, Any]] = {}
+_OWNER_DAILY_CHAT_USAGE: dict[str, dict[str, Any]] = {}
 _OWNER_USAGE_GUARD = asyncio.Lock()
 
-
-def _parse_daily_chat_limit() -> int:
-    raw = os.getenv("WEBUI_V2_ONLINE_DAILY_CHAT_LIMIT", "10").strip()
-    try:
-        value = int(raw)
-    except ValueError:
-        value = 10
-    return max(1, value)
-
-
-_ONLINE_DAILY_CHAT_LIMIT = _parse_daily_chat_limit()
-def _parse_session_token_ttl_hours() -> int:
-    raw = os.getenv("WEBUI_V2_SESSION_TOKEN_TTL_HOURS", "24").strip()
-    try:
-        value = int(raw)
-    except ValueError:
-        value = 24
-    return max(1, value)
-
-
-_SESSION_TOKEN_TTL_HOURS = _parse_session_token_ttl_hours()
+_ONLINE_DAILY_CHAT_LIMIT = _cfg.online_limits.daily_chat_limit
+_SESSION_TOKEN_TTL_HOURS = _cfg.online_limits.session_token_ttl_hours
 _SESSION_TOKEN_SECRET = os.getenv("WEBUI_V2_SESSION_TOKEN_SECRET", "").strip() or secrets.token_hex(32)
 
 
 def _runtime_mode() -> str:
-    mode = os.getenv("WEBUI_V2_MODE", "local").strip().lower()
-    return mode if mode in {"local", "online"} else "local"
+    return _cfg.server.mode
 
 
 def _extract_user_agent(request: Request) -> str:
@@ -95,9 +79,9 @@ def _hash_session_token(raw_token: str) -> str:
     return hmac.new(_SESSION_TOKEN_SECRET.encode("utf-8"), raw_token.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
-def _issue_session_access_token(state: Dict[str, Any], request: Request) -> tuple[str, str]:
+def _issue_session_access_token(state: dict[str, Any], request: Request) -> tuple[str, str]:
     raw_token = secrets.token_urlsafe(48)
-    expires_at = datetime.now(timezone.utc) + timedelta(hours=_SESSION_TOKEN_TTL_HOURS)
+    expires_at = datetime.now(UTC) + timedelta(hours=_SESSION_TOKEN_TTL_HOURS)
     state["session_token_hash"] = _hash_session_token(raw_token)
     state["token_expires_at"] = expires_at.isoformat()
     state["owner_key"] = _session_owner_key_for_request(request)
@@ -139,18 +123,18 @@ class SessionStateResponse(BaseModel):
     session_id: str
     model_name: str
     created_at: str
-    history: List[Dict[str, Any]]
-    conversation_log: List[Dict[str, Any]]
-    tool_executions: List[Dict[str, Any]]
+    history: list[dict[str, Any]]
+    conversation_log: list[dict[str, Any]]
+    tool_executions: list[dict[str, Any]]
 
 
 class ChatStreamRequest(BaseModel):
     text: str = Field(default="")
     model: Optional[str] = Field(default=None)
-    attachment_paths: List[str] = Field(default_factory=list)
+    attachment_paths: list[str] = Field(default_factory=list)
 
 
-def _to_json(data: Dict[str, Any]) -> str:
+def _to_json(data: dict[str, Any]) -> str:
     return json.dumps(data, ensure_ascii=False, default=str)
 
 
@@ -164,7 +148,7 @@ def _redact_obj(value: Any) -> Any:
     return value
 
 
-def _snapshot(state: Dict[str, Any]) -> Dict[str, Any]:
+def _snapshot(state: dict[str, Any]) -> dict[str, Any]:
     return {
         "session_id": state.get("session_id"),
         "model_name": getattr(state.get("llm"), "model_name", ""),
@@ -176,7 +160,7 @@ def _snapshot(state: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _append_dialogue_memory(state: Dict[str, Any], user_input: str, final_output: str) -> None:
+def _append_dialogue_memory(state: dict[str, Any], user_input: str, final_output: str) -> None:
     user = (user_input or "").strip()
     assistant = (final_output or "").strip()
     if not user or not assistant:
@@ -193,7 +177,7 @@ def _append_dialogue_memory(state: Dict[str, Any], user_input: str, final_output
         del memory[:-10]
 
 
-async def _get_session_or_404(session_id: str) -> Dict[str, Any]:
+async def _get_session_or_404(session_id: str) -> dict[str, Any]:
     async with _SESSIONS_GUARD:
         state = _SESSIONS.get(session_id)
     if state is None:
@@ -201,7 +185,7 @@ async def _get_session_or_404(session_id: str) -> Dict[str, Any]:
     return state
 
 
-def _assert_session_access(state: Dict[str, Any], request: Request) -> None:
+def _assert_session_access(state: dict[str, Any], request: Request) -> None:
     if _runtime_mode() == "online":
         expected_owner = _session_owner_key_for_request(request)
         actual_owner = str(state.get("owner_key", ""))
@@ -227,10 +211,10 @@ def _assert_session_access(state: Dict[str, Any], request: Request) -> None:
         try:
             expires_at = datetime.fromisoformat(expires_raw.replace("Z", "+00:00"))
             if expires_at.tzinfo is None:
-                expires_at = expires_at.replace(tzinfo=timezone.utc)
+                expires_at = expires_at.replace(tzinfo=UTC)
         except ValueError:
-            expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
-        if datetime.now(timezone.utc) >= expires_at:
+            expires_at = datetime.now(UTC) - timedelta(seconds=1)
+        if datetime.now(UTC) >= expires_at:
             raise HTTPException(
                 status_code=401,
                 detail={"code": "SESSION_TOKEN_EXPIRED", "message": "Session access token has expired."},
@@ -266,7 +250,7 @@ def _extract_client_ip(request: Request) -> str:
 
 
 async def _consume_online_chat_quota_or_429(request: Request) -> None:
-    if os.getenv("WEBUI_V2_MODE", "local").strip().lower() != "online":
+    if not _cfg.server.is_online:
         return
 
     owner_key = _session_owner_key_for_request(request)
@@ -288,9 +272,9 @@ async def _consume_online_chat_quota_or_429(request: Request) -> None:
         usage["count"] = int(usage.get("count", 0)) + 1
 
 
-async def _get_online_chat_quota_status(request: Request) -> Dict[str, Any]:
-    mode = os.getenv("WEBUI_V2_MODE", "local").strip().lower()
-    if mode != "online":
+async def _get_online_chat_quota_status(request: Request) -> dict[str, Any]:
+    mode = _cfg.server.mode
+    if not _cfg.server.is_online:
         return {
             "mode": mode,
             "enforced": False,
@@ -319,7 +303,7 @@ async def _get_online_chat_quota_status(request: Request) -> Dict[str, Any]:
 def _record_access_event(request: Request, endpoint: str) -> None:
     try:
         analytics_store.record_access_event(
-            ts=datetime.now(timezone.utc).isoformat(),
+            ts=datetime.now(UTC).isoformat(),
             endpoint=endpoint,
             owner_key=_session_owner_key_for_request(request),
             ip=_extract_client_ip(request),
@@ -332,7 +316,7 @@ def _record_access_event(request: Request, endpoint: str) -> None:
 async def _normalize_uploaded_file(
     src_path: str,
     agent_session_dir: str,
-    temp_files: List[str],
+    temp_files: list[str],
     owner_key: str,
 ) -> Optional[str]:
     if not src_path:
@@ -369,9 +353,9 @@ async def _normalize_uploaded_file(
 
 
 async def _stream_graph(
-    state: Dict[str, Any],
+    state: dict[str, Any],
     text: str,
-    attachment_paths: List[str],
+    attachment_paths: list[str],
 ):
     if await _is_cancelled(state["session_id"]):
         state["status"] = "stopped"
@@ -384,7 +368,7 @@ async def _stream_graph(
         raise RuntimeError("Agent session directory is missing.")
     os.makedirs(agent_session_dir, exist_ok=True)
 
-    valid_attachments: List[str] = []
+    valid_attachments: list[str] = []
     for p in attachment_paths or []:
         normalized = await _normalize_uploaded_file(
             p,
@@ -474,7 +458,18 @@ async def _stream_graph(
 
     yield f"event: state\ndata: {_to_json(_snapshot(state))}\n\n"
 
-    async for event in graph.astream(initial_state, config=config):
+    _STREAM_STATE_KEYS = {
+        "history", "conversation_log", "tool_executions", "status",
+        "pi_report", "pi_suggest_steps", "plan", "protein_context",
+        "current_step_index", "step_results", "research_sections",
+        "research_idx", "search_idx", "current_search_results",
+        "research_sub_reports", "tool_cache", "execution_failed",
+        "failed_step", "failed_reason",
+    }
+
+    async for stream_mode, data in graph.astream(
+        initial_state, config=config, stream_mode=["updates", "custom"]
+    ):
         if await _is_cancelled(state["session_id"]):
             state["status"] = "stopped"
             state.setdefault("history", []).append(
@@ -487,32 +482,17 @@ async def _stream_graph(
             yield f"event: state\ndata: {_to_json(_snapshot(state))}\n\n"
             yield "event: done\ndata: {}\n\n"
             return
-        for _, updates in event.items():
-            if updates:
-                for key, val in updates.items():
-                    if key in (
-                        "history",
-                        "conversation_log",
-                        "tool_executions",
-                        "status",
-                        "pi_report",
-                        "pi_suggest_steps",
-                        "plan",
-                        "protein_context",
-                        "current_step_index",
-                        "step_results",
-                        "research_sections",
-                        "research_idx",
-                        "search_idx",
-                        "current_search_results",
-                        "research_sub_reports",
-                        "tool_cache",
-                        "execution_failed",
-                        "failed_step",
-                        "failed_reason",
-                    ):
-                        state[key] = val
-        yield f"event: state\ndata: {_to_json(_snapshot(state))}\n\n"
+
+        if stream_mode == "custom":
+            event_type = data.get("type", "token") if isinstance(data, dict) else "token"
+            yield f"event: {event_type}\ndata: {_to_json(data)}\n\n"
+        elif stream_mode == "updates":
+            for _, updates in data.items():
+                if updates:
+                    for key, val in updates.items():
+                        if key in _STREAM_STATE_KEYS:
+                            state[key] = val
+            yield f"event: state\ndata: {_to_json(_snapshot(state))}\n\n"
 
     final_content = state["history"][-1]["content"] if state.get("history") else ""
     _append_dialogue_memory(state, display_text, final_content)

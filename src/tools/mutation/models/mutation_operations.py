@@ -16,10 +16,19 @@ except ImportError:
     DEFAULT_BACKEND = "local"
 
     def get_gradio_base_url(backend: str) -> str:
-        return "http://localhost:7860"
+        return os.getenv("GRADIO_BASE_URL", "http://localhost:7860").rstrip("/")
 
     def upload_file_to_oss_sync(file_path: str, backend: str = None) -> Optional[str]:
         return None
+
+
+def _check_gradio_reachable(url: str) -> bool:
+    import urllib.request
+    try:
+        urllib.request.urlopen(url, timeout=5)
+        return True
+    except Exception:
+        return False
 
 
 def _error_dict(error_type: str, message: str, suggestion: Optional[str] = None) -> Dict[str, Any]:
@@ -85,8 +94,21 @@ def zero_shot_mutation_sequence_prediction(
     else:
         return _error_dict("ValidationError", "Either sequence or fasta_file must be provided.")
 
+    gradio_url = get_gradio_base_url(backend)
+    if not _check_gradio_reachable(gradio_url):
+        if temp_fasta_created and fasta_path and os.path.exists(fasta_path):
+            try:
+                os.unlink(fasta_path)
+            except Exception:
+                pass
+        return _error_dict(
+            "ConnectionError",
+            f"Gradio backend is not reachable at {gradio_url}",
+            suggestion=f"Start the Gradio server or set GRADIO_BASE_URL env var. Current URL: {gradio_url}",
+        )
+
     try:
-        client = Client(get_gradio_base_url(backend))
+        client = Client(gradio_url)
         result = client.predict(
             function_selection="Activity",
             file_obj=handle_file(fasta_path),
@@ -112,7 +134,7 @@ def zero_shot_mutation_sequence_prediction(
                 os.unlink(fasta_path)
             except Exception:
                 pass
-        return _error_dict("PredictionError", str(e), suggestion="Check sequence, model_name, and Gradio backend.")
+        return _error_dict("PredictionError", str(e), suggestion=f"Check sequence, model_name, and Gradio backend at {gradio_url}.")
 
 
 def zero_shot_mutation_structure_prediction(
@@ -128,9 +150,17 @@ def zero_shot_mutation_structure_prediction(
     if not structure_file or not os.path.exists(structure_file):
         return _error_dict("ValidationError", f"Structure file not found: {structure_file}")
 
+    gradio_url = get_gradio_base_url(backend)
+    if not _check_gradio_reachable(gradio_url):
+        return _error_dict(
+            "ConnectionError",
+            f"Gradio backend is not reachable at {gradio_url}",
+            suggestion=f"Start the Gradio server or set GRADIO_BASE_URL env var. Current URL: {gradio_url}",
+        )
+
     try:
         processed_file = extract_first_chain_from_pdb_file(structure_file)
-        client = Client(get_gradio_base_url(backend))
+        client = Client(gradio_url)
         result = client.predict(
             function_selection="Activity",
             file_obj=handle_file(processed_file),

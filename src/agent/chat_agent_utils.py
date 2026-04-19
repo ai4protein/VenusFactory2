@@ -1,22 +1,30 @@
+from __future__ import annotations
+
+import asyncio
+import csv
 import json
 import os
 import re
-import asyncio
-import csv
-from typing import Dict, Any, List, Optional
+from typing import Any
+
 from langchain_classic.schema import HumanMessage
+
 from agent.prompts import MLS_SELF_CHECK_TEMPLATE
+from config import get_config
+from logger import get_logger
 from web.utils.common_utils import (
     get_project_root,
     get_temp_outputs_base_dir,
     get_web_v2_root_dir,
-    to_project_relative_path,
 )
+
+_logger = get_logger("agent.utils")
+_cfg = get_config()
 
 _PROJECT_ROOT = str(get_project_root().resolve())
 
 
-def _find_existing_file_by_name(file_name: str) -> Optional[str]:
+def _find_existing_file_by_name(file_name: str) -> str | None:
     """Find a generated artifact by basename under controlled output roots."""
     if not file_name or not isinstance(file_name, str):
         return None
@@ -53,7 +61,7 @@ def _find_existing_file_by_name(file_name: str) -> Optional[str]:
     return matches[0][1]
 
 
-def _resolve_existing_path(path: str) -> Optional[str]:
+def _resolve_existing_path(path: str) -> str | None:
     if not path or not isinstance(path, str):
         return None
     raw = path.strip()
@@ -87,28 +95,20 @@ def _resolve_existing_path(path: str) -> Optional[str]:
     return None
 
 def _is_online_mode() -> bool:
-    return os.getenv("WEBUI_V2_MODE", "local").strip().lower() == "online"
+    return _cfg.server.is_online
 
 
 def _resolve_agent_chat_limits() -> tuple[float, float]:
     """Return mode-based chat limits (online fixed, local unlimited)."""
-    if _is_online_mode():
-        return 200.0, 500.0
-    return float("inf"), float("inf")
+    return _cfg.agent.max_messages, _cfg.agent.max_tool_calls
 
 
-# Agent chat limits (mode-based): online has fixed caps, local is unlimited.
 AGENT_CHAT_MAX_MESSAGES, AGENT_CHAT_MAX_TOOL_CALLS = _resolve_agent_chat_limits()
-# PI search: max results per literature/web/dataset call (from .env)
-SEARCH_MAX_RESULTS = int(os.getenv("SEARCH_MAX_RESULTS", "3"))
-# When a tool fails, MLS self-check bubble (new dialog)
+SEARCH_MAX_RESULTS = _cfg.agent.search_max_results
 MLS_SELF_CHECK_MSG = "🔍 **MLS self-check:** Checking whether parameters can be adjusted and retried."
-# After every step execution, MLS post-step self-check (new dialog) — execution already happened, now verify output
 MLS_POST_STEP_SELF_CHECK_MSG = "🔍 **MLS self-check (post-step):** Step {step_num} executed; verifying output for technical errors before marking complete and proceeding."
-# Max step-level retries after MLS self-check (from .env; default 2)
-MAX_STEP_RETRIES = int(os.getenv("MAX_STEP_RETRIES", "2"))
-# Tool execution timeout in seconds (from .env; default 300 = 5 min); prevents indefinite hang
-TOOL_EXECUTION_TIMEOUT = int(os.getenv("TOOL_EXECUTION_TIMEOUT", "300"))
+MAX_STEP_RETRIES = _cfg.agent.max_step_retries
+TOOL_EXECUTION_TIMEOUT = _cfg.agent.tool_execution_timeout
 PI_SEARCH_TOOL_NAMES = [
     "query_pubmed", "query_semantic_scholar", "query_arxiv",
     "query_tavily", "query_duckduckgo",
@@ -173,7 +173,7 @@ def _tool_output_indicates_failure(raw_output: Any) -> tuple[bool, str]:
                     return (True, val_strip[:500])
     return (False, "")
 
-def _dedupe_references(refs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _dedupe_references(refs: list[dict[str, Any]]) -> list[dict[str, Any]]:
     seen = set()
     out = []
     for r in refs or []:
@@ -189,19 +189,19 @@ def _dedupe_references(refs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         out.append(r)
     return out
 
-def extract_sequence_from_message(message: str) -> Optional[str]:
+def extract_sequence_from_message(message: str) -> str | None:
     """Extract protein sequence from user message"""
     sequence_pattern = r'[ACDEFGHIKLMNPQRSTVWY]{20,}'
     matches = re.findall(sequence_pattern, message.upper())
     return matches[0] if matches else None
 
-def extract_uniprot_id_from_message(message: str) -> Optional[str]:
+def extract_uniprot_id_from_message(message: str) -> str | None:
     """Extract UniProt ID from user message"""
     uniprot_pattern = r'\b[A-Z][A-Z0-9]{5}(?:[A-Z0-9]{4})?\b'
     matches = re.findall(uniprot_pattern, message.upper())
     return matches[0] if matches else None
 
-def _extract_download_file_from_output(tool_name: str, output_data: dict) -> Optional[str]:
+def _extract_download_file_from_output(tool_name: str, output_data: dict) -> str | None:
     """Extract local file path from tool output for download. Returns path if file exists."""
     if not isinstance(output_data, dict):
         return None
@@ -225,7 +225,7 @@ def _extract_download_file_from_output(tool_name: str, output_data: dict) -> Opt
             return resolved
     return None
 
-def _get_output_file_path_from_raw(raw_output: Any, tool_name: str) -> Optional[str]:
+def _get_output_file_path_from_raw(raw_output: Any, tool_name: str) -> str | None:
     """Get output file path from raw tool output for CB post-step verification (file existence + preview)."""
     try:
         data = json.loads(raw_output) if isinstance(raw_output, str) else raw_output
@@ -254,7 +254,7 @@ def _read_output_file_preview(file_path: str, max_lines: int = 10, max_line_len:
         return ""
     try:
         lines = []
-        with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+        with open(file_path, encoding="utf-8", errors="replace") as f:
             for _ in range(max_lines):
                 line = f.readline()
                 if not line:
@@ -266,9 +266,9 @@ def _read_output_file_preview(file_path: str, max_lines: int = 10, max_line_len:
 
 _IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".svg", ".webp")
 
-def _extract_image_paths_from_tool_output(raw_output: Any, tool_name: str) -> List[str]:
+def _extract_image_paths_from_tool_output(raw_output: Any, tool_name: str) -> list[str]:
     """Extract image file paths from tool output (e.g. plot_path, figure_path from agent_generated_code/python_repl). Returns list of absolute paths."""
-    paths: List[str] = []
+    paths: list[str] = []
     try:
         data = json.loads(raw_output) if isinstance(raw_output, str) else raw_output
         if not isinstance(data, dict):
@@ -317,22 +317,22 @@ def _fetch_literature_for_pi(user_text: str, max_results: int = None) -> tuple:
             return empty
 
         query = (user_text or "").strip()[:120]
-        
+
         if not query:
             return empty
         tool_input = {"query": query, "max_results": max_results, "source": "pubmed"}
         out = lit_tool.invoke(tool_input)
         raw_out = out if isinstance(out, str) else json.dumps(out, ensure_ascii=False)
-        
+
         if isinstance(out, str):
             data = json.loads(out) if out.strip().startswith("{") else {}
         else:
             data = out if isinstance(out, dict) else {}
-        
+
         if not data.get("success"):
             return ("", tool_input, raw_out)
         refs_raw = data.get("references", [])
-        
+
         if isinstance(refs_raw, str):
             try:
                 refs = json.loads(refs_raw)
@@ -356,7 +356,7 @@ def _fetch_literature_for_pi(user_text: str, max_results: int = None) -> tuple:
         return ("\n".join(lines) if lines else "", tool_input, raw_out)
 
     except Exception as e:
-        print(f"[PI answer] literature_search failed: {e}")
+        _logger.warning("PI literature_search failed: %s", e)
         return empty
 
 def _refine_query_for_search(user_text: str, max_len: int = 60) -> str:
@@ -473,7 +473,7 @@ async def _run_mls_debug_with_tools(
             error_str,
         )
 
-def _parse_mls_post_step_output(content: str) -> tuple[bool, Optional[dict], Optional[str]]:
+def _parse_mls_post_step_output(content: str) -> tuple[bool, dict | None, str | None]:
     """Parse MLS post-step verify output. Returns (status_ok, retry_input or None, report_for_cb or None)."""
     if content is None or not str(content).strip():
         return (False, None, None)
@@ -503,7 +503,7 @@ async def _run_mls_post_step_verify(
     tool_name: str,
     merged_tool_input: dict,
     raw_output: Any,
-) -> tuple[bool, Optional[dict], Optional[str]]:
+) -> tuple[bool, dict | None, str | None]:
     """Run MLS post-step self-check: verify step output before proceeding. Shows new dialog. Returns (status_ok, retry_input, report_for_cb)."""
     out_preview = str(raw_output)
     if len(out_preview) > 2000:
@@ -577,8 +577,8 @@ async def _cb_post_step_check(
     task_desc: str,
     tool_name: str,
     raw_output: Any,
-    output_file_path: Optional[str] = None,
-    file_preview: Optional[str] = None,
+    output_file_path: str | None = None,
+    file_preview: str | None = None,
     timeout_sec: float = 12.0,
 ) -> tuple[bool, str]:
     """CB verifies: (1) execution matches plan, (2) output not null/empty/weird, (3) if file produced, exists and preview correct. Returns (matches, note)."""
@@ -592,7 +592,7 @@ async def _cb_post_step_check(
                     parsed.get("success") is True or parsed.get("status") == "success"
                 )
                 if status_ok:
-                    with open(output_file_path, "r", encoding="utf-8", errors="replace", newline="") as f:
+                    with open(output_file_path, encoding="utf-8", errors="replace", newline="") as f:
                         reader = csv.DictReader(f)
                         fieldnames = [str(x).strip().lower() for x in (reader.fieldnames or [])]
                         prediction_columns = [c for c in ("prediction", "predicted_class", "probabilities") if c in fieldnames]
@@ -652,7 +652,7 @@ async def _cb_post_step_check(
     except Exception:
         return (True, "")
 
-def _try_parse_json_array(s: str) -> Optional[list]:
+def _try_parse_json_array(s: str) -> list | None:
     """Try to parse s as JSON array. Removes trailing commas before ] or } to tolerate LLM output. Returns list or None."""
     if not s or not s.strip():
         return None
@@ -822,9 +822,13 @@ def _translate_user_query_to_english(user_text: str, llm) -> str:
 
 
 from web.utils.chat_format_utils import (
-    _format_literature_for_reading, _format_web_for_reading,
-    _format_literature_citations, _format_web_citations, _format_dataset_citations
+    _format_dataset_citations,
+    _format_literature_citations,
+    _format_literature_for_reading,
+    _format_web_citations,
+    _format_web_for_reading,
 )
+
 
 def _run_section_search(query: str, max_results: int = None) -> tuple:
     """Run literature_search and web_search for one section query. Returns (list_of_result_strings, list of (tool_name, inputs, raw_output))."""
@@ -841,7 +845,7 @@ def _run_section_search(query: str, max_results: int = None) -> tuple:
         return ("Search tools unavailable.", [])
     sections = []
     logged = []
-    
+
     # Try literature tools in order of preference
     for tool_name in ("query_pubmed", "query_semantic_scholar", "query_arxiv"):
         lit_tool = tools_dict.get(tool_name)
@@ -849,7 +853,7 @@ def _run_section_search(query: str, max_results: int = None) -> tuple:
             continue
         lit_input = {"query": query, "max_results": max_results}
         try:
-            print(f"\n[PI section] Invoking: `{tool_name}` with `{lit_input}`", flush=True)
+            _logger.info("PI section invoking: %s with %s", tool_name, lit_input)
             lit_out = lit_tool.invoke(lit_input)
             raw_lit = lit_out if isinstance(lit_out, str) else json.dumps(lit_out, ensure_ascii=False)
             logged.append((tool_name, lit_input, raw_lit))
@@ -871,7 +875,7 @@ def _run_section_search(query: str, max_results: int = None) -> tuple:
                     break
         except Exception as e:
             logged.append((tool_name, lit_input, json.dumps({"success": False, "error": str(e)})))
-            
+
     # Try web tools in order of preference
     for tool_name in ("query_tavily", "query_duckduckgo"):
         web_tool = tools_dict.get(tool_name)
@@ -879,7 +883,7 @@ def _run_section_search(query: str, max_results: int = None) -> tuple:
             continue
         web_input = {"query": query, "max_results": max_results}
         try:
-            print(f"\n[PI section] Invoking: `{tool_name}` with `{web_input}`", flush=True)
+            _logger.info("PI section invoking: %s with %s", tool_name, web_input)
             web_out = web_tool.invoke(web_input)
             raw_web = web_out if isinstance(web_out, str) else json.dumps(web_out, ensure_ascii=False)
             logged.append((tool_name, web_input, raw_web))
@@ -920,7 +924,7 @@ def _fetch_search_for_pi_report(user_text: str, max_results: int = None, llm=Non
         from tools.tools_agent_hub import get_tools
         tools = get_tools()
         tools_dict = {getattr(t, "name", ""): t for t in tools}
-        
+
         sections = []
         logged = []
 
@@ -931,7 +935,7 @@ def _fetch_search_for_pi_report(user_text: str, max_results: int = None, llm=Non
                 continue
             lit_input = {"query": query, "max_results": max_results}
             try:
-                print(f"\n[PI research] Invoking: `{tool_name}` with `{lit_input}`", flush=True)
+                _logger.info("PI research invoking: %s with %s", tool_name, lit_input)
                 lit_out = lit_tool.invoke(lit_input)
                 raw_lit = lit_out if isinstance(lit_out, str) else json.dumps(lit_out, ensure_ascii=False)
                 logged.append((tool_name, lit_input, raw_lit))
@@ -945,7 +949,7 @@ def _fetch_search_for_pi_report(user_text: str, max_results: int = None, llm=Non
                             sections.append("**Literature (cite as [1], [2], ...)**\n" + "\n".join(lines))
                             break
             except Exception as e:
-                print(f"[PI report] {tool_name} failed: {e}")
+                _logger.warning("PI report %s failed: %s", tool_name, e)
                 logged.append((tool_name, lit_input, json.dumps({"success": False, "error": str(e)})))
 
         # Web: default tavily; if empty/fail try duckduckgo
@@ -955,7 +959,7 @@ def _fetch_search_for_pi_report(user_text: str, max_results: int = None, llm=Non
                 continue
             web_input = {"query": query, "max_results": max_results}
             try:
-                print(f"\n[PI research] Invoking: `{tool_name}` with `{web_input}`", flush=True)
+                _logger.info("PI research invoking: %s with %s", tool_name, web_input)
                 web_out = web_tool.invoke(web_input)
                 raw_web = web_out if isinstance(web_out, str) else json.dumps(web_out, ensure_ascii=False)
                 logged.append((tool_name, web_input, raw_web))
@@ -972,7 +976,7 @@ def _fetch_search_for_pi_report(user_text: str, max_results: int = None, llm=Non
                         sections.append("**Web**\n" + res[:1500])
                         break
             except Exception as e:
-                print(f"[PI report] {tool_name} failed: {e}")
+                _logger.warning("PI report %s failed: %s", tool_name, e)
                 logged.append((tool_name, web_input, json.dumps({"success": False, "error": str(e)})))
 
         # Dataset: default github; if empty/fail try hugging_face
@@ -982,7 +986,7 @@ def _fetch_search_for_pi_report(user_text: str, max_results: int = None, llm=Non
                 continue
             ds_input = {"query": query, "max_results": max_results}
             try:
-                print(f"\n[PI research] Invoking: `{tool_name}` with `{ds_input}`", flush=True)
+                _logger.info("PI research invoking: %s with %s", tool_name, ds_input)
                 ds_out = dataset_tool.invoke(ds_input)
                 raw_ds = ds_out if isinstance(ds_out, str) else json.dumps(ds_out, ensure_ascii=False)
                 logged.append((tool_name, ds_input, raw_ds))
@@ -1001,12 +1005,12 @@ def _fetch_search_for_pi_report(user_text: str, max_results: int = None, llm=Non
                             sections.append("**Datasets (cite as [1], [2], ...)**\n" + "\n".join(lines))
                             break
             except Exception as e:
-                print(f"[PI report] {tool_name} failed: {e}")
+                _logger.warning("PI report %s failed: %s", tool_name, e)
                 logged.append((tool_name, ds_input, json.dumps({"success": False, "error": str(e)})))
         if not sections:
             return ("No search results.", logged)
         intro = "References from search (use [1], [2], etc. in your report):\n\n"
         return (intro + "\n\n".join(sections), logged)
     except Exception as e:
-        print(f"[PI report] search failed: {e}")
+        _logger.warning("PI report search failed: %s", e)
         return ("", [])

@@ -2585,7 +2585,8 @@ button:disabled {
 }
 
 .timeline-wrap {
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding: 14px;
 }
 
@@ -2636,6 +2637,11 @@ button:disabled {
   text-transform: capitalize;
 }
 
+.chat-msg-body {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .chat-msg-body p {
   margin: 0 0 8px;
 }
@@ -2646,6 +2652,21 @@ button:disabled {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 10px;
+}
+
+.chat-msg.streaming .chat-msg-body::after {
+  content: "";
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: var(--accent, #8b6f5a);
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: blink-cursor 0.7s step-end infinite;
+}
+
+@keyframes blink-cursor {
+  50% { opacity: 0; }
 }
 
 .composer {
@@ -5396,6 +5417,12 @@ input[type="file"]::file-selector-button:hover {
 
   .chat-panel.center {
     min-height: 70vh;
+    max-height: 80vh;
+  }
+
+  .chat-panel.left,
+  .chat-panel.right {
+    max-height: 30vh;
   }
 
   .vf2-layout {
