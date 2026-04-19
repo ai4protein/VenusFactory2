@@ -14,6 +14,7 @@ const STATUS_TO_STAGE: Record<string, StageKey | "done"> = {
   started: "analyze",
   analyzing: "analyze",
   new_request: "analyze",
+  waiting_for_clarification: "analyze",
   research_planning_done: "research",
   resume_research: "research",
   research_search_done: "research",
@@ -24,6 +25,9 @@ const STATUS_TO_STAGE: Record<string, StageKey | "done"> = {
   resume_execution: "execute",
   executing: "execute",
   execution_failed: "execute",
+  waiting_for_step_review: "execute",
+  waiting_for_sub_report_review: "execute",
+  waiting_for_iteration: "summarize",
   completed: "done",
 };
 
@@ -48,8 +52,27 @@ export function PipelineProgress({
   plan,
   toolExecutions,
 }: PipelineProgressProps) {
-  if (!status || status === "completed" || status === "stopped" || status === "stopping") {
-    return null;
+  if (!status) return null;
+
+  if (status === "completed") {
+    return (
+      <div className="pipeline-bar pipeline-done">
+        {STAGES.map((stage) => (
+          <div key={stage.key} className="pipeline-step step-done">
+            <span className="pipeline-step-icon">✓</span>
+            <span className="pipeline-step-label">{stage.label}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (status === "stopped" || status === "stopping") {
+    return (
+      <div className="pipeline-bar pipeline-simple pipeline-stopped">
+        <span className="pipeline-simple-text">{status === "stopping" ? "Stopping…" : "Stopped"}</span>
+      </div>
+    );
   }
 
   if (status === "chat_mode") {

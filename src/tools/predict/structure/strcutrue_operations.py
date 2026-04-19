@@ -81,7 +81,7 @@ def predict_structure_esmfold(
             return _error_response(
                 "PredictionError",
                 "ESMFold returned no PDB path.",
-                suggestion="Check local GPU/env and sequence.",
+                suggestion="Check ESMFOLD_BACKEND, GPU/env, and sequence.",
             )
         content_preview = json.dumps(result_info, ensure_ascii=False)[:_PREVIEW_LEN] if result_info else ""
         biological_metadata = dict(result_info) if isinstance(result_info, dict) else {"result_info": str(result_info)}

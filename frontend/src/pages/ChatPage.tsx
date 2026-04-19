@@ -42,13 +42,6 @@ type SessionMeta = {
 const MODELS = ["Gemini-2.5-Pro", "ChatGPT-4o", "Claude-3.7", "DeepSeek-R1"];
 type RunStatus = "running" | "stopping" | "stopped";
 
-function createPageInstanceId(): string {
-  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
-  }
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-}
-
 function friendlyErrorHint(msg: string): string {
   const m = msg.toLowerCase();
   if (m.includes("quota") || m.includes("limit reached"))
@@ -107,16 +100,16 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   const [chatQuota, setChatQuota] = useState<ChatQuota | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const timelineRef = useRef<HTMLDivElement | null>(null);
-  const pageInstanceIdRef = useRef(createPageInstanceId());
-  const SESSION_STORAGE_KEY = `vf2_active_session_id__${pageInstanceIdRef.current}`;
-  const SESSION_CACHE_KEY = `vf2_session_list_cache__${pageInstanceIdRef.current}`;
-  const SESSION_OWNED_KEY = `vf2_session_ids__${pageInstanceIdRef.current}`;
+  const SESSION_STORAGE_KEY = "vf2_active_session_id";
+  const SESSION_CACHE_KEY = "vf2_session_list_cache";
+  const SESSION_OWNED_KEY = "vf2_owned_session_ids";
   const COPY_HINT_MS = 1200;
   const [copiedSessionId, setCopiedSessionId] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [sessionsCollapsed, setSessionsCollapsed] = useState(false);
   const [logsCollapsed, setLogsCollapsed] = useState(false);
+  const [pipelineDismissed, setPipelineDismissed] = useState(false);
 
   useEffect(() => {
     void bootstrapSession();
@@ -140,7 +133,10 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       return;
     }
     if (s !== "completed") {
-      setRunStatus((prev) => (prev === "stopping" ? prev : "running"));
+      setRunStatus((prev) => {
+        if (prev !== "running" && prev !== "stopping") setPipelineDismissed(false);
+        return prev === "stopping" ? prev : "running";
+      });
       return;
     }
     setRunStatus("stopped");
@@ -166,15 +162,19 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
 
   async function fetchSessions() {
     const data = await listChatSessions();
-    const list = filterOwnedSessions(data.sessions || []);
+    const allServer = data.sessions || [];
+    const list = filterOwnedSessions(allServer);
     setSessions(list);
     sessionStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(list));
+    const serverIds = new Set(allServer.map((s) => s.session_id));
+    const owned = readOwnedSessionIds().filter((id) => serverIds.has(id));
+    writeOwnedSessionIds(owned);
     return list;
   }
 
   function readOwnedSessionIds(): string[] {
     try {
-      const parsed = JSON.parse(sessionStorage.getItem(SESSION_OWNED_KEY) || "[]") as unknown;
+      const parsed = JSON.parse(localStorage.getItem(SESSION_OWNED_KEY) || "[]") as unknown;
       return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string" && Boolean(item)) : [];
     } catch {
       return [];
@@ -182,7 +182,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   }
 
   function writeOwnedSessionIds(ids: string[]) {
-    sessionStorage.setItem(SESSION_OWNED_KEY, JSON.stringify(Array.from(new Set(ids.filter(Boolean)))));
+    localStorage.setItem(SESSION_OWNED_KEY, JSON.stringify(Array.from(new Set(ids.filter(Boolean)))));
   }
 
   function rememberOwnedSession(nextSessionId: string) {
@@ -214,14 +214,18 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   async function createAndActivateSession() {
     if (running) return;
     setError("");
-    const created = await createChatSession();
-    rememberOwnedSession(created.session_id);
-    setSessionId(created.session_id);
-    sessionStorage.setItem(SESSION_STORAGE_KEY, created.session_id);
-    setSelectedModel(modelLabelFromInternal(created.model_name));
-    const s = await getChatSession(created.session_id);
-    setSnapshot(s);
-    await fetchSessions();
+    try {
+      const created = await createChatSession();
+      rememberOwnedSession(created.session_id);
+      setSessionId(created.session_id);
+      sessionStorage.setItem(SESSION_STORAGE_KEY, created.session_id);
+      setSelectedModel(modelLabelFromInternal(created.model_name));
+      const s = await getChatSession(created.session_id);
+      setSnapshot(s);
+      await fetchSessions();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create session.");
+    }
   }
 
   async function deleteAndSelectNextSession(targetId: string) {
@@ -270,7 +274,20 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     }
     const remembered = sessionStorage.getItem(SESSION_STORAGE_KEY);
     if (remembered && list.find((item) => item.session_id === remembered)) {
-      await refreshCurrentSession(remembered);
+      try {
+        await refreshCurrentSession(remembered);
+      } catch {
+        await createAndActivateSession();
+      }
+      return;
+    }
+
+    if (list.length > 0) {
+      try {
+        await refreshCurrentSession(list[0].session_id);
+      } catch {
+        await createAndActivateSession();
+      }
       return;
     }
 
@@ -737,12 +754,19 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         <section className="chat-panel center">
           <div className="timeline-wrap" ref={timelineRef}>
             <div className="timeline-sticky-header">
-              {snapshot && running && (
-                <PipelineProgress
-                  status={snapshot.status}
-                  plan={snapshot.plan || []}
-                  toolExecutions={snapshot.tool_executions || []}
-                />
+              {snapshot && !pipelineDismissed && snapshot.status && snapshot.status !== "idle" && (
+                <div className="pipeline-wrap">
+                  <PipelineProgress
+                    status={snapshot.status}
+                    plan={snapshot.plan || []}
+                    toolExecutions={snapshot.tool_executions || []}
+                  />
+                  <button
+                    className="pipeline-dismiss"
+                    onClick={() => setPipelineDismissed(true)}
+                    title="Dismiss"
+                  >&times;</button>
+                </div>
               )}
               {(snapshot?.history?.length ?? 0) > 0 && (
                 <div className="timeline-toolbar">

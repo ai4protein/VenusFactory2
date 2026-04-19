@@ -2654,16 +2654,54 @@ button:disabled {
   background: var(--bg-soft);
 }
 
+.pipeline-wrap {
+  position: relative;
+}
+.pipeline-dismiss {
+  all: unset;
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 50%;
+  transition: all 0.15s;
+  z-index: 1;
+}
+.pipeline-dismiss:hover {
+  background: rgba(0,0,0,0.06);
+  color: var(--text);
+  transform: none;
+  box-shadow: none;
+}
+
 .pipeline-bar {
   display: flex;
   align-items: center;
   gap: 2px;
   padding: 8px 14px;
+  padding-right: 28px;
   margin-bottom: 10px;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--surface);
   overflow-x: auto;
+}
+
+.pipeline-bar.pipeline-done {
+  border-color: rgba(40, 200, 64, 0.25);
+  background: rgba(232, 245, 233, 0.5);
+}
+
+.pipeline-bar.pipeline-stopped {
+  border-color: rgba(200, 160, 100, 0.25);
+  background: rgba(255, 248, 235, 0.5);
 }
 
 .pipeline-bar.pipeline-simple {

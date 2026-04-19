@@ -469,7 +469,7 @@ export function ChatTimeline({ items, streamingIndex = -1, onSuggestedPrompt, se
         const { cleanText, attachments } = isUser || isStreaming
           ? { cleanText: rawContent, attachments: [] as RichAttachment[] }
           : extractRichAttachments(rawContent);
-        const structurePaths = isUser ? [] : extractStructurePaths(rawContent);
+        const structurePaths = isUser || isStreaming ? [] : extractStructurePaths(cleanText);
         const statusCls = isUser ? "" : statusMsgClass(rawContent);
         const msgTime = msgTimesRef.current.get(idx);
         const duration = getDuration(idx);

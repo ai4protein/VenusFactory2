@@ -227,22 +227,20 @@ class DrugSDAClient:
 
 
 async def predict_protein_structure_pjlab(sequence: str, output_dir: str = "./protein_structures",
-                                         verbose: bool = True) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
-    """Predict structure via PJLab DrugSDA remote ESMFold API."""
+                                         verbose: bool = True) -> Tuple[str, Dict[str, Any]]:
+    """Predict structure via PJLab DrugSDA remote ESMFold API. Raises RuntimeError on failure."""
     url_model, url_tool = _get_pjlab_env()
     if not url_model or not url_tool:
-        if verbose:
-            print("✗ Set DRUGSDA_MODEL_SERVER_URL and DRUGSDA_TOOL_SERVER_URL in .env")
-        return None, None
+        raise RuntimeError("PJLab env not configured: set DRUGSDA_MODEL_SERVER_URL and DRUGSDA_TOOL_SERVER_URL in .env")
 
     model_client = DrugSDAClient(url_model)
     if not await model_client.connect(verbose=verbose):
-        return None, None
+        raise RuntimeError(f"Failed to connect to PJLab model server: {url_model}")
 
     tool_client = DrugSDAClient(url_tool)
     if not await tool_client.connect(verbose=verbose):
         await model_client.disconnect(verbose=verbose)
-        return None, None
+        raise RuntimeError(f"Failed to connect to PJLab tool server: {url_tool}")
 
     try:
         if verbose:
@@ -253,9 +251,7 @@ async def predict_protein_structure_pjlab(sequence: str, output_dir: str = "./pr
         )
         result_data = model_client.parse_result(result)
         if "error" in result_data:
-            if verbose:
-                print(f"✗ Prediction failed: {result_data['error']}")
-            return None, None
+            raise RuntimeError(f"PJLab prediction failed: {result_data['error']}")
 
         pdb_path = result_data.get("pdb_path")
         if verbose:
@@ -269,9 +265,7 @@ async def predict_protein_structure_pjlab(sequence: str, output_dir: str = "./pr
         )
         result_data = tool_client.parse_result(result)
         if "error" in result_data:
-            if verbose:
-                print(f"✗ Conversion failed: {result_data['error']}")
-            return None, None
+            raise RuntimeError(f"PJLab file conversion failed: {result_data['error']}")
 
         file_name = result_data.get("file_name", "structure.pdb")
         base64_string = result_data.get("base64_string", "")
@@ -280,7 +274,7 @@ async def predict_protein_structure_pjlab(sequence: str, output_dir: str = "./pr
             print("\nStep 3: Save to local...")
         local_file_path = base64_to_pdb_file(base64_string, file_name, output_dir)
         if not local_file_path:
-            return None, None
+            raise RuntimeError("Failed to decode and save PDB file from PJLab response")
 
         result_info = {
             "file_name": file_name,
@@ -292,12 +286,6 @@ async def predict_protein_structure_pjlab(sequence: str, output_dir: str = "./pr
             print(f"\n✓ Success! PDB saved: {local_file_path}")
         return local_file_path, result_info
 
-    except Exception as e:
-        if verbose:
-            print(f"✗ Error: {e}")
-            import traceback
-            traceback.print_exc()
-        return None, None
     finally:
         await tool_client.disconnect(verbose=verbose)
         await model_client.disconnect(verbose=verbose)
@@ -317,17 +305,14 @@ def predict_structure_sync(sequence: str, output_dir: str = "./protein_structure
         output_dir = _get_default_output_dir()
     backend = backend if backend is not None else _get_default_backend()
     if backend == "local":
-        return predict_local(sequence, output_dir=output_dir, output_file=output_file)
+        pdb_path, result_info = predict_local(sequence, output_dir=output_dir, output_file=output_file)
+        if not pdb_path:
+            raise RuntimeError("Local ESMFold prediction failed. Check GPU/CUDA environment.")
+        return pdb_path, result_info
     elif backend == "pjlab":
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        return loop.run_until_complete(predict_protein_structure_pjlab(sequence, output_dir, verbose))
+        return asyncio.run(predict_protein_structure_pjlab(sequence, output_dir, verbose))
     else:
-        print(f"✗ Unknown backend: {backend}, use local or pjlab")
-        return None, None
+        raise RuntimeError(f"Unknown ESMFOLD_BACKEND: {backend}. Use 'local' or 'pjlab'.")
 
 
 # ---------- Local CLI (batch / single) ----------
