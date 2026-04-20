@@ -690,7 +690,10 @@ def create_mls_debug_executor(llm: BaseChatModel, debug_tools: list[BaseTool]):
 
 
 def create_finalizer_chain(llm: BaseChatModel):
-    return SC_PROMPT | llm | StrOutputParser()
+    from copy import copy
+    finalizer_llm = copy(llm)
+    finalizer_llm.max_tokens = 16384
+    return SC_PROMPT | finalizer_llm | StrOutputParser()
 
 
 def create_pi_report_chain(llm: BaseChatModel, tools_description: str):

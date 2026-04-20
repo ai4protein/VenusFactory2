@@ -75,7 +75,7 @@ _TOOL_TIMEOUTS: dict[str, int] = {
 }
 
 
-async def _stream_chain(chain, inputs: dict[str, Any], role_id: str = "principal_investigator") -> str:
+async def _stream_chain(chain, inputs: dict[str, Any], role_id: str = "assistant") -> str:
     """Invoke a chain with token-level streaming via get_stream_writer().
 
     Runs chain.stream() in a thread, pipes tokens through a queue to the
@@ -167,6 +167,7 @@ class AgentState(TypedDict):
     ui_lang: str | None
     sub_report_rewrite_comment: str
     auto_execute: bool
+    skipped_steps: list[int]
 
 
 def _detect_ui_lang(text: str) -> str:
@@ -231,6 +232,7 @@ def _ui_text(lang: str, key: str, **kwargs) -> str:
         "iteration_prompt": "🔄 **Scientific Critic** 结果已汇总完毕。请选择下一步操作：",
         "step_checkpoint": "🔍 **第 {step_num} 步已完成。** 请查看上方结果，并决定是否继续执行下一步（第 {next_step} 步：{next_desc}）。",
         "sub_report_checkpoint": "📄 **小报告 \"{section}\" 已完成。** 还有 {remaining} 个小节待调研。请查看结果并决定是否继续。",
+        "step_skipped": "⚠️ **第 {step_num} 步失败，但后续步骤不依赖此步骤，已跳过继续执行。**\n\n",
     }
     en = {
         "pipeline_title": "📋 **Pipeline**\n\nHere's what we'll do:\n\n{steps}",
@@ -257,6 +259,7 @@ def _ui_text(lang: str, key: str, **kwargs) -> str:
         "iteration_prompt": "🔄 **Scientific Critic** Results have been summarized. Please choose what to do next:",
         "step_checkpoint": "🔍 **Step {step_num} complete.** Review the results above and decide whether to continue to the next step (Step {next_step}: {next_desc}).",
         "sub_report_checkpoint": "📄 **Sub-report \"{section}\" complete.** {remaining} section(s) remaining. Review the results and decide whether to continue.",
+        "step_skipped": "⚠️ **Step {step_num} failed, but no downstream steps depend on it. Skipping and continuing.**\n\n",
     }
     bundle = zh if lang == "zh" else en
     template = bundle.get(key, key)
@@ -1455,6 +1458,7 @@ async def plan_node(state: AgentState, config: RunnableConfig):
         "execution_failed": False,
         "failed_step": None,
         "failed_reason": None,
+        "skipped_steps": [],
         "ui_lang": ui_lang,
         "waiting_for": "plan_confirmation",
         "status": "waiting_for_plan_confirmation"
@@ -2121,7 +2125,30 @@ async def execute_node(state: AgentState, config: RunnableConfig):
     except Exception:
         pass
 
+    skipped_steps = list(state.get("skipped_steps", []))
+
+    # Check if failure can be skipped: no downstream steps depend on this step
+    can_skip_failure = False
     if is_failure:
+        failed_step_str = str(step_num)
+        has_downstream_dep = False
+        for future_step in plan[idx + 1:]:
+            future_input = future_step.get("tool_input", {})
+            if isinstance(future_input, dict):
+                for _fv in future_input.values():
+                    if isinstance(_fv, str) and _fv.startswith("dependency:"):
+                        dep_token = _fv.split(":")[1].replace("step_", "").replace("step", "").strip()
+                        if dep_token == failed_step_str:
+                            has_downstream_dep = True
+                            break
+            if has_downstream_dep:
+                break
+        can_skip_failure = not has_downstream_dep
+
+    if is_failure and can_skip_failure:
+        feedback_content += _ui_text(ui_lang, "step_skipped", step_num=step_num)
+        skipped_steps.append(step_num)
+    elif is_failure:
         feedback_content += _ui_text(ui_lang, "pipeline_paused")
 
     history.append({"role": "assistant", "content": feedback_content, "role_id": "machine_learning_specialist"})
@@ -2131,7 +2158,7 @@ async def execute_node(state: AgentState, config: RunnableConfig):
 
     auto_execute = state.get("auto_execute", False)
 
-    if is_failure:
+    if is_failure and not can_skip_failure:
         status = "execution_failed"
         waiting_for_val = None
     elif has_more_steps and not auto_execute:
@@ -2157,9 +2184,10 @@ async def execute_node(state: AgentState, config: RunnableConfig):
         "tool_executions": executions,
         "tool_cache": state.get("tool_cache", {}),
         "status": status,
-        "execution_failed": is_failure,
-        "failed_step": step_num if is_failure else None,
-        "failed_reason": failure_reason if is_failure else None,
+        "execution_failed": is_failure and not can_skip_failure,
+        "failed_step": step_num if is_failure and not can_skip_failure else None,
+        "failed_reason": failure_reason if is_failure and not can_skip_failure else None,
+        "skipped_steps": skipped_steps,
         "waiting_for": waiting_for_val,
         "ui_lang": ui_lang,
     }
@@ -2201,11 +2229,42 @@ async def finalize_node(state: AgentState, config: RunnableConfig):
             + (f"  Cloud Download: {oss_url}" if oss_url else "")
         )
 
-    full_run_record = "\n\n".join([
-        f"User request: {user_input}",
-        f"Protein context: {protein_ctx.get_context_summary()}",
-        "Tool executions:\n" + "\n".join(analysis_log) if analysis_log else "No tools executed."
-    ])
+    # Include PI research report and sub-reports so SC has full context
+    pi_report = state.get("pi_report", "")
+    sub_reports = state.get("research_sub_reports", [])
+    sub_reports_text = "\n\n".join(sub_reports) if sub_reports else ""
+
+    record_parts = [f"User request: {user_input}"]
+    record_parts.append(f"Protein context: {protein_ctx.get_context_summary()}")
+    if pi_report:
+        record_parts.append(f"Principal Investigator research report:\n{pi_report}")
+    if sub_reports_text:
+        record_parts.append(f"Research sub-reports:\n{sub_reports_text}")
+    if analysis_log:
+        record_parts.append("Tool executions:\n" + "\n".join(analysis_log))
+    else:
+        record_parts.append("No tools executed.")
+    # Include skipped steps info
+    skipped_steps = state.get("skipped_steps", [])
+    if skipped_steps:
+        record_parts.append(
+            f"Skipped steps (failed but no downstream dependencies): {skipped_steps}\n"
+            f"  Note: These steps failed but execution continued because no subsequent "
+            f"steps depended on their output. Please note which steps were skipped and "
+            f"their impact in your report."
+        )
+    # Include failure context if pipeline failed
+    if state.get("execution_failed"):
+        failed_step = state.get("failed_step")
+        failed_reason = state.get("failed_reason", "Unknown error")
+        record_parts.append(
+            f"Pipeline failure:\n"
+            f"  Failed at step: {failed_step}\n"
+            f"  Failure reason: {failed_reason}\n"
+            f"  Note: Downstream steps were skipped. Please analyze the failure cause "
+            f"and suggest how to resolve it in your report."
+        )
+    full_run_record = "\n\n".join(record_parts)
 
     if history and ("Summarizing" in history[-1].get("content", "") or "正在总结" in history[-1].get("content", "") or "汇总" in history[-1].get("content", "")):
         history.pop()
