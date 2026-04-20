@@ -227,14 +227,15 @@ async def _get_session_or_404(session_id: str) -> dict[str, Any]:
 
 
 def _assert_session_access(state: dict[str, Any], request: Request) -> None:
-    if _runtime_mode() == "online":
-        expected_owner = _session_owner_key_for_request(request)
-        actual_owner = str(state.get("owner_key", ""))
-        if actual_owner != expected_owner:
-            raise HTTPException(
-                status_code=403,
-                detail={"code": "SESSION_OWNER_MISMATCH", "message": "You do not have access to this session."},
-            )
+    if _runtime_mode() != "online":
+        return
+    expected_owner = _session_owner_key_for_request(request)
+    actual_owner = str(state.get("owner_key", ""))
+    if actual_owner != expected_owner:
+        raise HTTPException(
+            status_code=403,
+            detail={"code": "SESSION_OWNER_MISMATCH", "message": "You do not have access to this session."},
+        )
     token = _extract_session_token(request)
     if not token:
         raise HTTPException(

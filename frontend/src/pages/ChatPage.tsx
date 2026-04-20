@@ -217,8 +217,18 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       setSessionId(created.session_id);
       sessionStorage.setItem(SESSION_STORAGE_KEY, created.session_id);
       setSelectedModel(modelLabelFromInternal(created.model_name));
-      const s = await getChatSession(created.session_id);
-      setSnapshot(s);
+      setSnapshot({
+        session_id: created.session_id,
+        model_name: created.model_name,
+        created_at: created.created_at,
+        history: [],
+        conversation_log: [],
+        tool_executions: [],
+        status: "",
+        clarification_questions: [],
+        plan: [],
+        waiting_for: "",
+      });
       await fetchSessions();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create session.");
@@ -700,11 +710,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
               {runStatus === "stopped" && "Stopped"}
             </span>
           </div>
-          <button onClick={() => void createAndActivateSession()}>New Session</button>
-          <button onClick={() => void fetchSessions()}>Refresh Sessions</button>
-          <button onClick={() => void deleteAndSelectNextSession(sessionId)} disabled={!sessionId || running}>
-            Delete Session
-          </button>
+          <button onClick={() => void fetchSessions()}>Refresh</button>
           {hasReportData && (
             <button
               className="report-download-btn"
@@ -724,8 +730,16 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
           onClick={sessionsCollapsed ? () => setSessionsCollapsed(false) : undefined}
         >
           <div className="session-panel-head" onClick={() => setSessionsCollapsed(!sessionsCollapsed)}>
-            <h3>Sessions <span className="panel-toggle-icon">{sessionsCollapsed ? "+" : "-"}</span></h3>
+            <h3>Sessions <span className="panel-toggle-icon">{sessionsCollapsed ? "›" : "‹"}</span></h3>
           </div>
+          <button
+            type="button"
+            className="session-new-btn"
+            onClick={() => void createAndActivateSession()}
+            disabled={running}
+          >
+            + New Session
+          </button>
           <div className="session-list" style={sessionsCollapsed ? { display: "none" } : undefined}>
             {sessions.map((s) => (
               <div
@@ -738,23 +752,34 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                   disabled={running && s.session_id === sessionId}
                   title={s.session_id}
                 >
-                  <span>{s.session_id.slice(0, 8)}</span>
-                  <small>{new Date(s.created_at).toLocaleString()}</small>
-                  <small>{s.status || "idle"} - {s.history_size} messages</small>
+                  <span className="session-id-label">{s.session_id.slice(0, 8)}</span>
+                  <small className="session-time-label">{new Date(s.created_at).toLocaleString()}</small>
+                  <small className="session-meta-label">{s.status || "idle"} · {s.history_size} msgs</small>
+                </button>
+                <button
+                  type="button"
+                  className="session-delete-btn"
+                  onClick={(e) => { e.stopPropagation(); void deleteAndSelectNextSession(s.session_id); }}
+                  disabled={running}
+                  title="Delete session"
+                >
+                  ✕
                 </button>
               </div>
             ))}
-            {sessions.length === 0 && <div className="session-empty">No sessions yet.</div>}
+            {sessions.length === 0 && <div className="session-empty">No sessions yet</div>}
           </div>
           {sessionId && !sessionsCollapsed && (
-            <button
-              type="button"
-              className="session-copy-btn"
-              onClick={() => void copySessionId(sessionId)}
-              title="Copy full session id"
-            >
-              {copiedSessionId === sessionId ? "Session ID copied" : "Copy Session ID"}
-            </button>
+            <div className="session-sidebar-footer">
+              <button
+                type="button"
+                className="session-copy-btn"
+                onClick={() => void copySessionId(sessionId)}
+                title="Copy full session id"
+              >
+                {copiedSessionId === sessionId ? "✓ Copied" : "Copy Session ID"}
+              </button>
+            </div>
           )}
         </aside>
 
