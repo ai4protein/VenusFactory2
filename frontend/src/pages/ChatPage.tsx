@@ -165,10 +165,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     const allServer = data.sessions || [];
     const list = filterOwnedSessions(allServer);
     setSessions(list);
-    sessionStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(list));
-    const serverIds = new Set(allServer.map((s) => s.session_id));
-    const owned = readOwnedSessionIds().filter((id) => serverIds.has(id));
-    writeOwnedSessionIds(owned);
+    localStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(list));
     return list;
   }
 
@@ -256,7 +253,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     await refreshChatQuota();
     let list: SessionMeta[] = [];
     try {
-      const raw = sessionStorage.getItem(SESSION_CACHE_KEY);
+      const raw = localStorage.getItem(SESSION_CACHE_KEY);
       if (raw) {
         const cached = JSON.parse(raw) as SessionMeta[];
         if (Array.isArray(cached) && cached.length > 0) {
@@ -307,7 +304,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       sessionStorage.setItem(SESSION_STORAGE_KEY, sid);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
-      if (msg.includes("401") || msg.includes("403") || msg.includes("authentication") || msg.includes("token") || msg.includes("access")) {
+      if (msg.includes("404") || msg.includes("not found") || msg.includes("Not Found")) {
         forgetOwnedSession(sid);
         if (sid === sessionId) {
           setSessionId("");
@@ -920,21 +917,26 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
             )}
           </div>
           <div className="composer">
-            {chatQuota?.enforced && (
-              <div className="chat-quota-hint" title={`Per-user daily limit in online mode: ${chatQuota.limit ?? 10}`}>
-                {quotaExhausted
-                  ? `Online mode quota reached (${chatQuota.used}/${chatQuota.limit ?? 10}).`
-                  : `Online mode quota: ${chatQuota.remaining ?? 0}/${chatQuota.limit ?? 10} remaining for this user today.`}
-              </div>
-            )}
-            <textarea
-              rows={4}
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={onComposerKeyDown}
-              placeholder={isWaitingForInteraction ? "Please respond to the form above..." : "Ask anything about AI protein engineering..."}
-              disabled={running || quotaExhausted || isWaitingForInteraction}
-            />
+            <div className="composer-textarea-wrap">
+              <textarea
+                rows={4}
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                onKeyDown={onComposerKeyDown}
+                placeholder={isWaitingForInteraction ? "Please respond to the form above..." : "Ask anything about AI protein engineering..."}
+                disabled={running || quotaExhausted || isWaitingForInteraction}
+              />
+              {chatQuota?.enforced && (
+                <span
+                  className={`chat-quota-pill${quotaExhausted ? " exhausted" : ""}`}
+                  title={`Per-IP daily limit in online mode: ${chatQuota.limit ?? 10}`}
+                >
+                  {quotaExhausted
+                    ? `${chatQuota.used}/${chatQuota.limit ?? 10}`
+                    : `${chatQuota.remaining ?? 0}/${chatQuota.limit ?? 10}`}
+                </span>
+              )}
+            </div>
             <div className="composer-row">
               <select value={selectedModel} onChange={(e) => setSelectedModel(e.target.value)} aria-label="Model">
                 {MODELS.map((m) => (
@@ -944,12 +946,18 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                 ))}
               </select>
               <div className="file-source-inline">
-                <input
-                  type="file"
-                  multiple
-                  onChange={(e) => setFiles(Array.from(e.target.files || []))}
-                  disabled={running || quotaExhausted}
-                />
+                <label className={`file-upload-icon-btn${running || quotaExhausted ? " disabled" : ""}`} title="Upload files">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                  </svg>
+                  <input
+                    type="file"
+                    multiple
+                    onChange={(e) => setFiles(Array.from(e.target.files || []))}
+                    disabled={running || quotaExhausted}
+                    className="file-upload-hidden"
+                  />
+                </label>
                 <WorkspaceFilePicker
                   workspaceEnabled={workspaceEnabled}
                   disabled={running || quotaExhausted}
@@ -958,14 +966,14 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                   onPick={(picked) => setWorkspaceFiles(picked)}
                 />
               </div>
-              <button onClick={() => void sendMessage()} disabled={running || quotaExhausted} title={sendTooltip}>
-                {running ? "Running..." : "Send"}
-              </button>
-              <button onClick={() => void retryLastMessage()} disabled={running || quotaExhausted} title={regenerateTooltip}>
+              <button className="btn-secondary" onClick={() => void retryLastMessage()} disabled={running || quotaExhausted} title={regenerateTooltip}>
                 Regenerate
               </button>
-              <button onClick={abortRun} disabled={!running}>
+              <button className="btn-secondary" onClick={abortRun} disabled={!running}>
                 Stop
+              </button>
+              <button className="btn-primary" onClick={() => void sendMessage()} disabled={running || quotaExhausted} title={sendTooltip}>
+                {running ? "Running..." : "Send"}
               </button>
             </div>
             {(files.length > 0 || workspaceFiles.length > 0) && (

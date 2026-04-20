@@ -383,10 +383,26 @@ function QuoteButton({ content, onQuote }: { content: string; onQuote: (t: strin
 }
 
 const SUGGESTED_PROMPTS = [
-  "Search PubMed for recent PETase engineering studies, download PDB 5XJH, and use ProteinMPNN to redesign the active-site region for improved thermostability",
-  "Download AlphaFold structure for human EGFR (P00533), predict beneficial mutations with ESM2 and ProtSSN, and identify top 10 stabilizing candidates",
-  "Query BRENDA for lipase EC 3.1.1.3 kinetics across thermophilic organisms, find the most thermostable homolog on UniProt, and predict its solubility",
-  "Predict the function of protein P04637, find its interaction partners on STRING, and check tissue expression from Human Protein Atlas",
+  {
+    title: "Enzyme Redesign",
+    desc: "Search PubMed for PETase studies, download PDB 5XJH, redesign active-site with ProteinMPNN for thermostability",
+    text: "Search PubMed for recent PETase engineering studies, download PDB 5XJH, and use ProteinMPNN to redesign the active-site region for improved thermostability",
+  },
+  {
+    title: "Mutation Prediction",
+    desc: "Get AlphaFold structure for EGFR (P00533), predict stabilizing mutations with ESM2 and ProtSSN",
+    text: "Download AlphaFold structure for human EGFR (P00533), predict beneficial mutations with ESM2 and ProtSSN, and identify top 10 stabilizing candidates",
+  },
+  {
+    title: "Lipase Mining",
+    desc: "Query BRENDA for lipase kinetics, find thermostable homologs on UniProt, predict solubility",
+    text: "Query BRENDA for lipase EC 3.1.1.3 kinetics across thermophilic organisms, find the most thermostable homolog on UniProt, and predict its solubility",
+  },
+  {
+    title: "Functional Analysis",
+    desc: "Predict function of P04637, find interaction partners on STRING, check tissue expression on HPA",
+    text: "Predict the function of protein P04637, find its interaction partners on STRING, and check tissue expression from Human Protein Atlas",
+  },
 ];
 
 interface ChatTimelineProps {
@@ -451,9 +467,10 @@ export function ChatTimeline({ items, streamingIndex = -1, onSuggestedPrompt, se
               <button
                 key={i}
                 className="chat-suggested-btn"
-                onClick={() => onSuggestedPrompt?.(prompt)}
+                onClick={() => onSuggestedPrompt?.(prompt.text)}
               >
-                {prompt}
+                <span className="chat-suggested-title">{prompt.title}</span>
+                <span className="chat-suggested-desc">{prompt.desc}</span>
               </button>
             ))}
           </div>

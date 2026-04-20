@@ -38,7 +38,10 @@ from agent.chat_agent_utils import (
     _run_section_search,
     _tool_output_indicates_failure,
 )
+from agent.guardrails import DEFAULT_INPUT_GUARDRAILS, run_input_guardrails
+from agent.retry import TOOL_RETRY, retry_async
 from agent.skills import get_skills_metadata_string
+from exceptions import InputGuardrailTripped
 from logger import get_logger
 from web.utils.chat_format_utils import _format_search_preview, _format_search_summary
 from web.utils.common_utils import get_project_root, to_project_relative_path
@@ -46,6 +49,30 @@ from web.utils.file_oss import upload_file_to_cloud_async
 from web_v2.analytics_store import analytics_store
 
 _logger = get_logger("agent.graph")
+
+_TOOL_TIMEOUTS: dict[str, int] = {
+    "query_literature_by_keywords": 60,
+    "query_pubmed": 60,
+    "query_semantic_scholar": 60,
+    "query_arxiv": 60,
+    "query_tavily": 30,
+    "query_duckduckgo": 30,
+    "query_github": 30,
+    "query_hugging_face": 30,
+    "query_fda_by_keywords": 30,
+    "query_web_by_keywords": 30,
+    "query_biorxiv": 60,
+    "download_brenda_km_values_by_ec_number": 120,
+    "download_brenda_specific_activity_by_ec_number": 120,
+    "query_foldseek_search_by_pdb_file": 300,
+    "query_sequence_from_pdb_file": 120,
+    "esmfold_structure_prediction": 300,
+    "zero_shot_mutation_sequence_prediction": 300,
+    "zero_shot_mutation_structure_prediction": 300,
+    "train_protein_model": 600,
+    "protein_model_predict": 300,
+    "agent_generated_code": 300,
+}
 
 
 async def _stream_chain(chain, inputs: dict[str, Any], role_id: str = "principal_investigator") -> str:
@@ -1683,28 +1710,53 @@ async def execute_node(state: AgentState, config: RunnableConfig):
             raw_output = cached["outputs"]
             cached_flag = True
         elif tool:
-            # Direct tool invocation (simpler and more reliable)
+            # --- Input guardrails ---
             try:
-                inputs_str = json.dumps(invoke_input, ensure_ascii=False, sort_keys=True)
-                if len(inputs_str) > 500:
-                    inputs_str = inputs_str[:500] + "..."
-                _logger.info("Execute: tool=%s, input=%s", tool_name, inputs_str)
-                out = await asyncio.wait_for(asyncio.to_thread(tool.invoke, invoke_input), timeout=TOOL_EXECUTION_TIMEOUT)
-                raw_output = out if isinstance(out, (str, dict)) else str(out)
-                out_preview = str(raw_output)[:300] + ("..." if len(str(raw_output)) > 300 else "")
-                _logger.info("Result: tool=%s, output_preview=%s", tool_name, out_preview)
-                cached_flag = False
-            except TimeoutError:
+                await run_input_guardrails(DEFAULT_INPUT_GUARDRAILS, tool_name, invoke_input)
+            except InputGuardrailTripped as gt:
                 raw_output = json.dumps(
-                    {"success": False, "error": f"Tool execution timed out ({TOOL_EXECUTION_TIMEOUT}s)"},
+                    {"success": False, "error": f"Input guardrail blocked: {gt}"},
                     ensure_ascii=False,
                 )
-                _logger.warning("Result: tool=%s, timeout after %ss", tool_name, TOOL_EXECUTION_TIMEOUT)
+                _logger.warning("Guardrail tripped: tool=%s, guardrail=%s", tool_name, gt.guardrail_name)
                 cached_flag = False
-            except Exception as e:
-                raw_output = json.dumps({"success": False, "error": str(e)})
-                _logger.error("Result: tool=%s, exception=%s", tool_name, e)
-                cached_flag = False
+                is_failure = True
+                failure_reason = str(gt)
+                step_done = True
+                break
+
+            # --- Tool invocation with per-tool timeout and retry ---
+            tool_timeout = _TOOL_TIMEOUTS.get(tool_name, TOOL_EXECUTION_TIMEOUT)
+            inputs_str = json.dumps(invoke_input, ensure_ascii=False, sort_keys=True)
+            if len(inputs_str) > 500:
+                inputs_str = inputs_str[:500] + "..."
+            _logger.info("Execute: tool=%s, timeout=%ss, input=%s", tool_name, tool_timeout, inputs_str)
+
+            async def _invoke_with_timeout():
+                return await asyncio.wait_for(
+                    asyncio.to_thread(tool.invoke, invoke_input),
+                    timeout=tool_timeout,
+                )
+
+            retry_result = await retry_async(_invoke_with_timeout, policy=TOOL_RETRY)
+
+            if retry_result.success:
+                out = retry_result.value
+                raw_output = out if isinstance(out, (str, dict)) else str(out)
+                out_preview = str(raw_output)[:300] + ("..." if len(str(raw_output)) > 300 else "")
+                _logger.info("Result: tool=%s, output_preview=%s (attempts=%d)", tool_name, out_preview, retry_result.attempts)
+            else:
+                err = retry_result.last_error
+                if isinstance(err, (TimeoutError, asyncio.TimeoutError)):
+                    raw_output = json.dumps(
+                        {"success": False, "error": f"Tool execution timed out ({tool_timeout}s) after {retry_result.attempts} attempts"},
+                        ensure_ascii=False,
+                    )
+                    _logger.warning("Result: tool=%s, timeout after %ss (%d attempts)", tool_name, tool_timeout, retry_result.attempts)
+                else:
+                    raw_output = json.dumps({"success": False, "error": str(err)})
+                    _logger.error("Result: tool=%s, failed after %d attempts, error=%s", tool_name, retry_result.attempts, err)
+            cached_flag = False
         else:
             # Tool not found
             last_output = json.dumps({"success": False, "error": f"Unknown tool: {tool_name}"})
