@@ -217,6 +217,17 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       setSessionId(created.session_id);
       sessionStorage.setItem(SESSION_STORAGE_KEY, created.session_id);
       setSelectedModel(modelLabelFromInternal(created.model_name));
+      const newMeta: SessionMeta = {
+        session_id: created.session_id,
+        created_at: created.created_at,
+        model_name: created.model_name,
+        history_size: 0,
+        status: "",
+      };
+      setSessions((prev) => {
+        const exists = prev.some((s) => s.session_id === created.session_id);
+        return exists ? prev : [newMeta, ...prev];
+      });
       setSnapshot({
         session_id: created.session_id,
         model_name: created.model_name,
@@ -229,7 +240,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         plan: [],
         waiting_for: "",
       });
-      await fetchSessions();
+      try { await fetchSessions(); } catch { /* optimistic update above is sufficient */ }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create session.");
     }
@@ -397,6 +408,17 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         setSessionId(activeSessionId);
         sessionStorage.setItem(SESSION_STORAGE_KEY, activeSessionId);
         setSelectedModel(modelLabelFromInternal(created.model_name));
+        setSessions((prev) => {
+          const exists = prev.some((s) => s.session_id === activeSessionId);
+          if (exists) return prev;
+          return [{
+            session_id: activeSessionId,
+            created_at: created.created_at,
+            model_name: created.model_name,
+            history_size: 0,
+            status: "",
+          }, ...prev];
+        });
       }
 
       let attachmentPaths: string[] = [];

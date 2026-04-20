@@ -218,7 +218,7 @@ def _ui_text(lang: str, key: str, **kwargs) -> str:
         "file_preview": "**文件预览（{name}）：**",
         "generated_image": "🖼️ **生成图片：** [{name}]({url})",
         "pipeline_paused": "⛔ **流水线已暂停：** 此步骤返回错误信号（如 `status:error` / `success:false`），已跳过后续步骤以避免级联失败。\n\n",
-        "summarizing": "📝 **Principal Investigator** 正在汇总结果 …",
+        "summarizing": "📝 **Scientific Critic** 正在汇总结果 …",
         "final_summary_title": "## 总结\n",
         "pipeline_paused_at": "流水线在第 {step} 步暂停：{reason}\n",
         "task_completed": "任务已完成，执行情况如下：\n",
@@ -228,7 +228,7 @@ def _ui_text(lang: str, key: str, **kwargs) -> str:
         "sub_report_failed": "(小报告生成失败：{section}，错误：{error})",
         "clarification_title": "🤔 **Principal Investigator** 在开始研究之前，有几个问题需要确认：",
         "plan_confirmation_title": "📋 **Computational Biologist** 已制定以下执行计划，请确认或编辑后再执行：\n\n{steps}",
-        "iteration_prompt": "🔄 **Principal Investigator** 结果已汇总完毕。请选择下一步操作：",
+        "iteration_prompt": "🔄 **Scientific Critic** 结果已汇总完毕。请选择下一步操作：",
         "step_checkpoint": "🔍 **第 {step_num} 步已完成。** 请查看上方结果，并决定是否继续执行下一步（第 {next_step} 步：{next_desc}）。",
         "sub_report_checkpoint": "📄 **小报告 \"{section}\" 已完成。** 还有 {remaining} 个小节待调研。请查看结果并决定是否继续。",
     }
@@ -244,7 +244,7 @@ def _ui_text(lang: str, key: str, **kwargs) -> str:
         "file_preview": "**File Preview ({name}):**",
         "generated_image": "🖼️ **Generated Image:** [{name}]({url})",
         "pipeline_paused": "⛔ **Pipeline paused:** This step returned an error signal (e.g. `status:error` / `success:false`). Downstream steps were skipped to avoid cascading failures.\n\n",
-        "summarizing": "📝 **Principal Investigator** is summarizing the results …",
+        "summarizing": "📝 **Scientific Critic** is summarizing the results …",
         "final_summary_title": "## Summary\n",
         "pipeline_paused_at": "Pipeline paused at Step {step}: {reason}\n",
         "task_completed": "Task completed. Here's what was done:\n",
@@ -254,7 +254,7 @@ def _ui_text(lang: str, key: str, **kwargs) -> str:
         "sub_report_failed": "(Sub-report failed for {section}: {error})",
         "clarification_title": "🤔 **Principal Investigator** Before starting the research, I have a few questions to clarify your needs:",
         "plan_confirmation_title": "📋 **Computational Biologist** has designed the following pipeline. Please review and confirm before execution:\n\n{steps}",
-        "iteration_prompt": "🔄 **Principal Investigator** Results have been summarized. Please choose what to do next:",
+        "iteration_prompt": "🔄 **Scientific Critic** Results have been summarized. Please choose what to do next:",
         "step_checkpoint": "🔍 **Step {step_num} complete.** Review the results above and decide whether to continue to the next step (Step {next_step}: {next_desc}).",
         "sub_report_checkpoint": "📄 **Sub-report \"{section}\" complete.** {remaining} section(s) remaining. Review the results and decide whether to continue.",
     }
@@ -1703,6 +1703,54 @@ async def execute_node(state: AgentState, config: RunnableConfig):
             except Exception as e:
                 _logger.warning("Artifact register failed for %s: %s", file_path, e)
 
+    # Pre-execution: validate file-like inputs exist; attempt repair if missing.
+    if isinstance(invoke_input, dict) and not step_done:
+        _session_root_pre = Path(agent_session_dir).expanduser().resolve() if agent_session_dir else None
+        _project_root_pre = get_project_root().resolve()
+        for _pk, _pv in list(invoke_input.items()):
+            if not isinstance(_pv, str) or not _pv.strip():
+                continue
+            _pk_l = _pk.lower()
+            if not any(tok in _pk_l for tok in ("path", "file", "input")):
+                continue
+            _pv_path = Path(_pv).expanduser()
+            if _pv_path.exists():
+                continue
+            _repaired = None
+            _basename = _pv_path.name
+            # Search session dir, previous step outputs, protein context
+            search_roots = [r for r in (_session_root_pre, _project_root_pre, Path.cwd().resolve()) if r is not None]
+            for _sr in search_roots:
+                try:
+                    _found = next(_sr.rglob(_basename), None)
+                    if _found and _found.exists() and _found.is_file():
+                        _repaired = str(_found.resolve())
+                        break
+                except Exception:
+                    pass
+            if not _repaired:
+                for _dep_step_no in sorted(step_results.keys(), key=lambda x: _normalize_step_number(x, 0), reverse=True):
+                    _dep_raw = _get_step_raw_output(step_results, _dep_step_no)
+                    if _dep_raw is None:
+                        continue
+                    _dep_file = _get_output_file_path_from_raw(_dep_raw, "dependency_step")
+                    if _dep_file and Path(_dep_file).exists() and Path(_dep_file).name == _basename:
+                        _repaired = _dep_file
+                        break
+            if not _repaired:
+                try:
+                    ctx_files = list(protein_ctx.files.values()) if hasattr(protein_ctx, "files") else []
+                    for _cf in ctx_files:
+                        _cf_path = _cf.get("path") if isinstance(_cf, dict) else None
+                        if isinstance(_cf_path, str) and Path(_cf_path).exists() and Path(_cf_path).name == _basename:
+                            _repaired = str(Path(_cf_path).resolve())
+                            break
+                except Exception:
+                    pass
+            if _repaired:
+                _logger.info("Pre-exec path repair: %s=%s -> %s", _pk, _pv, _repaired)
+                invoke_input[_pk] = _repaired
+
     while step_retry <= MAX_STEP_RETRIES and not step_done:
         # Cache check
         cached = get_cached_tool_result({"tool_cache": state.get("tool_cache", {})}, tool_name, invoke_input)
@@ -1766,13 +1814,18 @@ async def execute_node(state: AgentState, config: RunnableConfig):
 
         is_failure, failure_reason = _tool_output_indicates_failure(raw_output)
 
-        # Compat fallback: one-shot path rebinding retry for python_repl FileNotFoundError.
-        if (
-            tool_name == "python_repl"
-            and isinstance(raw_output, str)
+        # Path rebinding retry for FileNotFoundError — works for all tools.
+        _fnf_detected = (
+            isinstance(raw_output, str)
             and "FileNotFoundError" in raw_output
             and step_retry < MAX_STEP_RETRIES
-        ):
+        ) or (
+            is_failure
+            and isinstance(failure_reason, str)
+            and ("file" in failure_reason.lower() and "not found" in failure_reason.lower())
+            and step_retry < MAX_STEP_RETRIES
+        )
+        if _fnf_detected:
             candidate_paths = []
             try:
                 candidate_paths.extend(
@@ -1788,7 +1841,8 @@ async def execute_node(state: AgentState, config: RunnableConfig):
                 if dep_path:
                     candidate_paths.append(dep_path)
             candidate_paths = sorted(list({os.path.abspath(p) for p in candidate_paths if isinstance(p, str) and p.strip()}))
-            if candidate_paths:
+
+            if tool_name == "python_repl" and candidate_paths:
                 retry_seed = dict(invoke_input)
                 retry_seed.setdefault("files", [])
                 if isinstance(retry_seed.get("files"), list):
@@ -1808,6 +1862,39 @@ async def execute_node(state: AgentState, config: RunnableConfig):
                     step_retry += 1
                     invoke_input = _merge_retry_input(invoke_input, rebound_input)
                     _logger.info("FileNotFound retry: tool=%s, step=%s, retry=%s", tool_name, step_num, step_retry)
+                    continue
+            elif tool_name != "python_repl" and candidate_paths:
+                # General tool path rebinding: replace broken file-like input values
+                _rebind_changed = False
+                _session_root_rebind = Path(agent_session_dir).expanduser().resolve() if agent_session_dir else None
+                retry_seed = dict(invoke_input)
+                for _rk, _rv in list(retry_seed.items()):
+                    if not isinstance(_rv, str) or not _rv.strip():
+                        continue
+                    _rk_l = _rk.lower()
+                    if not any(tok in _rk_l for tok in ("path", "file", "input")):
+                        continue
+                    if Path(_rv).expanduser().exists():
+                        continue
+                    _target_name = Path(_rv).name
+                    # Try candidate paths first
+                    for _cp in candidate_paths:
+                        if Path(_cp).name == _target_name and Path(_cp).exists():
+                            retry_seed[_rk] = _cp
+                            _rebind_changed = True
+                            break
+                    if not _rebind_changed and _session_root_rebind:
+                        try:
+                            _match = next(_session_root_rebind.rglob(_target_name), None)
+                            if _match and _match.exists() and _match.is_file():
+                                retry_seed[_rk] = str(_match.resolve())
+                                _rebind_changed = True
+                        except Exception:
+                            pass
+                if _rebind_changed:
+                    step_retry += 1
+                    invoke_input = _merge_retry_input(invoke_input, retry_seed)
+                    _logger.info("FileNotFound retry (general): tool=%s, step=%s, retry=%s", tool_name, step_num, step_retry)
                     continue
 
         # MLS post-step verify for semantic/format errors (compat-first: try retry_input first)
@@ -1991,6 +2078,12 @@ async def execute_node(state: AgentState, config: RunnableConfig):
         if preview:
             feedback_content += _ui_text(ui_lang, "file_preview", name=os.path.basename(out_file)) + f"\n```\n{preview}\n```\n\n"
 
+        # 4. Structure file path for Molstar inline viewer
+        _structure_exts = {".pdb", ".cif", ".mmcif", ".ent"}
+        if os.path.splitext(out_file)[1].lower() in _structure_exts:
+            rel_path = to_project_relative_path(out_file)
+            feedback_content += f"📂 Structure file: `{rel_path}`\n\n"
+
     executions.append({
         "step": step_num, "tool_name": tool_name, "inputs": merged_tool_input,
         "outputs": (str(last_output)[:1000] + "..." if len(str(last_output)) > 1000 else str(last_output)),
@@ -2079,7 +2172,7 @@ async def finalize_start_node(state: AgentState, config: RunnableConfig):
     history.append({
         "role": "assistant",
         "content": _ui_text(ui_lang, "summarizing"),
-        "role_id": "principal_investigator",
+        "role_id": "scientific_critic",
     })
     return {"history": history, "ui_lang": ui_lang}
 
@@ -2104,7 +2197,7 @@ async def finalize_node(state: AgentState, config: RunnableConfig):
         analysis_log.append(
             f"Step {step}: {tool_name}\n"
             f"  Input: {json.dumps(inputs, ensure_ascii=False)}\n"
-            f"  Output: {str(outputs)[:500]}\n"
+            f"  Output: {str(outputs)[:2000]}\n"
             + (f"  Cloud Download: {oss_url}" if oss_url else "")
         )
 
@@ -2127,9 +2220,9 @@ async def finalize_node(state: AgentState, config: RunnableConfig):
                 "analysis_log": "\n".join(analysis_log) if analysis_log else "No analysis log available.",
                 "references": ""
             },
-            role_id="principal_investigator",
+            role_id="scientific_critic",
         )
-        history.append({"role": "assistant", "content": summary, "role_id": "principal_investigator"})
+        history.append({"role": "assistant", "content": summary, "role_id": "scientific_critic"})
     except Exception as e:
         _logger.warning("Finalizer failed: %s", e)
         # Fallback: derive status directly from recorded executions.
@@ -2163,12 +2256,12 @@ async def finalize_node(state: AgentState, config: RunnableConfig):
             summary = "\n".join(summary_parts)
         else:
             summary = _ui_text(ui_lang, "task_ended")
-        history.append({"role": "assistant", "content": summary, "role_id": "principal_investigator"})
+        history.append({"role": "assistant", "content": summary, "role_id": "scientific_critic"})
 
     history.append({
         "role": "assistant",
         "content": _ui_text(ui_lang, "iteration_prompt"),
-        "role_id": "principal_investigator",
+        "role_id": "scientific_critic",
     })
     return {"history": history, "status": "waiting_for_iteration", "waiting_for": "iteration"}
 

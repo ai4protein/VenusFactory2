@@ -107,7 +107,7 @@ const STRUCTURE_EXT_RE = /(?:[\w.\/~-]+\/)*[\w.-]+\.(?:pdb|cif|mmcif|ent)\b/gi;
 function extractStructurePaths(text: string): string[] {
   const matches = text.match(STRUCTURE_EXT_RE) || [];
   return [...new Set(matches)].filter(
-    (p) => p.includes("/") && !p.startsWith("http")
+    (p) => !p.startsWith("http")
   );
 }
 

@@ -8,7 +8,7 @@ interface MolstarViewerProps {
 export function MolstarViewer({ filePath, label }: MolstarViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const pluginRef = useRef<any>(null);
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [status, setStatus] = useState<"loading" | "ready" | "error" | "not_found">("loading");
   const [errMsg, setErrMsg] = useState("");
 
   useEffect(() => {
@@ -21,6 +21,10 @@ export function MolstarViewer({ filePath, label }: MolstarViewerProps) {
         const resp = await fetch(
           `/api/structure/content?path=${encodeURIComponent(filePath)}`
         );
+        if (resp.status === 404 || resp.status === 403) {
+          if (!disposed) setStatus("not_found");
+          return;
+        }
         if (!resp.ok) {
           throw new Error(`Failed to fetch structure (${resp.status})`);
         }
@@ -89,6 +93,8 @@ export function MolstarViewer({ filePath, label }: MolstarViewerProps) {
   }, [filePath, label]);
 
   const fileName = filePath.split("/").pop() || filePath;
+
+  if (status === "not_found") return null;
 
   return (
     <div className="molstar-wrapper">

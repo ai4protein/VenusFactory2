@@ -232,12 +232,25 @@ async def get_structure_content(path: str, download: int = 0):
         temp_base = project_root / temp_base
     temp_base = temp_base.resolve()
 
-    candidate = (project_root / path).resolve()
     allowed_roots = [temp_base, WEB_V2_RESULTS_ROOT, WEB_V2_UPLOAD_ROOT]
+    candidate = (project_root / path).resolve()
+    if not candidate.exists() or not candidate.is_file():
+        found = None
+        for root in allowed_roots:
+            if not root.is_dir():
+                continue
+            for dirpath, _, filenames in _os.walk(root):
+                if _os.path.basename(path) in filenames:
+                    found = Path(dirpath) / _os.path.basename(path)
+                    break
+            if found:
+                break
+        if found:
+            candidate = found.resolve()
+        else:
+            raise HTTPException(status_code=404, detail="File not found")
     if not ensure_within_roots(candidate, allowed_roots):
         raise HTTPException(status_code=403, detail="Access denied")
-    if not candidate.exists() or not candidate.is_file():
-        raise HTTPException(status_code=404, detail="File not found")
     if candidate.suffix.lower() not in _STRUCTURE_EXTENSIONS:
         raise HTTPException(status_code=400, detail=f"Unsupported format: {candidate.suffix}")
 
