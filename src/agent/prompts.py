@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional
 
 from langchain_classic.prompts import ChatPromptTemplate
+from langchain_core.messages import SystemMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
 _PROMPTS_DIR = Path(__file__).parent / "prompts"
@@ -122,7 +123,7 @@ MLS_SELF_CHECK_TEMPLATE = _load_md("machine_learning_specialist_self_check")
 
 # MLS debug agent: may call read_skill, python_repl, agent_generated_code, etc. then output retry_input or report_for_cb
 MLS_DEBUG_PROMPT = ChatPromptTemplate.from_messages([
-    ("system", MLS_SELF_CHECK_TEMPLATE),
+    SystemMessage(content=MLS_SELF_CHECK_TEMPLATE),
     ("human", "{input}"),
     ("placeholder", "{agent_scratchpad}"),
 ])
