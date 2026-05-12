@@ -864,6 +864,9 @@ def initialize_session_state() -> dict[str, Any]:
         'pi_answer': pi_answer_chain,
         'pi_chat': pi_chat_chain,
         'llm': llm,
+        'default_llm_api_key': llm.api_key,
+        'default_llm_base_url': llm.base_url,
+        'default_llm_model_name': llm.model_name,
         'memory': _ChatBufferWindowMemory(k=10),
         'dialogue_memory': [],
         'history': [],
@@ -889,5 +892,24 @@ def update_llm_model(selected: str, state: dict[str, Any]) -> dict[str, Any]:
     }
     if not state or state.get('llm') is None:
         return state
-    state['llm'].model_name = mapping.get(selected, "gemini-2.5-pro")
+    state['llm'].model_name = mapping.get(selected, selected or "gemini-2.5-pro")
+    return state
+
+
+def update_llm_openai_style_config(
+    *,
+    state: dict[str, Any],
+    model_name: str,
+    api_key: str,
+    base_url: str,
+) -> dict[str, Any]:
+    if not state or state.get("llm") is None:
+        return state
+    llm = state["llm"]
+    if model_name.strip():
+        llm.model_name = model_name.strip()
+    if api_key.strip():
+        llm.api_key = api_key.strip()
+    if base_url.strip():
+        llm.base_url = base_url.strip().rstrip("/")
     return state

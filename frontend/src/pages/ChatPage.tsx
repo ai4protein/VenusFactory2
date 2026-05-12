@@ -9,6 +9,8 @@ import { SubReportCheckpoint } from "../components/SubReportCheckpoint";
 import {
   cancelChatSession,
   createChatSession,
+  exportChatSessionBundle,
+  deleteCustomModelCache,
   deleteChatSession,
   downloadExperimentReport,
   getChatQuota,
@@ -39,8 +41,17 @@ type SessionMeta = {
   status: string;
 };
 
-const MODELS = ["Gemini-2.5-Pro", "ChatGPT-4o", "Claude-3.7", "DeepSeek-R1"];
+const BASE_MODELS = ["Gemini-2.5-Pro", "ChatGPT-4o", "Claude-3.7", "DeepSeek-R1"];
+const OTHER_MODEL_OPTION = "__other_model__";
 type RunStatus = "running" | "stopping" | "stopped";
+
+type OpenAIStyleModel = {
+  id: string;
+  label: string;
+  modelName: string;
+  apiKey: string;
+  baseUrl: string;
+};
 
 function friendlyErrorHint(msg: string): string {
   const m = msg.toLowerCase();
@@ -96,7 +107,14 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   const [runStatus, setRunStatus] = useState<RunStatus>("stopped");
   const [streamingIdx, setStreamingIdx] = useState(-1);
   const [error, setError] = useState<string>("");
-  const [selectedModel, setSelectedModel] = useState(MODELS[0]);
+  const [selectedModel, setSelectedModel] = useState(BASE_MODELS[0]);
+  const [customModels, setCustomModels] = useState<OpenAIStyleModel[]>([]);
+  const [showCustomModelModal, setShowCustomModelModal] = useState(false);
+  const [customModelLabel, setCustomModelLabel] = useState("");
+  const [customModelName, setCustomModelName] = useState("");
+  const [customModelApiKey, setCustomModelApiKey] = useState("");
+  const [customModelBaseUrl, setCustomModelBaseUrl] = useState("https://api.openai.com/v1");
+  const [modelSwitchNotice, setModelSwitchNotice] = useState("");
   const [chatQuota, setChatQuota] = useState<ChatQuota | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const timelineRef = useRef<HTMLDivElement | null>(null);
@@ -110,6 +128,24 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   const [sessionsCollapsed, setSessionsCollapsed] = useState(false);
   const [logsCollapsed, setLogsCollapsed] = useState(false);
   const [pipelineDismissed, setPipelineDismissed] = useState(false);
+  const CUSTOM_MODELS_STORAGE_KEY = "vf2_custom_openai_style_models";
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(CUSTOM_MODELS_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as OpenAIStyleModel[];
+      if (Array.isArray(parsed)) {
+        setCustomModels(parsed.filter((item) => item && item.id && item.modelName && item.baseUrl));
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(CUSTOM_MODELS_STORAGE_KEY, JSON.stringify(customModels));
+  }, [customModels]);
 
   useEffect(() => {
     void bootstrapSession();
@@ -215,8 +251,10 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       const created = await createChatSession();
       rememberOwnedSession(created.session_id);
       setSessionId(created.session_id);
+      setModelSwitchNotice("");
       sessionStorage.setItem(SESSION_STORAGE_KEY, created.session_id);
       setSelectedModel(modelLabelFromInternal(created.model_name));
+      rememberModelFromSession(created.model_name);
       const newMeta: SessionMeta = {
         session_id: created.session_id,
         created_at: created.created_at,
@@ -312,7 +350,29 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     if (modelName === "gpt-4o") return "ChatGPT-4o";
     if (modelName === "claude-3-7-sonnet-20250219") return "Claude-3.7";
     if (modelName === "deepseek-r1-0528") return "DeepSeek-R1";
-    return "Gemini-2.5-Pro";
+    if (modelName === "gemini-2.5-pro") return "Gemini-2.5-Pro";
+    return modelName || "Gemini-2.5-Pro";
+  }
+
+  function rememberModelFromSession(modelName: string) {
+    const normalized = (modelName || "").trim();
+    if (!normalized) return;
+    const builtInLabels = new Set(BASE_MODELS);
+    const builtInValues = new Set(["gpt-4o", "claude-3-7-sonnet-20250219", "deepseek-r1-0528", "gemini-2.5-pro"]);
+    if (builtInLabels.has(normalized) || builtInValues.has(normalized)) return;
+    setCustomModels((prev) => {
+      if (prev.some((item) => item.modelName === normalized || item.label === normalized)) return prev;
+      return [
+        ...prev,
+        {
+          id: normalized,
+          label: normalized,
+          modelName: normalized,
+          apiKey: "",
+          baseUrl: "https://api.openai.com/v1",
+        },
+      ];
+    });
   }
 
   async function refreshCurrentSession(targetId?: string) {
@@ -322,7 +382,10 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       const s = await getChatSession(sid);
       setSnapshot(s);
       setSessionId(sid);
+      setModelSwitchNotice("");
       sessionStorage.setItem(SESSION_STORAGE_KEY, sid);
+      setSelectedModel(modelLabelFromInternal(s.model_name));
+      rememberModelFromSession(s.model_name);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
       if (msg.includes("404") || msg.includes("not found") || msg.includes("Not Found")) {
@@ -386,6 +449,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
 
   async function sendMessage() {
     const composedText = message;
+    const selectedCustomModel = customModels.find((item) => item.id === selectedModel);
     if (running) return;
     if (!message.trim() && files.length === 0 && workspaceFiles.length === 0) return;
     if (chatQuota?.enforced && (chatQuota.remaining ?? 0) <= 0) {
@@ -408,6 +472,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         setSessionId(activeSessionId);
         sessionStorage.setItem(SESSION_STORAGE_KEY, activeSessionId);
         setSelectedModel(modelLabelFromInternal(created.model_name));
+        rememberModelFromSession(created.model_name);
         setSessions((prev) => {
           const exists = prev.some((s) => s.session_id === activeSessionId);
           if (exists) return prev;
@@ -434,7 +499,15 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         `/api/chat/sessions/${encodeURIComponent(activeSessionId)}/messages/stream`,
         {
           text: composedText,
-          model: selectedModel,
+          model: selectedCustomModel ? selectedCustomModel.modelName : selectedModel,
+          custom_model_config: selectedCustomModel
+            ? {
+                model_name: selectedCustomModel.modelName,
+                api_key: selectedCustomModel.apiKey,
+                base_url: selectedCustomModel.baseUrl,
+              }
+            : undefined,
+          custom_model_id: selectedCustomModel ? selectedCustomModel.id : "",
           attachment_paths: attachmentPaths
         },
         handleStreamEvent,
@@ -701,6 +774,102 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       ? `Daily quota reached (${chatQuota.limit ?? 10}/${chatQuota.limit ?? 10}).`
       : `Regenerate also consumes quota. Remaining: ${chatQuota.remaining ?? 0}/${chatQuota.limit ?? 10}.`
     : "Regenerate last message";
+  const isLocalMode = chatQuota?.mode === "local";
+  const modelOptions = [
+    ...BASE_MODELS.map((m) => ({ value: m, label: m })),
+    ...(isLocalMode ? customModels.map((m) => ({ value: m.id, label: `${m.label} (Custom)` })) : []),
+  ];
+
+  useEffect(() => {
+    if (isLocalMode) return;
+    if (customModels.some((m) => m.id === selectedModel)) {
+      setSelectedModel(BASE_MODELS[0]);
+    }
+  }, [isLocalMode, selectedModel, customModels]);
+
+  function handleModelChange(next: string) {
+    if (!isLocalMode && next === OTHER_MODEL_OPTION) return;
+    if (next === OTHER_MODEL_OPTION) {
+      setShowCustomModelModal(true);
+      return;
+    }
+    const prev = selectedModel;
+    setSelectedModel(next);
+    if (prev !== next && (snapshot?.history?.length || 0) > 0) {
+      setModelSwitchNotice("Model/provider switched. Existing context may not be consistent across providers. Start a new session if results look off.");
+    }
+  }
+
+  async function exportCurrentSession() {
+    if (!sessionId || running) return;
+    setError("");
+    setRunning(true);
+    try {
+      await exportChatSessionBundle(sessionId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to export session bundle.");
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  function saveCustomModel() {
+    const label = customModelLabel.trim() || customModelName.trim();
+    const modelName = customModelName.trim();
+    const apiKey = customModelApiKey.trim();
+    const baseUrl = customModelBaseUrl.trim();
+    if (!label || !modelName || !apiKey || !baseUrl) {
+      setError("Display name, model name, API key and base URL are required.");
+      return;
+    }
+    const normalizedLabel = label.toLowerCase();
+    const normalizedKey = `${baseUrl.toLowerCase()}::${modelName.toLowerCase()}`;
+    const builtInNameConflict = BASE_MODELS.some((m) => m.trim().toLowerCase() === normalizedLabel);
+    if (builtInNameConflict) {
+      setError("Display name conflicts with built-in model name. Please choose another name.");
+      return;
+    }
+    const labelConflict = customModels.some((m) => m.label.trim().toLowerCase() === normalizedLabel);
+    if (labelConflict) {
+      setError("Model name already exists. Please use another display name.");
+      return;
+    }
+    const endpointConflict = customModels.some(
+      (m) => `${m.baseUrl.trim().toLowerCase()}::${m.modelName.trim().toLowerCase()}` === normalizedKey
+    );
+    if (endpointConflict) {
+      setError("A model with the same model name and base URL already exists.");
+      return;
+    }
+    const item: OpenAIStyleModel = {
+      id: `custom-${Date.now()}`,
+      label,
+      modelName,
+      apiKey,
+      baseUrl,
+    };
+    setCustomModels((prev) => [...prev, item]);
+    setSelectedModel(item.id);
+    setShowCustomModelModal(false);
+    setCustomModelLabel("");
+    setCustomModelName("");
+    setCustomModelApiKey("");
+    setCustomModelBaseUrl("https://api.openai.com/v1");
+  }
+
+  async function removeCustomModel(modelId: string) {
+    setError("");
+    try {
+      await deleteCustomModelCache(modelId);
+      setCustomModels((prev) => prev.filter((m) => m.id !== modelId));
+      if (selectedModel === modelId) {
+        setSelectedModel(BASE_MODELS[0]);
+        setModelSwitchNotice("Custom model removed. Active session switched back to default model context.");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to remove custom model.");
+    }
+  }
 
   return (
     <div className="chat-page">
@@ -985,12 +1154,13 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
               )}
             </div>
             <div className="composer-row">
-              <select value={selectedModel} onChange={(e) => setSelectedModel(e.target.value)} aria-label="Model">
-                {MODELS.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
+              <select value={selectedModel} onChange={(e) => handleModelChange(e.target.value)} aria-label="Model">
+                {modelOptions.map((m) => (
+                  <option key={m.value} value={m.value}>
+                    {m.label}
                   </option>
                 ))}
+                {isLocalMode && <option value={OTHER_MODEL_OPTION}>Other Model...</option>}
               </select>
               <div className="file-source-inline">
                 <label className={`file-upload-icon-btn${running || quotaExhausted ? " disabled" : ""}`} title="Upload files">
@@ -1016,6 +1186,9 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
               <button className="btn-secondary" onClick={() => void retryLastMessage()} disabled={running || quotaExhausted} title={regenerateTooltip}>
                 Regenerate
               </button>
+              <button className="btn-secondary" onClick={() => void exportCurrentSession()} disabled={running || !sessionId}>
+                Export
+              </button>
               <button className="btn-secondary" onClick={abortRun} disabled={!running}>
                 Stop
               </button>
@@ -1023,6 +1196,11 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                 {running ? "Running..." : "Send"}
               </button>
             </div>
+            {modelSwitchNotice && (
+              <div className="model-switch-notice" role="status">
+                {modelSwitchNotice}
+              </div>
+            )}
             {(files.length > 0 || workspaceFiles.length > 0) && (
               <div className="file-preview">
                 {files.map((f) => (
@@ -1099,6 +1277,51 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
           )}
         </aside>
       </section>
+      {showCustomModelModal && isLocalMode && (
+        <div className="modal-backdrop">
+          <div className="custom-model-modal">
+            <h3>Add OpenAI-Style Model</h3>
+            <label>
+              Display Name
+              <input value={customModelLabel} onChange={(e) => setCustomModelLabel(e.target.value)} placeholder="My Model" />
+            </label>
+            <label>
+              Model Name
+              <input value={customModelName} onChange={(e) => setCustomModelName(e.target.value)} placeholder="gpt-4.1-mini" />
+            </label>
+            <label>
+              API Key
+              <input type="password" value={customModelApiKey} onChange={(e) => setCustomModelApiKey(e.target.value)} placeholder="sk-..." />
+            </label>
+            <label>
+              Base URL
+              <input value={customModelBaseUrl} onChange={(e) => setCustomModelBaseUrl(e.target.value)} placeholder="https://api.openai.com/v1" />
+            </label>
+            <div className="custom-model-modal-actions">
+              <button className="btn-secondary" onClick={() => setShowCustomModelModal(false)}>Cancel</button>
+              <button className="btn-primary" onClick={saveCustomModel}>Confirm</button>
+            </div>
+            <div className="custom-model-list">
+              <h4>Added Models</h4>
+              {customModels.length === 0 ? (
+                <div className="custom-model-empty">No custom models yet.</div>
+              ) : (
+                customModels.map((m) => (
+                  <div key={m.id} className="custom-model-item">
+                    <div className="custom-model-item-main">
+                      <strong>{m.label}</strong>
+                      <small>{m.modelName} | {m.baseUrl}</small>
+                    </div>
+                    <button className="btn-secondary custom-model-delete-btn" onClick={() => void removeCustomModel(m.id)}>
+                      Delete
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       <PageFooter />
     </div>
   );

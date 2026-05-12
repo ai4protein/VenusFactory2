@@ -3633,6 +3633,20 @@ button:disabled {
   border-color: rgba(177, 117, 117, 0.35);
 }
 
+.composer-row button.btn-primary,
+.composer-row button.btn-primary:nth-of-type(3) {
+  background: #3b3126;
+  border-color: #3b3126;
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.composer-row button.btn-primary:hover:not(:disabled),
+.composer-row button.btn-primary:nth-of-type(3):hover:not(:disabled) {
+  background: #2f271f;
+  border-color: #2f271f;
+}
+
 .file-source-inline {
   display: inline-flex;
   align-items: center;
@@ -3644,6 +3658,169 @@ button:disabled {
 
 .file-source-inline > .workspace-picker {
   flex: 0 0 auto;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(25, 20, 14, 0.36), rgba(25, 20, 14, 0.52));
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 90;
+  padding: 18px;
+}
+
+.custom-model-modal {
+  width: min(620px, 100%);
+  border: 1px solid rgba(146, 133, 112, 0.3);
+  border-radius: 16px;
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.96), rgba(247, 240, 230, 0.93));
+  box-shadow:
+    0 24px 56px rgba(66, 52, 36, 0.28),
+    0 8px 24px rgba(98, 78, 54, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78);
+  padding: 18px 18px 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.custom-model-modal h3 {
+  margin: 0;
+  font-size: 1.06rem;
+  color: #3d3125;
+  letter-spacing: 0;
+}
+
+.custom-model-modal label {
+  display: grid;
+  gap: 7px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #5a4a38;
+}
+
+.custom-model-modal input {
+  min-height: 40px;
+  border-radius: 11px;
+  border: 1px solid rgba(146, 133, 112, 0.32);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: inset 0 1px 2px rgba(70, 54, 36, 0.05);
+  padding: 9px 12px;
+  font-size: 0.88rem;
+  color: #2f261d;
+}
+
+.custom-model-modal input:focus {
+  outline: none;
+  border-color: rgba(124, 100, 70, 0.56);
+  box-shadow:
+    inset 0 1px 2px rgba(70, 54, 36, 0.04),
+    0 0 0 3px rgba(171, 145, 108, 0.2);
+}
+
+.custom-model-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(146, 133, 112, 0.2);
+}
+
+.custom-model-modal-actions .btn-secondary,
+.custom-model-modal-actions .btn-primary {
+  min-height: 38px;
+  min-width: 110px;
+  border-radius: 10px;
+  font-size: 0.84rem;
+}
+
+.custom-model-modal-actions .btn-secondary {
+  background: rgba(255, 255, 255, 0.78);
+  border-color: rgba(146, 133, 112, 0.34);
+  color: #5d5042;
+}
+
+.custom-model-modal-actions .btn-secondary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.custom-model-modal-actions .btn-primary {
+  background: linear-gradient(145deg, #e1ccab 0%, #cfb084 100%);
+  border-color: rgba(135, 106, 71, 0.5);
+  color: #2f2418;
+  box-shadow: 0 8px 18px rgba(114, 85, 52, 0.22);
+}
+
+.custom-model-modal-actions .btn-primary:hover:not(:disabled) {
+  background: linear-gradient(145deg, #e7d4b6 0%, #d6ba90 100%);
+}
+
+.custom-model-list {
+  margin-top: 4px;
+  border-top: 1px dashed rgba(146, 133, 112, 0.34);
+  padding-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.custom-model-list h4 {
+  margin: 0;
+  font-size: 0.86rem;
+  color: #584936;
+}
+
+.custom-model-empty {
+  color: #7a6853;
+  font-size: 0.8rem;
+}
+
+.custom-model-item {
+  border: 1px solid rgba(146, 133, 112, 0.24);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.72);
+  padding: 8px 9px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.custom-model-item-main {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.custom-model-item-main strong {
+  font-size: 0.84rem;
+  color: #3c3126;
+}
+
+.custom-model-item-main small {
+  font-size: 0.75rem;
+  color: #6c5a46;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.custom-model-delete-btn {
+  min-width: 78px;
+}
+
+.model-switch-notice {
+  margin-top: 8px;
+  border: 1px solid rgba(179, 136, 69, 0.45);
+  background: rgba(255, 244, 221, 0.9);
+  color: #6a4c1d;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 0.8rem;
+  line-height: 1.35;
 }
 
 .file-source-inline > input[type="file"] {

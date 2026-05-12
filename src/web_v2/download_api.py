@@ -4,6 +4,7 @@ import subprocess
 import sys
 import tarfile
 import time
+from statistics import mean
 from pathlib import Path
 from typing import Any, Dict, Literal, Tuple
 
@@ -212,6 +213,126 @@ def _build_response(
     }
 
 
+def _export_structure_for_preview(structure_path: Path, run_id: str) -> tuple[str, str]:
+    result_dir = get_web_v2_area_dir("results", tool="download", run_id=run_id)
+    result_dir.mkdir(parents=True, exist_ok=True)
+    export_name = structure_path.name
+    export_path = result_dir / export_name
+    if export_path.resolve() != structure_path.resolve():
+        shutil.copy2(structure_path, export_path)
+    relative = export_path.relative_to(WEB_V2_RESULTS_ROOT).as_posix()
+    return relative, to_web_v2_public_path(export_path)
+
+
+def _summarize_pdb_structure(path: Path) -> dict[str, Any]:
+    atom_count = 0
+    residue_keys: set[tuple[str, str, str]] = set()
+    b_factors: list[float] = []
+    with path.open("r", encoding="utf-8", errors="replace") as fp:
+        for line in fp:
+            if not line.startswith(("ATOM", "HETATM")):
+                continue
+            atom_count += 1
+            chain_id = line[21:22].strip() or "-"
+            res_seq = line[22:26].strip() or "?"
+            ins_code = line[26:27].strip()
+            residue_keys.add((chain_id, res_seq, ins_code))
+            bf_raw = line[60:66].strip()
+            if bf_raw:
+                try:
+                    b_factors.append(float(bf_raw))
+                except ValueError:
+                    pass
+    summary: dict[str, Any] = {
+        "file_name": path.name,
+        "atom_count": atom_count,
+        "residue_count": len(residue_keys),
+    }
+    if b_factors:
+        summary["bfactor"] = {
+            "mean": round(mean(b_factors), 2),
+            "min": round(min(b_factors), 2),
+            "max": round(max(b_factors), 2),
+        }
+    return summary
+
+
+def _summarize_structure_file(path: Path) -> dict[str, Any]:
+    return {
+        "file_name": path.name,
+        "file_size_bytes": path.stat().st_size,
+        "format": path.suffix.lstrip(".").lower(),
+    }
+
+
+def _collect_structure_files(task_folder: Path) -> list[Path]:
+    files: list[Path] = []
+    for ext in ("*.pdb", "*.cif", "*.mmcif", "*.ent"):
+        files.extend(task_folder.glob(ext))
+    return sorted({p.resolve() for p in files}, key=lambda p: p.name.lower())
+
+
+def _collect_structure_summaries(task_folder: Path, *, alpha_fold_mode: bool, max_items: int = 5) -> list[dict[str, Any]]:
+    summaries: list[dict[str, Any]] = []
+    for path in _collect_structure_files(task_folder)[:max_items]:
+        summary = _summarize_structure_file(path)
+        if path.suffix.lower() == ".pdb":
+            if alpha_fold_mode:
+                summary.update(_summarize_alphafold_pdb(path))
+            else:
+                summary.update(_summarize_pdb_structure(path))
+        summaries.append(summary)
+    return summaries
+
+
+def _plddt_bins_from_bfactors(b_factors: list[float]) -> dict[str, int]:
+    bins = {"very_high": 0, "confident": 0, "low": 0, "very_low": 0}
+    for value in b_factors:
+        if value >= 90:
+            bins["very_high"] += 1
+        elif value >= 70:
+            bins["confident"] += 1
+        elif value >= 50:
+            bins["low"] += 1
+        else:
+            bins["very_low"] += 1
+    return bins
+
+
+def _summarize_alphafold_pdb(path: Path) -> dict[str, Any]:
+    atom_count = 0
+    residue_keys: set[tuple[str, str, str]] = set()
+    plddt_values: list[float] = []
+    with path.open("r", encoding="utf-8", errors="replace") as fp:
+        for line in fp:
+            if not line.startswith("ATOM"):
+                continue
+            atom_count += 1
+            chain_id = line[21:22].strip() or "-"
+            res_seq = line[22:26].strip() or "?"
+            ins_code = line[26:27].strip()
+            residue_keys.add((chain_id, res_seq, ins_code))
+            raw = line[60:66].strip()
+            if raw:
+                try:
+                    plddt_values.append(float(raw))
+                except ValueError:
+                    pass
+    summary: dict[str, Any] = {
+        "file_name": path.name,
+        "atom_count": atom_count,
+        "residue_count": len(residue_keys),
+    }
+    if plddt_values:
+        summary["plddt"] = {
+            "mean": round(mean(plddt_values), 2),
+            "min": round(min(plddt_values), 2),
+            "max": round(max(plddt_values), 2),
+            "bins": _plddt_bins_from_bfactors(plddt_values),
+        }
+    return summary
+
+
 @router.get("/meta")
 async def download_meta():
     mode = _runtime_mode()
@@ -325,14 +446,29 @@ async def download_rcsb_structure(payload: RcsbStructureDownloadRequest):
     )
     preview = _first_file_preview(task_folder)
     viz_status = "Download failed."
+    structure_result_path = ""
+    structure_public_path = ""
+    structure_summary: dict[str, Any] = {}
+    structure_summaries: list[dict[str, Any]] = []
     if success and payload.method == "Single ID" and id_value:
         expected = task_folder / f"{id_value}.{payload.file_type}"
         if expected.exists():
             viz_status = f"Structure ready: {expected.name}"
+            structure_result_path, structure_public_path = _export_structure_for_preview(expected, run_id)
+            structure_summary = _summarize_structure_file(expected)
+            if payload.file_type == "pdb":
+                structure_summary.update(_summarize_pdb_structure(expected))
+            structure_summaries = [structure_summary]
         else:
             viz_status = f"Downloaded {id_value}, but expected structure file was not found."
     elif success:
-        viz_status = "Batch download complete. Use archive for all results."
+        viz_status = "Batch download complete. Showing summary for first structures."
+        structure_summaries = _collect_structure_summaries(task_folder, alpha_fold_mode=False, max_items=5)
+        if structure_summaries:
+            first_name = str(structure_summaries[0].get("file_name", ""))
+            first_path = task_folder / first_name
+            if first_name and first_path.exists():
+                structure_result_path, structure_public_path = _export_structure_for_preview(first_path, run_id)
     return _build_response(
         success=success,
         message=output,
@@ -344,6 +480,10 @@ async def download_rcsb_structure(payload: RcsbStructureDownloadRequest):
             "method": payload.method,
             "input_preview": input_preview,
             "visualization_status": viz_status,
+            "structure_result_path": structure_result_path,
+            "structure_public_path": structure_public_path,
+            "structure_summary": structure_summary,
+            "structure_summaries": structure_summaries,
         },
     )
 
@@ -371,14 +511,27 @@ async def download_alphafold_structure(payload: DownloadRequestBase):
     )
     preview = _first_file_preview(task_folder)
     viz_status = "Download failed."
+    structure_result_path = ""
+    structure_public_path = ""
+    structure_summary: dict[str, Any] = {}
+    structure_summaries: list[dict[str, Any]] = []
     if success and payload.method == "Single ID" and id_value:
         expected = task_folder / f"{id_value}.pdb"
         if expected.exists():
             viz_status = f"Structure ready: {expected.name}"
+            structure_result_path, structure_public_path = _export_structure_for_preview(expected, run_id)
+            structure_summary = _summarize_alphafold_pdb(expected)
+            structure_summaries = [structure_summary]
         else:
             viz_status = f"Downloaded {id_value}, but expected structure file was not found."
     elif success:
-        viz_status = "Batch download complete. Use archive for all results."
+        viz_status = "Batch download complete. Showing summary for first structures."
+        structure_summaries = _collect_structure_summaries(task_folder, alpha_fold_mode=True, max_items=5)
+        if structure_summaries:
+            first_name = str(structure_summaries[0].get("file_name", ""))
+            first_path = task_folder / first_name
+            if first_name and first_path.exists():
+                structure_result_path, structure_public_path = _export_structure_for_preview(first_path, run_id)
     return _build_response(
         success=success,
         message=output,
@@ -390,6 +543,10 @@ async def download_alphafold_structure(payload: DownloadRequestBase):
             "method": payload.method,
             "input_preview": input_preview,
             "visualization_status": viz_status,
+            "structure_result_path": structure_result_path,
+            "structure_public_path": structure_public_path,
+            "structure_summary": structure_summary,
+            "structure_summaries": structure_summaries,
         },
     )
 

@@ -279,6 +279,17 @@ export async function cancelChatSession(sessionId: string) {
   return res.json() as Promise<{ success: boolean; status: string }>;
 }
 
+export async function deleteCustomModelCache(customModelId: string) {
+  const res = await fetch(`${API_ROOT}/api/chat/models/custom/${encodeURIComponent(customModelId)}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    const detail = await extractErrorDetail(res);
+    throw new Error(parseErrorStatus(res.status, detail));
+  }
+  return res.json() as Promise<{ success: boolean; custom_model_id: string; cleared_sessions: string[] }>;
+}
+
 export async function getChatQuota() {
   const res = await fetch(`${API_ROOT}/api/chat/quota`);
   if (!res.ok) {
@@ -314,6 +325,29 @@ export async function downloadExperimentReport(sessionId: string) {
   const disposition = res.headers.get("Content-Disposition") || "";
   const filenameMatch = disposition.match(/filename="?([^"]+)"?/);
   const filename = filenameMatch?.[1] || `experiment_report_${sessionId.slice(0, 8)}.md`;
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+export async function exportChatSessionBundle(sessionId: string) {
+  const res = await fetch(`${API_ROOT}/api/chat/sessions/${encodeURIComponent(sessionId)}/export`, {
+    method: "POST",
+    headers: getChatSessionAuthHeaders(sessionId),
+  });
+  if (!res.ok) {
+    const detail = await extractErrorDetail(res);
+    throw new Error(parseErrorStatus(res.status, detail));
+  }
+  const disposition = res.headers.get("Content-Disposition") || "";
+  const filenameMatch = disposition.match(/filename="?([^"]+)"?/);
+  const filename = filenameMatch?.[1] || `chat_export_${sessionId.slice(0, 8)}.zip`;
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

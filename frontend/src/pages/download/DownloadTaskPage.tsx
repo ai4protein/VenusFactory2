@@ -4,6 +4,7 @@ import { DownloadLayout } from "./DownloadLayout";
 import { CopyableTextBlock } from "../../components/CommandPreviewCard";
 import { SegmentedSwitch } from "../../components/SegmentedSwitch";
 import { WorkspaceFilePicker } from "../../components/WorkspaceFilePicker";
+import { MolstarViewer } from "../../components/MolstarViewer";
 import { readWorkspaceTextFile } from "../../lib/workspaceApi";
 
 type DownloadTaskConfig = {
@@ -67,6 +68,59 @@ export function DownloadTaskPage({ config }: DownloadTaskPageProps) {
   const visualizationStatus = useMemo(() => {
     const raw = result?.details?.visualization_status;
     return typeof raw === "string" ? raw : "";
+  }, [result]);
+
+  const structureResultPath = useMemo(() => {
+    const raw = result?.details?.structure_result_path;
+    return typeof raw === "string" ? raw : "";
+  }, [result]);
+
+  const structureSummaryText = useMemo(() => {
+    const summary = result?.details?.structure_summary as Record<string, unknown> | undefined;
+    const summaries = result?.details?.structure_summaries as Record<string, unknown>[] | undefined;
+    const list = Array.isArray(summaries) && summaries.length ? summaries : (summary ? [summary] : []);
+    if (!list.length) {
+      return result?.preview || "";
+    }
+    const sections = list.map((item, index) => {
+      const lines: string[] = [];
+      const fileName = typeof item.file_name === "string" ? item.file_name : "";
+      const format = typeof item.format === "string" ? item.format : "";
+      const fileSizeBytes = typeof item.file_size_bytes === "number" ? item.file_size_bytes : null;
+      const residueCount = typeof item.residue_count === "number" ? item.residue_count : null;
+      const atomCount = typeof item.atom_count === "number" ? item.atom_count : null;
+      if (fileName) lines.push(`#${index + 1} ${fileName}`);
+      if (format) lines.push(`Format: ${format}`);
+      if (fileSizeBytes !== null) lines.push(`Size: ${fileSizeBytes} bytes`);
+      if (residueCount !== null) lines.push(`Residues: ${residueCount}`);
+      if (atomCount !== null) lines.push(`Atoms: ${atomCount}`);
+
+      const plddt = item.plddt as Record<string, unknown> | undefined;
+      if (plddt && typeof plddt === "object") {
+        const mean = typeof plddt.mean === "number" ? plddt.mean.toFixed(2) : "N/A";
+        const min = typeof plddt.min === "number" ? plddt.min.toFixed(2) : "N/A";
+        const max = typeof plddt.max === "number" ? plddt.max.toFixed(2) : "N/A";
+        lines.push(`pLDDT Mean/Min/Max: ${mean} / ${min} / ${max}`);
+        const bins = plddt.bins as Record<string, unknown> | undefined;
+        if (bins && typeof bins === "object") {
+          const veryHigh = typeof bins.very_high === "number" ? bins.very_high : 0;
+          const confident = typeof bins.confident === "number" ? bins.confident : 0;
+          const low = typeof bins.low === "number" ? bins.low : 0;
+          const veryLow = typeof bins.very_low === "number" ? bins.very_low : 0;
+          lines.push(`pLDDT Bins (atoms): >=90 ${veryHigh}, 70-89 ${confident}, 50-69 ${low}, <50 ${veryLow}`);
+        }
+      }
+
+      const bfactor = item.bfactor as Record<string, unknown> | undefined;
+      if (bfactor && typeof bfactor === "object") {
+        const mean = typeof bfactor.mean === "number" ? bfactor.mean.toFixed(2) : "N/A";
+        const min = typeof bfactor.min === "number" ? bfactor.min.toFixed(2) : "N/A";
+        const max = typeof bfactor.max === "number" ? bfactor.max.toFixed(2) : "N/A";
+        lines.push(`B-factor Mean/Min/Max: ${mean} / ${min} / ${max}`);
+      }
+      return lines.join("\n");
+    });
+    return sections.join("\n\n");
   }, [result]);
 
   const statusTone = running
@@ -281,6 +335,11 @@ export function DownloadTaskPage({ config }: DownloadTaskPageProps) {
           {config.showVisualization && (
             <div className="download-viz-status">
               <strong>Visualization:</strong> {visualizationStatus || "No structure preview available yet."}
+              {structureResultPath && (
+                <div style={{ marginTop: 12 }}>
+                  <MolstarViewer filePath={structureResultPath} label="Structure Preview" />
+                </div>
+              )}
             </div>
           )}
 
@@ -288,7 +347,7 @@ export function DownloadTaskPage({ config }: DownloadTaskPageProps) {
             <section className={`download-result-card ${statusTone === "failed" ? "failed" : ""}`}>
               <h4>Output Preview</h4>
               <CopyableTextBlock
-                text={result?.preview || ""}
+                text={structureSummaryText}
                 emptyText="Preview will appear here after download."
                 wrapperClassName="quick-tools-v2-copy-wrap"
                 preClassName="report-text quick-tools-v2-text"

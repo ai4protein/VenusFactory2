@@ -7,16 +7,21 @@ import re
 import secrets
 import shutil
 import uuid
+import zipfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, List, Optional
 
 from fastapi import APIRouter, File, HTTPException, Request, UploadFile
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from langchain_core.messages import HumanMessage
 from pydantic import BaseModel, Field
 
-from agent.chat_agent import initialize_session_state, update_llm_model
+from agent.chat_agent import (
+    initialize_session_state,
+    update_llm_model,
+    update_llm_openai_style_config,
+)
 from agent.chat_agent_utils import (
     AGENT_CHAT_MAX_MESSAGES,
     extract_sequence_from_message,
@@ -26,6 +31,8 @@ from agent.chat_graph import _format_clarification_answers, create_agent_graph
 from config import get_config
 from logger import get_logger
 from web.utils.common_utils import (
+    build_run_id_utc,
+    get_web_v2_area_dir,
     make_web_v2_upload_name,
     redact_path_text,
     resolve_web_v2_client_path,
@@ -38,6 +45,7 @@ _logger = get_logger("web_v2.chat_api")
 _cfg = get_config()
 
 router = APIRouter(prefix="/api/chat", tags=["chat-v2"])
+_BUILTIN_MODEL_LABELS = {"Gemini-2.5-Pro", "ChatGPT-4o", "Claude-3.7", "DeepSeek-R1"}
 
 _SESSIONS: dict[str, dict[str, Any]] = {}
 _SESSION_LOCKS: dict[str, asyncio.Lock] = {}
@@ -111,6 +119,23 @@ def _is_zh_text(text: str) -> bool:
     return any("\u4e00" <= ch <= "\u9fff" for ch in raw)
 
 
+def _should_skip_research(questions: list[dict[str, Any]], answers: list[dict[str, Any]]) -> bool:
+    for i, ans in enumerate(answers):
+        if i >= len(questions):
+            break
+        opts = questions[i].get("options", []) or []
+        selected = ans.get("selected_options", []) or []
+        custom = str(ans.get("custom_text", "") or "").strip().lower()
+        for idx in selected:
+            if isinstance(idx, int) and 0 <= idx < len(opts):
+                text = str(opts[idx]).strip().lower()
+                if ("skip research" in text) or ("跳过 research" in text):
+                    return True
+        if custom and ("skip research" in custom or "跳过research" in custom or "跳过 research" in custom):
+            return True
+    return False
+
+
 class CreateSessionResponse(BaseModel):
     session_id: str
     created_at: str
@@ -136,6 +161,8 @@ class ChatStreamRequest(BaseModel):
     text: str = Field(default="")
     model: Optional[str] = Field(default=None)
     attachment_paths: list[str] = Field(default_factory=list)
+    custom_model_config: dict[str, str] = Field(default_factory=dict)
+    custom_model_id: str = Field(default="")
 
 
 class ClarificationAnswer(BaseModel):
@@ -187,6 +214,8 @@ def _redact_obj(value: Any) -> Any:
 
 
 def _snapshot(state: dict[str, Any]) -> dict[str, Any]:
+    waiting_for = state.get("waiting_for", "")
+    waiting_for_str = waiting_for if isinstance(waiting_for, str) else ""
     return {
         "session_id": state.get("session_id"),
         "model_name": getattr(state.get("llm"), "model_name", ""),
@@ -197,7 +226,7 @@ def _snapshot(state: dict[str, Any]) -> dict[str, Any]:
         "status": state.get("status", ""),
         "clarification_questions": list(state.get("clarification_questions", [])),
         "plan": list(state.get("plan", [])),
-        "waiting_for": state.get("waiting_for", ""),
+        "waiting_for": waiting_for_str,
     }
 
 
@@ -701,10 +730,33 @@ async def stream_message(session_id: str, payload: ChatStreamRequest, request: R
     _record_access_event(request, "/api/chat/sessions/{id}/messages/stream")
     state = await _get_session_or_404(session_id)
     _assert_session_access(state, request)
+    if _runtime_mode() != "local" and (payload.custom_model_config or payload.custom_model_id):
+        raise HTTPException(status_code=403, detail="Custom models are available only in local mode.")
     await _consume_online_chat_quota_or_429(request)
     await _set_cancel(session_id, False)
     state["client_ip"] = _extract_client_ip(request)
     state["owner_key"] = _session_owner_key_for_request(request)
+    if payload.model in _BUILTIN_MODEL_LABELS:
+        llm = state.get("llm")
+        if llm is not None:
+            default_api_key = str(state.get("default_llm_api_key", "") or "")
+            default_base_url = str(state.get("default_llm_base_url", "") or "")
+            if default_api_key:
+                llm.api_key = default_api_key
+            if default_base_url:
+                llm.base_url = default_base_url
+    if payload.custom_model_config and _runtime_mode() == "local":
+        cfg = payload.custom_model_config
+        update_llm_openai_style_config(
+            state=state,
+            model_name=str(cfg.get("model_name", "") or ""),
+            api_key=str(cfg.get("api_key", "") or ""),
+            base_url=str(cfg.get("base_url", "") or ""),
+        )
+        if payload.custom_model_id:
+            state["active_custom_model_id"] = payload.custom_model_id
+    elif payload.model in _BUILTIN_MODEL_LABELS:
+        state["active_custom_model_id"] = ""
     if payload.model:
         update_llm_model(payload.model, state)
     lock = await _get_lock(session_id)
@@ -759,6 +811,32 @@ async def cancel_session_run(session_id: str, request: Request):
     state["status"] = "stopping"
     await _set_cancel(session_id, True)
     return {"success": True, "status": "stopping"}
+
+
+@router.delete("/models/custom/{custom_model_id}")
+async def delete_custom_model_cache(custom_model_id: str, request: Request):
+    _record_access_event(request, "/api/chat/models/custom/{id}:delete")
+    removed_sessions: list[str] = []
+    async with _SESSIONS_GUARD:
+        for sid, state in _SESSIONS.items():
+            if _runtime_mode() == "online" and str(state.get("owner_key", "")) != _session_owner_key_for_request(request):
+                continue
+            if str(state.get("active_custom_model_id", "")) != custom_model_id:
+                continue
+            llm = state.get("llm")
+            if llm is not None:
+                default_api_key = str(state.get("default_llm_api_key", "") or "")
+                default_base_url = str(state.get("default_llm_base_url", "") or "")
+                default_model_name = str(state.get("default_llm_model_name", "") or "")
+                if default_api_key:
+                    llm.api_key = default_api_key
+                if default_base_url:
+                    llm.base_url = default_base_url
+                if default_model_name:
+                    llm.model_name = default_model_name
+            state["active_custom_model_id"] = ""
+            removed_sessions.append(sid)
+    return {"success": True, "custom_model_id": custom_model_id, "cleared_sessions": removed_sessions}
 
 
 async def _stream_graph_resume(
@@ -909,6 +987,7 @@ async def stream_clarification_response(
     original_text = state.get("last_user_text", "")
     enriched_text = f"{original_text}\n\n[Clarification Details]\n{answers_summary}"
     state["last_user_text"] = enriched_text
+    skip_research = _should_skip_research(questions, answers_data)
 
     lock = await _get_lock(session_id)
 
@@ -916,7 +995,7 @@ async def stream_clarification_response(
         async with lock:
             async for chunk in _stream_graph_resume(
                 state,
-                waiting_for="clarification_answered",
+                waiting_for="skip_to_plan" if skip_research else "clarification_answered",
             ):
                 yield chunk
 
@@ -1506,6 +1585,69 @@ def _extract_figure_links_from_history(history: list[dict[str, Any]]) -> list[tu
     return figures
 
 
+def _write_chat_history_pdf(state: dict[str, Any], output_path: Path) -> None:
+    history = state.get("history", []) or []
+    lines: list[str] = []
+    for idx, msg in enumerate(history, 1):
+        role = str(msg.get("role", "unknown")).upper()
+        role_id = str(msg.get("role_id", "") or "")
+        title = f"{idx}. {role}" + (f" ({role_id})" if role_id else "")
+        content = str(msg.get("content", "") or "")
+        lines.append(title)
+        lines.extend(content.splitlines() or [""])
+        lines.append("")
+
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        from reportlab.pdfgen import canvas
+    except Exception as exc:
+        raise RuntimeError("PDF export requires reportlab. Please install it in current environment.") from exc
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    c = canvas.Canvas(str(output_path), pagesize=A4)
+    width, height = A4
+    margin = 40
+    y = height - margin
+    line_height = 14
+
+    font_name = "Helvetica"
+    c.setFont(font_name, 10)
+    for raw in lines:
+        text = raw.rstrip()
+        if not text:
+            y -= line_height
+            if y < margin:
+                c.showPage()
+                c.setFont(font_name, 10)
+                y = height - margin
+            continue
+        chunks = [text[i:i + 110] for i in range(0, len(text), 110)]
+        for chunk in chunks:
+            c.drawString(margin, y, chunk)
+            y -= line_height
+            if y < margin:
+                c.showPage()
+                c.setFont(font_name, 10)
+                y = height - margin
+    c.save()
+
+
+def _copy_session_files(state: dict[str, Any], target_dir: Path) -> list[str]:
+    copied: list[str] = []
+    session_dir_raw = str(state.get("agent_session_dir", "") or "").strip()
+    if not session_dir_raw:
+        return copied
+    session_dir = Path(session_dir_raw)
+    if not session_dir.exists() or not session_dir.is_dir():
+        return copied
+    dst = target_dir / "session_files"
+    shutil.copytree(session_dir, dst, dirs_exist_ok=True)
+    copied.append(str(dst))
+    return copied
+
+
 @router.get("/sessions/{session_id}/report")
 async def get_experiment_report(session_id: str, request: Request):
     _record_access_event(request, "/api/chat/sessions/{id}/report")
@@ -1518,4 +1660,50 @@ async def get_experiment_report(session_id: str, request: Request):
         content=report,
         media_type="text/markdown; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.post("/sessions/{session_id}/export")
+async def export_session_bundle(session_id: str, request: Request):
+    _record_access_event(request, "/api/chat/sessions/{id}/export")
+    state = await _get_session_or_404(session_id)
+    _assert_session_access(state, request)
+
+    run_id = build_run_id_utc()
+    export_root = get_web_v2_area_dir("results", tool="chat_export", run_id=run_id)
+    export_root.mkdir(parents=True, exist_ok=True)
+
+    report_path = export_root / "final_report.md"
+    report_path.write_text(_generate_experiment_report(state), encoding="utf-8")
+
+    pdf_path = export_root / "chat_history.pdf"
+    _write_chat_history_pdf(state, pdf_path)
+
+    snapshot = {
+        "session_id": state.get("session_id"),
+        "model_name": getattr(state.get("llm"), "model_name", ""),
+        "created_at": str(state.get("created_at", "")),
+        "status": state.get("status", ""),
+        "history": state.get("history", []),
+        "conversation_log": state.get("conversation_log", []),
+        "tool_executions": state.get("tool_executions", []),
+        "plan": state.get("plan", []),
+    }
+    snapshot_path = export_root / "session_snapshot.json"
+    snapshot_path.write_text(json.dumps(snapshot, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+
+    _copy_session_files(state, export_root)
+
+    zip_name = f"chat_export_{session_id[:8]}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+    zip_path = export_root / zip_name
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for file_path in export_root.rglob("*"):
+            if file_path == zip_path or file_path.is_dir():
+                continue
+            zf.write(file_path, file_path.relative_to(export_root))
+
+    return FileResponse(
+        path=str(zip_path),
+        filename=zip_name,
+        media_type="application/zip",
     )

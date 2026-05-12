@@ -348,6 +348,82 @@ def _parse_clarification_questions(raw: str) -> list[dict[str, Any]]:
         return []
 
 
+def _canonicalize_tool_name(raw_name: Any, available_tools_list: str) -> str:
+    """Normalize tool names from LLM output against known available tools."""
+    name = str(raw_name or "").strip()
+    if not name:
+        return ""
+    if not available_tools_list:
+        return name
+    candidates = [x.strip() for x in str(available_tools_list).split(",") if x.strip()]
+    if not candidates:
+        return name
+    lower_map = {c.lower(): c for c in candidates}
+    direct = lower_map.get(name.lower())
+    if direct:
+        return direct
+    compact = re.sub(r"[\s\-_]+", "", name.lower())
+    for c in candidates:
+        if re.sub(r"[\s\-_]+", "", c.lower()) == compact:
+            return c
+    return name
+
+
+async def _repair_plan_json_with_llm(llm: Any, raw_content: str) -> list[dict[str, Any]]:
+    """Ask model to rewrite planner output into strict JSON array format."""
+    if not llm or not raw_content:
+        return []
+    prompt = (
+        "Convert the following pipeline draft into strict JSON array only.\n"
+        "Each item must be an object with keys: step, task_description, tool_name, tool_input.\n"
+        "Return JSON array only. No markdown fences, no explanation.\n\n"
+        f"Draft:\n{str(raw_content)[:10000]}"
+    )
+    try:
+        fixed = await asyncio.to_thread(llm.invoke, [HumanMessage(content=prompt)])
+        fixed_text = getattr(fixed, "content", None) or str(fixed) or ""
+        parsed = _parse_cb_plan(fixed_text)
+        return parsed if isinstance(parsed, list) else []
+    except Exception:
+        return []
+
+
+async def _retry_plan_for_model_compat(
+    llm: Any,
+    user_text: str,
+    pi_report: str,
+    pi_suggest_steps: str,
+    protein_context_summary: str,
+    available_tools_list: str,
+) -> list[dict[str, Any]]:
+    """Fallback planner retry for models that frequently return [] despite executable intent."""
+    if llm is None:
+        return []
+    prompt = (
+        "You are Computational Biologist.\n"
+        "Generate an executable pipeline as JSON array ONLY.\n"
+        "No markdown, no explanation.\n"
+        "Each item must contain: step(int), task_description(str), tool_name(str), tool_input(object).\n"
+        "tool_name must be chosen exactly from AVAILABLE_TOOLS.\n"
+        "If user request is actionable, DO NOT return []. Return at least one executable step.\n\n"
+        f"USER_REQUEST:\n{user_text}\n\n"
+        f"PI_REPORT:\n{pi_report}\n\n"
+        f"SUGGEST_STEPS:\n{pi_suggest_steps}\n\n"
+        f"PROTEIN_CONTEXT:\n{protein_context_summary}\n\n"
+        f"AVAILABLE_TOOLS:\n{available_tools_list}\n"
+    )
+    try:
+        msg = await asyncio.to_thread(llm.invoke, [HumanMessage(content=prompt)])
+        content = getattr(msg, "content", None) or str(msg) or ""
+        _logger.info("CB planner compat retry output (first 1200 chars): %s", content[:1200])
+        parsed = _parse_cb_plan(content)
+        _logger.info("CB planner compat retry parsed steps count: %d", len(parsed) if isinstance(parsed, list) else 0)
+        return parsed if isinstance(parsed, list) else []
+    except Exception as e:
+        _logger.warning("CB planner compat retry failed: %s", e)
+        return []
+
+
 def _format_clarification_answers(questions: list[dict], answers: list[dict]) -> str:
     parts = []
     for i, ans in enumerate(answers):
@@ -367,6 +443,19 @@ def _format_clarification_answers(questions: list[dict], answers: list[dict]) ->
         if option_texts:
             parts.append(f"Q: {q['question']}\nA: {', '.join(option_texts)}")
     return "\n\n".join(parts)
+
+
+def _looks_like_execution_request(text: str) -> bool:
+    raw = str(text or "").strip().lower()
+    if not raw:
+        return False
+    exec_keywords = [
+        "download", "predict", "identify", "analyze", "analyse", "run", "execute",
+        "optimize", "mutation", "stability", "stabilizing", "pipeline", "workflow",
+        "design", "dock", "structure", "alphafold", "esm", "protssn", "uniprot",
+        "生成", "下载", "预测", "分析", "执行", "运行", "突变", "稳定性", "结构", "流程",
+    ]
+    return any(k in raw for k in exec_keywords)
 
 
 def _get_chat_history_messages(chains: dict[str, Any], history: list[dict[str, Any]], current_input: str = "") -> list[BaseMessage]:
@@ -988,6 +1077,11 @@ async def research_plan_node(state: AgentState, config: RunnableConfig):
         _logger.warning("PI sections failed: %s", e)
         sections_list = []
 
+    if not sections_list and _looks_like_execution_request(text):
+        # Planner parse can fail for some base models; for execution-style requests
+        # fall through to internal plan node instead of PI chat free-form reply.
+        return {"status": "resume_plan", "pi_report": "", "pi_suggest_steps": "", "ui_lang": ui_lang}
+
     if not sections_list:
         return {"status": "chat_mode", "pi_report": "", "pi_suggest_steps": "", "ui_lang": ui_lang}
 
@@ -1090,6 +1184,24 @@ async def clarification_node(state: AgentState, config: RunnableConfig):
             "status": "resume_research",
             "ui_lang": ui_lang,
         }
+
+    # Always add an explicit switch to let users skip literature research.
+    if ui_lang == "zh":
+        questions.append(
+            {
+                "question": "研究阶段是否继续？",
+                "options": ["继续 Research（推荐）", "跳过 Research，直接进入工具执行"],
+                "allow_multiple": False,
+            }
+        )
+    else:
+        questions.append(
+            {
+                "question": "How should we handle the research phase?",
+                "options": ["Continue research (recommended)", "Skip research and go straight to tool execution"],
+                "allow_multiple": False,
+            }
+        )
 
     title = _ui_text(ui_lang, "clarification_title")
     history.append({
@@ -1414,27 +1526,64 @@ async def plan_node(state: AgentState, config: RunnableConfig):
         "skills_metadata": skills_metadata,
         "available_tools_list": available_tools_list,
     }
+    _logger.info(
+        "CB planner inputs summary: user_len=%d pi_report_len=%d suggest_len=%d tools_count=%d",
+        len(str(state["messages"][-1].content or "")),
+        len(str(pi_report or "")),
+        len(str(pi_suggest_steps or "")),
+        len([x for x in str(available_tools_list or "").split(",") if x.strip()]),
+    )
 
     try:
         raw_msg = await asyncio.to_thread(chains["cb_planner_raw"].invoke, cb_planner_inputs)
         content = getattr(raw_msg, "content", None) or str(raw_msg) or ""
+        _logger.info("CB planner raw output (first 1200 chars): %s", content[:1200])
         plan = _parse_cb_plan(content)
+        _logger.info("CB planner parsed steps count: %d", len(plan) if isinstance(plan, list) else 0)
+        if (not plan) and _looks_like_execution_request(state["messages"][-1].content):
+            _logger.info("CB planner returned empty plan for execution-style request; starting compat retry.")
+            plan = await _retry_plan_for_model_compat(
+                llm=chains.get("llm"),
+                user_text=state["messages"][-1].content,
+                pi_report=pi_report,
+                pi_suggest_steps=pi_suggest_steps,
+                protein_context_summary=protein_context_summary,
+                available_tools_list=available_tools_list,
+            )
     except Exception as e:
         _logger.warning("CB planner failed: %s", e)
         plan = []
 
     # Filter and normalize plan
     normalized_plan = []
+    dropped_non_dict = 0
+    dropped_empty_or_missing_tool = 0
+    dropped_pi_search_tool = 0
     for i, p in enumerate(plan):
-        if not isinstance(p, dict): continue
+        if not isinstance(p, dict):
+            dropped_non_dict += 1
+            continue
         tname = p.get("tool_name") or p.get("tool") or ""
-        if not tname or tname in PI_SEARCH_TOOL_NAMES: continue
+        if not tname:
+            dropped_empty_or_missing_tool += 1
+            continue
+        if tname in PI_SEARCH_TOOL_NAMES:
+            dropped_pi_search_tool += 1
+            continue
         normalized_plan.append({
             "step": _normalize_step_number(p.get("step"), i + 1),
             "task_description": p.get("task_description") or p.get("task") or "",
             "tool_name": tname.strip(),
             "tool_input": _normalize_tool_input(p.get("tool_input") or p.get("input"))
         })
+    _logger.info(
+        "CB plan normalization: kept=%d dropped_non_dict=%d dropped_no_tool=%d dropped_pi_search=%d available_tools=%s",
+        len(normalized_plan),
+        dropped_non_dict,
+        dropped_empty_or_missing_tool,
+        dropped_pi_search_tool,
+        available_tools_list,
+    )
 
     normalized_plan = _enforce_skill_first_plan(normalized_plan, available_tools_list, skills_metadata, ui_lang)
 
@@ -2382,6 +2531,15 @@ def _route_from_clarification(state: AgentState):
     return END
 
 
+def _route_from_research_plan(state: AgentState):
+    status = state.get("status", "")
+    if status == "chat_mode":
+        return "chat_start_node"
+    if status == "resume_plan":
+        return "plan_start_node"
+    return "clarification_start_node"
+
+
 def _route_from_plan(state: AgentState):
     status = state.get("status", "")
     if status == "chat_mode":
@@ -2420,7 +2578,7 @@ def create_agent_graph():
     workflow.add_edge("research_plan_start_node", "research_plan_node")
     workflow.add_conditional_edges(
         "research_plan_node",
-        lambda s: "chat_start_node" if s.get("status") == "chat_mode" else "clarification_start_node",
+        _route_from_research_plan,
     )
 
     workflow.add_edge("clarification_start_node", "clarification_node")

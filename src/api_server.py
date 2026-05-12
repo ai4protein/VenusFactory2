@@ -5,10 +5,16 @@ and provides health and file download. Started by webui or run directly.
 from __future__ import annotations
 
 import importlib
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
+
+# Ensure `src` is importable no matter how the process is launched.
+_SRC_DIR = Path(__file__).resolve().parent
+if str(_SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(_SRC_DIR))
 
 from dotenv import load_dotenv
 
@@ -38,13 +44,17 @@ logger = get_logger(__name__)
 
 # Unified import helper: resolves both `src.X` and `X` import paths.
 def _import_attr(module_path: str, attr: str) -> Any:
+    errors: list[str] = []
     for prefix in ("src.", ""):
+        full_module = f"{prefix}{module_path}"
         try:
-            mod = importlib.import_module(f"{prefix}{module_path}")
+            mod = importlib.import_module(full_module)
             return getattr(mod, attr)
-        except (ModuleNotFoundError, AttributeError):
-            continue
-    raise ImportError(f"Cannot import '{attr}' from '{module_path}'")
+        except (ModuleNotFoundError, AttributeError) as exc:
+            errors.append(f"{full_module}: {type(exc).__name__}: {exc}")
+    raise ImportError(
+        f"Cannot import '{attr}' from '{module_path}'. Tried variants -> " + " | ".join(errors)
+    )
 
 mutation_router = _import_attr("tools.mutation.tools_api", "router")
 predict_router = _import_attr("tools.predict.tools_api", "router")
