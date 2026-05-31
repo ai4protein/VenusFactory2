@@ -286,6 +286,19 @@ All datasets available on [HuggingFace](https://huggingface.co/AI4Protein)
 
 ## 📦 Installation
 
+> **System packages (Linux):** PDF export pulls `pycairo`, which builds against `cairo`.
+> On Debian/Ubuntu, install once before pip-installing:
+> ```bash
+> sudo apt-get install -y libcairo2-dev libxml2-dev pkg-config
+> ```
+> Or, with conda, install the pre-built binary to skip the build:
+> ```bash
+> conda install -c conda-forge pycairo
+> ```
+> macOS / Windows: pre-built wheels exist, no extra system step needed.
+
+### Option A — conda + pip (recommended for end users)
+
 <details>
 <summary><b>🍎 macOS (M1/M2/M3)</b></summary>
 
@@ -305,9 +318,10 @@ pip install -r requirements_for_macOS.txt
 ```bash
 git clone https://github.com/AI4Protein/VenusFactory2.git && cd VenusFactory2
 conda create -n venus python=3.12 && conda activate venus
+# Linux only: see "System packages" note above for cairo headers.
 pip install torch==2.8.0 torchvision --index-url https://download.pytorch.org/whl/cu128
-pip install torch_geometric
-pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.8.0+cu128.html
+pip install torch_geometric pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv \
+    -f https://data.pyg.org/whl/torch-2.8.0+cu128.html
 pip install -r requirements.txt
 ```
 
@@ -320,8 +334,8 @@ pip install -r requirements.txt
 git clone https://github.com/AI4Protein/VenusFactory2.git && cd VenusFactory2
 conda create -n venus python=3.12 && conda activate venus
 pip install torch==2.7.0 --index-url https://download.pytorch.org/whl/cu118
-pip install torch_geometric
-pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.7.0+cu118.html
+pip install torch_geometric pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv \
+    -f https://data.pyg.org/whl/torch-2.7.0+cu118.html
 pip install -r requirements.txt
 ```
 
@@ -334,14 +348,33 @@ pip install -r requirements.txt
 git clone https://github.com/AI4Protein/VenusFactory2.git && cd VenusFactory2
 conda create -n venus python=3.12 && conda activate venus
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
-pip install torch_geometric
-pip install pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv -f https://data.pyg.org/whl/torch-2.8.0+cpu.html
+pip install torch_geometric pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv \
+    -f https://data.pyg.org/whl/torch-2.8.0+cpu.html
 pip install -r requirements.txt
 ```
 
 </details>
 
-**Verify:** `python -c "import torch; print(torch.__version__)"`
+### Option B — uv (faster, recommended for development)
+
+A helper script installs torch / PyG / `pyproject.toml` deps into `.venv/` via [uv](https://docs.astral.sh/uv/):
+
+```bash
+git clone https://github.com/AI4Protein/VenusFactory2.git && cd VenusFactory2
+# Linux only: see "System packages" note above for cairo headers.
+python install.py --type cu128       # or: --type cpu
+source .venv/bin/activate
+```
+
+### Verify the environment
+
+Run the bundled readiness check:
+
+```bash
+python scripts/check_env.py
+```
+
+It validates torch/CUDA, PyG, transformers, the agent stack, project `src` imports, and runs a CUDA matmul smoke test. Exit code is non-zero if any required dependency is missing.
 
 ---
 
