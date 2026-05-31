@@ -1,1 +1,68 @@
+# VCS
+.git/
+.gitignore
+.gitattributes
+
+# Python
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Virtualenvs
 .venv/
+venv/
+env/
+
+# Node / frontend (built in stage 1)
+frontend/node_modules/
+frontend/dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project heavy artefacts (mount as volumes if needed)
+ckpt/
+temp_outputs/
+img/
+docker/
+docs/
+example/
+script_dev/
+tests/
+Scripts_notebook.ipynb
+
+# Local secrets — provide via compose env_file instead
+.env
+.env.local
+.env.*.local
+
+# frpc binaries (downloaded at runtime if needed)
+frpc_*
+
+# Logs
+*.log
+logs/
+
+# Local conversation/session logs (this env)
+.sii/
+
+# Other local junk (top-level only to avoid masking source dirs)
+/build/
+/dist/
+/wheels/
+*.egg
+*.egg-info/
