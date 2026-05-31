@@ -1,248 +1,177 @@
-# VenusFactory2 Quick Tools 用户指南
+# Quick Tools — 零配置快速分析
 
-## 1. 简介
+**Quick Tools** 是跑单次预测最快的方式：预选模型、默认参数、最少的开关。选工具、丢数据、点 **Start Prediction**。
 
-Quick Tools (快捷工具) 专为快速、无需设置的蛋白质分析而设计。如果您有一个序列并希望快速获得预测结果而无需配置模型或参数，Quick Tools 就是您的起点。
+要完全掌控模型 / 数据集，去 **Advanced Tools**（同样的五大任务，加上更多选项）。
 
-**在以下情况选择 Quick Tools**：
-- 希望快速获得结果而不学习复杂设置
-- 需要标准预测（突变、功能、结合位点、性质）
-- 第一次探索一个新蛋白质
-- 不需要自定义使用哪些模型
+## 工具一览
 
-Quick Tools 提供 5 种即用型分析：
-
-* **Directed Evolution (智能定向进化):** 基于 AI 的突变预测。此工具可快速评估蛋白质突变的效果，提供对单点或多点突变影响的洞察。
-* **Protein Discovery (蛋白发现):** 基于 VenusMine 的结构同源搜索与聚类能力。在 Quick 入口中仅保留 PDB 输入和一键启动，其余高级参数由后端默认值自动处理。
-* **Protein Function (蛋白质功能预测):** 利用预训练模型，预测给定氨基酸序列的多种功能属性，如溶解性、亚细胞定位等。
-* **Functional Residue  (功能残基预测):** 专注于识别单个氨基酸残基的功能，如活性位点、结合位点和基序，帮助精确定位结构-功能关系。
-* **Physicochemical Property (理化性质分析):** 执行基于氨基酸组成的快速、确定性计算，以确定理论 pI、分子量、不稳定性指数和二级结构含量等基本性质。
+| # | 工具 | 路由 | 输入 | 告诉你什么 |
+| :---: | :--- | :--- | :--- | :--- |
+| 1 | Directed Evolution | `/quick-tools/directed-evolution` | FASTA 或 PDB | 针对目标功能的最佳单点突变 |
+| 2 | Sequence Design | `/quick-tools/sequence-design` | PDB | 给定骨架的候选序列（ProteinMPNN） |
+| 3 | Protein Discovery | `/quick-tools/protein-discovery` | PDB | 通过 VenusMine 找结构 / 序列同源 |
+| 4 | Protein Function | `/quick-tools/protein-function` | FASTA | 蛋白级属性（溶解性、定位…） |
+| 5 | Functional Residue | `/quick-tools/functional-residue` | FASTA | 残基级活性 / 结合 / 保守 / motif |
+| 6 | Physicochemical Property | `/quick-tools/physicochemical-property` | FASTA 或 PDB | MW、pI、SASA、二级结构等 |
 
 ---
 
-## 2. Quick Tools 界面概览
+## 通用布局
 
-### 2.1 模型配置与数据输入区域
+所有 Quick Tools 页面布局一致：
 
-该区域用于选择预测任务并提供蛋白质序列。
+| 区域 | 内容 |
+| :--- | :--- |
+| **左栏 — 输入 + 配置** | 序列 / PDB 输入（粘贴 / 上传 / Workspace / 用示例）、任务下拉、可选的 **Enable AI analysis** 开关（启用后会出现 LLM Provider）、**Start Prediction** 按钮。 |
+| **右栏 — 结果面板** | 状态、原始结果表、可选的热图、可选的 AI Expert Analysis、**Download Results**。 |
 
-**Model Configuration (模型配置):**
-
-* **Select Task / Select Protein function / Select Properties of Protein** (具体选项由工具功能决定): 这是一个下拉菜单，用于选择当前运行的预测任务类型。
-    * *directed mutation*: **Select Protein function**
-    * *Protein function prediction*: **Select Task**
-    * *Functional residual prediction*: **Select Task**
-    * *Physicochemical property analysis*: **Select Properties of Protein**
-
-**Data Input (数据输入):** 该区域允许用户通过文件上传或粘贴提供序列数据，并显示已上传序列的内容。
-
-* **Upload Protein File** (Upload FASTA File): 选中的标签页，用于通过文件上传序列。
-* **Paste Protein Content** (Paste FASTA Content): 替代标签页，用于直接粘贴 FASTA 格式的序列内容。
-* **Uploaded Protein Sequence**: 此区域将显示从输入文件或粘贴内容中读取的**原始氨基酸序列**。
-
-**Configure AI Analysis (Optional) (配置AI分析 - 可选):**
-
-* **AI Settings**: 用于选择或配置 AI 分析的具体参数。
-* **Enable AI Summary**: 激活此选项后，系统将在预测完成后生成**文本总结和分析**。
-* **Start Prediction**: 启动预测任务。
-
-### 2.2 结果展示功能
-
-该模块显示任务完成后的预测结果，并提供结果解读和下载选项。
-
-* **Status**: 提供**实时反馈**的预测进度。
-* **Result Display Tabs (结果展示标签页):** 结果以表格形式展示，并分为：
-    * **Raw Results**: 生成与任务对应的初始结果。
-    * **AI Expert Analysis**: 如果 **Enable AI Summary** 被启用，此标签页将显示由 AI 生成的**文本分析报告**。
-    * **Prediction heatmap**: **directed mutation** 和 **Functional residual prediction** 任务会提供此热图。
-* **Download Results**: 允许用户下载表格中的所有预测结果。
+**在线模式：** 序列输入受在线 FASTA 上限限制（默认粘贴 50 残基）。Protein Discovery 在在线模式下是**只读**的。
 
 ---
 
-## 3. Directed Evolution (智能定向进化)
+## 1. Directed Evolution（定向进化）
 
-### 3.1 序列输入与蛋白质功能选择
+针对目标功能给所有单点突变打分。
 
-**Sequence Input Method (序列输入方法):** 用户可通过两种方式提供蛋白质序列：
-* **Upload Protein File:** 支持 **.fasta, .fa, 或 .pdb** 格式的文件。
-* **Paste Protein Content:** 直接将序列输入 **FASTA format** 文本框。
+| 字段 | 说明 |
+| :--- | :--- |
+| **序列输入** | 粘贴 FASTA、上传 `.fasta` / `.fa` / `.pdb`、从 Workspace 选、或用示例。 |
+| **Select Protein Function** | 突变打分的目标功能（见下）。 |
+| **Enable AI analysis** | 可选；启用后多一个 AI Expert 总结标签。 |
 
-**Select Protein Function (选择蛋白质功能):** 用于选择定向进化预测的**目标功能**。
-* **Activity (活性):** 预测突变对蛋白质**催化或生物活性**的影响。
-* **Binding (结合):** 预测突变对蛋白质**结合配体或相互作用伙伴**能力的影响。
-* **Expression (表达):** 预测突变对蛋白质在宿主细胞中**表达水平**的影响。
-* **Organismal Fitness (有机体适应性):** 预测突变对整个有机体**生存或生长能力**的影响。
-* **Stability (稳定性):** 预测突变对蛋白质**热力学或构象稳定性**的影响。
+**功能选项：**
 
-### 3.2 执行预测
+- **Activity** — 突变对催化或生物活性的影响。
+- **Binding** — 突变对蛋白结合配体或互作伙伴能力的影响。
+- **Expression** — 突变对宿主细胞中表达量的影响。
+- **Organismal Fitness** — 突变对整个生物体存活 / 生长能力的影响。
+- **Stability** — 突变对热力学或构象稳定性的影响。
 
-1.  **Ensure all model configuration parameters are set correctly (确保所有模型配置参数设置正确)**。
-2.  Click the **"Start Prediction"** button to start the prediction process (点击“Start Prediction”按钮开始预测流程)。
-3.  The system will display **prediction progress and status information** (系统将显示预测进度和状态信息)。
-4.  To abort the prediction, click the **"Abort"** button (如需中止预测，点击“Abort”按钮)。
-
-### 3.3 结果展示功能
-
-**Raw Results (原始结果):** 清晰列出**最优突变体**及其**性能指标**，包括 **Mutant** 名称、**Prediction Rank** 和 **Prediction Score**。
-
-**Prediction Heatmap (预测热图):** 以**二维矩阵**形式展示每个残基位置突变为任何其他氨基酸的**潜在影响**。
-* **Y-axis** 显示**残基位置**；**X-axis** 显示**突变的氨基酸类型**。
-* **颜色强度**代表突变对目标功能的**归一化影响**。**深色 (High)** 表示有**更强的正面增强效果**。
-
-**AI Expert Analysis:** 由专业 **AI biology expert** 提供深入解读和实验建议。
-
-**Download Results:** 允许用户下载所有详细预测数据。
+**输出：**
+- **Raw 表** — 按预测分排序的突变
+- **Prediction heatmap** — 二维矩阵：Y = 排序后的位置，X = 替换氨基酸；颜色越深 = 增益越强
+- **AI Expert Analysis**（启用时）— 自然语言解读
+- **Download Results**
 
 ---
 
-## 4. Sequence Design（序列设计）
+## 2. Sequence Design（序列设计）
 
-### 4.1 工具说明
+基于结构用 ProteinMPNN 生成候选序列，默认参数对生物用户友好。
 
-Quick Tools 的 Sequence Design 提供面向生物实验用户的 **ProteinMPNN 结构条件序列生成**简化入口。  
-设计目标是“少参数、可直接运行”，避免复杂推理配置。
+| 字段 | 说明 |
+| :--- | :--- |
+| **PDB 输入** | 上传 `.pdb`、从 Workspace 选、或用示例。 |
+| **Model Family** | Soluble（默认 — 大多数场景推荐）、Vanilla（膜蛋白）、CA（仅 Cα 粗粒度）。 |
+| **Designed Chains** | 可选，例如 `A` 或 `A,B`。留空 = 设计所有链。 |
+| **Fixed Residues** | 可选固定位点语法，例如 `A12,C13` 或 `A:12,13;B:5-8`。 |
+| **Number of sequences** | 4 / 8 / 16 / 32（在线模式受上限限制）。 |
+| **Design Diversity** | Low / Medium / High（映射到 ProteinMPNN 采样温度）。 |
+| **Enable AI analysis** | 可选。 |
 
-### 4.2 输入与简化参数
+默认底层用 `v_48_020` + `backbone_noise=0.20`，适用于 AlphaFold 风格的骨架和常规重设计。
 
-* **结构输入：** 支持上传 **.pdb** 文件、从 Workspace 选择，或使用示例 PDB。
-* **Model Family：** `Soluble` / `Vanilla` / `CA`。
-  * **Soluble：** 用于蛋白发现与大多数序列设计任务（推荐）。
-  * **Vanilla：** 用于膜蛋白设计。
-  * **CA：** 仅在你只有 Cα 粗粒化坐标时使用。
-* **Designed Chains（可选）：** 输入链 ID，例如 `A` 或 `A,B`；留空表示对全部链进行设计。
-* **Fixed Residues（可选）：** 使用可读语法，例如 `A12,C13` 或 `A:12,13;B:5-8`。
-* **Number of Designed Sequences：** 设置生成候选序列数量。
-* **Design Diversity：** 低 / 中 / 高 三档，内部映射到 ProteinMPNN 的采样温度。
+**输出：**
+- **Table** — 生成的序列，含 header、长度、score
+- **Raw** — 完整 JSON
+- **AI Expert**（启用时）
+- **Download Result** — FASTA 文件
 
-Quick 默认组合为 **`v_48_020` + `backbone_noise=0.20`**，适用于绝大多数常规场景（AI 生成骨架、AlphaFold 结构、常规重设计）。
-
-### 4.3 输出结果
-
-* **Table：** 预览生成序列（header、sequence、length，以及可用时的 score 字段）。
-* **Raw：** 返回完整 JSON 结果，便于后续流程集成。
-* **AI Expert：** 若启用 AI Summary，会生成结果解读。
-* **Download Result：** 下载本次运行生成的 FASTA 文件。
-
-### 4.4 适用场景
-
-当你希望基于结构快速获得可实验验证的候选序列时，优先使用 Quick Sequence Design。  
-若需要完整 ProteinMPNN 推理参数控制，请使用 **Advanced Tools / Sequence Design**。
+需要更细的 ProteinMPNN 调参？去 **Advanced Tools → Sequence Design**。
 
 ---
 
-## 5. Protein Discovery（蛋白发现）
+## 3. Protein Discovery（蛋白发现）
 
-### 5.1 Quick 入口定位
+一键 VenusMine 流水线，做结构同源搜索 + 聚类。
 
-Quick Tools 的 Protein Discovery 是 **Advanced Tools / Protein Discovery** 的轻量入口，目标是降低使用门槛：  
-你只需要提供一个 `.pdb` 结构并点击 **Start VenusMine Discovery** 即可运行。
+| 字段 | 说明 |
+| :--- | :--- |
+| **PDB 输入** | 上传 `.pdb`、从 Workspace 选、或用示例。 |
+| **高级参数** | Quick 模式不暴露 — 使用后端默认值。 |
 
-### 5.2 输入与运行方式
+点开始按钮等结果。输出与 Advanced 后端产物兼容（tree / labels / archive 下载字段）。
 
-* **PDB Input：** 支持本地上传 `.pdb`、从 Workspace 选择，或直接使用示例 PDB。
-* **Start 按钮：** 一键启动 VenusMine 流程。
-* **高级参数默认化：** Quick 页面不展示 `protect_start`、`mmseqs_threads` 等高级参数，这些参数由后端默认配置自动注入。
+**在线模式：** 整张表单只读。
 
-### 5.3 结果与模式说明
-
-* 结果区会返回 discovery 的结构树、标签与打包下载路径（与高级版同一后端能力）。
-* 若部署在 **online mode**，该页面保持只读灰显（view-only），用于与线上环境权限策略保持一致。
-* 若需要手动调参（保护区间、MMseqs 迭代、阈值等），请切换到 **Advanced Tools / Protein Discovery**。
+需要调参（protected region、MMseqs 线程 / 迭代、聚类相似度、e-value）请去 **Advanced Tools → Protein Discovery**。
 
 ---
 
-## 6. Protein Function (蛋白质功能预测)
+## 4. Protein Function（蛋白功能）
 
-### 6.1 任务选择与序列输入
+从 FASTA 序列预测蛋白级属性。
 
-**Model Configuration (模型配置):** **Select Task** 下拉菜单用于选择具体预测目标：
-* **Solubility (溶解性):** 预测蛋白质表达后的**可溶性**。
-* **Localization (亚细胞定位):** 预测蛋白质在细胞内的**最终位置**。
-* **Metal ion binding (金属离子结合):** 预测蛋白质**结合特定金属离子**的能力。
-* **Stability (稳定性):** 预测蛋白质的**固有稳定性**。
-* **Sorting signal (分选信号):** 预测是否存在**信号肽**。
-* **Optimum temperature (最适温度):** 预测蛋白质发挥功能所需的**温度范围**。
+| 字段 | 说明 |
+| :--- | :--- |
+| **序列输入** | 粘贴 / 上传 FASTA、从 Workspace 选、或用示例。 |
+| **Select Task** | 要预测的属性（见下）。 |
+| **Enable AI analysis** | 可选。 |
 
-**Sequence Input Method:** 用户通过 **Upload FASTA File** 或 **Paste FASTA Content** 提供序列。
+**任务选项：**
 
-### 6.2 执行预测
+- **Solubility** — 表达后是否可能可溶（对纯化关键）。
+- **Localization** — 在细胞中的最终位置（核 / 胞质 / 线粒体 / …）。
+- **Metal ion binding** — 是否能结合特定金属离子。
+- **Stability** — 对热或化学变性的内在稳定性。
+- **Sorting signal** — 是否含信号肽，将蛋白引导到特定细胞器 / 分泌途径。
+- **Optimum temperature** — 蛋白发挥最大功能活性所需的温度范围。
 
-1.  **Ensure all model configuration parameters are set correctly (确保所有模型配置参数设置正确)**。
-2.  Click the **"Start Prediction"** button to start the prediction process (点击“Start Prediction”按钮开始预测流程)。
-3.  The system will display **prediction progress and status information** (系统将显示预测进度和状态信息)。
-4.  To abort the prediction, click the **"Abort"** button (如需中止预测，点击“Abort”按钮)。
+**输出：**
+- **Raw 表** — 蛋白名、序列、预测类别、置信度（0–1）
+- **AI Expert Analysis**（启用时）
+- **Download Results**
 
-### 6.3 结果展示功能
-
-**Status:** 提供实时反馈 (例如: **"All predictions completed! Results were aggregated using soft voting."**)。
-
-**Raw Results:** 显示单序列预测的核心输出，包括 **Protein Name**、**Sequence**、**Predicted Class** (例如 **Soluble**) 和 **Confidence Score** (0 到 1 之间的值)。
-
-**AI Expert Analysis:** 由专业 **AI biology expert** 提供解读和实验建议。
-
-**Download Results:** 允许用户下载所有详细预测数据。
+运行后状态提示： *"All predictions completed. Results were aggregated using soft voting."*
 
 ---
 
-## 7. Functional Residue  (功能残基预测)
+## 5. Functional Residue（功能残基）
 
-### 7.1 任务选择与序列输入
+沿序列预测残基级功能位点。
 
-**Model Configuration (模型配置):** **Select Task** 用于选择要预测的功能残基类型：
-* **Activity Site (活性位点):** 预测负责**催化或生物功能**的关键残基位置。
-* **Binding Site (结合位点):** 预测蛋白质**结合配体、离子**的关键残基位置。
-* **Conserved Site (保守位点):** 预测在进化中**高度保留**的残基位置。
-* **Motif (基序):** 预测形成特定结构或功能特征的**短氨基酸模式**。
+| 字段 | 说明 |
+| :--- | :--- |
+| **序列输入** | 粘贴 / 上传 FASTA、从 Workspace 选、或用示例。 |
+| **Select Task** | 要预测的残基级位点类型（见下）。 |
+| **Enable AI analysis** | 可选。 |
 
-**Sequence Input Method:** 用户通过 **Upload FASTA File** 或 **Paste FASTA Content** 提供序列。
+**任务选项：**
 
-### 7.2 执行预测
+- **Activity Site** — 负责催化 / 生物功能的关键残基。
+- **Binding Site** — 与配体、离子或其他分子结合的关键残基。
+- **Conserved Site** — 进化中高度保留的残基；通常对结构或功能关键。
+- **Motif** — 序列中形成特定结构 / 功能特征的短氨基酸模式。
 
-1.  **Ensure all model configuration parameters are set correctly (确保所有模型配置参数设置正确)**。
-2.  Click the **"Start Prediction"** button to start the prediction process (点击“Start Prediction”按钮开始预测流程)。
-3.  The system will display **prediction progress and status information** (系统将显示预测进度和状态信息)。
-4.  To abort the prediction, click the **"Abort"** button (如需中止预测，点击“Abort”按钮)。
-
-### 7.3 结果展示功能
-
-**Raw Results:** 显示**逐残基的预测结果**。
-* **表格内容:** **Position** (位置)、**Residue** (残基)、**Predicted Label** (预测标签，**1** 为目标残基)、**Probability** (置信度得分)。
-
-**Prediction Heatmap:** 此热图以**线性条形图**形式可视化整个序列的**概率分布**。
-* **图表类型:** **一维条形图**，**X-axis** 为 **Residue Position**。
-* **信息展示:** **颜色或高度变化**直观映射了残基被预测为目标位点的**概率**。
-
-**AI Expert Analysis:** 由专业 **AI biology expert** 提供解读和实验建议。
-
-**Download Results:** 允许用户下载所有详细预测数据。
+**输出：**
+- **Raw 表** — Position、Residue、Predicted Label (0/1)、Probability (0–1)
+- **Prediction heatmap** — 沿残基轴的一维概率分布带
+- **AI Expert Analysis**（启用时）
+- **Download Results**
 
 ---
 
-## 8. Physicochemical Property (理化性质分析)
+## 6. Physicochemical Property（理化性质）
 
-### 8.1 任务选择与序列输入
+计算生物物理性质——部分仅需序列，部分仅需结构。
 
-**Task Configuration (任务配置):** **Select Properties of Protein** 用于选择分析类型：
-* **Relative solvent accessible surface area (PDB only):** 计算每个残基的相对表面积。**注意:** 需要 **PDB structure file**。
-* **SASA value (PDB only):** 计算整个蛋白质的总 **SASA value**。**注意:** 需要 **PDB structure file**。
-* **Physical and chemical properties:** 计算**序列基础属性**。**注意:** 接受 **FASTA sequence file**。
-* **Secondary structure (PDB only):** 提取二级结构信息。**注意:** 需要 **PDB structure file**。
+| 性质 | 需要的输入 |
+| :--- | :--- |
+| **Physical and chemical properties** | FASTA — MW、pI、芳香性、不稳定指数、GRAVY、预测二级结构组成 |
+| **Relative solvent accessible surface area** | PDB — 每残基相对溶剂可及表面积 |
+| **SASA value** | PDB — 总 SASA（Å²） |
+| **Secondary structure** | PDB — 每残基 DSSP 编码（H、E…） |
 
-**Data Input:** 需要 PDB 文件的任务必须上传 **.pdb** 文件。
+选择仅需 PDB 的任务、且上传了多链 `.pdb` 时，会多出一个 **PDB Chain** 选择器。仅 PDB 任务下粘贴文本框会被禁用。
 
-### 8.2 执行预测
+**输出：** 任务相关的表格；本模块**没有** AI Expert 标签。用 **Download Results** 导出。
 
-1.  **Ensure all model configuration parameters are set correctly (确保所有模型配置参数设置正确)**。
-2.  Click the **"Start Prediction"** button to start the prediction process (点击“Start Prediction”按钮开始预测流程)。
-3.  The system will display **prediction progress and status information** (系统将显示预测进度和状态信息)。
-4.  To abort the prediction, click the **"Abort"** button (如需中止预测，点击“Abort”按钮)。
+---
 
-### 8.3 结果展示功能
+## 小贴士
 
-**Status:** 提供实时反馈。
-
-**Raw Results:** 根据任务输出相应数据：
-* **Physical and chemical properties:** 显示**Sequence length**、**Molecular weight**、**Theoretical pI**、**Instability index** 等属性。
-* **Secondary structure:** 显示每个残基的 **DSSP secondary structure code**。
-
-**Download Results:** 允许用户下载所有详细预测数据。
+- **PDB-only 任务必须传 PDB。** 别把 FASTA 丢进 SASA / 二级结构任务，跑不出结果。
+- **传大文件前先用示例验证。** 用 example 按钮 sanity check。
+- **盯住状态胶囊。** 多数任务秒级返回，但 Directed Evolution 时间正比于 `序列长度 × 20`。
+- **AI 总结可选关掉。** 只要原始数字、想要更快出结果时可以不勾。

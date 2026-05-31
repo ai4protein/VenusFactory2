@@ -1,87 +1,91 @@
-# Report Function Manual
+# Report — One-Click Comprehensive Protein Analysis
 
-### 1. Introduction
+The **Report** tab gives you a single document covering mutation, function, residue, and physicochemical analyses for one protein, with an AI-written narrative on top of the raw results.
 
-**Report** is a one-click analysis tool that gives you a complete overview of your protein in a single comprehensive report. Instead of running four separate analyses manually, Report automatically performs mutation prediction, function prediction, residue analysis, and physicochemical property calculations - then combines everything into one easy-to-read document with experimental recommendations.
+## 1. When to Use It
 
-**When to use Report**:
-- You're starting to work with a new protein and want to understand it quickly
-- You need a comprehensive analysis without learning multiple tools
-- You want mutation suggestions along with functional insights in one place
+- You're starting on a new protein and want a single overview without configuring multiple tools.
+- You need a sharable analysis (HTML + PDF) for collaborators.
+- You want mutation hotspots alongside functional context in one place.
 
----
-
-### 2. Interface Overview
-
-The Report interface is designed to be intuitive, primarily divided into three sections: Data Input, Analysis Type Selection, and Report Output.
-
-
-**Data Input**:
-- **Upload Protein File (.fasta, .fa, .pdb) / Paste Protein Content**: Users can upload FASTA or PDB files, or directly paste the sequence, to provide the protein for analysis.
-- **Uploaded Protein Sequence**: Displays the amino acid sequence that has been input or uploaded.
-
-**Analysis Type Selection**:
-- Provides checkboxes for four core prediction tasks, allowing users to freely select the analysis types to be integrated into the report based on their needs.
-- After selection, clicking the **Generate Brief Report** button starts the analysis.
-
-**Report Output**:
-- After the analysis is complete, the interface displays a report summary and experimental recommendations, and provides the complete **"Comprehensive Protein Analysis Report"** for user review.
+For step-by-step, agent-driven analyses, use **Agent / Chat** instead.
 
 ---
 
-### 3. Supported Analysis Type
+## 2. Layout
 
-Report allows users to customize the report by checking the boxes for the prediction modules they want to include, supporting the following four types:
+The page has three columns:
 
-- **Protein Mutation Prediction**: Predicts the effect of single point mutations on protein function (e.g., activity, stability) to guide directed mutation optimization.
-- **Protein Function**: Predicts the overall function and properties of the sequence, such as solubility, subcellular localization, and stability.
-- **Functional Residue **: Identifies key functional sites, such as active sites, binding sites, and conserved residues.
-- **Physical & Chemical Properties**: Calculates the sequence-based fundamental attributes of the protein, such as molecular weight, theoretical pI, and instability index.
+| Column | What it does |
+| :--- | :--- |
+| **Left — Input & Controls** | Choose input mode (Paste / Upload), pick chain or sequence, tick the analyses to run, click **Generate Report**. Shows progress %. |
+| **Center — AI Expert Analysis** | Renders the AI-generated narrative once the run finishes. Below it, links for **Download HTML** and **Download PDF**. |
+| **Right — Streaming Logs** | Live log lines from the backend pipeline. |
 
----
-
-### 4. Report Content in Detail
-
-The generated **"Comprehensive Protein Analysis Report"** is a structured document that presents all prediction results in detail:
-
-- **Comprehensive Summary**:
-    - Located at the top of the report, it provides basic protein information (e.g., molecular weight, theoretical pI) and a brief overview and assessment of the overall prediction results.
-
-- **Mutation Prediction Analysis**:
-    - **Top beneficial Mutations**: A table listing the highest-scoring mutants, including **Rank**, **Position**, **Mutation**, **Prediction Score**, and **Potential Function** description.
-    - **Secondary Beneficial Mutations**: Lists lower-ranked beneficial mutations, providing additional optimization options.
-    - **Key Site Optimization**: Focuses on potential optimization mutations at critical functional sites (e.g., active sites).
-
-- **Protein Function Analysis**:
-    - Displays overall function prediction results in a table format, including: **Functional/Property Assessment**, **Predicted Value/Class**, **Confidence**, and **Description**.
-    - Report content covers: solubility, subcellular localization, metal ion binding, stability, sorting signal, and optimum temperature.
-
-- **Functional Residue **:
-    - Displays residue-level prediction results in a list or table format, including **Binding Site Prediction**, **Functional Residues Prediction**, and **Functional Motifs**.
-    - The report provides sequence position and probability for key sites, helping users precisely locate functional regions.
-
-- **Physical & Chemical Properties**:
-    - **Biophysical Characterization**: Lists calculated sequence-based properties (e.g., molecular weight, pI, aromaticity).
-    - **Stability Considerations**: Provides the **stability prediction result** based on the Instability Index (e.g., Predicted as unstable protein) and corresponding experimental suggestions.
-
-- **Experimental Recommendations**:
-    - Based on all prediction results, the system provides summary suggestions for **function/stability**, **technical considerations**, and **experimental protocol suggestions**, directly guiding the user's wet-lab work.
-
-- **Conclusion**:
-    - Provides a final summary of the report, reiterating the protein's key characteristics and the most important directions for experimental optimization.
+A header status pill shows the current phase: *Ready / Processing Input / Generating Report*.
 
 ---
 
-### 5. User Guide
+## 3. Inputs
 
-Report is dedicated to providing the most concise and efficient comprehensive protein analysis experience.
+| Input mode | How to use |
+| :--- | :--- |
+| **Paste** | Paste a sequence or FASTA into the textarea. |
+| **Upload** | Drop a `.fasta` / `.fa` / `.pdb` file, pick one from **Workspace**, or hit **Use Default Example** to load a sample FASTA. |
 
-- **Operation Flow**:
-    1.  **Input Data**: Provide the protein sequence/structure by uploading a file or pasting the sequence.
-    2.  **Select Tasks**: In the **Select Analysis Types** area, check the boxes for one or more analysis modules you wish to include in the report (checking all is recommended for the most comprehensive insight).
-    3.  **Generate Report**: Click the **Generate Brief Report** button to start the analysis.
-    4.  **Review Results**: The system will generate the "Comprehensive Protein Analysis Report," which you can scroll through to view detailed analyses and find key conclusions in the **Experimental Recommendations** section.
+After parsing:
 
-- **Usage Tips**:
-    - **Prioritize PDB Files**: If the target protein has an resolved or high-quality predicted structure (e.g., AlphaFold structure), please upload a **PDB file** to ensure that structure-based analyses (like mutation prediction) achieve the highest accuracy.
-    - **Cross-Functional Integration**: Report's greatest value lies in its integrated analysis. For example, comparing key sites from **Functional Residue ** with beneficial mutations from **Mutation Prediction Analysis** enables more precise rational design.
+- A **chain / sequence selector** appears if the input contains multiple chains / records.
+- A short preview of the chosen sequence is shown.
+
+> **Online mode:** upload is restricted; use Paste with a sequence within the FASTA character limit.
+
+---
+
+## 4. Selecting Analyses
+
+Tick at least one of the four analyses:
+
+| Icon | Analysis | Powered by |
+| :---: | :--- | :--- |
+| 🧬 | **Mutation** | Saturation mutagenesis scoring (ESM-2, ProSST, ProtSSN…) |
+| 🔬 | **Function** | Fine-tuned predictors (solubility, localization, stability, optimum T°, sorting signal, metal-ion binding) |
+| 🎯 | **Residue** | Activity / binding / conserved sites, motifs |
+| ⚗️ | **Properties** | Sequence-based physicochemical calculation (MW, pI, instability index, GRAVY, secondary-structure composition) |
+
+Ticking all four gives the most complete report.
+
+---
+
+## 5. Run & Watch
+
+Click **Generate Report**. The page streams events:
+
+- **Progress** — bar + message (e.g., "Predicting solubility…", "Scoring mutations…")
+- **Logs** — appended to the right column
+- **Done** — renders the AI narrative in the center, enables HTML / PDF links
+
+If anything fails, an error block appears in the left column with a short reason; logs in the right column have the detail.
+
+---
+
+## 6. What's Inside the Report
+
+| Section | Contents |
+| :--- | :--- |
+| **Comprehensive Summary** | Top-level brief: MW, theoretical pI, and a one-paragraph assessment. |
+| **Mutation Prediction Analysis** | Top beneficial mutations table (Rank / Position / Mutation / Score / Notes), secondary list, and key-site optimization suggestions. |
+| **Protein Function Analysis** | Per-task table: Property, Predicted Value, Confidence, Description — covering solubility, localization, metal ion binding, stability, sorting signal, optimum temperature. |
+| **Functional Residue** | Binding-site / functional-residue / motif predictions with sequence positions and probabilities. |
+| **Physical & Chemical Properties** | Biophysical characterization plus an instability-index-driven stability call. |
+| **Experimental Recommendations** | Synthesized advice for function / stability, technical considerations, and protocol suggestions. |
+| **Conclusion** | Final wrap-up of the protein's key characteristics and the most important optimization directions. |
+
+---
+
+## 7. Tips
+
+- **Prefer PDB input when available.** Structure-aware analyses (e.g., structure-based mutation scoring) only kick in when a `.pdb` is provided.
+- **Cross-read sections.** Beneficial mutations near a **predicted binding site** are usually a better experimental target than mutations far from any functional residue.
+- **Save the downloads.** The HTML / PDF artifacts live in temporary backend storage; pull them locally before closing the browser.
+- **Long sequences are slow.** Mutation scoring time scales with sequence length × number of amino acid substitutions. Trim signal peptides / disordered tails if you only care about a specific domain.

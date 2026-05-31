@@ -1,62 +1,146 @@
-## Agent: Your AI Assistant for Protein Engineering
+# Agent: Your AI Assistant for Protein Engineering
 
-**Agent** is an AI-powered conversation interface that lets you analyze proteins using natural language. Instead of clicking through multiple tools and tabs, simply describe what you want to do in plain English (or Chinese), and Agent will automatically select the right models, run the analyses, and synthesize the results for you.
-
----
-
-## 1. What Can Agent Do For You?
-
-Agent is designed to help you complete protein engineering tasks quickly without needing to learn complex tool configurations:
-
-- **Ask questions in plain language**: "What is the solubility of this protein?" or "Find mutations to improve stability"
-- **Upload your data easily**: Paste sequences, upload FASTA/PDB files, or provide UniProt IDs
-- **Get comprehensive answers**: Agent automatically combines predictions from multiple models and explains the results in simple terms
-- **Work conversationally**: Ask follow-up questions without re-uploading data - Agent remembers your conversation context
-- **Save time**: Instead of running multiple separate analyses, Agent does it all in one conversation
+**Agent** is the conversational entry point of VenusFactory2. Describe what you want in plain English (or Chinese), and Agent plans a multi-step workflow, runs the right tools, reviews intermediate results with you, and assembles a final report.
 
 ---
 
-## 2. Interface Overview
+## 1. When to Use the Agent
 
-The Agent interface is a clean chat environment designed for fluid conversational interaction.
-
-| Element | Description |
+| Scenario | Why Agent fits |
 | :--- | :--- |
-| **New Chat** Button | Starts a new conversation thread, clearing the previous context. |
-| **Delete Chat** Button | Permanently removes the currently selected conversation record. |
-| **Conversations** List | Displays a history of past chat sessions, allowing the user to resume an interrupted workflow. |
-| **Chat Input Bar** | The primary area for inputting requests, questions, or commands. |
-| **Paperclip/Attachment Icon** | Allows the user to upload **data files** (FASTA, PDB) directly into the chat context for AI analysis. |
+| You want a multi-step analysis without wiring tools manually | Agent plans the pipeline for you |
+| You need follow-up questions on the same protein | The conversation keeps full context |
+| You want to inspect / edit the plan before execution | You can reorder, edit, or remove steps |
+| You want to checkpoint long runs | After each step / sub-report you can continue, rewrite, or abort |
+
+For a *single* prediction with no orchestration, **Quick Tools** is faster.
+For full control over model + dataset selection, use **Advanced Tools**.
 
 ---
 
-## 3. Usage Guide: Conversational Workflows
+## 2. Interface Layout
 
-The Agent is skilled at understanding and executing **goal-driven** tasks common in protein engineering, planned intelligently by the internal Agent architecture.
+The chat workspace has three columns:
 
-### 3.1 Core Workflow Capabilities
+| Column | What's there |
+| :--- | :--- |
+| **Left — Sessions** | New chat, session list, delete, copy session ID. Each session keeps its own history and uploaded files. |
+| **Center — Conversation** | Message timeline, model picker, file attach (browser upload or Workspace picker), Regenerate / Export / Stop / Send. Inline checkpoint widgets appear here when Agent needs your input. |
+| **Right — Execution Status** | Live status, last 12 tool runs, tail of the conversation log. Useful for watching long runs. |
 
-| Workflow Category | Example Tasks Handled by the Agent | Corresponding Core Models |
-| :--- | :--- | :--- |
-| **Function/Structural Localization** | "What is the likelihood of this protein being nuclear?" "Where is the **DNA binding site** on this zinc finger protein?" | **Protein Function** (Localization, Sorting Signal); **Functional Residue ** (Binding Site) |
-| **Rational Design & Optimization** | "Find the best 5 mutations to increase both **activity** and **stability**." "This sequence has an **Instability Index** > 40; recommend 3 stabilizing mutations." | **Directed Evolution** (Activity, Stability); **Physical & Chemical Properties** |
-| **Sequence & Structure Retrieval** | "My experiment uses UniProt ID P05798; retrieve its sequence and structure." "Use InterPro to query the **domain structure** of this sequence." | **InterPro Query**; **UniProt Query** |
-| **Integrated Analysis** | "Analyze the solubility and thermostability of this sequence, and give experimental protocol recommendations based on the results." | Automatically integrates multiple prediction models and runs the **Analysis module**. |
-
-### 3.2 Advanced Workflow Commands
-
-| Command Type | Example Request | Agent Action (Planned and Executed) |
-| :--- | :--- | :--- |
-| **Complex Task Decomposition** | "Analyze the stability of this sequence (P60002.fasta), and find the top 5 mutations that will **increase stability**." | **Planner** breaks the request down: 1. Run Function Prediction (Stability); 2. Run Directed Evolution (Workers execute); 3. Run the Analysis module for result sorting and summary. |
-| **Conditional Logic** | "If the **Instability Index** is greater than 40, recommend 5 stabilizing mutations." | Runs **Physicochemical Analysis** and only proceeds to **Mutation Prediction** if the condition is met. |
-| **Report Synthesis** | "Summarize the top 3 results from the mutation scan and explain why they are predicted to be stable." | Executes the **Analysis module** to synthesize and interpret raw data into a concise, natural-language response. |
+In **online** mode, a quota pill shows your remaining daily chats; once exhausted, Send / Regenerate / file upload are disabled.
 
 ---
 
-## 4. Best Practices and Important Note
+## 3. The Conversation Flow
 
-- **Be Goal-Oriented**: State your ultimate experimental goal directly (e.g., "I need a variant with better solubility") rather than listing buttons to press.
-- **Leverage Memory**: Within the same chat, you do not need to re-upload the sequence; simply refer to it in subsequent requests.
-- **Trust the Planner**: Submit your high-level objective, and allow the internal **Planner** to automatically orchestrate the required prediction and analysis steps for you.
-- **File Context**: Always upload the necessary **PDB file** before requesting structure-based predictions.
-- **Important Note**: **Agent does not retain permanent user data or conversation memory.** When you close your browser or start a new chat, the previous dialogue and context will be cleared. **Please be sure to save** any important conversation records and prediction results externally.
+A typical run cycles through five phases. Agent surfaces each one as a dedicated checkpoint card, so you stay in control without micromanaging.
+
+```
+You ─▶ Clarification ─▶ Plan ─▶ Execution ─▶ Sub-report ─▶ Iteration ─▶ Final report
+```
+
+### 3.1 Clarification
+
+Agent may ask a few short questions before planning — multiple-choice or text. Pick the option that matches your intent (or use the "Other" field). Submit to continue.
+
+> **Tip:** You can use `/loop` `/skip-research` style hints in your initial message to bypass clarification on simple tasks.
+
+### 3.2 Plan
+
+Agent proposes an ordered list of steps. Each step has a tool name and a short task description. In the **Plan Editor** you can:
+
+- Edit any step's description
+- Reorder with ↑ / ↓
+- Remove a step (min 1 required)
+- Toggle **auto-execute** before clicking Confirm
+
+### 3.3 Execution
+
+Steps run sequentially. For each step you may see:
+
+- **Step checkpoint:** continue / abort the pipeline
+- A streaming log of the tool call in the right panel
+
+### 3.4 Sub-report Checkpoint
+
+After each analytical step, Agent generates a short sub-report and waits for one of three decisions:
+
+- **Continue Research** — accept and move on
+- **Comment & Rewrite** — leave a comment; Agent will redo the sub-report with your feedback
+- **Skip to Report** — drop this branch and head to the final summary
+
+### 3.5 Iteration
+
+After the main pipeline finishes you get a final decision:
+
+- **Satisfied** — finalize the report
+- **Modify & Re-execute** — go back to planning with edits
+- **Continue Analysis** — start a follow-up with new instructions
+
+The final report is exported as a structured bundle — both **HTML** and **PDF** are downloadable via the Export button.
+
+---
+
+## 3.6 Example Prompts
+
+The Agent is built around natural-language, goal-driven requests. Some patterns that the planner handles well:
+
+| Workflow | Example prompt | Tools the planner typically uses |
+| :--- | :--- | :--- |
+| **Function / structural localization** | *"What is the likelihood of this protein being nuclear?"* — *"Where is the DNA binding site on this zinc finger protein?"* | Protein Function (Localization, Sorting Signal); Functional Residue (Binding Site) |
+| **Rational design & optimization** | *"Find the best 5 mutations to increase both activity and stability."* — *"This sequence has an Instability Index > 40; recommend 3 stabilizing mutations."* | Directed Evolution (Activity, Stability); Physical & Chemical Properties |
+| **Sequence & structure retrieval** | *"My experiment uses UniProt ID P05798; retrieve its sequence and structure."* — *"Use InterPro to query the domain structure of this sequence."* | InterPro / UniProt download tools |
+| **Integrated analysis** | *"Analyze the solubility and thermostability of this sequence, and give experimental protocol recommendations based on the results."* | Multiple prediction tools chained through the Analysis module |
+| **Complex task decomposition** | *"Analyze the stability of this sequence (P60002.fasta), and find the top 5 mutations that will increase stability."* | Planner splits into: Function Prediction (Stability) → Directed Evolution → Analysis |
+| **Conditional logic** | *"If the Instability Index is greater than 40, recommend 5 stabilizing mutations."* | Physical & Chemical Properties first; Mutation Prediction only fires if the threshold is met |
+| **Report synthesis** | *"Summarize the top 3 results from the mutation scan and explain why they are predicted to be stable."* | Analysis module synthesizing raw data into natural-language |
+
+> **Tip:** the more concrete your goal, the better the plan. *"Find mutations"* is vague; *"find 5 mutations that improve thermostability without hurting activity"* is actionable.
+
+---
+
+## 4. Attaching Data
+
+The paperclip / Workspace icons next to the input bar give you two paths:
+
+| Path | Use when |
+| :--- | :--- |
+| **Upload** | A fresh file from your machine (FASTA, PDB, CSV, TXT). Auto-categorised by extension. |
+| **Workspace** | Files you previously uploaded or that tools produced earlier; pick from a searchable list. |
+
+Workspace is **local-mode only**. In online mode the picker is disabled.
+
+---
+
+## 5. Model Picker
+
+Above the input bar you can switch the LLM that drives the agent:
+
+- **Built-in:** Gemini 2.5 Pro, GPT-4o, Claude 3.7, DeepSeek-R1
+- **Custom OpenAI-style:** Add your own endpoint (display name, model name, API key, base URL). Saved in your browser; **local mode only**.
+
+If you switch models mid-conversation, you'll see a notice — model behavior may differ.
+
+---
+
+## 6. Best Practices
+
+- **State the goal, not the buttons.** "Find 5 stabilizing mutations for this enzyme" beats "run mutation tool and sort."
+- **Reuse context.** Within a session, refer back to "the sequence" rather than re-attaching.
+- **Trust but review.** The Plan Editor lets you fix bad plans before you spend tokens / compute.
+- **Save what matters.** Agent does not retain server-side history beyond the session — download the final report or push files to Workspace before closing.
+- **Watch the right panel.** When a step looks stuck, the live tool log usually shows whether it's actually downloading data, calling a model, or hung.
+
+---
+
+## 7. Online vs Local Mode
+
+| Capability | Local | Online |
+| :--- | :---: | :---: |
+| Built-in model providers | ✓ | ✓ |
+| Custom OpenAI-style models | ✓ | — |
+| Workspace upload / replace / delete | ✓ | — (view-only) |
+| Daily chat quota | unlimited | enforced (see quota pill) |
+
+A small badge in the sidebar always shows the current runtime mode.

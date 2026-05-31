@@ -1,310 +1,154 @@
-# VenusFactory2 Training Module User Guide
+# Custom Model — Training
 
-## 1. Introduction
+> **Where to find it (v2):** Sidebar → **Custom Model → Training** (`/custom-model/training`).
+> **Local mode only:** training is disabled in online mode (read-only view).
 
-The Training Module helps you build custom prediction models for your specific protein analysis needs. Whether you want to predict protein solubility, localization, or any other property, this module guides you through the entire training process - from uploading your dataset to evaluating the final model.
+The Training page lets you fine-tune a protein language model (PLM) on your own dataset — or a pre-defined VenusFactory dataset — without writing a single line of training code. It covers the full lifecycle: dataset upload → method / hyperparameter config → training with live curves → test metrics + CSV export.
 
-**You don't need to be a machine learning expert** - the interface walks you through each step with clear options and explanations. Simply prepare your protein sequences with labels, select a model type, and start training.
+## 1. Two Modes
 
-## 2. Supported Protein Language Models
+| Mode | When to use |
+| :--- | :--- |
+| **From Scratch** | Fine-tune a fresh PLM. Requires PLM Model, Output Dir, Output Model Name. |
+| **Continue Training** | Resume from a checkpoint. Requires Model Folder (under `ckpt/`) + Checkpoint file. |
 
-VenusFactory2 supports various advanced protein language models. You can choose the appropriate model based on your task requirements and computational resources.
+In either mode, you can train on either a pre-defined dataset or a custom dataset.
 
-| Model Name                                                    | Model Parameter Size     | Number of Models | Model Example                   |
-| ------------------------------------------------------------ | ----------------------- | ---------------- | ------------------------------- |
-| [ESM2](https://huggingface.co/facebook/esm2_t33_650M_UR50D)  | 8M/35M/150M/650M/3B/15B | 6                | facebook/esm2_t33_650M_UR50D    |
-| [ESM-1b](https://huggingface.co/facebook/esm1b_t33_650M_UR50S) | 650M                    | 1                | facebook/esm1b_t33_650M_UR50S   |
-| [ESM-1v](https://huggingface.co/facebook/esm1v_t33_650M_UR90S_1) | 650M                    | 5                | facebook/esm1v_t33_650M_UR90S_1 |
-| [ProtBert-Uniref100](https://huggingface.co/Rostlab/prot_bert) | 420M                    | 1                | Rostlab/prot_bert_bfd           |
-| [ProtBert-BFD100](https://huggingface.co/Rostlab/prot_bert_bfd) | 420M                    | 1                | Rostlab/prot_bert_bfd           |
-| [IgBert](https://huggingface.co/Exscientia/IgBert) | 420M                    | 1                | Exscientia/IgBert               |
-| [IgBert_unpaired](https://huggingface.co/Exscientia/IgBert_unpaired) | 420M                    | 1                | Exscientia/IgBert_unpaired      |
-| [ProtT5-Uniref50](https://huggingface.co/Rostlab/prot_t5_xl_uniref50) | 3B/11B                  | 2                | Rostlab/prot_t5_xl_uniref50     |
-| [ProtT5-BFD100](https://huggingface.co/Rostlab/prot_t5_xl_bfd) | 3B/11B                  | 2                | Rostlab/prot_t5_xl_bfd          |
-| [IgT5](https://huggingface.co/Exscientia/IgT5) | 3B                      | 1                | Exscientia/IgT5                 |
-| [IgT5_unpaired](https://huggingface.co/Exscientia/IgT5_unpaired) | 3B                      | 1                | Exscientia/IgT5_unpaired        |
-| [Ankh](https://huggingface.co/ElnaggarLab/ankh-base)         | 450M/1.2B               | 2                | ElnaggarLab/ankh-base           |
-| [ProSST](https://huggingface.co/AI4Protein/ProSST-2048)      | 110M                    | 7                | AI4Protein/ProSST-2048          |
-| [ProPrime](https://huggingface.co/AI4Protein/Prime_690M)     | 690M                    | 1                | AI4Protein/Prime_690M           |
+## 2. Supported PLMs
 
+| Family | Sizes available | HF example |
+| :--- | :--- | :--- |
+| **ESM2** | 8M / 35M / 150M / 650M / 3B / 15B | `facebook/esm2_t33_650M_UR50D` |
+| **ESM-1v** | 650M × 5 seeds | `facebook/esm1v_t33_650M_UR90S_1` |
+| **ProtBert** | 420M (Uniref100 / BFD) | `Rostlab/prot_bert_bfd` |
+| **IgBert / IgBert_unpaired** | 420M | `Exscientia/IgBert` |
+| **ProtT5** | 3B / 11B (Uniref50 / BFD) | `Rostlab/prot_t5_xl_uniref50` |
+| **IgT5 / IgT5_unpaired** | 3B | `Exscientia/IgT5` |
+| **Ankh** | 450M / 1.2B | `ElnaggarLab/ankh-base` |
+| **ProSST** | 110M × 7 codebooks (20/128/512/1024/2048/4096 + AE) | `AI4Protein/ProSST-2048` |
+| **ProPrime** | 690M | `AI4Protein/Prime_690M` |
+| **VenusPLM** | 300M | `AI4Protein/VenusPLM-300M` |
+| **PETA** | 80M (base / bpe / unigram) | `AI4Protein/PETA-base` |
 
+> **Pick by GPU memory:** <8 GB → ESM2-8M / 35M, ProSST · 8–16 GB → ESM2-150M / 650M, ProtBert · 24 GB+ → ESM2-3B, ProtT5-XL · multi-GPU → ESM2-15B, ProtT5-XXL.
 
 ## 3. Supported Fine-tuning Methods
 
-VenusFactory2 provides multiple training methods, each with specific advantages and applicable scenarios.
-
-| Fine-tuning Method | Description | Data Type |
-|---------|------|------------|
-| **Freeze** | Freezes the pre-trained model, training only the classifier | Sequence information |
-| **Full** | Full parameter fine-tuning, training all parameters | Sequence information |
-| **LoRA** | Uses Low-Rank Adaptation method to reduce parameter count | Sequence information |
-| **DoRA** | Uses Weight-Decomposed Low-Rank Adaptation method | Sequence information |
-| **AdaLoRA** | Uses Adaptive Low-Rank Adaptation method | Sequence information |
-| **IA3** | Uses Infused Adapter by Inhibiting and Amplifying Inner Activations method | Sequence information |
-| **QLoRA** | Uses Quantized Low-Rank Adaptation method to reduce memory requirements | Sequence information |
-| **SES-Adapter** | Uses Structure-Enhanced Sequence Adapter, integrating sequence and structure information | Sequence & Structure information |
-
-## 4. Supported Evaluation Metrics
-
-VenusFactory2 provides multiple evaluation metrics to assess model performance.
-
-| Abbreviation | Metric Name | Applicable Problem Types | Description | Optimization Direction |
-|---------|------|------------|------|---------|
-| **Accuracy** | Accuracy | Single-label/Multi-label classification | Proportion of correctly predicted samples, suitable for balanced datasets | Higher is better |
-| **Recall** | Recall | Single-label/Multi-label classification | Proportion of correctly identified positive classes, focuses on reducing false negatives | Higher is better |
-| **Precision** | Precision | Single-label/Multi-label classification | Proportion of correctly predicted positive classes, focuses on reducing false positives | Higher is better |
-| **F1** | F1 Score | Single-label/Multi-label classification | Harmonic mean of precision and recall, suitable for imbalanced datasets | Higher is better |
-| **MCC** | Matthews Correlation Coefficient | Single-label/Multi-label classification | Metric that considers all confusion matrix elements, fairer for imbalanced datasets | Higher is better |
-| **AUROC** | Area Under ROC Curve | Single-label/Multi-label classification | Evaluates classification performance at different thresholds | Higher is better |
-| **F1_max** | Maximum F1 Score | Multi-label classification | Maximum F1 value at different thresholds, suitable for multi-label classification | Higher is better |
-| **Spearman_corr** | Spearman Correlation Coefficient | Regression | Evaluates the monotonic relationship between predicted and true values, range [-1,1] | Higher is better |
-| **MSE** | Mean Squared Error | Regression | Evaluates prediction error of regression models | Lower is better |
-
-## 5. Training Interface Details
-
-The training interface is divided into several main sections, each containing specific configuration options.
-
-### 5.1 Model and Dataset Configuration
-
-#### Protein Language Model Selection
-- **Protein Language Model**: Select a pre-trained model from the dropdown menu
-  - Consider your computational resources and task complexity when selecting
-  - Larger models require more computational resources
-
-#### Dataset Selection
-- **Dataset Selection**: Choose the dataset source
-  - **Use Pre-defined**: Use system-defined datasets
-    - **Dataset Configuration**: Select a dataset from the dropdown menu
-    - The system will automatically load the problem type, number of labels, and evaluation metrics
-  - **Custom**: Use a custom dataset
-    - **Custom Path**: Enter the Hugging Face dataset path (format: `username/dataset_name`)
-    - **Problem Type**: Select the problem type
-      - `single_label_classification`: Single-label classification
-      - `multi_label_classification`: Multi-label classification
-      - `regression`: Regression
-    - **Number of Labels**: Set the number of labels (for classification problems)
-    - **Metrics**: Select evaluation metrics (multiple selections allowed)
-      - `accuracy`: Accuracy
-      - `f1`: F1 Score
-      - `precision`: Precision
-      - `recall`: Recall
-      - `mcc`: Matthews Correlation Coefficient
-      - `auroc`: Area Under the ROC Curve
-      - `f1max`: Maximum F1 Score
-      - `spearman_corr`: Spearman Correlation Coefficient
-      - `mse`: Mean Squared Error
-
-      For more information, refer to [4. Supported Evaluation Metrics](#header-4)
-
-
-#### Dataset Preview
-- **Preview Dataset**: Click this button to preview the selected dataset
-  - Displays dataset statistics: number of samples in training, validation, and test sets
-  - Displays dataset examples: including sequences and labels
-
-### 5.2 Training Method Configuration
-
-- **Training Method**: Select the training method
-  - `freeze`: Freeze the pre-trained model, train only the classifier
-  - `full`: Full parameter fine-tuning, train all parameters
-  - `plm-lora`: Use LoRA (Low-Rank Adaptation) method to reduce parameter count
-  - `dora`: Use DoRA (Weight-Decomposed Low-Rank Adaptation) method
-  - `adalora`: Use AdaLoRA (Adaptive Low-Rank Adaptation) method
-  - `ia3`: Use IA³ (Infused Adapter by Inhibiting and Amplifying Inner Activations) method
-  - `plm-qlora`: Use QLoRA (Quantized Low-Rank Adaptation) method to reduce memory requirements
-  - `ses-adapter`: Use Structure-Enhanced Sequence Adapter, integrating sequence and structure information
-
-  For more information, refer to [3. Supported Fine-tuning Methods](#header-3)
-
-- **Pooling Method**: Select the pooling method
-  - `mean`: Mean pooling
-  - `attention1d`: Attention pooling
-  - `light_attention`: Lightweight attention pooling
-
-- **Structure Sequence** (visible when `ses-adapter` is selected):
-  - Select structure sequence types (multiple selections allowed), default is `foldseek_seq` and `ss8_seq`
-
-- **LoRA Parameters** (visible when `plm-lora` or `plm-qlora` is selected):
-  - **LoRA Rank**: The rank of LoRA, default is 8, affects parameter count and performance
-  - **LoRA Alpha**: The alpha value of LoRA, default is 32, affects scaling factor
-  - **LoRA Dropout**: The dropout rate of LoRA, default is 0.1, affects regularization
-  - **LoRA Target Modules**: Target modules for LoRA application, default is `query,key,value`
-
-### 5.3 Batch Processing Configuration
-
-- **Batch Processing Mode**: Select the batch processing mode
-  - **Batch Size Mode**: Fixed batch size
-    - **Batch Size**: Set the number of samples per batch, default is 16
-  - **Batch Token Mode**: Fixed token count
-    - **Tokens per Batch**: Set the number of tokens per batch, default is 10000
-    - Suitable for datasets with large variations in sequence length
+| Method | Description | Data type |
+| :--- | :--- | :--- |
+| **freeze** | Freeze PLM, train classifier head only | Sequence |
+| **full** | Train all parameters | Sequence |
+| **plm-lora** | Low-Rank Adaptation | Sequence |
+| **plm-dora** | Weight-Decomposed Low-Rank Adaptation | Sequence |
+| **plm-adalora** | Adaptive Low-Rank Adaptation | Sequence |
+| **plm-ia3** | Infused Adapter (IA³) | Sequence |
+| **plm-qlora** | Quantized LoRA (lowest memory) | Sequence |
+| **ses-adapter** | Structure-enhanced sequence adapter | Sequence + Structure |
+
+> **ses-adapter** needs the chosen structure sequence types (`foldseek_seq` / `ss8_seq`).
+> Structure-aware PLMs (**ProSST / ProtSSN / SaProt**) need a **PDB Dir** so the model can read each entry's structure.
+
+## 4. Evaluation Metrics
+
+| Abbrev. | Metric | Problem types | Direction |
+| :--- | :--- | :--- | :---: |
+| **Accuracy** | Proportion of correct predictions | Single-/Multi-label classification | ↑ |
+| **Recall** | True positive rate | Single-/Multi-label classification | ↑ |
+| **Precision** | Positive predictive value | Single-/Multi-label classification | ↑ |
+| **F1** | Harmonic mean of precision & recall | Single-/Multi-label classification | ↑ |
+| **MCC** | Matthews Correlation Coefficient | Single-/Multi-label classification | ↑ |
+| **AUROC** | Area under ROC curve | Single-/Multi-label classification | ↑ |
+| **F1_max** | Best F1 across thresholds | Multi-label classification | ↑ |
+| **Spearman_corr** | Rank correlation | Regression | ↑ |
+| **MSE** | Mean squared error | Regression | ↓ |
+
+---
+
+## 5. Page Walkthrough
+
+### 5.1 Dataset
+
+| Field | Notes |
+| :--- | :--- |
+| **Dataset Source** | `Pre-defined` (pick from dropdown — auto-fills problem type / num labels / metrics / sequence + label columns) or `Custom`. |
+| **HF ID or local upload** (custom) | Either a `username/dataset_name` from Hugging Face or upload `train / valid / test` files (CSV / TSV / XLSX). Workspace picker supported. |
+| **Problem Type** | `single_label_classification` · `multi_label_classification` · `regression`. |
+| **Num Labels** | Required for classification. |
+| **Sequence Column** | Auto-detected from uploaded files; can be overridden. Default convention: `aa_seq`. |
+| **Label Column** | Same. Default: `label`. |
+| **Metrics** | Multi-select grid; pick metrics relevant to your problem type. |
+| **Preview Dataset** | Quick view of train / val / test counts and sample rows. |
+
+### 5.2 Training Mode
+
+| Field | Notes |
+| :--- | :--- |
+| **PLM Model** | From dropdown — required for "From Scratch". |
+| **Training Method** | One of the methods in §3. |
+| **Pooling** | `mean` · `attention1d` · `light_attention`. |
+| **Structure Seq** | (ses-adapter / structure PLM only) — `foldseek_seq`, `ss8_seq`. |
+| **PDB Dir** | (ProSST / ProtSSN / SaProt only) — local directory with one PDB per sample. |
+| **LoRA params** | (plm-lora / qlora / adalora / dora / ia3) — `lora_r`, `lora_alpha`, `lora_dropout`, `lora_target_modules` (default `query,key,value`). |
+| **Model Folder + Checkpoint** | (Continue Training only) — pick from `ckpt/` listing. |
+
+### 5.3 Batch
+
+| Field | Notes |
+| :--- | :--- |
+| **Batch Mode** | `Batch Size Mode` (fixed N samples per batch) or `Batch Token Mode` (~N tokens per batch — better for variable-length sequences). |
+| **Batch Size / Tokens** | Defaults: 16 samples / 10000 tokens. |
+
+### 5.4 Hyperparameters
+
+| Field | Default | Notes |
+| :--- | :--- | :--- |
+| Learning Rate | `5e-4` | Lower for full-finetune; higher for LoRA family. |
+| Num Epochs | `20` | Early stopping will usually halt sooner. |
+| Patience | `10` | Stop after N epochs of no val-metric improvement. |
+| Max Seq Length | `1024` | `-1` for no cap. |
+| Scheduler | `linear` | `linear` / `cosine` / `step`. |
+| Warmup Steps | `0` | Try 5–10% of total steps. |
+| Gradient Accumulation Steps | `1` | Simulate larger batches when memory-bound. |
+| Max Grad Norm | `-1` | `-1` = no clipping; 1.0–5.0 if training is unstable. |
+| Num Workers | `4` | Data loader workers. |
+| Monitored Metric | (depends on task) | Drives early stopping + best model selection. |
+| Monitored Strategy | `max` | `max` or `min` depending on metric. |
+
+### 5.5 Output
+
+| Field | Notes |
+| :--- | :--- |
+| **Save Directory** | Default `ckpt/`. |
+| **Output Model Name** | Default `demo/best_model.pt`. |
+| **Enable W&B Logging** | Optional — set `wandb_project`, `wandb_entity` when on. |
+
+### 5.6 Run & Watch
+
+- **Preview Command** — shows the equivalent CLI invocation (useful for reproducibility / scripting).
+- **Start** — kicks off training; the right side panel streams training & validation loss curves, per-epoch metrics, model statistics (total / trainable param count + %), and a progress log.
+- **Abort** — gracefully stops the active run.
+- **Test Results** — final per-metric numbers + CSV download.
+
+---
+
+## 6. Custom Dataset Format
+
+When you go the Hugging Face / file-upload route, your data should have these columns:
+
+| Column | Required? | Notes |
+| :--- | :---: | :--- |
+| `aa_seq` (or your chosen sequence column) | ✓ | Amino acid sequence, single-letter codes. |
+| `label` (or your chosen label column) | ✓ | Numeric for regression; integer / list for classification. |
+| `foldseek_seq` | optional | Needed for `ses-adapter` with `foldseek_seq` enabled. |
+| `ss8_seq` | optional | Needed for `ses-adapter` with `ss8_seq` enabled. |
+| `name` / `id` | optional | Sample identifier. |
 
-### 5.4 Training Parameters
+Splits expected: `train`, `validation`, `test`. The Custom dataset upload accepts three separate files; the Pre-defined dataset path expects HuggingFace dataset structure.
 
-- **Learning Rate**: Learning rate, default is 5e-4
-  - Affects the step size of model training; larger values may cause non-convergence, smaller values may cause slow training
+### 6.1 Label formats per problem type
 
-- **Number of Epochs**: Number of training epochs, default is 100
-  - Number of complete passes through the dataset
-  - Actual training may end earlier due to early stopping
+**Single-label classification** — `label` is an integer class index (starting from 0):
 
-- **Early Stopping Patience**: Early stopping patience N, default is 10
-  - Training will stop early if validation performance does not improve for N consecutive epochs
-
-- **Max Sequence Length**: Maximum sequence length, default is None (-1 indicates no limit)
-  - Maximum protein sequence length to process
-
-- **Scheduler Type**: Learning rate scheduler type
-  - `linear`: Linear decay
-  - `cosine`: Cosine decay
-  - `step`: Step decay
-  - `None`: No scheduler
-
-- **Warmup Steps**: Number of warmup steps, default is 0
-  - Number of steps where the learning rate gradually increases from a small value to the set value
-  - Helps stabilize early training
-
-- **Gradient Accumulation Steps**: Number of gradient accumulation steps, default is 1
-  - Accumulates gradients from multiple batches before updating the model
-  - Can simulate larger batch sizes
-
-- **Max Gradient Norm**: Gradient clipping threshold, default is -1 (no clipping)
-  - Limits the maximum norm of gradients to prevent gradient explosion
-  - Recommended range: 1.0 to 5.0
-
-- **Number of Workers**: Number of data loading worker threads, default is 4
-  - Affects data loading speed
-  - Adjust based on CPU core count
-
-### 5.5 Output and Logging Settings
-
-- **Save Directory**: Save directory, default is `ckpt`
-  - Path to save model and training results
-
-- **Output Model Name**: Output model name, default is `model.pt`
-  - Filename of the saved model
-
-- **Enable W&B Logging**: Whether to enable Weights & Biases logging
-  - When checked, you can set W&B project name and entity
-  - Used for experiment tracking and visualization
-
-### 5.6 Training Control and Output
-
-- **Preview Command**: Preview the training command to be executed
-  - Click to display the complete command line arguments
-
-- **Abort**: Abort the current training process
-
-- **Start**: Start the training process
-
-- **Model Statistics**: Display model parameter statistics
-  - Parameter counts for the training model, pre-trained model, and combined model
-  - Percentage of trainable parameters
-
-- **Training Progress**: Display training progress
-  - Current phase (training, validation, testing)
-  - Progress percentage
-  - Time elapsed and estimated time remaining
-  - Current loss value and gradient steps
-
-- **Best Performance**: Display best model information
-  - Best epoch and corresponding evaluation metrics
-
-- **Training and Validation Loss**: Loss curve graph
-  - Training loss and validation loss over time
-
-- **Validation Metrics**: Validation set evaluation metrics graph
-  - Various evaluation metrics over time
-
-- **Test Results**: Test results
-  - Final performance metrics on the test set
-  - Evaluation metrics can be downloaded in CSV format
-
-## 6. Training Process Guide
-
-Below is a complete guide to using the VenusFactory2 training module, from data preparation to model evaluation.
-
-### 6.1 Preparing the Dataset
-
-#### Using Pre-defined Datasets
-1. Select "Use Pre-defined" in **Dataset Selection**
-2. Choose a dataset from the **Dataset Configuration** dropdown menu
-3. Click the **Preview Dataset** button to view dataset statistics and examples
-
-#### Using Custom Datasets
-1. Prepare a dataset that meets the requirements and upload it to Hugging Face (see [Custom Format Requirements](#header-7))
-2. Select "Custom" in **Dataset Selection**
-3. Enter the Hugging Face dataset path in **Custom Path** (format: `username/dataset_name`)
-4. Set **Problem Type**, **Number of Labels**, and **Metrics**
-5. Click the **Preview Dataset** button to verify that the dataset is loaded correctly
-
-### 6.2 Selecting a Model and Training Method
-
-1. Choose a pre-trained model from the **Protein Language Model** dropdown menu
-
-2. Select an appropriate **Training Method**
-
-3. Choose a **Pooling Method**
-
-4. If selecting `ses-adapter`, ensure you specify structure sequence types in **Structure Sequence**
-5. If selecting `plm-lora` or `plm-qlora`, adjust LoRA parameters as needed
-
-### 6.3 Configuring Batch Processing and Training Parameters
-
-1. Select **Batch Processing Mode**
-   - Use **Batch Size Mode** when sequence lengths are similar
-   - Use **Batch Token Mode** when sequence lengths vary significantly
-
-2. Set batch size or token count
-   - Adjust based on GPU memory; reduce if memory errors occur
-
-3. Set **Learning Rate**
-
-4. Set **Number of Epochs**
-   - Use early stopping mechanism; set **Early Stopping Patience** to 10-20 to prevent overfitting
-
-5. Set **Max Sequence Length**
-
-6. Adjust advanced parameters as needed
-   - **Scheduler Type**: Recommend using `linear` or `cosine`
-   - **Warmup Steps**: Recommend setting to 5-10% of total steps
-   - **Gradient Accumulation Steps**: Increase if memory is insufficient
-   - **Max Gradient Norm**: Set to 1.0-5.0 if training is unstable
-
-### 6.4 Setting Output and Logging
-
-1. Set **Save Directory** as the path to save the model
-2. Set **Output Model Name** as the model filename
-3. If you need to track training, check **Enable W&B Logging** and set project information
-
-### 6.5 Starting Training
-
-1. Click **Preview Command** to preview the training command
-2. Click the **Start** button to begin training
-3. Observe training progress and metric changes
-4. After training is complete, view the test results
-   - Check various evaluation metrics
-   - Download results in CSV format if needed
-5. To stop training, click the **Abort** button
-
-## 7. Custom Format Requirements
-
-To use a custom dataset, you need to upload the dataset to the Hugging Face platform and ensure it meets the following format requirements.
-
-### 7.1 Basic Requirements
-
-- The dataset must include `train`, `validation`, and `test` subsets
-- Each sample must contain the following fields:
-  - `aa_seq`: Amino acid sequence using standard single-letter codes
-  - `label`: Label, format depends on the problem type
-
-### 7.2 Label Formats for Different Problem Types
-
-#### Single-label Classification (single_label_classification)
-- `label`: Integer value representing the class index (starting from 0)
-- Example: 0, 1, 2, ...
-
-CSV format example:
 ```csv
 aa_seq,label
 MKTVRQERLKSIVRILERSKEPVSGAQLAEELSVSRQVIVQDIAYLRSLGYNIVATPRGYVLAGG,1
@@ -312,23 +156,16 @@ MLKFQQFGKGVLTEQKHALSELVCGLLEGRPFSQHEKETITIGIINIANNNDLFSAYK,0
 MSDKIIHLTDDSFDTDVLKADGAILVDFWAEWCGPCKMIAPILDEIADEYQGKLTVAK,2
 ```
 
-#### Multi-label Classification (multi_label_classification)
-- `label`: String of comma-separated class indices representing present classes
-- Example: "373,449,584,674,780,883,897,911,1048,1073,1130,1234"
+**Multi-label classification** — `label` is a comma-separated string of present class indices (quoted so commas don't break CSV parsing):
 
-CSV format example:
 ```csv
 aa_seq,label
 MKTVRQERLKSIVRILERSKEPVSGAQLAEELSVSRQVIVQDIAYLRSLGYNIVATPRGYVLAGG,"373,449,584,674,780,883,897,911,1048,1073,1130,1234"
 MLKFQQFGKGVLTEQKHALSELVCGLLEGRPFSQHEKETITIGIINIANNNDLFSAYK,"15,42,87,103,256"
-MSDKIIHLTDDSFDTDVLKADGAILVDFWAEWCGPCKMIAPILDEIADEYQGKLTVAK,"7,98,120,256,512,789"
 ```
 
-#### Regression (regression)
-- `label`: Floating-point number representing a continuous value
-- Examples: 0.75, -1.2, ...
+**Regression** — `label` is a float:
 
-CSV format example:
 ```csv
 aa_seq,label
 MKTVRQERLKSIVRILERSKEPVSGAQLAEELSVSRQVIVQDIAYLRSLGYNIVATPRGYVLAGG,0.75
@@ -336,33 +173,29 @@ MLKFQQFGKGVLTEQKHALSELVCGLLEGRPFSQHEKETITIGIINIANNNDLFSAYK,-1.2
 MSDKIIHLTDDSFDTDVLKADGAILVDFWAEWCGPCKMIAPILDEIADEYQGKLTVAK,3.45
 ```
 
-### 7.3 Structural Information (Optional)
+### 6.2 Adding structure columns (ses-adapter)
 
-If using the `ses-adapter` training method, you can add the following structural information fields:
+When training with `ses-adapter`, add `foldseek_seq` and/or `ss8_seq` as additional columns. Each row must align character-by-character with `aa_seq`:
 
-- `foldseek_seq`: FoldSeek structure sequence, using single-letter codes to represent structural elements
-- `ss8_seq`: 8-class secondary structure sequence, using single-letter codes to represent secondary structures
-
-CSV format example:
 ```csv
-name,aa_seq,labelname,aa_seq,foldseek_seq,ss8_seq,label
-Q9LSD8,MPEEDLVELKFRLYDGSDVGPFQYSPTATVSMLKERIVSEWPKDKKIVPKSASDIKLINAGKILENGKTVAQCKAPFDDLPKSVITMHVVVQLSPTKARPEKKIEKEEAPQRSFCSCTIM,DPPQLWAFAWEAEPVRDIDDRDTDHQQQFLLVVLQVCLVRPDPPDPDHAPHSVQKWKDDPNDTGDRNDGNNRRDDPPDDDSPDHHYIYIDGRDPPVVPPVPPPPPPPPPPPPPPPPPPPD,LLLLLLEEEEEELTTSLEEEEEEELTTLBHHHHHHHHHHTLLTTLSSLLSSGGGEEEEETTEELLTTLBHHHHLLLLLLLTTLLEEEEEEELLLLLLLLLLLLLLLLLLLLLLLLLLLLL,0
+name,aa_seq,foldseek_seq,ss8_seq,label
+Q9LSD8,MPEEDLVELKFR...,DPPQLWAFAWEA...,LLLLLLEEEEEE...,0
 ```
 
-### 7.4 Uploading to Hugging Face
+### 6.3 Uploading to Hugging Face
 
-1. Create separate CSV files for training, validation, and test sets:
-   - `train.csv`: Training data
-   - `validation.csv`: Validation data
-   - `test.csv`: Test data
+1. Create three separate files: `train.csv`, `validation.csv`, `test.csv`.
+2. Push them to a new HuggingFace dataset repository.
+3. Reference the dataset in the Training page as **Custom Path** = `username/dataset_name`.
 
-2. Upload the dataset to Hugging Face
+---
 
-- The relevant steps are shown in the following images:
+## 7. Workflow Summary
 
-![HF1](/img/HuggingFace/HF1.png)
-![HF2](/img/HuggingFace/HF2.png)
-![HF3](/img/HuggingFace/HF3.png)
-![HF4](/img/HuggingFace/HF4.png)
-
-After uploading, use `Owner/Dataset name` as the Custom Path in VenusFactory2
+1. **Dataset** — pre-defined or custom; preview before training.
+2. **Model + Method** — pick PLM, fine-tuning method, pooling. Configure LoRA / structure-seq / PDB Dir if needed.
+3. **Batch + Hyperparams** — start with defaults, tune only when needed.
+4. **Output** — pick save path, optionally enable W&B.
+5. **Preview Command** — sanity check.
+6. **Start** — monitor curves & metrics; **Abort** if anything looks off.
+7. **Test Results** — download CSV; the saved model is now usable from **Custom Model → Evaluation** and **Custom Model → Predict**.
