@@ -237,7 +237,7 @@ class Chat_LLM(BaseChatModel):
                 f"{self.base_url}/chat/completions",
                 headers=headers,
                 json=payload,
-                timeout=120
+                timeout=300
             )
 
             if response.status_code != 200:
@@ -323,7 +323,7 @@ class Chat_LLM(BaseChatModel):
             f"{self.base_url}/chat/completions",
             headers=headers,
             json=payload,
-            timeout=120,
+            timeout=300,
             stream=True,
         )
         if response.status_code != 200:
@@ -409,7 +409,7 @@ class Chat_LLM(BaseChatModel):
             payload["tools"] = _tools_to_openai_schema(self._bound_tools)
 
         with start_span("llm.agenerate", LLMSpanData(model_name=self.model_name)) as _span:
-            timeout = aiohttp.ClientTimeout(total=120)
+            timeout = aiohttp.ClientTimeout(total=300)
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 async with session.post(
                     f"{self.base_url}/chat/completions",
@@ -471,6 +471,29 @@ class Chat_LLM(BaseChatModel):
     @property
     def _llm_type(self) -> str:
         return "chat-llm"
+
+
+def make_llm(model_name: str | None = None, **kwargs: Any) -> BaseChatModel:
+    """Return a Chat_LLM or ChatAnthropicLLM depending on the resolved model's
+    ``api_compatible`` field.
+
+    Used by ``initialize_session_state``, ``update_llm_model``,
+    ``update_llm_openai_style_config`` and ``ensure_runtime_state`` so that the
+    correct adapter is picked per model id without callers having to know about
+    multiple LLM classes.
+
+    When a gateway is active (``CHAT_FORCE_GATEWAY``), ``resolve_endpoint``
+    returns the gateway's ``api_compatible``, so an OpenAI-style gateway in
+    front of Claude correctly resolves to Chat_LLM.
+    """
+    effective = model_name or get_default_model_id()
+    resolved = resolve_endpoint(effective, api_key=kwargs.get("api_key", "") or "")
+    if resolved.api_compatible == "anthropic":
+        # Local import avoids a hard import cycle (chat_anthropic imports
+        # chat_agent._prune_titles when building tool schemas).
+        from agent.chat_anthropic import ChatAnthropicLLM
+        return ChatAnthropicLLM(model_name=effective, **kwargs)
+    return Chat_LLM(model_name=effective, **kwargs)
 
 
 def generate_cache_key(tool_name: str, tool_input: dict) -> str:
@@ -1065,7 +1088,7 @@ def ensure_runtime_state(state: dict[str, Any]) -> dict[str, Any]:
         api_key = state.get("default_llm_api_key", "") or ""
         base_url = state.get("default_llm_base_url", "") or ""
         model_name = state.get("default_llm_model_name") or get_default_model_id()
-        llm = Chat_LLM(api_key=api_key, base_url=base_url, model_name=model_name, temperature=0.1)
+        llm = make_llm(model_name=model_name, api_key=api_key, base_url=base_url, temperature=0.1)
         state["llm"] = llm
     if "all_tools" not in state or state.get("all_tools") is None:
         all_tools_raw = get_tools()
@@ -1097,7 +1120,7 @@ def ensure_runtime_state(state: dict[str, Any]) -> dict[str, Any]:
 
 
 def initialize_session_state() -> dict[str, Any]:
-    llm = Chat_LLM(temperature=0.1)
+    llm = make_llm(temperature=0.1)
     all_tools_raw = get_tools()
     all_tools, disabled_tool_names = _filter_agent_tools_for_runtime_mode(all_tools_raw)
     pi_tools = get_pi_tools()  # PI can execute only search tools (no download / train / etc.)
@@ -1158,11 +1181,12 @@ def update_llm_model(selected: str, state: dict[str, Any]) -> dict[str, Any]:
     old_llm = state['llm']
     model_id = legacy_label_aliases.get(selected, selected or get_default_model_id())
     # Rebuild rather than mutate: chains hold references to the old llm; mutating model_name races
-    # with in-flight requests. A fresh Chat_LLM + chain rebuild gives a clean swap.
-    # Chat_LLM.__init__ calls resolve_endpoint internally, so base_url/api_key are
-    # re-derived from the registry for the new model — DO NOT carry over old_llm's
-    # base_url/api_key (they may belong to a different provider).
-    new_llm = Chat_LLM(
+    # with in-flight requests. A fresh LLM instance + chain rebuild gives a clean swap.
+    # make_llm picks the right adapter (Chat_LLM vs ChatAnthropicLLM) per model's
+    # api_compatible, and the underlying __init__ calls resolve_endpoint so
+    # base_url/api_key are re-derived from the registry — DO NOT carry over
+    # old_llm's base_url/api_key (they may belong to a different provider).
+    new_llm = make_llm(
         model_name=model_id,
         temperature=old_llm.temperature,
         max_tokens=old_llm.max_tokens,
@@ -1191,10 +1215,11 @@ def update_llm_openai_style_config(
     eff_api_key = api_key.strip() if api_key and api_key.strip() else old_llm.api_key
     eff_base_url = base_url.strip().rstrip("/") if base_url and base_url.strip() else old_llm.base_url
     # Rebuild rather than mutate (see update_llm_model). default_llm_* fields are preserved on state.
-    new_llm = Chat_LLM(
+    # make_llm dispatches to ChatAnthropicLLM when eff_model resolves to api_compatible=anthropic.
+    new_llm = make_llm(
+        model_name=eff_model,
         api_key=eff_api_key,
         base_url=eff_base_url,
-        model_name=eff_model,
         temperature=old_llm.temperature,
         max_tokens=old_llm.max_tokens,
     )

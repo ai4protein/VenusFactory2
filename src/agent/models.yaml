@@ -74,8 +74,8 @@ models:
     max_output_tokens: 8192
 
   # ─── Anthropic Claude (NOT OpenAI-compat) ───────────────────────────────
-  # Direct call requires /v1/messages schema; Chat_LLM only speaks OpenAI today.
-  # Listed for visibility; default UX is to route via a gateway (DMX) below.
+  # Direct call goes via ChatAnthropicLLM (/v1/messages); the DMX gateway alias
+  # below is still honored when CHAT_FORCE_GATEWAY=dmx is set.
   - id: claude-3-7-sonnet-20250219
     label: Claude 3.7 Sonnet
     provider: anthropic
@@ -87,7 +87,6 @@ models:
     supports_prompt_caching: true
     max_context_tokens: 200000
     max_output_tokens: 64000
-    requires_adapter: true
 
   # ─── Zhipu GLM (OpenAI-compat) ──────────────────────────────────────────
   - id: glm-4-plus
