@@ -371,6 +371,8 @@ log/
 .webui_secret_key
 memory_db/
 src/data/*.db
+data/chat_sessions.db
+data/chat_sessions.db-*
 mutation/proteingym/
 mutation/mycase/
 
