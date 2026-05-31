@@ -88,18 +88,37 @@ def generate_and_execute_code(task_description: str, input_files: Optional[List[
     Generate and execute Python code for data processing, model training, and prediction.
     Supports multi-turn conversations: train a model in one turn, use it for prediction in later turns.
     """
-    script_path = None 
+    script_path = None
     try:
-        # Use same API configuration as chat_tab.py
-        chat_api_key = os.getenv("OPENAI_API_KEY")
+        # Resolve API config via the unified LLM config (env-aware: tries
+        # OPENAI_API_KEY → DEEPSEEK_API_KEY → CHAT_API_KEY) and the model
+        # registry (per-model base_url). Falls back to env vars to remain
+        # compatible with legacy CHAT_BASE_URL / CHAT_MODEL_NAME pinning.
+        from config import get_config as _get_cfg
+        _cfg = _get_cfg()
+        chat_api_key = _cfg.llm.api_key or os.getenv("OPENAI_API_KEY") or os.getenv("DEEPSEEK_API_KEY") or ""
+        chat_model_name = os.getenv("CHAT_MODEL_NAME") or _cfg.llm.model_name or "deepseek-v4-pro"
+        chat_base_url = _cfg.llm.base_url or os.getenv("CHAT_BASE_URL", "")
+        if not chat_base_url:
+            try:
+                from agent.model_registry import resolve_endpoint as _resolve
+                _resolved = _resolve(chat_model_name, api_key=chat_api_key)
+                chat_base_url = _resolved.base_url
+                if not chat_api_key:
+                    chat_api_key = _resolved.api_key
+                # gateway alias may rewrite the model id
+                chat_model_name = _resolved.model_id or chat_model_name
+            except Exception:
+                chat_base_url = "https://api.deepseek.com"
         if not chat_api_key:
             return json.dumps({
                 "success": False,
-                "error": "Chat API key is not configured. Please set OPENAI_API_KEY."
+                "error": (
+                    "No LLM API key configured. Set one of OPENAI_API_KEY / "
+                    "DEEPSEEK_API_KEY / CHAT_API_KEY in your environment, "
+                    "or save a per-provider key via the UI (Settings → keys)."
+                ),
             })
-
-        chat_base_url = os.getenv("CHAT_BASE_URL", "https://www.dmxapi.cn/v1")
-        chat_model_name = os.getenv("CHAT_MODEL_NAME", "deepseek-v4-pro")
         max_tokens = int(os.getenv("CHAT_CODE_MAX_TOKENS", "10000"))  # Increased to prevent code truncation
         
         # Validate and prepare input files
