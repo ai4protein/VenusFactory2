@@ -240,7 +240,7 @@ User asks to download AlphaFold structure:
   {{
     "step": 1,
     "task_description": "Download protein structure from AlphaFold database",
-    "tool_name": "alphafold_structure_download",
+    "tool_name": "download_alphafold_structure_by_uniprot_id",
     "tool_input": {{
       "uniprot_id": "P00734",
       "output_format": "pdb"
