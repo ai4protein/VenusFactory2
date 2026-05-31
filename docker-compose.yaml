@@ -1,14 +1,58 @@
+# Two service profiles share the same Dockerfile, only the base image and the
+# torch/pyg wheel URLs differ.
+#
+# Usage:
+#   cp .env.example .env                            # create local config (once)
+#   docker compose --profile gpu up -d --build      # GPU (needs nvidia-container-toolkit)
+#   docker compose --profile cpu up -d --build      # CPU-only
+#
+# Override port:
+#   VENUS_PORT=8000 docker compose --profile gpu up -d
+
 services:
-  factory:
+  venus-gpu:
+    profiles: ["gpu"]
+    image: venusfactory/ce:gpu-${VENUS_FACTORY_VERSION:-0.1.0}
     build:
       context: .
       dockerfile: docker/Dockerfile
-      tags:
-        - venusfactory/ce:${VENUS_FACTORY_CUDA_VARIANT:-cpu}-${VENUS_FACTORY_VERSION_NUMBER:-0.1.0}
       args:
-        - VENUS_FACTORY_CUDA_VARIANT=${VENUS_FACTORY_CUDA_VARIANT:-cpu}
+        BASE_IMAGE: nvidia/cuda:12.8.0-runtime-ubuntu24.04
+        TORCH_INDEX_URL: https://download.pytorch.org/whl/cu128
+        PYG_INDEX_URL: https://data.pyg.org/whl/torch-2.8.0+cu128.html
     ports:
-      - "7860:7860" 
-      - "8080:8080" 
+      - "${VENUS_PORT:-7861}:7861"
+    env_file:
+      - path: .env
+        required: false
     volumes:
-      - .env:/app/.env
+      - ./temp_outputs:/app/temp_outputs
+      - ./ckpt:/app/ckpt
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  venus-cpu:
+    profiles: ["cpu"]
+    image: venusfactory/ce:cpu-${VENUS_FACTORY_VERSION:-0.1.0}
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        BASE_IMAGE: ubuntu:24.04
+        TORCH_INDEX_URL: https://download.pytorch.org/whl/cpu
+        PYG_INDEX_URL: https://data.pyg.org/whl/torch-2.8.0+cpu.html
+    ports:
+      - "${VENUS_PORT:-7861}:7861"
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ./temp_outputs:/app/temp_outputs
+      - ./ckpt:/app/ckpt
+    restart: unless-stopped
