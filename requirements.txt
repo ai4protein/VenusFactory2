@@ -1,47 +1,125 @@
-accelerate==1.8.1
-Bio==1.8.0
-biopython==1.85
-biotite==1.4.0
-datasets==4.0.0
-esm==3.2.3
-fake_useragent==2.1.0
-gradio==6.6.0
-gradio_molecule3d==0.0.7
-joblib==1.5.1
-lxml==5.4.0
-matplotlib==3.10.3
-seaborn==0.13.2
-markdown==3.7
-mdx_truly_sane_lists==1.3
-pandas==2.2.3
-peft==0.15.2
-plotly==6.2.0
-requests==2.32.5
-scikit-learn==1.7.0
-scipy==1.16.0
-sentencepiece==0.2.0
-torchmetrics==1.7.3
-tqdm==4.67.1
+# VenusFactory direct dependencies (mirror of [project.dependencies] in pyproject.toml).
+#
+# Install torch/torchvision and the PyG suite separately (see README), e.g.:
+#   pip install torch==2.8.0 torchvision --index-url https://download.pytorch.org/whl/cu128
+#   pip install torch_geometric pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv \
+#       -f https://data.pyg.org/whl/torch-2.8.0+cu128.html
+#
+# Then: pip install -r requirements.txt
+
+# --- Core ML / training -----------------------------------------------------
 transformers==4.48.1
-wandb==0.20.1
-vplm==0.0.1
-python-dotenv==1.1.1
-langchain==1.2.10
-langgraph==1.0.10
-langchain-community==0.4.1
-langchain-core==1.2.17
-langchain-openai==1.1.10
-langchain-text-splitters==1.1.0
-langsmith==0.7.16
-lightning-utilities==0.14.3
-openai==2.26.0
-sortedcontainers==2.4.0
-anthropic==0.84.0
+accelerate>=1.8.1
+peft>=0.15.2
+datasets>=4.0.0
+tokenizers>=0.21.4
+safetensors>=0.6.2
+sentencepiece>=0.2.0
+torchmetrics>=1.7.3
+einops>=0.8.1
+huggingface-hub>=0.34.4
+hf-xet>=1.1.9
+lightning-utilities>=0.14.3
+bitsandbytes>=0.47.0 ; sys_platform != "darwin"
+
+# --- Protein / Bio ----------------------------------------------------------
+Bio>=1.8.0
+biopython>=1.85
+biotite>=1.4.0
+biotraj>=1.2.2
+esm>=3.2.3
+vplm>=0.0.1
+py3Dmol>=2.5.3
+pydssp>=0.9.1
+dna_features_viewer>=3.1.5
+biothings_client>=0.4.1
+mygene>=3.2.2
+gprofiler-official>=1.0.0
+
+# --- Data / numerics --------------------------------------------------------
+numpy>=2.1.2
+pandas>=2.2.3
+scipy>=1.16.0
+scikit-learn>=1.7.0
+joblib>=1.5.1
+tqdm>=4.67.1
+regex>=2025.8.29
+pyarrow>=21.0.0
+
+# --- Visualization ----------------------------------------------------------
+matplotlib>=3.10.3
+seaborn>=0.13.2
+plotly>=6.2.0
+pillow>=11.0.0
+
+# --- Web / API --------------------------------------------------------------
 fastapi==0.116.1
-fastapi-mcp==0.4.0
-fastmcp==3.0.0
-mcp==1.26.0
-uvicorn==0.41.0
-beautifulsoup4==4.13.4
-pillow==11.2.1
-py3Dmol==2.5.3
+uvicorn>=0.41.0
+starlette>=0.47.3
+gradio>=6.6.0,<7
+gradio-client>=2.1.0
+python-multipart>=0.0.20
+sse-starlette>=3.0.3
+websockets>=15.0.1
+aiofiles>=24.1.0
+
+# --- HTTP / async -----------------------------------------------------------
+httpx>=0.28.1
+requests>=2.32.5
+aiohttp>=3.12.15
+
+# --- LangChain / agent stack -----------------------------------------------
+langchain>=1.2.10
+langchain-classic>=1.0.2
+langchain-community>=0.4.1
+langchain-core>=1.2.17
+langchain-openai>=1.1.10
+langchain-text-splitters>=1.1.0
+langsmith>=0.7.16
+langgraph>=1.2.2
+langgraph-prebuilt>=1.0.10
+openai>=2.26.0
+anthropic>=0.84.0
+tiktoken>=0.11.0
+
+# --- MCP --------------------------------------------------------------------
+mcp>=1.22.0
+fastmcp>=2.13.1
+fastapi-mcp>=0.4.0
+
+# --- Config / auth / persistence -------------------------------------------
+pydantic>=2.11.7
+pydantic-settings>=2.12.0
+python-dotenv>=1.1.1
+PyYAML>=6.0.2
+Jinja2>=3.1.4
+Authlib>=1.6.5
+PyJWT>=2.10.1
+SQLAlchemy>=2.0.43
+cryptography>=46.0.3
+
+# --- Markdown / report / PDF ------------------------------------------------
+markdown>=3.7
+mdx_truly_sane_lists>=1.3
+markdown-it-py>=4.0.0
+xhtml2pdf>=0.2.17
+reportlab>=4.5.0
+
+# --- HTML / XML -------------------------------------------------------------
+lxml>=5.4.0
+beautifulsoup4>=4.13.4
+
+# --- External integrations --------------------------------------------------
+zeep>=4.3.0           # BRENDA SOAP client
+wandb>=0.20.1
+gitpython>=3.1.45
+sentry-sdk>=2.35.1
+
+# --- Utilities --------------------------------------------------------------
+fake_useragent>=2.1.0
+sortedcontainers>=2.4.0
+tenacity>=9.1.2
+cachetools>=6.2.2
+rich>=14.1.0
+typer>=0.17.3
+ipython>=9.5.0
