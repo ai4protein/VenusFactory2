@@ -16,6 +16,15 @@ from dotenv import load_dotenv
 from web.utils.common_utils import get_save_path, to_project_relative_path
 from web.utils.command import build_command_list, build_predict_command_list
 
+# Sandboxed execution for agent-generated code (defense-in-depth on top of regex blocklist).
+from agent.sandbox import (
+    Capability,
+    PathGrant,
+    SandboxConfig,
+    SandboxExecutor,
+)
+from exceptions import ToolExecutionError, ToolTimeoutError, ToolValidationError
+
 load_dotenv()
 
 # --- Security: blocklist for agent-generated code (no malicious execution) ---
@@ -90,7 +99,7 @@ def generate_and_execute_code(task_description: str, input_files: Optional[List[
             })
 
         chat_base_url = os.getenv("CHAT_BASE_URL", "https://www.dmxapi.cn/v1")
-        chat_model_name = os.getenv("CHAT_MODEL_NAME", "gemini-2.5-pro")
+        chat_model_name = os.getenv("CHAT_MODEL_NAME", "deepseek-v4-pro")
         max_tokens = int(os.getenv("CHAT_CODE_MAX_TOKENS", "10000"))  # Increased to prevent code truncation
         
         # Validate and prepare input files
@@ -237,13 +246,73 @@ def generate_and_execute_code(task_description: str, input_files: Optional[List[
         print(f"📝 Generated code saved to: {to_project_relative_path(script_path)}")
         print("📂 Working directory prepared")
         
-        # Execute the generated code with absolute path
-        process = subprocess.run(
-            [sys.executable, script_path],
-            capture_output=True, 
-            text=True,           
-            timeout=120,
-            cwd=output_directory  # Run in output directory for file access
+        # Execute the generated code inside the capability-based sandbox.
+        # PathGrant whitelist: output dir (rw), each input file's parent dir (read-only),
+        # /tmp (rw) for transient artifacts. Network/subprocess capabilities are NOT
+        # granted; the existing regex blocklist (_validate_agent_generated_code_safety)
+        # remains the first line of defense, with SandboxExecutor enforcing timeout,
+        # env restriction, output cap, and (best-effort) path validation.
+        sandbox_grants: List[PathGrant] = [
+            PathGrant(path=output_directory, read=True, write=True),
+            PathGrant(path="/tmp", read=True, write=True),
+        ]
+        seen_parents = {str(Path(output_directory).resolve()), "/tmp"}
+        for vf in valid_files:
+            parent = str(Path(vf).parent.resolve())
+            if parent not in seen_parents:
+                sandbox_grants.append(PathGrant(path=parent, read=True, write=False))
+                seen_parents.add(parent)
+
+        sandbox_caps = frozenset({
+            Capability.READ_FILES,
+            Capability.WRITE_FILES,
+            Capability.IMPORT_ALL,
+        })
+        sandbox_cfg = SandboxConfig(
+            timeout_seconds=120,
+            capabilities=sandbox_caps,
+            path_grants=tuple(sandbox_grants),
+            working_directory=output_directory,
+        )
+        executor = SandboxExecutor(sandbox_cfg)
+
+        # Run the already-persisted script through the sandbox. SandboxExecutor
+        # writes a fresh temp script internally; we feed it the generated code
+        # directly so the persisted script_path stays available for debugging.
+        try:
+            exec_result = executor.execute(generated_code)
+        except ToolTimeoutError as e:
+            # Re-raise as subprocess.TimeoutExpired so the existing timeout
+            # handler below catches it (preserves existing user-facing message).
+            raise subprocess.TimeoutExpired(cmd=[sys.executable, script_path], timeout=120) from e
+        except ToolValidationError as e:
+            return json.dumps({
+                "success": False,
+                "error": f"Sandbox validation failed: {e}",
+                "security_blocked": True,
+                "generated_code_path": to_project_relative_path(script_path),
+            }, ensure_ascii=False)
+        except ToolExecutionError as e:
+            return json.dumps({
+                "success": False,
+                "error": f"Sandbox execution error: {e}",
+                "generated_code_path": to_project_relative_path(script_path),
+            }, ensure_ascii=False)
+
+        # Shim into the (process.returncode / .stdout / .stderr) shape that
+        # the downstream success/fail branches already understand.
+        class _SandboxProcShim:
+            __slots__ = ("returncode", "stdout", "stderr")
+
+            def __init__(self, r: int, out: str, err: str) -> None:
+                self.returncode = r
+                self.stdout = out
+                self.stderr = err
+
+        process = _SandboxProcShim(
+            r=exec_result.return_code,
+            out=exec_result.stdout or "",
+            err=exec_result.stderr or "",
         )
 
         if process.returncode == 0:
