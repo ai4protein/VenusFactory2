@@ -39,14 +39,56 @@ from agent.chat_agent_utils import (
     _tool_output_indicates_failure,
 )
 from agent.guardrails import DEFAULT_INPUT_GUARDRAILS, run_input_guardrails
+from agent.hooks import ToolResultInfo
 from agent.retry import TOOL_RETRY, retry_async
 from agent.skills import get_skills_metadata_string
+from agent.tracing import (
+    AgentSpanData,
+    NoOpTrace,
+    Scope,
+    ToolSpanData,
+    create_trace,
+    start_span,
+)
 from exceptions import InputGuardrailTripped
 from logger import get_logger
 from web.utils.chat_format_utils import _format_search_preview, _format_search_summary
 from web.utils.common_utils import get_project_root, to_project_relative_path
 from web.utils.file_oss import upload_file_to_cloud_async
-from web_v2.analytics_store import analytics_store
+
+# NOTE: web_v2.analytics_store was previously imported here for direct
+# record_tool_call. Tool-call observability is now routed through hooks
+# (AnalyticsHooks lives in agent/hooks.py and uses a lazy import).
+
+
+# Strong references for fire-and-forget background tasks (hook dispatch).
+# Without this, the asyncio.create_task tasks can be garbage-collected mid-flight.
+_BG_TASKS: set[asyncio.Task] = set()
+
+
+from contextlib import contextmanager
+
+
+@contextmanager
+def _ensure_trace(session_id: str = ""):
+    """Ensure a Trace is active on the current asyncio context.
+
+    If a real trace is already current (e.g. started by an outer caller), this
+    is a no-op and yields the existing trace. Otherwise it starts a fresh trace
+    from the global ``TracingProvider`` — which returns ``NoOpTrace`` (zero
+    overhead) when no processor is registered.
+
+    Wrapping the top-level graph nodes (plan/execute) in this guarantees that
+    spans opened inside the node tree have a parent trace to attach to without
+    forcing every caller (chat_api.py, tests, scripts) to manage tracing.
+    """
+    current = Scope.get_current_trace()
+    if not isinstance(current, NoOpTrace):
+        yield current
+        return
+    trace = create_trace(session_id=session_id)
+    with trace as t:
+        yield t
 
 _logger = get_logger("agent.graph")
 
@@ -380,7 +422,7 @@ async def _repair_plan_json_with_llm(llm: Any, raw_content: str) -> list[dict[st
         f"Draft:\n{str(raw_content)[:10000]}"
     )
     try:
-        fixed = await asyncio.to_thread(llm.invoke, [HumanMessage(content=prompt)])
+        fixed = await llm.ainvoke([HumanMessage(content=prompt)])
         fixed_text = getattr(fixed, "content", None) or str(fixed) or ""
         parsed = _parse_cb_plan(fixed_text)
         return parsed if isinstance(parsed, list) else []
@@ -413,7 +455,7 @@ async def _retry_plan_for_model_compat(
         f"AVAILABLE_TOOLS:\n{available_tools_list}\n"
     )
     try:
-        msg = await asyncio.to_thread(llm.invoke, [HumanMessage(content=prompt)])
+        msg = await llm.ainvoke([HumanMessage(content=prompt)])
         content = getattr(msg, "content", None) or str(msg) or ""
         _logger.info("CB planner compat retry output (first 1200 chars): %s", content[:1200])
         parsed = _parse_cb_plan(content)
@@ -1450,7 +1492,7 @@ async def research_report_node(state: AgentState, config: RunnableConfig):
 
     try:
         suggest_steps = await asyncio.to_thread(
-            chains["pi_suggest_steps"].invoke,
+            chains["pi_suggest_steps_chain"].invoke,
             {"draft_report": final_report, "input": text},
         )
     except:
@@ -1480,6 +1522,12 @@ async def plan_start_node(state: AgentState, config: RunnableConfig):
 
 async def plan_node(state: AgentState, config: RunnableConfig):
     """CB planning node: PI report -> pipeline (JSON list)."""
+    with _ensure_trace(session_id=state.get("session_id", "")), \
+            start_span("cb.plan", AgentSpanData(agent_name="CB", phase="planning")):
+        return await _plan_node_impl(state, config)
+
+
+async def _plan_node_impl(state: AgentState, config: RunnableConfig):
     chains = config.get("configurable", {}).get("chains", {})
     pi_report = state.get("pi_report", "")
     pi_suggest_steps = state.get("pi_suggest_steps", "")
@@ -1535,7 +1583,7 @@ async def plan_node(state: AgentState, config: RunnableConfig):
     )
 
     try:
-        raw_msg = await asyncio.to_thread(chains["cb_planner_raw"].invoke, cb_planner_inputs)
+        raw_msg = await chains["cb_planner_raw"].ainvoke(cb_planner_inputs)
         content = getattr(raw_msg, "content", None) or str(raw_msg) or ""
         _logger.info("CB planner raw output (first 1200 chars): %s", content[:1200])
         plan = _parse_cb_plan(content)
@@ -1635,6 +1683,21 @@ async def execute_start_node(state: AgentState, config: RunnableConfig):
 
 async def execute_node(state: AgentState, config: RunnableConfig):
     """MLS execution node: executes current step in plan."""
+    plan = state.get("plan", [])
+    idx = state.get("current_step_index", 0)
+    step_num_for_span = _normalize_step_number(
+        plan[idx].get("step") if (plan and idx < len(plan)) else None,
+        idx + 1,
+    )
+    with _ensure_trace(session_id=state.get("session_id", "")), \
+            start_span(
+                "mls.execute",
+                AgentSpanData(agent_name="MLS", phase=f"step_{step_num_for_span}"),
+            ):
+        return await _execute_node_impl(state, config)
+
+
+async def _execute_node_impl(state: AgentState, config: RunnableConfig):
     chains = config.get("configurable", {}).get("chains", {})
     plan = state["plan"]
     idx = state["current_step_index"]
@@ -1859,7 +1922,6 @@ async def execute_node(state: AgentState, config: RunnableConfig):
     # Pre-execution: validate file-like inputs exist; attempt repair if missing.
     if isinstance(invoke_input, dict) and not step_done:
         _session_root_pre = Path(agent_session_dir).expanduser().resolve() if agent_session_dir else None
-        _project_root_pre = get_project_root().resolve()
         for _pk, _pv in list(invoke_input.items()):
             if not isinstance(_pv, str) or not _pv.strip():
                 continue
@@ -1871,12 +1933,22 @@ async def execute_node(state: AgentState, config: RunnableConfig):
                 continue
             _repaired = None
             _basename = _pv_path.name
-            # Search session dir, previous step outputs, protein context
-            search_roots = [r for r in (_session_root_pre, _project_root_pre, Path.cwd().resolve()) if r is not None]
+            # Search ONLY within the current agent session directory to keep results
+            # predictable and avoid leaking unrelated project/cwd matches.
+            search_roots = [_session_root_pre] if _session_root_pre else []
             for _sr in search_roots:
                 try:
-                    _found = next(_sr.rglob(_basename), None)
-                    if _found and _found.exists() and _found.is_file():
+                    _matches = [p for p in _sr.rglob(_basename) if p.is_file()]
+                    if not _matches:
+                        continue
+                    if len(_matches) > 1:
+                        _logger.info(
+                            "Pre-exec path repair: %d candidates for %s under %s; picking newest by mtime",
+                            len(_matches), _basename, _sr,
+                        )
+                        _matches.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+                    _found = _matches[0]
+                    if _found.exists() and _found.is_file():
                         _repaired = str(_found.resolve())
                         break
                 except Exception:
@@ -1939,24 +2011,38 @@ async def execute_node(state: AgentState, config: RunnableConfig):
                     timeout=tool_timeout,
                 )
 
-            retry_result = await retry_async(_invoke_with_timeout, policy=TOOL_RETRY)
+            with start_span(
+                f"tool.{tool_name}",
+                ToolSpanData(tool_name=tool_name, tool_input=invoke_input),
+            ) as _tool_span:
+                retry_result = await retry_async(_invoke_with_timeout, policy=TOOL_RETRY)
 
-            if retry_result.success:
-                out = retry_result.value
-                raw_output = out if isinstance(out, (str, dict)) else str(out)
-                out_preview = str(raw_output)[:300] + ("..." if len(str(raw_output)) > 300 else "")
-                _logger.info("Result: tool=%s, output_preview=%s (attempts=%d)", tool_name, out_preview, retry_result.attempts)
-            else:
-                err = retry_result.last_error
-                if isinstance(err, (TimeoutError, asyncio.TimeoutError)):
-                    raw_output = json.dumps(
-                        {"success": False, "error": f"Tool execution timed out ({tool_timeout}s) after {retry_result.attempts} attempts"},
-                        ensure_ascii=False,
-                    )
-                    _logger.warning("Result: tool=%s, timeout after %ss (%d attempts)", tool_name, tool_timeout, retry_result.attempts)
+                if retry_result.success:
+                    out = retry_result.value
+                    raw_output = out if isinstance(out, (str, dict)) else str(out)
+                    out_preview = str(raw_output)[:300] + ("..." if len(str(raw_output)) > 300 else "")
+                    _logger.info("Result: tool=%s, output_preview=%s (attempts=%d)", tool_name, out_preview, retry_result.attempts)
+                    try:
+                        _tool_span.data.success = True
+                        _tool_span.data.tool_output = out_preview
+                    except Exception:
+                        pass
                 else:
-                    raw_output = json.dumps({"success": False, "error": str(err)})
-                    _logger.error("Result: tool=%s, failed after %d attempts, error=%s", tool_name, retry_result.attempts, err)
+                    err = retry_result.last_error
+                    if isinstance(err, (TimeoutError, asyncio.TimeoutError)):
+                        raw_output = json.dumps(
+                            {"success": False, "error": f"Tool execution timed out ({tool_timeout}s) after {retry_result.attempts} attempts"},
+                            ensure_ascii=False,
+                        )
+                        _logger.warning("Result: tool=%s, timeout after %ss (%d attempts)", tool_name, tool_timeout, retry_result.attempts)
+                    else:
+                        raw_output = json.dumps({"success": False, "error": str(err)})
+                        _logger.error("Result: tool=%s, failed after %d attempts, error=%s", tool_name, retry_result.attempts, err)
+                    try:
+                        _tool_span.data.success = False
+                        _tool_span.data.error_message = str(retry_result.last_error)[:500]
+                    except Exception:
+                        pass
             cached_flag = False
         else:
             # Tool not found
@@ -2215,16 +2301,60 @@ async def execute_node(state: AgentState, config: RunnableConfig):
         feedback_content += raw_str[:2000] + ("\n...(truncated)" if len(raw_str) > 2000 else "")
         feedback_content += "\n```\n\n"
 
-    # 2. File Hosting (OSS)
+    # 2. File Hosting (OSS) — upload runs in background; step completion is NOT blocked.
+    # The URL is delivered later via an incremental SSE event ("artifact_uploaded").
+    # Capture the LangGraph stream writer here while inside the graph context so the
+    # background coroutine can emit events after this node has already returned.
+    try:
+        _sse_writer = get_stream_writer()
+    except Exception:
+        _sse_writer = None
+
+    async def _upload_and_emit(file_path: str, kind: str, step_no: Any, sess_id: str, writer: Any) -> None:
+        try:
+            url = await upload_file_to_cloud_async(file_path)
+            if url and writer:
+                try:
+                    writer({
+                        "type": "artifact_uploaded",
+                        "kind": kind,
+                        "step": step_no,
+                        "session_id": sess_id,
+                        "name": os.path.basename(file_path),
+                        "url": url,
+                    })
+                except Exception as _emit_err:
+                    _logger.warning("artifact_uploaded emit failed for %s: %s", file_path, _emit_err)
+        except Exception as e:
+            _logger.warning("OSS upload failed for %s: %s", file_path, e)
+
+    _session_id_for_upload = str(state.get("session_id", ""))
+
     out_file = _get_output_file_path_from_raw(last_output, tool_name)
     oss_url = None
     if out_file:
         try:
-            oss_url = await upload_file_to_cloud_async(out_file)
-            if oss_url:
-                feedback_content += _ui_text(ui_lang, "cloud_download", name=os.path.basename(out_file), url=oss_url) + "\n\n"
+            _upload_task = asyncio.create_task(
+                _upload_and_emit(out_file, "output", step_num, _session_id_for_upload, _sse_writer)
+            )
+            # Best-effort: surface unexpected task errors via logger.
+            def _on_upload_done(task: "asyncio.Task[Any]") -> None:
+                try:
+                    exc = task.exception()
+                except asyncio.CancelledError:
+                    return
+                except Exception:
+                    return
+                if exc is not None:
+                    _logger.warning("Background OSS upload task error for %s: %s", out_file, exc)
+            _upload_task.add_done_callback(_on_upload_done)
+            # Inline placeholder text — actual URL arrives via SSE artifact_uploaded event.
+            if ui_lang == "zh":
+                feedback_content += f"📎 **正在上传到云端：** {os.path.basename(out_file)} …\n\n"
+            else:
+                feedback_content += f"📎 **Uploading to cloud:** {os.path.basename(out_file)} …\n\n"
         except Exception as e:
-            _logger.warning("OSS upload failed for %s: %s", out_file, e)
+            _logger.warning("Failed to schedule OSS upload for %s: %s", out_file, e)
 
         # 3. File Preview
         preview = _read_output_file_preview(out_file)
@@ -2244,33 +2374,64 @@ async def execute_node(state: AgentState, config: RunnableConfig):
         "timestamp": datetime.now().isoformat(),
     })
 
+    # Tool-call observability is now routed through hooks (AnalyticsHooks records
+    # to analytics_store; WebhookHooks etc. can subscribe transparently).
     try:
         input_tokens, output_tokens, total_tokens, usage_missing = _extract_usage_from_output(last_output)
-        analytics_store.record_tool_call(
-            ts=datetime.now().isoformat(),
-            session_id=str(state.get("session_id", "")),
-            tool_name=tool_name,
-            status="failed" if is_failure else "success",
-            latency_ms=int((time.time() - execute_started) * 1000),
-            input_tokens=input_tokens,
-            output_tokens=output_tokens,
-            total_tokens=total_tokens,
-            usage_missing=usage_missing,
-            model=getattr(chains.get("llm"), "model_name", "") if chains.get("llm") else "",
-            owner_key=str(config.get("configurable", {}).get("chains", {}).get("owner_key", state.get("owner_key", ""))),
-            ip=str(state.get("client_ip", "")),
-        )
+        hooks = state.get("hooks")
+        if hooks is not None:
+            info = ToolResultInfo(
+                tool_name=tool_name,
+                tool_input=merged_tool_input,
+                raw_output=last_output,
+                success=not is_failure,
+                error_message=failure_reason or "",
+                duration_seconds=time.time() - execute_started,
+                step_index=step_num,
+            )
+            record_task = asyncio.create_task(hooks.on_tool_end(
+                info=info,
+                session_id=str(state.get("session_id", "")),
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                total_tokens=total_tokens,
+                usage_missing=usage_missing,
+                model=getattr(chains.get("llm"), "model_name", "") if chains.get("llm") else "",
+                owner_key=str(config.get("configurable", {}).get("chains", {}).get("owner_key", state.get("owner_key", ""))),
+                ip=str(state.get("client_ip", "")),
+            ))
+            # Strong ref to avoid GC of fire-and-forget hook task
+            _BG_TASKS.add(record_task)
+            record_task.add_done_callback(_BG_TASKS.discard)
     except Exception:
-        pass
+        _logger.debug("hook on_tool_end dispatch failed", exc_info=True)
 
-    # 4. Image Hosting (plots, images)
+    # 4. Image Hosting (plots, images) — also uploaded in background; URLs arrive
+    # via SSE "artifact_uploaded" events (kind="image"). Step completion is NOT blocked.
     try:
         img_paths = _extract_image_paths_from_tool_output(last_output, tool_name)
         for ip in img_paths:
             if ip != out_file: # Avoid duplicate link
-                oss_img_url = await upload_file_to_cloud_async(ip)
-                if oss_img_url:
-                    feedback_content += _ui_text(ui_lang, "generated_image", name=os.path.basename(ip), url=oss_img_url) + "\n\n"
+                try:
+                    _img_task = asyncio.create_task(
+                        _upload_and_emit(ip, "image", step_num, _session_id_for_upload, _sse_writer)
+                    )
+                    def _on_img_done(task: "asyncio.Task[Any]", _ip: str = ip) -> None:
+                        try:
+                            exc = task.exception()
+                        except asyncio.CancelledError:
+                            return
+                        except Exception:
+                            return
+                        if exc is not None:
+                            _logger.warning("Background image upload task error for %s: %s", _ip, exc)
+                    _img_task.add_done_callback(_on_img_done)
+                    if ui_lang == "zh":
+                        feedback_content += f"🖼️ **正在上传图片：** {os.path.basename(ip)} …\n\n"
+                    else:
+                        feedback_content += f"🖼️ **Uploading image:** {os.path.basename(ip)} …\n\n"
+                except Exception as e:
+                    _logger.warning("Failed to schedule OSS image upload for %s: %s", ip, e)
     except Exception:
         pass
 
