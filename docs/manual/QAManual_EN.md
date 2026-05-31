@@ -1,430 +1,346 @@
 # VenusFactory2 Frequently Asked Questions (FAQ)
 
-## Installation and Environment Configuration Issues
+## Installation and Environment
 
-### Q1: How to properly install VenusFactory2?
+### Q1: How do I install VenusFactory2?
 
-**Answer**: You can find the installation step in README.md at the root directory.
+Follow the **Installation** section of `README.md`. The supported paths are:
 
-### Q2: What should I do if I encounter the error "Could not find a specific dependency" during installation?
+1. **conda + pip** (default for most users):
+   ```bash
+   git clone https://github.com/AI4Protein/VenusFactory2.git && cd VenusFactory2
+   conda create -n venus python=3.12 && conda activate venus
+   pip install torch==2.8.0 torchvision --index-url https://download.pytorch.org/whl/cu128
+   pip install torch_geometric pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv \
+       -f https://data.pyg.org/whl/torch-2.8.0+cu128.html
+   pip install -r requirements.txt
+   ```
 
-**Answer**: There are several solutions for this situation:
+2. **uv** (faster, for development): `python install.py --type cu128` then `source .venv/bin/activate`.
+
+3. **Docker**: `cp .env.example .env && docker compose --profile gpu up -d --build`.
+
+Verify with `python scripts/check_env.py`.
+
+### Q2: I hit "Could not find a specific dependency" during installation.
+
+Options, in order:
 
 1. Try installing the problematic dependency individually:
    ```bash
-   pip install name_of_the_problematic_library
+   pip install <name>
    ```
-
-2. If it is a CUDA-related library, ensure you have installed a PyTorch version compatible with your CUDA version:
+2. If it's CUDA-related, make sure your torch matches your CUDA. The default for VenusFactory2 is **CUDA 12.8 + torch 2.8.0**:
    ```bash
-   # For example, for CUDA 11.7
-   pip install torch==2.0.0+cu117 -f https://download.pytorch.org/whl/torch_stable.html
+   pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cu128
    ```
-
-3. For some special libraries, you may need to install system dependencies first. For example, on Ubuntu:
+3. Some packages need system libraries. On Ubuntu 24.04 the most common ones are needed by the `pycairo` build (pulled in via `xhtml2pdf` for PDF export):
    ```bash
    sudo apt-get update
-   sudo apt-get install build-essential
+   sudo apt-get install -y build-essential libcairo2-dev libxml2-dev pkg-config
    ```
+   Alternatively on conda: `conda install -c conda-forge pycairo` to skip the source build entirely.
 
-### Q3: How can I check if my CUDA is installed correctly?
+### Q3: How do I check that CUDA is set up correctly?
 
-**Answer**: You can verify if CUDA is installed correctly by the following methods:
-
-1. Check the CUDA version:
-   ```bash
-   nvidia-smi
-   ```
-
-2. Verify if PyTorch can recognize CUDA in Python:
+1. Driver check: `nvidia-smi` (driver should support CUDA 12.8 → driver ≥ 555.x).
+2. PyTorch check:
    ```python
    import torch
-   print(torch.cuda.is_available())  # Should return True
-   print(torch.cuda.device_count())  # Displays the number of GPUs
-   print(torch.cuda.get_device_name(0))  # Displays the GPU name
+   print(torch.__version__)            # should be 2.8.0+cu128
+   print(torch.cuda.is_available())    # True
+   print(torch.cuda.device_count())    # number of visible GPUs
+   print(torch.cuda.get_device_name(0))
    ```
+3. End-to-end check: `python scripts/check_env.py` runs the imports above plus a CUDA matmul smoke test.
 
-3. If PyTorch cannot recognize CUDA, ensure you have installed the matching versions of PyTorch and CUDA.
+If `cuda.is_available()` is False, your torch wheel was likely installed without CUDA. Reinstall with the right `--index-url` (see Q2).
 
-## Hardware and Resource Issues
+## Hardware and Resources
 
-### Q4: What should I do if I encounter a "CUDA out of memory" error during runtime?
+### Q4: I get "CUDA out of memory" during training.
 
-**Answer**: This error indicates that your GPU memory is insufficient. Solutions include:
+In order of effectiveness:
 
-1. **Reduce the batch size**: This is the most direct and effective method. Reduce the batch size in the training configuration by half or more.
+1. **Reduce batch size** — most direct fix. Halve `Batch Size` (or `Tokens per Batch`).
+2. **Use a smaller model** — e.g. switch from `ESM2-650M` to `ESM2-150M` or `ESM2-35M`. ProSST / VenusPLM are also lightweight options.
+3. **Use a PEFT method** — `plm-lora`, `plm-qlora`, `plm-dora`, `plm-ia3` train far fewer parameters.
+4. **Enable gradient accumulation** — set `gradient_accumulation_steps` to 2 / 4 / 8 to keep effective batch size while shrinking memory.
+5. **Reduce `Max Seq Length`** if your data allows it (truncate signal peptides / long disordered tails).
 
-2. **Use a smaller model**: Choose a pre-trained model with fewer parameters, such as switching from ProtBERT to ESM-1b.
+### Q5: How do I pick a batch size?
 
-3. **Enable gradient accumulation**: Increase the `gradient_accumulation_steps` parameter value, for example, set it to 2 or 4, which can reduce memory usage without decreasing the effective batch size.
+1. **Start small, grow.** Begin at 4 or 8; raise until you're near GPU memory limit.
+2. **Reference range.** For most protein PLMs, batch 16–64 is typical, but it depends heavily on GPU memory and sequence length.
+3. **Trade-off.** Larger batches → more stable gradients but may need a higher learning rate.
+4. **OOM rule.** If you OOM, halve first; only then think about other tweaks.
 
-4. **Use mixed precision training**: Enable the `fp16` option in the training options, which can significantly reduce memory usage.
-
-5. **Reduce the maximum sequence length**: If your data allows, you can decrease the `max_seq_length` parameter.
-
-### Q5: How can I determine what batch size I should use?
-
-**Answer**: Determining the appropriate batch size requires balancing memory usage and training effectiveness:
-
-1. **Start small and gradually increase**: Begin with smaller values (like 4 or 8) and gradually increase until memory is close to its limit.
-
-2. **Refer to benchmarks**: For common protein models, most studies use a batch size of 16-64, but this depends on your GPU memory and sequence length.
-
-3. **Monitor the training process**: A larger batch size may make each training iteration more stable but may require a higher learning rate.
-
-4. **Rule of thumb for memory issues**: If you encounter memory errors, first try halving the batch size.
-
-## Dataset Issues
+## Dataset
 
 ### Q6: How do I prepare a custom dataset?
 
-**Answer**: Preparing a custom dataset requires the following steps:
+For the **Custom Model → Training** page:
 
-1. **Format the data**: The data should be organized into a CSV file, containing at least the following columns:
-   - `sequence`: The protein sequence, represented using standard amino acid letters
-   - Label column: Depending on your task type, this can be numerical (regression) or categorical (classification)
+1. **Columns.** At minimum a sequence column (default `aa_seq`) and a label column (default `label`). For `ses-adapter` add `foldseek_seq` and/or `ss8_seq`. Regression: numeric label. Classification: integer (single-label) or list (multi-label).
+2. **Splits.** Three files — `train`, `validation`, `test` — uploaded separately, or a HuggingFace dataset with those splits.
+3. **Path on HF.** Reference as `username/dataset_name`.
+4. **Config.** On the page, set Problem Type, Num Labels, and Metrics; or pick a Pre-defined dataset which auto-fills these.
 
-2. **Split the data**: Prepare training, validation, and test sets, such as `train.csv`, `validation.csv`, and `test.csv`.
+### Q7: I get a format error when uploading my dataset.
 
-3. **Upload to Hugging Face**:
-   - Create a dataset repository on Hugging Face
-   - Upload your CSV file
-   - Reference it in VenusFactory2 using the `username/dataset_name` format
+Common issues:
 
-4. **Create dataset configuration**: The configuration should include the problem type (regression or classification), number of labels, and evaluation metrics.
+1. **Wrong column names.** Ensure your sequence column is `aa_seq` (or whatever you set in the form) and the label column is `label`.
+2. **Bad sequence characters.** Only the 20 standard AA letters (`ACDEFGHIKLMNPQRSTVWY`) plus optionally `X` for unknown. Strip whitespace, line breaks, and other characters.
+3. **Encoding.** Save as UTF-8.
+4. **Delimiter.** CSV uses comma; TSV uses tab — name your file accordingly.
+5. **Missing values.** Drop rows with missing sequences or labels.
 
-### Q7: What should I do if I encounter a format error when importing my dataset?
+### Q8: My dataset is huge and the system is slow.
 
-**Answer**: Common format issues and their solutions:
+1. **Subset for prototyping.** Validate the pipeline on 1–5k rows first.
+2. **Batch Token Mode** — for variable-length sequences, this packs more efficiently than fixed Batch Size.
+3. **Preprocess off-line.** Remove unused columns, deduplicate, and shard into multiple files.
+4. **More memory.** If your machine has spare RAM, raise `num_workers` in Training; if it's swapping, lower it.
 
-1. **Incorrect column names**: Ensure the CSV file contains the necessary columns, especially the `sequence` column and label column.
+## Training
 
-2. **Sequence format issues**:
-   - Ensure the sequence contains only valid amino acid letters (ACDEFGHIKLMNPQRSTVWY)
-   - Remove spaces, line breaks, or other illegal characters from the sequence
-   - Check if the sequence length is within a reasonable range
+### Q9: My training got interrupted. How do I recover?
 
-3. **Encoding issues**: Ensure the CSV file is saved with UTF-8 encoding.
+The training save path is whatever you set in **Save Directory** + **Output Model Name** (default `ckpt/demo/best_model.pt`).
 
-4. **CSV delimiter issues**: Ensure the file uses the correct delimiter (usually a comma). You can use a text editor to view and correct it.
+1. On the Training page, switch **Training Mode** from `From Scratch` to `Continue Training`.
+2. Pick the **Model Folder** that contains your last checkpoint.
+3. Pick the **Checkpoint** file from the dropdown.
+4. Hit Start — training resumes from that checkpoint's epoch and optimizer state.
 
-5. **Handling missing values**: Ensure there are no missing values in the data, or handle them appropriately.
+> The system keeps a "best so far" checkpoint per run (filtered by your monitored metric). Periodic step-based snapshots are not enabled by default.
 
-### Q8: My dataset is large, and the system loads slowly or crashes. What should I do?
+### Q10: Training is too slow.
 
-**Answer**: For large datasets, you can:
+1. **Use a PEFT method** (`plm-lora`, `plm-qlora`) — orders of magnitude fewer trainable params.
+2. **Lower `Max Seq Length`** if your task allows.
+3. **Use a smaller PLM** — ESM2-150M is often within 1–2 points of ESM2-650M on classification tasks but trains much faster.
+4. **Move data to SSD** — protein datasets with PDB files are often I/O bound.
+5. **`Batch Token Mode`** for variable-length data — better GPU utilization than fixed batch size.
 
-1. **Reduce the dataset size**: If possible, test your method with a subset of the data first.
+### Q11: Loss isn't going down, or I see NaN values.
 
-2. **Increase data loading efficiency**:
-   - Use the `batch_size` parameter to control the amount of data loaded at a time
-   - Enable data caching to avoid repeated loading
-   - Preprocess the data to reduce file size (e.g., remove unnecessary columns)
+For loss not decreasing:
 
-3. **Dataset sharding**: Split large datasets into multiple smaller files and process them one by one.
+- **Learning rate too high** — try `1e-5` instead of `5e-4` if doing `full` fine-tuning.
+- **Wrong optimizer** — full fine-tuning typically wants AdamW.
+- **Data issues** — check for label noise, mislabeled samples, off-by-one indexing.
 
-4. **Increase system resources**: If possible, increase RAM or use a server with more memory.
+For NaN:
 
-## Training Issues
+- **Gradient explosion** — set **Max Grad Norm** to 1.0–5.0.
+- **Learning rate too high** — drop by 10×.
+- **fp16 instability** — try fp32 if you suspect numerical underflow.
+- **Bad data** — extreme values in regression labels can produce NaN; cap or normalize them.
 
-### Q9: How can I recover if the training suddenly interrupts?
+### Q12: How do I avoid overfitting?
 
-**Answer**: Methods to handle training interruptions:
+1. **More data / data augmentation.**
+2. **Regularization** — dropout (0.1–0.3), weight decay, or early stopping via `Patience`.
+3. **Smaller model** — fewer parameters, or use `freeze` to lock the PLM.
+4. **Cross-validation** — train multiple folds and pick the median.
 
-1. **Check checkpoints**: The system periodically saves checkpoints (usually in the `ckpt` directory). You can recover from the most recent checkpoint:
-   - Look for the last saved model file (usually named `checkpoint-X`, where X is the step number)
-   - Specify the checkpoint path as the starting point in the training options
+## Evaluation
 
-2. **Use the checkpoint recovery feature**: Enable the checkpoint recovery option in the training configuration.
+### Q13: Which evaluation metric should I focus on?
 
-3. **Save checkpoints more frequently**: Adjust the frequency of saving checkpoints, for example, save every 500 steps instead of the default every 1000 steps.
+| Task | Default focus |
+| :--- | :--- |
+| Balanced classification | **Accuracy**, **F1** |
+| Imbalanced classification | **F1**, **MCC**, **AUROC** |
+| Multi-label classification | **F1_max**, per-label AUROC |
+| Regression | **Spearman_corr**, **MSE** |
 
-### Q10: How can I speed up training if it is very slow?
+The *most important* metric depends on your downstream use. For drug screening you might prioritize true-positive rate; for ranking candidates, Spearman.
 
-**Answer**: Methods to speed up training:
+### Q14: Evaluation results are poor. What now?
 
-1. **Hardware aspects**:
-   - Use a more powerful GPU
-   - Use multi-GPU training (if supported)
-   - Ensure data is stored on an SSD rather than an HDD
+1. **Data quality** — check for label noise, distribution shift between train and test.
+2. **Model + method choices** — try a different PLM, or change from `freeze` to `plm-lora`.
+3. **More features** — structure-aware methods (`ses-adapter`, ProSST, ProtSSN) often beat sequence-only on structurally-dependent tasks.
+4. **Ensemble** — train 3–5 seeds and average predictions.
 
-2. **Parameter settings**:
-   - Use mixed precision training (enable the fp16 option)
-   - Increase the batch size (if memory allows)
-   - Reduce the maximum sequence length (if the task allows)
-   - Decrease validation frequency (the `eval_steps` parameter)
+### Q15: Test-set performance is much worse than validation.
 
-3. **Model selection**:
-   - Choose a smaller pre-trained model
-   - Use parameter-efficient fine-tuning methods (like LoRA)
+1. **Distribution shift** — your test set has families / properties not seen in training. Use stratified splits.
+2. **Overfit to val** — repeated model selection against val acts like training on it. Hold out a *separate* test set you only touch once.
+3. **Data leakage** — duplicates between train and test. Cluster by sequence identity before splitting.
+4. **Small test set** — re-run with different seeds and check variance.
 
-### Q11: What does it mean if the loss value does not decrease or if NaN values appear during training?
+## Prediction
 
-**Answer**: This usually indicates that there is a problem with the training:
+### Q16: How do I speed up prediction?
 
-1. **Reasons for loss not decreasing and solutions**:
-   - **Learning rate too high**: Try reducing the learning rate, for example, from 5e-5 to 1e-5
-   - **Optimizer issues**: Try different optimizers, such as switching from Adam to AdamW
-   - **Initialization issues**: Check the model initialization settings
-   - **Data issues**: Validate if the training data has outliers or label errors
-
-2. **Reasons for NaN values and solutions**:
-   - **Gradient explosion**: Add gradient clipping, set the `max_grad_norm` parameter
-   - **Learning rate too high**: Significantly reduce the learning rate
-   - **Numerical instability**: This may occur when using mixed precision training; try disabling the fp16 option
-   - **Data anomalies**: Check if there are extreme values in the input data
-
-### Q12: What is overfitting, and how can it be avoided?
-
-**Answer**: Overfitting refers to a model performing well on training data but poorly on new data. Methods to avoid overfitting include:
-
-1. **Increase the amount of data**: Use more training data or data augmentation techniques.
-
-2. **Regularization methods**:
-   - Add dropout (usually set to 0.1-0.3)
-   - Use weight decay
-   - Early stopping: Stop training when the validation performance no longer improves
-
-3. **Simplify the model**:
-   - Use fewer layers or smaller hidden dimensions
-   - Freeze some layers of the pre-trained model (using the freeze method)
-
-4. **Cross-validation**: Use k-fold cross-validation to obtain a more robust model.
-
-## Evaluation Issues
-
-### Q13: How do I interpret evaluation metrics? Which metric is the most important?
-
-**Answer**: Different tasks focus on different metrics:
-
-1. **Classification tasks**:
-   - **Accuracy**: The proportion of correct predictions, suitable for balanced datasets
-   - **F1 Score**: The harmonic mean of precision and recall, suitable for imbalanced datasets
-   - **MCC (Matthews Correlation Coefficient)**: A comprehensive measure of classification performance, more robust to class imbalance
-   - **AUROC (Area Under the ROC Curve)**: Measures the model's ability to distinguish between different classes
-
-2. **Regression tasks**:
-   - **MSE (Mean Squared Error)**: The sum of the squared differences between predicted and actual values, the smaller the better
-   - **RMSE (Root Mean Squared Error)**: The square root of MSE, in the same units as the original data
-   - **MAE (Mean Absolute Error)**: The average of the absolute differences between predicted and actual values
-   - **R² (Coefficient of Determination)**: Measures the proportion of variance explained by the model, the closer to 1 the better
-
-3. **Most important metric**: Depends on your specific application needs. For example, in drug screening, you may focus more on true positive rates; for structural prediction, you may focus more on RMSE.
-
-### Q14: What should I do if the evaluation results are poor?
-
-**Answer**: Common strategies to improve model performance:
-
-1. **Data quality**:
-   - Check for errors or noise in the data
-   - Increase the number of training samples
-   - Ensure the training and test set distributions are similar
-
-2. **Model adjustments**:
-   - Try different pre-trained models
-   - Adjust hyperparameters like learning rate and batch size
-   - Use different fine-tuning methods (full parameter fine-tuning, LoRA, etc.)
-
-3. **Feature engineering**:
-   - Add structural information (e.g., using foldseek features)
-   - Consider sequence characteristics (e.g., hydrophobicity, charge, etc.)
-
-4. **Ensemble methods**:
-   - Train multiple models and combine results
-   - Use cross-validation to obtain a more robust model
-
-### Q15: Why does my model perform much worse on the test set than on the validation set?
-
-**Answer**: Common reasons for decreased performance on the test set:
-
-1. **Data distribution shift**:
-   - The training, validation, and test set distributions are inconsistent
-   - The test set contains protein families or features not seen during training
-
-2. **Overfitting**:
-   - The model overfits the validation set because it was used for model selection
-   - Increasing regularization or reducing the number of training epochs may help
-
-3. **Data leakage**:
-   - Unintentionally leaking test data information into the training process
-   - Ensure data splitting is done before preprocessing to avoid cross-contamination
-
-4. **Randomness**:
-   - If the test set is small, results may be influenced by randomness
-   - Try training multiple models with different random seeds and averaging the results
-
-## Prediction Issues
-
-### Q16: How can I speed up the prediction process?
-
-**Answer**: Methods to speed up predictions:
-
-1. **Batch prediction**: Use batch prediction mode instead of single-sequence prediction, which can utilize the GPU more efficiently.
-
-2. **Reduce computation**:
-   - Use a smaller model or a more efficient fine-tuning method
-   - Reduce the maximum sequence length (if possible)
-
-3. **Hardware optimization**:
-   - Use a faster GPU or CPU
-   - Ensure predictions are done on the GPU rather than the CPU
-
-4. **Model optimization**:
-   - Try model quantization (e.g., int8 quantization)
-   - Exporting to ONNX format may provide faster inference speeds
-
-### Q17: What could be the reason for the prediction results being significantly different from expectations?
-
-**Answer**: Possible reasons for prediction discrepancies:
-
-1. **Data mismatch**:
-   - The sequences being predicted differ from the training data distribution
-   - There are significant differences in sequence length, composition, or structural features
-
-2. **Model issues**:
-   - The model is under-trained or overfitted
-   - An unsuitable pre-trained model was chosen for the task
-
-3. **Parameter configuration**:
-   - Ensure the parameters used during prediction (like maximum sequence length) are consistent with those used during training
-   - Check if the correct problem type (classification/regression) is being used
-
-4. **Data preprocessing**:
-   - Ensure the prediction data undergoes the same preprocessing steps as the training data
-   - Check if the sequence format is correct (standard amino acid letters, no special characters)
-
-### Q18: How can I batch predict a large number of sequences?
-
-**Answer**: Steps for efficient batch prediction:
-
-1. **Prepare the input file**:
-   - Create a CSV file containing all sequences
-   - The file must include a `sequence` column
-   - Optionally include an ID or other identifier columns
-
-2. **Use the batch prediction feature**:
-   - Go to the prediction tab
-   - Select "Batch Prediction" mode
-   - Upload the sequence file
-   - Set an appropriate batch size (usually 16-32 is a good balance)
-
-3. **Optimize settings**:
-   - Increasing the batch size can improve throughput (if memory allows)
-   - Reducing unnecessary feature calculations can speed up processing
-
-4. **Result handling**:
-   - After prediction is complete, the system will generate a CSV file containing the original sequences and prediction results
-   - You can download this file for further analysis
+1. **Use Batch mode** in **Custom Model → Predict** — it amortizes GPU setup across many sequences.
+2. **Smaller model** — sometimes a `ESM2-150M` model is "good enough" and 4× faster than `650M`.
+3. **GPU not CPU** — make sure `torch.cuda.is_available()` returns True.
+4. **Lower `Max Seq Length`** if your inputs allow.
+
+### Q17: My predictions are far off from expectations.
+
+Possible causes:
+
+1. **Wrong model / wrong checkpoint** — Predict locks PLM / Method / Pooling from the checkpoint; confirm you picked the right one.
+2. **Out-of-distribution sequence** — your input may be much longer, much shorter, or from a different organism / family than training data.
+3. **Missing structure inputs** — for `ses-adapter` / ProSST / ProtSSN / SaProt models, you must provide the structure side (PDB Dir or Foldseek/SS8 text).
+4. **Sequence formatting** — non-AA characters, lowercase, gaps, or stop codons. Strip them first.
+
+### Q18: How do I batch-predict many sequences efficiently?
+
+Use **Custom Model → Predict** in **Batch** mode:
+
+1. **Prepare the input file** — a CSV/TSV/XLSX with at least:
+   - `aa_seq` — the amino acid sequence
+   - `id` / `name` — optional identifier
+   - `foldseek_seq` / `ss8_seq` — only needed when the model is `ses-adapter` with those structure-seq types enabled
+2. **Load the model** — pick the **Model Folder** + **Model Path** (the saved config locks PLM, method, pooling).
+3. **Switch to Batch mode** — choose `Upload file` (browser upload), `Paste FASTA`, or `Path` (point at a file already on the server — fastest for very large lists).
+4. **Set Batch Size** — 16–32 is a good default. Lower it if you OOM on long sequences; raise it if you have GPU headroom.
+5. **Start** — the page streams a progress bar and a tail of the prediction log.
+6. **Result CSV** — contains every input sample plus the prediction columns; download from the results panel.
 
 ## Model and Result Issues
 
 ### Q19: Which pre-trained model should I choose?
 
-**Answer**: Model selection recommendations:
+| Situation | Recommended |
+| :--- | :--- |
+| General-purpose, balanced compute / quality | **ESM2-650M** |
+| Limited GPU (<8 GB) | **ESM2-8M / 35M / 150M**, **ProSST**, **VenusPLM**, **PETA** |
+| Long-context / generation | **ProtT5-XL** |
+| Structure-aware (PDB available) | **ProSST-2048**, **ProtSSN**, **SaProt**, **VenusREM** |
+| Antibody sequences | **IgBert**, **IgT5** |
+| Largest available, multi-GPU | **ESM2-15B**, **ProtT5-XXL** |
 
-1. **For general tasks**:
-   - ESM-2 is suitable for various protein-related tasks, balancing performance and efficiency
-   - ProtBERT performs well on certain sequence classification tasks
+When picking:
 
-2. **Considerations**:
-   - **Data volume**: When data is limited, a smaller model may be better (to avoid overfitting)
-   - **Sequence length**: For long sequences, consider models that support longer contexts
-   - **Computational resources**: When resources are limited, choose smaller models or parameter-efficient methods
-   - **Task type**: Different models have their advantages in different tasks
+- **Data volume:** with limited training data, smaller models often generalize better (less overfitting risk).
+- **Sequence length:** for very long proteins, prefer models that natively support long context.
+- **Resources:** smaller PLM + a PEFT method (e.g. `plm-lora`) is usually the best resource-quality trade-off.
+- **Task type:** structure-aware models help on structure-dependent tasks (binding, stability); pure-sequence models are fine for solubility / localization.
 
-3. **Recommended strategy**: If conditions allow, try several different models and choose the one that performs best on the validation set.
+When in doubt, train 2-3 candidates and pick the one that wins on the validation set.
 
-### Q20: How do I interpret the loss curve during training?
+### Q20: How do I read the training-loss curve in the Training page?
 
-**Answer**: Guidelines for interpreting the loss curve:
+The Training page streams **Train Loss**, **Val Loss**, and **Val Metrics** charts in real time.
 
-1. **Ideal curve**:
-   - Both training loss and validation loss decrease steadily
-   - The two curves eventually stabilize and converge
-   - The validation loss stabilizes near its lowest point
+| Pattern | Likely meaning | What to try |
+| :--- | :--- | :--- |
+| Both losses go down and converge cleanly | Healthy run — let it finish | — |
+| Train loss ↓ / Val loss ↑ | Overfitting | Higher dropout, weight decay, lower `Num Epochs`, smaller `Patience`, smaller model |
+| Both losses plateau high | Underfitting | Higher learning rate, larger model, more epochs |
+| Curve is wildly noisy | Learning rate too high | Drop LR by 5–10×, set `Max Grad Norm` to 1.0–5.0 |
+| Val < Train | Often normal (dropout / data split effect); occasionally indicates split contamination | Check that train and val are truly disjoint |
+| Sudden spike then NaN | Gradient explosion | Set `Max Grad Norm`, lower LR, check for extreme labels |
 
-2. **Common patterns and their meanings**:
-   - **Training loss continues to decrease while validation loss increases**: Signal of overfitting; consider increasing regularization
-   - **Both losses stagnate at high values**: Indicates underfitting; may need a more complex model or longer training
-   - **Curve fluctuates dramatically**: The learning rate may be too high; consider lowering it
-   - **Validation loss is lower than training loss**: This may indicate a data splitting issue or batch normalization effect
+If val metric stops improving before the epoch cap, the **Patience** early-stop will halt the run automatically.
 
-3. **Adjusting based on the curve**:
-   - If validation loss stops improving early, consider early stopping
-   - If training loss decreases very slowly, try increasing the learning rate
-   - If there are sudden jumps in the curve, check for data issues or learning rate scheduling
+### Q21: How do I save and share my trained model?
 
-### Q21: How do I save and share my model?
+Models are saved to `Save Directory / Output Model Name` (default `ckpt/demo/best_model.pt`). The folder contains:
 
-**Answer**: Guidelines for saving and sharing models:
+| File | Purpose |
+| :--- | :--- |
+| `*.pt` | Model weights (the file you trained) |
+| `config.json` / `adapter_config.json` | Run configuration: PLM, method, pooling, problem type, num labels, LoRA params — **Custom Model → Evaluation / Predict reads this back** |
+| tokenizer files | Inherited from the base PLM |
 
-1. **Local saving**:
-   - After training is complete, the model will be automatically saved in the specified output directory
-   - The complete model includes model weights, configuration files, and tokenizer information
+**To share:**
 
-2. **Important files**:
-   - `pytorch_model.bin`: Model weights
-   - `config.json`: Model configuration
-   - `special_tokens_map.json` and `tokenizer_config.json`: Tokenizer configuration
-
-3. **Sharing the model**:
-   - **Hugging Face Hub**: The easiest way is to upload to Hugging Face
-     - Create a model repository
-     - Upload your model files
-     - Add model descriptions and usage instructions in the readme
-   
-   - **Local export**: You can also compress the model folder and share it
-     - Ensure all necessary files are included
-     - Provide environment requirements and usage instructions
-
-4. **Documentation**: Regardless of the sharing method, you should provide:
-   - Description of the training data
-   - Model architecture and parameters
-   - Performance metrics
-   - Usage examples
+1. **Hugging Face Hub** — easiest. Create a model repository, upload the folder, fill in a model card describing the training data, architecture, metrics, and a usage example.
+2. **Local export** — `tar -czf my_model.tar.gz ckpt/demo/`. Recipient should also receive a note on which PLM was the base + the training method, so they can plug into **Custom Model → Predict** the same way.
+3. **Document everything** — training data source, hyperparameters, validation / test metrics, intended use, and known limitations.
 
 ## Interface and Operation Issues
 
-### Q22: What should I do if the interface loads slowly or crashes?
+### Q22: The WebUI is slow or the page crashes.
 
-**Answer**: Solutions for interface issues:
+1. **Browser:** Chrome / Edge tend to have the best compatibility with the React + Molstar viewer. Clear cache, disable heavy extensions.
+2. **Resources:** make sure your machine has free RAM. Close other GPU-heavy apps. If on a remote server, check `top` / `nvidia-smi`.
+3. **Network:** for remote deployments, an unstable SSH tunnel or reverse proxy can cause API timeouts. Test with `curl http://<host>:7861/health`.
+4. **Restart:** kill `python src/webui_v2.py` and start it again. In Docker: `docker compose --profile gpu restart`.
+5. **Build fresh frontend:** if some pages render but others are stuck on a spinner, rebuild the React bundle (`cd frontend && npm run build`) — older artifacts can mismatch a newer backend.
 
-1. **Browser-related**:
-   - Try using different browsers (Chrome usually has the best compatibility)
-   - Clear browser cache and cookies
-   - Disable unnecessary browser extensions
+### Q23: Training process becomes unresponsive midway.
 
-2. **Resource issues**:
-   - Ensure the system has enough memory
-   - Close other resource-intensive programs
-   - If running on a remote server, check the server load
+Most common causes:
 
-3. **Network issues**:
-   - Ensure the network connection is stable
-   - If using through an SSH tunnel, check if the connection is stable
+1. **OOM kill:** the Linux OOM killer terminated the Python process. Check `dmesg | tail -30` for `Killed process`. Fix: lower batch size, use a smaller PLM, or use `plm-qlora`.
+2. **GPU OOM that didn't crash but stalled:** rare but possible with non-blocking CUDA errors. `nvidia-smi` will show 0% util and unfree memory. Restart the process.
+3. **Browser disconnect:** the UI shows "stopped" but the backend may still be running. The training process keeps going regardless — check the latest checkpoint in `ckpt/`.
+4. **Network / SSH tunnel drop:** if you launched via SSH without `tmux` / `nohup` / `screen`, the process was killed when the shell died. Always run inside `tmux` for long jobs.
+5. **API rate limits** (when training uses external services like W&B): the run can hang waiting on the API. Disable W&B with the toggle or check `wandb` status.
 
-4. **Restart services**:
-   - Try restarting the Gradio service
-   - In extreme cases, restart the server
+For all of the above, the best safeguard is **Continue Training** mode — restart from the last checkpoint with one click.
 
-### Q23: Why does my training stop responding midway?
+## Agent / Chat
 
-**Answer**: Possible reasons and solutions for training stopping responding:
+### Q24: The Agent stops mid-plan.
 
-1. **Resource exhaustion**:
-   - Insufficient system memory
-   - GPU memory overflow
-   - Solution: Reduce batch size, use more efficient training methods, or increase system resources
+- Check the **Execution Status** column on the right. A red status usually points at the failing tool.
+- The most common causes: missing API key (set it in **Settings** or `.env`), provider rate limit, or a tool that ran out of memory.
+- You can re-run the failing step: use **Modify & Re-execute** at the iteration checkpoint, or edit the plan and continue.
 
-2. **Process termination**:
-   - The system's OOM (Out of Memory) killer terminated the process
-   - Server timeout policies may terminate long-running processes
-   - Solution: Check system logs, use tools like screen or tmux to run in the background, reduce resource usage
+### Q25: Agent ran out of quota in online mode.
 
-3. **Network or interface issues**:
-   - Browser crashes or network disconnections
-   - Solution: Run training via command line, or ensure a stable network connection
+Online deployments enforce a per-user daily chat quota (visible in the quota pill near the input). When exhausted:
 
-4. **Data or code issues**:
-   - Anomalies or incorrect formats in the dataset causing processing to hang
-   - Solution: Check the dataset, and test the process with a small subset of data
+- Wait for the daily reset, or
+- Use **Local mode** with your own API keys — no quota.
+
+### Q26: My custom OpenAI-style model isn't showing up.
+
+- Custom models are **local-mode only** and stored in your browser's `localStorage` (`vf2_custom_openai_style_models`).
+- If you cleared site data, re-add them via the chat-page model picker.
+- In Online mode they're filtered out by design.
+
+## WebUI / Deployment
+
+### Q27: What's the difference between WebUI v1 and v2?
+
+- **v1** (`python src/webui.py`): legacy Gradio interface on port 7860.
+- **v2** (`python src/webui_v2.py`): current FastAPI + React interface on port 7861 — this is what all the manuals describe.
+
+v2 is the default for new deployments. v1 is kept around for users who depended on the old Gradio MCP integration.
+
+### Q28: I started v2 but pages are blank.
+
+You need to build the React frontend first:
+
+```bash
+cd frontend && npm install && npm run build && cd ..
+python src/webui_v2.py --host 0.0.0.0 --port 7861
+```
+
+Without `frontend/dist/`, v2 has no UI to serve.
+
+### Q29: WebUI v2 starts but pages can't reach the API.
+
+Check the bound host and port:
+
+- `--host 0.0.0.0` to accept external connections (default `0.0.0.0`).
+- The default port is `7861`. If something else uses it, override with `--port` or `VENUS_PORT` (Docker).
+- For external access through a reverse proxy, set `WEBUI_V2_CORS_ORIGINS` in `.env` to include your proxy URL.
+
+### Q30: How do I reset the environment after a bad install?
+
+```bash
+# conda path
+conda deactivate
+conda env remove -n venus
+conda create -n venus python=3.12
+# then re-run the install steps from Q1
+
+# uv path
+rm -rf .venv
+python install.py --type cu128
+```
+
+For Docker: `docker compose --profile gpu down -v && docker compose --profile gpu up -d --build`.

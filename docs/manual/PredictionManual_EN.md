@@ -1,103 +1,121 @@
-# VenusFactory2 Prediction Module User Guide
+# Custom Model — Prediction
 
-## Table of Contents
-1. Introduction
-2. Overview of the Prediction Interface
-3. Single Sequence Prediction
-4. Batch Prediction
-5. Frequently Asked Questions
+> **Where to find it (v2):** Sidebar → **Custom Model → Predict** (`/custom-model/predict`).
+> **Local mode only:** prediction is disabled in online mode (read-only view).
 
-## 1. Introduction
+The Predict page applies one of your trained models to new sequences — either one sequence at a time, or a whole batch.
 
-The Prediction Module lets you apply trained models to new protein sequences to predict their properties. After training a model (or using a pre-trained one), you can quickly predict properties for single sequences or process hundreds of sequences in batch mode.
+---
 
-**Two main use cases**:
-- **Single sequence prediction**: Get instant results for one protein - ideal for quick checks or interactive exploration
-- **Batch prediction**: Upload a CSV file with many sequences and get predictions for all of them at once - perfect for screening large protein libraries
+## 1. Pick a Model
 
-## 2. Overview of the Prediction Interface
+| Field | Notes |
+| :--- | :--- |
+| **Model Folder** | Pick from the `ckpt/` listing — populated by previous training runs. |
+| **Model Path** | The specific checkpoint file (`best_model.pt` by default) inside the chosen folder. Selecting a model auto-fills the rest of the model config. |
 
-The prediction interface is divided into a model configuration area and two main functional tabs: single sequence prediction and batch prediction.
+Selecting a model **locks** the following fields to the values from the checkpoint config (you can't predict with mismatched settings):
 
-### 2.1 Model Configuration Area
+- **PLM** — must match what was used in training
+- **Eval Method** — `freeze` · `full` · `plm-lora` · `plm-dora` · `plm-adalora` · `plm-ia3` · `plm-qlora` · `ses-adapter`
+- **Pooling** — `mean` · `attention1d` · `light_attention`
+- **Problem Type** — `single_label_classification` · `multi_label_classification` · `regression`
+- **Num Labels** — relevant for classification
 
-The model configuration area contains all the basic parameter settings required for prediction, which must be consistent with the parameters used during model training:
+If the Eval Method is `ses-adapter` or the PLM is structure-aware (ProSST / ProtSSN / SaProt), extra inputs appear (Structure Seq picker, PDB Dir, and/or Foldseek / SS8 sequence text areas for Single mode).
 
-- **Model Path**: The path to the trained model file, usually the model file saved during the training process (e.g., `ckpt/model.pt`)
-- **Protein Language Model**: Selection of the pre-trained protein language model, which must be the same as the model used during training
-- **Evaluation Method**: Selection of evaluation methods, including `freeze` (freeze the pre-trained model), `full` (full fine-tuning), `ses-adapter` (structure-enhanced adapter), `plm-lora`, and `plm-qlora` (parameter-efficient fine-tuning methods)
-- **Pooling Method**: Selection of pooling methods, including `mean` (mean pooling), `attention1d` (attention pooling), and `light_attention` (lightweight attention pooling)
-- **Problem Type**: Selection of problem types, including single-label classification, multi-label classification, and regression
-- **Number of Labels**: Setting the number of labels (for classification problems)
+---
 
-When the `ses-adapter` evaluation method is selected, additional structural sequence options will be displayed:
-- **Structure Sequences**: Options to select `foldseek_seq` (FoldSeek generated structural sequences) and `ss8_seq` (8-class secondary structure sequences)
+## 2. Pick a Prediction Mode
 
-### 2.2 Prediction Functional Tabs
+Toggle between **Single** and **Batch**.
 
-The prediction module provides two prediction modes, accessed through different tabs:
+### 2.1 Single
 
-- **Sequence Prediction**: Single sequence prediction, suitable for quickly predicting the function of a single protein sequence
-- **Batch Prediction**: Batch prediction, suitable for simultaneously predicting the functions of multiple protein sequences
+| Field | Notes |
+| :--- | :--- |
+| **AA Sequence** | Paste a single amino acid sequence (single-letter codes). |
+| **Foldseek Sequence** | (Only when `ses-adapter` + `foldseek_seq` selected) Matching foldseek-encoded string. |
+| **SS8 Sequence** | (Only when `ses-adapter` + `ss8_seq` selected) Matching 8-class secondary structure string. |
 
-## 3. Single Sequence Prediction
+Click **Predict** to get an instant result.
 
-The single sequence prediction function allows users to input a single protein sequence and obtain instant prediction results, suitable for quick validation and exploratory analysis.
+### 2.2 Batch
 
-### 3.1 Input Sequence
+| Field | Notes |
+| :--- | :--- |
+| **Source** | `Upload file` (upload a CSV/TSV/XLSX) · `Paste FASTA` (paste FASTA-formatted content in a textarea) · `Path` (point to an existing file path on the server). |
+| **Workspace** | The upload source also supports picking from Workspace. |
+| **Batch Size** | Number of sequences scored per forward pass. Lower it if you OOM on long sequences. |
 
-Enter the standard amino acid sequence (using single-letter codes) in the "Amino Acid Sequence" text box. If using the `ses-adapter` method, structural sequence information (FoldSeek sequence and/or secondary structure sequence) must also be entered in the corresponding text boxes.
+For file inputs (Upload / Path), the expected columns:
 
-### 3.2 Execute Prediction
+| Column | Required? | Notes |
+| :--- | :---: | :--- |
+| `aa_seq` | ✓ | Amino acid sequence. |
+| `id` / `name` | optional | Sample identifier. |
+| `foldseek_seq` | optional | Required when `ses-adapter` + `foldseek_seq` is enabled. |
+| `ss8_seq` | optional | Required when `ses-adapter` + `ss8_seq` is enabled. |
 
-1. Ensure all model configuration parameters are set correctly
-2. Click the "Predict" button to start the prediction process
-3. The system will display prediction progress and status information
-4. To abort the prediction, click the "Abort" button
+---
 
-### 3.3 Display Prediction Results
+## 3. Run & Watch
 
-After the prediction is complete, the results will be displayed in tabular form:
+- **Preview Command** — equivalent CLI invocation.
+- **Start** — kicks off prediction; the page streams a progress bar and a tail of the prediction log.
+- **Logs** panel shows per-batch progress and any data issues (bad sequence chars, missing structure-seq, etc.).
 
-- **Single-label Classification**: Displays the predicted categories and the probability distribution for each category
-- **Multi-label Classification**: Displays the prediction results (0/1) and probability values for each label
-- **Regression**: Displays the predicted numerical results
+---
 
-## 4. Batch Prediction
+## 4. Results
 
-The batch prediction function allows users to process multiple protein sequences simultaneously, suitable for large-scale screening and systematic analysis.
+| Problem type | What you get |
+| :--- | :--- |
+| **Single-label classification** | Predicted class + per-class probability distribution. |
+| **Multi-label classification** | Per-label 0/1 + per-label probability. |
+| **Regression** | Predicted numeric value. |
 
-### 4.1 Prepare Input File
+For batch mode, results are saved as a CSV containing every input sample plus the prediction columns. Download from the results panel.
 
-Batch prediction requires preparing an input file in CSV format, which should contain the following columns:
-- `aa_seq` (required): Amino acid sequence
-- `id` (optional): Sequence identifier
-- `foldseek_seq` (optional, required only for `ses-adapter` method): FoldSeek structural sequence
-- `ss8_seq` (optional, required only for `ses-adapter` method): Secondary structure sequence
+---
 
-### 4.2 Upload File and Configure Batch Processing Parameters
+## 5. Workflow Walkthroughs
 
-1. Click the "Upload CSV File" button to upload the prepared CSV file
-2. After uploading, you can preview the file content in the "File Preview" area
-3. Set the "Batch Size" parameter to control the number of sequences processed in each batch (default is 8)
-   - Larger batches can speed up the prediction process but require more memory/graphics memory
-   - For long sequences, it is recommended to use a smaller batch size
+### 5.1 Single-Sequence Prediction
 
-### 4.3 Execute Batch Prediction
+Quick check on one protein.
 
-1. Ensure all model configuration parameters are set correctly
-2. Click the "Start Batch Prediction" button to begin batch prediction
-3. The system will display a progress bar and status information, including:
-   - Total number of sequences
-   - Current processing progress
-   - Estimated remaining time
-4. To abort the prediction, click the "Abort" button
+1. **Pick the model** — Model Folder + Model Path; the rest of the model config auto-locks.
+2. **Switch to Single mode.**
+3. **Paste the AA sequence** in the text box (single-letter codes only).
+4. (For `ses-adapter` models) paste the matching **Foldseek** and/or **SS8** sequence.
+5. **Predict** — result appears in the panel:
+   - Single-label classification → predicted class + per-class probabilities.
+   - Multi-label classification → 0/1 + probability per label.
+   - Regression → predicted numeric value.
+6. **Abort** if a run misbehaves.
 
-### 4.4 Batch Prediction Results
+### 5.2 Batch Prediction
 
-After the prediction is complete, the results will be displayed in tabular form and provide the following functionalities:
-- Summary statistics of results (e.g., predicted category distribution or numerical statistics)
-- Complete prediction results table
-- "Download Predictions" button for downloading the complete prediction results in CSV format
+Scale to hundreds or thousands of sequences.
 
-The downloaded CSV file contains the original sequence information and corresponding prediction results, which can be further processed and visualized using other analysis tools.
+1. **Pick the model** — same as Single.
+2. **Switch to Batch mode.**
+3. **Choose a Source:**
+   - `Upload file` — drag a CSV / TSV / XLSX, or pick from Workspace.
+   - `Paste FASTA` — paste a multi-record FASTA into the textarea.
+   - `Path` — point at an existing file path on the server (fastest for huge files).
+4. **Check the preview** of input rows / records to confirm the columns map correctly.
+5. **Set Batch Size** — 16–32 usually works; lower it if you OOM with long sequences.
+6. **Start** — the progress bar shows total / processed / ETA.
+7. **Download CSV** — every input row plus the prediction columns.
+
+---
+
+## 6. Tips
+
+- **Sequence sanity.** Strip stop codons, line breaks, and non-AA characters before pasting.
+- **Long sequences.** If your training capped sequence length, predictions on longer inputs may silently truncate — check the logs.
+- **Structure-aware models.** Don't forget the structure-side inputs (PDB Dir for batch, Foldseek/SS8 text for single).
+- **Use Batch for >10 sequences.** Single mode rebuilds the GPU pipeline on every call; batch amortizes that cost.
+- **Custom workflow:** if you need to mass-screen, generate the input CSV from a database query or a script and feed it via **Source = Path** — much faster than the upload UI.

@@ -1,288 +1,177 @@
-# VenusFactory2 Quick Tools User Guide
+# Quick Tools — Fast, No-Setup Protein Analysis
 
-## 1. Introduction
+**Quick Tools** is the fastest way to run a single prediction. Pre-selected models, sensible defaults, minimal knobs. Pick the tool, drop your input, click **Start Prediction**.
 
-Quick Tools is designed for fast, no-setup protein analysis. If you have a sequence and want quick predictions without configuring models or parameters, Quick Tools is your starting point.
+For full control over which model / dataset to use, switch to **Advanced Tools** (same five tasks, plus more options).
 
-**Choose Quick Tools when you**:
-- Want results fast without learning complex settings
-- Need standard predictions (mutations, function, binding sites, properties)
-- Are exploring a new protein for the first time
-- Don't need to customize which models to use
+## Tools at a Glance
 
-Quick Tools offers 5 ready-to-use analysis types:
+| # | Tool | Route | Input | What it tells you |
+| :---: | :--- | :--- | :--- | :--- |
+| 1 | Directed Evolution | `/quick-tools/directed-evolution` | FASTA or PDB | Best single-point mutations for a target function |
+| 2 | Sequence Design | `/quick-tools/sequence-design` | PDB | Candidate sequences for a given backbone (ProteinMPNN) |
+| 3 | Protein Discovery | `/quick-tools/protein-discovery` | PDB | Structural / sequence homologs via VenusMine |
+| 4 | Protein Function | `/quick-tools/protein-function` | FASTA | Protein-level properties (solubility, localization, …) |
+| 5 | Functional Residue | `/quick-tools/functional-residue` | FASTA | Per-residue activity / binding / conserved / motif sites |
+| 6 | Physicochemical Property | `/quick-tools/physicochemical-property` | FASTA or PDB | MW, pI, SASA, secondary structure, etc. |
 
-Directed Evolution: AI-Powered Mutation Prediction This tool allows for the rapid scoring and analysis of protein mutations. Simply upload a PDB file or paste the PDB content, and the platform will provide insights into the effects of single or multiple mutations on the protein.
+---
 
-Protein Discovery: A quick-entry VenusMine workflow for structure homolog search and clustering. In Quick Tools, this module keeps only PDB input and one-click start. Advanced parameters are handled by backend defaults.
+## Common Layout
 
-Protein Function: Leveraging pre-trained models, this module predicts various protein functions from a given amino acid sequence. You can upload a FASTA file or paste the sequence directly to predict properties such as solubility, localization, and more.
+Every Quick Tool page looks the same:
 
-Functional Residual Prediction: This module focuses on identifying the function of individual amino acid residues, such as Activity Sites, Binding Sites, Conserved Sites, and Motifs, allowing researchers to precisely map structure-function relationships . Users can paste sequences to target these critical sites.
+| Area | What's there |
+| :--- | :--- |
+| **Left — Input + Config** | Sequence / PDB input (paste / upload / Workspace / Use Example), task dropdown, optional **Enable AI analysis** toggle (+ LLM Provider when on), **Start Prediction** button. |
+| **Right — Result Panel** | Status, tabs for the raw table, optional heatmap, optional AI Expert Analysis, plus **Download Results**. |
 
-Physicochemical Property: This module performs rapid, deterministic calculations based on amino acid composition to determine fundamental properties. These include theoretical pI, molecular weight, Instability Index, and secondary structure content, providing essential data for experimental planning 
+**Online mode:** sequence inputs are capped by the online FASTA limit (default 50 residues for paste). Protein Discovery is **view-only** in online mode.
 
-## 2.Overview of the QuickTools Interface
+---
 
-### 2.1 Model Configuration and Data Input Area
+## 1. Directed Evolution
 
-This area is used to select the prediction task and provide the protein sequences for analysis.
+Score every possible single-point mutation against a target function.
 
-**Model Configuration:**
+| Field | Notes |
+| :--- | :--- |
+| **Sequence input** | Paste FASTA, upload `.fasta` / `.fa` / `.pdb`, pick from Workspace, or use the example. |
+| **Select Protein Function** | Target function for which to score mutations (see below). |
+| **Enable AI analysis** | Optional; adds an AI Expert summary tab. |
 
-- **Select Task / Select Protein function / Select Properties of Protein** (Specific option depends on the function of different tools): This is a dropdown menu used to select the type of prediction task for the current run.
-    - *directed mutation*: Select Protein function
-    - *Protein function prediction*: Select Task
-    - *Functional residual prediction*: Select Task
-    - *Physicochemical property analysis*: Select Properties of Protein
+**Function options:**
 
-**Data Input:** This area allows the user to provide sequence data in two ways and displays the content of the uploaded sequence(s).
+- **Activity** — impact of mutations on catalytic or biological activity.
+- **Binding** — impact on the protein's ability to bind ligands or interaction partners.
+- **Expression** — impact on expression level in the host cell.
+- **Organismal Fitness** — impact on the survival / growth of the whole organism.
+- **Stability** — impact on thermodynamic or conformational stability.
 
-- **Upload Protein File** (Upload FASTA File): The selected tab for submitting sequences via file upload.
-- **Paste Protein Content** (Paste FASTA Content): The alternative tab for directly pasting FASTA-formatted sequence content into the text box.
-- **Uploaded Protein Sequence**: This area will display the uploaded protein sequence(s), which are the raw amino acid sequences read from the input file or pasted content.
+**Outputs:**
+- **Raw table** — ranked mutants with prediction score
+- **Prediction heatmap** — 2D matrix: Y = sorted positions, X = substituted amino acid; darker = stronger enhancement
+- **AI Expert Analysis** (if enabled) — natural-language interpretation
+- **Download Results**
 
-**Configure AI Analysis (Optional):**
+---
 
-- **AI Settings**: Used to select or configure the specific parameters for the AI analysis.
-- **Enable AI Summary**: Activating this option will trigger the system to generate a text summary and analysis upon completion of the prediction.
-- **Start Prediction**: Launches the prediction task.
+## 2. Sequence Design
 
-### 2.2 Results Display Functionality
+Generate candidate protein sequences for a given structure using ProteinMPNN with biology-friendly defaults.
 
-This module displays the prediction results upon task completion and provides options for result interpretation and download.
+| Field | Notes |
+| :--- | :--- |
+| **PDB input** | Upload `.pdb`, pick from Workspace, or use the example. |
+| **Model Family** | Soluble (default — recommended for most cases), Vanilla (membrane proteins), CA (Cα-only coarse-grained). |
+| **Designed Chains** | Optional, e.g. `A` or `A,B`. Empty = all chains. |
+| **Fixed Residues** | Optional pin syntax, e.g. `A12,C13` or `A:12,13;B:5-8`. |
+| **Number of sequences** | 4 / 8 / 16 / 32 (capped by online limit when enabled). |
+| **Design Diversity** | Low / Medium / High (maps to ProteinMPNN sampling temperature). |
+| **Enable AI analysis** | Optional. |
 
-- **Status**: Provides real-time feedback on the prediction progress.
+Defaults internally use `v_48_020` with `backbone_noise=0.20`, which works well for AlphaFold-style backbones and routine redesign.
 
-- **Result Display Tabs**: Results are presented in a table format, divided into:
-    - **Raw Results**: Generates corresponding initial results based on the different tasks.
-    - **AI Expert Analysis**: If the AI Summary is enabled, this tab will display the text analysis report generated by the AI.
-    - *directed mutation* and *Functional residual prediction* also provide a **Prediction heatmap** chart.
+**Outputs:**
+- **Table** — generated sequences with header, length, score fields
+- **Raw** — full JSON payload
+- **AI Expert** (if enabled)
+- **Download Result** — FASTA file
 
-- **Download Results**: Allows the user to download all prediction results from the table to their local computer.
+Need finer ProteinMPNN knobs? Use **Advanced Tools → Sequence Design**.
 
-## 3. Directed Evolution
+---
 
-### 3.1 Sequence Input and Protein Function Selection
+## 3. Protein Discovery
 
-**Sequence Input Method:** Users can provide protein sequences in two ways:
-* **Upload Protein File:** Supports files in formats like **.fasta, .fa, or .pdb**.
-* **Paste Protein Content:** Directly enter the sequence in **FASTA format** into the text box.
+A one-click VenusMine pipeline for structural homolog search and clustering.
 
-**Select Protein Function:** This is a **drop-down menu** used to select the **target function** for the directed mutation prediction. Different selections correspond to different prediction models and analysis results:
-* **Activity:** Predicts the impact of mutations on protein **catalytic or biological activity**.
-* **Binding:** Predicts the impact of mutations on the protein's ability to **bind to its ligand or interaction partners**.
-* **Expression:** Predicts the impact of mutations on the protein's **expression level** in the host cell.
-* **Organismal Fitness:** Predicts the impact of mutations on the **survival or growth ability** of the entire organism.
-* **Stability:** Predicts the impact of mutations on the protein's **thermodynamic or conformational stability**.
+| Field | Notes |
+| :--- | :--- |
+| **PDB input** | Upload `.pdb`, pick from Workspace, or use the example. |
+| **Advanced parameters** | Not exposed in Quick mode — backend defaults are used. |
 
-**Configure AI Analysis (Optional):** Users can choose to enable **Enable AI Summary** to receive a **textual evaluation** of the results from a professional **AI biology expert** after the prediction is complete.
+Click the start button and wait. Outputs are compatible with the Advanced backend artifacts (tree / labels / archive download fields).
 
-### 3.2 Execute Prediction
+**Online mode:** the entire form is read-only.
 
-1.  **Ensure all model configuration parameters are set correctly.**
-2.  Click the **"Start Prediction"** button to start the prediction process.
-3.  The system will display **prediction progress and status information**.
-4.  To abort the prediction, click the **"Abort"** button.
+For parameter tuning (protected region, MMseqs threads / iterations, cluster identity, e-value), switch to **Advanced Tools → Protein Discovery**.
 
-### 3.3 Results Display Features
+---
 
-**Raw Results:** This table clearly lists the **optimal mutants** predicted by the model and their **performance metrics**. The table typically includes the **Mutant** name, **Prediction Rank**, and **Prediction Score**. Users can use this score to intuitively understand each mutant's potential to improve the target function and select high-ranking mutants for subsequent experimental validation.
+## 4. Protein Function
 
-**Prediction Heatmap:** This visualization displays the **potential impact** of a mutation to any other amino acid at every residue position in the sequence, presented as a **two-dimensional matrix**.
-* The **Y-axis** shows the **residue position** (sorted by impact), and the **X-axis** shows the **type of mutated amino acid**.
-* The **color intensity** in the heatmap represents the **normalized impact** of the mutation on the target function (e.g., activity or stability).
-* **Darker colors (High)** indicate a **stronger positive enhancement** effect on the protein function; **Lighter colors (Low)** indicate a weaker enhancement effect or a negative impact. This helps users quickly identify potential **"hotspot" residues** to guide rational design.
+Predict a protein-level property from a FASTA sequence.
 
-**AI Expert Analysis:** A professional **AI biology expert** evaluates the prediction results, providing in-depth interpretation and experimental suggestions in a **textual format**.
+| Field | Notes |
+| :--- | :--- |
+| **Sequence input** | Paste or upload FASTA, pick from Workspace, or use the example. |
+| **Select Task** | Property to predict (see below). |
+| **Enable AI analysis** | Optional. |
 
-**Download Results:** Users can click this button to **download all detailed prediction data** from the table to their local computer for further data processing and archival.
+**Task options:**
 
------
+- **Solubility** — whether the protein is likely to be soluble after expression (critical for purification).
+- **Localization** — final location within the cell (nucleus / cytoplasm / mitochondria / …).
+- **Metal ion binding** — whether the protein can bind specific metal ions.
+- **Stability** — inherent stability against heat or chemical denaturation.
+- **Sorting signal** — whether a signal peptide directs the protein to a specific organelle / secretion pathway.
+- **Optimum temperature** — temperature range for maximum functional activity.
 
-## 4. Sequence Design
+**Outputs:**
+- **Raw table** — protein name, sequence, predicted class, confidence (0–1)
+- **AI Expert Analysis** (if enabled)
+- **Download Results**
 
-### 4.1 What this tool does
+Status message after run: *"All predictions completed. Results were aggregated using soft voting."*
 
-Quick Tools Sequence Design provides a simplified entry for **ProteinMPNN-based sequence generation** from structure input.  
-It is designed for wet-lab users who want direct outputs without tuning many inference switches.
+---
 
-### 4.2 Inputs and simple controls
+## 5. Functional Residue
 
-- **Structure input:** Upload a **.pdb** file, pick from Workspace, or use the built-in example.
-- **Model Family:** `Soluble` / `Vanilla` / `CA`.
-  - Use **Soluble** for protein discovery and most sequence design tasks.
-  - Use **Vanilla** for membrane-protein design.
-  - Use **CA** only when you only have C-alpha coarse-grained coordinates.
-- **Designed Chains (optional):** Enter chain IDs like `A` or `A,B`. Leave blank to design all chains.
-- **Fixed Residues (optional):** Use readable syntax like `A12,C13` or `A:12,13;B:5-8`.
-- **Number of Designed Sequences:** Choose how many candidate sequences to generate.
-- **Design Diversity:** Choose low / medium / high. This maps internally to ProteinMPNN sampling temperatures.
+Predict residue-level functional sites along a sequence.
 
-Quick defaults use **`v_48_020` + `backbone_noise=0.20`**, which is recommended for most practical structures (AI-generated backbones, AlphaFold structures, and routine redesign).
+| Field | Notes |
+| :--- | :--- |
+| **Sequence input** | Paste or upload FASTA, pick from Workspace, or use the example. |
+| **Select Task** | Type of residue-level site to predict (see below). |
+| **Enable AI analysis** | Optional. |
 
-### 4.3 Outputs
+**Task options:**
 
-- **Table tab:** Preview designed sequence records (header, sequence, length, score fields when available).
-- **Raw tab:** Full JSON payload for downstream integration.
-- **AI Expert tab:** Optional interpretation if AI summary is enabled.
-- **Download Result:** Downloads the generated FASTA file from the run.
+- **Activity Site** — residues responsible for catalytic / biological function.
+- **Binding Site** — residues that bind ligands, ions, or other molecules.
+- **Conserved Site** — residues highly retained during evolution; usually critical for structure or function.
+- **Motif** — short amino acid patterns that form a specific structural / functional feature.
 
-### 4.4 When to use Quick Sequence Design
+**Outputs:**
+- **Raw table** — Position, Residue, Predicted Label (0/1), Probability (0–1)
+- **Prediction heatmap** — 1-D probability strip along the residue axis
+- **AI Expert Analysis** (if enabled)
+- **Download Results**
 
-Use this module when you need fast candidate sequence generation from a structure and prefer minimal parameter decisions.  
-If you need full ProteinMPNN parameter-level control, use **Advanced Tools / Sequence Design**.
+---
 
------
+## 6. Physicochemical Property
 
-## 5. Protein Discovery
+Compute biophysical properties — some sequence-only, some structure-only.
 
-### 5.1 Positioning in Quick Tools
+| Property | Input required |
+| :--- | :--- |
+| **Physical and chemical properties** | FASTA — MW, pI, aromaticity, instability index, GRAVY, predicted secondary-structure composition |
+| **Relative solvent accessible surface area** | PDB — per-residue RSA |
+| **SASA value** | PDB — total SASA (Å²) |
+| **Secondary structure** | PDB — per-residue DSSP code (H, E, …) |
 
-Quick Protein Discovery is a lightweight entry of **Advanced Tools / Protein Discovery**.  
-It is designed for minimal setup: provide a `.pdb` file and click **Start VenusMine Discovery**.
+When you pick a PDB-only task with a multi-chain `.pdb`, an extra **PDB Chain** selector appears. Paste textarea is disabled for PDB-only tasks.
 
-### 5.2 Inputs and run behavior
+**Outputs:** task-specific table; **no** AI Expert tab for this module. Use **Download Results** to export.
 
-- **PDB Input:** Upload `.pdb`, select from Workspace, or use the example PDB.
-- **One-click Start:** Launches VenusMine Discovery directly.
-- **Backend defaults:** Advanced controls (such as protected region and MMseqs parameters) are not exposed in Quick mode and are filled by backend defaults.
+---
 
-### 5.3 Outputs and mode notes
+## Tips
 
-- Result output remains compatible with the advanced backend artifacts (tree/labels/archive download fields).
-- In **online mode**, this page stays view-only (greyed out) to match deployment policy.
-- If you need parameter tuning, switch to **Advanced Tools / Protein Discovery**.
-
-
-I will first translate the Chinese text into English, removing any redundant phrases. Then, I will structure the entire translated text using the requested code-like format.
-
------
-
-## 6. Protein Function
-
-### 6.1 Task Selection and Sequence Input
-
-**Model Configuration:** The core of this module is the **Select Task** drop-down menu, where the user must choose the specific goal for the protein function prediction:
-
-  * **Solubility:** Predicts whether the protein is likely to be **soluble** after expression, which is crucial for subsequent purification.
-  * **Localization:** Predicts the protein's **final location** within the cell (e.g., nucleus, cytoplasm, mitochondria, etc.).
-  * **Metal ion binding:** Predicts whether the protein has the ability to **bind with specific metal ions**.
-  * **Stability:** Predicts the protein's **inherent stability**, such as its resistance to heat or chemical denaturation.
-  * **Sorting signal:** Predicts whether a **signal peptide** is present in the protein sequence that directs its transport to a specific organelle or secretion pathway.
-  * **Optimum temperature:** Predicts the **temperature range** required for the protein to exhibit maximum functional activity.
-
-**Sequence Input Method:** Users can provide protein sequences in two ways:
-
-  * **Upload FASTA File:** Supports files in **FASTA format**.
-  * **Paste FASTA Content:** Directly enter the sequence in the text box.
-
-**Uploaded Protein Sequence:** This area displays the **raw amino acid sequence** read from the input file or pasted content.
-
-**Configure AI Analysis (Optional):** Users can choose to enable **Enable AI Summary** to receive a **textual evaluation** of the results from a professional **AI biology expert** after the prediction is complete.
-
-### 6.2 Execute Prediction
-
-1.  **Ensure all model configuration parameters are set correctly.**
-2.  Click the **"Start Prediction"** button to start the prediction process.
-3.  The system will display **prediction progress and status information.**
-4.  To abort the prediction, click the **"Abort"** button.
-
-### 6.3 Results Display Features
-
-**Status:** Provides **real-time feedback** on prediction progress. An example status shown is: **"All predictions completed\! Results were aggregated using soft voting."**
-
-**Raw Results:** This table shows the core output of the single-sequence prediction. The table content typically includes:
-
-  * **Protein Name:** The identifier for the input sequence.
-  * **Sequence:** The fragment or full sequence used for prediction.
-  * **Predicted Class:** The classification result derived by the model (e.g., **Soluble** for a solubility task).
-  * **Confidence Score:** The model's certainty in the prediction result, a value between **0 and 1** (e.g., 0.97).
-
-**AI Expert Analysis:** A professional **AI biology expert** evaluates the prediction results, providing in-depth interpretation and experimental suggestions in a **textual format**.
-
-**Download Results:** Users can click this button to **download all detailed prediction data** from the table to their local computer for further data processing and archival.
-
------
-
-## 7. Functional Residue 
-
-### 7.1 Task Selection and Sequence Input
-
-**Model Configuration:** The core of this module is the **Select Task** drop-down menu, where the user selects the type of protein functional residue to predict:
-* **Activity Site:** Predicts key residue positions in the protein sequence responsible for **catalytic or biological function**.
-* **Binding Site:** Predicts key residue positions where the protein **binds** with ligands, ions, or other molecules.
-* **Conserved Site:** Predicts residue positions that are **highly retained** during mutation, which are usually critical for protein structure and function.
-* **Motif:** Predicts short amino acid **patterns** in the sequence that may form a specific structural or functional feature.
-
-**Sequence Input Method:** Users can provide protein sequences in two ways:
-* **Upload FASTA File:** Supports files in **FASTA format**.
-* **Paste FASTA Content:** Directly enter the sequence in the text box.
-
-**Uploaded Protein Sequence:** This area displays the **raw amino acid sequence** read from the input file or pasted content.
-
-**Configure AI Analysis (Optional):** Users can choose to enable **Enable AI Summary** to receive a **textual evaluation** of the results from a professional **AI biology expert** after the prediction is complete.
-
-### 7.2 Execute Prediction
-
-1.  **Ensure all model configuration parameters are set correctly.**
-2.  Click the **"Start Prediction"** button to start the prediction process.
-3.  The system will display **prediction progress and status information.**
-4.  To abort the prediction, click the **"Abort"** button.
-
-### 7.3 Results Display Features
-
-**Status:** Provides **real-time feedback** on prediction progress. An example status shown is: **"All predictions completed! Results were aggregated using soft voting."**
-
-**Raw Results:** This table displays the **residue-by-residue prediction results.** Since this is a residue-level prediction, the content differs from overall function prediction, treating each amino acid in the sequence as a separate prediction object:
-* **Position:** The index number of the residue in the sequence (starting from 0 or 1).
-* **Residue:** The amino acid letter corresponding to that position.
-* **Predicted Label:** The model's classification result, usually in binary form (e.g., **1** represents a target residue, **0** represents not a target residue).
-* **Probability:** The model's **confidence score** (between 0 and 1) that the residue belongs to the target category. A higher score indicates a greater likelihood that the residue is the target site.
-
-**Prediction Heatmap:** This heatmap visualizes the **probability distribution** of the residue predictions across the entire sequence in the form of a linear bar chart.
-* **Chart Type:** This is a **one-dimensional bar chart or probability distribution graph** where the horizontal axis (**X-axis**) represents the **Residue Position**.
-* **Information Display:** The changes in **color or height** in the chart intuitively map the **Probability** or intensity for each residue position predicted by the model as a target site (e.g., an activity site). Users can view which regions or specific residues have the highest prediction probability along the sequence axis, allowing for rapid identification of potential functional sites for precise experimental validation.
-
-**AI Expert Analysis:** A professional **AI biology expert** evaluates the prediction results, providing in-depth interpretation and experimental suggestions in a **textual format**.
-
-**Download Results:** Users can click this button to **download all detailed prediction data** from the table to their local computer for further data processing and archival.
-
-
-I will first translate the Chinese text into English, removing all redundant phrases. Then, I will structure the entire translated text using the requested code-like format.
-
------
-
-## 8. Physicochemical Property
-
-### 8.1 Task Selection and Sequence Input
-
-**Task Configuration:** The core of this module is the **Select Properties of Protein** drop-down menu, where the user selects the type of physicochemical property analysis to perform:
-* **Relative solvent accessible surface area (PDB only):** Calculates the relative surface area of each residue exposed to the solvent. **Note:** This analysis requires a **PDB structure file** as input.
-* **SASA value (PDB only):** Calculates the absolute **Solvent Accessible Surface Area (SASA)** value for the entire protein. **Note:** This analysis requires a **PDB structure file** as input.
-* **Physical and chemical properties:** Calculates multiple **sequence-based fundamental properties**, such as molecular weight, theoretical pI value, and instability index. **Note:** This analysis accepts a **FASTA sequence file** as input.
-* **Secondary structure (PDB only):** Analyzes and extracts the protein's **secondary structure information** (e.g., $\alpha$-helix, $\beta$-sheet, random coil) from the PDB file. **Note:** This analysis requires a **PDB structure file** as input.
-
-**Data Input:** This area allows users to provide sequence or structure files. For tasks requiring a PDB file, the user must click the **Upload Protein File** button and upload a **.pdb** file. For the physicochemical properties task, users can upload a **FASTA file** or input the sequence via **Paste Protein Content**.
-
-**Uploaded Protein Sequence:** This area displays the **raw amino acid sequence** read from the input file (FASTA or PDB).
-
-### 8.2 Execute Prediction
-
-1.  **Ensure all model configuration parameters are set correctly.**
-2.  Click the **"Start Prediction"** button to start the prediction process.
-3.  The system will display **prediction progress and status information.**
-4.  To abort the prediction, click the **"Abort"** button.
-
-### 8.3 Results Display Features
-
-**Status:** Provides **real-time feedback** on prediction progress. The status typically indicates that the task has completed successfully and the results have been saved as a JSON file.
-
-**Raw Results:** This module outputs the corresponding physicochemical data based on the selected task. **Note:** This analysis does **not** include an AI Expert Analysis tab.
-* **Physical and chemical properties:** Displays a data list of the sequence's basic properties, including **Sequence length**, **Molecular weight**, **Theoretical pI**, **Aromaticity**, **Instability index** (including a stability prediction), **GRAVY** (hydrophilicity/hydrophobicity), and the proportion of **Secondary structure prediction** (e.g., $\alpha$-helix, turn, random coil).
-* **Relative solvent accessible surface area:** Displays a table showing the **Position**, **Residue type**, and the **percentage value** of the relative solvent accessible surface area for each residue.
-* **SASA value:** Directly outputs the total **SASA value** for the entire protein (in $\text{A}^\circ 2$).
-* **Secondary structure:** Displays a table showing the **Position**, **Residue type**, and the corresponding **DSSP secondary structure code** (e.g., $\text{H}$ for $\alpha$-helix, $\text{E}$ for $\beta$-sheet) for each residue.
-
-**Download Results:** Users can click this button to **download all detailed prediction data** from the table to their local computer for further data processing and archival.
-
+- **PDB-aware tasks need a PDB.** Don't paste a FASTA into a SASA / secondary-structure task — you'll get no result.
+- **Use the example button** as a sanity check before uploading large files.
+- **Watch the status pill** — most tasks finish in seconds, but Directed Evolution scales with `sequence_length × 20`.
+- **AI summaries are optional.** Toggle them off if you only need the raw numbers and want faster turnarounds.
