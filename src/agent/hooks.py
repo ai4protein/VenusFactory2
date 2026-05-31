@@ -208,3 +208,94 @@ class LoggingRunHooks(RunHooks):
         self._logger.info(
             "Tool end: %s (%.1fs) %s", info.tool_name, info.duration_seconds, status
         )
+
+
+async def _run_in_thread(fn, *args, **kwargs):
+    """Run a sync callable in thread pool from async context."""
+    import asyncio
+    return await asyncio.to_thread(fn, *args, **kwargs)
+
+
+class AnalyticsHooks(RunHooks):
+    """Records tool calls and runs into analytics_store.
+
+    Uses lazy import of web_v2.analytics_store to avoid an import cycle:
+    agent.hooks -> web_v2.analytics_store -> (web_v2 indirectly imports agent).
+    """
+
+    async def on_tool_end(self, *, info: ToolResultInfo, **kwargs: Any) -> None:
+        try:
+            from datetime import datetime
+
+            from web_v2.analytics_store import analytics_store
+            await _run_in_thread(
+                analytics_store.record_tool_call,
+                ts=datetime.now().isoformat(),
+                session_id=kwargs.get("session_id", ""),
+                tool_name=info.tool_name,
+                status="success" if info.success else "failed",
+                latency_ms=int(info.duration_seconds * 1000),
+                input_tokens=kwargs.get("input_tokens", 0),
+                output_tokens=kwargs.get("output_tokens", 0),
+                total_tokens=kwargs.get("total_tokens", 0),
+                usage_missing=kwargs.get("usage_missing", False),
+                model=kwargs.get("model", ""),
+                owner_key=kwargs.get("owner_key", ""),
+                ip=kwargs.get("ip", ""),
+            )
+        except Exception:
+            import logging
+            logging.getLogger("hooks").debug(
+                "AnalyticsHooks.on_tool_end failed", exc_info=True
+            )
+
+    async def on_run_end(
+        self, *, session_id: str, success: bool, **kwargs: Any
+    ) -> None:
+        # Hook for future: cross-run telemetry. analytics_store has no
+        # "run" table yet, so this is a no-op placeholder.
+        return None
+
+
+class WebhookHooks(RunHooks):
+    """Dispatches feedback webhooks at run lifecycle points."""
+
+    async def on_run_end(
+        self, *, session_id: str, success: bool, **kwargs: Any
+    ) -> None:
+        try:
+            from web_v2.feedback_webhook import dispatch_webhook
+            payload = {
+                "session_id": session_id,
+                "success": success,
+                **{
+                    k: v for k, v in kwargs.items()
+                    if isinstance(v, (str, int, float, bool, list, dict, type(None)))
+                },
+            }
+            await dispatch_webhook("run_ended", payload)
+        except Exception:
+            import logging
+            logging.getLogger("hooks").debug(
+                "WebhookHooks.on_run_end failed", exc_info=True
+            )
+
+
+# Module-level default — instantiated lazily so import order doesn't matter
+_DEFAULT_HOOKS: CompositeRunHooks | None = None
+
+
+def get_default_hooks() -> CompositeRunHooks:
+    """Return the process-wide default hooks chain.
+
+    Composed of LoggingRunHooks + AnalyticsHooks + WebhookHooks. Lazily
+    instantiated to avoid side effects at module import time.
+    """
+    global _DEFAULT_HOOKS
+    if _DEFAULT_HOOKS is None:
+        _DEFAULT_HOOKS = CompositeRunHooks([
+            LoggingRunHooks(),
+            AnalyticsHooks(),
+            WebhookHooks(),
+        ])
+    return _DEFAULT_HOOKS

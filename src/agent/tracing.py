@@ -480,3 +480,47 @@ def set_tracing_provider(provider: TracingProvider) -> None:
 def create_trace(session_id: str = "", **kwargs: Any) -> Trace:
     """Convenience: create a trace from the global provider."""
     return _provider.create_trace(session_id=session_id, metadata=kwargs)
+
+
+# ---------------------------------------------------------------------------
+# Public, minimal-friction API for callers
+# ---------------------------------------------------------------------------
+
+# Alias: ``LoggingTracingProcessor`` is the public name expected by integration
+# code. ``ConsoleTracingProcessor`` is the existing implementation that logs
+# trace/span lifecycle via the standard logger.
+LoggingTracingProcessor = ConsoleTracingProcessor
+
+
+def set_default_processor(processor: TracingProcessor | None) -> None:
+    """Register (or clear) the default processor on the global provider.
+
+    Passing ``None`` clears all processors, which causes ``create_trace`` to
+    fall back to ``NoOpTrace`` — i.e. tracing becomes a zero-cost no-op.
+    Passing a processor adds it; existing processors are preserved so multiple
+    exporters (e.g. logging + OTLP later) can coexist.
+    """
+    if processor is None:
+        _provider._processors.clear()
+        return
+    _provider.add_processor(processor)
+
+
+def get_default_processor() -> TracingProcessor | None:
+    """Return the first registered processor, or ``None`` if tracing is off."""
+    return _provider._processors[0] if _provider._processors else None
+
+
+def start_span(name: str, data: TSpanData) -> Span[TSpanData]:
+    """Create a span on the current trace.
+
+    If no trace is active (or no processor is registered), a ``NoOpSpan`` is
+    returned — safe to use as a context manager with zero overhead. Callers
+    therefore do not need to branch on "is tracing enabled".
+
+    Usage::
+
+        with start_span("mls.execute", ToolSpanData(tool_name="foo")) as span:
+            span.data.tool_output = result
+    """
+    return Scope.get_current_trace().create_span(name=name, data=data)
