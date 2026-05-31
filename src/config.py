@@ -93,8 +93,10 @@ class ServerConfig:
 @dataclass(frozen=True)
 class LLMConfig:
     api_key: str = ""
-    base_url: str = "https://www.dmxapi.cn/v1"
-    model_name: str = "gemini-2.5-pro"
+    # Empty base_url means "resolve per-model via agent.model_registry".
+    # Setting CHAT_BASE_URL still forces a single endpoint (legacy / gateway mode).
+    base_url: str = ""
+    model_name: str = "deepseek-v4-pro"
     temperature: float = 0.2
     max_tokens: int = 8192
     code_max_tokens: int = 10000
@@ -107,10 +109,23 @@ class LLMConfig:
 
     @classmethod
     def from_env(cls) -> LLMConfig:
+        # Import here to avoid a circular import at module load time (config <- agent.*).
+        try:
+            from agent.model_registry import get_default_model_id
+            default_model = get_default_model_id()
+        except Exception:
+            default_model = "deepseek-v4-pro"
+        # API key precedence: CHAT_API_KEY > OPENAI_API_KEY > DEEPSEEK_API_KEY (legacy).
+        # Per-model/provider keys are resolved separately by model_registry from
+        # ~/.venusfactory/keys.json or the model's api_key_env field.
+        api_key = _env("CHAT_API_KEY") or _env("OPENAI_API_KEY") or _env("DEEPSEEK_API_KEY")
+        # base_url: empty (default) = let Chat_LLM resolve per-model via registry.
+        # An explicit CHAT_BASE_URL still forces a single endpoint (legacy / gateway mode).
+        base_url = _env("CHAT_BASE_URL", "")
         return cls(
-            api_key=_env("OPENAI_API_KEY"),
-            base_url=_env("CHAT_BASE_URL", "https://www.dmxapi.cn/v1"),
-            model_name=_env("CHAT_MODEL_NAME", "gemini-2.5-pro"),
+            api_key=api_key,
+            base_url=base_url,
+            model_name=_env("CHAT_MODEL_NAME") or default_model,
             temperature=_env_float("CHAT_TEMPERATURE", 0.2),
             max_tokens=_env_int("CHAT_MAX_TOKENS", 8192),
             code_max_tokens=_env_int("CHAT_CODE_MAX_TOKENS", 10000),

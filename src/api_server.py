@@ -4,6 +4,7 @@ and provides health and file download. Started by webui or run directly.
 """
 from __future__ import annotations
 
+import asyncio
 import importlib
 import sys
 from datetime import datetime
@@ -68,6 +69,7 @@ advanced_tools_v2_router = _import_attr("web_v2.advanced_tools_api", "router")
 download_v2_router = _import_attr("web_v2.download_api", "router")
 settings_v2_router = _import_attr("web_v2.settings_api", "router")
 workspace_v2_router = _import_attr("web_v2.workspace_api", "router")
+models_v2_router = _import_attr("web_v2.models_api", "router")
 analytics_store = _import_attr("web_v2.analytics_store", "analytics_store")
 
 _cfg = get_config()
@@ -84,8 +86,51 @@ async def lifespan(app: FastAPI):
     logger.info("Web v2 storage roots initialized")
     analytics_store.ensure_initialized()
     logger.info("Web v2 cleanup: disabled (no automatic deletion)")
-    yield
-    logger.info("VenusFactory2 API server shutting down...")
+
+    # Wire the minimal default tracing processor so spans opened inside the
+    # agent (LLM calls, tool invocations, plan/execute phases) are emitted to
+    # the standard logger. Replace with an OTLP/Phoenix exporter later — the
+    # span API (agent.tracing.start_span) and call sites stay unchanged.
+    # Imported as `agent.tracing` (not via `_import_attr` which prefers `src.`)
+    # so the registered processor lands on the same module instance the rest
+    # of the codebase imports from.
+    try:
+        from agent.tracing import LoggingTracingProcessor, set_default_processor
+
+        set_default_processor(LoggingTracingProcessor())
+        logger.info("Tracing: LoggingTracingProcessor registered as default")
+    except Exception:
+        logger.exception("Failed to register default tracing processor")
+
+    # Start chat session TTL cleanup background task.
+    session_cleanup_task: asyncio.Task | None = None
+    try:
+        chat_api_module = importlib.import_module("web_v2.chat_api")
+        session_store = getattr(chat_api_module, "_session_store")
+        idle_ttl_hours = float(getattr(chat_api_module, "_SESSION_IDLE_TTL_HOURS"))
+        session_cleanup_task = asyncio.create_task(
+            session_store.cleanup_loop(
+                interval_sec=600,
+                idle_ttl_sec=idle_ttl_hours * 3600,
+            )
+        )
+        logger.info(
+            "Chat session TTL cleanup task started (idle_ttl=%.1fh, interval=600s)",
+            idle_ttl_hours,
+        )
+    except Exception:
+        logger.exception("Failed to start chat session TTL cleanup task")
+
+    try:
+        yield
+    finally:
+        if session_cleanup_task is not None:
+            session_cleanup_task.cancel()
+            try:
+                await session_cleanup_task
+            except (asyncio.CancelledError, Exception):
+                pass
+        logger.info("VenusFactory2 API server shutting down...")
 
 
 app = FastAPI(
@@ -122,6 +167,7 @@ app.include_router(advanced_tools_v2_router)
 app.include_router(download_v2_router)
 app.include_router(workspace_v2_router)
 app.include_router(settings_v2_router)
+app.include_router(models_v2_router)
 if WEBUI_V2_MODE == "local":
     app.include_router(custom_model_v2_router)
 

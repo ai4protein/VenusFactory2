@@ -1,0 +1,182 @@
+# VenusFactory LLM model registry
+#
+# Static model metadata (URLs, capabilities, defaults). User-private data
+# (API keys) lives in ~/.venusfactory/keys.json or per-provider env vars,
+# NOT here.
+#
+# Field reference:
+#   id                   stable backend model id (passed to provider as "model")
+#   label                user-facing name in UI
+#   provider             logical owner (deepseek, openai, google, anthropic, dmx, ...)
+#   base_url             provider HTTP endpoint
+#   api_compatible       openai | anthropic   (determines request/response schema)
+#   api_key_env          env var consulted first if user key not set in keys.json
+#   supports_tool_use    OpenAI-style function-calling supported
+#   supports_json_schema response_format={"type":"json_schema",...} supported
+#   supports_prompt_caching  cache_control blocks (Anthropic) or auto prefix cache (OpenAI/Gemini)
+#   max_context_tokens   context window in tokens (approximate)
+#   max_output_tokens    per-response output cap
+#   requires_adapter     true = Chat_LLM cannot currently call this directly (e.g. Anthropic /messages schema). UI may still show it but mark as needing a gateway.
+#   hidden               true = don't list in user-facing model picker (still resolvable by id)
+
+default_model: deepseek-v4-pro
+
+models:
+  # ─── DeepSeek (official) ────────────────────────────────────────────────
+  - id: deepseek-v4-pro
+    label: DeepSeek V4 Pro
+    provider: deepseek
+    base_url: https://api.deepseek.com
+    api_compatible: openai
+    api_key_env: DEEPSEEK_API_KEY
+    supports_tool_use: true
+    supports_json_schema: false
+    supports_prompt_caching: false
+    max_context_tokens: 128000
+    max_output_tokens: 8192
+
+  - id: deepseek-v4-flash
+    label: DeepSeek V4 Flash
+    provider: deepseek
+    base_url: https://api.deepseek.com
+    api_compatible: openai
+    api_key_env: DEEPSEEK_API_KEY
+    supports_tool_use: true
+    supports_json_schema: false
+    supports_prompt_caching: false
+    max_context_tokens: 128000
+    max_output_tokens: 8192
+
+  # ─── OpenAI (official) ──────────────────────────────────────────────────
+  - id: gpt-4o
+    label: ChatGPT 4o
+    provider: openai
+    base_url: https://api.openai.com/v1
+    api_compatible: openai
+    api_key_env: OPENAI_API_KEY
+    supports_tool_use: true
+    supports_json_schema: true
+    supports_prompt_caching: true
+    max_context_tokens: 128000
+    max_output_tokens: 16384
+
+  # ─── Google Gemini (OpenAI-compat endpoint) ─────────────────────────────
+  - id: gemini-2.5-pro
+    label: Gemini 2.5 Pro
+    provider: google
+    base_url: https://generativelanguage.googleapis.com/v1beta/openai
+    api_compatible: openai
+    api_key_env: GOOGLE_API_KEY
+    supports_tool_use: true
+    supports_json_schema: true
+    supports_prompt_caching: true
+    max_context_tokens: 1000000
+    max_output_tokens: 8192
+
+  # ─── Anthropic Claude (NOT OpenAI-compat) ───────────────────────────────
+  # Direct call requires /v1/messages schema; Chat_LLM only speaks OpenAI today.
+  # Listed for visibility; default UX is to route via a gateway (DMX) below.
+  - id: claude-3-7-sonnet-20250219
+    label: Claude 3.7 Sonnet
+    provider: anthropic
+    base_url: https://api.anthropic.com/v1
+    api_compatible: anthropic
+    api_key_env: ANTHROPIC_API_KEY
+    supports_tool_use: true
+    supports_json_schema: true
+    supports_prompt_caching: true
+    max_context_tokens: 200000
+    max_output_tokens: 64000
+    requires_adapter: true
+
+  # ─── Zhipu GLM (OpenAI-compat) ──────────────────────────────────────────
+  - id: glm-4-plus
+    label: GLM 4 Plus
+    provider: zhipu
+    base_url: https://open.bigmodel.cn/api/paas/v4
+    api_compatible: openai
+    api_key_env: ZHIPU_API_KEY
+    supports_tool_use: true
+    supports_json_schema: false
+    supports_prompt_caching: false
+    max_context_tokens: 128000
+    max_output_tokens: 4096
+
+  - id: glm-4-flash
+    label: GLM 4 Flash
+    provider: zhipu
+    base_url: https://open.bigmodel.cn/api/paas/v4
+    api_compatible: openai
+    api_key_env: ZHIPU_API_KEY
+    supports_tool_use: true
+    supports_json_schema: false
+    supports_prompt_caching: false
+    max_context_tokens: 128000
+    max_output_tokens: 4096
+
+  # ─── Alibaba Qwen (DashScope OpenAI-compat) ─────────────────────────────
+  - id: qwen-max
+    label: Qwen Max
+    provider: alibaba
+    base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    api_compatible: openai
+    api_key_env: DASHSCOPE_API_KEY
+    supports_tool_use: true
+    supports_json_schema: false
+    supports_prompt_caching: false
+    max_context_tokens: 32768
+    max_output_tokens: 8192
+
+  - id: qwen-plus
+    label: Qwen Plus
+    provider: alibaba
+    base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    api_compatible: openai
+    api_key_env: DASHSCOPE_API_KEY
+    supports_tool_use: true
+    supports_json_schema: false
+    supports_prompt_caching: false
+    max_context_tokens: 131072
+    max_output_tokens: 8192
+
+  # ─── Moonshot Kimi (OpenAI-compat) ──────────────────────────────────────
+  - id: moonshot-v1-128k
+    label: Kimi (Moonshot v1 128k)
+    provider: moonshot
+    base_url: https://api.moonshot.cn/v1
+    api_compatible: openai
+    api_key_env: MOONSHOT_API_KEY
+    supports_tool_use: true
+    supports_json_schema: false
+    supports_prompt_caching: true
+    max_context_tokens: 128000
+    max_output_tokens: 8192
+
+# Optional gateways. If a gateway is "active" (selected by user or via
+# CHAT_FORCE_GATEWAY env), ALL model requests route through it using the
+# gateway's base_url + key, regardless of the model's own entry above.
+# Gateway model IDs may differ from official IDs; declare overrides via
+# model_aliases.
+gateways:
+  - id: dmx
+    label: DMX 网关
+    base_url: https://www.dmxapi.cn/v1
+    api_compatible: openai
+    api_key_env: DMX_API_KEY
+    # When DMX is active, these official model IDs route to the DMX equivalents.
+    model_aliases:
+      deepseek-v4-pro: deepseek-v4-pro
+      deepseek-v4-flash: deepseek-v4-flash
+      gpt-4o: gpt-4o
+      gemini-2.5-pro: gemini-2.5-pro
+      claude-3-7-sonnet-20250219: claude-3-7-sonnet-20250219
+      glm-4-plus: glm-4-plus
+      glm-4-flash: glm-4-flash
+      qwen-max: qwen-max
+      qwen-plus: qwen-plus
+      moonshot-v1-128k: moonshot-v1-128k
+    # Legacy DMX-only model IDs (kept for backward-compat with existing sessions)
+    extra_models:
+      - id: deepseek-r1-0528
+        label: "DeepSeek R1 (legacy via DMX)"
+        hidden: false

@@ -32,6 +32,12 @@ import { streamSSEFromPost } from "../lib/sse";
 import { PageFooter } from "../components/PageFooter";
 import { WorkspaceFilePicker } from "../components/WorkspaceFilePicker";
 import { type WorkspaceFile } from "../lib/workspaceApi";
+import {
+  useModelRegistry,
+  setProviderKey,
+  setActiveGateway,
+  type ModelSpec,
+} from "../lib/useModelRegistry";
 
 type SessionMeta = {
   session_id: string;
@@ -41,7 +47,10 @@ type SessionMeta = {
   status: string;
 };
 
-const BASE_MODELS = ["Gemini-2.5-Pro", "ChatGPT-4o", "Claude-3.7", "DeepSeek-R1"];
+// Last-resort fallback identifier used only when the model registry has not
+// loaded yet AND we cannot read any model id from the active session. The real
+// model list comes from GET /api/models via useModelRegistry().
+const FALLBACK_MODEL_ID = "deepseek-v4-pro";
 const OTHER_MODEL_OPTION = "__other_model__";
 type RunStatus = "running" | "stopping" | "stopped";
 
@@ -107,7 +116,11 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   const [runStatus, setRunStatus] = useState<RunStatus>("stopped");
   const [streamingIdx, setStreamingIdx] = useState(-1);
   const [error, setError] = useState<string>("");
-  const [selectedModel, setSelectedModel] = useState(BASE_MODELS[0]);
+  const [selectedModel, setSelectedModel] = useState<string>(FALLBACK_MODEL_ID);
+  const registry = useModelRegistry();
+  const [keyPanelProvider, setKeyPanelProvider] = useState<string>("");
+  const [keyPanelValue, setKeyPanelValue] = useState<string>("");
+  const [keyPanelSaving, setKeyPanelSaving] = useState(false);
   const [customModels, setCustomModels] = useState<OpenAIStyleModel[]>([]);
   const [showCustomModelModal, setShowCustomModelModal] = useState(false);
   const [customModelLabel, setCustomModelLabel] = useState("");
@@ -346,20 +359,20 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     await createAndActivateSession();
   }
 
+  // Translate a backend model identifier to the value used in the selector.
+  // With the registry-driven UI the selector value IS the backend id, so this
+  // just normalizes empties / falls back to the registry default.
   function modelLabelFromInternal(modelName: string) {
-    if (modelName === "gpt-4o") return "ChatGPT-4o";
-    if (modelName === "claude-3-7-sonnet-20250219") return "Claude-3.7";
-    if (modelName === "deepseek-r1-0528") return "DeepSeek-R1";
-    if (modelName === "gemini-2.5-pro") return "Gemini-2.5-Pro";
-    return modelName || "Gemini-2.5-Pro";
+    const trimmed = (modelName || "").trim();
+    if (trimmed) return trimmed;
+    return registry.data?.default_model || FALLBACK_MODEL_ID;
   }
 
   function rememberModelFromSession(modelName: string) {
     const normalized = (modelName || "").trim();
     if (!normalized) return;
-    const builtInLabels = new Set(BASE_MODELS);
-    const builtInValues = new Set(["gpt-4o", "claude-3-7-sonnet-20250219", "deepseek-r1-0528", "gemini-2.5-pro"]);
-    if (builtInLabels.has(normalized) || builtInValues.has(normalized)) return;
+    const registryIds = new Set((registry.data?.models || []).map((m) => m.id));
+    if (registryIds.has(normalized)) return;
     setCustomModels((prev) => {
       if (prev.some((item) => item.modelName === normalized || item.label === normalized)) return prev;
       return [
@@ -775,17 +788,70 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       : `Regenerate also consumes quota. Remaining: ${chatQuota.remaining ?? 0}/${chatQuota.limit ?? 10}.`
     : "Regenerate last message";
   const isLocalMode = chatQuota?.mode === "local";
-  const modelOptions = [
-    ...BASE_MODELS.map((m) => ({ value: m, label: m })),
-    ...(isLocalMode ? customModels.map((m) => ({ value: m.id, label: `${m.label} (Custom)` })) : []),
+  const registryModels: ModelSpec[] = registry.data?.models || [];
+  const keyStatus: Record<string, boolean> = registry.data?.key_status || {};
+  const defaultModelId = registry.data?.default_model || FALLBACK_MODEL_ID;
+  type ModelOption = {
+    value: string;
+    label: string;
+    disabled?: boolean;
+    title?: string;
+    provider?: string;
+    requiresAdapter?: boolean;
+    hasKey?: boolean;
+  };
+  const modelOptions: ModelOption[] = [
+    ...registryModels.map((m) => {
+      const hasKey = keyStatus[m.provider] === true;
+      const requiresAdapter = m.requires_adapter === true;
+      const adapterReady = requiresAdapter ? Boolean(registry.data?.active_gateway) : true;
+      const disabled = requiresAdapter && !adapterReady;
+      const title = disabled
+        ? "Requires a configured gateway"
+        : !hasKey
+        ? `Missing API key for ${m.provider}. Click to add.`
+        : `${m.label} (${m.provider})`;
+      return {
+        value: m.id,
+        label: hasKey ? m.label : `${m.label} (no key)`,
+        disabled,
+        title,
+        provider: m.provider,
+        requiresAdapter,
+        hasKey,
+      };
+    }),
+    ...(isLocalMode
+      ? customModels.map((m) => ({ value: m.id, label: `${m.label} (Custom)` }))
+      : []),
   ];
+
+  const selectedModelSpec = registryModels.find((m) => m.id === selectedModel);
+  const selectedProvider = selectedModelSpec?.provider || "";
+  const selectedProviderHasKey = selectedProvider ? keyStatus[selectedProvider] === true : true;
+
+  // Once the registry loads, if the currently-selected id is not in the
+  // registry (and not a known custom model), reset to the registry default.
+  useEffect(() => {
+    if (registry.loading || !registry.data) return;
+    const isRegistryId = registryModels.some((m) => m.id === selectedModel);
+    const isCustomId = customModels.some((m) => m.id === selectedModel);
+    if (!isRegistryId && !isCustomId) {
+      setSelectedModel(defaultModelId);
+    }
+  }, [registry.loading, registry.data, defaultModelId, selectedModel, registryModels, customModels]);
 
   useEffect(() => {
     if (isLocalMode) return;
     if (customModels.some((m) => m.id === selectedModel)) {
-      setSelectedModel(BASE_MODELS[0]);
+      setSelectedModel(defaultModelId);
     }
-  }, [isLocalMode, selectedModel, customModels]);
+  }, [isLocalMode, selectedModel, customModels, defaultModelId]);
+
+  function openKeyPanelForProvider(provider: string) {
+    setKeyPanelProvider(provider);
+    setKeyPanelValue("");
+  }
 
   function handleModelChange(next: string) {
     if (!isLocalMode && next === OTHER_MODEL_OPTION) return;
@@ -797,6 +863,42 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     setSelectedModel(next);
     if (prev !== next && (snapshot?.history?.length || 0) > 0) {
       setModelSwitchNotice("Model/provider switched. Existing context may not be consistent across providers. Start a new session if results look off.");
+    }
+    // If the newly selected registry model is missing a key, surface the
+    // inline key input so the user can configure it without leaving the page.
+    const spec = registryModels.find((m) => m.id === next);
+    if (spec && keyStatus[spec.provider] !== true) {
+      openKeyPanelForProvider(spec.provider);
+    } else {
+      setKeyPanelProvider("");
+    }
+  }
+
+  async function submitProviderKey() {
+    if (!keyPanelProvider) return;
+    const value = keyPanelValue.trim();
+    setKeyPanelSaving(true);
+    setError("");
+    try {
+      await setProviderKey(keyPanelProvider, value);
+      setKeyPanelProvider("");
+      setKeyPanelValue("");
+      registry.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save API key.");
+    } finally {
+      setKeyPanelSaving(false);
+    }
+  }
+
+  async function handleGatewayChange(next: string) {
+    const gatewayId = next === "" ? null : next;
+    setError("");
+    try {
+      await setActiveGateway(gatewayId);
+      registry.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to switch gateway.");
     }
   }
 
@@ -824,7 +926,9 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     }
     const normalizedLabel = label.toLowerCase();
     const normalizedKey = `${baseUrl.toLowerCase()}::${modelName.toLowerCase()}`;
-    const builtInNameConflict = BASE_MODELS.some((m) => m.trim().toLowerCase() === normalizedLabel);
+    const builtInNameConflict = registryModels.some(
+      (m) => m.label.trim().toLowerCase() === normalizedLabel || m.id.trim().toLowerCase() === normalizedLabel
+    );
     if (builtInNameConflict) {
       setError("Display name conflicts with built-in model name. Please choose another name.");
       return;
@@ -863,7 +967,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       await deleteCustomModelCache(modelId);
       setCustomModels((prev) => prev.filter((m) => m.id !== modelId));
       if (selectedModel === modelId) {
-        setSelectedModel(BASE_MODELS[0]);
+        setSelectedModel(defaultModelId);
         setModelSwitchNotice("Custom model removed. Active session switched back to default model context.");
       }
     } catch (err) {
@@ -1154,14 +1258,65 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
               )}
             </div>
             <div className="composer-row">
-              <select value={selectedModel} onChange={(e) => handleModelChange(e.target.value)} aria-label="Model">
+              <select
+                value={selectedModel}
+                onChange={(e) => handleModelChange(e.target.value)}
+                aria-label="Model"
+                title={
+                  selectedProvider
+                    ? selectedProviderHasKey
+                      ? `Provider: ${selectedProvider} (key configured)`
+                      : `Provider: ${selectedProvider} (no API key)`
+                    : undefined
+                }
+              >
                 {modelOptions.map((m) => (
-                  <option key={m.value} value={m.value}>
+                  <option key={m.value} value={m.value} disabled={m.disabled} title={m.title}>
                     {m.label}
+                    {m.disabled ? " (gateway required)" : ""}
                   </option>
                 ))}
                 {isLocalMode && <option value={OTHER_MODEL_OPTION}>Other Model...</option>}
               </select>
+              {selectedModelSpec && (
+                <span
+                  className="model-key-status"
+                  title={
+                    selectedProviderHasKey
+                      ? `API key configured for ${selectedProvider}`
+                      : `Missing API key for ${selectedProvider}. Click to add.`
+                  }
+                  onClick={() => {
+                    if (!selectedProviderHasKey) openKeyPanelForProvider(selectedProvider);
+                  }}
+                  style={{
+                    cursor: selectedProviderHasKey ? "default" : "pointer",
+                    color: selectedProviderHasKey ? "#2e7d32" : "#b26a00",
+                    fontSize: "12px",
+                    marginLeft: "4px",
+                    userSelect: "none",
+                  }}
+                  role={selectedProviderHasKey ? undefined : "button"}
+                >
+                  {selectedProviderHasKey ? "key ok" : "set key"}
+                </span>
+              )}
+              {(registry.data?.gateways?.length ?? 0) > 0 && (
+                <select
+                  value={registry.data?.active_gateway || ""}
+                  onChange={(e) => void handleGatewayChange(e.target.value)}
+                  aria-label="Gateway"
+                  title="Active gateway"
+                  style={{ marginLeft: "4px" }}
+                >
+                  <option value="">No gateway</option>
+                  {(registry.data?.gateways || []).map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.label}
+                    </option>
+                  ))}
+                </select>
+              )}
               <div className="file-source-inline">
                 <label className={`file-upload-icon-btn${running || quotaExhausted ? " disabled" : ""}`} title="Upload files">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1199,6 +1354,53 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
             {modelSwitchNotice && (
               <div className="model-switch-notice" role="status">
                 {modelSwitchNotice}
+              </div>
+            )}
+            {keyPanelProvider && (
+              <div
+                className="model-key-panel"
+                role="dialog"
+                aria-label={`Set API key for ${keyPanelProvider}`}
+                style={{
+                  display: "flex",
+                  gap: "8px",
+                  alignItems: "center",
+                  padding: "8px 10px",
+                  marginTop: "6px",
+                  border: "1px solid #e0c080",
+                  background: "#fff8e6",
+                  borderRadius: "6px",
+                }}
+              >
+                <span style={{ fontSize: "13px" }}>
+                  API key for <strong>{keyPanelProvider}</strong>:
+                </span>
+                <input
+                  type="password"
+                  value={keyPanelValue}
+                  onChange={(e) => setKeyPanelValue(e.target.value)}
+                  placeholder="sk-..."
+                  disabled={keyPanelSaving}
+                  style={{ flex: 1, minWidth: 0 }}
+                  autoFocus
+                />
+                <button
+                  className="btn-primary"
+                  onClick={() => void submitProviderKey()}
+                  disabled={keyPanelSaving || !keyPanelValue.trim()}
+                >
+                  {keyPanelSaving ? "Saving..." : "Save"}
+                </button>
+                <button
+                  className="btn-secondary"
+                  onClick={() => {
+                    setKeyPanelProvider("");
+                    setKeyPanelValue("");
+                  }}
+                  disabled={keyPanelSaving}
+                >
+                  Cancel
+                </button>
               </div>
             )}
             {(files.length > 0 || workspaceFiles.length > 0) && (
