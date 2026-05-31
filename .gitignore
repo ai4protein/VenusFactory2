@@ -378,3 +378,7 @@ temp_outputs/
 temp_downloads/
 
 .claude/
+.sii/
+
+# Internal development notes (not for distribution)
+docs/dev/

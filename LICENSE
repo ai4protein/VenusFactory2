@@ -1,350 +1,242 @@
-Creative Commons Attribution-NonCommercial-NoDerivatives 4.0
-International
+VenusFactory Non-Commercial License
+====================================
 
-Creative Commons Corporation ("Creative Commons") is not a law firm and
-does not provide legal services or legal advice. Distribution of
-Creative Commons public licenses does not create a lawyer-client or
-other relationship. Creative Commons makes its licenses and related
-information available on an "as-is" basis. Creative Commons gives no
-warranties regarding its licenses, any material licensed under their
-terms and conditions, or any related information. Creative Commons
-disclaims all liability for damages resulting from their use to the
-fullest extent possible.
+Copyright (c) 2025-2026 Liang Lab, Shanghai Jiao Tong University.
+All rights reserved.
 
-Using Creative Commons Public Licenses
+The VenusFactory software, including all source code, model weights,
+datasets, documentation, and any other materials distributed under this
+repository (collectively, the "Software"), has been developed by the
+researchers and contributors of Liang Lab at Shanghai Jiao Tong
+University ("Developers"), and is made available by Liang Lab
+("Licensor") for non-commercial, non-profit use under the terms below.
 
-Creative Commons public licenses provide a standard set of terms and
-conditions that creators and other rights holders may use to share
-original works of authorship and other material subject to copyright and
-certain other rights specified in the public license below. The
-following considerations are for informational purposes only, are not
-exhaustive, and do not form part of our licenses.
+A Chinese-language translation of this License is provided in
+LICENSE_CN.md for reference only. In the event of any conflict or
+inconsistency between the two versions, this English version shall
+prevail.
 
-Considerations for licensors: Our public licenses are intended for use
-by those authorized to give the public permission to use material in
-ways otherwise restricted by copyright and certain other rights. Our
-licenses are irrevocable. Licensors should read and understand the terms
-and conditions of the license they choose before applying it. Licensors
-should also secure all rights necessary before applying our licenses so
-that the public can reuse the material as expected. Licensors should
-clearly mark any material not subject to the license. This includes
-other CC-licensed material, or material used under an exception or
-limitation to copyright. More considerations for licensors :
-wiki.creativecommons.org/Considerations_for_licensors
 
-Considerations for the public: By using one of our public licenses, a
-licensor grants the public permission to use the licensed material under
-specified terms and conditions. If the licensor's permission is not
-necessary for any reason–for example, because of any applicable
-exception or limitation to copyright–then that use is not regulated by
-the license. Our licenses grant only permissions under copyright and
-certain other rights that a licensor has authority to grant. Use of the
-licensed material may still be restricted for other reasons, including
-because others have copyright or other rights in the material. A
-licensor may make special requests, such as asking that all changes be
-marked or described. Although not required by our licenses, you are
-encouraged to respect those requests where reasonable. More
-considerations for the public :
-wiki.creativecommons.org/Considerations_for_licensees
+1. Definitions
+--------------
 
-Creative Commons Attribution-NonCommercial-NoDerivatives 4.0
-International Public License
+1.1 "Non-Commercial User" means:
 
-By exercising the Licensed Rights (defined below), You accept and agree
-to be bound by the terms and conditions of this Creative Commons
-Attribution-NonCommercial-NoDerivatives 4.0 International Public License
-("Public License"). To the extent this Public License may be interpreted
-as a contract, You are granted the Licensed Rights in consideration of
-Your acceptance of these terms and conditions, and the Licensor grants
-You such rights in consideration of benefits the Licensor receives from
-making the Licensed Material available under these terms and conditions.
+    (a) employees, students, faculty, and other personnel of not-for-
+        profit research institutions, government laboratories, and
+        universities, when conducting research that is NOT (i) a
+        commercial service, or (ii) contract research or services for
+        a for-profit company where the intellectual property resulting
+        from such research or service is owned, controlled, or
+        primarily benefits such for-profit company; and
 
--   Section 1 – Definitions.
+    (b) individuals, EXCLUDING (i) any use by, for, or on behalf of an
+        entity organized for profit, and (ii) any use intended for or
+        directed toward commercial advantage or monetary compensation.
 
-    -   a. Adapted Material means material subject to Copyright and
-        Similar Rights that is derived from or based upon the Licensed
-        Material and in which the Licensed Material is translated,
-        altered, arranged, transformed, or otherwise modified in a
-        manner requiring permission under the Copyright and Similar
-        Rights held by the Licensor. For purposes of this Public
-        License, where the Licensed Material is a musical work,
-        performance, or sound recording, Adapted Material is always
-        produced where the Licensed Material is synched in timed
-        relation with a moving image.
-    -   b. Copyright and Similar Rights means copyright and/or similar
-        rights closely related to copyright including, without
-        limitation, performance, broadcast, sound recording, and Sui
-        Generis Database Rights, without regard to how the rights are
-        labeled or categorized. For purposes of this Public License, the
-        rights specified in Section 2(b)(1)-(2) are not Copyright and
-        Similar Rights.
-    -   c. Effective Technological Measures means those measures that,
-        in the absence of proper authority, may not be circumvented
-        under laws fulfilling obligations under Article 11 of the WIPO
-        Copyright Treaty adopted on December 20, 1996, and/or similar
-        international agreements.
-    -   d. Exceptions and Limitations means fair use, fair dealing,
-        and/or any other exception or limitation to Copyright and
-        Similar Rights that applies to Your use of the Licensed
-        Material.
-    -   e. Licensed Material means the artistic or literary work,
-        database, or other material to which the Licensor applied this
-        Public License.
-    -   f. Licensed Rights means the rights granted to You subject to
-        the terms and conditions of this Public License, which are
-        limited to all Copyright and Similar Rights that apply to Your
-        use of the Licensed Material and that the Licensor has authority
-        to license.
-    -   g. Licensor means the individual(s) or entity(ies) granting
-        rights under this Public License.
-    -   h. NonCommercial means not primarily intended for or directed
-        towards commercial advantage or monetary compensation. For
-        purposes of this Public License, the exchange of the Licensed
-        Material for other material subject to Copyright and Similar
-        Rights by digital file-sharing or similar means is NonCommercial
-        provided there is no payment of monetary compensation in
-        connection with the exchange.
-    -   i. Share means to provide material to the public by any means or
-        process that requires permission under the Licensed Rights, such
-        as reproduction, public display, public performance,
-        distribution, dissemination, communication, or importation, and
-        to make material available to the public including in ways that
-        members of the public may access the material from a place and
-        at a time individually chosen by them.
-    -   j. Sui Generis Database Rights means rights other than copyright
-        resulting from Directive 96/9/EC of the European Parliament and
-        of the Council of 11 March 1996 on the legal protection of
-        databases, as amended and/or succeeded, as well as other
-        essentially equivalent rights anywhere in the world.
-    -   k. You means the individual or entity exercising the Licensed
-        Rights under this Public License. Your has a corresponding
-        meaning.
+1.2 "Non-Commercial Purpose" means use of the Software solely for
+    internal academic research, teaching, personal study, or other
+    activities that qualify under Section 1.1, in each case where no
+    monetary compensation, commercial advantage, or commercial
+    benefit is sought or obtained, directly or indirectly.
 
--   Section 2 – Scope.
+1.3 "Commercial Use" means any use of the Software that is not a
+    Non-Commercial Purpose, including without limitation:
 
-    -   a. License grant.
-        -   1. Subject to the terms and conditions of this Public
-            License, the Licensor hereby grants You a worldwide,
-            royalty-free, non-sublicensable, non-exclusive, irrevocable
-            license to exercise the Licensed Rights in the Licensed
-            Material to:
-            -   A. reproduce and Share the Licensed Material, in whole
-                or in part, for NonCommercial purposes only; and
-            -   B. produce and reproduce, but not Share, Adapted
-                Material for NonCommercial purposes only.
-        -   2. Exceptions and Limitations. For the avoidance of doubt,
-            where Exceptions and Limitations apply to Your use, this
-            Public License does not apply, and You do not need to comply
-            with its terms and conditions.
-        -   3. Term. The term of this Public License is specified in
-            Section 6(a).
-        -   4. Media and formats; technical modifications allowed. The
-            Licensor authorizes You to exercise the Licensed Rights in
-            all media and formats whether now known or hereafter
-            created, and to make technical modifications necessary to do
-            so. The Licensor waives and/or agrees not to assert any
-            right or authority to forbid You from making technical
-            modifications necessary to exercise the Licensed Rights,
-            including technical modifications necessary to circumvent
-            Effective Technological Measures. For purposes of this
-            Public License, simply making modifications authorized by
-            this Section 2(a)(4) never produces Adapted Material.
-        -   5. Downstream recipients.
-            -   A. Offer from the Licensor – Licensed Material. Every
-                recipient of the Licensed Material automatically
-                receives an offer from the Licensor to exercise the
-                Licensed Rights under the terms and conditions of this
-                Public License.
-            -   B. No downstream restrictions. You may not offer or
-                impose any additional or different terms or conditions
-                on, or apply any Effective Technological Measures to,
-                the Licensed Material if doing so restricts exercise of
-                the Licensed Rights by any recipient of the Licensed
-                Material.
-        -   6. No endorsement. Nothing in this Public License
-            constitutes or may be construed as permission to assert or
-            imply that You are, or that Your use of the Licensed
-            Material is, connected with, or sponsored, endorsed, or
-            granted official status by, the Licensor or others
-            designated to receive attribution as provided in Section
-            3(a)(1)(A)(i).
-    -   b. Other rights.
-        -   1. Moral rights, such as the right of integrity, are not
-            licensed under this Public License, nor are publicity,
-            privacy, and/or other similar personality rights; however,
-            to the extent possible, the Licensor waives and/or agrees
-            not to assert any such rights held by the Licensor to the
-            limited extent necessary to allow You to exercise the
-            Licensed Rights, but not otherwise.
-        -   2. Patent and trademark rights are not licensed under this
-            Public License.
-        -   3. To the extent possible, the Licensor waives any right to
-            collect royalties from You for the exercise of the Licensed
-            Rights, whether directly or through a collecting society
-            under any voluntary or waivable statutory or compulsory
-            licensing scheme. In all other cases the Licensor expressly
-            reserves any right to collect such royalties, including when
-            the Licensed Material is used other than for NonCommercial
-            purposes.
+    (a) use by, on behalf of, or for the benefit of a for-profit
+        entity;
+    (b) use in the development, training, evaluation, deployment, or
+        provision of any product, service, pipeline, model, or tool
+        that is sold, licensed, offered as a service (including
+        software-as-a-service, model-as-a-service, or API access),
+        or otherwise made available for a fee or other monetary
+        consideration;
+    (c) use to generate, design, validate, or optimize molecules,
+        proteins, sequences, or other assets that are used in a
+        commercial product, clinical pipeline, or fee-bearing service;
+    (d) use within or in support of contract research, consulting, or
+        fee-for-service work, including academic fee-for-service work
+        whose intellectual property is owned by or assigned to a for-
+        profit entity; and
+    (e) integration of the Software into any commercial software,
+        platform, or workflow.
 
--   Section 3 – License Conditions.
+1.4 "Modifications" means any changes to, additions to, or derivative
+    works based upon the Software, including modified source code,
+    fine-tuned or distilled model weights that materially rely on the
+    Software, and translations or ports of the Software.
 
-    Your exercise of the Licensed Rights is expressly made subject to
-    the following conditions.
 
-    -   a. Attribution.
-        -   1. If You Share the Licensed Material, You must:
+2. Grant of Rights to Non-Commercial Users
+------------------------------------------
 
-            -   A. retain the following if it is supplied by the
-                Licensor with the Licensed Material:
-                -   i. identification of the creator(s) of the Licensed
-                    Material and any others designated to receive
-                    attribution, in any reasonable manner requested by
-                    the Licensor (including by pseudonym if designated);
-                -   ii. a copyright notice;
-                -   iii. a notice that refers to this Public License;
-                -   iv. a notice that refers to the disclaimer of
-                    warranties;
-                -   v. a URI or hyperlink to the Licensed Material to
-                    the extent reasonably practicable;
-            -   B. indicate if You modified the Licensed Material and
-                retain an indication of any previous modifications; and
-            -   C. indicate the Licensed Material is licensed under this
-                Public License, and include the text of, or the URI or
-                hyperlink to, this Public License.
+Subject to the terms and conditions of this License, the Licensor and
+the Developers grant Non-Commercial Users a worldwide, royalty-free,
+non-exclusive, non-transferable, non-sublicensable right to use,
+perform, display, reproduce, and modify the Software solely for
+internal Non-Commercial Purposes.
 
-            For the avoidance of doubt, You do not have permission under
-            this Public License to Share Adapted Material.
 
-        -   2. You may satisfy the conditions in Section 3(a)(1) in any
-            reasonable manner based on the medium, means, and context in
-            which You Share the Licensed Material. For example, it may
-            be reasonable to satisfy the conditions by providing a URI
-            or hyperlink to a resource that includes the required
-            information.
-        -   3. If requested by the Licensor, You must remove any of the
-            information required by Section 3(a)(1)(A) to the extent
-            reasonably practicable.
+3. Restrictions on Distribution
+-------------------------------
 
--   Section 4 – Sui Generis Database Rights.
+3.1 Non-Commercial Users SHALL NOT distribute, publish, sublicense,
+    sell, rent, lease, transfer, or otherwise make available the
+    Software or any Modifications to any third party.
 
-    Where the Licensed Rights include Sui Generis Database Rights that
-    apply to Your use of the Licensed Material:
+3.2 As a limited exception to Section 3.1, Non-Commercial Users may
+    fork the official VenusFactory repository and publish Modifications
+    in such forks on the same version-control platform (e.g., GitHub)
+    on which the official repository is hosted, provided that:
+      (a) the fork retains this License and all copyright and
+          attribution notices;
+      (b) Modifications are clearly marked as such; and
+      (c) the fork is not used for, and does not enable, any
+          Commercial Use.
 
-    -   a. for the avoidance of doubt, Section 2(a)(1) grants You the
-        right to extract, reuse, reproduce, and Share all or a
-        substantial portion of the contents of the database for
-        NonCommercial purposes only and provided You do not Share
-        Adapted Material;
-    -   b. if You include all or a substantial portion of the database
-        contents in a database in which You have Sui Generis Database
-        Rights, then the database in which You have Sui Generis Database
-        Rights (but not its individual contents) is Adapted Material;
-        and
-    -   c. You must comply with the conditions in Section 3(a) if You
-        Share all or a substantial portion of the contents of the
-        database.
+3.3 Nothing in this License permits the redistribution of the Software
+    or any Modifications through package registries, model hubs, app
+    stores, container registries, web services, or any channel
+    intended to facilitate use by third parties outside Section 3.2.
 
-    For the avoidance of doubt, this Section 4 supplements and does not
-    replace Your obligations under this Public License where the
-    Licensed Rights include other Copyright and Similar Rights.
 
--   Section 5 – Disclaimer of Warranties and Limitation of Liability.
+4. Commercial Use Requires a Separate License
+---------------------------------------------
 
-    -   a. Unless otherwise separately undertaken by the Licensor, to
-        the extent possible, the Licensor offers the Licensed Material
-        as-is and as-available, and makes no representations or
-        warranties of any kind concerning the Licensed Material, whether
-        express, implied, statutory, or other. This includes, without
-        limitation, warranties of title, merchantability, fitness for a
-        particular purpose, non-infringement, absence of latent or other
-        defects, accuracy, or the presence or absence of errors, whether
-        or not known or discoverable. Where disclaimers of warranties
-        are not allowed in full or in part, this disclaimer may not
-        apply to You.
-    -   b. To the extent possible, in no event will the Licensor be
-        liable to You on any legal theory (including, without
-        limitation, negligence) or otherwise for any direct, special,
-        indirect, incidental, consequential, punitive, exemplary, or
-        other losses, costs, expenses, or damages arising out of this
-        Public License or use of the Licensed Material, even if the
-        Licensor has been advised of the possibility of such losses,
-        costs, expenses, or damages. Where a limitation of liability is
-        not allowed in full or in part, this limitation may not apply to
-        You.
-    -   c. The disclaimer of warranties and limitation of liability
-        provided above shall be interpreted in a manner that, to the
-        extent possible, most closely approximates an absolute
-        disclaimer and waiver of all liability.
+Commercial Use of the Software is NOT permitted under this License.
+Any Commercial Use, or any use about which the user is uncertain,
+requires a separate written commercial license from the Licensor.
 
--   Section 6 – Term and Termination.
+To inquire about a commercial license, or to ask whether a
+contemplated use qualifies as Commercial Use, please contact:
 
-    -   a. This Public License applies for the term of the Copyright and
-        Similar Rights licensed here. However, if You fail to comply
-        with this Public License, then Your rights under this Public
-        License terminate automatically.
-    -   b. Where Your right to use the Licensed Material has terminated
-        under Section 6(a), it reinstates:
+    Liang Lab, Shanghai Jiao Tong University
+    Attn: Prof. Liang Hong
+    Email: hongl3lilang@sjtu.edu.cn
 
-        -   1. automatically as of the date the violation is cured,
-            provided it is cured within 30 days of Your discovery of the
-            violation; or
-        -   2. upon express reinstatement by the Licensor.
+Inquiries should include, at a minimum, (a) the identity of the entity
+that will use the Software, (b) a description of the intended use,
+(c) the contemplated scope and duration of use, and (d) any
+deliverables or downstream products that may result. The Licensor has
+sole discretion over whether, and on what terms, to grant any
+commercial license.
 
-        For the avoidance of doubt, this Section 6(b) does not affect
-        any right the Licensor may have to seek remedies for Your
-        violations of this Public License.
 
-    -   c. For the avoidance of doubt, the Licensor may also offer the
-        Licensed Material under separate terms or conditions or stop
-        distributing the Licensed Material at any time; however, doing
-        so will not terminate this Public License.
-    -   d. Sections 1, 5, 6, 7, and 8 survive termination of this Public
-        License.
+5. Ownership and Reservation of Rights
+--------------------------------------
 
--   Section 7 – Other Terms and Conditions.
+5.1 The Software is owned by the Licensor and the Developers and is
+    protected by copyright and other intellectual property laws. All
+    rights not expressly granted in this License are reserved.
 
-    -   a. The Licensor shall not be bound by any additional or
-        different terms or conditions communicated by You unless
-        expressly agreed.
-    -   b. Any arrangements, understandings, or agreements regarding the
-        Licensed Material not stated herein are separate from and
-        independent of the terms and conditions of this Public License.
+5.2 No rights or licenses are granted by implication, estoppel, or
+    otherwise. No rights are granted under any patent, trademark,
+    trade secret, or other intellectual property right except as
+    expressly stated herein.
 
--   Section 8 – Interpretation.
+5.3 You retain all rights you may have in any novel and patentable
+    products that you generate with the help of the Software (e.g.,
+    novel proteins, sequences, or molecules), subject to your
+    compliance with this License. Nothing in this License shall be
+    construed as transferring such rights to the Licensor or the
+    Developers.
 
-    -   a. For the avoidance of doubt, this Public License does not, and
-        shall not be interpreted to, reduce, limit, restrict, or impose
-        conditions on any use of the Licensed Material that could
-        lawfully be made without permission under this Public License.
-    -   b. To the extent possible, if any provision of this Public
-        License is deemed unenforceable, it shall be automatically
-        reformed to the minimum extent necessary to make it enforceable.
-        If the provision cannot be reformed, it shall be severed from
-        this Public License without affecting the enforceability of the
-        remaining terms and conditions.
-    -   c. No term or condition of this Public License will be waived
-        and no failure to comply consented to unless expressly agreed to
-        by the Licensor.
-    -   d. Nothing in this Public License constitutes or may be
-        interpreted as a limitation upon, or waiver of, any privileges
-        and immunities that apply to the Licensor or You, including from
-        the legal processes of any jurisdiction or authority.
 
-Creative Commons is not a party to its public licenses. Notwithstanding,
-Creative Commons may elect to apply one of its public licenses to
-material it publishes and in those instances will be considered the
-"Licensor." The text of the Creative Commons public licenses is
-dedicated to the public domain under the CC0 Public Domain Dedication.
-Except for the limited purpose of indicating that material is shared
-under a Creative Commons public license or as otherwise permitted by the
-Creative Commons policies published at creativecommons.org/policies,
-Creative Commons does not authorize the use of the trademark "Creative
-Commons" or any other trademark or logo of Creative Commons without its
-prior written consent including, without limitation, in connection with
-any unauthorized modifications to any of its public licenses or any
-other arrangements, understandings, or agreements concerning use of
-licensed material. For the avoidance of doubt, this paragraph does not
-form part of the public licenses.
+6. Attribution and Citation
+---------------------------
 
-Creative Commons may be contacted at creativecommons.org.
+Any publication, preprint, presentation, software, model, or other
+work that results from use of the Software must:
+  (a) provide appropriate attribution to Liang Lab at Shanghai Jiao
+      Tong University and the Developers;
+  (b) cite the references identified in the "Citation" section of the
+      repository README; and
+  (c) include a notice that the Software was used.
+
+
+7. Disclaimer of Warranty
+-------------------------
+
+THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTY
+OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE
+WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE,
+TITLE, AND NON-INFRINGEMENT. THE LICENSOR AND THE DEVELOPERS MAKE NO
+REPRESENTATION OR WARRANTY THAT THE SOFTWARE OR ITS OUTPUTS ARE
+ACCURATE, RELIABLE, OR SUITABLE FOR ANY PARTICULAR PURPOSE, INCLUDING
+ANY CLINICAL, DIAGNOSTIC, THERAPEUTIC, OR COMMERCIAL APPLICATION.
+THE SOFTWARE IS EXPERIMENTAL IN NATURE AND IS MADE AVAILABLE AS A
+RESEARCH COURTESY, WITHOUT ANY OBLIGATION TO PROVIDE MAINTENANCE OR
+SUPPORT.
+
+
+8. Limitation of Liability
+--------------------------
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, IN NO EVENT SHALL
+THE LICENSOR, THE DEVELOPERS, OR ANY CONTRIBUTOR BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, CONSEQUENTIAL, OR
+PUNITIVE DAMAGES (INCLUDING, BUT NOT LIMITED TO, LOSS OF PROFITS,
+LOSS OF DATA, BUSINESS INTERRUPTION, OR PROCUREMENT OF SUBSTITUTE
+GOODS OR SERVICES) HOWEVER CAUSED AND UNDER ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+OR OTHERWISE), ARISING IN ANY WAY OUT OF THE USE OF OR INABILITY TO
+USE THE SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+9. Indemnification
+------------------
+
+You agree to indemnify, defend, and hold harmless the Licensor, the
+Developers, and their respective affiliates from and against any and
+all claims, damages, losses, liabilities, costs, and expenses
+(including reasonable attorneys' fees) arising out of or in any way
+related to (a) your use of the Software, (b) your breach of this
+License, or (c) any Modifications made by you.
+
+
+10. Term and Termination
+------------------------
+
+This License is effective until terminated. The rights granted under
+this License will terminate automatically and without notice if you
+fail to comply with any term of this License, including, without
+limitation, any unauthorized Commercial Use or unauthorized
+distribution. Upon termination, you must immediately cease all use of
+the Software and destroy all copies of the Software and any
+Modifications in your possession or control. Sections 5, 7, 8, 9, 11,
+and 12 survive termination.
+
+
+11. Third-Party Materials
+-------------------------
+
+The Software may include or depend on third-party components that are
+subject to their own license terms. Nothing in this License limits
+your obligations under those third-party licenses. You are solely
+responsible for complying with all third-party license terms
+applicable to such components.
+
+
+12. Governing Law and Severability
+----------------------------------
+
+This License shall be governed by and construed in accordance with
+the laws of the People's Republic of China, without regard to its
+conflict-of-laws principles. If any provision of this License is held
+to be unenforceable, that provision shall be reformed only to the
+extent necessary to make it enforceable, and the remaining provisions
+shall continue in full force and effect.
+
+
+13. Entire Agreement
+--------------------
+
+This License constitutes the entire agreement between you and the
+Licensor with respect to the use of the Software licensed hereunder
+and supersedes all prior or contemporaneous understandings regarding
+such subject matter.
+
+
+For commercial licensing inquiries, please contact:
+    Liang Lab, Shanghai Jiao Tong University
+    Email: hongl3lilang@sjtu.edu.cn

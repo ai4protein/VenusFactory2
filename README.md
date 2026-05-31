@@ -508,6 +508,16 @@ pdb_file = download_alphafold_structure("P12345")
 
 ---
 
+## 📜 License
+
+VenusFactory is released under the **VenusFactory Non-Commercial License** — see [`LICENSE`](./LICENSE) (English, authoritative) and [`LICENSE_CN.md`](./LICENSE_CN.md) (中文翻译, for reference).
+
+- ✅ **Academic / non-commercial use is free** for not-for-profit research institutions, government laboratories, universities, and individuals — for internal research, teaching, and personal study. Please cite the references in the [Citation](#-citation) section.
+- ❌ **Commercial use is NOT permitted** under the default license. This includes any use by or for a for-profit entity, any fee-bearing product/service/API, contract research whose IP is owned by a for-profit entity, and any use intended for commercial advantage.
+- 📧 **Commercial licensing requires prior written approval.** To request a commercial license — or to confirm whether your intended use qualifies as commercial — please email **<hongl3lilang@sjtu.edu.cn>** (Liang Lab, Shanghai Jiao Tong University). Your inquiry should include the licensee entity, intended use, scope, and duration.
+
+---
+
 ## 🎊 Acknowledgement
 
 Developed by [Liang's Lab](https://ins.sjtu.edu.cn/people/lhong/index.html) at Shanghai Jiao Tong University.

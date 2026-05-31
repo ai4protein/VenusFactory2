@@ -506,6 +506,16 @@ pdb_file = download_alphafold_structure("P12345")
 
 ---
 
+## 📜 协议
+
+VenusFactory 采用 **VenusFactory 非商业许可协议（VenusFactory Non-Commercial License）** 发布，详见 [`LICENSE`](./LICENSE)（英文，正式版本）与 [`LICENSE_CN.md`](./LICENSE_CN.md)（中文翻译，仅供参考）。
+
+- ✅ **学术 / 非商业用途免费**：适用于非营利研究机构、政府实验室、高校以及个人，用于内部科研、教学和个人学习。使用时请按 [引用](#-引用) 部分注明出处。
+- ❌ **不允许商业用途**：包括但不限于由营利性实体使用或为其使用、任何收费的产品 / 服务 / API、知识产权归属于营利性实体的合同研究，以及任何以商业利益为目的的使用。
+- 📧 **商用须事先获得邮件授权**：如需申请商业许可，或不确定您的使用是否属于商业用途，请发送邮件至 **<hongl3lilang@sjtu.edu.cn>**（上海交通大学 Liang Lab）咨询并取得书面认可。邮件中请说明：使用主体、用途、范围与期限。
+
+---
+
 ## 🎊 致谢
 
 由上海交通大学 [Liang's Lab](https://ins.sjtu.edu.cn/people/lhong/index.html) 开发和维护。
