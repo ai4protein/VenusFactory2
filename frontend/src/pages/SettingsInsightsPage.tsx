@@ -12,6 +12,77 @@ import {
   type InsightsTokenUsage,
   type InsightsToolCalls
 } from "../lib/api";
+import { useLang } from "../lib/i18n";
+import { useDocumentMeta } from "../lib/useDocumentMeta";
+
+const STRINGS = {
+  en: {
+    title: "Insights",
+    subtitle: "Operational analytics for tools, traffic, and token consumption.",
+    timeRange: "Time Range",
+    refresh: "Refresh",
+    loadingDash: "Loading insights dashboard...",
+    kpiTotalCalls: "Total Tool Calls",
+    kpiSuccessRate: "Success rate",
+    kpiActiveOwners: "Active Owners",
+    kpiUniqueIps: "Unique IPs",
+    kpiTotalTokens: "Total Tokens",
+    kpiTokensIn: "In",
+    kpiTokensOut: "Out",
+    kpiEstCost: "Estimated Cost",
+    kpiCostNote: "Based on configured model prices",
+    panelTrend: "Tool Call Trend",
+    panelIp: "IP Distribution",
+    panelIpUnit: "country",
+    panelMap: "Access Map",
+    panelMapUnit: "offline geoip",
+    panelToken: "Token Consumption",
+    panelTokenUnit: "daily rollup",
+    colBucket: "Bucket",
+    colTotalTokens: "Total Tokens",
+    colEstCost: "Estimated Cost",
+    noToolCalls: "No tool calls yet.",
+    noAccess: "No access events in range.",
+    noTokens: "No token usage in range.",
+    noData: "No data",
+    mapAriaLabel: "IP access world map",
+    errOverview: "Failed to load insights overview.",
+    errInsights: "Failed to load insights."
+  },
+  zh: {
+    title: "运行洞察",
+    subtitle: "工具、流量与 Token 消耗的运营分析。",
+    timeRange: "时间范围",
+    refresh: "刷新",
+    loadingDash: "正在加载洞察仪表盘…",
+    kpiTotalCalls: "工具调用总数",
+    kpiSuccessRate: "成功率",
+    kpiActiveOwners: "活跃用户",
+    kpiUniqueIps: "独立 IP",
+    kpiTotalTokens: "Token 总量",
+    kpiTokensIn: "输入",
+    kpiTokensOut: "输出",
+    kpiEstCost: "预估费用",
+    kpiCostNote: "基于已配置的模型价格",
+    panelTrend: "工具调用趋势",
+    panelIp: "IP 分布",
+    panelIpUnit: "按国家",
+    panelMap: "访问地图",
+    panelMapUnit: "离线 geoip",
+    panelToken: "Token 消耗",
+    panelTokenUnit: "按日汇总",
+    colBucket: "分桶",
+    colTotalTokens: "Token 总量",
+    colEstCost: "预估费用",
+    noToolCalls: "暂无工具调用。",
+    noAccess: "此时间段无访问记录。",
+    noTokens: "此时间段无 Token 消耗。",
+    noData: "无数据",
+    mapAriaLabel: "IP 访问世界地图",
+    errOverview: "加载洞察概览失败。",
+    errInsights: "加载洞察数据失败。"
+  }
+};
 
 type TimeWindow = "24h" | "7d" | "30d";
 
@@ -36,8 +107,8 @@ function formatUsd(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(value);
 }
 
-function Sparkline({ values }: { values: number[] }) {
-  if (!values.length) return <div className="insights-empty-inline">No data</div>;
+function Sparkline({ values, noDataLabel }: { values: number[]; noDataLabel: string }) {
+  if (!values.length) return <div className="insights-empty-inline">{noDataLabel}</div>;
   const max = Math.max(...values, 1);
   const min = Math.min(...values, 0);
   const span = Math.max(max - min, 1);
@@ -84,10 +155,10 @@ function toMapXY(lat: number, lon: number) {
   return { x, y };
 }
 
-function WorldMapPanel({ mapData }: { mapData: InsightsMap["data"]["rows"] }) {
+function WorldMapPanel({ mapData, mapAriaLabel }: { mapData: InsightsMap["data"]["rows"]; mapAriaLabel: string }) {
   const maxIntensity = Math.max(...mapData.map((row) => row.intensity), 1);
   return (
-    <svg viewBox="0 0 1000 500" className="insights-world-map" role="img" aria-label="IP access world map">
+    <svg viewBox="0 0 1000 500" className="insights-world-map" role="img" aria-label={mapAriaLabel}>
       <rect x="0" y="0" width="1000" height="500" rx="14" className="insights-world-map-bg" />
       {[125, 250, 375].map((y) => (
         <line key={`lat-${y}`} x1="0" x2="1000" y1={y} y2={y} className="insights-world-map-grid" />
@@ -113,6 +184,8 @@ function WorldMapPanel({ mapData }: { mapData: InsightsMap["data"]["rows"] }) {
 }
 
 export function SettingsInsightsPage() {
+  const t = useLang().t(STRINGS);
+  useDocumentMeta({ title: `${t.title} — VenusFactory2`, description: t.subtitle });
   const [window, setWindow] = useState<TimeWindow>("7d");
   const [reloadSeed, setReloadSeed] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -141,7 +214,7 @@ export function SettingsInsightsPage() {
 
         if (overviewResult.status !== "fulfilled") {
           const reason = overviewResult.reason;
-          throw reason instanceof Error ? reason : new Error("Failed to load insights overview.");
+          throw reason instanceof Error ? reason : new Error(t.errOverview);
         }
         setOverview(overviewResult.value);
 
@@ -151,7 +224,7 @@ export function SettingsInsightsPage() {
         setMapData(mapResult.status === "fulfilled" ? mapResult.value : null);
       } catch (err) {
         if (!alive) return;
-        setError(err instanceof Error ? err.message : "Failed to load insights.");
+        setError(err instanceof Error ? err.message : t.errInsights);
       } finally {
         if (alive) setLoading(false);
       }
@@ -181,14 +254,14 @@ export function SettingsInsightsPage() {
     <div className="settings-page insights-page">
       <header className="chat-header">
         <div>
-          <h2>Insights</h2>
-          <p>Operational analytics for tools, traffic, and token consumption.</p>
+          <h2>{t.title}</h2>
+          <p>{t.subtitle}</p>
         </div>
       </header>
 
       <section className="insights-filter-bar chat-panel">
         <div className="insights-filter-group">
-          <span>Time Range</span>
+          <span>{t.timeRange}</span>
           <div className="insights-segment">
             {(["24h", "7d", "30d"] as TimeWindow[]).map((item) => (
               <button
@@ -203,36 +276,36 @@ export function SettingsInsightsPage() {
           </div>
         </div>
         <button type="button" onClick={() => setReloadSeed((prev) => prev + 1)}>
-          Refresh
+          {t.refresh}
         </button>
       </section>
 
-      {loading && <div className="chat-panel chat-empty">Loading insights dashboard...</div>}
+      {loading && <div className="chat-panel chat-empty">{t.loadingDash}</div>}
       {!loading && error && <div className="error-box">{error}</div>}
 
       {!loading && !error && overview && (
         <section className="insights-grid">
           <article className="insights-kpi-card">
-            <div className="insights-kpi-title">Total Tool Calls</div>
+            <div className="insights-kpi-title">{t.kpiTotalCalls}</div>
             <div className="insights-kpi-value">{formatNumber(overview.data.total_calls)}</div>
-            <div className="insights-kpi-meta">Success rate {overview.data.success_rate.toFixed(1)}%</div>
+            <div className="insights-kpi-meta">{t.kpiSuccessRate} {overview.data.success_rate.toFixed(1)}%</div>
           </article>
           <article className="insights-kpi-card">
-            <div className="insights-kpi-title">Active Owners</div>
+            <div className="insights-kpi-title">{t.kpiActiveOwners}</div>
             <div className="insights-kpi-value">{formatNumber(overview.data.active_owners)}</div>
-            <div className="insights-kpi-meta">Unique IPs {formatNumber(overview.data.unique_ips)}</div>
+            <div className="insights-kpi-meta">{t.kpiUniqueIps} {formatNumber(overview.data.unique_ips)}</div>
           </article>
           <article className="insights-kpi-card">
-            <div className="insights-kpi-title">Total Tokens</div>
+            <div className="insights-kpi-title">{t.kpiTotalTokens}</div>
             <div className="insights-kpi-value">{formatNumber(overview.data.total_tokens)}</div>
             <div className="insights-kpi-meta">
-              In {formatNumber(overview.data.input_tokens)} / Out {formatNumber(overview.data.output_tokens)}
+              {t.kpiTokensIn} {formatNumber(overview.data.input_tokens)} / {t.kpiTokensOut} {formatNumber(overview.data.output_tokens)}
             </div>
           </article>
           <article className="insights-kpi-card">
-            <div className="insights-kpi-title">Estimated Cost</div>
+            <div className="insights-kpi-title">{t.kpiEstCost}</div>
             <div className="insights-kpi-value">{formatUsd(overview.data.estimated_cost_usd)}</div>
-            <div className="insights-kpi-meta">Based on configured model prices</div>
+            <div className="insights-kpi-meta">{t.kpiCostNote}</div>
           </article>
         </section>
       )}
@@ -241,10 +314,10 @@ export function SettingsInsightsPage() {
         <section className="insights-board-grid">
           <article className="chat-panel insights-panel">
             <div className="insights-panel-head">
-              <h3>Tool Call Trend</h3>
+              <h3>{t.panelTrend}</h3>
               <span>{toolCalls?.data.group_by || "day"}</span>
             </div>
-            <Sparkline values={trendValues} />
+            <Sparkline values={trendValues} noDataLabel={t.noData} />
             <div className="insights-top-list">
               {topTools.map(([tool, count]) => (
                 <div className="insights-top-item" key={tool}>
@@ -252,14 +325,14 @@ export function SettingsInsightsPage() {
                   <strong>{formatNumber(count)}</strong>
                 </div>
               ))}
-              {topTools.length === 0 && <div className="chat-empty">No tool calls yet.</div>}
+              {topTools.length === 0 && <div className="chat-empty">{t.noToolCalls}</div>}
             </div>
           </article>
 
           <article className="chat-panel insights-panel">
             <div className="insights-panel-head">
-              <h3>IP Distribution</h3>
-              <span>country</span>
+              <h3>{t.panelIp}</h3>
+              <span>{t.panelIpUnit}</span>
             </div>
             <div className="insights-country-list">
               {(ipDist?.data.rows || []).slice(0, 8).map((row) => (
@@ -268,28 +341,28 @@ export function SettingsInsightsPage() {
                   <span>PV {formatNumber(row.pv)} / UV {formatNumber(row.uv)}</span>
                 </div>
               ))}
-              {(ipDist?.data.rows || []).length === 0 && <div className="chat-empty">No access events in range.</div>}
+              {(ipDist?.data.rows || []).length === 0 && <div className="chat-empty">{t.noAccess}</div>}
             </div>
           </article>
 
           <article className="chat-panel insights-panel insights-panel-map">
             <div className="insights-panel-head">
-              <h3>Access Map</h3>
-              <span>offline geoip</span>
+              <h3>{t.panelMap}</h3>
+              <span>{t.panelMapUnit}</span>
             </div>
-            <WorldMapPanel mapData={mapData?.data.rows || []} />
+            <WorldMapPanel mapData={mapData?.data.rows || []} mapAriaLabel={t.mapAriaLabel} />
           </article>
 
           <article className="chat-panel insights-panel insights-panel-token">
             <div className="insights-panel-head">
-              <h3>Token Consumption</h3>
-              <span>daily rollup</span>
+              <h3>{t.panelToken}</h3>
+              <span>{t.panelTokenUnit}</span>
             </div>
             <div className="insights-token-table">
               <div className="insights-token-row insights-token-head">
-                <span>Bucket</span>
-                <span>Total Tokens</span>
-                <span>Estimated Cost</span>
+                <span>{t.colBucket}</span>
+                <span>{t.colTotalTokens}</span>
+                <span>{t.colEstCost}</span>
               </div>
               {(tokenUsage?.data.rows || []).slice(0, 10).map((row) => (
                 <div className="insights-token-row" key={`${row.bucket}-${row.model}-${row.tool_name}`}>
@@ -298,7 +371,7 @@ export function SettingsInsightsPage() {
                   <span>{formatUsd(row.estimated_cost_usd)}</span>
                 </div>
               ))}
-              {(tokenUsage?.data.rows || []).length === 0 && <div className="chat-empty">No token usage in range.</div>}
+              {(tokenUsage?.data.rows || []).length === 0 && <div className="chat-empty">{t.noTokens}</div>}
             </div>
           </article>
         </section>
