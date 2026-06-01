@@ -6,6 +6,81 @@ import { SegmentedSwitch } from "../../components/SegmentedSwitch";
 import { WorkspaceFilePicker } from "../../components/WorkspaceFilePicker";
 import { MolstarViewer } from "../../components/MolstarViewer";
 import { readWorkspaceTextFile } from "../../lib/workspaceApi";
+import { useLang } from "../../lib/i18n";
+import { useDocumentMeta } from "../../lib/useDocumentMeta";
+
+const STRINGS = {
+  en: {
+    downloadMethod: "Download Method",
+    methodAria: "Download method",
+    singleId: "Single ID",
+    fromFile: "From File",
+    fromWorkspace: "From Workspace",
+    useExample: "Use Example",
+    uploadPlaceholder: "Upload a .txt file with one ID per line.",
+    taskOptions: "Task Options",
+    fileType: "Structure File Type",
+    mergeFasta: "Merge outputs into one FASTA",
+    saveErrorFile: "Save error file",
+    runningBtn: "Running...",
+    startBtn: "Start Download",
+    downloadResult: "Download Result",
+    saveArchive: "Save Downloaded Data",
+    status: "Status:",
+    visualization: "Visualization:",
+    noViz: "No structure preview available yet.",
+    structurePreview: "Structure Preview",
+    outputPreview: "Output Preview",
+    previewEmpty: "Preview will appear here after download.",
+    downloadStatus: "Download Status",
+    logEmpty: "Status logs will appear here.",
+    copyPreview: "Copy output preview",
+    copyStatus: "Copy download status",
+    statusRunning: "Download in progress...",
+    statusOk: "Download completed successfully.",
+    statusErr: "Download finished with errors.",
+    statusIdle: "Ready to start a download task.",
+    truncated: "(Workspace file was truncated for preview limits.)",
+    moreLines: "more entries (showing first 20)",
+    failedDefault: "Download failed.",
+    loadWorkspaceFailed: "Failed to load workspace file."
+  },
+  zh: {
+    downloadMethod: "下载方式",
+    methodAria: "下载方式",
+    singleId: "单个 ID",
+    fromFile: "从文件",
+    fromWorkspace: "从工作区",
+    useExample: "使用示例",
+    uploadPlaceholder: "上传 .txt 文件，每行一个 ID。",
+    taskOptions: "任务选项",
+    fileType: "结构文件格式",
+    mergeFasta: "合并为单个 FASTA",
+    saveErrorFile: "保存错误日志",
+    runningBtn: "运行中…",
+    startBtn: "开始下载",
+    downloadResult: "下载结果",
+    saveArchive: "保存下载数据",
+    status: "状态：",
+    visualization: "可视化：",
+    noViz: "暂无结构预览。",
+    structurePreview: "结构预览",
+    outputPreview: "输出预览",
+    previewEmpty: "下载完成后此处显示预览。",
+    downloadStatus: "下载状态",
+    logEmpty: "此处显示状态日志。",
+    copyPreview: "复制输出预览",
+    copyStatus: "复制下载状态",
+    statusRunning: "下载进行中…",
+    statusOk: "下载成功完成。",
+    statusErr: "下载完成但有错误。",
+    statusIdle: "准备就绪，可开始下载任务。",
+    truncated: "（工作区文件预览已截断。）",
+    moreLines: "条记录（仅显示前 20 条）",
+    failedDefault: "下载失败。",
+    loadWorkspaceFailed: "加载工作区文件失败。"
+  }
+};
 
 type DownloadTaskConfig = {
   title: string;
@@ -25,6 +100,8 @@ type DownloadTaskPageProps = {
 };
 
 export function DownloadTaskPage({ config }: DownloadTaskPageProps) {
+  const t = useLang().t(STRINGS);
+  useDocumentMeta({ title: `${config.title} — VenusFactory2`, description: config.subtitle });
   const [method, setMethod] = useState<DownloadMethod>("Single ID");
   const [idValue, setIdValue] = useState(config.defaultId);
   const [fileContent, setFileContent] = useState("");
@@ -131,14 +208,14 @@ export function DownloadTaskPage({ config }: DownloadTaskPageProps) {
         ? "success"
         : "idle";
   const statusText = running
-    ? "Download in progress..."
+    ? t.statusRunning
     : error
       ? error
       : result
         ? result.success
-          ? "Download completed successfully."
-          : "Download finished with errors."
-        : "Ready to start a download task.";
+          ? t.statusOk
+          : t.statusErr
+        : t.statusIdle;
 
   async function onUpload(file: File | null) {
     if (!file) {
@@ -152,7 +229,7 @@ export function DownloadTaskPage({ config }: DownloadTaskPageProps) {
     const previewLines = lines.slice(0, 20);
     let preview = previewLines.join("\n");
     if (lines.length > 20) {
-      preview += `\n... and ${lines.length - 20} more entries (showing first 20)`;
+      preview += `\n... ${lines.length - 20} ${t.moreLines}`;
     }
     setFilePreview(preview);
   }
@@ -189,7 +266,7 @@ export function DownloadTaskPage({ config }: DownloadTaskPageProps) {
       });
       setResult(payload);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Download failed.");
+      setError(err instanceof Error ? err.message : t.failedDefault);
     } finally {
       setRunning(false);
     }
@@ -203,16 +280,16 @@ export function DownloadTaskPage({ config }: DownloadTaskPageProps) {
       left={
         <>
           <section className="custom-section-card">
-            <h3>Download Method</h3>
+            <h3>{t.downloadMethod}</h3>
             <div className="custom-row">
               <SegmentedSwitch
                 value={method}
                 onChange={setMethod}
-                ariaLabel="Download method"
+                ariaLabel={t.methodAria}
                 className="download-segment-switch"
                 options={[
-                  { value: "Single ID", label: "Single ID" },
-                  { value: "From File", label: "From File" }
+                  { value: "Single ID", label: t.singleId },
+                  { value: "From File", label: t.fromFile }
                 ]}
               />
             </div>
@@ -240,7 +317,7 @@ export function DownloadTaskPage({ config }: DownloadTaskPageProps) {
                     workspaceEnabled={runtimeMode === "local"}
                     disabled={running}
                     acceptedCategories={["table_or_text"]}
-                    buttonLabel="From Workspace"
+                    buttonLabel={t.fromWorkspace}
                     onPick={(picked) => {
                       const selected = picked[0];
                       if (!selected) return;
@@ -259,33 +336,33 @@ export function DownloadTaskPage({ config }: DownloadTaskPageProps) {
                           const previewLines = lines.slice(0, 20);
                           let preview = previewLines.join("\n");
                           if (lines.length > 20) {
-                            preview += `\n... and ${lines.length - 20} more entries (showing first 20)`;
+                            preview += `\n... ${lines.length - 20} ${t.moreLines}`;
                           }
                           if (loaded.truncated) {
-                            preview += "\n\n(Workspace file was truncated for preview limits.)";
+                            preview += `\n\n${t.truncated}`;
                           }
                           setFilePreview(preview);
                         } catch (err) {
-                          setError(err instanceof Error ? err.message : "Failed to load workspace file.");
+                          setError(err instanceof Error ? err.message : t.loadWorkspaceFailed);
                         }
                       })();
                     }}
                   />
                 </div>
                 <button type="button" className="custom-btn-secondary" onClick={onUseExampleIds} disabled={running}>
-                  Use Example
+                  {t.useExample}
                 </button>
                 <small>{config.fileHint}</small>
-                <pre className="download-file-preview">{filePreview || "Upload a .txt file with one ID per line."}</pre>
+                <pre className="download-file-preview">{filePreview || t.uploadPlaceholder}</pre>
               </div>
             )}
           </section>
 
           <section className="custom-section-card">
-            <h3>Task Options</h3>
+            <h3>{t.taskOptions}</h3>
             {config.supportsFileType && (
               <label className="left-controls download-field">
-                Structure File Type
+                {t.fileType}
                 <select className="download-input-field" value={fileType} onChange={(e) => setFileType(e.target.value as "pdb" | "cif")}>
                   <option value="pdb">pdb</option>
                   <option value="cif">cif</option>
@@ -296,48 +373,44 @@ export function DownloadTaskPage({ config }: DownloadTaskPageProps) {
             {config.supportsMerge && (
               <label className="download-option-item">
                 <input type="checkbox" checked={merge} onChange={(e) => setMerge(e.target.checked)} />
-                <span>
-                  Merge outputs into one FASTA
-                </span>
+                <span>{t.mergeFasta}</span>
               </label>
             )}
 
             <label className="download-option-item">
               <input type="checkbox" checked={saveErrorFile} onChange={(e) => setSaveErrorFile(e.target.checked)} />
-              <span>
-                Save error file
-              </span>
+              <span>{t.saveErrorFile}</span>
             </label>
           </section>
 
           <button type="button" className="download-action-btn" onClick={() => void onRun()} disabled={running}>
-            {running ? "Running..." : "Start Download"}
+            {running ? t.runningBtn : t.startBtn}
           </button>
         </>
       }
       right={
         <div className="download-result-wrap">
           <div className="report-result-header quick-tools-v2-result-header">
-            <h3>Download Result</h3>
+            <h3>{t.downloadResult}</h3>
             <div className="report-downloads">
               {archiveUrl && (
                 <a className="download-archive-btn" href={archiveUrl} target="_blank" rel="noreferrer">
-                  Save Downloaded Data
+                  {t.saveArchive}
                 </a>
               )}
             </div>
           </div>
 
           <div className={`download-status-banner ${statusTone}`}>
-            <strong>Status:</strong> {statusText}
+            <strong>{t.status}</strong> {statusText}
           </div>
 
           {config.showVisualization && (
             <div className="download-viz-status">
-              <strong>Visualization:</strong> {visualizationStatus || "No structure preview available yet."}
+              <strong>{t.visualization}</strong> {visualizationStatus || t.noViz}
               {structureResultPath && (
                 <div style={{ marginTop: 12 }}>
-                  <MolstarViewer filePath={structureResultPath} label="Structure Preview" />
+                  <MolstarViewer filePath={structureResultPath} label={t.structurePreview} />
                 </div>
               )}
             </div>
@@ -345,23 +418,23 @@ export function DownloadTaskPage({ config }: DownloadTaskPageProps) {
 
           <div className="download-result-grid">
             <section className={`download-result-card ${statusTone === "failed" ? "failed" : ""}`}>
-              <h4>Output Preview</h4>
+              <h4>{t.outputPreview}</h4>
               <CopyableTextBlock
                 text={structureSummaryText}
-                emptyText="Preview will appear here after download."
+                emptyText={t.previewEmpty}
                 wrapperClassName="quick-tools-v2-copy-wrap"
                 preClassName="report-text quick-tools-v2-text"
-                ariaLabel="Copy output preview"
+                ariaLabel={t.copyPreview}
               />
             </section>
             <section className={`download-result-card ${statusTone === "failed" ? "failed" : statusTone === "success" ? "success" : ""}`}>
-              <h4>Download Status</h4>
+              <h4>{t.downloadStatus}</h4>
               <CopyableTextBlock
                 text={result?.message || ""}
-                emptyText="Status logs will appear here."
+                emptyText={t.logEmpty}
                 wrapperClassName="quick-tools-v2-copy-wrap"
                 preClassName="report-text quick-tools-v2-text"
-                ariaLabel="Copy download status"
+                ariaLabel={t.copyStatus}
               />
             </section>
           </div>

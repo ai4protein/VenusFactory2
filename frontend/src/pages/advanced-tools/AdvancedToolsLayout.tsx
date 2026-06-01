@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 import { PageFooter } from "../../components/PageFooter";
+import { useLang } from "../../lib/i18n";
 
 type AdvancedToolsLayoutProps = {
   title: string;
@@ -11,7 +12,13 @@ type AdvancedToolsLayoutProps = {
   right: ReactNode;
 };
 
+const STRINGS = {
+  en: { running: "Task Running", idle: "Ready", progress: "Progress", runningLabel: "Running..." },
+  zh: { running: "任务运行中", idle: "就绪", progress: "进度", runningLabel: "运行中…" }
+};
+
 export function AdvancedToolsLayout(props: AdvancedToolsLayoutProps) {
+  const t = useLang().t(STRINGS);
   return (
     <div className="advanced-tools-page">
       <header className="chat-header">
@@ -21,7 +28,7 @@ export function AdvancedToolsLayout(props: AdvancedToolsLayoutProps) {
         </div>
         <div className={`run-status-bar ${props.running ? "running" : "stopped"}`}>
           <span className="run-status-dot" />
-          <span className="run-status-text">{props.running ? "Task Running" : "Ready"}</span>
+          <span className="run-status-text">{props.running ? t.running : t.idle}</span>
         </div>
       </header>
 
@@ -31,10 +38,10 @@ export function AdvancedToolsLayout(props: AdvancedToolsLayoutProps) {
       </section>
       {props.running && (
         <section className="chat-panel custom-section-card">
-          <h3>Progress</h3>
+          <h3>{t.progress}</h3>
           <div className="custom-progress-wrap">
             <div className="custom-progress-meta">
-              <span>{props.progressMessage || "Running..."}</span>
+              <span>{props.progressMessage || t.runningLabel}</span>
               <span>{Math.round(Math.max(0, Math.min(1, props.progress ?? 0)) * 100)}%</span>
             </div>
             <div
