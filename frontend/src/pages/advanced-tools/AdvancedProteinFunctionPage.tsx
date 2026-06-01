@@ -9,6 +9,54 @@ import {
 import { AdvancedToolsLayout } from "./AdvancedToolsLayout";
 import { AdvancedResultPanel } from "./AdvancedResultPanel";
 import { WorkspaceFilePicker } from "../../components/WorkspaceFilePicker";
+import { useLang } from "../../lib/i18n";
+import { useDocumentMeta } from "../../lib/useDocumentMeta";
+import { COMMON_STRINGS } from "../../lib/commonStrings";
+
+const STRINGS = {
+  en: {
+    ...COMMON_STRINGS.en,
+    title: "Protein Function",
+    subtitle: "Predict protein functions across selected datasets.",
+    modelTaskSection: "Model and Task",
+    modelLabel: "Model",
+    taskLabel: "Task",
+    datasetsLabel: "Datasets (Multi-select)",
+    selectedCount: (n: number) => `${n} selected`,
+    selectAll: "Select All",
+    clear: "Clear",
+    datasetSelected: "selected",
+    inputSection: "Input",
+    pasteFastaSequence: "Paste FASTA / sequence",
+    pasteFastaPlaceholder: "Paste sequence or FASTA content...",
+    onlineLimitNote: (n: number) => `Online mode supports up to ${n} FASTA sequences per run.`,
+    aiOn: "AI insight will be generated and attached to the result panel.",
+    aiOff: "Enable this to generate expert interpretation after prediction.",
+    startBtn: "Start Function Prediction",
+    resultTitle: "Protein Function Result"
+  },
+  zh: {
+    ...COMMON_STRINGS.zh,
+    title: "蛋白功能",
+    subtitle: "在选定的数据集上进行蛋白功能预测。",
+    modelTaskSection: "模型与任务",
+    modelLabel: "模型",
+    taskLabel: "任务",
+    datasetsLabel: "数据集（多选）",
+    selectedCount: (n: number) => `已选 ${n} 项`,
+    selectAll: "全选",
+    clear: "清空",
+    datasetSelected: "已选",
+    inputSection: "输入",
+    pasteFastaSequence: "粘贴 FASTA / 序列",
+    pasteFastaPlaceholder: "粘贴序列或 FASTA 内容…",
+    onlineLimitNote: (n: number) => `在线模式每次运行最多支持 ${n} 条 FASTA 序列。`,
+    aiOn: "AI 专家解读将生成并附加在结果面板中。",
+    aiOff: "开启后，预测完成会自动生成专家解读。",
+    startBtn: "开始功能预测",
+    resultTitle: "蛋白功能预测结果"
+  }
+};
 
 const DEFAULT_META: AdvancedToolsMeta = {
   dataset_mapping_zero_shot: [],
@@ -26,6 +74,8 @@ type AdvancedProteinFunctionPageProps = {
 };
 
 export function AdvancedProteinFunctionPage({ workspaceEnabled }: AdvancedProteinFunctionPageProps) {
+  const t = useLang().t(STRINGS);
+  useDocumentMeta({ title: `${t.title} — VenusFactory2`, description: t.subtitle });
   const [meta, setMeta] = useState<AdvancedToolsMeta>(DEFAULT_META);
   const [task, setTask] = useState("Solubility");
   const [modelName, setModelName] = useState("ESM2-650M");
@@ -38,7 +88,7 @@ export function AdvancedProteinFunctionPage({ workspaceEnabled }: AdvancedProtei
   const [enableAi, setEnableAi] = useState(false);
   const [llmProvider, setLlmProvider] = useState(DEFAULT_META.llm_models[0]);
   const [progress, setProgress] = useState(0);
-  const [progressMessage, setProgressMessage] = useState("Idle");
+  const [progressMessage, setProgressMessage] = useState("");
 
   useEffect(() => {
     void (async () => {
@@ -85,7 +135,7 @@ export function AdvancedProteinFunctionPage({ workspaceEnabled }: AdvancedProtei
         setSequence("");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed.");
+      setError(err instanceof Error ? err.message : t.uploadFailed);
     }
   }
 
@@ -93,7 +143,7 @@ export function AdvancedProteinFunctionPage({ workspaceEnabled }: AdvancedProtei
     setError("");
     setResultPayload(null);
     setProgress(0);
-    setProgressMessage("Preparing task...");
+    setProgressMessage(t.preparingTask);
     setRunning(true);
     try {
       const payload = await runAdvancedProteinFunctionStream({
@@ -111,9 +161,9 @@ export function AdvancedProteinFunctionPage({ workspaceEnabled }: AdvancedProtei
       });
       setResultPayload(payload);
       setProgress(1);
-      setProgressMessage("Prediction completed");
+      setProgressMessage(t.predictionDone);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Run failed.");
+      setError(err instanceof Error ? err.message : t.runFailed);
     } finally {
       setRunning(false);
     }
@@ -126,23 +176,23 @@ export function AdvancedProteinFunctionPage({ workspaceEnabled }: AdvancedProtei
       setUploadedPath(data.file_path);
       setSequence(data.content || "");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load example.");
+      setError(err instanceof Error ? err.message : t.loadExampleFailed);
     }
   }
 
   return (
     <AdvancedToolsLayout
-      title="Protein Function"
-      subtitle="Predict protein functions across selected datasets."
+      title={t.title}
+      subtitle={t.subtitle}
       running={running}
       progress={progress}
-      progressMessage={progressMessage}
+      progressMessage={progressMessage || t.idle}
       left={
         <>
           <section className="custom-section-card">
-            <h3>Model and Task</h3>
+            <h3>{t.modelTaskSection}</h3>
             <label className="left-controls">
-              Model
+              {t.modelLabel}
               <select value={modelName} onChange={(e) => setModelName(e.target.value)}>
                 {meta.model_mapping_function.map((item) => (
                   <option key={item} value={item}>
@@ -152,7 +202,7 @@ export function AdvancedProteinFunctionPage({ workspaceEnabled }: AdvancedProtei
               </select>
             </label>
             <label className="left-controls">
-              Task
+              {t.taskLabel}
               <select value={task} onChange={(e) => setTask(e.target.value)}>
                 {Object.keys(meta.dataset_mapping_function).map((item) => (
                   <option key={item} value={item}>
@@ -162,9 +212,9 @@ export function AdvancedProteinFunctionPage({ workspaceEnabled }: AdvancedProtei
               </select>
             </label>
             <div className="left-controls">
-              <span>Datasets (Multi-select)</span>
+              <span>{t.datasetsLabel}</span>
               <div className="advanced-dataset-toolbar">
-                <span className="advanced-dataset-count">{selectedDatasets.length} selected</span>
+                <span className="advanced-dataset-count">{t.selectedCount(selectedDatasets.length)}</span>
                 <div className="advanced-dataset-actions">
                   <button
                     type="button"
@@ -172,7 +222,7 @@ export function AdvancedProteinFunctionPage({ workspaceEnabled }: AdvancedProtei
                     onClick={() => setSelectedDatasets(datasetOptions)}
                     disabled={datasetOptions.length === 0}
                   >
-                    Select All
+                    {t.selectAll}
                   </button>
                   <button
                     type="button"
@@ -180,7 +230,7 @@ export function AdvancedProteinFunctionPage({ workspaceEnabled }: AdvancedProtei
                     onClick={() => setSelectedDatasets([])}
                     disabled={selectedDatasets.length === 0}
                   >
-                    Clear
+                    {t.clear}
                   </button>
                 </div>
               </div>
@@ -195,7 +245,7 @@ export function AdvancedProteinFunctionPage({ workspaceEnabled }: AdvancedProtei
                       aria-pressed={checked}
                       onClick={() => toggleDataset(item)}
                     >
-                      {checked && <span className="advanced-dataset-item-status">selected</span>}
+                      {checked && <span className="advanced-dataset-item-status">{t.datasetSelected}</span>}
                       <span className="advanced-dataset-item-label">{item}</span>
                     </button>
                   );
@@ -205,32 +255,32 @@ export function AdvancedProteinFunctionPage({ workspaceEnabled }: AdvancedProtei
           </section>
 
           <section className="custom-section-card">
-            <h3>Input</h3>
+            <h3>{t.inputSection}</h3>
             <label className="left-controls">
-              Paste FASTA / sequence
+              {t.pasteFastaSequence}
               <textarea
                 rows={6}
                 value={sequence}
                 onChange={(e) => setSequence(e.target.value)}
-                placeholder="Paste sequence or FASTA content..."
+                placeholder={t.pasteFastaPlaceholder}
               />
             </label>
             {meta.online_limit_enabled && (
               <p className="advanced-ai-note">
-                Online mode supports up to {meta.online_fasta_limit ?? 50} FASTA sequences per run.
+                {t.onlineLimitNote(meta.online_fasta_limit ?? 50)}
               </p>
             )}
             <div className="custom-file-example-row upload-source-stack">
               <div className="file-source-inline">
                 <label className="left-controls custom-file-picker-field">
-                  Select File
+                  {t.selectFile}
                   <input type="file" accept=".fasta,.fa,.txt" onChange={(e) => void onUpload(e.target.files?.[0] || null)} />
                 </label>
                 <WorkspaceFilePicker
                   workspaceEnabled={workspaceEnabled}
                   disabled={running}
                   acceptedCategories={["sequence"]}
-                  buttonLabel="From Workspace"
+                  buttonLabel={t.fromWorkspace}
                   onPick={(picked) => {
                     const selected = picked[0];
                     if (!selected) return;
@@ -240,29 +290,27 @@ export function AdvancedProteinFunctionPage({ workspaceEnabled }: AdvancedProtei
                 />
               </div>
               <button type="button" className="custom-btn-secondary" onClick={() => void onUseExample()}>
-                Use Example FASTA
+                {t.useExampleFasta}
               </button>
             </div>
-            {uploadedPath && <div className="report-preview">Uploaded: {uploadedPath}</div>}
+            {uploadedPath && <div className="report-preview">{t.uploaded} {uploadedPath}</div>}
           </section>
 
           <section className="custom-section-card advanced-ai-section">
-            <h3>AI Expert (Optional)</h3>
+            <h3>{t.aiExpert}</h3>
             <label className="advanced-ai-toggle">
               <input type="checkbox" checked={enableAi} onChange={(e) => setEnableAi(e.target.checked)} />
               <span className="advanced-ai-toggle-box" />
-              <span className="advanced-ai-toggle-text">Enable AI analysis and expert summary</span>
-              <span className={`advanced-ai-pill ${enableAi ? "active" : ""}`}>{enableAi ? "Enabled" : "Disabled"}</span>
+              <span className="advanced-ai-toggle-text">{t.enableAi}</span>
+              <span className={`advanced-ai-pill ${enableAi ? "active" : ""}`}>{enableAi ? t.enabled : t.disabled}</span>
             </label>
             <p className="advanced-ai-note">
-              {enableAi
-                ? "AI insight will be generated and attached to the result panel."
-                : "Enable this to generate expert interpretation after prediction."}
+              {enableAi ? t.aiOn : t.aiOff}
             </p>
             {enableAi && (
               <div className="advanced-ai-fields">
                 <label className="left-controls">
-                  LLM Provider
+                  {t.llmProvider}
                   <select value={llmProvider} onChange={(e) => setLlmProvider(e.target.value)}>
                     {meta.llm_models.map((item) => (
                       <option key={item} value={item}>
@@ -276,13 +324,13 @@ export function AdvancedProteinFunctionPage({ workspaceEnabled }: AdvancedProtei
           </section>
 
           <button type="button" className="custom-btn-primary" onClick={() => void onRun()} disabled={running}>
-            {running ? "Running..." : "Start Function Prediction"}
+            {running ? t.runningBtn : t.startBtn}
           </button>
         </>
       }
       right={
         <AdvancedResultPanel
-          title="Protein Function Result"
+          title={t.resultTitle}
           resultPayload={resultPayload}
           aiSummary={(resultPayload?.ai_summary as string) || ""}
           error={error}

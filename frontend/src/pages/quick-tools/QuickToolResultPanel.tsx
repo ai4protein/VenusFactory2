@@ -1,6 +1,60 @@
 import { useEffect, useMemo, useState } from "react";
 import { extractDownloadPath, getDownloadUrl } from "../../lib/quickToolsApi";
 import { CopyableTextBlock } from "../../components/CommandPreviewCard";
+import { useLang } from "../../lib/i18n";
+
+const STRINGS = {
+  en: {
+    downloadResult: "Download Result",
+    downloadTableCsv: "Download Table CSV",
+    tabTable: "Table",
+    tabRaw: "Raw",
+    tabHeatmap: "Heatmap",
+    tabAi: "AI Expert",
+    loadingCsv: "Loading CSV result...",
+    csvLoadFailed: "Failed to load CSV result. Fallback to JSON preview when available.",
+    labelFilter: "Label Filter",
+    filterAll: "All",
+    rowsTruncatedPrefix: "Showing first ",
+    rowsTruncatedMid: " rows out of ",
+    rowsTruncatedSuffix: ". Download full result for complete data.",
+    emptyTable: "No tabular rows available for current result.",
+    rawEmpty: "Result JSON will appear here...",
+    copyRawAria: "Copy raw result",
+    heatmapFrameTitle: "Quick Tools Heatmap",
+    heatmapFallback:
+      "Heatmap artifacts detected in current result. Use Download Result for full interactive plot or file output.",
+    heatmapMissing:
+      "No heatmap artifact detected in this result. Heatmap is typically available for mutation and residue-related tasks.",
+    copyHeatmapAria: "Copy heatmap note",
+    aiEmpty: "Enable AI Summary and run prediction to generate expert analysis.",
+    copyAiAria: "Copy AI summary"
+  },
+  zh: {
+    downloadResult: "下载结果",
+    downloadTableCsv: "下载表格 CSV",
+    tabTable: "表格",
+    tabRaw: "原始数据",
+    tabHeatmap: "热图",
+    tabAi: "AI 专家",
+    loadingCsv: "正在加载 CSV 结果……",
+    csvLoadFailed: "加载 CSV 结果失败，若有 JSON 数据将回退到 JSON 预览。",
+    labelFilter: "标签筛选",
+    filterAll: "全部",
+    rowsTruncatedPrefix: "仅展示前 ",
+    rowsTruncatedMid: " 行，共 ",
+    rowsTruncatedSuffix: " 行。请下载完整结果以获取全部数据。",
+    emptyTable: "当前结果暂无可展示的表格数据。",
+    rawEmpty: "结果 JSON 将显示在此处……",
+    copyRawAria: "复制原始结果",
+    heatmapFrameTitle: "快捷工具热图",
+    heatmapFallback: "当前结果中检测到热图相关文件，请使用“下载结果”获取完整的交互式图或文件输出。",
+    heatmapMissing: "当前结果未检测到热图文件。热图通常用于突变和残基相关任务。",
+    copyHeatmapAria: "复制热图说明",
+    aiEmpty: "启用 AI 解读并运行预测后，将在此处生成专家分析。",
+    copyAiAria: "复制 AI 解读"
+  }
+};
 
 type ResultTab = "table" | "raw" | "heatmap" | "ai";
 
@@ -15,6 +69,7 @@ type QuickToolResultPanelProps = {
 };
 
 export function QuickToolResultPanel(props: QuickToolResultPanelProps) {
+  const t = useLang().t(STRINGS);
   const [tab, setTab] = useState<ResultTab>("table");
   const [labelFilter, setLabelFilter] = useState<"all" | "0" | "1">("all");
   const [csvRows, setCsvRows] = useState<Record<string, unknown>[]>([]);
@@ -117,7 +172,7 @@ export function QuickToolResultPanel(props: QuickToolResultPanelProps) {
         <div className="report-downloads">
           {downloadPath && (
             <a className="chat-header-link" href={getDownloadUrl(downloadPath)} target="_blank" rel="noreferrer">
-              Download Result
+              {t.downloadResult}
             </a>
           )}
           <button
@@ -126,25 +181,25 @@ export function QuickToolResultPanel(props: QuickToolResultPanelProps) {
             onClick={onDownloadTableCsv}
             disabled={tableRowsForDisplay.length === 0}
           >
-            Download Table CSV
+            {t.downloadTableCsv}
           </button>
         </div>
       </div>
 
       <div className="quick-tools-v2-result-tabs">
         <button type="button" className={tab === "table" ? "active" : ""} onClick={() => setTab("table")}>
-          Table
+          {t.tabTable}
         </button>
         <button type="button" className={tab === "raw" ? "active" : ""} onClick={() => setTab("raw")}>
-          Raw
+          {t.tabRaw}
         </button>
         {showHeatmapTab && (
           <button type="button" className={tab === "heatmap" ? "active" : ""} onClick={() => setTab("heatmap")}>
-            Heatmap
+            {t.tabHeatmap}
           </button>
         )}
         <button type="button" className={tab === "ai" ? "active" : ""} onClick={() => setTab("ai")}>
-          AI Expert
+          {t.tabAi}
         </button>
       </div>
 
@@ -152,17 +207,17 @@ export function QuickToolResultPanel(props: QuickToolResultPanelProps) {
 
       {tab === "table" && (
         <div className="report-text quick-tools-v2-text quick-tools-v2-table-view">
-          {useCsvAsSource && csvLoading && <div className="quick-tools-v2-empty-note">Loading CSV result...</div>}
+          {useCsvAsSource && csvLoading && <div className="quick-tools-v2-empty-note">{t.loadingCsv}</div>}
           {useCsvAsSource && !csvLoading && csvLoadFailed && (
             <div className="quick-tools-v2-empty-note">
-              Failed to load CSV result. Fallback to JSON preview when available.
+              {t.csvLoadFailed}
             </div>
           )}
           {hasFunctionalResidueRows && (
             <div className="quick-tools-v2-table-filter">
-              <span>Label Filter</span>
+              <span>{t.labelFilter}</span>
               <select value={labelFilter} onChange={(e) => setLabelFilter(e.target.value as "all" | "0" | "1")}>
-                <option value="all">All</option>
+                <option value="all">{t.filterAll}</option>
                 <option value="0">0</option>
                 <option value="1">1</option>
               </select>
@@ -192,12 +247,12 @@ export function QuickToolResultPanel(props: QuickToolResultPanelProps) {
               </div>
               {rowsTruncated && (
                 <div className="quick-tools-v2-table-note">
-                  Showing first {MAX_TABLE_ROWS} rows out of {filteredRows.length}. Download full result for complete data.
+                  {t.rowsTruncatedPrefix}{MAX_TABLE_ROWS}{t.rowsTruncatedMid}{filteredRows.length}{t.rowsTruncatedSuffix}
                 </div>
               )}
             </>
           ) : !useCsvAsSource && !csvLoading ? (
-            <div className="quick-tools-v2-empty-note">No tabular rows available for current result.</div>
+            <div className="quick-tools-v2-empty-note">{t.emptyTable}</div>
           ) : null}
         </div>
       )}
@@ -205,10 +260,10 @@ export function QuickToolResultPanel(props: QuickToolResultPanelProps) {
       {tab === "raw" && (
         <CopyableTextBlock
           text={props.resultPayload ? JSON.stringify(props.resultPayload, null, 2) : ""}
-          emptyText="Result JSON will appear here..."
+          emptyText={t.rawEmpty}
           wrapperClassName="quick-tools-v2-copy-wrap"
           preClassName="report-text quick-tools-v2-text"
-          ariaLabel="Copy raw result"
+          ariaLabel={t.copyRawAria}
         />
       )}
 
@@ -218,19 +273,18 @@ export function QuickToolResultPanel(props: QuickToolResultPanelProps) {
             <iframe
               className="quick-tools-v2-heatmap-frame"
               src={getDownloadUrl(heatmapPath, true)}
-              title="Quick Tools Heatmap"
+              title={t.heatmapFrameTitle}
             />
           ) : (
             <CopyableTextBlock
               text={
                 hasHeatmapArtifact
-                  ? props.heatmapHint ||
-                    "Heatmap artifacts detected in current result. Use Download Result for full interactive plot or file output."
-                  : "No heatmap artifact detected in this result. Heatmap is typically available for mutation and residue-related tasks."
+                  ? props.heatmapHint || t.heatmapFallback
+                  : t.heatmapMissing
               }
               wrapperClassName="quick-tools-v2-copy-wrap"
               preClassName="report-text quick-tools-v2-text quick-tools-v2-heatmap-note"
-              ariaLabel="Copy heatmap note"
+              ariaLabel={t.copyHeatmapAria}
             />
           )}
         </div>
@@ -239,10 +293,10 @@ export function QuickToolResultPanel(props: QuickToolResultPanelProps) {
       {tab === "ai" && (
         <CopyableTextBlock
           text={props.aiSummary}
-          emptyText="Enable AI Summary and run prediction to generate expert analysis."
+          emptyText={t.aiEmpty}
           wrapperClassName="quick-tools-v2-copy-wrap"
           preClassName="report-text quick-tools-v2-text"
-          ariaLabel="Copy AI summary"
+          ariaLabel={t.copyAiAria}
         />
       )}
     </div>

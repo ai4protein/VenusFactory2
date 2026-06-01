@@ -9,6 +9,44 @@ import {
 import { AdvancedToolsLayout } from "./AdvancedToolsLayout";
 import { AdvancedResultPanel } from "./AdvancedResultPanel";
 import { WorkspaceFilePicker } from "../../components/WorkspaceFilePicker";
+import { useLang } from "../../lib/i18n";
+import { useDocumentMeta } from "../../lib/useDocumentMeta";
+import { COMMON_STRINGS } from "../../lib/commonStrings";
+
+const STRINGS = {
+  en: {
+    ...COMMON_STRINGS.en,
+    title: "Functional Residue",
+    subtitle: "Predict residue-level functional sites with configurable models.",
+    modelTaskSection: "Model and Task",
+    modelLabel: "Model",
+    taskLabel: "Task",
+    inputSection: "Input",
+    pasteFastaSequence: "Paste FASTA / sequence",
+    pasteFastaPlaceholder: "Paste sequence or FASTA content...",
+    onlineLimitNote: (n: number) => `Online mode supports up to ${n} FASTA sequences per run.`,
+    aiOn: "AI insight will be generated and attached to the result panel.",
+    aiOff: "Enable this to generate expert interpretation after prediction.",
+    startBtn: "Start Residue Prediction",
+    resultTitle: "Functional Residue Result"
+  },
+  zh: {
+    ...COMMON_STRINGS.zh,
+    title: "功能残基",
+    subtitle: "基于可配置模型预测残基级功能位点。",
+    modelTaskSection: "模型与任务",
+    modelLabel: "模型",
+    taskLabel: "任务",
+    inputSection: "输入",
+    pasteFastaSequence: "粘贴 FASTA / 序列",
+    pasteFastaPlaceholder: "粘贴序列或 FASTA 内容…",
+    onlineLimitNote: (n: number) => `在线模式每次运行最多支持 ${n} 条 FASTA 序列。`,
+    aiOn: "AI 专家解读将生成并附加在结果面板中。",
+    aiOff: "开启后，预测完成会自动生成专家解读。",
+    startBtn: "开始残基预测",
+    resultTitle: "功能残基预测结果"
+  }
+};
 
 const DEFAULT_META: AdvancedToolsMeta = {
   dataset_mapping_zero_shot: [],
@@ -26,6 +64,8 @@ type AdvancedFunctionalResiduePageProps = {
 };
 
 export function AdvancedFunctionalResiduePage({ workspaceEnabled }: AdvancedFunctionalResiduePageProps) {
+  const t = useLang().t(STRINGS);
+  useDocumentMeta({ title: `${t.title} — VenusFactory2`, description: t.subtitle });
   const [meta, setMeta] = useState<AdvancedToolsMeta>(DEFAULT_META);
   const [task, setTask] = useState("Activity Site");
   const [modelName, setModelName] = useState("ESM2-650M");
@@ -37,7 +77,7 @@ export function AdvancedFunctionalResiduePage({ workspaceEnabled }: AdvancedFunc
   const [enableAi, setEnableAi] = useState(false);
   const [llmProvider, setLlmProvider] = useState(DEFAULT_META.llm_models[0]);
   const [progress, setProgress] = useState(0);
-  const [progressMessage, setProgressMessage] = useState("Idle");
+  const [progressMessage, setProgressMessage] = useState("");
 
   useEffect(() => {
     void (async () => {
@@ -62,7 +102,7 @@ export function AdvancedFunctionalResiduePage({ workspaceEnabled }: AdvancedFunc
         setSequence("");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed.");
+      setError(err instanceof Error ? err.message : t.uploadFailed);
     }
   }
 
@@ -70,7 +110,7 @@ export function AdvancedFunctionalResiduePage({ workspaceEnabled }: AdvancedFunc
     setError("");
     setResultPayload(null);
     setProgress(0);
-    setProgressMessage("Preparing task...");
+    setProgressMessage(t.preparingTask);
     setRunning(true);
     try {
       const payload = await runAdvancedFunctionalResidueStream({
@@ -87,9 +127,9 @@ export function AdvancedFunctionalResiduePage({ workspaceEnabled }: AdvancedFunc
       });
       setResultPayload(payload);
       setProgress(1);
-      setProgressMessage("Prediction completed");
+      setProgressMessage(t.predictionDone);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Run failed.");
+      setError(err instanceof Error ? err.message : t.runFailed);
     } finally {
       setRunning(false);
     }
@@ -102,23 +142,23 @@ export function AdvancedFunctionalResiduePage({ workspaceEnabled }: AdvancedFunc
       setUploadedPath(data.file_path);
       setSequence(data.content || "");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load example.");
+      setError(err instanceof Error ? err.message : t.loadExampleFailed);
     }
   }
 
   return (
     <AdvancedToolsLayout
-      title="Functional Residue"
-      subtitle="Predict residue-level functional sites with configurable models."
+      title={t.title}
+      subtitle={t.subtitle}
       running={running}
       progress={progress}
-      progressMessage={progressMessage}
+      progressMessage={progressMessage || t.idle}
       left={
         <>
           <section className="custom-section-card">
-            <h3>Model and Task</h3>
+            <h3>{t.modelTaskSection}</h3>
             <label className="left-controls">
-              Model
+              {t.modelLabel}
               <select value={modelName} onChange={(e) => setModelName(e.target.value)}>
                 {meta.residue_model_mapping_function.map((item) => (
                   <option key={item} value={item}>
@@ -128,7 +168,7 @@ export function AdvancedFunctionalResiduePage({ workspaceEnabled }: AdvancedFunc
               </select>
             </label>
             <label className="left-controls">
-              Task
+              {t.taskLabel}
               <select value={task} onChange={(e) => setTask(e.target.value)}>
                 {Object.keys(meta.residue_mapping_function).map((item) => (
                   <option key={item} value={item}>
@@ -140,32 +180,32 @@ export function AdvancedFunctionalResiduePage({ workspaceEnabled }: AdvancedFunc
           </section>
 
           <section className="custom-section-card">
-            <h3>Input</h3>
+            <h3>{t.inputSection}</h3>
             <label className="left-controls">
-              Paste FASTA / sequence
+              {t.pasteFastaSequence}
               <textarea
                 rows={6}
                 value={sequence}
                 onChange={(e) => setSequence(e.target.value)}
-                placeholder="Paste sequence or FASTA content..."
+                placeholder={t.pasteFastaPlaceholder}
               />
             </label>
             {meta.online_limit_enabled && (
               <p className="advanced-ai-note">
-                Online mode supports up to {meta.online_fasta_limit ?? 50} FASTA sequences per run.
+                {t.onlineLimitNote(meta.online_fasta_limit ?? 50)}
               </p>
             )}
             <div className="custom-file-example-row upload-source-stack">
               <div className="file-source-inline">
                 <label className="left-controls custom-file-picker-field">
-                  Select File
+                  {t.selectFile}
                   <input type="file" accept=".fasta,.fa,.txt" onChange={(e) => void onUpload(e.target.files?.[0] || null)} />
                 </label>
                 <WorkspaceFilePicker
                   workspaceEnabled={workspaceEnabled}
                   disabled={running}
                   acceptedCategories={["sequence"]}
-                  buttonLabel="From Workspace"
+                  buttonLabel={t.fromWorkspace}
                   onPick={(picked) => {
                     const selected = picked[0];
                     if (!selected) return;
@@ -175,29 +215,27 @@ export function AdvancedFunctionalResiduePage({ workspaceEnabled }: AdvancedFunc
                 />
               </div>
               <button type="button" className="custom-btn-secondary" onClick={() => void onUseExample()}>
-                Use Example FASTA
+                {t.useExampleFasta}
               </button>
             </div>
-            {uploadedPath && <div className="report-preview">Uploaded: {uploadedPath}</div>}
+            {uploadedPath && <div className="report-preview">{t.uploaded} {uploadedPath}</div>}
           </section>
 
           <section className="custom-section-card advanced-ai-section">
-            <h3>AI Expert (Optional)</h3>
+            <h3>{t.aiExpert}</h3>
             <label className="advanced-ai-toggle">
               <input type="checkbox" checked={enableAi} onChange={(e) => setEnableAi(e.target.checked)} />
               <span className="advanced-ai-toggle-box" />
-              <span className="advanced-ai-toggle-text">Enable AI analysis and expert summary</span>
-              <span className={`advanced-ai-pill ${enableAi ? "active" : ""}`}>{enableAi ? "Enabled" : "Disabled"}</span>
+              <span className="advanced-ai-toggle-text">{t.enableAi}</span>
+              <span className={`advanced-ai-pill ${enableAi ? "active" : ""}`}>{enableAi ? t.enabled : t.disabled}</span>
             </label>
             <p className="advanced-ai-note">
-              {enableAi
-                ? "AI insight will be generated and attached to the result panel."
-                : "Enable this to generate expert interpretation after prediction."}
+              {enableAi ? t.aiOn : t.aiOff}
             </p>
             {enableAi && (
               <div className="advanced-ai-fields">
                 <label className="left-controls">
-                  LLM Provider
+                  {t.llmProvider}
                   <select value={llmProvider} onChange={(e) => setLlmProvider(e.target.value)}>
                     {meta.llm_models.map((item) => (
                       <option key={item} value={item}>
@@ -211,13 +249,13 @@ export function AdvancedFunctionalResiduePage({ workspaceEnabled }: AdvancedFunc
           </section>
 
           <button type="button" className="custom-btn-primary" onClick={() => void onRun()} disabled={running}>
-            {running ? "Running..." : "Start Residue Prediction"}
+            {running ? t.runningBtn : t.startBtn}
           </button>
         </>
       }
       right={
         <AdvancedResultPanel
-          title="Functional Residue Result"
+          title={t.resultTitle}
           resultPayload={resultPayload}
           aiSummary={(resultPayload?.ai_summary as string) || ""}
           error={error}
