@@ -3,10 +3,115 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>VenusFactory2 WebUI v2</title>
+    <meta name="theme-color" content="#f4f1ea" />
+    <meta name="color-scheme" content="light" />
+
+    <title>VenusFactory2 — Agent-Driven Protein Engineering Platform</title>
+    <meta
+      name="description"
+      content="VenusFactory2 unifies prediction, training, design and discovery for protein engineering. 40+ AI models, 11 biological databases, one agent — accessible from chat, web or API."
+    />
+    <meta
+      name="keywords"
+      content="protein engineering, protein design, protein language model, ESM, ProSST, ProtSSN, LoRA, QLoRA, directed evolution, sequence design, AlphaFold, UniProt, RCSB, AI4Protein, agent, bioinformatics"
+    />
+    <meta name="author" content="AI4Protein" />
+    <link rel="canonical" href="https://venusfactory.cn/playground/en/" />
+    <link rel="alternate" hreflang="en" href="https://venusfactory.cn/playground/en/" />
+    <link rel="alternate" hreflang="zh-CN" href="https://venusfactory.cn/playground/zh/" />
+    <link rel="alternate" hreflang="x-default" href="https://venusfactory.cn/playground/" />
+
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="VenusFactory2" />
+    <meta property="og:title" content="VenusFactory2 — Agent-Driven Protein Engineering Platform" />
+    <meta
+      property="og:description"
+      content="One platform for prediction, training, design and discovery — built on 40+ AI models and 11 biological databases."
+    />
+    <meta property="og:url" content="https://venusfactory.cn/playground/" />
+    <meta property="og:image" content="https://venusfactory.cn/playground/og-image.png" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale:alternate" content="zh_CN" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="VenusFactory2 — Agent-Driven Protein Engineering Platform" />
+    <meta
+      name="twitter:description"
+      content="One platform for prediction, training, design and discovery — built on 40+ AI models and 11 biological databases."
+    />
+    <meta name="twitter:image" content="https://venusfactory.cn/playground/og-image.png" />
+
+    <!-- Structured data: SoftwareApplication -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "VenusFactory2",
+        "alternateName": "VenusFactory 2",
+        "description": "An agent-driven protein engineering platform combining 40+ AI models with 11 biological databases for prediction, training, design and discovery.",
+        "url": "https://venusfactory.cn/playground/",
+        "applicationCategory": "Science",
+        "operatingSystem": "Linux, macOS, Windows (via Docker or web)",
+        "softwareVersion": "2.0",
+        "license": "https://github.com/ai4protein/VenusFactory2/blob/main/LICENSE",
+        "author": {
+          "@type": "Organization",
+          "name": "AI4Protein",
+          "url": "https://github.com/ai4protein"
+        },
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "citation": "https://arxiv.org/abs/2603.27303",
+        "sameAs": [
+          "https://github.com/ai4protein/VenusFactory2",
+          "https://huggingface.co/AI4Protein",
+          "https://arxiv.org/abs/2603.27303"
+        ]
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <main style="max-width:720px;margin:80px auto;padding:0 24px;font-family:system-ui,sans-serif;color:#2a2520;">
+        <h1 style="font-size:2rem;margin:0 0 16px;">VenusFactory2 — Agent-Driven Protein Engineering, Unified.</h1>
+        <p style="line-height:1.6;color:#6b5e4d;">
+          A unified open-source platform for protein engineering: prediction, training, design and discovery powered by
+          40+ AI models and 11 biological databases. The interactive interface requires JavaScript; please enable it,
+          or visit our
+          <a href="https://github.com/ai4protein/VenusFactory2">GitHub repository</a> and the
+          <a href="https://arxiv.org/abs/2603.27303">technical report</a> for documentation, examples and source code.
+        </p>
+        <ul style="line-height:1.8;color:#6b5e4d;">
+          <li><strong>Predict</strong> — function, fitness, stability — zero-shot or fine-tuned.</li>
+          <li><strong>Train</strong> — LoRA, QLoRA and 7 PEFT methods in minutes.</li>
+          <li><strong>Design</strong> — directed evolution and de novo sequence design.</li>
+          <li><strong>Discover</strong> — UniProt, AlphaFold, RCSB, InterPro and more.</li>
+        </ul>
+
+        <hr style="margin:48px 0;border:none;border-top:1px solid #d9cdb6;" />
+
+        <section lang="zh-CN">
+          <h1 style="font-size:2rem;margin:0 0 16px;">VenusFactory2 — 智能体驱动的蛋白质工程平台</h1>
+          <p style="line-height:1.6;color:#6b5e4d;">
+            面向蛋白质工程的统一开源平台：预测、训练、设计与发现，集成 40+ AI 模型与 11 个生物数据库。
+            交互界面依赖 JavaScript；如需启用，请打开 JS，或访问
+            <a href="https://github.com/ai4protein/VenusFactory2">GitHub 仓库</a> 与
+            <a href="https://arxiv.org/abs/2603.27303">技术报告</a>查阅文档、示例与源代码。
+          </p>
+          <ul style="line-height:1.8;color:#6b5e4d;">
+            <li><strong>预测</strong> — 功能、适应度、稳定性，支持零样本或微调。</li>
+            <li><strong>训练</strong> — LoRA、QLoRA 等 7 种 PEFT 方法，分钟级完成。</li>
+            <li><strong>设计</strong> — 定向进化与 de novo 序列设计。</li>
+            <li><strong>发现</strong> — 覆盖 UniProt、AlphaFold、RCSB、InterPro 等。</li>
+          </ul>
+        </section>
+      </main>
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
