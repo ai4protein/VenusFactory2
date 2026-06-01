@@ -38,6 +38,273 @@ import {
   setActiveGateway,
   type ModelSpec,
 } from "../lib/useModelRegistry";
+import { useLang } from "../lib/i18n";
+import { useDocumentMeta } from "../lib/useDocumentMeta";
+
+const STRINGS = {
+  en: {
+    docTitle: "Agent Chat — VenusFactory2",
+    docDescription: "Chat with the protein-engineering agent to run predictions, training and analysis tasks.",
+    // Error hints (friendlyErrorHint)
+    errHintQuota: "You've reached the daily usage limit for online mode. Try again tomorrow, or deploy locally for unlimited access.",
+    errHintTimeout: "The request took too long. This can happen with complex tasks or heavy server load. Please try again.",
+    errHintNetwork: "A network issue occurred. Please check your connection and try again.",
+    errHintAuth: "Authentication failed. Your session may have expired — try refreshing the page.",
+    errHintForbidden: "Access was denied. You may not have permission for this action.",
+    errHintRate: "Too many requests in a short time. Please wait a moment and try again.",
+    errHintServer: "The server encountered an internal error. This is usually temporary — please retry shortly.",
+    errHintModel: "There was an issue with the AI model service. The model may be temporarily unavailable.",
+    errHintSession: "The session could not be found. It may have expired — try creating a new session.",
+    errHintGeneric: "Something went wrong. This is usually temporary — please try again or start a new session.",
+    // ErrorAlert
+    dismiss: "Dismiss",
+    details: "Details",
+    // Error fallbacks
+    errCreateSession: "Failed to create session.",
+    errDeleteSession: "Failed to delete session.",
+    errOnlineLimit: (limit: number) => `Online mode limit reached: up to ${limit} chats per user per day.`,
+    errNoUserMsg: "No previous user message in current session.",
+    errStreamMsg: "Failed to stream message.",
+    errRetryMsg: "Failed to retry message.",
+    errClarification: "Failed to submit clarification.",
+    errConfirmPlan: "Failed to confirm plan.",
+    errIteration: "Failed to process iteration decision.",
+    errStepDecision: "Failed to process step decision.",
+    errSubReport: "Failed to process sub-report decision.",
+    errCopySession: "Failed to copy session id.",
+    errDownloadReport: "Failed to download report.",
+    errSaveKey: "Failed to save API key.",
+    errSwitchGateway: "Failed to switch gateway.",
+    errExportSession: "Failed to export session bundle.",
+    errRequiredCustomModel: "Display name, model name, API key and base URL are required.",
+    errLabelConflictBuiltIn: "Display name conflicts with built-in model name. Please choose another name.",
+    errLabelConflict: "Model name already exists. Please use another display name.",
+    errEndpointConflict: "A model with the same model name and base URL already exists.",
+    errRemoveCustomModel: "Failed to remove custom model.",
+    // Notices
+    noticeModelSwitched: "Model/provider switched. Existing context may not be consistent across providers. Start a new session if results look off.",
+    noticeCustomRemoved: "Custom model removed. Active session switched back to default model context.",
+    // Tooltips for model selector
+    titleGatewayRequired: "Requires a configured gateway",
+    titleMissingKey: (provider: string) => `Missing API key for ${provider}. Click to add.`,
+    titleModelInfo: (label: string, provider: string) => `${label} (${provider})`,
+    titleProviderWithKey: (provider: string) => `Provider: ${provider} (key configured)`,
+    titleProviderNoKey: (provider: string) => `Provider: ${provider} (no API key)`,
+    titleKeyConfigured: (provider: string) => `API key configured for ${provider}`,
+    // Tooltips
+    sendMessage: "Send message",
+    regenerateLast: "Regenerate last message",
+    quotaReached: (used: number, limit: number) => `Daily quota reached (${used}/${limit}).`,
+    quotaRemaining: (remaining: number, limit: number) => `Online mode quota: ${remaining}/${limit} chats remaining for this IP today.`,
+    quotaRegenerate: (remaining: number, limit: number) => `Regenerate also consumes quota. Remaining: ${remaining}/${limit}.`,
+    // Header
+    chat: "Chat",
+    modeOnline: "Mode: Online",
+    modeOnlineTooltip: (limit: number) => `Mode: Online. Per-user daily limit: ${limit} chats.`,
+    onlineLocalHint: "For unlimited and more efficient usage, local deployment is recommended.",
+    running: "Running",
+    stopping: "Stopping",
+    stopped: "Stopped",
+    refresh: "Refresh",
+    report: "Report",
+    reportTooltip: "Download structured experiment report",
+    // Sessions
+    sessions: "Sessions",
+    newSession: "+ New Session",
+    noSessions: "No sessions yet",
+    deleteSession: "Delete session",
+    idle: "idle",
+    msgs: "msgs",
+    copyFullId: "Copy full session id",
+    copied: "✓ Copied",
+    copySessionId: "Copy Session ID",
+    // Roles
+    rolePI: "Principal Investigator",
+    roleCompBio: "Computational Biologist",
+    roleMLSpec: "Machine Learning Specialist",
+    // Composer
+    composerWaiting: "Please respond to the form above...",
+    composerPlaceholder: "Ask anything about AI protein engineering...",
+    quotaPillTitle: (limit: number) => `Per-IP daily limit in online mode: ${limit}`,
+    modelAria: "Model",
+    gatewayRequiredSuffix: " (gateway required)",
+    otherModel: "Other Model...",
+    noKeySuffix: " (no key)",
+    customSuffix: " (Custom)",
+    keyOk: "key ok",
+    setKey: "set key",
+    gatewayAria: "Gateway",
+    activeGateway: "Active gateway",
+    noGateway: "No gateway",
+    uploadFiles: "Upload files",
+    fromWorkspace: "From Workspace",
+    regenerate: "Regenerate",
+    export: "Export",
+    stop: "Stop",
+    send: "Send",
+    runningEllipsis: "Running...",
+    searchMessages: "Search messages",
+    searchPlaceholder: "Search messages...",
+    pipelineDismiss: "Dismiss",
+    // Key panel
+    keyPanelAria: (provider: string) => `Set API key for ${provider}`,
+    keyPanelLabelPre: "API key for ",
+    keyPanelLabelPost: ":",
+    keyPanelSaving: "Saving...",
+    save: "Save",
+    cancel: "Cancel",
+    // File preview
+    workspaceSuffix: "(workspace)",
+    // Execution status (right panel)
+    executionStatus: "Execution Status",
+    termWaiting: "$ waiting for session...",
+    termMessagesTools: (msgs: number, tools: number) => `${msgs} messages, ${tools} tool runs`,
+    termEmpty: "(empty)",
+    // Custom model modal
+    addCustomModel: "Add OpenAI-Style Model",
+    displayName: "Display Name",
+    displayNamePlaceholder: "My Model",
+    modelName: "Model Name",
+    modelNamePlaceholder: "gpt-4.1-mini",
+    apiKey: "API Key",
+    baseUrl: "Base URL",
+    confirm: "Confirm",
+    addedModels: "Added Models",
+    noCustomModels: "No custom models yet.",
+    deleteBtn: "Delete",
+  },
+  zh: {
+    docTitle: "智能体对话 — VenusFactory2",
+    docDescription: "通过对话使用蛋白质工程智能体，运行预测、训练与分析任务。",
+    // Error hints (friendlyErrorHint)
+    errHintQuota: "您已达到在线模式的每日使用上限。请明天再试，或本地部署以获得无限制访问。",
+    errHintTimeout: "请求耗时过长。复杂任务或服务器负载较高时可能出现此问题，请重试。",
+    errHintNetwork: "出现网络问题。请检查您的网络连接后重试。",
+    errHintAuth: "身份验证失败。您的会话可能已过期 — 请尝试刷新页面。",
+    errHintForbidden: "访问被拒绝。您可能没有执行此操作的权限。",
+    errHintRate: "短时间内请求过多。请稍候再试。",
+    errHintServer: "服务器遇到内部错误。通常为临时问题 — 请稍后重试。",
+    errHintModel: "AI 模型服务出现问题。该模型可能暂时不可用。",
+    errHintSession: "未找到该会话。可能已过期 — 请尝试创建新会话。",
+    errHintGeneric: "出现错误。通常为临时问题 — 请重试或开启新会话。",
+    // ErrorAlert
+    dismiss: "关闭",
+    details: "详情",
+    // Error fallbacks
+    errCreateSession: "创建会话失败。",
+    errDeleteSession: "删除会话失败。",
+    errOnlineLimit: (limit: number) => `已达到在线模式上限：每位用户每日最多 ${limit} 次对话。`,
+    errNoUserMsg: "当前会话中没有以往的用户消息。",
+    errStreamMsg: "消息流式传输失败。",
+    errRetryMsg: "重试消息失败。",
+    errClarification: "提交澄清答复失败。",
+    errConfirmPlan: "确认计划失败。",
+    errIteration: "处理迭代决策失败。",
+    errStepDecision: "处理步骤决策失败。",
+    errSubReport: "处理子报告决策失败。",
+    errCopySession: "复制会话 ID 失败。",
+    errDownloadReport: "下载报告失败。",
+    errSaveKey: "保存 API 密钥失败。",
+    errSwitchGateway: "切换网关失败。",
+    errExportSession: "导出会话包失败。",
+    errRequiredCustomModel: "显示名称、模型名称、API 密钥和 Base URL 均为必填项。",
+    errLabelConflictBuiltIn: "显示名称与内置模型名称冲突。请更换名称。",
+    errLabelConflict: "模型名称已存在。请使用其他显示名称。",
+    errEndpointConflict: "已存在相同模型名称和 Base URL 的模型。",
+    errRemoveCustomModel: "删除自定义模型失败。",
+    // Notices
+    noticeModelSwitched: "已切换模型 / 服务商。已有上下文在不同服务商之间可能不一致，如结果异常请新建会话。",
+    noticeCustomRemoved: "自定义模型已删除。当前会话已切换回默认模型上下文。",
+    // Tooltips for model selector
+    titleGatewayRequired: "需要先配置网关",
+    titleMissingKey: (provider: string) => `缺少 ${provider} 的 API 密钥，点击添加。`,
+    titleModelInfo: (label: string, provider: string) => `${label}（${provider}）`,
+    titleProviderWithKey: (provider: string) => `服务商：${provider}（密钥已配置）`,
+    titleProviderNoKey: (provider: string) => `服务商：${provider}（无 API 密钥）`,
+    titleKeyConfigured: (provider: string) => `已为 ${provider} 配置 API 密钥`,
+    // Tooltips
+    sendMessage: "发送消息",
+    regenerateLast: "重新生成上一条消息",
+    quotaReached: (used: number, limit: number) => `每日配额已用尽（${used}/${limit}）。`,
+    quotaRemaining: (remaining: number, limit: number) => `在线模式配额：本 IP 今日剩余 ${remaining}/${limit} 次对话。`,
+    quotaRegenerate: (remaining: number, limit: number) => `重新生成同样会消耗配额。剩余：${remaining}/${limit}。`,
+    // Header
+    chat: "对话",
+    modeOnline: "模式：在线",
+    modeOnlineTooltip: (limit: number) => `模式：在线。每位用户每日上限：${limit} 次对话。`,
+    onlineLocalHint: "如需无限制且更高效的使用，建议本地部署。",
+    running: "运行中",
+    stopping: "停止中",
+    stopped: "已停止",
+    refresh: "刷新",
+    report: "报告",
+    reportTooltip: "下载结构化实验报告",
+    // Sessions
+    sessions: "会话",
+    newSession: "+ 新建会话",
+    noSessions: "暂无会话",
+    deleteSession: "删除会话",
+    idle: "空闲",
+    msgs: "条消息",
+    copyFullId: "复制完整会话 ID",
+    copied: "✓ 已复制",
+    copySessionId: "复制会话 ID",
+    // Roles
+    rolePI: "首席研究员",
+    roleCompBio: "计算生物学家",
+    roleMLSpec: "机器学习专家",
+    // Composer
+    composerWaiting: "请先回复上方的表单……",
+    composerPlaceholder: "随时提问 AI 蛋白质工程相关的任何问题……",
+    quotaPillTitle: (limit: number) => `在线模式按 IP 每日上限：${limit}`,
+    modelAria: "模型",
+    gatewayRequiredSuffix: "（需要网关）",
+    otherModel: "其他模型……",
+    noKeySuffix: "（无密钥）",
+    customSuffix: "（自定义）",
+    keyOk: "密钥已配置",
+    setKey: "设置密钥",
+    gatewayAria: "网关",
+    activeGateway: "当前网关",
+    noGateway: "无网关",
+    uploadFiles: "上传文件",
+    fromWorkspace: "从工作区选择",
+    regenerate: "重新生成",
+    export: "导出",
+    stop: "停止",
+    send: "发送",
+    runningEllipsis: "运行中……",
+    searchMessages: "搜索消息",
+    searchPlaceholder: "搜索消息……",
+    pipelineDismiss: "关闭",
+    // Key panel
+    keyPanelAria: (provider: string) => `为 ${provider} 设置 API 密钥`,
+    keyPanelLabelPre: "为 ",
+    keyPanelLabelPost: " 设置 API 密钥：",
+    keyPanelSaving: "保存中……",
+    save: "保存",
+    cancel: "取消",
+    // File preview
+    workspaceSuffix: "（工作区）",
+    // Execution status (right panel)
+    executionStatus: "执行状态",
+    termWaiting: "$ 等待会话……",
+    termMessagesTools: (msgs: number, tools: number) => `${msgs} 条消息，${tools} 次工具调用`,
+    termEmpty: "（空）",
+    // Custom model modal
+    addCustomModel: "添加 OpenAI 风格模型",
+    displayName: "显示名称",
+    displayNamePlaceholder: "我的模型",
+    modelName: "模型名称",
+    modelNamePlaceholder: "gpt-4.1-mini",
+    apiKey: "API 密钥",
+    baseUrl: "Base URL",
+    confirm: "确认",
+    addedModels: "已添加的模型",
+    noCustomModels: "暂无自定义模型。",
+    deleteBtn: "删除",
+  }
+};
 
 type SessionMeta = {
   session_id: string;
@@ -62,39 +329,54 @@ type OpenAIStyleModel = {
   baseUrl: string;
 };
 
-function friendlyErrorHint(msg: string): string {
+type ErrorHintStrings = {
+  errHintQuota: string;
+  errHintTimeout: string;
+  errHintNetwork: string;
+  errHintAuth: string;
+  errHintForbidden: string;
+  errHintRate: string;
+  errHintServer: string;
+  errHintModel: string;
+  errHintSession: string;
+  errHintGeneric: string;
+};
+
+function friendlyErrorHint(msg: string, t: ErrorHintStrings): string {
   const m = msg.toLowerCase();
   if (m.includes("quota") || m.includes("limit reached"))
-    return "You've reached the daily usage limit for online mode. Try again tomorrow, or deploy locally for unlimited access.";
+    return t.errHintQuota;
   if (m.includes("timeout") || m.includes("timed out"))
-    return "The request took too long. This can happen with complex tasks or heavy server load. Please try again.";
+    return t.errHintTimeout;
   if (m.includes("network") || m.includes("fetch") || m.includes("failed to fetch"))
-    return "A network issue occurred. Please check your connection and try again.";
+    return t.errHintNetwork;
   if (m.includes("401") || m.includes("unauthorized") || m.includes("auth"))
-    return "Authentication failed. Your session may have expired — try refreshing the page.";
+    return t.errHintAuth;
   if (m.includes("403") || m.includes("forbidden") || m.includes("access denied"))
-    return "Access was denied. You may not have permission for this action.";
+    return t.errHintForbidden;
   if (m.includes("429") || m.includes("rate") || m.includes("too many"))
-    return "Too many requests in a short time. Please wait a moment and try again.";
+    return t.errHintRate;
   if (m.includes("500") || m.includes("internal server"))
-    return "The server encountered an internal error. This is usually temporary — please retry shortly.";
+    return t.errHintServer;
   if (m.includes("model") || m.includes("llm") || m.includes("api key"))
-    return "There was an issue with the AI model service. The model may be temporarily unavailable.";
+    return t.errHintModel;
   if (m.includes("session") || m.includes("not found"))
-    return "The session could not be found. It may have expired — try creating a new session.";
-  return "Something went wrong. This is usually temporary — please try again or start a new session.";
+    return t.errHintSession;
+  return t.errHintGeneric;
 }
 
-function ErrorAlert({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+type ErrorAlertStrings = ErrorHintStrings & { dismiss: string; details: string };
+
+function ErrorAlert({ message, onDismiss, t }: { message: string; onDismiss: () => void; t: ErrorAlertStrings }) {
   return (
     <div className="error-box">
       <div className="error-box-header">
         <span className="error-box-icon">!</span>
-        <span className="error-box-hint">{friendlyErrorHint(message)}</span>
-        <button className="error-box-dismiss" onClick={onDismiss} title="Dismiss">&times;</button>
+        <span className="error-box-hint">{friendlyErrorHint(message, t)}</span>
+        <button className="error-box-dismiss" onClick={onDismiss} title={t.dismiss}>&times;</button>
       </div>
       <details className="error-box-details">
-        <summary>Details</summary>
+        <summary>{t.details}</summary>
         <pre className="error-box-raw">{message}</pre>
       </details>
     </div>
@@ -106,6 +388,8 @@ type ChatPageProps = {
 };
 
 export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
+  const t = useLang().t(STRINGS);
+  useDocumentMeta({ title: t.docTitle, description: t.docDescription });
   const [sessionId, setSessionId] = useState<string>("");
   const [snapshot, setSnapshot] = useState<ChatSnapshot | null>(null);
   const [sessions, setSessions] = useState<SessionMeta[]>([]);
@@ -293,7 +577,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       });
       try { await fetchSessions(); } catch { /* optimistic update above is sufficient */ }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create session.");
+      setError(err instanceof Error ? err.message : t.errCreateSession);
     }
   }
 
@@ -316,7 +600,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         await refreshCurrentSession(next.session_id);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete session.");
+      setError(err instanceof Error ? err.message : t.errDeleteSession);
     }
   }
 
@@ -425,14 +709,20 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         if (!prev) return prev;
         const history = [...prev.history];
         const last = history[history.length - 1];
-        if (last && last.role === "assistant" && (
-          last.content.includes("Thinking") || last.content.includes("思考中") ||
-          last.content.includes("Summarizing") || last.content.includes("正在总结") ||
-          last.content.includes("汇总") || last.content.includes("撰写小报告") ||
-          last.content.includes("writing sub-report") ||
-          last.content.includes("撰写研究草案") ||
-          last.content.includes("writing the draft report")
-        )) {
+        // Prefer the structured `phase` marker (set by backend on placeholder
+        // messages). Fall back to legacy substring matching while older backends
+        // still in the wild may not emit `phase` yet.
+        const isPlaceholder =
+          last && last.role === "assistant" && (
+            Boolean(last.phase) ||
+            last.content.includes("Thinking") || last.content.includes("思考中") ||
+            last.content.includes("Summarizing") || last.content.includes("正在总结") ||
+            last.content.includes("汇总") || last.content.includes("撰写小报告") ||
+            last.content.includes("writing sub-report") ||
+            last.content.includes("撰写研究草案") ||
+            last.content.includes("writing the draft report")
+          );
+        if (isPlaceholder) {
           history[history.length - 1] = { role: "assistant", content: "", role_id: info.role_id || last.role_id };
         } else {
           history.push({ role: "assistant", content: "", role_id: info.role_id });
@@ -467,7 +757,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     if (!message.trim() && files.length === 0 && workspaceFiles.length === 0) return;
     if (chatQuota?.enforced && (chatQuota.remaining ?? 0) <= 0) {
       const limit = chatQuota.limit ?? 10;
-      setError(`Online mode limit reached: up to ${limit} chats per user per day.`);
+      setError(t.errOnlineLimit(limit));
       return;
     }
     setError("");
@@ -535,7 +825,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         return;
       }
       setMessage(composedText);
-      setError(err instanceof Error ? err.message : "Failed to stream message.");
+      setError(err instanceof Error ? err.message : t.errStreamMsg);
       await refreshChatQuota();
       setRunStatus("stopped");
     } finally {
@@ -552,11 +842,11 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     if (!sessionId || running) return;
     if (chatQuota?.enforced && (chatQuota.remaining ?? 0) <= 0) {
       const limit = chatQuota.limit ?? 10;
-      setError(`Online mode limit reached: up to ${limit} chats per user per day.`);
+      setError(t.errOnlineLimit(limit));
       return;
     }
     if (!snapshot?.history?.some((h) => h.role === "user")) {
-      setError("No previous user message in current session.");
+      setError(t.errNoUserMsg);
       return;
     }
     setError("");
@@ -578,7 +868,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         setRunStatus("stopped");
         return;
       }
-      setError(err instanceof Error ? err.message : "Failed to retry message.");
+      setError(err instanceof Error ? err.message : t.errRetryMsg);
       await refreshChatQuota();
       setRunStatus("stopped");
     } finally {
@@ -625,7 +915,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         setRunStatus("stopped");
         return;
       }
-      setError(err instanceof Error ? err.message : "Failed to submit clarification.");
+      setError(err instanceof Error ? err.message : t.errClarification);
       setRunStatus("stopped");
     } finally {
       setRunning(false);
@@ -654,7 +944,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         setRunStatus("stopped");
         return;
       }
-      setError(err instanceof Error ? err.message : "Failed to confirm plan.");
+      setError(err instanceof Error ? err.message : t.errConfirmPlan);
       setRunStatus("stopped");
     } finally {
       setRunning(false);
@@ -684,7 +974,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       }
       await refreshCurrentSession();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to process iteration decision.");
+      setError(err instanceof Error ? err.message : t.errIteration);
     }
   }
 
@@ -708,7 +998,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         setRunStatus("stopped");
         return;
       }
-      setError(err instanceof Error ? err.message : "Failed to process step decision.");
+      setError(err instanceof Error ? err.message : t.errStepDecision);
       setRunStatus("stopped");
     } finally {
       setRunning(false);
@@ -737,7 +1027,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         setRunStatus("stopped");
         return;
       }
-      setError(err instanceof Error ? err.message : "Failed to process sub-report decision.");
+      setError(err instanceof Error ? err.message : t.errSubReport);
       setRunStatus("stopped");
     } finally {
       setRunning(false);
@@ -752,7 +1042,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       setCopiedSessionId(value);
       window.setTimeout(() => setCopiedSessionId(""), COPY_HINT_MS);
     } catch {
-      setError("Failed to copy session id.");
+      setError(t.errCopySession);
     }
   }
 
@@ -762,7 +1052,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     try {
       await downloadExperimentReport(sessionId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to download report.");
+      setError(err instanceof Error ? err.message : t.errDownloadReport);
     }
   }
 
@@ -779,14 +1069,14 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   const quotaExhausted = Boolean(chatQuota?.enforced && (chatQuota.remaining ?? 0) <= 0);
   const sendTooltip = chatQuota?.enforced
     ? quotaExhausted
-      ? `Daily quota reached (${chatQuota.limit ?? 10}/${chatQuota.limit ?? 10}).`
-      : `Online mode quota: ${chatQuota.remaining ?? 0}/${chatQuota.limit ?? 10} chats remaining for this IP today.`
-    : "Send message";
+      ? t.quotaReached(chatQuota.limit ?? 10, chatQuota.limit ?? 10)
+      : t.quotaRemaining(chatQuota.remaining ?? 0, chatQuota.limit ?? 10)
+    : t.sendMessage;
   const regenerateTooltip = chatQuota?.enforced
     ? quotaExhausted
-      ? `Daily quota reached (${chatQuota.limit ?? 10}/${chatQuota.limit ?? 10}).`
-      : `Regenerate also consumes quota. Remaining: ${chatQuota.remaining ?? 0}/${chatQuota.limit ?? 10}.`
-    : "Regenerate last message";
+      ? t.quotaReached(chatQuota.limit ?? 10, chatQuota.limit ?? 10)
+      : t.quotaRegenerate(chatQuota.remaining ?? 0, chatQuota.limit ?? 10)
+    : t.regenerateLast;
   const isLocalMode = chatQuota?.mode === "local";
   const registryModels: ModelSpec[] = registry.data?.models || [];
   const keyStatus: Record<string, boolean> = registry.data?.key_status || {};
@@ -807,13 +1097,13 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       const adapterReady = requiresAdapter ? Boolean(registry.data?.active_gateway) : true;
       const disabled = requiresAdapter && !adapterReady;
       const title = disabled
-        ? "Requires a configured gateway"
+        ? t.titleGatewayRequired
         : !hasKey
-        ? `Missing API key for ${m.provider}. Click to add.`
-        : `${m.label} (${m.provider})`;
+        ? t.titleMissingKey(m.provider)
+        : t.titleModelInfo(m.label, m.provider);
       return {
         value: m.id,
-        label: hasKey ? m.label : `${m.label} (no key)`,
+        label: hasKey ? m.label : `${m.label}${t.noKeySuffix}`,
         disabled,
         title,
         provider: m.provider,
@@ -822,7 +1112,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       };
     }),
     ...(isLocalMode
-      ? customModels.map((m) => ({ value: m.id, label: `${m.label} (Custom)` }))
+      ? customModels.map((m) => ({ value: m.id, label: `${m.label}${t.customSuffix}` }))
       : []),
   ];
 
@@ -862,7 +1152,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     const prev = selectedModel;
     setSelectedModel(next);
     if (prev !== next && (snapshot?.history?.length || 0) > 0) {
-      setModelSwitchNotice("Model/provider switched. Existing context may not be consistent across providers. Start a new session if results look off.");
+      setModelSwitchNotice(t.noticeModelSwitched);
     }
     // If the newly selected registry model is missing a key, surface the
     // inline key input so the user can configure it without leaving the page.
@@ -885,7 +1175,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       setKeyPanelValue("");
       registry.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save API key.");
+      setError(err instanceof Error ? err.message : t.errSaveKey);
     } finally {
       setKeyPanelSaving(false);
     }
@@ -898,7 +1188,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       await setActiveGateway(gatewayId);
       registry.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to switch gateway.");
+      setError(err instanceof Error ? err.message : t.errSwitchGateway);
     }
   }
 
@@ -909,7 +1199,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     try {
       await exportChatSessionBundle(sessionId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to export session bundle.");
+      setError(err instanceof Error ? err.message : t.errExportSession);
     } finally {
       setRunning(false);
     }
@@ -921,7 +1211,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     const apiKey = customModelApiKey.trim();
     const baseUrl = customModelBaseUrl.trim();
     if (!label || !modelName || !apiKey || !baseUrl) {
-      setError("Display name, model name, API key and base URL are required.");
+      setError(t.errRequiredCustomModel);
       return;
     }
     const normalizedLabel = label.toLowerCase();
@@ -930,19 +1220,19 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       (m) => m.label.trim().toLowerCase() === normalizedLabel || m.id.trim().toLowerCase() === normalizedLabel
     );
     if (builtInNameConflict) {
-      setError("Display name conflicts with built-in model name. Please choose another name.");
+      setError(t.errLabelConflictBuiltIn);
       return;
     }
     const labelConflict = customModels.some((m) => m.label.trim().toLowerCase() === normalizedLabel);
     if (labelConflict) {
-      setError("Model name already exists. Please use another display name.");
+      setError(t.errLabelConflict);
       return;
     }
     const endpointConflict = customModels.some(
       (m) => `${m.baseUrl.trim().toLowerCase()}::${m.modelName.trim().toLowerCase()}` === normalizedKey
     );
     if (endpointConflict) {
-      setError("A model with the same model name and base URL already exists.");
+      setError(t.errEndpointConflict);
       return;
     }
     const item: OpenAIStyleModel = {
@@ -968,10 +1258,10 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       setCustomModels((prev) => prev.filter((m) => m.id !== modelId));
       if (selectedModel === modelId) {
         setSelectedModel(defaultModelId);
-        setModelSwitchNotice("Custom model removed. Active session switched back to default model context.");
+        setModelSwitchNotice(t.noticeCustomRemoved);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to remove custom model.");
+      setError(err instanceof Error ? err.message : t.errRemoveCustomModel);
     }
   }
 
@@ -980,19 +1270,19 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       <header className="chat-header">
         <div>
           <div className="chat-header-title-row">
-            <h2>Chat</h2>
+            <h2>{t.chat}</h2>
             {chatQuota?.enforced && (
               <span
                 className="chat-mode-online-pill"
-                title={`Mode: Online. Per-user daily limit: ${chatQuota.limit ?? 10} chats.`}
+                title={t.modeOnlineTooltip(chatQuota.limit ?? 10)}
               >
-                Mode: Online
+                {t.modeOnline}
               </span>
             )}
           </div>
           {chatQuota?.enforced && (
             <p className="chat-online-local-hint">
-              For unlimited and more efficient usage, local deployment is recommended.
+              {t.onlineLocalHint}
             </p>
           )}
         </div>
@@ -1000,20 +1290,20 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
           <div className={`run-status-bar ${runStatus}`}>
             <span className="run-status-dot" />
             <span className="run-status-text">
-              {runStatus === "running" && "Running"}
-              {runStatus === "stopping" && "Stopping"}
-              {runStatus === "stopped" && "Stopped"}
+              {runStatus === "running" && t.running}
+              {runStatus === "stopping" && t.stopping}
+              {runStatus === "stopped" && t.stopped}
             </span>
           </div>
-          <button onClick={() => void fetchSessions()}>Refresh</button>
+          <button onClick={() => void fetchSessions()}>{t.refresh}</button>
           {hasReportData && (
             <button
               className="report-download-btn"
               onClick={() => void handleDownloadReport()}
               disabled={running}
-              title="Download structured experiment report"
+              title={t.reportTooltip}
             >
-              Report
+              {t.report}
             </button>
           )}
         </div>
@@ -1025,7 +1315,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
           onClick={sessionsCollapsed ? () => setSessionsCollapsed(false) : undefined}
         >
           <div className="session-panel-head" onClick={() => setSessionsCollapsed(!sessionsCollapsed)}>
-            <h3>Sessions <span className="panel-toggle-icon">{sessionsCollapsed ? "›" : "‹"}</span></h3>
+            <h3>{t.sessions} <span className="panel-toggle-icon">{sessionsCollapsed ? "›" : "‹"}</span></h3>
           </div>
           <button
             type="button"
@@ -1033,7 +1323,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
             onClick={() => void createAndActivateSession()}
             disabled={running}
           >
-            + New Session
+            {t.newSession}
           </button>
           <div className="session-list" style={sessionsCollapsed ? { display: "none" } : undefined}>
             {sessions.map((s) => (
@@ -1049,20 +1339,20 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                 >
                   <span className="session-id-label">{s.session_id.slice(0, 8)}</span>
                   <small className="session-time-label">{new Date(s.created_at).toLocaleString()}</small>
-                  <small className="session-meta-label">{s.status || "idle"} · {s.history_size} msgs</small>
+                  <small className="session-meta-label">{s.status || t.idle} · {s.history_size} {t.msgs}</small>
                 </button>
                 <button
                   type="button"
                   className="session-delete-btn"
                   onClick={(e) => { e.stopPropagation(); void deleteAndSelectNextSession(s.session_id); }}
                   disabled={running}
-                  title="Delete session"
+                  title={t.deleteSession}
                 >
                   ✕
                 </button>
               </div>
             ))}
-            {sessions.length === 0 && <div className="session-empty">No sessions yet</div>}
+            {sessions.length === 0 && <div className="session-empty">{t.noSessions}</div>}
           </div>
           {sessionId && !sessionsCollapsed && (
             <div className="session-sidebar-footer">
@@ -1070,9 +1360,9 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                 type="button"
                 className="session-copy-btn"
                 onClick={() => void copySessionId(sessionId)}
-                title="Copy full session id"
+                title={t.copyFullId}
               >
-                {copiedSessionId === sessionId ? "✓ Copied" : "Copy Session ID"}
+                {copiedSessionId === sessionId ? t.copied : t.copySessionId}
               </button>
             </div>
           )}
@@ -1091,7 +1381,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                   <button
                     className="pipeline-dismiss"
                     onClick={() => setPipelineDismissed(true)}
-                    title="Dismiss"
+                    title={t.pipelineDismiss}
                   >&times;</button>
                 </div>
               )}
@@ -1100,7 +1390,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                   <button
                     className={`timeline-search-toggle${searchOpen ? " active" : ""}`}
                     onClick={() => { setSearchOpen(!searchOpen); if (searchOpen) setSearchQuery(""); }}
-                    title="Search messages"
+                    title={t.searchMessages}
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
@@ -1110,7 +1400,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                     <input
                       className="timeline-search-input"
                       type="text"
-                      placeholder="Search messages..."
+                      placeholder={t.searchPlaceholder}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       autoFocus
@@ -1137,14 +1427,14 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                   <img
                     className="chat-msg-avatar"
                     src="/img/agent_role/principal_investigator.png"
-                    alt="Principal Investigator"
+                    alt={t.rolePI}
                     onError={(e) => {
                       (e.currentTarget as HTMLImageElement).src =
                         "https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png";
                     }}
                   />
                   <div className="chat-msg-content">
-                    <div className="chat-msg-role">Principal Investigator</div>
+                    <div className="chat-msg-role">{t.rolePI}</div>
                     <ClarificationForm
                       questions={snapshot.clarification_questions}
                       onSubmit={submitClarification}
@@ -1159,14 +1449,14 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                   <img
                     className="chat-msg-avatar"
                     src="/img/agent_role/computational_biologist.png"
-                    alt="Computational Biologist"
+                    alt={t.roleCompBio}
                     onError={(e) => {
                       (e.currentTarget as HTMLImageElement).src =
                         "https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png";
                     }}
                   />
                   <div className="chat-msg-content">
-                    <div className="chat-msg-role">Computational Biologist</div>
+                    <div className="chat-msg-role">{t.roleCompBio}</div>
                     <PlanEditor
                       plan={snapshot.plan}
                       onConfirm={confirmPlan}
@@ -1180,14 +1470,14 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                 <img
                   className="chat-msg-avatar"
                   src="/img/agent_role/principal_investigator.png"
-                  alt="Principal Investigator"
+                  alt={t.rolePI}
                   onError={(e) => {
                     (e.currentTarget as HTMLImageElement).src =
                       "https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png";
                   }}
                 />
                 <div className="chat-msg-content">
-                  <div className="chat-msg-role">Principal Investigator</div>
+                  <div className="chat-msg-role">{t.rolePI}</div>
                   <SubReportCheckpoint
                     onDecide={handleSubReportDecision}
                     disabled={running}
@@ -1200,14 +1490,14 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                 <img
                   className="chat-msg-avatar"
                   src="/img/agent_role/machine_learning_specialist.png"
-                  alt="Machine Learning Specialist"
+                  alt={t.roleMLSpec}
                   onError={(e) => {
                     (e.currentTarget as HTMLImageElement).src =
                       "https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png";
                   }}
                 />
                 <div className="chat-msg-content">
-                  <div className="chat-msg-role">Machine Learning Specialist</div>
+                  <div className="chat-msg-role">{t.roleMLSpec}</div>
                   <StepCheckpoint
                     onDecide={handleStepDecision}
                     disabled={running}
@@ -1220,14 +1510,14 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                 <img
                   className="chat-msg-avatar"
                   src="/img/agent_role/principal_investigator.png"
-                  alt="Principal Investigator"
+                  alt={t.rolePI}
                   onError={(e) => {
                     (e.currentTarget as HTMLImageElement).src =
                       "https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png";
                   }}
                 />
                 <div className="chat-msg-content">
-                  <div className="chat-msg-role">Principal Investigator</div>
+                  <div className="chat-msg-role">{t.rolePI}</div>
                   <IterationDecision
                     onDecide={handleIterationDecision}
                     disabled={running}
@@ -1243,13 +1533,13 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyDown={onComposerKeyDown}
-                placeholder={isWaitingForInteraction ? "Please respond to the form above..." : "Ask anything about AI protein engineering..."}
+                placeholder={isWaitingForInteraction ? t.composerWaiting : t.composerPlaceholder}
                 disabled={running || quotaExhausted || isWaitingForInteraction}
               />
               {chatQuota?.enforced && (
                 <span
                   className={`chat-quota-pill${quotaExhausted ? " exhausted" : ""}`}
-                  title={`Per-IP daily limit in online mode: ${chatQuota.limit ?? 10}`}
+                  title={t.quotaPillTitle(chatQuota.limit ?? 10)}
                 >
                   {quotaExhausted
                     ? `${chatQuota.used}/${chatQuota.limit ?? 10}`
@@ -1261,30 +1551,30 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
               <select
                 value={selectedModel}
                 onChange={(e) => handleModelChange(e.target.value)}
-                aria-label="Model"
+                aria-label={t.modelAria}
                 title={
                   selectedProvider
                     ? selectedProviderHasKey
-                      ? `Provider: ${selectedProvider} (key configured)`
-                      : `Provider: ${selectedProvider} (no API key)`
+                      ? t.titleProviderWithKey(selectedProvider)
+                      : t.titleProviderNoKey(selectedProvider)
                     : undefined
                 }
               >
                 {modelOptions.map((m) => (
                   <option key={m.value} value={m.value} disabled={m.disabled} title={m.title}>
                     {m.label}
-                    {m.disabled ? " (gateway required)" : ""}
+                    {m.disabled ? t.gatewayRequiredSuffix : ""}
                   </option>
                 ))}
-                {isLocalMode && <option value={OTHER_MODEL_OPTION}>Other Model...</option>}
+                {isLocalMode && <option value={OTHER_MODEL_OPTION}>{t.otherModel}</option>}
               </select>
               {selectedModelSpec && (
                 <span
                   className="model-key-status"
                   title={
                     selectedProviderHasKey
-                      ? `API key configured for ${selectedProvider}`
-                      : `Missing API key for ${selectedProvider}. Click to add.`
+                      ? t.titleKeyConfigured(selectedProvider)
+                      : t.titleMissingKey(selectedProvider)
                   }
                   onClick={() => {
                     if (!selectedProviderHasKey) openKeyPanelForProvider(selectedProvider);
@@ -1298,18 +1588,18 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                   }}
                   role={selectedProviderHasKey ? undefined : "button"}
                 >
-                  {selectedProviderHasKey ? "key ok" : "set key"}
+                  {selectedProviderHasKey ? t.keyOk : t.setKey}
                 </span>
               )}
               {(registry.data?.gateways?.length ?? 0) > 0 && (
                 <select
                   value={registry.data?.active_gateway || ""}
                   onChange={(e) => void handleGatewayChange(e.target.value)}
-                  aria-label="Gateway"
-                  title="Active gateway"
+                  aria-label={t.gatewayAria}
+                  title={t.activeGateway}
                   style={{ marginLeft: "4px" }}
                 >
-                  <option value="">No gateway</option>
+                  <option value="">{t.noGateway}</option>
                   {(registry.data?.gateways || []).map((g) => (
                     <option key={g.id} value={g.id}>
                       {g.label}
@@ -1318,7 +1608,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                 </select>
               )}
               <div className="file-source-inline">
-                <label className={`file-upload-icon-btn${running || quotaExhausted ? " disabled" : ""}`} title="Upload files">
+                <label className={`file-upload-icon-btn${running || quotaExhausted ? " disabled" : ""}`} title={t.uploadFiles}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
                   </svg>
@@ -1334,21 +1624,21 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                   workspaceEnabled={workspaceEnabled}
                   disabled={running || quotaExhausted}
                   allowMultiple
-                  buttonLabel="From Workspace"
+                  buttonLabel={t.fromWorkspace}
                   onPick={(picked) => setWorkspaceFiles(picked)}
                 />
               </div>
               <button className="btn-secondary" onClick={() => void retryLastMessage()} disabled={running || quotaExhausted} title={regenerateTooltip}>
-                Regenerate
+                {t.regenerate}
               </button>
               <button className="btn-secondary" onClick={() => void exportCurrentSession()} disabled={running || !sessionId}>
-                Export
+                {t.export}
               </button>
               <button className="btn-secondary" onClick={abortRun} disabled={!running}>
-                Stop
+                {t.stop}
               </button>
               <button className="btn-primary" onClick={() => void sendMessage()} disabled={running || quotaExhausted} title={sendTooltip}>
-                {running ? "Running..." : "Send"}
+                {running ? t.runningEllipsis : t.send}
               </button>
             </div>
             {modelSwitchNotice && (
@@ -1360,7 +1650,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
               <div
                 className="model-key-panel"
                 role="dialog"
-                aria-label={`Set API key for ${keyPanelProvider}`}
+                aria-label={t.keyPanelAria(keyPanelProvider)}
                 style={{
                   display: "flex",
                   gap: "8px",
@@ -1373,7 +1663,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                 }}
               >
                 <span style={{ fontSize: "13px" }}>
-                  API key for <strong>{keyPanelProvider}</strong>:
+                  {t.keyPanelLabelPre}<strong>{keyPanelProvider}</strong>{t.keyPanelLabelPost}
                 </span>
                 <input
                   type="password"
@@ -1389,7 +1679,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                   onClick={() => void submitProviderKey()}
                   disabled={keyPanelSaving || !keyPanelValue.trim()}
                 >
-                  {keyPanelSaving ? "Saving..." : "Save"}
+                  {keyPanelSaving ? t.keyPanelSaving : t.save}
                 </button>
                 <button
                   className="btn-secondary"
@@ -1399,7 +1689,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                   }}
                   disabled={keyPanelSaving}
                 >
-                  Cancel
+                  {t.cancel}
                 </button>
               </div>
             )}
@@ -1409,11 +1699,11 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                   <span key={f.name}>{f.name}</span>
                 ))}
                 {workspaceFiles.map((f) => (
-                  <span key={f.id}>{f.display_name} (workspace)</span>
+                  <span key={f.id}>{f.display_name} {t.workspaceSuffix}</span>
                 ))}
               </div>
             )}
-            {error && <ErrorAlert message={error} onDismiss={() => setError("")} />}
+            {error && <ErrorAlert message={error} onDismiss={() => setError("")} t={t} />}
           </div>
         </section>
 
@@ -1427,13 +1717,13 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
               <span className="term-dot dot-yellow" />
               <span className="term-dot dot-green" />
             </span>
-            <span className="term-head-title">Execution Status</span>
+            <span className="term-head-title">{t.executionStatus}</span>
             <span className="panel-toggle-icon">{logsCollapsed ? "+" : "-"}</span>
           </div>
           {!logsCollapsed && (
             <div className="term-body">
               {!terminalData ? (
-                <div className="term-line"><span className="term-muted">$ waiting for session...</span></div>
+                <div className="term-line"><span className="term-muted">{t.termWaiting}</span></div>
               ) : (
                 <>
                   <div className="term-section">
@@ -1447,7 +1737,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                     <div className="term-line">
                       <span className="term-prompt">$</span>
                       <span className="term-cmd">info</span>
-                      <span className="term-val">{terminalData.messages} messages, {terminalData.toolRuns} tool runs</span>
+                      <span className="term-val">{t.termMessagesTools(terminalData.messages, terminalData.toolRuns)}</span>
                     </div>
                   </div>
                   {terminalData.tools.length > 0 && (
@@ -1468,7 +1758,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                       {terminalData.conv.map((c, i) => (
                         <div key={i} className="term-line term-indent term-log-line">
                           <span className={`term-role ${c.role === "user" ? "role-user" : "role-agent"}`}>{c.role}</span>
-                          <span className="term-log-content">{c.content || "(empty)"}</span>
+                          <span className="term-log-content">{c.content || t.termEmpty}</span>
                         </div>
                       ))}
                     </div>
@@ -1482,31 +1772,31 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       {showCustomModelModal && isLocalMode && (
         <div className="modal-backdrop">
           <div className="custom-model-modal">
-            <h3>Add OpenAI-Style Model</h3>
+            <h3>{t.addCustomModel}</h3>
             <label>
-              Display Name
-              <input value={customModelLabel} onChange={(e) => setCustomModelLabel(e.target.value)} placeholder="My Model" />
+              {t.displayName}
+              <input value={customModelLabel} onChange={(e) => setCustomModelLabel(e.target.value)} placeholder={t.displayNamePlaceholder} />
             </label>
             <label>
-              Model Name
-              <input value={customModelName} onChange={(e) => setCustomModelName(e.target.value)} placeholder="gpt-4.1-mini" />
+              {t.modelName}
+              <input value={customModelName} onChange={(e) => setCustomModelName(e.target.value)} placeholder={t.modelNamePlaceholder} />
             </label>
             <label>
-              API Key
+              {t.apiKey}
               <input type="password" value={customModelApiKey} onChange={(e) => setCustomModelApiKey(e.target.value)} placeholder="sk-..." />
             </label>
             <label>
-              Base URL
+              {t.baseUrl}
               <input value={customModelBaseUrl} onChange={(e) => setCustomModelBaseUrl(e.target.value)} placeholder="https://api.openai.com/v1" />
             </label>
             <div className="custom-model-modal-actions">
-              <button className="btn-secondary" onClick={() => setShowCustomModelModal(false)}>Cancel</button>
-              <button className="btn-primary" onClick={saveCustomModel}>Confirm</button>
+              <button className="btn-secondary" onClick={() => setShowCustomModelModal(false)}>{t.cancel}</button>
+              <button className="btn-primary" onClick={saveCustomModel}>{t.confirm}</button>
             </div>
             <div className="custom-model-list">
-              <h4>Added Models</h4>
+              <h4>{t.addedModels}</h4>
               {customModels.length === 0 ? (
-                <div className="custom-model-empty">No custom models yet.</div>
+                <div className="custom-model-empty">{t.noCustomModels}</div>
               ) : (
                 customModels.map((m) => (
                   <div key={m.id} className="custom-model-item">
@@ -1515,7 +1805,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                       <small>{m.modelName} | {m.baseUrl}</small>
                     </div>
                     <button className="btn-secondary custom-model-delete-btn" onClick={() => void removeCustomModel(m.id)}>
-                      Delete
+                      {t.deleteBtn}
                     </button>
                   </div>
                 ))
