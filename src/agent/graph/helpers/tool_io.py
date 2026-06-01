@@ -179,6 +179,16 @@ def _is_write_like_tool(tool_name: str) -> bool:
         return True
     write_prefixes = (
         "predict_structure_",
+        # Finetuned predict tools: write a CSV to out_dir; previously fell back to
+        # a global agent/predict_finetuned dir, now session-scoped via out_dir.
+        "predict_protein_function",
+        "predict_residue_function",
+        # Zero-shot mutation tools: write a heatmap CSV to out_dir; previously fell
+        # back to a global Zero_shot/HeatMap dir, now session-scoped via out_dir.
+        "zero_shot_mutation_",
+        # ProteinMPNN design/score: write FASTAs to out_dir; previously fell back to
+        # a global ProteinMPNN/Design|Score dir, now session-scoped via out_dir.
+        "proteinmpnn_sequence_",
         "generate_training_config",
         "train_protein_model",
         "protein_model_predict",

@@ -40,16 +40,32 @@ def _df_to_result(df, output_dir: str) -> Dict[str, Any]:
     return result
 
 
+def _resolve_output_dir(out_dir: Optional[str]) -> str:
+    """Use caller-supplied out_dir when given; otherwise fall back to global Zero_shot/HeatMap.
+
+    Backward-compat: out_dir=None preserves the historical (date-bucketed) path.
+    """
+    if out_dir:
+        target = os.path.expanduser(out_dir)
+        os.makedirs(target, exist_ok=True)
+        return target
+    return str(get_save_path("Zero_shot", "HeatMap"))
+
+
 def zero_shot_mutation_sequence_prediction(
     sequence: Optional[str] = None,
     fasta_file: Optional[str] = None,
     model_name: str = "ESM2-650M",
     api_key: Optional[str] = None,
     backend: Optional[str] = None,
+    out_dir: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Run zero-shot sequence-based mutation prediction. Returns status dict.
     Provide either sequence or fasta_file.
+
+    out_dir (optional): Output directory for the CSV/heatmap. When omitted, falls back
+    to the global ``temp_outputs/.../Zero_shot/HeatMap`` path (backward-compat).
     """
     fasta_path = None
     temp_fasta_created = False
@@ -70,7 +86,7 @@ def zero_shot_mutation_sequence_prediction(
         if raw_df.empty:
             return _error_dict("PredictionError", status_msg or "Prediction returned empty results.",
                                suggestion="Check sequence and model_name.")
-        output_dir = str(get_save_path("Zero_shot", "HeatMap"))
+        output_dir = _resolve_output_dir(out_dir)
         result_data = _df_to_result(raw_df, output_dir)
         return {"status": "success", "data": result_data, "file_info": {"output_dir": output_dir}}
     except Exception as e:
@@ -88,9 +104,13 @@ def zero_shot_mutation_structure_prediction(
     model_name: str = "ESM-IF1",
     api_key: Optional[str] = None,
     backend: Optional[str] = None,
+    out_dir: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Run zero-shot structure-based mutation prediction. Returns status dict.
+
+    out_dir (optional): Output directory for the CSV/heatmap. When omitted, falls back
+    to the global ``temp_outputs/.../Zero_shot/HeatMap`` path (backward-compat).
     """
     if not structure_file or not os.path.exists(structure_file):
         return _error_dict("ValidationError", f"Structure file not found: {structure_file}")
@@ -101,7 +121,7 @@ def zero_shot_mutation_structure_prediction(
         if raw_df.empty:
             return _error_dict("PredictionError", status_msg or "Prediction returned empty results.",
                                suggestion="Check structure file and model_name.")
-        output_dir = str(get_save_path("Zero_shot", "HeatMap"))
+        output_dir = _resolve_output_dir(out_dir)
         result_data = _df_to_result(raw_df, output_dir)
         return {"status": "success", "data": result_data, "file_info": {"output_dir": output_dir}}
     except Exception as e:

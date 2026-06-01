@@ -38,6 +38,10 @@ class ProteinMPNNSequenceDesignFromStructureInput(BaseModel):
     model_name: str = Field("v_48_020", description="Model weights: v_48_002/010/020/030")
     backbone_noise: float = Field(0.0, description="Backbone coord Gaussian noise std")
     ca_only: bool = Field(False, description="Use CA-only model and coordinates")
+    out_dir: Optional[str] = Field(
+        None,
+        description="Output directory for designed sequences (FASTA). When omitted, falls back to the global temp_outputs ProteinMPNN/Design path (backward-compat).",
+    )
 
 
 class ProteinMPNNSequenceScoringFromStructureInput(BaseModel):
@@ -47,6 +51,10 @@ class ProteinMPNNSequenceScoringFromStructureInput(BaseModel):
     num_batches: int = Field(1, description="Stochastic forward passes to average over")
     model_name: str = Field("v_48_020", description="Model weights name")
     backbone_noise: float = Field(0.0, description="Backbone coord Gaussian noise std")
+    out_dir: Optional[str] = Field(
+        None,
+        description="Output directory for scored sequences (FASTA). When omitted, falls back to the global temp_outputs ProteinMPNN/Score path (backward-compat).",
+    )
 
 
 @tool("proteinmpnn_sequence_design_from_structure", args_schema=ProteinMPNNSequenceDesignFromStructureInput)
@@ -62,6 +70,7 @@ def proteinmpnn_sequence_design_from_structure_tool(
     model_name: str = "v_48_020",
     backbone_noise: float = 0.0,
     ca_only: bool = False,
+    out_dir: Optional[str] = None,
 ) -> str:
     """
     Design protein sequences using ProteinMPNN given a PDB backbone structure.
@@ -91,6 +100,7 @@ def proteinmpnn_sequence_design_from_structure_tool(
         model_name=model_name,
         backbone_noise=backbone_noise,
         ca_only=ca_only,
+        out_dir=out_dir,
     )
 
 
@@ -102,6 +112,7 @@ def proteinmpnn_sequence_scoring_from_structure_tool(
     num_batches: int = 1,
     model_name: str = "v_48_020",
     backbone_noise: float = 0.0,
+    out_dir: Optional[str] = None,
 ) -> str:
     """
     Score sequences against a backbone structure using ProteinMPNN log-probabilities
@@ -116,4 +127,5 @@ def proteinmpnn_sequence_scoring_from_structure_tool(
         num_batches=num_batches,
         model_name=model_name,
         backbone_noise=backbone_noise,
+        out_dir=out_dir,
     )

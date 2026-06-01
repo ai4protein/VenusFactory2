@@ -22,14 +22,20 @@ def mcp_zero_shot_mutation_sequence_prediction(
     model_name: str = "ESM2-650M",
     api_key: Optional[str] = None,
     backend: Optional[str] = None,
+    out_dir: Optional[str] = None,
 ) -> str:
-    """Predict beneficial mutations from protein sequence (zero-shot). Returns status JSON."""
+    """Predict beneficial mutations from protein sequence (zero-shot). Returns status JSON.
+
+    out_dir (optional): Output directory for the CSV/heatmap. When omitted, falls back
+    to the global temp_outputs Zero_shot/HeatMap path (backward-compat).
+    """
     result = zero_shot_mutation_sequence_prediction(
         sequence=sequence,
         fasta_file=fasta_file,
         model_name=model_name,
         api_key=api_key,
         backend=backend or DEFAULT_BACKEND,
+        out_dir=out_dir,
     )
     return json.dumps(result, ensure_ascii=False, indent=2)
 
@@ -40,12 +46,18 @@ def mcp_zero_shot_mutation_structure_prediction(
     model_name: str = "ESM-IF1",
     api_key: Optional[str] = None,
     backend: Optional[str] = None,
+    out_dir: Optional[str] = None,
 ) -> str:
-    """Predict beneficial mutations from PDB structure (zero-shot). Returns status JSON."""
+    """Predict beneficial mutations from PDB structure (zero-shot). Returns status JSON.
+
+    out_dir (optional): Output directory for the CSV/heatmap. When omitted, falls back
+    to the global temp_outputs Zero_shot/HeatMap path (backward-compat).
+    """
     result = zero_shot_mutation_structure_prediction(
         structure_file=structure_file,
         model_name=model_name,
         api_key=api_key,
         backend=backend or DEFAULT_BACKEND,
+        out_dir=out_dir,
     )
     return json.dumps(result, ensure_ascii=False, indent=2)

@@ -37,6 +37,8 @@ file cannot be opened, or the intended output is not produced. Reporting
 
 **SECURITY (MANDATORY):** The code runs in a sandbox. You MUST NOT use: subprocess, os.system, os.popen, eval(), exec(), __import__(), compile(), input(), breakpoint(), socket, pty, shutil.rmtree, os.remove, os.unlink, os.rmdir, or __builtins__/__globals__. Use only standard data-processing and file I/O within the output directory.
 
+**PATH ISOLATION (MANDATORY):** Do NOT write to `/tmp`, `~`, the user's home dir, the project root, or any path outside OUTPUT_DIR. OUTPUT_DIR is the session-scoped sandbox grant — use it as both your scratch and final-output location. The sandbox already gives full read+write there; any other write target is either denied (sandbox path validation) or globally shared across sessions (breaks isolation). If you need a tempfile, place it under OUTPUT_DIR (e.g. `os.path.join(OUTPUT_DIR, ".scratch_<uuid>.tmp")`), not in `/tmp`.
+
 **CRITICAL REQUIREMENTS:**
 1. Write COMPLETE code - DO NOT truncate or use placeholders like "# ... rest of code"
 2. Include ALL imports at the top

@@ -22,6 +22,10 @@ class ZeroShotSequenceInput(BaseModel):
     model_name: str = Field(default="ESM2-650M", description="Model: ESM-1v, ESM2-650M, ESM-1b, VenusPLM. Default ESM2-650M.")
     backend: str = Field(default=DEFAULT_BACKEND, description="Backend: local or pjlab.")
     api_key: Optional[str] = Field(default=None, description="Optional API key for prediction service.")
+    out_dir: Optional[str] = Field(
+        default=None,
+        description="Output directory for the prediction CSV/heatmap. When omitted, falls back to the global temp_outputs Zero_shot/HeatMap path (backward-compat).",
+    )
 
     @model_validator(mode="after")
     def require_sequence_or_fasta(self):
@@ -35,6 +39,10 @@ class ZeroShotStructureInput(BaseModel):
     model_name: str = Field(default="ESM-IF1", description="Model: SaProt, ProtSSN, ESM-IF1, MIF-ST, etc. Default ESM-IF1.")
     backend: str = Field(default=DEFAULT_BACKEND, description="Backend: local or pjlab.")
     api_key: Optional[str] = Field(default=None, description="Optional API key for prediction service.")
+    out_dir: Optional[str] = Field(
+        default=None,
+        description="Output directory for the prediction CSV/heatmap. When omitted, falls back to the global temp_outputs Zero_shot/HeatMap path (backward-compat).",
+    )
 
 
 @tool("zero_shot_mutation_sequence_prediction", args_schema=ZeroShotSequenceInput)
@@ -44,6 +52,7 @@ def zero_shot_mutation_sequence_prediction_tool(
     model_name: str = "ESM2-650M",
     api_key: Optional[str] = None,
     backend: Optional[str] = None,
+    out_dir: Optional[str] = None,
 ) -> str:
     """Predict beneficial mutations from sequence (zero-shot). Returns status JSON with data/file_info or error."""
     try:
@@ -51,9 +60,21 @@ def zero_shot_mutation_sequence_prediction_tool(
             if not os.path.exists(fasta_file):
                 return json.dumps({"status": "error", "error": {"type": "ValidationError", "message": f"FASTA file not found: {fasta_file}"}, "file_info": None})
             fasta_path = extract_first_sequence_from_fasta_file(fasta_file)
-            result = zero_shot_mutation_sequence_prediction(fasta_file=fasta_path, model_name=model_name, api_key=api_key, backend=backend or DEFAULT_BACKEND)
+            result = zero_shot_mutation_sequence_prediction(
+                fasta_file=fasta_path,
+                model_name=model_name,
+                api_key=api_key,
+                backend=backend or DEFAULT_BACKEND,
+                out_dir=out_dir,
+            )
         elif sequence:
-            result = zero_shot_mutation_sequence_prediction(sequence=sequence, model_name=model_name, api_key=api_key, backend=backend or DEFAULT_BACKEND)
+            result = zero_shot_mutation_sequence_prediction(
+                sequence=sequence,
+                model_name=model_name,
+                api_key=api_key,
+                backend=backend or DEFAULT_BACKEND,
+                out_dir=out_dir,
+            )
         else:
             result = {"status": "error", "error": {"type": "ValidationError", "message": "Either sequence or fasta_file must be provided."}, "file_info": None}
         return json.dumps(result, ensure_ascii=False, indent=2)
@@ -67,6 +88,7 @@ def zero_shot_mutation_structure_prediction_tool(
     model_name: str = "ESM-IF1",
     api_key: Optional[str] = None,
     backend: Optional[str] = None,
+    out_dir: Optional[str] = None,
 ) -> str:
     """Predict beneficial mutations from PDB structure (zero-shot). Returns status JSON with data/file_info or error."""
     try:
@@ -80,7 +102,13 @@ def zero_shot_mutation_structure_prediction_tool(
                 pass
         if not os.path.exists(actual_path):
             return json.dumps({"status": "error", "error": {"type": "ValidationError", "message": f"Structure file not found: {actual_path}"}, "file_info": None})
-        result = zero_shot_mutation_structure_prediction(actual_path, model_name=model_name, api_key=api_key, backend=backend or DEFAULT_BACKEND)
+        result = zero_shot_mutation_structure_prediction(
+            actual_path,
+            model_name=model_name,
+            api_key=api_key,
+            backend=backend or DEFAULT_BACKEND,
+            out_dir=out_dir,
+        )
         return json.dumps(result, ensure_ascii=False, indent=2)
     except Exception as e:
         return json.dumps({"status": "error", "error": {"type": "ToolError", "message": str(e)}, "file_info": None}, ensure_ascii=False)
