@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
+from typing import Any, Iterable
 
 from langchain_core.runnables import RunnableConfig
 
@@ -24,6 +25,63 @@ from logger import get_logger
 from web.utils.common_utils import to_project_relative_path
 
 _logger = get_logger("agent.graph")
+
+
+def _filter_unparameterized_steps(
+    plan: list[dict[str, Any]],
+    all_tools: Iterable[Any] | None,
+    ui_lang: str,
+) -> tuple[list[dict[str, Any]], list[tuple[Any, str, list[str]]]]:
+    """Drop plan steps whose tool requires fields but tool_input is empty.
+
+    Conservative filter: only removes a step when (a) the tool is known,
+    (b) tool_input is an empty dict, and (c) the tool's args_schema declares
+    at least one required field. Steps with partial tool_input are kept so
+    the MLS debug pass can still attempt to recover defaults. Returns
+    (kept_plan, dropped_steps) where each dropped entry is
+    (step_no, tool_name, sorted_required_field_names).
+    """
+    tool_by_name: dict[str, Any] = {}
+    for t in all_tools or []:
+        name = getattr(t, "name", None)
+        if isinstance(name, str) and name:
+            tool_by_name[name] = t
+
+    kept: list[dict[str, Any]] = []
+    dropped: list[tuple[Any, str, list[str]]] = []
+    for step in plan:
+        tname = step.get("tool_name") or ""
+        tool = tool_by_name.get(tname)
+        ti = step.get("tool_input") or {}
+        # Unknown tool or non-empty input → keep (let downstream handle).
+        if tool is None or ti:
+            kept.append(step)
+            continue
+        schema = getattr(tool, "args_schema", None)
+        required: set[str] = set()
+        if schema is not None:
+            model_fields = getattr(schema, "model_fields", None)  # pydantic v2
+            if isinstance(model_fields, dict) and model_fields:
+                for fname, finfo in model_fields.items():
+                    try:
+                        if finfo.is_required():
+                            required.add(fname)
+                    except Exception:
+                        # Fallback: treat fields with no default as required.
+                        if getattr(finfo, "default", None) is None and \
+                                getattr(finfo, "default_factory", None) is None:
+                            required.add(fname)
+            else:
+                v1_fields = getattr(schema, "__fields__", None)  # pydantic v1
+                if isinstance(v1_fields, dict):
+                    for fname, finfo in v1_fields.items():
+                        if getattr(finfo, "required", False):
+                            required.add(fname)
+        if required:
+            dropped.append((step.get("step"), tname, sorted(required)))
+            continue
+        kept.append(step)
+    return kept, dropped
 
 
 async def plan_start_node(state: AgentState, config: RunnableConfig):
@@ -159,6 +217,44 @@ async def _plan_node_impl(state: AgentState, config: RunnableConfig):
     )
 
     normalized_plan = _enforce_skill_first_plan(normalized_plan, available_tools_list, skills_metadata, ui_lang)
+
+    # Drop steps whose tool_input is empty but whose tool requires fields:
+    # those will otherwise fail Pydantic validation at execute time. Keep
+    # partially-parameterized steps so MLS debug can still recover them.
+    normalized_plan, dropped_unparam = _filter_unparameterized_steps(
+        normalized_plan, chains.get("all_tools"), ui_lang
+    )
+    if dropped_unparam:
+        for step_no, tool_name, reqs in dropped_unparam:
+            _logger.warning(
+                "Dropped plan step %s (%s): tool_input empty but requires %s",
+                step_no, tool_name, reqs,
+            )
+        if ui_lang == "zh":
+            drop_lines = [
+                f"  - 第 {sn} 步 `{tn}` 缺少必填参数：{', '.join(reqs)}"
+                for sn, tn, reqs in dropped_unparam
+            ]
+            drop_msg = (
+                "⚠️ 已自动跳过以下计划步骤（参数为空但工具需要必填项）：\n"
+                + "\n".join(drop_lines)
+                + "\n建议重新生成 plan 或手动编辑。"
+            )
+        else:
+            drop_lines = [
+                f"  - Step {sn} `{tn}` requires: {', '.join(reqs)}"
+                for sn, tn, reqs in dropped_unparam
+            ]
+            drop_msg = (
+                "⚠️ Auto-dropped plan steps (empty params but tool requires inputs):\n"
+                + "\n".join(drop_lines)
+                + "\nConsider rerunning the plan or editing manually."
+            )
+        history.append({
+            "role": "assistant",
+            "content": drop_msg,
+            "role_id": "computational_biologist",
+        })
 
     if not normalized_plan:
         # Safety fallback: CB planner produced no usable steps (typically because
