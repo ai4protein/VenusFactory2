@@ -235,7 +235,11 @@ def download_hpa_tissue_expression_by_gene(gene_name: str, out_path: str) -> str
         out_path:  Output JSON file path.
 
     Returns:
-        Rich JSON string with tissue expression data, or error details.
+        Rich JSON string with tissue expression data, or error details. When HPA
+        returns an entry that lacks substantive tissue expression annotation
+        (no per-tissue nTPM AND no specificity / distribution / cluster fields),
+        the response is an error of type 'IncompleteData' so downstream callers
+        can retry / replan / skip rather than silently consume metadata-only stubs.
     """
     t0 = time.perf_counter()
     try:
@@ -253,6 +257,46 @@ def download_hpa_tissue_expression_by_gene(gene_name: str, out_path: str) -> str
             "Tissue expression cluster": entry.get("Tissue expression cluster"),
         }
 
+        # ---- Response completeness check ----
+        # HPA sometimes returns an entry that only carries identifier metadata
+        # (Gene / Ensembl / Uniprot) but every tissue-expression field is missing
+        # or empty. The file write would still succeed (~400 bytes of nulls) and
+        # downstream parsers expecting `tissues` / nTPM data would silently fail.
+        #
+        # Ubiquitous genes (e.g. GAPDH) legitimately have empty per-tissue nTPM
+        # dicts but DO carry a distribution / specificity label ("Detected in
+        # all", "Low tissue specificity"). We treat the response as complete
+        # whenever ANY of the substantive fields is populated.
+        tissue_ntpm_raw = entry.get("RNA tissue specific nTPM") or {}
+        has_ntpm = bool(tissue_ntpm_raw)
+        has_specificity = bool(entry.get("RNA tissue specificity"))
+        has_distribution = bool(entry.get("RNA tissue distribution"))
+        has_cluster = bool(entry.get("Tissue expression cluster"))
+        has_cell_enrichment = bool(entry.get("RNA tissue cell type enrichment"))
+
+        if not any([has_ntpm, has_specificity, has_distribution,
+                    has_cluster, has_cell_enrichment]):
+            # Persist the (mostly-null) payload so it remains available for
+            # debugging, but signal an error to the caller.
+            Path(out_path).parent.mkdir(parents=True, exist_ok=True)
+            with open(out_path, "w", encoding="utf-8") as f:
+                json.dump(tissue_data, f, ensure_ascii=False, indent=2)
+            return _error_response(
+                "IncompleteData",
+                (
+                    f"HPA returned an entry for '{gene_name}' but no tissue "
+                    f"expression data (per-tissue nTPM, specificity, distribution, "
+                    f"cell-type enrichment, and tissue expression cluster are all "
+                    f"empty). Metadata stub was saved to {out_path} for debugging."
+                ),
+                suggestion=(
+                    "Verify the gene symbol is the canonical HGNC name "
+                    "(e.g. 'TP53', not 'P53') at https://www.proteinatlas.org, "
+                    "or retry later as the HPA /search endpoint may return a "
+                    "partial response under load."
+                ),
+            )
+
         Path(out_path).parent.mkdir(parents=True, exist_ok=True)
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(tissue_data, f, ensure_ascii=False, indent=2)
@@ -260,7 +304,7 @@ def download_hpa_tissue_expression_by_gene(gene_name: str, out_path: str) -> str
         elapsed_ms = int((time.perf_counter() - t0) * 1000)
 
         # Per-tissue nTPM dict — may be None for ubiquitous genes (Low tissue specificity)
-        tissue_ntpm = entry.get("RNA tissue specific nTPM") or {}
+        tissue_ntpm = tissue_ntpm_raw
         # Top expressed tissue(s) by nTPM value
         top_tissues = sorted(
             tissue_ntpm.items(),
@@ -280,6 +324,11 @@ def download_hpa_tissue_expression_by_gene(gene_name: str, out_path: str) -> str
             "tissue_expression_cluster": entry.get("Tissue expression cluster"),
             "source": _SOURCE_HPA,
         }
+        # Note when nTPM is empty but other fields are populated (ubiquitous gene)
+        # so downstream consumers can branch on a distribution label rather than
+        # an empty top_expressed_tissues dict.
+        if not has_ntpm:
+            meta["data_completeness"] = "no_per_tissue_ntpm"
         return _download_success_response(
             out_path,
             content_preview=_read_preview(out_path),

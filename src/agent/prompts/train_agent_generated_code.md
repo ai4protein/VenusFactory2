@@ -17,6 +17,19 @@ paths from TASK or other free-form text — use the structured INPUT FILES
 entries verbatim. Same rule for OUTPUT DIR: open/save under the absolute
 path provided, never under a project-relative prefix.
 
+⚠️ **OUTPUT RULE:** OUTPUT_DIR is already an absolute path. Save files
+DIRECTLY under it; do NOT prepend `temp_outputs/`, `web_v2/`, or any
+other project-relative prefix. Examples:
+
+  GOOD:  out = os.path.join(OUTPUT_DIR, "result.csv")
+  GOOD:  out = f"{{output_directory}}/result.csv"
+  BAD:   out = os.path.join("temp_outputs", "result.csv")  # cwd mismatch
+  BAD:   out = f"temp_outputs/web_v2/.../result.csv"        # double prefix
+
+Treat OUTPUT_DIR as you would `/tmp` — it's a real absolute directory,
+not a path fragment to extend. Do NOT echo the OUTPUT_DIR string inside
+another path concatenation; pass it as the base directory exactly once.
+
 ⚠️ **SUCCESS REPORTING:** Set `"success": false` (not true) and put the
 real error message into `"summary"` whenever an exception is caught, a
 file cannot be opened, or the intended output is not produced. Reporting

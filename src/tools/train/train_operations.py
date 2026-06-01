@@ -175,13 +175,19 @@ def generate_and_execute_code(task_description: str, input_files: Optional[List[
                             "files": model_files
                         })
 
-        # Load prompt from src/agent/prompts and fill placeholders
+        # Load prompt from src/agent/prompts and fill placeholders.
+        # IMPORTANT: feed ABSOLUTE paths to the LLM. The sandbox runs the
+        # generated script with a working_directory that is NOT the project
+        # root, so a project-relative path (e.g. "temp_outputs/...") would
+        # be mis-resolved. The prompt's PATH RULE + OUTPUT RULE blocks tell
+        # the model to use these strings verbatim as base directories,
+        # never prepending another prefix.
         code_prompt = _load_train_prompt(
             "train_agent_generated_code",
             task_description=task_description,
             file_info=json.dumps(file_info, indent=2) if file_info else "None",
-            output_directory=to_project_relative_path(output_directory),
-            model_registry_dir=to_project_relative_path(model_registry_dir),
+            output_directory=output_directory,
+            model_registry_dir=model_registry_dir,
             available_models=json.dumps(available_models, indent=2) if available_models else "None",
         )
 
@@ -351,24 +357,65 @@ def generate_and_execute_code(task_description: str, input_files: Optional[List[
                 if json_match:
                     result_json = json.loads(json_match.group())
                     result_json["generated_code_path"] = to_project_relative_path(script_path)
+
+                    # Defensive output_files self-check: LLM-generated scripts
+                    # sometimes echo OUTPUT_DIR into a project-relative prefix
+                    # (e.g. `temp_outputs/...`) so the final saved path ends
+                    # up as `<abs_output_dir>/temp_outputs/<abs_output_dir>/foo`
+                    # — a doubled `/temp_outputs/` segment. Collapse those,
+                    # rewrite project-relative entries to absolute, and verify
+                    # the files actually exist before trusting success=True.
+                    output_files = result_json.get("output_files") or []
+                    cleaned_files: List[str] = []
+                    for f in output_files:
+                        if not isinstance(f, str):
+                            continue
+                        fp = f
+                        # Heuristic: collapse double 'temp_outputs/' prefix
+                        parts = fp.split("/temp_outputs/")
+                        if len(parts) > 2:
+                            fp = "/temp_outputs/" + parts[-1]
+                            print(f"⚠️ agent_generated_code: collapsed double temp_outputs prefix in {f} -> {fp}")
+                        # Normalize / make absolute against the real OUTPUT_DIR
+                        if not os.path.isabs(fp):
+                            fp = os.path.join(output_directory, fp.lstrip("./"))
+                        fp = str(Path(fp).resolve())
+                        if os.path.exists(fp):
+                            cleaned_files.append(fp)
+                        else:
+                            print(f"⚠️ agent_generated_code: claimed output_file does not exist: {fp}")
+                    if cleaned_files:
+                        result_json["output_files"] = cleaned_files
+                    elif output_files:
+                        # Claimed but missing — downgrade success
+                        result_json["success"] = False
+                        result_json.setdefault(
+                            "summary",
+                            f"Claimed {len(output_files)} output_files but none exist on disk",
+                        )
+
                     # Trust the script's own success self-report. Previously this
                     # line forced success=True even when the script printed
                     # success=False (or carried an `error` field), causing the
                     # MLS post-step verifier to mis-classify failed runs as
-                    # successes. Now: only stamp success=True when the script
-                    # itself reported success AND emitted no error field.
-                    reported_success = result_json.get("success") is True
+                    # successes. New policy: subprocess exited 0 so the script
+                    # ran without raising; treat as success UNLESS the script
+                    # explicitly reported failure (success=false) OR emitted an
+                    # error field / error-prefixed summary. Scripts that don't
+                    # include a success key (returncode=0 means the run was
+                    # fine) are still treated as success.
+                    explicitly_failed = result_json.get("success") is False
                     has_error_field = bool(result_json.get("error")) or (
                         isinstance(result_json.get("summary"), str)
                         and result_json["summary"].lower().startswith(("error", "traceback", "failed"))
                     )
-                    if reported_success and not has_error_field:
-                        result_json["success"] = True
-                        result_json["SYSTEM_NOTE"] = "STOP EXECUTION NOW. The code has run successfully. Provide the Final Answer immediately."
-                    else:
+                    if explicitly_failed or has_error_field:
                         result_json["success"] = False
                         result_json.setdefault("summary", "Script reported failure or emitted an error field; see details.")
                         result_json["SYSTEM_NOTE"] = "The generated script ran but reported failure; downstream steps should treat this step as failed."
+                    else:
+                        result_json["success"] = True
+                        result_json["SYSTEM_NOTE"] = "STOP EXECUTION NOW. The code has run successfully. Provide the Final Answer immediately."
                     
                     # Keep the generated code since execution was successful
                     print(f"✓ Code executed successfully. Saved to: {to_project_relative_path(script_path)}")
