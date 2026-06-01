@@ -14,6 +14,42 @@ import {
 import { QuickToolsLayout } from "./QuickToolsLayout";
 import { QuickToolResultPanel } from "./QuickToolResultPanel";
 import { WorkspaceFilePicker } from "../../components/WorkspaceFilePicker";
+import { useLang } from "../../lib/i18n";
+import { useDocumentMeta } from "../../lib/useDocumentMeta";
+import { COMMON_STRINGS } from "../../lib/commonStrings";
+
+const STRINGS = {
+  en: {
+    ...COMMON_STRINGS.en,
+    title: "Physicochemical Property",
+    subtitle: "Calculate protein properties from FASTA or PDB inputs.",
+    selectProperties: "Select Properties of Protein",
+    pdbChain: "PDB Chain",
+    pasteSeqPlaceholderPdb: "Paste FASTA content with >header for non-PDB tasks...",
+    onlineFastaLimit: (n: number) => `Online mode supports up to ${n} FASTA sequences per run.`,
+    useExamplePdb: "Use Example PDB",
+    pleaseUploadPdb: "Please upload a PDB file for this task.",
+    pleaseUploadOrPaste: "Please upload a file or paste sequence.",
+    pdbRequiredError: "Current task requires .pdb file.",
+    fastaRequiredError: "Physical and chemical properties expects FASTA input.",
+    resultTitle: "Physicochemical Property Result"
+  },
+  zh: {
+    ...COMMON_STRINGS.zh,
+    title: "理化性质",
+    subtitle: "基于 FASTA 或 PDB 输入计算蛋白质理化性质。",
+    selectProperties: "选择蛋白性质",
+    pdbChain: "PDB 链",
+    pasteSeqPlaceholderPdb: "对于非 PDB 任务，请粘贴包含 > 开头 header 的 FASTA 内容…",
+    onlineFastaLimit: (n: number) => `在线模式每次运行最多支持 ${n} 条 FASTA 序列。`,
+    useExamplePdb: "使用示例 PDB",
+    pleaseUploadPdb: "当前任务需要上传 PDB 文件。",
+    pleaseUploadOrPaste: "请上传文件或粘贴序列。",
+    pdbRequiredError: "当前任务需要 .pdb 文件。",
+    fastaRequiredError: "理化性质计算需要 FASTA 输入。",
+    resultTitle: "理化性质计算结果"
+  }
+};
 
 const DEFAULT_META: QuickToolsMeta = {
   dataset_mapping_zero_shot: [],
@@ -34,6 +70,8 @@ type PhysicochemicalPropertyPageProps = {
 };
 
 export function PhysicochemicalPropertyPage({ workspaceEnabled = false }: PhysicochemicalPropertyPageProps) {
+  const t = useLang().t(STRINGS);
+  useDocumentMeta({ title: `${t.title} — VenusFactory2`, description: t.subtitle });
   const [meta, setMeta] = useState<QuickToolsMeta>(DEFAULT_META);
   const [task, setTask] = useState(DEFAULT_META.protein_properties_function[0]);
   const [chainId, setChainId] = useState("A");
@@ -48,7 +86,7 @@ export function PhysicochemicalPropertyPage({ workspaceEnabled = false }: Physic
   const [enableAi, setEnableAi] = useState(false);
   const [llmProvider, setLlmProvider] = useState(DEFAULT_META.llm_models[0]);
   const [progress, setProgress] = useState(0);
-  const [progressMessage, setProgressMessage] = useState("Idle");
+  const [progressMessage, setProgressMessage] = useState("");
 
   useEffect(() => {
     void (async () => {
@@ -114,7 +152,7 @@ export function PhysicochemicalPropertyPage({ workspaceEnabled = false }: Physic
         setPasteSequence("");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed.");
+      setError(err instanceof Error ? err.message : t.uploadFailed);
     }
   }
 
@@ -131,7 +169,7 @@ export function PhysicochemicalPropertyPage({ workspaceEnabled = false }: Physic
         setPasteSequence("");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load example.");
+      setError(err instanceof Error ? err.message : t.loadExampleFailed);
     }
   }
 
@@ -141,11 +179,11 @@ export function PhysicochemicalPropertyPage({ workspaceEnabled = false }: Physic
     }
 
     if (task.includes("(PDB only)")) {
-      throw new Error("Please upload a PDB file for this task.");
+      throw new Error(t.pleaseUploadPdb);
     }
 
     if (!pasteSequence.trim()) {
-      throw new Error("Please upload a file or paste sequence.");
+      throw new Error(t.pleaseUploadOrPaste);
     }
 
     const uploaded = await uploadSequenceAsFasta(pasteSequence);
@@ -156,10 +194,10 @@ export function PhysicochemicalPropertyPage({ workspaceEnabled = false }: Physic
 
   function validateInput(suffix: string) {
     if (task.includes("(PDB only)") && suffix !== ".pdb") {
-      throw new Error("Current task requires .pdb file.");
+      throw new Error(t.pdbRequiredError);
     }
     if (!task.includes("(PDB only)") && suffix === ".pdb") {
-      throw new Error("Physical and chemical properties expects FASTA input.");
+      throw new Error(t.fastaRequiredError);
     }
   }
 
@@ -168,7 +206,7 @@ export function PhysicochemicalPropertyPage({ workspaceEnabled = false }: Physic
     setAiSummary("");
     setRunning(true);
     setProgress(0);
-    setProgressMessage("Preparing task...");
+    setProgressMessage(t.preparingTask);
     try {
       const { filePath, suffix } = await resolveInputFile();
       validateInput(suffix);
@@ -182,7 +220,7 @@ export function PhysicochemicalPropertyPage({ workspaceEnabled = false }: Physic
       });
       setResultPayload(payload);
       setProgress(1);
-      setProgressMessage("Prediction completed");
+      setProgressMessage(t.predictionDone);
       if (enableAi) {
         const ai = await requestQuickToolAiSummary({
           tool: "properties",
@@ -194,7 +232,7 @@ export function PhysicochemicalPropertyPage({ workspaceEnabled = false }: Physic
         setAiSummary(ai.summary);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Run failed.");
+      setError(err instanceof Error ? err.message : t.runFailed);
     } finally {
       setRunning(false);
     }
@@ -202,17 +240,17 @@ export function PhysicochemicalPropertyPage({ workspaceEnabled = false }: Physic
 
   return (
     <QuickToolsLayout
-      title="Physicochemical Property"
-      subtitle="Calculate protein properties from FASTA or PDB inputs."
+      title={t.title}
+      subtitle={t.subtitle}
       running={running}
       progress={progress}
-      progressMessage={progressMessage}
+      progressMessage={progressMessage || t.idle}
       left={
         <>
           <section className="custom-section-card">
-            <h3>Task Configuration</h3>
+            <h3>{t.taskConfig}</h3>
             <label className="left-controls">
-              Select Properties of Protein
+              {t.selectProperties}
               <select value={task} onChange={(e) => setTask(e.target.value)}>
                 {meta.protein_properties_function.map((item) => (
                   <option key={item} value={item}>
@@ -223,7 +261,7 @@ export function PhysicochemicalPropertyPage({ workspaceEnabled = false }: Physic
             </label>
             {requiresPdb && uploadedSuffix === ".pdb" && (
               <label className="left-controls">
-                PDB Chain
+                {t.pdbChain}
                 <select value={chainId} onChange={(e) => setChainId(e.target.value)}>
                   {chainOptions.map((chain) => (
                     <option key={chain} value={chain}>
@@ -236,33 +274,33 @@ export function PhysicochemicalPropertyPage({ workspaceEnabled = false }: Physic
           </section>
 
           <section className="custom-section-card">
-            <h3>Data Input</h3>
+            <h3>{t.dataInput}</h3>
             <label className="left-controls">
-              Paste Sequence
+              {t.pasteSequence}
               <textarea
                 rows={6}
                 value={pasteSequence}
                 onChange={(e) => setPasteSequence(e.target.value)}
-                placeholder="Paste FASTA content with >header for non-PDB tasks..."
+                placeholder={t.pasteSeqPlaceholderPdb}
                 disabled={task.includes("(PDB only)")}
               />
             </label>
             {meta.online_limit_enabled && !task.includes("(PDB only)") && (
               <p className="quick-ai-note">
-                Online mode supports up to {meta.online_fasta_limit ?? 50} FASTA sequences per run.
+                {t.onlineFastaLimit(meta.online_fasta_limit ?? 50)}
               </p>
             )}
             <div className="custom-file-example-row upload-source-stack">
               <div className="file-source-inline">
                 <label className="left-controls custom-file-picker-field">
-                  Select File
+                  {t.selectFile}
                   <input type="file" accept=".fasta,.fa,.pdb" onChange={(e) => void onUpload(e.target.files?.[0] || null)} />
                 </label>
                 <WorkspaceFilePicker
                   workspaceEnabled={workspaceEnabled}
                   disabled={running}
                   acceptedCategories={task.includes("(PDB only)") ? ["structure"] : ["sequence"]}
-                  buttonLabel="From Workspace"
+                  buttonLabel={t.fromWorkspace}
                   onPick={(picked) => {
                     const selected = picked[0];
                     if (!selected) return;
@@ -273,29 +311,25 @@ export function PhysicochemicalPropertyPage({ workspaceEnabled = false }: Physic
                 />
               </div>
               <button type="button" className="custom-btn-secondary" onClick={() => void onUseExample()}>
-                {task.includes("(PDB only)") ? "Use Example PDB" : "Use Example FASTA"}
+                {task.includes("(PDB only)") ? t.useExamplePdb : t.useExampleFasta}
               </button>
             </div>
-            {uploadedPath && <div className="report-preview">Uploaded: {uploadedPath}</div>}
+            {uploadedPath && <div className="report-preview">{t.uploaded} {uploadedPath}</div>}
           </section>
 
           <section className="custom-section-card quick-ai-section">
-            <h3>AI Expert (Optional)</h3>
+            <h3>{t.aiExpert}</h3>
             <label className="quick-ai-toggle">
               <input type="checkbox" checked={enableAi} onChange={(e) => setEnableAi(e.target.checked)} />
               <span className="quick-ai-toggle-box" />
-              <span className="quick-ai-toggle-text">Enable AI analysis and expert summary</span>
-              <span className={`quick-ai-pill ${enableAi ? "active" : ""}`}>{enableAi ? "Enabled" : "Disabled"}</span>
+              <span className="quick-ai-toggle-text">{t.enableAi}</span>
+              <span className={`quick-ai-pill ${enableAi ? "active" : ""}`}>{enableAi ? t.enabled : t.disabled}</span>
             </label>
-            <p className="quick-ai-note">
-              {enableAi
-                ? "AI expert interpretation will be generated together with prediction output."
-                : "Turn on to generate an expert summary after prediction finishes."}
-            </p>
+            <p className="quick-ai-note">{enableAi ? t.aiOn : t.aiOff}</p>
             {enableAi && (
               <div className="quick-ai-fields">
                 <label className="left-controls">
-                  LLM Provider
+                  {t.llmProvider}
                   <select value={llmProvider} onChange={(e) => setLlmProvider(e.target.value)}>
                     {meta.llm_models.map((item) => (
                       <option key={item} value={item}>
@@ -309,13 +343,13 @@ export function PhysicochemicalPropertyPage({ workspaceEnabled = false }: Physic
           </section>
 
           <button type="button" className="custom-btn-primary" onClick={() => void onRun()} disabled={running}>
-            {running ? "Running..." : "Start Prediction"}
+            {running ? t.runningBtn : t.startPrediction}
           </button>
         </>
       }
       right={
         <QuickToolResultPanel
-          title="Physicochemical Property Result"
+          title={t.resultTitle}
           resultPayload={resultPayload}
           aiSummary={aiSummary}
           error={error}

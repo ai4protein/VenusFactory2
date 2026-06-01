@@ -13,6 +13,32 @@ import {
 import { QuickToolsLayout } from "./QuickToolsLayout";
 import { QuickToolResultPanel } from "./QuickToolResultPanel";
 import { WorkspaceFilePicker } from "../../components/WorkspaceFilePicker";
+import { useLang } from "../../lib/i18n";
+import { useDocumentMeta } from "../../lib/useDocumentMeta";
+import { COMMON_STRINGS } from "../../lib/commonStrings";
+
+const STRINGS = {
+  en: {
+    ...COMMON_STRINGS.en,
+    title: "Protein Function",
+    subtitle: "Predict protein-level function from FASTA sequences.",
+    selectTask: "Select Task",
+    pasteFasta: "Paste FASTA/sequence",
+    onlineFastaLimit: (n: number) => `Online mode supports up to ${n} FASTA sequences per run.`,
+    pleaseProvideFasta: "Please upload a FASTA file or paste sequence.",
+    resultTitle: "Protein Function Result"
+  },
+  zh: {
+    ...COMMON_STRINGS.zh,
+    title: "蛋白质功能",
+    subtitle: "基于 FASTA 序列预测蛋白质层级的功能。",
+    selectTask: "选择任务",
+    pasteFasta: "粘贴 FASTA / 序列",
+    onlineFastaLimit: (n: number) => `在线模式每次运行最多支持 ${n} 条 FASTA 序列。`,
+    pleaseProvideFasta: "请上传 FASTA 文件或粘贴序列。",
+    resultTitle: "蛋白质功能预测结果"
+  }
+};
 
 const DEFAULT_META: QuickToolsMeta = {
   dataset_mapping_zero_shot: [],
@@ -28,6 +54,8 @@ type ProteinFunctionPageProps = {
 };
 
 export function ProteinFunctionPage({ workspaceEnabled = false }: ProteinFunctionPageProps) {
+  const t = useLang().t(STRINGS);
+  useDocumentMeta({ title: `${t.title} — VenusFactory2`, description: t.subtitle });
   const [meta, setMeta] = useState<QuickToolsMeta>(DEFAULT_META);
   const [task, setTask] = useState(DEFAULT_META.dataset_mapping_function[0]);
   const [sequence, setSequence] = useState("");
@@ -39,7 +67,7 @@ export function ProteinFunctionPage({ workspaceEnabled = false }: ProteinFunctio
   const [enableAi, setEnableAi] = useState(false);
   const [llmProvider, setLlmProvider] = useState(DEFAULT_META.llm_models[0]);
   const [progress, setProgress] = useState(0);
-  const [progressMessage, setProgressMessage] = useState("Idle");
+  const [progressMessage, setProgressMessage] = useState("");
   useEffect(() => {
     void (async () => {
       const loaded = await fetchQuickToolsMeta();
@@ -59,7 +87,7 @@ export function ProteinFunctionPage({ workspaceEnabled = false }: ProteinFunctio
       const content = await file.text();
       setSequence(normalizePastedFastaForDisplay(content));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed.");
+      setError(err instanceof Error ? err.message : t.uploadFailed);
     }
   }
 
@@ -70,7 +98,7 @@ export function ProteinFunctionPage({ workspaceEnabled = false }: ProteinFunctio
       setUploadedPath(data.file_path);
       setSequence(data.content || "");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load example.");
+      setError(err instanceof Error ? err.message : t.loadExampleFailed);
     }
   }
 
@@ -81,7 +109,7 @@ export function ProteinFunctionPage({ workspaceEnabled = false }: ProteinFunctio
       setUploadedPath(uploaded.file_path);
       return uploaded.file_path;
     }
-    throw new Error("Please upload a FASTA file or paste sequence.");
+    throw new Error(t.pleaseProvideFasta);
   }
 
   async function onRun() {
@@ -89,7 +117,7 @@ export function ProteinFunctionPage({ workspaceEnabled = false }: ProteinFunctio
     setAiSummary("");
     setRunning(true);
     setProgress(0);
-    setProgressMessage("Preparing task...");
+    setProgressMessage(t.preparingTask);
     try {
       const fastaPath = await resolveFastaFile();
       const payload = await runProteinFunctionToolStream({ fastaFile: fastaPath, task }, (evt) => {
@@ -98,7 +126,7 @@ export function ProteinFunctionPage({ workspaceEnabled = false }: ProteinFunctio
       });
       setResultPayload(payload);
       setProgress(1);
-      setProgressMessage("Prediction completed");
+      setProgressMessage(t.predictionDone);
       if (enableAi) {
         const ai = await requestQuickToolAiSummary({
           tool: "function",
@@ -110,7 +138,7 @@ export function ProteinFunctionPage({ workspaceEnabled = false }: ProteinFunctio
         setAiSummary(ai.summary);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Run failed.");
+      setError(err instanceof Error ? err.message : t.runFailed);
     } finally {
       setRunning(false);
     }
@@ -118,17 +146,17 @@ export function ProteinFunctionPage({ workspaceEnabled = false }: ProteinFunctio
 
   return (
     <QuickToolsLayout
-      title="Protein Function"
-      subtitle="Predict protein-level function from FASTA sequences."
+      title={t.title}
+      subtitle={t.subtitle}
       running={running}
       progress={progress}
-      progressMessage={progressMessage}
+      progressMessage={progressMessage || t.idle}
       left={
         <>
           <section className="custom-section-card">
-            <h3>Task Configuration</h3>
+            <h3>{t.taskConfig}</h3>
             <label className="left-controls">
-              Select Task
+              {t.selectTask}
               <select value={task} onChange={(e) => setTask(e.target.value)}>
                 {meta.dataset_mapping_function.map((item) => (
                   <option key={item} value={item}>
@@ -140,32 +168,32 @@ export function ProteinFunctionPage({ workspaceEnabled = false }: ProteinFunctio
           </section>
 
           <section className="custom-section-card">
-            <h3>Data Input</h3>
+            <h3>{t.dataInput}</h3>
             <label className="left-controls">
-              Paste FASTA/sequence
+              {t.pasteFasta}
               <textarea
                 rows={7}
                 value={sequence}
                 onChange={(e) => setSequence(e.target.value)}
-                placeholder="Paste FASTA content (must include >header)..."
+                placeholder={t.pasteSeqPlaceholder}
               />
             </label>
             {meta.online_limit_enabled && (
               <p className="quick-ai-note">
-                Online mode supports up to {meta.online_fasta_limit ?? 50} FASTA sequences per run.
+                {t.onlineFastaLimit(meta.online_fasta_limit ?? 50)}
               </p>
             )}
             <div className="custom-file-example-row upload-source-stack">
               <div className="file-source-inline">
                 <label className="left-controls custom-file-picker-field">
-                  Select File
+                  {t.selectFile}
                   <input type="file" accept=".fasta,.fa" onChange={(e) => void onUpload(e.target.files?.[0] || null)} />
                 </label>
                 <WorkspaceFilePicker
                   workspaceEnabled={workspaceEnabled}
                   disabled={running}
                   acceptedCategories={["sequence"]}
-                  buttonLabel="From Workspace"
+                  buttonLabel={t.fromWorkspace}
                   onPick={(picked) => {
                     const selected = picked[0];
                     if (!selected) return;
@@ -175,29 +203,25 @@ export function ProteinFunctionPage({ workspaceEnabled = false }: ProteinFunctio
                 />
               </div>
               <button type="button" className="custom-btn-secondary" onClick={() => void onUseExample()}>
-                Use Example FASTA
+                {t.useExampleFasta}
               </button>
             </div>
-            {uploadedPath && <div className="report-preview">Uploaded: {uploadedPath}</div>}
+            {uploadedPath && <div className="report-preview">{t.uploaded} {uploadedPath}</div>}
           </section>
 
           <section className="custom-section-card quick-ai-section">
-            <h3>AI Expert (Optional)</h3>
+            <h3>{t.aiExpert}</h3>
             <label className="quick-ai-toggle">
               <input type="checkbox" checked={enableAi} onChange={(e) => setEnableAi(e.target.checked)} />
               <span className="quick-ai-toggle-box" />
-              <span className="quick-ai-toggle-text">Enable AI analysis and expert summary</span>
-              <span className={`quick-ai-pill ${enableAi ? "active" : ""}`}>{enableAi ? "Enabled" : "Disabled"}</span>
+              <span className="quick-ai-toggle-text">{t.enableAi}</span>
+              <span className={`quick-ai-pill ${enableAi ? "active" : ""}`}>{enableAi ? t.enabled : t.disabled}</span>
             </label>
-            <p className="quick-ai-note">
-              {enableAi
-                ? "AI expert interpretation will be generated together with prediction output."
-                : "Turn on to generate an expert summary after prediction finishes."}
-            </p>
+            <p className="quick-ai-note">{enableAi ? t.aiOn : t.aiOff}</p>
             {enableAi && (
               <div className="quick-ai-fields">
                 <label className="left-controls">
-                  LLM Provider
+                  {t.llmProvider}
                   <select value={llmProvider} onChange={(e) => setLlmProvider(e.target.value)}>
                     {meta.llm_models.map((item) => (
                       <option key={item} value={item}>
@@ -211,13 +235,13 @@ export function ProteinFunctionPage({ workspaceEnabled = false }: ProteinFunctio
           </section>
 
           <button type="button" className="custom-btn-primary" onClick={() => void onRun()} disabled={running}>
-            {running ? "Running..." : "Start Prediction"}
+            {running ? t.runningBtn : t.startPrediction}
           </button>
         </>
       }
       right={
         <QuickToolResultPanel
-          title="Protein Function Result"
+          title={t.resultTitle}
           resultPayload={resultPayload}
           aiSummary={aiSummary}
           error={error}

@@ -7,6 +7,52 @@ import {
 import { AdvancedToolsLayout } from "./AdvancedToolsLayout";
 import { AdvancedResultPanel } from "./AdvancedResultPanel";
 import { WorkspaceFilePicker } from "../../components/WorkspaceFilePicker";
+import { useLang } from "../../lib/i18n";
+import { useDocumentMeta } from "../../lib/useDocumentMeta";
+import { COMMON_STRINGS } from "../../lib/commonStrings";
+
+const STRINGS = {
+  en: {
+    ...COMMON_STRINGS.en,
+    title: "Protein Discovery (VenusMine)",
+    subtitle: "Search and cluster structural homologs with FoldSeek and MMseqs.",
+    readonlyBanner: "Online mode: protein discovery controls are view-only in this deployment.",
+    pdbInputSection: "PDB Input",
+    useExamplePdb: "Use Example PDB",
+    advancedParamsSection: "Advanced Parameters",
+    protectStart: "Protected Region Start",
+    protectEnd: "Protected Region End",
+    mmseqsThreads: "MMseqs Threads",
+    mmseqsIterations: "MMseqs Iterations",
+    mmseqsMaxSeqs: "MMseqs Max Sequences",
+    clusterMinSeqId: "Cluster Min Seq Identity",
+    clusterThreads: "Cluster Threads",
+    topNThreshold: "Tree Top-N Threshold",
+    evalueThreshold: "E-value Threshold",
+    startBtn: "Start VenusMine Discovery",
+    resultTitle: "Protein Discovery Result"
+  },
+  zh: {
+    ...COMMON_STRINGS.zh,
+    title: "蛋白挖掘（VenusMine）",
+    subtitle: "使用 FoldSeek 和 MMseqs 搜索并聚类结构同源蛋白。",
+    readonlyBanner: "在线模式：当前部署下蛋白挖掘参数仅供查看。",
+    pdbInputSection: "PDB 输入",
+    useExamplePdb: "使用示例 PDB",
+    advancedParamsSection: "高级参数",
+    protectStart: "保护区起始位点",
+    protectEnd: "保护区结束位点",
+    mmseqsThreads: "MMseqs 线程数",
+    mmseqsIterations: "MMseqs 迭代次数",
+    mmseqsMaxSeqs: "MMseqs 最大序列数",
+    clusterMinSeqId: "聚类最低序列一致性",
+    clusterThreads: "聚类线程数",
+    topNThreshold: "进化树 Top-N 阈值",
+    evalueThreshold: "E-value 阈值",
+    startBtn: "开始 VenusMine 挖掘",
+    resultTitle: "蛋白挖掘结果"
+  }
+};
 
 type AdvancedProteinDiscoveryPageProps = {
   readonly?: boolean;
@@ -14,6 +60,8 @@ type AdvancedProteinDiscoveryPageProps = {
 };
 
 export function AdvancedProteinDiscoveryPage({ readonly = false, workspaceEnabled = false }: AdvancedProteinDiscoveryPageProps) {
+  const t = useLang().t(STRINGS);
+  useDocumentMeta({ title: `${t.title} — VenusFactory2`, description: t.subtitle });
   const [uploadedPath, setUploadedPath] = useState("");
   const [protectStart, setProtectStart] = useState(1);
   const [protectEnd, setProtectEnd] = useState(100);
@@ -29,7 +77,7 @@ export function AdvancedProteinDiscoveryPage({ readonly = false, workspaceEnable
   const [error, setError] = useState("");
   const [resultPayload, setResultPayload] = useState<Record<string, unknown> | null>(null);
   const [progress, setProgress] = useState(0);
-  const [progressMessage, setProgressMessage] = useState("Idle");
+  const [progressMessage, setProgressMessage] = useState("");
 
   async function onUpload(file: File | null) {
     if (!file) return;
@@ -38,14 +86,14 @@ export function AdvancedProteinDiscoveryPage({ readonly = false, workspaceEnable
       const data = await uploadAdvancedToolFile(file);
       setUploadedPath(data.file_path);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed.");
+      setError(err instanceof Error ? err.message : t.uploadFailed);
     }
   }
 
   async function onRun() {
     setError("");
     setProgress(0);
-    setProgressMessage("Preparing task...");
+    setProgressMessage(t.preparingTask);
     setRunning(true);
     try {
       const payload = await runAdvancedProteinDiscoveryStream({
@@ -65,9 +113,9 @@ export function AdvancedProteinDiscoveryPage({ readonly = false, workspaceEnable
       });
       setResultPayload(payload);
       setProgress(1);
-      setProgressMessage("Prediction completed");
+      setProgressMessage(t.predictionDone);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Run failed.");
+      setError(err instanceof Error ? err.message : t.runFailed);
     } finally {
       setRunning(false);
     }
@@ -79,38 +127,38 @@ export function AdvancedProteinDiscoveryPage({ readonly = false, workspaceEnable
       const data = await loadAdvancedDefaultExample("pdb");
       setUploadedPath(data.file_path);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load example.");
+      setError(err instanceof Error ? err.message : t.loadExampleFailed);
     }
   }
 
   return (
     <AdvancedToolsLayout
-      title="Protein Discovery (VenusMine)"
-      subtitle="Search and cluster structural homologs with FoldSeek and MMseqs."
+      title={t.title}
+      subtitle={t.subtitle}
       running={running}
       progress={progress}
-      progressMessage={progressMessage}
+      progressMessage={progressMessage || t.idle}
       left={
         <div className={`advanced-discovery-form ${readonly ? "readonly-mode" : ""}`}>
           {readonly && (
             <div className="readonly-banner" role="status" aria-live="polite">
-              Online mode: protein discovery controls are view-only in this deployment.
+              {t.readonlyBanner}
             </div>
           )}
           <fieldset className="readonly-fieldset advanced-discovery-fieldset" disabled={readonly}>
             <section className="custom-section-card">
-              <h3>PDB Input</h3>
+              <h3>{t.pdbInputSection}</h3>
               <div className="custom-file-example-row upload-source-stack">
                 <div className="file-source-inline">
                   <label className="left-controls custom-file-picker-field">
-                    Select File
+                    {t.selectFile}
                     <input type="file" accept=".pdb" onChange={(e) => void onUpload(e.target.files?.[0] || null)} />
                   </label>
                   <WorkspaceFilePicker
                     workspaceEnabled={workspaceEnabled}
                     disabled={running || readonly}
                     acceptedCategories={["structure"]}
-                    buttonLabel="From Workspace"
+                    buttonLabel={t.fromWorkspace}
                     onPick={(picked) => {
                       const selected = picked[0];
                       if (!selected) return;
@@ -119,28 +167,28 @@ export function AdvancedProteinDiscoveryPage({ readonly = false, workspaceEnable
                   />
                 </div>
                 <button type="button" className="custom-btn-secondary" onClick={() => void onUseExample()}>
-                  Use Example PDB
+                  {t.useExamplePdb}
                 </button>
               </div>
-              {uploadedPath && <div className="report-preview">Uploaded: {uploadedPath}</div>}
+              {uploadedPath && <div className="report-preview">{t.uploaded} {uploadedPath}</div>}
             </section>
 
             <section className="custom-section-card">
-              <h3>Advanced Parameters</h3>
+              <h3>{t.advancedParamsSection}</h3>
               <label className="left-controls">
-                Protected Region Start
+                {t.protectStart}
                 <input type="number" value={protectStart} onChange={(e) => setProtectStart(Number(e.target.value) || 1)} />
               </label>
               <label className="left-controls">
-                Protected Region End
+                {t.protectEnd}
                 <input type="number" value={protectEnd} onChange={(e) => setProtectEnd(Number(e.target.value) || 100)} />
               </label>
               <label className="left-controls">
-                MMseqs Threads
+                {t.mmseqsThreads}
                 <input type="number" value={mmseqsThreads} onChange={(e) => setMmseqsThreads(Number(e.target.value) || 1)} />
               </label>
               <label className="left-controls">
-                MMseqs Iterations
+                {t.mmseqsIterations}
                 <input
                   type="number"
                   value={mmseqsIterations}
@@ -148,11 +196,11 @@ export function AdvancedProteinDiscoveryPage({ readonly = false, workspaceEnable
                 />
               </label>
               <label className="left-controls">
-                MMseqs Max Sequences
+                {t.mmseqsMaxSeqs}
                 <input type="number" value={mmseqsMaxSeqs} onChange={(e) => setMmseqsMaxSeqs(Number(e.target.value) || 1)} />
               </label>
               <label className="left-controls">
-                Cluster Min Seq Identity
+                {t.clusterMinSeqId}
                 <input
                   type="number"
                   step="0.01"
@@ -161,15 +209,15 @@ export function AdvancedProteinDiscoveryPage({ readonly = false, workspaceEnable
                 />
               </label>
               <label className="left-controls">
-                Cluster Threads
+                {t.clusterThreads}
                 <input type="number" value={clusterThreads} onChange={(e) => setClusterThreads(Number(e.target.value) || 1)} />
               </label>
               <label className="left-controls">
-                Tree Top-N Threshold
+                {t.topNThreshold}
                 <input type="number" value={topNThreshold} onChange={(e) => setTopNThreshold(Number(e.target.value) || 10)} />
               </label>
               <label className="left-controls">
-                E-value Threshold
+                {t.evalueThreshold}
                 <input
                   type="number"
                   step="0.000001"
@@ -180,14 +228,14 @@ export function AdvancedProteinDiscoveryPage({ readonly = false, workspaceEnable
             </section>
 
             <button type="button" className="custom-btn-primary advanced-discovery-submit" onClick={() => void onRun()} disabled={running}>
-              {running ? "Running..." : "Start VenusMine Discovery"}
+              {running ? t.runningBtn : t.startBtn}
             </button>
           </fieldset>
         </div>
       }
       right={
         <AdvancedResultPanel
-          title="Protein Discovery Result"
+          title={t.resultTitle}
           resultPayload={resultPayload}
           aiSummary=""
           error={error}

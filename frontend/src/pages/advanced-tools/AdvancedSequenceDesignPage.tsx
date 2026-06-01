@@ -10,6 +10,124 @@ import {
 import { AdvancedToolsLayout } from "./AdvancedToolsLayout";
 import { AdvancedResultPanel } from "./AdvancedResultPanel";
 import { WorkspaceFilePicker } from "../../components/WorkspaceFilePicker";
+import { useLang } from "../../lib/i18n";
+import { useDocumentMeta } from "../../lib/useDocumentMeta";
+import { COMMON_STRINGS } from "../../lib/commonStrings";
+
+const STRINGS = {
+  en: {
+    ...COMMON_STRINGS.en,
+    title: "Sequence Design (ProteinMPNN)",
+    subtitle: "Configure full ProteinMPNN inference options for structure-conditioned sequence design.",
+    coreSection: "ProteinMPNN Core Design",
+    coreHint:
+      "Choose model family by data type first: Soluble for discovery/design, Vanilla for membrane proteins, CA only when you only have C-alpha coordinates.",
+    modelFamily: "Model Family",
+    modelFamilySoluble: "Soluble (recommended for protein discovery and design)",
+    modelFamilyVanilla: "Vanilla (recommended for membrane proteins)",
+    modelFamilyCa: "CA (only for C-alpha coarse-grained coordinates)",
+    designedChains: "Designed Chains (optional)",
+    designedChainsPlaceholder: "A,B (empty means all chains)",
+    fixedChains: "Fixed Chains",
+    fixedChainsPlaceholder: "e.g. A",
+    temperatures: "Temperatures",
+    temperaturesPlaceholder: "0.1 or 0.1,0.2",
+    numSequences: "Number of sequences",
+    onlineLimitNote: (n: number) => `Online mode supports up to ${n} designed sequences per run.`,
+    fixedResidues: "Fixed Residues (optional)",
+    fixedResiduesPlaceholder: "A12,C13 or A:12,13;B:5-8",
+    enableHomomer: "Enable homomer tying",
+    modelRuntimeSection: "Model and Runtime",
+    modelNameLabel: "Model Name",
+    omitAas: "Omit AAs",
+    modelNoiseHint:
+      "`v_48_020` (0.20A) is the default for most structures (AI-generated backbones, AlphaFold, routine redesign). Use `v_48_002` (0.02A) only for very high-resolution native structures.",
+    seed: "Seed",
+    batchSize: "Batch Size",
+    maxLength: "Max Length",
+    advancedRulesSection: "Optional Advanced Rules",
+    advancedRulesHint: "Use readable text rules. Backend converts them to JSON/JSONL automatically.",
+    tiedPositions: "Tied Positions",
+    tiedPositionsPlaceholder: "A12=B12;A13=B13",
+    omitAaRules: "Omit AA Rules",
+    omitAaRulesPlaceholder: "A12:WY;B5:AP",
+    aaBias: "AA Bias",
+    aaBiasPlaceholder: "A:-1.1,F:0.7",
+    biasByResidue: "Bias By Residue",
+    biasByResiduePlaceholder: "A12:F=1.0|W=-0.3;B5:A=0.2",
+    pssmRules: "PSSM Rules",
+    pssmRulesPlaceholder: "Optional JSON or compact rules",
+    structureInputSection: "Structure Input",
+    selectPdbFile: "Select PDB File",
+    useExamplePdb: "Use Example PDB",
+    selected: "Selected:",
+    startBtn: "Start Sequence Design",
+    resetDefaults: "Reset to Defaults",
+    pdbRequired: "ProteinMPNN Sequence Design requires .pdb input.",
+    pleaseUploadPdb: "Please upload a PDB file first.",
+    tempsRequired: "Temperatures must include at least one numeric value.",
+    onlineLimitExceeded: (n: number) => `Online mode supports up to ${n} designed sequences per run.`,
+    preparingTask: "Preparing ProteinMPNN task...",
+    mpnnDone: "ProteinMPNN design completed",
+    resultTitle: "ProteinMPNN Sequence Design Result"
+  },
+  zh: {
+    ...COMMON_STRINGS.zh,
+    title: "序列设计（ProteinMPNN）",
+    subtitle: "配置完整的 ProteinMPNN 推理参数，进行基于结构的序列设计。",
+    coreSection: "ProteinMPNN 核心设计",
+    coreHint:
+      "请先根据数据类型选择模型族：Soluble 适用于蛋白挖掘与设计，Vanilla 适用于膜蛋白，CA 仅在仅有 Cα 坐标时使用。",
+    modelFamily: "模型族",
+    modelFamilySoluble: "Soluble（推荐用于蛋白挖掘与设计）",
+    modelFamilyVanilla: "Vanilla（推荐用于膜蛋白）",
+    modelFamilyCa: "CA（仅适用于 Cα 粗粒度坐标）",
+    designedChains: "设计链（可选）",
+    designedChainsPlaceholder: "A,B（留空表示所有链）",
+    fixedChains: "固定链",
+    fixedChainsPlaceholder: "例如 A",
+    temperatures: "温度",
+    temperaturesPlaceholder: "0.1 或 0.1,0.2",
+    numSequences: "生成序列数",
+    onlineLimitNote: (n: number) => `在线模式每次运行最多支持 ${n} 条设计序列。`,
+    fixedResidues: "固定残基（可选）",
+    fixedResiduesPlaceholder: "A12,C13 或 A:12,13;B:5-8",
+    enableHomomer: "启用同源寡聚体绑定",
+    modelRuntimeSection: "模型与运行参数",
+    modelNameLabel: "模型名称",
+    omitAas: "排除的氨基酸",
+    modelNoiseHint:
+      "`v_48_020`（0.20Å）适用于多数结构（AI 生成骨架、AlphaFold、常规重设计）的默认选择。`v_48_002`（0.02Å）仅推荐用于高分辨率天然结构。",
+    seed: "随机种子",
+    batchSize: "批大小",
+    maxLength: "最大长度",
+    advancedRulesSection: "高级规则（可选）",
+    advancedRulesHint: "使用可读的文本规则，后端会自动转换为 JSON/JSONL。",
+    tiedPositions: "绑定位点",
+    tiedPositionsPlaceholder: "A12=B12;A13=B13",
+    omitAaRules: "排除氨基酸规则",
+    omitAaRulesPlaceholder: "A12:WY;B5:AP",
+    aaBias: "氨基酸偏置",
+    aaBiasPlaceholder: "A:-1.1,F:0.7",
+    biasByResidue: "按残基偏置",
+    biasByResiduePlaceholder: "A12:F=1.0|W=-0.3;B5:A=0.2",
+    pssmRules: "PSSM 规则",
+    pssmRulesPlaceholder: "可选的 JSON 或紧凑规则",
+    structureInputSection: "结构输入",
+    selectPdbFile: "选择 PDB 文件",
+    useExamplePdb: "使用示例 PDB",
+    selected: "已选择：",
+    startBtn: "开始序列设计",
+    resetDefaults: "恢复默认设置",
+    pdbRequired: "ProteinMPNN 序列设计需要 .pdb 输入。",
+    pleaseUploadPdb: "请先上传 PDB 文件。",
+    tempsRequired: "温度必须至少包含一个数值。",
+    onlineLimitExceeded: (n: number) => `在线模式每次运行最多支持 ${n} 条设计序列。`,
+    preparingTask: "正在准备 ProteinMPNN 任务…",
+    mpnnDone: "ProteinMPNN 序列设计完成",
+    resultTitle: "ProteinMPNN 序列设计结果"
+  }
+};
 
 type ModelFamily = "soluble" | "vanilla" | "ca";
 const DEFAULT_MPNN_OPTIONS: Required<AdvancedToolsMeta>["proteinmpnn_model_options"] = {
@@ -43,6 +161,8 @@ type AdvancedSequenceDesignPageProps = {
 };
 
 export function AdvancedSequenceDesignPage({ workspaceEnabled }: AdvancedSequenceDesignPageProps) {
+  const t = useLang().t(STRINGS);
+  useDocumentMeta({ title: `${t.title} — VenusFactory2`, description: t.subtitle });
   const [toolsMeta, setToolsMeta] = useState<AdvancedToolsMeta | null>(null);
   const [modelOptionsByFamily, setModelOptionsByFamily] = useState(DEFAULT_MPNN_OPTIONS);
   const [uploadedPath, setUploadedPath] = useState("");
@@ -73,7 +193,7 @@ export function AdvancedSequenceDesignPage({ workspaceEnabled }: AdvancedSequenc
   const [error, setError] = useState("");
   const [resultPayload, setResultPayload] = useState<Record<string, unknown> | null>(null);
   const [progress, setProgress] = useState(0);
-  const [progressMessage, setProgressMessage] = useState("Idle");
+  const [progressMessage, setProgressMessage] = useState("");
   const onlineSequenceDesignLimit =
     toolsMeta?.online_limit_enabled ? Math.max(1, toolsMeta.online_sequence_design_limit ?? 50) : 512;
 
@@ -148,11 +268,11 @@ export function AdvancedSequenceDesignPage({ workspaceEnabled }: AdvancedSequenc
     try {
       const data = await uploadAdvancedToolFile(file);
       if (data.suffix !== ".pdb") {
-        throw new Error("ProteinMPNN Sequence Design requires .pdb input.");
+        throw new Error(t.pdbRequired);
       }
       setUploadedPath(data.file_path);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed.");
+      setError(err instanceof Error ? err.message : t.uploadFailed);
     }
   }
 
@@ -162,7 +282,7 @@ export function AdvancedSequenceDesignPage({ workspaceEnabled }: AdvancedSequenc
       const data = await loadAdvancedDefaultExample("pdb");
       setUploadedPath(data.file_path);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load example.");
+      setError(err instanceof Error ? err.message : t.loadExampleFailed);
     }
   }
 
@@ -170,12 +290,12 @@ export function AdvancedSequenceDesignPage({ workspaceEnabled }: AdvancedSequenc
     setError("");
     setRunning(true);
     setProgress(0);
-    setProgressMessage("Preparing ProteinMPNN task...");
+    setProgressMessage(t.preparingTask);
     try {
-      if (!uploadedPath) throw new Error("Please upload a PDB file first.");
-      if (parsedTemperatures.length === 0) throw new Error("Temperatures must include at least one numeric value.");
+      if (!uploadedPath) throw new Error(t.pleaseUploadPdb);
+      if (parsedTemperatures.length === 0) throw new Error(t.tempsRequired);
       if (numSequences > onlineSequenceDesignLimit) {
-        throw new Error(`Online mode supports up to ${onlineSequenceDesignLimit} designed sequences per run.`);
+        throw new Error(t.onlineLimitExceeded(onlineSequenceDesignLimit));
       }
 
       const body: AdvancedSequenceDesignRequest = {
@@ -212,9 +332,9 @@ export function AdvancedSequenceDesignPage({ workspaceEnabled }: AdvancedSequenc
       });
       setResultPayload(payload);
       setProgress(1);
-      setProgressMessage("ProteinMPNN design completed");
+      setProgressMessage(t.mpnnDone);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Run failed.");
+      setError(err instanceof Error ? err.message : t.runFailed);
     } finally {
       setRunning(false);
     }
@@ -222,49 +342,46 @@ export function AdvancedSequenceDesignPage({ workspaceEnabled }: AdvancedSequenc
 
   return (
     <AdvancedToolsLayout
-      title="Sequence Design (ProteinMPNN)"
-      subtitle="Configure full ProteinMPNN inference options for structure-conditioned sequence design."
+      title={t.title}
+      subtitle={t.subtitle}
       running={running}
       progress={progress}
-      progressMessage={progressMessage}
+      progressMessage={progressMessage || t.idle}
       left={
         <>
           <section className="custom-section-card">
-            <h3>ProteinMPNN Core Design</h3>
-            <p className="advanced-ai-note">
-              Choose model family by data type first: Soluble for discovery/design, Vanilla for membrane proteins, CA only when
-              you only have C-alpha coordinates.
-            </p>
+            <h3>{t.coreSection}</h3>
+            <p className="advanced-ai-note">{t.coreHint}</p>
             <label className="left-controls">
-              Model Family
+              {t.modelFamily}
               <select value={modelFamily} onChange={(e) => setModelFamily(e.target.value as ModelFamily)}>
-                <option value="soluble">Soluble (recommended for protein discovery and design)</option>
-                <option value="vanilla">Vanilla (recommended for membrane proteins)</option>
-                <option value="ca">CA (only for C-alpha coarse-grained coordinates)</option>
+                <option value="soluble">{t.modelFamilySoluble}</option>
+                <option value="vanilla">{t.modelFamilyVanilla}</option>
+                <option value="ca">{t.modelFamilyCa}</option>
               </select>
             </label>
             <label className="left-controls">
-              Designed Chains (optional)
+              {t.designedChains}
               <input
                 value={designedChainsText}
                 onChange={(e) => setDesignedChainsText(e.target.value)}
-                placeholder="A,B (empty means all chains)"
+                placeholder={t.designedChainsPlaceholder}
               />
             </label>
             <label className="left-controls">
-              Fixed Chains
-              <input value={fixedChainsText} onChange={(e) => setFixedChainsText(e.target.value)} placeholder="e.g. A" />
+              {t.fixedChains}
+              <input value={fixedChainsText} onChange={(e) => setFixedChainsText(e.target.value)} placeholder={t.fixedChainsPlaceholder} />
             </label>
             <label className="left-controls">
-              Temperatures
+              {t.temperatures}
               <input
                 value={temperaturesText}
                 onChange={(e) => setTemperaturesText(e.target.value)}
-                placeholder="0.1 or 0.1,0.2"
+                placeholder={t.temperaturesPlaceholder}
               />
             </label>
             <label className="left-controls">
-              Number of sequences
+              {t.numSequences}
               <input
                 type="number"
                 min={1}
@@ -279,30 +396,30 @@ export function AdvancedSequenceDesignPage({ workspaceEnabled }: AdvancedSequenc
             </label>
             {toolsMeta?.online_limit_enabled && (
               <p className="advanced-ai-note">
-                Online mode supports up to {onlineSequenceDesignLimit} designed sequences per run.
+                {t.onlineLimitNote(onlineSequenceDesignLimit)}
               </p>
             )}
             <label className="left-controls">
-              Fixed Residues (optional)
+              {t.fixedResidues}
               <textarea
                 rows={2}
                 className="advanced-two-line-text"
                 value={fixedResiduesText}
                 onChange={(e) => setFixedResiduesText(e.target.value)}
-                placeholder="A12,C13 or A:12,13;B:5-8"
+                placeholder={t.fixedResiduesPlaceholder}
               />
             </label>
             <label className="quick-ai-toggle advanced-homomer-row">
               <input type="checkbox" checked={homomer} onChange={(e) => setHomomer(e.target.checked)} />
               <span className="quick-ai-toggle-box" />
-              <span className="quick-ai-toggle-text">Enable homomer tying</span>
+              <span className="quick-ai-toggle-text">{t.enableHomomer}</span>
             </label>
           </section>
 
           <section className="custom-section-card">
-            <h3>Model and Runtime</h3>
+            <h3>{t.modelRuntimeSection}</h3>
             <label className="left-controls">
-              Model Name
+              {t.modelNameLabel}
               <select value={modelName} onChange={(e) => setModelName(e.target.value)}>
                 {modelOptions.map((option) => (
                   <option key={option} value={option}>
@@ -312,68 +429,67 @@ export function AdvancedSequenceDesignPage({ workspaceEnabled }: AdvancedSequenc
               </select>
             </label>
             <label className="left-controls">
-              Omit AAs
+              {t.omitAas}
               <input value={omitAas} onChange={(e) => setOmitAas(e.target.value)} placeholder="X" />
             </label>
             <p className="advanced-ai-note">
-              `v_48_020` (0.20A) is the default for most structures (AI-generated backbones, AlphaFold, routine redesign). Use
-              `v_48_002` (0.02A) only for very high-resolution native structures.
+              {t.modelNoiseHint}
             </p>
             <label className="left-controls">
-              Seed
+              {t.seed}
               <input value={seed} onChange={(e) => setSeed(e.target.value)} placeholder="0" />
             </label>
             <label className="left-controls">
-              Batch Size
+              {t.batchSize}
               <input value={batchSize} onChange={(e) => setBatchSize(e.target.value)} placeholder="1" />
             </label>
             <label className="left-controls">
-              Max Length
+              {t.maxLength}
               <input value={maxLength} onChange={(e) => setMaxLength(e.target.value)} placeholder="200000" />
             </label>
           </section>
 
           <section className="custom-section-card">
-            <h3>Optional Advanced Rules</h3>
-            <p className="advanced-ai-note">Use readable text rules. Backend converts them to JSON/JSONL automatically.</p>
+            <h3>{t.advancedRulesSection}</h3>
+            <p className="advanced-ai-note">{t.advancedRulesHint}</p>
             <label className="left-controls">
-              Tied Positions
+              {t.tiedPositions}
               <input
                 value={tiedPositionsText}
                 onChange={(e) => setTiedPositionsText(e.target.value)}
-                placeholder="A12=B12;A13=B13"
+                placeholder={t.tiedPositionsPlaceholder}
               />
             </label>
             <label className="left-controls">
-              Omit AA Rules
+              {t.omitAaRules}
               <input
                 value={omitAaRulesText}
                 onChange={(e) => setOmitAaRulesText(e.target.value)}
-                placeholder="A12:WY;B5:AP"
+                placeholder={t.omitAaRulesPlaceholder}
               />
             </label>
             <label className="left-controls">
-              AA Bias
+              {t.aaBias}
               <input
                 value={aaBiasText}
                 onChange={(e) => setAaBiasText(e.target.value)}
-                placeholder="A:-1.1,F:0.7"
+                placeholder={t.aaBiasPlaceholder}
               />
             </label>
             <label className="left-controls">
-              Bias By Residue
+              {t.biasByResidue}
               <input
                 value={biasByResidueText}
                 onChange={(e) => setBiasByResidueText(e.target.value)}
-                placeholder="A12:F=1.0|W=-0.3;B5:A=0.2"
+                placeholder={t.biasByResiduePlaceholder}
               />
             </label>
             <label className="left-controls">
-              PSSM Rules
+              {t.pssmRules}
               <input
                 value={pssmRulesText}
                 onChange={(e) => setPssmRulesText(e.target.value)}
-                placeholder="Optional JSON or compact rules"
+                placeholder={t.pssmRulesPlaceholder}
               />
             </label>
             <label className="left-controls">
@@ -395,18 +511,18 @@ export function AdvancedSequenceDesignPage({ workspaceEnabled }: AdvancedSequenc
           </section>
 
           <section className="custom-section-card">
-            <h3>Structure Input</h3>
+            <h3>{t.structureInputSection}</h3>
             <div className="custom-file-example-row upload-source-stack">
               <div className="file-source-inline">
                 <label className="left-controls custom-file-picker-field">
-                  Select PDB File
+                  {t.selectPdbFile}
                   <input type="file" accept=".pdb" onChange={(e) => void onUpload(e.target.files?.[0] || null)} />
                 </label>
                 <WorkspaceFilePicker
                   workspaceEnabled={workspaceEnabled}
                   disabled={running}
                   acceptedCategories={["structure"]}
-                  buttonLabel="From Workspace"
+                  buttonLabel={t.fromWorkspace}
                   onPick={(picked) => {
                     const selected = picked[0];
                     if (!selected) return;
@@ -415,23 +531,23 @@ export function AdvancedSequenceDesignPage({ workspaceEnabled }: AdvancedSequenc
                 />
               </div>
               <button type="button" className="custom-btn-secondary" onClick={() => void onUseExample()}>
-                Use Example PDB
+                {t.useExamplePdb}
               </button>
             </div>
-            {uploadedPath && <div className="report-preview">Selected: {uploadedPath}</div>}
+            {uploadedPath && <div className="report-preview">{t.selected} {uploadedPath}</div>}
           </section>
 
           <button type="button" className="custom-btn-primary" onClick={() => void onRun()} disabled={running}>
-            {running ? "Running..." : "Start Sequence Design"}
+            {running ? t.runningBtn : t.startBtn}
           </button>
           <button type="button" className="custom-btn-secondary" onClick={resetToDefaults} disabled={running}>
-            Reset to Defaults
+            {t.resetDefaults}
           </button>
         </>
       }
       right={
         <AdvancedResultPanel
-          title="ProteinMPNN Sequence Design Result"
+          title={t.resultTitle}
           resultPayload={resultPayload}
           aiSummary={(resultPayload?.ai_summary as string) || ""}
           error={error}

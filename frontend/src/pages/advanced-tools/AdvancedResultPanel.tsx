@@ -1,5 +1,38 @@
 import { useEffect, useMemo, useState } from "react";
 import { extractAdvancedDownloadPath, getAdvancedDownloadUrl } from "../../lib/advancedToolsApi";
+import { useLang } from "../../lib/i18n";
+
+const STRINGS = {
+  en: {
+    downloadResult: "Download Result",
+    downloadTableCsv: "Download Table CSV",
+    tabSummary: "Summary",
+    tabTable: "Table",
+    tabRaw: "Raw",
+    tabHeatmap: "Heatmap",
+    tabAi: "AI Expert",
+    emptyTable: "No tabular rows available for current result.",
+    rawEmpty: "Raw JSON output will appear here...",
+    heatmapFrameTitle: "Advanced Tools Heatmap",
+    heatmapMissing:
+      "No heatmap artifact found in this result. You can still use Download Result to inspect packaged outputs.",
+    aiEmpty: "Enable AI analysis and run task to generate expert interpretation."
+  },
+  zh: {
+    downloadResult: "下载结果",
+    downloadTableCsv: "下载表格 CSV",
+    tabSummary: "概要",
+    tabTable: "表格",
+    tabRaw: "原始数据",
+    tabHeatmap: "热图",
+    tabAi: "AI 专家",
+    emptyTable: "当前结果暂无可展示的表格数据。",
+    rawEmpty: "原始 JSON 输出将显示在此处……",
+    heatmapFrameTitle: "高级工具热图",
+    heatmapMissing: "当前结果未找到热图文件，您仍可使用“下载结果”查看打包输出。",
+    aiEmpty: "启用 AI 分析并运行任务后，将在此处生成专家解读。"
+  }
+};
 
 type ResultTab = "summary" | "table" | "raw" | "heatmap" | "ai";
 
@@ -33,6 +66,7 @@ function ResultTextBlock({ text, emptyText = "" }: { text: string; emptyText?: s
 }
 
 export function AdvancedResultPanel(props: AdvancedResultPanelProps) {
+  const t = useLang().t(STRINGS);
   const showSummaryTab = props.showSummaryTab !== false;
   const readonly = props.readonly === true;
   const [tab, setTab] = useState<ResultTab>(showSummaryTab ? "summary" : "table");
@@ -91,7 +125,7 @@ export function AdvancedResultPanel(props: AdvancedResultPanelProps) {
               }
               aria-disabled={readonly}
             >
-              Download Result
+              {t.downloadResult}
             </a>
           )}
           <button
@@ -100,7 +134,7 @@ export function AdvancedResultPanel(props: AdvancedResultPanelProps) {
             onClick={onDownloadTableCsv}
             disabled={readonly || tableRecords.length === 0}
           >
-            Download Table CSV
+            {t.downloadTableCsv}
           </button>
         </div>
       </div>
@@ -113,14 +147,14 @@ export function AdvancedResultPanel(props: AdvancedResultPanelProps) {
             onClick={() => setTab("summary")}
             disabled={readonly}
           >
-            Summary
+            {t.tabSummary}
           </button>
         )}
         <button type="button" className={tab === "table" ? "active" : ""} onClick={() => setTab("table")} disabled={readonly}>
-          Table
+          {t.tabTable}
         </button>
         <button type="button" className={tab === "raw" ? "active" : ""} onClick={() => setTab("raw")} disabled={readonly}>
-          Raw
+          {t.tabRaw}
         </button>
         {showHeatmapTab && (
           <button
@@ -129,11 +163,11 @@ export function AdvancedResultPanel(props: AdvancedResultPanelProps) {
             onClick={() => setTab("heatmap")}
             disabled={readonly}
           >
-            Heatmap
+            {t.tabHeatmap}
           </button>
         )}
         <button type="button" className={tab === "ai" ? "active" : ""} onClick={() => setTab("ai")} disabled={readonly}>
-          AI Expert
+          {t.tabAi}
         </button>
       </div>
 
@@ -167,7 +201,7 @@ export function AdvancedResultPanel(props: AdvancedResultPanelProps) {
               </table>
             </div>
           ) : (
-            <div className="quick-tools-v2-empty-note">No tabular rows available for current result.</div>
+            <div className="quick-tools-v2-empty-note">{t.emptyTable}</div>
           )}
         </div>
       )}
@@ -175,7 +209,7 @@ export function AdvancedResultPanel(props: AdvancedResultPanelProps) {
       {tab === "raw" && (
         <ResultTextBlock
           text={props.resultPayload ? toPrettyString(props.resultPayload) : ""}
-          emptyText="Raw JSON output will appear here..."
+          emptyText={t.rawEmpty}
         />
       )}
 
@@ -185,12 +219,12 @@ export function AdvancedResultPanel(props: AdvancedResultPanelProps) {
             <iframe
               className="quick-tools-v2-heatmap-frame"
               src={getAdvancedDownloadUrl(heatmapPath, true)}
-              title="Advanced Tools Heatmap"
+              title={t.heatmapFrameTitle}
             />
           ) : (
             <ResultTextBlock
               text=""
-              emptyText="No heatmap artifact found in this result. You can still use Download Result to inspect packaged outputs."
+              emptyText={t.heatmapMissing}
             />
           )}
         </div>
@@ -199,7 +233,7 @@ export function AdvancedResultPanel(props: AdvancedResultPanelProps) {
       {tab === "ai" && (
         <ResultTextBlock
           text={props.aiSummary || ""}
-          emptyText="Enable AI analysis and run task to generate expert interpretation."
+          emptyText={t.aiEmpty}
         />
       )}
     </div>

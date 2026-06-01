@@ -10,10 +10,80 @@ import {
 import { QuickToolsLayout } from "./QuickToolsLayout";
 import { QuickToolResultPanel } from "./QuickToolResultPanel";
 import { WorkspaceFilePicker } from "../../components/WorkspaceFilePicker";
+import { useLang } from "../../lib/i18n";
+import { useDocumentMeta } from "../../lib/useDocumentMeta";
+import { COMMON_STRINGS } from "../../lib/commonStrings";
 type ModelFamily = "soluble" | "vanilla" | "ca";
 
 const DEFAULT_MODEL_NAME = "v_48_020";
 const DEFAULT_BACKBONE_NOISE = 0.2;
+
+const STRINGS = {
+  en: {
+    ...COMMON_STRINGS.en,
+    title: "Sequence Design",
+    subtitle: "Design protein sequences from a structure with simple, biology-friendly controls.",
+    modelFamily: "Model Family",
+    modelSoluble: "Soluble (recommended for protein discovery and design)",
+    modelVanilla: "Vanilla (recommended for membrane proteins)",
+    modelCa: "CA (only for C-alpha coarse-grained coordinates)",
+    quickModeBefore: "Quick mode uses ",
+    quickModeAfter: (noise: string) => ` by default (backbone_noise ${noise}A).`,
+    designedChains: "Designed Chains (optional)",
+    designedChainsPlaceholder: "A,B (empty means all chains)",
+    fixedResidues: "Fixed Residues (optional)",
+    fixedResiduesPlaceholder: "A12,C13 or A:12,13;B:5-8",
+    numSequences: "Number of sequences",
+    designDiversity: "Design Diversity",
+    diversityLow: "Low (conservative)",
+    diversityMedium: "Medium (balanced)",
+    diversityHigh: "High (exploratory)",
+    onlineLimitNote: (n: number) => `Online mode supports up to ${n} designed sequences per run.`,
+    structureInput: "Structure Input",
+    selectPdb: "Select PDB File",
+    useExamplePdb: "Use Example PDB",
+    selected: "Selected:",
+    startSeqDesign: "Start Sequence Design",
+    preparingSeqDesign: "Preparing sequence design...",
+    seqDesignDone: "Sequence design completed",
+    pdbOnlyError: "Sequence Design only supports PDB structure input.",
+    pleaseUploadPdb: "Please upload or pick a PDB file first.",
+    onlineLimitExceeded: (n: number) => `Online mode supports up to ${n} designed sequences per run.`,
+    resultTitle: "Sequence Design Result"
+  },
+  zh: {
+    ...COMMON_STRINGS.zh,
+    title: "序列设计",
+    subtitle: "基于蛋白结构进行序列设计，提供贴近生物学家习惯的简洁参数。",
+    modelFamily: "模型家族",
+    modelSoluble: "Soluble（推荐用于蛋白挖掘与设计）",
+    modelVanilla: "Vanilla（推荐用于膜蛋白）",
+    modelCa: "CA（仅适用于 C-alpha 粗粒度坐标）",
+    quickModeBefore: "快速模式默认使用 ",
+    quickModeAfter: (noise: string) => `（backbone_noise ${noise}A）。`,
+    designedChains: "待设计链（可选）",
+    designedChainsPlaceholder: "A,B（留空表示所有链）",
+    fixedResidues: "固定残基（可选）",
+    fixedResiduesPlaceholder: "A12,C13 或 A:12,13;B:5-8",
+    numSequences: "生成序列数",
+    designDiversity: "设计多样性",
+    diversityLow: "低（保守）",
+    diversityMedium: "中（平衡）",
+    diversityHigh: "高（探索）",
+    onlineLimitNote: (n: number) => `在线模式每次运行最多支持设计 ${n} 条序列。`,
+    structureInput: "结构输入",
+    selectPdb: "选择 PDB 文件",
+    useExamplePdb: "使用示例 PDB",
+    selected: "已选择：",
+    startSeqDesign: "开始序列设计",
+    preparingSeqDesign: "准备序列设计中…",
+    seqDesignDone: "序列设计完成",
+    pdbOnlyError: "序列设计仅支持 PDB 结构输入。",
+    pleaseUploadPdb: "请先上传或选择一个 PDB 文件。",
+    onlineLimitExceeded: (n: number) => `在线模式每次运行最多支持设计 ${n} 条序列。`,
+    resultTitle: "序列设计结果"
+  }
+};
 
 const DEFAULT_META: QuickToolsMeta = {
   dataset_mapping_zero_shot: [],
@@ -42,6 +112,8 @@ function diversityToTemperatures(level: "low" | "medium" | "high"): number[] {
 }
 
 export function SequenceDesignPage({ workspaceEnabled = false }: SequenceDesignPageProps) {
+  const t = useLang().t(STRINGS);
+  useDocumentMeta({ title: `${t.title} — VenusFactory2`, description: t.subtitle });
   const [meta, setMeta] = useState<QuickToolsMeta>(DEFAULT_META);
   const [uploadedPath, setUploadedPath] = useState("");
   const [designedChainsText, setDesignedChainsText] = useState("");
@@ -56,7 +128,7 @@ export function SequenceDesignPage({ workspaceEnabled = false }: SequenceDesignP
   const [enableAi, setEnableAi] = useState(false);
   const [llmProvider, setLlmProvider] = useState(DEFAULT_META.llm_models[0]);
   const [progress, setProgress] = useState(0);
-  const [progressMessage, setProgressMessage] = useState("Idle");
+  const [progressMessage, setProgressMessage] = useState("");
   const onlineSequenceDesignLimit = meta.online_limit_enabled ? Math.max(1, meta.online_sequence_design_limit ?? 50) : 512;
   const baseSequenceOptions = [4, 8, 16, 32];
   const sequenceOptions = (
@@ -87,11 +159,11 @@ export function SequenceDesignPage({ workspaceEnabled = false }: SequenceDesignP
     try {
       const data = await uploadQuickToolFile(file);
       if (data.suffix !== ".pdb") {
-        throw new Error("Sequence Design only supports PDB structure input.");
+        throw new Error(t.pdbOnlyError);
       }
       setUploadedPath(data.file_path);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed.");
+      setError(err instanceof Error ? err.message : t.uploadFailed);
     }
   }
 
@@ -101,7 +173,7 @@ export function SequenceDesignPage({ workspaceEnabled = false }: SequenceDesignP
       const data = await loadQuickToolDefaultExample("pdb");
       setUploadedPath(data.file_path);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load example.");
+      setError(err instanceof Error ? err.message : t.loadExampleFailed);
     }
   }
 
@@ -110,13 +182,13 @@ export function SequenceDesignPage({ workspaceEnabled = false }: SequenceDesignP
     setAiSummary("");
     setRunning(true);
     setProgress(0);
-    setProgressMessage("Preparing sequence design...");
+    setProgressMessage(t.preparingSeqDesign);
     try {
       if (!uploadedPath) {
-        throw new Error("Please upload or pick a PDB file first.");
+        throw new Error(t.pleaseUploadPdb);
       }
       if (meta.online_limit_enabled && numSequences > onlineSequenceDesignLimit) {
-        throw new Error(`Online mode supports up to ${onlineSequenceDesignLimit} designed sequences per run.`);
+        throw new Error(t.onlineLimitExceeded(onlineSequenceDesignLimit));
       }
       const payload = await runSequenceDesignToolStream(
         {
@@ -138,7 +210,7 @@ export function SequenceDesignPage({ workspaceEnabled = false }: SequenceDesignP
       );
       setResultPayload(payload);
       setProgress(1);
-      setProgressMessage("Sequence design completed");
+      setProgressMessage(t.seqDesignDone);
       if (enableAi) {
         const ai = await requestQuickToolAiSummary({
           tool: "sequence-design",
@@ -150,7 +222,7 @@ export function SequenceDesignPage({ workspaceEnabled = false }: SequenceDesignP
         setAiSummary(ai.summary);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Run failed.");
+      setError(err instanceof Error ? err.message : t.runFailed);
     } finally {
       setRunning(false);
     }
@@ -158,46 +230,47 @@ export function SequenceDesignPage({ workspaceEnabled = false }: SequenceDesignP
 
   return (
     <QuickToolsLayout
-      title="Sequence Design"
-      subtitle="Design protein sequences from a structure with simple, biology-friendly controls."
+      title={t.title}
+      subtitle={t.subtitle}
       running={running}
       progress={progress}
-      progressMessage={progressMessage}
+      progressMessage={progressMessage || t.idle}
       left={
         <>
           <section className="custom-section-card">
-            <h3>Task Configuration</h3>
+            <h3>{t.taskConfig}</h3>
             <label className="left-controls">
-              Model Family
+              {t.modelFamily}
               <select value={modelFamily} onChange={(e) => setModelFamily(e.target.value as ModelFamily)}>
-                <option value="soluble">Soluble (recommended for protein discovery and design)</option>
-                <option value="vanilla">Vanilla (recommended for membrane proteins)</option>
-                <option value="ca">CA (only for C-alpha coarse-grained coordinates)</option>
+                <option value="soluble">{t.modelSoluble}</option>
+                <option value="vanilla">{t.modelVanilla}</option>
+                <option value="ca">{t.modelCa}</option>
               </select>
             </label>
             <p className="quick-ai-note">
-              Quick mode uses <code>{DEFAULT_MODEL_NAME}</code> by default (backbone_noise{" "}
-              {DEFAULT_BACKBONE_NOISE.toFixed(2)}A).
+              {t.quickModeBefore}
+              <code>{DEFAULT_MODEL_NAME}</code>
+              {t.quickModeAfter(DEFAULT_BACKBONE_NOISE.toFixed(2))}
             </p>
             <label className="left-controls quick-seq-match-input">
-              Designed Chains (optional)
+              {t.designedChains}
               <input
                 value={designedChainsText}
                 onChange={(e) => setDesignedChainsText(e.target.value)}
-                placeholder="A,B (empty means all chains)"
+                placeholder={t.designedChainsPlaceholder}
               />
             </label>
             <label className="left-controls quick-seq-match-input">
-              Fixed Residues (optional)
+              {t.fixedResidues}
               <input
                 value={fixedResiduesText}
                 onChange={(e) => setFixedResiduesText(e.target.value)}
-                placeholder="A12,C13 or A:12,13;B:5-8"
+                placeholder={t.fixedResiduesPlaceholder}
               />
             </label>
             <div style={{ display: "flex", gap: "12px", alignItems: "stretch" }}>
               <label className="left-controls" style={{ flex: 1, minWidth: 0 }}>
-                Number of sequences
+                {t.numSequences}
                 <select value={numSequences} onChange={(e) => setNumSequences(Number(e.target.value))}>
                   {sequenceOptions.map((count) => (
                     <option key={count} value={count}>
@@ -207,32 +280,32 @@ export function SequenceDesignPage({ workspaceEnabled = false }: SequenceDesignP
                 </select>
               </label>
               <label className="left-controls" style={{ flex: 1, minWidth: 0 }}>
-                Design Diversity
+                {t.designDiversity}
                 <select value={diversity} onChange={(e) => setDiversity(e.target.value as "low" | "medium" | "high")}>
-                  <option value="low">Low (conservative)</option>
-                  <option value="medium">Medium (balanced)</option>
-                  <option value="high">High (exploratory)</option>
+                  <option value="low">{t.diversityLow}</option>
+                  <option value="medium">{t.diversityMedium}</option>
+                  <option value="high">{t.diversityHigh}</option>
                 </select>
               </label>
             </div>
             {meta.online_limit_enabled && (
-              <p className="quick-ai-note">Online mode supports up to {onlineSequenceDesignLimit} designed sequences per run.</p>
+              <p className="quick-ai-note">{t.onlineLimitNote(onlineSequenceDesignLimit)}</p>
             )}
           </section>
 
           <section className="custom-section-card">
-            <h3>Structure Input</h3>
+            <h3>{t.structureInput}</h3>
             <div className="custom-file-example-row upload-source-stack">
               <div className="file-source-inline">
                 <label className="left-controls custom-file-picker-field">
-                  Select PDB File
+                  {t.selectPdb}
                   <input type="file" accept=".pdb" onChange={(e) => void onUpload(e.target.files?.[0] || null)} />
                 </label>
                 <WorkspaceFilePicker
                   workspaceEnabled={workspaceEnabled}
                   disabled={running}
                   acceptedCategories={["structure"]}
-                  buttonLabel="From Workspace"
+                  buttonLabel={t.fromWorkspace}
                   onPick={(picked) => {
                     const selected = picked[0];
                     if (!selected || selected.suffix !== ".pdb") return;
@@ -241,23 +314,23 @@ export function SequenceDesignPage({ workspaceEnabled = false }: SequenceDesignP
                 />
               </div>
               <button type="button" className="custom-btn-secondary" onClick={() => void onUseExample()}>
-                Use Example PDB
+                {t.useExamplePdb}
               </button>
             </div>
-            {uploadedPath && <div className="report-preview">Selected: {uploadedPath}</div>}
+            {uploadedPath && <div className="report-preview">{t.selected} {uploadedPath}</div>}
           </section>
 
           <section className="custom-section-card quick-ai-section">
-            <h3>AI Expert (Optional)</h3>
+            <h3>{t.aiExpert}</h3>
             <label className="quick-ai-toggle">
               <input type="checkbox" checked={enableAi} onChange={(e) => setEnableAi(e.target.checked)} />
               <span className="quick-ai-toggle-box" />
-              <span className="quick-ai-toggle-text">Enable AI analysis and expert summary</span>
-              <span className={`quick-ai-pill ${enableAi ? "active" : ""}`}>{enableAi ? "Enabled" : "Disabled"}</span>
+              <span className="quick-ai-toggle-text">{t.enableAi}</span>
+              <span className={`quick-ai-pill ${enableAi ? "active" : ""}`}>{enableAi ? t.enabled : t.disabled}</span>
             </label>
             {enableAi && (
               <label className="left-controls">
-                LLM Provider
+                {t.llmProvider}
                 <select value={llmProvider} onChange={(e) => setLlmProvider(e.target.value)}>
                   {meta.llm_models.map((item) => (
                     <option key={item} value={item}>
@@ -270,13 +343,13 @@ export function SequenceDesignPage({ workspaceEnabled = false }: SequenceDesignP
           </section>
 
           <button type="button" className="custom-btn-primary" onClick={() => void onRun()} disabled={running}>
-            {running ? "Running..." : "Start Sequence Design"}
+            {running ? t.runningBtn : t.startSeqDesign}
           </button>
         </>
       }
       right={
         <QuickToolResultPanel
-          title="Sequence Design Result"
+          title={t.resultTitle}
           resultPayload={resultPayload}
           aiSummary={aiSummary}
           error={error}
