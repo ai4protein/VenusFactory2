@@ -1,4 +1,10 @@
 import { useEffect, useState } from "react";
+import { useLang } from "../lib/i18n";
+
+const STRINGS = {
+  en: { copy: "Copy", copied: "Copied", copyTextDefault: "Copy text", copyCommand: "Copy command" },
+  zh: { copy: "复制", copied: "已复制", copyTextDefault: "复制文本", copyCommand: "复制命令" }
+};
 
 type CopyableTextBlockProps = {
   text: string;
@@ -13,8 +19,9 @@ export function CopyableTextBlock({
   emptyText = "",
   wrapperClassName = "",
   preClassName = "",
-  ariaLabel = "Copy text"
+  ariaLabel
 }: CopyableTextBlockProps) {
+  const t = useLang().t(STRINGS);
   const [copied, setCopied] = useState(false);
   const content = text || emptyText;
 
@@ -35,8 +42,8 @@ export function CopyableTextBlock({
 
   return (
     <div className={`copyable-pre-wrap ${wrapperClassName}`.trim()}>
-      <button type="button" className="copyable-pre-btn" onClick={() => void onCopy()} aria-label={ariaLabel}>
-        {copied ? "Copied" : "Copy"}
+      <button type="button" className="copyable-pre-btn" onClick={() => void onCopy()} aria-label={ariaLabel ?? t.copyTextDefault}>
+        {copied ? t.copied : t.copy}
       </button>
       <pre className={`copyable-pre ${preClassName}`.trim()}>{content}</pre>
     </div>
@@ -48,12 +55,19 @@ type CommandPreviewCardProps = {
   emptyText?: string;
 };
 
+const CMD_STRINGS = {
+  en: { empty: "Click Preview Command to generate CLI." },
+  zh: { empty: "点击「预览命令」生成 CLI。" }
+};
+
 export function CommandPreviewCard({
   command,
-  emptyText = "Click Preview Command to generate CLI."
+  emptyText
 }: CommandPreviewCardProps) {
+  const t = useLang().t(STRINGS);
+  const tc = useLang().t(CMD_STRINGS);
   const [copied, setCopied] = useState(false);
-  const text = command || emptyText;
+  const text = command || emptyText || tc.empty;
 
   useEffect(() => {
     if (!copied) return;
@@ -77,9 +91,9 @@ export function CommandPreviewCard({
           type="button"
           className="custom-command-copy-btn"
           onClick={() => void onCopy()}
-          aria-label="Copy command"
+          aria-label={t.copyCommand}
         >
-          {copied ? "Copied" : "Copy"}
+          {copied ? t.copied : t.copy}
         </button>
       </div>
       <div className="custom-command-wrap">
