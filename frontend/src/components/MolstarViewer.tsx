@@ -1,4 +1,10 @@
 import { useEffect, useRef, useState } from "react";
+import { useLang } from "../lib/i18n";
+
+const STRINGS = {
+  en: { downloadFile: "Download structure file", download: "Download", loading: "Loading structure…" },
+  zh: { downloadFile: "下载结构文件", download: "下载", loading: "结构加载中…" }
+};
 
 interface MolstarViewerProps {
   filePath: string;
@@ -6,6 +12,7 @@ interface MolstarViewerProps {
 }
 
 export function MolstarViewer({ filePath, label }: MolstarViewerProps) {
+  const t = useLang().t(STRINGS);
   const containerRef = useRef<HTMLDivElement>(null);
   const pluginRef = useRef<any>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "not_found">("loading");
@@ -106,15 +113,15 @@ export function MolstarViewer({ filePath, label }: MolstarViewerProps) {
           className="molstar-download-btn"
           href={`/api/structure/content?path=${encodeURIComponent(filePath)}&download=1`}
           download={fileName}
-          title="Download structure file"
+          title={t.downloadFile}
         >
-          Download
+          {t.download}
         </a>
       </div>
       <div className="molstar-viewport-wrap">
         <div ref={containerRef} className="molstar-viewport" />
         {status === "loading" && (
-          <div className="molstar-overlay">Loading structure…</div>
+          <div className="molstar-overlay">{t.loading}</div>
         )}
         {status === "error" && (
           <div className="molstar-overlay molstar-overlay-err">{errMsg}</div>

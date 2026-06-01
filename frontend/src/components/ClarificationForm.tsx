@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { ClarificationQuestion, ClarificationAnswer } from "../lib/api";
+import { useLang } from "../lib/i18n";
 
 type Props = {
   questions: ClarificationQuestion[];
@@ -7,10 +8,24 @@ type Props = {
   disabled?: boolean;
 };
 
+const STRINGS = {
+  en: {
+    multipleHint: "(multiple choice)",
+    specifyPlaceholder: "Please specify...",
+    submit: "Submit"
+  },
+  zh: {
+    multipleHint: "（可多选）",
+    specifyPlaceholder: "请说明…",
+    submit: "提交"
+  }
+};
+
 export function ClarificationForm({ questions, onSubmit, disabled }: Props) {
   const [answers, setAnswers] = useState<ClarificationAnswer[]>(
     questions.map((_, i) => ({ question_index: i, selected_options: [], custom_text: "" }))
   );
+  const t = useLang().t(STRINGS);
 
   function toggleOption(qIdx: number, optIdx: number) {
     setAnswers(prev => {
@@ -57,7 +72,7 @@ export function ClarificationForm({ questions, onSubmit, disabled }: Props) {
         <div key={qIdx} className="clarification-question">
           <div className="clarification-question-text">
             {qIdx + 1}. {q.question}
-            {q.allow_multiple && <span className="clarification-multi-hint">(可多选 / multiple)</span>}
+            {q.allow_multiple && <span className="clarification-multi-hint">{t.multipleHint}</span>}
           </div>
           <div className="clarification-options">
             {q.options.map((opt, optIdx) => {
@@ -83,7 +98,7 @@ export function ClarificationForm({ questions, onSubmit, disabled }: Props) {
             <input
               type="text"
               className="clarification-custom-input"
-              placeholder="Please specify..."
+              placeholder={t.specifyPlaceholder}
               value={answers[qIdx].custom_text}
               onChange={e => setCustomText(qIdx, e.target.value)}
               disabled={disabled}
@@ -96,7 +111,7 @@ export function ClarificationForm({ questions, onSubmit, disabled }: Props) {
         onClick={() => onSubmit(answers)}
         disabled={disabled || !allAnswered}
       >
-        Submit
+        {t.submit}
       </button>
     </div>
   );

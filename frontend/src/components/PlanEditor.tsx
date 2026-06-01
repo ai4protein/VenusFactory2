@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { PlanStep } from "../lib/api";
+import { useLang } from "../lib/i18n";
 
 type Props = {
   plan: PlanStep[];
@@ -7,8 +8,30 @@ type Props = {
   disabled?: boolean;
 };
 
+const STRINGS = {
+  en: {
+    step: "Step",
+    moveUp: "Move up",
+    moveDown: "Move down",
+    remove: "Remove step",
+    confirm: "Confirm Plan",
+    autoExecute: "Confirm & Auto-execute",
+    autoExecuteHint: "Confirm and execute all steps automatically without pausing"
+  },
+  zh: {
+    step: "步骤",
+    moveUp: "上移",
+    moveDown: "下移",
+    remove: "删除步骤",
+    confirm: "确认计划",
+    autoExecute: "确认并自动执行",
+    autoExecuteHint: "确认后自动执行所有步骤，不再暂停"
+  }
+};
+
 export function PlanEditor({ plan, onConfirm, disabled }: Props) {
   const [steps, setSteps] = useState<PlanStep[]>(plan.map(s => ({ ...s })));
+  const t = useLang().t(STRINGS);
 
   function updateDescription(idx: number, desc: string) {
     setSteps(prev => {
@@ -40,14 +63,14 @@ export function PlanEditor({ plan, onConfirm, disabled }: Props) {
       {steps.map((step, idx) => (
         <div key={idx} className="plan-editor-step">
           <div className="plan-editor-step-header">
-            <span className="plan-editor-step-num">Step {idx + 1}</span>
+            <span className="plan-editor-step-num">{t.step} {idx + 1}</span>
             <span className="plan-editor-tool-badge">{step.tool_name}</span>
             <div className="plan-editor-step-actions">
               <button
                 className="plan-editor-btn"
                 onClick={() => moveStep(idx, "up")}
                 disabled={disabled || idx === 0}
-                title="Move up"
+                title={t.moveUp}
               >
                 ↑
               </button>
@@ -55,7 +78,7 @@ export function PlanEditor({ plan, onConfirm, disabled }: Props) {
                 className="plan-editor-btn"
                 onClick={() => moveStep(idx, "down")}
                 disabled={disabled || idx === steps.length - 1}
-                title="Move down"
+                title={t.moveDown}
               >
                 ↓
               </button>
@@ -63,7 +86,7 @@ export function PlanEditor({ plan, onConfirm, disabled }: Props) {
                 className="plan-editor-btn plan-editor-btn-delete"
                 onClick={() => removeStep(idx)}
                 disabled={disabled || steps.length <= 1}
-                title="Remove step"
+                title={t.remove}
               >
                 ×
               </button>
@@ -84,15 +107,15 @@ export function PlanEditor({ plan, onConfirm, disabled }: Props) {
           onClick={() => onConfirm(steps, false)}
           disabled={disabled || steps.length === 0}
         >
-          Confirm Plan
+          {t.confirm}
         </button>
         <button
           className="plan-editor-auto-execute"
           onClick={() => onConfirm(steps, true)}
           disabled={disabled || steps.length === 0}
-          title="Confirm and execute all steps automatically without pausing"
+          title={t.autoExecuteHint}
         >
-          Confirm & Auto-execute
+          {t.autoExecute}
         </button>
       </div>
     </div>

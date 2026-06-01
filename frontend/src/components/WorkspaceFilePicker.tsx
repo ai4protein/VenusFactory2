@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { listWorkspaceFiles, type WorkspaceFile } from "../lib/workspaceApi";
+import { useLang } from "../lib/i18n";
 
 type WorkspaceFilePickerProps = {
   workspaceEnabled: boolean;
@@ -10,14 +11,41 @@ type WorkspaceFilePickerProps = {
   onPick: (files: WorkspaceFile[]) => void;
 };
 
+const STRINGS = {
+  en: {
+    trigger: "Pick from Workspace",
+    enabledHint: "Select existing local file.",
+    disabledHint: "Workspace is available in Local mode only.",
+    searchPlaceholder: "Search workspace files...",
+    loading: "Loading...",
+    refresh: "Refresh",
+    empty: "No files available.",
+    useSelected: "Use Selected",
+    loadFailed: "Failed to load workspace files."
+  },
+  zh: {
+    trigger: "从工作区选择",
+    enabledHint: "选择已有的本地文件。",
+    disabledHint: "工作区仅在本地模式下可用。",
+    searchPlaceholder: "搜索工作区文件…",
+    loading: "加载中…",
+    refresh: "刷新",
+    empty: "暂无可选文件。",
+    useSelected: "使用所选",
+    loadFailed: "工作区文件加载失败。"
+  }
+};
+
 export function WorkspaceFilePicker({
   workspaceEnabled,
   disabled = false,
   allowMultiple = false,
   acceptedCategories,
-  buttonLabel = "Pick from Workspace",
+  buttonLabel,
   onPick
 }: WorkspaceFilePickerProps) {
+  const t = useLang().t(STRINGS);
+  const triggerLabel = buttonLabel ?? t.trigger;
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -36,7 +64,7 @@ export function WorkspaceFilePicker({
       });
       setItems(data.items);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load workspace files.");
+      setError(err instanceof Error ? err.message : t.loadFailed);
     } finally {
       setLoading(false);
     }
@@ -81,9 +109,9 @@ export function WorkspaceFilePicker({
         className="workspace-picker-trigger"
         onClick={() => setOpen((v) => !v)}
         disabled={blocked}
-        title={workspaceEnabled ? "Select existing local file." : "Workspace is available in Local mode only."}
+        title={workspaceEnabled ? t.enabledHint : t.disabledHint}
       >
-        {buttonLabel}
+        {triggerLabel}
       </button>
       {open && !blocked && (
         <div className="workspace-picker-popover">
@@ -92,16 +120,16 @@ export function WorkspaceFilePicker({
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search workspace files..."
+              placeholder={t.searchPlaceholder}
             />
             <button type="button" onClick={() => void load()} disabled={loading}>
-              {loading ? "Loading..." : "Refresh"}
+              {loading ? t.loading : t.refresh}
             </button>
           </div>
           {error && <div className="error-box">{error}</div>}
           <div className="workspace-picker-list">
             {visibleItems.length === 0 ? (
-              <div className="session-empty">No files available.</div>
+              <div className="session-empty">{t.empty}</div>
             ) : (
               visibleItems.slice(0, 100).map((item) => {
                 const checked = selectedIds.includes(item.id);
@@ -122,7 +150,7 @@ export function WorkspaceFilePicker({
           </div>
           <div className="workspace-picker-actions">
             <button type="button" onClick={confirmPick} disabled={selectedIds.length === 0}>
-              Use Selected
+              {t.useSelected}
             </button>
           </div>
         </div>

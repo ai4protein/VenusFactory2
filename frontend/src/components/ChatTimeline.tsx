@@ -4,6 +4,12 @@ import { marked } from "marked";
 import type { ChatHistoryItem } from "../lib/api";
 import { submitFeedback } from "../lib/api";
 import { MolstarViewer } from "./MolstarViewer";
+import { useLang } from "../lib/i18n";
+
+const TIMELINE_STRINGS = {
+  en: { helpful: "Helpful", notHelpful: "Not helpful", quote: "Quote reply", copy: "Copy", copied: "Copied!", downloadCard: "Download" },
+  zh: { helpful: "有帮助", notHelpful: "没帮助", quote: "引用回复", copy: "复制", copied: "已复制！", downloadCard: "下载" }
+};
 
 const DEFAULT_AVATAR = "https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png";
 const USER_AVATAR =
@@ -189,11 +195,12 @@ function fileIcon(filename: string): string {
 
 function DownloadCard({ filename, url }: { filename: string; url: string }) {
   const icon = fileIcon(filename);
+  const t = useLang().t(TIMELINE_STRINGS);
   return (
     <a className="rich-download-card" href={url} target="_blank" rel="noopener noreferrer" download={filename}>
       <span className={`rich-file-icon icon-${icon}`} />
       <span className="rich-download-name" title={filename}>{filename}</span>
-      <span className="rich-download-action">Download</span>
+      <span className="rich-download-action">{t.downloadCard}</span>
     </a>
   );
 }
@@ -276,6 +283,7 @@ function FeedbackButtons({
 }) {
   const [rating, setRating] = useState<"like" | "dislike" | null>(null);
   const [sending, setSending] = useState(false);
+  const t = useLang().t(TIMELINE_STRINGS);
 
   const handleRate = useCallback(
     async (value: "like" | "dislike") => {
@@ -299,7 +307,7 @@ function FeedbackButtons({
         className={`feedback-btn feedback-like${rating === "like" ? " active" : ""}`}
         onClick={() => handleRate("like")}
         disabled={sending}
-        title="Helpful"
+        title={t.helpful}
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M7 10v12" /><path d="M15 5.88L14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z" />
@@ -309,7 +317,7 @@ function FeedbackButtons({
         className={`feedback-btn feedback-dislike${rating === "dislike" ? " active" : ""}`}
         onClick={() => handleRate("dislike")}
         disabled={sending}
-        title="Not helpful"
+        title={t.notHelpful}
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M17 14V2" /><path d="M9 18.12L10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22h0a3.13 3.13 0 0 1-3-3.88Z" />
@@ -321,6 +329,7 @@ function FeedbackButtons({
 
 function ChatMessageBody({ html }: { html: string }) {
   const ref = useRef<HTMLDivElement>(null);
+  const t = useLang().t(TIMELINE_STRINGS);
 
   useEffect(() => {
     if (!ref.current) return;
@@ -328,12 +337,12 @@ function ChatMessageBody({ html }: { html: string }) {
       if (pre.querySelector(".code-copy-btn")) return;
       const btn = document.createElement("button");
       btn.className = "code-copy-btn";
-      btn.textContent = "Copy";
+      btn.textContent = t.copy;
       btn.onclick = () => {
         const text = pre.querySelector("code")?.textContent || pre.textContent || "";
         const onSuccess = () => {
-          btn.textContent = "Copied!";
-          setTimeout(() => (btn.textContent = "Copy"), 1500);
+          btn.textContent = t.copied;
+          setTimeout(() => (btn.textContent = t.copy), 1500);
         };
         if (navigator.clipboard?.writeText) {
           navigator.clipboard.writeText(text).then(onSuccess).catch(() => {
@@ -345,7 +354,7 @@ function ChatMessageBody({ html }: { html: string }) {
       };
       pre.appendChild(btn);
     });
-  }, [html]);
+  }, [html, t]);
 
   return (
     <div
@@ -368,11 +377,12 @@ function formatDuration(ms: number): string | null {
   return `${Math.floor(secs / 60)}m ${secs % 60}s`;
 }
 
-function QuoteButton({ content, onQuote }: { content: string; onQuote: (t: string) => void }) {
+function QuoteButton({ content, onQuote }: { content: string; onQuote: (text: string) => void }) {
+  const t = useLang().t(TIMELINE_STRINGS);
   return (
     <button
       className="feedback-btn quote-btn"
-      title="Quote reply"
+      title={t.quote}
       onClick={() => onQuote(content)}
     >
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
