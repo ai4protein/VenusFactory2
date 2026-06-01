@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+
+  <!-- Root redirect (entry point for crawlers that find the bare URL) -->
+  <url>
+    <loc>https://venusfactory.cn/playground/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://venusfactory.cn/playground/en/"/>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://venusfactory.cn/playground/zh/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://venusfactory.cn/playground/"/>
+  </url>
+
+  <!-- Home page (one per language) -->
+  <url>
+    <loc>https://venusfactory.cn/playground/en/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://venusfactory.cn/playground/en/"/>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://venusfactory.cn/playground/zh/"/>
+  </url>
+  <url>
+    <loc>https://venusfactory.cn/playground/zh/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://venusfactory.cn/playground/en/"/>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://venusfactory.cn/playground/zh/"/>
+  </url>
+
+  <!-- Agent chat -->
+  <url>
+    <loc>https://venusfactory.cn/playground/en/agent/chat</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://venusfactory.cn/playground/en/agent/chat"/>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://venusfactory.cn/playground/zh/agent/chat"/>
+  </url>
+  <url>
+    <loc>https://venusfactory.cn/playground/zh/agent/chat</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.9</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://venusfactory.cn/playground/en/agent/chat"/>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://venusfactory.cn/playground/zh/agent/chat"/>
+  </url>
+
+  <!-- Leaderboards -->
+  <url>
+    <loc>https://venusfactory.cn/playground/en/leaderboards</loc>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://venusfactory.cn/playground/en/leaderboards"/>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://venusfactory.cn/playground/zh/leaderboards"/>
+  </url>
+  <url>
+    <loc>https://venusfactory.cn/playground/zh/leaderboards</loc>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://venusfactory.cn/playground/en/leaderboards"/>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://venusfactory.cn/playground/zh/leaderboards"/>
+  </url>
+
+  <!-- Manual index (most read of the static content) -->
+  <url>
+    <loc>https://venusfactory.cn/playground/en/manual/index</loc>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://venusfactory.cn/playground/en/manual/index"/>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://venusfactory.cn/playground/zh/manual/index"/>
+  </url>
+  <url>
+    <loc>https://venusfactory.cn/playground/zh/manual/index</loc>
+    <priority>0.8</priority>
+    <xhtml:link rel="alternate" hreflang="en" href="https://venusfactory.cn/playground/en/manual/index"/>
+    <xhtml:link rel="alternate" hreflang="zh-CN" href="https://venusfactory.cn/playground/zh/manual/index"/>
+  </url>
+
+  <!-- Quick tools (en + zh) -->
+  <url><loc>https://venusfactory.cn/playground/en/quick-tools/directed-evolution</loc><priority>0.8</priority></url>
+  <url><loc>https://venusfactory.cn/playground/zh/quick-tools/directed-evolution</loc><priority>0.8</priority></url>
+  <url><loc>https://venusfactory.cn/playground/en/quick-tools/sequence-design</loc><priority>0.8</priority></url>
+  <url><loc>https://venusfactory.cn/playground/zh/quick-tools/sequence-design</loc><priority>0.8</priority></url>
+  <url><loc>https://venusfactory.cn/playground/en/quick-tools/protein-discovery</loc><priority>0.8</priority></url>
+  <url><loc>https://venusfactory.cn/playground/zh/quick-tools/protein-discovery</loc><priority>0.8</priority></url>
+  <url><loc>https://venusfactory.cn/playground/en/quick-tools/protein-function</loc><priority>0.8</priority></url>
+  <url><loc>https://venusfactory.cn/playground/zh/quick-tools/protein-function</loc><priority>0.8</priority></url>
+  <url><loc>https://venusfactory.cn/playground/en/quick-tools/functional-residue</loc><priority>0.8</priority></url>
+  <url><loc>https://venusfactory.cn/playground/zh/quick-tools/functional-residue</loc><priority>0.8</priority></url>
+  <url><loc>https://venusfactory.cn/playground/en/quick-tools/physicochemical-property</loc><priority>0.8</priority></url>
+  <url><loc>https://venusfactory.cn/playground/zh/quick-tools/physicochemical-property</loc><priority>0.8</priority></url>
+
+  <!-- Advanced tools -->
+  <url><loc>https://venusfactory.cn/playground/en/advanced-tools/directed-evolution</loc><priority>0.7</priority></url>
+  <url><loc>https://venusfactory.cn/playground/zh/advanced-tools/directed-evolution</loc><priority>0.7</priority></url>
+  <url><loc>https://venusfactory.cn/playground/en/advanced-tools/sequence-design</loc><priority>0.7</priority></url>
+  <url><loc>https://venusfactory.cn/playground/zh/advanced-tools/sequence-design</loc><priority>0.7</priority></url>
+  <url><loc>https://venusfactory.cn/playground/en/advanced-tools/protein-discovery</loc><priority>0.7</priority></url>
+  <url><loc>https://venusfactory.cn/playground/zh/advanced-tools/protein-discovery</loc><priority>0.7</priority></url>
+  <url><loc>https://venusfactory.cn/playground/en/advanced-tools/protein-function</loc><priority>0.7</priority></url>
+  <url><loc>https://venusfactory.cn/playground/zh/advanced-tools/protein-function</loc><priority>0.7</priority></url>
+  <url><loc>https://venusfactory.cn/playground/en/advanced-tools/functional-residue</loc><priority>0.7</priority></url>
+  <url><loc>https://venusfactory.cn/playground/zh/advanced-tools/functional-residue</loc><priority>0.7</priority></url>
+
+  <!-- Custom model -->
+  <url><loc>https://venusfactory.cn/playground/en/custom-model/training</loc><priority>0.7</priority></url>
+  <url><loc>https://venusfactory.cn/playground/zh/custom-model/training</loc><priority>0.7</priority></url>
+  <url><loc>https://venusfactory.cn/playground/en/custom-model/evaluation</loc><priority>0.7</priority></url>
+  <url><loc>https://venusfactory.cn/playground/zh/custom-model/evaluation</loc><priority>0.7</priority></url>
+  <url><loc>https://venusfactory.cn/playground/en/custom-model/predict</loc><priority>0.7</priority></url>
+  <url><loc>https://venusfactory.cn/playground/zh/custom-model/predict</loc><priority>0.7</priority></url>
+
+  <!-- Download -->
+  <url><loc>https://venusfactory.cn/playground/en/download/uniprot</loc><priority>0.6</priority></url>
+  <url><loc>https://venusfactory.cn/playground/zh/download/uniprot</loc><priority>0.6</priority></url>
+  <url><loc>https://venusfactory.cn/playground/en/download/ncbi</loc><priority>0.6</priority></url>
+  <url><loc>https://venusfactory.cn/playground/zh/download/ncbi</loc><priority>0.6</priority></url>
+  <url><loc>https://venusfactory.cn/playground/en/download/rcsb-structure</loc><priority>0.6</priority></url>
+  <url><loc>https://venusfactory.cn/playground/zh/download/rcsb-structure</loc><priority>0.6</priority></url>
+  <url><loc>https://venusfactory.cn/playground/en/download/alphafold</loc><priority>0.6</priority></url>
+  <url><loc>https://venusfactory.cn/playground/zh/download/alphafold</loc><priority>0.6</priority></url>
+  <url><loc>https://venusfactory.cn/playground/en/manual/faq</loc><priority>0.6</priority></url>
+  <url><loc>https://venusfactory.cn/playground/zh/manual/faq</loc><priority>0.6</priority></url>
+</urlset>

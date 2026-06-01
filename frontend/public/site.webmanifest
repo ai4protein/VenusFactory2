@@ -1,0 +1,12 @@
+{
+  "name": "VenusFactory2 — Agent-Driven Protein Engineering Platform",
+  "short_name": "VenusFactory2",
+  "description": "Unified open-source platform for protein engineering: prediction, training, design and discovery powered by 40+ AI models and 11 biological databases.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f1ea",
+  "theme_color": "#c8a86b",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
