@@ -17,6 +17,7 @@ async def chat_start_node(state: AgentState, config: RunnableConfig):
         "role": "assistant",
         "content": "🤔 思考中..." if ui_lang == "zh" else "🤔 Thinking...",
         "role_id": "principal_investigator",
+        "phase": "thinking",
     })
     return {"history": history, "ui_lang": ui_lang}
 
@@ -28,7 +29,11 @@ async def chat_node(state: AgentState, config: RunnableConfig):
     ui_lang = state.get("ui_lang") or _detect_ui_lang(text)
     history = list(state.get("history", []))
 
-    if history and ("Thinking" in history[-1].get("content", "") or "思考中" in history[-1].get("content", "")):
+    if history and (
+        history[-1].get("phase") == "thinking"
+        or "Thinking" in history[-1].get("content", "")
+        or "思考中" in history[-1].get("content", "")
+    ):
         history.pop()
 
     try:

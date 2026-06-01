@@ -25,6 +25,7 @@ async def research_sub_report_start_node(state: AgentState, config: RunnableConf
         if ui_lang == "zh" else
         f"✍️ **Principal Investigator** is writing the sub-report for: **{section['section_name']}** …",
         "role_id": "principal_investigator",
+        "phase": "sub_report_writing",
     })
     return {"history": history}
 
@@ -80,7 +81,8 @@ async def research_sub_report_node(state: AgentState, config: RunnableConfig):
             )
 
     if history and (
-        "撰写小报告" in history[-1].get("content", "")
+        history[-1].get("phase") == "sub_report_writing"
+        or "撰写小报告" in history[-1].get("content", "")
         or "writing sub-report" in history[-1].get("content", "").lower()
     ):
         history.pop()
