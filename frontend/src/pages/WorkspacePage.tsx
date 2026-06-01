@@ -7,12 +7,117 @@ import {
   uploadWorkspaceFile,
   type WorkspaceFile
 } from "../lib/workspaceApi";
+import { useLang } from "../lib/i18n";
+import { useDocumentMeta } from "../lib/useDocumentMeta";
 
 type WorkspacePageProps = {
   workspaceEnabled: boolean;
 };
 
+const STRINGS = {
+  en: {
+    docTitle: "Workspace — VenusFactory2",
+    docDescription: "Manage your local workspace files.",
+    library: "Workspace Library",
+    onlyLocal: "Workspace is available in Local mode only.",
+    searchPlaceholder: "Search by name or path...",
+    refreshing: "Refreshing...",
+    search: "Search",
+    allSources: "All Sources",
+    allCategories: "All Categories",
+    catSequence: "Sequence",
+    catStructure: "Structure",
+    catTableText: "Table/Text",
+    catOther: "Other",
+    sortNewest: "Newest First",
+    sortNameAsc: "Name A-Z",
+    sortLargest: "Largest First",
+    allBuckets: "All Buckets",
+    bucketUser: "User Upload",
+    bucketChat: "Chat Session",
+    bucketTool: "Tool Upload",
+    uploading: "Uploading...",
+    uploadBtn: "Upload",
+    filesHeading: "Files",
+    browseDisabled: "Workspace browsing is disabled in Online mode.",
+    noFiles: "No files found. Upload files or clear filters.",
+    colName: "Name",
+    colBucket: "Bucket",
+    colSource: "Source",
+    colCategory: "Category",
+    colSize: "Size",
+    colUpdated: "Updated",
+    colActions: "Actions",
+    working: "Working...",
+    replace: "Replace",
+    deleteBtn: "Delete",
+    readonly: "Readonly",
+    confirmDelete: "Confirm Delete",
+    confirmDeletePrefix: "Delete",
+    confirmDeleteSuffix: "? This cannot be undone.",
+    cancel: "Cancel",
+    deleting: "Deleting...",
+    dismissNotif: "Dismiss notification",
+    errLoad: "Failed to load workspace files.",
+    errUpload: "Upload failed.",
+    errReplace: "Replace failed.",
+    errDelete: "Delete failed.",
+    replacedToast: "Replaced %s successfully."
+  },
+  zh: {
+    docTitle: "工作区 — VenusFactory2",
+    docDescription: "管理本地工作区文件。",
+    library: "工作区资源库",
+    onlyLocal: "工作区仅在本地模式下可用。",
+    searchPlaceholder: "按名称或路径搜索…",
+    refreshing: "刷新中…",
+    search: "搜索",
+    allSources: "全部来源",
+    allCategories: "全部类别",
+    catSequence: "序列",
+    catStructure: "结构",
+    catTableText: "表格 / 文本",
+    catOther: "其他",
+    sortNewest: "最新优先",
+    sortNameAsc: "按名称 A-Z",
+    sortLargest: "最大优先",
+    allBuckets: "全部存储桶",
+    bucketUser: "用户上传",
+    bucketChat: "对话会话",
+    bucketTool: "工具上传",
+    uploading: "上传中…",
+    uploadBtn: "上传",
+    filesHeading: "文件",
+    browseDisabled: "在线模式下工作区浏览功能不可用。",
+    noFiles: "未找到文件。上传文件或清除筛选条件。",
+    colName: "名称",
+    colBucket: "存储桶",
+    colSource: "来源",
+    colCategory: "类别",
+    colSize: "大小",
+    colUpdated: "更新时间",
+    colActions: "操作",
+    working: "处理中…",
+    replace: "替换",
+    deleteBtn: "删除",
+    readonly: "只读",
+    confirmDelete: "确认删除",
+    confirmDeletePrefix: "删除",
+    confirmDeleteSuffix: " 吗？此操作不可撤销。",
+    cancel: "取消",
+    deleting: "删除中…",
+    dismissNotif: "关闭通知",
+    errLoad: "加载工作区文件失败。",
+    errUpload: "上传失败。",
+    errReplace: "替换失败。",
+    errDelete: "删除失败。",
+    replacedToast: "已成功替换 %s。"
+  }
+};
+
 export function WorkspacePage({ workspaceEnabled }: WorkspacePageProps) {
+  const t = useLang().t(STRINGS);
+  useDocumentMeta({ title: t.docTitle, description: t.docDescription });
   const [items, setItems] = useState<WorkspaceFile[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -42,7 +147,7 @@ export function WorkspacePage({ workspaceEnabled }: WorkspacePageProps) {
       });
       setItems(data.items);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load workspace files.");
+      setError(err instanceof Error ? err.message : t.errLoad);
     } finally {
       setLoading(false);
     }
@@ -91,7 +196,7 @@ export function WorkspacePage({ workspaceEnabled }: WorkspacePageProps) {
       await uploadWorkspaceFile(file);
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed.");
+      setError(err instanceof Error ? err.message : t.errUpload);
     } finally {
       setUploading(false);
     }
@@ -104,9 +209,9 @@ export function WorkspacePage({ workspaceEnabled }: WorkspacePageProps) {
     try {
       await replaceWorkspaceFile(item.storage_path, file);
       await refresh();
-      setToastMessage(`Replaced ${item.display_name} successfully.`);
+      setToastMessage(t.replacedToast.replace("%s", item.display_name));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Replace failed.");
+      setError(err instanceof Error ? err.message : t.errReplace);
     } finally {
       setActingId("");
     }
@@ -135,7 +240,7 @@ export function WorkspacePage({ workspaceEnabled }: WorkspacePageProps) {
       setPendingDeleteItem(null);
       deleteTriggerEl?.focus();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Delete failed.");
+      setError(err instanceof Error ? err.message : t.errDelete);
     } finally {
       setActingId("");
     }
@@ -160,16 +265,16 @@ export function WorkspacePage({ workspaceEnabled }: WorkspacePageProps) {
             type="button"
             className="workspace-toast-close"
             onClick={() => setToastMessage("")}
-            aria-label="Dismiss notification"
+            aria-label={t.dismissNotif}
           >
             ×
           </button>
         </div>
       )}
       <section className="chat-panel workspace-control-panel">
-        <h3>Workspace Library</h3>
+        <h3>{t.library}</h3>
         {!workspaceEnabled && (
-          <div className="readonly-banner">Workspace is available in Local mode only.</div>
+          <div className="readonly-banner">{t.onlyLocal}</div>
         )}
         {workspaceEnabled && (
           <>
@@ -178,15 +283,15 @@ export function WorkspacePage({ workspaceEnabled }: WorkspacePageProps) {
                 type="text"
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Search by name or path..."
+                placeholder={t.searchPlaceholder}
               />
               <button type="button" onClick={() => void refresh()} disabled={loading}>
-                {loading ? "Refreshing..." : "Search"}
+                {loading ? t.refreshing : t.search}
               </button>
             </div>
             <div className="workspace-filter-row">
               <select value={source} onChange={(e) => setSource(e.target.value)}>
-                <option value="">All Sources</option>
+                <option value="">{t.allSources}</option>
                 {sourceOptions.map((entry) => (
                   <option key={entry} value={entry}>
                     {entry}
@@ -194,25 +299,25 @@ export function WorkspacePage({ workspaceEnabled }: WorkspacePageProps) {
                 ))}
               </select>
               <select value={fileType} onChange={(e) => setFileType(e.target.value)}>
-                <option value="">All Categories</option>
-                <option value="sequence">Sequence</option>
-                <option value="structure">Structure</option>
-                <option value="table_or_text">Table/Text</option>
-                <option value="other">Other</option>
+                <option value="">{t.allCategories}</option>
+                <option value="sequence">{t.catSequence}</option>
+                <option value="structure">{t.catStructure}</option>
+                <option value="table_or_text">{t.catTableText}</option>
+                <option value="other">{t.catOther}</option>
               </select>
               <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
-                <option value="created_desc">Newest First</option>
-                <option value="name_asc">Name A-Z</option>
-                <option value="size_desc">Largest First</option>
+                <option value="created_desc">{t.sortNewest}</option>
+                <option value="name_asc">{t.sortNameAsc}</option>
+                <option value="size_desc">{t.sortLargest}</option>
               </select>
               <select value={bucket} onChange={(e) => setBucket(e.target.value)}>
-                <option value="">All Buckets</option>
-                <option value="user_upload">User Upload</option>
-                <option value="chat_session">Chat Session</option>
-                <option value="tool_upload">Tool Upload</option>
+                <option value="">{t.allBuckets}</option>
+                <option value="user_upload">{t.bucketUser}</option>
+                <option value="chat_session">{t.bucketChat}</option>
+                <option value="tool_upload">{t.bucketTool}</option>
               </select>
               <label className="workspace-upload-btn">
-                {uploading ? "Uploading..." : "Upload"}
+                {uploading ? t.uploading : t.uploadBtn}
                 <input
                   type="file"
                   disabled={uploading}
@@ -226,23 +331,21 @@ export function WorkspacePage({ workspaceEnabled }: WorkspacePageProps) {
       </section>
 
       <section className="chat-panel workspace-list-panel">
-        <h3>Files ({bucketFilteredItems.length})</h3>
+        <h3>{t.filesHeading} ({bucketFilteredItems.length})</h3>
         {!workspaceEnabled ? (
-          <div className="session-empty">
-            Workspace browsing is disabled in Online mode.
-          </div>
+          <div className="session-empty">{t.browseDisabled}</div>
         ) : bucketFilteredItems.length === 0 ? (
-          <div className="session-empty">No files found. Upload files or clear filters.</div>
+          <div className="session-empty">{t.noFiles}</div>
         ) : (
           <div className="workspace-table">
             <div className="workspace-row workspace-header-row">
-              <span>Name</span>
-              <span>Bucket</span>
-              <span>Source</span>
-              <span>Category</span>
-              <span>Size</span>
-              <span>Updated</span>
-              <span>Actions</span>
+              <span>{t.colName}</span>
+              <span>{t.colBucket}</span>
+              <span>{t.colSource}</span>
+              <span>{t.colCategory}</span>
+              <span>{t.colSize}</span>
+              <span>{t.colUpdated}</span>
+              <span>{t.colActions}</span>
             </div>
             {bucketFilteredItems.map((item) => (
               <div key={item.id} className="workspace-row">
@@ -256,7 +359,7 @@ export function WorkspacePage({ workspaceEnabled }: WorkspacePageProps) {
                   {item.bucket === "user_upload" ? (
                     <>
                       <label className="workspace-row-btn">
-                        {actingId === item.id ? "Working..." : "Replace"}
+                        {actingId === item.id ? t.working : t.replace}
                         <input
                           type="file"
                           disabled={Boolean(actingId)}
@@ -269,11 +372,11 @@ export function WorkspacePage({ workspaceEnabled }: WorkspacePageProps) {
                         disabled={Boolean(actingId)}
                         onClick={(e) => void onDelete(item, e.currentTarget)}
                       >
-                        Delete
+                        {t.deleteBtn}
                       </button>
                     </>
                   ) : (
-                    <span className="workspace-row-readonly">Readonly</span>
+                    <span className="workspace-row-readonly">{t.readonly}</span>
                   )}
                 </span>
               </div>
@@ -291,9 +394,9 @@ export function WorkspacePage({ workspaceEnabled }: WorkspacePageProps) {
             aria-describedby="workspace-delete-desc"
             onClick={(e) => e.stopPropagation()}
           >
-            <h4 id="workspace-delete-title">Confirm Delete</h4>
+            <h4 id="workspace-delete-title">{t.confirmDelete}</h4>
             <p id="workspace-delete-desc">
-              Delete <strong>{pendingDeleteItem.display_name}</strong>? This cannot be undone.
+              {t.confirmDeletePrefix} <strong>{pendingDeleteItem.display_name}</strong>{t.confirmDeleteSuffix}
             </p>
             <div className="workspace-modal-actions">
               <button
@@ -303,7 +406,7 @@ export function WorkspacePage({ workspaceEnabled }: WorkspacePageProps) {
                 disabled={Boolean(actingId)}
                 onClick={cancelDelete}
               >
-                Cancel
+                {t.cancel}
               </button>
               <button
                 type="button"
@@ -311,7 +414,7 @@ export function WorkspacePage({ workspaceEnabled }: WorkspacePageProps) {
                 disabled={Boolean(actingId)}
                 onClick={() => void confirmDelete()}
               >
-                {Boolean(actingId) ? "Deleting..." : "Delete"}
+                {Boolean(actingId) ? t.deleting : t.deleteBtn}
               </button>
             </div>
           </div>

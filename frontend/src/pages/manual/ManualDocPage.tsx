@@ -7,15 +7,36 @@ import {
   type TocItem
 } from "../../lib/manualContent";
 import type { ManualLayoutContext } from "./ManualLayout";
+import { useLang } from "../../lib/i18n";
 
-function buildNotFoundHtml() {
-  return "<h1>Manual section not found</h1><p>Please choose a valid section from the tabs.</p>";
+const STRINGS = {
+  en: {
+    notFoundTitle: "Manual section not found",
+    notFoundBody: "Please choose a valid section from the tabs.",
+    loadingOutline: "Loading outline...",
+    noHeadings: "No headings found.",
+    imageAlt: "Manual image",
+    imageMissing: "[Image does not exist:"
+  },
+  zh: {
+    notFoundTitle: "未找到手册章节",
+    notFoundBody: "请从标签页选择一个有效章节。",
+    loadingOutline: "目录加载中…",
+    noHeadings: "未找到标题。",
+    imageAlt: "手册图片",
+    imageMissing: "[图片不存在："
+  }
+};
+
+function buildNotFoundHtml(title: string, body: string) {
+  return `<h1>${title}</h1><p>${body}</p>`;
 }
 
 export function ManualDocPage() {
   const { section: sectionParam } = useParams<{ section: string }>();
   const section = useMemo(() => getManualSection(sectionParam), [sectionParam]);
   const { language } = useOutletContext<ManualLayoutContext>();
+  const t = useLang().t(STRINGS);
 
   const [loading, setLoading] = useState(true);
   const [toc, setToc] = useState<TocItem[]>([]);
@@ -31,7 +52,7 @@ export function ManualDocPage() {
       setActiveId("");
       if (!section) {
         setToc([]);
-        setHtml(buildNotFoundHtml());
+        setHtml(buildNotFoundHtml(t.notFoundTitle, t.notFoundBody));
         setLoading(false);
         return;
       }
@@ -46,7 +67,7 @@ export function ManualDocPage() {
     return () => {
       alive = false;
     };
-  }, [language, section]);
+  }, [language, section, t]);
 
   useEffect(() => {
     if (!contentRef.current) return;
@@ -56,7 +77,7 @@ export function ManualDocPage() {
       const target = event.target as HTMLElement | null;
       if (!target || target.tagName.toLowerCase() !== "img") return;
       const image = target as HTMLImageElement;
-      setModalImage({ src: image.src, alt: image.alt || "Manual image" });
+      setModalImage({ src: image.src, alt: image.alt || t.imageAlt });
     };
     root.addEventListener("click", handleImageClick);
 
@@ -66,7 +87,7 @@ export function ManualDocPage() {
       const onError = () => {
         const holder = document.createElement("div");
         holder.className = "manual-v2-image-error";
-        holder.textContent = `[Image does not exist: ${image.getAttribute("src") || "unknown"}]`;
+        holder.textContent = `${t.imageMissing} ${image.getAttribute("src") || "unknown"}]`;
         image.replaceWith(holder);
       };
       image.addEventListener("error", onError, { once: true });
@@ -106,9 +127,9 @@ export function ManualDocPage() {
     <section className="manual-v2-panel">
       <aside className="manual-v2-nav">
         {loading ? (
-          <p>{language === "Chinese" ? "目录加载中..." : "Loading outline..."}</p>
+          <p>{t.loadingOutline}</p>
         ) : toc.length === 0 ? (
-          <p>{language === "Chinese" ? "未找到标题。" : "No headings found."}</p>
+          <p>{t.noHeadings}</p>
         ) : (
           <ul>
             {toc.map((item) => (

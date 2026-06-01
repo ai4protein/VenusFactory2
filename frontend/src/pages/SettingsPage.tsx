@@ -1,5 +1,134 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PageFooter } from "../components/PageFooter";
+import { useLang } from "../lib/i18n";
+import { useDocumentMeta } from "../lib/useDocumentMeta";
+
+const STRINGS = {
+  en: {
+    title: "Env Settings",
+    subtitle: "View and edit runtime environment variables in a form-based editor.",
+    onlineReadonly: "Online mode: settings are view-only in this deployment.",
+    howItWorks: "How It Works",
+    helpLeadA: "Variables are fixed from",
+    helpLeadB: ". This page loads values from",
+    helpLeadC: "and lets you edit only predefined keys.",
+    displayRules: "Display Rules",
+    rule1: "Config values are visible by default.",
+    rule2: "Key values can be hidden/shown.",
+    rule3: "Boolean values use on/off switches.",
+    varTypes: "Variable Types",
+    typeConfigStrong: "Config",
+    typeConfigDesc: ": system/runtime configuration and limits.",
+    typeKeyStrong: "Key",
+    typeKeyDesc: ": platform API credentials and access tokens.",
+    sectionsNote: "Sections follow",
+    sectionsNote2: "heading groups.",
+    filtersNote: "Filters support type, importance, and key search.",
+    saveBehavior: "Save Behavior",
+    save1Pre: "Only current form values are written to",
+    save2: "Changes apply after restarting related services/processes.",
+    metaTotal: "Total rows:",
+    metaConfigured: "Configured values:",
+    metaConfigRows: "Config rows:",
+    metaKeyRows: "Key rows:",
+    loadingBtn: "Loading...",
+    reload: "Reload .env",
+    hideAllKeys: "Hide all keys",
+    showAllKeys: "Show all keys",
+    searchKeyPlaceholder: "Search by key...",
+    typeAll: "Type: All",
+    typeConfig: "Type: Config",
+    typeKey: "Type: Key",
+    impAll: "Importance: All",
+    impSensitive: "Importance: Sensitive",
+    impImportant: "Importance: Important",
+    impNormal: "Importance: Normal",
+    savingBtn: "Saving...",
+    saveBtn: "Save .env",
+    noVars: "No variables found in .env.example / .env.",
+    noMatch: "No variables match current search/filter.",
+    sections: "Sections",
+    sectionsAria: "Settings sections",
+    tagKey: "Key",
+    tagConfig: "Config",
+    valuePlaceholder: "value",
+    boolTrue: "True",
+    boolFalse: "False",
+    hide: "Hide",
+    show: "Show",
+    hideValue: "Hide value",
+    showValue: "Show value",
+    errLoad: "Failed to load .env settings.",
+    errSave: "Failed to save .env settings.",
+    errLoadStatus: "Load failed",
+    errSaveStatus: "Save failed",
+    createdFromEx: ".env not found, created from",
+    savedPrefix: "Saved",
+    savedMidEntries: "entries to"
+  },
+  zh: {
+    title: "环境变量设置",
+    subtitle: "通过表单方式查看与编辑运行时环境变量。",
+    onlineReadonly: "在线模式下，设置在当前部署中仅可查看。",
+    howItWorks: "工作机制",
+    helpLeadA: "变量条目以",
+    helpLeadB: "为准。此页面从",
+    helpLeadC: "读取值，仅允许编辑预定义的 key。",
+    displayRules: "展示规则",
+    rule1: "Config 类型的值默认显示。",
+    rule2: "Key 类型的值可隐藏 / 显示。",
+    rule3: "布尔值使用开关切换。",
+    varTypes: "变量类型",
+    typeConfigStrong: "Config",
+    typeConfigDesc: "：系统 / 运行时配置与限制。",
+    typeKeyStrong: "Key",
+    typeKeyDesc: "：平台 API 凭据与访问令牌。",
+    sectionsNote: "分组沿用",
+    sectionsNote2: "中的标题分组。",
+    filtersNote: "筛选支持按类型、重要程度和 key 搜索。",
+    saveBehavior: "保存行为",
+    save1Pre: "只会将当前表单的值写入",
+    save2: "变更需在相关服务 / 进程重启后生效。",
+    metaTotal: "总行数：",
+    metaConfigured: "已配置值数：",
+    metaConfigRows: "Config 行数：",
+    metaKeyRows: "Key 行数：",
+    loadingBtn: "加载中…",
+    reload: "重新加载 .env",
+    hideAllKeys: "全部隐藏 Key",
+    showAllKeys: "全部显示 Key",
+    searchKeyPlaceholder: "按 key 搜索…",
+    typeAll: "类型：全部",
+    typeConfig: "类型：Config",
+    typeKey: "类型：Key",
+    impAll: "重要程度：全部",
+    impSensitive: "重要程度：敏感",
+    impImportant: "重要程度：重要",
+    impNormal: "重要程度：普通",
+    savingBtn: "保存中…",
+    saveBtn: "保存 .env",
+    noVars: "未在 .env.example / .env 中找到变量。",
+    noMatch: "没有匹配当前搜索 / 筛选条件的变量。",
+    sections: "分组",
+    sectionsAria: "设置分组导航",
+    tagKey: "Key",
+    tagConfig: "Config",
+    valuePlaceholder: "值",
+    boolTrue: "True",
+    boolFalse: "False",
+    hide: "隐藏",
+    show: "显示",
+    hideValue: "隐藏值",
+    showValue: "显示值",
+    errLoad: "加载 .env 设置失败。",
+    errSave: "保存 .env 设置失败。",
+    errLoadStatus: "加载失败",
+    errSaveStatus: "保存失败",
+    createdFromEx: "未找到 .env，已从",
+    savedPrefix: "已保存",
+    savedMidEntries: "条变量到"
+  }
+};
 
 type EnvEntry = {
   key: string;
@@ -57,6 +186,8 @@ type SettingsPageProps = {
 };
 
 export function SettingsPage({ readonly = false }: SettingsPageProps) {
+  const t = useLang().t(STRINGS);
+  useDocumentMeta({ title: `${t.title} — VenusFactory2`, description: t.subtitle });
   const [entries, setEntries] = useState<EnvEntry[]>([]);
   const [visibility, setVisibility] = useState<Record<string, boolean>>({});
   const [path, setPath] = useState(".env");
@@ -80,7 +211,7 @@ export function SettingsPage({ readonly = false }: SettingsPageProps) {
     setLoading(true);
     try {
       const res = await fetch("/api/settings/env");
-      if (!res.ok) throw new Error(`Load failed (${res.status})`);
+      if (!res.ok) throw new Error(`${t.errLoadStatus} (${res.status})`);
       const data = (await res.json()) as {
         entries: EnvEntry[];
         path: string;
@@ -98,10 +229,10 @@ export function SettingsPage({ readonly = false }: SettingsPageProps) {
       });
       setPath(data.path || ".env");
       if (data.created_from_example) {
-        setMessage(`.env not found, created from ${data.source || ".env.example"}.`);
+        setMessage(`${t.createdFromEx} ${data.source || ".env.example"}.`);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load .env settings.");
+      setError(err instanceof Error ? err.message : t.errLoad);
     } finally {
       setLoading(false);
     }
@@ -131,12 +262,12 @@ export function SettingsPage({ readonly = false }: SettingsPageProps) {
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data?.detail || `Save failed (${res.status})`);
+        throw new Error(data?.detail || `${t.errSaveStatus} (${res.status})`);
       }
-      setMessage(`Saved ${data.count ?? entries.length} entries to ${data.path || ".env"}.`);
+      setMessage(`${t.savedPrefix} ${data.count ?? entries.length} ${t.savedMidEntries} ${data.path || ".env"}.`);
       await loadEnv();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save .env settings.");
+      setError(err instanceof Error ? err.message : t.errSave);
     } finally {
       setSaving(false);
     }
@@ -252,54 +383,53 @@ export function SettingsPage({ readonly = false }: SettingsPageProps) {
     <div className={`settings-page ${readonly ? "readonly-mode" : ""}`}>
       <header className="chat-header">
         <div>
-          <h2>Env Settings</h2>
-          <p>View and edit runtime environment variables in a form-based editor.</p>
+          <h2>{t.title}</h2>
+          <p>{t.subtitle}</p>
         </div>
       </header>
       {readonly && (
         <div className="readonly-banner" role="status" aria-live="polite">
-          Online mode: settings are view-only in this deployment.
+          {t.onlineReadonly}
         </div>
       )}
 
       <section className="settings-stack">
         <section className="chat-panel settings-help-card">
-          <h3>How It Works</h3>
+          <h3>{t.howItWorks}</h3>
           <p className="settings-help-lead">
-            Variables are fixed from <code>.env.example</code>. This page loads values from <code>{path}</code> and
-            lets you edit only predefined keys.
+            {t.helpLeadA} <code>.env.example</code>{t.helpLeadB} <code>{path}</code> {t.helpLeadC}
           </p>
           <div className="settings-help-grid">
             <div className="settings-help-item">
-              <div className="settings-help-item-title">Display Rules</div>
+              <div className="settings-help-item-title">{t.displayRules}</div>
               <ul>
-                <li>Config values are visible by default.</li>
-                <li>Key values can be hidden/shown.</li>
-                <li>Boolean values use on/off switches.</li>
+                <li>{t.rule1}</li>
+                <li>{t.rule2}</li>
+                <li>{t.rule3}</li>
               </ul>
             </div>
             <div className="settings-help-item">
-              <div className="settings-help-item-title">Variable Types</div>
+              <div className="settings-help-item-title">{t.varTypes}</div>
               <ul>
-                <li><strong>Config</strong>: system/runtime configuration and limits.</li>
-                <li><strong>Key</strong>: platform API credentials and access tokens.</li>
-                <li>Sections follow <code>.env.example</code> heading groups.</li>
-                <li>Filters support type, importance, and key search.</li>
+                <li><strong>{t.typeConfigStrong}</strong>{t.typeConfigDesc}</li>
+                <li><strong>{t.typeKeyStrong}</strong>{t.typeKeyDesc}</li>
+                <li>{t.sectionsNote} <code>.env.example</code> {t.sectionsNote2}</li>
+                <li>{t.filtersNote}</li>
               </ul>
             </div>
             <div className="settings-help-item">
-              <div className="settings-help-item-title">Save Behavior</div>
+              <div className="settings-help-item-title">{t.saveBehavior}</div>
               <ul>
-                <li>Only current form values are written to <code>{path}</code>.</li>
-                <li>Changes apply after restarting related services/processes.</li>
+                <li>{t.save1Pre} <code>{path}</code>.</li>
+                <li>{t.save2}</li>
               </ul>
             </div>
           </div>
           <div className="settings-meta">
-            <div>Total rows: {stats.total}</div>
-            <div>Configured values: {stats.nonEmpty}</div>
-            <div>Config rows: {stats.configCount}</div>
-            <div>Key rows: {stats.keyCount}</div>
+            <div>{t.metaTotal} {stats.total}</div>
+            <div>{t.metaConfigured} {stats.nonEmpty}</div>
+            <div>{t.metaConfigRows} {stats.configCount}</div>
+            <div>{t.metaKeyRows} {stats.keyCount}</div>
           </div>
         </section>
 
@@ -307,45 +437,45 @@ export function SettingsPage({ readonly = false }: SettingsPageProps) {
           <fieldset className="readonly-fieldset" disabled={readonly}>
           <div className="settings-toolbar">
             <button type="button" onClick={() => void loadEnv()} disabled={loading || saving}>
-              {loading ? "Loading..." : "Reload .env"}
+              {loading ? t.loadingBtn : t.reload}
             </button>
             <button type="button" onClick={toggleShowAll} disabled={stats.keyCount === 0}>
-              {allVisible ? "Hide all keys" : "Show all keys"}
+              {allVisible ? t.hideAllKeys : t.showAllKeys}
             </button>
             <input
               className="settings-filter-input"
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
-              placeholder="Search by key..."
+              placeholder={t.searchKeyPlaceholder}
             />
             <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as "all" | "config" | "key")}>
-              <option value="all">Type: All</option>
-              <option value="config">Type: Config</option>
-              <option value="key">Type: Key</option>
+              <option value="all">{t.typeAll}</option>
+              <option value="config">{t.typeConfig}</option>
+              <option value="key">{t.typeKey}</option>
             </select>
             <select
               value={importanceFilter}
               onChange={(e) => setImportanceFilter(e.target.value as "all" | ImportanceLevel)}
             >
-              <option value="all">Importance: All</option>
-              <option value="sensitive">Importance: Sensitive</option>
-              <option value="important">Importance: Important</option>
-              <option value="normal">Importance: Normal</option>
+              <option value="all">{t.impAll}</option>
+              <option value="sensitive">{t.impSensitive}</option>
+              <option value="important">{t.impImportant}</option>
+              <option value="normal">{t.impNormal}</option>
             </select>
             <button type="button" className="report-btn-primary" onClick={() => void saveEnv()} disabled={saving}>
-              {saving ? "Saving..." : "Save .env"}
+              {saving ? t.savingBtn : t.saveBtn}
             </button>
           </div>
 
           <div className="settings-rows" ref={rowsContainerRef}>
-            {entries.length === 0 && <div className="chat-empty">No variables found in .env.example / .env.</div>}
+            {entries.length === 0 && <div className="chat-empty">{t.noVars}</div>}
             {entries.length > 0 && filteredEntries.length === 0 && (
-              <div className="chat-empty">No variables match current search/filter.</div>
+              <div className="chat-empty">{t.noMatch}</div>
             )}
             {sectionedEntries.length > 0 && (
               <div className="settings-layout">
-                <aside className="settings-sections-nav" aria-label="Settings sections">
-                  <h4 className="settings-group-title">Sections</h4>
+                <aside className="settings-sections-nav" aria-label={t.sectionsAria}>
+                  <h4 className="settings-group-title">{t.sections}</h4>
                   {sectionedEntries.map(({ section, rows }) => (
                     <button
                       key={section}
@@ -366,7 +496,7 @@ export function SettingsPage({ readonly = false }: SettingsPageProps) {
                         <div className="settings-row settings-row-inline" key={`${idx}-${entry.key}`}>
                           <div className="settings-key-block">
                             <label className="settings-key-label">{entry.key}</label>
-                            <span className={`settings-key-tag ${isKey ? "secret" : "normal"}`}>{isKey ? "Key" : "Config"}</span>
+                            <span className={`settings-key-tag ${isKey ? "secret" : "normal"}`}>{isKey ? t.tagKey : t.tagConfig}</span>
                           </div>
                           <div className="settings-row-value">
                             {parseBooleanLiteral(entry.value) == null ? (
@@ -374,7 +504,7 @@ export function SettingsPage({ readonly = false }: SettingsPageProps) {
                                 className="settings-value-input"
                                 type={isKey && !visibility[entry.key] ? "password" : "text"}
                                 value={entry.value}
-                                placeholder="value"
+                                placeholder={t.valuePlaceholder}
                                 onChange={(e) => updateEntryValue(idx, e.target.value)}
                               />
                             ) : (
@@ -385,7 +515,7 @@ export function SettingsPage({ readonly = false }: SettingsPageProps) {
                                   onChange={(e) => updateBooleanEntry(idx, e.target.checked)}
                                 />
                                 <span className="settings-bool-slider" aria-hidden="true" />
-                                <span className="settings-bool-label">{parseBooleanLiteral(entry.value) ? "True" : "False"}</span>
+                                <span className="settings-bool-label">{parseBooleanLiteral(entry.value) ? t.boolTrue : t.boolFalse}</span>
                               </label>
                             )}
                           </div>
@@ -394,9 +524,9 @@ export function SettingsPage({ readonly = false }: SettingsPageProps) {
                               type="button"
                               className="settings-eye-btn"
                               onClick={() => toggleVisibility(entry.key)}
-                              title={visibility[entry.key] ? "Hide value" : "Show value"}
+                              title={visibility[entry.key] ? t.hideValue : t.showValue}
                             >
-                              {visibility[entry.key] ? "Hide" : "Show"}
+                              {visibility[entry.key] ? t.hide : t.show}
                             </button>
                           ) : (
                             <div />
