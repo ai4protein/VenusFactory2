@@ -132,10 +132,18 @@ def generate_and_execute_code(task_description: str, input_files: Optional[List[
                     # Get file info for better context
                     file_ext = os.path.splitext(file_path)[1]
                     file_size = os.path.getsize(file_path)
+                    # IMPORTANT: pass the ABSOLUTE path to the LLM. The
+                    # sandbox runs the generated script with its own
+                    # working_directory which is NOT the project root, so a
+                    # project-relative path like "temp_outputs/..." fails to
+                    # open. The "relative_path" field is kept for display /
+                    # readability only — the prompt below tells the model to
+                    # use "path" for I/O.
                     file_info.append({
-                        "path": to_project_relative_path(normalized_input),
+                        "path": normalized_input,
+                        "relative_path": to_project_relative_path(normalized_input),
                         "extension": file_ext,
-                        "size_kb": round(file_size / 1024, 2)
+                        "size_kb": round(file_size / 1024, 2),
                     })
         
         # Determine output directory
@@ -343,8 +351,24 @@ def generate_and_execute_code(task_description: str, input_files: Optional[List[
                 if json_match:
                     result_json = json.loads(json_match.group())
                     result_json["generated_code_path"] = to_project_relative_path(script_path)
-                    result_json["success"] = True  # Ensure success flag is set
-                    result_json["SYSTEM_NOTE"] = "STOP EXECUTION NOW. The code has run successfully. Provide the Final Answer immediately."
+                    # Trust the script's own success self-report. Previously this
+                    # line forced success=True even when the script printed
+                    # success=False (or carried an `error` field), causing the
+                    # MLS post-step verifier to mis-classify failed runs as
+                    # successes. Now: only stamp success=True when the script
+                    # itself reported success AND emitted no error field.
+                    reported_success = result_json.get("success") is True
+                    has_error_field = bool(result_json.get("error")) or (
+                        isinstance(result_json.get("summary"), str)
+                        and result_json["summary"].lower().startswith(("error", "traceback", "failed"))
+                    )
+                    if reported_success and not has_error_field:
+                        result_json["success"] = True
+                        result_json["SYSTEM_NOTE"] = "STOP EXECUTION NOW. The code has run successfully. Provide the Final Answer immediately."
+                    else:
+                        result_json["success"] = False
+                        result_json.setdefault("summary", "Script reported failure or emitted an error field; see details.")
+                        result_json["SYSTEM_NOTE"] = "The generated script ran but reported failure; downstream steps should treat this step as failed."
                     
                     # Keep the generated code since execution was successful
                     print(f"✓ Code executed successfully. Saved to: {to_project_relative_path(script_path)}")

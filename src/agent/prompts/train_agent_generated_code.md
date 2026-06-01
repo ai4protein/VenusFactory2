@@ -4,10 +4,23 @@ Generate a COMPLETE, executable Python script for this task.
 
 **TASK:** {task_description}
 
-**INPUT FILES:** {file_info}
-**OUTPUT DIR:** {output_directory}
+**INPUT FILES (use the absolute `path` field for ALL file I/O):** {file_info}
+**OUTPUT DIR (absolute):** {output_directory}
 **MODEL REGISTRY:** {model_registry_dir}
 **AVAILABLE TRAINED MODELS:** {available_models}
+
+⚠️ **PATH RULE:** Always use the `"path"` field from INPUT FILES (it is an
+absolute path) when opening any input file. The script runs under a sandbox
+working directory that is NOT the repo root, so project-relative paths
+(e.g. `temp_outputs/...`) will fail with `FileNotFoundError`. Do NOT copy
+paths from TASK or other free-form text — use the structured INPUT FILES
+entries verbatim. Same rule for OUTPUT DIR: open/save under the absolute
+path provided, never under a project-relative prefix.
+
+⚠️ **SUCCESS REPORTING:** Set `"success": false` (not true) and put the
+real error message into `"summary"` whenever an exception is caught, a
+file cannot be opened, or the intended output is not produced. Reporting
+`"success": true` on a failed run misleads downstream verifiers.
 
 **SECURITY (MANDATORY):** The code runs in a sandbox. You MUST NOT use: subprocess, os.system, os.popen, eval(), exec(), __import__(), compile(), input(), breakpoint(), socket, pty, shutil.rmtree, os.remove, os.unlink, os.rmdir, or __builtins__/__globals__. Use only standard data-processing and file I/O within the output directory.
 
