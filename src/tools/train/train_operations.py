@@ -83,10 +83,19 @@ def _load_train_prompt(name: str, **kwargs: Any) -> str:
     template = path.read_text(encoding="utf-8").strip()
     return template.format(**kwargs)
 
-def generate_and_execute_code(task_description: str, input_files: Optional[List[str]] = None) -> str:
+def generate_and_execute_code(
+    task_description: str,
+    input_files: Optional[List[str]] = None,
+    output_dir: Optional[str] = None,
+) -> str:
     """
     Generate and execute Python code for data processing, model training, and prediction.
     Supports multi-turn conversations: train a model in one turn, use it for prediction in later turns.
+
+    output_dir (optional): session-scoped output directory. Resolution order:
+      1. caller-supplied ``output_dir`` (e.g. an agent session dir);
+      2. parent dir of the first valid input file;
+      3. global ``temp_outputs/.../Code_Execution/Generated_Outputs`` (backward-compat).
     """
     script_path = None
     try:
@@ -146,8 +155,15 @@ def generate_and_execute_code(task_description: str, input_files: Optional[List[
                         "size_kb": round(file_size / 1024, 2),
                     })
         
-        # Determine output directory
-        if valid_files:
+        # Determine output directory.
+        # Priority:
+        #   1. caller-supplied output_dir (session-scoped, e.g. agent_session_dir)
+        #   2. parent dir of first valid input file
+        #   3. global Code_Execution/Generated_Outputs fallback (backward-compat)
+        if output_dir:
+            output_directory = str(Path(output_dir).expanduser())
+            os.makedirs(output_directory, exist_ok=True)
+        elif valid_files:
             primary_file = valid_files[0]
             output_directory = os.path.dirname(primary_file)
         else:

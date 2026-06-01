@@ -60,6 +60,7 @@ def call_proteinmpnn_design(
     model_name: str = "v_48_020",
     backbone_noise: float = 0.0,
     ca_only: bool = False,
+    out_dir: Optional[str] = None,
 ) -> str:
     try:
         fasta_path = proteinmpnn_design(
@@ -74,6 +75,7 @@ def call_proteinmpnn_design(
             model_name=model_name,
             backbone_noise=backbone_noise,
             ca_only=ca_only,
+            out_dir=out_dir,
         )
         preview = _read_fasta_preview(fasta_path, max_records=10)
         return json.dumps({
@@ -93,6 +95,7 @@ def call_proteinmpnn_score(
     num_batches: int = 1,
     model_name: str = "v_48_020",
     backbone_noise: float = 0.0,
+    out_dir: Optional[str] = None,
 ) -> str:
     try:
         out_fasta = proteinmpnn_score(
@@ -102,6 +105,7 @@ def call_proteinmpnn_score(
             num_batches=num_batches,
             model_name=model_name,
             backbone_noise=backbone_noise,
+            out_dir=out_dir,
         )
         preview = _read_fasta_preview(out_fasta, max_records=10)
         return json.dumps({

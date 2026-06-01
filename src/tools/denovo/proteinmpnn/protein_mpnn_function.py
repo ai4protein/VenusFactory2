@@ -105,6 +105,7 @@ def proteinmpnn_design(
     backbone_noise: float = 0.0,
     ca_only: bool = False,
     use_soluble_model: bool = False,
+    out_dir: Optional[str] = None,
 ) -> str:
     """
     ProteinMPNN sequence design covering all scenarios. Returns the output FASTA path.
@@ -133,10 +134,17 @@ def proteinmpnn_design(
     backbone_noise  : Gaussian noise std added to backbone coordinates
     ca_only         : Use the CA-only model
     use_soluble_model : Use soluble ProteinMPNN weights
+    out_dir          : Output directory for the designed sequences. When omitted,
+                       falls back to the global temp_outputs ProteinMPNN/Design path
+                       (backward-compat).
     """
     if temperatures is None:
         temperatures = [0.1]
-    out_folder = str(_get_save_path("ProteinMPNN", "Design"))
+    if out_dir:
+        out_folder = os.path.expanduser(out_dir)
+        os.makedirs(out_folder, exist_ok=True)
+    else:
+        out_folder = str(_get_save_path("ProteinMPNN", "Design"))
     pdb_name = Path(pdb_path).stem
     sampling_temp = " ".join(str(t) for t in temperatures)
     
@@ -206,6 +214,7 @@ def proteinmpnn_score(
     num_batches: int = 1,
     model_name: str = "v_48_020",
     backbone_noise: float = 0.0,
+    out_dir: Optional[str] = None,
 ) -> str:
     """
     Score sequences against a backbone structure (NLL = -log_prob; lower is better).
@@ -217,12 +226,18 @@ def proteinmpnn_score(
     fasta_path      : FASTA of sequences to score; None = score the native PDB sequence
     designed_chains : Chains to evaluate; None = all chains
     num_batches     : Number of stochastic forward passes to average over
+    out_dir         : Output directory for scored sequences. When omitted, falls back
+                      to the global temp_outputs ProteinMPNN/Score path (backward-compat).
 
     Returns
     -------
     str  Path to the output FASTA file ({timestamp}_{pdb_name}.fasta)
     """
-    out_folder = str(_get_save_path("ProteinMPNN", "Score"))
+    if out_dir:
+        out_folder = os.path.expanduser(out_dir)
+        os.makedirs(out_folder, exist_ok=True)
+    else:
+        out_folder = str(_get_save_path("ProteinMPNN", "Score"))
     kwargs: dict = dict(
         pdb_path=pdb_path,
         out_folder=out_folder,

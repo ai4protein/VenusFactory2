@@ -56,6 +56,15 @@ class CodeExecutionInput(BaseModel):
         default=None,
         description="Optional list of absolute or relative paths to input files (CSV, FASTA, etc.). These paths are passed to the generated code. Omit or empty for tasks that need no input files.",
     )
+    output_dir: Optional[str] = Field(
+        default=None,
+        description=(
+            "Optional output directory for generated files. Prefer the session-scoped "
+            "agent dir (e.g. temp_outputs/web_v2/sessions/{sid}/...) so artifacts stay "
+            "isolated per session. When omitted, falls back to the parent dir of the "
+            "first input file, or the global Code_Execution/Generated_Outputs path."
+        ),
+    )
 
 
 class ModelTrainingInput(BaseModel):
@@ -106,10 +115,14 @@ def generate_training_config_tool(
 
 
 @tool("agent_generated_code", args_schema=CodeExecutionInput)
-def agent_generated_code_tool(task_description: str, input_files: Optional[List[str]] = None) -> str:
+def agent_generated_code_tool(
+    task_description: str,
+    input_files: Optional[List[str]] = None,
+    output_dir: Optional[str] = None,
+) -> str:
     """Generate and execute Python code based on task description (agent-generated code runs in a sandbox; malicious patterns are blocked). Use for data processing, splitting, analysis tasks."""
     try:
-        return generate_and_execute_code(task_description, input_files)
+        return generate_and_execute_code(task_description, input_files, output_dir=output_dir)
     except Exception as e:
         return json.dumps({"success": False, "error": f"Code execution error: {str(e)}"}, ensure_ascii=False)
 
