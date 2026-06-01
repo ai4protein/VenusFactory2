@@ -1,5 +1,7 @@
-import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { LangNavLink, LangNavigate } from "./components/LangLink";
+import { readDefaultLang, langFromPath } from "./lib/i18n";
 import { ChatPage } from "./pages/ChatPage";
 import { ReportPage } from "./pages/ReportPage";
 import { ModuleShellPage } from "./pages/ModuleShellPage";
@@ -31,73 +33,225 @@ import { ManualDocPage } from "./pages/manual/ManualDocPage";
 import { RuntimeModeBadge } from "./components/RuntimeModeBadge";
 import { AgentShellPage } from "./pages/AgentShellPage";
 import { WorkspacePage } from "./pages/WorkspacePage";
+import { HomePage } from "./pages/HomePage";
+import { LeaderboardsPage } from "./pages/LeaderboardsPage";
+import { useLang } from "./lib/i18n";
+import { LanguageSwitch } from "./components/LanguageSwitch";
 
-const MODULES = [
-  { path: "/agent", label: "Agent", status: "Available" },
-  { path: "/report", label: "Report", status: "Available" },
-  { path: "/quick-tools", label: "Quick Tools", status: "Available" },
-  { path: "/advanced-tools", label: "Advanced Tools", status: "Available" },
-  { path: "/settings", label: "Settings", status: "Available" },
-  { path: "/download", label: "Download", status: "Available" },
-  { path: "/manual", label: "Manual", status: "Available" }
+const SIDEBAR_STRINGS = {
+  en: {
+    agent: "Agent",
+    report: "Report",
+    leaderboards: "Leaderboards",
+    quickTools: "Quick Tools",
+    advancedTools: "Advanced Tools",
+    settings: "Settings",
+    download: "Download",
+    manual: "Manual",
+    customModel: "Custom Model",
+    chat: "Chat",
+    workspace: "Workspace",
+    train: "Train",
+    evaluate: "Evaluate",
+    predict: "Predict",
+    directedEvolution: "Directed Evolution",
+    sequenceDesign: "Sequence Design",
+    proteinDiscovery: "Protein Discovery",
+    proteinFunction: "Protein Function",
+    functionalResidue: "Functional Residue",
+    physicochemicalProperty: "Physicochemical Property",
+    uniprot: "UniProt",
+    ncbi: "NCBI",
+    rcsbStructure: "RCSB Structure",
+    alphafold: "AlphaFold",
+    rcsbMetadata: "RCSB Metadata",
+    interproMetadata: "InterPro Metadata",
+    index: "Index",
+    prediction: "Prediction",
+    faq: "FAQ",
+    envSettings: "Env Settings",
+    insights: "Insights",
+    conference: "Conference",
+    arxiv: "Arxiv",
+    hf: "Hugging Face",
+    github: "GitHub",
+    expandSidebar: "Expand sidebar",
+    collapseSidebar: "Collapse sidebar",
+    brandHome: "VenusFactory2 — Home"
+  },
+  zh: {
+    agent: "智能体",
+    report: "报告",
+    leaderboards: "排行榜",
+    quickTools: "快速工具",
+    advancedTools: "高级工具",
+    settings: "设置",
+    download: "下载",
+    manual: "手册",
+    customModel: "自定义模型",
+    chat: "对话",
+    workspace: "工作区",
+    train: "训练",
+    evaluate: "评估",
+    predict: "预测",
+    directedEvolution: "定向进化",
+    sequenceDesign: "序列设计",
+    proteinDiscovery: "蛋白发现",
+    proteinFunction: "蛋白功能",
+    functionalResidue: "功能残基",
+    physicochemicalProperty: "理化性质",
+    uniprot: "UniProt",
+    ncbi: "NCBI",
+    rcsbStructure: "RCSB 结构",
+    alphafold: "AlphaFold",
+    rcsbMetadata: "RCSB 元数据",
+    interproMetadata: "InterPro 元数据",
+    index: "目录",
+    prediction: "预测",
+    faq: "常见问题",
+    envSettings: "环境设置",
+    insights: "洞察",
+    conference: "会议",
+    arxiv: "Arxiv",
+    hf: "Hugging Face",
+    github: "GitHub",
+    expandSidebar: "展开侧边栏",
+    collapseSidebar: "收起侧边栏",
+    brandHome: "VenusFactory2 — 首页"
+  }
+};
+
+type LabelKey = keyof typeof SIDEBAR_STRINGS["en"];
+
+const MODULES: Array<{ path: string; labelKey: LabelKey; status: string }> = [
+  { path: "/agent", labelKey: "agent", status: "Available" },
+  { path: "/report", labelKey: "report", status: "Available" },
+  { path: "/leaderboards", labelKey: "leaderboards", status: "Available" },
+  { path: "/quick-tools", labelKey: "quickTools", status: "Available" },
+  { path: "/advanced-tools", labelKey: "advancedTools", status: "Available" },
+  { path: "/settings", labelKey: "settings", status: "Available" },
+  { path: "/download", labelKey: "download", status: "Available" },
+  { path: "/manual", labelKey: "manual", status: "Available" }
 ];
 
-const AGENT_MODULES = [
-  { path: "/agent/chat", label: "Chat", status: "Available" },
-  { path: "/agent/workspace", label: "Workspace", status: "Available" }
+const AGENT_MODULES: Array<{ path: string; labelKey: LabelKey; status: string }> = [
+  { path: "/agent/chat", labelKey: "chat", status: "Available" },
+  { path: "/agent/workspace", labelKey: "workspace", status: "Available" }
 ];
 
-const CUSTOM_MODEL_MODULES = [
-  { path: "/custom-model/training", label: "Train", status: "Available" },
-  { path: "/custom-model/evaluation", label: "Evaluate", status: "Available" },
-  { path: "/custom-model/predict", label: "Predict", status: "Available" }
+const CUSTOM_MODEL_MODULES: Array<{ path: string; labelKey: LabelKey; status: string }> = [
+  { path: "/custom-model/training", labelKey: "train", status: "Available" },
+  { path: "/custom-model/evaluation", labelKey: "evaluate", status: "Available" },
+  { path: "/custom-model/predict", labelKey: "predict", status: "Available" }
 ];
 
-const QUICK_TOOL_MODULES = [
-  { path: "/quick-tools/directed-evolution", label: "Directed Evolution", status: "Available" },
-  { path: "/quick-tools/sequence-design", label: "Sequence Design", status: "Available" },
-  { path: "/quick-tools/protein-discovery", label: "Protein Discovery", status: "Available" },
-  { path: "/quick-tools/protein-function", label: "Protein Function", status: "Available" },
-  { path: "/quick-tools/functional-residue", label: "Functional Residue", status: "Available" },
-  { path: "/quick-tools/physicochemical-property", label: "Physicochemical Property", status: "Available" }
+const QUICK_TOOL_MODULES: Array<{ path: string; labelKey: LabelKey; status: string }> = [
+  { path: "/quick-tools/directed-evolution", labelKey: "directedEvolution", status: "Available" },
+  { path: "/quick-tools/sequence-design", labelKey: "sequenceDesign", status: "Available" },
+  { path: "/quick-tools/protein-discovery", labelKey: "proteinDiscovery", status: "Available" },
+  { path: "/quick-tools/protein-function", labelKey: "proteinFunction", status: "Available" },
+  { path: "/quick-tools/functional-residue", labelKey: "functionalResidue", status: "Available" },
+  { path: "/quick-tools/physicochemical-property", labelKey: "physicochemicalProperty", status: "Available" }
 ];
 
-const ADVANCED_TOOL_MODULES = [
-  { path: "/advanced-tools/directed-evolution", label: "Directed Evolution", status: "Available" },
-  { path: "/advanced-tools/sequence-design", label: "Sequence Design", status: "Available" },
-  { path: "/advanced-tools/protein-discovery", label: "Protein Discovery", status: "Available" },
-  { path: "/advanced-tools/protein-function", label: "Protein Function", status: "Available" },
-  { path: "/advanced-tools/functional-residue", label: "Functional Residue", status: "Available" }
+const ADVANCED_TOOL_MODULES: Array<{ path: string; labelKey: LabelKey; status: string }> = [
+  { path: "/advanced-tools/directed-evolution", labelKey: "directedEvolution", status: "Available" },
+  { path: "/advanced-tools/sequence-design", labelKey: "sequenceDesign", status: "Available" },
+  { path: "/advanced-tools/protein-discovery", labelKey: "proteinDiscovery", status: "Available" },
+  { path: "/advanced-tools/protein-function", labelKey: "proteinFunction", status: "Available" },
+  { path: "/advanced-tools/functional-residue", labelKey: "functionalResidue", status: "Available" }
 ];
 
-const DOWNLOAD_MODULES = [
-  { path: "/download/uniprot", label: "UniProt", status: "Available" },
-  { path: "/download/ncbi", label: "NCBI", status: "Available" },
-  { path: "/download/rcsb-structure", label: "RCSB Structure", status: "Available" },
-  { path: "/download/alphafold", label: "AlphaFold", status: "Available" },
-  { path: "/download/rcsb-metadata", label: "RCSB Metadata", status: "Available" },
-  { path: "/download/interpro", label: "InterPro Metadata", status: "Available" }
+const DOWNLOAD_MODULES: Array<{ path: string; labelKey: LabelKey; status: string }> = [
+  { path: "/download/uniprot", labelKey: "uniprot", status: "Available" },
+  { path: "/download/ncbi", labelKey: "ncbi", status: "Available" },
+  { path: "/download/rcsb-structure", labelKey: "rcsbStructure", status: "Available" },
+  { path: "/download/alphafold", labelKey: "alphafold", status: "Available" },
+  { path: "/download/rcsb-metadata", labelKey: "rcsbMetadata", status: "Available" },
+  { path: "/download/interpro", labelKey: "interproMetadata", status: "Available" }
 ];
 
-const MANUAL_MODULES = [
-  { path: "/manual/index", label: "Index", status: "Available" },
-  { path: "/manual/report", label: "Report", status: "Available" },
-  { path: "/manual/agent", label: "Agent", status: "Available" },
-  { path: "/manual/training", label: "Train", status: "Available" },
-  { path: "/manual/prediction", label: "Prediction", status: "Available" },
-  { path: "/manual/evaluation", label: "Evaluate", status: "Available" },
-  { path: "/manual/quick-tools", label: "Quick Tools", status: "Available" },
-  { path: "/manual/advanced-tools", label: "Advanced Tools", status: "Available" },
-  { path: "/manual/download", label: "Download", status: "Available" },
-  { path: "/manual/faq", label: "FAQ", status: "Available" }
+const MANUAL_MODULES: Array<{ path: string; labelKey: LabelKey; status: string }> = [
+  { path: "/manual/index", labelKey: "index", status: "Available" },
+  { path: "/manual/report", labelKey: "report", status: "Available" },
+  { path: "/manual/agent", labelKey: "agent", status: "Available" },
+  { path: "/manual/training", labelKey: "train", status: "Available" },
+  { path: "/manual/prediction", labelKey: "prediction", status: "Available" },
+  { path: "/manual/evaluation", labelKey: "evaluate", status: "Available" },
+  { path: "/manual/quick-tools", labelKey: "quickTools", status: "Available" },
+  { path: "/manual/advanced-tools", labelKey: "advancedTools", status: "Available" },
+  { path: "/manual/download", labelKey: "download", status: "Available" },
+  { path: "/manual/faq", labelKey: "faq", status: "Available" }
 ];
 
-const SETTINGS_MODULES = [
-  { path: "/settings/env", label: "Env Settings", status: "Available" },
-  { path: "/settings/insights", label: "Insights", status: "Available" }
+const SETTINGS_MODULES: Array<{ path: string; labelKey: LabelKey; status: string }> = [
+  { path: "/settings/env", labelKey: "envSettings", status: "Available" },
+  { path: "/settings/insights", labelKey: "insights", status: "Available" }
 ];
 
+/** Outer router: pins every URL into a `/${lang}/...` shape so that
+ *  search engines and hreflang see two genuinely distinct documents
+ *  (one per language) instead of a single SPA that swaps language
+ *  client-side. */
 export default function App() {
+  return (
+    <Routes>
+      {/* Bare root → redirect to the default-language root. */}
+      <Route path="/" element={<DefaultLangRedirect />} />
+      {/* Localized app shell. All real content lives here. */}
+      <Route path="/:lang/*" element={<LocalizedApp />} />
+      {/* Legacy / external links without lang prefix → prepend default lang. */}
+      <Route path="/*" element={<LegacyToLangRedirect />} />
+    </Routes>
+  );
+}
+
+function DefaultLangRedirect() {
+  return <Navigate to={`/${readDefaultLang()}`} replace />;
+}
+
+// Path prefixes that are NEVER React-Router routes — they're served by
+// the backend (API) or as static files. Direct navigation to these paths
+// must NOT be rewritten to /:lang/... otherwise the resulting URL is
+// meaningless (e.g. /en/api/foo doesn't exist on the backend).
+const NON_SPA_PREFIXES = [
+  "/api/",
+  "/manual-docs/",
+  "/img/",
+  "/assets/",
+  "/static/"
+];
+
+// Filenames at the root that should also bypass the redirect.
+const NON_SPA_FILES = new Set([
+  "/favicon.svg",
+  "/favicon.ico",
+  "/robots.txt",
+  "/sitemap.xml",
+  "/site.webmanifest",
+  "/manifest.json"
+]);
+
+function isNonSpaPath(pathname: string): boolean {
+  if (NON_SPA_FILES.has(pathname)) return true;
+  return NON_SPA_PREFIXES.some((p) => pathname.startsWith(p));
+}
+
+function LegacyToLangRedirect() {
+  const loc = useLocation();
+  // Don't infinite-loop: only prepend if first segment isn't already a known lang.
+  if (langFromPath(loc.pathname)) return null;
+  // Don't hijack API / static-asset paths. If a user (or external link)
+  // hits /api/foo or /sitemap.xml, the SPA must NOT prepend /en/ — that
+  // would produce a URL the backend doesn't serve. Render null and let
+  // the request 404 the normal way (in production these paths are
+  // dispatched to the backend by nginx/proxy before reaching the SPA).
+  if (isNonSpaPath(loc.pathname)) return null;
+  const target = `/${readDefaultLang()}${loc.pathname}${loc.search}${loc.hash}`;
+  return <Navigate to={target} replace />;
+}
+
+function LocalizedApp() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [customModelExpanded, setCustomModelExpanded] = useState(false);
   const [quickToolsExpanded, setQuickToolsExpanded] = useState(false);
@@ -108,25 +262,32 @@ export default function App() {
   const [agentExpanded, setAgentExpanded] = useState(true);
   const [runtimeMode, setRuntimeMode] = useState<"unknown" | "local" | "online">("unknown");
   const location = useLocation();
+  // Path beyond the `:lang` prefix, e.g. "/en/agent/chat" → "/agent/chat".
+  // Used for route-active comparisons that were authored against the
+  // pre-prefix URLs.
+  const langSeg = langFromPath(location.pathname);
+  const pathBeyondLang = langSeg
+    ? location.pathname.slice(`/${langSeg}`.length) || "/"
+    : location.pathname;
   const agentRouteActive =
-    AGENT_MODULES.some((m) => location.pathname.startsWith(m.path)) || location.pathname === "/chat";
+    AGENT_MODULES.some((m) => pathBeyondLang.startsWith(m.path)) || pathBeyondLang === "/chat";
   const customModelRouteActive = CUSTOM_MODEL_MODULES.some((m) =>
-    location.pathname.startsWith(m.path)
+    pathBeyondLang.startsWith(m.path)
   );
   const quickToolsRouteActive = QUICK_TOOL_MODULES.some((m) =>
-    location.pathname.startsWith(m.path)
+    pathBeyondLang.startsWith(m.path)
   );
   const advancedToolsRouteActive = ADVANCED_TOOL_MODULES.some((m) =>
-    location.pathname.startsWith(m.path)
+    pathBeyondLang.startsWith(m.path)
   );
   const downloadRouteActive = DOWNLOAD_MODULES.some((m) =>
-    location.pathname.startsWith(m.path)
+    pathBeyondLang.startsWith(m.path)
   );
   const manualRouteActive = MANUAL_MODULES.some((m) =>
-    location.pathname.startsWith(m.path)
+    pathBeyondLang.startsWith(m.path)
   );
   const settingsRouteActive = SETTINGS_MODULES.some((m) =>
-    location.pathname.startsWith(m.path)
+    pathBeyondLang.startsWith(m.path)
   );
   const showCustomModelChildren =
     !sidebarCollapsed && (customModelExpanded || customModelRouteActive);
@@ -143,7 +304,14 @@ export default function App() {
   const showAgentChildren = !sidebarCollapsed && (agentExpanded || agentRouteActive);
   const localFeaturesEnabled = runtimeMode === "local";
   const workspaceEnabled = localFeaturesEnabled;
+  // Landing page = the localized root `/en` or `/zh` (no further path).
+  const isLanding = pathBeyondLang === "/" || pathBeyondLang === "";
+  const t = useLang().t(SIDEBAR_STRINGS);
 
+  // NOTE: every hook must be called above the `if (isLanding)` early return,
+  // otherwise navigating between `/` and any inner route changes the hook
+  // count and React throws "Rendered more hooks than during the previous
+  // render", blanking the page.
   useEffect(() => {
     let alive = true;
     void (async () => {
@@ -168,18 +336,26 @@ export default function App() {
     };
   }, []);
 
+  if (isLanding) {
+    return (
+      <Routes>
+        <Route path="" element={<HomePage />} />
+      </Routes>
+    );
+  }
+
   return (
     <div className={`vf2-layout ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
       <aside className={`vf2-sidebar ${sidebarCollapsed ? "collapsed" : ""}`}>
         <div className="vf2-sidebar-top">
-          <div className="vf2-brand">
+          <LangNavLink to="/" className="vf2-brand vf2-brand-link" title={t.brandHome}>
             <h1>{sidebarCollapsed ? "VF2" : "VenusFactory2"}</h1>
-          </div>
+          </LangNavLink>
           <button
             className="vf2-sidebar-toggle"
             type="button"
             onClick={() => setSidebarCollapsed((v) => !v)}
-            aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={sidebarCollapsed ? t.expandSidebar : t.collapseSidebar}
           >
             {sidebarCollapsed ? "›" : "‹"}
           </button>
@@ -191,25 +367,25 @@ export default function App() {
               href="https://aclanthology.org/2025.acl-demo.23/"
               target="_blank"
               rel="noreferrer"
-              title="Conference"
+              title={t.conference}
             >
-              📄 Conference
+              📄 {t.conference}
             </a>
             <a
               className="vf2-sidebar-link"
               href="http://arxiv.org/abs/2603.27303"
               target="_blank"
               rel="noreferrer"
-              title="Arxiv"
+              title={t.arxiv}
             >
-              🆕 Arxiv
+              🆕 {t.arxiv}
             </a>
             <a
               className="vf2-sidebar-link"
               href="https://huggingface.co/AI4Protein"
               target="_blank"
               rel="noreferrer"
-              title="Hugging Face"
+              title={t.hf}
             >
               🤗 HF
             </a>
@@ -218,9 +394,9 @@ export default function App() {
               href="https://github.com/ai4protein/VenusFactory2"
               target="_blank"
               rel="noreferrer"
-              title="GitHub"
+              title={t.github}
             >
-              🐙 GitHub
+              🐙 {t.github}
             </a>
           </div>
         )}
@@ -234,25 +410,25 @@ export default function App() {
               item.path !== "/manual" &&
               item.path !== "/settings"
           ).map((item) => (
-            <NavLink
+            <LangNavLink
               key={item.path}
               to={item.path}
               className={({ isActive }) => `vf2-nav-item ${isActive ? "active" : ""}`}
-              title={item.label}
+              title={t[item.labelKey]}
             >
-              <span className="vf2-nav-label">{item.label}</span>
-            </NavLink>
+              <span className="vf2-nav-label">{t[item.labelKey]}</span>
+            </LangNavLink>
           ))}
 
           <div className="vf2-nav-group">
             <button
               type="button"
               className={`vf2-nav-item vf2-nav-parent ${agentRouteActive ? "active" : ""}`}
-              title="Agent"
+              title={t.agent}
               onClick={() => setAgentExpanded((v) => !v)}
               aria-expanded={showAgentChildren}
             >
-              <span className="vf2-nav-label">Agent</span>
+              <span className="vf2-nav-label">{t.agent}</span>
               {!sidebarCollapsed && (
                 <span className={`vf2-nav-caret ${showAgentChildren ? "expanded" : ""}`}>
                   ▾
@@ -262,14 +438,14 @@ export default function App() {
             {showAgentChildren &&
               AGENT_MODULES.map((item) => {
                 return (
-                  <NavLink
+                  <LangNavLink
                     key={item.path}
                     to={item.path}
                     className={({ isActive }) => `vf2-nav-item vf2-nav-subitem ${isActive ? "active" : ""}`}
-                    title={item.label}
+                    title={t[item.labelKey]}
                   >
-                    <span className="vf2-nav-label">{item.label}</span>
-                  </NavLink>
+                    <span className="vf2-nav-label">{t[item.labelKey]}</span>
+                  </LangNavLink>
                 );
               })}
           </div>
@@ -278,11 +454,11 @@ export default function App() {
             <button
               type="button"
               className={`vf2-nav-item vf2-nav-parent ${quickToolsRouteActive ? "active" : ""}`}
-              title="Quick Tools"
+              title={t.quickTools}
               onClick={() => setQuickToolsExpanded((v) => !v)}
               aria-expanded={showQuickToolChildren}
             >
-              <span className="vf2-nav-label">Quick Tools</span>
+              <span className="vf2-nav-label">{t.quickTools}</span>
               {!sidebarCollapsed && (
                 <span className={`vf2-nav-caret ${showQuickToolChildren ? "expanded" : ""}`}>
                   ▾
@@ -292,14 +468,14 @@ export default function App() {
 
             {showQuickToolChildren &&
               QUICK_TOOL_MODULES.map((item) => (
-                <NavLink
+                <LangNavLink
                   key={item.path}
                   to={item.path}
                   className={({ isActive }) => `vf2-nav-item vf2-nav-subitem ${isActive ? "active" : ""}`}
-                  title={item.label}
+                  title={t[item.labelKey]}
                 >
-                  <span className="vf2-nav-label">{item.label}</span>
-                </NavLink>
+                  <span className="vf2-nav-label">{t[item.labelKey]}</span>
+                </LangNavLink>
               ))}
           </div>
 
@@ -307,11 +483,11 @@ export default function App() {
             <button
               type="button"
               className={`vf2-nav-item vf2-nav-parent ${advancedToolsRouteActive ? "active" : ""}`}
-              title="Advanced Tools"
+              title={t.advancedTools}
               onClick={() => setAdvancedToolsExpanded((v) => !v)}
               aria-expanded={showAdvancedToolChildren}
             >
-              <span className="vf2-nav-label">Advanced Tools</span>
+              <span className="vf2-nav-label">{t.advancedTools}</span>
               {!sidebarCollapsed && (
                 <span className={`vf2-nav-caret ${showAdvancedToolChildren ? "expanded" : ""}`}>
                   ▾
@@ -321,14 +497,14 @@ export default function App() {
 
             {showAdvancedToolChildren &&
               ADVANCED_TOOL_MODULES.map((item) => (
-                <NavLink
+                <LangNavLink
                   key={item.path}
                   to={item.path}
                   className={({ isActive }) => `vf2-nav-item vf2-nav-subitem ${isActive ? "active" : ""}`}
-                  title={item.label}
+                  title={t[item.labelKey]}
                 >
-                  <span className="vf2-nav-label">{item.label}</span>
-                </NavLink>
+                  <span className="vf2-nav-label">{t[item.labelKey]}</span>
+                </LangNavLink>
               ))}
           </div>
 
@@ -336,11 +512,11 @@ export default function App() {
             <button
               type="button"
               className={`vf2-nav-item vf2-nav-parent ${customModelRouteActive ? "active" : ""}`}
-              title="Custom Model"
+              title={t.customModel}
               onClick={() => setCustomModelExpanded((v) => !v)}
               aria-expanded={showCustomModelChildren}
             >
-              <span className="vf2-nav-label">Custom Model</span>
+              <span className="vf2-nav-label">{t.customModel}</span>
               {!sidebarCollapsed && (
                 <span className={`vf2-nav-caret ${showCustomModelChildren ? "expanded" : ""}`}>
                   ▾
@@ -350,14 +526,14 @@ export default function App() {
 
             {showCustomModelChildren &&
               CUSTOM_MODEL_MODULES.map((item) => (
-                <NavLink
+                <LangNavLink
                   key={item.path}
                   to={item.path}
                   className={({ isActive }) => `vf2-nav-item vf2-nav-subitem ${isActive ? "active" : ""}`}
-                  title={item.label}
+                  title={t[item.labelKey]}
                 >
-                  <span className="vf2-nav-label">{item.label}</span>
-                </NavLink>
+                  <span className="vf2-nav-label">{t[item.labelKey]}</span>
+                </LangNavLink>
               ))}
           </div>
 
@@ -365,11 +541,11 @@ export default function App() {
             <button
               type="button"
               className={`vf2-nav-item vf2-nav-parent ${downloadRouteActive ? "active" : ""}`}
-              title="Download"
+              title={t.download}
               onClick={() => setDownloadExpanded((v) => !v)}
               aria-expanded={showDownloadChildren}
             >
-              <span className="vf2-nav-label">Download</span>
+              <span className="vf2-nav-label">{t.download}</span>
               {!sidebarCollapsed && (
                 <span className={`vf2-nav-caret ${showDownloadChildren ? "expanded" : ""}`}>
                   ▾
@@ -379,14 +555,14 @@ export default function App() {
 
             {showDownloadChildren &&
               DOWNLOAD_MODULES.map((item) => (
-                <NavLink
+                <LangNavLink
                   key={item.path}
                   to={item.path}
                   className={({ isActive }) => `vf2-nav-item vf2-nav-subitem ${isActive ? "active" : ""}`}
-                  title={item.label}
+                  title={t[item.labelKey]}
                 >
-                  <span className="vf2-nav-label">{item.label}</span>
-                </NavLink>
+                  <span className="vf2-nav-label">{t[item.labelKey]}</span>
+                </LangNavLink>
               ))}
           </div>
 
@@ -394,11 +570,11 @@ export default function App() {
             <button
               type="button"
               className={`vf2-nav-item vf2-nav-parent ${manualRouteActive ? "active" : ""}`}
-              title="Manual"
+              title={t.manual}
               onClick={() => setManualExpanded((v) => !v)}
               aria-expanded={showManualChildren}
             >
-              <span className="vf2-nav-label">Manual</span>
+              <span className="vf2-nav-label">{t.manual}</span>
               {!sidebarCollapsed && (
                 <span className={`vf2-nav-caret ${showManualChildren ? "expanded" : ""}`}>
                   ▾
@@ -408,14 +584,14 @@ export default function App() {
 
             {showManualChildren &&
               MANUAL_MODULES.map((item) => (
-                <NavLink
+                <LangNavLink
                   key={item.path}
                   to={item.path}
                   className={({ isActive }) => `vf2-nav-item vf2-nav-subitem ${isActive ? "active" : ""}`}
-                  title={item.label}
+                  title={t[item.labelKey]}
                 >
-                  <span className="vf2-nav-label">{item.label}</span>
-                </NavLink>
+                  <span className="vf2-nav-label">{t[item.labelKey]}</span>
+                </LangNavLink>
               ))}
           </div>
 
@@ -423,11 +599,11 @@ export default function App() {
             <button
               type="button"
               className={`vf2-nav-item vf2-nav-parent ${settingsRouteActive ? "active" : ""}`}
-              title="Settings"
+              title={t.settings}
               onClick={() => setSettingsExpanded((v) => !v)}
               aria-expanded={showSettingsChildren}
             >
-              <span className="vf2-nav-label">Settings</span>
+              <span className="vf2-nav-label">{t.settings}</span>
               {!sidebarCollapsed && (
                 <span className={`vf2-nav-caret ${showSettingsChildren ? "expanded" : ""}`}>
                   ▾
@@ -437,43 +613,51 @@ export default function App() {
 
             {showSettingsChildren &&
               SETTINGS_MODULES.map((item) => (
-                <NavLink
+                <LangNavLink
                   key={item.path}
                   to={item.path}
                   className={({ isActive }) => `vf2-nav-item vf2-nav-subitem ${isActive ? "active" : ""}`}
-                  title={item.label}
+                  title={t[item.labelKey]}
                 >
-                  <span className="vf2-nav-label">{item.label}</span>
-                </NavLink>
+                  <span className="vf2-nav-label">{t[item.labelKey]}</span>
+                </LangNavLink>
               ))}
           </div>
-          <RuntimeModeBadge runtimeMode={runtimeMode} placement="sidebar" />
+          {sidebarCollapsed ? (
+            <RuntimeModeBadge runtimeMode={runtimeMode} placement="sidebar" />
+          ) : (
+            <div className="vf2-sidebar-foot-row">
+              <RuntimeModeBadge runtimeMode={runtimeMode} placement="sidebar" />
+              <LanguageSwitch variant="compact" />
+            </div>
+          )}
         </nav>
       </aside>
       <main className="vf2-main">
         <Routes>
-          <Route path="/" element={<Navigate to="/agent/chat" replace />} />
-          <Route path="/chat" element={<Navigate to="/agent/chat" replace />} />
-          <Route path="/agent" element={<AgentShellPage />}>
-            <Route index element={<Navigate to="/agent/chat" replace />} />
+          <Route path="" element={<LangNavigate to="/agent/chat" replace />} />
+          <Route path="chat" element={<LangNavigate to="/agent/chat" replace />} />
+          <Route path="agent" element={<AgentShellPage />}>
+            <Route index element={<LangNavigate to="/agent/chat" replace />} />
             <Route path="chat" element={<ChatPage workspaceEnabled={workspaceEnabled} />} />
             <Route path="workspace" element={<WorkspacePage workspaceEnabled={workspaceEnabled} />} />
           </Route>
-          <Route path="/report" element={<ReportPage workspaceEnabled={workspaceEnabled} />} />
-          <Route path="/settings" element={<Navigate to="/settings/env" replace />} />
-          <Route path="/settings/env" element={<SettingsPage readonly={!localFeaturesEnabled} />} />
-          <Route path="/settings/insights" element={<SettingsInsightsPage />} />
-          <Route path="/quick-tools" element={<Navigate to="/quick-tools/directed-evolution" replace />} />
-          <Route path="/quick-tools/directed-evolution" element={<DirectedEvolutionPage workspaceEnabled={workspaceEnabled} />} />
-          <Route path="/quick-tools/sequence-design" element={<SequenceDesignPage workspaceEnabled={workspaceEnabled} />} />
+          <Route path="report" element={<ReportPage workspaceEnabled={workspaceEnabled} />} />
+          <Route path="leaderboards" element={<LeaderboardsPage />} />
+          <Route path="settings" element={<LangNavigate to="/settings/env" replace />} />
+          <Route path="settings/env" element={<SettingsPage readonly={!localFeaturesEnabled} />} />
+          <Route path="settings/insights" element={<SettingsInsightsPage />} />
+          <Route path="quick-tools" element={<LangNavigate to="/quick-tools/directed-evolution" replace />} />
+          <Route path="quick-tools/directed-evolution" element={<DirectedEvolutionPage workspaceEnabled={workspaceEnabled} />} />
+          <Route path="quick-tools/sequence-design" element={<SequenceDesignPage workspaceEnabled={workspaceEnabled} />} />
           <Route
             path="/quick-tools/protein-discovery"
             element={<ProteinDiscoveryPage readonly={!localFeaturesEnabled} workspaceEnabled={workspaceEnabled} />}
           />
-          <Route path="/quick-tools/protein-function" element={<ProteinFunctionPage workspaceEnabled={workspaceEnabled} />} />
-          <Route path="/quick-tools/functional-residue" element={<FunctionalResiduePage workspaceEnabled={workspaceEnabled} />} />
-          <Route path="/quick-tools/physicochemical-property" element={<PhysicochemicalPropertyPage workspaceEnabled={workspaceEnabled} />} />
-          <Route path="/advanced-tools" element={<Navigate to="/advanced-tools/directed-evolution" replace />} />
+          <Route path="quick-tools/protein-function" element={<ProteinFunctionPage workspaceEnabled={workspaceEnabled} />} />
+          <Route path="quick-tools/functional-residue" element={<FunctionalResiduePage workspaceEnabled={workspaceEnabled} />} />
+          <Route path="quick-tools/physicochemical-property" element={<PhysicochemicalPropertyPage workspaceEnabled={workspaceEnabled} />} />
+          <Route path="advanced-tools" element={<LangNavigate to="/advanced-tools/directed-evolution" replace />} />
           <Route
             path="/advanced-tools/directed-evolution"
             element={<AdvancedDirectedEvolutionPage workspaceEnabled={workspaceEnabled} />}
@@ -494,23 +678,23 @@ export default function App() {
             path="/advanced-tools/functional-residue"
             element={<AdvancedFunctionalResiduePage workspaceEnabled={workspaceEnabled} />}
           />
-          <Route path="/download" element={<Navigate to="/download/uniprot" replace />} />
-          <Route path="/download/uniprot" element={<UniProtDownloadPage />} />
-          <Route path="/download/ncbi" element={<NcbiDownloadPage />} />
-          <Route path="/download/rcsb-structure" element={<RcsbStructureDownloadPage />} />
-          <Route path="/download/alphafold" element={<AlphaFoldDownloadPage />} />
-          <Route path="/download/rcsb-metadata" element={<RcsbMetadataDownloadPage />} />
-          <Route path="/download/interpro" element={<InterProDownloadPage />} />
-          <Route path="/manual" element={<Navigate to="/manual/index" replace />} />
-          <Route path="/manual/*" element={<ManualLayout />}>
+          <Route path="download" element={<LangNavigate to="/download/uniprot" replace />} />
+          <Route path="download/uniprot" element={<UniProtDownloadPage />} />
+          <Route path="download/ncbi" element={<NcbiDownloadPage />} />
+          <Route path="download/rcsb-structure" element={<RcsbStructureDownloadPage />} />
+          <Route path="download/alphafold" element={<AlphaFoldDownloadPage />} />
+          <Route path="download/rcsb-metadata" element={<RcsbMetadataDownloadPage />} />
+          <Route path="download/interpro" element={<InterProDownloadPage />} />
+          <Route path="manual" element={<LangNavigate to="/manual/index" replace />} />
+          <Route path="manual/*" element={<ManualLayout />}>
             <Route path="index" element={<ManualIndexPage />} />
             <Route path=":section" element={<ManualDocPage />} />
           </Route>
-          {MODULES.filter((m) => m.path !== "/agent" && m.path !== "/report" && m.path !== "/quick-tools" && m.path !== "/advanced-tools" && m.path !== "/download" && m.path !== "/manual" && m.path !== "/settings").map((module) => (
+          {MODULES.filter((m) => m.path !== "/agent" && m.path !== "/report" && m.path !== "/leaderboards" && m.path !== "/quick-tools" && m.path !== "/advanced-tools" && m.path !== "/download" && m.path !== "/manual" && m.path !== "/settings").map((module) => (
             <Route
               key={module.path}
               path={module.path}
-              element={<ModuleShellPage title={module.label} status={module.status} />}
+              element={<ModuleShellPage title={t[module.labelKey]} status={module.status} />}
             />
           ))}
           <Route

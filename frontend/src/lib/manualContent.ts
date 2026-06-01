@@ -1,7 +1,12 @@
 import DOMPurify from "dompurify";
 import { marked, type Tokens } from "marked";
+import type { Lang } from "./i18n";
 
 export type ManualLanguage = "English" | "Chinese";
+
+export function langToManual(lang: Lang): ManualLanguage {
+  return lang === "zh" ? "Chinese" : "English";
+}
 
 export type ManualSectionKey =
   | "report"
