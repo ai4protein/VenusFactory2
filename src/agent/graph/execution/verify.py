@@ -39,6 +39,53 @@ class VerifyResult:
     failure_type: str = "unknown"
 
 
+def _tool_self_reports_success(raw_output: Any) -> bool:
+    """Return True when the tool's own payload is a success envelope with substantive content.
+
+    A tool is considered to self-report success when:
+
+    * the parsed payload is a dict, AND
+    * ``success`` is exactly ``True`` or ``status == "success"``, AND
+    * the payload carries at least one substantive content field
+      (``file_info``, ``output_files``, ``data``, ``content``, ``content_preview``,
+      ``results``, ``sequence``, ``sequences``, ``file_path``, ``entries``).
+
+    Used by ``run_mls_post_check`` to downgrade verifier rejections to soft
+    warnings when the tool clearly succeeded with real output. Mirrors (but is
+    independent from) the CB tolerant heuristic, and intentionally requires a
+    substantive field — bare ``{"status": "success"}`` envelopes do not count.
+    """
+    try:
+        parsed = json.loads(raw_output) if isinstance(raw_output, str) else raw_output
+    except Exception:
+        return False
+    if not isinstance(parsed, dict):
+        return False
+    if parsed.get("success") is not True and parsed.get("status") != "success":
+        return False
+    for key in (
+        "file_info",
+        "output_files",
+        "data",
+        "content",
+        "content_preview",
+        "results",
+        "sequence",
+        "sequences",
+        "file_path",
+        "entries",
+    ):
+        val = parsed.get(key)
+        if val is None:
+            continue
+        if isinstance(val, str) and not val.strip():
+            continue
+        if isinstance(val, (list, dict, tuple, set)) and len(val) == 0:
+            continue
+        return True
+    return False
+
+
 async def run_mls_post_check(
     ctx: ExecutionContext, raw_output: Any
 ) -> VerifyResult:
@@ -46,6 +93,15 @@ async def run_mls_post_check(
 
     Updates ``ctx.history`` / ``ctx.log_entries`` in place to match the legacy
     side effects.
+
+    Tolerant softening: when the underlying tool's payload self-reports success
+    with substantive content (see ``_tool_self_reports_success``), a verifier
+    rejection is downgraded to a soft warning. The verifier is still invoked
+    (so its diagnostic side effects — history note, logs — remain), but the
+    orchestrator is told to proceed. This matches the spirit of the CB tolerant
+    branch in :func:`run_cb_post_check` and prevents real tool successes (e.g.
+    ``download_uniprot_seq_by_id`` returning a FASTA, ``predict_protein_function``
+    writing a CSV) from being blocked by an over-strict semantic verifier.
     """
     session_state_for_check = {
         "mls_debug_executor": ctx.chains.get("mls_debug_executor"),
@@ -70,6 +126,36 @@ async def run_mls_post_check(
     post_reason = post_report_for_cb or (
         "步骤后置校验失败。" if ctx.ui_lang == "zh" else "Post-step verification failed."
     )
+
+    # Soften: when the tool itself returned a success envelope with substantive
+    # content, treat the verifier rejection as a non-fatal warning and let the
+    # plan continue. We still surface the verifier's opinion in history so the
+    # user can see why the verifier was unhappy.
+    if _tool_self_reports_success(raw_output):
+        _logger.warning(
+            "MLS post-step verifier flagged step %s (%s) but tool reports success "
+            "with substantive content — treating as soft warning. Verifier note: %s",
+            ctx.step_num,
+            ctx.tool_name,
+            post_reason,
+        )
+        try:
+            note = (
+                f"⚠️ **MLS self-check (post-step):** 校验器对工具输出有疑问，但工具自报成功，跳过该警告继续执行。\n\n校验意见：{post_reason}"
+                if ctx.ui_lang == "zh"
+                else f"⚠️ **MLS self-check (post-step):** Verifier flagged the output but the tool reported success — continuing.\n\nVerifier note: {post_reason}"
+            )
+            ctx.history.append(
+                {"role": "assistant", "content": note, "role_id": "machine_learning_specialist"}
+            )
+            ctx.log_entries.append(
+                f"MLS post-step verifier downgraded to warning for step {ctx.step_num} ({ctx.tool_name}): {post_reason}"
+            )
+        except Exception:
+            # Never let history bookkeeping break the success path.
+            pass
+        return VerifyResult(ok=True)
+
     retry_input = post_retry_input if isinstance(post_retry_input, dict) else None
     new_raw = json.dumps(
         {"status": "error", "error": {"type": "PostStepCheckFailed", "message": post_reason}},
