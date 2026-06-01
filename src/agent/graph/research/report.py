@@ -20,6 +20,7 @@ async def research_report_start_node(state: AgentState, config: RunnableConfig):
         if ui_lang == "zh" else
         "✍️ **Principal Investigator** is writing the draft report (Abstract, Introduction, Related Work, References) …",
         "role_id": "principal_investigator",
+        "phase": "draft_report_writing",
     })
     return {"history": history}
 
@@ -33,7 +34,8 @@ async def research_report_node(state: AgentState, config: RunnableConfig):
     history = list(state.get("history", []))
 
     if history and (
-        "撰写研究草案" in history[-1].get("content", "")
+        history[-1].get("phase") == "draft_report_writing"
+        or "撰写研究草案" in history[-1].get("content", "")
         or "writing the draft report" in history[-1].get("content", "").lower()
     ):
         history.pop()

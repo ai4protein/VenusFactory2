@@ -2,6 +2,10 @@ export type ChatHistoryItem = {
   role: string;
   content: string;
   role_id?: string;
+  /** Marker for ephemeral placeholder messages (thinking / summarizing / writing-*).
+   * Set by backend graph nodes so the frontend can detect a placeholder without
+   * matching localized substrings. */
+  phase?: string;
 };
 
 export type ClarificationQuestion = {

@@ -23,6 +23,7 @@ async def finalize_start_node(state: AgentState, config: RunnableConfig):
         "role": "assistant",
         "content": _ui_text(ui_lang, "summarizing"),
         "role_id": "scientific_critic",
+        "phase": "summarizing",
     })
     return {"history": history, "ui_lang": ui_lang}
 
@@ -89,7 +90,8 @@ async def finalize_node(state: AgentState, config: RunnableConfig):
     full_run_record = "\n\n".join(record_parts)
 
     if history and (
-        "Summarizing" in history[-1].get("content", "")
+        history[-1].get("phase") == "summarizing"
+        or "Summarizing" in history[-1].get("content", "")
         or "正在总结" in history[-1].get("content", "")
         or "汇总" in history[-1].get("content", "")
     ):

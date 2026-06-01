@@ -230,6 +230,9 @@ def _generate_experiment_report(state: dict[str, Any]) -> str:
     lines.append("")
 
     # Collect the finalizer summary (Scientific Critic / PI)
+    # Phase-tagged ephemeral placeholders (thinking, summarizing, sub_report_writing,
+    # draft_report_writing) are always skipped without language-specific substring matching.
+    skip_phases = {"thinking", "summarizing", "sub_report_writing", "draft_report_writing"}
     skip_markers = (
         "iteration_prompt", "请选择下一步", "Please choose",
         "正在分析", "is analyzing", "正在汇总", "is summarizing",
@@ -241,6 +244,8 @@ def _generate_experiment_report(state: dict[str, Any]) -> str:
     final_summaries: list[str] = []
     for item in reversed(history):
         if item.get("role") != "assistant":
+            continue
+        if item.get("phase") in skip_phases:
             continue
         content = item.get("content", "")
         role_id = item.get("role_id", "")
