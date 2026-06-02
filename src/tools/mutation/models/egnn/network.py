@@ -10,8 +10,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-from tools.mutation.models.egnn.egnn_pytorch_geometric import EGNN_Sparse
-from tools.mutation.models.egnn.utils import get_edge_feature_dims, get_node_feature_dims
+from src.tools.mutation.models.egnn.egnn_pytorch_geometric import EGNN_Sparse
+from src.tools.mutation.models.egnn.utils import get_edge_feature_dims, get_node_feature_dims
 
 class nodeEncoder(torch.nn.Module):
 

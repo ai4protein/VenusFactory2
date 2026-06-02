@@ -15,6 +15,20 @@ from .common_utils import get_project_root, get_save_path
 PROJECT_ROOT = get_project_root()
 
 
+def _subprocess_env() -> dict:
+    """Return os.environ with PYTHONPATH augmented so child scripts can resolve
+    both ``src.tools.*`` and bare ``tools.*`` imports regardless of whether
+    the parent server was launched from project root or from ``src/``.
+    """
+    env = os.environ.copy()
+    existing = env.get("PYTHONPATH", "")
+    extras = [str(PROJECT_ROOT), str(PROJECT_ROOT / "src")]
+    env["PYTHONPATH"] = os.pathsep.join(
+        [p for p in extras if p] + ([existing] if existing else [])
+    )
+    return env
+
+
 def run_zero_shot_prediction(model_type: str, model_name: str, file_path: str) -> Tuple[str, pd.DataFrame]:
     """Run zero-shot mutation prediction."""
     try:
@@ -38,12 +52,13 @@ def run_zero_shot_prediction(model_type: str, model_name: str, file_path: str) -
         ]
         
         subprocess.run(
-            cmd, 
-            capture_output=True, 
-            text=True, 
-            check=True, 
-            encoding='utf-8', 
-            errors='ignore'
+            cmd,
+            capture_output=True,
+            text=True,
+            check=True,
+            encoding='utf-8',
+            errors='ignore',
+            env=_subprocess_env(),
         )
 
         if os.path.exists(output_csv):
@@ -95,9 +110,10 @@ def run_single_function_prediction(
             text=True,
             check=True,
             encoding='utf-8',
-            errors='ignore'
+            errors='ignore',
+            env=_subprocess_env(),
         )
-        
+
         if output_file.exists():
             df = pd.read_csv(output_file)
             df["Dataset"] = dataset
@@ -141,7 +157,8 @@ def run_protein_properties_prediction(task_type: str, file_path: str) -> Tuple[s
            capture_output=True,
            text=True,
            encoding="utf-8",
-           errors="ignore"
+           errors="ignore",
+           env=_subprocess_env(),
         )
 
         # Check if the command failed

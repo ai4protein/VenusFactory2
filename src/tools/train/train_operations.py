@@ -158,19 +158,42 @@ def generate_and_execute_code(
         # Determine output directory.
         # Priority:
         #   1. caller-supplied output_dir (session-scoped, e.g. agent_session_dir)
-        #   2. parent dir of first valid input file
+        #   2. parent dir of first valid *file* (skip directory entries — passing
+        #      a directory like ``temp_outputs`` as input would otherwise yield
+        #      ``os.path.dirname(dir) = project root``, leaking ``generated_scripts/``
+        #      into the repo root)
         #   3. global Code_Execution/Generated_Outputs fallback (backward-compat)
         if output_dir:
             output_directory = str(Path(output_dir).expanduser())
             os.makedirs(output_directory, exist_ok=True)
-        elif valid_files:
-            primary_file = valid_files[0]
-            output_directory = os.path.dirname(primary_file)
         else:
-            output_directory = str(get_save_path("Code_Execution", "Generated_Outputs"))
-        
+            output_directory = None
+            for vf in valid_files:
+                if os.path.isfile(vf):
+                    output_directory = os.path.dirname(vf)
+                    break
+            if not output_directory:
+                output_directory = str(get_save_path("Code_Execution", "Generated_Outputs"))
+
         # Ensure output_directory is absolute path
         output_directory = str(Path(output_directory).expanduser().resolve())
+
+        # Hard guard: refuse to use project root (or its parent) as output dir.
+        # If we ever resolve to that, fall back to the global generated outputs
+        # path so scripts/artifacts never leak into the repo tree.
+        try:
+            from web.utils.common_utils import get_project_root as _get_root
+            _proj_root = str(_get_root().resolve())
+            if output_directory == _proj_root or output_directory == os.path.dirname(_proj_root):
+                fallback = str(get_save_path("Code_Execution", "Generated_Outputs"))
+                print(
+                    f"⚠️ agent_generated_code: refusing project-root output dir "
+                    f"({output_directory}); falling back to {fallback}"
+                )
+                output_directory = str(Path(fallback).expanduser().resolve())
+                os.makedirs(output_directory, exist_ok=True)
+        except Exception:
+            pass
         
         # Model registry directory for persistent storage
         model_registry_dir = os.path.join(output_directory, "trained_models")
