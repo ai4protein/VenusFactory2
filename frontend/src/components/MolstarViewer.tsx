@@ -15,6 +15,12 @@ export function MolstarViewer({ filePath, label }: MolstarViewerProps) {
   const t = useLang().t(STRINGS);
   const containerRef = useRef<HTMLDivElement>(null);
   const pluginRef = useRef<any>(null);
+  // Latest `label` for use inside the init effect without making it a
+  // dep — otherwise switching language (which changes the localized
+  // `label` prop) would tear down + re-init the whole Molstar plugin
+  // and re-fetch the structure.
+  const labelRef = useRef(label);
+  labelRef.current = label;
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "not_found">("loading");
   const [errMsg, setErrMsg] = useState("");
 
@@ -69,7 +75,7 @@ export function MolstarViewer({ filePath, label }: MolstarViewerProps) {
           rawFmt === "cif" || rawFmt === "mmcif" ? "mmcif" : rawFmt || "pdb";
         const data = await plugin.builders.data.rawData({
           data: content,
-          label: label || filePath,
+          label: labelRef.current || filePath,
         });
         const trajectory = await plugin.builders.structure.parseTrajectory(
           data,
@@ -97,7 +103,7 @@ export function MolstarViewer({ filePath, label }: MolstarViewerProps) {
       pluginRef.current?.dispose();
       pluginRef.current = null;
     };
-  }, [filePath, label]);
+  }, [filePath]);
 
   const fileName = filePath.split("/").pop() || filePath;
 

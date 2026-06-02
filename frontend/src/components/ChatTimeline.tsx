@@ -112,9 +112,15 @@ const STRUCTURE_EXT_RE = /(?:[\w.\/~-]+\/)*[\w.-]+\.(?:pdb|cif|mmcif|ent)\b/gi;
 
 function extractStructurePaths(text: string): string[] {
   const matches = text.match(STRUCTURE_EXT_RE) || [];
-  return [...new Set(matches)].filter(
-    (p) => !p.startsWith("http")
-  );
+  // Dedupe by exact string first, then drop any path whose basename
+  // is already covered by a longer / more-qualified path in the set.
+  // Without this collapse, a message that mentions `P00734.pdb` in a
+  // markdown link AND `/path/to/P00734.pdb` as a URL would render the
+  // same structure TWICE in two MolstarViewers.
+  const unique = [...new Set(matches)].filter((p) => !p.startsWith("http"));
+  return unique.filter((p) => {
+    return !unique.some((other) => other !== p && other.endsWith("/" + p));
+  });
 }
 
 /* ── Rich content extraction ── */

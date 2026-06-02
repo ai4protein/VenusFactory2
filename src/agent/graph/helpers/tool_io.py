@@ -149,7 +149,35 @@ def _sanitize_tool_invoke_input(
     for key, value in list(filtered.items()):
         key_l = str(key).lower()
         if any(tok in key_l for tok in ("path", "file", "dir")):
-            filtered[key] = maybe_resolve_local_path(value, project_root, session_root)
+            if isinstance(value, list):
+                # Resolve each element; for ``input_files``-style params drop
+                # directory entries so downstream tools (notably
+                # ``agent_generated_code``) don't infer output_dir from a
+                # whole directory blob and leak ``generated_scripts/`` into
+                # the project root.
+                drop_dirs = tool_name == "agent_generated_code" and "input" in key_l
+                resolved_list = []
+                for item in value:
+                    if isinstance(item, str):
+                        resolved_item = maybe_resolve_local_path(item, project_root, session_root)
+                        if drop_dirs and isinstance(resolved_item, str):
+                            try:
+                                if os.path.isdir(resolved_item):
+                                    _logger.warning(
+                                        "Input sanitize: tool=%s dropping directory entry from %s: %s",
+                                        tool_name,
+                                        key,
+                                        resolved_item,
+                                    )
+                                    continue
+                            except Exception:
+                                pass
+                        resolved_list.append(resolved_item)
+                    else:
+                        resolved_list.append(item)
+                filtered[key] = resolved_list
+            else:
+                filtered[key] = maybe_resolve_local_path(value, project_root, session_root)
     if tool_name == "python_repl" and "query" in filtered:
         filtered["query"] = rewrite_python_query_paths(
             filtered["query"],
