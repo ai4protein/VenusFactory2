@@ -35,6 +35,24 @@ real error message into `"summary"` whenever an exception is caught, a
 file cannot be opened, or the intended output is not produced. Reporting
 `"success": true` on a failed run misleads downstream verifiers.
 
+⚠️ **INSPECT BEFORE ASSUMING (MANDATORY):** Never assume CSV column
+names, JSON field names, or list-of-dict shapes. For every input file
+you load:
+1. **CSV:** load with `pd.read_csv`, then `print("Columns:",
+   list(df.columns))` and `print(df.head(2).to_dict())` BEFORE any column
+   access. If your task wants a "score" or "position" column that isn't
+   literally named that, fuzzy-match by substring (any column containing
+   "score" / "prob" / "pred" / "site" / "pos"), and report what you used
+   in the summary.
+2. **JSON:** after `json.load`, print `type(data)` and (if dict)
+   `list(data.keys())[:20]`, OR (if list) `len(data)` and
+   `list(data[0].keys())[:20]`. Pick the field by substring not by
+   guessed name.
+
+This eliminates the most common agent_generated_code failure mode:
+script crashes with KeyError / "Could not identify columns" because the
+upstream tool's schema didn't match the LLM's assumption.
+
 ⚠️ **GRACEFUL EMPTY-DATA HANDLING:** When the input data is structurally
 valid but a specific field is missing or empty (e.g. HPA `RNA tissue
 specific nTPM` is null because the gene has "Low tissue specificity";
