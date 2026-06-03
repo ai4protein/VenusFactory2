@@ -10,23 +10,65 @@ _SKILLS_DIR = Path(__file__).resolve().parent / "skills"
 
 
 def _parse_frontmatter(text: str) -> Dict[str, Any]:
-    """Parse YAML-like frontmatter between first --- and second ---."""
-    out = {}
+    """Parse YAML-like frontmatter between first --- and second ---.
+
+    Handles three forms:
+      key: value                       — single-line scalar
+      key: >-                          — YAML folded scalar (lines joined with spaces, no final newline)
+        line1
+        line2
+      key: >                           — YAML folded scalar (lines joined with spaces, trailing newline)
+        line1
+    """
+    out: Dict[str, Any] = {}
     if not text.strip().startswith("---"):
         return out
     parts = text.split("---", 2)
     if len(parts) < 3:
         return out
-    block = parts[1].strip()
-    for line in block.splitlines():
-        line = line.strip()
-        if ":" not in line:
+    lines = parts[1].strip().splitlines()
+
+    i = 0
+    while i < len(lines):
+        raw = lines[i]
+        stripped = raw.strip()
+        if not stripped or stripped.startswith("#"):
+            i += 1
             continue
-        key, _, value = line.partition(":")
+        if ":" not in stripped:
+            i += 1
+            continue
+        key, _, value = stripped.partition(":")
         key = key.strip()
-        value = value.strip().strip("'\"").strip()
+        value = value.strip()
+        # Folded scalar: collect indented continuation lines
+        if value in (">", ">-", "|", "|-"):
+            collected: List[str] = []
+            base_indent = None
+            j = i + 1
+            while j < len(lines):
+                cont = lines[j]
+                if not cont.strip():
+                    j += 1
+                    continue
+                # Detect indentation
+                indent = len(cont) - len(cont.lstrip())
+                if base_indent is None:
+                    base_indent = indent
+                if indent < base_indent or indent == 0:
+                    break
+                collected.append(cont.strip())
+                j += 1
+            joined = " ".join(collected).strip().strip("'\"").strip()
+            if key:
+                out[key] = joined
+            i = j
+            continue
+        # Single-line scalar
+        value = value.strip("'\"").strip()
         if key and value:
             out[key] = value
+        i += 1
     return out
 
 

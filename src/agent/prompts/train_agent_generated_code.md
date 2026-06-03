@@ -56,12 +56,39 @@ upstream tool's schema didn't match the LLM's assumption.
 ⚠️ **VISUALIZATION IS MANDATORY WHEN ASKED:** If the task description
 contains any of: `plot`, `chart`, `figure`, `visualize`, `bar`, `scatter`,
 `heatmap`, `histogram`, `boxplot`, `图`, `可视化`, `绘`, then your script
-**MUST** save at least one image file (`.png` recommended, 150+ dpi) to
+**MUST** save at least one image file (`.png` recommended, 300+ dpi) to
 OUTPUT_DIR and include that path in `output_files`. Use `matplotlib`
-(`plt.savefig(path, dpi=150, bbox_inches='tight')`) or `seaborn`. A `.txt`
+(`plt.savefig(path, dpi=300, bbox_inches='tight')`) or `seaborn`. A `.txt`
 summary alone is NOT acceptable for a plot task — return `success: false`
 with reason `"plot task but no image was produced"` if you cannot
 generate an actual image (so the harness can auto-retry).
+
+⚠️ **PUBLICATION-GRADE STYLE (when the task asks for a "publication" /
+"Nature" / "出版" / "学术配图" / "manuscript figure"):** Use the
+`nature_figure` skill's PALETTE and font/SVG rules. The CB plan should
+have inserted a `read_skill nature_figure` step before this one — if
+not, the minimal mandatory preamble is:
+
+```python
+import matplotlib.pyplot as plt
+plt.rcParams['font.family'] = 'sans-serif'
+plt.rcParams['font.sans-serif'] = ['Arial', 'DejaVu Sans', 'Liberation Sans']
+plt.rcParams['svg.fonttype'] = 'none'   # keeps text editable in SVG
+plt.rcParams['pdf.fonttype'] = 42       # embed TrueType for PDF
+plt.rcParams['axes.linewidth'] = 0.6
+plt.rcParams['xtick.major.width'] = 0.6
+plt.rcParams['ytick.major.width'] = 0.6
+PALETTE = {  # subset; full list in nature_figure/references/api.md
+    "blue_main": "#0F4D92", "blue_secondary": "#3775BA",
+    "green_3": "#8BCF8B", "red_strong": "#B64342",
+    "teal": "#42949E", "violet": "#9A4D8E", "gold": "#FFD700",
+    "neutral_mid": "#767676", "neutral_dark": "#4D4D4D",
+}
+```
+
+Save as both `.png` (300 dpi) and `.pdf` (vector) when the task asks
+for "publication" or "Nature". Default figure size: single-column
+~3.4 inches wide, double-column ~7.0 inches.
 
 ⚠️ **EMPTY-FIELD FALLBACK (NOT EMPTY-SCRIPT FALLBACK):** When a SPECIFIC
 field you wanted to plot is empty (e.g. HPA `RNA tissue specific nTPM`
