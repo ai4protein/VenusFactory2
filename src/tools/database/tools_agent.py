@@ -14,6 +14,8 @@ from src.web.utils.common_utils import get_save_path
 from .alphafold import (
     download_alphafold_structure_by_uniprot_id,
     download_alphafold_metadata_by_uniprot_id,
+    analyze_alphafold_plddt_by_metadata_file,
+    analyze_alphafold_pae_by_pae_file,
 )
 from .brenda import (
     download_brenda_km_values_by_ec_number,
@@ -31,6 +33,21 @@ from .chembl import (
     download_chembl_drug_by_id,
 )
 from .foldseek import download_foldseek_results_by_pdb_file
+from .clustalo import download_clustalo_msa_by_fasta
+from .openalex import (
+    download_openalex_entries_by_query,
+    download_openalex_entry_by_id,
+)
+from .arxiv import download_arxiv_paper_by_id
+from .biorxiv import download_biorxiv_by_doi
+from .seq_search import (
+    download_mmseqs2_homologs_by_sequence,
+    download_blast_homologs_by_sequence,
+)
+from src.tools.visualize.pymol import (
+    render_protein_structure,
+    superpose_two_structures,
+)
 from .kegg import (
     download_kegg_info_by_database,
     download_kegg_list_by_database,
@@ -54,10 +71,14 @@ from .ncbi import (
     download_ncbi_gene_by_id,
     download_ncbi_gene_by_symbol,
     download_ncbi_batch_lookup_by_symbols,
+    translate_ncbi_cds_to_protein,
+    search_ncbi_protein_by_gene_and_organism,
+    download_pubmed_abstracts_by_pmids,
 )
 from .rcsb import (
     download_rcsb_entry_metadata_by_pdb_id,
     download_rcsb_structure_by_pdb_id,
+    download_rcsb_search_by_query,
 )
 from .uniprot import (
     download_uniprot_search_by_query,
@@ -65,6 +86,7 @@ from .uniprot import (
     download_uniprot_mapping,
     download_uniprot_seq_by_id,
     download_uniprot_meta_by_id,
+    download_uniprot_sparql_by_query,
 )
 
 
@@ -104,7 +126,31 @@ def download_alphafold_metadata_by_uniprot_id_tool(
         return download_alphafold_metadata_by_uniprot_id(uniprot_id, out_dir)
     except Exception as e:
         return f"Download AlphaFold metadata error: {str(e)}"
-    
+
+class AlphaFoldAnalyzePlddtInput(BaseModel):
+    metadata_path: str = Field(..., description="Path to a previously downloaded AlphaFold metadata JSON (output of download_alphafold_metadata_by_uniprot_id). Required.")
+
+@tool("analyze_alphafold_plddt_by_metadata_file", args_schema=AlphaFoldAnalyzePlddtInput)
+def analyze_alphafold_plddt_by_metadata_file_tool(metadata_path: str) -> str:
+    """Analyze AlphaFold pLDDT confidence fractions from a local metadata JSON. Returns rich JSON: {status, content, biological_metadata {uniprot_id, global_plddt, fractions, conclusion}}."""
+    try:
+        return analyze_alphafold_plddt_by_metadata_file(metadata_path)
+    except Exception as e:
+        return f"Analyze AlphaFold pLDDT error: {str(e)}"
+
+class AlphaFoldAnalyzePaeInput(BaseModel):
+    pae_path: str = Field(..., description="Path to an AlphaFold PAE (predicted aligned error) JSON file. Required.")
+    distance_cutoff: float = Field(default=7.0, description="Avg-PAE cutoff (Å) for joining residues into the same sub-domain. Default 7.0.")
+    min_domain_size: int = Field(default=40, ge=1, description="Minimum residues a sub-domain must have. Default 40.")
+
+@tool("analyze_alphafold_pae_by_pae_file", args_schema=AlphaFoldAnalyzePaeInput)
+def analyze_alphafold_pae_by_pae_file_tool(pae_path: str, distance_cutoff: float = 7.0, min_domain_size: int = 40) -> str:
+    """Analyze an AlphaFold PAE matrix and detect global domain boundaries. Returns rich JSON: {status, content, biological_metadata {matrix_shape, mean_pae, domains[], conclusion}}."""
+    try:
+        return analyze_alphafold_pae_by_pae_file(pae_path, distance_cutoff=distance_cutoff, min_domain_size=min_domain_size)
+    except Exception as e:
+        return f"Analyze AlphaFold PAE error: {str(e)}"
+
 # ---------- BRENDA Database Tools (download only) ----------
 # All return JSON: {success, file_path[, error]}. Require BRENDA_EMAIL and BRENDA_PASSWORD in environment.
 class BrendaDownloadKmInput(BaseModel):
@@ -295,6 +341,215 @@ def download_foldseek_results_by_pdb_file_tool(
         return download_foldseek_results_by_pdb_file(pdb_file_path, protect_start, protect_end, out_dir=out_dir)
     except Exception as e:
         return f"Download FoldSeek results by PDB file error: {str(e)}"
+
+# ---------- Clustal Omega (EBI) MSA Tools (download only) ----------
+
+class ClustalOmegaMsaDownloadInput(BaseModel):
+    fasta_path: str = Field(..., description="Path to a FASTA file containing 2-4000 sequences, ≤ 4 MB. Required.")
+    out_dir: str = Field(..., description="Output directory for the MSA result file (<stem>_msa.fasta). Required.")
+    email: Optional[str] = Field(default=None, description="Contact email for the EBI job. Falls back to env USER_EMAIL or noreply@venusfactory.cn.")
+    poll_interval: float = Field(default=10.0, ge=1.0, description="Seconds between status polls. Default 10.")
+    timeout_secs: int = Field(default=15 * 60, ge=10, description="Maximum total wait time. Default 900 s.")
+
+@tool("download_clustalo_msa_by_fasta", args_schema=ClustalOmegaMsaDownloadInput)
+def download_clustalo_msa_by_fasta_tool(
+    fasta_path: str,
+    out_dir: str,
+    email: Optional[str] = None,
+    poll_interval: float = 10.0,
+    timeout_secs: int = 15 * 60,
+) -> str:
+    """Run EBI Clustal Omega multiple sequence alignment on a FASTA file. Returns rich JSON: {status, file_info, content_preview, biological_metadata {input_sequences, aligned_sequences, job_id, email}}."""
+    try:
+        return download_clustalo_msa_by_fasta(
+            fasta_path, out_dir, email=email, poll_interval=poll_interval, timeout_secs=timeout_secs
+        )
+    except Exception as e:
+        return f"Download Clustal Omega MSA error: {str(e)}"
+
+# ---------- Sequence Similarity Search Tools (MMseqs2 + BLAST) ----------
+
+class Mmseqs2HomologSearchInput(BaseModel):
+    sequence_or_fasta_path: str = Field(..., description="Either a raw amino-acid sequence or a path to a FASTA file. Required.")
+    out_dir: str = Field(..., description="Output directory for the hits JSON file. Required.")
+    include_mgnify: bool = Field(default=False, description="Also include hits from the mgnify/environmental database. Default False.")
+    poll_interval: float = Field(default=10.0, ge=1.0, description="Seconds between status polls. Default 10.")
+    timeout_secs: int = Field(default=15 * 60, ge=10, description="Maximum wall-clock wait. Default 900 s.")
+
+@tool("download_mmseqs2_homologs_by_sequence", args_schema=Mmseqs2HomologSearchInput)
+def download_mmseqs2_homologs_by_sequence_tool(
+    sequence_or_fasta_path: str,
+    out_dir: str,
+    include_mgnify: bool = False,
+    poll_interval: float = 10.0,
+    timeout_secs: int = 15 * 60,
+) -> str:
+    """Submit a protein sequence to ColabFold MMseqs2 and download parsed homologue hits as JSON. Returns rich JSON envelope; preview is a top-10 markdown table."""
+    try:
+        return download_mmseqs2_homologs_by_sequence(
+            sequence_or_fasta_path, out_dir,
+            include_mgnify=include_mgnify, poll_interval=poll_interval, timeout_secs=timeout_secs,
+        )
+    except Exception as e:
+        return f"MMseqs2 homologue search error: {str(e)}"
+
+class BlastHomologSearchInput(BaseModel):
+    sequence_or_fasta_path: str = Field(..., description="Either a raw amino-acid sequence or a path to a FASTA file. Required.")
+    out_dir: str = Field(..., description="Output directory for the hits JSON file. Required.")
+    database: str = Field(default="uniprotkb_swissprot", description="EBI BLAST database (or comma-separated list). Examples: uniprotkb, uniprotkb_swissprot, uniref90, pdb. Default uniprotkb_swissprot.")
+    email: Optional[str] = Field(default=None, description="Contact email for the EBI job. Falls back to env USER_EMAIL.")
+    poll_interval: float = Field(default=30.0, ge=1.0, description="Seconds between status polls. Default 30.")
+    timeout_secs: int = Field(default=15 * 60, ge=10, description="Maximum wall-clock wait. Default 900 s.")
+
+@tool("download_blast_homologs_by_sequence", args_schema=BlastHomologSearchInput)
+def download_blast_homologs_by_sequence_tool(
+    sequence_or_fasta_path: str,
+    out_dir: str,
+    database: str = "uniprotkb_swissprot",
+    email: Optional[str] = None,
+    poll_interval: float = 30.0,
+    timeout_secs: int = 15 * 60,
+) -> str:
+    """Submit a protein sequence to EBI NCBI BLAST and download parsed UniProt/PDB hits as JSON. Returns rich JSON envelope; preview is a top-10 markdown table."""
+    try:
+        return download_blast_homologs_by_sequence(
+            sequence_or_fasta_path, out_dir,
+            database=database, email=email, poll_interval=poll_interval, timeout_secs=timeout_secs,
+        )
+    except Exception as e:
+        return f"BLAST homologue search error: {str(e)}"
+
+# ---------- OpenAlex (scholarly works / authors / institutions / topics) ----------
+
+class OpenAlexEntriesQueryInput(BaseModel):
+    entity_type: str = Field(..., description="OpenAlex entity type: works, authors, sources, institutions, topics, concepts, domains, fields, subfields, sdgs, countries, continents, languages, keywords, publishers, funders. Required.")
+    out_dir: str = Field(..., description="Output directory for the OpenAlex JSON page response. Required.")
+    search: Optional[str] = Field(default=None, description="Free-text keyword (e.g. 'AlphaFold').")
+    filter_expr: Optional[str] = Field(default=None, description="OpenAlex filter expression (e.g. 'authorships.author.id:A123,publication_year:>2020').")
+    sort: Optional[str] = Field(default=None, description="OpenAlex sort expression (e.g. 'cited_by_count:desc', 'publication_date:desc').")
+    per_page: int = Field(default=25, ge=1, le=200, description="Results per page. Default 25, max 200.")
+    page: int = Field(default=1, ge=1, description="1-based page index. Default 1.")
+    timeout: int = Field(default=30, ge=5, description="HTTP timeout in seconds.")
+
+@tool("download_openalex_entries_by_query", args_schema=OpenAlexEntriesQueryInput)
+def download_openalex_entries_by_query_tool(
+    entity_type: str, out_dir: str,
+    search: Optional[str] = None, filter_expr: Optional[str] = None, sort: Optional[str] = None,
+    per_page: int = 25, page: int = 1, timeout: int = 30,
+) -> str:
+    """Search OpenAlex for scholarly entities. Save a single page of JSON to disk. Returns rich JSON envelope; biological_metadata contains total_count + next_page hint."""
+    try:
+        return download_openalex_entries_by_query(
+            entity_type, out_dir,
+            search=search, filter_expr=filter_expr, sort=sort,
+            per_page=per_page, page=page, timeout=timeout,
+        )
+    except Exception as e:
+        return f"OpenAlex search error: {str(e)}"
+
+class OpenAlexEntryByIdInput(BaseModel):
+    entity_type: str = Field(..., description="OpenAlex entity type (works, authors, sources, institutions, topics, ...). Required.")
+    openalex_id: str = Field(..., description="Short OpenAlex ID (e.g. W3177828909, A5089215617) or a full openalex.org URL. Required.")
+    out_dir: str = Field(..., description="Output directory for the entity JSON. Required.")
+    timeout: int = Field(default=30, ge=5, description="HTTP timeout in seconds.")
+
+@tool("download_openalex_entry_by_id", args_schema=OpenAlexEntryByIdInput)
+def download_openalex_entry_by_id_tool(entity_type: str, openalex_id: str, out_dir: str, timeout: int = 30) -> str:
+    """Fetch a single OpenAlex entity by ID and save the JSON. Returns rich JSON envelope; biological_metadata extracts title, cited_by_count, year, DOI when applicable."""
+    try:
+        return download_openalex_entry_by_id(entity_type, openalex_id, out_dir, timeout=timeout)
+    except Exception as e:
+        return f"OpenAlex entry-by-id error: {str(e)}"
+
+# ---------- arXiv paper download ----------
+
+class ArxivPaperDownloadInput(BaseModel):
+    arxiv_id: str = Field(..., description="arXiv id (e.g. '2106.04559', '2106.04559v2', 'hep-th/9510017'). Required.")
+    out_dir: str = Field(..., description="Output directory for the downloaded file. Required.")
+    format: str = Field(default="pdf", description="One of: 'pdf' (default), 'html', 'source' (tar.gz). HTML only exists for newer papers.")
+    timeout: int = Field(default=60, ge=5, description="HTTP timeout in seconds.")
+
+@tool("download_arxiv_paper_by_id", args_schema=ArxivPaperDownloadInput)
+def download_arxiv_paper_by_id_tool(arxiv_id: str, out_dir: str, format: str = "pdf", timeout: int = 60) -> str:
+    """Download an arXiv paper as PDF / HTML / source tarball to out_dir. Returns rich JSON envelope; file_info.file_path is the saved file."""
+    try:
+        return download_arxiv_paper_by_id(arxiv_id, out_dir, format=format, timeout=timeout)
+    except Exception as e:
+        return f"arXiv download error: {str(e)}"
+
+# ---------- bioRxiv / medRxiv per-DOI fetch ----------
+
+class BiorxivByDoiInput(BaseModel):
+    doi: str = Field(..., description="Bare DOI (e.g. '10.1101/2023.05.16.541025') or DOI URL. Required.")
+    out_dir: str = Field(..., description="Output directory for the JSON. Required.")
+    server: str = Field(default="biorxiv", description="'biorxiv' or 'medrxiv'. Default 'biorxiv'.")
+    include_abstract: bool = Field(default=True, description="If False, abstract is stripped from saved JSON. Default True.")
+    timeout: int = Field(default=30, ge=5, description="HTTP timeout in seconds.")
+
+@tool("download_biorxiv_by_doi", args_schema=BiorxivByDoiInput)
+def download_biorxiv_by_doi_tool(doi: str, out_dir: str, server: str = "biorxiv", include_abstract: bool = True, timeout: int = 30) -> str:
+    """Fetch a single bioRxiv/medRxiv preprint by DOI. Returns rich JSON envelope; file_info.file_path → JSON with all versions + the latest record."""
+    try:
+        return download_biorxiv_by_doi(doi, out_dir, server=server, include_abstract=include_abstract, timeout=timeout)
+    except Exception as e:
+        return f"bioRxiv-by-doi error: {str(e)}"
+
+# ---------- Visualization Tools (PyMOL headless rendering) ----------
+
+class PymolRenderProteinStructureInput(BaseModel):
+    pdb_path: str = Field(..., description="Path to a PDB or mmCIF structure file. Required.")
+    out_dir: str = Field(..., description="Output directory for the rendered PNG + PSE session. Required.")
+    color_by: str = Field(default="plddt", description="Coloring strategy: 'plddt' (B-factor as pLDDT spectrum), 'bfactor' (general), 'chain', or 'ss' (secondary structure).")
+    width: int = Field(default=1200, ge=200, description="Output PNG width in pixels.")
+    height: int = Field(default=900, ge=200, description="Output PNG height in pixels.")
+    dpi: int = Field(default=150, ge=50, description="Output PNG DPI.")
+    timeout_secs: int = Field(default=5 * 60, ge=10, description="PyMOL subprocess timeout.")
+
+@tool("render_protein_structure", args_schema=PymolRenderProteinStructureInput)
+def render_protein_structure_tool(
+    pdb_path: str,
+    out_dir: str,
+    color_by: str = "plddt",
+    width: int = 1200,
+    height: int = 900,
+    dpi: int = 150,
+    timeout_secs: int = 5 * 60,
+) -> str:
+    """Render a protein structure to PNG via headless PyMOL (OSMesa). Returns rich JSON envelope including the PNG and PSE session paths."""
+    try:
+        return render_protein_structure(
+            pdb_path, out_dir,
+            color_by=color_by, width=width, height=height, dpi=dpi, timeout_secs=timeout_secs,
+        )
+    except Exception as e:
+        return f"PyMOL render error: {str(e)}"
+
+class PymolSuperposeInput(BaseModel):
+    pdb_a: str = Field(..., description="Mobile structure path (gets aligned ONTO pdb_b). Required.")
+    pdb_b: str = Field(..., description="Reference structure path. Required.")
+    out_dir: str = Field(..., description="Output directory. Required.")
+    width: int = Field(default=1200, ge=200)
+    height: int = Field(default=900, ge=200)
+    dpi: int = Field(default=150, ge=50)
+    timeout_secs: int = Field(default=5 * 60, ge=10)
+
+@tool("superpose_two_structures", args_schema=PymolSuperposeInput)
+def superpose_two_structures_tool(
+    pdb_a: str,
+    pdb_b: str,
+    out_dir: str,
+    width: int = 1200,
+    height: int = 900,
+    dpi: int = 150,
+    timeout_secs: int = 5 * 60,
+) -> str:
+    """Superpose pdb_a onto pdb_b via PyMOL cealign, render the alignment to PNG, return RMSD. Rich JSON envelope; biological_metadata.rmsd_angstroms is the alignment RMSD."""
+    try:
+        return superpose_two_structures(
+            pdb_a, pdb_b, out_dir, width=width, height=height, dpi=dpi, timeout_secs=timeout_secs,
+        )
+    except Exception as e:
+        return f"PyMOL superpose error: {str(e)}"
 
 # ---------- InterPro Database Tools (download only) ----------
 # All return rich JSON: status, file_info, content_preview, biological_metadata, execution_context.
@@ -561,6 +816,53 @@ def download_ncbi_batch_lookup_by_symbols_tool(gene_symbols: List[str], organism
     except Exception as e:
         return f"Download NCBI Gene batch lookup by symbols error: {str(e)}"
 
+class NcbiCdsTranslateInput(BaseModel):
+    accession: str = Field(..., description="NCBI nuccore accession (e.g. NM_000518 for HBB mRNA). Required.")
+    out_dir: str = Field(..., description="Output directory for the FASTA file. Required.")
+    target_length: int = Field(default=0, ge=0, description="Pick the CDS translation closest to this length (residues). 0 = longest. Default 0.")
+    timeout: int = Field(default=60, ge=5, description="HTTP timeout in seconds.")
+
+@tool("translate_ncbi_cds_to_protein", args_schema=NcbiCdsTranslateInput)
+def translate_ncbi_cds_to_protein_tool(accession: str, out_dir: str, target_length: int = 0, timeout: int = 60) -> str:
+    """Fetch a CDS-translated protein FASTA for an NCBI nuccore accession (uses efetch rettype=fasta_cds_aa). Picks the translation closest to target_length, or the longest. Returns rich JSON envelope."""
+    try:
+        return translate_ncbi_cds_to_protein(accession, out_dir, target_length=target_length, timeout=timeout)
+    except Exception as e:
+        return f"NCBI CDS translate error: {str(e)}"
+
+class NcbiSearchByGeneOrganismInput(BaseModel):
+    gene: str = Field(..., description="Gene symbol (e.g. TP53). Required.")
+    organism: str = Field(..., description="Organism scientific name (e.g. 'Homo sapiens'). Required.")
+    out_dir: str = Field(..., description="Output directory for the multi-FASTA + JSON summary. Required.")
+    target_length: int = Field(default=0, ge=0, description="Narrow by sequence length window (±25 around target). 0 = no length filter. Default 0.")
+    retmax: int = Field(default=10, ge=1, le=200, description="Max number of hits to fetch. Default 10.")
+    timeout: int = Field(default=60, ge=5, description="HTTP timeout in seconds.")
+
+@tool("search_ncbi_protein_by_gene_and_organism", args_schema=NcbiSearchByGeneOrganismInput)
+def search_ncbi_protein_by_gene_and_organism_tool(
+    gene: str, organism: str, out_dir: str, target_length: int = 0, retmax: int = 10, timeout: int = 60,
+) -> str:
+    """Search NCBI Protein DB by gene symbol + organism (with optional length filter), fetch all hits as a multi-FASTA. Returns rich JSON envelope; biological_metadata.summary_path points at the per-hit metadata JSON."""
+    try:
+        return search_ncbi_protein_by_gene_and_organism(
+            gene, organism, out_dir, target_length=target_length, retmax=retmax, timeout=timeout,
+        )
+    except Exception as e:
+        return f"NCBI protein search by gene+organism error: {str(e)}"
+
+class PubmedAbstractsBatchInput(BaseModel):
+    pmids: List[str] = Field(..., description="List of PubMed IDs (PMIDs). Max 200 per call. Required.")
+    out_path: str = Field(..., description="Output JSON file path. Required.")
+    timeout: int = Field(default=60, ge=5, description="HTTP timeout in seconds.")
+
+@tool("download_pubmed_abstracts_by_pmids", args_schema=PubmedAbstractsBatchInput)
+def download_pubmed_abstracts_by_pmids_tool(pmids: List[str], out_path: str, timeout: int = 60) -> str:
+    """Fetch full title + authors + journal + structured abstract + DOI for a batch of PubMed PMIDs (one efetch call). Returns rich JSON envelope; file_info.file_path → JSON with `{requested_pmids, articles[]}`."""
+    try:
+        return download_pubmed_abstracts_by_pmids(pmids, out_path, timeout=timeout)
+    except Exception as e:
+        return f"PubMed batch abstract fetch error: {str(e)}"
+
 # RCSB PDB
 class RCSBEntryDownloadInput(BaseModel):
     pdb_id: str = Field(..., description="RCSB PDB entry ID (e.g. 4HHB). Required.")
@@ -588,6 +890,41 @@ def download_rcsb_structure_by_pdb_id_tool(pdb_id: str, out_dir: str, file_type:
         return download_rcsb_structure_by_pdb_id(pdb_id, out_dir, file_type=file_type)
     except Exception as e:
         return f"Download RCSB PDB structure file by PDB ID error: {str(e)}"
+
+class RCSBSearchInput(BaseModel):
+    query: str = Field(..., description="JSON string of an RCSB Search API v2 query. Either a query block ({type, service, parameters}) or a full request payload ({query, ...}). Required.")
+    out_dir: str = Field(..., description="Output directory for the response JSON. Required.")
+    return_type: str = Field(default="entry", description="One of: entry, assembly, polymer_entity, non_polymer_entity, polymer_instance, mol_definition. Default 'entry' (PDB IDs).")
+    page_start: Optional[int] = Field(default=None, description="Start index for pagination. If None and rows is None, all hits are returned.")
+    rows: Optional[int] = Field(default=None, description="Number of results to return per page.")
+    sort_by: Optional[str] = Field(default=None, description="Attribute to sort by, e.g. 'score' or 'rcsb_accession_info.initial_release_date'.")
+    sort_direction: Optional[str] = Field(default=None, description="'asc' or 'desc'; used with sort_by.")
+    count_only: bool = Field(default=False, description="Only return total_count, not the full result list. Cheaper for cardinality checks.")
+    timeout: int = Field(default=60, ge=5, description="HTTP timeout in seconds.")
+
+@tool("download_rcsb_search_by_query", args_schema=RCSBSearchInput)
+def download_rcsb_search_by_query_tool(
+    query: str,
+    out_dir: str,
+    return_type: str = "entry",
+    page_start: Optional[int] = None,
+    rows: Optional[int] = None,
+    sort_by: Optional[str] = None,
+    sort_direction: Optional[str] = None,
+    count_only: bool = False,
+    timeout: int = 60,
+) -> str:
+    """Run an RCSB Search API v2 query and save the matching identifiers to JSON. Returns rich JSON envelope; biological_metadata contains total_count, return_type, and pagination echo."""
+    try:
+        from .rcsb import download_rcsb_search_by_query
+        return download_rcsb_search_by_query(
+            query, out_dir,
+            return_type=return_type, page_start=page_start, rows=rows,
+            sort_by=sort_by, sort_direction=sort_direction,
+            count_only=count_only, timeout=timeout,
+        )
+    except Exception as e:
+        return f"RCSB search by query error: {str(e)}"
 
 # ---------- STRING Database Tools ----------
 class StringMapIdsDownloadInput(BaseModel):
@@ -787,6 +1124,20 @@ def download_uniprot_meta_by_id_tool(uniprot_id: str, out_path: str) -> str:
     except Exception as e:
         return f"Download metadata (JSON) from Uniprot error: {str(e)}"
 
+class UniprotSparqlInput(BaseModel):
+    query: str = Field(..., description="SPARQL query string to run against https://sparql.uniprot.org/sparql. Required.")
+    out_dir: str = Field(..., description="Output directory for the SPARQL JSON response. Required.")
+    timeout: int = Field(default=120, ge=5, description="HTTP timeout in seconds. Default 120.")
+
+@tool("download_uniprot_sparql_by_query", args_schema=UniprotSparqlInput)
+def download_uniprot_sparql_by_query_tool(query: str, out_dir: str, timeout: int = 120) -> str:
+    """Execute a SPARQL query against sparql.uniprot.org and save the raw JSON response. Returns rich JSON envelope; biological_metadata contains row_count and head_vars."""
+    try:
+        from .uniprot import download_uniprot_sparql_by_query
+        return download_uniprot_sparql_by_query(query, out_dir, timeout=timeout)
+    except Exception as e:
+        return f"UniProt SPARQL error: {str(e)}"
+
 class HpaGeneDownloadInput(BaseModel):
     gene_name: str = Field(..., description="Target gene symbol (e.g. EGFR, TP53).")
     out_path: str = Field(..., description="Output JSON file path.")
@@ -841,6 +1192,23 @@ DATABASE_TOOLS = [
     # AlphaFold
     download_alphafold_structure_by_uniprot_id_tool,
     download_alphafold_metadata_by_uniprot_id_tool,
+    analyze_alphafold_plddt_by_metadata_file_tool,
+    analyze_alphafold_pae_by_pae_file_tool,
+    # Clustal Omega
+    download_clustalo_msa_by_fasta_tool,
+    # Sequence similarity search
+    download_mmseqs2_homologs_by_sequence_tool,
+    download_blast_homologs_by_sequence_tool,
+    # OpenAlex (scholarly)
+    download_openalex_entries_by_query_tool,
+    download_openalex_entry_by_id_tool,
+    # arXiv (literature download)
+    download_arxiv_paper_by_id_tool,
+    # bioRxiv (per-DOI)
+    download_biorxiv_by_doi_tool,
+    # PyMOL visualization
+    render_protein_structure_tool,
+    superpose_two_structures_tool,
     # BRENDA
     download_brenda_km_values_by_ec_number_tool,
     download_brenda_reactions_by_ec_number_tool,
@@ -877,8 +1245,12 @@ DATABASE_TOOLS = [
     download_ncbi_gene_by_id_tool,
     download_ncbi_gene_by_symbol_tool,
     download_ncbi_batch_lookup_by_symbols_tool,
+    translate_ncbi_cds_to_protein_tool,
+    search_ncbi_protein_by_gene_and_organism_tool,
+    download_pubmed_abstracts_by_pmids_tool,
     # RCSB
     download_rcsb_entry_metadata_by_pdb_id_tool,
+    download_rcsb_search_by_query_tool,
     download_rcsb_structure_by_pdb_id_tool,
     # STRING
     download_string_map_ids_tool,
@@ -894,6 +1266,7 @@ DATABASE_TOOLS = [
     download_uniprot_mapping_tool,
     download_uniprot_seq_by_id_tool,
     download_uniprot_meta_by_id_tool,
+    download_uniprot_sparql_by_query_tool,
     # HPA
     download_hpa_protein_by_gene_tool,
     download_hpa_subcellular_location_by_gene_tool,
