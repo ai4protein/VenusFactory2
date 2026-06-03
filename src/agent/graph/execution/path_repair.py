@@ -164,6 +164,13 @@ def rebind_file_not_found(
         "could not find",
         "cannot find",
         "search root directory does not exist",  # common agent_generated_code message
+        # Schema-mismatch signatures — same recovery (re-prompt with all
+        # upstream paths + inspect-before-assume hint) usually works because
+        # the LLM regenerates the script after re-reading file_info.
+        "keyerror",
+        "could not identify",
+        "column not found",
+        "no column named",
     )
     _fnf_detected = any(sig in raw_lower for sig in _fnf_signatures) or (
         is_failure
