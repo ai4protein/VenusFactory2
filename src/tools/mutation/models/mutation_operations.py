@@ -20,7 +20,11 @@ def _error_dict(error_type: str, message: str, suggestion: Optional[str] = None)
 
 
 def _df_to_result(df, output_dir: str) -> Dict[str, Any]:
-    """Convert prediction DataFrame to result dict, save CSV."""
+    """Convert prediction DataFrame to result dict, save CSV.
+
+    Returns the full path under ``csv_path`` so callers/dependency tokens
+    can reach the saved CSV.
+    """
     records = df.to_dict(orient="split")
     data = records.get("data", [])
     total = len(data)
@@ -36,7 +40,8 @@ def _df_to_result(df, output_dir: str) -> Dict[str, Any]:
         df.to_csv(csv_path, index=False)
         result["csv_path"] = csv_path
     except Exception:
-        pass
+        csv_path = None
+    result["_csv_path"] = csv_path  # internal reference used by callers to build file_info
     return result
 
 
@@ -88,7 +93,15 @@ def zero_shot_mutation_sequence_prediction(
                                suggestion="Check sequence and model_name.")
         output_dir = _resolve_output_dir(out_dir)
         result_data = _df_to_result(raw_df, output_dir)
-        return {"status": "success", "data": result_data, "file_info": {"output_dir": output_dir}}
+        csv_path = result_data.pop("_csv_path", None)
+        file_info: Dict[str, Any] = {"output_dir": output_dir}
+        if csv_path:
+            # Surface the CSV path through the canonical ``file_path`` key so
+            # CB's ``dependency:step_N:file_path`` tokens resolve correctly
+            # without requiring the planner to know the exact field name.
+            file_info["file_path"] = csv_path
+            file_info["file_name"] = os.path.basename(csv_path)
+        return {"status": "success", "data": result_data, "file_info": file_info}
     except Exception as e:
         return _error_dict("PredictionError", str(e), suggestion="Check sequence, model_name, and GPU environment.")
     finally:
@@ -123,6 +136,14 @@ def zero_shot_mutation_structure_prediction(
                                suggestion="Check structure file and model_name.")
         output_dir = _resolve_output_dir(out_dir)
         result_data = _df_to_result(raw_df, output_dir)
-        return {"status": "success", "data": result_data, "file_info": {"output_dir": output_dir}}
+        csv_path = result_data.pop("_csv_path", None)
+        file_info: Dict[str, Any] = {"output_dir": output_dir}
+        if csv_path:
+            # Surface the CSV path through the canonical ``file_path`` key so
+            # CB's ``dependency:step_N:file_path`` tokens resolve correctly
+            # without requiring the planner to know the exact field name.
+            file_info["file_path"] = csv_path
+            file_info["file_name"] = os.path.basename(csv_path)
+        return {"status": "success", "data": result_data, "file_info": file_info}
     except Exception as e:
         return _error_dict("PredictionError", str(e), suggestion="Check structure file path and GPU environment.")
