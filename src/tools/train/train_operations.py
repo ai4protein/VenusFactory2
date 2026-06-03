@@ -178,16 +178,28 @@ def generate_and_execute_code(
         # Ensure output_directory is absolute path
         output_directory = str(Path(output_directory).expanduser().resolve())
 
-        # Hard guard: refuse to use project root (or its parent) as output dir.
-        # If we ever resolve to that, fall back to the global generated outputs
-        # path so scripts/artifacts never leak into the repo tree.
+        # Hard guard: only allow outputs under <project>/temp_outputs (or
+        # equivalent absolute paths supplied via output_dir). Without this,
+        # deriving output_directory from a non-temp_outputs input file
+        # (e.g. data/DeepSol/DeepSol_HF.json → data/DeepSol/) would litter
+        # the repo with generated_scripts/ and trained_models/ directories
+        # alongside the source data, breaking session isolation and leaving
+        # artifacts in the git working tree.
         try:
             from web.utils.common_utils import get_project_root as _get_root
             _proj_root = str(_get_root().resolve())
-            if output_directory == _proj_root or output_directory == os.path.dirname(_proj_root):
+            _safe_root = str((Path(_proj_root) / "temp_outputs").resolve())
+            # Anything under temp_outputs is fine. Anything else under the
+            # project root (including data/, ckpt/, src/, ...) gets rewritten.
+            try:
+                Path(output_directory).resolve().relative_to(_safe_root)
+                _is_safe = True
+            except ValueError:
+                _is_safe = False
+            if not _is_safe and output_directory.startswith(_proj_root):
                 fallback = str(get_save_path("Code_Execution", "Generated_Outputs"))
                 print(
-                    f"⚠️ agent_generated_code: refusing project-root output dir "
+                    f"⚠️ agent_generated_code: refusing in-repo output dir "
                     f"({output_directory}); falling back to {fallback}"
                 )
                 output_directory = str(Path(fallback).expanduser().resolve())

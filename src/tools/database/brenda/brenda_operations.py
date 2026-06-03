@@ -71,14 +71,38 @@ def _download_success_response(
     download_time_ms: int = 0,
     source: str = _SOURCE_BRENDA,
 ) -> str:
-    """Build JSON for download success: status, file_info, content_preview, biological_metadata, execution_context."""
+    """Build JSON for download success: status, file_info, content_preview, biological_metadata, execution_context.
+
+    Empty-file gate: BRENDA returns 0-byte files when credentials are missing
+    or the SOAP query returns no rows. Reporting these as success misleads
+    downstream tools (they fail trying to parse an empty file). Downgrade to
+    a typed error with an actionable suggestion.
+    """
     path = Path(file_path)
     file_size = path.stat().st_size if path.exists() else 0
+    if not path.exists() or file_size == 0:
+        return _error_response(
+            "EmptyDownload",
+            (
+                f"BRENDA returned no data for this query (file "
+                f"{'missing' if not path.exists() else 'is empty'} at {file_path}). "
+                "Most common cause: BRENDA_EMAIL / BRENDA_PASSWORD are not set "
+                "in .env, so the SOAP API rejects the request silently. Second "
+                "most common: the EC number has no entries for the requested "
+                "parameter (try a different EC or different field)."
+            ),
+            suggestion=(
+                "Set BRENDA_EMAIL and BRENDA_PASSWORD in .env (register at "
+                "https://www.brenda-enzymes.org/register.php — free), restart "
+                "the server, and retry. If credentials are already set, verify "
+                "the EC number has entries on the BRENDA website."
+            ),
+        )
     fmt = path.suffix.lstrip(".").lower() or "json"
     out: Dict[str, Any] = {
         "status": "success",
         "file_info": {
-            "file_path": to_client_file_path(path if path.exists() else file_path),
+            "file_path": to_client_file_path(path),
             "file_name": path.name,
             "file_size": file_size,
             "format": fmt,
