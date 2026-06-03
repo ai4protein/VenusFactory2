@@ -201,10 +201,22 @@ def _sanitize_tool_invoke_input(
                 # directory entries so downstream tools (notably
                 # ``agent_generated_code``) don't infer output_dir from a
                 # whole directory blob and leak ``generated_scripts/`` into
-                # the project root.
+                # the project root. Also coerce dict items (left over by
+                # incomplete dependency-token resolution) to their best
+                # path-like field so Pydantic ``input should be a valid
+                # string`` errors don't surface.
                 drop_dirs = tool_name == "agent_generated_code" and "input" in key_l
                 resolved_list = []
                 for item in value:
+                    if isinstance(item, dict):
+                        for k in ("file_path", "path", "out_path", "config_path", "fasta_path", "model_path"):
+                            if isinstance(item.get(k), str) and item[k].strip():
+                                item = item[k]
+                                break
+                        else:
+                            fi = item.get("file_info") if isinstance(item, dict) else None
+                            if isinstance(fi, dict) and isinstance(fi.get("file_path"), str):
+                                item = fi["file_path"]
                     if isinstance(item, str):
                         resolved_item = maybe_resolve_local_path(item, project_root, session_root)
                         if drop_dirs and isinstance(resolved_item, str):
@@ -220,8 +232,13 @@ def _sanitize_tool_invoke_input(
                             except Exception:
                                 pass
                         resolved_list.append(resolved_item)
+                    elif item is None:
+                        continue
                     else:
-                        resolved_list.append(item)
+                        _logger.debug(
+                            "Input sanitize: tool=%s dropping non-string %s item: %r",
+                            tool_name, key, item,
+                        )
                 filtered[key] = resolved_list
             else:
                 filtered[key] = maybe_resolve_local_path(value, project_root, session_root)

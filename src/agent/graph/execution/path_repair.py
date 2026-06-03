@@ -249,12 +249,30 @@ def rebind_file_not_found(
         existing_inputs = retry_seed.get("input_files") or []
         if not isinstance(existing_inputs, list):
             existing_inputs = []
-        # Build the augmented input_files list by union with all upstream paths
-        augmented = list(existing_inputs)
-        for _cp in candidate_paths:
-            if _cp not in augmented and os.path.exists(_cp):
-                augmented.append(_cp)
-        if not augmented or augmented == existing_inputs:
+        # Build the augmented input_files list by union with all upstream paths.
+        # Coerce items to strings — agent_generated_code's CodeExecutionInput
+        # rejects non-string entries, and dependency-token resolution
+        # sometimes leaves a parsed dict/None in the list when the upstream
+        # output doesn't have an obvious path field.
+        def _as_path_str(v: Any) -> str | None:
+            if isinstance(v, str):
+                return v if v.strip() else None
+            if isinstance(v, dict):
+                for k in ("file_path", "path", "out_path", "config_path", "fasta_path", "model_path"):
+                    if isinstance(v.get(k), str) and v[k].strip():
+                        return v[k]
+                fi = v.get("file_info")
+                if isinstance(fi, dict) and isinstance(fi.get("file_path"), str):
+                    return fi["file_path"]
+            return None
+
+        augmented: list[str] = []
+        for src in (existing_inputs, candidate_paths):
+            for item in src:
+                s = _as_path_str(item)
+                if s and s not in augmented and os.path.exists(s):
+                    augmented.append(s)
+        if not augmented or augmented == [s for s in (existing_inputs if all(isinstance(x, str) for x in existing_inputs) else []) ]:
             return None
         retry_seed["input_files"] = augmented
         # Amend task_description so the LLM is forced to use the structured list
