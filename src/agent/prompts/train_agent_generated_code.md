@@ -73,16 +73,22 @@ not, the minimal mandatory preamble is:
 import matplotlib.pyplot as plt
 plt.rcParams['font.family'] = 'sans-serif'
 plt.rcParams['font.sans-serif'] = ['Arial', 'DejaVu Sans', 'Liberation Sans']
-plt.rcParams['svg.fonttype'] = 'none'   # keeps text editable in SVG
-plt.rcParams['pdf.fonttype'] = 42       # embed TrueType for PDF
+plt.rcParams['svg.fonttype'] = 'none'
+plt.rcParams['pdf.fonttype'] = 42
 plt.rcParams['axes.linewidth'] = 0.6
 plt.rcParams['xtick.major.width'] = 0.6
 plt.rcParams['ytick.major.width'] = 0.6
-PALETTE = {  # subset; full list in nature_figure/references/api.md
-    "blue_main": "#0F4D92", "blue_secondary": "#3775BA",
-    "green_3": "#8BCF8B", "red_strong": "#B64342",
-    "teal": "#42949E", "violet": "#9A4D8E", "gold": "#FFD700",
-    "neutral_mid": "#767676", "neutral_dark": "#4D4D4D",
+
+PALETTE = {
+    "blue_main": "#0F4D92",
+    "blue_secondary": "#3775BA",
+    "green_3": "#8BCF8B",
+    "red_strong": "#B64342",
+    "teal": "#42949E",
+    "violet": "#9A4D8E",
+    "gold": "#FFD700",
+    "neutral_mid": "#767676",
+    "neutral_dark": "#4D4D4D",
 }
 ```
 
