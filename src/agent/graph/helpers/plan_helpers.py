@@ -146,13 +146,20 @@ async def _retry_plan_for_model_compat(
     protein_context_summary: str,
     available_tools_list: str,
 ) -> list[dict[str, Any]]:
-    """Fallback planner retry for models that frequently return [] despite executable intent."""
+    """Fallback planner retry for models that frequently return [] despite executable intent.
+
+    Robust to reasoning-style models (DeepSeek-V4-Pro, GLM-4.6): if ``content``
+    comes back empty but ``additional_kwargs.reasoning_content`` is populated,
+    parse the reasoning text (the model often embeds the JSON there). If still
+    empty, do one more attempt with an explicit "do NOT reason, emit JSON
+    directly" instruction.
+    """
     if llm is None:
         return []
     prompt = (
         "You are Computational Biologist.\n"
         "Generate an executable pipeline as JSON array ONLY.\n"
-        "No markdown, no explanation.\n"
+        "No markdown, no explanation, no chain-of-thought.\n"
         "Each item must contain: step(int), task_description(str), tool_name(str), tool_input(object).\n"
         "tool_name must be chosen exactly from AVAILABLE_TOOLS.\n"
         "If user request is actionable, DO NOT return []. Return at least one executable step.\n\n"
@@ -162,13 +169,39 @@ async def _retry_plan_for_model_compat(
         f"PROTEIN_CONTEXT:\n{protein_context_summary}\n\n"
         f"AVAILABLE_TOOLS:\n{available_tools_list}\n"
     )
+
+    def _extract_content(msg: Any) -> str:
+        content = getattr(msg, "content", None) or ""
+        if str(content).strip():
+            return str(content)
+        extra = getattr(msg, "additional_kwargs", None) or {}
+        if isinstance(extra, dict):
+            rc = str(extra.get("reasoning_content") or "")
+            if rc.strip():
+                return rc
+        return str(msg) or ""
+
     try:
         msg = await llm.ainvoke([HumanMessage(content=prompt)])
-        content = getattr(msg, "content", None) or str(msg) or ""
+        content = _extract_content(msg)
         _logger.info("CB planner compat retry output (first 1200 chars): %s", content[:1200])
         parsed = _parse_cb_plan(content)
         _logger.info("CB planner compat retry parsed steps count: %d", len(parsed) if isinstance(parsed, list) else 0)
-        return parsed if isinstance(parsed, list) else []
+        if isinstance(parsed, list) and parsed:
+            return parsed
+
+        # Second attempt: be even more explicit about no-reasoning.
+        prompt2 = (
+            "Output ONLY a JSON array. No markdown, no comments, no <think> tags, "
+            "no reasoning prefix. Start your response with `[` and end with `]`.\n\n"
+            + prompt
+        )
+        msg2 = await llm.ainvoke([HumanMessage(content=prompt2)])
+        content2 = _extract_content(msg2)
+        _logger.info("CB planner compat retry #2 output (first 1200 chars): %s", content2[:1200])
+        parsed2 = _parse_cb_plan(content2)
+        _logger.info("CB planner compat retry #2 parsed steps count: %d", len(parsed2) if isinstance(parsed2, list) else 0)
+        return parsed2 if isinstance(parsed2, list) else []
     except Exception as e:
         _logger.warning("CB planner compat retry failed: %s", e)
         return []

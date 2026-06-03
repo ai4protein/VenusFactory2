@@ -958,7 +958,21 @@ def create_cb_planner_chain(llm: BaseChatModel, tools_description: str, all_tool
     return prompt | llm | JsonOutputParser()
 
 def create_cb_planner_raw_chain(llm: BaseChatModel, tools_description: str, all_tools: list[BaseTool] | None = None):
-    """CB: same as planner but returns raw LLM output (for fallback parsing in chat_tab)."""
+    """CB: same as planner but returns raw LLM output (for fallback parsing in chat_tab).
+
+    Uses a larger ``max_tokens`` cap (16384) than the default 8192 because
+    reasoning-style models (DeepSeek-V4-Pro, GLM-4.6, ...) burn most of their
+    output budget inside ``reasoning_content`` and would otherwise return an
+    empty ``content`` field — producing an empty plan and a confusing
+    "planning_failed" terminal state.
+    """
+    from copy import copy
+    planner_llm = copy(llm)
+    try:
+        planner_llm.max_tokens = max(int(getattr(llm, "max_tokens", 8192) or 8192), 16384)
+    except Exception:
+        pass
+
     available_tools_list = ", ".join(t.name for t in all_tools) if all_tools else "(none)"
     available_skills_meta = get_skills_metadata_string()
     prompt = CB_PLANNER_PROMPT.partial(
@@ -970,7 +984,7 @@ def create_cb_planner_raw_chain(llm: BaseChatModel, tools_description: str, all_
         computational_biologist_step_planning=CB_STEP_PLANNING,
         machine_learning_specialist_post_step_check=MLS_POST_STEP_CHECK,
     )
-    return prompt | llm
+    return prompt | planner_llm
 
 
 def run_pi_research_step(llm: BaseChatModel, pi_tools: list[BaseTool], messages: list) -> tuple:

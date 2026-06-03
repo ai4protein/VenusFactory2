@@ -216,6 +216,12 @@ class NormalizeProtein(BaseTransform):
                                                    - self.edge_attr_mean[self.skip_edge_attr:]).div_(self.edge_attr_std[self.skip_edge_attr:] + self.safe_domi)
 
         return data
+
+    # torch_geometric>=2.4 made BaseTransform.forward an abstractmethod, so
+    # subclasses must define ``forward``. We keep ``__call__`` for backwards
+    # compatibility and route ``forward`` to the same implementation.
+    def forward(self, data):
+        return self.__call__(data)
 # NormalizeProtein(filename = 'dataset_alpha_Fold/40_10/mean_attr.pt')
 
 

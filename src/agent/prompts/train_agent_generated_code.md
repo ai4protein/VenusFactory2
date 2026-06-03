@@ -35,6 +35,27 @@ real error message into `"summary"` whenever an exception is caught, a
 file cannot be opened, or the intended output is not produced. Reporting
 `"success": true` on a failed run misleads downstream verifiers.
 
+⚠️ **GRACEFUL EMPTY-DATA HANDLING:** When the input data is structurally
+valid but a specific field is missing or empty (e.g. HPA `RNA tissue
+specific nTPM` is null because the gene has "Low tissue specificity";
+BRENDA `KM` is empty because the EC number has no kinetic entries; a CSV
+has zero rows after filtering) — this is NOT a script failure. Do this
+instead:
+1. Detect the empty field with explicit `if not data or len(data) == 0`.
+2. Save a placeholder artifact (e.g. a small text file under OUTPUT_DIR
+   named `<task>_no_data.txt` describing what was checked) so
+   `output_files` is non-empty.
+3. Report `"success": true` with a clear `"summary"` like
+   `"Input loaded successfully but field 'RNA tissue specific nTPM' was
+   empty (gene has Low tissue specificity). Saved a no-data placeholder."`
+4. Put the available fallback fields under `"details"` (e.g.
+   `tissue_distribution`, `tissue_specificity`, `cluster`) so downstream
+   code has SOMETHING to consume.
+
+Only return `"success": false` when the script could not run at all
+(exception, file-not-found, invalid format). Empty result fields are a
+data-quality signal, not a script bug.
+
 **SECURITY (MANDATORY):** The code runs in a sandbox. You MUST NOT use: subprocess, os.system, os.popen, eval(), exec(), __import__(), compile(), input(), breakpoint(), socket, pty, shutil.rmtree, os.remove, os.unlink, os.rmdir, or __builtins__/__globals__. Use only standard data-processing and file I/O within the output directory.
 
 **PATH ISOLATION (MANDATORY):** Do NOT write to `/tmp`, `~`, the user's home dir, the project root, or any path outside OUTPUT_DIR. OUTPUT_DIR is the session-scoped sandbox grant — use it as both your scratch and final-output location. The sandbox already gives full read+write there; any other write target is either denied (sandbox path validation) or globally shared across sessions (breaks isolation). If you need a tempfile, place it under OUTPUT_DIR (e.g. `os.path.join(OUTPUT_DIR, ".scratch_<uuid>.tmp")`), not in `/tmp`.
