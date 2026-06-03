@@ -74,6 +74,16 @@ def _tool_self_reports_success(raw_output: Any) -> bool:
         "sequences",
         "file_path",
         "entries",
+        # Tool-specific substantive fields:
+        "config_path",        # generate_training_config
+        "dataset_info",       # generate_training_config
+        "model_info",         # agent_generated_code (training)
+        "model_path",         # agent_generated_code (training)
+        "predictions",        # protein_model_predict
+        "metrics",            # train_protein_model
+        "fasta_path",         # proteinmpnn_*
+        "score",              # zero_shot_mutation_*
+        "scores",
     ):
         val = parsed.get(key)
         if val is None:

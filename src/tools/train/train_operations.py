@@ -572,17 +572,38 @@ def detect_sequence_and_label_columns(df: pd.DataFrame) -> Tuple[str, str]:
     return aa_seq_column, label_column
 
 def download_and_process_huggingface_dataset(dataset_path: str) -> Tuple[pd.DataFrame, str]:
-    """Download and process a dataset from Hugging Face."""
+    """Download and process a dataset from Hugging Face.
+
+    Accepts:
+      * ``user/name`` — direct HF dataset slug
+      * VenusFactory-bundled metadata JSON (e.g. ``data/DeepSol/DeepSol_HF.json``)
+        which contains ``{"dataset": "AI4Protein/DeepSol", ...}`` — the slug is
+        extracted and forwarded to ``load_dataset``.
+      * local dataset directory — passed through to ``load_dataset`` as-is.
+    """
     try:
         from datasets import load_dataset
-        
+
+        resolved_slug = dataset_path
+
+        # VenusFactory bundled HF metadata JSON: parse and pull out the slug.
+        if dataset_path.endswith(".json") and os.path.exists(dataset_path):
+            try:
+                with open(dataset_path, "r", encoding="utf-8") as _f:
+                    _meta = json.load(_f)
+                slug = _meta.get("dataset") if isinstance(_meta, dict) else None
+                if slug and isinstance(slug, str) and "/" in slug:
+                    resolved_slug = slug
+            except Exception:
+                pass
+
         # Check if dataset_path is a valid Hugging Face dataset path
-        if '/' in dataset_path:
+        if '/' in resolved_slug:
             # It's a Hugging Face dataset path like 'username/dataset_name'
-            dataset = load_dataset(dataset_path)
+            dataset = load_dataset(resolved_slug)
         else:
             # It might be a local path or a built-in dataset
-            dataset = load_dataset(dataset_path)
+            dataset = load_dataset(resolved_slug)
         
         # Convert to DataFrame - typically the first split is 'train'
         if 'train' in dataset:
@@ -844,12 +865,66 @@ def convert_to_serializable(obj):
     else:
         return obj
 
+def _apply_user_overrides(cfg: dict, user_requirements: Optional[str]) -> dict:
+    """Pull simple key=value style hints out of ``user_requirements`` text and
+    override the generated config. Handles num_epochs/epochs/learning_rate/
+    batch_size/max_seq_len which are the most common knobs users specify in
+    natural language (e.g. ``Use 1 epoch as a smoke test``).
+    """
+    if not user_requirements or not isinstance(cfg, dict):
+        return cfg
+    txt = str(user_requirements).lower()
+    # num_epochs: '1 epoch', 'num_epochs=3', '3 epochs', 'epoch=5'
+    m = re.search(r"(?:num[_\s-]?)?epochs?\s*[=:]\s*(\d+)", txt)
+    if not m:
+        m = re.search(r"\b(\d+)\s*epoch[s]?\b", txt)
+    if m:
+        try:
+            cfg["num_epochs"] = max(1, int(m.group(1)))
+        except Exception:
+            pass
+    # learning_rate
+    m = re.search(r"(?:learning[_\s-]?rate|lr)\s*[=:]\s*([0-9.eE+\-]+)", txt)
+    if m:
+        try:
+            cfg["learning_rate"] = float(m.group(1))
+        except Exception:
+            pass
+    # batch_size
+    m = re.search(r"batch[_\s-]?size\s*[=:]\s*(\d+)", txt)
+    if m:
+        try:
+            cfg["batch_size"] = max(1, int(m.group(1)))
+        except Exception:
+            pass
+    # max_seq_len
+    m = re.search(r"max[_\s-]?seq[_\s-]?len(?:gth)?\s*[=:]\s*(\d+)", txt)
+    if m:
+        try:
+            cfg["max_seq_len"] = max(8, int(m.group(1)))
+        except Exception:
+            pass
+    return cfg
+
+
 def generate_ai_training_config(analysis: dict, user_requirements: Optional[str] = None) -> dict:
-    """Use DeepSeek AI to generate optimal training configuration"""
+    """Use the configured LLM to generate an optimal training configuration."""
     try:
-        api_key = os.getenv("OPENAI_API_KEY")
+        # Resolve API config via unified LLM cfg (tries OPENAI_API_KEY →
+        # DEEPSEEK_API_KEY → CHAT_API_KEY). Falls back to env vars to remain
+        # compatible with legacy pinning.
+        try:
+            from config import get_config as _get_cfg
+            _cfg = _get_cfg()
+            api_key = _cfg.llm.api_key or os.getenv("OPENAI_API_KEY") or os.getenv("DEEPSEEK_API_KEY") or ""
+            base_url = _cfg.llm.base_url or "https://api.deepseek.com"
+            model_name = _cfg.llm.model_name or "deepseek-chat"
+        except Exception:
+            api_key = os.getenv("OPENAI_API_KEY") or os.getenv("DEEPSEEK_API_KEY") or ""
+            base_url = "https://api.deepseek.com"
+            model_name = "deepseek-chat"
         if not api_key:
-            return get_default_config(analysis)
+            return _apply_user_overrides(get_default_config(analysis), user_requirements)
         
         # Use module-level CONSTANT for model options
         constant_data = CONSTANT if CONSTANT else {"plm_models": PLM_MODELS}
@@ -890,7 +965,7 @@ def generate_ai_training_config(analysis: dict, user_requirements: Optional[str]
         }
         
         data = {
-            "model": "deepseek-chat",
+            "model": model_name,
             "messages": [
                 {"role": "system", "content": "You are a protein machine learning expert. Always respond with valid JSON."},
                 {"role": "user", "content": prompt}
@@ -898,28 +973,33 @@ def generate_ai_training_config(analysis: dict, user_requirements: Optional[str]
             "temperature": 0.3,
             "max_tokens": 800
         }
-        
+
         response = requests.post(
-            "https://api.deepseek.com/v1/chat/completions",
+            f"{base_url.rstrip('/')}/chat/completions",
             headers=headers,
             json=data,
             timeout=30
         )
-        
+
         if response.status_code == 200:
             result = response.json()
             content = result['choices'][0]['message']['content']
-            
-            import re
+
             json_match = re.search(r'\{.*\}', content, re.DOTALL)
             if json_match:
-                return json.loads(json_match.group())
-        
-        return get_default_config(analysis)
-        
+                try:
+                    parsed = json.loads(json_match.group())
+                    # AI output sometimes misses or hallucinates explicit values
+                    # for parameters the user requested; enforce after the fact.
+                    return _apply_user_overrides(parsed, user_requirements)
+                except Exception:
+                    pass
+
+        return _apply_user_overrides(get_default_config(analysis), user_requirements)
+
     except Exception as e:
         print(f"AI config generation failed: {e}")
-        return get_default_config(analysis)
+        return _apply_user_overrides(get_default_config(analysis), user_requirements)
 
 def get_default_config(analysis: dict) -> dict:
     """Fallback default configuration"""
