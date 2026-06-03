@@ -123,6 +123,79 @@ def _read_file_summary(path: str, max_chars: int = 1500) -> str:
         return f"[unreadable: {type(e).__name__}: {e}]"
 
 
+def _force_embed_missing_figures(
+    report: str,
+    figure_artifacts: list,
+    ui_lang: str,
+) -> str:
+    """Post-process the SC report so every produced figure is embedded.
+
+    The SC prompt asks the LLM to insert ``![title](url)`` inline, but in
+    practice the model frequently misses figures (multi-run measurement:
+    roughly half are dropped). This helper deterministically appends a
+    ``## Figures`` section at the end of the report with the missing
+    figures so the user always sees them rendered in the chat panel.
+    """
+    if not figure_artifacts:
+        return report
+
+    embedded_srcs = set()
+    # Detect what's already inside the report via Markdown image syntax.
+    for m in re.finditer(r"!\[[^\]]*\]\(([^)]+)\)", report):
+        embedded_srcs.add(m.group(1).strip())
+
+    def _is_present(fa: dict) -> bool:
+        # An image counts as embedded if either the OSS URL OR the short
+        # path OR the absolute path appears in any ``![...]()`` syntax.
+        for candidate in (fa.get("oss_url"), fa.get("short_path"), fa.get("abs_path")):
+            if not candidate:
+                continue
+            for src in embedded_srcs:
+                if candidate == src or candidate in src or src in candidate:
+                    return True
+        return False
+
+    missing = [fa for fa in figure_artifacts if not _is_present(fa)]
+    if not missing:
+        return report
+
+    is_zh = ui_lang == "zh"
+    section_title = "## 图表汇总（自动嵌入）" if is_zh else "## Figures (auto-embedded)"
+    intro = (
+        "以下图表在本次执行中自动生成；如未在 Results 章节中提及，请将其作为补充材料参考。"
+        if is_zh else
+        "The following figures were generated during this run; if not already cited in the Results section, treat them as supplementary visualizations."
+    )
+
+    blocks = [section_title, "", intro, ""]
+    for i, fa in enumerate(missing, 1):
+        src = fa.get("oss_url") or fa.get("short_path") or fa.get("abs_path") or ""
+        # Build a short, meaningful caption from the file stem
+        try:
+            stem = (fa.get("short_path") or fa.get("abs_path") or "").rsplit("/", 1)[-1]
+            stem = stem.rsplit(".", 1)[0]
+            stem = stem.replace("_", " ").replace("-", " ").strip()
+        except Exception:
+            stem = f"figure {i}"
+        caption_word = "图" if is_zh else "Figure"
+        from_step = fa.get("step", "?")
+        tool_name = fa.get("tool_name", "tool")
+        blocks.append(f"![{stem}]({src})")
+        if is_zh:
+            blocks.append(f"*{caption_word} {i}. {stem}（来自 step {from_step} `{tool_name}`）*")
+        else:
+            blocks.append(f"*{caption_word} {i}. {stem} (from step {from_step}, `{tool_name}`).*")
+        blocks.append("")
+
+    # Insert the section BEFORE References if present, otherwise append.
+    refs_pat = re.search(r"(?:^|\n)(##\s*(?:References|参考文献)\s*\n)", report)
+    section_text = "\n".join(blocks).rstrip() + "\n\n"
+    if refs_pat:
+        idx = refs_pat.start(1)
+        return report[:idx] + section_text + report[idx:]
+    return report.rstrip() + "\n\n" + section_text
+
+
 async def finalize_node(state: AgentState, config: RunnableConfig):
     """Finalizer node: generates final summary using tool execution history."""
     chains = config.get("configurable", {}).get("chains", {})
@@ -330,6 +403,13 @@ async def finalize_node(state: AgentState, config: RunnableConfig):
             },
             role_id="scientific_critic",
         )
+        # Q1: deterministically force-embed any figures the SC LLM forgot.
+        # We can't rely on the LLM to follow the "MANDATORY inline image"
+        # rule (multiple runs proved it skips ≥50% of inventoried figures).
+        # Post-process the report: for every figure not already embedded,
+        # append a "## Figures (auto-embedded)" section at the end with
+        # one image per missing figure and a short caption.
+        summary = _force_embed_missing_figures(summary, figure_artifacts, ui_lang)
         history.append({"role": "assistant", "content": summary, "role_id": "scientific_critic"})
     except Exception as e:
         _logger.warning("Finalizer failed: %s", e)
