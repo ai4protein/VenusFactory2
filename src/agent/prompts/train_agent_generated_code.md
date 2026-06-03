@@ -53,26 +53,43 @@ This eliminates the most common agent_generated_code failure mode:
 script crashes with KeyError / "Could not identify columns" because the
 upstream tool's schema didn't match the LLM's assumption.
 
-⚠️ **GRACEFUL EMPTY-DATA HANDLING:** When the input data is structurally
-valid but a specific field is missing or empty (e.g. HPA `RNA tissue
-specific nTPM` is null because the gene has "Low tissue specificity";
-BRENDA `KM` is empty because the EC number has no kinetic entries; a CSV
-has zero rows after filtering) — this is NOT a script failure. Do this
-instead:
-1. Detect the empty field with explicit `if not data or len(data) == 0`.
-2. Save a placeholder artifact (e.g. a small text file under OUTPUT_DIR
-   named `<task>_no_data.txt` describing what was checked) so
-   `output_files` is non-empty.
-3. Report `"success": true` with a clear `"summary"` like
-   `"Input loaded successfully but field 'RNA tissue specific nTPM' was
-   empty (gene has Low tissue specificity). Saved a no-data placeholder."`
-4. Put the available fallback fields under `"details"` (e.g.
-   `tissue_distribution`, `tissue_specificity`, `cluster`) so downstream
-   code has SOMETHING to consume.
+⚠️ **VISUALIZATION IS MANDATORY WHEN ASKED:** If the task description
+contains any of: `plot`, `chart`, `figure`, `visualize`, `bar`, `scatter`,
+`heatmap`, `histogram`, `boxplot`, `图`, `可视化`, `绘`, then your script
+**MUST** save at least one image file (`.png` recommended, 150+ dpi) to
+OUTPUT_DIR and include that path in `output_files`. Use `matplotlib`
+(`plt.savefig(path, dpi=150, bbox_inches='tight')`) or `seaborn`. A `.txt`
+summary alone is NOT acceptable for a plot task — return `success: false`
+with reason `"plot task but no image was produced"` if you cannot
+generate an actual image (so the harness can auto-retry).
 
-Only return `"success": false` when the script could not run at all
-(exception, file-not-found, invalid format). Empty result fields are a
-data-quality signal, not a script bug.
+⚠️ **EMPTY-FIELD FALLBACK (NOT EMPTY-SCRIPT FALLBACK):** When a SPECIFIC
+field you wanted to plot is empty (e.g. HPA `RNA tissue specific nTPM`
+is null because the gene has "Low tissue specificity") but the input
+file itself is structurally valid:
+1. **DO NOT just write a no_data.txt and exit.** That hides the rest of
+   the data from the report.
+2. Look for FALLBACK fields in the same input that ARE populated. For
+   HPA: `RNA tissue distribution`, `RNA tissue specificity`, `Tissue
+   expression cluster`, `RNA tissue cell type enrichment`. For BRENDA:
+   if `KM` is empty try `kcat`, `optimum_temperature`, `optimum_ph`. For
+   CSVs: if the requested column is empty, check sibling columns.
+3. **Produce the plot using the fallback fields**, with a clear title
+   like "TP53 tissue expression — nTPM unavailable (Low tissue
+   specificity); showing tissue distribution categories instead". Save
+   the PNG.
+4. In your JSON summary, state which field was missing and which
+   fallback you used.
+
+Only write `<task>_no_data.txt` and skip the plot when EVERY
+substantive field in the input is null/empty — i.e. the upstream tool
+genuinely produced no usable data. In that rare case set
+`"success": false` so the harness can flag it; do NOT report success
+on a no-data placeholder if the task expected a chart.
+
+⚠️ **WHEN THE SCRIPT TRULY CANNOT RUN:** Return `"success": false` only
+for actual exceptions, file-not-found, or invalid format. A merely
+sparse data field is NOT a script failure — use the fallback above.
 
 **SECURITY (MANDATORY):** The code runs in a sandbox. You MUST NOT use: subprocess, os.system, os.popen, eval(), exec(), __import__(), compile(), input(), breakpoint(), socket, pty, shutil.rmtree, os.remove, os.unlink, os.rmdir, or __builtins__/__globals__. Use only standard data-processing and file I/O within the output directory.
 

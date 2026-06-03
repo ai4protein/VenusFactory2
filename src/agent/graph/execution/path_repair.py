@@ -176,6 +176,11 @@ def rebind_file_not_found(
         # input_files pinned to the granted upstream paths.
         "outside granted directories",
         "sandbox validation failed",
+        # Plot-task enforcement (train_operations): script didn't actually
+        # save an image even though task wanted one. Re-prompting with the
+        # input_files makes the LLM produce a real PNG.
+        "plot-task enforcement",
+        "task asked for a chart",
     )
     _fnf_detected = any(sig in raw_lower for sig in _fnf_signatures) or (
         is_failure

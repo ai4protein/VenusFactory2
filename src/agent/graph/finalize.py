@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import os
+import re
 
 from langchain_core.runnables import RunnableConfig
 
@@ -28,6 +30,99 @@ async def finalize_start_node(state: AgentState, config: RunnableConfig):
     return {"history": history, "ui_lang": ui_lang}
 
 
+def _agent_step_failed_or_empty(outputs_raw: str) -> bool:
+    """True if an agent_generated_code step had no substantive deliverable."""
+    s = str(outputs_raw or "")
+    if not s.strip():
+        return True
+    if '"success": false' in s.lower() or '"status": "error"' in s.lower():
+        return True
+    # Check output_files contents
+    try:
+        # Try to parse as JSON to read output_files
+        m = re.search(r'\{.*\}', s, re.DOTALL)
+        if not m:
+            return False
+        data = json.loads(m.group())
+        ofs = data.get("output_files") or []
+        if not isinstance(ofs, list) or not ofs:
+            return True
+        # Only no_data placeholders count as empty
+        if all(isinstance(f, str) and ("no_data" in f.lower() or f.lower().endswith(".txt") and "summary" not in f.lower() and "report" not in f.lower())
+               for f in ofs):
+            # Heuristic: if every output is a .txt with "no_data" in the name, treat as empty
+            if any("no_data" in str(f).lower() for f in ofs):
+                return True
+    except Exception:
+        pass
+    return False
+
+
+def _read_file_summary(path: str, max_chars: int = 1500) -> str:
+    """Read a file and return a short, SC-friendly summary string.
+
+    Handles JSON, CSV, TSV, FASTA, and plain text. Truncates content to
+    ``max_chars`` and strips long fields so SC can see real structure
+    without exploding the prompt.
+    """
+    try:
+        if not path or not os.path.exists(path):
+            return f"[missing: {path}]"
+        size = os.path.getsize(path)
+        suffix = path.rsplit(".", 1)[-1].lower() if "." in path else ""
+
+        if suffix == "json":
+            with open(path, "r", encoding="utf-8", errors="replace") as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                keys = list(data.keys())
+                preview = {k: data[k] for k in keys[:15] if not isinstance(data[k], (list, dict))}
+                struct = {k: (f"list({len(data[k])})" if isinstance(data[k], list)
+                              else f"dict({len(data[k])} keys)") for k in keys[:15]
+                          if isinstance(data[k], (list, dict))}
+                summary = (
+                    f"JSON dict, {len(keys)} top-level keys: {keys[:20]}\n"
+                    f"Scalar/string preview: {json.dumps(preview, ensure_ascii=False, default=str)[:600]}\n"
+                    f"Nested field shapes: {json.dumps(struct, ensure_ascii=False)[:400]}"
+                )
+            elif isinstance(data, list):
+                summary = (
+                    f"JSON list, {len(data)} items\n"
+                    f"First item: {json.dumps(data[0], ensure_ascii=False, default=str)[:800]}"
+                    if data else "JSON list, empty"
+                )
+            else:
+                summary = f"JSON scalar: {str(data)[:400]}"
+        elif suffix in ("csv", "tsv"):
+            sep = "\t" if suffix == "tsv" else ","
+            with open(path, "r", encoding="utf-8", errors="replace") as f:
+                head_lines = [f.readline().rstrip("\n") for _ in range(6)]
+            # Count remaining lines
+            with open(path, "r", encoding="utf-8", errors="replace") as f:
+                row_count = sum(1 for _ in f) - 1  # minus header
+            summary = (
+                f"{suffix.upper()}, ~{max(0,row_count)} data rows, header:\n"
+                + (head_lines[0] if head_lines else "")
+                + "\nFirst 5 rows:\n"
+                + "\n".join(l for l in head_lines[1:6] if l)
+            )
+        elif suffix in ("fasta", "fa", "faa"):
+            with open(path, "r", encoding="utf-8", errors="replace") as f:
+                lines = f.readlines()
+            seq_count = sum(1 for l in lines if l.startswith(">"))
+            summary = (
+                f"FASTA, {seq_count} sequence(s)\n"
+                f"First 4 lines:\n" + "".join(lines[:4])
+            )
+        else:
+            with open(path, "r", encoding="utf-8", errors="replace") as f:
+                content = f.read(max_chars)
+            summary = f"Text file ({size}B), first chars:\n{content}"
+        return summary[:max_chars] + ("\n...(truncated)" if len(summary) > max_chars else "")
+    except Exception as e:
+        return f"[unreadable: {type(e).__name__}: {e}]"
+
+
 async def finalize_node(state: AgentState, config: RunnableConfig):
     """Finalizer node: generates final summary using tool execution history."""
     chains = config.get("configurable", {}).get("chains", {})
@@ -39,6 +134,7 @@ async def finalize_node(state: AgentState, config: RunnableConfig):
 
     # Build the full run record for the finalizer
     analysis_log = []
+    auto_remedy_blocks: list[str] = []
     for i, entry in enumerate(tool_executions, 1):
         step = entry.get("step", i)
         tool_name = entry.get("tool_name", "unknown")
@@ -51,6 +147,40 @@ async def finalize_node(state: AgentState, config: RunnableConfig):
             f"  Output: {str(outputs)[:2000]}\n"
             + (f"  Cloud Download: {oss_url}" if oss_url else "")
         )
+
+        # P4 auto-remedy: when agent_generated_code failed or produced only
+        # a no-data placeholder, read the upstream file(s) directly and
+        # attach a structured summary to the SC context. This eliminates
+        # the "建议手动检查 JSON" pattern from reports — the SC will see
+        # actual content instead.
+        if tool_name == "agent_generated_code" and _agent_step_failed_or_empty(outputs):
+            input_files = inputs.get("input_files") or []
+            if isinstance(input_files, list):
+                summaries = []
+                for fp in input_files[:3]:  # cap to 3 files per failed step
+                    if not isinstance(fp, str):
+                        continue
+                    s = _read_file_summary(fp, max_chars=1500)
+                    if s:
+                        short_fp = fp
+                        if "temp_outputs/web_v2/sessions/" in fp:
+                            try:
+                                rel = fp.split("temp_outputs/web_v2/sessions/", 1)[1]
+                                parts = rel.split("/", 4)
+                                if len(parts) >= 5:
+                                    short_fp = f"~/sessions/{parts[0][:8]}/{parts[4]}"
+                            except Exception:
+                                pass
+                        summaries.append(f"--- {short_fp} ---\n{s}")
+                if summaries:
+                    auto_remedy_blocks.append(
+                        f"AUTO-REMEDY for failed agent_generated_code step {step}: "
+                        f"the LLM script could not produce a useful deliverable, "
+                        f"so the harness extracted the upstream inputs directly. "
+                        f"Use these summaries to write substantive Results entries "
+                        f"instead of saying 'manual review recommended'.\n\n"
+                        + "\n\n".join(summaries)
+                    )
 
     # Include PI research report and sub-reports so SC has full context
     pi_report = state.get("pi_report", "")
@@ -67,6 +197,15 @@ async def finalize_node(state: AgentState, config: RunnableConfig):
         record_parts.append("Tool executions:\n" + "\n".join(analysis_log))
     else:
         record_parts.append("No tools executed.")
+    # P4 auto-remedy: when agent_generated_code steps were empty/failed, the
+    # block below feeds SC actual content from the upstream files so the
+    # report doesn't degrade to "manual review recommended" for fields the
+    # harness can read trivially.
+    if auto_remedy_blocks:
+        record_parts.append(
+            "Upstream-file summaries (auto-remedy for failed analysis steps):\n\n"
+            + "\n\n".join(auto_remedy_blocks)
+        )
     # Include skipped steps info
     skipped_steps = state.get("skipped_steps", [])
     if skipped_steps:
