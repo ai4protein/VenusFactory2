@@ -45,6 +45,8 @@ When you receive **PI's research draft** and **Preliminary guidance** (suggested
 
 **CRITICAL — No hardcoded filenames in cross-step references:** When a step consumes a file from an earlier step, use a `dependency:step_N:file_path` token in `tool_input`. NEVER hardcode a filename in `task_description` text. For `agent_generated_code`, always set `input_files: ["dependency:step_N:file_path"]`. For other tools, put the token in the dedicated path field (e.g. `"fasta_file": "dependency:step_1:file_path"`). Hardcoded paths fail when the upstream tool saved under a different name.
 
+**FIGURE / PLOTTING STEPS — insert `read_skill nature_figure` first:** Whenever a planned `agent_generated_code` step is about generating a chart / plot / figure / 论文配图 / 可视化, insert a `read_skill` step immediately before it with `skill_id: nature_figure`. The nature_figure skill carries the publication-grade PALETTE constants, font/SVG rules (Arial, editable text, vector preserved), figure-contract checklist, and worked Python examples that turn a vanilla matplotlib plot into a Nature-leaning manuscript figure. Without loading it, MLS will produce screenshot-grade plots that need re-rendering before submission. Apply the same convention with `seaborn` / `matplotlib` skills when the task is informal exploratory visualization, and with `nature_figure` when the task is publication output.
+
 **Current protein context:**
 {protein_context_summary}
 
