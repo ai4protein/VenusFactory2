@@ -18,6 +18,8 @@ from pydantic import BaseModel, Field
 from .alphafold import (
     download_alphafold_structure_by_uniprot_id,
     download_alphafold_metadata_by_uniprot_id,
+    analyze_alphafold_plddt_by_metadata_file,
+    analyze_alphafold_pae_by_pae_file,
 )
 from .brenda import (
     download_brenda_km_values_by_ec_number,
@@ -35,6 +37,21 @@ from .chembl import (
     download_chembl_drug_by_id,
 )
 from .foldseek import download_foldseek_results_by_pdb_file
+from .clustalo import download_clustalo_msa_by_fasta
+from .openalex import (
+    download_openalex_entries_by_query,
+    download_openalex_entry_by_id,
+)
+from .arxiv import download_arxiv_paper_by_id
+from .biorxiv import download_biorxiv_by_doi
+from .seq_search import (
+    download_mmseqs2_homologs_by_sequence,
+    download_blast_homologs_by_sequence,
+)
+from src.tools.visualize.pymol import (
+    render_protein_structure,
+    superpose_two_structures,
+)
 from .kegg import (
     download_kegg_info_by_database,
     download_kegg_list_by_database,
@@ -58,10 +75,14 @@ from .ncbi import (
     download_ncbi_gene_by_id,
     download_ncbi_gene_by_symbol,
     download_ncbi_batch_lookup_by_symbols,
+    translate_ncbi_cds_to_protein,
+    search_ncbi_protein_by_gene_and_organism,
+    download_pubmed_abstracts_by_pmids,
 )
 from .rcsb import (
     download_rcsb_entry_metadata_by_pdb_id,
     download_rcsb_structure_by_pdb_id,
+    download_rcsb_search_by_query,
 )
 from .string import (
     download_string_map_ids,
@@ -78,6 +99,7 @@ from .uniprot import (
     download_uniprot_mapping,
     download_uniprot_seq_by_id,
     download_uniprot_meta_by_id,
+    download_uniprot_sparql_by_query,
 )
 from src.web.utils.common_utils import get_save_path
 
@@ -113,6 +135,30 @@ def api_get_alphafold_metadata(
     try:
         result = download_alphafold_metadata_by_uniprot_id(uniprot_id, out_dir)
         return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/alphafold-analyze-plddt")
+def api_analyze_alphafold_plddt(
+    metadata_path: str = Query(..., description="Path to a downloaded AlphaFold metadata JSON file"),
+):
+    """Analyze pLDDT fractions from a local AlphaFold metadata JSON."""
+    try:
+        return analyze_alphafold_plddt_by_metadata_file(metadata_path)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/alphafold-analyze-pae")
+def api_analyze_alphafold_pae(
+    pae_path: str = Query(..., description="Path to an AlphaFold PAE JSON file"),
+    distance_cutoff: float = Query(7.0, description="Avg-PAE cutoff (Å) for sub-domain joining"),
+    min_domain_size: int = Query(40, ge=1, description="Minimum residues per sub-domain"),
+):
+    """Detect global domain boundaries from a local AlphaFold PAE JSON."""
+    try:
+        return analyze_alphafold_pae_by_pae_file(pae_path, distance_cutoff=distance_cutoff, min_domain_size=min_domain_size)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -318,6 +364,208 @@ def api_foldseek_results(body: FoldSeekBody):
             body.pdb_file_path, body.protect_start, body.protect_end, out_dir=out_dir
         )
         return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------- Clustal Omega (EBI) ----------
+class ClustalOmegaMsaBody(BaseModel):
+    fasta_path: str
+    out_dir: str
+    email: Optional[str] = None
+    poll_interval: float = 10.0
+    timeout_secs: int = 15 * 60
+
+
+@router.post("/clustalo-msa")
+def api_clustalo_msa(body: ClustalOmegaMsaBody):
+    """Run EBI Clustal Omega MSA on a local FASTA file."""
+    try:
+        return download_clustalo_msa_by_fasta(
+            body.fasta_path,
+            body.out_dir,
+            email=body.email,
+            poll_interval=body.poll_interval,
+            timeout_secs=body.timeout_secs,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------- Sequence similarity search (MMseqs2 + BLAST) ----------
+class Mmseqs2HomologsBody(BaseModel):
+    sequence_or_fasta_path: str
+    out_dir: str
+    include_mgnify: bool = False
+    poll_interval: float = 10.0
+    timeout_secs: int = 15 * 60
+
+
+@router.post("/mmseqs2-homologs")
+def api_mmseqs2_homologs(body: Mmseqs2HomologsBody):
+    """ColabFold MMseqs2 homologue search by sequence."""
+    try:
+        return download_mmseqs2_homologs_by_sequence(
+            body.sequence_or_fasta_path,
+            body.out_dir,
+            include_mgnify=body.include_mgnify,
+            poll_interval=body.poll_interval,
+            timeout_secs=body.timeout_secs,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class BlastHomologsBody(BaseModel):
+    sequence_or_fasta_path: str
+    out_dir: str
+    database: str = "uniprotkb_swissprot"
+    email: Optional[str] = None
+    poll_interval: float = 30.0
+    timeout_secs: int = 15 * 60
+
+
+@router.post("/blast-homologs")
+def api_blast_homologs(body: BlastHomologsBody):
+    """EBI NCBI BLAST homologue search by sequence."""
+    try:
+        return download_blast_homologs_by_sequence(
+            body.sequence_or_fasta_path,
+            body.out_dir,
+            database=body.database,
+            email=body.email,
+            poll_interval=body.poll_interval,
+            timeout_secs=body.timeout_secs,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------- OpenAlex ----------
+class OpenAlexEntriesQueryBody(BaseModel):
+    entity_type: str
+    out_dir: str
+    search: Optional[str] = None
+    filter_expr: Optional[str] = None
+    sort: Optional[str] = None
+    per_page: int = 25
+    page: int = 1
+    timeout: int = 30
+
+
+@router.post("/openalex-entries")
+def api_openalex_entries(body: OpenAlexEntriesQueryBody):
+    """Search OpenAlex for scholarly entities."""
+    try:
+        return download_openalex_entries_by_query(
+            body.entity_type, body.out_dir,
+            search=body.search, filter_expr=body.filter_expr, sort=body.sort,
+            per_page=body.per_page, page=body.page, timeout=body.timeout,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class OpenAlexEntryByIdBody(BaseModel):
+    entity_type: str
+    openalex_id: str
+    out_dir: str
+    timeout: int = 30
+
+
+@router.post("/openalex-entry")
+def api_openalex_entry(body: OpenAlexEntryByIdBody):
+    """Fetch a single OpenAlex entity by ID."""
+    try:
+        return download_openalex_entry_by_id(
+            body.entity_type, body.openalex_id, body.out_dir, timeout=body.timeout,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------- arXiv ----------
+class ArxivPaperBody(BaseModel):
+    arxiv_id: str
+    out_dir: str
+    format: str = "pdf"
+    timeout: int = 60
+
+
+@router.post("/arxiv-paper")
+def api_arxiv_paper(body: ArxivPaperBody):
+    """Download an arXiv paper (PDF/HTML/source)."""
+    try:
+        return download_arxiv_paper_by_id(
+            body.arxiv_id, body.out_dir, format=body.format, timeout=body.timeout,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------- bioRxiv ----------
+class BiorxivByDoiBody(BaseModel):
+    doi: str
+    out_dir: str
+    server: str = "biorxiv"
+    include_abstract: bool = True
+    timeout: int = 30
+
+
+@router.post("/biorxiv-by-doi")
+def api_biorxiv_by_doi(body: BiorxivByDoiBody):
+    """Fetch a bioRxiv/medRxiv preprint by DOI."""
+    try:
+        return download_biorxiv_by_doi(
+            body.doi, body.out_dir,
+            server=body.server, include_abstract=body.include_abstract, timeout=body.timeout,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------- PyMOL visualization ----------
+class PymolRenderBody(BaseModel):
+    pdb_path: str
+    out_dir: str
+    color_by: str = "plddt"
+    width: int = 1200
+    height: int = 900
+    dpi: int = 150
+    timeout_secs: int = 5 * 60
+
+
+@router.post("/pymol-render")
+def api_pymol_render(body: PymolRenderBody):
+    """Headless PyMOL cartoon render of a single structure."""
+    try:
+        return render_protein_structure(
+            body.pdb_path, body.out_dir,
+            color_by=body.color_by, width=body.width, height=body.height, dpi=body.dpi,
+            timeout_secs=body.timeout_secs,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class PymolSuperposeBody(BaseModel):
+    pdb_a: str
+    pdb_b: str
+    out_dir: str
+    width: int = 1200
+    height: int = 900
+    dpi: int = 150
+    timeout_secs: int = 5 * 60
+
+
+@router.post("/pymol-superpose")
+def api_pymol_superpose(body: PymolSuperposeBody):
+    """Headless PyMOL cealign + render of two structures."""
+    try:
+        return superpose_two_structures(
+            body.pdb_a, body.pdb_b, body.out_dir,
+            width=body.width, height=body.height, dpi=body.dpi, timeout_secs=body.timeout_secs,
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -599,6 +847,60 @@ def api_ncbi_batch_lookup(body: NcbiBatchLookupBody):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class NcbiCdsTranslateBody(BaseModel):
+    accession: str
+    out_dir: str
+    target_length: int = 0
+    timeout: int = 60
+
+
+@router.post("/ncbi-cds-translate")
+def api_ncbi_cds_translate(body: NcbiCdsTranslateBody):
+    """Translate a nuccore accession to protein FASTA via fasta_cds_aa."""
+    try:
+        return translate_ncbi_cds_to_protein(
+            body.accession, body.out_dir, target_length=body.target_length, timeout=body.timeout,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class NcbiProteinByGeneOrgBody(BaseModel):
+    gene: str
+    organism: str
+    out_dir: str
+    target_length: int = 0
+    retmax: int = 10
+    timeout: int = 60
+
+
+@router.post("/ncbi-protein-by-gene-organism")
+def api_ncbi_protein_by_gene_organism(body: NcbiProteinByGeneOrgBody):
+    """Search NCBI Protein by gene + organism and fetch hits as multi-FASTA."""
+    try:
+        return search_ncbi_protein_by_gene_and_organism(
+            body.gene, body.organism, body.out_dir,
+            target_length=body.target_length, retmax=body.retmax, timeout=body.timeout,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class PubmedAbstractsBatchBody(BaseModel):
+    pmids: List[str]
+    out_path: str
+    timeout: int = 60
+
+
+@router.post("/pubmed-abstracts")
+def api_pubmed_abstracts(body: PubmedAbstractsBatchBody):
+    """Batch-fetch PubMed abstracts by PMID list."""
+    try:
+        return download_pubmed_abstracts_by_pmids(body.pmids, body.out_path, timeout=body.timeout)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ---------- RCSB ----------
 @router.get("/rcsb-metadata/{pdb_id}")
 def api_rcsb_metadata(
@@ -623,6 +925,33 @@ def api_rcsb_structure(
             pdb_id, out_dir, file_type=file_type
         )
         return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class RCSBSearchBody(BaseModel):
+    query: str
+    out_dir: str
+    return_type: str = "entry"
+    page_start: Optional[int] = None
+    rows: Optional[int] = None
+    sort_by: Optional[str] = None
+    sort_direction: Optional[str] = None
+    count_only: bool = False
+    timeout: int = 60
+
+
+@router.post("/rcsb-search")
+def api_rcsb_search(body: RCSBSearchBody):
+    """Run an RCSB Search API v2 query."""
+    try:
+        return download_rcsb_search_by_query(
+            body.query, body.out_dir,
+            return_type=body.return_type,
+            page_start=body.page_start, rows=body.rows,
+            sort_by=body.sort_by, sort_direction=body.sort_direction,
+            count_only=body.count_only, timeout=body.timeout,
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -864,5 +1193,20 @@ def api_uniprot_meta(
             uniprot_id=uniprot_id, out_path=out_path
         )
         return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class UniprotSparqlBody(BaseModel):
+    query: str
+    out_dir: str
+    timeout: int = 120
+
+
+@router.post("/uniprot-sparql")
+def api_uniprot_sparql(body: UniprotSparqlBody):
+    """Execute a SPARQL query against sparql.uniprot.org and save the JSON response."""
+    try:
+        return download_uniprot_sparql_by_query(body.query, body.out_dir, timeout=body.timeout)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

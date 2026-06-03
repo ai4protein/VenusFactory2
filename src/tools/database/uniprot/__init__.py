@@ -1,4 +1,4 @@
-# UniProt: seq (query/download), meta (query/download), search, mapping
+# UniProt: seq (query/download), meta (query/download), search, mapping, SPARQL
 
 from .uniprot_operations import (
     download_uniprot_search_by_query,
@@ -7,6 +7,7 @@ from .uniprot_operations import (
     download_uniprot_seq_by_id,
     download_uniprot_meta_by_id,
 )
+from .uniprot_sparql import download_uniprot_sparql_by_query
 
 # For backwards compatibility with other modules if they directly import these
 from .uniprot_sequence import query_uniprot_seq, download_uniprot_seq, download_uniprot_sequence
@@ -19,4 +20,5 @@ __all__ = [
     "download_uniprot_mapping",
     "download_uniprot_seq_by_id",
     "download_uniprot_meta_by_id",
+    "download_uniprot_sparql_by_query",
 ]

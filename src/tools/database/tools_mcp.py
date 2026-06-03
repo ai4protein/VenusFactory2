@@ -20,6 +20,8 @@ from fastmcp import FastMCP
 from .alphafold import (
     download_alphafold_structure_by_uniprot_id,
     download_alphafold_metadata_by_uniprot_id,
+    analyze_alphafold_plddt_by_metadata_file,
+    analyze_alphafold_pae_by_pae_file,
 )
 from .brenda import (
     download_brenda_km_values_by_ec_number,
@@ -37,6 +39,21 @@ from .chembl import (
     download_chembl_drug_by_id,
 )
 from .foldseek import download_foldseek_results_by_pdb_file
+from .clustalo import download_clustalo_msa_by_fasta
+from .openalex import (
+    download_openalex_entries_by_query,
+    download_openalex_entry_by_id,
+)
+from .arxiv import download_arxiv_paper_by_id
+from .biorxiv import download_biorxiv_by_doi
+from .seq_search import (
+    download_mmseqs2_homologs_by_sequence,
+    download_blast_homologs_by_sequence,
+)
+from src.tools.visualize.pymol import (
+    render_protein_structure,
+    superpose_two_structures,
+)
 from .kegg import (
     download_kegg_info_by_database,
     download_kegg_list_by_database,
@@ -60,10 +77,14 @@ from .ncbi import (
     download_ncbi_gene_by_id,
     download_ncbi_gene_by_symbol,
     download_ncbi_batch_lookup_by_symbols,
+    translate_ncbi_cds_to_protein,
+    search_ncbi_protein_by_gene_and_organism,
+    download_pubmed_abstracts_by_pmids,
 )
 from .rcsb import (
     download_rcsb_entry_metadata_by_pdb_id,
     download_rcsb_structure_by_pdb_id,
+    download_rcsb_search_by_query,
 )
 from .string import (
     download_string_map_ids,
@@ -80,6 +101,7 @@ from .uniprot import (
     download_uniprot_mapping,
     download_uniprot_seq_by_id,
     download_uniprot_meta_by_id,
+    download_uniprot_sparql_by_query,
 )
 from src.web.utils.common_utils import get_save_path
 
@@ -108,6 +130,22 @@ def mcp_download_alphafold_metadata(uniprot_id: str, out_dir: str) -> str:
     """Download AlphaFold metadata by UniProt ID."""
     result = download_alphafold_metadata_by_uniprot_id(uniprot_id, out_dir)
     return result
+
+
+@mcp.tool(name="analyze_alphafold_plddt")
+def mcp_analyze_alphafold_plddt(metadata_path: str) -> str:
+    """Analyze pLDDT fractions from a local AlphaFold metadata JSON file."""
+    return analyze_alphafold_plddt_by_metadata_file(metadata_path)
+
+
+@mcp.tool(name="analyze_alphafold_pae")
+def mcp_analyze_alphafold_pae(
+    pae_path: str,
+    distance_cutoff: float = 7.0,
+    min_domain_size: int = 40,
+) -> str:
+    """Detect global domain boundaries from a local AlphaFold PAE JSON file."""
+    return analyze_alphafold_pae_by_pae_file(pae_path, distance_cutoff=distance_cutoff, min_domain_size=min_domain_size)
 
 
 # ---------- BRENDA ----------
@@ -245,6 +283,126 @@ def mcp_download_foldseek_results(
         pdb_file_path, protect_start, protect_end, out_dir=out_dir
     )
     return result
+
+
+# ---------- Clustal Omega (EBI) ----------
+@mcp.tool(name="download_clustalo_msa")
+def mcp_download_clustalo_msa(
+    fasta_path: str,
+    out_dir: str,
+    email: Optional[str] = None,
+    poll_interval: float = 10.0,
+    timeout_secs: int = 15 * 60,
+) -> str:
+    """Run EBI Clustal Omega MSA on a FASTA file (submit + poll + download FASTA alignment)."""
+    return download_clustalo_msa_by_fasta(
+        fasta_path, out_dir, email=email, poll_interval=poll_interval, timeout_secs=timeout_secs
+    )
+
+
+# ---------- Sequence similarity search (MMseqs2 + BLAST) ----------
+@mcp.tool(name="download_mmseqs2_homologs")
+def mcp_download_mmseqs2_homologs(
+    sequence_or_fasta_path: str,
+    out_dir: str,
+    include_mgnify: bool = False,
+    poll_interval: float = 10.0,
+    timeout_secs: int = 15 * 60,
+) -> str:
+    """ColabFold MMseqs2 homologue search by protein sequence (submit + poll + download + parse)."""
+    return download_mmseqs2_homologs_by_sequence(
+        sequence_or_fasta_path, out_dir,
+        include_mgnify=include_mgnify, poll_interval=poll_interval, timeout_secs=timeout_secs,
+    )
+
+
+@mcp.tool(name="download_blast_homologs")
+def mcp_download_blast_homologs(
+    sequence_or_fasta_path: str,
+    out_dir: str,
+    database: str = "uniprotkb_swissprot",
+    email: Optional[str] = None,
+    poll_interval: float = 30.0,
+    timeout_secs: int = 15 * 60,
+) -> str:
+    """EBI NCBI BLAST homologue search by protein sequence."""
+    return download_blast_homologs_by_sequence(
+        sequence_or_fasta_path, out_dir,
+        database=database, email=email, poll_interval=poll_interval, timeout_secs=timeout_secs,
+    )
+
+
+# ---------- OpenAlex ----------
+@mcp.tool(name="download_openalex_entries")
+def mcp_download_openalex_entries(
+    entity_type: str, out_dir: str,
+    search: Optional[str] = None, filter_expr: Optional[str] = None, sort: Optional[str] = None,
+    per_page: int = 25, page: int = 1, timeout: int = 30,
+) -> str:
+    """Search OpenAlex for scholarly entities (works, authors, institutions, ...)."""
+    return download_openalex_entries_by_query(
+        entity_type, out_dir,
+        search=search, filter_expr=filter_expr, sort=sort,
+        per_page=per_page, page=page, timeout=timeout,
+    )
+
+
+@mcp.tool(name="download_openalex_entry")
+def mcp_download_openalex_entry(
+    entity_type: str, openalex_id: str, out_dir: str, timeout: int = 30,
+) -> str:
+    """Fetch a single OpenAlex entity by ID."""
+    return download_openalex_entry_by_id(entity_type, openalex_id, out_dir, timeout=timeout)
+
+
+# ---------- arXiv ----------
+@mcp.tool(name="download_arxiv_paper")
+def mcp_download_arxiv_paper(arxiv_id: str, out_dir: str, format: str = "pdf", timeout: int = 60) -> str:
+    """Download an arXiv paper (PDF / HTML / source tarball)."""
+    return download_arxiv_paper_by_id(arxiv_id, out_dir, format=format, timeout=timeout)
+
+
+# ---------- bioRxiv ----------
+@mcp.tool(name="download_biorxiv_by_doi")
+def mcp_download_biorxiv_by_doi(
+    doi: str, out_dir: str, server: str = "biorxiv", include_abstract: bool = True, timeout: int = 30,
+) -> str:
+    """Fetch a bioRxiv/medRxiv preprint by DOI."""
+    return download_biorxiv_by_doi(doi, out_dir, server=server, include_abstract=include_abstract, timeout=timeout)
+
+
+# ---------- PyMOL visualization ----------
+@mcp.tool(name="render_protein_structure")
+def mcp_render_protein_structure(
+    pdb_path: str,
+    out_dir: str,
+    color_by: str = "plddt",
+    width: int = 1200,
+    height: int = 900,
+    dpi: int = 150,
+    timeout_secs: int = 5 * 60,
+) -> str:
+    """Render a protein structure to PNG via headless PyMOL."""
+    return render_protein_structure(
+        pdb_path, out_dir,
+        color_by=color_by, width=width, height=height, dpi=dpi, timeout_secs=timeout_secs,
+    )
+
+
+@mcp.tool(name="superpose_two_structures")
+def mcp_superpose_two_structures(
+    pdb_a: str,
+    pdb_b: str,
+    out_dir: str,
+    width: int = 1200,
+    height: int = 900,
+    dpi: int = 150,
+    timeout_secs: int = 5 * 60,
+) -> str:
+    """Headless PyMOL cealign + render of two structures."""
+    return superpose_two_structures(
+        pdb_a, pdb_b, out_dir, width=width, height=height, dpi=dpi, timeout_secs=timeout_secs,
+    )
 
 
 # ---------- InterPro ----------
@@ -432,6 +590,32 @@ def mcp_download_ncbi_batch_lookup(
     return result
 
 
+@mcp.tool(name="translate_ncbi_cds_to_protein")
+def mcp_translate_ncbi_cds_to_protein(
+    accession: str, out_dir: str, target_length: int = 0, timeout: int = 60,
+) -> str:
+    """Fetch CDS-translated protein FASTA for an nuccore accession (rettype=fasta_cds_aa)."""
+    return translate_ncbi_cds_to_protein(accession, out_dir, target_length=target_length, timeout=timeout)
+
+
+@mcp.tool(name="search_ncbi_protein_by_gene_and_organism")
+def mcp_search_ncbi_protein_by_gene_and_organism(
+    gene: str, organism: str, out_dir: str,
+    target_length: int = 0, retmax: int = 10, timeout: int = 60,
+) -> str:
+    """Search NCBI Protein DB by gene + organism (optional length filter), fetch hits as multi-FASTA."""
+    return search_ncbi_protein_by_gene_and_organism(
+        gene, organism, out_dir,
+        target_length=target_length, retmax=retmax, timeout=timeout,
+    )
+
+
+@mcp.tool(name="download_pubmed_abstracts")
+def mcp_download_pubmed_abstracts(pmids: List[str], out_path: str, timeout: int = 60) -> str:
+    """Batch-fetch PubMed abstracts by PMID list (single efetch call)."""
+    return download_pubmed_abstracts_by_pmids(pmids, out_path, timeout=timeout)
+
+
 # ---------- RCSB ----------
 @mcp.tool(name="download_rcsb_metadata")
 def mcp_download_rcsb_metadata(pdb_id: str, out_path: str) -> str:
@@ -449,6 +633,27 @@ def mcp_download_rcsb_structure(
         pdb_id, out_dir, file_type=file_type
     )
     return result
+
+
+@mcp.tool(name="download_rcsb_search")
+def mcp_download_rcsb_search(
+    query: str,
+    out_dir: str,
+    return_type: str = "entry",
+    page_start: Optional[int] = None,
+    rows: Optional[int] = None,
+    sort_by: Optional[str] = None,
+    sort_direction: Optional[str] = None,
+    count_only: bool = False,
+    timeout: int = 60,
+) -> str:
+    """Run an RCSB Search API v2 query (text/sequence/structure/attribute) and save matching identifiers to JSON."""
+    return download_rcsb_search_by_query(
+        query, out_dir,
+        return_type=return_type, page_start=page_start, rows=rows,
+        sort_by=sort_by, sort_direction=sort_direction,
+        count_only=count_only, timeout=timeout,
+    )
 
 
 # ---------- STRING ----------
@@ -637,3 +842,9 @@ def mcp_download_uniprot_metadata(uniprot_id: str, out_path: str) -> str:
         uniprot_id=uniprot_id, out_path=out_path
     )
     return result
+
+
+@mcp.tool(name="download_uniprot_sparql")
+def mcp_download_uniprot_sparql(query: str, out_dir: str, timeout: int = 120) -> str:
+    """Execute a SPARQL query against sparql.uniprot.org and save the JSON response."""
+    return download_uniprot_sparql_by_query(query, out_dir, timeout=timeout)

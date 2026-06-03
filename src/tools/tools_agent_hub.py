@@ -19,6 +19,8 @@ from tools.database.tools_agent import (
     # AlphaFold
     download_alphafold_structure_by_uniprot_id_tool,
     download_alphafold_metadata_by_uniprot_id_tool,
+    analyze_alphafold_plddt_by_metadata_file_tool,
+    analyze_alphafold_pae_by_pae_file_tool,
     # BRENDA
     download_brenda_km_values_by_ec_number_tool,
     download_brenda_reactions_by_ec_number_tool,
@@ -34,6 +36,21 @@ from tools.database.tools_agent import (
     download_chembl_drug_by_id_tool,
     # FoldSeek
     download_foldseek_results_by_pdb_file_tool,
+    # Clustal Omega (EBI MSA)
+    download_clustalo_msa_by_fasta_tool,
+    # Sequence similarity search (MMseqs2 + BLAST)
+    download_mmseqs2_homologs_by_sequence_tool,
+    download_blast_homologs_by_sequence_tool,
+    # OpenAlex (scholarly)
+    download_openalex_entries_by_query_tool,
+    download_openalex_entry_by_id_tool,
+    # arXiv (literature download)
+    download_arxiv_paper_by_id_tool,
+    # bioRxiv (per-DOI)
+    download_biorxiv_by_doi_tool,
+    # PyMOL visualization
+    render_protein_structure_tool,
+    superpose_two_structures_tool,
     # InterPro
     download_interpro_metadata_by_id_tool,
     download_interpro_annotations_by_uniprot_id_tool,
@@ -55,9 +72,13 @@ from tools.database.tools_agent import (
     download_ncbi_gene_by_id_tool,
     download_ncbi_gene_by_symbol_tool,
     download_ncbi_batch_lookup_by_symbols_tool,
+    translate_ncbi_cds_to_protein_tool,
+    search_ncbi_protein_by_gene_and_organism_tool,
+    download_pubmed_abstracts_by_pmids_tool,
     # RCSB
     download_rcsb_entry_metadata_by_pdb_id_tool,
     download_rcsb_structure_by_pdb_id_tool,
+    download_rcsb_search_by_query_tool,
     # STRING
     download_string_map_ids_tool,
     download_string_network_tool,
@@ -72,6 +93,7 @@ from tools.database.tools_agent import (
     download_uniprot_mapping_tool,
     download_uniprot_seq_by_id_tool,
     download_uniprot_meta_by_id_tool,
+    download_uniprot_sparql_by_query_tool,
     # HPA
     download_hpa_protein_by_gene_tool,
     download_hpa_subcellular_location_by_gene_tool,
@@ -169,6 +191,8 @@ DATABASE_TOOLS: list[BaseTool] = [
     # AlphaFold
     download_alphafold_structure_by_uniprot_id_tool,
     download_alphafold_metadata_by_uniprot_id_tool,
+    analyze_alphafold_plddt_by_metadata_file_tool,
+    analyze_alphafold_pae_by_pae_file_tool,
     # BRENDA
     download_brenda_km_values_by_ec_number_tool,
     download_brenda_reactions_by_ec_number_tool,
@@ -184,6 +208,21 @@ DATABASE_TOOLS: list[BaseTool] = [
     download_chembl_drug_by_id_tool,
     # FoldSeek
     download_foldseek_results_by_pdb_file_tool,
+    # Clustal Omega (EBI MSA)
+    download_clustalo_msa_by_fasta_tool,
+    # Sequence similarity search (MMseqs2 + BLAST)
+    download_mmseqs2_homologs_by_sequence_tool,
+    download_blast_homologs_by_sequence_tool,
+    # OpenAlex (scholarly)
+    download_openalex_entries_by_query_tool,
+    download_openalex_entry_by_id_tool,
+    # arXiv (literature download)
+    download_arxiv_paper_by_id_tool,
+    # bioRxiv (per-DOI)
+    download_biorxiv_by_doi_tool,
+    # PyMOL visualization
+    render_protein_structure_tool,
+    superpose_two_structures_tool,
     # InterPro
     download_interpro_metadata_by_id_tool,
     download_interpro_annotations_by_uniprot_id_tool,
@@ -205,9 +244,13 @@ DATABASE_TOOLS: list[BaseTool] = [
     download_ncbi_gene_by_id_tool,
     download_ncbi_gene_by_symbol_tool,
     download_ncbi_batch_lookup_by_symbols_tool,
+    translate_ncbi_cds_to_protein_tool,
+    search_ncbi_protein_by_gene_and_organism_tool,
+    download_pubmed_abstracts_by_pmids_tool,
     # RCSB
     download_rcsb_entry_metadata_by_pdb_id_tool,
     download_rcsb_structure_by_pdb_id_tool,
+    download_rcsb_search_by_query_tool,
     # STRING
     download_string_map_ids_tool,
     download_string_network_tool,
@@ -222,6 +265,7 @@ DATABASE_TOOLS: list[BaseTool] = [
     download_uniprot_mapping_tool,
     download_uniprot_seq_by_id_tool,
     download_uniprot_meta_by_id_tool,
+    download_uniprot_sparql_by_query_tool,
     # HPA
     download_hpa_protein_by_gene_tool,
     download_hpa_subcellular_location_by_gene_tool,
@@ -343,6 +387,8 @@ __all__ = [
     # AlphaFold
     "download_alphafold_structure_by_uniprot_id_tool",
     "download_alphafold_metadata_by_uniprot_id_tool",
+    "analyze_alphafold_plddt_by_metadata_file_tool",
+    "analyze_alphafold_pae_by_pae_file_tool",
     # BRENDA
     "download_brenda_km_values_by_ec_number_tool",
     "download_brenda_reactions_by_ec_number_tool",
@@ -358,6 +404,21 @@ __all__ = [
     "download_chembl_drug_by_id_tool",
     # FoldSeek
     "download_foldseek_results_by_pdb_file_tool",
+    # Clustal Omega (EBI MSA)
+    "download_clustalo_msa_by_fasta_tool",
+    # Sequence similarity search (MMseqs2 + BLAST)
+    "download_mmseqs2_homologs_by_sequence_tool",
+    "download_blast_homologs_by_sequence_tool",
+    # OpenAlex (scholarly)
+    "download_openalex_entries_by_query_tool",
+    "download_openalex_entry_by_id_tool",
+    # arXiv (literature download)
+    "download_arxiv_paper_by_id_tool",
+    # bioRxiv (per-DOI)
+    "download_biorxiv_by_doi_tool",
+    # PyMOL visualization
+    "render_protein_structure_tool",
+    "superpose_two_structures_tool",
     # InterPro
     "download_interpro_metadata_by_id_tool",
     "download_interpro_annotations_by_uniprot_id_tool",
@@ -379,9 +440,13 @@ __all__ = [
     "download_ncbi_gene_by_id_tool",
     "download_ncbi_gene_by_symbol_tool",
     "download_ncbi_batch_lookup_by_symbols_tool",
+    "translate_ncbi_cds_to_protein_tool",
+    "search_ncbi_protein_by_gene_and_organism_tool",
+    "download_pubmed_abstracts_by_pmids_tool",
     # RCSB
     "download_rcsb_entry_metadata_by_pdb_id_tool",
     "download_rcsb_structure_by_pdb_id_tool",
+    "download_rcsb_search_by_query_tool",
     # STRING
     "download_string_map_ids_tool",
     "download_string_network_tool",
@@ -396,6 +461,7 @@ __all__ = [
     "download_uniprot_mapping_tool",
     "download_uniprot_seq_by_id_tool",
     "download_uniprot_meta_by_id_tool",
+    "download_uniprot_sparql_by_query_tool",
     # Mutation
     "zero_shot_mutation_sequence_prediction_tool",
     "zero_shot_mutation_structure_prediction_tool",
@@ -417,7 +483,6 @@ __all__ = [
     "query_pubmed_tool",
     "query_semantic_scholar_tool",
     "query_tavily_tool",
-    "download_foldseek_results_by_pdb_file_tool",
     # Train
     "generate_training_config_tool",
     "train_protein_model_tool",

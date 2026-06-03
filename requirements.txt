@@ -51,6 +51,9 @@ matplotlib>=3.10.3
 seaborn>=0.13.2
 plotly>=6.2.0
 pillow>=11.0.0
+# PyMOL (headless OSMesa rendering, src/tools/visualize/pymol/) is NOT pip-installable —
+# install via conda-forge: `conda install -c conda-forge pymol-open-source`.
+# The pip wheel `pymol-open-source-whl` lacks libGL/OSMesa and crashes on import.
 
 # --- Web / API --------------------------------------------------------------
 fastapi==0.116.1

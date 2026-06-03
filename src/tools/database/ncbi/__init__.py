@@ -1,4 +1,4 @@
-# NCBI operations: seq, meta, blast, clinvar, gene (download returning rich JSON)
+# NCBI operations: seq, meta, blast, clinvar, gene, extras (CDS translate + gene+organism search)
 
 from .ncbi_operations import (
     download_ncbi_sequence,
@@ -17,3 +17,8 @@ from .ncbi_operations import (
     download_ncbi_batch_lookup_by_ids,
     download_ncbi_batch_lookup_by_symbols,
 )
+from .ncbi_extras import (
+    translate_ncbi_cds_to_protein,
+    search_ncbi_protein_by_gene_and_organism,
+)
+from .pubmed_abstracts import download_pubmed_abstracts_by_pmids

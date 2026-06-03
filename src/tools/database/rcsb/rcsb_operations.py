@@ -28,6 +28,11 @@ except ImportError:
     from src.tools.database.rcsb.rcsb_structure import query_rcsb_structure as _raw_query_structure
     from src.tools.database.rcsb.rcsb_structure import download_rcsb_structure as _raw_download_structure
 
+try:
+    from .rcsb_search import search_rcsb_pdb as _raw_search_rcsb
+except ImportError:
+    from src.tools.database.rcsb.rcsb_search import search_rcsb_pdb as _raw_search_rcsb
+
 
 _PREVIEW_LEN = 500
 _SOURCE_RCSB = "RCSB PDB"
@@ -221,11 +226,75 @@ def download_rcsb_structure_by_pdb_id(
         return _error_response("DownloadError", str(e), suggestion="Check PDB ID and file_type (pdb, cif, xml, etc.).")
 
 
+def download_rcsb_search_by_query(
+    query: Any,
+    out_dir: str,
+    return_type: str = "entry",
+    page_start: Optional[int] = None,
+    rows: Optional[int] = None,
+    sort_by: Optional[str] = None,
+    sort_direction: Optional[str] = None,
+    count_only: bool = False,
+    timeout: int = 60,
+) -> str:
+    """Run an RCSB Search API v2 query and save matching identifiers to a JSON file.
+
+    `query` may be a query block (`{type, service, parameters}`), a full request
+    payload (with `query` key), or a JSON string of either. Always returns the
+    standard VenusFactory rich JSON envelope; `file_info.file_path` points at
+    `<out_dir>/rcsb_search_<return_type>.json` containing the raw RCSB response.
+    """
+    t0 = time.perf_counter()
+    out_dir = str(out_dir or "").strip().rstrip(os.sep)
+    if not out_dir:
+        return _error_response("ValidationError", "empty out_dir")
+    Path(out_dir).mkdir(parents=True, exist_ok=True)
+
+    try:
+        body, summary = _raw_search_rcsb(
+            query,
+            return_type=return_type,
+            page_start=page_start,
+            rows=rows,
+            sort_by=sort_by,
+            sort_direction=sort_direction,
+            count_only=count_only,
+            timeout=timeout,
+        )
+    except ValueError as e:
+        return _error_response("ValidationError", str(e))
+    except RuntimeError as e:
+        return _error_response("SearchError", str(e), suggestion="Verify the query JSON against the RCSB Search API v2 schema.")
+    except Exception as e:
+        return _error_response("SearchError", str(e))
+
+    out_path = os.path.join(out_dir, f"rcsb_search_{return_type}.json")
+    try:
+        with open(out_path, "w", encoding="utf-8") as f:
+            json.dump(body, f, ensure_ascii=False, indent=2)
+    except OSError as e:
+        return _error_response("IOError", f"failed to write search response: {e}")
+
+    elapsed_ms = int((time.perf_counter() - t0) * 1000)
+    summary["search_time_ms"] = summary.pop("elapsed_ms", elapsed_ms)
+    # Build a compact text preview: first N identifiers
+    identifiers = [hit.get("identifier") for hit in (body.get("result_set") or [])][:25]
+    preview = (
+        f"RCSB Search ({return_type}) — total_count={summary['total_count']}, "
+        f"returned={summary['result_count']}\n"
+        f"first {len(identifiers)} ids: {identifiers}"
+    )
+    return _download_success_response(
+        out_path, content_preview=preview, biological_metadata=summary, download_time_ms=elapsed_ms
+    )
+
+
 __all__ = [
     "query_rcsb_entry_metadata_by_pdb_id",
     "query_rcsb_structure_by_pdb_id",
     "download_rcsb_entry_metadata_by_pdb_id",
     "download_rcsb_structure_by_pdb_id",
+    "download_rcsb_search_by_query",
 ]
 
 
