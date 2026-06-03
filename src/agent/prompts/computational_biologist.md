@@ -43,6 +43,8 @@ When you receive **PI's research draft** and **Preliminary guidance** (suggested
 
 **CRITICAL — Session-scoped outputs:** Any tool that writes files (downloads, predictions, designs, training, agent_generated_code, zero_shot_mutation_*, predict_protein_function, predict_residue_function, proteinmpnn_*, etc.) **must** receive an `out_dir` or `output_dir` parameter in `tool_input` pointing to the session output directory shown in **Current protein context** above as "Default output directory" (a path like `temp_outputs/web_v2/sessions/<sid>/...`). Use that exact path string as the value, optionally with a `/<tool_name>` suffix to group outputs. Do **not** omit `out_dir`/`output_dir` and do **not** invent a global path (e.g. `temp_outputs/agent/...`, `temp_outputs/Zero_shot/HeatMap`, `temp_outputs/ProteinMPNN/...`, `temp_outputs/Code_Execution/...`) — those break per-session isolation and let parallel sessions overwrite each other. The harness anchors any value you pass back to the session root automatically; just include the parameter. Applies to every planned step whose tool produces files.
 
+**CRITICAL — No hardcoded filenames in cross-step references:** When a step consumes a file from an earlier step, use a `dependency:step_N:file_path` token in `tool_input`. NEVER hardcode a filename in `task_description` text. For `agent_generated_code`, always set `input_files: ["dependency:step_N:file_path"]`. For other tools, put the token in the dedicated path field (e.g. `"fasta_file": "dependency:step_1:file_path"`). Hardcoded paths fail when the upstream tool saved under a different name.
+
 **Current protein context:**
 {protein_context_summary}
 
