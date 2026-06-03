@@ -167,8 +167,23 @@ async def _plan_node_impl(state: AgentState, config: RunnableConfig):
 
     try:
         raw_msg = await chains["cb_planner_raw"].ainvoke(cb_planner_inputs)
-        content = getattr(raw_msg, "content", None) or str(raw_msg) or ""
-        _logger.info("CB planner raw output (first 1200 chars): %s", content[:1200])
+        content = getattr(raw_msg, "content", None) or ""
+        # Reasoning-style models (DeepSeek-V4-Pro, GLM-4.6) sometimes return
+        # ``content=''`` and put the actual JSON inside
+        # ``additional_kwargs.reasoning_content``. Fall back to it before
+        # giving up — the parser is tolerant enough to pick the JSON block.
+        if not str(content).strip():
+            extra = getattr(raw_msg, "additional_kwargs", None) or {}
+            reasoning = ""
+            if isinstance(extra, dict):
+                reasoning = str(extra.get("reasoning_content") or "")
+            if reasoning.strip():
+                _logger.info("CB planner: content empty, falling back to reasoning_content (len=%d)", len(reasoning))
+                content = reasoning
+        if not str(content).strip():
+            # Last resort: stringify the message so downstream debugging shows what came back
+            content = str(raw_msg) or ""
+        _logger.info("CB planner raw output (first 1200 chars): %s", str(content)[:1200])
         plan = _parse_cb_plan(content)
         _logger.info("CB planner parsed steps count: %d", len(plan) if isinstance(plan, list) else 0)
         if (not plan) and _looks_like_execution_request(state["messages"][-1].content):
