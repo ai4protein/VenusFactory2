@@ -14,15 +14,18 @@ AlphaFold DB is a public repository of AI-predicted 3D protein structures for ov
 
 ## Project Tools (VenusFactory2)
 
-**Only the following two agent tools are exposed** for AlphaFold in this codebase. Query tools that return structure/metadata text into the conversation are **not** exposed, because they would put large PDB/mmCIF or JSON payloads into the context and cause context explosion. Use the download tools instead: they write to disk and return only `{success, file_path}` in JSON.
+**The following agent tools are exposed** for AlphaFold in this codebase. Query tools that would return structure/metadata text into the conversation are **not** exposed, because they would put large PDB/mmCIF or JSON payloads into the context and cause context explosion. Use the download tools instead: they write to disk and return only `{success, file_path}` in JSON. The two `analyze_*` tools then read those local files and emit a small structured report — keeping the analysis off the wire.
 
 | Tool | Args | Returns | Description |
 |------|------|---------|--------------|
 | **download_alphafold_structure_by_uniprot_id** | `uniprot_id` (required), `out_dir` (required), `format` (default `"pdb"`, choices `pdb` \| `cif`), `version` (default `"v6"`, choices `v1` \| `v2` \| `v4` \| `v6`), `fragment` (default `1`, ≥1) | JSON: `{success: bool, file_path: str \| null}` | Download AlphaFold structure (PDB or mmCIF) to `out_dir`. `file_path` is the path to the downloaded file. |
 | **download_alphafold_metadata_by_uniprot_id** | `uniprot_id` (required), `out_dir` (required) | JSON: `{success: bool, file_path: str \| null}` | Download AlphaFold prediction metadata (JSON) to `out_dir`. `file_path` is the path to the saved metadata file. |
+| **analyze_alphafold_plddt_by_metadata_file** | `metadata_path` (required, path to a downloaded AlphaFold metadata JSON) | JSON: `{status, content, biological_metadata {uniprot_id, global_plddt, fractions {very_low, low, confident, very_high}, conclusion}}` | Parse pLDDT fractions and emit a human-readable confidence verdict. Pure local analysis (no network). |
+| **analyze_alphafold_pae_by_pae_file** | `pae_path` (required, path to a downloaded PAE JSON file), `distance_cutoff` (default `7.0`), `min_domain_size` (default `40`) | JSON: `{status, content, biological_metadata {matrix_shape, mean_pae, max_pae, min_pae, confident_pairs_pct, domains [{start, end, length}], conclusion}}` | Walk the PAE matrix to detect rigid sub-domains, merge into global domains, report boundaries and aggregate stats. Pure local analysis. |
 
-- Always call with a valid `out_dir`; the tools create the directory if needed.
-- Structure URLs follow: `https://alphafold.ebi.ac.uk/files/{entry_id}-model_{version}.{pdb|cif}` with `entry_id` = `AF-{uniprot_id}-F{fragment}`. See `references/api_reference.md` for full API details.
+- Always call with a valid `out_dir`; the download tools create the directory if needed.
+- The analyze tools require a previously downloaded file path; chain them after the corresponding download tool.
+- Structure URLs follow: `https://alphafold.ebi.ac.uk/files/{entry_id}-model_{version}.{pdb|cif}` with `entry_id` = `AF-{uniprot_id}-F{fragment}`. PAE JSON URL: `…/{entry_id}-predicted_aligned_error_{version}.json`. See `references/api_reference.md` for full API details.
 
 ## When to Use This Skill
 
