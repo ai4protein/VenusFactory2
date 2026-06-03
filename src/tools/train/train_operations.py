@@ -747,27 +747,81 @@ def generate_and_execute_code(
                     else:
                         result_json["success"] = True
                         result_json["SYSTEM_NOTE"] = "STOP EXECUTION NOW. The code has run successfully. Provide the Final Answer immediately."
-                    
+
+                    # Q4 (post-rewrite): if THIS step was a plot task and we
+                    # still don't have an image in output_files after all the
+                    # earlier handling, fire the fallback now. Covers both
+                    # the explicit-failure path AND the success-but-no-image
+                    # path (some LLM scripts print "Columns:" and exit
+                    # without ever calling savefig).
+                    if task_wants_plot and not any(
+                        isinstance(f, str) and f.lower().endswith(IMAGE_EXTS)
+                        for f in (result_json.get("output_files") or [])
+                    ):
+                        fb_pngs = _fallback_default_plot(
+                            input_files=valid_files,
+                            output_directory=output_directory,
+                            task_description=task_description or "",
+                        )
+                        if fb_pngs:
+                            existing = [f for f in (result_json.get("output_files") or []) if isinstance(f, str)]
+                            for p in fb_pngs:
+                                if p not in existing:
+                                    existing.append(p)
+                            result_json["output_files"] = existing
+                            result_json["success"] = True
+                            old_summary = result_json.get("summary", "")
+                            result_json["summary"] = (
+                                "Auto-fallback: harness rendered a default pandas/matplotlib chart "
+                                "because the LLM script did not produce an image. "
+                                "Original status: " + str(old_summary or result_json.get("error",""))[:200]
+                            )
+                            result_json.pop("error", None)
+                            result_json["fallback_used"] = "default_pandas_plot"
+
                     # Keep the generated code since execution was successful
                     print(f"✓ Code executed successfully. Saved to: {to_project_relative_path(script_path)}")
                     return json.dumps(result_json, indent=2)
                 else:
-                    # Fallback if no JSON found but execution succeeded
+                    # No JSON found but execution succeeded. For plot tasks,
+                    # the absence of structured output means we don't know if
+                    # an image was saved; try the deterministic fallback.
                     print(f"✓ Code executed but no JSON output found. Saved to: {to_project_relative_path(script_path)}")
-                    return json.dumps({
+                    final_payload = {
                         "success": True,
                         "output": stdout,
                         "generated_code_path": to_project_relative_path(script_path),
                         "SYSTEM_NOTE": "STOP EXECUTION NOW. The code has run successfully. Provide the Final Answer immediately."
-                    }, indent=2)
+                    }
+                    if task_wants_plot:
+                        fb_pngs = _fallback_default_plot(
+                            input_files=valid_files,
+                            output_directory=output_directory,
+                            task_description=task_description or "",
+                        )
+                        if fb_pngs:
+                            final_payload["output_files"] = fb_pngs
+                            final_payload["fallback_used"] = "default_pandas_plot"
+                    return json.dumps(final_payload, indent=2)
             except json.JSONDecodeError:
-                # If JSON parsing fails, return raw output
+                # JSON parsing failed. For plot tasks, run fallback so the
+                # user still gets a figure.
                 print(f"✓ Code executed but JSON parsing failed. Saved to: {to_project_relative_path(script_path)}")
-                return json.dumps({
+                final_payload = {
                     "success": True,
                     "output": stdout,
-                    "generated_code_path": to_project_relative_path(script_path)
-                }, indent=2)
+                    "generated_code_path": to_project_relative_path(script_path),
+                }
+                if task_wants_plot:
+                    fb_pngs = _fallback_default_plot(
+                        input_files=valid_files,
+                        output_directory=output_directory,
+                        task_description=task_description or "",
+                    )
+                    if fb_pngs:
+                        final_payload["output_files"] = fb_pngs
+                        final_payload["fallback_used"] = "default_pandas_plot"
+                return json.dumps(final_payload, indent=2)
         else:
             # Execution failed - prepare error message
             stderr = process.stderr.strip()
