@@ -42,11 +42,15 @@ def _resolve_one_token(token: str, step_results, key_hint: str) -> tuple[bool, A
     if len(parts) < 2:
         return False, token, f"Invalid dependency token for `{key_hint}`: {token}"
 
-    dep_token = parts[1].replace("step_", "").replace("step", "").strip()
-    try:
-        dep_step = int(dep_token)
-    except ValueError:
+    # Strip the leading "step_" / "step" alias and pull the first run of
+    # digits — tolerates the LLM hallucinating suffixes like "step_5b",
+    # "step5a", "step_5_a" (all interpreted as step 5).
+    dep_token_raw = parts[1].replace("step_", "").replace("step", "").strip()
+    import re as _re
+    m = _re.match(r"\d+", dep_token_raw)
+    if not m:
         return False, token, f"Invalid dependency step token for `{key_hint}`: {token}"
+    dep_step = int(m.group(0))
 
     dep_out = _get_step_raw_output(step_results, dep_step)
     if dep_out is None:
