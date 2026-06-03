@@ -124,6 +124,53 @@ def _sanitize_tool_invoke_input(
     if not allowed:
         return merged_input
 
+    # Tool-aware alias map: planners (especially DeepSeek) occasionally emit
+    # param names that don't match the schema (e.g. ``code`` for
+    # ``agent_generated_code`` which actually expects ``task_description``).
+    # Translate well-known aliases before filtering so the tool doesn't fail
+    # Pydantic validation with the cryptic ``Field required`` error.
+    _alias_maps = {
+        "agent_generated_code": {
+            "code": "task_description",
+            "script": "task_description",
+            "source": "task_description",
+            "task": "task_description",
+            "prompt": "task_description",
+            "language": None,  # silently dropped — sandbox is python-only
+        },
+        "python_repl": {
+            "code": "query",
+            "script": "query",
+            "source": "query",
+            "python": "query",
+        },
+        "predict_structure_esmfold": {
+            "fasta": "sequence",
+            "fasta_file": "sequence",
+            "fasta_path": "sequence",
+            "seq": "sequence",
+        },
+    }
+    aliases = _alias_maps.get(tool_name) or {}
+    if aliases:
+        rewritten = {}
+        for k, v in merged_input.items():
+            if k in aliases:
+                target = aliases[k]
+                if target is None:
+                    continue  # drop
+                if target not in merged_input and target not in rewritten:
+                    rewritten[target] = v
+                    _logger.debug(
+                        "Input sanitize: tool=%s, aliased %s -> %s",
+                        tool_name,
+                        k,
+                        target,
+                    )
+                    continue
+            rewritten[k] = v
+        merged_input = rewritten
+
     filtered = {k: v for k, v in merged_input.items() if k in allowed}
 
     # If planner produced a scalar-like wrapper, map it to the only accepted field.

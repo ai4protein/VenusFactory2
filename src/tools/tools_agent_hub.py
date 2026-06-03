@@ -125,6 +125,15 @@ from tools.file.tools_agent import (
 )
 from tools.skill.tools_agent import read_skill_tool, get_python_repl_tool
 
+try:
+    from tools.denovo.tools_agent import (
+        proteinmpnn_sequence_design_from_structure_tool,
+        proteinmpnn_sequence_scoring_from_structure_tool,
+    )
+    _DENOVO_AVAILABLE = True
+except Exception:
+    _DENOVO_AVAILABLE = False
+
 # ---------------------------------------------------------------------------
 # Per-series lists (each tool appears in exactly one list)
 # ---------------------------------------------------------------------------
@@ -249,6 +258,15 @@ SKILL_TOOLS: list[BaseTool] = [read_skill_tool] + ([_py_repl] if _py_repl else [
 # Concatenated full list and subsets
 # ---------------------------------------------------------------------------
 
+DENOVO_TOOLS: list[BaseTool] = (
+    [
+        proteinmpnn_sequence_design_from_structure_tool,
+        proteinmpnn_sequence_scoring_from_structure_tool,
+    ]
+    if _DENOVO_AVAILABLE
+    else []
+)
+
 ALL_TOOLS: list[BaseTool] = (
     MUTATION_TOOLS
     + PREDICT_TOOLS
@@ -257,6 +275,7 @@ ALL_TOOLS: list[BaseTool] = (
     + FILE_TOOLS
     + SKILL_TOOLS
     + DATABASE_TOOLS
+    + DENOVO_TOOLS
 )
 
 # PI can execute only search tools (no download / train / file / etc.). Used for PI report and PI answer chains.

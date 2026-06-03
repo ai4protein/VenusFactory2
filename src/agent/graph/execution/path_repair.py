@@ -12,6 +12,7 @@ Two distinct flows live here:
 
 from __future__ import annotations
 
+import json
 import os
 from enum import Enum
 from pathlib import Path
@@ -152,12 +153,22 @@ def rebind_file_not_found(
     is_failure, derived_reason = _tool_output_indicates_failure(raw_output)
     failure_reason = failure_reason or derived_reason or ""
 
-    _fnf_detected = (
-        isinstance(raw_output, str) and "FileNotFoundError" in raw_output
-    ) or (
+    raw_text = raw_output if isinstance(raw_output, str) else (
+        json.dumps(raw_output) if not isinstance(raw_output, (int, float, bool, type(None))) else str(raw_output)
+    )
+    raw_lower = raw_text.lower() if isinstance(raw_text, str) else ""
+    _fnf_signatures = (
+        "filenotfounderror",
+        "no such file",
+        "does not exist",
+        "could not find",
+        "cannot find",
+        "search root directory does not exist",  # common agent_generated_code message
+    )
+    _fnf_detected = any(sig in raw_lower for sig in _fnf_signatures) or (
         is_failure
         and isinstance(failure_reason, str)
-        and ("file" in failure_reason.lower() and "not found" in failure_reason.lower())
+        and ("file" in failure_reason.lower() and ("not found" in failure_reason.lower() or "does not exist" in failure_reason.lower()))
     )
     if not _fnf_detected:
         return None
@@ -216,6 +227,42 @@ def rebind_file_not_found(
         ):
             return merge_retry_input(ctx, invoke_input, rebound_input)
         return None
+
+    # Special handling for agent_generated_code: the failure is INSIDE the
+    # LLM-generated script (it hardcoded a path in code that doesn't exist on
+    # disk). The script's input_files may be empty or omit the upstream output
+    # the CB planner forgot to wire up. Auto-inject ALL upstream file_path
+    # values into ``input_files`` and amend the task_description so the LLM
+    # rewrites the script using the structured file list rather than the
+    # original hardcoded names. This addresses the common CB pattern of
+    # referencing files by name in task_description text instead of via
+    # ``dependency:step_N:file_path`` tokens.
+    if ctx.tool_name == "agent_generated_code":
+        retry_seed = dict(invoke_input)
+        existing_inputs = retry_seed.get("input_files") or []
+        if not isinstance(existing_inputs, list):
+            existing_inputs = []
+        # Build the augmented input_files list by union with all upstream paths
+        augmented = list(existing_inputs)
+        for _cp in candidate_paths:
+            if _cp not in augmented and os.path.exists(_cp):
+                augmented.append(_cp)
+        if not augmented or augmented == existing_inputs:
+            return None
+        retry_seed["input_files"] = augmented
+        # Amend task_description so the LLM is forced to use the structured list
+        task_desc = retry_seed.get("task_description") or ""
+        retry_hint = (
+            "\n\n[AUTO-RETRY] Previous attempt failed with a file-not-found error. "
+            "The harness has populated `input_files` with the actual absolute paths "
+            "of upstream tool outputs. Use ONLY these paths via the file_info `path` "
+            "field — do NOT reference any hardcoded filename from the original task "
+            "text. If a required file is not in input_files, save a clear error and "
+            "return success=false with details."
+        )
+        if "[AUTO-RETRY]" not in str(task_desc):
+            retry_seed["task_description"] = str(task_desc) + retry_hint
+        return merge_retry_input(ctx, invoke_input, retry_seed)
 
     # General tool path rebinding: replace broken file-like input values
     _rebind_changed = False
