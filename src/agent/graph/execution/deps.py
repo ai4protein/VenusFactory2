@@ -80,28 +80,65 @@ def _resolve_one_token(token: str, step_results, key_hint: str) -> tuple[bool, A
         if field_ok:
             val = cursor
         else:
-            val = dep_out
+            # Keep the parsed dict (if any) so the path-extraction heuristic
+            # below can still find a usable field (e.g. requested ``file_path``
+            # missing but ``config_path`` present). Falling back to ``dep_out``
+            # (the raw JSON string) would hide the structured fields from the
+            # heuristic and make it pass the whole JSON blob through as the
+            # parameter value, which then fails Pydantic validation downstream.
+            val = parsed if isinstance(parsed, dict) else dep_out
             _logger.debug(
-                "Dependency resolve: field path %s not found in step %s output; using raw output",
+                "Dependency resolve: field path %s not found in step %s output; "
+                "passing parsed dict to path heuristic",
                 "/".join(field_path),
                 dep_step,
             )
     else:
-        val = dep_out
+        # No explicit field requested. Prefer the parsed dict so the heuristic
+        # below can pick the right path field; fall back to the raw string.
+        val = parsed if isinstance(parsed, dict) else dep_out
 
     # Heuristic auto-extraction for paths if the expected parameter is a file/path/input.
     # NB: list-valued params like ``input_files`` carry the 'file' substring so this
     # heuristic also applies per-element after recursion.
-    if any(k in key_hint.lower() for k in ("path", "file", "input")):
+    if any(k in key_hint.lower() for k in ("path", "file", "input", "config")):
+        # Ordered fallback for path-like fields, broadest first. Tools differ
+        # in which field carries the canonical output path (``file_path`` is
+        # most common, but ``config_path`` for generate_training_config,
+        # ``model_path``/``output_dir`` for trainers, ``fasta_path`` for
+        # proteinmpnn, etc.). Try the most specific to the caller's key first,
+        # then broader fallbacks, so e.g. ``key_hint=config_path`` prefers
+        # ``parsed['config_path']`` over ``parsed['file_path']``.
         if isinstance(val, dict):
-            if "file_path" in val:
-                val = val["file_path"]
-            elif (
-                "file_info" in val
-                and isinstance(val["file_info"], dict)
-                and "file_path" in val["file_info"]
-            ):
-                val = val["file_info"]["file_path"]
+            key_l = key_hint.lower()
+            specific_candidates = []
+            if "config" in key_l:
+                specific_candidates.append("config_path")
+            if "model" in key_l:
+                specific_candidates.extend(["model_path"])
+            if "fasta" in key_l:
+                specific_candidates.append("fasta_path")
+            generic_candidates = [
+                "file_path", "config_path", "model_path", "fasta_path",
+                "output_path", "out_path", "output_file",
+            ]
+            ordered_keys = []
+            for k in specific_candidates + generic_candidates:
+                if k not in ordered_keys:
+                    ordered_keys.append(k)
+            picked = None
+            for k in ordered_keys:
+                if k in val and isinstance(val[k], str) and val[k].strip():
+                    picked = val[k]
+                    break
+            if picked is None and isinstance(val.get("file_info"), dict):
+                fi = val["file_info"]
+                for k in ordered_keys:
+                    if k in fi and isinstance(fi[k], str) and fi[k].strip():
+                        picked = fi[k]
+                        break
+            if picked is not None:
+                val = picked
         elif isinstance(val, str):
             extracted = _get_output_file_path_from_raw(val, "previous_step")
             if extracted:
