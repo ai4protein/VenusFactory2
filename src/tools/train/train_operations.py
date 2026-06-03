@@ -223,6 +223,49 @@ def _fallback_default_plot(
     return saved
 
 
+def _maybe_apply_plot_fallback(
+    pre_payload: Dict[str, Any],
+    task_description: str,
+    valid_files: List[str],
+    output_directory: str,
+) -> str:
+    """Shared helper: if the task wanted a plot and we have upstream files,
+    run the deterministic fallback plotter and turn a failure payload into
+    a successful one with the rendered PNG attached. Used by both the LLM
+    API error path and the outer exception handler.
+    """
+    PLOT_HINTS = (
+        "plot", "chart", "figure", "visualize", "visualization",
+        "bar plot", "scatter", "heatmap", "histogram", "boxplot",
+        "图", "可视化", "绘制", "画图", "绘图", "热图", "柱状图",
+    )
+    task_low = (task_description or "").lower()
+    wants_plot = any(h in task_low for h in PLOT_HINTS)
+    if not wants_plot or not valid_files or not output_directory:
+        return json.dumps(pre_payload, ensure_ascii=False)
+    try:
+        fb_pngs = _fallback_default_plot(
+            input_files=valid_files,
+            output_directory=output_directory,
+            task_description=task_description,
+        )
+    except Exception:
+        fb_pngs = []
+    if not fb_pngs:
+        return json.dumps(pre_payload, ensure_ascii=False)
+    return json.dumps({
+        "success": True,
+        "output_files": fb_pngs,
+        "summary": (
+            "Auto-fallback: LLM script could not be generated (upstream "
+            "failure: " + str(pre_payload.get("error", ""))[:200] + "). The "
+            "harness rendered a default pandas/matplotlib chart from the "
+            "upstream input — content is correct but styling is the default."
+        ),
+        "fallback_used": "default_pandas_plot",
+    }, ensure_ascii=False)
+
+
 def generate_and_execute_code(
     task_description: str,
     input_files: Optional[List[str]] = None,
@@ -413,10 +456,16 @@ def generate_and_execute_code(
         )
         
         if response.status_code != 200:
-            return json.dumps({
+            # If this was a plot task and we have upstream input files, run
+            # the deterministic fallback plotter — that's still useful even
+            # without an LLM-generated script.
+            pre_payload = {
                 "success": False,
-                "error": f"API error: {response.status_code} - {response.text}"
-            })
+                "error": f"API error: {response.status_code} - {response.text}",
+            }
+            return _maybe_apply_plot_fallback(
+                pre_payload, task_description, valid_files, output_directory
+            )
         
         result = response.json()
         generated_code = result['choices'][0]['message']['content'].strip()
@@ -762,10 +811,21 @@ def generate_and_execute_code(
                 print(f"✗ Error occurred. Deleted script: {to_project_relative_path(script_path)}")
             except Exception:
                 pass
-        return json.dumps({
+        # Q4: when the outer error path fires for a plot task with upstream
+        # files, still try the deterministic fallback plotter so the user
+        # gets a figure even if the LLM call timed out / network failed.
+        pre_payload = {
             "success": False,
-            "error": f"Unexpected error: {str(e)}"
-        })
+            "error": f"Unexpected error: {str(e)}",
+        }
+        # ``valid_files`` and ``output_directory`` may not be defined if the
+        # exception fired before they were set; defend with locals().get.
+        return _maybe_apply_plot_fallback(
+            pre_payload,
+            task_description,
+            locals().get("valid_files", []) or [],
+            locals().get("output_directory", ""),
+        )
 
 
 def detect_sequence_and_label_columns(df: pd.DataFrame) -> Tuple[str, str]:
