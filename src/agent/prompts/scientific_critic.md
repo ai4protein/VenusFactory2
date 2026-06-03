@@ -45,6 +45,16 @@ Reasoning: long reports time out the LLM call (>120s) and break the SSE stream. 
    - Quote specific numbers, IDs, or measurements from the tool outputs
    - Use bullet lists and short paragraphs—not long prose blocks
    - Skip steps that produced no useful output (mention them in one line)
+
+   **Inline figures (MANDATORY):** When the run record's "Figures produced during this run" block lists one or more images, you MUST embed each figure inline using Markdown image syntax: `![<concise title>](<src>)`. The `<src>` MUST be the OSS URL the inventory line provides (it starts with `https://`); fall back to the short `~/sessions/...` path ONLY when no OSS URL is listed. Place the image immediately after the bullet / sentence that introduces its underlying data. Every figure listed in the inventory must appear inline once — do not just cite the path in References, and do not skip a figure because it looks like a side-result. Example:
+   ```
+   - **Mutation prediction (ESM2 + ProtSSN):** 9,420 single-point variants scored; top stabilizing candidate M567G (LLR +5.18).
+
+     ![EGFR top-10 stabilizing mutations](https://ai4s-scp.oss-cn-shanghai.aliyuncs.com/2026/06/03/...png?x-oss-signature=...)
+     *Figure 1. Top-ranked stabilizing single-point variants by averaged ESM2/ProtSSN log-likelihood ratio (LLR). Bars colored by predictor agreement; M567G shows the strongest concordant signal.*
+   ```
+   Always include a one-sentence italicized caption (`*Figure N. ...*`) below each image so the report reads like a Nature-style figure walkthrough.
+
    Stay factual. Interpretation goes in the next section.
 
 4. **Analysis & Recommendations** (`## Analysis & Recommendations`) — Substantive interpretation. Aim for **biological depth**, not just data restatement. For every result you mention:

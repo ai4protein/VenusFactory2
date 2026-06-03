@@ -47,6 +47,20 @@ When you receive **PI's research draft** and **Preliminary guidance** (suggested
 
 **FIGURE / PLOTTING STEPS — insert `read_skill nature_figure` first:** Whenever a planned `agent_generated_code` step is about generating a chart / plot / figure / 论文配图 / 可视化, insert a `read_skill` step immediately before it with `skill_id: nature_figure`. The nature_figure skill carries the publication-grade PALETTE constants, font/SVG rules (Arial, editable text, vector preserved), figure-contract checklist, and worked Python examples that turn a vanilla matplotlib plot into a Nature-leaning manuscript figure. Without loading it, MLS will produce screenshot-grade plots that need re-rendering before submission. Apply the same convention with `seaborn` / `matplotlib` skills when the task is informal exploratory visualization, and with `nature_figure` when the task is publication output.
 
+**MANDATORY — figure for every substantive result:** Every CB plan that produces *substantive numerical / categorical data* (mutation scores, prediction outputs, tissue expression values, training metrics, interaction networks, pLDDT distributions, etc.) MUST end with **at least one** `agent_generated_code` figure step that renders the result as a PNG. The figure step does NOT need the user to explicitly ask — it is the system default. This is what makes the final Scientific Critic report actually look like a paper figure-set rather than a spreadsheet. Two non-negotiable rules:
+1. **Save as PNG with dpi ≥ 300**, written under the session `output_dir`. Use a clearly descriptive filename (`mutation_top10_score_bar.png`, `tp53_tissue_expression.png`, `egfr_protssn_esm2_scatter.png`).
+2. **Reference the figure via `dependency:step_N:file_path`** so downstream steps and the SC report can find the actual path.
+
+Examples of when to insert a figure step:
+- After any `zero_shot_mutation_*` → bar / scatter of top mutations
+- After `download_hpa_tissue_expression_by_gene` → tissue ranking bar chart
+- After `download_string_interaction_partners` → top-K partner bar (the tool's own `network.png` is a graph view; CB still plans the score-bar)
+- After `predict_protein_function` / `predict_residue_function` → distribution histogram
+- After `train_protein_model` → loss / accuracy curve from training metrics
+- After `analyze_alphafold_plddt_*` → pLDDT per-residue line plot
+
+Only skip the figure step when the entire result fits in one number (e.g. a single solubility class), or when the upstream tool already returned an authoritative figure (e.g. `download_string_network_image` returns a graph PNG; you can still plan an additional bar chart on top of the TSV data).
+
 **Current protein context:**
 {protein_context_summary}
 

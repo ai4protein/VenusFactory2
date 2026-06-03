@@ -135,6 +135,8 @@ async def finalize_node(state: AgentState, config: RunnableConfig):
     # Build the full run record for the finalizer
     analysis_log = []
     auto_remedy_blocks: list[str] = []
+    figure_artifacts: list[dict] = []  # {step, path, short_path, oss_url, kind}
+    IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".pdf", ".svg", ".webp")
     for i, entry in enumerate(tool_executions, 1):
         step = entry.get("step", i)
         tool_name = entry.get("tool_name", "unknown")
@@ -147,6 +149,61 @@ async def finalize_node(state: AgentState, config: RunnableConfig):
             f"  Output: {str(outputs)[:2000]}\n"
             + (f"  Cloud Download: {oss_url}" if oss_url else "")
         )
+
+        # Harvest figure-like artifacts produced by this step so SC can embed
+        # them directly via Markdown ![title](path) — turning the report into
+        # a paper-style figure walkthrough instead of bare file references.
+        # Look at both ``output_files`` (agent_generated_code) and ``file_info``
+        # (download_string_network_image / pymol_render / etc.).
+        try:
+            out_text = str(outputs or "")
+            m_files = re.search(r'"output_files":\s*\[([^\]]*)\]', out_text)
+            candidates: list[str] = []
+            if m_files:
+                # crude extraction: split on commas, strip quotes/whitespace
+                for tok in m_files.group(1).split(","):
+                    s = tok.strip().strip("'\"").strip()
+                    if s:
+                        candidates.append(s)
+            m_fp = re.search(r'"file_path":\s*"([^"]+)"', out_text)
+            if m_fp:
+                candidates.append(m_fp.group(1))
+            for p in candidates:
+                if not isinstance(p, str):
+                    continue
+                if not p.lower().endswith(IMAGE_EXTS):
+                    continue
+                # Normalize relative → absolute, validate exists
+                abs_p = p
+                if not os.path.isabs(abs_p):
+                    abs_p = abs_p.lstrip("./")
+                    # try project root prefix
+                    pr = "/inspire/hdd/global_user/tanyang-253108120165/workspace/research/VenusFactory"
+                    cand = os.path.join(pr, abs_p)
+                    if os.path.exists(cand):
+                        abs_p = cand
+                if not os.path.exists(abs_p):
+                    continue
+                # Short display path
+                short = abs_p
+                if "temp_outputs/web_v2/sessions/" in abs_p:
+                    try:
+                        rel = abs_p.split("temp_outputs/web_v2/sessions/", 1)[1]
+                        parts = rel.split("/", 4)
+                        if len(parts) >= 5:
+                            short = f"~/sessions/{parts[0][:8]}/{parts[4]}"
+                    except Exception:
+                        pass
+                figure_artifacts.append({
+                    "step": step,
+                    "tool_name": tool_name,
+                    "abs_path": abs_p,
+                    "short_path": short,
+                    "oss_url": oss_url,
+                    "kind": p.rsplit(".", 1)[-1].lower(),
+                })
+        except Exception:
+            pass
 
         # P4 auto-remedy: when agent_generated_code failed or produced only
         # a no-data placeholder, read the upstream file(s) directly and
@@ -206,6 +263,31 @@ async def finalize_node(state: AgentState, config: RunnableConfig):
             "Upstream-file summaries (auto-remedy for failed analysis steps):\n\n"
             + "\n\n".join(auto_remedy_blocks)
         )
+
+    # Figure inventory: feed SC the list of PNG/PDF/SVG files produced
+    # during the run so it can embed each one with Markdown
+    # ``![title](url)`` in the appropriate Results sub-section. The frontend
+    # renders the OSS URL inline; we also include the short path so SC can
+    # write a human-readable caption alongside.
+    if figure_artifacts:
+        lines = ["Figures produced during this run (embed inline in Results sub-sections):"]
+        for i, fa in enumerate(figure_artifacts, 1):
+            url = fa.get("oss_url") or fa.get("short_path")
+            lines.append(
+                f"  Figure {i}: step {fa['step']} {fa['tool_name']} → embed as "
+                f"`![<short title>]({url})`  "
+                f"(caption hint: file = `{fa['short_path']}`)"
+            )
+        lines.append(
+            "\nMANDATORY: in the Results section, immediately after the bullet "
+            "or sentence that introduces each result, insert the figure inline "
+            "using the exact Markdown above. The src must be the OSS URL (when "
+            "present in the inventory) so the chat panel renders the image; if "
+            "no OSS URL is listed, fall back to the short path. Every figure in "
+            "the inventory must appear inline once — do NOT just list the path "
+            "in References."
+        )
+        record_parts.append("\n".join(lines))
     # Include skipped steps info
     skipped_steps = state.get("skipped_steps", [])
     if skipped_steps:
