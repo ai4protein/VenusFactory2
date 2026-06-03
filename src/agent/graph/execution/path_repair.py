@@ -171,6 +171,11 @@ def rebind_file_not_found(
         "could not identify",
         "column not found",
         "no column named",
+        # Sandbox-grant violations: the LLM walked outside session_root
+        # (e.g. os.walk('/'), reading project source). Retry with explicit
+        # input_files pinned to the granted upstream paths.
+        "outside granted directories",
+        "sandbox validation failed",
     )
     _fnf_detected = any(sig in raw_lower for sig in _fnf_signatures) or (
         is_failure
