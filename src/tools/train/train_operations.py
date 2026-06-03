@@ -360,11 +360,33 @@ def generate_and_execute_code(
         )
         executor = SandboxExecutor(sandbox_cfg)
 
+        # Prepend a tiny compat shim for common deprecated APIs the LLM still
+        # emits (its training data lags real library versions). Each block is
+        # a no-op when the modern API is in use; restores the legacy attr name
+        # when it's missing so old-style LLM code keeps working.
+        _COMPAT_SHIM = (
+            "# --- auto-injected API compat shim (LLM training-data drift) ---\n"
+            "try:\n"
+            "    from Bio.PDB import Polypeptide as _bppp\n"
+            "    if not hasattr(_bppp, 'three_to_one'):\n"
+            "        # Biopython >=1.80 removed three_to_one; map to the lookup table.\n"
+            "        _bppp.three_to_one = lambda aa: _bppp.protein_letters_3to1.get(\n"
+            "            (aa or '').upper(), 'X'\n"
+            "        )\n"
+            "    if not hasattr(_bppp, 'one_to_three'):\n"
+            "        _inv = {v: k for k, v in _bppp.protein_letters_3to1.items()}\n"
+            "        _bppp.one_to_three = lambda aa: _inv.get((aa or '').upper(), 'XAA')\n"
+            "except Exception:\n"
+            "    pass\n"
+            "# --- end compat shim ---\n\n"
+        )
+        sandboxed_code = _COMPAT_SHIM + generated_code
+
         # Run the already-persisted script through the sandbox. SandboxExecutor
         # writes a fresh temp script internally; we feed it the generated code
         # directly so the persisted script_path stays available for debugging.
         try:
-            exec_result = executor.execute(generated_code)
+            exec_result = executor.execute(sandboxed_code)
         except ToolTimeoutError as e:
             # Re-raise as subprocess.TimeoutExpired so the existing timeout
             # handler below catches it (preserves existing user-facing message).
