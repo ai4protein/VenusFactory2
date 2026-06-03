@@ -467,6 +467,39 @@ def generate_and_execute_code(
                             f"Claimed {len(output_files)} output_files but none exist on disk",
                         )
 
+                    # Plot-task enforcement: when the task description asked
+                    # for a visualization but no image file was actually
+                    # produced (only .txt / .json / no_data placeholders),
+                    # mark the step as failed so the harness auto-retries.
+                    # Without this gate, LLMs frequently shortcut "make a
+                    # bar chart" into "print a table to stdout" and report
+                    # success, leaving the final report figure-less.
+                    PLOT_HINTS = (
+                        "plot", "chart", "figure", "visualize", "visualization",
+                        "bar plot", "scatter", "heatmap", "histogram", "boxplot",
+                        "图", "可视化", "绘制", "画图", "绘图", "热图", "柱状图",
+                    )
+                    IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".pdf", ".svg", ".webp")
+                    task_low = (task_description or "").lower()
+                    task_wants_plot = any(h in task_low for h in PLOT_HINTS)
+                    if task_wants_plot and result_json.get("success") is not False:
+                        has_image = any(
+                            isinstance(f, str) and f.lower().endswith(IMAGE_EXTS)
+                            for f in (result_json.get("output_files") or [])
+                        )
+                        if not has_image:
+                            result_json["success"] = False
+                            result_json["error"] = (
+                                "Plot-task enforcement: task description requested a "
+                                "visualization but no image file (.png/.pdf/.svg) was "
+                                "saved. Outputs: "
+                                + json.dumps(result_json.get("output_files") or [], ensure_ascii=False)
+                            )
+                            result_json.setdefault(
+                                "summary",
+                                "Task asked for a chart but the script produced no image — retry.",
+                            )
+
                     # Trust the script's own success self-report. Previously this
                     # line forced success=True even when the script printed
                     # success=False (or carried an `error` field), causing the
