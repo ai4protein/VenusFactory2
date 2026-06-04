@@ -155,6 +155,127 @@ def _resolve_one_token(token: str, step_results, key_hint: str) -> tuple[bool, A
     return True, val, ""
 
 
+def _looks_like_placeholder(value: str) -> tuple[bool, int]:
+    """Detect placeholder-style strings the LLM sometimes emits in place
+    of a real ``dependency:step_N:...`` token. Returns (matched, step_no).
+
+    Examples we have seen in production CB output:
+    - ``"PLACEHOLDER_FROM_STEP_3"``  →  step 3
+    - ``"FROM_STEP_5"``              →  step 5
+    - ``"<step_2 output>"``          →  step 2
+    - ``"{{step_4_file_path}}"``     →  step 4
+    - ``"step_7_output"``            →  step 7
+    """
+    import re as _re
+    if not isinstance(value, str):
+        return False, -1
+    s = value.strip()
+    if not s:
+        return False, -1
+    # Reject if it's already a real path or URL
+    if "/" in s or s.startswith(("http://", "https://", ".", "~")):
+        return False, -1
+    # Reject if length suggests real content (paths, JSON snippets)
+    if len(s) > 80:
+        return False, -1
+    # Two-stage match: (a) the whole string must look like a placeholder
+    # (contains "step" + a number, optionally with placeholder/from/output
+    # surrounding markers); (b) extract the step number.
+    s_low = s.lower()
+    placeholder_markers = ("placeholder", "from", "output", "<", "{{", "{", "[[")
+    has_marker = any(m in s_low for m in placeholder_markers)
+    # If no marker AND the string doesn't START with step_, reject — we
+    # don't want to false-positive on free-form sentences containing "step 3".
+    if not has_marker and not _re.match(r"(?i)^\s*step[_\s-]?\d+", s):
+        return False, -1
+    # Extract the step number.
+    m = _re.search(r"(?i)step[_\s-]?(\d+)", s)
+    if not m:
+        return False, -1
+    try:
+        return True, int(m.group(1))
+    except Exception:
+        return False, -1
+
+
+def _maybe_read_json_file_as_string(value: Any, key_hint: str) -> Any:
+    """When a tool parameter expects a JSON-encoded string (heuristic: key
+    name ends in ``_json``) but the resolved value is a path to an existing
+    JSON file on disk, read the file content and use it as the string value.
+
+    Also handles the dict-passthrough case: when ``_resolve_one_token``
+    couldn't find a field path and returned the parsed dict, we look inside
+    for a ``file_path`` or ``output_files[0]`` that points to a real JSON
+    file and read THAT.
+
+    Bridges the common CB pattern where step N writes a JSON file and step
+    N+1 wants to pass the JSON content (not the path) to a tool like
+    ``proteinmpnn_sequence_design_from_structure``'s
+    ``fixed_residues_json`` parameter.
+    """
+    import os as _os
+    import json as _json
+
+    if not isinstance(key_hint, str) or not key_hint.lower().endswith("_json"):
+        return value
+
+    # First normalize the value to a candidate path. Accept three shapes:
+    #   (a) string that looks like a path to a .json file
+    #   (b) dict that carries file_path / output_files containing a .json
+    candidate_path: str | None = None
+    if isinstance(value, str):
+        if value.endswith(".json") or "/" in value:
+            candidate_path = value
+    elif isinstance(value, dict):
+        for k in ("file_path", "path", "out_path"):
+            v = value.get(k)
+            if isinstance(v, str) and v.endswith(".json"):
+                candidate_path = v
+                break
+        if candidate_path is None:
+            fi = value.get("file_info")
+            if isinstance(fi, dict):
+                fp = fi.get("file_path")
+                if isinstance(fp, str) and fp.endswith(".json"):
+                    candidate_path = fp
+        if candidate_path is None:
+            ofs = value.get("output_files")
+            if isinstance(ofs, list):
+                for f in ofs:
+                    if isinstance(f, str) and f.endswith(".json"):
+                        candidate_path = f
+                        break
+
+    if not candidate_path:
+        return value
+
+    try:
+        if not _os.path.isabs(candidate_path):
+            from pathlib import Path as _Path
+            for root in (_Path.cwd(), _Path("/inspire/hdd/global_user/tanyang-253108120165/workspace/research/VenusFactory")):
+                cand = root / candidate_path
+                if cand.exists():
+                    candidate_path = str(cand.resolve())
+                    break
+        if not _os.path.exists(candidate_path):
+            return value
+        with open(candidate_path, "r", encoding="utf-8") as f:
+            content = f.read()
+        # Validate it's parseable JSON before substituting
+        _json.loads(content)
+        _logger.info(
+            "Dependency resolve: %s expects JSON string but got %s %s; "
+            "reading file content (%d chars) as the string value.",
+            key_hint,
+            "dict pointing to" if isinstance(value, dict) else "file path",
+            candidate_path,
+            len(content),
+        )
+        return content
+    except Exception:
+        return value
+
+
 def _resolve_nested(value: Any, step_results, key_hint: str) -> tuple[bool, Any, str]:
     """Recursively resolve dependency tokens inside nested str/list/dict structures.
 
@@ -162,9 +283,31 @@ def _resolve_nested(value: Any, step_results, key_hint: str) -> tuple[bool, Any,
     ``input_files: ["dependency:step_3:file_path"]`` for ``agent_generated_code``)
     or nested dicts. Without recursion the token was passed through as a literal
     string path, and the tool then failed with FileNotFound.
+
+    Also handles two LLM-output shapes that aren't proper dependency tokens:
+
+    1. ``PLACEHOLDER_FROM_STEP_N`` / ``<step_N output>`` / ``step_N_output``
+       — the LLM's informal way of saying "this comes from step N". We
+       detect these and rewrite as if they were ``dependency:step_N``.
+    2. Parameter expects JSON string (``_json`` suffix) but resolves to a
+       file path on disk → read the file contents as the string value.
     """
+    # Placeholder rewrite — happens BEFORE the dependency: prefix check
+    if isinstance(value, str) and not value.startswith("dependency:"):
+        is_placeholder, step_no = _looks_like_placeholder(value)
+        if is_placeholder:
+            _logger.info(
+                "Dependency resolve: detected placeholder %r for key %s; "
+                "treating as dependency:step_%d",
+                value, key_hint, step_no,
+            )
+            value = f"dependency:step_{step_no}"
+
     if isinstance(value, str) and value.startswith("dependency:"):
-        return _resolve_one_token(value, step_results, key_hint)
+        ok, resolved, reason = _resolve_one_token(value, step_results, key_hint)
+        if ok:
+            resolved = _maybe_read_json_file_as_string(resolved, key_hint)
+        return ok, resolved, reason
     if isinstance(value, list):
         new_list = []
         for item in value:
