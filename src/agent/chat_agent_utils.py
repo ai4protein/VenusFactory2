@@ -1102,10 +1102,27 @@ def _pi_database_fallback(query: str, tools_dict: dict) -> list:
 
 
 def _fetch_search_for_pi_report(user_text: str, max_results: int = None, llm=None) -> tuple:
-    """Run literature_search, web_search, dataset_search. Default sources: pubmed, tavily, github. When a search returns empty or fails, retry with another source (e.g. web: tavily → duckduckgo; literature: pubmed → semantic_scholar → arxiv). Returns (combined_str_with_citations, list of (tool_name, inputs, raw_output))."""
+    """Deep-research mode: query ALL configured sources in parallel for each
+    of three search groups (literature, web, datasets), merge results across
+    sources within each group (deduping by URL/DOI/PMID), then fall back to
+    structural-database metadata when everything else is empty.
+
+    Returns (combined_str_with_citations, list of (tool_name, inputs, raw_output)).
+
+    Source coverage (was fallback-chain, now merge):
+    - Literature: PubMed + Semantic Scholar + arXiv + bioRxiv (4)
+    - Web:        Tavily + DuckDuckGo (2)
+    - Datasets:   GitHub + HuggingFace (2)
+    - FDA:        query_fda when query mentions a drug-related keyword (1)
+    - DB metadata fallback: RCSB/UniProt/HPA/STRING when bio identifiers
+      are present in the prompt
+    """
+    import concurrent.futures as _cf
+
     if max_results is None:
         max_results = SEARCH_MAX_RESULTS
-    # Use English keywords: if user_text has non-ASCII, translate via LLM; otherwise refine
+
+    # Use English keywords: if user_text has non-ASCII, translate via LLM
     has_non_ascii = any(ord(c) > 127 for c in (user_text or ""))
     query = ""
     if has_non_ascii and llm:
@@ -1114,93 +1131,146 @@ def _fetch_search_for_pi_report(user_text: str, max_results: int = None, llm=Non
         query = _refine_query_for_search(user_text, 80) or (user_text or "").strip()[:80]
     if not query:
         return ("", [])
+
     try:
         from tools.tools_agent_hub import get_tools
         tools = get_tools()
         tools_dict = {getattr(t, "name", ""): t for t in tools}
 
-        sections = []
-        logged = []
+        sections: list = []
+        logged: list = []
 
-        # Literature: default pubmed; if empty/fail try semantic_scholar, then arxiv
-        for tool_name in ("query_pubmed", "query_semantic_scholar", "query_arxiv"):
-            lit_tool = tools_dict.get(tool_name)
-            if not lit_tool:
-                continue
-            lit_input = {"query": query, "max_results": max_results}
+        def _invoke_one(tool_name: str, tool_input: dict) -> tuple:
+            """Invoke a single search tool; return (tool_name, input, raw_str)."""
+            tool = tools_dict.get(tool_name)
+            if not tool:
+                return (tool_name, tool_input, json.dumps({"success": False, "error": "tool not available"}))
             try:
-                _logger.info("PI research invoking: %s with %s", tool_name, lit_input)
-                lit_out = lit_tool.invoke(lit_input)
-                raw_lit = lit_out if isinstance(lit_out, str) else json.dumps(lit_out, ensure_ascii=False)
-                logged.append((tool_name, lit_input, raw_lit))
-                data = json.loads(raw_lit) if isinstance(raw_lit, str) and raw_lit.strip().startswith("{") else {}
-                data = _extract_deepsearch_data(data)
-                if data.get("success") is not False:
-                    refs = data.get("references") or data.get("results") or data.get("papers") or data
-                    if isinstance(refs, list) and refs:
-                        lines = _format_literature_citations(refs, max_n=5)
-                        if lines:
-                            sections.append("**Literature (cite as [1], [2], ...)**\n" + "\n".join(lines))
-                            break
+                _logger.info("PI deep-research invoking: %s with %s", tool_name, tool_input)
+                out = tool.invoke(tool_input)
+                raw = out if isinstance(out, str) else json.dumps(out, ensure_ascii=False)
+                return (tool_name, tool_input, raw)
             except Exception as e:
-                _logger.warning("PI report %s failed: %s", tool_name, e)
-                logged.append((tool_name, lit_input, json.dumps({"success": False, "error": str(e)})))
+                _logger.warning("PI %s failed: %s", tool_name, e)
+                return (tool_name, tool_input, json.dumps({"success": False, "error": str(e)}))
 
-        # Web: default tavily; if empty/fail try duckduckgo
-        for tool_name in ("query_tavily", "query_duckduckgo"):
-            web_tool = tools_dict.get(tool_name)
-            if not web_tool:
-                continue
-            web_input = {"query": query, "max_results": max_results}
+        def _parse_results(raw_str: str) -> list:
             try:
-                _logger.info("PI research invoking: %s with %s", tool_name, web_input)
-                web_out = web_tool.invoke(web_input)
-                raw_web = web_out if isinstance(web_out, str) else json.dumps(web_out, ensure_ascii=False)
-                logged.append((tool_name, web_input, raw_web))
-                data = json.loads(raw_web) if isinstance(raw_web, str) and raw_web.strip().startswith("{") else {}
-                data = _extract_deepsearch_data(data)
-                if data.get("success") is not False:
-                    res = data.get("results") or data
-                    if isinstance(res, list) and res:
-                        lines = _format_web_citations(res, max_n=5)
-                        if lines:
-                            sections.append("**Web (cite as [1], [2], ...)**\n" + "\n".join(lines))
-                            break
-                    elif isinstance(res, str) and res.strip():
-                        sections.append("**Web**\n" + res[:1500])
-                        break
-            except Exception as e:
-                _logger.warning("PI report %s failed: %s", tool_name, e)
-                logged.append((tool_name, web_input, json.dumps({"success": False, "error": str(e)})))
+                data = json.loads(raw_str) if isinstance(raw_str, str) and raw_str.strip().startswith("{") else {}
+            except Exception:
+                return []
+            data = _extract_deepsearch_data(data) if isinstance(data, dict) else {}
+            if not isinstance(data, dict) or data.get("success") is False:
+                return []
+            refs = (data.get("references") or data.get("results")
+                    or data.get("papers") or data.get("datasets") or [])
+            if isinstance(refs, str):
+                try:
+                    refs = json.loads(refs) if refs.strip().startswith("[") else []
+                except Exception:
+                    refs = []
+            return refs if isinstance(refs, list) else []
 
-        # Dataset: default github; if empty/fail try hugging_face
-        for tool_name in ("query_github", "query_hugging_face"):
-            dataset_tool = tools_dict.get(tool_name)
-            if not dataset_tool:
-                continue
-            ds_input = {"query": query, "max_results": max_results}
-            try:
-                _logger.info("PI research invoking: %s with %s", tool_name, ds_input)
-                ds_out = dataset_tool.invoke(ds_input)
-                raw_ds = ds_out if isinstance(ds_out, str) else json.dumps(ds_out, ensure_ascii=False)
-                logged.append((tool_name, ds_input, raw_ds))
-                data = json.loads(raw_ds) if isinstance(raw_ds, str) and raw_ds.strip().startswith("{") else {}
-                data = _extract_deepsearch_data(data)
-                if data.get("success") is not False:
-                    ds_list = data.get("datasets") or data.get("results") or data
-                    if isinstance(ds_list, str):
-                        try:
-                            ds_list = json.loads(ds_list)
-                        except json.JSONDecodeError:
-                            ds_list = []
-                    if isinstance(ds_list, list) and ds_list:
-                        lines = _format_dataset_citations(ds_list, max_n=5)
-                        if lines:
-                            sections.append("**Datasets (cite as [1], [2], ...)**\n" + "\n".join(lines))
-                            break
-            except Exception as e:
-                _logger.warning("PI report %s failed: %s", tool_name, e)
-                logged.append((tool_name, ds_input, json.dumps({"success": False, "error": str(e)})))
+        def _dedupe(items: list, key_fn) -> list:
+            seen = set()
+            out = []
+            for it in items:
+                try:
+                    k = key_fn(it)
+                except Exception:
+                    k = id(it)
+                if k in seen:
+                    continue
+                seen.add(k)
+                out.append(it)
+            return out
+
+        # Build the parallel invocation plan
+        LITERATURE = ["query_pubmed", "query_semantic_scholar", "query_arxiv", "query_biorxiv"]
+        WEB = ["query_tavily", "query_duckduckgo"]
+        DATASETS = ["query_github", "query_hugging_face"]
+
+        # FDA only triggered when query looks drug/clinical-related
+        FDA_KEYWORDS = ("drug", "compound", "inhibitor", "small molecule", "clinical",
+                        "FDA", "approved", "trial", "adverse", "antibody", "biologic")
+        plan: list[tuple[str, dict]] = []
+        for tn in LITERATURE + WEB + DATASETS:
+            plan.append((tn, {"query": query, "max_results": max_results}))
+        if any(kw.lower() in user_text.lower() for kw in FDA_KEYWORDS) and "query_fda" in tools_dict:
+            plan.append(("query_fda", {"query": query, "max_results": max_results}))
+
+        # Parallel execution — bounded concurrency to be polite to upstream
+        # rate limits but not so slow that everything is serialized.
+        results_by_tool: dict[str, str] = {}
+        with _cf.ThreadPoolExecutor(max_workers=min(6, len(plan))) as ex:
+            futures = {ex.submit(_invoke_one, tn, ti): (tn, ti) for tn, ti in plan}
+            for fut in _cf.as_completed(futures, timeout=30):
+                try:
+                    tn, ti, raw = fut.result()
+                    results_by_tool[tn] = raw
+                    logged.append((tn, ti, raw))
+                except _cf.TimeoutError:
+                    pass
+                except Exception:
+                    pass
+
+        # Merge literature across PubMed + S2 + arXiv + bioRxiv
+        lit_refs: list = []
+        for tn in LITERATURE:
+            lit_refs.extend(_parse_results(results_by_tool.get(tn, "")))
+        lit_refs = _dedupe(lit_refs, lambda r: (
+            (r.get("url") or r.get("doi") or r.get("pmid") or r.get("title") or "")[:120]
+            if isinstance(r, dict) else str(r)[:120]
+        ))
+        if lit_refs:
+            lines = _format_literature_citations(lit_refs[: max_results * 2], max_n=max_results * 2)
+            if lines:
+                productive = [t for t in LITERATURE if _parse_results(results_by_tool.get(t, ""))]
+                source_tag = ", ".join(t.replace("query_", "") for t in productive) or "literature"
+                sections.append(f"**Literature ({source_tag}; cite as [1], [2], ...)**\n" + "\n".join(lines))
+
+        # Merge web across Tavily + DuckDuckGo
+        web_refs: list = []
+        for tn in WEB:
+            web_refs.extend(_parse_results(results_by_tool.get(tn, "")))
+        web_refs = _dedupe(web_refs, lambda r: (
+            (r.get("url") or r.get("link") or r.get("title") or "")[:120]
+            if isinstance(r, dict) else str(r)[:120]
+        ))
+        if web_refs:
+            lines = _format_web_citations(web_refs[: max_results * 2], max_n=max_results * 2)
+            if lines:
+                productive_web = [t for t in WEB if _parse_results(results_by_tool.get(t, ""))]
+                source_tag = ", ".join(t.replace("query_", "") for t in productive_web) or "web"
+                sections.append(f"**Web ({source_tag}; cite as [1], [2], ...)**\n" + "\n".join(lines))
+
+        # Merge datasets across GitHub + HuggingFace
+        ds_refs: list = []
+        for tn in DATASETS:
+            ds_refs.extend(_parse_results(results_by_tool.get(tn, "")))
+        ds_refs = _dedupe(ds_refs, lambda r: (
+            (r.get("url") or r.get("html_url") or r.get("id") or r.get("name") or "")[:120]
+            if isinstance(r, dict) else str(r)[:120]
+        ))
+        if ds_refs:
+            lines = _format_dataset_citations(ds_refs[: max_results * 2], max_n=max_results * 2)
+            if lines:
+                productive_ds = [t for t in DATASETS if _parse_results(results_by_tool.get(t, ""))]
+                source_tag = ", ".join(t.replace("query_", "") for t in productive_ds) or "datasets"
+                sections.append(f"**Datasets ({source_tag}; cite as [1], [2], ...)**\n" + "\n".join(lines))
+
+        # FDA (when triggered)
+        if "query_fda" in results_by_tool:
+            fda_refs = _parse_results(results_by_tool["query_fda"])
+            if fda_refs:
+                fda_lines = []
+                for r in fda_refs[:max_results]:
+                    if isinstance(r, dict):
+                        nm = r.get("title") or r.get("name") or r.get("brand_name") or "FDA record"
+                        url = r.get("url") or r.get("link") or ""
+                        fda_lines.append(f"- [{nm}]({url})" if url else f"- {nm}")
+                if fda_lines:
+                    sections.append("**FDA (drug/clinical context)**\n" + "\n".join(fda_lines))
 
         # Structural / functional database fallback: when literature + web
         # + dataset search all returned nothing useful, parse the ORIGINAL
