@@ -610,6 +610,18 @@ def generate_and_execute_code(
             err=exec_result.stderr or "",
         )
 
+        # Plot-task detection (used by multiple branches below, including the
+        # JSONDecodeError path). Defined before the branches so every code
+        # path can read ``task_wants_plot`` without UnboundLocalError.
+        PLOT_HINTS = (
+            "plot", "chart", "figure", "visualize", "visualization",
+            "bar plot", "scatter", "heatmap", "histogram", "boxplot",
+            "图", "可视化", "绘制", "画图", "绘图", "热图", "柱状图",
+        )
+        IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".pdf", ".svg", ".webp")
+        task_low = (task_description or "").lower()
+        task_wants_plot = any(h in task_low for h in PLOT_HINTS)
+
         if process.returncode == 0:
             # Try to parse JSON output from the script
             stdout = process.stdout.strip()
@@ -660,17 +672,8 @@ def generate_and_execute_code(
                     # for a visualization but no image file was actually
                     # produced (only .txt / .json / no_data placeholders),
                     # mark the step as failed so the harness auto-retries.
-                    # Without this gate, LLMs frequently shortcut "make a
-                    # bar chart" into "print a table to stdout" and report
-                    # success, leaving the final report figure-less.
-                    PLOT_HINTS = (
-                        "plot", "chart", "figure", "visualize", "visualization",
-                        "bar plot", "scatter", "heatmap", "histogram", "boxplot",
-                        "图", "可视化", "绘制", "画图", "绘图", "热图", "柱状图",
-                    )
-                    IMAGE_EXTS = (".png", ".jpg", ".jpeg", ".pdf", ".svg", ".webp")
-                    task_low = (task_description or "").lower()
-                    task_wants_plot = any(h in task_low for h in PLOT_HINTS)
+                    # (task_wants_plot was hoisted above the branches so all
+                    # paths can read it without UnboundLocalError.)
                     if task_wants_plot and result_json.get("success") is not False:
                         has_image = any(
                             isinstance(f, str) and f.lower().endswith(IMAGE_EXTS)
