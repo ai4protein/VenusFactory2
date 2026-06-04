@@ -88,11 +88,12 @@ def proteinmpnn_sequence_design_from_structure_tool(
             fixed_residues = json.loads(fixed_residues_json)
         except json.JSONDecodeError as e:
             return json.dumps({"success": False, "error": f"Invalid fixed_residues_json: {e}"})
-        # Validate + clamp residue indices to the actual chain length.
-        # ProteinMPNN expects 1-based residue numbers; passing an index
-        # equal to or beyond the chain length crashes with a numpy
-        # ``index N is out of bounds for axis 0 with size N`` deep inside
-        # the runner. Catch this at the boundary instead.
+        # Validate + clamp residue indices to the actual chain length AND
+        # detect the common "inverted-fix" failure where the LLM passed
+        # nearly-all residues as fixed when the user clearly wanted to
+        # redesign the small active-site region (CB sometimes mis-frames
+        # "fix everything except active site" by enumerating 260 residues
+        # instead of just the 3 catalytic ones to design).
         if isinstance(fixed_residues, dict):
             try:
                 import os as _os
@@ -125,6 +126,21 @@ def proteinmpnn_sequence_design_from_structure_tool(
                     if warnings:
                         # Continue with cleaned set; surface the clamp in tool output
                         print(f"⚠️ proteinmpnn: clamped {len(warnings)} out-of-bound fixed residues: {warnings[:5]}")
+
+                    # High-fix sanity check (for diagnostics): warn when nearly
+                    # all residues are fixed. This is usually correct for
+                    # "redesign a small active-site region" tasks (fix 260,
+                    # design 3) — DO NOT auto-invert. Just surface the count
+                    # so a misframed plan is easy to spot in logs.
+                    for chain, idxs in cleaned.items():
+                        n = chain_lengths.get(chain, 0)
+                        if n > 0 and len(idxs) / n >= 0.9:
+                            designed_count = n - len(idxs)
+                            print(
+                                f"ℹ️ proteinmpnn: chain {chain} has {len(idxs)}/{n} "
+                                f"residues fixed → designing only {designed_count} positions. "
+                                f"If this differs from your intent, swap fixed↔designed."
+                            )
             except Exception:
                 # If validation itself fails, fall through with the original
                 # residues — the runner will still error but with the same
