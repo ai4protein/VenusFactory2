@@ -322,17 +322,30 @@ ALL_TOOLS: list[BaseTool] = (
     + DENOVO_TOOLS
 )
 
-# PI can execute only search tools (no download / train / file / etc.). Used for PI report and PI answer chains.
+# PI can execute search tools + structural/sequence metadata lookups during
+# the research phase. The actual ``t.name`` values (from the @tool decorator)
+# do NOT carry the ``_tool`` suffix — make sure these match.
 PI_SEARCH_TOOL_NAMES = frozenset({
-    "query_arxiv_tool",
-    "query_biorxiv_tool",
-    "query_duckduckgo_tool",
-    "query_fda_tool",
-    "query_github_tool",
-    "query_hugging_face_tool",
-    "query_pubmed_tool",
-    "query_semantic_scholar_tool",
-    "query_tavily_tool",
+    # Literature / web search
+    "query_arxiv",
+    "query_biorxiv",
+    "query_duckduckgo",
+    "query_fda",
+    "query_github",
+    "query_hugging_face",
+    "query_pubmed",
+    "query_semantic_scholar",
+    "query_tavily",
+    # Structural / sequence / functional metadata lookups (read-only,
+    # cheap, complement literature when the literature search returns
+    # nothing — e.g. for a fresh PDB ID with no published paper yet)
+    "download_rcsb_entry_metadata_by_pdb_id",
+    "download_uniprot_meta_by_id",
+    "download_uniprot_search_by_query",
+    "download_alphafold_metadata_by_uniprot_id",
+    "download_interpro_annotations_by_uniprot_id",
+    "download_string_map_ids",
+    "download_hpa_protein_by_gene",
 })
 
 # FASTAPI: all except train_protein_model, protein_model_predict, query_dataset_by_keywords, query_web_by_keywords, query_foldseek_search_by_pdb_file, esmfold_structure_prediction

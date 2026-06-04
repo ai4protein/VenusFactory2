@@ -916,9 +916,141 @@ def _run_section_search(query: str, max_results: int = None) -> tuple:
                         break
         except Exception as e:
             logged.append((tool_name, web_input, json.dumps({"success": False, "error": str(e)})))
+    # Structural / sequence-database fallback when literature + web returned
+    # nothing. Detect identifier patterns in the query (4-char PDB IDs,
+    # UniProt accessions, common gene names) and call the corresponding
+    # metadata endpoint directly. This is what a senior researcher would do:
+    # if no paper exists for "5XJH", at least look up the RCSB metadata.
+    if not sections:
+        try:
+            import re as _re
+            db_sections = _pi_database_fallback(query, tools_dict)
+            if db_sections:
+                sections.extend(db_sections)
+                logged.append(("__db_fallback__",
+                              {"query": query, "via": "_pi_database_fallback"},
+                              json.dumps({"sections_added": len(db_sections)})))
+        except Exception as e:
+            logged.append(("__db_fallback__", {"query": query},
+                          json.dumps({"success": False, "error": str(e)})))
+
     if not sections:
         return ([], logged)
     return (sections, logged)
+
+
+def _pi_database_fallback(query: str, tools_dict: dict) -> list:
+    """Last-resort fallback: when literature + web search return nothing,
+    parse the query for identifier patterns (PDB IDs, UniProt accessions,
+    gene names) and call the corresponding structural / functional database
+    endpoints directly. Returns a list of formatted text sections.
+
+    Patterns recognized:
+    - 4-character PDB ID: e.g. 5XJH, 1ABC → download_rcsb_entry_metadata_by_pdb_id
+    - UniProt accession (1 letter + 5-10 alphanumeric): e.g. P04637, A0A0A0A → download_uniprot_meta_by_id
+    - All-caps gene-like token (3-12 chars, ≥1 letter): TP53, EGFR, PETase →
+      download_uniprot_search_by_query + download_string_map_ids
+    """
+    import re as _re
+
+    sections: list = []
+    seen_ids = set()
+
+    def _try_tool(tool_name: str, tool_input: dict, label_prefix: str) -> str | None:
+        tool = tools_dict.get(tool_name)
+        if not tool:
+            return None
+        try:
+            out = tool.invoke(tool_input)
+            raw = out if isinstance(out, str) else json.dumps(out, ensure_ascii=False)
+            data = json.loads(raw) if isinstance(raw, str) and raw.strip().startswith("{") else {}
+            if data.get("status") == "error" or data.get("success") is False:
+                return None
+            # Pull preview content / metadata so SC sees real data
+            preview = (data.get("content_preview")
+                       or data.get("biological_metadata")
+                       or data.get("data")
+                       or data)
+            preview_str = (json.dumps(preview, ensure_ascii=False)[:2000]
+                           if not isinstance(preview, str) else preview[:2000])
+            return f"**{label_prefix}**\n{preview_str}"
+        except Exception:
+            return None
+
+    # PDB IDs
+    for pdb_id in _re.findall(r"\b([1-9][A-Za-z0-9]{3})\b", query):
+        if pdb_id.upper() in seen_ids:
+            continue
+        seen_ids.add(pdb_id.upper())
+        s = _try_tool(
+            "download_rcsb_entry_metadata_by_pdb_id",
+            {"pdb_id": pdb_id.upper(), "out_path": f"/tmp/pi_rcsb_{pdb_id.upper()}.json"},
+            f"RCSB metadata for PDB {pdb_id.upper()}",
+        )
+        if s:
+            sections.append(s)
+
+    # UniProt accessions
+    for up_id in _re.findall(r"\b([OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2})\b", query):
+        # Above regex returns tuples for the second alternative; collapse
+        if isinstance(up_id, tuple):
+            up_id = up_id[0]
+        if up_id in seen_ids:
+            continue
+        seen_ids.add(up_id)
+        s = _try_tool(
+            "download_uniprot_meta_by_id",
+            {"uniprot_id": up_id, "out_path": f"/tmp/pi_uniprot_{up_id}.json"},
+            f"UniProt metadata for {up_id}",
+        )
+        if s:
+            sections.append(s)
+
+    # Gene-like all-caps tokens (only try if we have NO sections yet — keeps
+    # this cheap; gene-symbol lookups can be slow). Try HPA (per-gene record)
+    # first because it's a fast REST endpoint that returns rich
+    # functional+expression context in one call. STRING mapping is a cheap
+    # backup if HPA doesn't have an entry.
+    if not sections:
+        STOP_TOKENS = {"PDB", "FASTA", "JSON", "API", "HTTP", "DNA", "RNA",
+                       "PETase", "EGFR", "STRING", "UNIPROT", "INTERPRO",
+                       "HPA", "KEGG", "MMSEQS", "BLAST", "NCBI", "REST"}
+        # Note: PETase / EGFR ARE valid gene names — STOP_TOKENS is just to
+        # skip obvious non-gene acronyms. We still try them because the
+        # gene-lookup just returns empty for non-genes.
+        STOP_TOKENS = {"PDB", "FASTA", "JSON", "API", "HTTP", "DNA", "RNA",
+                       "STRING", "UNIPROT", "INTERPRO", "HPA", "KEGG",
+                       "MMSEQS", "BLAST", "NCBI", "REST"}
+        for tok in _re.findall(r"\b([A-Z][A-Z0-9]{2,11})\b", query):
+            if tok in seen_ids or tok in STOP_TOKENS:
+                continue
+            seen_ids.add(tok)
+            s = _try_tool(
+                "download_hpa_protein_by_gene",
+                {"gene_name": tok,
+                 "out_path": f"/tmp/pi_hpa_{tok}.json"},
+                f"Human Protein Atlas record for gene {tok}",
+            )
+            if s:
+                sections.append(s)
+                break  # one gene is enough for context
+            # HPA empty → try STRING id mapping (still gives a hit list with
+            # functional annotations)
+            s2 = _try_tool(
+                "download_string_map_ids",
+                {"identifiers": tok,
+                 "out_dir": "/tmp",
+                 "species": 9606,
+                 "limit": 3,
+                 "echo_query": True,
+                 "filename": f"pi_string_{tok}.tsv"},
+                f"STRING ID mapping for gene {tok}",
+            )
+            if s2:
+                sections.append(s2)
+                break
+    return sections
+
 
 def _fetch_search_for_pi_report(user_text: str, max_results: int = None, llm=None) -> tuple:
     """Run literature_search, web_search, dataset_search. Default sources: pubmed, tavily, github. When a search returns empty or fails, retry with another source (e.g. web: tavily → duckduckgo; literature: pubmed → semantic_scholar → arxiv). Returns (combined_str_with_citations, list of (tool_name, inputs, raw_output))."""
