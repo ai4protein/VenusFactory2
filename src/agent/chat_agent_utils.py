@@ -893,7 +893,15 @@ from web.utils.chat_format_utils import (
 
 
 def _run_section_search(query: str, max_results: int = None) -> tuple:
-    """Run literature_search and web_search for one section query. Returns (list_of_result_strings, list of (tool_name, inputs, raw_output))."""
+    """Per-section deep-research: parallel-invoke all 4 literature sources
+    (PubMed + Semantic Scholar + arXiv + bioRxiv) and 2 web sources
+    (Tavily + DuckDuckGo), merge results across sources, dedupe, then fall
+    back to structural-DB metadata if everything is empty. Same pattern as
+    _fetch_search_for_pi_report but optimized for the per-section flow
+    where the query is already a narrow sub-topic.
+    """
+    import concurrent.futures as _cf
+
     if max_results is None:
         max_results = SEARCH_MAX_RESULTS
     query = (query or "").strip()[:80]
@@ -905,66 +913,95 @@ def _run_section_search(query: str, max_results: int = None) -> tuple:
         tools_dict = {getattr(t, "name", ""): t for t in tools}
     except Exception:
         return ("Search tools unavailable.", [])
-    sections = []
-    logged = []
 
-    # Try literature tools in order of preference
-    for tool_name in ("query_pubmed", "query_semantic_scholar", "query_arxiv"):
-        lit_tool = tools_dict.get(tool_name)
-        if not lit_tool:
-            continue
-        lit_input = {"query": query, "max_results": max_results}
-        try:
-            _logger.info("PI section invoking: %s with %s", tool_name, lit_input)
-            lit_out = lit_tool.invoke(lit_input)
-            raw_lit = lit_out if isinstance(lit_out, str) else json.dumps(lit_out, ensure_ascii=False)
-            logged.append((tool_name, lit_input, raw_lit))
-            data = json.loads(raw_lit) if isinstance(raw_lit, str) and raw_lit.strip().startswith("{") else {}
-            data = _extract_deepsearch_data(data)
-            # Some tools return a list of results directly or wrap them in 'references', 'results', or 'papers'
-            # We'll normalize to a list.
-            if data.get("success") is not False:
-                refs = data.get("references") or data.get("results") or data.get("papers") or data
-                if isinstance(refs, str):
-                    try:
-                        refs = json.loads(refs) if refs.strip().startswith("[") else []
-                    except Exception:
-                        refs = []
-                refs = refs if isinstance(refs, list) else []
-                lines = _format_literature_for_reading(refs, max_n=5, abstract_max=400)
-                if lines:
-                    sections.extend(lines)
-                    break
-        except Exception as e:
-            logged.append((tool_name, lit_input, json.dumps({"success": False, "error": str(e)})))
+    sections: list = []
+    logged: list = []
 
-    # Try web tools in order of preference
-    for tool_name in ("query_tavily", "query_duckduckgo"):
-        web_tool = tools_dict.get(tool_name)
-        if not web_tool:
-            continue
-        web_input = {"query": query, "max_results": max_results}
+    LITERATURE = ["query_pubmed", "query_semantic_scholar", "query_arxiv", "query_biorxiv"]
+    WEB = ["query_tavily", "query_duckduckgo"]
+    plan = [(tn, {"query": query, "max_results": max_results})
+            for tn in LITERATURE + WEB]
+
+    def _invoke(tn, ti):
+        tool = tools_dict.get(tn)
+        if not tool:
+            return (tn, ti, json.dumps({"success": False, "error": "tool not available"}))
         try:
-            _logger.info("PI section invoking: %s with %s", tool_name, web_input)
-            web_out = web_tool.invoke(web_input)
-            raw_web = web_out if isinstance(web_out, str) else json.dumps(web_out, ensure_ascii=False)
-            logged.append((tool_name, web_input, raw_web))
-            data = json.loads(raw_web) if isinstance(raw_web, str) and raw_web.strip().startswith("{") else {}
-            data = _extract_deepsearch_data(data)
-            if data.get("success") is not False:
-                res = data.get("results") or data
-                if isinstance(res, str):
-                    try:
-                        res = json.loads(res) if res.strip().startswith("[") else []
-                    except Exception:
-                        res = []
-                if isinstance(res, list) and res:
-                    lines = _format_web_for_reading(res, max_n=5, snippet_max=300)
-                    if lines:
-                        sections.extend(lines)
-                        break
+            _logger.info("PI section invoking (parallel): %s with %s", tn, ti)
+            out = tool.invoke(ti)
+            raw = out if isinstance(out, str) else json.dumps(out, ensure_ascii=False)
+            return (tn, ti, raw)
         except Exception as e:
-            logged.append((tool_name, web_input, json.dumps({"success": False, "error": str(e)})))
+            return (tn, ti, json.dumps({"success": False, "error": str(e)}))
+
+    results_by_tool: dict = {}
+    with _cf.ThreadPoolExecutor(max_workers=min(6, len(plan))) as ex:
+        futures = {ex.submit(_invoke, tn, ti): (tn, ti) for tn, ti in plan}
+        for fut in _cf.as_completed(futures, timeout=30):
+            try:
+                tn, ti, raw = fut.result()
+                results_by_tool[tn] = raw
+                logged.append((tn, ti, raw))
+            except Exception:
+                pass
+
+    def _parse_refs(raw_str: str) -> list:
+        try:
+            data = json.loads(raw_str) if isinstance(raw_str, str) and raw_str.strip().startswith("{") else {}
+        except Exception:
+            return []
+        data = _extract_deepsearch_data(data) if isinstance(data, dict) else {}
+        if not isinstance(data, dict) or data.get("success") is False:
+            return []
+        refs = (data.get("references") or data.get("results")
+                or data.get("papers") or data.get("datasets") or [])
+        if isinstance(refs, str):
+            try:
+                refs = json.loads(refs) if refs.strip().startswith("[") else []
+            except Exception:
+                refs = []
+        return refs if isinstance(refs, list) else []
+
+    # Merge literature across all 4 sources, dedupe by URL/DOI/PMID/title
+    lit_refs: list = []
+    for tn in LITERATURE:
+        lit_refs.extend(_parse_refs(results_by_tool.get(tn, "")))
+    seen = set()
+    deduped_lit = []
+    for r in lit_refs:
+        if isinstance(r, dict):
+            k = (r.get("url") or r.get("doi") or r.get("pmid") or r.get("title") or str(id(r)))[:120]
+        else:
+            k = str(r)[:120]
+        if k in seen:
+            continue
+        seen.add(k)
+        deduped_lit.append(r)
+    if deduped_lit:
+        lines = _format_literature_for_reading(deduped_lit, max_n=max_results * 2, abstract_max=400)
+        if lines:
+            sections.extend(lines)
+
+    # Merge web across both sources
+    web_refs: list = []
+    for tn in WEB:
+        web_refs.extend(_parse_refs(results_by_tool.get(tn, "")))
+    seen = set()
+    deduped_web = []
+    for r in web_refs:
+        if isinstance(r, dict):
+            k = (r.get("url") or r.get("link") or r.get("title") or str(id(r)))[:120]
+        else:
+            k = str(r)[:120]
+        if k in seen:
+            continue
+        seen.add(k)
+        deduped_web.append(r)
+    if deduped_web:
+        lines = _format_web_for_reading(deduped_web, max_n=max_results * 2, snippet_max=300)
+        if lines:
+            sections.extend(lines)
+
     # Structural / sequence-database fallback when literature + web returned
     # nothing. Detect identifier patterns in the query (4-char PDB IDs,
     # UniProt accessions, common gene names) and call the corresponding
