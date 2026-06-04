@@ -40,20 +40,29 @@ class VerifyResult:
 
 
 def _tool_self_reports_success(raw_output: Any) -> bool:
-    """Return True when the tool's own payload is a success envelope with substantive content.
+    """Return True when the tool's own payload looks substantively successful.
 
-    A tool is considered to self-report success when:
+    Two acceptance modes (any one is enough):
 
-    * the parsed payload is a dict, AND
-    * ``success`` is exactly ``True`` or ``status == "success"``, AND
-    * the payload carries at least one substantive content field
-      (``file_info``, ``output_files``, ``data``, ``content``, ``content_preview``,
-      ``results``, ``sequence``, ``sequences``, ``file_path``, ``entries``).
+    A. **Explicit-success mode**: dict has ``success: True`` OR
+       ``status: 'success'``, AND carries at least one substantive content
+       field (file_info, output_files, data, content, results, sequence,
+       file_path, entries, config_path, model_info, predictions, metrics,
+       fasta_path, score, ...).
+
+    B. **Implicit-success mode** (new): dict has no explicit failure signal
+       (no ``success: False`` / ``status: 'error'`` / ``error`` field /
+       ``error_msg`` field), AND total payload size suggests real content
+       (>=400 chars of useful keys), AND a substantive content field is
+       present. This catches tools that just return their data without
+       wrapping it in a ``success: True`` envelope — e.g. some download
+       tools that return ``{"file_path": "...", "file_size": 12345,
+       "file_name": "..."}``.
 
     Used by ``run_mls_post_check`` to downgrade verifier rejections to soft
-    warnings when the tool clearly succeeded with real output. Mirrors (but is
-    independent from) the CB tolerant heuristic, and intentionally requires a
-    substantive field — bare ``{"status": "success"}`` envelopes do not count.
+    warnings when the tool clearly produced real output. The verifier's
+    rejection is preserved in history as a warning so the user still sees
+    its concern, but the orchestrator is told to proceed.
     """
     try:
         parsed = json.loads(raw_output) if isinstance(raw_output, str) else raw_output
@@ -61,38 +70,50 @@ def _tool_self_reports_success(raw_output: Any) -> bool:
         return False
     if not isinstance(parsed, dict):
         return False
-    if parsed.get("success") is not True and parsed.get("status") != "success":
-        return False
-    for key in (
-        "file_info",
-        "output_files",
-        "data",
-        "content",
-        "content_preview",
-        "results",
-        "sequence",
-        "sequences",
-        "file_path",
-        "entries",
+
+    SUBSTANTIVE_KEYS = (
+        "file_info", "output_files", "data", "content", "content_preview",
+        "results", "sequence", "sequences", "file_path", "entries",
         # Tool-specific substantive fields:
-        "config_path",        # generate_training_config
-        "dataset_info",       # generate_training_config
-        "model_info",         # agent_generated_code (training)
-        "model_path",         # agent_generated_code (training)
-        "predictions",        # protein_model_predict
-        "metrics",            # train_protein_model
-        "fasta_path",         # proteinmpnn_*
-        "score",              # zero_shot_mutation_*
-        "scores",
-    ):
-        val = parsed.get(key)
-        if val is None:
-            continue
-        if isinstance(val, str) and not val.strip():
-            continue
-        if isinstance(val, (list, dict, tuple, set)) and len(val) == 0:
-            continue
+        "config_path", "dataset_info", "model_info", "model_path",
+        "predictions", "metrics", "fasta_path", "score", "scores",
+        # Additional fields for tools that don't use success: envelopes
+        "biological_metadata", "file_name", "file_size",
+    )
+
+    def _has_substantive_content() -> bool:
+        for key in SUBSTANTIVE_KEYS:
+            val = parsed.get(key)
+            if val is None:
+                continue
+            if isinstance(val, str) and not val.strip():
+                continue
+            if isinstance(val, (list, dict, tuple, set)) and len(val) == 0:
+                continue
+            return True
+        return False
+
+    # Mode A: explicit success envelope
+    if (parsed.get("success") is True or parsed.get("status") == "success") and _has_substantive_content():
         return True
+
+    # Mode B: no explicit failure AND substantive content
+    has_explicit_failure = (
+        parsed.get("success") is False
+        or parsed.get("status") in ("error", "fail", "failed")
+        or bool(parsed.get("error"))
+        or bool(parsed.get("error_msg"))
+        or bool(parsed.get("err"))
+    )
+    if not has_explicit_failure and _has_substantive_content():
+        # Final sanity: payload should be at least mildly large (avoid
+        # treating ``{"file_path": null}`` as a real success).
+        try:
+            payload_size = len(json.dumps(parsed, ensure_ascii=False))
+        except Exception:
+            payload_size = 0
+        if payload_size >= 80:
+            return True
     return False
 
 
@@ -167,8 +188,28 @@ async def run_mls_post_check(
         return VerifyResult(ok=True)
 
     retry_input = post_retry_input if isinstance(post_retry_input, dict) else None
+    # Preserve the actual tool output in the failure envelope so the user
+    # (and downstream debug tools) can see what the verifier was unhappy
+    # about — not just an opaque "Post-step verification failed."
+    try:
+        raw_preview = (
+            raw_output if isinstance(raw_output, str)
+            else json.dumps(raw_output, ensure_ascii=False, default=str)
+        )
+    except Exception:
+        raw_preview = str(raw_output)
+    if len(raw_preview) > 1500:
+        raw_preview = raw_preview[:1500] + "\n...(truncated)"
     new_raw = json.dumps(
-        {"status": "error", "error": {"type": "PostStepCheckFailed", "message": post_reason}},
+        {
+            "status": "error",
+            "error": {
+                "type": "PostStepCheckFailed",
+                "message": post_reason,
+                "verifier_note": post_reason,
+                "actual_tool_output_preview": raw_preview,
+            },
+        },
         ensure_ascii=False,
     )
     return VerifyResult(

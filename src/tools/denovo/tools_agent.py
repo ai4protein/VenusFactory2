@@ -88,6 +88,48 @@ def proteinmpnn_sequence_design_from_structure_tool(
             fixed_residues = json.loads(fixed_residues_json)
         except json.JSONDecodeError as e:
             return json.dumps({"success": False, "error": f"Invalid fixed_residues_json: {e}"})
+        # Validate + clamp residue indices to the actual chain length.
+        # ProteinMPNN expects 1-based residue numbers; passing an index
+        # equal to or beyond the chain length crashes with a numpy
+        # ``index N is out of bounds for axis 0 with size N`` deep inside
+        # the runner. Catch this at the boundary instead.
+        if isinstance(fixed_residues, dict):
+            try:
+                import os as _os
+                from tools.denovo.proteinmpnn.protein_mpnn_utils import parse_PDB as _parse_PDB
+                if _os.path.exists(pdb_path):
+                    pdb_dict_list = _parse_PDB(pdb_path)
+                    chain_lengths: dict[str, int] = {}
+                    for k, v in (pdb_dict_list[0].items() if pdb_dict_list else []):
+                        if k.startswith("seq_chain_"):
+                            chain_lengths[k[-1]] = len(v)
+                    cleaned: dict[str, list[int]] = {}
+                    warnings: list[str] = []
+                    for chain, idxs in fixed_residues.items():
+                        if not isinstance(idxs, list):
+                            continue
+                        n = chain_lengths.get(chain, 0)
+                        valid = []
+                        for i in idxs:
+                            try:
+                                ii = int(i)
+                            except Exception:
+                                continue
+                            if n > 0 and (ii < 1 or ii > n):
+                                warnings.append(f"chain {chain}: residue index {ii} out of range [1, {n}]; dropped")
+                                continue
+                            valid.append(ii)
+                        if valid:
+                            cleaned[chain] = sorted(set(valid))
+                    fixed_residues = cleaned or fixed_residues
+                    if warnings:
+                        # Continue with cleaned set; surface the clamp in tool output
+                        print(f"⚠️ proteinmpnn: clamped {len(warnings)} out-of-bound fixed residues: {warnings[:5]}")
+            except Exception:
+                # If validation itself fails, fall through with the original
+                # residues — the runner will still error but with the same
+                # message as before.
+                pass
     return call_proteinmpnn_design(
         pdb_path=pdb_path,
         designed_chains=designed_chains,
