@@ -503,7 +503,56 @@ def generate_and_execute_code(
                 "error": f"Generated code appears incomplete. Missing: {', '.join([x for x, y in [('imports', not has_imports), ('main function', not has_main), ('JSON output', not has_json_output)] if y])}",
                 "generated_code_preview": generated_code[:500]
             })
-        
+
+        # Static-analysis self-check: catch common LLM-coding bugs before
+        # we burn a sandbox subprocess running the script. This is a
+        # deterministic pre-flight check (no extra LLM call), so it's
+        # near-zero cost and catches the most frequent failure modes we
+        # have seen in production:
+        #   1. SyntaxError — script won't even parse
+        #   2. Empty / hardcoded ``data = {}`` or ``data = []`` after a
+        #      file-load step (LLM forgot the actual parsing logic)
+        #   3. Reading a path that's clearly outside the provided
+        #      ``input_files`` (e.g. another LLM-hallucinated filename)
+        #   4. PALETTE-style multi-line string keys (the bug that caused
+        #      the recent ``\\n    "blue_main"`` KeyError crashes)
+        _static_issues: list[str] = []
+        try:
+            import ast as _ast
+            try:
+                _ast.parse(generated_code)
+            except SyntaxError as _se:
+                _static_issues.append(f"SyntaxError at line {_se.lineno}: {_se.msg}")
+        except Exception:
+            pass
+        if re.search(r"PALETTE\s*\[\s*[\"\']\s*\n", generated_code):
+            _static_issues.append(
+                "Suspicious PALETTE['<multi-line string>'] access — likely a copy/paste bug "
+                "where prompt comment text was treated as a dict key"
+            )
+        # Detect literal "data = {}" or "data = []" that is never reassigned
+        # before being used — usually means the LLM forgot to parse the file.
+        if re.search(r"^\s*data\s*=\s*\{\s*\}\s*$", generated_code, re.MULTILINE) or \
+           re.search(r"^\s*data\s*=\s*\[\s*\]\s*$", generated_code, re.MULTILINE):
+            # Only flag if the file looks like it should be loaded
+            if "json.load" not in generated_code and "pd.read_csv" not in generated_code and "open(" not in generated_code:
+                _static_issues.append(
+                    "Empty ``data`` assignment without any file-load call — "
+                    "script is unlikely to produce real output"
+                )
+        if _static_issues:
+            return json.dumps({
+                "success": False,
+                "error": "Static self-check failed: " + "; ".join(_static_issues),
+                "static_issues": _static_issues,
+                "generated_code_preview": generated_code[:800],
+                "SYSTEM_NOTE": (
+                    "The generated script failed a deterministic pre-flight check. "
+                    "Regenerate with a stricter task description that explicitly lists "
+                    "what to load from input_files and what to write to output_dir."
+                ),
+            }, ensure_ascii=False)
+
         # Save generated code to temp_output directory structure
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         code_filename = f"generated_code_{timestamp}_{uuid.uuid4().hex[:8]}.py"

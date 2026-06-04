@@ -181,6 +181,12 @@ def rebind_file_not_found(
         # input_files makes the LLM produce a real PNG.
         "plot-task enforcement",
         "task asked for a chart",
+        # Static self-check failures (syntax errors, empty data assignment,
+        # PALETTE multi-line key bug). H6 retry re-prompts with the input_files
+        # populated, which usually fixes these.
+        "static self-check failed",
+        "syntaxerror at line",
+        "empty ``data`` assignment",
     )
     _fnf_detected = any(sig in raw_lower for sig in _fnf_signatures) or (
         is_failure
