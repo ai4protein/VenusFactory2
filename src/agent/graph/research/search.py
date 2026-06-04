@@ -13,7 +13,13 @@ from web.utils.chat_format_utils import _format_search_preview, _format_search_s
 
 
 async def research_search_start_node(state: AgentState, config: RunnableConfig):
-    """Show 'PI is searching' so UI updates before search runs."""
+    """Announce the upcoming parallel deep-research call to the chat UI.
+
+    Tells the user exactly what query is being sent and across which
+    sources, so the research process is transparent rather than a
+    silent "PI is thinking" black box. The actual fan-out happens in
+    research_search_node which calls _run_section_search.
+    """
     research_idx = state.get("research_idx", 0)
     search_idx = state.get("search_idx", 0)
     sections = state.get("research_sections", [])
@@ -28,11 +34,28 @@ async def research_search_start_node(state: AgentState, config: RunnableConfig):
     sq = (queries[search_idx] or "").strip()[:80]
     if sq and len(sq) == 80:
         sq = sq + "…"
+
+    # List the sources PI will hit so the user sees the breadth of
+    # coverage (Nature-paper-style "we searched across PubMed, arXiv,
+    # bioRxiv, Semantic Scholar, ...").
+    sources_zh = "PubMed · arXiv · bioRxiv · Semantic Scholar · Tavily · DuckDuckGo · GitHub · HuggingFace（必要时回退 RCSB/UniProt/HPA/STRING 元数据）"
+    sources_en = "PubMed · arXiv · bioRxiv · Semantic Scholar · Tavily · DuckDuckGo · GitHub · HuggingFace (with structural-DB fallback to RCSB/UniProt/HPA/STRING)"
+
+    if ui_lang == "zh":
+        content = (
+            f"🔍 **Principal Investigator** 正在并行检索 **{sq or '…'}**\n"
+            f"\n"
+            f"_深度研究模式：同时查询 {sources_zh}。结果跨源去重后汇总。_"
+        )
+    else:
+        content = (
+            f"🔍 **Principal Investigator** is searching in parallel: **{sq or '…'}**\n"
+            f"\n"
+            f"_Deep-research mode: querying {sources_en}. Results are merged and deduped across sources._"
+        )
     history.append({
         "role": "assistant",
-        "content": f"🔍 **Principal Investigator** 正在检索：**{sq or '…'}** …"
-        if ui_lang == "zh" else
-        f"🔍 **Principal Investigator** is searching: **{sq or '…'}** …",
+        "content": content,
         "role_id": "principal_investigator",
     })
     return {"history": history}
