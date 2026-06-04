@@ -123,6 +123,74 @@ def _read_file_summary(path: str, max_chars: int = 1500) -> str:
         return f"[unreadable: {type(e).__name__}: {e}]"
 
 
+async def _maybe_retry_truncated_summary(
+    summary: str,
+    finalizer_chain,
+    finalizer_inputs: dict,
+    tool_executions: list,
+    ui_lang: str,
+) -> str:
+    """Detect a truncated SC report (LLM stream cut off mid-response) and
+    retry once via non-streaming ``chain.ainvoke`` which is more resilient.
+
+    Heuristics for "truncated":
+    - Word count < 600 (manuscript target is 3500–5500 words)
+    - AND at least one tool execution succeeded (so we should have content)
+    - AND fewer than 4 of the required manuscript section headers are
+      present
+
+    When the retry also returns something truncated, keep the longer of
+    the two responses (no third attempt — bounds latency).
+    """
+    import re as _re
+
+    EXPECTED = ("Abstract", "Introduction", "Methods", "Results",
+                "Discussion", "Figure Legends", "Data", "References")
+
+    def _looks_truncated(text: str) -> bool:
+        if not text or not isinstance(text, str):
+            return True
+        wc = len(text.split())
+        section_hits = sum(
+            1 for s in EXPECTED
+            if _re.search(rf"(?m)^##\s+\d?\.?\s*{_re.escape(s)}", text)
+        )
+        if wc < 600 and section_hits < 4 and len(tool_executions) > 0:
+            return True
+        # Common truncation tail: hanging unfinished sentence or
+        # "Task ended" minimal-fallback content.
+        if wc < 200:
+            return True
+        return False
+
+    if not _looks_truncated(summary):
+        return summary
+
+    _logger.warning(
+        "SC report looks truncated (words=%d, sections~%d) — retrying via direct ainvoke",
+        len(summary.split()) if summary else 0,
+        sum(1 for s in EXPECTED if s in (summary or "")),
+    )
+
+    if finalizer_chain is None:
+        return summary or ""
+
+    try:
+        retry = await finalizer_chain.ainvoke(finalizer_inputs)
+        retry_text = retry if isinstance(retry, str) else getattr(retry, "content", str(retry))
+    except Exception as e:
+        _logger.warning("SC retry also failed: %s", e)
+        return summary or ""
+
+    if retry_text and len(retry_text.split()) > len(summary.split()):
+        _logger.info(
+            "SC retry produced longer report (%d → %d words); using retry.",
+            len(summary.split()), len(retry_text.split()),
+        )
+        return retry_text
+    return summary
+
+
 def _force_embed_missing_figures(
     report: str,
     figure_artifacts: list,
@@ -392,16 +460,24 @@ async def finalize_node(state: AgentState, config: RunnableConfig):
         history.pop()
 
     try:
+        finalizer_inputs = {
+            "input": user_input,
+            "full_run_record": full_run_record,
+            "original_input": user_input,
+            "analysis_log": "\n".join(analysis_log) if analysis_log else "No analysis log available.",
+            "references": "",
+        }
         summary = await _stream_chain(
             chains["finalizer"],
-            {
-                "input": user_input,
-                "full_run_record": full_run_record,
-                "original_input": user_input,
-                "analysis_log": "\n".join(analysis_log) if analysis_log else "No analysis log available.",
-                "references": "",
-            },
+            finalizer_inputs,
             role_id="scientific_critic",
+        )
+        # R1: detect a truncated SC stream (LLM call cut off mid-response).
+        # Symptom: short word count AND missing manuscript section headers.
+        # When detected, retry once via direct chain.invoke (no stream) which
+        # is more resilient to one-shot LLM timeouts than token streaming.
+        summary = await _maybe_retry_truncated_summary(
+            summary, chains.get("finalizer"), finalizer_inputs, tool_executions, ui_lang
         )
         # Q1: deterministically force-embed any figures the SC LLM forgot.
         # We can't rely on the LLM to follow the "MANDATORY inline image"
