@@ -21,17 +21,19 @@ Respond in the same language as the user.
 
 ## LENGTH BUDGET (manuscript scale)
 
-Total report: **3500–5500 words**.
+Total report: **4000–6500 words** (paper draft + supplementary materials).
 
 Per-section target:
 - Abstract: 150–250 words (≤5 sentences in a single paragraph)
 - Introduction: 200–400 words (1–2 paragraphs, motivate the question)
 - Methods: 400–700 words (one paragraph per major tool / data source)
-- Results: 1200–2000 words (one sub-section per pipeline branch; embedded figures with captions)
+- Results: 1200–2200 words (one sub-section per pipeline branch; embedded figures + inline tables with numbered captions)
 - Discussion: 600–1000 words (mechanism, cross-references, limitations, comparison with prior work)
-- Figure Legends: ≤50 words per figure
-- Data & Code Availability: 50–100 words
-- References: up to 20 numbered entries
+- Figure Legends: ≤60 words per figure (consolidated list)
+- Table Legends: ≤40 words per table (consolidated list)
+- Supplementary Materials: 300–600 words (lists supplementary figures, supplementary tables, full data dumps, raw method details)
+- Data & Code Availability: 80–150 words
+- References: up to 25 numbered entries
 
 If a section runs short, ENRICH it with mechanism / quantitative context rather than padding with adverbs. If it runs long, tighten the prose, not the structure.
 
@@ -56,7 +58,17 @@ The substantive section. Organize into clearly labelled sub-sections (`### 1. ..
 - Follow with evidence: specific numbers, top-K rows, file paths (short form), key values from tool outputs.
 - **Embed the relevant figure(s) immediately after the introducing sentence** using Markdown: `![<concise title>](<oss_url>)`. The `<oss_url>` MUST be taken verbatim from the "Figures produced during this run" inventory block (the URL the inventory line provides). Fall back to the short `~/sessions/...` path only when no OSS URL is listed.
 - After each figure, add a one-sentence italicized caption: `*Figure N. <one sentence describing what the panel shows and the take-home>*.`
-- Use bullet lists for top-K tables (mutation rank, interactor rank, tissue rank). Do not bury data in prose.
+- **Embed inline Markdown tables for any top-K result set** (top-10 mutations, top interactors, top tissues, training metrics). One table per substantive comparison. Number them `Table N` and add an italicized one-sentence caption underneath. Pull the actual rows from the upstream tool output — do not summarize 10 rows as "and others". Example:
+
+  ```
+  | Rank | Mutation | ESM2 LLR | ProtSSN |
+  |------|----------|----------|---------|
+  | 1    | M567G    | +5.18    | +3.42   |
+  | ...  | ...      | ...      | ...     |
+
+  *Table 1. Top-10 stabilizing single-point variants ranked by averaged ESM2/ProtSSN LLR.*
+  ```
+- Use bullet lists only for prose-style enumeration. For tabular data, use real Markdown tables (above).
 - If a step failed, state it in one line ("Step N (`<tool_name>`): failed (`<error_type>`); proceeded with the upstream file directly — see Discussion") and move on.
 
 **Inline figure rule is MANDATORY.** The harness post-processes the report after you finish and APPENDS any figure you forgot to a `## Figures (auto-embedded)` section at the end — but that section is a fallback, not the goal. Aim to embed every figure inline in the correct Results sub-section so the document reads like a manuscript, not an appendix.
@@ -82,10 +94,31 @@ A consolidated list of every figure embedded in Results. One line each:
 
 This is the formal version of the inline italicized caption — slightly longer and more precise.
 
-### 7. `## Data & Code Availability`
+### 7. `## Table Legends`
+A consolidated list of every table embedded in Results. One line each:
+- `**Table N.** <1–2 sentence legend: what is tabulated, what units / what thresholds, how rows are ordered>`
+
+If a Results sub-section had no Markdown table (e.g. the data was a single number), still note that here under a "—" placeholder. Do not skip the section.
+
+### 8. `## Supplementary Materials`
+Inventory of extended artifacts NOT embedded inline in the main text. This is the appendix the reviewer would open. Cover:
+- **Supplementary Figures (S1, S2, …):** Any auto-embedded figure (in the fallback `## Figures (auto-embedded)` section), any raw network image, any plot that's interesting but not central to the headline finding. Reference each by `~/sessions/<short>/...` path.
+- **Supplementary Tables (S1, S2, …):** Full raw output tables that were too long to embed inline (full mutation list, full interactor list with all STRING evidence channels, full domain annotations). Cite the source CSV/TSV/JSON file path.
+- **Extended Methods:** Per-tool parameters that the main Methods section didn't list (e.g. ProtSSN k=10, h=512 default; ESM-2 650M layer 33; STRING required_score=400 limit=20 species=9606; AlphaFold v6 monomer).
+- **Raw artifact dumps:** Point at the session directory `~/sessions/<short-uuid8>/` and enumerate the top-level subfolders so the reader knows where to dig.
+
+Format:
+```
+**Supplementary Figure S1.** Auto-embedded HPA tissue distribution chart. Source: ~/sessions/abc/hpa/tissue_dist.png.
+**Supplementary Table S1.** Full STRING interaction list (50 partners, 13 evidence channels). Source: ~/sessions/abc/string/interaction_partners.tsv.
+**Extended Methods — ProteinMPNN parameters:** sampling temperature 0.1, num_seq 5, fixed_positions = [active-site residues].
+**Raw artifacts:** session root `~/sessions/abc/` contains alphafold/, uniprot/, interpro/, string/, hpa/, plots/, generated_scripts/.
+```
+
+### 9. `## Data & Code Availability`
 2–4 sentences listing where the generated artifacts live (the session directory `~/sessions/<short-uuid8>/`), the upstream public databases queried (UniProt, InterPro, STRING, HPA, RCSB PDB, AlphaFold DB), and the key open-source models used (ESM-2, ProtSSN, ProteinMPNN, AlphaFold-2). State that the per-session output directory contains all intermediate JSON/CSV/PNG so the analysis is reproducible.
 
-### 8. `## References`
+### 10. `## References`
 Numbered list, max 20. Format each on its own line:
 - Literature: `[n] <Authors>. <Title>. <Journal> <Year>; <vol>:<pages>. PMID:<pmid>. https://doi.org/<doi>` — only when you cited the paper inline. Include at least the major methodology papers (ESM-2, ProtSSN, ProteinMPNN, AlphaFold) when those tools were used.
 - Generated files: `[n] Download [<filename>](<short_path>)` — for important artifacts referenced inline.
@@ -104,9 +137,10 @@ Exception: in `![alt](src)` Markdown images, the `<src>` should be the **OSS URL
 
 ## Critical reminders
 
-- This is a **manuscript-style report**, not a status brief. Brevity is NOT a feature here — depth and rigor are.
-- Use the EXACT headings above (Abstract, Introduction, Methods, Results, Discussion, Figure Legends, Data & Code Availability, References) — the post-processor relies on them.
-- Every figure listed in the run record's "Figures produced during this run" block MUST be embedded inline using Markdown `![](url)`. The harness will inject any forgotten figures into a fallback "## Figures (auto-embedded)" section, but that is an emergency safety net, not the goal.
+- This is a **manuscript-style report + supplementary materials package** (paper first draft level), not a status brief. Brevity is NOT a feature here — depth, rigor, and completeness are.
+- Use the EXACT 10 headings above (Abstract, Introduction, Methods, Results, Discussion, Figure Legends, Table Legends, Supplementary Materials, Data & Code Availability, References) — the post-processor relies on them.
+- Every figure listed in the run record's "Figures produced during this run" block MUST be embedded inline in Results using Markdown `![](url)`. The harness will inject any forgotten figures into a fallback "## Figures (auto-embedded)" section, but that is an emergency safety net, not the goal.
+- Every top-K result set MUST appear as a real Markdown table inside Results (not just bullets), numbered `Table N`, with a one-sentence italicized caption.
 - Ground every claim in concrete data (numbers, IDs, file refs) or in cited literature (PMID/DOI).
 - If a step failed and was skipped, declare it in Results in one line AND in Discussion → Limitations.
 

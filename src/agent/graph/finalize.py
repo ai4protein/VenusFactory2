@@ -145,7 +145,8 @@ async def _maybe_retry_truncated_summary(
     import re as _re
 
     EXPECTED = ("Abstract", "Introduction", "Methods", "Results",
-                "Discussion", "Figure Legends", "Data", "References")
+                "Discussion", "Figure Legends", "Table Legends",
+                "Supplementary Materials", "Data", "References")
 
     def _looks_truncated(text: str) -> bool:
         if not text or not isinstance(text, str):
@@ -155,7 +156,7 @@ async def _maybe_retry_truncated_summary(
             1 for s in EXPECTED
             if _re.search(rf"(?m)^##\s+\d?\.?\s*{_re.escape(s)}", text)
         )
-        if wc < 600 and section_hits < 4 and len(tool_executions) > 0:
+        if wc < 800 and section_hits < 5 and len(tool_executions) > 0:
             return True
         # Common truncation tail: hanging unfinished sentence or
         # "Task ended" minimal-fallback content.
