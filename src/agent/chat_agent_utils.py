@@ -372,20 +372,69 @@ def _fetch_literature_for_pi(user_text: str, max_results: int = None) -> tuple:
         _logger.warning("PI literature_search failed: %s", e)
         return empty
 
-def _refine_query_for_search(user_text: str, max_len: int = 60) -> str:
-    """Extract short search keywords: protein/gene ID plus up to 3 words (no long sentence)."""
+def _refine_query_for_search(user_text: str, max_len: int = 80) -> str:
+    """Extract short, search-engine-friendly keywords from the user query.
+
+    The previous version naively took the first 3–4 words, which for a
+    request like "Search PubMed for recent PETase engineering studies,
+    download PDB 5XJH, ..." kept the meta-instruction ("Search PubMed for
+    recent") and dropped the real content keywords (PETase, 5XJH,
+    ProteinMPNN). Now:
+
+    1. Strip a small set of meta-verbs at the start ("search", "find",
+       "look up", "query", "download", "fetch", "get") and the
+       sources they reference ("PubMed for", "in PubMed", "from PDB",
+       etc.).
+    2. Keep biological identifiers (UniProt accessions, PDB IDs,
+       all-caps gene-like tokens, EC numbers) verbatim.
+    3. Drop stop-words and prepositions.
+    4. Cap at max_len chars.
+    """
     import re
     t = (user_text or "").strip()
     if not t:
         return ""
-    # Protein/gene ID (e.g. P04040) then next 3 words only
-    id_match = re.search(r"\b(P\d{5}|[A-Z0-9]{5,6})\b", t, re.IGNORECASE)
-    if id_match:
-        pid = id_match.group(1).strip()
-        rest = re.sub(r"\s+", " ", t[id_match.end() :]).strip().split()[:3]
-        return (pid + " " + " ".join(rest)).strip()[:max_len]
-    words = re.sub(r"\s+", " ", t).strip().split()[:4]
-    return " ".join(words)[:max_len]
+
+    # 1. Strip meta-instruction prefixes
+    META_PREFIX = re.compile(
+        r"^(please\s+)?(search|find|look\s*(up|for)|query|download|fetch|get|retrieve|use|"
+        r"check|analyze|run|predict|examine|investigate)\s+(in\s+|for\s+|from\s+|the\s+)?"
+        r"(pubmed|arxiv|semantic\s*scholar|biorxiv|uniprot|pdb|rcsb|alphafold|interpro|string|hpa|brenda|chembl|kegg|ncbi)"
+        r"(\s+for\s+|\s+in\s+|\s+by\s+|\s+from\s+|\s+|\s*,\s*)?",
+        re.IGNORECASE,
+    )
+    cleaned = META_PREFIX.sub("", t)
+    # also strip ", download PDB ..." trailing meta clauses
+    cleaned = re.sub(r",\s*(and\s+)?(use|download|fetch|run|then|use)\s+\S+\s+\S+", " ", cleaned, flags=re.IGNORECASE)
+
+    # 2. Extract biological identifiers verbatim from the ORIGINAL text
+    # so PDB IDs / UniProt accessions / EC numbers can never be lost to
+    # the meta-prefix stripping above.
+    bio_tokens: list[str] = []
+    bio_tokens.extend(re.findall(r"\b([1-9][A-Za-z0-9]{3})\b", t))  # PDB IDs
+    bio_tokens.extend(re.findall(r"\b([OPQ][0-9][A-Z0-9]{3}[0-9])\b", t))  # UniProt
+    bio_tokens.extend(re.findall(r"\b(\d+\.\d+\.\d+\.\d+)\b", t))  # EC numbers
+    # 3. Word-level cleanup
+    STOP = {
+        "the", "a", "an", "and", "or", "of", "to", "in", "on", "for", "by", "with",
+        "is", "are", "was", "were", "be", "this", "that", "these", "those",
+        "studies", "study", "paper", "papers", "literature", "article", "articles",
+        "recent", "latest", "new",
+    }
+    word_re = re.compile(r"\b[A-Za-z][A-Za-z0-9\-]{1,}\b")
+    words = [w for w in word_re.findall(cleaned) if w.lower() not in STOP]
+    # Dedup preserving order; prepend bio tokens so they're never dropped
+    seen = set()
+    out: list[str] = []
+    for tok in bio_tokens + words:
+        k = tok.upper()
+        if k in seen:
+            continue
+        seen.add(k)
+        out.append(tok)
+        if sum(len(x) + 1 for x in out) > max_len:
+            break
+    return " ".join(out)[:max_len]
 
 def _mls_debug_step(llm, step_num: int, task_desc: str, tool_name: str, merged_tool_input: dict, error_str: str) -> tuple:
     """Ask MLS to analyze the error (no tools). Returns (retry_input_dict or None, report_for_cb or None). Fallback when mls_debug_executor is not used."""
@@ -1152,6 +1201,34 @@ def _fetch_search_for_pi_report(user_text: str, max_results: int = None, llm=Non
             except Exception as e:
                 _logger.warning("PI report %s failed: %s", tool_name, e)
                 logged.append((tool_name, ds_input, json.dumps({"success": False, "error": str(e)})))
+
+        # Structural / functional database fallback: when literature + web
+        # + dataset search all returned nothing useful, parse the ORIGINAL
+        # user query (not the truncated keyword form) for identifier
+        # patterns and call the corresponding metadata endpoint. This is
+        # what gets the report substantive content for prompts like
+        # "Search for PDB 5XJH" where no paper indexes the PDB ID directly.
+        if not sections:
+            try:
+                db_sections = _pi_database_fallback(user_text, tools_dict)
+                if db_sections:
+                    sections.append(
+                        "**Database metadata (cite as [1], [2], ...)**\n"
+                        + "\n\n".join(db_sections)
+                    )
+                    logged.append((
+                        "__db_fallback__",
+                        {"query": user_text},
+                        json.dumps({"sections_added": len(db_sections)}),
+                    ))
+            except Exception as e:
+                _logger.warning("PI DB fallback failed: %s", e)
+                logged.append((
+                    "__db_fallback__",
+                    {"query": user_text},
+                    json.dumps({"success": False, "error": str(e)}),
+                ))
+
         if not sections:
             return ("No search results.", logged)
         intro = "References from search (use [1], [2], etc. in your report):\n\n"
