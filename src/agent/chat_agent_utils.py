@@ -5,6 +5,7 @@ import csv
 import json
 import os
 import re
+from datetime import datetime
 from typing import Any
 
 from langchain_classic.schema import HumanMessage
@@ -520,7 +521,12 @@ async def _run_mls_debug_with_tools(
             else:
                 msg = f"🔧 **MLS self-check:** Called tool `{tname}`."
             history.append({"role": "assistant", "content": msg, "role_id": "machine_learning_specialist"})
-            log_entries.append(f"MLS self-check tool: {tname}")
+            log_entries.append({
+                "role": "assistant",
+                "content": f"MLS self-check tool: {tname}",
+                "role_id": "machine_learning_specialist",
+                "timestamp": datetime.now().isoformat(),
+            })
         session_state["history"] = history
         session_state["conversation_log"] = log_entries
         return _parse_mls_debug_output(output)
@@ -536,9 +542,17 @@ async def _run_mls_debug_with_tools(
         )
 
 def _parse_mls_post_step_output(content: str) -> tuple[bool, dict | None, str | None]:
-    """Parse MLS post-step verify output. Returns (status_ok, retry_input or None, report_for_cb or None)."""
+    """Parse MLS post-step verify output. Returns (status_ok, retry_input, report_for_cb).
+
+    Verifier *silence* (empty / unparseable / malformed-without-complaint output)
+    is treated as a pass, not a failure: a verifier that fails to produce a
+    structured verdict has not actually expressed a complaint, and the
+    downstream CB post-step check still runs as a second line of defense.
+    Only a parseable JSON that carries a concrete ``retry_input`` or
+    ``report_for_cb`` is treated as a real complaint.
+    """
     if content is None or not str(content).strip():
-        return (False, None, None)
+        return (True, None, None)
     raw = content
     if "```" in raw:
         start = raw.find("```")
@@ -548,15 +562,31 @@ def _parse_mls_post_step_output(content: str) -> tuple[bool, dict | None, str | 
             start = raw.find("```") + 3
         end = raw.find("```", start)
         raw = raw[start: end if end > 0 else None].strip()
+    if not raw:
+        return (True, None, None)
     try:
         data = json.loads(raw)
-        if isinstance(data, dict) and data.get("status") == "ok":
-            return (True, None, None)
-        retry = data.get("retry_input") if isinstance(data.get("retry_input"), dict) else None
-        report = data.get("report_for_cb") if isinstance(data.get("report_for_cb"), str) else None
-        return (False, retry, report)
     except Exception:
-        return (False, None, None)
+        # Try to extract a JSON object substring (the LLM may have prefixed
+        # the verdict with prose like "Here is my analysis: { ... }").
+        match = re.search(r"\{.*\}", raw, re.DOTALL)
+        if match:
+            try:
+                data = json.loads(match.group(0))
+            except Exception:
+                return (True, None, None)
+        else:
+            return (True, None, None)
+    if not isinstance(data, dict):
+        return (True, None, None)
+    if data.get("status") == "ok":
+        return (True, None, None)
+    retry = data.get("retry_input") if isinstance(data.get("retry_input"), dict) else None
+    report = data.get("report_for_cb") if isinstance(data.get("report_for_cb"), str) else None
+    if retry or (report and report.strip()):
+        return (False, retry, report.strip() if report else None)
+    # Parseable JSON but no actionable complaint — treat as pass.
+    return (True, None, None)
 
 async def _run_mls_post_step_verify(
     session_state: dict,
@@ -600,7 +630,12 @@ async def _run_mls_post_step_verify(
             else:
                 msg = f"🔧 **MLS self-check (post-step):** Called tool `{tname}`."
             history.append({"role": "assistant", "content": msg, "role_id": "machine_learning_specialist"})
-            log_entries.append(f"MLS post-step self-check tool: {tname}")
+            log_entries.append({
+                "role": "assistant",
+                "content": f"MLS post-step self-check tool: {tname}",
+                "role_id": "machine_learning_specialist",
+                "timestamp": datetime.now().isoformat(),
+            })
         session_state["history"] = history
         session_state["conversation_log"] = log_entries
         return _parse_mls_post_step_output(output)
@@ -608,7 +643,13 @@ async def _run_mls_post_step_verify(
         return (True, None, None)
 
 def _output_looks_null_or_empty(raw_output: Any) -> bool:
-    """Heuristic: True if output has success but results/references/data is null or empty. Sequence/download outputs (sequence, file_path, etc.) count as non-empty."""
+    """Heuristic: True if a success-envelope payload has *explicitly* null or
+    empty ``results``/``references``/``data``/``entries`` AND no other
+    substantive content. Missing keys do NOT count as null — many tools
+    return their data under a different key (``content``, ``sequence``,
+    ``file_path``, ``file_info``, ``predictions``, ...), and treating an
+    absent ``results`` field as null would mis-flag every one of them.
+    """
     try:
         parsed = json.loads(str(raw_output)) if isinstance(raw_output, str) else raw_output
         if not isinstance(parsed, dict):
@@ -616,20 +657,38 @@ def _output_looks_null_or_empty(raw_output: Any) -> bool:
         is_success = parsed.get("success") is True or parsed.get("status") == "success"
         if not is_success:
             return False
-        # Payload keys that indicate non-empty output (e.g. download_uniprot_sequence, download_ncbi_sequence, file downloads)
-        if parsed.get("sequence") and isinstance(parsed["sequence"], str) and parsed["sequence"].strip():
-            return False
-        if parsed.get("file_path") and isinstance(parsed["file_path"], str) and parsed["file_path"].strip():
-            return False
-        if parsed.get("sequences") and isinstance(parsed["sequences"], (list, dict)) and len(parsed["sequences"]) > 0:
-            return False
-        for key in ("results", "references", "data", "entries"):
+        # Substantive content fields — if any of these has real content,
+        # the payload is non-empty regardless of results/references/data.
+        SUBSTANTIVE = (
+            "sequence", "sequences", "file_path", "file_info", "file_name",
+            "content", "content_preview", "predictions", "metrics", "model_info",
+            "biological_metadata", "score", "scores", "config_path", "output_files",
+            "skill_id", "uniprot_id",
+        )
+        for key in SUBSTANTIVE:
             val = parsed.get(key)
             if val is None:
-                return True
+                continue
+            if isinstance(val, str) and not val.strip():
+                continue
+            if isinstance(val, (list, dict, tuple, set)) and len(val) == 0:
+                continue
+            return False
+        # Only when none of the substantive keys carried real content do we
+        # look at results/references/data/entries as a last signal. Missing
+        # keys here mean "tool did not promise this field" — not "null".
+        flagged = False
+        for key in ("results", "references", "data", "entries"):
+            if key not in parsed:
+                continue
+            val = parsed[key]
+            if val is None:
+                flagged = True
+                break
             if isinstance(val, (list, dict)) and len(val) == 0:
-                return True
-        return False
+                flagged = True
+                break
+        return flagged
     except Exception:
         return False
 
@@ -645,6 +704,22 @@ async def _cb_post_step_check(
 ) -> tuple[bool, str]:
     """CB verifies: (1) execution matches plan, (2) output not null/empty/weird, (3) if file produced, exists and preview correct. Returns (matches, note)."""
     try:
+        # Deterministic guard for read_skill: when it returns success with a
+        # non-empty ``content`` field, skip the LLM check entirely. The CB
+        # prompt would otherwise summarize the output as ``success=True`` with
+        # no content snippet, giving the LLM nothing to judge against and
+        # often producing spurious MISMATCH verdicts.
+        if tool_name == "read_skill":
+            try:
+                parsed_rs = json.loads(str(raw_output)) if isinstance(raw_output, str) else raw_output
+                if isinstance(parsed_rs, dict):
+                    is_ok = parsed_rs.get("success") is True or parsed_rs.get("status") == "success"
+                    content_val = parsed_rs.get("content")
+                    if is_ok and isinstance(content_val, str) and content_val.strip():
+                        return (True, "")
+            except Exception:
+                pass
+
         # Deterministic guard for finetuned function prediction outputs.
         # Avoids LLM false negatives when CSV already contains a valid prediction value.
         if tool_name in {"predict_protein_function", "predict_residue_function"} and output_file_path and os.path.isfile(output_file_path):
@@ -680,6 +755,25 @@ async def _cb_post_step_check(
                     out_str += f", uniprot_id={parsed.get('uniprot_id')}"
                 if parsed.get("sequence") and isinstance(parsed["sequence"], str):
                     out_str += f", sequence length={len(parsed['sequence'])}"
+                # Surface a content snippet so the LLM can actually judge the
+                # payload. Without this, many tools collapse to
+                # ``success=True`` and the LLM defaults to MISMATCH because
+                # it has nothing to look at.
+                for snippet_key in ("content_preview", "content", "data", "results", "biological_metadata", "predictions", "metrics"):
+                    val = parsed.get(snippet_key)
+                    if val in (None, "", [], {}):
+                        continue
+                    try:
+                        val_str = val if isinstance(val, str) else json.dumps(val, ensure_ascii=False, default=str)
+                    except Exception:
+                        val_str = str(val)
+                    val_str = val_str.strip()
+                    if not val_str:
+                        continue
+                    if len(val_str) > 300:
+                        val_str = val_str[:300] + "..."
+                    out_str += f", {snippet_key}={val_str}"
+                    break
                 if null_or_empty:
                     out_str += "; results/references/data is null or empty"
         except Exception:

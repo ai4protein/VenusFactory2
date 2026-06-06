@@ -11,7 +11,12 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Optional
+
+
+def _now_iso() -> str:
+    return datetime.now().isoformat()
 
 from logger import get_logger
 
@@ -154,9 +159,28 @@ async def run_mls_post_check(
     if status_ok:
         return VerifyResult(ok=True)
 
-    post_reason = post_report_for_cb or (
-        "步骤后置校验失败。" if ctx.ui_lang == "zh" else "Post-step verification failed."
-    )
+    # Synthesize a useful failure reason. Order of preference:
+    #   1. Verifier's own ``report_for_cb`` text
+    #   2. A compact summary of the corrective ``retry_input``
+    #   3. Generic fallback (kept only for legacy compatibility — with the
+    #      parse fix in chat_agent_utils, status_ok is True whenever the
+    #      verifier produced no actionable complaint, so this is unreachable
+    #      in normal operation).
+    if post_report_for_cb and str(post_report_for_cb).strip():
+        post_reason = str(post_report_for_cb).strip()
+    elif isinstance(post_retry_input, dict) and post_retry_input:
+        try:
+            keys_preview = ", ".join(sorted(post_retry_input.keys())[:5])
+        except Exception:
+            keys_preview = ""
+        post_reason = (
+            f"校验器要求用不同参数重试（{keys_preview}）。" if ctx.ui_lang == "zh"
+            else f"Verifier requested a retry with different parameters ({keys_preview})."
+        )
+    else:
+        post_reason = (
+            "步骤后置校验失败。" if ctx.ui_lang == "zh" else "Post-step verification failed."
+        )
 
     # Soften: when the tool itself returned a success envelope with substantive
     # content, treat the verifier rejection as a non-fatal warning and let the
@@ -179,9 +203,15 @@ async def run_mls_post_check(
             ctx.history.append(
                 {"role": "assistant", "content": note, "role_id": "machine_learning_specialist"}
             )
-            ctx.log_entries.append(
-                f"MLS post-step verifier downgraded to warning for step {ctx.step_num} ({ctx.tool_name}): {post_reason}"
-            )
+            ctx.log_entries.append({
+                "role": "assistant",
+                "content": (
+                    f"MLS post-step verifier downgraded to warning for step "
+                    f"{ctx.step_num} ({ctx.tool_name}): {post_reason}"
+                ),
+                "role_id": "machine_learning_specialist",
+                "timestamp": _now_iso(),
+            })
         except Exception:
             # Never let history bookkeeping break the success path.
             pass
