@@ -52,10 +52,14 @@ def _extract_client_ip(request: Request) -> str:
 
 
 def _build_owner_fingerprint(request: Request) -> str:
+    # NOTE: do NOT include Origin in the fingerprint. Browsers omit the
+    # Origin header on default GET fetch() requests but include it on POST,
+    # so mixing it in causes CREATE (POST, origin set) and LIST (GET, origin
+    # empty) for the same user to produce different fingerprints — and the
+    # user's own session never shows in their sidebar.
     ip = _extract_client_ip(request)
     ua = _extract_user_agent(request)
-    origin = _extract_origin(request)
-    raw = f"{ip}|{ua}|{origin}"
+    raw = f"{ip}|{ua}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
