@@ -410,9 +410,9 @@ const SUGGESTED_PROMPTS = [
     text: "Download AlphaFold structure for human EGFR (P00533), predict beneficial mutations with ESM2 and ProtSSN, and identify top 10 stabilizing candidates",
   },
   {
-    title: "Lipase Mining",
-    desc: "Query BRENDA for lipase kinetics, find thermostable homologs on UniProt, predict solubility",
-    text: "Query BRENDA for lipase EC 3.1.1.3 kinetics across thermophilic organisms, find the most thermostable homolog on UniProt, and predict its solubility",
+    title: "Homolog Survey",
+    desc: "Get UniProt sequence for carbonic anhydrase II (P00918), find homologs via MMseqs2, compare physicochemical properties across the family",
+    text: "Download UniProt sequence for human carbonic anhydrase II (P00918), find its top homologs via MMseqs2 against UniRef, and compute physicochemical properties (MW, pI, GRAVY) for each to compare the family",
   },
   {
     title: "Functional Analysis",
