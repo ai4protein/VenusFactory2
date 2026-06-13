@@ -2,56 +2,69 @@ import os
 import argparse
 import json
 from Bio.PDB import PDBParser
-from Bio.PDB.DSSP import DSSP
+from Bio.PDB.SASA import ShrakeRupley
 
-# conda install -c ostrokach dssp
+# Backend: BioPython Shrake-Rupley → SASA(residue) ÷ MaxASA(residue_type) → RSA.
+# Avoids the external DSSP binary, whose bioconda packaging has a broken
+# libcifpp dict loader on common installs.
+#
+# MaxASA values from Tien et al. 2013 "Maximum allowed solvent accessibility of
+# residues in proteins" (PLoS ONE), in Å². Same numbers DSSP uses internally.
+_MAX_ASA_TIEN_2013 = {
+    'A': 129.0, 'R': 274.0, 'N': 195.0, 'D': 193.0, 'C': 167.0,
+    'Q': 225.0, 'E': 223.0, 'G': 104.0, 'H': 224.0, 'I': 197.0,
+    'L': 201.0, 'K': 236.0, 'M': 224.0, 'F': 240.0, 'P': 159.0,
+    'S': 155.0, 'T': 172.0, 'W': 285.0, 'Y': 263.0, 'V': 174.0,
+}
+_THREE_TO_ONE = {
+    'ALA':'A','ARG':'R','ASN':'N','ASP':'D','CYS':'C','GLN':'Q','GLU':'E',
+    'GLY':'G','HIS':'H','ILE':'I','LEU':'L','LYS':'K','MET':'M','PHE':'F',
+    'PRO':'P','SER':'S','THR':'T','TRP':'W','TYR':'Y','VAL':'V',
+}
+
+
 def calculate_rsa_from_pdb(pdb_file: str, chain_id: str = 'A') -> dict:
-    """
-    read pdb file, use DSSP to calculate the relative solvent accessible surface area (RSA) of each residue on the specified chain.
-
-    Args:
-        pdb_file: path to the pdb file.
-        chain_id: the id of the chain to analyze (default is 'A').
+    """Calculate per-residue RSA on one chain (Shrake-Rupley SASA ÷ MaxASA).
 
     Returns:
-        a dictionary, the key is the residue number (str), the value is a dictionary containing the amino acid name and RSA value.
-        for example: {'10': {'aa': 'CYS', 'rsa': 0.45}, ...}
-        if the file does not exist or cannot be processed, return an empty dictionary.
+        dict keyed by residue number (str) → {'aa': one_letter, 'rsa': float}.
+        Empty dict on error or empty chain.
     """
     if not os.path.exists(pdb_file):
         print(f"error: file '{pdb_file}' not found.")
         return {}
 
     try:
-        # 1. initialize the parser and load the structure
-        parser = PDBParser()
+        parser = PDBParser(QUIET=True)
         structure = parser.get_structure("protein_structure", pdb_file)
-        model = structure[0] # usually only process the first model
-
-        # 2. run DSSP
-        # if your dssp program is not in the system path, you need to specify its path here, e.g., dssp=DSSP(model, pdb_file, dssp='/path/to/your/mkdssp')
-        dssp = DSSP(model, pdb_file)
-
-        # 3. extract RSA information
-        rsa_data = {}
-        for key in dssp.keys():
-            # the key format of DSSP is (chain_id, residue_id_tuple)
-            # the value format is (dssp_index, amino_acid, secondary_structure, relative_asa, ...)
-            if key[0] == chain_id:
-                residue_id = str(key[1][1])
-                amino_acid_code = dssp[key][1]
-                rsa_value = dssp[key][3] 
-                
-                rsa_data[residue_id] = {
-                    'aa': amino_acid_code,
-                    'rsa': rsa_value
-                }
-        
-        return rsa_data
-
+        model = structure[0]
+        sasa_calc = ShrakeRupley()
+        sasa_calc.compute(model, level='R')  # attaches .sasa (Å²) to each residue
     except Exception as e:
         print(f"error: {e}")
         return {}
+
+    try:
+        chain = model[chain_id]
+    except KeyError:
+        return {}
+
+    rsa_data: dict = {}
+    for residue in chain:
+        if residue.id[0].strip() != "":  # skip HETATM / waters
+            continue
+        resname = residue.get_resname().strip().upper()
+        aa = _THREE_TO_ONE.get(resname)
+        if aa is None or aa not in _MAX_ASA_TIEN_2013:
+            continue
+        sasa = float(getattr(residue, "sasa", 0.0) or 0.0)
+        max_asa = _MAX_ASA_TIEN_2013[aa]
+        rsa = round(sasa / max_asa, 4) if max_asa > 0 else 0.0
+        rsa_data[str(residue.id[1])] = {
+            'aa': aa,
+            'rsa': rsa,
+        }
+    return rsa_data
 
 
 if __name__ == "__main__":
