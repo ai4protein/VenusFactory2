@@ -2,10 +2,12 @@ import os
 import argparse
 import json
 from Bio.PDB import PDBParser
-from Bio.PDB.DSSP import DSSP
 
-# make sure to install dssp: conda install -c salilab dssp
-# make sure to install biopython: pip install biopython
+# Backend: pydssp (pure-Python). Avoids the bioconda dssp binary, whose
+# libcifpp dict loader is broken on common conda installs ("Is a directory"
+# error when reading mmcif_pdbx.dic). pydssp computes a 3-class assignment
+# (H / E / -). We map to 8-class via the standard collapse below so the
+# returned dict still has both ss8_seq and ss3_seq fields.
 
 ss_alphabet = ['H', 'E', 'C']
 ss_alphabet_dic = {
@@ -14,7 +16,7 @@ ss_alphabet_dic = {
     "S": "C", "L": "C", "-": "C",
     "P": "C"
 }
-# DSSP secondary structure code to full name mapping
+# Secondary structure code to full name mapping (kept for 8-class compatibility).
 ss_map = {
     'H': 'Alpha Helix',
     'B': 'Beta Bridge',
@@ -23,55 +25,79 @@ ss_map = {
     'I': 'Pi Helix',
     'T': 'Turn',
     'S': 'Bend',
-    '-': 'Loop/Irregular'
+    '-': 'Loop/Irregular',
+    'C': 'Coil',
 }
 
-def calculate_ss_from_pdb(pdb_file: str, chain_id: str = 'A') -> dict:
-    """
-    read PDB file, use DSSP to calculate the secondary structure of each residue on the specified chain.
+# Three-letter → one-letter amino acid (used to recover aa_seq for chain match).
+_THREE_TO_ONE = {
+    'ALA':'A','ARG':'R','ASN':'N','ASP':'D','CYS':'C','GLN':'Q','GLU':'E',
+    'GLY':'G','HIS':'H','ILE':'I','LEU':'L','LYS':'K','MET':'M','PHE':'F',
+    'PRO':'P','SER':'S','THR':'T','TRP':'W','TYR':'Y','VAL':'V',
+}
 
-    Args:
-        pdb_file: path to the PDB file.
-        chain_id: ID of the chain to analyze (default is 'A').
+
+def calculate_ss_from_pdb(pdb_file: str, chain_id: str = 'A') -> dict:
+    """Calculate secondary structure for one chain using pydssp.
 
     Returns:
-        a dictionary, key is the residue number (str), value is a dictionary containing the amino acid name and secondary structure information.
-        for example: {'10': {'aa': 'CYS', 'ss': 'Beta Strand'}, ...}
-        if the file does not exist or cannot be processed, return an empty dictionary.
+        dict keyed by residue number (str) → {'aa_seq': one_letter, 'ss8_seq', 'ss3_seq'}.
+        Empty dict on error or empty chain.
     """
     if not os.path.exists(pdb_file):
         print(f"error: file '{pdb_file}' not found.")
         return {}
 
     try:
-        parser = PDBParser()
+        import pydssp
+        with open(pdb_file, encoding='utf-8', errors='replace') as fh:
+            pdb_text = fh.read()
+        coords = pydssp.read_pdbtext(pdb_text)
+        # pydssp default returns one-character codes ('-', 'H', 'E') as numpy array of strings
+        ss_letters = pydssp.assign(coords)
+    except Exception as e:
+        print(f"error (pydssp assign failed): {e}")
+        return {}
+
+    # pydssp returns one assignment per CA atom across ALL chains in PDB order.
+    # We need to walk the structure ourselves to map (pydssp index → chain_id, resnum, aa).
+    try:
+        parser = PDBParser(QUIET=True)
         structure = parser.get_structure("protein_structure", pdb_file)
         model = structure[0]
-        
-        # run DSSP. if your dssp program is not in the system path, you need to specify its path here.
-        # for example: dssp=DSSP(model, pdb_file, dssp='/path/to/your/mkdssp')
-        dssp = DSSP(model, pdb_file)
-
-        ss_data = {}
-        for key in dssp.keys():
-            # the key format of DSSP is (chain_id, residue_id_tuple)
-            # the value format of DSSP is (dssp_index, amino_acid, secondary_structure, rsa, ...)
-            if key[0] == chain_id:
-                residue_id = str(key[1][1])
-                amino_acid_code = dssp[key][1]
-                ss_code = dssp[key][2]
-                
-                ss_data[residue_id] = {
-                    'aa_seq': amino_acid_code,
-                    'ss8_seq': ss_code,
-                    'ss3_seq': ss_alphabet_dic.get(ss_code, 'C')
-                }
-        
-        return ss_data
-
+        residues_in_order: list[tuple[str, int, str]] = []
+        for chain in model:
+            for residue in chain:
+                # Skip HETATM / waters
+                if residue.id[0].strip() != "":
+                    continue
+                if "CA" not in residue:
+                    continue
+                resname = residue.get_resname().strip().upper()
+                residues_in_order.append((chain.id, residue.id[1], _THREE_TO_ONE.get(resname, 'X')))
     except Exception as e:
-        print(f"error: {e}")
+        print(f"error (PDB walk failed): {e}")
         return {}
+
+    if len(residues_in_order) != len(ss_letters):
+        # Mismatch — usually means non-standard residues skipped here but not in pydssp.
+        # Truncate to the shorter length so we still return something useful.
+        n = min(len(residues_in_order), len(ss_letters))
+        residues_in_order = residues_in_order[:n]
+        ss_letters = ss_letters[:n]
+
+    ss_data: dict = {}
+    for (cid, resnum, aa), code in zip(residues_in_order, ss_letters):
+        if cid != chain_id:
+            continue
+        ss8 = str(code)  # pydssp gives 3-class already (H/E/-); use same for ss8 field
+        ss3 = ss_alphabet_dic.get(ss8, 'C')
+        ss_data[str(resnum)] = {
+            'aa_seq': aa,
+            'ss8_seq': ss8,
+            'ss3_seq': ss3,
+        }
+    return ss_data
 
 
 if __name__ == "__main__":

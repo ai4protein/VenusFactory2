@@ -56,7 +56,7 @@ def calculate_physchem_from_fasta(fasta_file: str) -> dict:
                 'turn': round(analysed_seq.secondary_structure_fraction()[1], 3),
                 'sheet': round(analysed_seq.secondary_structure_fraction()[2], 3),
             },
-            'amino_acid_composition': {aa: count for aa, count in analysed_seq.get_amino_acids_percent().items()}
+            'amino_acid_composition': {aa: count for aa, count in analysed_seq.amino_acids_percent.items()}
         }
         
         return properties
