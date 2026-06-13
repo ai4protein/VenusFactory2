@@ -266,6 +266,113 @@ def _maybe_apply_plot_fallback(
     }, ensure_ascii=False)
 
 
+def _build_input_file_preview(path: str, ext: str, *, max_bytes: int = 4096) -> dict:
+    """Read a structured preview of an input file so the code-gen LLM doesn't
+    have to invent JSON keys / CSV columns / FASTA headers.
+
+    Returns a small dict describing the on-disk structure:
+      - JSON  → {"type":"json", "top_level": "dict"|"list"|...,
+                 "keys" / "list_item_keys" / "sample": ...}
+      - CSV/TSV → {"type":"table", "header": [...], "row0": {...}, "row1": {...},
+                   "row_count_estimate": int|None}
+      - FASTA → {"type":"fasta", "first_record": {"header","seq_len","seq_preview"}}
+      - Text  → {"type":"text", "head_lines": [...]}
+      - Binary/unknown → {"type":"binary"|"unknown"}
+
+    Best-effort: any read/parse error returns {"type":"unreadable", "error": "..."}.
+    Capped at ``max_bytes`` of raw file content so we never blow up the prompt.
+    """
+    import json as _json
+    import csv as _csv
+    from io import StringIO as _StringIO
+    e = (ext or "").lower().lstrip(".")
+    try:
+        if e in ("png", "jpg", "jpeg", "svg", "webp", "gif", "pdf", "pt", "pth",
+                 "pkl", "joblib", "h5", "npy", "npz", "zip", "gz", "tar"):
+            return {"type": "binary", "extension": e}
+        if not os.path.isfile(path):
+            return {"type": "unreadable", "error": "not a regular file"}
+        # Cap read at max_bytes
+        with open(path, "rb") as fh:
+            raw = fh.read(max_bytes)
+        try:
+            text = raw.decode("utf-8", errors="replace")
+        except Exception:
+            return {"type": "binary", "extension": e}
+
+        if e == "json" or text.lstrip().startswith(("{", "[")):
+            # Try full parse first (if file fits in our cap); otherwise sketch shape
+            try:
+                with open(path, encoding="utf-8") as fh2:
+                    obj = _json.load(fh2)
+            except Exception:
+                # Maybe truncated by cap — fall back to text head
+                return {"type": "text", "head_lines": text.split("\n")[:8]}
+            if isinstance(obj, dict):
+                # Show top-level keys + a sample value for each key (truncated)
+                sample = {}
+                for k in list(obj.keys())[:20]:
+                    v = obj[k]
+                    if isinstance(v, dict):
+                        sample[k] = {"<type>": "dict", "<keys>": list(v.keys())[:10]}
+                    elif isinstance(v, list):
+                        sample[k] = {"<type>": "list", "<len>": len(v),
+                                     "<first>": (v[0] if v else None) if not isinstance(v[0] if v else None, (dict, list)) else
+                                                {"<type>": type(v[0]).__name__,
+                                                 "<keys>": list(v[0].keys())[:10] if isinstance(v[0], dict) else None}}
+                    elif isinstance(v, str):
+                        sample[k] = v[:120] + ("…" if len(v) > 120 else "")
+                    else:
+                        sample[k] = v
+                return {"type": "json", "top_level": "dict", "keys": list(obj.keys())[:30], "sample": sample}
+            if isinstance(obj, list):
+                first = obj[0] if obj else None
+                item_keys = list(first.keys())[:30] if isinstance(first, dict) else None
+                return {"type": "json", "top_level": "list", "len": len(obj),
+                        "list_item_keys": item_keys, "sample_item": first}
+            return {"type": "json", "top_level": type(obj).__name__, "value": str(obj)[:200]}
+
+        if e in ("csv", "tsv", "txt") or "," in text.split("\n", 1)[0] or "\t" in text.split("\n", 1)[0]:
+            delim = "\t" if e == "tsv" or "\t" in text.split("\n", 1)[0] else ","
+            try:
+                reader = _csv.DictReader(_StringIO(text), delimiter=delim)
+                header = reader.fieldnames or []
+                rows = []
+                for i, row in enumerate(reader):
+                    if i >= 2:
+                        break
+                    rows.append({k: (str(v)[:80] if v else v) for k, v in row.items()})
+                row_count_estimate = text.count("\n")
+                return {"type": "table", "delimiter": delim, "header": header,
+                        "row0": rows[0] if len(rows) > 0 else None,
+                        "row1": rows[1] if len(rows) > 1 else None,
+                        "row_count_estimate": row_count_estimate}
+            except Exception:
+                return {"type": "text", "head_lines": text.split("\n")[:8]}
+
+        if e in ("fasta", "fa", "faa", "fna") or text.lstrip().startswith(">"):
+            lines = text.split("\n")
+            first_header = None
+            first_seq_parts: list[str] = []
+            for line in lines:
+                if line.startswith(">"):
+                    if first_header is not None:
+                        break
+                    first_header = line
+                elif first_header is not None:
+                    first_seq_parts.append(line.strip())
+            seq = "".join(first_seq_parts)
+            return {"type": "fasta",
+                    "first_record": {"header": (first_header or "")[:200],
+                                     "seq_len": len(seq),
+                                     "seq_preview": seq[:60] + ("…" if len(seq) > 60 else "")}}
+
+        # Generic text head
+        return {"type": "text", "head_lines": text.split("\n")[:8]}
+    except Exception as exc:
+        return {"type": "unreadable", "error": f"{type(exc).__name__}: {exc}"[:200]}
+
+
 def generate_and_execute_code(
     task_description: str,
     input_files: Optional[List[str]] = None,
@@ -331,11 +438,16 @@ def generate_and_execute_code(
                     # open. The "relative_path" field is kept for display /
                     # readability only — the prompt below tells the model to
                     # use "path" for I/O.
+                    # ALSO attach a schema preview so the LLM doesn't have to
+                    # guess JSON/CSV/FASTA field names (a common failure mode:
+                    # generated code references "per_residue_sasa" when the
+                    # actual key is "residue_sasa", etc.).
                     file_info.append({
                         "path": normalized_input,
                         "relative_path": to_project_relative_path(normalized_input),
                         "extension": file_ext,
                         "size_kb": round(file_size / 1024, 2),
+                        "preview": _build_input_file_preview(normalized_input, file_ext),
                     })
         
         # Determine output directory.
@@ -448,13 +560,30 @@ def generate_and_execute_code(
         }
 
         endpoint = f"{chat_base_url.rstrip('/')}/chat/completions"
-        response = requests.post(
-            endpoint,
-            headers=headers,
-            json=data,
-            timeout=60
-        )
-        
+        # LLM code generation often hits read timeouts under load (DeepSeek/DMX
+        # in particular). Retry 3 times with light backoff before surrendering:
+        # the call is idempotent (same prompt → same code) so retries are safe.
+        # Bumping per-attempt timeout from 60s to 180s gives slow models room.
+        response = None
+        _last_err: Exception | None = None
+        for _attempt in range(3):
+            try:
+                response = requests.post(endpoint, headers=headers, json=data, timeout=180)
+                break
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as exc:
+                _last_err = exc
+                if _attempt < 2:
+                    time.sleep(2 ** _attempt)  # 1s, 2s
+                continue
+        if response is None:
+            pre_payload = {
+                "success": False,
+                "error": f"LLM API unreachable after 3 attempts: {type(_last_err).__name__}: {_last_err}",
+            }
+            return _maybe_apply_plot_fallback(
+                pre_payload, task_description, valid_files, output_directory
+            )
+
         if response.status_code != 200:
             # If this was a plot task and we have upstream input files, run
             # the deterministic fallback plotter — that's still useful even

@@ -27,6 +27,45 @@ from web.utils.common_utils import to_project_relative_path
 _logger = get_logger("agent.graph")
 
 
+import re as _re_dep_lint
+
+# Legal dependency token: dependency:step_N[:field...] (deps.py:32-53).
+# The N digits are required; "step_" prefix is optional.
+_LEGAL_DEP_TOKEN_RE = _re_dep_lint.compile(r"^dependency:step_?\d+(:[\w./-]+)*$")
+
+
+def _sanitize_dependency_tokens(value: Any, *, step_no: int, tool_name: str) -> Any:
+    """Walk ``value`` and strip the ``dependency:`` prefix from malformed tokens.
+
+    The CB planner LLM occasionally hallucinates non-DSL placeholders such as
+    ``dependency:system:session_dir/foo`` or ``dependency:user_input/bar``.
+    Without sanitization, these slip into ``tool_input`` and ``deps.py`` later
+    raises ``Invalid dependency step token`` — which cascades through every
+    downstream step that depends on this one. The fix:
+
+    * Tokens matching ``dependency:step_N[:field...]`` are left alone (valid).
+    * Anything else starting with ``dependency:`` has its prefix stripped, so
+      the residue is treated as a literal path/string and the tool either
+      consumes it directly or surfaces a real validation error (instead of an
+      opaque dependency-resolution error that masks the planner mistake).
+    """
+    if isinstance(value, str):
+        if value.startswith("dependency:") and not _LEGAL_DEP_TOKEN_RE.match(value):
+            stripped = value[len("dependency:"):]
+            _logger.warning(
+                "Planner lint: step %s (%s) had malformed dependency token %r; "
+                "stripped 'dependency:' prefix → %r",
+                step_no, tool_name, value, stripped,
+            )
+            return stripped
+        return value
+    if isinstance(value, list):
+        return [_sanitize_dependency_tokens(v, step_no=step_no, tool_name=tool_name) for v in value]
+    if isinstance(value, dict):
+        return {k: _sanitize_dependency_tokens(v, step_no=step_no, tool_name=tool_name) for k, v in value.items()}
+    return value
+
+
 def _filter_unparameterized_steps(
     plan: list[dict[str, Any]],
     all_tools: Iterable[Any] | None,
@@ -216,11 +255,13 @@ async def _plan_node_impl(state: AgentState, config: RunnableConfig):
         if tname in PI_SEARCH_TOOL_NAMES:
             dropped_pi_search_tool += 1
             continue
+        _tool_input = _normalize_tool_input(p.get("tool_input") or p.get("input"))
+        _tool_input = _sanitize_dependency_tokens(_tool_input, step_no=i + 1, tool_name=tname.strip())
         normalized_plan.append({
             "step": _normalize_step_number(p.get("step"), i + 1),
             "task_description": p.get("task_description") or p.get("task") or "",
             "tool_name": tname.strip(),
-            "tool_input": _normalize_tool_input(p.get("tool_input") or p.get("input")),
+            "tool_input": _tool_input,
         })
     _logger.info(
         "CB plan normalization: kept=%d dropped_non_dict=%d dropped_no_tool=%d dropped_pi_search=%d available_tools=%s",

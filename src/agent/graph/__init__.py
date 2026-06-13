@@ -35,8 +35,10 @@ _TOOL_TIMEOUTS: dict[str, int] = {
     "query_foldseek_search_by_pdb_file": 300,
     "query_sequence_from_pdb_file": 120,
     "esmfold_structure_prediction": 300,
-    "zero_shot_mutation_sequence_prediction": 300,
-    "zero_shot_mutation_structure_prediction": 300,
+    "zero_shot_mutation_sequence_prediction": 600,
+    # ProSST structure-based scan is O(L) on residues — 300s is too tight for
+    # proteins like EGFR (1210 aa). Bump to 1200s. Per-step retry still applies.
+    "zero_shot_mutation_structure_prediction": 1200,
     "train_protein_model": 600,
     "protein_model_predict": 300,
     "agent_generated_code": 300,

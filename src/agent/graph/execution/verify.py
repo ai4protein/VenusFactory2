@@ -182,40 +182,69 @@ async def run_mls_post_check(
             "步骤后置校验失败。" if ctx.ui_lang == "zh" else "Post-step verification failed."
         )
 
-    # Soften: when the tool itself returned a success envelope with substantive
-    # content, treat the verifier rejection as a non-fatal warning and let the
-    # plan continue. We still surface the verifier's opinion in history so the
-    # user can see why the verifier was unhappy.
+    # Soften: when the tool genuinely produced real content (success envelope
+    # + substantive field + non-empty artifact file when applicable), downgrade
+    # the verifier rejection to a soft warning. But escalate to a hard failure
+    # when the artifact is empty/missing OR the verifier explicitly flags
+    # emptiness — those are the cases where "tool says success" is a lie and
+    # silently propagating that into downstream steps is what produces
+    # convincingly-formatted but empty plots / reports.
     if _tool_self_reports_success(raw_output):
-        _logger.warning(
-            "MLS post-step verifier flagged step %s (%s) but tool reports success "
-            "with substantive content — treating as soft warning. Verifier note: %s",
-            ctx.step_num,
-            ctx.tool_name,
-            post_reason,
+        import os as _os
+        output_file_path = _get_output_file_path_from_raw(raw_output, ctx.tool_name)
+        file_preview = (
+            _read_output_file_preview(output_file_path) if output_file_path else None
         )
-        try:
-            note = (
-                f"⚠️ **MLS self-check (post-step):** 校验器对工具输出有疑问，但工具自报成功，跳过该警告继续执行。\n\n校验意见：{post_reason}"
-                if ctx.ui_lang == "zh"
-                else f"⚠️ **MLS self-check (post-step):** Verifier flagged the output but the tool reported success — continuing.\n\nVerifier note: {post_reason}"
+        file_is_empty = bool(output_file_path) and (
+            not _os.path.exists(output_file_path)
+            or _os.path.getsize(output_file_path) == 0
+            or not (file_preview or "").strip()
+        )
+        _reason_lower = (post_reason or "").lower()
+        verifier_flags_emptiness = any(
+            keyword in _reason_lower
+            for keyword in (
+                "no evidence", "no preview", "no output", "no content",
+                "empty result", "empty results", "no sequences", "no records",
+                "no data", "no hits", "no file", "0 sequences", "zero sequences",
+                "missing file", "missing data", "data missing", "数据缺失",
+                "空表", "为空", "缺失",
             )
-            ctx.history.append(
-                {"role": "assistant", "content": note, "role_id": "machine_learning_specialist"}
+        )
+        if not file_is_empty and not verifier_flags_emptiness:
+            _logger.warning(
+                "MLS post-step verifier flagged step %s (%s) but tool reports success "
+                "with substantive content — treating as soft warning. Verifier note: %s",
+                ctx.step_num, ctx.tool_name, post_reason,
             )
-            ctx.log_entries.append({
-                "role": "assistant",
-                "content": (
-                    f"MLS post-step verifier downgraded to warning for step "
-                    f"{ctx.step_num} ({ctx.tool_name}): {post_reason}"
-                ),
-                "role_id": "machine_learning_specialist",
-                "timestamp": _now_iso(),
-            })
-        except Exception:
-            # Never let history bookkeeping break the success path.
-            pass
-        return VerifyResult(ok=True)
+            try:
+                note = (
+                    f"⚠️ **MLS self-check (post-step):** 校验器对工具输出有疑问，但工具自报成功，跳过该警告继续执行。\n\n校验意见：{post_reason}"
+                    if ctx.ui_lang == "zh"
+                    else f"⚠️ **MLS self-check (post-step):** Verifier flagged the output but the tool reported success — continuing.\n\nVerifier note: {post_reason}"
+                )
+                ctx.history.append(
+                    {"role": "assistant", "content": note, "role_id": "machine_learning_specialist"}
+                )
+                ctx.log_entries.append({
+                    "role": "assistant",
+                    "content": (
+                        f"MLS post-step verifier downgraded to warning for step "
+                        f"{ctx.step_num} ({ctx.tool_name}): {post_reason}"
+                    ),
+                    "role_id": "machine_learning_specialist",
+                    "timestamp": _now_iso(),
+                })
+            except Exception:
+                pass
+            return VerifyResult(ok=True)
+
+        _logger.warning(
+            "MLS post-step HARD-FAIL for step %s (%s): tool envelope claimed success "
+            "but file_is_empty=%s verifier_flags_emptiness=%s. Verifier note: %s",
+            ctx.step_num, ctx.tool_name,
+            file_is_empty, verifier_flags_emptiness, post_reason,
+        )
 
     retry_input = post_retry_input if isinstance(post_retry_input, dict) else None
     # Preserve the actual tool output in the failure envelope so the user
@@ -256,9 +285,14 @@ async def run_cb_post_check(
 ) -> VerifyResult:
     """CB post-step verifier (L2171-2220).
 
-    Returns ok=True both when CB agrees with the output AND when CB disagrees
-    but the tool itself reported success (legacy tolerant behaviour).
+    Returns ok=True when CB agrees, OR when CB disagrees but the tool's claimed
+    success is backed by real content. When the tool claims success but produced
+    no real output (empty file, missing file, CB explicitly flags emptiness),
+    the rejection is escalated to a hard failure so the orchestrator can retry
+    or surface the failure to the user instead of silently propagating empty
+    intermediate state into downstream steps.
     """
+    import os as _os
     if not ctx.chains.get("llm"):
         return VerifyResult(ok=True)
 
@@ -276,32 +310,79 @@ async def run_cb_post_check(
     if cb_match:
         return VerifyResult(ok=True)
 
-    # Soften: if the tool itself returned success, downgrade to a log warning.
-    tool_itself_succeeded = False
-    try:
-        _parsed = json.loads(str(raw_output)) if isinstance(raw_output, str) else raw_output
-        if isinstance(_parsed, dict) and (
-            _parsed.get("success") is True or _parsed.get("status") == "success"
-        ):
-            tool_itself_succeeded = True
-    except Exception:
-        pass
+    # CB rejected. Decide: soft warning (tool genuinely succeeded, CB is fussy)
+    # vs hard failure (tool says success but the artifact is empty/missing).
+    #
+    # The legacy code only checked the tool envelope's `success: true` flag,
+    # which masks the most common failure mode: a tool returns success=true with
+    # a valid-looking file_path but the file is empty / has no records.
+    # Use `_tool_self_reports_success` (which also requires a SUBSTANTIVE_KEYS
+    # field) AND additionally require, when a file_path is declared, that the
+    # file actually exists with non-empty preview.
+    real_success = _tool_self_reports_success(raw_output)
+    file_is_empty = bool(output_file_path) and (
+        not _os.path.exists(output_file_path)
+        or _os.path.getsize(output_file_path) == 0
+        or not (file_preview or "").strip()
+    )
 
-    if tool_itself_succeeded:
+    # Heuristic: CB note explicitly mentions emptiness / missing evidence.
+    _note_lower = (cb_note or "").lower()
+    cb_flags_emptiness = any(
+        keyword in _note_lower
+        for keyword in (
+            "no evidence", "no preview", "no output", "no content",
+            "empty result", "empty results", "no sequences",
+            "no records", "no data", "no hits", "no file",
+            "0 sequences", "zero sequences", "missing file",
+        )
+    )
+
+    if real_success and not file_is_empty and not cb_flags_emptiness:
         _logger.info(
-            "CB post-step mismatch for step %s (%s) but tool returned success — "
-            "treating as non-fatal (empty results). CB note: %s",
+            "CB post-step mismatch for step %s (%s) but tool returned success "
+            "and artifact is non-empty — treating as non-fatal warning. CB note: %s",
             ctx.step_num,
             ctx.tool_name,
             cb_note,
         )
         return VerifyResult(ok=True)
 
-    failure_reason = cb_note or (
-        "CB 后置校验不一致。" if ctx.ui_lang == "zh" else "CB post-step check mismatch."
+    # Hard failure: build an explicit error envelope so the orchestrator's
+    # retry/skip logic sees this as a real failure (not a tool success).
+    _logger.warning(
+        "CB post-step HARD-FAIL for step %s (%s): tool envelope claimed success "
+        "but file_is_empty=%s real_success=%s cb_flags_emptiness=%s. CB note: %s",
+        ctx.step_num, ctx.tool_name,
+        file_is_empty, real_success, cb_flags_emptiness, cb_note,
+    )
+    try:
+        raw_preview = (
+            raw_output if isinstance(raw_output, str)
+            else json.dumps(raw_output, ensure_ascii=False, default=str)
+        )
+    except Exception:
+        raw_preview = str(raw_output)
+    if len(raw_preview) > 1500:
+        raw_preview = raw_preview[:1500] + "\n...(truncated)"
+    failure_reason = (
+        f"CB verifier rejected step {ctx.step_num} ({ctx.tool_name}): tool reported "
+        f"success but the artifact is empty/missing. "
+        f"file_path={output_file_path or '<none>'}, "
+        f"file_is_empty={file_is_empty}. CB note: {cb_note or '(no note)'}"
     )
     new_raw = json.dumps(
-        {"status": "error", "error": {"type": "CBPostStepMismatch", "message": failure_reason}},
+        {
+            "status": "error",
+            "error": {
+                "type": "CBPostCheckFailed",
+                "message": failure_reason,
+                "cb_note": cb_note,
+                "file_path": output_file_path,
+                "file_is_empty": file_is_empty,
+                "actual_tool_output_preview": raw_preview,
+            },
+        },
         ensure_ascii=False,
     )
     return VerifyResult(
