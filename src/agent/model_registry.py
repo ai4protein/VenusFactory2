@@ -309,7 +309,10 @@ def list_user_key_providers() -> dict[str, bool]:
 
     "has_key" = TRUE if the provider has either:
       - a key stored in ~/.venusfactory/keys.json, OR
-      - any model/gateway under this provider whose api_key_env var is non-empty.
+      - any model/gateway under this provider whose api_key_env var is non-empty, OR
+      - an active gateway (CHAT_FORCE_GATEWAY) holds a key and routes this provider's
+        models — mirrors resolve_endpoint(), which dispatches such calls through the
+        gateway using the gateway's key.
     The UI uses this to decide whether to prompt the user for a key.
     """
     models = list(_load_models().values())
@@ -329,12 +332,36 @@ def list_user_key_providers() -> dict[str, bool]:
         if gw.api_key_env:
             env_by_provider.setdefault(gw.id, set()).add(gw.api_key_env)
 
+    # Gateway propagation: when an active gateway holds a key, every provider whose
+    # model is routed through it inherits has_key (matches resolve_endpoint()).
+    gateway_lifted: set[str] = set()
+    active_gw_id = get_active_gateway()
+    if active_gw_id:
+        active_gw = next((g for g in gateways if g.id == active_gw_id), None)
+        if active_gw is not None:
+            gw_has_key = bool(stored.get(active_gw.id)) or (
+                bool(active_gw.api_key_env)
+                and bool(os.getenv(active_gw.api_key_env, "").strip())
+            )
+            if gw_has_key:
+                models_by_id = {m.id: m for m in models}
+                for aliased_model_id in (active_gw.model_aliases or {}).keys():
+                    m = models_by_id.get(aliased_model_id)
+                    if m and m.provider:
+                        gateway_lifted.add(m.provider)
+                for em in active_gw.extra_models or []:
+                    if em.provider:
+                        gateway_lifted.add(em.provider)
+
     result: dict[str, bool] = {}
     for p in sorted(providers):
         if stored.get(p):
             result[p] = True
             continue
         if any(os.getenv(var, "").strip() for var in env_by_provider.get(p, set())):
+            result[p] = True
+            continue
+        if p in gateway_lifted:
             result[p] = True
             continue
         result[p] = False
