@@ -444,6 +444,18 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     localStorage.setItem(CUSTOM_MODELS_STORAGE_KEY, JSON.stringify(customModels));
   }, [customModels]);
 
+  // Cleanup pass: if any customModel id collides with a built-in registry id,
+  // drop it — those are stale entries from the older race-condition bug where
+  // rememberModelFromSession ran before the registry loaded.
+  useEffect(() => {
+    if (!registry.data || !Array.isArray(registry.data.models)) return;
+    const builtinIds = new Set(registry.data.models.map((m) => m.id));
+    setCustomModels((prev) => {
+      const cleaned = prev.filter((m) => !builtinIds.has(m.id));
+      return cleaned.length === prev.length ? prev : cleaned;
+    });
+  }, [registry.data]);
+
   useEffect(() => {
     void bootstrapSession();
   }, []);
@@ -655,7 +667,11 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   function rememberModelFromSession(modelName: string) {
     const normalized = (modelName || "").trim();
     if (!normalized) return;
-    const registryIds = new Set((registry.data?.models || []).map((m) => m.id));
+    // Skip if the registry hasn't loaded yet: otherwise every built-in model id
+    // would be misclassified as "custom" (race with bootstrapSession), which
+    // makes the next send payload carry custom_model_id and get 403'd in online mode.
+    if (!registry.data || !Array.isArray(registry.data.models)) return;
+    const registryIds = new Set(registry.data.models.map((m) => m.id));
     if (registryIds.has(normalized)) return;
     setCustomModels((prev) => {
       if (prev.some((item) => item.modelName === normalized || item.label === normalized)) return prev;
