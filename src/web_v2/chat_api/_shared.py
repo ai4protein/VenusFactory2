@@ -157,6 +157,8 @@ def _snapshot(state: dict[str, Any]) -> dict[str, Any]:
         "clarification_questions": list(state.get("clarification_questions", [])),
         "plan": list(state.get("plan", [])),
         "waiting_for": waiting_for_str,
+        # kimi security policy: tool calls our policy refused (most recent last)
+        "security_events": _redact_obj(list(state.get("security_events", []))),
     }
 
 

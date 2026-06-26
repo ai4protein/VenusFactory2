@@ -35,6 +35,11 @@ class ChatStreamRequest(BaseModel):
     attachment_paths: list[str] = Field(default_factory=list)
     custom_model_config: dict[str, str] = Field(default_factory=dict)
     custom_model_id: str = Field(default="")
+    # "graph" = legacy LangGraph PI/CB/MLS/SC pipeline (default for back-compat).
+    # "kimi-code" = route the turn through the local kimi-code daemon.
+    # The model-registry entry for the selected model may override this
+    # (see messages.py: any model with engine="kimi-code" forces the kimi path).
+    engine: Optional[str] = Field(default=None)
 
 
 class ClarificationAnswer(BaseModel):
