@@ -16,6 +16,7 @@ from fastapi import HTTPException, Request
 
 from web.utils.common_utils import redact_path_text
 from web_v2.analytics_store import analytics_store
+from web_v2.redact import redact_for_frontend
 
 from web_v2.chat_api._hooks_runtime import (
     _ONLINE_DAILY_CHAT_LIMIT,
@@ -133,13 +134,42 @@ def _to_json(data: dict[str, Any]) -> str:
     return json.dumps(data, ensure_ascii=False, default=str)
 
 
+# Dict keys whose values must always be redacted (mirrors web_v2.redact
+# logic) — duplicated here to keep _redact_obj self-contained and avoid an
+# import cycle with the recursive walker.
+_SECRET_KEY_NAMES_LOWER = frozenset({
+    "api_key", "apikey", "api-key",
+    "secret", "secret_key", "secret-key",
+    "access_token", "access-token", "refresh_token", "refresh-token",
+    "bearer", "password", "passwd",
+    "private_key", "private-key", "client_secret", "client-secret",
+    "openai_api_key", "anthropic_api_key", "deepseek_api_key",
+    "moonshot_api_key", "google_api_key", "hf_token", "huggingface_token",
+    "aws_access_key_id", "aws_secret_access_key", "aws_session_token",
+    "github_token", "gh_token",
+})
+
+
 def _redact_obj(value: Any) -> Any:
+    """Snapshot redaction: project-root → ".", host topology → marker,
+    API-key values → [REDACTED]. Walks dict/list recursively; dict values
+    keyed by a secret-shaped name are unconditionally redacted (covers
+    JSON tool outputs where key and value are separate strings)."""
     if isinstance(value, dict):
-        return {k: _redact_obj(v) for k, v in value.items()}
+        out: dict[Any, Any] = {}
+        for k, v in value.items():
+            if (isinstance(k, str) and isinstance(v, str)
+                    and k.lower().replace("-", "_") in _SECRET_KEY_NAMES_LOWER):
+                out[k] = "[REDACTED]" if v else v
+            else:
+                out[k] = _redact_obj(v)
+        return out
     if isinstance(value, list):
         return [_redact_obj(v) for v in value]
     if isinstance(value, str):
-        return redact_path_text(value)
+        # Project-root → "." first (most readable for known paths), then
+        # generic /home/X / key-value redaction picks up the rest.
+        return redact_for_frontend(redact_path_text(value))
     return value
 
 
