@@ -61,6 +61,10 @@ class ModelSpec:
     max_output_tokens: int = 8192
     requires_adapter: bool = False
     hidden: bool = False
+    # Which chat backend handles this model:
+    #   "graph"     → legacy LangGraph PI/CB/MLS/SC pipeline (default).
+    #   "kimi-code" → routed through the local kimi-code daemon.
+    engine: str = "graph"
 
     def to_public_dict(self) -> dict[str, Any]:
         """JSON-serializable dict for /api/models endpoint (no keys)."""
@@ -77,6 +81,7 @@ class ModelSpec:
             "max_context_tokens": self.max_context_tokens,
             "max_output_tokens": self.max_output_tokens,
             "requires_adapter": self.requires_adapter,
+            "engine": self.engine,
         }
 
 

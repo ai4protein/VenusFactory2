@@ -46,6 +46,10 @@ _PERSISTABLE_KEYS: frozenset[str] = frozenset({
     "default_llm_api_key", "default_llm_base_url", "default_llm_model_name",
     # custom model
     "active_custom_model_id",
+    # kimi-code engine: 1:1 mapping to a kimi server session
+    "kimi_session_id",
+    # Security audit trail: kimi tool-call approvals our policy refused
+    "security_events",
 })
 
 # Special: protein_context is serialized via ProteinContextManager.serialize()
