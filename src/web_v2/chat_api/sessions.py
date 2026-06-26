@@ -133,6 +133,49 @@ async def delete_session(session_id: str, request: Request):
     return {"success": True, "session_id": session_id}
 
 
+@router.get("/sessions/{session_id}/files")
+async def list_session_files(session_id: str, request: Request):
+    """List every file under this session's working directory.
+
+    Used by the frontend's session files panel. Returns paths relative to
+    `agent_session_dir` plus size + mtime so the UI can render a tree and
+    link each entry through `/api/files/inline?path=...` for inline preview.
+    """
+    import os as _os
+    _record_access_event(request, "/api/chat/sessions/{id}/files")
+    state = await _get_session_or_404(session_id)
+    _assert_session_access(state, request)
+    sdir = state.get("agent_session_dir") or ""
+    if not sdir or not _os.path.isdir(sdir):
+        return {"session_dir": sdir, "files": []}
+
+    files: list[dict[str, Any]] = []
+    max_entries = 500
+    # Sort by mtime desc so newest artifacts surface first.
+    for dirpath, _dirs, filenames in _os.walk(sdir):
+        for name in filenames:
+            full = _os.path.join(dirpath, name)
+            try:
+                st = _os.stat(full)
+            except OSError:
+                continue
+            rel = _os.path.relpath(full, sdir)
+            files.append({
+                "name": name,
+                "rel": rel,
+                "abs": full,
+                "size": st.st_size,
+                "mtime": st.st_mtime,
+                "ext": _os.path.splitext(name)[1].lower().lstrip("."),
+            })
+            if len(files) >= max_entries:
+                break
+        if len(files) >= max_entries:
+            break
+    files.sort(key=lambda f: f["mtime"], reverse=True)
+    return {"session_dir": sdir, "files": files}
+
+
 @router.post("/sessions/{session_id}/cancel")
 async def cancel_session_run(session_id: str, request: Request):
     _record_access_event(request, "/api/chat/sessions/{id}/cancel")
