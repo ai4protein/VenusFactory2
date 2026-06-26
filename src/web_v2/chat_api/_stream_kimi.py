@@ -19,6 +19,9 @@ from agent.kimi_client import KimiAPIError, KimiClient, KimiEvent
 from agent.kimi_daemon import base_url as kimi_base_url
 from agent.kimi_mcp_config import VENUSFACTORY_MCP_NAME
 from agent.kimi_security import decide as kimi_security_decide
+from agent.kimi_session_pool import (
+    PoolExhaustedError, SpawnError, get_pool as get_kimi_pool,
+)
 from config import get_config
 from logger import get_logger
 
@@ -292,7 +295,48 @@ async def _stream_kimi(
     state["status"] = "started"
     yield f"event: state\ndata: {_to_json(_snapshot(state))}\n\n"
 
-    client = KimiClient(base_url=kimi_base_url())
+    # In ONLINE mode, every chat session gets its own sandboxed kimi instance
+    # via the per-session pool (UID isolation, bind-mounted /workspace, capped
+    # concurrency). In LOCAL mode we use the single shared daemon spawned at
+    # api_server startup — simpler for dev, same daemon already running.
+    mode = get_config().server.mode or "local"
+    if mode == "online":
+        pool = get_kimi_pool()
+        try:
+            inst = await pool.acquire(session_id)
+        except PoolExhaustedError as exc:
+            yield _make_error_evt(
+                f"Server at capacity: {exc}. Please retry in a few minutes.",
+                code="pool_exhausted",
+            )
+            state["status"] = "error"
+            state["error"] = "pool_exhausted"
+            await _session_store.save(session_id)
+            yield f"event: state\ndata: {_to_json(_snapshot(state))}\n\n"
+            yield "event: done\ndata: {}\n\n"
+            return
+        except SpawnError as exc:
+            yield _make_error_evt(
+                f"Failed to spawn isolated kimi instance: {exc}",
+                code="spawn_failed",
+            )
+            state["status"] = "error"
+            state["error"] = "spawn_failed"
+            await _session_store.save(session_id)
+            yield f"event: state\ndata: {_to_json(_snapshot(state))}\n\n"
+            yield "event: done\ndata: {}\n\n"
+            return
+        # If pool GC stopped the previous instance, kimi_session_id from
+        # state points at a dead kimi server. Clear it so _ensure_kimi_session
+        # creates a fresh kimi-side session in the new instance.
+        if state.get("_pool_scope") and state.get("_pool_scope") != inst.scope_name:
+            state["kimi_session_id"] = ""
+        state["_pool_scope"] = inst.scope_name
+        client_base_url = inst.base_url
+    else:
+        client_base_url = kimi_base_url()
+
+    client = KimiClient(base_url=client_base_url)
     try:
         # Lazy create / verify kimi session
         try:
