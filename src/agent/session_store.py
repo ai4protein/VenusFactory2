@@ -50,6 +50,9 @@ _PERSISTABLE_KEYS: frozenset[str] = frozenset({
     "kimi_session_id",
     # Security audit trail: kimi tool-call approvals our policy refused
     "security_events",
+    # Forced response language ("en" | "zh") pinned from the UI locale.
+    # Persisted so retries / reloads inherit the same language policy.
+    "user_lang",
 })
 
 # Special: protein_context is serialized via ProteinContextManager.serialize()
