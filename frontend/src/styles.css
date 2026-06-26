@@ -2898,6 +2898,898 @@ button:disabled {
   font-size: 0.88rem;
 }
 
+/* ── kimi-code thinking block (collapsible reasoning) ──
+ * Same indent + max-width as an assistant bubble so it sits visually
+ * inside the message column instead of bleeding to the page edge.
+ */
+.chat-thinking-block {
+  margin: 4px 0 4px 48px;
+  max-width: min(75%, 720px);
+  padding: 6px 10px;
+  border-left: 2px solid #8b9dc3;
+  background: rgba(139, 157, 195, 0.05);
+  border-radius: 4px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+.chat-thinking-block > summary {
+  cursor: pointer;
+  user-select: none;
+  font-weight: 500;
+  color: var(--muted);
+  list-style: none;
+  outline: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.chat-thinking-block > summary::-webkit-details-marker { display: none; }
+.chat-thinking-block > summary::before {
+  content: "▸";
+  display: inline-block;
+  width: 1em;
+  transition: transform 0.15s ease;
+  color: #8b9dc3;
+}
+.chat-thinking-block[open] > summary::before {
+  transform: rotate(90deg);
+}
+.chat-thinking-icon {
+  font-size: 1rem;
+  filter: grayscale(0.2);
+}
+.chat-thinking-label {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
+.chat-thinking-block .chat-msg-body {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+.chat-thinking-block .chat-msg-body p {
+  margin: 0.25em 0;
+}
+.chat-thinking-block .chat-msg-body pre {
+  font-size: 0.72rem;
+  background: rgba(255,255,255,0.6);
+  padding: 6px 8px;
+  padding-top: 6px;
+}
+
+/* ── Markdown code block: language label + tighter look ── */
+.chat-msg-body pre {
+  position: relative;
+  background: #f6f8fa;
+  border: 1px solid #e1e4e8;
+  border-radius: 6px;
+  padding: 12px 14px;
+  padding-top: 28px;            /* room for lang label */
+  overflow-x: auto;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+.chat-msg-body pre > code {
+  background: transparent;
+  padding: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.code-lang-label {
+  position: absolute;
+  top: 6px;
+  left: 12px;
+  font-size: 0.7rem;
+  color: #6e7781;
+  text-transform: lowercase;
+  font-weight: 500;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.02em;
+  user-select: none;
+}
+/* the code-copy-btn is injected by ChatMessageBody at runtime */
+.code-copy-btn {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  background: rgba(255,255,255,0.9);
+  border: 1px solid #d0d7de;
+  color: #57606a;
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.chat-msg-body pre:hover .code-copy-btn { opacity: 1; }
+
+/* ── Markdown tables: wrap in horizontal-scroll ── */
+.md-table-scroll {
+  overflow-x: auto;
+  margin: 8px 0;
+  border: 1px solid #e1e4e8;
+  border-radius: 6px;
+}
+.md-table-scroll > table {
+  margin: 0;
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.88rem;
+}
+.md-table-scroll th,
+.md-table-scroll td {
+  padding: 6px 12px;
+  border-bottom: 1px solid #eaecef;
+  text-align: left;
+  white-space: nowrap;
+}
+.md-table-scroll th {
+  background: #f6f8fa;
+  font-weight: 600;
+}
+.md-table-scroll tr:last-child td { border-bottom: 0; }
+
+/* ── Security policy banner (backend-denied tool calls) ── */
+.chat-security-banner {
+  margin: 8px 0 4px 48px;
+  padding: 8px 14px;
+  background: rgba(255, 220, 130, 0.18);
+  border: 1px solid rgba(214, 158, 46, 0.45);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: #7c4a00;
+}
+.chat-security-banner > summary {
+  cursor: pointer;
+  user-select: none;
+  font-weight: 500;
+  list-style: none;
+  outline: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.chat-security-banner > summary::-webkit-details-marker { display: none; }
+.chat-security-banner > summary::before {
+  content: "▸";
+  display: inline-block;
+  width: 1em;
+  color: #d69e2e;
+  transition: transform 0.15s ease;
+}
+.chat-security-banner[open] > summary::before { transform: rotate(90deg); }
+.chat-security-icon { font-size: 1rem; }
+.chat-security-body { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+.chat-security-item {
+  padding: 6px 10px;
+  background: rgba(255,255,255,0.55);
+  border: 1px solid rgba(214, 158, 46, 0.3);
+  border-radius: 4px;
+}
+.chat-security-item-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+}
+.chat-security-item-head code {
+  background: transparent;
+  padding: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #6b3a00;
+  font-weight: 600;
+}
+.chat-security-item-ts { color: #8a6a2a; font-size: 0.75rem; margin-left: auto; }
+.chat-security-item-reason { margin-top: 3px; color: #6b3a00; }
+.chat-security-item-input {
+  margin: 4px 0 0;
+  padding: 6px 8px;
+  background: rgba(0,0,0,0.04);
+  border-radius: 4px;
+  font-size: 0.72rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 80px;
+  overflow-y: auto;
+  color: #5a3000;
+}
+.chat-security-more { font-size: 0.78rem; color: #8a6a2a; font-style: italic; }
+
+/* ── Stop button: prominent while a run is in flight ── */
+.btn-stop { display: inline-flex; align-items: center; gap: 6px; }
+.btn-stop-square {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  background: currentColor;
+  border-radius: 1px;
+}
+.btn-stop-active {
+  background: #fff1f0 !important;
+  border-color: #ff6b6b !important;
+  color: #c0392b !important;
+  animation: btn-stop-pulse 1.6s ease-in-out infinite;
+}
+.btn-stop-active:hover:not(:disabled) {
+  background: #ffe2e0 !important;
+  border-color: #e0383d !important;
+}
+@keyframes btn-stop-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 107, 107, 0.35); }
+  50%      { box-shadow: 0 0 0 4px rgba(255, 107, 107, 0); }
+}
+
+/* ── Per-message inline retry icon (latest assistant only) ── */
+.chat-msg-retry-btn {
+  all: unset;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  color: #6e7781;
+  opacity: 0.7;
+  transition: background 0.12s, color 0.12s, opacity 0.12s;
+}
+.chat-msg-retry-btn:hover { background: rgba(0,0,0,0.05); color: #24292f; opacity: 1; }
+.chat-msg-retry-btn:disabled { opacity: 0.3; cursor: default; }
+
+/* ── Tool execution cards (kimi MCP / Bash calls — running, ok, error) ── */
+
+/* Three containers:
+ *   .chat-msg-tools     — DEPRECATED inline-in-bubble layout (kept for any
+ *                         legacy use); tool cards are no longer in here
+ *   .chat-tools-row     — SEPARATE row below each chat-msg, aligned to the
+ *                         same column the message bubble uses (avatar gutter)
+ *   .chat-tool-card-list — bottom catch-all for stranded tools
+ */
+.chat-msg-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.chat-tools-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 8px 48px;          /* match assistant bubble indent (avatar + gap) */
+  max-width: min(75%, 720px);    /* match bubble width cap */
+}
+.chat-tools-row.user {
+  margin-left: auto;
+  margin-right: 48px;            /* avatar on the right side instead */
+  align-items: flex-end;
+}
+.chat-tool-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0 4px 48px;
+}
+
+/* tool-card-media-count: small pill next to the tool name in collapsed
+ *                       header when there are renderable outputs */
+.tool-card-media-count {
+  font-size: 0.7rem;
+  padding: 1px 6px;
+  background: rgba(45, 164, 78, 0.12);
+  color: #2da44e;
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Media inside a tool card */
+.tool-card-media-strip {
+  padding: 8px 12px 10px;
+  border-top: 1px solid #e1e4e8;
+  background: #f6f8fa;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.tool-card-media-more {
+  font-size: 0.78rem;
+  color: #6e7781;
+  font-style: italic;
+  cursor: pointer;
+  padding: 2px 6px;
+}
+.tool-card-media-more:hover { color: #24292f; text-decoration: underline; }
+
+.tool-card-media-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tool-media {
+  background: #ffffff;
+  border: 1px solid #e1e4e8;
+  border-radius: 4px;
+  padding: 6px;
+  margin: 0;
+}
+.tool-media-image img {
+  max-width: 100%;
+  max-height: 360px;
+  display: block;
+  margin: 0 auto;
+  object-fit: contain;
+}
+.tool-media-image figcaption,
+.tool-media-html figcaption {
+  font-size: 0.74rem;
+  color: #6e7781;
+  margin-top: 4px;
+  text-align: center;
+  word-break: break-all;
+}
+.tool-media-html iframe {
+  width: 100%;
+  height: 360px;
+  border: 0;
+  background: #fff;
+}
+.tool-media-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font-size: 0.82rem;
+  background: #ffffff;
+  border: 1px solid #d0d7de;
+  border-radius: 4px;
+  text-decoration: none;
+}
+.tool-media-link a {
+  color: #0969da;
+  text-decoration: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  word-break: break-all;
+}
+.tool-media-link a:hover { text-decoration: underline; }
+.tool-media-icon { font-size: 0.95rem; }
+.tool-card {
+  border: 1px solid #e1e4e8;
+  border-radius: 6px;
+  background: #fafbfc;
+  overflow: hidden;
+  font-size: 0.85rem;
+}
+.tool-card-running {
+  border-color: rgba(196, 121, 58, 0.35);
+  background: rgba(196, 121, 58, 0.06);
+}
+.tool-card-ok {
+  border-color: #d0d7de;
+}
+.tool-card-error {
+  border-color: #ff8888;
+  background: rgba(255, 100, 100, 0.05);
+}
+.tool-card-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: var(--muted);
+}
+.tool-card-header:disabled { cursor: default; }
+.tool-card-header:hover:not(:disabled) {
+  background: rgba(0,0,0,0.025);
+}
+.tool-card-icon {
+  width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.tool-card-running .tool-card-icon { color: #c4793a; }
+.tool-card-ok .tool-card-icon { color: #2da44e; }
+.tool-card-error .tool-card-icon { color: #cf222e; }
+.tool-card-name {
+  background: transparent;
+  padding: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #24292f;
+}
+.tool-card-duration {
+  margin-left: auto;
+  color: #6e7781;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+.tool-card-chev {
+  margin-left: 6px;
+  color: #6e7781;
+  width: 1em;
+  text-align: right;
+}
+.tool-card-body {
+  border-top: 1px solid #e1e4e8;
+  padding: 8px 12px 10px;
+  background: #f6f8fa;
+}
+.tool-card-section { margin-top: 6px; }
+.tool-card-section:first-child { margin-top: 0; }
+.tool-card-section-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6e7781;
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+.tool-card-body pre {
+  background: #ffffff;
+  border: 1px solid #e1e4e8;
+  border-radius: 4px;
+  padding: 8px 10px;
+  margin: 0;
+  overflow-x: auto;
+  max-height: 260px;
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.tool-card-body pre > code {
+  background: transparent;
+  padding: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* ── Session files panel — matches the project's warm cream/orange palette ── */
+.session-files {
+  margin: 12px 12px 12px;
+  padding: 12px 13px 10px;
+  border-radius: 12px;
+  background: var(--bg-soft);
+  border: 1px solid var(--line-strong);
+  color: var(--text);
+  font-size: 0.82rem;
+  box-shadow: 0 1px 0 rgba(146, 133, 112, 0.06);
+}
+.session-files-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  color: var(--text);
+}
+.session-files-title {
+  font-weight: 600;
+  font-size: 0.88rem;
+  letter-spacing: 0.01em;
+  color: var(--text);
+}
+.session-files-title::before {
+  content: "📁";
+  margin-right: 6px;
+  font-size: 1rem;
+}
+.session-files-count {
+  padding: 1px 8px;
+  background: rgba(196, 121, 58, 0.16);
+  color: #c4793a;
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.72rem;
+  font-weight: 700;
+  min-width: 22px;
+  text-align: center;
+}
+.session-files-refresh {
+  all: unset;
+  margin-left: auto;
+  cursor: pointer;
+  color: var(--muted);
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.95rem;
+  transition: background 0.12s, color 0.12s;
+}
+.session-files-refresh:hover:not(:disabled) {
+  color: var(--text);
+  background: rgba(146, 133, 112, 0.12);
+}
+.session-files-refresh:disabled { opacity: 0.4; cursor: default; }
+
+/* Old single-line cwd (kept for any legacy reference); the new
+ * .session-files-cwd-block is what's actually rendered now. */
+.session-files-cwd {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin-bottom: 8px;
+  padding: 4px 8px;
+  background: rgba(146, 133, 112, 0.08);
+  border-radius: 5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl;
+  text-align: left;
+}
+
+/* Prominent "Working directory" block: label + full path + copy button.
+ * Path is shown in full (wraps) so the user can see exactly where files
+ * are being written. */
+.session-files-cwd-block {
+  margin-bottom: 10px;
+  padding: 6px 8px 7px;
+  background: rgba(146, 133, 112, 0.08);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.session-files-cwd-label {
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+.session-files-cwd-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.session-files-cwd-path {
+  flex: 1;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.7rem;
+  color: var(--text);
+  background: transparent;
+  word-break: break-all;
+  line-height: 1.4;
+  padding: 0;
+}
+.session-files-copy {
+  all: unset;
+  cursor: pointer;
+  color: var(--muted);
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+  transition: background 0.12s, color 0.12s;
+}
+.session-files-copy:hover {
+  color: var(--text);
+  background: rgba(146, 133, 112, 0.16);
+}
+
+.session-files-empty,
+.session-files-error {
+  color: var(--muted);
+  font-style: italic;
+  padding: 12px 4px 8px;
+  text-align: center;
+  font-size: 0.8rem;
+}
+.session-files-error { color: #c0392b; font-style: normal; }
+
+.session-files-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 460px;
+  overflow-y: auto;
+  margin: 0 -3px;
+}
+.session-files-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  color: var(--text);
+  text-decoration: none;
+  border-radius: 6px;
+  position: relative;
+  transition: background 0.1s;
+  /* Button reset (was <a>; now <button> for click-to-preview) */
+  background: transparent;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+  font: inherit;
+}
+.session-files-item + .session-files-item::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 36px;
+  right: 8px;
+  height: 1px;
+  background: var(--line);
+}
+.session-files-item:hover {
+  background: rgba(196, 121, 58, 0.1);
+}
+.session-files-item:hover::before,
+.session-files-item:hover + .session-files-item::before { background: transparent; }
+.session-files-icon {
+  flex-shrink: 0;
+  font-size: 1rem;
+  width: 18px;
+  text-align: center;
+}
+.session-files-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text);
+}
+.session-files-meta {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+/* Subtle scrollbar matching the warm theme */
+.session-files-list::-webkit-scrollbar { width: 6px; }
+.session-files-list::-webkit-scrollbar-thumb {
+  background: rgba(146, 133, 112, 0.35);
+  border-radius: 3px;
+}
+.session-files-list::-webkit-scrollbar-thumb:hover { background: rgba(146, 133, 112, 0.55); }
+.session-files-list::-webkit-scrollbar-track { background: transparent; }
+
+
+/* ── File preview modal ────────────────────────────────────────────────── */
+.fpm-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(40, 30, 20, 0.5);
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: fpm-fade-in 0.12s ease-out;
+}
+@keyframes fpm-fade-in {
+  from { opacity: 0; } to { opacity: 1; }
+}
+.fpm-modal {
+  background: var(--bg-soft);
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  box-shadow: 0 24px 80px rgba(40, 30, 20, 0.35);
+  width: min(1400px, 95vw);
+  height: min(900px, 92vh);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: fpm-pop 0.14s ease-out;
+}
+@keyframes fpm-pop {
+  from { transform: scale(0.97); opacity: 0; }
+  to   { transform: scale(1);    opacity: 1; }
+}
+.fpm-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg);
+  flex-shrink: 0;
+}
+.fpm-name {
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+.fpm-meta {
+  display: flex;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.fpm-open,
+.fpm-close {
+  all: unset;
+  cursor: pointer;
+  color: var(--muted);
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  transition: background 0.12s, color 0.12s;
+}
+.fpm-open:hover,
+.fpm-close:hover {
+  color: var(--text);
+  background: rgba(146, 133, 112, 0.15);
+}
+.fpm-body {
+  overflow: auto;
+  padding: 14px 16px;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Per-type renderers */
+.fpm-loading,
+.fpm-error,
+.fpm-unknown {
+  padding: 24px;
+  text-align: center;
+  color: var(--muted);
+}
+.fpm-error { color: #c0392b; }
+.fpm-unknown a { color: #c4793a; text-decoration: none; margin-top: 8px; display: inline-block; }
+.fpm-unknown a:hover { text-decoration: underline; }
+
+.fpm-image-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.fpm-image-wrap img {
+  max-width: 100%;
+  max-height: calc(92vh - 80px);   /* full modal height minus header */
+  object-fit: contain;
+  display: block;
+  margin: 0 auto;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 0 0 1px var(--line);
+}
+.fpm-iframe {
+  width: 100%;
+  height: calc(92vh - 100px);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+}
+.fpm-molstar-wrap {
+  width: 100%;
+  height: calc(92vh - 100px);
+}
+.fpm-molstar-wrap > * { width: 100%; height: 100%; }
+
+/* CSV table */
+.fpm-csv {
+  overflow-x: auto;
+}
+.fpm-csv table {
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  min-width: 100%;
+}
+.fpm-csv th,
+.fpm-csv td {
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.fpm-csv th {
+  background: var(--bg);
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+}
+.fpm-csv tr:hover td { background: rgba(196, 121, 58, 0.05); }
+.fpm-csv-truncated {
+  margin-top: 8px;
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--muted);
+  font-style: italic;
+}
+
+/* Text / markdown views — reuse chat-msg-body's markdown styling */
+.fpm-text, .fpm-md {
+  font-size: 0.85rem;
+  line-height: 1.6;
+  max-width: 100%;
+}
+.fpm-text pre, .fpm-md pre {
+  max-height: 70vh;
+  overflow: auto;
+}
+
+/* ── Older tool calls foldout ("▸ N earlier tool calls") ── */
+.tool-history-fold {
+  border: 1px dashed #d0d7de;
+  border-radius: 6px;
+  background: #fafbfc;
+  padding: 0;
+  overflow: hidden;
+}
+.tool-history-fold > summary {
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  outline: none;
+  padding: 6px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: #6e7781;
+  background: transparent;
+}
+.tool-history-fold > summary::-webkit-details-marker { display: none; }
+.tool-history-fold[open] > summary { border-bottom: 1px solid #e1e4e8; background: #f1f3f5; }
+.tool-history-fold:not([open]) > summary:hover { background: rgba(0,0,0,0.025); }
+.tool-history-icon {
+  display: inline-block;
+  width: 1em;
+  text-align: center;
+  transition: transform 0.15s ease;
+  color: #8b949e;
+}
+.tool-history-fold[open] .tool-history-icon { transform: rotate(90deg); }
+.tool-history-label { font-weight: 500; color: #57606a; }
+.tool-history-summary {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.74rem;
+  color: #8b949e;
+}
+.tool-history-body {
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #fafbfc;
+}
+
+/* spinner re-used by both tool cards and any other inline indicator */
+.chat-tool-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(196, 121, 58, 0.25);
+  border-top-color: #c4793a;
+  border-radius: 50%;
+  animation: chat-tool-spin 0.8s linear infinite;
+  display: inline-block;
+}
+@keyframes chat-tool-spin {
+  to { transform: rotate(360deg); }
+}
+
 .chat-msg.msg-status-planning .chat-msg-body {
   border-left: 3px solid #c4973a;
   padding-left: 10px;
@@ -3092,12 +3984,25 @@ button:disabled {
   padding: 10px 12px;
 }
 
-.chat-msg.with-avatar {
-  display: grid;
-  grid-template-columns: 36px 1fr;
-  gap: 10px;
-  align-items: start;
+/* ── iMessage-style chat bubbles ── */
+.chat-msg {
+  border: 0;                      /* outer wrapper has no chrome — bubble holds the chrome */
+  padding: 0;
+  background: transparent;
 }
+.chat-msg.with-avatar {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 100%;
+}
+.chat-msg.with-avatar.assistant { justify-content: flex-start; }
+/* row-reverse means the FIRST DOM child (the avatar) sits on the right; with
+ * justify-content:flex-start the cluster pins to the START (which is now the
+ * right edge thanks to the reversal). Net effect: cluster on right, avatar
+ * on far right, content bubble to its left. Using flex-end would push the
+ * cluster the other way and put it on the left edge — bug we just fixed. */
+.chat-msg.with-avatar.user      { justify-content: flex-start; flex-direction: row-reverse; }
 
 .chat-msg-avatar {
   width: 34px;
@@ -3106,18 +4011,54 @@ button:disabled {
   object-fit: cover;
   border: 1px solid rgba(143, 127, 106, 0.35);
   background: #f3eee4;
+  flex-shrink: 0;
 }
 
 .chat-msg-content {
   min-width: 0;
+  max-width: min(75%, 720px);     /* shrink to text, cap so wide screens don't stretch */
+  padding: 9px 13px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--bg-soft);     /* default — overridden per role below */
+}
+.chat-msg.user .chat-msg-content {
+  background: #d8ecff;            /* soft blue */
+  border-color: rgba(120, 170, 220, 0.45);
+  border-top-right-radius: 4px;   /* "tail" pointing toward the right-side avatar */
+}
+.chat-msg.assistant .chat-msg-content {
+  background: #fcf8f0;
+  border-top-left-radius: 4px;
 }
 
-.chat-msg.user {
-  background: rgba(255, 255, 255, 0.78);
+/* Streaming pulse — keep it but on the bubble, not the wrapper */
+.chat-msg.streaming .chat-msg-content {
+  box-shadow: 0 0 0 1px rgba(196, 121, 58, 0.18);
 }
 
-.chat-msg.assistant {
-  background: rgba(252, 248, 240, 0.85);
+/* Hide redundant role label for both sides — the avatar already identifies
+ * who's speaking. Keep timestamp + duration but show them as a subtle row.
+ */
+.chat-msg-role {
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin-bottom: 4px;
+  text-transform: none;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  opacity: 0.8;
+}
+.chat-msg.user .chat-msg-role {
+  justify-content: flex-end;
+}
+.chat-msg.assistant .chat-msg-role {
+  justify-content: flex-start;
+}
+/* Drop the role NAME visually (kimi/user) — keep only timestamp/duration */
+.chat-msg-role > :first-child:not(.chat-msg-time):not(.chat-msg-duration) {
+  display: none;
 }
 
 .chat-msg-role {
