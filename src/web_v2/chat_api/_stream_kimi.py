@@ -26,6 +26,7 @@ from web_v2.chat_api._hooks_runtime import _is_cancelled, _session_store
 from web_v2.chat_api._shared import _snapshot, _to_json
 from web_v2.chat_api._stream import _STREAM_STATE_KEYS, _finalize_after_stream  # noqa: F401
 from web_v2.chat_api._uploads import _normalize_uploaded_file
+from web_v2.redact import redact_for_frontend, redact_obj_for_frontend
 
 _logger = get_logger("chat_api.stream_kimi")
 
@@ -180,13 +181,16 @@ def _apply_event(state: dict[str, Any], ev: KimiEvent) -> list[str]:
         frames.append(f"event: token\ndata: {_to_json({'content': ev.text, 'turn_id': ev.turn_id, 'role_id': 'assistant'})}\n\n")
 
     elif ev.kind == "tool_call_start":
+        # Redact args at store time so persisted session state never holds
+        # raw key=value tokens / host paths that may have been passed in.
+        # _snapshot() also redacts on read, this is defense in depth at rest.
         tool_execs.append({
             "tool_call_id": ev.tool_call_id,
             # Write both `name` (kimi-native) and `tool_name` (legacy graph
             # convention the frontend reads). Avoids a rename across the UI.
             "name": ev.tool_name,
             "tool_name": ev.tool_name,
-            "args": ev.tool_args,
+            "args": redact_obj_for_frontend(ev.tool_args),
             "status": "running",
             "turn_id": ev.turn_id,
             "started_at": datetime.now().isoformat(),
@@ -195,16 +199,20 @@ def _apply_event(state: dict[str, Any], ev: KimiEvent) -> list[str]:
         frames.append(f"event: state\ndata: {_to_json(_snapshot(state))}\n\n")
 
     elif ev.kind == "tool_result":
+        # Same: redact tool output before it lands in state. MCP tool results
+        # are often JSON dicts with paths and occasional traceback text that
+        # may leak env vars; this catches the most common cases.
+        redacted_output = redact_obj_for_frontend(ev.tool_output)
         for te in tool_execs:
             if te.get("tool_call_id") == ev.tool_call_id:
-                te["output"] = ev.tool_output
+                te["output"] = redacted_output
                 te["status"] = "error" if ev.is_error else "ok"
                 te["finished_at"] = datetime.now().isoformat()
                 break
         else:
             tool_execs.append({
                 "tool_call_id": ev.tool_call_id,
-                "output": ev.tool_output,
+                "output": redacted_output,
                 "status": "error" if ev.is_error else "ok",
                 "turn_id": ev.turn_id,
                 "finished_at": datetime.now().isoformat(),
