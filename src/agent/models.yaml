@@ -19,9 +19,27 @@
 #   requires_adapter     true = Chat_LLM cannot currently call this directly (e.g. Anthropic /messages schema). UI may still show it but mark as needing a gateway.
 #   hidden               true = don't list in user-facing model picker (still resolvable by id)
 
-default_model: deepseek-v4-pro
+default_model: kimi-code
 
 models:
+  # ─── kimi-code (local daemon) ───────────────────────────────────────────
+  # Routed through the local `kimi server` daemon (started by api_server.py
+  # lifespan). The actual model picker is inside kimi-code; this entry just
+  # tells VenusFactory's chat router to take the kimi-code path. No HTTP
+  # base_url / api_key is used by VF for this engine.
+  - id: kimi-code
+    label: "Agent"
+    provider: kimi
+    base_url: ""
+    api_compatible: openai
+    api_key_env: ""
+    supports_tool_use: true
+    supports_json_schema: false
+    supports_prompt_caching: false
+    max_context_tokens: 200000
+    max_output_tokens: 8192
+    engine: kimi-code
+
   # ─── DeepSeek (official) ────────────────────────────────────────────────
   - id: deepseek-v4-pro
     label: DeepSeek V4 Pro
