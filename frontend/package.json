@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "dompurify": "^3.2.6",
+    "highlight.js": "^11.11.1",
     "marked": "^15.0.12",
     "molstar": "^5.8.0",
     "react": "^18.3.1",
