@@ -107,6 +107,23 @@ async def lifespan(app: FastAPI):
     except Exception:
         logger.exception("Failed to register VenusFactory MCP with kimi-code config")
 
+    # Populate kimi_security's MCP allowlist by introspecting the local
+    # FastMCP instance. Until this completes, decide() falls back to
+    # prefix matching for `mcp__venusfactory__*` (logged as a warning).
+    try:
+        from mcp_server import mcp as _vf_mcp
+        from agent.kimi_mcp_config import VENUSFACTORY_MCP_NAME
+        from agent.kimi_security import install_trusted_mcp_tools
+        tools = await _vf_mcp.list_tools()
+        prefixed = [f"mcp__{VENUSFACTORY_MCP_NAME}__{t.name}" for t in tools]
+        install_trusted_mcp_tools(prefixed)
+        logger.info("kimi_security: installed %d trusted MCP tool names", len(prefixed))
+    except Exception:
+        logger.exception(
+            "Failed to install kimi_security MCP allowlist "
+            "(will fall back to prefix match for mcp__venusfactory__*)"
+        )
+
     try:
         from agent.kimi_daemon import start_daemon as _kimi_start
         await _kimi_start()
