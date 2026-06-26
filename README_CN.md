@@ -82,6 +82,11 @@
 git clone https://github.com/AI4Protein/VenusFactory2.git && cd VenusFactory2
 conda create -n venus python=3.12 && conda activate venus
 pip install -r requirements.txt  # 详细指南见下方 ↓
+
+# 本地部署：安装 kimi-code（默认聊天引擎）
+# 参见：<https://example.com/kimi-code>  # TODO: 替换为官方仓库链接
+# 仅使用 online 模式或其他 LLM 模型时可跳过：
+#   export KIMI_EXTERNAL=1   # 或从 src/agent/models.yaml 移除 kimi-code
 ```
 
 ### 2. 构建前端（WebUI v2 必需）
