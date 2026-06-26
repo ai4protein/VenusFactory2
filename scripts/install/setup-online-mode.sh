@@ -53,6 +53,8 @@ if [[ ! -x "$HELPER_SRC" ]]; then
   echo "  ERROR: helper not found or not executable at $HELPER_SRC" >&2
   exit 2
 fi
+# /usr/local/libexec/ isn't created by default on Debian/Ubuntu.
+mkdir -p "$(dirname "$HELPER_DEST")"
 install -m 0755 -o root -g root "$HELPER_SRC" "$HELPER_DEST"
 echo "  - installed at $HELPER_DEST"
 
@@ -80,12 +82,21 @@ echo "[4/5] Preparing session root at ${SESSIONS_DIR}..."
 mkdir -p "$SESSIONS_DIR"
 chgrp venus "$SESSIONS_DIR"
 chmod 2770 "$SESSIONS_DIR"
-# default ACL so files created by DynamicUser inherit venus group + g+rw
+# Default ACL is the nicest-to-have but POSIX ACLs aren't supported on
+# many shared filesystems (NFS without acl mount option, some bind mounts).
+# The setgid bit on a 2770 dir already makes new SUBDIRS inherit the group,
+# and files inherit the group too (regardless of ACL). The ACL would only
+# add g+rwx on plain files; without it group gets default umask perms
+# which on a 0022 umask is g+r — enough for fastapi to LIST and READ files,
+# which is what /api/files/inline needs. Write happens via DynamicUser only.
 if command -v setfacl >/dev/null; then
-  setfacl -d -m g:venus:rwx "$SESSIONS_DIR"
-  echo "  - set default venus ACL on $SESSIONS_DIR"
+  if setfacl -d -m g:venus:rwx "$SESSIONS_DIR" 2>/dev/null; then
+    echo "  - set default venus ACL on $SESSIONS_DIR"
+  else
+    echo "  - setfacl unsupported on this filesystem (likely NFS) — relying on setgid bit"
+  fi
 else
-  echo "  - setfacl not found; new files won't auto-inherit g+rw (install acl: apt-get install acl)"
+  echo "  - setfacl not found; relying on setgid bit (install acl pkg if you want default ACLs)"
 fi
 # Also make sure parent dirs are traversable
 chain="${SESSIONS_DIR}"
