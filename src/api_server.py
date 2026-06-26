@@ -124,11 +124,26 @@ async def lifespan(app: FastAPI):
             "(will fall back to prefix match for mcp__venusfactory__*)"
         )
 
-    try:
-        from agent.kimi_daemon import start_daemon as _kimi_start
-        await _kimi_start()
-    except Exception:
-        logger.exception("Failed to start kimi-code daemon (kimi engine will be unavailable)")
+    # In ONLINE mode we don't spawn the shared kimi daemon — every chat
+    # session gets its own sandboxed instance via KimiSessionPool on first
+    # message. In LOCAL mode the shared daemon stays the simpler path.
+    if WEBUI_V2_MODE == "online":
+        try:
+            from agent.kimi_session_pool import get_pool as _get_kimi_pool
+            _pool = _get_kimi_pool()
+            await _pool.start_gc()
+            logger.info(
+                "kimi session pool started (cap=%d, idle_ttl=%.0fs)",
+                _pool._max, _pool._idle_ttl,
+            )
+        except Exception:
+            logger.exception("Failed to start kimi session pool (online mode will be broken)")
+    else:
+        try:
+            from agent.kimi_daemon import start_daemon as _kimi_start
+            await _kimi_start()
+        except Exception:
+            logger.exception("Failed to start kimi-code daemon (kimi engine will be unavailable)")
 
     # Long-running approval worker: drains pending kimi approvals every few
     # seconds independent of any chat stream. Without this, restarts / idle
@@ -188,11 +203,18 @@ async def lifespan(app: FastAPI):
             await _kimi_approval_stop()
         except Exception:
             logger.exception("Failed to stop kimi approval worker cleanly")
-        try:
-            from agent.kimi_daemon import stop_daemon as _kimi_stop
-            await _kimi_stop()
-        except Exception:
-            logger.exception("Failed to stop kimi-code daemon cleanly")
+        if WEBUI_V2_MODE == "online":
+            try:
+                from agent.kimi_session_pool import get_pool as _get_kimi_pool
+                await _get_kimi_pool().shutdown_all()
+            except Exception:
+                logger.exception("Failed to shut down kimi session pool cleanly")
+        else:
+            try:
+                from agent.kimi_daemon import stop_daemon as _kimi_stop
+                await _kimi_stop()
+            except Exception:
+                logger.exception("Failed to stop kimi-code daemon cleanly")
         logger.info("VenusFactory2 API server shutting down...")
 
 

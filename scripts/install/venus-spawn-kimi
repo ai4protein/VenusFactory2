@@ -1,0 +1,162 @@
+#!/bin/bash
+# Spawn one isolated kimi-code session via systemd-run with DynamicUser.
+#
+# Called by fastapi (as `tanyang`) through sudo; see sudoers fragment in
+# scripts/install/setup-online-mode.sh. Args are strictly validated so
+# the NOPASSWD sudo rule has minimal blast radius.
+#
+# Args:
+#   $1 = session_id  (uuid v4 form: 8-4-4-4-12 hex with hyphens)
+#   $2 = port        (58800-58899)
+#   $3 = session_dir (must live under <PROJECT_ROOT>/temp_outputs/web_v2/sessions/)
+#
+# Output (stdout, one key=value per line):
+#   uid=<allocated dynamic uid>
+#   scope=<systemd scope unit name>
+#
+# The script does NOT wait for kimi to be healthy — the Python pool polls
+# the healthz endpoint itself with appropriate timeout.
+set -euo pipefail
+
+SID="${1:-}"
+PORT="${2:-}"
+SDIR="${3:-}"
+
+# ── Argument validation (defense against sudo arg injection) ─────────────
+if [[ ! "$SID" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
+  echo "ERROR: bad session_id format" >&2
+  exit 2
+fi
+if [[ ! "$PORT" =~ ^588[0-9]{2}$ ]]; then
+  echo "ERROR: port must be in 58800-58899" >&2
+  exit 2
+fi
+# session_dir must be an absolute path ending with /sessions/<session_id>
+# (i.e. it matches what the Python pool builds — defense against bind-mount
+# arbitrary host paths into the sandbox)
+if [[ ! "$SDIR" =~ ^/[^[:space:]]+/temp_outputs/web_v2/sessions/${SID}$ ]]; then
+  echo "ERROR: session_dir does not match expected pattern" >&2
+  echo "       got: $SDIR" >&2
+  exit 2
+fi
+
+# ── Locate kimi binary ────────────────────────────────────────────────────
+KIMI_BIN="${KIMI_BIN:-/home/tanyang/.kimi-code/bin/kimi}"
+if [[ ! -x "$KIMI_BIN" ]]; then
+  KIMI_BIN="$(command -v kimi || true)"
+fi
+if [[ -z "$KIMI_BIN" || ! -x "$KIMI_BIN" ]]; then
+  echo "ERROR: kimi binary not found (set KIMI_BIN in env)" >&2
+  exit 3
+fi
+
+# ── Ensure session_dir exists with the right perms ────────────────────────
+# DynamicUser is in the venus group (via SupplementaryGroups below) so the
+# 2770 (rwxrws---) + group=venus lets it rwx in here, and the setgid bit
+# (the leading 2) means files it creates inherit group=venus so fastapi
+# (also in venus group) can later read them back.
+if [[ ! -d "$SDIR" ]]; then
+  mkdir -p "$SDIR"
+fi
+chgrp venus "$SDIR" || { echo "ERROR: chgrp venus failed; is the venus group created?" >&2; exit 4; }
+chmod 2770 "$SDIR"
+
+# ── Seed per-session kimi config ──────────────────────────────────────────
+# Kimi reads its provider auth + mcp config from $HOME/.kimi-code/. We
+# set HOME=/workspace below and ProtectHome=tmpfs hides the host home, so
+# we materialize a per-session copy under <SDIR>/.kimi-code/ before spawn.
+# Copy is fine here (helper runs as root via sudo NOPASSWD) — provider
+# keys land in session_dir but it's 2770 owned by a per-session UID, so
+# other sessions can't read them.
+KIMI_CONFIG_SRC="${KIMI_CONFIG_DIR:-/home/tanyang/.kimi-code}"
+if [[ -d "$KIMI_CONFIG_SRC" ]]; then
+  mkdir -p "$SDIR/.kimi-code/sessions"
+  for item in config.toml mcp.json providers credentials.json auth.json; do
+    src="$KIMI_CONFIG_SRC/$item"
+    if [[ -e "$src" ]]; then
+      cp -r "$src" "$SDIR/.kimi-code/" 2>/dev/null || true
+    fi
+  done
+  chgrp -R venus "$SDIR/.kimi-code"
+  chmod -R g+rwX "$SDIR/.kimi-code"
+  find "$SDIR/.kimi-code" -type d -exec chmod g+s {} +
+fi
+
+SCOPE="venus-kimi-${SID:0:8}-${PORT}.scope"
+
+# ── Spawn the sandboxed kimi ──────────────────────────────────────────────
+# Restrictions stacked here:
+#   DynamicUser=yes              — fresh UID/GID per scope, released on stop
+#   SupplementaryGroups=venus    — so dyn UID can rwx session_dir (group=venus)
+#   ProtectHome=tmpfs            — /home appears empty inside the sandbox
+#   BindPaths=<sdir>:/workspace  — session_dir surfaces at /workspace
+#   ProtectSystem=strict         — /usr /boot /etc are read-only
+#   PrivateTmp=yes               — fresh /tmp per scope (no cross-session)
+#   PrivateDevices=yes           — only /dev/{null,zero,full,random,...}
+#   ProtectProc=invisible        — kimi sees only its own /proc/<pid>/*
+#   ProtectKernel{Tunables,Modules}=yes
+#   ProtectControlGroups=yes
+#   NoNewPrivileges=yes          — no setuid escape inside sandbox
+#   CapabilityBoundingSet=       — empty: drops ALL caps
+#   SystemCallFilter=@system-service  ~@mount @swap @reboot
+#                                — block mount/swap/reboot syscalls
+#   RestrictNamespaces=yes       — block kimi from creating its own NS
+#
+# WorkingDirectory=/workspace + HOME=/workspace + KIMI_PORT=$PORT pinned via env.
+
+systemd-run \
+  --scope --collect --no-block \
+  --unit="$SCOPE" \
+  --property=DynamicUser=yes \
+  --property=SupplementaryGroups=venus \
+  --property=ProtectHome=tmpfs \
+  --property=ProtectSystem=strict \
+  --property=ReadWritePaths="$SDIR" \
+  --property=PrivateTmp=yes \
+  --property=PrivateDevices=yes \
+  --property=ProtectProc=invisible \
+  --property=ProcSubset=pid \
+  --property=ProtectKernelTunables=yes \
+  --property=ProtectKernelModules=yes \
+  --property=ProtectControlGroups=yes \
+  --property=ProtectClock=yes \
+  --property=ProtectHostname=yes \
+  --property=NoNewPrivileges=yes \
+  --property=CapabilityBoundingSet= \
+  --property=AmbientCapabilities= \
+  --property=RestrictNamespaces=yes \
+  --property=RestrictSUIDSGID=yes \
+  --property=RestrictRealtime=yes \
+  --property=LockPersonality=yes \
+  --property=MemoryDenyWriteExecute=no \
+  --property=SystemCallFilter="@system-service" \
+  --property=SystemCallFilter="~@mount @swap @reboot @raw-io" \
+  --property=BindPaths="$SDIR:/workspace" \
+  --property=WorkingDirectory=/workspace \
+  --property=Environment="HOME=/workspace" \
+  --property=Environment="KIMI_PORT=$PORT" \
+  --property=Environment="PATH=/usr/local/bin:/usr/bin:/bin" \
+  "$KIMI_BIN" server run --port "$PORT" --foreground \
+  > /dev/null 2>&1 || {
+    rc=$?
+    echo "ERROR: systemd-run failed (rc=$rc)" >&2
+    exit $rc
+  }
+
+# ── Wait for systemd to allocate the UID, then report ────────────────────
+# (Up to 2s — DynamicUser allocation is usually <50ms.)
+ALLOC_UID=""
+for _ in {1..40}; do
+  ALLOC_UID=$(systemctl show "$SCOPE" -p UID --value 2>/dev/null || true)
+  if [[ -n "$ALLOC_UID" && "$ALLOC_UID" != "[not set]" ]]; then
+    break
+  fi
+  sleep 0.05
+done
+
+if [[ -z "$ALLOC_UID" || "$ALLOC_UID" == "[not set]" ]]; then
+  ALLOC_UID="unknown"
+fi
+
+echo "uid=${ALLOC_UID}"
+echo "scope=${SCOPE}"
