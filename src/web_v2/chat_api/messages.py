@@ -6,6 +6,7 @@ from agent.chat_agent import (
     update_llm_model,
     update_llm_openai_style_config,
 )
+from agent.model_registry import get_model
 
 from web_v2.chat_api._hooks_runtime import (
     _BUILTIN_MODEL_LABELS,
@@ -23,8 +24,29 @@ from web_v2.chat_api._shared import (
     _session_owner_key_for_request,
 )
 from web_v2.chat_api._stream import _stream_graph
+from web_v2.chat_api._stream_kimi import _stream_kimi
 
 router = APIRouter()
+
+
+def _resolve_engine(payload_engine: str | None, model_id: str | None) -> str:
+    """Decide whether this turn runs through the kimi-code daemon or the
+    legacy LangGraph pipeline.
+
+    Precedence:
+      1. The model's registry entry. A model with `engine: kimi-code` forces
+         the kimi path regardless of the request (so the UI's model selector
+         is the single source of truth).
+      2. Explicit `engine` field on the request payload (advanced clients).
+      3. Default: "graph".
+    """
+    if model_id:
+        spec = get_model(model_id)
+        if spec is not None and (spec.engine or "graph") == "kimi-code":
+            return "kimi-code"
+    if payload_engine in ("kimi-code", "graph"):
+        return payload_engine
+    return "graph"
 
 
 @router.post("/sessions/{session_id}/messages/stream")
@@ -60,12 +82,19 @@ async def stream_message(session_id: str, payload: ChatStreamRequest, request: R
     elif payload.model in _BUILTIN_MODEL_LABELS:
         state["active_custom_model_id"] = ""
     if payload.model:
-        update_llm_model(payload.model, state)
+        # Skip LLM hot-swap for kimi-code engine — kimi manages its own model
+        # selection internally and trying to instantiate a LangChain LLM for
+        # the "kimi-code" pseudo-model fails.
+        engine_for_swap = _resolve_engine(payload.engine, payload.model)
+        if engine_for_swap != "kimi-code":
+            update_llm_model(payload.model, state)
     lock = await _get_lock(session_id)
+    engine = _resolve_engine(payload.engine, payload.model)
+    streamer = _stream_kimi if engine == "kimi-code" else _stream_graph
 
     async def event_gen():
         async with lock:
-            async for chunk in _stream_graph(
+            async for chunk in streamer(
                 state,
                 payload.text or "",
                 payload.attachment_paths or [],
@@ -91,9 +120,16 @@ async def stream_retry(session_id: str, request: Request):
     if not last_text and not last_paths:
         raise HTTPException(status_code=400, detail="No previous user message to retry.")
 
+    # On retry we don't have a fresh payload; re-derive the engine from the
+    # currently-active model so retries use the same backend as the original.
+    llm = state.get("llm")
+    model_id = getattr(llm, "model_name", "") if llm is not None else ""
+    engine = _resolve_engine(None, model_id)
+    streamer = _stream_kimi if engine == "kimi-code" else _stream_graph
+
     async def event_gen():
         async with lock:
-            async for chunk in _stream_graph(state, last_text, last_paths):
+            async for chunk in streamer(state, last_text, last_paths):
                 yield chunk
 
     return StreamingResponse(event_gen(), media_type="text/event-stream")
