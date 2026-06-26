@@ -6,6 +6,11 @@ export type ChatHistoryItem = {
    * Set by backend graph nodes so the frontend can detect a placeholder without
    * matching localized substrings. */
   phase?: string;
+  /** kimi-code engine writes message kind. "thinking" → collapsible reasoning
+   * block rendered above the answer; "text" (or undefined) → regular message. */
+  kind?: "text" | "thinking";
+  /** Optional kimi turn id; used to group thinking + text from the same turn. */
+  turn_id?: string;
 };
 
 export type ClarificationQuestion = {
@@ -27,6 +32,14 @@ export type PlanStep = {
   tool_input: Record<string, unknown>;
 };
 
+export type SecurityEvent = {
+  ts: string;
+  tool: string;
+  action: string;
+  reason: string;
+  input_preview: string;
+};
+
 export type ChatSnapshot = {
   session_id: string;
   model_name: string;
@@ -38,6 +51,7 @@ export type ChatSnapshot = {
   clarification_questions: ClarificationQuestion[];
   plan: PlanStep[];
   waiting_for: string;
+  security_events?: SecurityEvent[];
 };
 
 export type ChatQuota = {

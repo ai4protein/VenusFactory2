@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChatTimeline } from "../components/ChatTimeline";
+import { SessionFilesPanel } from "../components/SessionFilesPanel";
 import { PipelineProgress } from "../components/PipelineProgress";
 import { ClarificationForm } from "../components/ClarificationForm";
 import { IterationDecision } from "../components/IterationDecision";
@@ -753,12 +754,34 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
           if (!prev) return prev;
           const history = [...prev.history];
           const last = history[history.length - 1];
-          if (last && last.role === "assistant") {
+          // kimi-code may have pushed a `kind:"thinking"` block right before
+          // the answer text — never merge text deltas into the thinking
+          // block. Append to the last assistant TEXT message, or push a new
+          // one if the tail is a user / thinking message.
+          if (last && last.role === "assistant" && last.kind !== "thinking") {
             history[history.length - 1] = { ...last, content: last.content + token.content };
             setStreamingIdx(history.length - 1);
           } else {
-            history.push({ role: "assistant", content: token.content || "", role_id: token.role_id });
+            history.push({ role: "assistant", content: token.content || "", role_id: token.role_id, kind: "text" });
             setStreamingIdx(history.length - 1);
+          }
+          return { ...prev, history };
+        });
+      }
+    } else if (event === "thinking" && data) {
+      // kimi-code reasoning stream: accumulate into a dedicated
+      // `kind:"thinking"` assistant message so the timeline can render it
+      // as a collapsible block above the final answer.
+      const evt = JSON.parse(data) as { content?: string; turn_id?: string };
+      if (evt.content) {
+        setSnapshot(prev => {
+          if (!prev) return prev;
+          const history = [...prev.history];
+          const last = history[history.length - 1];
+          if (last && last.role === "assistant" && last.kind === "thinking") {
+            history[history.length - 1] = { ...last, content: last.content + evt.content };
+          } else {
+            history.push({ role: "assistant", content: evt.content || "", kind: "thinking", turn_id: evt.turn_id });
           }
           return { ...prev, history };
         });
@@ -1108,11 +1131,27 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   };
   const modelOptions: ModelOption[] = [
     ...registryModels.map((m) => {
+      // kimi-code manages its own provider auth via the local daemon, so our
+      // own key_status / requires_adapter checks don't apply. Use the
+      // backend-provided `disabled` / `disabled_reason` directly.
+      if (m.engine === "kimi-code") {
+        return {
+          value: m.id,
+          label: m.label,
+          disabled: m.disabled === true,
+          title: m.disabled ? (m.disabled_reason || "") : t.titleModelInfo(m.label, m.provider),
+          provider: m.provider,
+          requiresAdapter: false,
+          hasKey: true,
+        };
+      }
       const hasKey = keyStatus[m.provider] === true;
       const requiresAdapter = m.requires_adapter === true;
       const adapterReady = requiresAdapter ? Boolean(registry.data?.active_gateway) : true;
-      const disabled = requiresAdapter && !adapterReady;
-      const title = disabled
+      const disabled = (requiresAdapter && !adapterReady) || m.disabled === true;
+      const title = m.disabled
+        ? (m.disabled_reason || t.titleGatewayRequired)
+        : requiresAdapter && !adapterReady
         ? t.titleGatewayRequired
         : !hasKey
         ? t.titleMissingKey(m.provider)
@@ -1283,47 +1322,21 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
 
   return (
     <div className="chat-page">
-      <header className="chat-header">
-        <div>
-          <div className="chat-header-title-row">
-            <h2>{t.chat}</h2>
-            {chatQuota?.enforced && (
+      {chatQuota?.enforced && (
+        <header className="chat-header chat-header-slim">
+          <div>
+            <div className="chat-header-title-row">
               <span
                 className="chat-mode-online-pill"
                 title={t.modeOnlineTooltip(chatQuota.limit ?? 10)}
               >
                 {t.modeOnline}
               </span>
-            )}
+            </div>
+            <p className="chat-online-local-hint">{t.onlineLocalHint}</p>
           </div>
-          {chatQuota?.enforced && (
-            <p className="chat-online-local-hint">
-              {t.onlineLocalHint}
-            </p>
-          )}
-        </div>
-        <div className="chat-header-actions">
-          <div className={`run-status-bar ${runStatus}`}>
-            <span className="run-status-dot" />
-            <span className="run-status-text">
-              {runStatus === "running" && t.running}
-              {runStatus === "stopping" && t.stopping}
-              {runStatus === "stopped" && t.stopped}
-            </span>
-          </div>
-          <button onClick={() => void fetchSessions()}>{t.refresh}</button>
-          {hasReportData && (
-            <button
-              className="report-download-btn"
-              onClick={() => void handleDownloadReport()}
-              disabled={running}
-              title={t.reportTooltip}
-            >
-              {t.report}
-            </button>
-          )}
-        </div>
-      </header>
+        </header>
+      )}
 
       <section className={`chat-grid${sessionsCollapsed ? " left-collapsed" : ""}${logsCollapsed ? " right-collapsed" : ""}`}>
         <aside
@@ -1387,20 +1400,6 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         <section className="chat-panel center">
           <div className="timeline-wrap" ref={timelineRef}>
             <div className="timeline-sticky-header">
-              {snapshot && !pipelineDismissed && snapshot.status && snapshot.status !== "idle" && (
-                <div className="pipeline-wrap">
-                  <PipelineProgress
-                    status={snapshot.status}
-                    plan={snapshot.plan || []}
-                    toolExecutions={snapshot.tool_executions || []}
-                  />
-                  <button
-                    className="pipeline-dismiss"
-                    onClick={() => setPipelineDismissed(true)}
-                    title={t.pipelineDismiss}
-                  >&times;</button>
-                </div>
-              )}
               {(snapshot?.history?.length ?? 0) > 0 && (
                 <div className="timeline-toolbar">
                   <button
@@ -1431,6 +1430,10 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
               onSuggestedPrompt={(text) => setMessage(text)}
               sessionId={sessionId}
               searchQuery={searchQuery}
+              toolExecutions={snapshot?.tool_executions || []}
+              securityEvents={snapshot?.security_events || []}
+              onRetry={() => void retryLastMessage()}
+              retryDisabled={running || quotaExhausted}
               onQuoteReply={(text) => {
                 const lines = text.split("\n").slice(0, 3);
                 const quoted = lines.map((l) => `> ${l}`).join("\n");
@@ -1650,8 +1653,13 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
               <button className="btn-secondary" onClick={() => void exportCurrentSession()} disabled={running || !sessionId}>
                 {t.export}
               </button>
-              <button className="btn-secondary" onClick={abortRun} disabled={!running}>
-                {t.stop}
+              <button
+                className={`btn-secondary btn-stop${running ? " btn-stop-active" : ""}`}
+                onClick={abortRun}
+                disabled={!running}
+                title="Stop the current run"
+              >
+                <span className="btn-stop-square" aria-hidden="true" /> {t.stop}
               </button>
               <button className="btn-primary" onClick={() => void sendMessage()} disabled={running || quotaExhausted} title={sendTooltip}>
                 {running ? t.runningEllipsis : t.send}
@@ -1783,6 +1791,15 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
               )}
             </div>
           )}
+          {/* Always visible — pulled out of the collapsible term-body so the
+              session's working directory stays in view even when the user
+              hides the terminal log. */}
+          <SessionFilesPanel
+            sessionId={sessionId}
+            authHeaders={sessionId ? getChatSessionAuthHeaders(sessionId) : undefined}
+            liveRefresh={running}
+            pollMs={5000}
+          />
         </aside>
       </section>
       {showCustomModelModal && isLocalMode && (

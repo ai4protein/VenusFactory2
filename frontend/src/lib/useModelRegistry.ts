@@ -13,6 +13,12 @@ export type ModelSpec = {
   max_context_tokens: number;
   max_output_tokens: number;
   requires_adapter: boolean;
+  /** "graph" (legacy LangGraph pipeline) or "kimi-code" (local kimi daemon). */
+  engine?: string;
+  /** Backend may set these to gate a model that is not currently usable
+   * (e.g., kimi-code with no provider configured). */
+  disabled?: boolean;
+  disabled_reason?: string;
 };
 
 export type GatewaySpec = {

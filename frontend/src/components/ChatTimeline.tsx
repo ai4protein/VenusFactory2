@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState, useCallback } from "react";
-import DOMPurify from "dompurify";
-import { marked } from "marked";
-import type { ChatHistoryItem } from "../lib/api";
+import { Fragment, useEffect, useRef, useState, useCallback } from "react";
+import type { ChatHistoryItem, SecurityEvent } from "../lib/api";
 import { submitFeedback } from "../lib/api";
+import { renderMarkdown } from "../lib/markdown";
+import { ToolExecutionCard, ToolExecutionList, type ToolExecution } from "./ToolExecutionCard";
 import { MolstarViewer } from "./MolstarViewer";
 import { useLang } from "../lib/i18n";
 
@@ -72,13 +72,6 @@ function roleAvatar(roleId: string, isUser: boolean) {
   return AVATAR_BY_ROLE[roleId] || DEFAULT_AVATAR;
 }
 
-function renderMarkdown(text: string) {
-  const html = marked.parse(text || "", { async: false }) as string;
-  return DOMPurify.sanitize(html, {
-    ADD_TAGS: ["img"],
-    ADD_ATTR: ["src", "alt", "style", "width", "height", "loading"],
-  });
-}
 
 function fallbackCopy(text: string): boolean {
   const ta = document.createElement("textarea");
@@ -371,6 +364,98 @@ function ChatMessageBody({ html }: { html: string }) {
   );
 }
 
+/**
+ * Banner listing kimi tool calls the backend security policy refused.
+ * Default closed; click summary to expand.
+ */
+function SecurityEventsBanner({ events }: { events: SecurityEvent[] }) {
+  if (events.length === 0) return null;
+  const last5 = events.slice(-5).reverse();
+  return (
+    <details className="chat-security-banner">
+      <summary>
+        <span className="chat-security-icon">🛡️</span>
+        <span className="chat-security-label">
+          {events.length === 1
+            ? "1 tool call blocked by security policy"
+            : `${events.length} tool calls blocked by security policy`}
+        </span>
+      </summary>
+      <div className="chat-security-body">
+        {last5.map((e, i) => (
+          <div key={i} className="chat-security-item">
+            <div className="chat-security-item-head">
+              <code>{e.tool}</code>
+              <span className="chat-security-item-ts">
+                {(() => {
+                  try { return new Date(e.ts).toLocaleTimeString(); }
+                  catch { return e.ts; }
+                })()}
+              </span>
+            </div>
+            <div className="chat-security-item-reason">{e.reason}</div>
+            {e.input_preview && (
+              <pre className="chat-security-item-input">{e.input_preview}</pre>
+            )}
+          </div>
+        ))}
+        {events.length > 5 && (
+          <div className="chat-security-more">…{events.length - 5} more older</div>
+        )}
+      </div>
+    </details>
+  );
+}
+
+/**
+ * Collapsible reasoning block (kimi `thinking.delta` stream).
+ * - Open by default while streaming; auto-collapses once a real answer
+ *   message follows (parent passes `defaultOpen=false` after streaming ends).
+ * - Summary shows "Thought for Xs" — the X updates live while streaming.
+ */
+function ThinkingBlock({
+  content,
+  startedAt,
+  endedAt,
+  streaming,
+  defaultOpen,
+}: {
+  content: string;
+  startedAt?: number;
+  endedAt: number | null;
+  streaming: boolean;
+  defaultOpen: boolean;
+}) {
+  // Tick once per second while streaming so the duration label stays fresh.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!streaming) return;
+    const id = window.setInterval(() => setTick((x) => x + 1), 1000);
+    return () => window.clearInterval(id);
+  }, [streaming]);
+
+  const elapsedMs =
+    startedAt != null ? (endedAt ?? Date.now()) - startedAt : null;
+  const label = (() => {
+    if (elapsedMs == null) return streaming ? "Thinking…" : "Thought";
+    const s = Math.max(0, Math.round(elapsedMs / 1000));
+    if (streaming) return `Thinking… ${s}s`;
+    if (s < 60) return `Thought for ${s}s`;
+    const m = Math.floor(s / 60);
+    return `Thought for ${m}m ${s % 60}s`;
+  })();
+
+  return (
+    <details className="chat-thinking-block" open={defaultOpen}>
+      <summary>
+        <span className="chat-thinking-icon">{streaming ? "💭" : "✦"}</span>
+        <span className="chat-thinking-label">{label}</span>
+      </summary>
+      <ChatMessageBody html={renderMarkdown(content)} />
+    </details>
+  );
+}
+
 function formatTime(ts: number): string {
   const d = new Date(ts);
   return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
@@ -406,8 +491,8 @@ const SUGGESTED_PROMPTS = [
   },
   {
     title: "Mutation Prediction",
-    desc: "Get AlphaFold structure for EGFR (P00533), predict stabilizing mutations with ESM2 and ProtSSN",
-    text: "Download AlphaFold structure for human EGFR (P00533), predict beneficial mutations with ESM2 and ProtSSN, and identify top 10 stabilizing candidates",
+    desc: "Get AlphaFold structure for myoglobin (P02185, 154 aa), predict stabilizing mutations with ESM2 and ProSST",
+    text: "Download AlphaFold structure for sperm whale myoglobin (P02185), predict beneficial mutations with ESM2 and ProSST, and identify top 10 stabilizing candidates",
   },
   {
     title: "Homolog Survey",
@@ -428,11 +513,50 @@ interface ChatTimelineProps {
   sessionId?: string;
   searchQuery?: string;
   onQuoteReply?: (text: string) => void;
+  /** Live list of tool executions; rows with status="running" render as
+   * spinner pills under the timeline so the user sees activity while a
+   * long-running MCP tool is in flight. */
+  toolExecutions?: Array<Record<string, unknown>>;
+  /** Retry the last user message; shown as an icon on the latest assistant
+   * message when the run is not in flight. */
+  onRetry?: () => void;
+  /** When true the retry button is hidden (run still in flight or quota out). */
+  retryDisabled?: boolean;
+  /** Backend-side security policy denials (kimi tool calls we refused).
+   * Rendered as a collapsible warning banner under the timeline. */
+  securityEvents?: SecurityEvent[];
 }
 
-export function ChatTimeline({ items, streamingIndex = -1, onSuggestedPrompt, sessionId, searchQuery, onQuoteReply }: ChatTimelineProps) {
+export function ChatTimeline({ items, streamingIndex = -1, onSuggestedPrompt, sessionId, searchQuery, onQuoteReply, toolExecutions = [], onRetry, retryDisabled = false, securityEvents = [] }: ChatTimelineProps) {
   const msgTimesRef = useRef<Map<number, number>>(new Map());
   const prevSessionRef = useRef<string | undefined>(undefined);
+  // Index of the last non-thinking assistant message (used to anchor the
+  // per-message Retry icon).
+  const lastAssistantIdx = items.reduce<number>(
+    (acc, it, i) => (it.role === "assistant" && it.kind !== "thinking" ? i : acc),
+    -1
+  );
+
+  // Bucket tool executions by their kimi turn_id so each turn's tools render
+  // INLINE with that turn's answer message instead of all piling up at the
+  // bottom of the chat.
+  //
+  // Some kimi events arrive with an empty turn_id (kimi's own bookkeeping is
+  // inconsistent across turns); those get collected as "orphans" and pinned
+  // to the LAST non-thinking assistant message so they still surface next to
+  // the answer they belong to instead of disappearing into a bottom dump.
+  const toolsByTurn = new Map<string, ToolExecution[]>();
+  const orphanTools: ToolExecution[] = [];
+  for (const t of toolExecutions as ToolExecution[]) {
+    const k = String(t.turn_id || "");
+    if (k) {
+      const arr = toolsByTurn.get(k);
+      if (arr) arr.push(t); else toolsByTurn.set(k, [t]);
+    } else {
+      orphanTools.push(t);
+    }
+  }
+  const usedTurnIds = new Set<string>();
 
   useEffect(() => {
     if (prevSessionRef.current !== sessionId) {
@@ -493,6 +617,34 @@ export function ChatTimeline({ items, streamingIndex = -1, onSuggestedPrompt, se
         </div>
       )}
       {items.map((item, idx) => {
+        // kimi-code thinking stream: render as a collapsible reasoning block
+        // instead of a normal message bubble.
+        if (item.kind === "thinking") {
+          const followedByAnswer = items
+            .slice(idx + 1)
+            .some((it) => it.role === "assistant" && it.kind !== "thinking");
+          const isStreamingThinking =
+            !followedByAnswer && (idx === streamingIndex || idx === items.length - 1);
+          const startedAt = msgTimesRef.current.get(idx);
+          // End: next non-thinking assistant's start time, OR null (= still going)
+          let endedAt: number | null = null;
+          for (let j = idx + 1; j < items.length; j++) {
+            if (items[j].role === "assistant" && items[j].kind !== "thinking") {
+              endedAt = msgTimesRef.current.get(j) ?? null;
+              break;
+            }
+          }
+          return (
+            <ThinkingBlock
+              key={idx}
+              content={item.content || ""}
+              startedAt={startedAt}
+              endedAt={endedAt}
+              streaming={isStreamingThinking}
+              defaultOpen={isStreamingThinking}
+            />
+          );
+        }
         const isUser = item.role === "user";
         const roleId = normalizeRoleId(item.role_id, item.role);
         const roleLabel = roleDisplayName(roleId, isUser);
@@ -507,9 +659,22 @@ export function ChatTimeline({ items, streamingIndex = -1, onSuggestedPrompt, se
         const msgTime = msgTimesRef.current.get(idx);
         const duration = getDuration(idx);
         const dimmed = queryLower && !rawContent.toLowerCase().includes(queryLower);
+        // Tools belonging to THIS assistant message's turn — render inside
+        // the bubble. Also: orphan tools (kimi sometimes emits empty turn_id)
+        // pin to the LAST non-thinking assistant message so they don't fall
+        // off into a bottom dump.
+        const turnId = String(item.turn_id || "");
+        let turnTools: ToolExecution[] = [];
+        if (!isUser && turnId && toolsByTurn.has(turnId)) {
+          turnTools = [...(toolsByTurn.get(turnId) as ToolExecution[])];
+          usedTurnIds.add(turnId);
+        }
+        if (!isUser && idx === lastAssistantIdx && orphanTools.length > 0) {
+          turnTools = [...turnTools, ...orphanTools];
+        }
         return (
+          <Fragment key={idx}>
           <div
-            key={idx}
             className={`chat-msg ${isUser ? "user" : "assistant"} with-avatar${isStreaming ? " streaming" : ""}${statusCls ? ` ${statusCls}` : ""}${dimmed ? " search-dimmed" : ""}`}
           >
             <img
@@ -521,11 +686,12 @@ export function ChatTimeline({ items, streamingIndex = -1, onSuggestedPrompt, se
               }}
             />
             <div className="chat-msg-content">
-              <div className="chat-msg-role">
-                {roleLabel}
-                {msgTime && <span className="chat-msg-time">{formatTime(msgTime)}</span>}
-                {duration && <span className="chat-msg-duration">{duration}</span>}
-              </div>
+              {(msgTime || duration) && (
+                <div className="chat-msg-role">
+                  {msgTime && <span className="chat-msg-time">{formatTime(msgTime)}</span>}
+                  {duration && <span className="chat-msg-duration">{duration}</span>}
+                </div>
+              )}
               <ChatMessageBody html={renderMarkdown(cleanText)} />
               <RichAttachmentList attachments={attachments} />
               {structurePaths.length > 0 && (
@@ -539,18 +705,56 @@ export function ChatTimeline({ items, streamingIndex = -1, onSuggestedPrompt, se
                   ))}
                 </div>
               )}
-              {!isUser && !isStreaming && (sessionId || onQuoteReply) && (
+              {!isUser && !isStreaming && (sessionId || onQuoteReply || onRetry) && (
                 <div className="chat-feedback-buttons">
                   {sessionId && <FeedbackButtons sessionId={sessionId} messageIndex={idx} />}
                   {onQuoteReply && (
                     <QuoteButton content={rawContent} onQuote={onQuoteReply} />
                   )}
+                  {onRetry && idx === lastAssistantIdx && (
+                    <button
+                      type="button"
+                      className="chat-msg-retry-btn"
+                      onClick={onRetry}
+                      disabled={retryDisabled}
+                      title="Retry this turn"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3 12a9 9 0 1 0 3-6.7" />
+                        <path d="M3 4v5h5" />
+                      </svg>
+                    </button>
+                  )}
                 </div>
               )}
             </div>
           </div>
+          {turnTools.length > 0 && (
+            <div className={`chat-tools-row ${isUser ? "user" : "assistant"}`}>
+              <ToolExecutionList tools={turnTools} recentCount={3} />
+            </div>
+          )}
+          </Fragment>
         );
       })}
+      {/* Bottom catch-all: only NON-orphan tools whose turn_id didn't match
+          any rendered assistant message (would happen if a turn_id exists
+          but the corresponding assistant message hasn't streamed yet). True
+          orphans (empty turn_id) are pinned to the last assistant message
+          above instead of falling into this dump. */}
+      {(() => {
+        const stranded = (toolExecutions as ToolExecution[]).filter((t) => {
+          const k = String(t.turn_id || "");
+          return k && !usedTurnIds.has(k);
+        });
+        if (stranded.length === 0) return null;
+        return (
+          <div className="chat-tool-card-list">
+            <ToolExecutionList tools={stranded} recentCount={3} />
+          </div>
+        );
+      })()}
+      {securityEvents.length > 0 && <SecurityEventsBanner events={securityEvents} />}
     </div>
   );
 }
