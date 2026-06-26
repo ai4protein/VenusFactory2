@@ -116,27 +116,68 @@ _BASH_DENY_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
 )
 
 # ── Online-only deny patterns: tools that egress data over the network
-# bypassing our FetchURL host allowlist. Kimi already has MCP equivalents
-# (query_pubmed, download_uniprot_*, etc.) that DO go through the allowlist.
+# bypassing our FetchURL host allowlist, OR enumerate environment variables
+# that would leak the host fastapi's API keys (kimi inherits parent env).
+# Kimi already has MCP equivalents (query_pubmed, download_uniprot_*, etc.)
+# for legitimate network calls.
 _BASH_ONLINE_DENY_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
     re.compile(p, re.IGNORECASE)
     for p in (
+        # Network egress
         r"\b(curl|wget|fetch|aria2c|httpie|http)\b",
         r"\b(nc|ncat|netcat|socat)\b",
         r"\b(dig|nslookup|host|whois|drill|delv)\b",
         r"\b(ftp|sftp|tftp|telnet)\b",
         r"\b(python3?|perl|ruby|node)\b[^\n]*\b(urllib|requests|httpx|http\.client|net::http|net/http|fetch)\b",
         r">\s*/dev/(tcp|udp)/",                # bash builtin /dev/tcp/host/port
+
+        # Environment-variable enumeration (would leak parent fastapi's keys)
+        r"^\s*(env|printenv)\b",                                       # `env` / `printenv` standalone
+        r"\b(env|printenv)\s*\|\s*",                                   # piping enum to grep/etc
+        r"\bdeclare\s+-p\b",                                           # bash declare -p (dumps vars)
+        r"\bset\b\s*\|\s*(grep|head|tail|sed|awk|sort|less|more|cat)", # set | grep secrets
+        r"\$\{?(?:OPENAI|ANTHROPIC|DEEPSEEK|MOONSHOT|DMX|ZHIPU|DASHSCOPE|GOOGLE|GEMINI|AWS|GCP|AZURE|HF|HUGGINGFACE)_?[A-Z_]*(?:KEY|TOKEN|SECRET|PASSWORD)",
+        r"\$\{?KIMI_[A-Z_]*",                                          # any $KIMI_* refs (BIN/PORT included — kimi shouldn't introspect its own config)
+        r"\$\{?(?:CHAT_|WEBUI_V2_)[A-Z_]*(?:SECRET|TOKEN|KEY)",        # our own app secrets
     )
 )
 
 # ── Read-only system prefixes that bash / Read may touch even though they
-# live outside the session directory (binaries, shared libs, certs, /proc).
-_READ_ONLY_SYSTEM_PREFIXES: tuple[str, ...] = (
+# live outside the session directory.
+# Local mode is loose (your own machine, you can read /proc); online mode
+# is strict — /proc is a *huge* info-leak surface (environ, cmdline, maps,
+# net/route, status of any pid you can stat). Allow only a handful of
+# read-only system roots needed to invoke binaries / load shared libs.
+_READ_ONLY_SYSTEM_PREFIXES_LOCAL: tuple[str, ...] = (
     "/usr/", "/opt/", "/lib/", "/lib64/", "/bin/", "/sbin/",
     "/etc/ssl/", "/etc/ca-certificates/",
     "/proc/", "/sys/",
     "/dev/null", "/dev/stdout", "/dev/stderr",
+)
+_READ_ONLY_SYSTEM_PREFIXES_ONLINE: tuple[str, ...] = (
+    "/usr/lib/", "/usr/lib64/", "/usr/share/",
+    "/lib/", "/lib64/",
+    "/etc/ssl/certs/", "/etc/ca-certificates/",
+    "/dev/null", "/dev/stdout", "/dev/stderr",
+    # NOTE: /proc/cpuinfo and /proc/meminfo are intentionally NOT here —
+    # legitimate uses are rare and any /proc whitelist is a hole. If you
+    # need them, write the value into the kimi system prompt at session
+    # create time (e.g., available_cpus=N), don't let kimi read /proc.
+)
+
+
+def _read_only_prefixes(mode: str) -> tuple[str, ...]:
+    return _READ_ONLY_SYSTEM_PREFIXES_ONLINE if mode == "online" else _READ_ONLY_SYSTEM_PREFIXES_LOCAL
+
+
+# ── /proc info-leak paths explicitly denied in online mode regardless of
+# any whitelist. Catches `cat /proc/$$/environ` (parent fastapi env vars)
+# and similar pid-introspection attacks.
+_PROC_INFO_LEAK_RE = re.compile(
+    r"^/proc/(?:self|thread-self|\d+)/"
+    r"(?:environ|cmdline|status|stat|maps|smaps|mem|mounts|fd(?:/|$)|task(?:/|$)|"
+    r"comm|sched|net/|root(?:/|$)|cwd(?:/|$)|exe(?:/|$))",
+    re.IGNORECASE,
 )
 
 
@@ -304,12 +345,21 @@ def _bash_policy(cmd: str, *, session_dir: str, mode: str) -> SecurityDecision:
                         "Bash",
                     )
 
+        prefixes = _read_only_prefixes("online")
         path_tokens = re.findall(r"(?:^|\s)(/[^\s\"'|;<>&]+|~/[^\s\"'|;<>&]*)", c)
         for tok in path_tokens:
+            norm = _norm_path(tok)
+            # /proc info-leak paths always denied, even if they would match
+            # one of the read-only prefixes — environ/cmdline trump perms.
+            if _PROC_INFO_LEAK_RE.match(norm):
+                return SecurityDecision(
+                    False,
+                    f"online mode: bash references /proc info-leak path: {tok}",
+                    "Bash",
+                )
             if _is_under(tok, session_dir):
                 continue
-            norm = _norm_path(tok)
-            if any(norm.startswith(p.rstrip("/")) for p in _READ_ONLY_SYSTEM_PREFIXES):
+            if any(norm.startswith(p.rstrip("/")) for p in prefixes):
                 continue
             return SecurityDecision(
                 False,
@@ -323,6 +373,14 @@ def _bash_policy(cmd: str, *, session_dir: str, mode: str) -> SecurityDecision:
 # ── Per-tool handlers ─────────────────────────────────────────────────────
 
 
+# Grep patterns that look like they're fishing for secrets — denied online.
+_GREP_SECRET_PATTERN_RE = re.compile(
+    r"(?i)(?:api[_-]?key|secret|token|password|bearer|"
+    r"BEGIN\s+(?:OPENSSH|RSA|DSA|EC|PGP)\s+PRIVATE\s+KEY|"
+    r"aws_access_key|aws_secret|gcp_credentials|private_key)"
+)
+
+
 def _decide_read_like(
     tool_name: str, args: dict[str, Any], session_dir: str, mode: str
 ) -> SecurityDecision:
@@ -331,8 +389,11 @@ def _decide_read_like(
     - Secret paths (.env / .ssh / id_rsa / .kimi-code / .venusfactory ...)
       are denied in BOTH modes — never makes sense for the agent to touch
       these even on the user's own machine.
-    - Online mode additionally requires the path to live under session_dir
-      (or a small read-only system whitelist).
+    - Online mode additionally requires Read/Glob/Grep paths to live under
+      session_dir (or a small read-only system whitelist that excludes /proc).
+    - Online mode Grep patterns are also screened — `Grep("api_key", "/")`
+      can side-channel-leak the existence/location of secrets even without
+      reading them.
     - Local mode trusts the user: read anywhere except secrets.
     """
     path = (
@@ -345,14 +406,32 @@ def _decide_read_like(
         return SecurityDecision(
             False, f"read of secret path refused: {path}", tool_name
         )
-    if mode == "online" and tool_name == "Read" and path:
+    # Online: containment applies to Read, Glob AND Grep — the previous
+    # version only checked Read, letting `Glob("/**/*.env")` enumerate the
+    # whole filesystem for sensitive files.
+    if mode == "online" and tool_name in ("Read", "Glob", "Grep") and path:
         norm = _norm_path(str(path))
+        if _PROC_INFO_LEAK_RE.match(norm):
+            return SecurityDecision(
+                False,
+                f"online mode: {tool_name} of /proc info-leak path refused: {path}",
+                tool_name,
+            )
         if not _is_under(norm, session_dir) and not any(
-            norm.startswith(p.rstrip("/")) for p in _READ_ONLY_SYSTEM_PREFIXES
+            norm.startswith(p.rstrip("/")) for p in _read_only_prefixes(mode)
         ):
             return SecurityDecision(
                 False,
-                f"online mode: Read of {path} outside session_dir refused",
+                f"online mode: {tool_name} of {path} outside session_dir refused",
+                tool_name,
+            )
+    # Online Grep: also screen the pattern for secret-fishing.
+    if mode == "online" and tool_name == "Grep":
+        pat = str(args.get("pattern") or "")
+        if _GREP_SECRET_PATTERN_RE.search(pat):
+            return SecurityDecision(
+                False,
+                f"online mode: Grep pattern looks like secret-fishing: {pat[:80]}",
                 tool_name,
             )
     return SecurityDecision(True, "read allowed", tool_name)
@@ -364,7 +443,10 @@ def _decide_write_like(
     """Write / Edit / NotebookEdit.
 
     - Secret paths denied in BOTH modes.
-    - Online: must live inside session_dir (no /tmp/ escape).
+    - Online: must live inside session_dir (no /tmp/ escape) AND the parent
+      directory must `realpath()` inside session_dir too — defeats the
+      symlink-escape attack where kimi `Write`s `<sdir>/sym → /etc/cron.d/X`
+      first, then writes payload through the symlink.
     - Local: trust the user; allow writes anywhere that isn't a secret path
       (the user explicitly stated "this is my own machine" for local mode).
     """
@@ -378,12 +460,33 @@ def _decide_write_like(
         return SecurityDecision(
             False, f"write to secret path refused: {path}", tool_name
         )
-    if mode == "online" and not _is_under(str(path), session_dir):
-        return SecurityDecision(
-            False,
-            f"online mode: write outside session_dir refused: {path}",
-            tool_name,
-        )
+    if mode == "online":
+        if not _is_under(str(path), session_dir):
+            return SecurityDecision(
+                False,
+                f"online mode: write outside session_dir refused: {path}",
+                tool_name,
+            )
+        # Symlink escape check: even if the literal path looks contained,
+        # its parent dir might be a symlink we (or an earlier turn) made
+        # that points outside session_dir.
+        try:
+            parent = os.path.dirname(os.path.abspath(str(path)))
+            real_parent = os.path.realpath(parent)
+            if not _is_under(real_parent, session_dir):
+                return SecurityDecision(
+                    False,
+                    f"online mode: write parent dir is a symlink escape: "
+                    f"{parent} → {real_parent}",
+                    tool_name,
+                )
+        except OSError:
+            # If we can't stat, deny in online mode — fail closed.
+            return SecurityDecision(
+                False,
+                f"online mode: cannot resolve write parent for {path}; refusing",
+                tool_name,
+            )
     return SecurityDecision(True, "write allowed", tool_name)
 
 
@@ -400,6 +503,50 @@ def _decide_fetchurl(
             tool_name,
         )
     return SecurityDecision(True, "fetchurl allowed", tool_name)
+
+
+# ── Trusted MCP-tool whitelist (populated at server startup) ──────────────
+# Filled by `init_trusted_mcp_tools()` after the local FastMCP server has
+# registered all its tools — see api_server lifespan. Empty until then;
+# in that warm-up window the prefix-match fallback below kicks in so we
+# don't break startup. Once populated, only exact matches are allowed —
+# guards against a malicious MCP server registering a name that prefix-
+# matches `mcp__venusfactory__*`.
+_TRUSTED_MCP_TOOLS: frozenset[str] = frozenset()
+_TRUSTED_MCP_TOOLS_INITIALIZED: bool = False
+
+
+def install_trusted_mcp_tools(names: list[str]) -> None:
+    """Populate the trusted-MCP-tool set. Called once at startup.
+
+    `names` should be the fully-qualified kimi-side tool names
+    (`mcp__venusfactory__<tool_name>`) — NOT the bare FastMCP tool names.
+    """
+    global _TRUSTED_MCP_TOOLS, _TRUSTED_MCP_TOOLS_INITIALIZED
+    cleaned = {n for n in names if n and isinstance(n, str)}
+    _TRUSTED_MCP_TOOLS = frozenset(cleaned)
+    _TRUSTED_MCP_TOOLS_INITIALIZED = True
+    _logger.info(
+        "kimi_security: loaded %d trusted MCP tool names",
+        len(_TRUSTED_MCP_TOOLS),
+    )
+
+
+def _is_trusted_mcp_tool(tool: str) -> tuple[bool, str]:
+    """Return (allowed, reason). Exact match if init'd, prefix fallback before."""
+    if _TRUSTED_MCP_TOOLS_INITIALIZED:
+        if tool in _TRUSTED_MCP_TOOLS:
+            return True, "venusfactory MCP allowlist (exact)"
+        return False, f"MCP tool not in introspection allowlist: {tool}"
+    # Pre-init fallback: prefix match. Logged as warning so we notice if
+    # this path stays hot past startup (would mean init never ran).
+    if tool.startswith("mcp__venusfactory__"):
+        _logger.warning(
+            "kimi_security: MCP allowlist not initialized yet, "
+            "falling back to prefix match for %s", tool,
+        )
+        return True, "venusfactory MCP allowlist (prefix, pre-init)"
+    return False, f"unknown MCP tool: {tool}"
 
 
 # ── Entry point ───────────────────────────────────────────────────────────
@@ -421,11 +568,12 @@ def decide(
     if not isinstance(args, dict):
         args = {}
 
-    # 1. venusfactory MCP tools — always allow. They go through our own
-    # FastMCP server which already runs in our process, so they can't escape
-    # our trust boundary further.
-    if tool.startswith("mcp__venusfactory__"):
-        return SecurityDecision(True, "venusfactory MCP allowlist", tool)
+    # 1. MCP tools — must exactly match the introspected venusfactory tool
+    # set. Pre-init fallback allows prefix `mcp__venusfactory__*` so the
+    # very first requests during startup don't get rejected.
+    if tool.startswith("mcp__"):
+        ok, reason = _is_trusted_mcp_tool(tool)
+        return SecurityDecision(ok, reason, tool)
 
     # 2. Read-like kimi builtins
     if tool in ("Read", "Glob", "Grep"):
@@ -446,12 +594,21 @@ def decide(
 
     # 6. Skill / TaskCreate / planning tools — allow (kimi-internal, no FS)
     if tool in (
-        "Skill", "TaskCreate", "TaskUpdate", "TaskGet", "TaskList",
+        "TaskCreate", "TaskUpdate", "TaskGet", "TaskList",
         "EnterPlanMode", "ExitPlanMode",
         "CreateGoal", "GetGoal", "SetGoalBudget", "UpdateGoal",
-        "Bash",  # already handled, kept for clarity
     ):
         return SecurityDecision(True, "kimi-internal tool allowed", tool)
+
+    # 6b. Skill — can execute arbitrary user-defined scripts. Deny in
+    # online mode (a malicious skill bypasses every other policy here);
+    # allow in local mode.
+    if tool == "Skill":
+        if mode == "online":
+            return SecurityDecision(
+                False, "online mode: Skill execution refused (skills can run arbitrary code)", tool
+            )
+        return SecurityDecision(True, "Skill allowed (local mode)", tool)
 
     # 7. Unknown tools — deny by default in online mode, allow in local.
     if mode == "online":
