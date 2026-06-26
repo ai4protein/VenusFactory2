@@ -1,0 +1,53 @@
+[Unit]
+Description=VenusFactory2 WebUI v2 (online mode, frp-exposed on :7861)
+Documentation=https://github.com/AI4Protein/VenusFactory2
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=tanyang
+Group=venus
+WorkingDirectory=/home/tanyang/workspace/VenusFactory2
+
+# Inherit venus group via SupplementaryGroups so the user-level Group= and
+# the supplementary one don't fight. systemd handles this cleanly when
+# the primary Group= is also `venus` (the new files inherit the right gid).
+SupplementaryGroups=venus
+
+# Run in online mode on port 7861 (frp tunnels this out). Keep MCP server
+# on 8088 to avoid the common 8080 collision on shared hosts.
+Environment=WEBUI_V2_MODE=online
+Environment=WEBUI_V2_HOST=0.0.0.0
+Environment=WEBUI_V2_PORT=7861
+Environment=MCP_HTTP_PORT=8088
+Environment=KIMI_POOL_MAX_SESSIONS=5
+Environment=KIMI_POOL_IDLE_TTL_S=600
+Environment=KIMI_POOL_PORT_MIN=58800
+Environment=KIMI_POOL_PORT_MAX=58899
+
+ExecStart=/home/tanyang/miniconda3/envs/venus/bin/python src/webui_v2.py --online --host 0.0.0.0 --port 7861
+
+Restart=on-failure
+RestartSec=5s
+
+# Resource hygiene
+TimeoutStopSec=30s
+KillMode=mixed
+
+# Process hardening for the FASTAPI process itself (kimi sandboxes are
+# separate, set up by venus-spawn-kimi). NoNewPrivileges is fine here
+# even though fastapi later invokes `sudo` — sudo is on the systemd
+# allowlist via SystemCallFilter=@system-service. If you hit "sudo:
+# effective uid is not 0" errors, remove NoNewPrivileges (sudo needs
+# to setuid which NNP blocks).
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictRealtime=yes
+LockPersonality=yes
+# NoNewPrivileges=yes   # ← commented: sudo to spawn helper would break
+
+[Install]
+WantedBy=multi-user.target
