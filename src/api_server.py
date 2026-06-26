@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -87,6 +88,41 @@ async def lifespan(app: FastAPI):
     analytics_store.ensure_initialized()
     logger.info("Web v2 cleanup: disabled (no automatic deletion)")
 
+    # ── Phase 1 (kimi-code engine) ─────────────────────────────────────────
+    # Best-effort: start the unified MCP HTTP server, register its URL with
+    # kimi-code's config, then spawn the kimi server. Any failure here is
+    # logged and tolerated — the legacy graph engine still works without
+    # kimi-code, and users can fall back to it via the model selector.
+    try:
+        from mcp_server import start_http_server as _start_mcp_http
+        _start_mcp_http()  # background daemon thread on :8080
+    except Exception:
+        logger.exception("Failed to start VenusFactory MCP HTTP server (kimi engine will not work)")
+
+    try:
+        from agent.kimi_mcp_config import ensure_registered as _kimi_register_mcp
+        mcp_url = f"http://127.0.0.1:{int(os.getenv('MCP_HTTP_PORT', '8080'))}/mcp"
+        _kimi_register_mcp(mcp_url=mcp_url)
+        logger.info("kimi-code MCP config updated (venusfactory -> %s)", mcp_url)
+    except Exception:
+        logger.exception("Failed to register VenusFactory MCP with kimi-code config")
+
+    try:
+        from agent.kimi_daemon import start_daemon as _kimi_start
+        await _kimi_start()
+    except Exception:
+        logger.exception("Failed to start kimi-code daemon (kimi engine will be unavailable)")
+
+    # Long-running approval worker: drains pending kimi approvals every few
+    # seconds independent of any chat stream. Without this, restarts / idle
+    # tabs / >60s thinking pauses cause kimi approvals to time out and the
+    # agent stalls with "authorizeToolExecution hook failed".
+    try:
+        from agent.kimi_approval_worker import start_worker as _kimi_approval_start
+        await _kimi_approval_start()
+    except Exception:
+        logger.exception("Failed to start kimi approval worker (per-stream approver still active)")
+
     # Wire the minimal default tracing processor so spans opened inside the
     # agent (LLM calls, tool invocations, plan/execute phases) are emitted to
     # the standard logger. Replace with an OTLP/Phoenix exporter later — the
@@ -130,6 +166,16 @@ async def lifespan(app: FastAPI):
                 await session_cleanup_task
             except (asyncio.CancelledError, Exception):
                 pass
+        try:
+            from agent.kimi_approval_worker import stop_worker as _kimi_approval_stop
+            await _kimi_approval_stop()
+        except Exception:
+            logger.exception("Failed to stop kimi approval worker cleanly")
+        try:
+            from agent.kimi_daemon import stop_daemon as _kimi_stop
+            await _kimi_stop()
+        except Exception:
+            logger.exception("Failed to stop kimi-code daemon cleanly")
         logger.info("VenusFactory2 API server shutting down...")
 
 
@@ -247,7 +293,64 @@ _INLINE_MEDIA_TYPES: dict[str, str] = {
     ".gif": "image/gif", ".webp": "image/webp", ".svg": "image/svg+xml",
     ".bmp": "image/bmp", ".ico": "image/x-icon", ".tiff": "image/tiff",
     ".tif": "image/tiff",
+    ".html": "text/html", ".htm": "text/html",
+    ".csv": "text/csv", ".tsv": "text/tab-separated-values",
+    ".fasta": "text/plain", ".fa": "text/plain", ".faa": "text/plain",
+    ".fna": "text/plain", ".ffn": "text/plain", ".frn": "text/plain",
+    ".txt": "text/plain", ".json": "application/json", ".yaml": "text/yaml",
+    ".pdb": "chemical/x-pdb", ".cif": "chemical/x-cif",
 }
+
+
+# Extensions allowed to be served inline via /api/files/inline. Strictly limited:
+# no .py/.sh/.zip etc. to avoid this becoming a generic exfil endpoint.
+_INLINE_ALLOWED_EXTS: frozenset[str] = frozenset({
+    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp", ".tiff", ".tif",
+    ".html", ".htm",
+    ".csv", ".tsv",
+    ".fasta", ".fa", ".faa", ".fna", ".ffn", ".frn",
+    ".txt", ".json", ".yaml", ".yml", ".md",
+    ".pdb", ".cif", ".mmcif", ".ent",
+})
+
+
+@app.get("/api/files/inline")
+async def get_inline_file(path: str):
+    """Serve a session artifact inline (images, html reports, csv, fasta, ...).
+
+    Containment: path must resolve INSIDE one of `temp_base /
+    WEB_V2_RESULTS_ROOT / WEB_V2_UPLOAD_ROOT`. Extension must be in
+    `_INLINE_ALLOWED_EXTS`. This is intentionally narrow — code-execution
+    extensions (.py, .sh, .zip, .so, ...) are refused. HTML files are
+    rendered inline by the browser; the frontend wraps them in a sandboxed
+    <iframe> so embedded scripts can't reach the parent.
+    """
+    import os as _os
+
+    project_root = Path(__file__).resolve().parent.parent
+    temp_base = Path(_os.getenv("TEMP_OUTPUTS_DIR", "temp_outputs"))
+    if not temp_base.is_absolute():
+        temp_base = project_root / temp_base
+    temp_base = temp_base.resolve()
+
+    allowed_roots = [temp_base, WEB_V2_RESULTS_ROOT, WEB_V2_UPLOAD_ROOT]
+    candidate: Path = (project_root / path).resolve()
+    if not candidate.exists() or not candidate.is_file():
+        # also try interpreting `path` as already-absolute (when kimi writes
+        # absolute paths into tool output, e.g. cwd of session_dir)
+        if Path(path).is_absolute():
+            abs_candidate = Path(path).resolve()
+            if abs_candidate.exists() and abs_candidate.is_file():
+                candidate = abs_candidate
+    if not candidate.exists() or not candidate.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    if not ensure_within_roots(candidate, allowed_roots):
+        raise HTTPException(status_code=403, detail="Access denied")
+    ext = candidate.suffix.lower()
+    if ext not in _INLINE_ALLOWED_EXTS:
+        raise HTTPException(status_code=400, detail=f"Inline not allowed for: {ext}")
+    media_type = _INLINE_MEDIA_TYPES.get(ext, "application/octet-stream")
+    return FileResponse(path=str(candidate), media_type=media_type)
 
 @app.get("/api/download/{file_path:path}")
 async def download_file(file_path: str):
