@@ -39,8 +39,23 @@ export type ModelRegistryResponse = {
 // Fallback registry used when GET /api/models fails — keeps the UI usable
 // rather than crashing. Should mirror the backend default as closely as possible.
 export const FALLBACK_REGISTRY: ModelRegistryResponse = {
-  default_model: "deepseek-v4-pro",
+  default_model: "kimi-code",
   models: [
+    {
+      id: "kimi-code",
+      label: "Agent",
+      provider: "kimi",
+      base_url: "",
+      api_compatible: "openai",
+      api_key_env: "",
+      supports_tool_use: true,
+      supports_json_schema: false,
+      supports_prompt_caching: false,
+      max_context_tokens: 200000,
+      max_output_tokens: 8192,
+      requires_adapter: false,
+      engine: "kimi-code",
+    },
     {
       id: "deepseek-v4-pro",
       label: "DeepSeek V4 Pro",

@@ -531,11 +531,21 @@ export function ChatTimeline({ items, streamingIndex = -1, onSuggestedPrompt, se
   const msgTimesRef = useRef<Map<number, number>>(new Map());
   const prevSessionRef = useRef<string | undefined>(undefined);
   // Index of the last non-thinking assistant message (used to anchor the
-  // per-message Retry icon).
+  // per-message Retry icon — retrying a thinking block makes no sense).
   const lastAssistantIdx = items.reduce<number>(
     (acc, it, i) => (it.role === "assistant" && it.kind !== "thinking" ? i : acc),
     -1
   );
+  // Same index but with a fallback to the last assistant message of ANY
+  // kind (including thinking). Used to anchor orphan tool cards so a turn
+  // that produced thinking + tool calls but no final text still surfaces
+  // the tools in the UI (instead of silently discarding them).
+  const lastAssistantAnyIdx = lastAssistantIdx !== -1
+    ? lastAssistantIdx
+    : items.reduce<number>(
+        (acc, it, i) => (it.role === "assistant" ? i : acc),
+        -1
+      );
 
   // Bucket tool executions by their kimi turn_id so each turn's tools render
   // INLINE with that turn's answer message instead of all piling up at the
@@ -669,7 +679,7 @@ export function ChatTimeline({ items, streamingIndex = -1, onSuggestedPrompt, se
           turnTools = [...(toolsByTurn.get(turnId) as ToolExecution[])];
           usedTurnIds.add(turnId);
         }
-        if (!isUser && idx === lastAssistantIdx && orphanTools.length > 0) {
+        if (!isUser && idx === lastAssistantAnyIdx && orphanTools.length > 0) {
           turnTools = [...turnTools, ...orphanTools];
         }
         return (
@@ -743,9 +753,13 @@ export function ChatTimeline({ items, streamingIndex = -1, onSuggestedPrompt, se
           orphans (empty turn_id) are pinned to the last assistant message
           above instead of falling into this dump. */}
       {(() => {
+        const noAssistantToPin = lastAssistantAnyIdx === -1;
         const stranded = (toolExecutions as ToolExecution[]).filter((t) => {
           const k = String(t.turn_id || "");
-          return k && !usedTurnIds.has(k);
+          if (k) return !usedTurnIds.has(k);
+          // Empty turn_id normally pins to lastAssistantAnyIdx above; only
+          // dump here when there's literally no assistant message yet.
+          return noAssistantToPin;
         });
         if (stranded.length === 0) return null;
         return (

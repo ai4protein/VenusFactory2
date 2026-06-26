@@ -88,6 +88,15 @@ async def stream_message(session_id: str, payload: ChatStreamRequest, request: R
         engine_for_swap = _resolve_engine(payload.engine, payload.model)
         if engine_for_swap != "kimi-code":
             update_llm_model(payload.model, state)
+    # Pin the response language from the UI locale ("en" | "zh"). Stored on
+    # state so retries (which carry no fresh payload) inherit it; also
+    # stamped on the LLM instance so chat_agent._build_message_dicts can
+    # prepend a forced-language directive on every graph-engine call.
+    if payload.lang in ("en", "zh"):
+        state["user_lang"] = payload.lang
+    _llm = state.get("llm")
+    if _llm is not None:
+        _llm._user_lang = state.get("user_lang") or ""
     lock = await _get_lock(session_id)
     engine = _resolve_engine(payload.engine, payload.model)
     streamer = _stream_kimi if engine == "kimi-code" else _stream_graph
@@ -126,6 +135,10 @@ async def stream_retry(session_id: str, request: Request):
     model_id = getattr(llm, "model_name", "") if llm is not None else ""
     engine = _resolve_engine(None, model_id)
     streamer = _stream_kimi if engine == "kimi-code" else _stream_graph
+    # Carry forward the last-known user_lang so retries respect the same
+    # forced-language policy as the original turn.
+    if llm is not None:
+        llm._user_lang = state.get("user_lang") or ""
 
     async def event_gen():
         async with lock:

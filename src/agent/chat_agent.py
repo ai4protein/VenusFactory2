@@ -354,12 +354,32 @@ class Chat_LLM(BaseChatModel):
 
     def _build_message_dicts(self, messages: list[BaseMessage]) -> list[dict[str, Any]]:
         use_anthropic_caching = self.model_name in PROMPT_CACHING_MODELS
+        # Forced response-language directive set by chat_api.messages — stamped
+        # onto the LLM instance per request from the frontend UI locale. We
+        # prepend it to the FIRST system message so every graph node (PI / CB
+        # / MLS / SC / sub-reports / planning prompts) inherits it without
+        # editing 17 prompt .md files.
+        forced_lang = str(getattr(self, "_user_lang", "") or "")
+        lang_directive = ""
+        if forced_lang in ("en", "zh"):
+            label = "English" if forced_lang == "en" else "Chinese (中文)"
+            lang_directive = (
+                f"**MANDATORY LANGUAGE — overrides anything below.** "
+                f"Respond ONLY in {label}, regardless of the input language, "
+                f"tool output language, or earlier turns. Code, identifiers, "
+                f"and quoted error text stay verbatim; all prose / commentary / "
+                f"reasoning is in {label}.\n\n"
+            )
+        injected_directive = False
         message_dicts = []
         for msg in messages:
             if isinstance(msg, HumanMessage):
                 message_dicts.append({"role": "user", "content": msg.content or ""})
             elif isinstance(msg, SystemMessage):
                 content = msg.content or ""
+                if lang_directive and not injected_directive:
+                    content = lang_directive + content
+                    injected_directive = True
                 # Anthropic explicit prompt caching: wrap large system prompts in a content
                 # block with cache_control: ephemeral. DMX-style gateways pass this through.
                 # Threshold 1024 chars roughly corresponds to Anthropic's minimum cacheable size.
@@ -384,6 +404,11 @@ class Chat_LLM(BaseChatModel):
                 message_dicts.append({"role": "tool", "tool_call_id": getattr(msg, "tool_call_id", ""), "content": getattr(msg, "content", "") or ""})
             else:
                 message_dicts.append({"role": "user", "content": str(getattr(msg, "content", msg))})
+        # If the request was language-pinned but the message list had no
+        # SystemMessage to host the directive, inject a synthetic system
+        # message at the head so the constraint still applies.
+        if lang_directive and not injected_directive:
+            message_dicts.insert(0, {"role": "system", "content": lang_directive.rstrip()})
         return message_dicts
 
     async def _agenerate(

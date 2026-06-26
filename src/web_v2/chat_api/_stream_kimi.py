@@ -38,7 +38,41 @@ def _make_error_evt(message: str, code: str = "") -> str:
     return f"event: error\ndata: {_to_json({'message': message, 'code': code})}\n\n"
 
 
-_DEFAULT_SYSTEM_PROMPT = """\
+_LANG_LABEL = {"en": "English", "zh": "Chinese (中文)"}
+
+
+def _language_policy_block(lang: str) -> str:
+    """Mandatory language directive. The UI locale pins the response language;
+    auto-detection from user input is explicitly forbidden so short prompts
+    like 'ok' or code snippets don't flip the conversation language."""
+    label = _LANG_LABEL.get(lang or "", "")
+    if not label:
+        return (
+            "## Language policy\n\n"
+            "Respond AND think in the SAME language as the user's most recent "
+            "message. Both the visible reply and the chain-of-thought / "
+            "reasoning shown in the Thinking block must match.\n"
+        )
+    return (
+        "## Language policy — MANDATORY, OVERRIDES INPUT DETECTION\n\n"
+        f"You MUST respond ONLY in **{label}**, regardless of the language of "
+        "the user's input, regardless of the language of file contents or "
+        "tool outputs, regardless of any earlier turns. Both your visible "
+        f"reply AND your chain-of-thought / reasoning (the Thinking block) "
+        f"MUST be in {label}.\n\n"
+        "- If the user writes in another language, still reply in "
+        f"{label}.\n"
+        "- If a tool returns text in another language, summarize it in "
+        f"{label}.\n"
+        f"- Code, identifiers, command names and quoted error messages stay "
+        "verbatim; everything else is in "
+        f"{label}.\n"
+        "- Do NOT translate user-supplied names, sequences, or PDB IDs.\n"
+    )
+
+
+def _build_system_prompt(lang: str) -> str:
+    return f"""\
 You are the VenusFactory2 protein-engineering assistant.
 
 ## Tool calling — read carefully
@@ -63,19 +97,11 @@ instead of fabricating a tool call.
 Prefer calling tools over reasoning from memory when the user asks for
 protein-specific facts, structures, or computations.
 
-## Language policy
+{_language_policy_block(lang)}"""
 
-Respond AND think in the SAME language as the user's most recent message.
-Both your visible reply AND the chain-of-thought / reasoning (the
-"Thinking" block the user sees) must match the user's language:
 
-- User writes English → think in English, answer in English.
-- User writes Chinese (中文) → think in Chinese, answer in Chinese.
-- User mixes languages → follow the language of the most recent message.
-
-Do NOT think in one language and reply in another. Do NOT default to one
-language regardless of input.
-"""
+# Back-compat for any importer that still references the old constant.
+_DEFAULT_SYSTEM_PROMPT = _build_system_prompt("")
 
 
 async def _ensure_kimi_session(client: KimiClient, state: dict[str, Any]) -> str:
@@ -100,10 +126,21 @@ async def _ensure_kimi_session(client: KimiClient, state: dict[str, Any]) -> str
         # rejects what falls outside the policy. With "yolo" kimi would auto-
         # allow most tools internally and our policy would never see them.
         permission_mode="manual",
-        system_prompt=_DEFAULT_SYSTEM_PROMPT,
+        system_prompt=_build_system_prompt(str(state.get("user_lang") or "")),
     )
     state["kimi_session_id"] = sid
     return sid
+
+
+def _language_pin(lang: str) -> str:
+    """Per-turn reminder prepended to the user message. Belt-and-suspenders
+    for sessions whose system_prompt was baked with a different language
+    (user switched UI locale mid-session — kimi sessions are immutable so we
+    can't update the system_prompt after create_session)."""
+    label = _LANG_LABEL.get(lang or "", "")
+    if not label:
+        return ""
+    return f"[Reply in {label} only — both visible answer and Thinking block.]\n\n"
 
 
 def _apply_event(state: dict[str, Any], ev: KimiEvent) -> list[str]:
@@ -357,8 +394,12 @@ async def _stream_kimi(
                     # past internal limits and silently drop later messages.
                     if not prompt_submitted:
                         prompt_submitted = True
+                        # Per-turn language pin overrides the session-level
+                        # system prompt if the user switched UI locale after
+                        # session creation (kimi sessions are immutable).
+                        pin = _language_pin(str(state.get("user_lang") or ""))
                         asyncio.create_task(
-                            client.submit_prompt(kimi_sid, display_text)
+                            client.submit_prompt(kimi_sid, pin + display_text)
                         )
                     continue
 

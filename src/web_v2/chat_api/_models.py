@@ -40,6 +40,10 @@ class ChatStreamRequest(BaseModel):
     # The model-registry entry for the selected model may override this
     # (see messages.py: any model with engine="kimi-code" forces the kimi path).
     engine: Optional[str] = Field(default=None)
+    # UI locale ("en" | "zh"). When set, the chat router forces the model to
+    # respond in this language regardless of the input language. Persisted on
+    # the session so retries inherit it. None → fall back to model defaults.
+    lang: Optional[str] = Field(default=None)
 
 
 class ClarificationAnswer(BaseModel):

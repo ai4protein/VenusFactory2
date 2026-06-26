@@ -318,7 +318,7 @@ type SessionMeta = {
 // Last-resort fallback identifier used only when the model registry has not
 // loaded yet AND we cannot read any model id from the active session. The real
 // model list comes from GET /api/models via useModelRegistry().
-const FALLBACK_MODEL_ID = "deepseek-v4-pro";
+const FALLBACK_MODEL_ID = "kimi-code";
 const OTHER_MODEL_OPTION = "__other_model__";
 type RunStatus = "running" | "stopping" | "stopped";
 
@@ -389,7 +389,8 @@ type ChatPageProps = {
 };
 
 export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
-  const t = useLang().t(STRINGS);
+  const { lang, t: translate } = useLang();
+  const t = translate(STRINGS);
   useDocumentMeta({ title: t.docTitle, description: t.docDescription });
   const [sessionId, setSessionId] = useState<string>("");
   const [snapshot, setSnapshot] = useState<ChatSnapshot | null>(null);
@@ -850,7 +851,10 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
               }
             : undefined,
           custom_model_id: selectedCustomModel ? selectedCustomModel.id : "",
-          attachment_paths: attachmentPaths
+          attachment_paths: attachmentPaths,
+          // Pin response language to the UI locale. Backend stores this on
+          // session state, so retries and follow-up actions inherit it.
+          lang,
         },
         handleStreamEvent,
         abortRef.current.signal,
