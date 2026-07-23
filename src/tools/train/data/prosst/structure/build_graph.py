@@ -84,24 +84,37 @@ def generate_graph(pdb_file, max_distance=10):
     """
     pdb_parser = PDB.PDBParser(QUIET=True)
     structure = pdb_parser.get_structure("protein", pdb_file)
+    # NMR ensembles may contain many models; only the first is used for ProSST.
     model = structure[0]
 
     # extract amino acid sequence
     seq = []
     # extract amino acid coordinates
     aa_coords = {"N": [], "CA": [], "C": [], "O": []}
-    
-    for model in structure:
-        for chain in model:
-            for residue in chain:
-                if residue.get_id()[0] == " ":
-                    seq.append(residue.get_resname())
-                    for atom_name in aa_coords.keys():
-                        atom = residue[atom_name]
-                        aa_coords[atom_name].append(atom.get_coord().tolist())
+
+    for chain in model:
+        for residue in chain:
+            if residue.get_id()[0] != " ":
+                continue
+            # Backbone N/CA/C are required; O may be missing (esp. C-terminus) or named OXT.
+            if not all(atom_name in residue for atom_name in ("N", "CA", "C")):
+                continue
+            seq.append(residue.get_resname())
+            for atom_name in ("N", "CA", "C"):
+                aa_coords[atom_name].append(residue[atom_name].get_coord().tolist())
+            if "O" in residue:
+                aa_coords["O"].append(residue["O"].get_coord().tolist())
+            elif "OXT" in residue:
+                aa_coords["O"].append(residue["OXT"].get_coord().tolist())
+            else:
+                # Placeholder: feature extraction only uses N/CA/C for orientations.
+                aa_coords["O"].append(residue["C"].get_coord().tolist())
+    if not seq:
+        raise ValueError(
+            f"No residues with complete backbone atoms (N/CA/C) found in {pdb_file}"
+        )
     aa_seq = "".join([seq1(aa) for aa in seq])
-    
-        
+
     # aa means amino acid
     coords = list(zip(aa_coords['N'], aa_coords['CA'], aa_coords['C'], aa_coords['O']))
     coords = torch.tensor(coords)
