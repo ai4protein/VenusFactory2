@@ -37,7 +37,15 @@ def prosst_score(pdb_file: str, mutants: List[str]) -> List[float]:
     predictor = SSTPredictor(structure_vocab_size=2048)
 
     # Extract structure sequence from PDB
-    structure_sequence = predictor.predict_from_pdb(pdb_file)[0]['2048_sst_seq']
+    sst_results = predictor.predict_from_pdb(pdb_file)
+    if not sst_results or "2048_sst_seq" not in sst_results[0]:
+        err = sst_results[0].get("error") if sst_results else None
+        detail = f" ({err})" if err else ""
+        raise RuntimeError(
+            f"ProSST structure tokenization failed for {pdb_file}{detail}. "
+            "Check that the PDB has backbone atoms (N/CA/C) and is a valid protein structure."
+        )
+    structure_sequence = sst_results[0]["2048_sst_seq"]
     structure_sequence_offset = [i + 3 for i in structure_sequence]
 
     # Extract residue sequence from PDB
