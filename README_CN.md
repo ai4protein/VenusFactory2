@@ -344,7 +344,13 @@ pip install -r requirements.txt
 
 </details>
 
-**验证:** `python -c "import torch; print(torch.__version__)"`
+**验证环境:**
+
+```bash
+python scripts/check_env.py
+```
+
+会检查 torch/CUDA、PyG、transformers、Agent 栈、ProSST 依赖（`pathos` 等）以及项目 `src` 导入；任一必需依赖缺失时退出码非 0。
 
 ---
 

@@ -126,12 +126,15 @@ dependencies:
       - packaging==25.0
       - pandas==2.3.2
       - parso==0.8.5
+      - pathos==0.3.5
       - peft==0.17.1
       - pexpect==4.9.0
       - pillow==11.0.0
       - platformdirs==4.4.0
       - plotly==6.3.0
       - pooch==1.8.2
+      - pox==0.3.7
+      - ppft==1.7.8
       - prompt-toolkit==3.0.52
       - propcache==0.3.2
       - protobuf==6.32.0

@@ -379,7 +379,7 @@ Run the bundled readiness check:
 python scripts/check_env.py
 ```
 
-It validates torch/CUDA, PyG, transformers, the agent stack, project `src` imports, and runs a CUDA matmul smoke test. Exit code is non-zero if any required dependency is missing.
+It validates torch/CUDA, PyG, transformers, the agent stack, ProSST deps (`pathos`, etc.), project `src` imports, and runs a CUDA matmul smoke test. Exit code is non-zero if any required dependency is missing.
 
 ---
 

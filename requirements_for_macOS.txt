@@ -36,6 +36,7 @@ langsmith==0.7.16
 lightning-utilities==0.14.3
 openai==2.26.0
 sortedcontainers==2.4.0
+pathos==0.3.5
 anthropic==0.84.0
 fastapi==0.116.1
 fastapi-mcp==0.4.0
