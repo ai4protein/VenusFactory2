@@ -86,6 +86,12 @@ GROUPS: dict[str, list[tuple[str, tuple[str, ...], bool]]] = {
         ("vplm", (), False),
         ("py3Dmol", (), False),
     ],
+    # ProSST / VenusREM structure tokenization (SSTPredictor)
+    "Mutation / ProSST": [
+        ("pathos", ("__version__",), False),
+        ("joblib", ("__version__",), False),
+        ("tqdm", ("__version__",), False),
+    ],
     "Web / API": [
         ("gradio", ("__version__",), False),
         ("fastapi", ("__version__",), False),
