@@ -4,23 +4,17 @@
 
 ### Q1: How do I install VenusFactory2?
 
-Follow the **Installation** section of `README.md`. The supported paths are:
+**Recommended:** interactive one-click install (see [Installation wiki](../wiki/Installation.md)):
 
-1. **conda + pip** (default for most users):
-   ```bash
-   git clone https://github.com/AI4Protein/VenusFactory2.git && cd VenusFactory2
-   conda create -n venus python=3.12 && conda activate venus
-   pip install torch==2.8.0 torchvision --index-url https://download.pytorch.org/whl/cu128
-   pip install torch_geometric pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv \
-       -f https://data.pyg.org/whl/torch-2.8.0+cu128.html
-   pip install -r requirements.txt
-   ```
+```bash
+git clone https://github.com/AI4Protein/VenusFactory2.git && cd VenusFactory2
+python scripts/setup_quickstart.py          # press Enter for recommended options
+# python scripts/setup_quickstart.py -y     # CI / non-interactive
+source .venv/bin/activate
+python scripts/check_env.py                 # optional smoke check
+```
 
-2. **uv** (faster, for development): `python install.py --type cu128` then `source .venv/bin/activate`.
-
-3. **Docker**: `cp .env.example .env && docker compose --profile gpu up -d --build`.
-
-Verify with `python scripts/check_env.py`.
+Alternatives (advanced / offline / Docker) are documented in the same wiki page (`install.py`, conda+pip, `docker compose`). Do **not** follow old “Installation” sections that lived in the root README — that content moved to the wiki.
 
 ### Q2: I hit "Could not find a specific dependency" during installation.
 
@@ -332,15 +326,13 @@ Check the bound host and port:
 ### Q30: How do I reset the environment after a bad install?
 
 ```bash
-# conda path
-conda deactivate
-conda env remove -n venus
-conda create -n venus python=3.12
-# then re-run the install steps from Q1
+# One-click wipe + reinstall (preferred)
+python scripts/setup_quickstart.py -y --clean-venv --clean-frontend
 
-# uv path
+# Or only remove the venv, then re-run the interactive installer
 rm -rf .venv
-python install.py --type cu128
+python scripts/setup_quickstart.py
 ```
 
-For Docker: `docker compose --profile gpu down -v && docker compose --profile gpu up -d --build`.
+If you used a conda env named `venus` from an older guide: `conda env remove -n venus`, then use Q1 / the wiki again.  
+Docker: `docker compose --profile gpu down -v && docker compose --profile gpu up -d --build`.
