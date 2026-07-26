@@ -1044,6 +1044,16 @@ async def run_sequence_design(body: SequenceDesignBody):
     )
 
     try:
+        try:
+            from ckpt_hub import ensure_proteinmpnn_weights
+        except ImportError:  # pragma: no cover
+            from src.ckpt_hub import ensure_proteinmpnn_weights
+
+        variant = "ca" if bool(body.ca_only) else ("soluble" if bool(body.use_soluble_model) else "vanilla")
+        ensure_proteinmpnn_weights(
+            model_name=body.model_name or "v_48_020",
+            variant=variant,
+        )
         proteinmpnn_run(args)
         fasta_path = _proteinmpnn_latest_design_fasta(out_folder, safe_pdb_file)
     except Exception as exc:

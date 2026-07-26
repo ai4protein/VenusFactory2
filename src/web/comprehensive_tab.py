@@ -22,7 +22,7 @@ from web.utils.file_handlers import extract_sequence_from_pdb
 from web.utils.label_mappers import map_labels_individual
 from web.utils.ui_helpers import handle_paste_fasta_detect, wrap_upload_show_section, wrap_paste_show_section, wrap_clear_hide_section
 from web.utils.llm_helpers import get_api_key, get_chat_base_url, call_llm_api, LLMConfig
-from web.utils.common_utils import get_save_path
+from web.utils.common_utils import ensure_project_ckpt, get_save_path
 from web.utils.constants import LLM_MODELS
 from web.utils.html_ui import load_html_template
 from dotenv import load_dotenv
@@ -332,7 +332,7 @@ def handle_individual_function_prediction(content, selected_chain, current_file,
             model_key = MODEL_MAPPING_FUNCTION.get(model_name)
             adapter_key = MODEL_ADAPTER_MAPPING_FUNCTION[model_key]
             script_path = PROJECT_ROOT / "src" / "tools" / "predict" / "finetuned" / f"{model_key}.py"
-            adapter_path = PROJECT_ROOT / "ckpt" / dataset / adapter_key
+            adapter_path = ensure_project_ckpt(PROJECT_ROOT / "ckpt" / dataset / adapter_key)
             output_file = output_data_dir / f"temp_{dataset}_{model_name}_{timestamp}.csv"
             
             if script_path.exists() and adapter_path.exists():
@@ -490,7 +490,7 @@ def handle_functional_residue_prediction(content, selected_chain, current_file, 
                 model_key = MODEL_MAPPING_FUNCTION.get(model_name)
                 adapter_key = MODEL_ADAPTER_MAPPING_FUNCTION[model_key]
                 script_path = PROJECT_ROOT / "src" / "tools" / "predict" / "finetuned" / f"{model_key}.py"
-                adapter_path = PROJECT_ROOT / "ckpt" / dataset / adapter_key
+                adapter_path = ensure_project_ckpt(PROJECT_ROOT / "ckpt" / dataset / adapter_key)
                 output_file = output_data_dir / f"temp_{dataset}_{model_name}_{timestamp}.csv"
                 
                 if script_path.exists() and adapter_path.exists():

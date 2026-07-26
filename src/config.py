@@ -230,6 +230,28 @@ class StorageConfig:
 
 
 # ---------------------------------------------------------------------------
+# Checkpoint hub (Hugging Face)
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class CkptHubConfig:
+    repo_id: str = "AI4Protein/VenusFactory2-ckpts"
+    local_dir: str = "ckpt"
+    revision: str = "main"
+    auto_download: bool = True
+
+    @classmethod
+    def from_env(cls) -> CkptHubConfig:
+        return cls(
+            repo_id=_env("VENUS_CKPT_REPO_ID", "AI4Protein/VenusFactory2-ckpts")
+            or "AI4Protein/VenusFactory2-ckpts",
+            local_dir=_env("VENUS_CKPT_DIR", "ckpt") or "ckpt",
+            revision=_env("VENUS_CKPT_REVISION", "main") or "main",
+            auto_download=_env_bool("VENUS_CKPT_AUTO_DOWNLOAD", True),
+        )
+
+
+# ---------------------------------------------------------------------------
 # MCP configuration
 # ---------------------------------------------------------------------------
 
@@ -278,6 +300,7 @@ class VenusConfig:
     agent: AgentConfig = field(default_factory=AgentConfig)
     online_limits: OnlineLimitsConfig = field(default_factory=OnlineLimitsConfig)
     storage: StorageConfig = field(default_factory=StorageConfig)
+    ckpt_hub: CkptHubConfig = field(default_factory=CkptHubConfig)
     mcp: MCPConfig = field(default_factory=MCPConfig)
     feedback: FeedbackConfig = field(default_factory=FeedbackConfig)
 
@@ -290,6 +313,7 @@ class VenusConfig:
             agent=AgentConfig.from_env(online=server.is_online),
             online_limits=OnlineLimitsConfig.from_env(),
             storage=StorageConfig.from_env(),
+            ckpt_hub=CkptHubConfig.from_env(),
             mcp=MCPConfig.from_env(),
             feedback=FeedbackConfig.from_env(),
         )

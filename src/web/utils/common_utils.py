@@ -48,6 +48,15 @@ def get_project_root() -> Path:
     return Path(__file__).resolve().parent.parent.parent.parent
 
 
+def ensure_project_ckpt(path: str | Path) -> Path:
+    """Ensure a path under ``ckpt/`` exists, auto-downloading from HF when needed."""
+    try:
+        from ckpt_hub import ensure_ckpt_path
+    except ImportError:  # pragma: no cover
+        from src.ckpt_hub import ensure_ckpt_path
+    return ensure_ckpt_path(path)
+
+
 def to_project_relative_path(path: str | Path) -> str:
     """Convert a path to a project-relative path whenever possible."""
     target = Path(path).expanduser()

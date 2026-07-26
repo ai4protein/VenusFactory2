@@ -58,6 +58,21 @@ def proteinmpnn_run(args):
             model_folder_path = _VANILLA_CKPT_ROOT
 
     checkpoint_path = str(Path(model_folder_path) / f"{args.model_name}.pt")
+    # Auto-fetch ProteinMPNN weights from HF when missing locally.
+    try:
+        import sys as _sys
+        _src = str(_PROJECT_ROOT / "src")
+        if _src not in _sys.path:
+            _sys.path.insert(0, _src)
+        from ckpt_hub import ensure_ckpt_file
+
+        checkpoint_path = str(ensure_ckpt_file(checkpoint_path))
+    except Exception as _ckpt_exc:
+        if not os.path.isfile(checkpoint_path):
+            raise FileNotFoundError(
+                f"ProteinMPNN checkpoint not found: {checkpoint_path}. "
+                "Run: python scripts/download_ckpts.py --preset proteinmpnn"
+            ) from _ckpt_exc
     folder_for_outputs = args.out_folder
     
     NUM_BATCHES = args.num_seq_per_target//args.batch_size

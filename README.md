@@ -97,7 +97,23 @@ npm run build
 cd ..
 ```
 
-### 3. Launch
+### 3. Download Checkpoints
+Weights are hosted at [AI4Protein/VenusFactory2-ckpts](https://huggingface.co/AI4Protein/VenusFactory2-ckpts) and are **not** shipped via git.
+
+```bash
+# Recommended: demo + ankh-large adapters
+python scripts/download_ckpts.py --preset predict-core
+
+# Sequence design
+python scripts/download_ckpts.py --preset proteinmpnn
+
+# Everything
+python scripts/download_ckpts.py --preset all
+```
+
+On-demand auto-download is enabled by default (`VENUS_CKPT_AUTO_DOWNLOAD=1`). For air-gapped installs, pre-download and set `VENUS_CKPT_AUTO_DOWNLOAD=0`.
+
+### 4. Launch
 ```bash
 # Web UI v1 (legacy Gradio, local mode)
 python src/webui.py --mode all  # → http://localhost:7860
@@ -115,7 +131,7 @@ python src/api_server.py  # → http://localhost:5000/docs
 bash script/train/train_plm_lora.sh
 ```
 
-### 3. Get Results
+### 5. Get Results
 
 <details>
 <summary><b>🤖 Try Agent-0.1 | ⚡ Quick Tools | 🔬 Train Models</b> (Click to expand examples)</summary>

@@ -97,7 +97,23 @@ npm run build
 cd ..
 ```
 
-### 3. 启动
+### 3. 下载模型权重（ckpt）
+权重托管在 [AI4Protein/VenusFactory2-ckpts](https://huggingface.co/AI4Protein/VenusFactory2-ckpts)，**不再随 git 分发**。
+
+```bash
+# 推荐：demo + 各任务 ankh-large 适配器
+python scripts/download_ckpts.py --preset predict-core
+
+# 需要序列设计时
+python scripts/download_ckpts.py --preset proteinmpnn
+
+# 全量
+python scripts/download_ckpts.py --preset all
+```
+
+默认开启按需自动下载（`VENUS_CKPT_AUTO_DOWNLOAD=1`）：首次用到缺失权重时会从 Hugging Face 拉取到 `ckpt/`。离线环境请预先下载并设置 `VENUS_CKPT_AUTO_DOWNLOAD=0`。
+
+### 4. 启动
 ```bash
 # Web UI v1（传统 Gradio，本地模式）
 python src/webui.py --mode all  # → http://localhost:7860
@@ -115,7 +131,7 @@ python src/api_server.py  # → http://localhost:5000/docs
 bash script/train/train_plm_lora.sh
 ```
 
-### 4. 获取结果
+### 5. 获取结果
 
 <details>
 <summary><b>🤖 试试Agent-0.1 | ⚡ 快速工具 | 🔬 训练模型</b> (点击展开示例)</summary>
