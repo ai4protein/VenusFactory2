@@ -44,11 +44,26 @@ def build_parser() -> argparse.ArgumentParser:
         default="",
         help="Directory for the binary (default: repo root).",
     )
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Suppress progress notices (sets VENUS_DOWNLOAD_QUIET=1).",
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.quiet:
+        import os
+
+        os.environ["VENUS_DOWNLOAD_QUIET"] = "1"
+
+    print(f"target     : {frpc_filename()}")
+    print("sources    : Gradio CDN → Hugging Face assets/frpc fallback")
+    print("note       : Progress prints to stderr; HF also shows a bar when used.")
+    print()
+
     dest_dir = Path(args.dest_dir) if args.dest_dir else None
     if args.to_gradio_cache and dest_dir is None:
         path = ensure_frpc(force=args.force)
@@ -59,6 +74,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         path = download_frpc(dest_dir=dest_dir, force=args.force)
 
+    print()
     print(f"filename   : {frpc_filename()}")
     print(f"local_path : {path}")
     print(f"size_bytes : {path.stat().st_size}")

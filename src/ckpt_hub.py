@@ -8,12 +8,14 @@ Environment:
   VENUS_CKPT_DIR              Local cache directory (default: <repo>/ckpt)
   VENUS_CKPT_REVISION         HF revision / tag / commit (default: main)
   VENUS_CKPT_AUTO_DOWNLOAD    1/true to auto-fetch missing weights (default: 1)
+  VENUS_DOWNLOAD_QUIET        1 to suppress user-facing download notices
 """
 from __future__ import annotations
 
 import json
 import os
 import threading
+from fnmatch import fnmatch
 from pathlib import Path
 from typing import Iterable, Sequence
 
@@ -24,6 +26,11 @@ except ImportError:  # pragma: no cover - direct script execution edge case
 
     def get_logger(name: str):  # type: ignore[misc]
         return logging.getLogger(name)
+
+try:
+    from hub_progress import announce, format_bytes
+except ImportError:  # pragma: no cover
+    from src.hub_progress import announce, format_bytes
 
 
 logger = get_logger("ckpt_hub")
@@ -232,6 +239,55 @@ def _import_hub():
     return hf_hub_download, snapshot_download
 
 
+def estimate_download_bytes(patterns: Sequence[str]) -> int | None:
+    """Best-effort total size from local/bundled manifest for the given patterns."""
+    files = load_manifest().get("files") or []
+    if not files:
+        return None
+    cleaned = [p.strip() for p in patterns if p and p.strip()]
+    if not cleaned:
+        return None
+    total = 0
+    matched = 0
+    for item in files:
+        path = str(item.get("path", ""))
+        if not path:
+            continue
+        if any(fnmatch(path, pat.rstrip("/")) or fnmatch(path, pat) for pat in cleaned):
+            try:
+                total += int(item.get("size") or 0)
+                matched += 1
+            except (TypeError, ValueError):
+                continue
+    return total if matched else None
+
+
+def _announce_download_start(label: str, patterns: Sequence[str] | None = None) -> None:
+    size = estimate_download_bytes(patterns or [])
+    size_txt = f" (~{format_bytes(size)})" if size else ""
+    announce(
+        f"[ckpt] Downloading {label}{size_txt} from {ckpt_repo_id()}@{ckpt_revision()} "
+        f"→ {ckpt_root()}",
+        log=logger,
+    )
+
+
+def _announce_download_done(label: str, dest: Path | None = None) -> None:
+    extra = ""
+    if dest is not None and dest.exists():
+        try:
+            if dest.is_file():
+                extra = f" ({format_bytes(dest.stat().st_size)})"
+            elif dest.is_dir():
+                # lightweight: count .pt files only
+                pts = list(dest.glob("*.pt"))
+                if pts:
+                    extra = f" ({len(pts)} .pt file(s))"
+        except OSError:
+            pass
+    announce(f"[ckpt] Finished {label}{extra}", log=logger)
+
+
 def download_file(rel_path: str | Path, *, force: bool = False) -> Path:
     """Download a single file into the local ckpt root. Returns the local path."""
     rel = normalize_rel_path(rel_path)
@@ -241,12 +297,7 @@ def download_file(rel_path: str | Path, *, force: bool = False) -> Path:
 
     hf_hub_download, _ = _import_hub()
     ckpt_root().mkdir(parents=True, exist_ok=True)
-    logger.info(
-        "Downloading ckpt file %s from %s@%s",
-        rel,
-        ckpt_repo_id(),
-        ckpt_revision(),
-    )
+    _announce_download_start(f"file '{rel}'", [rel])
     hf_hub_download(
         repo_id=ckpt_repo_id(),
         filename=rel,
@@ -260,6 +311,7 @@ def download_file(rel_path: str | Path, *, force: bool = False) -> Path:
             f"Downloaded '{rel}' but local file is missing/empty at {dest}. "
             f"Check that it exists in {ckpt_repo_id()}."
         )
+    _announce_download_done(f"file '{rel}'", dest)
     return dest
 
 
@@ -275,12 +327,8 @@ def download_patterns(
 
     _, snapshot_download = _import_hub()
     ckpt_root().mkdir(parents=True, exist_ok=True)
-    logger.info(
-        "Downloading ckpt patterns %s from %s@%s",
-        cleaned,
-        ckpt_repo_id(),
-        ckpt_revision(),
-    )
+    label = ", ".join(cleaned)
+    _announce_download_start(f"patterns [{label}]", cleaned)
     snapshot_download(
         repo_id=ckpt_repo_id(),
         repo_type="model",
@@ -289,11 +337,14 @@ def download_patterns(
         allow_patterns=list(cleaned),
         force_download=force,
     )
+    _announce_download_done(f"patterns [{label}]", ckpt_root())
     return ckpt_root()
 
 
 def download_preset(preset: str, *, force: bool = False) -> Path:
-    return download_patterns(preset_patterns(preset), force=force)
+    patterns = preset_patterns(preset)
+    announce(f"[ckpt] Preset '{preset}' → {', '.join(patterns)}", log=logger)
+    return download_patterns(patterns, force=force)
 
 
 def ensure_ckpt_file(path: str | Path, *, download: bool | None = None) -> Path:
@@ -307,6 +358,10 @@ def ensure_ckpt_file(path: str | Path, *, download: bool | None = None) -> Path:
             return dest
         if not should_download:
             raise FileNotFoundError(_missing_hint(rel))
+        announce(
+            f"[ckpt] Missing local weight '{rel}'; auto-downloading from Hugging Face...",
+            log=logger,
+        )
         return download_file(rel)
 
 
@@ -327,6 +382,11 @@ def ensure_ckpt_dir(
             return dest
         if not should_download:
             raise FileNotFoundError(_missing_hint(rel))
+        announce(
+            f"[ckpt] Missing local adapter '{rel}/'; auto-downloading from Hugging Face "
+            "(first run may take a few minutes)...",
+            log=logger,
+        )
         download_patterns([pattern])
         if not _dir_ready(dest, require_json=require_json):
             raise FileNotFoundError(

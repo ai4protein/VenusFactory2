@@ -91,7 +91,7 @@ def _http_get(sess: requests.Session, url: str, params: Optional[Dict[str, Any]]
     api_key = os.environ.get("OPENALEX_API_KEY")
     if api_key:
         p["api_key"] = api_key
-    return sess.get(url, params=p, timeout=timeout, headers={"User-Agent": "VenusFactory2 (https://venusfactory.cn)"})
+    return sess.get(url, params=p, timeout=timeout, headers={"User-Agent": "VenusFactory2 (https://venusfactory.bio)"})
 
 
 def _summarize_works(results: List[Dict[str, Any]], limit: int = 5) -> str:

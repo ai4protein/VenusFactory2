@@ -8,43 +8,29 @@
 
 <div align="center">
 
-[![GitHub stars](https://img.shields.io/github/stars/AI4Protein/VenusFactory2?style=flat-square)](https://github.com/AI4Protein/VenusFactory2/stargazers) [![GitHub forks](https://img.shields.io/github/forks/AI4Protein/VenusFactory2?style=flat-square)](https://github.com/AI4Protein/VenusFactory2/network/members) [![GitHub issues](https://img.shields.io/github/issues/AI4Protein/VenusFactory2?style=flat-square)](https://github.com/AI4Protein/VenusFactory2/issues) [![GitHub license](https://img.shields.io/github/license/AI4Protein/VenusFactory2?style=flat-square)](https://github.com/AI4Protein/VenusFactory2/blob/main/LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/AI4Protein/VenusFactory2?style=flat-square)](https://github.com/AI4Protein/VenusFactory2/stargazers)
+[![GitHub license](https://img.shields.io/github/license/AI4Protein/VenusFactory2?style=flat-square)](https://github.com/AI4Protein/VenusFactory2/blob/main/LICENSE)
+[![Wiki](https://img.shields.io/badge/Wiki-docs-brightgreen?style=flat-square)](docs/wiki/Home.md)
+[![Demo](https://img.shields.io/badge/Demo-Website-blue?style=flat-square)](https://venusfactory.bio/)
+[![arXiv](https://img.shields.io/badge/arXiv-2603.27303-b31b1b?style=flat-square)](https://arxiv.org/abs/2603.27303)
 
-[![Python Version](https://img.shields.io/badge/Python-3.12-blue?style=flat-square&logo=python)](https://www.python.org/) [![Documentation](https://img.shields.io/badge/docs-latest-brightgreen?style=flat-square)](https://venusfactory.readthedocs.io/) [![Downloads](https://img.shields.io/github/downloads/AI4Protein/VenusFactory2/total?style=flat-square)](https://github.com/AI4Protein/VenusFactory2/releases) [![Youtube](https://img.shields.io/badge/Youtube-AI4Protein-red?style=flat-square&logo=youtube)](https://www.youtube.com/watch?v=MT6lPH5kgCc&ab_channel=BxinZhou) [![Demo](https://img.shields.io/badge/Demo-OpenBayes-blue)](https://openbayes.com/console/public/tutorials/O3RCA0XUKa0)
-
-**🤖 Agent-Driven Protein Engineering Platform**
-*One platform, three interfaces, infinite possibilities*
+**Agent-driven protein engineering platform**  
+Web UI · REST API · CLI · 40+ models · 11+ databases
 
 </div>
 
----
-
-## 🌟 Recent News
-
-- [2026-04-01] 🎉 New released VenusFactory2 website at [venusfactory.cn/playground](https://venusfactory.cn/playground/)
-- [2026-03-27] 🚀 VenusFactory2 technical report released at [arXiv:2603.27303](https://arxiv.org/abs/2603.27303)
-- [2026-01-23] 🚀 Added [VenusX (ICLR2026)](https://openreview.net/forum?id=zcmL592XRG) in VenusFactory2
-- [2025-04-19] 🎉 [VenusREM (ISMB/ECCB2025)](https://github.com/ai4protein/VenusREM) #1 in [ProteinGym](https://proteingym.org/benchmarks) & [VenusMutHub](https://lianglab.sjtu.edu.cn/muthub/)!
-
 <details>
-<summary>📨 Join our WeChat Group / 📝 Share Your Feedback</summary>
-<p align="center">
-  <img src="img/wechat.png" width="60%" alt="WeChat Group">
-</p>
+<summary>📨 WeChat / feedback</summary>
+<p align="center"><img src="img/wechat.png" width="50%" alt="WeChat"></p>
 </details>
 
 ---
 
-## 🎯 What is VenusFactory2?
+## What is it?
 
-**VenusFactory2** is an **Agent-driven protein engineering platform** combining 40+ AI models with 11 biological databases. Designed for everyone — from biologists to AI researchers.
+VenusFactory2 puts protein language models, biological databases, and an Agent orchestrator in one place: upload a sequence/structure to predict, drive multi-step analysis in natural language, or fine-tune your own models.
 
-<p align="center">
-  <img src="https://img.shields.io/badge/🤖_Agent_Driven-Core-FF6B6B?style=for-the-badge">
-  <img src="https://img.shields.io/badge/Models-40+-4ECDC4?style=for-the-badge">
-  <img src="https://img.shields.io/badge/Databases-11+-95E1D3?style=for-the-badge">
-  <img src="https://img.shields.io/badge/Tools-9_Categories-F38181?style=for-the-badge">
-</p>
+Try online: [venusfactory.bio](https://venusfactory.bio/)
 
 <p align="center">
   <img src="img/web_v2/train.png" width="90%" alt="VenusFactory2 Training Interface">
@@ -54,500 +40,54 @@
   <img src="img/web_v2/agent.png" width="90%" alt="VenusFactory2 Agent Interface">
 </p>
 
-### 🚀 Why VenusFactory2?
-
-| **🤖 Agent-First** | **🎯 Three Interfaces** | **⚡ Zero to Results** |
-|:------------------:|:----------------------:|:---------------------:|
-| Natural language → Multi-step automation | Web UI / REST API / CLI | Upload → Predict in seconds |
-| 40+ models + 11 databases | Same power, different styles | Or train custom models in minutes |
-
-> **📖 Easy to Learn**: Designed for life science professionals with no programming background required. Intuitive Web UI, comprehensive bilingual documentation, rich examples and video tutorials help you quickly grow from beginner to protein AI expert.
-
-### 💡 Capabilities at a Glance
-
-| Task | Solution | Time |
-|:-----|:---------|:-----|
-| 🧬 Mutation effects | ESM-2, ProSST, ProtSSN (zero-shot) | <1 min |
-| 🎯 Protein function | 30+ fine-tuned models | <30 sec |
-| 🔬 Custom training | 7 PEFT methods (LoRA, QLoRA, etc.) | 10-60 min |
-| 💾 Data download | AlphaFold, UniProt, RCSB, KEGG, etc. | Real-time |
-| 📚 Literature | AI-powered search & analysis | <2 min |
-
 ---
 
-## ⚡ Quick Start
-
-### 1. Install
-```bash
-git clone https://github.com/AI4Protein/VenusFactory2.git && cd VenusFactory2
-conda create -n venus python=3.12 && conda activate venus
-pip install -r requirements.txt  # Detailed guide below ↓
-
-# Local deploy: install kimi-code (the default chat engine).
-# See: <https://example.com/kimi-code>  # TODO: replace with official repo
-# Skip if you only use online mode or other LLM models:
-#   export KIMI_EXTERNAL=1   # or remove kimi-code from src/agent/models.yaml
-```
-
-### 2. Build Frontend (WebUI v2 required)
-```bash
-cd frontend
-npm install
-npm run build
-cd ..
-```
-
-### 3. Download Checkpoints
-Weights are hosted at [AI4Protein/VenusFactory2-ckpts](https://huggingface.co/AI4Protein/VenusFactory2-ckpts) and are **not** shipped via git.
-
-```bash
-# Recommended: demo + ankh-large adapters
-python scripts/download_ckpts.py --preset predict-core
-
-# Sequence design
-python scripts/download_ckpts.py --preset proteinmpnn
-
-# Everything
-python scripts/download_ckpts.py --preset all
-```
-
-On-demand auto-download is enabled by default (`VENUS_CKPT_AUTO_DOWNLOAD=1`). For air-gapped installs, pre-download and set `VENUS_CKPT_AUTO_DOWNLOAD=0`.
-
-The Gradio Share `frpc` binary is also not tracked in git:
-
-```bash
-python scripts/download_frpc.py --to-gradio-cache
-```
-
-### 4. Launch
-```bash
-# Web UI v1 (legacy Gradio, local mode)
-python src/webui.py --mode all  # → http://localhost:7860
-
-# Web UI v2 (FastAPI + React, local mode)
-python src/webui_v2.py --host 0.0.0.0 --port 7861  # → http://localhost:7861
-
-# Web UI v2 (FastAPI + React, online mode)
-python src/webui_v2.py --host 0.0.0.0 --port 7861 --online
-
-# REST API only
-python src/api_server.py  # → http://localhost:5000/docs
-
-# CLI
-bash script/train/train_plm_lora.sh
-```
-
-### 5. Get Results
-
-<details>
-<summary><b>🤖 Try Agent-0.1 | ⚡ Quick Tools | 🔬 Train Models</b> (Click to expand examples)</summary>
-
-**Agent-0.1 (Natural Language)**
-```
-Q: "Predict stability for sequence MKTAYIAKQRQISFV..."
-→ Agent auto-selects model → Runs prediction → Returns results + explanations
-```
-
-**Quick Mutation Scoring**
-```
-Upload: PDB/FASTA → Mutations: A23V, K45R → Get: Stability scores
-```
-
-**Train Your Model**
-```
-Model: ESM2-650M → Dataset: DeepSol → Method: LoRA → 15 min → Trained model ✓
-```
-
-</details>
-
-<p align="center">
-  <video width="70%" controls>
-    <source src="./img/venusfactory.mp4" type="video/mp4">
-  </video>
-</p>
-
----
-
-## 🤖 Agent-0.1: The Brain
-
-**Agent-0.1** orchestrates all tools via natural language. Powered by LangGraph + LangChain.
-
-```
-You: "Design thermostable mutations for PDB:1ABC"
-         ↓
-    🤖 Agent Planning
-         ↓
-  📥 Download → 🧬 Predict → 🎯 Score → 📊 Report
-  RCSB PDB     ESM-2 scan    Stability   Ranked list
-```
-
-<details>
-<summary><b>✨ Agent Capabilities</b></summary>
-
-| Category | Features |
-|:---------|:---------|
-| **🔬 Analysis** | Mutation prediction • Function/stability scoring • Structure analysis |
-| **💾 Data** | Multi-database search • Format conversion • Batch processing |
-| **🧠 Planning** | Multi-step automation • Tool orchestration • Error handling |
-| **📚 Research** | Literature mining • Family analysis • Report generation |
-
-</details>
-
-<details>
-<summary><b>💬 Example Conversations</b></summary>
-
-**Mutation Design:**
-```
-You: "Improve thermostability of MKTAYIAKQR..."
-Agent: ✓ ESM-2 scanning... ✓ Stability scoring...
-→ Top 3: A5V (+2.8 kcal/mol), K9R (+1.9), T2S (+1.5)
-```
-
-**Database Search:**
-```
-You: "Find lysozyme structures <2.0Å resolution"
-Agent: ✓ Searching RCSB... → Found 47 structures
-→ Downloaded to: temp_outputs/lysozyme_structures/
-```
-
-</details>
-
-> 💡 **Note:** Requires API key (OpenAI/Anthropic). Currently in Beta.
-
----
-
-## 🏗️ Architecture
-
-```
-🌐 Interfaces: Web UI | REST API | CLI
-        ↓
-   🤖 Agent Layer (LangGraph + LangChain)
-        ↓
-   🔧 Application: Train | Eval | Predict | Tools
-        ↓
-   🛠️ Core Tools: 9 categories (mutation, database, search, etc.)
-        ↓
-   📊 Resources: 40+ Models | 30+ Datasets | 11+ Databases
-```
-
-<details>
-<summary><b>📚 Integrated Resources</b></summary>
-
-**Models (40+):** ESM, ProtBert, ProtT5, Venus/PETA/ProSST series
-
-**Databases (11+):** AlphaFold • RCSB PDB • UniProt • NCBI • KEGG • STRING • BRENDA • ChEMBL • HPA • FDA • Foldseek
-
-**Datasets (30+):** Function • Localization • Stability • Solubility • Mutation fitness
-
-</details>
-
-<details>
-<summary><b>🔧 Tool Categories</b></summary>
-
-| Tool | Description | Agent | CLI |
-|:-----|:------------|:-----:|:---:|
-| 🧬 Mutation | ESM-1v, ESM-2, ProSST, ProtSSN, MIF-ST | ✅ | ✅ |
-| 🎯 Prediction | 30+ fine-tuned models | ✅ | ✅ |
-| 💾 Database | 11 integrations | ✅ | ✅ |
-| 🔍 Search | PubMed, FDA, patents | ✅ | ✅ |
-| 🏋️ Training | LoRA, QLoRA, DoRA, etc. | ✅ | ✅ |
-| 📁 File | Format conversion | ✅ | ✅ |
-| 🔬 Denovo | Protein design | ✅ | ✅ |
-| 🧪 Discovery | Novel discovery | ✅ | ✅ |
-| 📊 Visualize | 3D viewer | ✅ | ✅ |
-
-</details>
-
----
-
-## 🧬 Supported Models
-
-<details>
-<summary><b>40+ Protein Language Models</b> (Click to expand)</summary>
-
-**Venus Series (Liang's Lab):**
-ProSST-20/128/512/1024/2048/4096 (110M) • ProPrime-690M • VenusPLM-300M • PETA-base/bpe/unigram (80M)
-
-**ESM Series (Meta AI):**
-ESM2: 8M, 35M, 150M, 650M, 3B, 15B • ESM-1v: 5 models (650M each)
-
-**ProtBert & ProtT5:**
-ProtBert-Uniref100/BFD (420M) • IgBert (420M) • ProtT5-XL/XXL (3B-11B) • Ankh-base/large (450M-1.2B)
-
-**Selection Guide:**
-- GPU <8GB: ESM2-8M/35M, ProSST
-- GPU 8-16GB: ESM2-150M/650M, ProtBert
-- GPU 24GB+: ESM2-3B, ProtT5-XL
-- Multi-GPU: ESM2-15B, ProtT5-XXL
-
-**By Task:**
-- Classification: ESM2, ProtBert
-- Structure: Ankh
-- Generation: ProtT5
-- Antibody: IgBert/IgT5
-- Lightweight: ProSST, PETA
-
-</details>
-
----
-
-## 📚 Supported Datasets
-
-<details>
-<summary><b>30+ Supervised + Zero-Shot Datasets</b></summary>
-
-**Zero-Shot:** VenusMutHub • ProteinGym (217 DMS)
-
-**Function:** EC • GO_BP • GO_CC • GO_MF
-**Localization:** DeepLocBinary • DeepLocMulti • DeepLoc2Multi
-**Stability:** Thermostability • TAPE_Stability
-**Solubility:** DeepSol • DeepSoluE • eSOL • ProtSolM • PETA_CHS/LGK/TEM_Sol
-**Mutation:** FLIP_AAV (7 splits) • FLIP_GB1 (5 splits) • TAPE_Fluorescence
-**Others:** DeepET_Topt • MetalIonBinding • SortingSignal • PaCRISPR
-
-All datasets available on [HuggingFace](https://huggingface.co/AI4Protein)
-
-</details>
-
----
-
-## 📦 Installation
-
-> **System packages (Linux):** PDF export pulls `pycairo`, which builds against `cairo`.
-> On Debian/Ubuntu, install once before pip-installing:
-> ```bash
-> sudo apt-get install -y libcairo2-dev libxml2-dev pkg-config
-> ```
-> Or, with conda, install the pre-built binary to skip the build:
-> ```bash
-> conda install -c conda-forge pycairo
-> ```
-> macOS / Windows: pre-built wheels exist, no extra system step needed.
-
-### Option A — conda + pip (recommended for end users)
-
-<details>
-<summary><b>🍎 macOS (M1/M2/M3)</b></summary>
+## Quick Start
+
+| Prerequisite | Notes |
+|:-------------|:------|
+| Python | **≥3.12** (installer creates a 3.12 `.venv` by default) |
+| Node.js | **25.x** + npm (WebUI v2 build) |
+| Disk | Reserve several–15+ GB (PyTorch wheels dominate) |
+| GPU | Optional; NVIDIA → CUDA wheels, else CPU |
+
+Slow Hugging Face access: `export HF_ENDPOINT=https://hf-mirror.com`
 
 ```bash
 git clone https://github.com/AI4Protein/VenusFactory2.git && cd VenusFactory2
-conda create -n venus python=3.12 && conda activate venus
-pip install --pre torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/nightly/cpu
-pip install torch_scatter torch-sparse torch-geometric -f https://data.pyg.org/whl/torch-2.8.0+cpu.html
-pip install -r requirements_for_macOS.txt
-```
+python scripts/setup_quickstart.py          # interactive one-click install
+# python scripts/setup_quickstart.py -y     # CI / non-interactive
 
-</details>
-
-<details>
-<summary><b>🪟 Windows / 🐧 Linux (CUDA 12.8)</b></summary>
-
-```bash
-git clone https://github.com/AI4Protein/VenusFactory2.git && cd VenusFactory2
-conda create -n venus python=3.12 && conda activate venus
-# Linux only: see "System packages" note above for cairo headers.
-pip install torch==2.8.0 torchvision --index-url https://download.pytorch.org/whl/cu128
-pip install torch_geometric pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv \
-    -f https://data.pyg.org/whl/torch-2.8.0+cu128.html
-pip install -r requirements.txt
-```
-
-</details>
-
-<details>
-<summary><b>🪟 Windows / 🐧 Linux (CUDA 11.8)</b></summary>
-
-```bash
-git clone https://github.com/AI4Protein/VenusFactory2.git && cd VenusFactory2
-conda create -n venus python=3.12 && conda activate venus
-pip install torch==2.7.0 --index-url https://download.pytorch.org/whl/cu118
-pip install torch_geometric pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv \
-    -f https://data.pyg.org/whl/torch-2.7.0+cu118.html
-pip install -r requirements.txt
-```
-
-</details>
-
-<details>
-<summary><b>💻 CPU Only</b></summary>
-
-```bash
-git clone https://github.com/AI4Protein/VenusFactory2.git && cd VenusFactory2
-conda create -n venus python=3.12 && conda activate venus
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
-pip install torch_geometric pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv \
-    -f https://data.pyg.org/whl/torch-2.8.0+cpu.html
-pip install -r requirements.txt
-```
-
-</details>
-
-### Option B — uv (faster, recommended for development)
-
-A helper script installs torch / PyG / `pyproject.toml` deps into `.venv/` via [uv](https://docs.astral.sh/uv/):
-
-```bash
-git clone https://github.com/AI4Protein/VenusFactory2.git && cd VenusFactory2
-# Linux only: see "System packages" note above for cairo headers.
-python install.py --type cu128       # or: --type cpu
 source .venv/bin/activate
+python src/webui_v2.py --host 0.0.0.0 --port 7861
+# → http://localhost:7861
 ```
 
-### Verify the environment
+The installer detects older setups (`.venv` / frontend / weights) and can reuse or wipe them. Press Enter for the recommended path.
 
-Run the bundled readiness check:
+**After launch**
 
-```bash
-python scripts/check_env.py
-```
-
-It validates torch/CUDA, PyG, transformers, the agent stack, ProSST deps (`pathos`, etc.), project `src` imports, and runs a CUDA matmul smoke test. Exit code is non-zero if any required dependency is missing.
+1. Open the UI → Quick Tools work without an LLM key  
+2. Agent: set an API key in Settings, or `cp .env.example .env` (see `.env.example`)  
+3. Optional check: `python scripts/check_env.py`
 
 ---
 
-## 🚀 Usage
+## Documentation
 
-### Web UI
+Three layers — start at the top; dig only when needed:
 
-> WebUI v2 serves static files from `frontend/dist` in production mode, so run `npm run build` in `frontend/` before starting `src/webui_v2.py`.
+| Layer | Where |
+|:------|:------|
+| Map of all docs | **[docs/README.md](docs/README.md)** |
+| Install · catalogs · WebUI map · CLI/API | [docs/wiki/Home.md](docs/wiki/Home.md) |
+| Per-feature how-tos | [docs/manual/](docs/manual/) |
 
-```bash
-# Build WebUI v2 frontend assets first
-cd frontend && npm run build && cd ..
-
-# v1 (legacy Gradio) - local mode
-python src/webui.py --mode all  # → http://localhost:7860
-
-# v1 (legacy Gradio) - online-compatible mode (feature-limited)
-WEBUI_V2_MODE=online python src/webui.py --mode all  # → http://localhost:7860
-
-# v2 (FastAPI + React) - local mode
-python src/webui_v2.py --host 0.0.0.0 --port 7861  # → http://localhost:7861
-
-# v2 (FastAPI + React) - online mode
-python src/webui_v2.py --host 0.0.0.0 --port 7861 --online  # → http://localhost:7861
-```
-
-### Configuration Entry
-
-- Main runtime configuration template: `.env.example`
-- Typical flow: `cp .env.example .env` then adjust required keys for your mode.
-- Minimal local setup: keep defaults, set `OPENAI_API_KEY` only if you use LLM-backed features.
-- Minimal online setup: set `WEBUI_V2_MODE=online`, `WEBUI_V2_SESSION_TOKEN_SECRET`, and review all `WEBUI_V2_*_LIMIT` values.
-
-| Tab | Purpose | Features |
-|:----|:--------|:---------|
-| **Training** | Train custom models | Model selection • PEFT methods • Real-time monitoring • Wandb |
-| **Evaluation** | Benchmark testing | Load model • Select metrics • CSV export |
-| **Prediction** | Inference | Single/batch prediction • Result visualization |
-| **Agent** | Natural language | Multi-step automation • Tool orchestration |
-| **Quick Tools** | Rapid prediction | Mutation scoring • Function prediction |
-| **Advanced** | Deep analysis | Sequence/structure-based models |
-| **Download** | Data retrieval | AlphaFold • UniProt • RCSB • InterPro |
-| **Manual** | Documentation | Guides & tutorials |
-
-<details>
-<summary><b>Screenshots</b></summary>
-
-![Training](img/web_v1/Train/Model_Dataset_Config.png)
-![Evaluation](img/web_v1/Eval/Model_Dataset_Config.png)
-![Prediction](img/web_v1/Predict/Predict_Tab.png)
-
-</details>
-
-### CLI & API
-
-<details>
-<summary><b>Command Line Examples</b></summary>
-
-```bash
-# Train model
-bash script/train/train_plm_lora.sh \
-  --model facebook/esm2_t33_650M_UR50D \
-  --dataset DeepSol --batch_size 32
-
-# Evaluate
-bash script/eval/eval.sh \
-  --model_path ckpt/DeepSol/best_model \
-  --test_dataset DeepSol
-
-# Download data
-bash script/tools/database/alphafold/download_alphafold_structure.sh
-bash script/tools/database/uniprot/download_uniprot_seq.sh
-
-# Generate structure sequences
-bash script/get_structure_seq/get_esm3_structure_seq.sh
-```
-
-</details>
-
-<details>
-<summary><b>REST API Examples</b></summary>
-
-```bash
-# Start server
-python src/api_server.py  # → http://localhost:5000/docs
-
-# Mutation prediction
-curl -X POST http://localhost:5000/api/mutation/predict \
-  -H "Content-Type: application/json" \
-  -d '{"sequence": "MKTAYIA...", "mutations": ["A23V", "K45R"]}'
-
-# Function prediction
-curl -X POST http://localhost:5000/api/predict/function \
-  -H "Content-Type: application/json" \
-  -d '{"sequence": "MKTAYIA...", "tasks": ["solubility", "stability"]}'
-
-# Database search
-curl http://localhost:5000/api/database/uniprot/search?query=lysozyme&limit=10
-```
-
-</details>
-
-<details>
-<summary><b>Python API</b></summary>
-
-```python
-from src.tools.mutation import predict_mutation_effects
-from src.tools.predict import predict_protein_function
-from src.tools.database import download_alphafold_structure
-
-# Mutations
-results = predict_mutation_effects(
-    sequence="MKTAYIAKQR...",
-    mutations=["A5V", "K9R"],
-    model="esm2"
-)
-
-# Function
-predictions = predict_protein_function(
-    sequence="MKTAYIA...",
-    tasks=["solubility", "stability"]
-)
-
-# Data
-pdb_file = download_alphafold_structure("P12345")
-```
-
-</details>
+中文：[README_CN.md](README_CN.md) · [docs/README.md](docs/README.md)
 
 ---
 
-## 📊 Training Methods
-
-| Method | Memory | Speed | Performance | Best For |
-|:-------|:------:|:-----:|:-----------:|:---------|
-| **LoRA** | Low | Fast | Good | General tasks |
-| **QLoRA** | Very Low | Slow | Good | Limited GPU |
-| **DoRA** | Low | Medium | Better | Improved LoRA |
-| **AdaLoRA** | Low | Medium | Better | Adaptive rank |
-| **SES-Adapter** | Medium | Medium | Better | Selective tuning |
-| **IA3** | Very Low | Fast | Good | Lightweight |
-| **Freeze** | Low | Fast | Good | Simple tuning |
-
----
-
-## 🙌 Citation
+## Citation
 
 ```bibtex
 @article{tan2026venusfactory2,
@@ -568,28 +108,9 @@ pdb_file = download_alphafold_structure("P12345")
 
 ---
 
-## 📜 License
+## License & acknowledgement
 
-VenusFactory is released under the **VenusFactory Non-Commercial License** — see [`LICENSE`](./LICENSE) (English, authoritative) and [`LICENSE_CN.md`](./LICENSE_CN.md) (中文翻译, for reference).
+Released under the **VenusFactory Non-Commercial License**: free for academic / non-commercial use; commercial use needs written approval → **<hongl3lilang@sjtu.edu.cn>**. See [`LICENSE`](./LICENSE) / [`LICENSE_CN.md`](./LICENSE_CN.md).
 
-- ✅ **Academic / non-commercial use is free** for not-for-profit research institutions, government laboratories, universities, and individuals — for internal research, teaching, and personal study. Please cite the references in the [Citation](#-citation) section.
-- ❌ **Commercial use is NOT permitted** under the default license. This includes any use by or for a for-profit entity, any fee-bearing product/service/API, contract research whose IP is owned by a for-profit entity, and any use intended for commercial advantage.
-- 📧 **Commercial licensing requires prior written approval.** To request a commercial license — or to confirm whether your intended use qualifies as commercial — please email **<hongl3lilang@sjtu.edu.cn>** (Liang Lab, Shanghai Jiao Tong University). Your inquiry should include the licensee entity, intended use, scope, and duration.
-
----
-
-## 🎊 Acknowledgement
-
-Developed by [Liang's Lab](https://ins.sjtu.edu.cn/people/lhong/index.html) at Shanghai Jiao Tong University.
-
-**Resources:** [Docs](https://venusfactory.readthedocs.io/) • [YouTube](https://www.youtube.com/watch?v=MT6lPH5kgCc&ab_channel=BxinZhou) • [Playground](https://venusfactory.cn/playground/) • [Issues](https://github.com/AI4Protein/VenusFactory2/issues)
-
----
-
-<div align="center">
-
-**Made with ❤️ for the protein engineering community**
-
-[⭐ Star](https://github.com/AI4Protein/VenusFactory2) • [🐛 Report Bug](https://github.com/AI4Protein/VenusFactory2/issues) • [💡 Request Feature](https://github.com/AI4Protein/VenusFactory2/issues)
-
-</div>
+Maintained by [Liang's Lab](https://ins.sjtu.edu.cn/people/lhong/index.html), Shanghai Jiao Tong University.  
+[Website](https://venusfactory.bio/) · [YouTube](https://www.youtube.com/watch?v=MT6lPH5kgCc) · [Issues](https://github.com/AI4Protein/VenusFactory2/issues)
