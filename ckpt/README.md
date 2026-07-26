@@ -12,6 +12,8 @@ library_name: venus-factory
 
 Pretrained / finetuned weights for [VenusFactory2](https://github.com/AI4Protein/VenusFactory2).
 
+> **VenusFactory users:** prefer the in-repo guide [docs/wiki/Checkpoints.md](../docs/wiki/Checkpoints.md) (presets, env vars, auto-download). This file is also the Hugging Face model-card text for `AI4Protein/VenusFactory2-ckpts`.
+
 These files are **not** stored in the GitHub repository. VenusFactory2 downloads them into a local `ckpt/` directory.
 
 ## Install / download

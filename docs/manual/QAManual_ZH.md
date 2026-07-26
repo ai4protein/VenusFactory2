@@ -4,23 +4,17 @@
 
 ### Q1: 怎么安装 VenusFactory2？
 
-参考 `README.md` 的 **Installation** 章节。支持三条路径：
+**推荐：** 交互式一键安装（详见 [Installation 中文 Wiki](../wiki/Installation_CN.md)）：
 
-1. **conda + pip**（多数用户的默认路径）：
-   ```bash
-   git clone https://github.com/AI4Protein/VenusFactory2.git && cd VenusFactory2
-   conda create -n venus python=3.12 && conda activate venus
-   pip install torch==2.8.0 torchvision --index-url https://download.pytorch.org/whl/cu128
-   pip install torch_geometric pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv \
-       -f https://data.pyg.org/whl/torch-2.8.0+cu128.html
-   pip install -r requirements.txt
-   ```
+```bash
+git clone https://github.com/AI4Protein/VenusFactory2.git && cd VenusFactory2
+python scripts/setup_quickstart.py --lang zh   # 中文菜单；默认英文可不加 --lang
+# python scripts/setup_quickstart.py -y        # CI / 非交互
+source .venv/bin/activate
+python scripts/check_env.py                    # 可选冒烟检查
+```
 
-2. **uv**（更快，开发用）：`python install.py --type cu128` 后 `source .venv/bin/activate`。
-
-3. **Docker**：`cp .env.example .env && docker compose --profile gpu up -d --build`。
-
-用 `python scripts/check_env.py` 校验。
+进阶路径（`install.py`、conda+pip、Docker）见同一 Wiki 页。根目录 README 里已不再放长篇安装说明——请以 Wiki 为准。
 
 ### Q2: 安装时报 "Could not find a specific dependency"。
 
@@ -332,15 +326,13 @@ python src/webui_v2.py --host 0.0.0.0 --port 7861
 ### Q30: 怎么完全重置环境？
 
 ```bash
-# conda 路径
-conda deactivate
-conda env remove -n venus
-conda create -n venus python=3.12
-# 然后按 Q1 重新装
+# 一键清环境并重装（推荐）
+python scripts/setup_quickstart.py -y --clean-venv --clean-frontend
 
-# uv 路径
+# 或只删 venv 后重新跑交互安装
 rm -rf .venv
-python install.py --type cu128
+python scripts/setup_quickstart.py --lang zh
 ```
 
+若仍在用旧文档里的 conda 环境 `venus`：`conda env remove -n venus`，再按 Q1 / Wiki 安装。  
 Docker：`docker compose --profile gpu down -v && docker compose --profile gpu up -d --build`。
