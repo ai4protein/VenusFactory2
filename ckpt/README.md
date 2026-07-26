@@ -52,9 +52,18 @@ DeepSol/<backbone>/*.pt|*.json
 ProteinMPNN/vanilla_model_weights/*.pt
 ...
 manifest.json
+assets/frpc/frpc_linux_amd64_v0.3   # Gradio share helper (not a model weight)
 ```
 
 See `manifest.json` for the full file list, sizes, and sha256 checksums.
+
+## Gradio ``frpc``
+
+```bash
+python scripts/download_frpc.py --to-gradio-cache
+```
+
+This binary is also ignored by git (same idea as checkpoints).
 
 ## Presets
 
