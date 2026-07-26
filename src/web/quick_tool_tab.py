@@ -12,7 +12,7 @@ import json
 from dotenv import load_dotenv
 
 from web.utils.constants import *
-from web.utils.common_utils import *
+from web.utils.common_utils import *  # includes ensure_project_ckpt
 from web.utils.file_handlers import *
 from web.utils.llm_helpers import *
 from web.utils.data_processors import *
@@ -401,7 +401,7 @@ def handle_protein_function_prediction(
             
             adapter_key = MODEL_ADAPTER_MAPPING_FUNCTION[model_key]
             script_path = PROJECT_ROOT / "src" / "tools" / "predict" / "finetuned" / f"{model_key}.py"
-            adapter_path = PROJECT_ROOT / "ckpt" / dataset / adapter_key
+            adapter_path = ensure_project_ckpt(PROJECT_ROOT / "ckpt" / dataset / adapter_key)
             output_file = function_dir / f"{dataset}_{model}_{timestamp}.csv"
             
             if not script_path.exists() or not adapter_path.exists():
@@ -810,7 +810,7 @@ def handle_protein_residue_function_prediction(
         
         for dataset in datasets:
             script_path = PROJECT_ROOT / "src" / "tools" / "predict" / "finetuned" / f"{model_key}.py"
-            adapter_path = PROJECT_ROOT / "ckpt" / dataset / adapter_key
+            adapter_path = ensure_project_ckpt(PROJECT_ROOT / "ckpt" / dataset / adapter_key)
             output_file = residue_save_dir/ f"{dataset}_{model}_{timestamp}.csv"
 
             if not script_path.exists() or not adapter_path.exists():

@@ -1,0 +1,800 @@
+{
+  "version": 1,
+  "repo_id": "AI4Protein/VenusFactory2-ckpts",
+  "generated_at": "2026-07-26T07:37:12.020433+00:00",
+  "presets": {
+    "demo": [
+      "demo/**"
+    ],
+    "predict-core": [
+      "demo/**",
+      "DeepET_Topt/ankh-large/**",
+      "DeepLocBinary/ankh-large/**",
+      "DeepLocMulti/ankh-large/**",
+      "DeepSol/ankh-large/**",
+      "DeepSoluE/ankh-large/**",
+      "DLKcat/ankh-large/**",
+      "EpHod/ankh-large/**",
+      "MetalIonBinding/ankh-large/**",
+      "ProtSolM/ankh-large/**",
+      "SortingSignal/ankh-large/**",
+      "Thermostability/ankh-large/**",
+      "VenusVaccine_BacteriaBinary/ankh-large/**",
+      "VenusVaccine_TumorBinary/ankh-large/**",
+      "VenusVaccine_VirusBinary/ankh-large/**",
+      "VenusX_Res_Act_MP90/ankh-large/**",
+      "VenusX_Res_BindI_MP90/ankh-large/**",
+      "VenusX_Res_Evo_MP90/ankh-large/**",
+      "VenusX_Res_Motif_MP90/ankh-large/**"
+    ],
+    "predict-all": [
+      "demo/**",
+      "DeepET_Topt/**",
+      "DeepLocBinary/**",
+      "DeepLocMulti/**",
+      "DeepSol/**",
+      "DeepSoluE/**",
+      "DLKcat/**",
+      "EpHod/**",
+      "MetalIonBinding/**",
+      "ProtSolM/**",
+      "SortingSignal/**",
+      "Thermostability/**",
+      "VenusVaccine_BacteriaBinary/**",
+      "VenusVaccine_TumorBinary/**",
+      "VenusVaccine_VirusBinary/**",
+      "VenusX_Res_Act_MP90/**",
+      "VenusX_Res_BindI_MP90/**",
+      "VenusX_Res_Evo_MP90/**",
+      "VenusX_Res_Motif_MP90/**"
+    ],
+    "proteinmpnn": [
+      "ProteinMPNN/**"
+    ],
+    "all": [
+      "**"
+    ]
+  },
+  "files": [
+    {
+      "path": "DLKcat/ankh-large/lr5e-4_bt12k_ga8.json",
+      "size": 1266,
+      "sha256": "daac3c155a9c627b21921e3f3f28b94a0d3aee299fb35dcadb32cc6247d867d3"
+    },
+    {
+      "path": "DLKcat/ankh-large/lr5e-4_bt12k_ga8.pt",
+      "size": 9464961,
+      "sha256": "7359a3f8badecb8da05f1ef0b0a7192def0cde0034602227b4da6b0947bb5ae1"
+    },
+    {
+      "path": "DLKcat/esm2_t33_650M_UR50D/lr5e-4_bt12k_ga8.json",
+      "size": 1281,
+      "sha256": "97821285e0135da641924c8da320cfa01efa02995b75e5fad24c6d02630394d4"
+    },
+    {
+      "path": "DLKcat/esm2_t33_650M_UR50D/lr5e-4_bt12k_ga8.pt",
+      "size": 6577281,
+      "sha256": "f8ea8a2f9aef830717fcc5947f2297b76ed4293e11a8c4c4c16bf94b291c40ff"
+    },
+    {
+      "path": "DLKcat/prot_bert/lr5e-4_bt12k_ga8.json",
+      "size": 1260,
+      "sha256": "584cfd559cde7cdabfa6d484d4444cd979fe9f283a5de0a95db36391f70253be"
+    },
+    {
+      "path": "DLKcat/prot_bert/lr5e-4_bt12k_ga8.pt",
+      "size": 4213889,
+      "sha256": "856b5fcb1d198f8178d6e031b8e0e668eb0f497fec25f71e564b1bcdc510ffbb"
+    },
+    {
+      "path": "DLKcat/prot_t5_xl_uniref50/lr5e-4_bt12k_ga8.json",
+      "size": 1280,
+      "sha256": "fba226c09952b03741270421f2117c3b68ce64932636c420a4664420a00e4155"
+    },
+    {
+      "path": "DLKcat/prot_t5_xl_uniref50/lr5e-4_bt12k_ga8.pt",
+      "size": 4213889,
+      "sha256": "b400515791adcf6a000041c45e45a913f0dfc1fdb79a23819dac7b01c98b4e57"
+    },
+    {
+      "path": "DeepET_Topt/ankh-large/lr5e-4_bt12k_ga8.json",
+      "size": 995,
+      "sha256": "294cee824dc874e5f652efe01f69af524c7becaaa7ad360dba9433c56d7624a2"
+    },
+    {
+      "path": "DeepET_Topt/ankh-large/lr5e-4_bt12k_ga8.pt",
+      "size": 9464930,
+      "sha256": "3d8fd56a6e87e9f8bcc92e728edf95ab2e9a42ddb3285b424f1728532ba6b43a"
+    },
+    {
+      "path": "DeepET_Topt/esm2_t33_650M_UR50D/lr5e-4_bt12k_ga8.json",
+      "size": 1010,
+      "sha256": "d5971c0939c468a5aa5b15cc2bac2eca979e238e323629f4d3e506eb79f35a0a"
+    },
+    {
+      "path": "DeepET_Topt/esm2_t33_650M_UR50D/lr5e-4_bt12k_ga8.pt",
+      "size": 6577250,
+      "sha256": "54da6ce3f7a61a40582f585463bca8ac61ca4eaffaeea8166bcae35da48c0ac3"
+    },
+    {
+      "path": "DeepET_Topt/prot_bert/lr5e-4_bt12k_ga8.json",
+      "size": 989,
+      "sha256": "6cab143b790654615f2a78cdf0e72c42f722914cc65525dc95790fe20af8d82c"
+    },
+    {
+      "path": "DeepET_Topt/prot_bert/lr5e-4_bt12k_ga8.pt",
+      "size": 4213858,
+      "sha256": "650bac1a333c1223a9ae26eeb90e6ee8b882d8149ad8781c523901faf663155b"
+    },
+    {
+      "path": "DeepET_Topt/prot_t5_xl_uniref50/lr5e-4_bt12k_ga8.json",
+      "size": 1009,
+      "sha256": "17d06b7e8b51e72fc1dfabebfe4fd9c6f8ba3a91956975c87197cc4fc960419a"
+    },
+    {
+      "path": "DeepET_Topt/prot_t5_xl_uniref50/lr5e-4_bt12k_ga8.pt",
+      "size": 4213858,
+      "sha256": "5e8ffda867e4690ef2c12ac486c9a183e75f9a73deb13e8a820ea918fce74168"
+    },
+    {
+      "path": "DeepLocBinary/ankh-large/lr5e-4_bt12k_ga8.json",
+      "size": 1073,
+      "sha256": "057ccd7699ebd0fbb14ccf5d218c29ca099c51cc03ea54f058ad117f831718c2"
+    },
+    {
+      "path": "DeepLocBinary/ankh-large/lr5e-4_bt12k_ga8.pt",
+      "size": 9471074,
+      "sha256": "2486de7822226af75128c1529eb63b5af91fa1764ca32bb40d330abfbf236bf0"
+    },
+    {
+      "path": "DeepLocBinary/esm2_t33_650M_UR50D/lr5e-4_bt12k_ga8.json",
+      "size": 1088,
+      "sha256": "5d0c70a3c0ca81234c15a688ccc9a3af3be8e3b61ec0ca6441afd8490c9600fb"
+    },
+    {
+      "path": "DeepLocBinary/esm2_t33_650M_UR50D/lr5e-4_bt12k_ga8.pt",
+      "size": 6582370,
+      "sha256": "558d7fbbe623c50ef04c3be366ccfdc05288e1818236bd228852903c7e1aa7fa"
+    },
+    {
+      "path": "DeepLocBinary/prot_bert/lr5e-4_bt12k_ga8.json",
+      "size": 1067,
+      "sha256": "60ee6771616aae9a3fb2a1f6563806d9fde4601f527ecb714e95f3cd287880fe"
+    },
+    {
+      "path": "DeepLocBinary/prot_bert/lr5e-4_bt12k_ga8.pt",
+      "size": 4217954,
+      "sha256": "fa0c55e7fd23ead6574e860473ac491c24252bb703642d689d34cf2a7cb50185"
+    },
+    {
+      "path": "DeepLocBinary/prot_t5_xl_uniref50/lr5e-4_bt12k_ga8.json",
+      "size": 1087,
+      "sha256": "a3829440d4eaab9ad15c4dca7dd142e2eda2deb5b40e06623ef53e99b99bb96a"
+    },
+    {
+      "path": "DeepLocBinary/prot_t5_xl_uniref50/lr5e-4_bt12k_ga8.pt",
+      "size": 4217954,
+      "sha256": "5bf65ab5ed288554d89f439814f3a0c41b43ec8f30977883ec79221419003a05"
+    },
+    {
+      "path": "DeepLocMulti/ankh-large/lr5e-4_bt12k_ga8.json",
+      "size": 1049,
+      "sha256": "8a4b90b120862f74f4677ed90831a5d8f92b19dd3beaac3de68cf8b59889567b"
+    },
+    {
+      "path": "DeepLocMulti/ankh-large/lr5e-4_bt12k_ga8.pt",
+      "size": 9520226,
+      "sha256": "d2dab211bb71de56886024a57a045bf8d62ec9e0c646734569e56cdf62edd1e4"
+    },
+    {
+      "path": "DeepLocMulti/esm2_t33_650M_UR50D/lr5e-4_bt12k_ga8.json",
+      "size": 1085,
+      "sha256": "7ecb30f3d1d0ac74a33b20c76e19f13118fbf40c15be2de4721bd1f6b1653e43"
+    },
+    {
+      "path": "DeepLocMulti/esm2_t33_650M_UR50D/lr5e-4_bt12k_ga8.pt",
+      "size": 6623330,
+      "sha256": "3fc727a0025a0b90fbb1da97395e171403845218d773019ab0e1277471469e8d"
+    },
+    {
+      "path": "DeepLocMulti/prot_bert/lr5e-4_bt12k_ga8.json",
+      "size": 1064,
+      "sha256": "2ea1c0205e54b13fe1e8137b602325aed53a660f1f858a2655536c47a152700e"
+    },
+    {
+      "path": "DeepLocMulti/prot_bert/lr5e-4_bt12k_ga8.pt",
+      "size": 4250722,
+      "sha256": "c33c9e6de2c78707e119ead71cb6b32a52008f0a5f564ceb9443bdda6a28df1e"
+    },
+    {
+      "path": "DeepLocMulti/prot_t5_xl_uniref50/lr5e-4_bt12k_ga8.json",
+      "size": 1084,
+      "sha256": "e83c519699f3eb5c4bc0d8e171a66dfe5e25b147ad0bec481dbbe4efb7b55d06"
+    },
+    {
+      "path": "DeepLocMulti/prot_t5_xl_uniref50/lr5e-4_bt12k_ga8.pt",
+      "size": 4250722,
+      "sha256": "f525e4de11033647d149aa4be7142f0720e208e76182bb74cdee4d735aa1963c"
+    },
+    {
+      "path": "DeepSol/ankh-large/lr5e-4_bt12k_ga8.json",
+      "size": 1049,
+      "sha256": "afbe9ced19642b1aaceba25b69a2c1dfcc9849fdddaa48aa72dfe6f9f6b72435"
+    },
+    {
+      "path": "DeepSol/ankh-large/lr5e-4_bt12k_ga8.pt",
+      "size": 9471074,
+      "sha256": "d88db91e38532787eeb6b138262b6037cbf9319448da07a82e21b566b95398f8"
+    },
+    {
+      "path": "DeepSol/esm2_t33_650M_UR50D/lr5e-4_bt12k_ga8.json",
+      "size": 1064,
+      "sha256": "34b473d6432a73a2707303cb567726bb6b028fcecaf74165db1ef66e9da00b27"
+    },
+    {
+      "path": "DeepSol/esm2_t33_650M_UR50D/lr5e-4_bt12k_ga8.pt",
+      "size": 6582370,
+      "sha256": "e4ebd2a50f29d21adeaf2440bfebcca42146cd1c69f2d834bc33eacf1d58939e"
+    },
+    {
+      "path": "DeepSol/prot_bert/lr5e-4_bt12k_ga8.json",
+      "size": 1043,
+      "sha256": "30d7ca950283785b19de1e63590eb28435271dfd4a06e67840ad3de9deb888cb"
+    },
+    {
+      "path": "DeepSol/prot_bert/lr5e-4_bt12k_ga8.pt",
+      "size": 4217954,
+      "sha256": "b58386db3c3c7da8bf7e16cb0678ab73b7b8b81e66bc85cdbe3ff71622cf9acf"
+    },
+    {
+      "path": "DeepSol/prot_t5_xl_uniref50/lr5e-4_bt12k_ga8.json",
+      "size": 1063,
+      "sha256": "2cbdec818b6f6f491f9a496516ce69ae8dc5f5553fdd7df74d0549f56436b813"
+    },
+    {
+      "path": "DeepSol/prot_t5_xl_uniref50/lr5e-4_bt12k_ga8.pt",
+      "size": 4217954,
+      "sha256": "e0ade433e5e8bd6d5b6d1a8a59ffbe2cd4aab15074a76f8c75d8f7bdd07a3697"
+    },
+    {
+      "path": "DeepSoluE/ankh-large/lr5e-4_bt12k_ga8.json",
+      "size": 1057,
+      "sha256": "a086b9808d14268b46cb3ad2dd6ce69de38fae06c6140536b83e3460ab34f7f9"
+    },
+    {
+      "path": "DeepSoluE/ankh-large/lr5e-4_bt12k_ga8.pt",
+      "size": 9471074,
+      "sha256": "94700814007589ad107673afc5c030ed41a1fdce420a5c501e3872da86387ab4"
+    },
+    {
+      "path": "DeepSoluE/esm2_t33_650M_UR50D/lr5e-4_bt12k_ga8.json",
+      "size": 1072,
+      "sha256": "4c68e65f2b3b2f6aed83745eb5843381553be9eb25c943f309dbcdde4f5eeddc"
+    },
+    {
+      "path": "DeepSoluE/esm2_t33_650M_UR50D/lr5e-4_bt12k_ga8.pt",
+      "size": 6582370,
+      "sha256": "31c5a105030d95f43062de881549a34e1bb9687aced8ec7725925114b08ff987"
+    },
+    {
+      "path": "DeepSoluE/prot_bert/lr5e-4_bt12k_ga8.json",
+      "size": 1051,
+      "sha256": "e2d38f4acbf278dc595ae327e2fa3bd9073b979af41f1721464711beedf62d21"
+    },
+    {
+      "path": "DeepSoluE/prot_bert/lr5e-4_bt12k_ga8.pt",
+      "size": 4217954,
+      "sha256": "62215964b270876ebd69f63af5a90402b66b19ca92f94eb4a73e82c70885b769"
+    },
+    {
+      "path": "DeepSoluE/prot_t5_xl_uniref50/lr5e-4_bt12k_ga8.json",
+      "size": 1071,
+      "sha256": "b6584271c6b5fe57b89ef5d7a2f5305624045bc66f36d9bec78a526817f094d3"
+    },
+    {
+      "path": "DeepSoluE/prot_t5_xl_uniref50/lr5e-4_bt12k_ga8.pt",
+      "size": 4217954,
+      "sha256": "6c6310a553d08cb304a64b47ed2016ce02210194ef05b9911dc34bf135f57486"
+    },
+    {
+      "path": "EpHod/ankh-large/lr5e-4_bt12k_ga8.json",
+      "size": 1257,
+      "sha256": "56d2ca52a3b4ee29fe72857e9a882151a5c64b9378eed4d7eb636ec94485d13d"
+    },
+    {
+      "path": "EpHod/ankh-large/lr5e-4_bt12k_ga8.pt",
+      "size": 9464961,
+      "sha256": "f359e2916d38e94394cfa4b439fbfc644aff424a6845d8209446076c1ecd0207"
+    },
+    {
+      "path": "EpHod/esm2_t33_650M_UR50D/lr5e-4_bt12k_ga8.json",
+      "size": 1272,
+      "sha256": "e52bf8002dd5333820fa471b7c974fdf13324d8e1f4835a694e18ba7fc2ad087"
+    },
+    {
+      "path": "EpHod/esm2_t33_650M_UR50D/lr5e-4_bt12k_ga8.pt",
+      "size": 6577281,
+      "sha256": "7b5c6ad9dbc2a34cfa460ee6bbc521baf308917afa33f6359a1597c71741be04"
+    },
+    {
+      "path": "EpHod/prot_bert/lr5e-4_bt12k_ga8.json",
+      "size": 1251,
+      "sha256": "8bb128fcf246470d8303dce8ca318148902f580245867ef633bec3b8c669e02d"
+    },
+    {
+      "path": "EpHod/prot_bert/lr5e-4_bt12k_ga8.pt",
+      "size": 4213889,
+      "sha256": "056b26d1be9d6cf70b43368c01c363371c1bda3e4658fdc6e894d7d7a5e5218c"
+    },
+    {
+      "path": "EpHod/prot_t5_xl_uniref50/lr5e-4_bt12k_ga8.json",
+      "size": 1271,
+      "sha256": "23c221277eab5613b73b593eeeefe3ddcacb62b9f14733e87268868fcaf991c5"
+    },
+    {
+      "path": "EpHod/prot_t5_xl_uniref50/lr5e-4_bt12k_ga8.pt",
+      "size": 4213889,
+      "sha256": "96ab1b74fd73463d4278e6c5dee6a784f32e3d322f81fa3b785ff59b04b57dfe"
+    },
+    {
+      "path": "MetalIonBinding/ankh-large/lr5e-4_bt12k_ga8.json",
+      "size": 1068,
+      "sha256": "d9b6b72fdbcf59a482a802a171ac1f4d6591ab7fb14dc3838975048f72fc56be"
+    },
+    {
+      "path": "MetalIonBinding/ankh-large/lr5e-4_bt12k_ga8.pt",
+      "size": 9471074,
+      "sha256": "4349f47222e269430d197abbf6c1414b344bee2081f1a11838a3919b8691bdc9"
+    },
+    {
+      "path": "MetalIonBinding/esm2_t33_650M_UR50D/lr5e-4_bt12k_ga8.json",
+      "size": 1083,
+      "sha256": "ee13936249ba2151acc4410511592459e6b7f433ee7e4dce1899822c9646ee11"
+    },
+    {
+      "path": "MetalIonBinding/esm2_t33_650M_UR50D/lr5e-4_bt12k_ga8.pt",
+      "size": 6582370,
+      "sha256": "856b484f678802e4dab97e5081e0aafac02831e92e5cb0358917b9461849b291"
+    },
+    {
+      "path": "MetalIonBinding/prot_bert/lr5e-4_bt12k_ga8.json",
+      "size": 1062,
+      "sha256": "ff779f5de1113537dd00ff0a6885c58c4b2d9b46069cdf5cbd06497b6a648ee7"
+    },
+    {
+      "path": "MetalIonBinding/prot_bert/lr5e-4_bt12k_ga8.pt",
+      "size": 4217954,
+      "sha256": "d63b9502b995876188718be578c4a5f8b41a5fd5ee912df86797765ef8e7ab9a"
+    },
+    {
+      "path": "MetalIonBinding/prot_t5_xl_uniref50/lr5e-4_bt12k_ga8.json",
+      "size": 1082,
+      "sha256": "91e4392408e1bbd029ad33d0572b40496a4010414d0e5c81a4d557937434eb4c"
+    },
+    {
+      "path": "MetalIonBinding/prot_t5_xl_uniref50/lr5e-4_bt12k_ga8.pt",
+      "size": 4217954,
+      "sha256": "a88b05a44be2d7620650131949fb3311be04d6d7335e9b8792ee5d00c083c631"
+    },
+    {
+      "path": "ProtSolM/ankh-large/lr5e-4_bt12k_ga8.json",
+      "size": 1032,
+      "sha256": "92ddfe010843cc418d78b9944c79c2694899c40fa1c0af7f187822b60027e9cc"
+    },
+    {
+      "path": "ProtSolM/ankh-large/lr5e-4_bt12k_ga8.pt",
+      "size": 9471074,
+      "sha256": "2e1dfdac19ab241ecff8804b3bd92be6a7a26136e985931ae8674fb55f83fbd1"
+    },
+    {
+      "path": "ProtSolM/esm2_t33_650M_UR50D/lr5e-4_bt12k_ga8.json",
+      "size": 1047,
+      "sha256": "7368412020371247dd8810412360d0af3b7ddba9dcfdeea24754fd62dce0a33a"
+    },
+    {
+      "path": "ProtSolM/esm2_t33_650M_UR50D/lr5e-4_bt12k_ga8.pt",
+      "size": 6582370,
+      "sha256": "b0e323f9a74666f24017ec5e799e320687dd1fab990e12f97e3ae2986157df52"
+    },
+    {
+      "path": "ProtSolM/prot_bert/lr5e-4_bt12k_ga8.json",
+      "size": 1026,
+      "sha256": "dca67438141e467142fdc0613589522c7ad6c74bedba7dd4793bca62cd212522"
+    },
+    {
+      "path": "ProtSolM/prot_bert/lr5e-4_bt12k_ga8.pt",
+      "size": 4217954,
+      "sha256": "79b47a9a21345dd772845284124db2400218fc538b4b30e5b30e3ac0b49c681d"
+    },
+    {
+      "path": "ProtSolM/prot_t5_xl_uniref50/lr5e-4_bt12k_ga8.json",
+      "size": 1046,
+      "sha256": "31722963a0fc6a4ff4aa75c068cf041c0c38128b641357acabb6c029251a7f1d"
+    },
+    {
+      "path": "ProtSolM/prot_t5_xl_uniref50/lr5e-4_bt12k_ga8.pt",
+      "size": 4217954,
+      "sha256": "10aa009302066b3cb292588b5ae03cf6e35a44cd5533b9213b699603d5fecc84"
+    },
+    {
+      "path": "ProteinMPNN/ca_model_weights/v_48_002.pt",
+      "size": 6624011,
+      "sha256": "ec038b44a987d7c8351b6ed887c82a2370d54e45e55a6bdaf508a729cef0340e"
+    },
+    {
+      "path": "ProteinMPNN/ca_model_weights/v_48_020.pt",
+      "size": 6624011,
+      "sha256": "f28f40170e21858c5ff31ef50b6e63414ff76dc331b19f85aa8586a12031744a"
+    },
+    {
+      "path": "ProteinMPNN/soluble_model_weights/v_48_002.pt",
+      "size": 6681301,
+      "sha256": "0877f840978fe770be6fcec025784d8f50c438571db3260c05e41aa207a7c448"
+    },
+    {
+      "path": "ProteinMPNN/soluble_model_weights/v_48_020.pt",
+      "size": 6681301,
+      "sha256": "7af52d090172c230c7f0e9d21e02203f6b3a38b16db58d3c7a3960e0a9a6e31a"
+    },
+    {
+      "path": "ProteinMPNN/v_48_002.pt",
+      "size": 6681301,
+      "sha256": "925f2ca1007bf9b02e0e7f420ff00eb91f50fcc2722f64b42e644ae95adaa131"
+    },
+    {
+      "path": "ProteinMPNN/v_48_010.pt",
+      "size": 6681301,
+      "sha256": "db866fae956a28661f926053d630610c55e9fc4bc03922f2aeeb98a37435ccce"
+    },
+    {
+      "path": "ProteinMPNN/v_48_020.pt",
+      "size": 6681301,
+      "sha256": "c9cb4a671d79604111231f8dbfc7c590e06f1197453b7a6854ac6661a642f5bd"
+    },
+    {
+      "path": "ProteinMPNN/v_48_030.pt",
+      "size": 6681301,
+      "sha256": "c34b7bfb38418ea30989fda3314f4781ac4e3920f9825731cf555f1fed44ac66"
+    },
+    {
+      "path": "ProteinMPNN/vanilla_model_weights/v_48_002.pt",
+      "size": 6681301,
+      "sha256": "925f2ca1007bf9b02e0e7f420ff00eb91f50fcc2722f64b42e644ae95adaa131"
+    },
+    {
+      "path": "ProteinMPNN/vanilla_model_weights/v_48_020.pt",
+      "size": 6681301,
+      "sha256": "c9cb4a671d79604111231f8dbfc7c590e06f1197453b7a6854ac6661a642f5bd"
+    },
+    {
+      "path": "SortingSignal/ankh-large/lr5e-4_bt12k_ga8.json",
+      "size": 1002,
+      "sha256": "4f511766774c0260a255631752b309598b1c29aa41884a25c1578add068871f5"
+    },
+    {
+      "path": "SortingSignal/ankh-large/lr5e-4_bt12k_ga8.pt",
+      "size": 9514082,
+      "sha256": "bbdc043b78385377cfaa354c54950ef68cd936b345ba775341631547e83f5efe"
+    },
+    {
+      "path": "SortingSignal/esm2_t33_650M_UR50D/lr5e-4_bt12k_ga8.json",
+      "size": 1017,
+      "sha256": "b1038cb1bc6045bccb4765f354a43eee45061a9e49a812c27fe6d854605b253f"
+    },
+    {
+      "path": "SortingSignal/esm2_t33_650M_UR50D/lr5e-4_bt12k_ga8.pt",
+      "size": 6618210,
+      "sha256": "17639ece9ecb643e13312f17f5a8242725919d4563b06a2f2671c25659beed48"
+    },
+    {
+      "path": "SortingSignal/prot_bert/lr5e-4_bt12k_ga8.json",
+      "size": 996,
+      "sha256": "ad0362e89d979970d37ff34bceb1db7657747848ae61a3fdb4c7795ccc6ebab9"
+    },
+    {
+      "path": "SortingSignal/prot_bert/lr5e-4_bt12k_ga8.pt",
+      "size": 4246626,
+      "sha256": "606d0f818d0b5d0f335667a22022be76e8b99e09e29d09e398f34146894c89f1"
+    },
+    {
+      "path": "SortingSignal/prot_t5_xl_uniref50/lr5e-4_bt12k_ga8.json",
+      "size": 1016,
+      "sha256": "16c702538700d6272790bca628aab2af51976735cb7045ad25f4259156aaf18c"
+    },
+    {
+      "path": "SortingSignal/prot_t5_xl_uniref50/lr5e-4_bt12k_ga8.pt",
+      "size": 4246626,
+      "sha256": "c09cd69a91ff45477f88ac6bc341091d75053d6592712a4fd6ab773fcecad4d3"
+    },
+    {
+      "path": "Thermostability/ankh-large/lr5e-4_bt12k_ga8.json",
+      "size": 1034,
+      "sha256": "07270d73b4620f736d128a0d1459cc321048c8a6ff51c1d6fe100acb43fdf55c"
+    },
+    {
+      "path": "Thermostability/ankh-large/lr5e-4_bt12k_ga8.pt",
+      "size": 9464930,
+      "sha256": "e7de99c975e73299de4b015ebf5ec302bcb4383e0fc32879062aec8d7a30640a"
+    },
+    {
+      "path": "Thermostability/esm2_t33_650M_UR50D/lr5e-4_bt12k_ga8.json",
+      "size": 1049,
+      "sha256": "5fb9b446118285b8ad05a13714f7abf34cb8bb582e64b9ea9baabbf254f5eedf"
+    },
+    {
+      "path": "Thermostability/esm2_t33_650M_UR50D/lr5e-4_bt12k_ga8.pt",
+      "size": 6577250,
+      "sha256": "9fded3217ff4896982f1fba6d2baf69d959ec65d61a36661237831cd52e47c9a"
+    },
+    {
+      "path": "Thermostability/prot_bert/lr5e-4_bt12k_ga8.json",
+      "size": 1028,
+      "sha256": "bbb602f21f35f72bbd9028b9b12be3e4c012c0f62cf5a6f4e52f4c0a443327a0"
+    },
+    {
+      "path": "Thermostability/prot_bert/lr5e-4_bt12k_ga8.pt",
+      "size": 4213858,
+      "sha256": "a9d3fe95a8bd767c94e7d3be8765ce37ea3c9d413d92d9fdcd4866b57b2a64e7"
+    },
+    {
+      "path": "Thermostability/prot_t5_xl_uniref50/lr5e-4_bt12k_ga8.json",
+      "size": 1048,
+      "sha256": "0b88443353a6d500284fcb8afac4de9ebf7563b21b274fb7df098e2249283e67"
+    },
+    {
+      "path": "Thermostability/prot_t5_xl_uniref50/lr5e-4_bt12k_ga8.pt",
+      "size": 4213858,
+      "sha256": "61ccb7810ef6ec251702d95a4f85fdf2476e50b8ced59e399535ed36cb7a5d50"
+    },
+    {
+      "path": "VenusVaccine_BacteriaBinary/ankh-large/lr5e-4_bt12k_ga8.json",
+      "size": 1422,
+      "sha256": "881899090ad7586a3414ef1a002083d49fbba2af4ea5489fded532814d9a38ee"
+    },
+    {
+      "path": "VenusVaccine_BacteriaBinary/ankh-large/lr5e-4_bt12k_ga8.pt",
+      "size": 9471105,
+      "sha256": "410f3c3949bf03a3dab6ef6fedd52d7bdcec69dfe13f985313848a0541cabd9f"
+    },
+    {
+      "path": "VenusVaccine_BacteriaBinary/esm2_t33_650M_UR50D/lr5e-4_bt12k_ga8.json",
+      "size": 1437,
+      "sha256": "4f4f771711b50091ef1684f7f48e2373db17aa639d4e512513ab6dbdb1ae3968"
+    },
+    {
+      "path": "VenusVaccine_BacteriaBinary/esm2_t33_650M_UR50D/lr5e-4_bt12k_ga8.pt",
+      "size": 6582401,
+      "sha256": "dc3c35dae290eb3c03e38ed6976bbcef083a01f3d291e599521a972aeabdde68"
+    },
+    {
+      "path": "VenusVaccine_BacteriaBinary/prot_bert/lr5e-4_bt12k_ga8.json",
+      "size": 1416,
+      "sha256": "6d3124462bf4bb10d1ac0a519ec81a202bb56207099680df2d6ded63c8817b92"
+    },
+    {
+      "path": "VenusVaccine_BacteriaBinary/prot_bert/lr5e-4_bt12k_ga8.pt",
+      "size": 4217985,
+      "sha256": "e6cc3ec897ec129d829e36abc3fe36ef08b3f06a252fa730c28e253ae3ebba87"
+    },
+    {
+      "path": "VenusVaccine_BacteriaBinary/prot_t5_xl_uniref50/lr5e-4_bt12k_ga8.json",
+      "size": 1436,
+      "sha256": "e527e67106a52218a62d11b23745cd2c925313d99abc68ad84aca817fdefc329"
+    },
+    {
+      "path": "VenusVaccine_BacteriaBinary/prot_t5_xl_uniref50/lr5e-4_bt12k_ga8.pt",
+      "size": 4217985,
+      "sha256": "c72a4b55d421e5d9ec5bd55b7ba148cddfb8a98400a25062e05207172f08958a"
+    },
+    {
+      "path": "VenusVaccine_TumorBinary/ankh-large/lr5e-4_bt12k_ga8.json",
+      "size": 1410,
+      "sha256": "1be08de3f74f3abf29f5967d14bc9ef8decd17bd6ff1960946786709a2da11f5"
+    },
+    {
+      "path": "VenusVaccine_TumorBinary/ankh-large/lr5e-4_bt12k_ga8.pt",
+      "size": 9471105,
+      "sha256": "4454d97b6b6fe35e926c3c6d510a22b3a495d481b1eeee94f3cfb75da69c44fe"
+    },
+    {
+      "path": "VenusVaccine_TumorBinary/esm2_t33_650M_UR50D/lr5e-4_bt12k_ga8.json",
+      "size": 1425,
+      "sha256": "a82a2b590f7388363fa3d017346bc7614532ea67f6470b417daba180bdca29f4"
+    },
+    {
+      "path": "VenusVaccine_TumorBinary/esm2_t33_650M_UR50D/lr5e-4_bt12k_ga8.pt",
+      "size": 6582401,
+      "sha256": "16f47b702b086e3b00969a610c3c33ae4a7971dfcaea82844c5c0f1ae79b645c"
+    },
+    {
+      "path": "VenusVaccine_TumorBinary/prot_bert/lr5e-4_bt12k_ga8.json",
+      "size": 1404,
+      "sha256": "87822c8790419eb121c88318d2c20de05a4c06dd36517cf0675271b2018edf75"
+    },
+    {
+      "path": "VenusVaccine_TumorBinary/prot_bert/lr5e-4_bt12k_ga8.pt",
+      "size": 4217985,
+      "sha256": "e8d0046cc33b23868b0e8f66edea74d3e37ce50c4a32309ef53575ca82b43b7b"
+    },
+    {
+      "path": "VenusVaccine_TumorBinary/prot_t5_xl_uniref50/lr5e-4_bt12k_ga8.json",
+      "size": 1424,
+      "sha256": "e94501235b4eb9a287c9f8cd4c8c591b2cba41498130934afc9169fab0476e33"
+    },
+    {
+      "path": "VenusVaccine_TumorBinary/prot_t5_xl_uniref50/lr5e-4_bt12k_ga8.pt",
+      "size": 4217985,
+      "sha256": "7dca902a7f63fccb2b2aeebe18cc1199524570b4d0a0f40b9493ab3a6a533289"
+    },
+    {
+      "path": "VenusVaccine_VirusBinary/ankh-large/lr5e-4_bt12k_ga8.json",
+      "size": 1410,
+      "sha256": "677d869fc3f64dd676598868a55c664b056ba5f4c05e164e76448a9c1a0a3cbe"
+    },
+    {
+      "path": "VenusVaccine_VirusBinary/ankh-large/lr5e-4_bt12k_ga8.pt",
+      "size": 9471105,
+      "sha256": "9018d38bd1076e78dca3fd266abb50803cb591de878767046fa0bc168383ff26"
+    },
+    {
+      "path": "VenusVaccine_VirusBinary/esm2_t33_650M_UR50D/lr5e-4_bt12k_ga8.json",
+      "size": 1425,
+      "sha256": "9cd58c2ba22fc2efa034a4567ba1e6934a638090981c996c965b67829a0f4309"
+    },
+    {
+      "path": "VenusVaccine_VirusBinary/esm2_t33_650M_UR50D/lr5e-4_bt12k_ga8.pt",
+      "size": 6582401,
+      "sha256": "68c2ae43d9464081d0e7d77cf73264e94ce67f529f68a7fba5065fa71d1dcd03"
+    },
+    {
+      "path": "VenusVaccine_VirusBinary/prot_bert/lr5e-4_bt12k_ga8.json",
+      "size": 1404,
+      "sha256": "1b20347d33f91d4d507b90f68b7414658bba796eba53541d4f62e371ed9a9e8d"
+    },
+    {
+      "path": "VenusVaccine_VirusBinary/prot_bert/lr5e-4_bt12k_ga8.pt",
+      "size": 4217985,
+      "sha256": "0531c0650087a865dde6dbbb732486c0152ca426ceca67107d7e774d2e20caa6"
+    },
+    {
+      "path": "VenusVaccine_VirusBinary/prot_t5_xl_uniref50/lr5e-4_bt12k_ga8.json",
+      "size": 1424,
+      "sha256": "08f77d82ec8741b2b38a51bf2a4597676ab54614a2dd65c971ea41f8d0069cbe"
+    },
+    {
+      "path": "VenusVaccine_VirusBinary/prot_t5_xl_uniref50/lr5e-4_bt12k_ga8.pt",
+      "size": 4217985,
+      "sha256": "fcaea09b790573adf500544b881e9ffc372b830e82ced35fb0620c522a1d95c4"
+    },
+    {
+      "path": "VenusX_Res_Act_MP90/ankh-large/lr5e-4_bt12k_ga8.json",
+      "size": 1195,
+      "sha256": "419fc5c3c5d6bbe9e67aa0ec4852b939b5b17840580a0a45e8f5d2e4f4c0c129"
+    },
+    {
+      "path": "VenusX_Res_Act_MP90/ankh-large/lr5e-4_bt12k_ga8.pt",
+      "size": 9483851,
+      "sha256": "0a8be65d86d916d1b1ee4e570dfc694c71832ab98d43d6702aad562d9f0fdd0e"
+    },
+    {
+      "path": "VenusX_Res_Act_MP90/esm2_t33_650M_UR50D/lr5e-4_bt12k_ga8.json",
+      "size": 1210,
+      "sha256": "1f5a0c1dc73901825a9411541f9c21391db34bb3d05331330d8b93ceaaf921da"
+    },
+    {
+      "path": "VenusX_Res_Act_MP90/esm2_t33_650M_UR50D/lr5e-4_bt12k_ga8.pt",
+      "size": 6593099,
+      "sha256": "07ef77a36e5b7e87bfa3638b590c654def6012785583a58c48b5b7f42afdf3b3"
+    },
+    {
+      "path": "VenusX_Res_Act_MP90/prot_t5_xl_uniref50/lr5e-4_bt12k_ga8.json",
+      "size": 1209,
+      "sha256": "ba8b4448f72ae0227c483f7e5debe157b3078c1c0b4ca63c952b2edd79b8161d"
+    },
+    {
+      "path": "VenusX_Res_Act_MP90/prot_t5_xl_uniref50/lr5e-4_bt12k_ga8.pt",
+      "size": 4226635,
+      "sha256": "54da2b615031380b94b84206ba1e0d20330a592b7417f89ac121d15f407c10ca"
+    },
+    {
+      "path": "VenusX_Res_BindI_MP90/ankh-large/lr5e-4_bt12k_ga8.json",
+      "size": 1244,
+      "sha256": "e0cd7b37793bc8b360f093a78b0de64aaefe04ff629d718cf25dded0e3ee678e"
+    },
+    {
+      "path": "VenusX_Res_BindI_MP90/ankh-large/lr5e-4_bt12k_ga8.pt",
+      "size": 9483851,
+      "sha256": "2f1cefcc352cc06ecb46dc0c6b1474550326fb9ff18edd893378450d794151e3"
+    },
+    {
+      "path": "VenusX_Res_BindI_MP90/esm2_t33_650M_UR50D/lr5e-4_bt12k_ga8.json",
+      "size": 1259,
+      "sha256": "115fb02cea241d9b0ce4aa58b7c5be589d1e97adb7d0872202f569d3dc6485fe"
+    },
+    {
+      "path": "VenusX_Res_BindI_MP90/esm2_t33_650M_UR50D/lr5e-4_bt12k_ga8.pt",
+      "size": 6593099,
+      "sha256": "0ff2c7a1ca30839cd3db70d1670e7849718aacd99deb0d7345da3f3de66fb77d"
+    },
+    {
+      "path": "VenusX_Res_BindI_MP90/prot_t5_xl_uniref50/lr5e-4_bt12k_ga8.json",
+      "size": 1258,
+      "sha256": "807044ce64fba3996165f9e0b47f7fc4644b1c1e42a7ba37d20e68e3e5c47a67"
+    },
+    {
+      "path": "VenusX_Res_BindI_MP90/prot_t5_xl_uniref50/lr5e-4_bt12k_ga8.pt",
+      "size": 4226635,
+      "sha256": "78778d36fa5b7f46350270dda1a93ebbb12f384df7316ec3356ee7fa2ce726be"
+    },
+    {
+      "path": "VenusX_Res_Evo_MP90/ankh-large/lr5e-4_bt12k_ga8.json",
+      "size": 1195,
+      "sha256": "3a279e9277d1c63073dbe3698cbd2e4aadf300ed1755af9ac1560cde3936c640"
+    },
+    {
+      "path": "VenusX_Res_Evo_MP90/ankh-large/lr5e-4_bt12k_ga8.pt",
+      "size": 9483851,
+      "sha256": "254bd1c176e9d078775a3308255e8a171c677a3b21810d410f5b01796e3a872c"
+    },
+    {
+      "path": "VenusX_Res_Evo_MP90/esm2_t33_650M_UR50D/lr5e-4_bt12k_ga8.json",
+      "size": 1210,
+      "sha256": "14e90c37a68e7e80bf8a00497159da46baddce240a4855810f827964515ca126"
+    },
+    {
+      "path": "VenusX_Res_Evo_MP90/esm2_t33_650M_UR50D/lr5e-4_bt12k_ga8.pt",
+      "size": 6593099,
+      "sha256": "f64ec21dec5b8b85e2b26c90b210f47c282cdfaaf58c848879b33833838cdff2"
+    },
+    {
+      "path": "VenusX_Res_Evo_MP90/prot_t5_xl_uniref50/lr5e-4_bt12k_ga8.json",
+      "size": 1209,
+      "sha256": "93b13adf2db27139284b6de42798faaf8e72d1de1c87b8ed0e35f6135df1a016"
+    },
+    {
+      "path": "VenusX_Res_Evo_MP90/prot_t5_xl_uniref50/lr5e-4_bt12k_ga8.pt",
+      "size": 4226635,
+      "sha256": "0ff74015c69ecb42cf46b2ad23d478392b1dfc33aadd7f993b3cafc761eac986"
+    },
+    {
+      "path": "VenusX_Res_Motif_MP90/ankh-large/lr5e-4_bt12k_ga8.json",
+      "size": 1201,
+      "sha256": "d1d8de65d92713fbf4c6573f6df1731386fd5429115e5cba25aa8ffc76879c59"
+    },
+    {
+      "path": "VenusX_Res_Motif_MP90/ankh-large/lr5e-4_bt12k_ga8.pt",
+      "size": 9483851,
+      "sha256": "90efaf5a59be61270c66c203afa09703fbfe71eb5a327107647f3bcfaba8737c"
+    },
+    {
+      "path": "VenusX_Res_Motif_MP90/esm2_t33_650M_UR50D/lr5e-4_bt12k_ga8.json",
+      "size": 1216,
+      "sha256": "43fb0bab7bb9905a8a6736c02cfc22887ec59801d8575e7e6a9aa16b323ab756"
+    },
+    {
+      "path": "VenusX_Res_Motif_MP90/esm2_t33_650M_UR50D/lr5e-4_bt12k_ga8.pt",
+      "size": 6593099,
+      "sha256": "d0ba6f4e3b218e72bf5750843d8ea9812c8f6eb797c348df35ba0babadbddbd3"
+    },
+    {
+      "path": "VenusX_Res_Motif_MP90/prot_t5_xl_uniref50/lr5e-4_bt12k_ga8.json",
+      "size": 1215,
+      "sha256": "facced38f90fc911c852d3b32cf6e9ce454adb0666a27599f412db82443deed9"
+    },
+    {
+      "path": "VenusX_Res_Motif_MP90/prot_t5_xl_uniref50/lr5e-4_bt12k_ga8.pt",
+      "size": 4226635,
+      "sha256": "318e32d6521a647fe3f51361b091882de445d58d18e12fefb111129f3ba192ea"
+    },
+    {
+      "path": "demo/demo_solubility.json",
+      "size": 1159,
+      "sha256": "d0c47fae7e09c9d7a9586ca9b34a4d774dd44795418c822378eb00e940acf13a"
+    },
+    {
+      "path": "demo/demo_solubility.pt",
+      "size": 418692,
+      "sha256": "3b46ee577312579dee0906b3cdbd23d30d40bbb8a8ce873cba85abbf694c125e"
+    }
+  ]
+}

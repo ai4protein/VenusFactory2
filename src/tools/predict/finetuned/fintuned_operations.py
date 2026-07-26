@@ -34,6 +34,23 @@ _CKPT_BASE = "ckpt"
 _CONSTANT_PATH = Path(__file__).resolve().parent.parent.parent.parent / "constant.json"
 
 
+def _ensure_adapter_dir(adapter_path: str) -> str:
+    """Auto-download missing hub adapters under ckpt/ when enabled."""
+    if not adapter_path:
+        return adapter_path
+    path = Path(adapter_path)
+    if path.exists():
+        return str(path)
+    try:
+        try:
+            from ckpt_hub import ensure_ckpt_path
+        except ImportError:
+            from src.ckpt_hub import ensure_ckpt_path
+        return str(ensure_ckpt_path(adapter_path))
+    except Exception:
+        return adapter_path
+
+
 def _default_agent_out_dir() -> str:
     """Default output directory for agent/tool calls when out_dir is omitted."""
     base = Path(os.getenv("TEMP_OUTPUTS_DIR", "temp_outputs")).resolve()
@@ -236,9 +253,16 @@ def predict_protein_function(
     model_key = _model_name_to_key(model_name)
     if model_key not in _MODEL_KEYS:
         return _error_response("ValidationError", f"model_name must map to one of {_MODEL_KEYS}.", suggestion="Use e.g. Ankh-large, ESM2-650M, ProtBert, ProtT5-xl-uniref50.")
-    resolved_adapter = _resolve_adapter_path(task, model_name, adapter_path, ckpt_base)
+    resolved_adapter = _ensure_adapter_dir(_resolve_adapter_path(task, model_name, adapter_path, ckpt_base))
     if not resolved_adapter or not Path(resolved_adapter).exists():
-        return _error_response("ValidationError", f"Adapter path not found: {resolved_adapter}.", suggestion="Set adapter_path or ensure ckpt_base/task/model dir exists (e.g. ckpt/DeepET_Topt/ankh-large).")
+        return _error_response(
+            "ValidationError",
+            f"Adapter path not found: {resolved_adapter}.",
+            suggestion=(
+                "Set adapter_path, run `python scripts/download_ckpts.py --preset predict-core`, "
+                "or ensure VENUS_CKPT_AUTO_DOWNLOAD=1 (e.g. ckpt/DeepET_Topt/ankh-large)."
+            ),
+        )
 
     try:
         mod, tokenize_for_model = _get_module(model_key)
@@ -336,9 +360,19 @@ def predict_residue_function(
             f"model_name must map to one of {_RESIDUE_MODEL_KEYS}.",
             suggestion="Use ESM2-650M for residue prediction in current runtime.",
         )
-    resolved_adapter = _resolve_residue_adapter_path(task, model_name, adapter_path, ckpt_base)
+    resolved_adapter = _ensure_adapter_dir(
+        _resolve_residue_adapter_path(task, model_name, adapter_path, ckpt_base)
+    )
     if not resolved_adapter or not Path(resolved_adapter).exists():
-        return _error_response("ValidationError", f"Adapter path not found: {resolved_adapter}.", suggestion="Set adapter_path or ensure ckpt_base/residue_dataset/model dir exists (e.g. ckpt/VenusX_Res_Act_MP90/ankh-large).")
+        return _error_response(
+            "ValidationError",
+            f"Adapter path not found: {resolved_adapter}.",
+            suggestion=(
+                "Set adapter_path, run `python scripts/download_ckpts.py --include 'VenusX_Res_*/**'`, "
+                "or ensure VENUS_CKPT_AUTO_DOWNLOAD=1 "
+                "(e.g. ckpt/VenusX_Res_Act_MP90/ankh-large)."
+            ),
+        )
 
     try:
         mod, tokenize_for_model = _get_module(model_key)

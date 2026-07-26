@@ -91,7 +91,9 @@ def run_single_function_prediction(
         
         adapter_key = adapter_mapping[model_key]
         script_path = PROJECT_ROOT / "src" / "tools" / "predict" / "finetuned" / f"{model_key}.py"
-        adapter_path = PROJECT_ROOT / "ckpt" / dataset / adapter_key
+        from web.utils.common_utils import ensure_project_ckpt
+
+        adapter_path = ensure_project_ckpt(PROJECT_ROOT / "ckpt" / dataset / adapter_key)
         output_file = output_dir / f"temp_{dataset}_{model}.csv"
         
         if not script_path.exists() or not adapter_path.exists():
