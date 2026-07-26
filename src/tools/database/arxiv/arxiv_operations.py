@@ -103,7 +103,7 @@ def download_arxiv_paper_by_id(
         resp = sess.get(
             url,
             timeout=timeout,
-            headers={"User-Agent": "VenusFactory2 (https://venusfactory.cn)"},
+            headers={"User-Agent": "VenusFactory2 (https://venusfactory.bio)"},
             allow_redirects=True,
         )
     except requests.RequestException as e:

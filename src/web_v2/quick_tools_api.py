@@ -1000,6 +1000,13 @@ async def run_quick_tool_sequence_design_stream(body: SequenceDesignRunBody):
         start = time.perf_counter()
         yield _sse("progress", {"progress": 0.08, "message": "Validating structure input..."})
         try:
+            yield _sse(
+                "progress",
+                {
+                    "progress": 0.2,
+                    "message": "Checking ProteinMPNN weights (auto-downloads from Hugging Face if missing)...",
+                },
+            )
             yield _sse("progress", {"progress": 0.35, "message": "Running ProteinMPNN sequence design..."})
             payload = await run_quick_tool_sequence_design(body)
             elapsed_ms = int((time.perf_counter() - start) * 1000)
@@ -1048,6 +1055,13 @@ async def run_quick_tool_protein_function_stream(body: ProteinFunctionRunBody):
             normalized = _load_normalized_fasta_from_path(fasta_path)
             total = max(1, _count_fasta_records(normalized))
             yield _sse("progress", {"progress": 0.2, "message": f"Loaded {total} protein sequence(s)."})
+            yield _sse(
+                "progress",
+                {
+                    "progress": 0.3,
+                    "message": "Checking model weights (auto-downloads from Hugging Face if missing)...",
+                },
+            )
             yield _sse("progress", {"progress": 0.45, "message": "Running Protein Function model..."})
             payload = await run_quick_tool_protein_function(body)
             elapsed_ms = int((time.perf_counter() - start) * 1000)
@@ -1074,6 +1088,13 @@ async def run_quick_tool_residue_function_stream(body: ResidueFunctionRunBody):
             normalized = _load_normalized_fasta_from_path(fasta_path)
             total = max(1, _count_fasta_records(normalized))
             yield _sse("progress", {"progress": 0.2, "message": f"Loaded {total} protein sequence(s)."})
+            yield _sse(
+                "progress",
+                {
+                    "progress": 0.3,
+                    "message": "Checking residue-model weights (auto-downloads from Hugging Face if missing)...",
+                },
+            )
             yield _sse("progress", {"progress": 0.45, "message": "Running Functional Residue model..."})
             payload = await run_quick_tool_residue_function(body)
             elapsed_ms = int((time.perf_counter() - start) * 1000)

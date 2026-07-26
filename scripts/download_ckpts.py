@@ -26,9 +26,11 @@ from ckpt_hub import (  # noqa: E402
     ckpt_root,
     download_patterns,
     download_preset,
+    estimate_download_bytes,
     list_presets,
     preset_patterns,
 )
+from hub_progress import format_bytes  # noqa: E402
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -56,6 +58,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Force re-download even if local files exist.",
     )
     parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Suppress progress notices (sets VENUS_DOWNLOAD_QUIET=1).",
+    )
+    parser.add_argument(
         "--repo-id",
         default="",
         help="Override VENUS_CKPT_REPO_ID for this run.",
@@ -75,24 +82,23 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    import os
 
+    if args.quiet:
+        os.environ["VENUS_DOWNLOAD_QUIET"] = "1"
     if args.repo_id:
-        import os
-
         os.environ["VENUS_CKPT_REPO_ID"] = args.repo_id
     if args.revision:
-        import os
-
         os.environ["VENUS_CKPT_REVISION"] = args.revision
     if args.local_dir:
-        import os
-
         os.environ["VENUS_CKPT_DIR"] = args.local_dir
 
     if args.list_presets:
         for name in list_presets():
-            patterns = ", ".join(preset_patterns(name))
-            print(f"{name}: {patterns}")
+            patterns = list(preset_patterns(name))
+            size = estimate_download_bytes(patterns)
+            size_txt = f" (~{format_bytes(size)})" if size else ""
+            print(f"{name}{size_txt}: {', '.join(patterns)}")
         return 0
 
     presets = list(args.preset)
@@ -100,8 +106,18 @@ def main(argv: list[str] | None = None) -> int:
     if not presets and not includes:
         presets = ["predict-core"]
 
-    print(f"repo     : {ckpt_repo_id()}@{ckpt_revision()}")
-    print(f"local_dir: {ckpt_root()}")
+    planned: list[str] = []
+    for preset in presets:
+        planned.extend(preset_patterns(preset))
+    planned.extend(includes)
+    est = estimate_download_bytes(planned)
+
+    print(f"repo      : {ckpt_repo_id()}@{ckpt_revision()}")
+    print(f"local_dir : {ckpt_root()}")
+    if est:
+        print(f"approx_size: {format_bytes(est)} (from manifest)")
+    print("note      : Hugging Face shows a live progress bar in the terminal.")
+    print()
 
     for preset in presets:
         print(f"→ preset {preset}")
@@ -111,7 +127,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"→ include {includes}")
         download_patterns(includes, force=args.force)
 
-    print("Done.")
+    print()
+    print("Done. Weights are ready under:", ckpt_root())
     return 0
 
 

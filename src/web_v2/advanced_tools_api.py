@@ -1164,6 +1164,13 @@ async def run_protein_function_stream(body: ProteinFunctionBody):
 
             total = len(records)
             yield _sse("progress", {"progress": 0.15, "message": f"Loaded {total} protein sequence(s)."})
+            yield _sse(
+                "progress",
+                {
+                    "progress": 0.18,
+                    "message": "Checking model weights (auto-downloads from Hugging Face if missing)...",
+                },
+            )
 
             merged_rows: list[dict[str, Any]] = []
             failures: list[str] = []
@@ -1251,6 +1258,13 @@ async def run_functional_residue_stream(body: FunctionalResidueBody):
 
             total = len(records)
             yield _sse("progress", {"progress": 0.15, "message": f"Loaded {total} protein sequence(s)."})
+            yield _sse(
+                "progress",
+                {
+                    "progress": 0.18,
+                    "message": "Checking residue-model weights (auto-downloads from Hugging Face if missing)...",
+                },
+            )
 
             merged_rows: list[dict[str, Any]] = []
             failures: list[str] = []
@@ -1328,6 +1342,13 @@ async def run_sequence_design_stream(body: SequenceDesignBody):
         start = time.perf_counter()
         yield _sse("progress", {"progress": 0.08, "message": "Validating ProteinMPNN structure input..."})
         try:
+            yield _sse(
+                "progress",
+                {
+                    "progress": 0.2,
+                    "message": "Checking ProteinMPNN weights (auto-downloads from Hugging Face if missing)...",
+                },
+            )
             yield _sse("progress", {"progress": 0.4, "message": "Running ProteinMPNN sequence design..."})
             payload = await run_sequence_design(body)
             elapsed_ms = int((time.perf_counter() - start) * 1000)

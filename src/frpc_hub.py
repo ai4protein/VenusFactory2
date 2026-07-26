@@ -29,6 +29,11 @@ except ImportError:  # pragma: no cover
     def get_logger(name: str):  # type: ignore[misc]
         return logging.getLogger(name)
 
+try:
+    from hub_progress import announce, format_bytes, urllib_reporthook
+except ImportError:  # pragma: no cover
+    from src.hub_progress import announce, format_bytes, urllib_reporthook
+
 
 logger = get_logger("frpc_hub")
 
@@ -126,11 +131,11 @@ def _make_executable(path: Path) -> None:
 
 
 def _download_cdn(url: str, dest: Path) -> Path:
-    logger.info("Downloading frpc from CDN: %s", url)
+    announce(f"[frpc] Downloading from CDN: {url}", log=logger)
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp = dest.with_suffix(dest.suffix + ".partial")
     try:
-        urllib.request.urlretrieve(url, tmp)
+        urllib.request.urlretrieve(url, tmp, reporthook=urllib_reporthook("[frpc] CDN"))
         tmp.replace(dest)
     finally:
         if tmp.exists():
@@ -138,6 +143,7 @@ def _download_cdn(url: str, dest: Path) -> Path:
     if not _is_ready(dest):
         raise FileNotFoundError(f"CDN download produced empty file: {dest}")
     _make_executable(dest)
+    announce(f"[frpc] CDN download complete ({format_bytes(dest.stat().st_size)})", log=logger)
     return dest
 
 
@@ -145,7 +151,7 @@ def _download_hf(filename: str, dest: Path) -> Path:
     from huggingface_hub import hf_hub_download
 
     remote = f"{hf_prefix()}/{filename}"
-    logger.info("Downloading frpc from HF %s@%s", hf_repo_id(), remote)
+    announce(f"[frpc] Downloading from Hugging Face {hf_repo_id()}:{remote}", log=logger)
     dest.parent.mkdir(parents=True, exist_ok=True)
     # Use hub cache, then copy to the requested destination (keeps repo root clean).
     cached = Path(
@@ -162,6 +168,7 @@ def _download_hf(filename: str, dest: Path) -> Path:
     _make_executable(dest)
     if not _is_ready(dest):
         raise FileNotFoundError(f"HF download produced empty file: {dest}")
+    announce(f"[frpc] HF download complete ({format_bytes(dest.stat().st_size)})", log=logger)
     return dest
 
 
@@ -178,8 +185,10 @@ def download_frpc(
     out_dir = Path(dest_dir) if dest_dir is not None else repo_root()
     dest = out_dir / filename
     if not force and _is_ready(dest):
+        announce(f"[frpc] Using local binary: {dest}", log=logger)
         return dest
 
+    announce(f"[frpc] Preparing {filename} → {dest}", log=logger)
     errors: list[str] = []
     url = cdn_url(system=system, arch=arch, version=version)
     if url:
@@ -187,7 +196,7 @@ def download_frpc(
             return _download_cdn(url, dest)
         except Exception as exc:
             errors.append(f"CDN: {exc}")
-            logger.warning("CDN frpc download failed: %s", exc)
+            announce(f"[frpc] CDN failed, trying Hugging Face fallback... ({exc})", log=logger)
 
     try:
         return _download_hf(filename, dest)

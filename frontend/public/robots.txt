@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://venusfactory.cn/playground/sitemap.xml
+Sitemap: https://venusfactory.bio/sitemap.xml

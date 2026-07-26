@@ -206,13 +206,27 @@ def run(cmd, step_name):
         print(f"❌ [Step: {step_name}] Failed! Please check the error above.")
         sys.exit(1)
 
+def _resolve_type(requested: str) -> str:
+    detect_dir = os.path.dirname(os.path.abspath(__file__))
+    if detect_dir not in sys.path:
+        sys.path.insert(0, detect_dir)
+    from torch_detect import resolve_install_type
+
+    resolved, reason = resolve_install_type(requested)
+    print(f"🔍 Torch profile: {resolved} ({reason})")
+    if resolved not in configs:
+        print(f"❌ Unknown torch profile '{resolved}'. Available: {', '.join(configs)}")
+        sys.exit(1)
+    return resolved
+
+
 def main():
     parser = argparse.ArgumentParser(description="Automatically configure PyTorch and PyG environment (supports uv acceleration)")
     parser.add_argument(
-        "--type", 
-        choices=["cpu", "cu128"], 
-        default="cu128", 
-        help="Select installation version: 'cpu' or 'cu128' (default: cu128)"
+        "--type",
+        choices=["auto", "cpu", "cu128"],
+        default="auto",
+        help="Install profile: auto-detect GPU/CPU (default), or force cpu / cu128",
     )
     parser.add_argument(
         "--skip-frpc",
@@ -225,13 +239,13 @@ def main():
         help="Force redownload frpc even if it exists locally"
     )
     args = parser.parse_args()
+    install_type = _resolve_type(args.type)
     
     if not args.skip_frpc:
         if args.force_download:
             print("🔄 Forcing frpc redownload...")
             system = platform.system().lower()
             arch_str = get_arch_str()
-            pattern = f"frpc_{system}_{arch_str}_*"
             for file in os.listdir('.'):
                 if file.startswith(f"frpc_{system}_{arch_str}"):
                     os.remove(file)
@@ -240,8 +254,8 @@ def main():
         setup_frpc()
     
     # Get current selected configuration
-    current_config = configs[args.type]
-    print(f"\n⚙️  Current installation mode: \033[1;36m{args.type.upper()}\033[0m")
+    current_config = configs[install_type]
+    print(f"\n⚙️  Current installation mode: \033[1;36m{install_type.upper()}\033[0m")
     print(f"   Torch source: {current_config['torch_url']}")
     print(f"   PyG   source: {current_config['torch_aug_url']}")
 
@@ -251,14 +265,14 @@ def main():
     # Ensure virtual environment exists
     if not os.path.exists(VENV_PATH):
         print("📦 Creating virtual environment...")
-        subprocess.check_call(f"uv venv --python 3.12.0 {VENV_PATH}", shell=True)
+        subprocess.check_call(f"uv venv --python 3.12 {VENV_PATH}", shell=True)
 
     # ==========================================
     # Step 1: Install PyTorch
     # ==========================================
     run(
         f'"torch==2.8.0" torchvision --index-url {current_config["torch_url"]} --prerelease=allow',
-        f"Install PyTorch 2.8.0 ({args.type})"
+        f"Install PyTorch 2.8.0 ({install_type})"
     )
 
     # ==========================================
@@ -276,8 +290,9 @@ def main():
     # ==========================================
     if os.path.exists("pyproject.toml"):
         print("\n📦 Synchronizing other regular dependencies...")
+        index_url = pip_mirror["index_url"]
         run(
-            f"--index-url {pip_mirror["index_url"]} -r pyproject.toml",
+            f"--index-url {index_url} -r pyproject.toml",
             "Install regular dependencies"
         )
 
