@@ -182,7 +182,9 @@ src/tools/train/data/weight/
 
 tmp_db/
 log/
-!frpc_linux_amd64_v0.3
+# Gradio share frpc binaries at repo root (download via scripts/download_frpc.py)
+# Leading slash limits the match to the repository root (do not ignore src/frpc_hub.py).
+/frpc_*
 .webui_secret_key
 memory_db/
 src/data/*.db

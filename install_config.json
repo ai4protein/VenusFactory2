@@ -18,6 +18,11 @@
       "darwin_arm64": "https://cdn-media.huggingface.co/frpc-gradio-0.3/frpc_darwin_arm64"
     }
   },
+  "frpc_hf_fallback": {
+    "repo_id": "AI4Protein/VenusFactory2-ckpts",
+    "path_prefix": "assets/frpc",
+    "note": "Used when Gradio CDN is unreachable. Prefer: python scripts/download_frpc.py"
+  },
   "pip_mirror": {
     "index_url": "https://pypi.org/simple"
   }

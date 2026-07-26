@@ -113,6 +113,12 @@ python scripts/download_ckpts.py --preset all
 
 On-demand auto-download is enabled by default (`VENUS_CKPT_AUTO_DOWNLOAD=1`). For air-gapped installs, pre-download and set `VENUS_CKPT_AUTO_DOWNLOAD=0`.
 
+The Gradio Share `frpc` binary is also not tracked in git:
+
+```bash
+python scripts/download_frpc.py --to-gradio-cache
+```
+
 ### 4. Launch
 ```bash
 # Web UI v1 (legacy Gradio, local mode)

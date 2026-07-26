@@ -113,6 +113,12 @@ python scripts/download_ckpts.py --preset all
 
 默认开启按需自动下载（`VENUS_CKPT_AUTO_DOWNLOAD=1`）：首次用到缺失权重时会从 Hugging Face 拉取到 `ckpt/`。离线环境请预先下载并设置 `VENUS_CKPT_AUTO_DOWNLOAD=0`。
 
+Gradio Share 所需的 `frpc` 二进制同样不进 git，需要时可：
+
+```bash
+python scripts/download_frpc.py --to-gradio-cache
+```
+
 ### 4. 启动
 ```bash
 # Web UI v1（传统 Gradio，本地模式）

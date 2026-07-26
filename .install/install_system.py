@@ -20,8 +20,24 @@ pip_mirror = config['pip_mirror']
 
 def download_frpc(system, arch_str, version="v0.3"):
     """
-    Download the frpc executable for the corresponding system
+    Download the frpc executable for the corresponding system.
+
+    Prefer the shared helper (CDN → Hugging Face fallback). Keep a small
+    inline CDN attempt so this script still works if ``src/`` is unavailable.
     """
+    try:
+        repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+        src_dir = os.path.join(repo_root, "src")
+        if src_dir not in sys.path:
+            sys.path.insert(0, src_dir)
+        from frpc_hub import download_frpc as hub_download_frpc
+
+        path = hub_download_frpc(system=system, arch=arch_str, version=version, force=True)
+        print(f"✅ Download complete via frpc_hub: {path}")
+        return os.path.basename(path)
+    except Exception as hub_exc:
+        print(f"⚠️  frpc_hub download failed ({hub_exc}); trying CDN only...")
+
     url_key = f"{system}_{arch_str}"
     
     if url_key not in FRPC_VERSIONS[version]:
@@ -58,6 +74,7 @@ def download_frpc(system, arch_str, version="v0.3"):
         return download_filename
     except Exception as e:
         print(f"❌ Download failed: {e}")
+        print("   Tip: python scripts/download_frpc.py --to-gradio-cache")
         return None
 
 
