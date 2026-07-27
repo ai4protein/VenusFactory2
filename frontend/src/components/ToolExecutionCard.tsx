@@ -39,15 +39,53 @@ export interface ToolExecution {
   timestamp?: string;
   turn_id?: string;
   error?: string;
+  kind?: string;
+}
+
+/** Expert literature fan-out tools — hide from the tool-card strip. */
+export function isResearchNoiseTool(t: ToolExecution): boolean {
+  const name = String(t.tool_name || t.name || "").toLowerCase();
+  const kind = String(t.kind || "").toLowerCase();
+  return (
+    kind === "research_search" ||
+    name === "research_search" ||
+    name.startsWith("query_")
+  );
+}
+
+function hasSettledOutput(t: ToolExecution): boolean {
+  const out = t.output ?? t.outputs;
+  if (out == null) return false;
+  if (typeof out === "string") return out.trim().length > 0;
+  if (typeof out === "object") return Object.keys(out as object).length > 0;
+  return true;
+}
+
+function isToolRunning(t: ToolExecution): boolean {
+  const status = String(t.status || "").toLowerCase();
+  if (status === "running") return true;
+  if (status === "error" || status === "ok" || status === "success") return false;
+  // Graph-era search rows often only have `timestamp` + `outputs` and no
+  // finished_at — treat those as completed so they don't grow a live timer.
+  if (hasSettledOutput(t) || t.finished_at) return false;
+  return !t.finished_at && Boolean(t.started_at || t.timestamp);
 }
 
 function durationMs(t: ToolExecution): number | null {
   const start = t.started_at || t.timestamp;
-  const end = t.finished_at;
   if (!start) return null;
   const startMs = Date.parse(start);
   if (isNaN(startMs)) return null;
-  const endMs = end ? Date.parse(end) : Date.now();
+  // Prefer finished_at; otherwise if we have outputs, don't use Date.now()
+  // (that made old query_* cards show "16m" and look stuck running).
+  let endMs: number;
+  if (t.finished_at) {
+    endMs = Date.parse(t.finished_at);
+  } else if (hasSettledOutput(t) || !isToolRunning(t)) {
+    return null;
+  } else {
+    endMs = Date.now();
+  }
   if (isNaN(endMs)) return null;
   return endMs - startMs;
 }
@@ -156,14 +194,16 @@ export function ToolExecutionList({
   tools: ToolExecution[];
   recentCount?: number;
 }) {
-  if (tools.length === 0) return null;
+  // Drop Expert literature fan-out noise (old sessions can have dozens of
+  // query_* rows that otherwise pin under the last PI message).
+  const filtered = tools.filter((t) => !isResearchNoiseTool(t));
+  if (filtered.length === 0) return null;
 
   // Split: in-flight always visible; from the rest keep the last `recentCount`.
   const running: ToolExecution[] = [];
   const completed: ToolExecution[] = [];
-  for (const t of tools) {
-    const st = String(t.status || "").toLowerCase();
-    if (st === "running" || (st === "" && !t.finished_at)) running.push(t);
+  for (const t of filtered) {
+    if (isToolRunning(t)) running.push(t);
     else completed.push(t);
   }
   const visibleCompleted = completed.slice(-recentCount);
@@ -216,9 +256,9 @@ export function ToolExecutionList({
 export function ToolExecutionCard({ t }: { t: ToolExecution }) {
   const [open, setOpen] = useState(false);
   const status = String(t.status || "").toLowerCase();
-  const isRunning = status === "running" || (status === "" && !t.finished_at);
+  const isRunning = isToolRunning(t);
   const isError = status === "error" || t.is_error === true;
-  const isOk = status === "ok" || (!isRunning && !isError && Boolean(t.finished_at));
+  const isOk = !isRunning && !isError;
 
   const args = t.args ?? t.inputs;
   const rawOutput = t.output ?? t.outputs;

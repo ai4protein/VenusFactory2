@@ -8,17 +8,17 @@ type Props = {
 
 const STRINGS = {
   en: {
-    continue: "Continue Research",
-    comment: "Comment & Rewrite",
-    skip: "Skip to Report",
-    placeholder: "Describe what changes you'd like to the sub-report...",
-    submit: "Submit & Rewrite"
+    continue: "Continue",
+    comment: "Revise",
+    skip: "Skip to report",
+    placeholder: "What should change in this sub-report?",
+    submit: "Submit rewrite"
   },
   zh: {
-    continue: "继续研究",
-    comment: "评论并重写",
-    skip: "跳转到报告",
-    placeholder: "描述你希望对小报告做的修改…",
+    continue: "继续",
+    comment: "修改",
+    skip: "跳过至报告",
+    placeholder: "希望小报告如何修改？",
     submit: "提交并重写"
   }
 };
@@ -29,10 +29,11 @@ export function SubReportCheckpoint({ onDecide, disabled }: Props) {
   const t = useLang().t(STRINGS);
 
   return (
-    <div className="step-checkpoint">
+    <div className="step-checkpoint expert-checkpoint-actions">
       <div className="step-checkpoint-options">
         <button
-          className="step-checkpoint-btn step-checkpoint-btn-continue"
+          type="button"
+          className="step-checkpoint-btn step-checkpoint-btn-continue step-checkpoint-btn-primary"
           onClick={() => onDecide("continue")}
           disabled={disabled}
         >
@@ -40,6 +41,7 @@ export function SubReportCheckpoint({ onDecide, disabled }: Props) {
           <span>{t.continue}</span>
         </button>
         <button
+          type="button"
           className="step-checkpoint-btn step-checkpoint-btn-rewrite"
           onClick={() => setShowComment(!showComment)}
           disabled={disabled}
@@ -48,6 +50,7 @@ export function SubReportCheckpoint({ onDecide, disabled }: Props) {
           <span>{t.comment}</span>
         </button>
         <button
+          type="button"
           className="step-checkpoint-btn step-checkpoint-btn-abort"
           onClick={() => onDecide("skip")}
           disabled={disabled}
@@ -67,7 +70,8 @@ export function SubReportCheckpoint({ onDecide, disabled }: Props) {
             disabled={disabled}
           />
           <button
-            className="step-checkpoint-btn step-checkpoint-btn-continue sub-report-submit-btn"
+            type="button"
+            className="step-checkpoint-btn step-checkpoint-btn-continue step-checkpoint-btn-primary sub-report-submit-btn"
             onClick={() => {
               onDecide("rewrite", comment);
               setComment("");

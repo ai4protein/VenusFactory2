@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { PlanStep } from "../lib/api";
 import { useLang } from "../lib/i18n";
 
@@ -14,24 +14,28 @@ const STRINGS = {
     moveUp: "Move up",
     moveDown: "Move down",
     remove: "Remove step",
-    confirm: "Confirm Plan",
-    autoExecute: "Confirm & Auto-execute",
-    autoExecuteHint: "Confirm and execute all steps automatically without pausing"
+    confirm: "Confirm step-by-step",
+    autoExecute: "Confirm & auto-execute",
+    autoExecuteHint: "Confirm and run all steps without pausing"
   },
   zh: {
     step: "步骤",
     moveUp: "上移",
     moveDown: "下移",
     remove: "删除步骤",
-    confirm: "确认计划",
+    confirm: "逐步确认",
     autoExecute: "确认并自动执行",
-    autoExecuteHint: "确认后自动执行所有步骤，不再暂停"
+    autoExecuteHint: "确认后自动执行所有步骤，不再逐步暂停"
   }
 };
 
 export function PlanEditor({ plan, onConfirm, disabled }: Props) {
   const [steps, setSteps] = useState<PlanStep[]>(plan.map(s => ({ ...s })));
   const t = useLang().t(STRINGS);
+
+  useEffect(() => {
+    setSteps(plan.map(s => ({ ...s })));
+  }, [plan]);
 
   function updateDescription(idx: number, desc: string) {
     setSteps(prev => {
@@ -103,19 +107,21 @@ export function PlanEditor({ plan, onConfirm, disabled }: Props) {
       ))}
       <div className="plan-editor-actions">
         <button
-          className="plan-editor-confirm"
-          onClick={() => onConfirm(steps, false)}
-          disabled={disabled || steps.length === 0}
-        >
-          {t.confirm}
-        </button>
-        <button
+          type="button"
           className="plan-editor-auto-execute"
           onClick={() => onConfirm(steps, true)}
           disabled={disabled || steps.length === 0}
           title={t.autoExecuteHint}
         >
           {t.autoExecute}
+        </button>
+        <button
+          type="button"
+          className="plan-editor-confirm"
+          onClick={() => onConfirm(steps, false)}
+          disabled={disabled || steps.length === 0}
+        >
+          {t.confirm}
         </button>
       </div>
     </div>

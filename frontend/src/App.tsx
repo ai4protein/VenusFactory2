@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { LangNavLink, LangNavigate } from "./components/LangLink";
 import { readDefaultLang, langFromPath } from "./lib/i18n";
@@ -71,7 +71,7 @@ const SIDEBAR_STRINGS = {
     faq: "FAQ",
     envSettings: "Env Settings",
     insights: "Insights",
-    conference: "Conference",
+    conference: "conf",
     arxiv: "Arxiv",
     hf: "Hugging Face",
     github: "GitHub",
@@ -123,6 +123,32 @@ const SIDEBAR_STRINGS = {
 
 type LabelKey = keyof typeof SIDEBAR_STRINGS["en"];
 
+/** Compact labels for the ~84px collapsed left rail. Full text stays in `title`. */
+const SIDEBAR_SHORT: Record<"en" | "zh", Partial<Record<LabelKey, string>>> = {
+  en: {
+    agent: "Agent",
+    report: "Report",
+    leaderboards: "Ranks",
+    quickTools: "Quick",
+    advancedTools: "Adv",
+    settings: "Set",
+    download: "DL",
+    manual: "Docs",
+    customModel: "Model",
+  },
+  zh: {
+    agent: "智能",
+    report: "报告",
+    leaderboards: "排行",
+    quickTools: "快速",
+    advancedTools: "高级",
+    settings: "设置",
+    download: "下载",
+    manual: "手册",
+    customModel: "模型",
+  },
+};
+
 const MODULES: Array<{ path: string; labelKey: LabelKey; status: string }> = [
   { path: "/agent", labelKey: "agent", status: "Available" },
   { path: "/report", labelKey: "report", status: "Available" },
@@ -136,6 +162,7 @@ const MODULES: Array<{ path: string; labelKey: LabelKey; status: string }> = [
 
 const AGENT_MODULES: Array<{ path: string; labelKey: LabelKey; status: string }> = [
   { path: "/agent/chat", labelKey: "chat", status: "Available" },
+  { path: "/report", labelKey: "report", status: "Available" },
   { path: "/agent/workspace", labelKey: "workspace", status: "Available" }
 ];
 
@@ -262,6 +289,7 @@ function LocalizedApp() {
   const [agentExpanded, setAgentExpanded] = useState(true);
   const [runtimeMode, setRuntimeMode] = useState<"unknown" | "local" | "online">("unknown");
   const location = useLocation();
+  const navigate = useNavigate();
   // Path beyond the `:lang` prefix, e.g. "/en/agent/chat" → "/agent/chat".
   // Used for route-active comparisons that were authored against the
   // pre-prefix URLs.
@@ -301,12 +329,18 @@ function LocalizedApp() {
     !sidebarCollapsed && (manualExpanded || manualRouteActive);
   const showSettingsChildren =
     !sidebarCollapsed && (settingsExpanded || settingsRouteActive);
-  const showAgentChildren = !sidebarCollapsed && (agentExpanded || agentRouteActive);
+  const showAgentChildren =
+    !sidebarCollapsed && (agentExpanded || agentRouteActive || pathBeyondLang.startsWith("/report"));
   const localFeaturesEnabled = runtimeMode === "local";
   const workspaceEnabled = localFeaturesEnabled;
   // Landing page = the localized root `/en` or `/zh` (no further path).
   const isLanding = pathBeyondLang === "/" || pathBeyondLang === "";
-  const t = useLang().t(SIDEBAR_STRINGS);
+  const { lang, t: tFn } = useLang();
+  const t = tFn(SIDEBAR_STRINGS);
+  const short = SIDEBAR_SHORT[lang === "zh" ? "zh" : "en"];
+  const navLabel = (key: LabelKey) =>
+    sidebarCollapsed ? short[key] ?? t[key] : t[key];
+  const go = (path: string) => navigate(`/${langSeg ?? lang}${path}`);
 
   // NOTE: every hook must be called above the `if (isLanding)` early return,
   // otherwise navigating between `/` and any inner route changes the hook
@@ -369,7 +403,7 @@ function LocalizedApp() {
               rel="noreferrer"
               title={t.conference}
             >
-              📄 {t.conference}
+              {t.conference}
             </a>
             <a
               className="vf2-sidebar-link"
@@ -378,7 +412,7 @@ function LocalizedApp() {
               rel="noreferrer"
               title={t.arxiv}
             >
-              🆕 {t.arxiv}
+              {t.arxiv}
             </a>
             <a
               className="vf2-sidebar-link"
@@ -387,7 +421,7 @@ function LocalizedApp() {
               rel="noreferrer"
               title={t.hf}
             >
-              🤗 HF
+              HF
             </a>
             <a
               className="vf2-sidebar-link"
@@ -396,7 +430,7 @@ function LocalizedApp() {
               rel="noreferrer"
               title={t.github}
             >
-              🐙 {t.github}
+              {t.github}
             </a>
           </div>
         )}
@@ -404,6 +438,7 @@ function LocalizedApp() {
           {MODULES.filter(
             (item) =>
               item.path !== "/agent" &&
+              item.path !== "/report" &&
               item.path !== "/quick-tools" &&
               item.path !== "/advanced-tools" &&
               item.path !== "/download" &&
@@ -416,19 +451,25 @@ function LocalizedApp() {
               className={({ isActive }) => `vf2-nav-item ${isActive ? "active" : ""}`}
               title={t[item.labelKey]}
             >
-              <span className="vf2-nav-label">{t[item.labelKey]}</span>
+              <span className="vf2-nav-label">{navLabel(item.labelKey)}</span>
             </LangNavLink>
           ))}
 
           <div className="vf2-nav-group">
             <button
               type="button"
-              className={`vf2-nav-item vf2-nav-parent ${agentRouteActive ? "active" : ""}`}
+              className={`vf2-nav-item vf2-nav-parent ${agentRouteActive || pathBeyondLang.startsWith("/report") ? "active" : ""}`}
               title={t.agent}
-              onClick={() => setAgentExpanded((v) => !v)}
+              onClick={() => {
+                if (sidebarCollapsed) {
+                  go("/agent/chat");
+                  return;
+                }
+                setAgentExpanded((v) => !v);
+              }}
               aria-expanded={showAgentChildren}
             >
-              <span className="vf2-nav-label">{t.agent}</span>
+              <span className="vf2-nav-label">{navLabel("agent")}</span>
               {!sidebarCollapsed && (
                 <span className={`vf2-nav-caret ${showAgentChildren ? "expanded" : ""}`}>
                   ▾
@@ -455,10 +496,16 @@ function LocalizedApp() {
               type="button"
               className={`vf2-nav-item vf2-nav-parent ${quickToolsRouteActive ? "active" : ""}`}
               title={t.quickTools}
-              onClick={() => setQuickToolsExpanded((v) => !v)}
+              onClick={() => {
+                if (sidebarCollapsed) {
+                  go("/quick-tools/directed-evolution");
+                  return;
+                }
+                setQuickToolsExpanded((v) => !v);
+              }}
               aria-expanded={showQuickToolChildren}
             >
-              <span className="vf2-nav-label">{t.quickTools}</span>
+              <span className="vf2-nav-label">{navLabel("quickTools")}</span>
               {!sidebarCollapsed && (
                 <span className={`vf2-nav-caret ${showQuickToolChildren ? "expanded" : ""}`}>
                   ▾
@@ -484,10 +531,16 @@ function LocalizedApp() {
               type="button"
               className={`vf2-nav-item vf2-nav-parent ${advancedToolsRouteActive ? "active" : ""}`}
               title={t.advancedTools}
-              onClick={() => setAdvancedToolsExpanded((v) => !v)}
+              onClick={() => {
+                if (sidebarCollapsed) {
+                  go("/advanced-tools/directed-evolution");
+                  return;
+                }
+                setAdvancedToolsExpanded((v) => !v);
+              }}
               aria-expanded={showAdvancedToolChildren}
             >
-              <span className="vf2-nav-label">{t.advancedTools}</span>
+              <span className="vf2-nav-label">{navLabel("advancedTools")}</span>
               {!sidebarCollapsed && (
                 <span className={`vf2-nav-caret ${showAdvancedToolChildren ? "expanded" : ""}`}>
                   ▾
@@ -513,10 +566,16 @@ function LocalizedApp() {
               type="button"
               className={`vf2-nav-item vf2-nav-parent ${customModelRouteActive ? "active" : ""}`}
               title={t.customModel}
-              onClick={() => setCustomModelExpanded((v) => !v)}
+              onClick={() => {
+                if (sidebarCollapsed) {
+                  go("/custom-model/training");
+                  return;
+                }
+                setCustomModelExpanded((v) => !v);
+              }}
               aria-expanded={showCustomModelChildren}
             >
-              <span className="vf2-nav-label">{t.customModel}</span>
+              <span className="vf2-nav-label">{navLabel("customModel")}</span>
               {!sidebarCollapsed && (
                 <span className={`vf2-nav-caret ${showCustomModelChildren ? "expanded" : ""}`}>
                   ▾
@@ -542,10 +601,16 @@ function LocalizedApp() {
               type="button"
               className={`vf2-nav-item vf2-nav-parent ${downloadRouteActive ? "active" : ""}`}
               title={t.download}
-              onClick={() => setDownloadExpanded((v) => !v)}
+              onClick={() => {
+                if (sidebarCollapsed) {
+                  go("/download/uniprot");
+                  return;
+                }
+                setDownloadExpanded((v) => !v);
+              }}
               aria-expanded={showDownloadChildren}
             >
-              <span className="vf2-nav-label">{t.download}</span>
+              <span className="vf2-nav-label">{navLabel("download")}</span>
               {!sidebarCollapsed && (
                 <span className={`vf2-nav-caret ${showDownloadChildren ? "expanded" : ""}`}>
                   ▾
@@ -571,10 +636,16 @@ function LocalizedApp() {
               type="button"
               className={`vf2-nav-item vf2-nav-parent ${manualRouteActive ? "active" : ""}`}
               title={t.manual}
-              onClick={() => setManualExpanded((v) => !v)}
+              onClick={() => {
+                if (sidebarCollapsed) {
+                  go("/manual/index");
+                  return;
+                }
+                setManualExpanded((v) => !v);
+              }}
               aria-expanded={showManualChildren}
             >
-              <span className="vf2-nav-label">{t.manual}</span>
+              <span className="vf2-nav-label">{navLabel("manual")}</span>
               {!sidebarCollapsed && (
                 <span className={`vf2-nav-caret ${showManualChildren ? "expanded" : ""}`}>
                   ▾
@@ -600,10 +671,16 @@ function LocalizedApp() {
               type="button"
               className={`vf2-nav-item vf2-nav-parent ${settingsRouteActive ? "active" : ""}`}
               title={t.settings}
-              onClick={() => setSettingsExpanded((v) => !v)}
+              onClick={() => {
+                if (sidebarCollapsed) {
+                  go("/settings/env");
+                  return;
+                }
+                setSettingsExpanded((v) => !v);
+              }}
               aria-expanded={showSettingsChildren}
             >
-              <span className="vf2-nav-label">{t.settings}</span>
+              <span className="vf2-nav-label">{navLabel("settings")}</span>
               {!sidebarCollapsed && (
                 <span className={`vf2-nav-caret ${showSettingsChildren ? "expanded" : ""}`}>
                   ▾

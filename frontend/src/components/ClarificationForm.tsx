@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ClarificationQuestion, ClarificationAnswer } from "../lib/api";
 import { useLang } from "../lib/i18n";
 
@@ -12,12 +12,12 @@ const STRINGS = {
   en: {
     multipleHint: "(multiple choice)",
     specifyPlaceholder: "Please specify...",
-    submit: "Submit"
+    submit: "Confirm"
   },
   zh: {
     multipleHint: "（可多选）",
     specifyPlaceholder: "请说明…",
-    submit: "提交"
+    submit: "确认并继续"
   }
 };
 
@@ -26,6 +26,10 @@ export function ClarificationForm({ questions, onSubmit, disabled }: Props) {
     questions.map((_, i) => ({ question_index: i, selected_options: [], custom_text: "" }))
   );
   const t = useLang().t(STRINGS);
+
+  useEffect(() => {
+    setAnswers(questions.map((_, i) => ({ question_index: i, selected_options: [], custom_text: "" })));
+  }, [questions]);
 
   function toggleOption(qIdx: number, optIdx: number) {
     setAnswers(prev => {
@@ -107,6 +111,7 @@ export function ClarificationForm({ questions, onSubmit, disabled }: Props) {
         </div>
       ))}
       <button
+        type="button"
         className="clarification-submit"
         onClick={() => onSubmit(answers)}
         disabled={disabled || !allAnswered}
