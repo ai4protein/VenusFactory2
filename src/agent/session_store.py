@@ -34,6 +34,9 @@ _PERSISTABLE_KEYS: frozenset[str] = frozenset({
     "pi_report", "pi_suggest_steps", "plan", "current_step_index", "step_results",
     "clarification_questions", "clarification_answers",
     "waiting_for", "status", "error",
+    # Science Agent (kimi-code) interactive gates
+    "kimi_pending_question", "kimi_pending_approval",
+    "approval_prompt", "plan_markdown",
     "execution_failed", "failed_step", "failed_reason",
     "ui_lang", "sub_report_rewrite_comment", "auto_execute", "skipped_steps",
     # research
@@ -53,6 +56,10 @@ _PERSISTABLE_KEYS: frozenset[str] = frozenset({
     # Forced response language ("en" | "zh") pinned from the UI locale.
     # Persisted so retries / reloads inherit the same language policy.
     "user_lang",
+    # Dual-chat mode: science_agent (kimi-code) | science_expert (graph).
+    "chat_mode", "engine",
+    # Expert optional flags (SC is paper-level by default; full_manuscript kept for compat).
+    "review_sub_reports", "full_manuscript",
 })
 
 # Special: protein_context is serialized via ProteinContextManager.serialize()
@@ -72,6 +79,94 @@ def persistable_state(state: dict[str, Any]) -> dict[str, Any]:
     if pc is not None and hasattr(pc, "serialize"):
         out[_PROTEIN_CONTEXT_KEY] = pc.serialize()
     return out
+
+
+_TITLE_SKIP_PREFIXES = (
+    "📝",
+    "clarification details",
+    "**clarification",
+    "澄清详情",
+    "澄清细节",
+)
+
+
+def shorten_session_title(raw: str, *, max_len: int = 22) -> str:
+    """Compress a user message into a short sidebar label (not a full copy)."""
+    lines = [
+        ln.strip()
+        for ln in str(raw or "").splitlines()
+        if ln.strip() and not ln.lstrip().startswith(">")
+    ]
+    text = " ".join(lines) if lines else " ".join(str(raw or "").split())
+    text = " ".join(text.split()).strip()
+    if not text:
+        return ""
+    lower = text.lower()
+    if any(lower.startswith(p) or text.startswith(p) for p in _TITLE_SKIP_PREFIXES):
+        return ""
+
+    # Prefer the first clause / sentence, not the whole prompt.
+    for sep in ("。", "！", "？", "；", "\n", ". ", "! ", "? ", "; "):
+        if sep in text:
+            head = text.split(sep, 1)[0].strip()
+            if len(head) >= 4:
+                text = head
+                break
+    else:
+        # Soft break on first comma when the line is long.
+        for sep in ("，", ", "):
+            if sep in text and len(text) > max_len:
+                head = text.split(sep, 1)[0].strip()
+                if len(head) >= 4:
+                    text = head
+                    break
+
+    # English-heavy prompts → keep a few leading words.
+    ascii_ratio = sum(1 for ch in text if ord(ch) < 128) / max(len(text), 1)
+    if ascii_ratio > 0.7:
+        words = text.split()
+        if len(words) > 3:
+            text = " ".join(words[:3])
+
+    text = text.strip(" ·-–—:：,，;；")
+    if not text:
+        return ""
+    if len(text) <= max_len:
+        return text
+    cut = text[: max_len - 1]
+    if ascii_ratio > 0.7:
+        sp = cut.rfind(" ")
+        if sp >= 6:
+            cut = cut[:sp]
+    return cut.rstrip() + "…"
+
+
+def session_title_from_history(history: Any, *, max_len: int = 22) -> str:
+    """Build a short sidebar title from the first real user message in ``history``."""
+    if not isinstance(history, list):
+        return ""
+    for item in history:
+        if not isinstance(item, dict):
+            continue
+        if str(item.get("role") or "") != "user":
+            continue
+        content = item.get("content")
+        if isinstance(content, list):
+            parts: list[str] = []
+            for part in content:
+                if isinstance(part, dict):
+                    text = part.get("text") or part.get("content") or ""
+                    if text:
+                        parts.append(str(text))
+                elif isinstance(part, str) and part.strip():
+                    parts.append(part)
+            raw = " ".join(parts)
+        else:
+            raw = str(content or "")
+        title = shorten_session_title(raw, max_len=max_len)
+        if title:
+            return title
+    return ""
 
 
 class SqliteBackend:
@@ -223,6 +318,7 @@ class SqliteBackend:
                 "status": d.get("status") or "",
                 "history_size": len(history) if isinstance(history, list) else 0,
                 "model_name": d.get("default_llm_model_name") or "",
+                "title": session_title_from_history(history),
             })
         return summaries
 
@@ -348,12 +444,10 @@ class SessionStore:
         see them in the listing immediately after create().
         """
         db_summaries = await asyncio.to_thread(self._backend.list_summaries, owner_key)
-        seen = {s["session_id"] for s in db_summaries}
+        by_id = {s["session_id"]: s for s in db_summaries}
         async with self._lock:
             mem_snapshot = list(self._mem.items())
         for sid, state in mem_snapshot:
-            if sid in seen:
-                continue
             if owner_key is not None and str(state.get("owner_key", "")) != owner_key:
                 continue
             history = state.get("history") or []
@@ -363,16 +457,31 @@ class SessionStore:
                 or state.get("default_llm_model_name", "")
                 or ""
             )
-            db_summaries.append({
+            mem_fields = {
+                "status": state.get("status", ""),
+                "history_size": len(history) if isinstance(history, list) else 0,
+                "model_name": model_name,
+                "title": session_title_from_history(history),
+            }
+            existing = by_id.get(sid)
+            if existing is not None:
+                # Prefer in-memory history for title/size — DB may lag mid-turn.
+                existing.update(mem_fields)
+                continue
+            by_id[sid] = {
                 "session_id": sid,
                 "owner_key": str(state.get("owner_key", "")),
                 "created_at": str(state.get("created_at", "")),
                 "last_accessed": None,
-                "status": state.get("status", ""),
-                "history_size": len(history) if isinstance(history, list) else 0,
-                "model_name": model_name,
-            })
-        return db_summaries
+                **mem_fields,
+            }
+        # Keep DB order first, then append mem-only sessions.
+        ordered = [by_id[s["session_id"]] for s in db_summaries if s["session_id"] in by_id]
+        seen = {s["session_id"] for s in ordered}
+        for sid, summary in by_id.items():
+            if sid not in seen:
+                ordered.append(summary)
+        return ordered
 
     def spawn_cleanup_loop(
         self,

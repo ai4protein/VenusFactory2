@@ -27,6 +27,26 @@ from web_v2.chat_api._hooks_runtime import (
 )
 
 
+# ── SSE helpers ────────────────────────────────────────────────────────────
+
+_SSE_HEADERS: dict[str, str] = {
+    "Cache-Control": "no-cache, no-transform",
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no",
+}
+
+
+def _sse_response(body) -> "StreamingResponse":
+    """Build a StreamingResponse that proxies/browsers will not buffer."""
+    from fastapi.responses import StreamingResponse
+
+    return StreamingResponse(
+        body,
+        media_type="text/event-stream",
+        headers=dict(_SSE_HEADERS),
+    )
+
+
 # ── Runtime mode + request fingerprinting ──────────────────────────────────
 
 def _runtime_mode() -> str:
@@ -173,9 +193,128 @@ def _redact_obj(value: Any) -> Any:
     return value
 
 
+def _infer_chat_mode(state: dict[str, Any]) -> str:
+    """Return session chat_mode, inferring from engine when missing."""
+    mode = state.get("chat_mode")
+    if mode in ("science_agent", "science_expert"):
+        return mode
+    engine = state.get("engine") or ""
+    if not engine:
+        llm = state.get("llm")
+        model_id = getattr(llm, "model_name", "") if llm is not None else ""
+        if model_id == "kimi-code":
+            engine = "kimi-code"
+    return "science_agent" if engine == "kimi-code" else "science_expert"
+
+
+def _is_agent_session(state: dict[str, Any]) -> bool:
+    """Science Agent = kimi-code only (hard-split from Expert graph)."""
+    return _infer_chat_mode(state) == "science_agent" or state.get("engine") == "kimi-code"
+
+
+def _is_expert_session(state: dict[str, Any]) -> bool:
+    """Science Expert = LangGraph PI→CB→MLS→SC only."""
+    return not _is_agent_session(state)
+
+
+_AGENT_WAITING_STATUSES = frozenset({
+    "waiting_for_kimi_question",
+    "waiting_for_kimi_approval",
+})
+_EXPERT_WAITING_STATUSES = frozenset({
+    "waiting_for_clarification",
+    "waiting_for_plan_confirmation",
+    "waiting_for_iteration",
+    "waiting_for_step_review",
+    "waiting_for_sub_report_review",
+})
+
+
+def clear_agent_gates(state: dict[str, Any]) -> None:
+    """Drop kimi AskUser / Approve leftovers so Expert cannot be hijacked."""
+    state.pop("kimi_pending_question", None)
+    state.pop("kimi_pending_approval", None)
+    state.pop("approval_prompt", None)
+    state.pop("plan_markdown", None)
+    if state.get("waiting_for") in ("kimi_question", "kimi_approval"):
+        state["waiting_for"] = ""
+    if state.get("status") in _AGENT_WAITING_STATUSES:
+        state["status"] = ""
+
+
+def clear_expert_gates(state: dict[str, Any]) -> None:
+    """Drop Expert checkpoint leftovers so Agent turns stay on kimi-code."""
+    if state.get("waiting_for") in (
+        "clarification",
+        "plan_confirmation",
+        "sub_report_review",
+        "step_review",
+        "iteration",
+        "skip_to_plan",
+        "clarification_answered",
+        "resume_plan",
+        "resume_research",
+    ):
+        state["waiting_for"] = ""
+    if state.get("status") in _EXPERT_WAITING_STATUSES:
+        state["status"] = ""
+    # Fresh Agent turn should not inherit Expert clarification form payload.
+    if state.get("waiting_for") not in ("kimi_question", "kimi_approval"):
+        state["clarification_questions"] = []
+        state["clarification_answers"] = []
+        state["plan"] = []
+
+
+def _snapshot_kimi_pending_question(state: dict[str, Any]) -> dict[str, Any] | None:
+    """Public, redacted view of a pending AskUserQuestion (no reverse-map ids)."""
+    if not _is_agent_session(state):
+        return None
+    pending = state.get("kimi_pending_question")
+    if not isinstance(pending, dict) or not pending:
+        return None
+    questions = state.get("clarification_questions") or []
+    return {
+        "question_id": str(pending.get("question_id") or ""),
+        "question_count": len(questions) if isinstance(questions, list) else 0,
+    }
+
+
+def _snapshot_kimi_pending_approval(state: dict[str, Any]) -> dict[str, Any] | None:
+    """Public view of a pending tool/plan approval for ApprovalCard."""
+    if not _is_agent_session(state):
+        return None
+    pending = state.get("kimi_pending_approval")
+    if not isinstance(pending, dict) or not pending:
+        return None
+    plan = str(
+        pending.get("plan_markdown")
+        or state.get("plan_markdown")
+        or ""
+    )
+    prompt = str(
+        pending.get("approval_prompt")
+        or state.get("approval_prompt")
+        or ""
+    )
+    return {
+        "approval_id": str(pending.get("approval_id") or ""),
+        "tool_name": str(pending.get("tool_name") or ""),
+        "option_labels": list(pending.get("option_labels") or []),
+        "approval_prompt": redact_for_frontend(prompt) if prompt else "",
+        "plan_markdown": redact_for_frontend(plan) if plan else "",
+    }
+
+
 def _snapshot(state: dict[str, Any]) -> dict[str, Any]:
     waiting_for = state.get("waiting_for", "")
     waiting_for_str = waiting_for if isinstance(waiting_for, str) else ""
+    chat_mode = _infer_chat_mode(state)
+    is_agent = chat_mode == "science_agent"
+    engine = state.get("engine") or ("kimi-code" if is_agent else "graph")
+    plan_md = str(state.get("plan_markdown") or "") if is_agent else ""
+    approval_prompt = str(state.get("approval_prompt") or "") if is_agent else ""
+    # Expert PI clarification vs Agent AskUser both use clarification_questions,
+    # but never cross-expose Agent approval markdown into Expert snapshots.
     return {
         "session_id": state.get("session_id"),
         "model_name": getattr(state.get("llm"), "model_name", ""),
@@ -185,10 +324,21 @@ def _snapshot(state: dict[str, Any]) -> dict[str, Any]:
         "tool_executions": _redact_obj(list(state.get("tool_executions", []))),
         "status": state.get("status", ""),
         "clarification_questions": list(state.get("clarification_questions", [])),
-        "plan": list(state.get("plan", [])),
+        "plan": list(state.get("plan", [])) if not is_agent else [],
         "waiting_for": waiting_for_str,
+        "engine": engine,
+        "chat_mode": chat_mode,
+        # Explicit opt-in only — missing/False means Expert auto-continues
+        # sub-reports (frontend hides the Continue/Rewrite checkpoint).
+        "review_sub_reports": (state.get("review_sub_reports") is True) and not is_agent,
+        "full_manuscript": (state.get("full_manuscript") is True) and not is_agent,
         # kimi security policy: tool calls our policy refused (most recent last)
-        "security_events": _redact_obj(list(state.get("security_events", []))),
+        "security_events": _redact_obj(list(state.get("security_events", []))) if is_agent else [],
+        # Science Agent interactive gates (AskUser / Approve) — never on Expert
+        "kimi_pending_question": _snapshot_kimi_pending_question(state),
+        "kimi_pending_approval": _snapshot_kimi_pending_approval(state),
+        "approval_prompt": redact_for_frontend(approval_prompt) if approval_prompt else "",
+        "plan_markdown": redact_for_frontend(plan_md) if plan_md else "",
     }
 
 

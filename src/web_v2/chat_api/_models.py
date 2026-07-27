@@ -27,6 +27,12 @@ class SessionStateResponse(BaseModel):
     clarification_questions: list[dict[str, Any]] = Field(default_factory=list)
     plan: list[dict[str, Any]] = Field(default_factory=list)
     waiting_for: str = ""
+    engine: str = ""
+    chat_mode: str = ""
+    kimi_pending_question: Optional[dict[str, Any]] = None
+    kimi_pending_approval: Optional[dict[str, Any]] = None
+    approval_prompt: str = ""
+    plan_markdown: str = ""
 
 
 class ChatStreamRequest(BaseModel):
@@ -40,6 +46,12 @@ class ChatStreamRequest(BaseModel):
     # The model-registry entry for the selected model may override this
     # (see messages.py: any model with engine="kimi-code" forces the kimi path).
     engine: Optional[str] = Field(default=None)
+    # Dual-chat mode (preferred by new clients). Maps to engine:
+    #   "science_agent"  → kimi-code
+    #   "science_expert" → graph (LangGraph PI/CB/MLS/SC)
+    # Registry engine=kimi-code still forces science_agent. Old clients that
+    # only send model/engine remain supported when this is omitted.
+    chat_mode: Optional[str] = Field(default=None)
     # UI locale ("en" | "zh"). When set, the chat router forces the model to
     # respond in this language regardless of the input language. Persisted on
     # the session so retries inherit it. None → fall back to model defaults.
@@ -56,9 +68,17 @@ class ClarificationResponseRequest(BaseModel):
     answers: list[ClarificationAnswer] = Field(default_factory=list)
 
 
+class ApprovalDecideRequest(BaseModel):
+    """Science Agent Approve/Reject decision (ExitPlanMode / dangerous tools)."""
+    decision: str = Field(default="approved")  # approved | rejected
+    selected_label: str = ""
+    feedback: str = ""
+
+
 class PlanConfirmRequest(BaseModel):
     plan: list[dict[str, Any]] = Field(default_factory=list)
-    auto_execute: bool = Field(default=False)
+    # Expert default: auto-run steps after plan confirmation (no per-step gate).
+    auto_execute: bool = Field(default=True)
 
 
 class IterationDecideRequest(BaseModel):

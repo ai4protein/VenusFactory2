@@ -1,6 +1,5 @@
 """Streaming chat message endpoints (new message + retry)."""
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import StreamingResponse
 
 from agent.chat_agent import (
     update_llm_model,
@@ -22,24 +21,38 @@ from web_v2.chat_api._shared import (
     _record_access_event,
     _runtime_mode,
     _session_owner_key_for_request,
+    _sse_response,
 )
 from web_v2.chat_api._stream import _stream_graph
 from web_v2.chat_api._stream_kimi import _stream_kimi
 
 router = APIRouter()
 
+# Online deployments pin Science Expert (graph) to DeepSeek — clients cannot
+# pick GPT/Claude/etc. Science Agent still routes through kimi-code.
+_ONLINE_FIXED_GRAPH_MODEL = "deepseek-v4-pro"
 
-def _resolve_engine(payload_engine: str | None, model_id: str | None) -> str:
+
+def _resolve_engine(
+    payload_engine: str | None,
+    model_id: str | None,
+    chat_mode: str | None = None,
+) -> str:
     """Decide whether this turn runs through the kimi-code daemon or the
-    legacy LangGraph pipeline.
+    LangGraph Science Expert pipeline.
 
     Precedence:
-      1. The model's registry entry. A model with `engine: kimi-code` forces
-         the kimi path regardless of the request (so the UI's model selector
-         is the single source of truth).
-      2. Explicit `engine` field on the request payload (advanced clients).
-      3. Default: "graph".
+      1. Explicit ``chat_mode`` from the UI mode toggle
+         (science_agent→kimi-code, science_expert→graph).
+      2. Model registry ``engine: kimi-code`` (legacy clients that only send
+         model id, e.g. selecting the Science Agent pseudo-model).
+      3. Explicit ``engine`` field on the request payload.
+      4. Default: ``graph``.
     """
+    if chat_mode == "science_agent":
+        return "kimi-code"
+    if chat_mode == "science_expert":
+        return "graph"
     if model_id:
         spec = get_model(model_id)
         if spec is not None and (spec.engine or "graph") == "kimi-code":
@@ -47,6 +60,13 @@ def _resolve_engine(payload_engine: str | None, model_id: str | None) -> str:
     if payload_engine in ("kimi-code", "graph"):
         return payload_engine
     return "graph"
+
+
+def _resolve_chat_mode(engine: str, chat_mode: str | None = None) -> str:
+    """Normalize chat_mode for session state / snapshots."""
+    if chat_mode in ("science_agent", "science_expert"):
+        return chat_mode
+    return "science_agent" if engine == "kimi-code" else "science_expert"
 
 
 @router.post("/sessions/{session_id}/messages/stream")
@@ -81,13 +101,35 @@ async def stream_message(session_id: str, payload: ChatStreamRequest, request: R
             state["active_custom_model_id"] = payload.custom_model_id
     elif payload.model in _BUILTIN_MODEL_LABELS:
         state["active_custom_model_id"] = ""
-    if payload.model:
-        # Skip LLM hot-swap for kimi-code engine — kimi manages its own model
-        # selection internally and trying to instantiate a LangChain LLM for
-        # the "kimi-code" pseudo-model fails.
-        engine_for_swap = _resolve_engine(payload.engine, payload.model)
-        if engine_for_swap != "kimi-code":
-            update_llm_model(payload.model, state)
+
+    engine = _resolve_engine(payload.engine, payload.model, payload.chat_mode)
+    chat_mode = _resolve_chat_mode(engine, payload.chat_mode)
+    # Online: ignore client model for graph / Science Expert — always DeepSeek.
+    # Science Agent (kimi-code) keeps client model in local mode so the picker
+    # can choose the underlying LLM forwarded to kimi create_session.
+    graph_model = payload.model
+    if _runtime_mode() != "local" and engine != "kimi-code":
+        graph_model = _ONLINE_FIXED_GRAPH_MODEL
+        state["active_custom_model_id"] = ""
+
+    if engine == "kimi-code":
+        from agent.kimi_model import to_kimi_model_id
+
+        # Online Agent: always kimi default. Local Agent: honor picker.
+        selected = "" if _runtime_mode() != "local" else (graph_model or "")
+        kimi_model = to_kimi_model_id(selected)
+        prev = str(state.get("kimi_model") or "")
+        state["kimi_model"] = kimi_model or ""
+        # Recreate kimi session when the underlying model changes.
+        if prev != state["kimi_model"]:
+            state["kimi_session_id"] = ""
+            state.pop("_kimi_bound_model", None)
+        # Snapshot / retry display: keep a real registry LLM when possible.
+        # Never instantiate LangChain for the sentinel id "kimi-code".
+        if selected and selected != "kimi-code":
+            update_llm_model(selected, state)
+    elif graph_model:
+        update_llm_model(graph_model, state)
     # Pin the response language from the UI locale ("en" | "zh"). Stored on
     # state so retries (which carry no fresh payload) inherit it; also
     # stamped on the LLM instance so chat_agent._build_message_dicts can
@@ -98,7 +140,8 @@ async def stream_message(session_id: str, payload: ChatStreamRequest, request: R
     if _llm is not None:
         _llm._user_lang = state.get("user_lang") or ""
     lock = await _get_lock(session_id)
-    engine = _resolve_engine(payload.engine, payload.model)
+    state["engine"] = engine
+    state["chat_mode"] = chat_mode
     streamer = _stream_kimi if engine == "kimi-code" else _stream_graph
 
     async def event_gen():
@@ -110,7 +153,7 @@ async def stream_message(session_id: str, payload: ChatStreamRequest, request: R
             ):
                 yield chunk
 
-    return StreamingResponse(event_gen(), media_type="text/event-stream")
+    return _sse_response(event_gen())
 
 
 @router.post("/sessions/{session_id}/messages/retry/stream")
@@ -130,10 +173,18 @@ async def stream_retry(session_id: str, request: Request):
         raise HTTPException(status_code=400, detail="No previous user message to retry.")
 
     # On retry we don't have a fresh payload; re-derive the engine from the
-    # currently-active model so retries use the same backend as the original.
+    # currently-active model / session chat_mode so retries use the same backend.
     llm = state.get("llm")
     model_id = getattr(llm, "model_name", "") if llm is not None else ""
-    engine = _resolve_engine(None, model_id)
+    engine = _resolve_engine(state.get("engine"), model_id, state.get("chat_mode"))
+    chat_mode = _resolve_chat_mode(engine, state.get("chat_mode"))
+    # Online graph retries stay pinned to DeepSeek even if session LLM drifted.
+    if _runtime_mode() != "local" and engine != "kimi-code":
+        update_llm_model(_ONLINE_FIXED_GRAPH_MODEL, state)
+        state["active_custom_model_id"] = ""
+        llm = state.get("llm")
+    state["engine"] = engine
+    state["chat_mode"] = chat_mode
     streamer = _stream_kimi if engine == "kimi-code" else _stream_graph
     # Carry forward the last-known user_lang so retries respect the same
     # forced-language policy as the original turn.
@@ -145,4 +196,4 @@ async def stream_retry(session_id: str, request: Request):
             async for chunk in streamer(state, last_text, last_paths):
                 yield chunk
 
-    return StreamingResponse(event_gen(), media_type="text/event-stream")
+    return _sse_response(event_gen())

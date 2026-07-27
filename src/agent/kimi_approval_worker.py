@@ -1,24 +1,25 @@
 """Long-running background worker that drains kimi tool-call approvals.
 
 The per-stream auto-approver in `_stream_kimi._auto_approve_all` only runs
-while a chat SSE stream is open. If the backend restarts, the user closes
-the tab, or the agent goes through a >60 s thinking/tool pause without any
-new event, kimi's approval requests time out and the agent stalls with
+while a chat SSE stream is open, and historically only when certain WS
+events arrived. MCP tools request approval *before* `tool.call.started`,
+so without a poller they sit for 60s and expire with
 "authorizeToolExecution hook failed".
 
-This worker is the safety net: every `interval` seconds it lists EVERY kimi
-session, GETs its pending approvals, and runs each through `kimi_security.
-decide`. Approved ones go via `POST /approvals/{id}` (scope=session, so the
-same tool only needs one approval per session). Denied ones are rejected
-with a human-readable reason as `feedback` so the agent learns what got
-blocked and can plan around it.
+This worker is the safety net: every `interval` seconds it drains pending
+approvals through `kimi_security.decide`.
+
+  - LOCAL mode: one shared kimi daemon (`kimi_daemon.base_url()`).
+  - ONLINE mode: every live instance in `KimiSessionPool` (each has its
+    own port / sandbox). Host `session_dir` is used for path policy, not
+    the in-sandbox cwd (`/workspace`).
 
 Lifecycle: started/stopped from the FastAPI lifespan in `api_server.py`.
 """
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import Any, Optional
 
 from agent.kimi_client import KimiAPIError, KimiClient
 from agent.kimi_daemon import base_url
@@ -28,7 +29,7 @@ from logger import get_logger
 
 _logger = get_logger("agent.kimi_approval_worker")
 
-_DEFAULT_INTERVAL = 4.0  # seconds
+_DEFAULT_INTERVAL = 2.0  # seconds — keep well under kimi's 60s approval TTL
 
 
 class KimiApprovalWorker:
@@ -65,40 +66,73 @@ class KimiApprovalWorker:
         _logger.info("kimi approval worker stopped")
 
     async def _run(self) -> None:
-        client = KimiClient(base_url=base_url())
         consecutive_failures = 0
+        while self._stop_event and not self._stop_event.is_set():
+            try:
+                await self._tick_all()
+                consecutive_failures = 0
+            except Exception as exc:  # noqa: BLE001
+                consecutive_failures += 1
+                if consecutive_failures <= 2:
+                    _logger.warning("approval worker tick failed: %s", exc)
+                elif consecutive_failures == 3:
+                    _logger.exception(
+                        "approval worker tick repeatedly failing; "
+                        "suppressing further stack traces and backing off"
+                    )
+            wait_s = self.interval * min(2 ** max(0, consecutive_failures - 1), 8)
+            try:
+                await asyncio.wait_for(self._stop_event.wait(), timeout=wait_s)
+            except asyncio.TimeoutError:
+                pass
+
+    async def _tick_all(self) -> None:
+        mode = get_config().server.mode or "local"
+        if mode == "online":
+            await self._tick_online_pool(mode)
+        else:
+            await self._tick_shared_daemon(mode)
+
+    async def _tick_shared_daemon(self, mode: str) -> None:
+        client = KimiClient(base_url=base_url())
         try:
-            while self._stop_event and not self._stop_event.is_set():
-                try:
-                    await self._tick(client)
-                    consecutive_failures = 0
-                except Exception as exc:  # noqa: BLE001
-                    consecutive_failures += 1
-                    if consecutive_failures <= 2:
-                        _logger.warning("approval worker tick failed: %s", exc)
-                    elif consecutive_failures == 3:
-                        _logger.exception(
-                            "approval worker tick repeatedly failing; "
-                            "suppressing further stack traces and backing off"
-                        )
-                # Exponential backoff after repeated failures (max 8× the
-                # base interval) so a dead kimi server doesn't hammer the
-                # logs. wait_for + stop_event keeps cancellation responsive.
-                wait_s = self.interval * min(2 ** max(0, consecutive_failures - 1), 8)
-                try:
-                    await asyncio.wait_for(self._stop_event.wait(), timeout=wait_s)
-                except asyncio.TimeoutError:
-                    pass
+            await self._drain_client(client, mode=mode, session_dir_override=None)
         finally:
             await client.aclose()
 
-    async def _tick(self, client: KimiClient) -> None:
-        mode = get_config().server.mode or "local"
+    async def _tick_online_pool(self, mode: str) -> None:
+        try:
+            from agent.kimi_session_pool import get_pool
+            instances = get_pool().snapshot_instances()
+        except Exception:
+            _logger.debug("online pool unavailable for approval tick", exc_info=True)
+            return
+        for inst in instances:
+            client = KimiClient(base_url=inst.base_url)
+            try:
+                await self._drain_client(
+                    client,
+                    mode=mode,
+                    session_dir_override=inst.session_dir,
+                )
+            except Exception:  # noqa: BLE001
+                _logger.debug(
+                    "approval tick failed for pool instance port=%s",
+                    inst.port, exc_info=True,
+                )
+            finally:
+                await client.aclose()
+
+    async def _drain_client(
+        self,
+        client: KimiClient,
+        *,
+        mode: str,
+        session_dir_override: Optional[str],
+    ) -> None:
         try:
             sessions = await client.list_sessions()
         except KimiAPIError as exc:
-            # Common: kimi just started and has no provider configured.
-            # Don't spam the log every tick.
             if exc.code is not None:
                 _logger.debug("list_sessions skipped (kimi code=%s)", exc.code)
             return
@@ -106,16 +140,12 @@ class KimiApprovalWorker:
             sid = s.get("id")
             if not sid:
                 continue
-            # `metadata.cwd` is the kimi session's working dir == our
-            # agent_session_dir; the security policy needs it to validate
-            # path-scoped operations.
-            cwd = str((s.get("metadata") or {}).get("cwd") or "/tmp")
+            cwd = session_dir_override or str(
+                (s.get("metadata") or {}).get("cwd") or "/tmp"
+            )
             try:
                 pending = await client.list_pending_approvals(sid)
             except KimiAPIError:
-                # Session may have been deleted between list and pending
-                # query, or kimi internal state is partially recovered after
-                # a restart. Both are benign — skip silently.
                 continue
             except Exception:  # noqa: BLE001
                 _logger.exception("list_pending_approvals(%s) failed", sid[:12])
@@ -137,6 +167,14 @@ class KimiApprovalWorker:
             tool = str(ap.get("tool_name") or "")
             action = str(ap.get("action") or "")
             decision = security_decide(ap, session_dir=cwd, mode=mode)
+            # ExitPlanMode (and any future needs_user tools) must reach the
+            # chat UI — do not race the stream poller by deciding here.
+            if decision.needs_user:
+                _logger.debug(
+                    "worker SKIP needs_user tool=%s sid=%s aid=%s",
+                    tool, sid[:12], aid[:12],
+                )
+                continue
             if decision.allowed:
                 try:
                     await client.approve(sid, aid, scope="session")
@@ -145,7 +183,6 @@ class KimiApprovalWorker:
                         tool, action, sid[:12], aid[:12],
                     )
                 except KimiAPIError as exc:
-                    # session.not_found / approval already resolved / etc.
                     _logger.debug("worker approve %s noop: %s", aid[:12], exc)
                 except Exception:  # noqa: BLE001
                     _logger.exception("worker approve POST failed for %s", aid)

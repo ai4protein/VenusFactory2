@@ -16,6 +16,13 @@ from agent.chat_agent_utils import (
     extract_sequence_from_message,
     extract_uniprot_id_from_message,
 )
+from agent.graph.common.streaming import (
+    attach_sse_to_session_state,
+    bind_sse_queue,
+    detach_sse_from_session_state,
+    reset_sse_queue,
+    sse_config_keys,
+)
 
 from web_v2.chat_api._hooks_runtime import (
     _dispatch_hook,
@@ -28,6 +35,7 @@ from web_v2.chat_api._shared import (
     _is_zh_text,
     _snapshot,
     _to_json,
+    clear_agent_gates,
 )
 from web_v2.chat_api._uploads import _archive_conversation, _normalize_uploaded_file
 
@@ -43,6 +51,7 @@ _STREAM_STATE_KEYS: frozenset[str] = frozenset({
     "auto_execute", "tool_cache", "execution_failed",
     "failed_step", "failed_reason",
     "clarification_questions", "clarification_answers", "waiting_for",
+    "review_sub_reports", "full_manuscript", "ui_lang", "user_lang", "error",
 })
 
 # Statuses that should NOT trigger end-of-run finalization (archive + memory).
@@ -54,6 +63,155 @@ _WAITING_STATUSES: tuple[str, ...] = (
     "waiting_for_sub_report_review",
 )
 
+# Terminal failure statuses that must NOT be rewritten to completed.
+_FAILURE_STATUSES: frozenset[str] = frozenset({
+    "planning_failed",
+    "error",
+    "execution_failed",
+    "stopped",
+})
+
+
+async def _drain_graph_astream(
+    graph,
+    initial_state: dict[str, Any],
+    config: dict[str, Any],
+    state: dict[str, Any],
+    *,
+    is_zh: bool,
+):
+    """Run ``graph.astream`` while flushing token SSE via the side-channel queue.
+
+    LangGraph may buffer ``get_stream_writer()`` custom events until a node
+    returns; ``_stream_chain`` / ``_stream_text`` also push into a bound
+    asyncio.Queue so the client sees tokens as they are produced.
+    """
+    sse_q: asyncio.Queue = asyncio.Queue()
+    loop = asyncio.get_running_loop()
+    bind_tokens = bind_sse_queue(sse_q, loop)
+    # Also stash on session state (configurable["chains"]) — most reliable
+    # resolution path inside LangGraph nodes.
+    attach_sse_to_session_state(state, sse_q, loop)
+    astream_q: asyncio.Queue = asyncio.Queue()
+    # Stash queue on runnable config so graph nodes can emit even when
+    # contextvars are not inherited into LangGraph's node tasks.
+    merged_config = dict(config or {})
+    conf = dict(merged_config.get("configurable") or {})
+    conf.update(sse_config_keys(sse_q, loop))
+    # Ensure chains points at the live session state (with SSE stash).
+    conf.setdefault("chains", state)
+    merged_config["configurable"] = conf
+    # Count side-channel token/stream_start emits so we only skip LangGraph
+    # custom duplicates when the side-channel actually delivered them.
+    side_channel_live_events = 0
+
+    async def _run_astream() -> None:
+        try:
+            async for stream_mode, data in graph.astream(
+                initial_state, config=merged_config, stream_mode=["updates", "custom"]
+            ):
+                await astream_q.put((stream_mode, data))
+        finally:
+            await astream_q.put(None)
+
+    task = asyncio.create_task(_run_astream())
+    astream_waiter: asyncio.Task | None = asyncio.create_task(astream_q.get())
+    sse_waiter: asyncio.Task | None = asyncio.create_task(sse_q.get())
+    astream_done = False
+
+    try:
+        while True:
+            if await _is_cancelled(state["session_id"]):
+                state["status"] = "stopped"
+                state.setdefault("history", []).append(
+                    {
+                        "role": "assistant",
+                        "content": "用户已停止本次运行。" if is_zh else "Run stopped by user.",
+                        "role_id": "principal_investigator",
+                    }
+                )
+                await _session_store.save(state["session_id"])
+                yield f"event: state\ndata: {_to_json(_snapshot(state))}\n\n"
+                yield "event: done\ndata: {}\n\n"
+                task.cancel()
+                return
+
+            wait_set = {t for t in (astream_waiter, sse_waiter) if t is not None}
+            if not wait_set:
+                break
+            done, _ = await asyncio.wait(wait_set, return_when=asyncio.FIRST_COMPLETED)
+
+            if sse_waiter is not None and sse_waiter in done:
+                try:
+                    event = sse_waiter.result()
+                except Exception:
+                    event = None
+                if isinstance(event, dict):
+                    event_type = event.get("type", "token")
+                    if event_type in ("token", "stream_start", "thinking"):
+                        side_channel_live_events += 1
+                    yield f"event: {event_type}\ndata: {_to_json(event)}\n\n"
+                sse_waiter = None if astream_done else asyncio.create_task(sse_q.get())
+
+            if astream_waiter is not None and astream_waiter in done:
+                item = astream_waiter.result()
+                if item is None:
+                    astream_done = True
+                    astream_waiter = None
+                    # Drain any remaining side-channel tokens, then stop.
+                    while True:
+                        try:
+                            event = sse_q.get_nowait()
+                        except asyncio.QueueEmpty:
+                            break
+                        if isinstance(event, dict):
+                            event_type = event.get("type", "token")
+                            if event_type in ("token", "stream_start", "thinking"):
+                                side_channel_live_events += 1
+                            yield f"event: {event_type}\ndata: {_to_json(event)}\n\n"
+                    if sse_waiter is not None and not sse_waiter.done():
+                        sse_waiter.cancel()
+                    sse_waiter = None
+                    break
+
+                stream_mode, data = item
+                # Custom events are usually flushed via the side-channel when
+                # nodes use ``_emit_custom``. Forward them when the side-channel
+                # did not deliver (otherwise Expert looks like a one-shot dump).
+                if stream_mode == "custom":
+                    event_type = data.get("type", "token") if isinstance(data, dict) else "token"
+                    if (
+                        isinstance(data, dict)
+                        and event_type in ("token", "stream_start", "thinking")
+                        and side_channel_live_events > 0
+                    ):
+                        pass
+                    else:
+                        yield f"event: {event_type}\ndata: {_to_json(data)}\n\n"
+                elif stream_mode == "updates":
+                    cancelled = await _is_cancelled(state["session_id"])
+                    for _, updates in data.items():
+                        if updates:
+                            for key, val in updates.items():
+                                if key in _STREAM_STATE_KEYS:
+                                    if cancelled and key == "status":
+                                        continue
+                                    state[key] = val
+                    yield f"event: state\ndata: {_to_json(_snapshot(state))}\n\n"
+                astream_waiter = asyncio.create_task(astream_q.get())
+    finally:
+        detach_sse_from_session_state(state)
+        reset_sse_queue(bind_tokens)
+        if not task.done():
+            task.cancel()
+            try:
+                await task
+            except (asyncio.CancelledError, Exception):
+                pass
+        for waiter in (astream_waiter, sse_waiter):
+            if waiter is not None and not waiter.done():
+                waiter.cancel()
+
 
 async def _finalize_after_stream(state: dict[str, Any], user_text: str) -> None:
     """Run post-astream finalization shared by ``_stream_graph`` + ``_stream_graph_resume``.
@@ -62,7 +220,8 @@ async def _finalize_after_stream(state: dict[str, Any], user_text: str) -> None:
     log the assistant's final message, mark status=completed, and archive the
     conversation (fire-and-forget).
     """
-    if state.get("status", "") in _WAITING_STATUSES:
+    status = str(state.get("status", "") or "")
+    if status in _WAITING_STATUSES:
         return
     final_content = state["history"][-1]["content"] if state.get("history") else ""
     _append_dialogue_memory(state, user_text, final_content)
@@ -74,7 +233,9 @@ async def _finalize_after_stream(state: dict[str, Any], user_text: str) -> None:
         state["memory"].save_context({"input": user_text}, {"output": final_content})
     except Exception:
         pass
-    state["status"] = "completed"
+    # Keep planning_failed / error / stopped visible for PipelineProgress + Retry.
+    if status not in _FAILURE_STATUSES:
+        state["status"] = "completed"
     asyncio.create_task(_archive_conversation(state))
 
 
@@ -152,6 +313,15 @@ async def _stream_graph(
     state["last_user_text"] = text
     state["last_attachment_paths"] = valid_attachments
     state["status"] = "started"
+    state["engine"] = "graph"
+    state["chat_mode"] = "science_expert"
+    # Expert path is graph-only — never inherit Agent AskUser/Approve gates.
+    clear_agent_gates(state)
+    state["waiting_for"] = "skip_to_plan" if (
+        bool(state.get("has_prior_research")) and bool(state.get("pi_report"))
+    ) else ""
+    state["clarification_questions"] = []
+    state["clarification_answers"] = []
 
     skip_research = bool(state.get("has_prior_research")) and bool(state.get("pi_report"))
     if skip_research:
@@ -185,6 +355,12 @@ async def _stream_graph(
         "clarification_questions": [],
         "clarification_answers": [],
         "waiting_for": "skip_to_plan" if skip_research else None,
+        # Expert defaults: do not pause after every sub-report; paper-level SC.
+        "review_sub_reports": state.get("review_sub_reports") is True,
+        "full_manuscript": True if state.get("full_manuscript") is None else bool(state.get("full_manuscript")),
+        # Prefer UI locale (user_lang) so graph nodes don't CJK-guess wrong.
+        "user_lang": state.get("user_lang") or "",
+        "ui_lang": state.get("user_lang") or state.get("ui_lang") or "",
     }
     graph = _get_compiled_graph()
     config = {
@@ -202,38 +378,12 @@ async def _stream_graph(
             user_message=display_text[:500],
         ))
 
-    async for stream_mode, data in graph.astream(
-        initial_state, config=config, stream_mode=["updates", "custom"]
+    async for chunk in _drain_graph_astream(
+        graph, initial_state, config, state, is_zh=is_zh
     ):
-        if await _is_cancelled(state["session_id"]):
-            state["status"] = "stopped"
-            state.setdefault("history", []).append(
-                {
-                    "role": "assistant",
-                    "content": "用户已停止本次运行。" if is_zh else "Run stopped by user.",
-                    "role_id": "principal_investigator",
-                }
-            )
-            await _session_store.save(state["session_id"])
-            yield f"event: state\ndata: {_to_json(_snapshot(state))}\n\n"
-            yield "event: done\ndata: {}\n\n"
+        yield chunk
+        if chunk.startswith("event: done"):
             return
-
-        if stream_mode == "custom":
-            event_type = data.get("type", "token") if isinstance(data, dict) else "token"
-            yield f"event: {event_type}\ndata: {_to_json(data)}\n\n"
-        elif stream_mode == "updates":
-            # If user already requested cancel, preserve our stopping/stopped
-            # status so the graph's in-flight node updates don't clobber it.
-            cancelled = await _is_cancelled(state["session_id"])
-            for _, updates in data.items():
-                if updates:
-                    for key, val in updates.items():
-                        if key in _STREAM_STATE_KEYS:
-                            if cancelled and key == "status":
-                                continue  # don't overwrite stopping/stopped
-                            state[key] = val
-            yield f"event: state\ndata: {_to_json(_snapshot(state))}\n\n"
 
     await _finalize_after_stream(state, display_text)
     await _session_store.save(state["session_id"])

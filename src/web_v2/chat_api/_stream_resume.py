@@ -12,9 +12,14 @@ from web_v2.chat_api._hooks_runtime import (
     _is_cancelled,
     _session_store,
 )
-from web_v2.chat_api._shared import _is_zh_text, _snapshot, _to_json
+from web_v2.chat_api._shared import (
+    _is_zh_text,
+    _snapshot,
+    _to_json,
+    clear_agent_gates,
+)
 from web_v2.chat_api._stream import (
-    _STREAM_STATE_KEYS,
+    _drain_graph_astream,
     _finalize_after_stream,
 )
 
@@ -58,18 +63,24 @@ async def _stream_graph_resume(
         "step_results": dict(state.get("step_results", {})),
         "error": None,
         "research_sections": list(state.get("research_sections", [])),
-        "research_idx": 0,
-        "search_idx": 0,
-        "current_search_results": [],
+        # Preserve research cursor — resetting to 0 made Continue/Rewrite
+        # restart the first section instead of advancing.
+        "research_idx": int(state.get("research_idx") or 0),
+        "search_idx": int(state.get("search_idx") or 0),
+        "current_search_results": list(state.get("current_search_results") or []),
         "research_sub_reports": list(state.get("research_sub_reports", [])),
         "sub_report_rewrite_comment": state.get("sub_report_rewrite_comment", ""),
-        "auto_execute": state.get("auto_execute", False),
+        "auto_execute": state.get("auto_execute") is not False,
         "execution_failed": False,
         "failed_step": None,
         "failed_reason": None,
         "clarification_questions": list(state.get("clarification_questions", [])),
         "clarification_answers": list(state.get("clarification_answers", [])),
         "waiting_for": waiting_for,
+        "review_sub_reports": state.get("review_sub_reports") is True,
+        "full_manuscript": True if state.get("full_manuscript") is None else bool(state.get("full_manuscript")),
+        "user_lang": state.get("user_lang") or "",
+        "ui_lang": state.get("user_lang") or state.get("ui_lang") or "",
     }
     if extra_state:
         initial_state.update(extra_state)
@@ -81,38 +92,17 @@ async def _stream_graph_resume(
     }
 
     state["status"] = "started"
+    state["engine"] = "graph"
+    state["chat_mode"] = "science_expert"
+    clear_agent_gates(state)
     yield f"event: state\ndata: {_to_json(_snapshot(state))}\n\n"
 
-    async for stream_mode, data in graph.astream(
-        initial_state, config=config, stream_mode=["updates", "custom"]
+    async for chunk in _drain_graph_astream(
+        graph, initial_state, config, state, is_zh=is_zh
     ):
-        if await _is_cancelled(state["session_id"]):
-            state["status"] = "stopped"
-            state.setdefault("history", []).append({
-                "role": "assistant",
-                "content": "用户已停止本次运行。" if is_zh else "Run stopped by user.",
-                "role_id": "principal_investigator",
-            })
-            await _session_store.save(state["session_id"])
-            yield f"event: state\ndata: {_to_json(_snapshot(state))}\n\n"
-            yield "event: done\ndata: {}\n\n"
+        yield chunk
+        if chunk.startswith("event: done"):
             return
-
-        if stream_mode == "custom":
-            event_type = data.get("type", "token") if isinstance(data, dict) else "token"
-            yield f"event: {event_type}\ndata: {_to_json(data)}\n\n"
-        elif stream_mode == "updates":
-            # If user already requested cancel, preserve our stopping/stopped
-            # status so the graph's in-flight node updates don't clobber it.
-            cancelled = await _is_cancelled(state["session_id"])
-            for _, updates in data.items():
-                if updates:
-                    for key, val in updates.items():
-                        if key in _STREAM_STATE_KEYS:
-                            if cancelled and key == "status":
-                                continue  # don't overwrite stopping/stopped
-                            state[key] = val
-            yield f"event: state\ndata: {_to_json(_snapshot(state))}\n\n"
 
     await _finalize_after_stream(state, original_text)
     await _session_store.save(state["session_id"])
