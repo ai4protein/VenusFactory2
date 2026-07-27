@@ -136,7 +136,7 @@ _BASH_ONLINE_DENY_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
         r"\b(env|printenv)\s*\|\s*",                                   # piping enum to grep/etc
         r"\bdeclare\s+-p\b",                                           # bash declare -p (dumps vars)
         r"\bset\b\s*\|\s*(grep|head|tail|sed|awk|sort|less|more|cat)", # set | grep secrets
-        r"\$\{?(?:OPENAI|ANTHROPIC|DEEPSEEK|MOONSHOT|DMX|ZHIPU|DASHSCOPE|GOOGLE|GEMINI|AWS|GCP|AZURE|HF|HUGGINGFACE)_?[A-Z_]*(?:KEY|TOKEN|SECRET|PASSWORD)",
+        r"\$\{?(?:OPENAI|ANTHROPIC|DEEPSEEK|MOONSHOT|ZHIPU|DASHSCOPE|GOOGLE|GEMINI|AWS|GCP|AZURE|HF|HUGGINGFACE)_?[A-Z_]*(?:KEY|TOKEN|SECRET|PASSWORD)",
         r"\$\{?KIMI_[A-Z_]*",                                          # any $KIMI_* refs (BIN/PORT included — kimi shouldn't introspect its own config)
         r"\$\{?(?:CHAT_|WEBUI_V2_)[A-Z_]*(?:SECRET|TOKEN|KEY)",        # our own app secrets
     )
@@ -240,6 +240,10 @@ class SecurityDecision:
     reason: str
     tool_name: str = ""
     redacted_input: dict[str, Any] | None = None  # safe to log
+    # When True the caller must NOT auto-approve/reject — surface the pending
+    # approval to the VenusFactory UI (kimi TUI approval panel equivalent).
+    # Used for ExitPlanMode plan review and any future human-gated tools.
+    needs_user: bool = False
 
 
 def _norm_path(p: str) -> str:
@@ -250,11 +254,57 @@ def _norm_path(p: str) -> str:
         return p
 
 
+def _session_containment_root(session_dir: str) -> str:
+    """Widen date-partitioned session dirs up to ``.../sessions/<sid>``.
+
+    Online bwrap mounts the pool root at both ``/workspace`` and the host
+    ``sessions/<sid>`` path. Policy checks must use that root, not a
+    ``YYYY/MM/DD`` leaf that would reject sibling date folders / /workspace.
+    """
+    if not session_dir:
+        return session_dir
+    parts = Path(_norm_path(session_dir)).parts
+    if "sessions" in parts:
+        i = parts.index("sessions")
+        if i + 1 < len(parts):
+            return str(Path(*parts[: i + 2]))
+    return _norm_path(session_dir)
+
+
+def _resolve_in_session(path: str, session_dir: str) -> str:
+    """Map sandbox / relative tool paths onto the host session tree.
+
+    kimi online cwd is ``/workspace`` (== sessions/<sid>). MCP tools often
+    return host-absolute paths under the same tree. Relative paths and
+    ``/workspace/...`` must be rewritten before containment checks — otherwise
+    ``Path.resolve()`` joins them to the FastAPI process cwd and falsely
+    refuses them.
+    """
+    raw = (path or "").strip()
+    root = _session_containment_root(session_dir)
+    if not raw:
+        return root
+    expanded = os.path.expandvars(os.path.expanduser(raw))
+    if expanded == "/workspace" or expanded.startswith("/workspace/"):
+        rel = expanded[len("/workspace"):].lstrip("/")
+        return _norm_path(str(Path(root) / rel)) if rel else root
+    if not os.path.isabs(expanded):
+        # Prefer the concrete session_dir (may be a date subdir = kimi cwd
+        # metadata) when joining relatives; fall back to pool root.
+        base = _norm_path(session_dir) if session_dir else root
+        return _norm_path(str(Path(base) / expanded))
+    return _norm_path(expanded)
+
+
 def _is_secret_path(path: str) -> bool:
     if not path:
         return False
-    p = _norm_path(path).lower()
-    return any(s in p for s in _SECRET_PATH_SUBSTRINGS)
+    # Check both the raw string and the resolved form so `/workspace/.env`
+    # is caught even before session rewriting.
+    candidates = {path.lower(), _norm_path(path).lower()}
+    return any(
+        s in c for c in candidates for s in _SECRET_PATH_SUBSTRINGS
+    )
 
 
 def _is_under(path: str, root: str) -> bool:
@@ -346,20 +396,26 @@ def _bash_policy(cmd: str, *, session_dir: str, mode: str) -> SecurityDecision:
                     )
 
         prefixes = _read_only_prefixes("online")
-        path_tokens = re.findall(r"(?:^|\s)(/[^\s\"'|;<>&]+|~/[^\s\"'|;<>&]*)", c)
+        contain_root = _session_containment_root(session_dir)
+        path_tokens = re.findall(
+            r"(?:^|\s)(/[^\s\"'|;<>&]+|~/[^\s\"'|;<>&]*)", c
+        )
         for tok in path_tokens:
-            norm = _norm_path(tok)
+            # Rewrite /workspace/... before /proc + containment checks.
+            resolved = _resolve_in_session(tok, session_dir) if tok.startswith(
+                "/workspace"
+            ) else _norm_path(tok)
             # /proc info-leak paths always denied, even if they would match
             # one of the read-only prefixes — environ/cmdline trump perms.
-            if _PROC_INFO_LEAK_RE.match(norm):
+            if _PROC_INFO_LEAK_RE.match(resolved):
                 return SecurityDecision(
                     False,
                     f"online mode: bash references /proc info-leak path: {tok}",
                     "Bash",
                 )
-            if _is_under(tok, session_dir):
+            if _is_under(resolved, contain_root):
                 continue
-            if any(norm.startswith(p.rstrip("/")) for p in prefixes):
+            if any(resolved.startswith(p.rstrip("/")) for p in prefixes):
                 continue
             return SecurityDecision(
                 False,
@@ -395,35 +451,51 @@ def _decide_read_like(
       can side-channel-leak the existence/location of secrets even without
       reading them.
     - Local mode trusts the user: read anywhere except secrets.
+
+    Important: Glob/Grep ``pattern`` is a search glob/regex, NOT a filesystem
+    path. Only ``path`` / ``file_path`` are used for containment.
     """
-    path = (
-        args.get("file_path")
-        or args.get("path")
-        or args.get("pattern")
-        or ""
-    )
-    if _is_secret_path(str(path)):
+    # Never fall back to `pattern` — for Glob/Grep that is the query string
+    # (e.g. "**/*.fasta"), which is not a path and would always fail online
+    # containment after resolve().
+    path = str(args.get("file_path") or args.get("path") or "")
+    # Glob target directory (optional; empty → session cwd).
+    if not path and tool_name == "Glob":
+        path = str(args.get("target_directory") or "")
+
+    if path and _is_secret_path(path):
         return SecurityDecision(
             False, f"read of secret path refused: {path}", tool_name
         )
-    # Online: containment applies to Read, Glob AND Grep — the previous
-    # version only checked Read, letting `Glob("/**/*.env")` enumerate the
-    # whole filesystem for sensitive files.
-    if mode == "online" and tool_name in ("Read", "Glob", "Grep") and path:
-        norm = _norm_path(str(path))
-        if _PROC_INFO_LEAK_RE.match(norm):
+    # Online: containment applies to Read, Glob AND Grep. Empty path means
+    # "use session cwd" — which is inside the sandbox by construction.
+    if mode == "online" and tool_name in ("Read", "Glob", "Grep"):
+        if path:
+            resolved = _resolve_in_session(path, session_dir)
+            if _is_secret_path(resolved):
+                return SecurityDecision(
+                    False, f"read of secret path refused: {path}", tool_name
+                )
+            if _PROC_INFO_LEAK_RE.match(resolved):
+                return SecurityDecision(
+                    False,
+                    f"online mode: {tool_name} of /proc info-leak path refused: {path}",
+                    tool_name,
+                )
+            contain_root = _session_containment_root(session_dir)
+            if not _is_under(resolved, contain_root) and not any(
+                resolved.startswith(p.rstrip("/"))
+                for p in _read_only_prefixes(mode)
+            ):
+                return SecurityDecision(
+                    False,
+                    f"online mode: {tool_name} of {path} outside session_dir refused",
+                    tool_name,
+                )
+        elif tool_name == "Read":
+            # Read with no path is invalid / useless — deny rather than guess.
             return SecurityDecision(
-                False,
-                f"online mode: {tool_name} of /proc info-leak path refused: {path}",
-                tool_name,
-            )
-        if not _is_under(norm, session_dir) and not any(
-            norm.startswith(p.rstrip("/")) for p in _read_only_prefixes(mode)
-        ):
-            return SecurityDecision(
-                False,
-                f"online mode: {tool_name} of {path} outside session_dir refused",
-                tool_name,
+                False, "Read requires a path", tool_name
             )
     # Online Grep: also screen the pattern for secret-fishing.
     if mode == "online" and tool_name == "Grep":
@@ -450,30 +522,38 @@ def _decide_write_like(
     - Local: trust the user; allow writes anywhere that isn't a secret path
       (the user explicitly stated "this is my own machine" for local mode).
     """
-    path = (
+    path = str(
         args.get("file_path")
         or args.get("path")
         or args.get("notebook_path")
         or ""
     )
-    if _is_secret_path(str(path)):
+    if path and _is_secret_path(path):
         return SecurityDecision(
             False, f"write to secret path refused: {path}", tool_name
         )
     if mode == "online":
-        if not _is_under(str(path), session_dir):
+        if not path:
+            return SecurityDecision(
+                False, f"online mode: {tool_name} requires a path", tool_name
+            )
+        resolved = _resolve_in_session(path, session_dir)
+        if _is_secret_path(resolved):
+            return SecurityDecision(
+                False, f"write to secret path refused: {path}", tool_name
+            )
+        contain_root = _session_containment_root(session_dir)
+        if not _is_under(resolved, contain_root):
             return SecurityDecision(
                 False,
                 f"online mode: write outside session_dir refused: {path}",
                 tool_name,
             )
-        # Symlink escape check: even if the literal path looks contained,
-        # its parent dir might be a symlink we (or an earlier turn) made
-        # that points outside session_dir.
+        # Symlink escape check on the host-mapped path.
         try:
-            parent = os.path.dirname(os.path.abspath(str(path)))
+            parent = os.path.dirname(resolved)
             real_parent = os.path.realpath(parent)
-            if not _is_under(real_parent, session_dir):
+            if not _is_under(real_parent, contain_root):
                 return SecurityDecision(
                     False,
                     f"online mode: write parent dir is a symlink escape: "
@@ -481,7 +561,6 @@ def _decide_write_like(
                     tool_name,
                 )
         except OSError:
-            # If we can't stat, deny in online mode — fail closed.
             return SecurityDecision(
                 False,
                 f"online mode: cannot resolve write parent for {path}; refusing",
@@ -592,15 +671,33 @@ def decide(
     if tool in ("FetchURL", "WebFetch"):
         return _decide_fetchurl(tool, args, mode)
 
-    # 6. Skill / TaskCreate / planning tools — allow (kimi-internal, no FS)
+    # 6. AskUserQuestion — kimi docs: auto-allowed; the host must answer via
+    # the /questions API (VenusFactory ClarificationForm). Never block it or
+    # the agent cannot solicit structured user input.
+    if tool == "AskUserQuestion":
+        return SecurityDecision(True, "AskUserQuestion allowed (host answers via /questions)", tool)
+
+    # 6b. ExitPlanMode — tool itself is "auto" in kimi, but still presents a
+    # plan-approval panel (even under YOLO). We surface that as needs_user so
+    # VenusFactory can show Approve/Reject (+ optional approach labels).
+    if tool == "ExitPlanMode":
+        return SecurityDecision(
+            True,
+            "ExitPlanMode requires user plan confirmation",
+            tool,
+            needs_user=True,
+        )
+
+    # 6c. Collaboration / task / plan-enter tools — no FS side effects.
     if tool in (
-        "TaskCreate", "TaskUpdate", "TaskGet", "TaskList",
-        "EnterPlanMode", "ExitPlanMode",
+        "TaskCreate", "TaskUpdate", "TaskGet", "TaskList", "TaskOutput",
+        "EnterPlanMode",
         "CreateGoal", "GetGoal", "SetGoalBudget", "UpdateGoal",
+        "TodoList", "WebSearch", "ReadMediaFile", "Agent",
     ):
         return SecurityDecision(True, "kimi-internal tool allowed", tool)
 
-    # 6b. Skill — can execute arbitrary user-defined scripts. Deny in
+    # 6d. Skill — can execute arbitrary user-defined scripts. Deny in
     # online mode (a malicious skill bypasses every other policy here);
     # allow in local mode.
     if tool == "Skill":
