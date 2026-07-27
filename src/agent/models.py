@@ -161,7 +161,7 @@ class OpenAICompatibleModelConfig:
 class OpenAICompatibleModel:
     """Model implementation for OpenAI-compatible APIs.
 
-    Works with OpenAI, Azure, DeepSeek, dmxapi, and other
+    Works with OpenAI, Azure, DeepSeek, and other
     providers that follow the /chat/completions API spec.
     """
 

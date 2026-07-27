@@ -9,8 +9,9 @@ import gradio as gr
 
 from .constants import LLM_MODELS
 
-# api_base and API key come from .env (CHAT_BASE_URL, OPENAI_API_KEY)
-CHAT_BASE_URL_DEFAULT = "https://www.dmxapi.cn/v1"
+# api_base and API key come from .env (CHAT_BASE_URL, OPENAI_API_KEY).
+# Default is DeepSeek official; prefer per-model URLs from models.yaml in v2.
+CHAT_BASE_URL_DEFAULT = "https://api.deepseek.com"
 
 
 def get_chat_base_url() -> str:

@@ -560,7 +560,7 @@ def generate_and_execute_code(
         }
 
         endpoint = f"{chat_base_url.rstrip('/')}/chat/completions"
-        # LLM code generation often hits read timeouts under load (DeepSeek/DMX
+        # LLM code generation often hits read timeouts under load (DeepSeek/
         # in particular). Retry 3 times with light backoff before surrendering:
         # the call is idempotent (same prompt → same code) so retries are safe.
         # Bumping per-attempt timeout from 60s to 180s gives slow models room.

@@ -7,8 +7,8 @@
 # Field reference:
 #   id                   stable backend model id (passed to provider as "model")
 #   label                user-facing name in UI
-#   provider             logical owner (deepseek, openai, google, anthropic, dmx, ...)
-#   base_url             provider HTTP endpoint
+#   provider             logical owner (deepseek, openai, google, anthropic, ...)
+#   base_url             official provider HTTP endpoint (no third-party gateway)
 #   api_compatible       openai | anthropic   (determines request/response schema)
 #   api_key_env          env var consulted first if user key not set in keys.json
 #   supports_tool_use    OpenAI-style function-calling supported
@@ -16,19 +16,23 @@
 #   supports_prompt_caching  cache_control blocks (Anthropic) or auto prefix cache (OpenAI/Gemini)
 #   max_context_tokens   context window in tokens (approximate)
 #   max_output_tokens    per-response output cap
-#   requires_adapter     true = Chat_LLM cannot currently call this directly (e.g. Anthropic /messages schema). UI may still show it but mark as needing a gateway.
+#   requires_adapter     reserved; unused (all listed models call official APIs directly)
 #   hidden               true = don't list in user-facing model picker (still resolvable by id)
 
 default_model: kimi-code
 
 models:
-  # ─── kimi-code (local daemon) ───────────────────────────────────────────
+  # ─── kimi-code (local daemon) → Science Agent ───────────────────────────
   # Routed through the local `kimi server` daemon (started by api_server.py
-  # lifespan). The actual model picker is inside kimi-code; this entry just
-  # tells VenusFactory's chat router to take the kimi-code path. No HTTP
-  # base_url / api_key is used by VF for this engine.
+  # lifespan). UI label: "Science Agent". The actual model picker is inside
+  # kimi-code; this entry just tells VenusFactory's chat router to take the
+  # kimi-code path. No HTTP base_url / api_key is used by VF for this engine.
+  #
+  # Science Expert (chat_mode=science_expert) uses any of the graph-engine
+  # models below (DeepSeek / GPT / Gemini / …) via the LangGraph PI/CB/MLS/SC
+  # pipeline — they have no `engine:` field (defaults to graph).
   - id: kimi-code
-    label: "Agent"
+    label: "Science Agent"
     provider: kimi
     base_url: ""
     api_compatible: openai
@@ -40,7 +44,7 @@ models:
     max_output_tokens: 8192
     engine: kimi-code
 
-  # ─── DeepSeek (official) ────────────────────────────────────────────────
+  # ─── DeepSeek (official) — graph / Science Expert ───────────────────────
   - id: deepseek-v4-pro
     label: DeepSeek V4 Pro
     provider: deepseek
@@ -91,9 +95,7 @@ models:
     max_context_tokens: 1000000
     max_output_tokens: 8192
 
-  # ─── Anthropic Claude (NOT OpenAI-compat) ───────────────────────────────
-  # Direct call goes via ChatAnthropicLLM (/v1/messages); the DMX gateway alias
-  # below is still honored when CHAT_FORCE_GATEWAY=dmx is set.
+  # ─── Anthropic Claude (official /v1/messages via ChatAnthropicLLM) ──────
   - id: claude-3-7-sonnet-20250219
     label: Claude 3.7 Sonnet
     provider: anthropic
@@ -169,31 +171,5 @@ models:
     max_context_tokens: 128000
     max_output_tokens: 8192
 
-# Optional gateways. If a gateway is "active" (selected by user or via
-# CHAT_FORCE_GATEWAY env), ALL model requests route through it using the
-# gateway's base_url + key, regardless of the model's own entry above.
-# Gateway model IDs may differ from official IDs; declare overrides via
-# model_aliases.
-gateways:
-  - id: dmx
-    label: DMX 网关
-    base_url: https://www.dmxapi.cn/v1
-    api_compatible: openai
-    api_key_env: DMX_API_KEY
-    # When DMX is active, these official model IDs route to the DMX equivalents.
-    model_aliases:
-      deepseek-v4-pro: deepseek-v4-pro
-      deepseek-v4-flash: deepseek-v4-flash
-      gpt-4o: gpt-4o
-      gemini-2.5-pro: gemini-2.5-pro
-      claude-3-7-sonnet-20250219: claude-3-7-sonnet-20250219
-      glm-4-plus: glm-4-plus
-      glm-4-flash: glm-4-flash
-      qwen-max: qwen-max
-      qwen-plus: qwen-plus
-      moonshot-v1-128k: moonshot-v1-128k
-    # Legacy DMX-only model IDs (kept for backward-compat with existing sessions)
-    extra_models:
-      - id: deepseek-r1-0528
-        label: "DeepSeek R1 (legacy via DMX)"
-        hidden: false
+# No third-party gateways. Every model uses its official base_url above.
+gateways: []

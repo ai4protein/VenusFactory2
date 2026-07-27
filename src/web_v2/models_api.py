@@ -9,6 +9,7 @@ material never leaves the server.
 from __future__ import annotations
 
 import asyncio
+import os
 import re
 import time
 
@@ -27,6 +28,7 @@ from agent.model_registry import (
     set_active_gateway,
     set_user_key,
 )
+from config import get_config
 from logger import get_logger
 
 _logger = get_logger("web_v2.models_api")
@@ -34,6 +36,12 @@ _logger = get_logger("web_v2.models_api")
 router = APIRouter(prefix="/api/models", tags=["models"])
 
 _PROVIDER_RE = re.compile(r"^[a-z0-9_-]{1,32}$")
+# Online Science Expert is pinned to this graph model (see chat_api.messages).
+_ONLINE_FIXED_GRAPH_MODEL = "deepseek-v4-pro"
+
+
+def _runtime_mode() -> str:
+    return get_config().server.mode
 
 
 class SetKeyRequest(BaseModel):
@@ -54,6 +62,26 @@ async def _kimi_ready_status() -> tuple[bool, str]:
     if now - float(_KIMI_READY_CACHE["ts"]) < _KIMI_READY_TTL:
         return bool(_KIMI_READY_CACHE["ready"]), str(_KIMI_READY_CACHE["reason"])
     ready, reason = False, "Kimi daemon unreachable. Start the API server or set KIMI_EXTERNAL=1."
+    # Online mode spawns per-session kimi on demand (sandbox or user). There
+    # may be no shared daemon to probe — treat binary + host config as ready.
+    online = (os.environ.get("WEBUI_V2_MODE") or "local").strip().lower() == "online"
+    if online:
+        try:
+            from agent.kimi_daemon import _kimi_bin
+            from pathlib import Path
+            bin_path = _kimi_bin()
+            bin_ok = Path(bin_path).is_file()
+            cfg_ok = (Path.home() / ".kimi-code").is_dir()
+            if bin_ok and cfg_ok:
+                ready, reason = True, ""
+            elif not bin_ok:
+                ready, reason = False, f"kimi binary not found at {bin_path!r}"
+            else:
+                ready, reason = False, "Kimi config missing at ~/.kimi-code"
+        except Exception as exc:  # noqa: BLE001
+            ready, reason = False, f"Kimi online readiness check failed: {exc}"
+        _KIMI_READY_CACHE.update({"ts": now, "ready": ready, "reason": reason})
+        return ready, reason
     try:
         async with httpx.AsyncClient(timeout=1.0) as client:
             r = await client.get(f"{kimi_base_url()}/api/v1/auth")
@@ -83,18 +111,28 @@ async def list_all_models() -> dict:
     the local kimi daemon is unreachable or has no provider configured.
     """
     kimi_ready, kimi_reason = await _kimi_ready_status()
+    online = _runtime_mode() != "local"
     models_out = []
     for m in list_models():
         d = m.to_public_dict()
         if d.get("engine") == "kimi-code" and not kimi_ready:
             d["disabled"] = True
             d["disabled_reason"] = kimi_reason
+        # Online: only expose Science Agent (kimi) + fixed DeepSeek Expert model.
+        if online:
+            engine = d.get("engine") or "graph"
+            mid = d.get("id") or ""
+            if engine == "kimi-code" or mid == _ONLINE_FIXED_GRAPH_MODEL:
+                models_out.append(d)
+            continue
         models_out.append(d)
     return {
-        "default_model": get_default_model_id(),
+        "default_model": (
+            _ONLINE_FIXED_GRAPH_MODEL if online else get_default_model_id()
+        ),
         "models": models_out,
-        "gateways": [g.to_public_dict() for g in list_gateways()],
-        "active_gateway": get_active_gateway(),
+        "gateways": [] if online else [g.to_public_dict() for g in list_gateways()],
+        "active_gateway": None if online else get_active_gateway(),
         "key_status": list_user_key_providers(),
     }
 

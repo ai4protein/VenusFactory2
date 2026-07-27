@@ -10,11 +10,10 @@ Lookup precedence for a model's API key:
   3. Environment variable named by the model's ``api_key_env`` field.
   4. Empty string (caller decides how to handle).
 
-Gateway behaviour:
-  If ``CHAT_FORCE_GATEWAY=<gateway_id>`` env is set (or ``set_active_gateway``
-  is called at runtime), ``resolve_endpoint`` returns the gateway's base_url +
-  the gateway's key. The model id passed to the provider is translated via the
-  gateway's ``model_aliases`` table when present.
+Gateways:
+  ``models.yaml`` currently ships with an empty ``gateways: []`` list. Models
+  always resolve to their official ``base_url``. The optional gateway plumbing
+  remains for tests / future use, but unknown gateway ids are ignored.
 """
 from __future__ import annotations
 
@@ -68,6 +67,11 @@ class ModelSpec:
 
     def to_public_dict(self) -> dict[str, Any]:
         """JSON-serializable dict for /api/models endpoint (no keys)."""
+        engine = self.engine or "graph"
+        # Frontend-friendly dual-chat mode:
+        #   science_agent  → kimi-code daemon
+        #   science_expert → LangGraph PI/CB/MLS/SC pipeline
+        chat_mode = "science_agent" if engine == "kimi-code" else "science_expert"
         return {
             "id": self.id,
             "label": self.label,
@@ -81,7 +85,8 @@ class ModelSpec:
             "max_context_tokens": self.max_context_tokens,
             "max_output_tokens": self.max_output_tokens,
             "requires_adapter": self.requires_adapter,
-            "engine": self.engine,
+            "engine": engine,
+            "chat_mode": chat_mode,
         }
 
 
@@ -226,17 +231,31 @@ _active_gateway: Optional[str] = None
 
 
 def get_active_gateway() -> Optional[str]:
-    """Returns active gateway id or None. env CHAT_FORCE_GATEWAY wins."""
+    """Returns active gateway id or None.
+
+    ``CHAT_FORCE_GATEWAY`` wins when set, but unknown / removed gateway ids
+    (e.g. legacy ``dmx``) are ignored so requests stay on official endpoints.
+    """
     forced = (os.getenv("CHAT_FORCE_GATEWAY") or "").strip()
-    if forced:
-        return forced
-    with _ACTIVE_GATEWAY_LOCK:
-        return _active_gateway
+    candidate = forced
+    if not candidate:
+        with _ACTIVE_GATEWAY_LOCK:
+            candidate = _active_gateway
+    if not candidate:
+        return None
+    if get_gateway(candidate) is None:
+        return None
+    return candidate
 
 
 def set_active_gateway(gateway_id: Optional[str]) -> None:
-    """Set or clear the process-wide active gateway. Pass None to clear."""
+    """Set or clear the process-wide active gateway. Pass None to clear.
+
+    Raises ValueError if ``gateway_id`` is set but not present in the registry.
+    """
     global _active_gateway
+    if gateway_id and get_gateway(gateway_id) is None:
+        raise ValueError(f"Unknown gateway id: {gateway_id}")
     with _ACTIVE_GATEWAY_LOCK:
         _active_gateway = gateway_id
 
@@ -247,7 +266,7 @@ def set_active_gateway(gateway_id: Optional[str]) -> None:
 #
 # Schema:
 # {
-#   "providers": {"deepseek": "sk-...", "openai": "sk-...", "google": "...", "anthropic": "...", "dmx": "sk-..."},
+#   "providers": {"deepseek": "sk-...", "openai": "sk-...", "google": "...", "anthropic": "..."},
 #   "custom": {"<arbitrary-id>": {"label": "...", "api_key": "...", "base_url": "..."}}
 # }
 #
