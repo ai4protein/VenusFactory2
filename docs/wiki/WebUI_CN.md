@@ -44,11 +44,23 @@ Directed Evolution · Sequence Design · Protein Discovery · Protein Function �
 
 与 Quick Tools 同类任务，提供更多模型 / 参数控制。
 
+### Chat — 双模式
+
+Agent 对话（`/agent`）在输入区上方切换 **Science Agent** / **Science Expert**（选择会保存在浏览器）。
+
+| 模式 | 引擎 | 说明 |
+|:-----|:-----|:-----|
+| **Science Agent** | kimi-code | 以工具调用为主的 agent 循环（MCP / bash）；支持可折叠 Thinking、内联工具卡片。模型固定走 kimi-code 守护进程（见下方配置）。Online 不提供模型选择器。 |
+| **Science Expert** | LangGraph（`graph`） | 多角色流水线 **PI → CB → MLS → SC**；执行前仍可在 Plan Editor 审计划。已做流畅度优化：执行型任务可跳过文献调研；计划确认后步骤默认自动执行；小报告默认自动推进（计划确认仍保留）。**Local** 可在模型选择器切换 LLM；**Online** 无模型选择器，使用平台固定后端模型。 |
+
+详见 [AgentManual_CN.md](../manual/AgentManual_CN.md)。
+
 ## 配置
 
 - 模板：`.env.example` → `.env`
 - Agent / LLM：优先界面 **Settings**；也可写环境变量（见 `.env.example`）
 - Online：`WEBUI_V2_MODE=online`、`WEBUI_V2_SESSION_TOKEN_SECRET`、`WEBUI_V2_*_LIMIT`
+- Online 无 sudo 时 kimi-code：默认 `auto` 会走 `bwrap` 沙箱；也可显式 `KIMI_ONLINE_SPAWN_MODE=bwrap`
 - 跳过默认 kimi-code：`export KIMI_EXTERNAL=1`
 
 ## 权重
