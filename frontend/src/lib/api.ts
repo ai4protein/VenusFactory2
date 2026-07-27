@@ -7,8 +7,9 @@ export type ChatHistoryItem = {
    * matching localized substrings. */
   phase?: string;
   /** kimi-code engine writes message kind. "thinking" → collapsible reasoning
-   * block rendered above the answer; "text" (or undefined) → regular message. */
-  kind?: "text" | "thinking";
+   * block rendered above the answer; "status" → foldable research noise;
+   * "text" (or undefined) → regular message. */
+  kind?: "text" | "thinking" | "status" | "checkpoint";
   /** Optional kimi turn id; used to group thinking + text from the same turn. */
   turn_id?: string;
 };
@@ -17,6 +18,22 @@ export type ClarificationQuestion = {
   question: string;
   options: string[];
   allow_multiple: boolean;
+  header?: string;
+  allow_other?: boolean;
+  other_label?: string;
+};
+
+export type KimiPendingQuestion = {
+  question_id: string;
+  question_count: number;
+};
+
+export type KimiPendingApproval = {
+  approval_id: string;
+  tool_name: string;
+  option_labels: string[];
+  approval_prompt?: string;
+  plan_markdown?: string;
 };
 
 export type ClarificationAnswer = {
@@ -52,6 +69,38 @@ export type ChatSnapshot = {
   plan: PlanStep[];
   waiting_for: string;
   security_events?: SecurityEvent[];
+  /** Product chat mode when backend persists it: science_agent | science_expert. */
+  chat_mode?: string;
+  /** Backend engine for the session/turn: kimi-code | graph. */
+  engine?: string;
+  /** Science Agent AskUserQuestion gate (redacted). */
+  kimi_pending_question?: KimiPendingQuestion | null;
+  /** Science Agent Approve/Reject gate (redacted). */
+  kimi_pending_approval?: KimiPendingApproval | null;
+  approval_prompt?: string;
+  plan_markdown?: string;
+  /** Explicit opt-in: pause after each research sub-report. */
+  review_sub_reports?: boolean;
+  /** SC paper-level manuscript (default on; kept for API compat). */
+  full_manuscript?: boolean;
+};
+
+/** Stream body fields for POST .../messages/stream (extra keys ignored by older backends). */
+export type ChatStreamBody = {
+  text: string;
+  model?: string;
+  custom_model_config?: {
+    model_name: string;
+    api_key: string;
+    base_url: string;
+  };
+  custom_model_id?: string;
+  attachment_paths?: string[];
+  lang?: string;
+  /** Product mode: science_agent | science_expert */
+  chat_mode?: string;
+  /** Engine override / hint: kimi-code | graph */
+  engine?: string;
 };
 
 export type ChatQuota = {
@@ -241,7 +290,16 @@ export async function listChatSessions() {
     const detail = await extractErrorDetail(res);
     throw new Error(parseErrorStatus(res.status, detail));
   }
-  return res.json() as Promise<{ sessions: Array<{ session_id: string; created_at: string; model_name: string; history_size: number; status: string }> }>;
+  return res.json() as Promise<{
+    sessions: Array<{
+      session_id: string;
+      created_at: string;
+      model_name: string;
+      history_size: number;
+      status: string;
+      title?: string;
+    }>;
+  }>;
 }
 
 export async function getChatSession(sessionId: string) {
@@ -318,6 +376,14 @@ export async function getChatQuota() {
 
 export function getClarificationRespondUrl(sessionId: string): string {
   return `${API_ROOT}/api/chat/sessions/${encodeURIComponent(sessionId)}/clarification/respond/stream`;
+}
+
+export function getAskUserRespondUrl(sessionId: string): string {
+  return `${API_ROOT}/api/chat/sessions/${encodeURIComponent(sessionId)}/ask-user/respond/stream`;
+}
+
+export function getApprovalDecideUrl(sessionId: string): string {
+  return `${API_ROOT}/api/chat/sessions/${encodeURIComponent(sessionId)}/approval/decide/stream`;
 }
 
 export function getPlanConfirmUrl(sessionId: string): string {

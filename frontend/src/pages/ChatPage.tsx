@@ -2,11 +2,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ChatTimeline } from "../components/ChatTimeline";
 import { SessionFilesPanel } from "../components/SessionFilesPanel";
 import { PipelineProgress } from "../components/PipelineProgress";
+import { AskUserCard } from "../components/AskUserCard";
+import { ApprovalCard, type ApprovalDecision } from "../components/ApprovalCard";
 import { ClarificationForm } from "../components/ClarificationForm";
 import { IterationDecision } from "../components/IterationDecision";
 import { PlanEditor } from "../components/PlanEditor";
 import { StepCheckpoint } from "../components/StepCheckpoint";
 import { SubReportCheckpoint } from "../components/SubReportCheckpoint";
+import { isResearchNoiseTool, type ToolExecution } from "../components/ToolExecutionCard";
 import {
   cancelChatSession,
   createChatSession,
@@ -17,6 +20,8 @@ import {
   getChatQuota,
   getChatSession,
   getChatSessionAuthHeaders,
+  getAskUserRespondUrl,
+  getApprovalDecideUrl,
   getClarificationRespondUrl,
   getPlanConfirmUrl,
   getStepDecideUrl,
@@ -37,6 +42,14 @@ import {
   useModelRegistry,
   setProviderKey,
   setActiveGateway,
+  persistChatMode,
+  pickExpertModelId,
+  chatModeFromSnapshot,
+  isKimiEngineModel,
+  isGraphEngineModel,
+  SCIENCE_AGENT_MODEL_ID,
+  ONLINE_FIXED_EXPERT_MODEL_ID,
+  type ChatMode,
   type ModelSpec,
 } from "../lib/useModelRegistry";
 import { useLang } from "../lib/i18n";
@@ -44,8 +57,8 @@ import { useDocumentMeta } from "../lib/useDocumentMeta";
 
 const STRINGS = {
   en: {
-    docTitle: "Agent Chat — VenusFactory2",
-    docDescription: "Chat with the protein-engineering agent to run predictions, training and analysis tasks.",
+    docTitle: "Science Chat — VenusFactory2",
+    docDescription: "Science Agent and Science Expert chat for protein engineering predictions, training and analysis.",
     // Error hints (friendlyErrorHint)
     errHintQuota: "You've reached the daily usage limit for online mode. Try again tomorrow, or deploy locally for unlimited access.",
     errHintTimeout: "The request took too long. This can happen with complex tasks or heavy server load. Please try again.",
@@ -68,6 +81,8 @@ const STRINGS = {
     errStreamMsg: "Failed to stream message.",
     errRetryMsg: "Failed to retry message.",
     errClarification: "Failed to submit clarification.",
+    errAskUser: "Failed to submit answers to the agent.",
+    errApproval: "Failed to submit approval decision.",
     errConfirmPlan: "Failed to confirm plan.",
     errIteration: "Failed to process iteration decision.",
     errStepDecision: "Failed to process step decision.",
@@ -84,14 +99,19 @@ const STRINGS = {
     errRemoveCustomModel: "Failed to remove custom model.",
     // Notices
     noticeModelSwitched: "Model/provider switched. Existing context may not be consistent across providers. Start a new session if results look off.",
+    noticeModeSwitched: "Chat mode switched. Existing context may not be consistent across modes. Start a new session if results look off.",
     noticeCustomRemoved: "Custom model removed. Active session switched back to default model context.",
+    noticeAgentDisabled: "Science Agent is currently unavailable. Check kimi-code setup, or switch to Science Expert.",
+    noticeAskUserSubmitted: "Answers submitted — agent continuing…",
+    noticeApprovalApproved: "Approved — agent continuing…",
+    noticeApprovalRejected: "Rejected — agent continuing…",
     // Tooltips for model selector
     titleGatewayRequired: "Requires a configured gateway",
     titleMissingKey: (provider: string) => `Missing API key for ${provider}. Click to add.`,
     titleModelInfo: (label: string, provider: string) => `${label} (${provider})`,
     titleProviderWithKey: (provider: string) => `Provider: ${provider} (key configured)`,
     titleProviderNoKey: (provider: string) => `Provider: ${provider} (no API key)`,
-    titleKeyConfigured: (provider: string) => `API key configured for ${provider}`,
+    titleKeyConfigured: (provider: string) => `API key saved for ${provider} in ~/.venusfactory/keys.json. Click to update or clear.`,
     // Tooltips
     sendMessage: "Send message",
     regenerateLast: "Regenerate last message",
@@ -100,9 +120,6 @@ const STRINGS = {
     quotaRegenerate: (remaining: number, limit: number) => `Regenerate also consumes quota. Remaining: ${remaining}/${limit}.`,
     // Header
     chat: "Chat",
-    modeOnline: "Mode: Online",
-    modeOnlineTooltip: (limit: number) => `Mode: Online. Per-user daily limit: ${limit} chats.`,
-    onlineLocalHint: "For unlimited and more efficient usage, local deployment is recommended.",
     running: "Running",
     stopping: "Stopping",
     stopped: "Stopped",
@@ -114,6 +131,7 @@ const STRINGS = {
     newSession: "+ New Session",
     noSessions: "No sessions yet",
     deleteSession: "Delete session",
+    newChat: "New chat",
     idle: "idle",
     msgs: "msgs",
     copyFullId: "Copy full session id",
@@ -124,35 +142,66 @@ const STRINGS = {
     roleCompBio: "Computational Biologist",
     roleMLSpec: "Machine Learning Specialist",
     // Composer
-    composerWaiting: "Please respond to the form above...",
+    composerWaiting: "Please finish the action card above…",
+    composerWaitingClarification: "Please answer the clarification questions above…",
+    composerWaitingAskUser: "Agent is waiting for your answer…",
+    composerWaitingApproval: "Agent is waiting for your approval…",
+    composerWaitingPlan: "Please confirm the execution plan above…",
+    composerWaitingSubReport: "Please choose continue or revise above…",
+    composerWaitingStep: "Please confirm the step result above…",
+    composerWaitingIteration: "Please choose the next action above…",
+    checkpointClarify: "Clarification",
+    checkpointAskUser: "Agent question",
+    checkpointApproval: "Approval required",
+    checkpointPlan: "Execution plan",
+    checkpointSubReport: "Sub-report checkpoint",
+    checkpointStep: "Step checkpoint",
+    checkpointIteration: "Next step",
     composerPlaceholder: "Ask anything about AI protein engineering...",
-    quotaPillTitle: (limit: number) => `Per-IP daily limit in online mode: ${limit}`,
+    quotaPillTitle: (remaining: number, limit: number) =>
+      `Online daily quota: ${remaining} sends left of ${limit} per IP. Counts each Send/Regenerate, not tool calls or streaming.`,
+    quotaPillLabel: (remaining: number, limit: number) => `${remaining} left / ${limit}`,
+    quotaPillExhausted: (used: number, limit: number) => `${used}/${limit} used`,
+    chatModeAria: "Chat mode",
+    modeScienceAgent: "Science Agent",
+    modeScienceExpert: "Science Expert",
+    modeAgentShort: "Agent",
+    modeExpertShort: "Expert",
     modelAria: "Model",
+    modelLabel: "Model",
+    modelViaKimi: "via kimi",
     gatewayRequiredSuffix: " (gateway required)",
     otherModel: "Other Model...",
     noKeySuffix: " (no key)",
     customSuffix: " (Custom)",
-    keyOk: "key ok",
-    setKey: "set key",
+    keyOk: "Key ready",
+    setKey: "Set key",
     gatewayAria: "Gateway",
+    gatewayLabel: "Gateway",
     activeGateway: "Active gateway",
     noGateway: "No gateway",
-    uploadFiles: "Upload files",
+    uploadFiles: "Attach files",
+    fileSourceAria: "Choose file source",
+    fileSourceLocal: "Local files",
+    fileSourceLocalHint: "Upload files from this computer",
     fromWorkspace: "From Workspace",
-    regenerate: "Regenerate",
+    fromWorkspaceHint: "Pick files already in the local Workspace",
+    fromWorkspaceOnlineHint: "Available only with local deployment. Online mode cannot browse Workspace.",
     export: "Export",
+    exportTooltip: "Export session",
     stop: "Stop",
+    stopTooltip: "Stop",
     send: "Send",
-    runningEllipsis: "Running...",
-    searchMessages: "Search messages",
-    searchPlaceholder: "Search messages...",
+    sendTooltipShort: "Send",
     pipelineDismiss: "Dismiss",
     // Key panel
     keyPanelAria: (provider: string) => `Set API key for ${provider}`,
     keyPanelLabelPre: "API key for ",
     keyPanelLabelPost: ":",
+    keyPanelHint: "Paste a new key to update, or click Clear to remove the saved key.",
     keyPanelSaving: "Saving...",
     save: "Save",
+    clearKey: "Clear",
     cancel: "Cancel",
     // File preview
     workspaceSuffix: "(workspace)",
@@ -175,8 +224,8 @@ const STRINGS = {
     deleteBtn: "Delete",
   },
   zh: {
-    docTitle: "智能体对话 — VenusFactory2",
-    docDescription: "通过对话使用蛋白质工程智能体，运行预测、训练与分析任务。",
+    docTitle: "科学对话 — VenusFactory2",
+    docDescription: "通过 Science Agent / Science Expert 双模式对话，运行蛋白质工程预测、训练与分析任务。",
     // Error hints (friendlyErrorHint)
     errHintQuota: "您已达到在线模式的每日使用上限。请明天再试，或本地部署以获得无限制访问。",
     errHintTimeout: "请求耗时过长。复杂任务或服务器负载较高时可能出现此问题，请重试。",
@@ -199,6 +248,8 @@ const STRINGS = {
     errStreamMsg: "消息流式传输失败。",
     errRetryMsg: "重试消息失败。",
     errClarification: "提交澄清答复失败。",
+    errAskUser: "提交回答给 Agent 失败。",
+    errApproval: "提交批准决定失败。",
     errConfirmPlan: "确认计划失败。",
     errIteration: "处理迭代决策失败。",
     errStepDecision: "处理步骤决策失败。",
@@ -215,14 +266,19 @@ const STRINGS = {
     errRemoveCustomModel: "删除自定义模型失败。",
     // Notices
     noticeModelSwitched: "已切换模型 / 服务商。已有上下文在不同服务商之间可能不一致，如结果异常请新建会话。",
+    noticeModeSwitched: "已切换对话模式。已有上下文在不同模式之间可能不一致，如结果异常请新建会话。",
     noticeCustomRemoved: "自定义模型已删除。当前会话已切换回默认模型上下文。",
+    noticeAgentDisabled: "Science Agent 当前不可用。请检查 kimi-code 配置，或切换到 Science Expert。",
+    noticeAskUserSubmitted: "已提交回答 — Agent 继续执行…",
+    noticeApprovalApproved: "已批准 — Agent 继续执行…",
+    noticeApprovalRejected: "已拒绝 — Agent 继续执行…",
     // Tooltips for model selector
     titleGatewayRequired: "需要先配置网关",
     titleMissingKey: (provider: string) => `缺少 ${provider} 的 API 密钥，点击添加。`,
     titleModelInfo: (label: string, provider: string) => `${label}（${provider}）`,
     titleProviderWithKey: (provider: string) => `服务商：${provider}（密钥已配置）`,
     titleProviderNoKey: (provider: string) => `服务商：${provider}（无 API 密钥）`,
-    titleKeyConfigured: (provider: string) => `已为 ${provider} 配置 API 密钥`,
+    titleKeyConfigured: (provider: string) => `已在 ~/.venusfactory/keys.json 保存 ${provider} 的密钥。点击可更新或清空。`,
     // Tooltips
     sendMessage: "发送消息",
     regenerateLast: "重新生成上一条消息",
@@ -231,9 +287,6 @@ const STRINGS = {
     quotaRegenerate: (remaining: number, limit: number) => `重新生成同样会消耗配额。剩余：${remaining}/${limit}。`,
     // Header
     chat: "对话",
-    modeOnline: "模式：在线",
-    modeOnlineTooltip: (limit: number) => `模式：在线。每位用户每日上限：${limit} 次对话。`,
-    onlineLocalHint: "如需无限制且更高效的使用，建议本地部署。",
     running: "运行中",
     stopping: "停止中",
     stopped: "已停止",
@@ -245,6 +298,7 @@ const STRINGS = {
     newSession: "+ 新建会话",
     noSessions: "暂无会话",
     deleteSession: "删除会话",
+    newChat: "新对话",
     idle: "空闲",
     msgs: "条消息",
     copyFullId: "复制完整会话 ID",
@@ -255,35 +309,66 @@ const STRINGS = {
     roleCompBio: "计算生物学家",
     roleMLSpec: "机器学习专家",
     // Composer
-    composerWaiting: "请先回复上方的表单……",
+    composerWaiting: "请先完成上方的操作卡片……",
+    composerWaitingClarification: "请先回答上方的澄清问题……",
+    composerWaitingAskUser: "Agent 正在等待你的回答…",
+    composerWaitingApproval: "Agent 正在等待你的批准…",
+    composerWaitingPlan: "请先确认上方的执行计划……",
+    composerWaitingSubReport: "请先在上方选择继续或修改……",
+    composerWaitingStep: "请先确认上方的步骤结果……",
+    composerWaitingIteration: "请先选择下一步操作……",
+    checkpointClarify: "需求澄清",
+    checkpointAskUser: "Agent 提问",
+    checkpointApproval: "需要批准",
+    checkpointPlan: "执行计划",
+    checkpointSubReport: "小报告检查点",
+    checkpointStep: "步骤检查点",
+    checkpointIteration: "下一步",
     composerPlaceholder: "随时提问 AI 蛋白质工程相关的任何问题……",
-    quotaPillTitle: (limit: number) => `在线模式按 IP 每日上限：${limit}`,
+    quotaPillTitle: (remaining: number, limit: number) =>
+      `在线日配额：本 IP 今日还剩 ${remaining}/${limit} 次发送。按每次点「发送」计数，工具调用/流式输出不另计。`,
+    quotaPillLabel: (remaining: number, limit: number) => `剩余 ${remaining}/${limit}`,
+    quotaPillExhausted: (used: number, limit: number) => `已用 ${used}/${limit}`,
+    chatModeAria: "对话模式",
+    modeScienceAgent: "科学智能体",
+    modeScienceExpert: "科学专家",
+    modeAgentShort: "智能体",
+    modeExpertShort: "专家",
     modelAria: "模型",
+    modelLabel: "模型",
+    modelViaKimi: "经 kimi",
     gatewayRequiredSuffix: "（需要网关）",
     otherModel: "其他模型……",
     noKeySuffix: "（无密钥）",
     customSuffix: "（自定义）",
-    keyOk: "密钥已配置",
+    keyOk: "密钥就绪",
     setKey: "设置密钥",
     gatewayAria: "网关",
+    gatewayLabel: "网关",
     activeGateway: "当前网关",
     noGateway: "无网关",
-    uploadFiles: "上传文件",
+    uploadFiles: "添加文件",
+    fileSourceAria: "选择文件来源",
+    fileSourceLocal: "本地文件",
+    fileSourceLocalHint: "从本机上传文件",
     fromWorkspace: "从工作区选择",
-    regenerate: "重新生成",
+    fromWorkspaceHint: "选择本地 Workspace 中已有的文件",
+    fromWorkspaceOnlineHint: "仅本地部署可用；在线模式无法浏览 Workspace。",
     export: "导出",
+    exportTooltip: "导出会话",
     stop: "停止",
+    stopTooltip: "停止",
     send: "发送",
-    runningEllipsis: "运行中……",
-    searchMessages: "搜索消息",
-    searchPlaceholder: "搜索消息……",
+    sendTooltipShort: "发送",
     pipelineDismiss: "关闭",
     // Key panel
     keyPanelAria: (provider: string) => `为 ${provider} 设置 API 密钥`,
     keyPanelLabelPre: "为 ",
     keyPanelLabelPost: " 设置 API 密钥：",
+    keyPanelHint: "留空后点「清空」可删除已保存的密钥。",
     keyPanelSaving: "保存中……",
     save: "保存",
+    clearKey: "清空",
     cancel: "取消",
     // File preview
     workspaceSuffix: "（工作区）",
@@ -313,12 +398,101 @@ type SessionMeta = {
   model_name: string;
   history_size: number;
   status: string;
+  title?: string;
 };
+
+const TITLE_SKIP_PREFIXES = [
+  "📝",
+  "clarification details",
+  "**clarification",
+  "澄清详情",
+  "澄清细节",
+];
+
+/** Compress a user message into a short sidebar label (not a full copy). */
+function abbreviateSessionTitle(raw: string, maxLen = 22): string {
+  const lines = raw
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith(">"));
+  let text = (lines.length ? lines.join(" ") : raw).replace(/\s+/g, " ").trim();
+  if (!text) return "";
+  const lower = text.toLowerCase();
+  if (TITLE_SKIP_PREFIXES.some((p) => lower.startsWith(p) || text.startsWith(p))) {
+    return "";
+  }
+
+  // Prefer the first clause / sentence.
+  const hardSeps = ["。", "！", "？", "；", ". ", "! ", "? ", "; "];
+  for (const sep of hardSeps) {
+    if (text.includes(sep)) {
+      const head = text.split(sep)[0]?.trim() || "";
+      if (head.length >= 4) {
+        text = head;
+        break;
+      }
+    }
+  }
+  if (text.length > maxLen) {
+    for (const sep of ["，", ", "]) {
+      if (text.includes(sep)) {
+        const head = text.split(sep)[0]?.trim() || "";
+        if (head.length >= 4) {
+          text = head;
+          break;
+        }
+      }
+    }
+  }
+
+  // English-heavy prompts → keep a few leading words.
+  const asciiRatio = [...text].filter((ch) => ch.charCodeAt(0) < 128).length / Math.max(text.length, 1);
+  if (asciiRatio > 0.7) {
+    const words = text.split(/\s+/);
+    if (words.length > 3) text = words.slice(0, 3).join(" ");
+  }
+
+  text = text.replace(/^[\s·\-–—:：,，;；]+|[\s·\-–—:：,，;；]+$/g, "");
+  if (!text) return "";
+  if (text.length <= maxLen) return text;
+  let cut = text.slice(0, maxLen - 1);
+  if (asciiRatio > 0.7) {
+    const sp = cut.lastIndexOf(" ");
+    if (sp >= 6) cut = cut.slice(0, sp);
+  }
+  return `${cut.trimEnd()}…`;
+}
+
+function titleFromHistory(history: Array<{ role?: string; content?: unknown }> | undefined): string {
+  if (!history?.length) return "";
+  for (const item of history) {
+    if (item?.role !== "user") continue;
+    const content = item.content;
+    let raw = "";
+    if (typeof content === "string") raw = content;
+    else if (Array.isArray(content)) {
+      raw = content
+        .map((part) => {
+          if (typeof part === "string") return part;
+          if (part && typeof part === "object") {
+            const obj = part as { text?: string; content?: string };
+            return obj.text || obj.content || "";
+          }
+          return "";
+        })
+        .filter(Boolean)
+        .join(" ");
+    }
+    const title = abbreviateSessionTitle(raw);
+    if (title) return title;
+  }
+  return "";
+}
 
 // Last-resort fallback identifier used only when the model registry has not
 // loaded yet AND we cannot read any model id from the active session. The real
 // model list comes from GET /api/models via useModelRegistry().
-const FALLBACK_MODEL_ID = "kimi-code";
+const FALLBACK_MODEL_ID = SCIENCE_AGENT_MODEL_ID;
 const OTHER_MODEL_OPTION = "__other_model__";
 type RunStatus = "running" | "stopping" | "stopped";
 
@@ -403,6 +577,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   const [streamingIdx, setStreamingIdx] = useState(-1);
   const [error, setError] = useState<string>("");
   const [selectedModel, setSelectedModel] = useState<string>(FALLBACK_MODEL_ID);
+  const [chatMode, setChatMode] = useState<ChatMode>("science_agent");
   const registry = useModelRegistry();
   const [keyPanelProvider, setKeyPanelProvider] = useState<string>("");
   const [keyPanelValue, setKeyPanelValue] = useState<string>("");
@@ -416,14 +591,20 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   const [modelSwitchNotice, setModelSwitchNotice] = useState("");
   const [chatQuota, setChatQuota] = useState<ChatQuota | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  /** Expert token pump: apply SSE tokens across animation frames so a
+   * buffered burst still paints as progressive streaming. */
+  const tokenQueueRef = useRef<Array<{ content: string; role_id?: string }>>([]);
+  const tokenPumpScheduledRef = useRef(false);
   const timelineRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const fileSourceMenuRef = useRef<HTMLDivElement | null>(null);
+  const [fileSourceMenuOpen, setFileSourceMenuOpen] = useState(false);
+  const [workspacePickerOpen, setWorkspacePickerOpen] = useState(false);
   const SESSION_STORAGE_KEY = "vf2_active_session_id";
   const SESSION_CACHE_KEY = "vf2_session_list_cache";
   const SESSION_OWNED_KEY = "vf2_owned_session_ids";
   const COPY_HINT_MS = 1200;
   const [copiedSessionId, setCopiedSessionId] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchOpen, setSearchOpen] = useState(false);
   const [sessionsCollapsed, setSessionsCollapsed] = useState(false);
   const [logsCollapsed, setLogsCollapsed] = useState(false);
   const [pipelineDismissed, setPipelineDismissed] = useState(false);
@@ -462,6 +643,26 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     void bootstrapSession();
   }, []);
 
+  useEffect(() => {
+    if (!fileSourceMenuOpen) return;
+    function onDocPointerDown(ev: MouseEvent) {
+      const root = fileSourceMenuRef.current;
+      if (!root) return;
+      if (ev.target instanceof Node && !root.contains(ev.target)) {
+        setFileSourceMenuOpen(false);
+      }
+    }
+    function onKeyDown(ev: KeyboardEvent) {
+      if (ev.key === "Escape") setFileSourceMenuOpen(false);
+    }
+    document.addEventListener("mousedown", onDocPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onDocPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [fileSourceMenuOpen]);
+
   const lastContentLen = snapshot?.history?.[snapshot.history.length - 1]?.content?.length ?? 0;
   useEffect(() => {
     const el = timelineRef.current;
@@ -475,19 +676,54 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   useEffect(() => {
     const s = (snapshot?.status || "").toLowerCase();
     if (!s) return;
-    if (s === "stopped" || s === "waiting_for_clarification" || s === "waiting_for_plan_confirmation" || s === "waiting_for_iteration" || s === "waiting_for_step_review" || s === "waiting_for_sub_report_review") {
+    if (
+      s === "stopped" ||
+      s === "completed" ||
+      s === "error" ||
+      s === "planning_failed" ||
+      s === "execution_failed" ||
+      s === "waiting_for_clarification" ||
+      s === "waiting_for_kimi_question" ||
+      s === "waiting_for_kimi_approval" ||
+      s === "waiting_for_plan_confirmation" ||
+      s === "waiting_for_iteration" ||
+      s === "waiting_for_step_review" ||
+      s === "waiting_for_sub_report_review"
+    ) {
       setRunStatus("stopped");
       return;
     }
-    if (s !== "completed") {
-      setRunStatus((prev) => {
-        if (prev !== "running" && prev !== "stopping") setPipelineDismissed(false);
-        return prev === "stopping" ? prev : "running";
-      });
-      return;
-    }
-    setRunStatus("stopped");
+    setRunStatus((prev) => {
+      if (prev !== "running" && prev !== "stopping") setPipelineDismissed(false);
+      return prev === "stopping" ? prev : "running";
+    });
   }, [snapshot?.status]);
+
+  // Keep sidebar label in sync with the first user message of the active chat.
+  const activeSessionTitle = titleFromHistory(snapshot?.history);
+  useEffect(() => {
+    if (!sessionId) return;
+    const historySize = snapshot?.history?.length ?? 0;
+    // Never blank out an existing title with "" while history is still loading.
+    if (!activeSessionTitle && historySize === 0) return;
+    setSessions((prev) => {
+      let changed = false;
+      const next = prev.map((item) => {
+        if (item.session_id !== sessionId) return item;
+        const nextTitle = activeSessionTitle || item.title || "";
+        if ((item.title || "") === nextTitle && item.history_size === historySize) return item;
+        changed = true;
+        return { ...item, title: nextTitle, history_size: historySize };
+      });
+      if (!changed) return prev;
+      try {
+        localStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }, [sessionId, activeSessionTitle, snapshot?.history?.length]);
 
   const terminalData = useMemo(() => {
     if (!snapshot) return null;
@@ -511,9 +747,32 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     const data = await listChatSessions();
     const allServer = data.sessions || [];
     const list = filterOwnedSessions(allServer);
-    setSessions(list);
-    localStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(list));
-    return list;
+    // Preserve locally derived titles when the API omits them (older server
+    // process, or race before the first message is persisted).
+    let merged: SessionMeta[] = [];
+    setSessions((prev) => {
+      const prevById = new Map(prev.map((item) => [item.session_id, item]));
+      merged = list.map((item) => {
+        const prior = prevById.get(item.session_id);
+        const serverTitle = (item.title || "").trim();
+        const priorTitle = (prior?.title || "").trim();
+        const activeTitle =
+          item.session_id === sessionId ? titleFromHistory(snapshot?.history) : "";
+        const raw = serverTitle || activeTitle || priorTitle || "";
+        return {
+          ...item,
+          // Always compress — older clients may have stored near-full questions.
+          title: abbreviateSessionTitle(raw) || raw,
+        };
+      });
+      try {
+        localStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(merged));
+      } catch {
+        /* ignore */
+      }
+      return merged;
+    });
+    return merged;
   }
 
   function readOwnedSessionIds(): string[] {
@@ -546,13 +805,29 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     return list.filter((item) => owned.has(item.session_id));
   }
 
-  async function refreshChatQuota() {
+  async function refreshChatQuota(): Promise<ChatQuota | null> {
     try {
       const quota = await getChatQuota();
       setChatQuota(quota);
+      return quota;
     } catch {
       setChatQuota(null);
+      return null;
     }
+  }
+
+  /** Optimistic local decrement so the pill moves as soon as Send starts. */
+  function noteQuotaSendStarted() {
+    setChatQuota((prev) => {
+      if (!prev?.enforced) return prev;
+      const used = (prev.used ?? 0) + 1;
+      const limit = prev.limit ?? 0;
+      return {
+        ...prev,
+        used,
+        remaining: Math.max(0, limit - used),
+      };
+    });
   }
 
   async function createAndActivateSession() {
@@ -564,14 +839,39 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       setSessionId(created.session_id);
       setModelSwitchNotice("");
       sessionStorage.setItem(SESSION_STORAGE_KEY, created.session_id);
-      setSelectedModel(modelLabelFromInternal(created.model_name));
-      rememberModelFromSession(created.model_name);
+      let runtimeMode = chatQuota?.mode;
+      if (!runtimeMode) {
+        try {
+          runtimeMode = (await getChatQuota()).mode;
+        } catch {
+          runtimeMode = undefined;
+        }
+      }
+      if (runtimeMode !== "local") {
+        // Online: Agent → kimi sentinel; Expert → fixed DeepSeek.
+        setSelectedModel(
+          chatMode === "science_agent" ? SCIENCE_AGENT_MODEL_ID : ONLINE_FIXED_EXPERT_MODEL_ID
+        );
+        if (chatMode !== "science_agent") {
+          rememberModelFromSession(ONLINE_FIXED_EXPERT_MODEL_ID);
+        }
+      } else {
+        // Local: both modes pick a concrete registry/custom model.
+        const createdId = modelLabelFromInternal(created.model_name);
+        const nextId =
+          isKimiEngineModel({ id: createdId, engine: undefined }) || !createdId
+            ? pickExpertModelId(registry.data?.models || [], selectedModel)
+            : createdId;
+        setSelectedModel(nextId);
+        rememberModelFromSession(nextId);
+      }
       const newMeta: SessionMeta = {
         session_id: created.session_id,
         created_at: created.created_at,
         model_name: created.model_name,
         history_size: 0,
         status: "",
+        title: "",
       };
       setSessions((prev) => {
         const exists = prev.some((s) => s.session_id === created.session_id);
@@ -620,7 +920,8 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
 
   async function bootstrapSession() {
     setError("");
-    await refreshChatQuota();
+    const quota = await refreshChatQuota();
+    const localMode = quota?.mode === "local";
     let list: SessionMeta[] = [];
     try {
       const raw = localStorage.getItem(SESSION_CACHE_KEY);
@@ -647,7 +948,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     for (const sid of candidates) {
       if (!list.find((s) => s.session_id === sid)) continue;
       try {
-        await refreshCurrentSession(sid);
+        await refreshCurrentSession(sid, { localMode });
         return;
       } catch {
         // inaccessible session — already cleaned up by refreshCurrentSession, try next
@@ -690,7 +991,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     });
   }
 
-  async function refreshCurrentSession(targetId?: string) {
+  async function refreshCurrentSession(targetId?: string, opts?: { localMode?: boolean }) {
     const sid = targetId || sessionId;
     if (!sid) return;
     try {
@@ -699,8 +1000,30 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       setSessionId(sid);
       setModelSwitchNotice("");
       sessionStorage.setItem(SESSION_STORAGE_KEY, sid);
-      setSelectedModel(modelLabelFromInternal(s.model_name));
-      rememberModelFromSession(s.model_name);
+      // Empty sessions (no turns yet) always open as Science Agent on refresh.
+      // Sessions with history keep their persisted/inferred mode.
+      const hasHistory = (s.history?.length ?? 0) > 0;
+      const nextMode: ChatMode = hasHistory
+        ? chatModeFromSnapshot({
+            chat_mode: s.chat_mode,
+            engine: s.engine,
+            model_name: s.model_name,
+            models: registry.data?.models,
+          })
+        : "science_agent";
+      setChatMode(nextMode);
+      persistChatMode(nextMode);
+      const modelId = modelLabelFromInternal(s.model_name);
+      const isLocal = opts?.localMode ?? chatQuota?.mode === "local";
+      if (nextMode === "science_agent" && !isLocal) {
+        setSelectedModel(SCIENCE_AGENT_MODEL_ID);
+      } else {
+        const graphId = isKimiEngineModel({ id: modelId, engine: s.engine })
+          ? pickExpertModelId(registry.data?.models || [], null)
+          : modelId;
+        setSelectedModel(graphId);
+        rememberModelFromSession(s.model_name);
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
       if (msg.includes("404") || msg.includes("not found") || msg.includes("Not Found")) {
@@ -716,13 +1039,103 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     }
   }
 
+  function appendTokenToSnapshot(content: string, roleId?: string) {
+    if (!content) return;
+    setSnapshot((prev) => {
+      if (!prev) return prev;
+      const history = [...prev.history];
+      const last = history[history.length - 1];
+      if (last && last.role === "assistant" && last.kind !== "thinking") {
+        history[history.length - 1] = { ...last, content: (last.content || "") + content };
+        setStreamingIdx(history.length - 1);
+      } else {
+        history.push({
+          role: "assistant",
+          content,
+          role_id: roleId,
+          kind: "text",
+        });
+        setStreamingIdx(history.length - 1);
+      }
+      return { ...prev, history };
+    });
+  }
+
+  function scheduleTokenPump() {
+    if (tokenPumpScheduledRef.current) return;
+    tokenPumpScheduledRef.current = true;
+    const pump = () => {
+      const next = tokenQueueRef.current.shift();
+      if (!next) {
+        tokenPumpScheduledRef.current = false;
+        return;
+      }
+      appendTokenToSnapshot(next.content, next.role_id);
+      // Keep yielding frames while the queue has more Expert tokens.
+      if (tokenQueueRef.current.length > 0) {
+        window.requestAnimationFrame(pump);
+      } else {
+        tokenPumpScheduledRef.current = false;
+      }
+    };
+    window.requestAnimationFrame(pump);
+  }
+
   function handleStreamEvent({ event, data }: { event: string; data: string }) {
     if (event === "state" && data) {
       const payload = JSON.parse(data) as ChatSnapshot;
-      setSnapshot(payload);
-      setStreamingIdx(-1);
+      // Merge carefully: graph token events accumulate on the client, while
+      // node `updates` may still carry a shorter placeholder. Prefer the
+      // longer in-progress assistant tail so Expert streaming isn't wiped.
+      setSnapshot((prev) => {
+        if (!prev?.history?.length) return payload;
+        const prevHist = prev.history;
+        const nextHist = Array.isArray(payload.history) ? [...payload.history] : [];
+        if (!nextHist.length) return payload;
+        const prevLast = prevHist[prevHist.length - 1];
+        const nextLast = nextHist[nextHist.length - 1];
+        const prevText = (prevLast?.content || "").trim();
+        const nextText = (nextLast?.content || "").trim();
+        const nextLooksPlaceholder =
+          Boolean(nextLast?.phase) ||
+          /思考中|Thinking|正在设计|designing the pipeline|准备澄清|preparing clarification|撰写|Summarizing|正在总结/i.test(
+            nextText
+          );
+        if (
+          prevLast?.role === "assistant" &&
+          nextLast?.role === "assistant" &&
+          prevLast.kind !== "thinking" &&
+          prevText.length > nextText.length &&
+          (nextLooksPlaceholder || nextText.length === 0 || prevText.startsWith(nextText))
+        ) {
+          nextHist[nextHist.length - 1] = {
+            ...nextLast,
+            content: prevLast.content,
+            role_id: prevLast.role_id || nextLast.role_id,
+            kind: prevLast.kind || "text",
+            phase: undefined,
+          };
+          return { ...payload, history: nextHist };
+        }
+        return payload;
+      });
+      // Don't kill the streaming caret on every node update — only clear when
+      // the run reached a waiting/terminal status (forms need to mount).
+      const status = String(payload.status || "").toLowerCase();
+      if (
+        status.startsWith("waiting_") ||
+        status === "completed" ||
+        status === "error" ||
+        status === "planning_failed" ||
+        status === "execution_failed" ||
+        status === "stopped"
+      ) {
+        tokenQueueRef.current = [];
+        tokenPumpScheduledRef.current = false;
+        setStreamingIdx(-1);
+      }
     } else if (event === "stream_start" && data) {
-      const info = JSON.parse(data) as { role_id?: string };
+      const info = JSON.parse(data) as { role_id?: string; turn_id?: string; kind?: string };
       setSnapshot(prev => {
         if (!prev) return prev;
         const history = [...prev.history];
@@ -730,8 +1143,8 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         // Prefer the structured `phase` marker (set by backend on placeholder
         // messages). Fall back to legacy substring matching while older backends
         // still in the wild may not emit `phase` yet.
-        const isPlaceholder =
-          last && last.role === "assistant" && (
+        const isGraphPlaceholder =
+          last && last.role === "assistant" && last.kind !== "thinking" && (
             Boolean(last.phase) ||
             last.content.includes("Thinking") || last.content.includes("思考中") ||
             last.content.includes("Summarizing") || last.content.includes("正在总结") ||
@@ -740,34 +1153,67 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
             last.content.includes("撰写研究草案") ||
             last.content.includes("writing the draft report")
           );
-        if (isPlaceholder) {
-          history[history.length - 1] = { role: "assistant", content: "", role_id: info.role_id || last.role_id };
+        if (isGraphPlaceholder && last) {
+          // Graph engine: replace status placeholder with an empty answer bubble.
+          history[history.length - 1] = {
+            role: "assistant",
+            content: "",
+            role_id: info.role_id || last.role_id,
+            kind: "text",
+          };
+          setStreamingIdx(history.length - 1);
+          tokenQueueRef.current = [];
+          tokenPumpScheduledRef.current = false;
+        } else if (info.kind === "thinking") {
+          // kimi-code reasoning stream only (explicit kind).
+          if (last?.role === "assistant" && last.kind === "thinking") {
+            history[history.length - 1] = {
+              ...last,
+              turn_id: info.turn_id || last.turn_id,
+              role_id: info.role_id || last.role_id,
+            };
+            setStreamingIdx(history.length - 1);
+          } else {
+            history.push({
+              role: "assistant",
+              content: "",
+              kind: "thinking",
+              phase: "thinking",
+              turn_id: info.turn_id,
+              role_id: info.role_id,
+            });
+            setStreamingIdx(history.length - 1);
+          }
+        } else if (last?.role === "assistant" && last.kind === "thinking") {
+          // Answer tokens after a Thinking block: open a fresh text bubble.
+          history.push({ role: "assistant", content: "", role_id: info.role_id, kind: "text" });
+          setStreamingIdx(history.length - 1);
+        } else if (last?.role === "assistant" && !(last.content || "").trim()) {
+          // Reuse blank assistant bubble (graph tokens may arrive before placeholder state).
+          history[history.length - 1] = {
+            ...last,
+            content: "",
+            role_id: info.role_id || last.role_id,
+            kind: last.kind === "thinking" ? "text" : last.kind,
+          };
+          setStreamingIdx(history.length - 1);
         } else {
-          history.push({ role: "assistant", content: "", role_id: info.role_id });
+          // Science Expert / graph: never invent a thinking bubble on stream_start.
+          history.push({ role: "assistant", content: "", role_id: info.role_id, kind: "text" });
+          setStreamingIdx(history.length - 1);
         }
-        setStreamingIdx(history.length - 1);
         return { ...prev, history };
       });
     } else if (event === "token" && data) {
       const token = JSON.parse(data) as { content?: string; role_id?: string };
       if (token.content) {
-        setSnapshot(prev => {
-          if (!prev) return prev;
-          const history = [...prev.history];
-          const last = history[history.length - 1];
-          // kimi-code may have pushed a `kind:"thinking"` block right before
-          // the answer text — never merge text deltas into the thinking
-          // block. Append to the last assistant TEXT message, or push a new
-          // one if the tail is a user / thinking message.
-          if (last && last.role === "assistant" && last.kind !== "thinking") {
-            history[history.length - 1] = { ...last, content: last.content + token.content };
-            setStreamingIdx(history.length - 1);
-          } else {
-            history.push({ role: "assistant", content: token.content || "", role_id: token.role_id, kind: "text" });
-            setStreamingIdx(history.length - 1);
-          }
-          return { ...prev, history };
+        // Queue + rAF pump: even if the proxy delivers many Expert frames in
+        // one TCP read, the UI still paints them progressively.
+        tokenQueueRef.current.push({
+          content: token.content,
+          role_id: token.role_id,
         });
+        scheduleTokenPump();
       }
     } else if (event === "thinking" && data) {
       // kimi-code reasoning stream: accumulate into a dedicated
@@ -787,6 +1233,19 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
           return { ...prev, history };
         });
       }
+    } else if (event === "error" && data) {
+      // SSE error frames (e.g. AskUser/Approve ACK failed) do not reject
+      // streamSSEFromPost — surface them so the user can retry the gate.
+      try {
+        const payload = JSON.parse(data) as { message?: string; detail?: string };
+        const msg = String(payload.message || payload.detail || "").trim();
+        if (msg) setError(msg);
+      } catch {
+        const raw = String(data || "").trim();
+        if (raw) setError(raw);
+      }
+      setStreamingIdx(-1);
+      setRunStatus("stopped");
     }
   }
 
@@ -796,7 +1255,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     if (running) return;
     if (!message.trim() && files.length === 0 && workspaceFiles.length === 0) return;
     if (chatQuota?.enforced && (chatQuota.remaining ?? 0) <= 0) {
-      const limit = chatQuota.limit ?? 10;
+      const limit = chatQuota.limit ?? 3;
       setError(t.errOnlineLimit(limit));
       return;
     }
@@ -805,6 +1264,20 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     setRunStatus("running");
     setMessage("");
     abortRef.current = new AbortController();
+    // Backend consumes one quota unit when the stream request is accepted;
+    // update the pill immediately so a long Agent turn doesn't look "stuck".
+    if (chatQuota?.enforced) noteQuotaSendStarted();
+    // Optimistic sidebar title from the first user turn.
+    const optimisticTitle = abbreviateSessionTitle(composedText);
+    if (optimisticTitle && sessionId) {
+      setSessions((prev) =>
+        prev.map((item) =>
+          item.session_id === sessionId && !(item.title || "").trim()
+            ? { ...item, title: optimisticTitle }
+            : item
+        )
+      );
+    }
 
     try {
       let activeSessionId = sessionId;
@@ -814,19 +1287,42 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         rememberOwnedSession(activeSessionId);
         setSessionId(activeSessionId);
         sessionStorage.setItem(SESSION_STORAGE_KEY, activeSessionId);
-        setSelectedModel(modelLabelFromInternal(created.model_name));
-        rememberModelFromSession(created.model_name);
+        if (chatMode === "science_agent") {
+          setSelectedModel(SCIENCE_AGENT_MODEL_ID);
+        } else {
+          const createdId = modelLabelFromInternal(created.model_name);
+          const nextId = isKimiEngineModel({ id: createdId, engine: undefined })
+            ? pickExpertModelId(registry.data?.models || [], null)
+            : createdId;
+          setSelectedModel(nextId);
+          rememberModelFromSession(created.model_name);
+        }
         setSessions((prev) => {
           const exists = prev.some((s) => s.session_id === activeSessionId);
-          if (exists) return prev;
+          if (exists) {
+            return prev.map((item) =>
+              item.session_id === activeSessionId && !(item.title || "").trim() && optimisticTitle
+                ? { ...item, title: optimisticTitle }
+                : item
+            );
+          }
           return [{
             session_id: activeSessionId,
             created_at: created.created_at,
             model_name: created.model_name,
             history_size: 0,
             status: "",
+            title: optimisticTitle || "",
           }, ...prev];
         });
+      } else if (optimisticTitle) {
+        setSessions((prev) =>
+          prev.map((item) =>
+            item.session_id === activeSessionId && !(item.title || "").trim()
+              ? { ...item, title: optimisticTitle }
+              : item
+          )
+        );
       }
 
       let attachmentPaths: string[] = [];
@@ -838,19 +1334,35 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         attachmentPaths = [...attachmentPaths, ...workspaceFiles.map((item) => item.storage_path)];
       }
 
+      // Online Agent always sends the kimi sentinel; local Agent sends the
+      // picker value so the backend can map it into kimi agent_config.model.
+      // Custom OpenAI-style models stay Expert/local-only (not wired into kimi).
+      const streamModel = selectedCustomModel
+        ? selectedCustomModel.modelName
+        : !isLocalMode
+          ? chatMode === "science_agent"
+            ? SCIENCE_AGENT_MODEL_ID
+            : ONLINE_FIXED_EXPERT_MODEL_ID
+          : chatMode === "science_agent" && isKimiEngineModel({ id: selectedModel, engine: "kimi-code" })
+            ? SCIENCE_AGENT_MODEL_ID
+            : selectedModel;
       await streamSSEFromPost(
         `/api/chat/sessions/${encodeURIComponent(activeSessionId)}/messages/stream`,
         {
           text: composedText,
-          model: selectedCustomModel ? selectedCustomModel.modelName : selectedModel,
-          custom_model_config: selectedCustomModel
-            ? {
-                model_name: selectedCustomModel.modelName,
-                api_key: selectedCustomModel.apiKey,
-                base_url: selectedCustomModel.baseUrl,
-              }
-            : undefined,
-          custom_model_id: selectedCustomModel ? selectedCustomModel.id : "",
+          model: streamModel,
+          chat_mode: chatMode,
+          engine: chatMode === "science_agent" ? "kimi-code" : "graph",
+          custom_model_config:
+            selectedCustomModel && chatMode === "science_expert"
+              ? {
+                  model_name: selectedCustomModel.modelName,
+                  api_key: selectedCustomModel.apiKey,
+                  base_url: selectedCustomModel.baseUrl,
+                }
+              : undefined,
+          custom_model_id:
+            selectedCustomModel && chatMode === "science_expert" ? selectedCustomModel.id : "",
           attachment_paths: attachmentPaths,
           // Pin response language to the UI locale. Backend stores this on
           // session state, so retries and follow-up actions inherit it.
@@ -861,16 +1373,14 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         getChatSessionAuthHeaders(activeSessionId)
       );
       await fetchSessions();
-      await refreshChatQuota();
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") {
         setRunStatus("stopped");
-        return;
+      } else {
+        setMessage(composedText);
+        setError(err instanceof Error ? err.message : t.errStreamMsg);
+        setRunStatus("stopped");
       }
-      setMessage(composedText);
-      setError(err instanceof Error ? err.message : t.errStreamMsg);
-      await refreshChatQuota();
-      setRunStatus("stopped");
     } finally {
       setRunning(false);
       setStreamingIdx(-1);
@@ -878,13 +1388,14 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       setFiles([]);
       setWorkspaceFiles([]);
       abortRef.current = null;
+      await refreshChatQuota();
     }
   }
 
   async function retryLastMessage() {
     if (!sessionId || running) return;
     if (chatQuota?.enforced && (chatQuota.remaining ?? 0) <= 0) {
-      const limit = chatQuota.limit ?? 10;
+      const limit = chatQuota.limit ?? 3;
       setError(t.errOnlineLimit(limit));
       return;
     }
@@ -896,6 +1407,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     setRunning(true);
     setRunStatus("running");
     abortRef.current = new AbortController();
+    if (chatQuota?.enforced) noteQuotaSendStarted();
     try {
       await streamSSEFromPost(
         `/api/chat/sessions/${encodeURIComponent(sessionId)}/messages/retry/stream`,
@@ -905,19 +1417,18 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         getChatSessionAuthHeaders(sessionId)
       );
       await fetchSessions();
-      await refreshChatQuota();
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") {
         setRunStatus("stopped");
-        return;
+      } else {
+        setError(err instanceof Error ? err.message : t.errRetryMsg);
+        setRunStatus("stopped");
       }
-      setError(err instanceof Error ? err.message : t.errRetryMsg);
-      await refreshChatQuota();
-      setRunStatus("stopped");
     } finally {
       setRunning(false);
       setStreamingIdx(-1);
       abortRef.current = null;
+      await refreshChatQuota();
     }
   }
 
@@ -959,6 +1470,72 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         return;
       }
       setError(err instanceof Error ? err.message : t.errClarification);
+      setRunStatus("stopped");
+    } finally {
+      setRunning(false);
+      setStreamingIdx(-1);
+      abortRef.current = null;
+    }
+  }
+
+  async function submitAskUser(answers: ClarificationAnswer[]) {
+    if (!sessionId || running) return;
+    setError("");
+    setModelSwitchNotice(t.noticeAskUserSubmitted);
+    setRunning(true);
+    setRunStatus("running");
+    abortRef.current = new AbortController();
+    try {
+      await streamSSEFromPost(
+        getAskUserRespondUrl(sessionId),
+        { answers },
+        handleStreamEvent,
+        abortRef.current.signal,
+        getChatSessionAuthHeaders(sessionId)
+      );
+      await fetchSessions();
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        setRunStatus("stopped");
+        return;
+      }
+      setError(err instanceof Error ? err.message : t.errAskUser);
+      setRunStatus("stopped");
+    } finally {
+      setRunning(false);
+      setStreamingIdx(-1);
+      abortRef.current = null;
+    }
+  }
+
+  async function submitApproval(decision: ApprovalDecision) {
+    if (!sessionId || running) return;
+    setError("");
+    setModelSwitchNotice(
+      decision.decision === "approved" ? t.noticeApprovalApproved : t.noticeApprovalRejected
+    );
+    setRunning(true);
+    setRunStatus("running");
+    abortRef.current = new AbortController();
+    try {
+      await streamSSEFromPost(
+        getApprovalDecideUrl(sessionId),
+        {
+          decision: decision.decision,
+          selected_label: decision.selected_label || "",
+          feedback: decision.feedback || "",
+        },
+        handleStreamEvent,
+        abortRef.current.signal,
+        getChatSessionAuthHeaders(sessionId)
+      );
+      await fetchSessions();
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        setRunStatus("stopped");
+        return;
+      }
+      setError(err instanceof Error ? err.message : t.errApproval);
       setRunStatus("stopped");
     } finally {
       setRunning(false);
@@ -1050,8 +1627,11 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     }
   }
 
-  async function handleSubReportDecision(action: "continue" | "skip" | "rewrite", comment?: string) {
-    if (!sessionId || running) return;
+  async function handleSubReportDecision(
+    action: "continue" | "skip" | "rewrite",
+    comment?: string
+  ): Promise<boolean> {
+    if (!sessionId || running) return false;
     setError("");
     setRunning(true);
     setRunStatus("running");
@@ -1065,13 +1645,15 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         getChatSessionAuthHeaders(sessionId)
       );
       await fetchSessions();
+      return true;
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") {
         setRunStatus("stopped");
-        return;
+        return false;
       }
       setError(err instanceof Error ? err.message : t.errSubReport);
       setRunStatus("stopped");
+      return false;
     } finally {
       setRunning(false);
       setStreamingIdx(-1);
@@ -1107,19 +1689,93 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     void sendMessage();
   }
 
-  const isWaitingForInteraction = snapshot?.status === "waiting_for_clarification" || snapshot?.status === "waiting_for_plan_confirmation" || snapshot?.status === "waiting_for_iteration" || snapshot?.status === "waiting_for_step_review" || snapshot?.status === "waiting_for_sub_report_review";
+  const waitingFor = snapshot?.waiting_for || "";
+  const snapStatus = snapshot?.status || "";
+  // Hard split: gate UI follows the *session* mode (snapshot), not the composer
+  // toggle. Expert = LangGraph checkpoints only; Agent = kimi Ask/Approve only.
+  const sessionMode: ChatMode =
+    snapshot?.chat_mode === "science_agent" ||
+    snapshot?.engine === "kimi-code" ||
+    waitingFor === "kimi_question" ||
+    waitingFor === "kimi_approval" ||
+    snapStatus === "waiting_for_kimi_question" ||
+    snapStatus === "waiting_for_kimi_approval"
+      ? "science_agent"
+      : snapshot?.chat_mode === "science_expert" ||
+          snapshot?.engine === "graph" ||
+          snapStatus === "waiting_for_clarification" ||
+          snapStatus === "waiting_for_plan_confirmation" ||
+          snapStatus === "waiting_for_sub_report_review" ||
+          snapStatus === "waiting_for_step_review" ||
+          snapStatus === "waiting_for_iteration"
+        ? "science_expert"
+        : chatMode;
+  const isAgentSession = sessionMode === "science_agent";
+  const isExpertSession = sessionMode === "science_expert";
+
+  const isKimiAskUser =
+    isAgentSession &&
+    (waitingFor === "kimi_question" ||
+      snapStatus === "waiting_for_kimi_question" ||
+      Boolean(snapshot?.kimi_pending_question));
+  const isKimiApproval =
+    isAgentSession &&
+    !isKimiAskUser &&
+    (waitingFor === "kimi_approval" ||
+      snapStatus === "waiting_for_kimi_approval" ||
+      Boolean(snapshot?.kimi_pending_approval));
+  const isExpertClarification =
+    isExpertSession &&
+    snapStatus === "waiting_for_clarification" &&
+    (waitingFor === "clarification" || waitingFor === "");
+  // If the graph paused on a sub-report, always show Continue/Rewrite.
+  // (review_sub_reports only controls whether the graph pauses — not whether
+  // the already-paused UI may render. Hiding the card left users stuck.)
+  const isSubReportGate =
+    isExpertSession && snapStatus === "waiting_for_sub_report_review";
+  const isExpertPlanGate =
+    isExpertSession && snapStatus === "waiting_for_plan_confirmation";
+  const isExpertStepGate =
+    isExpertSession && snapStatus === "waiting_for_step_review";
+  const isExpertIterationGate =
+    isExpertSession && snapStatus === "waiting_for_iteration";
+  const isWaitingForInteraction =
+    isKimiAskUser ||
+    isKimiApproval ||
+    isExpertClarification ||
+    isExpertPlanGate ||
+    isExpertStepGate ||
+    isExpertIterationGate ||
+    isSubReportGate;
+  const composerWaitingText = (() => {
+    if (isKimiApproval) return t.composerWaitingApproval;
+    if (isKimiAskUser) return t.composerWaitingAskUser;
+    switch (snapStatus) {
+      case "waiting_for_clarification":
+        return t.composerWaitingClarification;
+      case "waiting_for_kimi_question":
+        return t.composerWaitingAskUser;
+      case "waiting_for_kimi_approval":
+        return t.composerWaitingApproval;
+      case "waiting_for_plan_confirmation":
+        return t.composerWaitingPlan;
+      case "waiting_for_sub_report_review":
+        return t.composerWaitingSubReport;
+      case "waiting_for_step_review":
+        return t.composerWaitingStep;
+      case "waiting_for_iteration":
+        return t.composerWaitingIteration;
+      default:
+        return t.composerWaiting;
+    }
+  })();
   const hasReportData = Boolean(snapshot && (snapshot.tool_executions.length > 0 || snapshot.plan.length > 0));
   const quotaExhausted = Boolean(chatQuota?.enforced && (chatQuota.remaining ?? 0) <= 0);
   const sendTooltip = chatQuota?.enforced
     ? quotaExhausted
-      ? t.quotaReached(chatQuota.limit ?? 10, chatQuota.limit ?? 10)
-      : t.quotaRemaining(chatQuota.remaining ?? 0, chatQuota.limit ?? 10)
+      ? t.quotaReached(chatQuota.limit ?? 3, chatQuota.limit ?? 3)
+      : t.quotaRemaining(chatQuota.remaining ?? 0, chatQuota.limit ?? 3)
     : t.sendMessage;
-  const regenerateTooltip = chatQuota?.enforced
-    ? quotaExhausted
-      ? t.quotaReached(chatQuota.limit ?? 10, chatQuota.limit ?? 10)
-      : t.quotaRegenerate(chatQuota.remaining ?? 0, chatQuota.limit ?? 10)
-    : t.regenerateLast;
   const isLocalMode = chatQuota?.mode === "local";
   const registryModels: ModelSpec[] = registry.data?.models || [];
   const keyStatus: Record<string, boolean> = registry.data?.key_status || {};
@@ -1133,22 +1789,14 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     requiresAdapter?: boolean;
     hasKey?: boolean;
   };
+  // Local picker: graph models (+ custom in Expert). Agent still uses these ids
+  // as the underlying kimi LLM (engine stays kimi-code).
+  const expertRegistryModels = useMemo(
+    () => registryModels.filter((m) => isGraphEngineModel(m)),
+    [registryModels]
+  );
   const modelOptions: ModelOption[] = [
-    ...registryModels.map((m) => {
-      // kimi-code manages its own provider auth via the local daemon, so our
-      // own key_status / requires_adapter checks don't apply. Use the
-      // backend-provided `disabled` / `disabled_reason` directly.
-      if (m.engine === "kimi-code") {
-        return {
-          value: m.id,
-          label: m.label,
-          disabled: m.disabled === true,
-          title: m.disabled ? (m.disabled_reason || "") : t.titleModelInfo(m.label, m.provider),
-          provider: m.provider,
-          requiresAdapter: false,
-          hasKey: true,
-        };
-      }
+    ...expertRegistryModels.map((m) => {
       const hasKey = keyStatus[m.provider] === true;
       const requiresAdapter = m.requires_adapter === true;
       const adapterReady = requiresAdapter ? Boolean(registry.data?.active_gateway) : true;
@@ -1170,7 +1818,8 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         hasKey,
       };
     }),
-    ...(isLocalMode
+    // Custom OpenAI-style endpoints are Expert-only (not registered in kimi).
+    ...(isLocalMode && chatMode === "science_expert"
       ? customModels.map((m) => ({ value: m.id, label: `${m.label}${t.customSuffix}` }))
       : []),
   ];
@@ -1178,46 +1827,136 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   const selectedModelSpec = registryModels.find((m) => m.id === selectedModel);
   const selectedProvider = selectedModelSpec?.provider || "";
   const selectedProviderHasKey = selectedProvider ? keyStatus[selectedProvider] === true : true;
+  // Local: model picker for both Agent (→ kimi) and Expert (→ graph).
+  const showLocalModelControls = isLocalMode;
 
-  // Once the registry loads, if the currently-selected id is not in the
-  // registry (and not a known custom model), reset to the registry default.
+  // Keep selected model aligned with chat mode once registry is available.
   useEffect(() => {
     if (registry.loading || !registry.data) return;
-    const isRegistryId = registryModels.some((m) => m.id === selectedModel);
-    const isCustomId = customModels.some((m) => m.id === selectedModel);
-    if (!isRegistryId && !isCustomId) {
-      setSelectedModel(defaultModelId);
+    // Online locks: Agent → kimi sentinel, Expert → fixed DeepSeek.
+    if (!isLocalMode) {
+      const locked =
+        chatMode === "science_agent" ? SCIENCE_AGENT_MODEL_ID : ONLINE_FIXED_EXPERT_MODEL_ID;
+      if (selectedModel !== locked) setSelectedModel(locked);
+      return;
     }
-  }, [registry.loading, registry.data, defaultModelId, selectedModel, registryModels, customModels]);
+    // Local Agent/Expert: keep a concrete graph (or Expert custom) model.
+    const isCustomId =
+      chatMode === "science_expert" && customModels.some((m) => m.id === selectedModel);
+    const isExpertRegistryId = expertRegistryModels.some((m) => m.id === selectedModel);
+    if (!isExpertRegistryId && !isCustomId) {
+      setSelectedModel(pickExpertModelId(registryModels, selectedModel));
+    }
+  }, [
+    registry.loading,
+    registry.data,
+    chatMode,
+    selectedModel,
+    registryModels,
+    expertRegistryModels,
+    customModels,
+    isLocalMode,
+  ]);
 
   useEffect(() => {
     if (isLocalMode) return;
     if (customModels.some((m) => m.id === selectedModel)) {
-      setSelectedModel(defaultModelId);
+      setSelectedModel(
+        chatMode === "science_agent"
+          ? SCIENCE_AGENT_MODEL_ID
+          : ONLINE_FIXED_EXPERT_MODEL_ID
+      );
     }
-  }, [isLocalMode, selectedModel, customModels, defaultModelId]);
+  }, [isLocalMode, selectedModel, customModels, chatMode]);
 
   function openKeyPanelForProvider(provider: string) {
     setKeyPanelProvider(provider);
     setKeyPanelValue("");
   }
 
+  function handleChatModeChange(next: ChatMode) {
+    if (running || next === chatMode) return;
+    if (next === "science_agent") {
+      const agent = registryModels.find((m) => isKimiEngineModel(m));
+      if (agent?.disabled) {
+        setModelSwitchNotice(agent.disabled_reason || t.noticeAgentDisabled);
+        return;
+      }
+      if (!agent && registry.data) {
+        setModelSwitchNotice(t.noticeAgentDisabled);
+        return;
+      }
+      setChatMode("science_agent");
+      persistChatMode("science_agent");
+      if (!isLocalMode) {
+        setSelectedModel(SCIENCE_AGENT_MODEL_ID);
+        setKeyPanelProvider("");
+      } else {
+        // Keep current graph model as the kimi underlying LLM when possible.
+        const currentSpec = registryModels.find((m) => m.id === selectedModel);
+        const keepCurrent = Boolean(
+          currentSpec && isGraphEngineModel(currentSpec) && !currentSpec.disabled
+        );
+        const nextModel = keepCurrent
+          ? selectedModel
+          : pickExpertModelId(registryModels, selectedModel);
+        setSelectedModel(nextModel);
+        setKeyPanelProvider("");
+      }
+    } else {
+      setChatMode("science_expert");
+      persistChatMode("science_expert");
+      if (!isLocalMode) {
+        setSelectedModel(ONLINE_FIXED_EXPERT_MODEL_ID);
+        setKeyPanelProvider("");
+      } else {
+        const currentSpec = registryModels.find((m) => m.id === selectedModel);
+        const keepCurrent =
+          Boolean(currentSpec && isGraphEngineModel(currentSpec) && !currentSpec.disabled) ||
+          customModels.some((m) => m.id === selectedModel);
+        const nextModel = keepCurrent
+          ? selectedModel
+          : pickExpertModelId(registryModels, selectedModel);
+        setSelectedModel(nextModel);
+        const spec = registryModels.find((m) => m.id === nextModel);
+        if (spec && keyStatus[spec.provider] !== true && !isKimiEngineModel(spec)) {
+          openKeyPanelForProvider(spec.provider);
+        } else {
+          setKeyPanelProvider("");
+        }
+      }
+    }
+    if ((snapshot?.history?.length || 0) > 0) {
+      setModelSwitchNotice(t.noticeModeSwitched);
+    }
+  }
+
   function handleModelChange(next: string) {
-    if (!isLocalMode && next === OTHER_MODEL_OPTION) return;
+    // Online: model is server-fixed (no client picker).
+    if (!isLocalMode) return;
     if (next === OTHER_MODEL_OPTION) {
+      // Custom endpoints are Expert-only.
+      if (chatMode !== "science_expert") {
+        setChatMode("science_expert");
+        persistChatMode("science_expert");
+      }
       setShowCustomModelModal(true);
       return;
     }
     const prev = selectedModel;
     setSelectedModel(next);
+    // Stay in the current mode: Agent → kimi with this model; Expert → graph.
     if (prev !== next && (snapshot?.history?.length || 0) > 0) {
       setModelSwitchNotice(t.noticeModelSwitched);
     }
-    // If the newly selected registry model is missing a key, surface the
-    // inline key input so the user can configure it without leaving the page.
-    const spec = registryModels.find((m) => m.id === next);
-    if (spec && keyStatus[spec.provider] !== true) {
-      openKeyPanelForProvider(spec.provider);
+    // Expert/graph keys live in VF; Agent uses kimi's catalog — no VF key panel.
+    if (chatMode === "science_expert") {
+      const spec = registryModels.find((m) => m.id === next);
+      if (spec && keyStatus[spec.provider] !== true) {
+        openKeyPanelForProvider(spec.provider);
+      } else {
+        setKeyPanelProvider("");
+      }
     } else {
       setKeyPanelProvider("");
     }
@@ -1316,7 +2055,11 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       await deleteCustomModelCache(modelId);
       setCustomModels((prev) => prev.filter((m) => m.id !== modelId));
       if (selectedModel === modelId) {
-        setSelectedModel(defaultModelId);
+        setSelectedModel(
+          chatMode === "science_agent"
+            ? SCIENCE_AGENT_MODEL_ID
+            : pickExpertModelId(registryModels, defaultModelId)
+        );
         setModelSwitchNotice(t.noticeCustomRemoved);
       }
     } catch (err) {
@@ -1326,115 +2069,98 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
 
   return (
     <div className="chat-page">
-      {chatQuota?.enforced && (
-        <header className="chat-header chat-header-slim">
-          <div>
-            <div className="chat-header-title-row">
-              <span
-                className="chat-mode-online-pill"
-                title={t.modeOnlineTooltip(chatQuota.limit ?? 10)}
-              >
-                {t.modeOnline}
-              </span>
-            </div>
-            <p className="chat-online-local-hint">{t.onlineLocalHint}</p>
-          </div>
-        </header>
-      )}
-
       <section className={`chat-grid${sessionsCollapsed ? " left-collapsed" : ""}${logsCollapsed ? " right-collapsed" : ""}`}>
         <aside
           className={`chat-panel left${sessionsCollapsed ? " collapsed" : ""}`}
+          data-collapsed-label={t.sessions}
           onClick={sessionsCollapsed ? () => setSessionsCollapsed(false) : undefined}
         >
           <div className="session-panel-head" onClick={() => setSessionsCollapsed(!sessionsCollapsed)}>
             <h3>{t.sessions} <span className="panel-toggle-icon">{sessionsCollapsed ? "›" : "‹"}</span></h3>
           </div>
-          <button
-            type="button"
-            className="session-new-btn"
-            onClick={() => void createAndActivateSession()}
-            disabled={running}
-          >
-            {t.newSession}
-          </button>
-          <div className="session-list" style={sessionsCollapsed ? { display: "none" } : undefined}>
-            {sessions.map((s) => (
-              <div
-                key={s.session_id}
-                className={s.session_id === sessionId ? "session-item active" : "session-item"}
-              >
-                <button
-                  className="session-select-btn"
-                  onClick={() => void refreshCurrentSession(s.session_id)}
-                  disabled={running && s.session_id === sessionId}
-                  title={s.session_id}
-                >
-                  <span className="session-id-label">{s.session_id.slice(0, 8)}</span>
-                  <small className="session-time-label">{new Date(s.created_at).toLocaleString()}</small>
-                  <small className="session-meta-label">{s.status || t.idle} · {s.history_size} {t.msgs}</small>
-                </button>
-                <button
-                  type="button"
-                  className="session-delete-btn"
-                  onClick={(e) => { e.stopPropagation(); void deleteAndSelectNextSession(s.session_id); }}
-                  disabled={running}
-                  title={t.deleteSession}
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
-            {sessions.length === 0 && <div className="session-empty">{t.noSessions}</div>}
-          </div>
-          {sessionId && !sessionsCollapsed && (
-            <div className="session-sidebar-footer">
+          {!sessionsCollapsed && (
+            <>
               <button
                 type="button"
-                className="session-copy-btn"
-                onClick={() => void copySessionId(sessionId)}
-                title={t.copyFullId}
+                className="session-new-btn"
+                onClick={() => void createAndActivateSession()}
+                disabled={running}
               >
-                {copiedSessionId === sessionId ? t.copied : t.copySessionId}
+                {t.newSession}
               </button>
-            </div>
+              <div className="session-list">
+                {sessions.map((s) => {
+                  const raw =
+                    (s.session_id === sessionId ? activeSessionTitle : "") ||
+                    s.title?.trim() ||
+                    "";
+                  const label = abbreviateSessionTitle(raw) || raw || t.newChat;
+                  return (
+                  <div
+                    key={s.session_id}
+                    className={s.session_id === sessionId ? "session-item active" : "session-item"}
+                  >
+                    <button
+                      className="session-select-btn"
+                      onClick={() => void refreshCurrentSession(s.session_id)}
+                      disabled={running && s.session_id === sessionId}
+                      title={label}
+                    >
+                      <span className="session-title-label">{label}</span>
+                      <small className="session-time-label">{new Date(s.created_at).toLocaleString()}</small>
+                      <small className="session-meta-label">{s.status || t.idle} · {s.history_size} {t.msgs}</small>
+                    </button>
+                    <button
+                      type="button"
+                      className="session-delete-btn"
+                      onClick={(e) => { e.stopPropagation(); void deleteAndSelectNextSession(s.session_id); }}
+                      disabled={running}
+                      title={t.deleteSession}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  );
+                })}
+                {sessions.length === 0 && <div className="session-empty">{t.noSessions}</div>}
+              </div>
+              {sessionId && (
+                <div className="session-sidebar-footer">
+                  <button
+                    type="button"
+                    className="session-copy-btn"
+                    onClick={() => void copySessionId(sessionId)}
+                    title={t.copyFullId}
+                  >
+                    {copiedSessionId === sessionId ? t.copied : t.copySessionId}
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </aside>
 
         <section className="chat-panel center">
-          <div className="timeline-wrap" ref={timelineRef}>
-            <div className="timeline-sticky-header">
-              {(snapshot?.history?.length ?? 0) > 0 && (
-                <div className="timeline-toolbar">
-                  <button
-                    className={`timeline-search-toggle${searchOpen ? " active" : ""}`}
-                    onClick={() => { setSearchOpen(!searchOpen); if (searchOpen) setSearchQuery(""); }}
-                    title={t.searchMessages}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
-                    </svg>
-                  </button>
-                  {searchOpen && (
-                    <input
-                      className="timeline-search-input"
-                      type="text"
-                      placeholder={t.searchPlaceholder}
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      autoFocus
-                    />
-                  )}
-                </div>
-              )}
-            </div>
+          <div className="timeline-column">
+            <div className="timeline-wrap" ref={timelineRef}>
+            {/* Expert 模式：时间线上方轻量流水线进度（不跟 Agent/kimi 耦合） */}
+            {isExpertSession && snapshot?.status && (
+              <PipelineProgress
+                status={snapshot.status}
+                plan={snapshot.plan || []}
+                toolExecutions={(snapshot.tool_executions || []).filter(
+                  (e) => !isResearchNoiseTool(e as ToolExecution)
+                )}
+              />
+            )}
             <ChatTimeline
               items={snapshot?.history || []}
               streamingIndex={streamingIdx}
               onSuggestedPrompt={(text) => setMessage(text)}
               sessionId={sessionId}
-              searchQuery={searchQuery}
-              toolExecutions={snapshot?.tool_executions || []}
+              toolExecutions={(snapshot?.tool_executions || []).filter(
+                (e) => !isResearchNoiseTool(e as ToolExecution)
+              )}
               securityEvents={snapshot?.security_events || []}
               onRetry={() => void retryLastMessage()}
               retryDisabled={running || quotaExhausted}
@@ -1444,110 +2170,101 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                 setMessage((prev) => `${quoted}\n\n${prev}`);
               }}
             />
-            {snapshot?.status === "waiting_for_clarification" &&
-              snapshot.clarification_questions?.length > 0 && (
-                <div className="chat-msg assistant with-avatar">
-                  <img
-                    className="chat-msg-avatar"
-                    src="/img/agent_role/principal_investigator.png"
-                    alt={t.rolePI}
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).src =
-                        "https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png";
-                    }}
+            {/* Science Agent (kimi-code) gates — never mix with Expert forms */}
+            {isAgentSession &&
+              streamingIdx < 0 &&
+              isKimiAskUser &&
+              (snapshot?.clarification_questions?.length ?? 0) > 0 && (
+                <div className="agent-gate-wrap">
+                  <AskUserCard
+                    key={`ask-${waitingFor}-${snapshot?.kimi_pending_question?.question_id || ""}-${(snapshot?.clarification_questions || []).map((q) => q.question).join("|").slice(0, 80)}`}
+                    questions={snapshot!.clarification_questions}
+                    onSubmit={submitAskUser}
+                    disabled={running}
                   />
-                  <div className="chat-msg-content">
-                    <div className="chat-msg-role">{t.rolePI}</div>
-                    <ClarificationForm
-                      questions={snapshot.clarification_questions}
-                      onSubmit={submitClarification}
-                      disabled={running}
-                    />
-                  </div>
                 </div>
               )}
-            {snapshot?.status === "waiting_for_plan_confirmation" &&
-              snapshot.plan?.length > 0 && (
-                <div className="chat-msg assistant with-avatar">
-                  <img
-                    className="chat-msg-avatar"
-                    src="/img/agent_role/computational_biologist.png"
-                    alt={t.roleCompBio}
-                    onError={(e) => {
-                      (e.currentTarget as HTMLImageElement).src =
-                        "https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png";
-                    }}
+            {isAgentSession && streamingIdx < 0 && isKimiApproval && (
+                <div className="agent-gate-wrap">
+                  <ApprovalCard
+                    key={`appr-${waitingFor}-${snapshot?.kimi_pending_approval?.approval_id || ""}`}
+                    toolName={snapshot?.kimi_pending_approval?.tool_name || ""}
+                    prompt={
+                      snapshot?.kimi_pending_approval?.approval_prompt ||
+                      snapshot?.approval_prompt ||
+                      ""
+                    }
+                    planMarkdown={
+                      snapshot?.kimi_pending_approval?.plan_markdown ||
+                      snapshot?.plan_markdown ||
+                      ""
+                    }
+                    optionLabels={
+                      snapshot?.kimi_pending_approval?.option_labels ||
+                      snapshot?.clarification_questions?.[0]?.options ||
+                      []
+                    }
+                    onDecide={submitApproval}
+                    disabled={running}
                   />
-                  <div className="chat-msg-content">
-                    <div className="chat-msg-role">{t.roleCompBio}</div>
-                    <PlanEditor
-                      plan={snapshot.plan}
-                      onConfirm={confirmPlan}
-                      disabled={running}
-                    />
-                  </div>
                 </div>
               )}
-            {snapshot?.status === "waiting_for_sub_report_review" && (
-              <div className="chat-msg assistant with-avatar">
-                <img
-                  className="chat-msg-avatar"
-                  src="/img/agent_role/principal_investigator.png"
-                  alt={t.rolePI}
-                  onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).src =
-                      "https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png";
-                  }}
-                />
-                <div className="chat-msg-content">
-                  <div className="chat-msg-role">{t.rolePI}</div>
-                  <SubReportCheckpoint
-                    onDecide={handleSubReportDecision}
+            {/* Science Expert (LangGraph PI→CB→MLS→SC) checkpoints only */}
+            {isExpertSession &&
+              streamingIdx < 0 &&
+              isExpertClarification &&
+              (snapshot?.clarification_questions?.length ?? 0) > 0 && (
+                <div className="expert-checkpoint-card">
+                  <div className="expert-checkpoint-title">{t.checkpointClarify}</div>
+                  <ClarificationForm
+                    key={`${snapshot?.waiting_for}-${(snapshot?.clarification_questions || []).map((q) => q.question).join("|").slice(0, 120)}`}
+                    questions={snapshot!.clarification_questions}
+                    onSubmit={submitClarification}
                     disabled={running}
                   />
                 </div>
-              </div>
-            )}
-            {snapshot?.status === "waiting_for_step_review" && (
-              <div className="chat-msg assistant with-avatar">
-                <img
-                  className="chat-msg-avatar"
-                  src="/img/agent_role/machine_learning_specialist.png"
-                  alt={t.roleMLSpec}
-                  onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).src =
-                      "https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png";
-                  }}
-                />
-                <div className="chat-msg-content">
-                  <div className="chat-msg-role">{t.roleMLSpec}</div>
-                  <StepCheckpoint
-                    onDecide={handleStepDecision}
+              )}
+            {isExpertSession &&
+              isExpertPlanGate &&
+              (snapshot?.plan?.length ?? 0) > 0 &&
+              streamingIdx < 0 && (
+                <div className="expert-checkpoint-card">
+                  <div className="expert-checkpoint-title">{t.checkpointPlan}</div>
+                  <PlanEditor
+                    plan={snapshot!.plan}
+                    onConfirm={confirmPlan}
                     disabled={running}
                   />
                 </div>
-              </div>
-            )}
-            {snapshot?.status === "waiting_for_iteration" && (
-              <div className="chat-msg assistant with-avatar">
-                <img
-                  className="chat-msg-avatar"
-                  src="/img/agent_role/principal_investigator.png"
-                  alt={t.rolePI}
-                  onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).src =
-                      "https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png";
-                  }}
+              )}
+            {isExpertSession && isSubReportGate && (
+              <div className="expert-checkpoint-card">
+                <div className="expert-checkpoint-title">{t.checkpointSubReport}</div>
+                <SubReportCheckpoint
+                  onDecide={handleSubReportDecision}
+                  disabled={running}
                 />
-                <div className="chat-msg-content">
-                  <div className="chat-msg-role">{t.rolePI}</div>
-                  <IterationDecision
-                    onDecide={handleIterationDecision}
-                    disabled={running}
-                  />
-                </div>
               </div>
             )}
+            {isExpertSession && isExpertStepGate && (
+              <div className="expert-checkpoint-card">
+                <div className="expert-checkpoint-title">{t.checkpointStep}</div>
+                <StepCheckpoint
+                  onDecide={handleStepDecision}
+                  disabled={running}
+                />
+              </div>
+            )}
+            {isExpertSession && isExpertIterationGate && (
+              <div className="expert-checkpoint-card">
+                <div className="expert-checkpoint-title">{t.checkpointIteration}</div>
+                <IterationDecision
+                  onDecide={handleIterationDecision}
+                  disabled={running}
+                />
+              </div>
+            )}
+            </div>
           </div>
           <div className="composer">
             <div className="composer-textarea-wrap">
@@ -1556,118 +2273,247 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyDown={onComposerKeyDown}
-                placeholder={isWaitingForInteraction ? t.composerWaiting : t.composerPlaceholder}
+                placeholder={isWaitingForInteraction ? composerWaitingText : t.composerPlaceholder}
                 disabled={running || quotaExhausted || isWaitingForInteraction}
               />
-              {chatQuota?.enforced && (
-                <span
-                  className={`chat-quota-pill${quotaExhausted ? " exhausted" : ""}`}
-                  title={t.quotaPillTitle(chatQuota.limit ?? 10)}
-                >
-                  {quotaExhausted
-                    ? `${chatQuota.used}/${chatQuota.limit ?? 10}`
-                    : `${chatQuota.remaining ?? 0}/${chatQuota.limit ?? 10}`}
-                </span>
-              )}
             </div>
-            <div className="composer-row">
-              <select
-                value={selectedModel}
-                onChange={(e) => handleModelChange(e.target.value)}
-                aria-label={t.modelAria}
-                title={
-                  selectedProvider
-                    ? selectedProviderHasKey
-                      ? t.titleProviderWithKey(selectedProvider)
-                      : t.titleProviderNoKey(selectedProvider)
-                    : undefined
-                }
-              >
-                {modelOptions.map((m) => (
-                  <option key={m.value} value={m.value} disabled={m.disabled} title={m.title}>
-                    {m.label}
-                    {m.disabled ? t.gatewayRequiredSuffix : ""}
-                  </option>
-                ))}
-                {isLocalMode && <option value={OTHER_MODEL_OPTION}>{t.otherModel}</option>}
-              </select>
-              {selectedModelSpec && (
-                <span
-                  className="model-key-status"
-                  title={
-                    selectedProviderHasKey
-                      ? t.titleKeyConfigured(selectedProvider)
-                      : t.titleMissingKey(selectedProvider)
-                  }
-                  onClick={() => {
-                    if (!selectedProviderHasKey) openKeyPanelForProvider(selectedProvider);
-                  }}
-                  style={{
-                    cursor: selectedProviderHasKey ? "default" : "pointer",
-                    color: selectedProviderHasKey ? "#2e7d32" : "#b26a00",
-                    fontSize: "12px",
-                    marginLeft: "4px",
-                    userSelect: "none",
-                  }}
-                  role={selectedProviderHasKey ? undefined : "button"}
-                >
-                  {selectedProviderHasKey ? t.keyOk : t.setKey}
-                </span>
-              )}
-              {(registry.data?.gateways?.length ?? 0) > 0 && (
-                <select
-                  value={registry.data?.active_gateway || ""}
-                  onChange={(e) => void handleGatewayChange(e.target.value)}
-                  aria-label={t.gatewayAria}
-                  title={t.activeGateway}
-                  style={{ marginLeft: "4px" }}
-                >
-                  <option value="">{t.noGateway}</option>
-                  {(registry.data?.gateways || []).map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.label}
-                    </option>
-                  ))}
-                </select>
-              )}
-              <div className="file-source-inline">
-                <label className={`file-upload-icon-btn${running || quotaExhausted ? " disabled" : ""}`} title={t.uploadFiles}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
-                  </svg>
+            <div className={`composer-row${showLocalModelControls ? " composer-row--expert" : ""}`}>
+              <div className="composer-controls">
+                <div className="composer-mode-switch" role="group" aria-label={t.chatModeAria}>
+                  <button
+                    type="button"
+                    className={`composer-mode-btn${chatMode === "science_agent" ? " is-active" : ""}`}
+                    aria-pressed={chatMode === "science_agent"}
+                    title={t.modeScienceAgent}
+                    disabled={running}
+                    onClick={() => handleChatModeChange("science_agent")}
+                  >
+                    {t.modeAgentShort}
+                  </button>
+                  <button
+                    type="button"
+                    className={`composer-mode-btn${chatMode === "science_expert" ? " is-active" : ""}`}
+                    aria-pressed={chatMode === "science_expert"}
+                    title={t.modeScienceExpert}
+                    disabled={running}
+                    onClick={() => handleChatModeChange("science_expert")}
+                  >
+                    {t.modeExpertShort}
+                  </button>
+                </div>
+                {showLocalModelControls && (
+                  <>
+                    <label className="composer-select-shell">
+                      <span className="composer-select-meta">
+                        <span className="composer-select-label">{t.modelLabel}</span>
+                        {chatMode === "science_agent" && (
+                          <span className="composer-select-hint">{t.modelViaKimi}</span>
+                        )}
+                      </span>
+                      <span className="composer-select-field">
+                        <select
+                          className="composer-model-select"
+                          value={selectedModel}
+                          onChange={(e) => handleModelChange(e.target.value)}
+                          aria-label={t.modelAria}
+                          title={
+                            selectedProvider
+                              ? selectedProviderHasKey
+                                ? t.titleProviderWithKey(selectedProvider)
+                                : t.titleProviderNoKey(selectedProvider)
+                              : undefined
+                          }
+                        >
+                          {modelOptions.map((m) => (
+                            <option key={m.value} value={m.value} disabled={m.disabled} title={m.title}>
+                              {m.label}
+                              {m.disabled ? t.gatewayRequiredSuffix : ""}
+                            </option>
+                          ))}
+                          {chatMode === "science_expert" && (
+                            <option value={OTHER_MODEL_OPTION}>{t.otherModel}</option>
+                          )}
+                        </select>
+                        <span className="composer-select-chevron" aria-hidden="true">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="6 9 12 15 18 9" />
+                          </svg>
+                        </span>
+                      </span>
+                    </label>
+                    {/* VF provider keys apply to Expert/graph only; Agent uses kimi's own catalog. */}
+                    {chatMode === "science_expert" &&
+                      selectedModelSpec &&
+                      !isKimiEngineModel(selectedModelSpec) && (
+                      <button
+                        type="button"
+                        className={`model-key-chip${selectedProviderHasKey ? " is-ok" : " is-missing"}`}
+                        title={
+                          selectedProviderHasKey
+                            ? t.titleKeyConfigured(selectedProvider)
+                            : t.titleMissingKey(selectedProvider)
+                        }
+                        onClick={() => openKeyPanelForProvider(selectedProvider)}
+                      >
+                        <span className="model-key-dot" aria-hidden="true" />
+                        {selectedProviderHasKey ? t.keyOk : t.setKey}
+                      </button>
+                    )}
+                    {chatMode === "science_expert" && (registry.data?.gateways?.length ?? 0) > 0 && (
+                      <label className="composer-select-shell composer-select-shell--compact">
+                        <span className="composer-select-meta">
+                          <span className="composer-select-label">{t.gatewayLabel}</span>
+                        </span>
+                        <span className="composer-select-field">
+                          <select
+                            className="composer-gateway-select"
+                            value={registry.data?.active_gateway || ""}
+                            onChange={(e) => void handleGatewayChange(e.target.value)}
+                            aria-label={t.gatewayAria}
+                            title={t.activeGateway}
+                          >
+                            <option value="">{t.noGateway}</option>
+                            {(registry.data?.gateways || []).map((g) => (
+                              <option key={g.id} value={g.id}>
+                                {g.label}
+                              </option>
+                            ))}
+                          </select>
+                          <span className="composer-select-chevron" aria-hidden="true">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="6 9 12 15 18 9" />
+                            </svg>
+                          </span>
+                        </span>
+                      </label>
+                    )}
+                  </>
+                )}
+              </div>
+              <div className="composer-actions">
+                <div className="file-source-inline" ref={fileSourceMenuRef}>
+                  <button
+                    type="button"
+                    className={`file-upload-icon-btn${running || quotaExhausted ? " disabled" : ""}${fileSourceMenuOpen ? " is-open" : ""}`}
+                    title={t.uploadFiles}
+                    aria-label={t.fileSourceAria}
+                    aria-haspopup="menu"
+                    aria-expanded={fileSourceMenuOpen}
+                    disabled={running || quotaExhausted}
+                    onClick={() => setFileSourceMenuOpen((v) => !v)}
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                    </svg>
+                  </button>
                   <input
+                    ref={fileInputRef}
                     type="file"
                     multiple
-                    onChange={(e) => setFiles(Array.from(e.target.files || []))}
+                    onChange={(e) => {
+                      setFiles(Array.from(e.target.files || []));
+                      setFileSourceMenuOpen(false);
+                    }}
                     disabled={running || quotaExhausted}
                     className="file-upload-hidden"
                   />
-                </label>
-                <WorkspaceFilePicker
-                  workspaceEnabled={workspaceEnabled}
-                  disabled={running || quotaExhausted}
-                  allowMultiple
-                  buttonLabel={t.fromWorkspace}
-                  onPick={(picked) => setWorkspaceFiles(picked)}
-                />
+                  {fileSourceMenuOpen && (
+                    <div className="file-source-menu" role="menu" aria-label={t.fileSourceAria}>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="file-source-menu-item"
+                        onClick={() => {
+                          setFileSourceMenuOpen(false);
+                          fileInputRef.current?.click();
+                        }}
+                      >
+                        <span className="file-source-menu-title">{t.fileSourceLocal}</span>
+                        <span className="file-source-menu-hint">{t.fileSourceLocalHint}</span>
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className={`file-source-menu-item${workspaceEnabled ? "" : " is-disabled"}`}
+                        disabled={!workspaceEnabled}
+                        title={workspaceEnabled ? t.fromWorkspaceHint : t.fromWorkspaceOnlineHint}
+                        onClick={() => {
+                          if (!workspaceEnabled) return;
+                          setFileSourceMenuOpen(false);
+                          setWorkspacePickerOpen(true);
+                        }}
+                      >
+                        <span className="file-source-menu-title">{t.fromWorkspace}</span>
+                        <span className="file-source-menu-hint">
+                          {workspaceEnabled ? t.fromWorkspaceHint : t.fromWorkspaceOnlineHint}
+                        </span>
+                      </button>
+                    </div>
+                  )}
+                  <WorkspaceFilePicker
+                    workspaceEnabled={workspaceEnabled}
+                    disabled={running || quotaExhausted}
+                    allowMultiple
+                    hideTrigger
+                    open={workspacePickerOpen}
+                    onOpenChange={setWorkspacePickerOpen}
+                    buttonLabel={t.fromWorkspace}
+                    onPick={(picked) => {
+                      setWorkspaceFiles(picked);
+                      setWorkspacePickerOpen(false);
+                    }}
+                  />
+                </div>
+                {chatQuota?.enforced && (
+                  <span
+                    className={`chat-quota-pill${quotaExhausted ? " exhausted" : ""}`}
+                    title={t.quotaPillTitle(chatQuota.remaining ?? 0, chatQuota.limit ?? 3)}
+                  >
+                    {quotaExhausted
+                      ? t.quotaPillExhausted(chatQuota.used ?? 0, chatQuota.limit ?? 3)
+                      : t.quotaPillLabel(chatQuota.remaining ?? 0, chatQuota.limit ?? 3)}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  className="composer-icon-btn"
+                  onClick={() => void exportCurrentSession()}
+                  disabled={running || !sessionId}
+                  title={t.exportTooltip}
+                  aria-label={t.export}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                </button>
+                {running ? (
+                  <button
+                    type="button"
+                    className="composer-icon-btn composer-stop-btn"
+                    onClick={abortRun}
+                    title={t.stopTooltip}
+                    aria-label={t.stop}
+                  >
+                    <span className="composer-stop-square" aria-hidden="true" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="composer-icon-btn composer-send-btn"
+                    onClick={() => void sendMessage()}
+                    disabled={quotaExhausted}
+                    title={sendTooltip}
+                    aria-label={t.sendTooltipShort}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M12 19V5" />
+                      <path d="M5 12l7-7 7 7" />
+                    </svg>
+                  </button>
+                )}
               </div>
-              <button className="btn-secondary" onClick={() => void retryLastMessage()} disabled={running || quotaExhausted} title={regenerateTooltip}>
-                {t.regenerate}
-              </button>
-              <button className="btn-secondary" onClick={() => void exportCurrentSession()} disabled={running || !sessionId}>
-                {t.export}
-              </button>
-              <button
-                className={`btn-secondary btn-stop${running ? " btn-stop-active" : ""}`}
-                onClick={abortRun}
-                disabled={!running}
-                title="Stop the current run"
-              >
-                <span className="btn-stop-square" aria-hidden="true" /> {t.stop}
-              </button>
-              <button className="btn-primary" onClick={() => void sendMessage()} disabled={running || quotaExhausted} title={sendTooltip}>
-                {running ? t.runningEllipsis : t.send}
-              </button>
             </div>
             {modelSwitchNotice && (
               <div className="model-switch-notice" role="status">
@@ -1690,9 +2536,12 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                   borderRadius: "6px",
                 }}
               >
-                <span style={{ fontSize: "13px" }}>
-                  {t.keyPanelLabelPre}<strong>{keyPanelProvider}</strong>{t.keyPanelLabelPost}
-                </span>
+                <div style={{ display: "grid", gap: 4, flex: 1, minWidth: 0 }}>
+                  <span style={{ fontSize: "13px" }}>
+                    {t.keyPanelLabelPre}<strong>{keyPanelProvider}</strong>{t.keyPanelLabelPost}
+                  </span>
+                  <span style={{ fontSize: "12px", color: "var(--muted)" }}>{t.keyPanelHint}</span>
+                </div>
                 <input
                   type="password"
                   value={keyPanelValue}
@@ -1708,6 +2557,30 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                   disabled={keyPanelSaving || !keyPanelValue.trim()}
                 >
                   {keyPanelSaving ? t.keyPanelSaving : t.save}
+                </button>
+                <button
+                  className="btn-secondary"
+                  onClick={() => {
+                    setKeyPanelValue("");
+                    void (async () => {
+                      if (!keyPanelProvider) return;
+                      setKeyPanelSaving(true);
+                      setError("");
+                      try {
+                        await setProviderKey(keyPanelProvider, "");
+                        setKeyPanelProvider("");
+                        setKeyPanelValue("");
+                        registry.refresh();
+                      } catch (err) {
+                        setError(err instanceof Error ? err.message : t.errSaveKey);
+                      } finally {
+                        setKeyPanelSaving(false);
+                      }
+                    })();
+                  }}
+                  disabled={keyPanelSaving}
+                >
+                  {t.clearKey}
                 </button>
                 <button
                   className="btn-secondary"
@@ -1737,6 +2610,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
 
         <aside
           className={`chat-panel right${logsCollapsed ? " collapsed" : ""}`}
+          data-collapsed-label={t.executionStatus}
           onClick={logsCollapsed ? () => setLogsCollapsed(false) : undefined}
         >
           <div className="panel-toggle-head term-head" onClick={() => setLogsCollapsed(!logsCollapsed)}>
@@ -1749,61 +2623,60 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
             <span className="panel-toggle-icon">{logsCollapsed ? "+" : "-"}</span>
           </div>
           {!logsCollapsed && (
-            <div className="term-body">
-              {!terminalData ? (
-                <div className="term-line"><span className="term-muted">{t.termWaiting}</span></div>
-              ) : (
-                <>
-                  <div className="term-section">
-                    <div className="term-line">
-                      <span className="term-prompt">$</span>
-                      <span className="term-cmd">status</span>
-                      <span className={`term-status-badge ${terminalData.status === "completed" ? "st-done" : runStatus === "running" ? "st-run" : "st-idle"}`}>
-                        {terminalData.status}
-                      </span>
-                    </div>
-                    <div className="term-line">
-                      <span className="term-prompt">$</span>
-                      <span className="term-cmd">info</span>
-                      <span className="term-val">{t.termMessagesTools(terminalData.messages, terminalData.toolRuns)}</span>
-                    </div>
-                  </div>
-                  {terminalData.tools.length > 0 && (
+            <>
+              <div className="term-body">
+                {!terminalData ? (
+                  <div className="term-line"><span className="term-muted">{t.termWaiting}</span></div>
+                ) : (
+                  <>
                     <div className="term-section">
-                      <div className="term-line"><span className="term-prompt">$</span><span className="term-cmd">tools --recent</span></div>
-                      {terminalData.tools.map((t, i) => (
-                        <div key={i} className="term-line term-indent">
-                          <span className={`term-tool-dot ${t.status === "failed" ? "dot-fail" : "dot-ok"}`} />
-                          <span className="term-tool-name">{t.name}</span>
-                          {t.ts && <span className="term-ts">{t.ts.split("T")[1]?.slice(0, 8) || t.ts}</span>}
-                        </div>
-                      ))}
+                      <div className="term-line">
+                        <span className="term-prompt">$</span>
+                        <span className="term-cmd">status</span>
+                        <span className={`term-status-badge ${terminalData.status === "completed" ? "st-done" : runStatus === "running" ? "st-run" : "st-idle"}`}>
+                          {terminalData.status}
+                        </span>
+                      </div>
+                      <div className="term-line">
+                        <span className="term-prompt">$</span>
+                        <span className="term-cmd">info</span>
+                        <span className="term-val">{t.termMessagesTools(terminalData.messages, terminalData.toolRuns)}</span>
+                      </div>
                     </div>
-                  )}
-                  {terminalData.conv.length > 0 && (
-                    <div className="term-section">
-                      <div className="term-line"><span className="term-prompt">$</span><span className="term-cmd">log --tail 6</span></div>
-                      {terminalData.conv.map((c, i) => (
-                        <div key={i} className="term-line term-indent term-log-line">
-                          <span className={`term-role ${c.role === "user" ? "role-user" : "role-agent"}`}>{c.role}</span>
-                          <span className="term-log-content">{c.content || t.termEmpty}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
+                    {terminalData.tools.length > 0 && (
+                      <div className="term-section">
+                        <div className="term-line"><span className="term-prompt">$</span><span className="term-cmd">tools --recent</span></div>
+                        {terminalData.tools.map((t, i) => (
+                          <div key={i} className="term-line term-indent">
+                            <span className={`term-tool-dot ${t.status === "failed" ? "dot-fail" : "dot-ok"}`} />
+                            <span className="term-tool-name">{t.name}</span>
+                            {t.ts && <span className="term-ts">{t.ts.split("T")[1]?.slice(0, 8) || t.ts}</span>}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {terminalData.conv.length > 0 && (
+                      <div className="term-section">
+                        <div className="term-line"><span className="term-prompt">$</span><span className="term-cmd">log --tail 6</span></div>
+                        {terminalData.conv.map((c, i) => (
+                          <div key={i} className="term-line term-indent term-log-line">
+                            <span className={`term-role ${c.role === "user" ? "role-user" : "role-agent"}`}>{c.role}</span>
+                            <span className="term-log-content">{c.content || t.termEmpty}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+              <SessionFilesPanel
+                sessionId={sessionId}
+                authHeaders={sessionId ? getChatSessionAuthHeaders(sessionId) : undefined}
+                liveRefresh={running}
+                pollMs={5000}
+              />
+            </>
           )}
-          {/* Always visible — pulled out of the collapsible term-body so the
-              session's working directory stays in view even when the user
-              hides the terminal log. */}
-          <SessionFilesPanel
-            sessionId={sessionId}
-            authHeaders={sessionId ? getChatSessionAuthHeaders(sessionId) : undefined}
-            liveRefresh={running}
-            pollMs={5000}
-          />
         </aside>
       </section>
       {showCustomModelModal && isLocalMode && (
