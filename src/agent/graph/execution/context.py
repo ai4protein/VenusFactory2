@@ -68,7 +68,7 @@ class ExecutionContext:
         """Build an ``ExecutionContext`` from raw LangGraph ``state``/``config``."""
         # Local imports avoid an import cycle (chat_graph imports this package
         # at module load to wire ``_execute_node_impl``).
-        from agent.graph.common.lang import _detect_ui_lang
+        from agent.graph.common.lang import _resolve_ui_lang
         from agent.graph.helpers.plan_helpers import _normalize_step_number
 
         chains = config.get("configurable", {}).get("chains", {})
@@ -80,7 +80,7 @@ class ExecutionContext:
         log_entries = list(state.get("conversation_log", []))
         executions = list(state.get("tool_executions", []))
         step_results = dict(state.get("step_results", {}))
-        ui_lang = state.get("ui_lang") or _detect_ui_lang(state["messages"][-1].content)
+        ui_lang = _resolve_ui_lang(state)
         disabled_tool_names = set(chains.get("disabled_tool_names") or [])
 
         step_num = _normalize_step_number(step.get("step"), idx + 1)

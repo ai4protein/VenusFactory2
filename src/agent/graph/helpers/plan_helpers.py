@@ -39,7 +39,9 @@ def _parse_sections(raw: str) -> list[dict[str, Any]]:
         if not isinstance(sections_list, list):
             return []
         parsed = []
-        for s in sections_list[:5]:
+        # Cap sections + queries so Expert research cannot flood the timeline
+        # (3 sections × 3 queries × 6 sources was drowning sub-reports).
+        for s in sections_list[:3]:
             sec_name = (s.get("section_name") or "Section").strip() or "Section"
             focus = (s.get("focus") or "both").strip() or "both"
             queries = s.get("search_queries") or s.get("search_query") or []
@@ -47,7 +49,14 @@ def _parse_sections(raw: str) -> list[dict[str, Any]]:
                 queries = [queries]
             elif not isinstance(queries, list):
                 queries = [""]
-            parsed.append({"section_name": sec_name, "search_queries": queries, "focus": focus})
+            cleaned = [str(q).strip() for q in queries if str(q).strip()][:2]
+            if not cleaned:
+                cleaned = [sec_name]
+            parsed.append({
+                "section_name": sec_name,
+                "search_queries": cleaned,
+                "focus": focus,
+            })
         return parsed
     except Exception:
         return []
@@ -228,6 +237,19 @@ def _format_clarification_answers(questions: list[dict], answers: list[dict]) ->
     return "\n\n".join(parts)
 
 
+def _looks_like_research_request(text: str) -> bool:
+    """True when the user clearly wants literature / survey-style research."""
+    raw = str(text or "").strip().lower()
+    if not raw:
+        return False
+    research_keywords = [
+        "literature", "review", "survey", "paper", "papers", "pubmed", "preprint",
+        "cite", "citation", "references", "related work",
+        "调研", "文献", "综述", "论文", "查阅", "检索文献", "相关工作", "背景调研",
+    ]
+    return any(k in raw for k in research_keywords)
+
+
 def _looks_like_execution_request(text: str) -> bool:
     raw = str(text or "").strip().lower()
     if not raw:
@@ -236,9 +258,21 @@ def _looks_like_execution_request(text: str) -> bool:
         "download", "predict", "identify", "analyze", "analyse", "run", "execute",
         "optimize", "mutation", "stability", "stabilizing", "pipeline", "workflow",
         "design", "dock", "structure", "alphafold", "esm", "protssn", "uniprot",
+        "generate", "compute", "score", "fold", "sequence", "fasta", "pdb",
+        "string", "interaction partner", "protein atlas", "hpa", "tissue expression",
+        "function of protein", "zero-shot", "directed evolution",
+        # Obvious in-platform / common tool-library names (research keywords still win).
+        "venusrem", "venusplm", "venusfactory", "foldseek", "esmfold", "colabfold",
+        "interpro", "blast", "proteinmpnn", "rfdiffusion", "diffdock", "rosetta",
         "生成", "下载", "预测", "分析", "执行", "运行", "突变", "稳定性", "结构", "流程",
+        "计算", "打分", "折叠", "序列", "工具", "相互作用", "组织表达", "蛋白功能",
     ]
     return any(k in raw for k in exec_keywords)
+
+
+def _should_skip_research_phase(text: str) -> bool:
+    """Execution-shaped asks without research intent skip PI clarification+search."""
+    return _looks_like_execution_request(text) and not _looks_like_research_request(text)
 
 
 def _normalize_step_number(raw_step: Any, fallback: int) -> int:

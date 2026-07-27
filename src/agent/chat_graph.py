@@ -11,8 +11,8 @@ lives in :mod:`agent.graph`:
 - ``agent.graph.planning``   → CB plan nodes
 - ``agent.graph.execution``  → MLS ``execute_start_node`` + ``execute_node_impl``
 - ``agent.graph.finalize``   → SC finalize nodes
-- ``agent.graph.common``     → ``_ui_text`` / ``_stream_chain`` / ``_ensure_trace`` /
-  ``_detect_ui_lang`` / ``_extract_usage_from_output``
+- ``agent.graph.common``     → ``_ui_text`` / ``_stream_chain`` / ``_stream_text`` / ``_ensure_trace`` /
+  ``_detect_ui_lang`` / ``_resolve_ui_lang`` / ``_extract_usage_from_output``
 - ``agent.graph.helpers``    → planner, chat-history, and tool I/O helpers
 
 This module only re-exports those names so that downstream callers using
@@ -30,6 +30,7 @@ from agent.graph.common import (
     _detect_ui_lang,
     _ensure_trace,
     _extract_usage_from_output,
+    _resolve_ui_lang,
     _stream_chain,
     _ui_text,
 )
@@ -160,6 +161,7 @@ __all__ = [
     "finalize_start_node",
     # common
     "_detect_ui_lang",
+    "_resolve_ui_lang",
     "_ensure_trace",
     "_extract_usage_from_output",
     "_stream_chain",

@@ -8,9 +8,8 @@ from typing import Any, Iterable
 from langchain_core.runnables import RunnableConfig
 
 from agent.chat_agent_utils import PI_SEARCH_TOOL_NAMES, _parse_cb_plan
-from agent.graph.common.lang import _detect_ui_lang
-from agent.graph.common.streaming import _ensure_trace
-from agent.graph.common.ui_text import _ui_text
+from agent.graph.common.lang import _resolve_ui_lang
+from agent.graph.common.streaming import _ensure_trace, _stream_text
 from agent.graph.helpers.plan_helpers import (
     _enforce_skill_first_plan,
     _looks_like_execution_request,
@@ -126,13 +125,14 @@ def _filter_unparameterized_steps(
 async def plan_start_node(state: AgentState, config: RunnableConfig):
     """Show 'CB is designing pipeline' so UI updates before LLM runs."""
     history = list(state.get("history", []))
-    ui_lang = state.get("ui_lang") or _detect_ui_lang(state["messages"][-1].content)
+    ui_lang = _resolve_ui_lang(state)
     history.append({
         "role": "assistant",
         "content": "📋 **Computational Biologist** 正在设计流程 …"
         if ui_lang == "zh" else
         "📋 **Computational Biologist** is designing the pipeline …",
         "role_id": "computational_biologist",
+        "phase": "thinking",
     })
     return {"history": history}
 
@@ -151,7 +151,7 @@ async def _plan_node_impl(state: AgentState, config: RunnableConfig):
     protein_ctx = state["protein_context"]
     history = list(state.get("history", []))
     log_entries = list(state.get("conversation_log", []))
-    ui_lang = state.get("ui_lang") or _detect_ui_lang(state["messages"][-1].content)
+    ui_lang = _resolve_ui_lang(state)
 
     # When research is skipped, use user's original input as the "PI report"
     if not pi_report:
@@ -195,6 +195,7 @@ async def _plan_node_impl(state: AgentState, config: RunnableConfig):
         "tools_description": tools_description,
         "skills_metadata": skills_metadata,
         "available_tools_list": available_tools_list,
+        "response_language": "Chinese (中文)" if ui_lang == "zh" else "English",
     }
     _logger.info(
         "CB planner inputs summary: user_len=%d pi_report_len=%d suggest_len=%d tools_count=%d",
@@ -340,15 +341,28 @@ async def _plan_node_impl(state: AgentState, config: RunnableConfig):
             "error": "CB planner returned no usable steps",
         }
 
-    step_lines = [
-        (
-            f"**第 {p['step']} 步。** {p['task_description']}"
-            if ui_lang == "zh"
-            else f"**Step {p['step']}.** {p['task_description']}"
+    # Intro streams first; step chips/rows reveal progressively in PlanEditor.
+    if ui_lang == "zh":
+        plan_text = (
+            f"📋 **Computational Biologist** 已制定 {len(normalized_plan)} 步执行计划，"
+            "请确认或编辑后再执行："
         )
-        for p in normalized_plan
-    ]
-    plan_text = _ui_text(ui_lang, "plan_confirmation_title", steps="\n\n".join(step_lines))
+    else:
+        plan_text = (
+            f"📋 **Computational Biologist** has designed a {len(normalized_plan)}-step "
+            "pipeline. Please review and confirm before execution:"
+        )
+
+    # Drop the "designing pipeline" placeholder, then stream the plan prose
+    # before the interactive PlanEditor mounts on the waiting state.
+    if history and (
+        history[-1].get("phase") == "thinking"
+        or "正在设计流程" in history[-1].get("content", "")
+        or "designing the pipeline" in history[-1].get("content", "").lower()
+    ):
+        history.pop()
+
+    await _stream_text(plan_text, role_id="computational_biologist")
     history.append({"role": "assistant", "content": plan_text, "role_id": "computational_biologist"})
     log_entries.append({
         "role": "assistant",
@@ -368,6 +382,9 @@ async def _plan_node_impl(state: AgentState, config: RunnableConfig):
         "failed_reason": None,
         "skipped_steps": [],
         "ui_lang": ui_lang,
+        # Expert default: after plan confirmation, run steps without per-step gates.
+        # Frontend / PlanConfirmRequest may still set auto_execute=False.
+        "auto_execute": True,
         "waiting_for": "plan_confirmation",
         "status": "waiting_for_plan_confirmation",
     }

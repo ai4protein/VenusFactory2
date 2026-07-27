@@ -4,7 +4,7 @@ from __future__ import annotations
 from langchain_core.runnables import RunnableConfig
 
 from agent.chat_agent_utils import _parse_sub_report_short_title
-from agent.graph.common.lang import _detect_ui_lang
+from agent.graph.common.lang import _resolve_ui_lang
 from agent.graph.common.streaming import _stream_chain
 from agent.graph.common.ui_text import _ui_text
 from agent.graph.state import AgentState
@@ -15,7 +15,7 @@ async def research_sub_report_start_node(state: AgentState, config: RunnableConf
     research_idx = state.get("research_idx", 0)
     sections = state.get("research_sections", [])
     history = list(state.get("history", []))
-    ui_lang = state.get("ui_lang") or _detect_ui_lang(state["messages"][-1].content)
+    ui_lang = _resolve_ui_lang(state)
     if research_idx >= len(sections):
         return {"status": "research_steps_done"}
     section = sections[research_idx]
@@ -36,7 +36,7 @@ async def research_sub_report_node(state: AgentState, config: RunnableConfig):
     research_idx = state.get("research_idx", 0)
     sections = state.get("research_sections", [])
     history = list(state.get("history", []))
-    ui_lang = state.get("ui_lang") or _detect_ui_lang(state["messages"][-1].content)
+    ui_lang = _resolve_ui_lang(state)
     current_search_results = state.get("current_search_results", [])
     sub_reports = list(state.get("research_sub_reports", []))
 
@@ -110,8 +110,16 @@ async def research_sub_report_node(state: AgentState, config: RunnableConfig):
 
     next_research_idx = research_idx + 1
     has_more_sections = next_research_idx < len(sections)
+    # Default: auto-continue. Only pause when the session EXPLICITLY sets
+    # review_sub_reports=True (must be injected into graph state; missing/
+    # None/False all mean auto-continue so Expert does not stall on
+    # Continue Research / Comment & Rewrite after every section).
+    review_flag = state.get("review_sub_reports")
+    review_sub_reports = review_flag is True or (
+        isinstance(review_flag, str) and review_flag.strip().lower() in ("1", "true", "yes")
+    )
 
-    if has_more_sections:
+    if has_more_sections and review_sub_reports:
         remaining = len(sections) - next_research_idx
         history.append({
             "role": "assistant",
@@ -122,6 +130,9 @@ async def research_sub_report_node(state: AgentState, config: RunnableConfig):
                 remaining=remaining,
             ),
             "role_id": "principal_investigator",
+            # Keep this bubble out of the frontend "search process" fold.
+            "kind": "checkpoint",
+            "phase": "sub_report_checkpoint",
         })
         return {
             "history": history,
@@ -132,6 +143,8 @@ async def research_sub_report_node(state: AgentState, config: RunnableConfig):
             "sub_report_rewrite_comment": "",
             "status": "waiting_for_sub_report_review",
             "waiting_for": "sub_report_review",
+            # Persist opt-in so the UI snapshot keeps showing the Continue card.
+            "review_sub_reports": True,
         }
 
     return {
@@ -142,4 +155,5 @@ async def research_sub_report_node(state: AgentState, config: RunnableConfig):
         "current_search_results": [],
         "sub_report_rewrite_comment": "",
         "status": "research_step_done",
+        "waiting_for": None,
     }

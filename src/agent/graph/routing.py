@@ -11,7 +11,9 @@ async def router_node(state: AgentState, config: RunnableConfig):
     """Entry node: routes to the appropriate phase based on resume state."""
     waiting_for = state.get("waiting_for")
     if waiting_for == "clarification_answered":
-        return {"status": "resume_research"}
+        # Continue Research: re-run PI sections with clarification answers
+        # before search (answers are already folded into last_user_text).
+        return {"status": "replan_research"}
     elif waiting_for == "plan_confirmed":
         return {"status": "resume_execution"}
     elif waiting_for == "iteration_rerun":
@@ -67,6 +69,8 @@ def should_continue(state: AgentState):
 
 def _route_from_router(state: AgentState):
     status = state.get("status", "")
+    if status == "replan_research":
+        return "research_plan_node"
     if status == "resume_research":
         return "research_search_start_node"
     if status == "resume_execution":
@@ -83,8 +87,11 @@ def _route_from_router(state: AgentState):
 
 
 def _route_from_clarification(state: AgentState):
-    if state.get("status") == "resume_research":
+    status = state.get("status", "")
+    if status == "resume_research":
         return "research_search_start_node"
+    if status == "resume_plan":
+        return "plan_start_node"
     return END
 
 
@@ -94,6 +101,9 @@ def _route_from_research_plan(state: AgentState):
         return "chat_start_node"
     if status == "resume_plan":
         return "plan_start_node"
+    # Post-clarification replan → search with refreshed sections.
+    if status == "resume_research":
+        return "research_search_start_node"
     return "clarification_start_node"
 
 
@@ -101,6 +111,5 @@ def _route_from_plan(state: AgentState):
     status = state.get("status", "")
     if status == "chat_mode":
         return "chat_start_node"
-    if status == "planning_failed" or not state.get("plan"):
-        return "finalize_start_node"
+    # planning_failed / 空 plan / 待确认：均 END（失败勿进 SC finalize）
     return END

@@ -21,10 +21,12 @@ def _now_iso() -> str:
 from logger import get_logger
 
 from agent.chat_agent_utils import (
+    _BINARY_EXTENSIONS,
     _cb_post_step_check,
     _get_output_file_path_from_raw,
     _read_output_file_preview,
     _run_mls_post_step_verify,
+    _tool_output_indicates_failure,
 )
 from agent.graph.execution.context import ExecutionContext
 
@@ -78,10 +80,13 @@ def _tool_self_reports_success(raw_output: Any) -> bool:
 
     SUBSTANTIVE_KEYS = (
         "file_info", "output_files", "data", "content", "content_preview",
-        "results", "sequence", "sequences", "file_path", "entries",
+        "results", "result", "output", "response",
+        "sequence", "sequences", "file_path", "entries",
         # Tool-specific substantive fields:
         "config_path", "dataset_info", "model_info", "model_path",
-        "predictions", "metrics", "fasta_path", "score", "scores",
+        "predictions", "metrics", "fasta_path", "fasta_file",
+        "pdb_path", "pdb_file", "structure_file", "generated_code_path",
+        "csv_path", "download_path", "score", "scores",
         # Additional fields for tools that don't use success: envelopes
         "biological_metadata", "file_name", "file_size",
     )
@@ -122,6 +127,52 @@ def _tool_self_reports_success(raw_output: Any) -> bool:
     return False
 
 
+def _artifact_file_is_empty(raw_output: Any, tool_name: str) -> bool:
+    """True when a declared output file path is missing or empty.
+
+    Binary artifacts (png/pdf/…) have no text preview by design — treat a
+    positive file size as non-empty so success paths can skip dual verify.
+    """
+    import os as _os
+
+    output_file_path = _get_output_file_path_from_raw(raw_output, tool_name)
+    if not output_file_path:
+        return False
+    if not _os.path.exists(output_file_path) or _os.path.getsize(output_file_path) == 0:
+        return True
+    ext = _os.path.splitext(output_file_path)[1].lower()
+    if ext in _BINARY_EXTENSIONS:
+        return False
+    file_preview = _read_output_file_preview(output_file_path)
+    return not (file_preview or "").strip()
+
+
+def _should_skip_dual_verify(raw_output: Any, tool_name: str) -> bool:
+    """Skip MLS/CB LLM post-checks when the tool already succeeded with content.
+
+    Runs full dual verify only on failure / empty artifact / ambiguous output.
+    """
+    is_failure, _ = _tool_output_indicates_failure(raw_output)
+    if is_failure:
+        return False
+    if _artifact_file_is_empty(raw_output, tool_name):
+        return False
+    if _tool_self_reports_success(raw_output):
+        return True
+    # Explicit success envelope without matching SUBSTANTIVE_KEYS, but a
+    # real on-disk artifact exists → still safe to skip the LLM round-trips.
+    try:
+        parsed = json.loads(raw_output) if isinstance(raw_output, str) else raw_output
+    except Exception:
+        return False
+    if not isinstance(parsed, dict):
+        return False
+    explicit_ok = parsed.get("success") is True or parsed.get("status") == "success"
+    if not explicit_ok:
+        return False
+    return bool(_get_output_file_path_from_raw(raw_output, tool_name))
+
+
 async def run_mls_post_check(
     ctx: ExecutionContext, raw_output: Any
 ) -> VerifyResult:
@@ -130,15 +181,19 @@ async def run_mls_post_check(
     Updates ``ctx.history`` / ``ctx.log_entries`` in place to match the legacy
     side effects.
 
-    Tolerant softening: when the underlying tool's payload self-reports success
-    with substantive content (see ``_tool_self_reports_success``), a verifier
-    rejection is downgraded to a soft warning. The verifier is still invoked
-    (so its diagnostic side effects — history note, logs — remain), but the
-    orchestrator is told to proceed. This matches the spirit of the CB tolerant
-    branch in :func:`run_cb_post_check` and prevents real tool successes (e.g.
-    ``download_uniprot_seq_by_id`` returning a FASTA, ``predict_protein_function``
-    writing a CSV) from being blocked by an over-strict semantic verifier.
+    Fast path: when the tool envelope already reports success with substantive
+    non-empty content, skip the MLS LLM verifier entirely (no debug agent).
+    Real failures still run the full verifier + retry/debug path.
     """
+    # Skip expensive MLS LLM round-trip when the tool already succeeded.
+    if _should_skip_dual_verify(raw_output, ctx.tool_name):
+        _logger.debug(
+            "MLS post-check skipped for step %s (%s): tool success + non-empty artifact",
+            ctx.step_num,
+            ctx.tool_name,
+        )
+        return VerifyResult(ok=True)
+
     session_state_for_check = {
         "mls_debug_executor": ctx.chains.get("mls_debug_executor"),
         "llm": ctx.chains.get("llm"),
@@ -190,16 +245,7 @@ async def run_mls_post_check(
     # silently propagating that into downstream steps is what produces
     # convincingly-formatted but empty plots / reports.
     if _tool_self_reports_success(raw_output):
-        import os as _os
-        output_file_path = _get_output_file_path_from_raw(raw_output, ctx.tool_name)
-        file_preview = (
-            _read_output_file_preview(output_file_path) if output_file_path else None
-        )
-        file_is_empty = bool(output_file_path) and (
-            not _os.path.exists(output_file_path)
-            or _os.path.getsize(output_file_path) == 0
-            or not (file_preview or "").strip()
-        )
+        file_is_empty = _artifact_file_is_empty(raw_output, ctx.tool_name)
         _reason_lower = (post_reason or "").lower()
         verifier_flags_emptiness = any(
             keyword in _reason_lower
@@ -291,13 +337,26 @@ async def run_cb_post_check(
     the rejection is escalated to a hard failure so the orchestrator can retry
     or surface the failure to the user instead of silently propagating empty
     intermediate state into downstream steps.
+
+    Fast path: skip the CB LLM call when the tool already reports success with
+    a non-empty artifact.
     """
-    import os as _os
     if not ctx.chains.get("llm"):
+        return VerifyResult(ok=True)
+
+    # Skip CB LLM when tool success + non-empty result (no extra debug loop).
+    if _should_skip_dual_verify(raw_output, ctx.tool_name):
+        _logger.debug(
+            "CB post-check skipped for step %s (%s): tool success + non-empty artifact",
+            ctx.step_num,
+            ctx.tool_name,
+        )
         return VerifyResult(ok=True)
 
     output_file_path = _get_output_file_path_from_raw(raw_output, ctx.tool_name)
     file_preview = _read_output_file_preview(output_file_path) if output_file_path else None
+    file_is_empty = _artifact_file_is_empty(raw_output, ctx.tool_name)
+
     cb_match, cb_note = await _cb_post_step_check(
         ctx.chains["llm"],
         ctx.step_num,
@@ -320,11 +379,6 @@ async def run_cb_post_check(
     # field) AND additionally require, when a file_path is declared, that the
     # file actually exists with non-empty preview.
     real_success = _tool_self_reports_success(raw_output)
-    file_is_empty = bool(output_file_path) and (
-        not _os.path.exists(output_file_path)
-        or _os.path.getsize(output_file_path) == 0
-        or not (file_preview or "").strip()
-    )
 
     # Heuristic: CB note explicitly mentions emptiness / missing evidence.
     _note_lower = (cb_note or "").lower()
