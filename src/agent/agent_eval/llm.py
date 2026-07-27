@@ -10,7 +10,7 @@ from langchain_core.callbacks import CallbackManagerForLLMRun
 
 class LLM_Model(BaseChatModel):
     api_key: Optional[str] = None
-    base_url: str = "https://www.dmxapi.cn/v1"
+    base_url: str = "https://api.openai.com/v1"
     model_name: str = "gpt-4o-mini" 
     temperature: float = 0.2
     max_tokens: int = 4096

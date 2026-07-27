@@ -115,7 +115,7 @@ class TestAgentConfig:
 class TestOnlineLimitsConfig:
     def test_defaults(self):
         cfg = OnlineLimitsConfig()
-        assert cfg.daily_chat_limit == 10
+        assert cfg.daily_chat_limit == 3
         assert cfg.session_token_ttl_hours == 24
 
     def test_from_env(self, monkeypatch):

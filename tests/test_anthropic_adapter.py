@@ -159,18 +159,25 @@ def test_make_llm_picks_openai_for_others():
     assert isinstance(llm, Chat_LLM)
 
 
-def test_make_llm_picks_openai_via_gateway_even_for_claude():
-    """When the DMX gateway is active, Claude resolves to api_compatible=openai
-    (DMX exposes Claude via an OpenAI-compatible /chat/completions endpoint),
-    so make_llm should pick Chat_LLM, not ChatAnthropicLLM."""
-    from agent.chat_agent import Chat_LLM, make_llm
+def test_make_llm_claude_stays_anthropic_without_gateway(monkeypatch):
+    """Claude always uses the official Anthropic Messages adapter; third-party
+    OpenAI-compat gateways (e.g. former DMX) are no longer supported."""
+    from agent.chat_agent import make_llm
+    from agent.chat_anthropic import ChatAnthropicLLM
     from agent.model_registry import set_active_gateway
 
+    monkeypatch.setenv("CHAT_FORCE_GATEWAY", "dmx")  # removed gateway → ignored
     try:
-        set_active_gateway("dmx")
         llm = make_llm("claude-3-7-sonnet-20250219", api_key="dummy")
-        assert isinstance(llm, Chat_LLM)
+        assert isinstance(llm, ChatAnthropicLLM)
+        assert getattr(llm, "base_url", "").startswith("https://api.anthropic.com")
+        try:
+            set_active_gateway("dmx")
+            assert False, "expected ValueError for unknown gateway"
+        except ValueError:
+            pass
     finally:
+        monkeypatch.delenv("CHAT_FORCE_GATEWAY", raising=False)
         set_active_gateway(None)
 
 

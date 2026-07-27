@@ -183,7 +183,7 @@ class AgentConfig:
 class OnlineLimitsConfig:
     fasta_limit: int = 50
     sequence_design_limit: int = 50
-    daily_chat_limit: int = 10
+    daily_chat_limit: int = 3
     session_token_ttl_hours: int = 24
     local_download_batch_limit: int = 0
     online_download_batch_limit: int = 50
@@ -193,7 +193,7 @@ class OnlineLimitsConfig:
         return cls(
             fasta_limit=_env_int("WEBUI_V2_ONLINE_FASTA_LIMIT", 50),
             sequence_design_limit=_env_int("WEBUI_V2_ONLINE_SEQUENCE_DESIGN_LIMIT", 50),
-            daily_chat_limit=max(1, _env_int("WEBUI_V2_ONLINE_DAILY_CHAT_LIMIT", 10)),
+            daily_chat_limit=max(1, _env_int("WEBUI_V2_ONLINE_DAILY_CHAT_LIMIT", 3)),
             session_token_ttl_hours=max(1, _env_int("WEBUI_V2_SESSION_TOKEN_TTL_HOURS", 24)),
             local_download_batch_limit=_env_int("WEBUI_V2_LOCAL_DOWNLOAD_BATCH_LIMIT", 0),
             online_download_batch_limit=_env_int("WEBUI_V2_ONLINE_DOWNLOAD_BATCH_LIMIT", 50),
