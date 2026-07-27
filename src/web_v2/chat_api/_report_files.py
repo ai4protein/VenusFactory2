@@ -12,12 +12,21 @@ def _write_chat_history_pdf(state: dict[str, Any], output_path: Path) -> None:
     history = state.get("history", []) or []
     lines: list[str] = []
     for idx, msg in enumerate(history, 1):
+        kind = str(msg.get("kind", "") or "")
+        # Skip empty / hollow thinking placeholders from kimi warm-up.
+        content = str(msg.get("content", "") or "").strip()
+        if kind == "thinking" and not content:
+            continue
+        if not content and str(msg.get("role", "")) == "assistant":
+            continue
         role = str(msg.get("role", "unknown")).upper()
         role_id = str(msg.get("role_id", "") or "")
-        title = f"{idx}. {role}" + (f" ({role_id})" if role_id else "")
-        content = str(msg.get("content", "") or "")
+        suffix_parts = [p for p in (role_id, kind) if p]
+        title = f"{idx}. {role}" + (f" ({', '.join(suffix_parts)})" if suffix_parts else "")
+        if kind == "thinking":
+            title += " [thinking]"
         lines.append(title)
-        lines.extend(content.splitlines() or [""])
+        lines.extend((content or "").splitlines() or [""])
         lines.append("")
 
     try:

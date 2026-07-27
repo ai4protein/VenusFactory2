@@ -310,6 +310,87 @@ class KimiClient:
             )
         )
 
+    async def decide_approval(
+        self,
+        session_id: str,
+        approval_id: str,
+        *,
+        decision: str,
+        scope: str | None = None,
+        feedback: str | None = None,
+        selected_label: str | None = None,
+    ) -> dict[str, Any]:
+        """POST an approval decision (`approved`/`rejected`/`cancelled`).
+
+        `selected_label` is used by ExitPlanMode when the agent offered
+        alternate approaches via the tool's `options` parameter.
+        """
+        body: dict[str, Any] = {"decision": decision}
+        if scope:
+            body["scope"] = scope
+        if feedback:
+            body["feedback"] = feedback
+        if selected_label:
+            body["selected_label"] = selected_label
+        return await _unwrap_async(
+            self._http.post(
+                f"/api/v1/sessions/{session_id}/approvals/{approval_id}",
+                json=body,
+            )
+        )
+
+    async def list_pending_questions(self, session_id: str) -> list[dict[str, Any]]:
+        """Return AskUserQuestion requests waiting for a structured answer.
+
+        Kimi session status becomes `awaiting_question` until each item is
+        resolved via `answer_question` or dismissed. Without a host handler
+        the AskUserQuestion tool fails and the agent falls back to prose.
+        """
+        data = await _unwrap_async(
+            self._http.get(
+                f"/api/v1/sessions/{session_id}/questions",
+                params={"status": "pending"},
+            )
+        )
+        return list((data or {}).get("items") or [])
+
+    async def answer_question(
+        self,
+        session_id: str,
+        question_id: str,
+        *,
+        answers: dict[str, Any],
+        method: str = "click",
+        note: str | None = None,
+    ) -> dict[str, Any]:
+        """Resolve a pending AskUserQuestion with structured answers.
+
+        `answers` maps each sub-question id →
+        `{kind: single|multi|other|multi_with_other|skipped, ...}`.
+        """
+        body: dict[str, Any] = {"answers": answers, "method": method}
+        if note:
+            body["note"] = note
+        return await _unwrap_async(
+            self._http.post(
+                f"/api/v1/sessions/{session_id}/questions/{question_id}",
+                json=body,
+            )
+        )
+
+    async def dismiss_question(
+        self,
+        session_id: str,
+        question_id: str,
+    ) -> dict[str, Any]:
+        """Dismiss a pending question without answering (tail `:dismiss`)."""
+        return await _unwrap_async(
+            self._http.post(
+                f"/api/v1/sessions/{session_id}/questions/{question_id}:dismiss",
+                json={},
+            )
+        )
+
     # ── WebSocket ─────────────────────────────────────────────────────────
     def ws_url(self) -> str:
         if self.base_url.startswith("https://"):

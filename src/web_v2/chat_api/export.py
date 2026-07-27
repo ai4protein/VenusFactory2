@@ -55,6 +55,8 @@ async def export_session_bundle(session_id: str, request: Request):
         "model_name": getattr(state.get("llm"), "model_name", ""),
         "created_at": str(state.get("created_at", "")),
         "status": state.get("status", ""),
+        "chat_mode": state.get("chat_mode", ""),
+        "engine": state.get("engine", ""),
         "history": state.get("history", []),
         "conversation_log": state.get("conversation_log", []),
         "tool_executions": state.get("tool_executions", []),

@@ -146,26 +146,17 @@ async def lifespan(app: FastAPI):
             logger.exception("Failed to start kimi-code daemon (kimi engine will be unavailable)")
 
     # Long-running approval worker: drains pending kimi approvals every few
-    # seconds independent of any chat stream. Without this, restarts / idle
-    # tabs / >60s thinking pauses cause kimi approvals to time out and the
-    # agent stalls with "authorizeToolExecution hook failed".
+    # seconds independent of any chat stream. Without this, MCP tools that
+    # request approval *before* tool.call.started sit for 60s and expire with
+    # "authorizeToolExecution hook failed".
     #
-    # Skipped in ONLINE mode — the worker hardcodes the shared-daemon base
-    # URL (kimi_daemon.base_url()) which doesn't exist when each session
-    # has its own kimi via KimiSessionPool. Per-stream _auto_approve_all
-    # still handles approvals for the active session; a per-pool-instance
-    # variant of the worker is a planned follow-up.
-    if WEBUI_V2_MODE != "online":
-        try:
-            from agent.kimi_approval_worker import start_worker as _kimi_approval_start
-            await _kimi_approval_start()
-        except Exception:
-            logger.exception("Failed to start kimi approval worker (per-stream approver still active)")
-    else:
-        logger.info(
-            "kimi approval worker: SKIPPED in online mode "
-            "(per-stream auto-approver handles active sessions)"
-        )
+    # LOCAL: polls the shared kimi daemon.
+    # ONLINE: polls every live KimiSessionPool instance (per-session sandbox).
+    try:
+        from agent.kimi_approval_worker import start_worker as _kimi_approval_start
+        await _kimi_approval_start()
+    except Exception:
+        logger.exception("Failed to start kimi approval worker (per-stream approver still active)")
 
     # Wire the minimal default tracing processor so spans opened inside the
     # agent (LLM calls, tool invocations, plan/execute phases) are emitted to
@@ -210,12 +201,11 @@ async def lifespan(app: FastAPI):
                 await session_cleanup_task
             except (asyncio.CancelledError, Exception):
                 pass
-        if WEBUI_V2_MODE != "online":
-            try:
-                from agent.kimi_approval_worker import stop_worker as _kimi_approval_stop
-                await _kimi_approval_stop()
-            except Exception:
-                logger.exception("Failed to stop kimi approval worker cleanly")
+        try:
+            from agent.kimi_approval_worker import stop_worker as _kimi_approval_stop
+            await _kimi_approval_stop()
+        except Exception:
+            logger.exception("Failed to stop kimi approval worker cleanly")
         if WEBUI_V2_MODE == "online":
             try:
                 from agent.kimi_session_pool import get_pool as _get_kimi_pool

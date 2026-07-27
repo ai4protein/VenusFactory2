@@ -71,6 +71,7 @@ async def list_sessions(request: Request):
                     "model_name": s.get("model_name", ""),
                     "history_size": s.get("history_size", 0),
                     "status": s.get("status", ""),
+                    "title": s.get("title") or "",
                 }
                 for s in summaries
             ]
@@ -79,18 +80,22 @@ async def list_sessions(request: Request):
             _logger.debug("list_summaries failed; falling back to list_ids", exc_info=True)
     if not used_summaries:
         # TODO: remove this fallback once SessionStore.list_summaries is guaranteed.
+        from agent.session_store import session_title_from_history
+
         sids = await _session_store.list_ids(owner_key)
         for sid in sids:
             s = await _session_store.get(sid)
             if s is None:
                 continue
+            history = s.get("history") or []
             data.append(
                 {
                     "session_id": sid,
                     "created_at": str(s.get("created_at", "")),
                     "model_name": getattr(s.get("llm"), "model_name", ""),
-                    "history_size": len(s.get("history") or []),
+                    "history_size": len(history),
                     "status": s.get("status", ""),
+                    "title": session_title_from_history(history),
                 }
             )
     return {"sessions": data}
