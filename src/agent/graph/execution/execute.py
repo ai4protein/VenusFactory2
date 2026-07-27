@@ -190,7 +190,8 @@ async def execute_node_impl(state: dict, config: RunnableConfig) -> dict:
 
     next_idx = ctx.idx + 1
     has_more_steps = next_idx < len(ctx.plan)
-    auto_execute = ctx.state.get("auto_execute", False)
+    # Expert default: auto-run remaining steps unless explicitly disabled.
+    auto_execute = ctx.state.get("auto_execute") is not False
 
     if is_failure and not can_skip_failure:
         status = "execution_failed"

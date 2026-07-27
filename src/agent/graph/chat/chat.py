@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from langchain_core.runnables import RunnableConfig
 
-from agent.graph.common.lang import _detect_ui_lang
+from agent.graph.common.lang import _resolve_ui_lang
 from agent.graph.common.streaming import _stream_chain
 from agent.graph.helpers.chat_history import _get_chat_history_messages
 from agent.graph.state import AgentState
@@ -12,11 +12,12 @@ from agent.graph.state import AgentState
 async def chat_start_node(state: AgentState, config: RunnableConfig):
     """Show 'PI is responding' for simple chat/greeting inputs."""
     history = list(state.get("history", []))
-    ui_lang = state.get("ui_lang") or _detect_ui_lang(state["messages"][-1].content)
+    ui_lang = _resolve_ui_lang(state)
     history.append({
         "role": "assistant",
         "content": "🤔 思考中..." if ui_lang == "zh" else "🤔 Thinking...",
         "role_id": "principal_investigator",
+        "kind": "thinking",
         "phase": "thinking",
     })
     return {"history": history, "ui_lang": ui_lang}
@@ -26,11 +27,12 @@ async def chat_node(state: AgentState, config: RunnableConfig):
     """Chat mode: use pi_chat_chain for direct responses (greetings, simple questions)."""
     chains = config.get("configurable", {}).get("chains", {})
     text = state["messages"][-1].content
-    ui_lang = state.get("ui_lang") or _detect_ui_lang(text)
+    ui_lang = _resolve_ui_lang(state, text)
     history = list(state.get("history", []))
 
     if history and (
-        history[-1].get("phase") == "thinking"
+        history[-1].get("kind") == "thinking"
+        or history[-1].get("phase") == "thinking"
         or "Thinking" in history[-1].get("content", "")
         or "思考中" in history[-1].get("content", "")
     ):

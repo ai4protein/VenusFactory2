@@ -114,7 +114,7 @@ MLS_POST_STEP_CHECK = _load_md("machine_learning_specialist_post_step_check")
 CB_PLANNER_SYSTEM = _load_md("computational_biologist")
 CB_PLANNER_PROMPT = ChatPromptTemplate.from_messages([
     ("system", CB_PLANNER_SYSTEM),
-    ("human", "Turn the PI report and Suggest steps above into a concrete pipeline. Suggest steps may be in any language. If it lists any tools or any numbered steps (1. 2. 3, etc.), you MUST output a non-empty JSON array (one object per step with step, task_description, tool_name, tool_input). Do NOT output the sentence 'No pipeline steps to run' or any other prose—output ONLY a JSON array (or [] if Suggest steps explicitly says no tools and no execution steps). No markdown code fence, no explanation."),
+    ("human", "Turn the PI report and Suggest steps above into a concrete pipeline. Suggest steps may be in any language. If it lists any tools or any numbered steps (1. 2. 3, etc.), you MUST output a non-empty JSON array (one object per step with step, task_description, tool_name, tool_input). Write goal, success_criteria, and task_description in {response_language}; keep tool_name and tool_input keys/values in English. Do NOT output the sentence 'No pipeline steps to run' or any other prose—output ONLY a JSON array (or [] if Suggest steps explicitly says no tools and no execution steps). No markdown code fence, no explanation."),
 ])
 
 # --- Machine Learning Specialist ---

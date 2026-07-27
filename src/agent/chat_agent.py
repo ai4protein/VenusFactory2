@@ -2,6 +2,7 @@
 Chat agent: LLM, planner/worker/finalizer chains, session state, and tool cache.
 Used by web.chat_tab for the Agent chat UI.
 """
+import asyncio
 import hashlib
 import json
 import os
@@ -65,7 +66,7 @@ _ONLINE_DISABLED_AGENT_TOOL_NAMES = {
 }
 
 # Models that support Anthropic-style explicit prompt caching via cache_control blocks.
-# Extend this set as more cache-capable models are wired through the DMX gateway.
+# Extend this set as more cache-capable official models are added.
 PROMPT_CACHING_MODELS = {
     "claude-3-7-sonnet-20250219",
     "claude-3-5-sonnet-20241022",
@@ -341,7 +342,15 @@ class Chat_LLM(BaseChatModel):
             try:
                 chunk_data = json.loads(data)
                 delta = chunk_data["choices"][0].get("delta", {})
-                content = delta.get("content", "")
+                content = delta.get("content", "") or ""
+                # DeepSeek reasoner-style models stream into reasoning_content
+                # first; surface that so Expert PI replies are not one-shot.
+                if not content:
+                    content = (
+                        delta.get("reasoning_content")
+                        or delta.get("reasoning")
+                        or ""
+                    )
                 if content:
                     chunk = ChatGenerationChunk(
                         message=AIMessageChunk(content=content)
@@ -352,6 +361,78 @@ class Chat_LLM(BaseChatModel):
             except (json.JSONDecodeError, KeyError, IndexError):
                 continue
 
+    async def _astream(
+        self, messages: list[BaseMessage], stop: list[str] | None = None,
+        run_manager: CallbackManagerForLLMRun | None = None, **kwargs: Any,
+    ):
+        """Native async SSE streaming — keeps the event loop free to flush Expert tokens."""
+        if not self.api_key:
+            raise ValueError("OpenAI API key is not configured.")
+
+        message_dicts = self._build_message_dicts(messages)
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+            "Accept": "text/event-stream",
+        }
+        payload = {
+            "model": self.model_name,
+            "messages": message_dicts,
+            "max_tokens": self.max_tokens,
+            "temperature": self.temperature,
+            "stream": True,
+            **kwargs,
+        }
+        if getattr(self, "_bound_tools", None):
+            payload["tools"] = _tools_to_openai_schema(self._bound_tools)
+
+        timeout = aiohttp.ClientTimeout(total=300)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.post(
+                f"{self.base_url}/chat/completions",
+                headers=headers,
+                json=payload,
+            ) as response:
+                if response.status != 200:
+                    text = await response.text()
+                    raise RuntimeError(f"API request failed: {response.status} - {text}")
+
+                buffer = ""
+                async for raw in response.content:
+                    if not raw:
+                        continue
+                    buffer += raw.decode("utf-8", errors="ignore")
+                    while "\n" in buffer:
+                        line, buffer = buffer.split("\n", 1)
+                        line = line.strip()
+                        if not line or not line.startswith("data:"):
+                            continue
+                        data = line[5:].strip()
+                        if data == "[DONE]":
+                            return
+                        try:
+                            chunk_data = json.loads(data)
+                            delta = (chunk_data.get("choices") or [{}])[0].get("delta", {}) or {}
+                            content = delta.get("content", "") or ""
+                            if not content:
+                                content = (
+                                    delta.get("reasoning_content")
+                                    or delta.get("reasoning")
+                                    or ""
+                                )
+                            if not content:
+                                continue
+                            chunk = ChatGenerationChunk(
+                                message=AIMessageChunk(content=content)
+                            )
+                            if run_manager:
+                                maybe = run_manager.on_llm_new_token(content, chunk=chunk)
+                                if asyncio.iscoroutine(maybe):
+                                    await maybe
+                            yield chunk
+                        except (json.JSONDecodeError, KeyError, IndexError, TypeError):
+                            continue
+
     def _build_message_dicts(self, messages: list[BaseMessage]) -> list[dict[str, Any]]:
         use_anthropic_caching = self.model_name in PROMPT_CACHING_MODELS
         # Forced response-language directive set by chat_api.messages — stamped
@@ -359,7 +440,14 @@ class Chat_LLM(BaseChatModel):
         # prepend it to the FIRST system message so every graph node (PI / CB
         # / MLS / SC / sub-reports / planning prompts) inherits it without
         # editing 17 prompt .md files.
+        # Prefer this instance's pin; fall back to the parent LLM when this is a
+        # max_tokens copy made at chain-build time (cb_planner_raw / finalizer).
+        # Otherwise language pins stamped on state["llm"] never reach planning.
         forced_lang = str(getattr(self, "_user_lang", "") or "")
+        if forced_lang not in ("en", "zh"):
+            parent = getattr(self, "_lang_parent", None)
+            if parent is not None:
+                forced_lang = str(getattr(parent, "_user_lang", "") or "")
         lang_directive = ""
         if forced_lang in ("en", "zh"):
             label = "English" if forced_lang == "en" else "Chinese (中文)"
@@ -368,7 +456,7 @@ class Chat_LLM(BaseChatModel):
                 f"Respond ONLY in {label}, regardless of the input language, "
                 f"tool output language, or earlier turns. Code, identifiers, "
                 f"and quoted error text stay verbatim; all prose / commentary / "
-                f"reasoning is in {label}.\n\n"
+                f"reasoning / task_description / goal / success_criteria is in {label}.\n\n"
             )
         injected_directive = False
         message_dicts = []
@@ -381,7 +469,7 @@ class Chat_LLM(BaseChatModel):
                     content = lang_directive + content
                     injected_directive = True
                 # Anthropic explicit prompt caching: wrap large system prompts in a content
-                # block with cache_control: ephemeral. DMX-style gateways pass this through.
+                # block with cache_control: ephemeral (Anthropic / OpenAI-compat).
                 # Threshold 1024 chars roughly corresponds to Anthropic's minimum cacheable size.
                 if use_anthropic_caching and len(content) > 1024:
                     message_dicts.append({
@@ -507,9 +595,8 @@ def make_llm(model_name: str | None = None, **kwargs: Any) -> BaseChatModel:
     correct adapter is picked per model id without callers having to know about
     multiple LLM classes.
 
-    When a gateway is active (``CHAT_FORCE_GATEWAY``), ``resolve_endpoint``
-    returns the gateway's ``api_compatible``, so an OpenAI-style gateway in
-    front of Claude correctly resolves to Chat_LLM.
+    Each model uses its official provider endpoint from ``models.yaml``
+    (no third-party gateway aggregation).
     """
     effective = model_name or get_default_model_id()
     resolved = resolve_endpoint(effective, api_key=kwargs.get("api_key", "") or "")
@@ -932,7 +1019,10 @@ def create_mls_debug_executor(llm: BaseChatModel, debug_tools: list[BaseTool]):
 def create_finalizer_chain(llm: BaseChatModel):
     from copy import copy
     finalizer_llm = copy(llm)
-    finalizer_llm.max_tokens = 16384
+    # Paper-level SC reports are 5000–8000 words; keep headroom beyond 16k.
+    finalizer_llm.max_tokens = 32768
+    # Language pins are applied to state["llm"]; follow that parent at call time.
+    finalizer_llm._lang_parent = llm
     return SC_PROMPT | finalizer_llm | StrOutputParser()
 
 
@@ -979,6 +1069,7 @@ def create_cb_planner_chain(llm: BaseChatModel, tools_description: str, all_tool
         skills_metadata=available_skills_meta,
         computational_biologist_step_planning=CB_STEP_PLANNING,
         machine_learning_specialist_post_step_check=MLS_POST_STEP_CHECK,
+        response_language="English",
     )
     return prompt | llm | JsonOutputParser()
 
@@ -997,6 +1088,8 @@ def create_cb_planner_raw_chain(llm: BaseChatModel, tools_description: str, all_
         planner_llm.max_tokens = max(int(getattr(llm, "max_tokens", 8192) or 8192), 16384)
     except Exception:
         pass
+    # Language pins are applied to state["llm"]; follow that parent at call time.
+    planner_llm._lang_parent = llm
 
     available_tools_list = ", ".join(t.name for t in all_tools) if all_tools else "(none)"
     available_skills_meta = get_skills_metadata_string()
@@ -1008,6 +1101,7 @@ def create_cb_planner_raw_chain(llm: BaseChatModel, tools_description: str, all_
         skills_metadata=available_skills_meta,
         computational_biologist_step_planning=CB_STEP_PLANNING,
         machine_learning_specialist_post_step_check=MLS_POST_STEP_CHECK,
+        response_language="English",
     )
     return prompt | planner_llm
 
@@ -1210,7 +1304,7 @@ def update_llm_model(selected: str, state: dict[str, Any]) -> dict[str, Any]:
     legacy_label_aliases = {
         "DeepSeek-V4-Pro": "deepseek-v4-pro",
         "DeepSeek-V4-Flash": "deepseek-v4-flash",
-        "DeepSeek-R1": "deepseek-r1-0528",  # legacy DMX route
+        "DeepSeek-R1": "deepseek-v4-pro",  # legacy label → current official model
         "ChatGPT-4o": "gpt-4o",
         "Gemini-2.5-Pro": "gemini-2.5-pro",
         "Claude-3.7": "claude-3-7-sonnet-20250219",

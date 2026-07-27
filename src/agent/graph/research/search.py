@@ -2,29 +2,52 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
 
 from langchain_core.runnables import RunnableConfig
 
 from agent.chat_agent_utils import AGENT_CHAT_MAX_TOOL_CALLS, _run_section_search
-from agent.graph.common.lang import _detect_ui_lang
+from agent.graph.common.lang import _resolve_ui_lang
 from agent.graph.state import AgentState
-from web.utils.chat_format_utils import _format_search_preview, _format_search_summary
+
+
+def _summarize_query_results(
+    query: str,
+    search_results_list: list,
+    search_logged: list,
+    ui_lang: str,
+) -> str:
+    """One compact history line for a multi-source query (no per-tool spam)."""
+    hits = len(search_results_list or [])
+    tools_ok = []
+    for tname, _tinputs, toutputs in search_logged or []:
+        raw = str(toutputs or "")
+        if '"success": false' in raw.lower() or "no results" in raw.lower():
+            continue
+        # Cheap signal: non-empty structured payload with references/results.
+        if any(k in raw for k in ("references", "results", "papers", "title")):
+            short = (tname or "").replace("query_", "")
+            if short and short not in tools_ok:
+                tools_ok.append(short)
+    sources = " · ".join(tools_ok) if tools_ok else ("none" if ui_lang != "zh" else "无")
+    q = (query or "").strip()
+    if len(q) > 72:
+        q = q[:72] + "…"
+    if ui_lang == "zh":
+        return (
+            f"🔎 检索完成：**{q or '…'}** — 汇总 {hits} 条（来源：{sources}）"
+        )
+    return (
+        f"🔎 Search done: **{q or '…'}** — {hits} merged hit(s) (sources: {sources})"
+    )
 
 
 async def research_search_start_node(state: AgentState, config: RunnableConfig):
-    """Announce the upcoming parallel deep-research call to the chat UI.
-
-    Tells the user exactly what query is being sent and across which
-    sources, so the research process is transparent rather than a
-    silent "PI is thinking" black box. The actual fan-out happens in
-    research_search_node which calls _run_section_search.
-    """
+    """Announce the upcoming parallel deep-research call to the chat UI."""
     research_idx = state.get("research_idx", 0)
     search_idx = state.get("search_idx", 0)
     sections = state.get("research_sections", [])
     history = list(state.get("history", []))
-    ui_lang = state.get("ui_lang") or _detect_ui_lang(state["messages"][-1].content)
+    ui_lang = _resolve_ui_lang(state)
     if research_idx >= len(sections):
         return {"status": "research_steps_done"}
     section = sections[research_idx]
@@ -35,41 +58,30 @@ async def research_search_start_node(state: AgentState, config: RunnableConfig):
     if sq and len(sq) == 80:
         sq = sq + "…"
 
-    # List the sources PI will hit so the user sees the breadth of
-    # coverage (Nature-paper-style "we searched across PubMed, arXiv,
-    # bioRxiv, Semantic Scholar, ...").
-    sources_zh = "PubMed · arXiv · bioRxiv · Semantic Scholar · Tavily · DuckDuckGo · GitHub · HuggingFace（必要时回退 RCSB/UniProt/HPA/STRING 元数据）"
-    sources_en = "PubMed · arXiv · bioRxiv · Semantic Scholar · Tavily · DuckDuckGo · GitHub · HuggingFace (with structural-DB fallback to RCSB/UniProt/HPA/STRING)"
-
+    # Keep the announcement short — detailed per-tool chatter was drowning
+    # the eventual sub-report in the timeline.
     if ui_lang == "zh":
-        content = (
-            f"🔍 **Principal Investigator** 正在并行检索 **{sq or '…'}**\n"
-            f"\n"
-            f"_深度研究模式：同时查询 {sources_zh}。结果跨源去重后汇总。_"
-        )
+        content = f"🔍 **Principal Investigator** 正在检索：**{sq or '…'}**"
     else:
-        content = (
-            f"🔍 **Principal Investigator** is searching in parallel: **{sq or '…'}**\n"
-            f"\n"
-            f"_Deep-research mode: querying {sources_en}. Results are merged and deduped across sources._"
-        )
+        content = f"🔍 **Principal Investigator** is searching: **{sq or '…'}**"
     history.append({
         "role": "assistant",
         "content": content,
         "role_id": "principal_investigator",
+        "phase": "research_search",
+        "kind": "status",
     })
     return {"history": history}
 
 
 async def research_search_node(state: AgentState, config: RunnableConfig):
     """PI phase 2a: Process ONE search query from the current section."""
-    chains = config.get("configurable", {}).get("chains", {})
     protein_ctx = state["protein_context"]
     research_idx = state.get("research_idx", 0)
     search_idx = state.get("search_idx", 0)
     sections = state.get("research_sections", [])
     history = list(state.get("history", []))
-    ui_lang = state.get("ui_lang") or _detect_ui_lang(state["messages"][-1].content)
+    ui_lang = _resolve_ui_lang(state)
     executions = list(state.get("tool_executions", []))
     current_search_results = list(state.get("current_search_results", []))
 
@@ -81,34 +93,65 @@ async def research_search_node(state: AgentState, config: RunnableConfig):
 
     if search_idx == 0:
         section_title = (
-            f"**第 {research_idx + 1} 节：** {section['section_name']}"
+            f"**第 {research_idx + 1}/{len(sections)} 节：** {section['section_name']}"
             if ui_lang == "zh"
-            else f"**Section {research_idx + 1}:** {section['section_name']}"
+            else f"**Section {research_idx + 1}/{len(sections)}:** {section['section_name']}"
         )
-        history.append({"role": "assistant", "content": section_title, "role_id": "principal_investigator"})
+        history.append({
+            "role": "assistant",
+            "content": section_title,
+            "role_id": "principal_investigator",
+            "phase": "research_section",
+            "kind": "status",
+        })
+
+    # Drop the "is searching…" status bubble once results are ready.
+    if history and history[-1].get("phase") == "research_search":
+        history.pop()
 
     if search_idx < len(queries):
         sq = queries[search_idx]
-        search_results_list, search_logged = await asyncio.to_thread(_run_section_search, sq)
+        # Lighter fan-out for Expert UX: fewer sources, less timeline noise.
+        search_results_list, search_logged = await asyncio.to_thread(
+            _run_section_search, sq, None, "lite"
+        )
         current_search_results.extend(search_results_list)
 
-        for tname, tinputs, toutputs in search_logged:
-            step_off = len(protein_ctx.tool_history) + 1
-            protein_ctx.add_tool_call(step_off, tname, tinputs, toutputs, cached=False)
-            executions.append({
-                "step": step_off,
-                "tool_name": tname,
-                "inputs": tinputs,
-                "outputs": (str(toutputs)[:1000] + "..." if len(str(toutputs)) > 1000 else str(toutputs)),
-                "timestamp": datetime.now().isoformat(),
-            })
-            summary_msg = _format_search_summary(tname, tinputs, str(toutputs))
-            preview = _format_search_preview(tname, str(toutputs))
-            history.append({
-                "role": "assistant",
-                "content": summary_msg + ("\n\n" + preview if preview else ""),
-                "role_id": "principal_investigator",
-            })
+        # Record in protein_ctx only — do NOT push into chat tool_executions
+        # (those cards drown sub-reports and inflate PipelineProgress counts).
+        step_off = len(protein_ctx.tool_history) + 1
+        summary_inputs = {"query": sq, "sources": [t[0] for t in (search_logged or [])]}
+        summary_outputs = {
+            "success": True,
+            "merged_hits": len(search_results_list or []),
+            "tools": [
+                {"tool": t[0], "ok": '"success": false' not in str(t[2] or "").lower()}
+                for t in (search_logged or [])
+            ],
+        }
+        protein_ctx.add_tool_call(
+            step_off, "research_search", summary_inputs, summary_outputs, cached=False
+        )
+        # Keep raw calls in protein_ctx for debugging / report citations, but
+        # do NOT push each query_arxiv/… into chat history or tool_executions.
+        for tname, tinputs, toutputs in search_logged or []:
+            protein_ctx.add_tool_call(
+                len(protein_ctx.tool_history) + 1,
+                tname,
+                tinputs,
+                toutputs,
+                cached=False,
+            )
+
+        history.append({
+            "role": "assistant",
+            "content": _summarize_query_results(
+                sq, search_results_list, search_logged, ui_lang
+            ),
+            "role_id": "principal_investigator",
+            "phase": "research_search_done",
+            "kind": "status",
+        })
 
     return {
         "history": history,

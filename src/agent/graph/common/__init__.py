@@ -7,15 +7,17 @@ Leaf modules with no upward dependencies on node implementations:
 - ``usage``: LLM usage-token extraction
 """
 
-from agent.graph.common.lang import _detect_ui_lang
-from agent.graph.common.streaming import _ensure_trace, _stream_chain
+from agent.graph.common.lang import _detect_ui_lang, _resolve_ui_lang
+from agent.graph.common.streaming import _ensure_trace, _stream_chain, _stream_text
 from agent.graph.common.ui_text import _ui_text
 from agent.graph.common.usage import _extract_usage_from_output
 
 __all__ = [
     "_detect_ui_lang",
+    "_resolve_ui_lang",
     "_ensure_trace",
     "_stream_chain",
+    "_stream_text",
     "_ui_text",
     "_extract_usage_from_output",
 ]

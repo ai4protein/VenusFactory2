@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from langchain_core.runnables import RunnableConfig
 
-from agent.graph.common.lang import _detect_ui_lang
+from agent.graph.common.lang import _resolve_ui_lang
 from agent.graph.common.ui_text import _ui_text
 from agent.graph.helpers.plan_helpers import _normalize_step_number
 from agent.graph.state import AgentState
@@ -71,7 +71,7 @@ async def execute_start_node(state: AgentState, config: RunnableConfig):
     plan = state.get("plan", [])
     idx = state.get("current_step_index", 0)
     history = list(state.get("history", []))
-    ui_lang = state.get("ui_lang") or _detect_ui_lang(state["messages"][-1].content)
+    ui_lang = _resolve_ui_lang(state)
     if idx >= len(plan):
         return {}
     step = plan[idx]

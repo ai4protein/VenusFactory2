@@ -986,13 +986,13 @@ from web.utils.chat_format_utils import (
 )
 
 
-def _run_section_search(query: str, max_results: int = None) -> tuple:
-    """Per-section deep-research: parallel-invoke all 4 literature sources
-    (PubMed + Semantic Scholar + arXiv + bioRxiv) and 2 web sources
-    (Tavily + DuckDuckGo), merge results across sources, dedupe, then fall
-    back to structural-DB metadata if everything is empty. Same pattern as
-    _fetch_search_for_pi_report but optimized for the per-section flow
-    where the query is already a narrow sub-topic.
+def _run_section_search(query: str, max_results: int = None, mode: str = "full") -> tuple:
+    """Per-section deep-research: parallel-invoke literature + web sources,
+    merge/dedupe, then fall back to structural-DB metadata if empty.
+
+    ``mode``:
+      - ``full``: PubMed + S2 + arXiv + bioRxiv + Tavily + DuckDuckGo
+      - ``lite``: PubMed + Semantic Scholar + Tavily (Expert timeline-friendly)
     """
     import concurrent.futures as _cf
 
@@ -1000,19 +1000,23 @@ def _run_section_search(query: str, max_results: int = None) -> tuple:
         max_results = SEARCH_MAX_RESULTS
     query = (query or "").strip()[:80]
     if not query:
-        return ("No query.", [])
+        return ([], [])
     try:
         from tools.tools_agent_hub import get_tools
         tools = get_tools()
         tools_dict = {getattr(t, "name", ""): t for t in tools}
     except Exception:
-        return ("Search tools unavailable.", [])
+        return ([], [])
 
     sections: list = []
     logged: list = []
 
-    LITERATURE = ["query_pubmed", "query_semantic_scholar", "query_arxiv", "query_biorxiv"]
-    WEB = ["query_tavily", "query_duckduckgo"]
+    if (mode or "full").strip().lower() == "lite":
+        LITERATURE = ["query_pubmed", "query_semantic_scholar"]
+        WEB = ["query_tavily"]
+    else:
+        LITERATURE = ["query_pubmed", "query_semantic_scholar", "query_arxiv", "query_biorxiv"]
+        WEB = ["query_tavily", "query_duckduckgo"]
     plan = [(tn, {"query": query, "max_results": max_results})
             for tn in LITERATURE + WEB]
 

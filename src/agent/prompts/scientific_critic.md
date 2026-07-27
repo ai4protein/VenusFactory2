@@ -19,23 +19,28 @@ Respond in the same language as the user.
 
 ---
 
-## LENGTH BUDGET (manuscript scale)
+## LENGTH BUDGET
 
-Total report: **4000–6500 words** (paper draft + supplementary materials).
+**Default (Science Expert — paper-level manuscript):** **5000–8000 words**
+(Chinese prose roughly **7000–12000 字**). This is a first-draft research
+article / Nature-family letter scale, not a short status brief.
 
-Per-section target:
-- Abstract: 150–250 words (≤5 sentences in a single paragraph)
-- Introduction: 200–400 words (1–2 paragraphs, motivate the question)
-- Methods: 400–700 words (one paragraph per major tool / data source)
-- Results: 1200–2200 words (one sub-section per pipeline branch; embedded figures + inline tables with numbered captions)
-- Discussion: 600–1000 words (mechanism, cross-references, limitations, comparison with prior work)
-- Figure Legends: ≤60 words per figure (consolidated list)
-- Table Legends: ≤40 words per table (consolidated list)
-- Supplementary Materials: 300–600 words (lists supplementary figures, supplementary tables, full data dumps, raw method details)
+If `{full_run_record}` contains a "LENGTH CONSTRAINT" / "篇幅约束" block,
+follow that directive (it should match the same paper-level target).
+
+Per-section target (sum ≈ 5000–8000 words):
+- Abstract: 200–300 words (≤6 sentences in a single paragraph)
+- Introduction: 600–1000 words (2–4 paragraphs: biological context, gap, objective)
+- Methods: 800–1400 words (one paragraph per major tool / data source + key parameters)
+- Results: 2000–3500 words (one sub-section per pipeline branch; embedded figures + inline tables with numbered captions)
+- Discussion: 1000–1600 words (mechanism, cross-references, limitations, comparison with prior work, next experiments)
+- Figure Legends: ≤80 words per figure (consolidated list)
+- Table Legends: ≤50 words per table (consolidated list)
+- Supplementary Materials: 400–800 words (lists supplementary figures, supplementary tables, full data dumps, raw method details)
 - Data & Code Availability: 80–150 words
-- References: up to 25 numbered entries
+- References: up to 30 numbered entries
 
-If a section runs short, ENRICH it with mechanism / quantitative context rather than padding with adverbs. If it runs long, tighten the prose, not the structure.
+If a section runs short, ENRICH it with mechanism / quantitative context rather than padding with adverbs. If it runs long past ~8000 words, tighten the prose, not the structure. Do **not** collapse into an 800–1500 word summary.
 
 ---
 
@@ -45,9 +50,11 @@ If a section runs short, ENRICH it with mechanism / quantitative context rather 
 A single paragraph that compresses the entire study: 1 sentence on the biological/engineering question, 1 sentence on the approach (data sources + analysis pipeline), 2–3 sentences on the most informative quantitative findings (real numbers and IDs from the tool outputs — top mutation, top interactor, key threshold), 1 sentence on the implication. No headings, no bullets.
 
 ### 2. `## Introduction`
-Two short paragraphs:
-- Paragraph 1: biological context — what protein/system, why it matters (cite KEGG pathway IDs when available: e.g. p53 → MDM2 → MDM4 axis in hsa04115 cell cycle; AKT/PI3K in hsa04151), known clinical or mechanistic relevance.
-- Paragraph 2: the specific gap or question the user asked, framed as a hypothesis or design objective.
+2–4 paragraphs (paper-scale, not a brief):
+- Biological context — what protein/system, why it matters (cite KEGG pathway IDs when available: e.g. p53 → MDM2 → MDM4 axis in hsa04115 cell cycle; AKT/PI3K in hsa04151), known clinical or mechanistic relevance.
+- Prior knowledge / related approaches that frame the gap.
+- The specific gap or question the user asked, framed as a hypothesis or design objective.
+- What this computational study will deliver (data sources + expected readouts).
 
 ### 3. `## Methods`
 One paragraph per major tool family that was actually run. For each: (a) what was queried/computed, (b) why this tool was selected (mechanism the score captures, database scope), (c) key parameters used, (d) reference identifier when the tool wraps a published method (e.g. ESM-2 650M [Lin et al. 2023, Science 379], ProtSSN [Tan et al. 2024], ProteinMPNN [Dauparas et al. 2022, Science 378], AlphaFold v6 [Jumper et al. 2021, Nature 596]). Cite literature inline with `[n]` and add to References. Do not re-list every step — that is in Results.

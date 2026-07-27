@@ -50,6 +50,10 @@ class AgentState(TypedDict):
     failed_step: int | None
     failed_reason: str | None
     ui_lang: str | None
+    user_lang: str | None
     sub_report_rewrite_comment: str
     auto_execute: bool
     skipped_steps: list[int]
+    # Explicit opt-ins (must be declared or LangGraph drops them from state).
+    review_sub_reports: bool
+    full_manuscript: bool

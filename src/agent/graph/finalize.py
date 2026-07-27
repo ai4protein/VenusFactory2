@@ -8,7 +8,7 @@ import re
 from langchain_core.runnables import RunnableConfig
 
 from agent.chat_agent_utils import _tool_output_indicates_failure
-from agent.graph.common.lang import _detect_ui_lang
+from agent.graph.common.lang import _resolve_ui_lang
 from agent.graph.common.streaming import _stream_chain
 from agent.graph.common.ui_text import _ui_text
 from agent.graph.state import AgentState
@@ -20,7 +20,7 @@ _logger = get_logger("agent.graph")
 async def finalize_start_node(state: AgentState, config: RunnableConfig):
     """Show 'Summarizing' so UI updates before LLM runs."""
     history = list(state.get("history", []))
-    ui_lang = state.get("ui_lang") or _detect_ui_lang(state["messages"][-1].content)
+    ui_lang = _resolve_ui_lang(state)
     history.append({
         "role": "assistant",
         "content": _ui_text(ui_lang, "summarizing"),
@@ -129,15 +129,15 @@ async def _maybe_retry_truncated_summary(
     finalizer_inputs: dict,
     tool_executions: list,
     ui_lang: str,
+    *,
+    short_mode: bool = False,
 ) -> str:
     """Detect a truncated SC report (LLM stream cut off mid-response) and
     retry once via non-streaming ``chain.ainvoke`` which is more resilient.
 
     Heuristics for "truncated":
-    - Word count < 600 (manuscript target is 3500–5500 words)
-    - AND at least one tool execution succeeded (so we should have content)
-    - AND fewer than 4 of the required manuscript section headers are
-      present
+    - Paper-level manuscript: word count < 2000 with few section headers
+    - Legacy short_mode (if ever re-enabled): only retry when <200 words
 
     When the retry also returns something truncated, keep the longer of
     the two responses (no third attempt — bounds latency).
@@ -152,15 +152,17 @@ async def _maybe_retry_truncated_summary(
         if not text or not isinstance(text, str):
             return True
         wc = len(text.split())
+        # Legacy short reports: only flag extreme cut-offs.
+        if short_mode:
+            return wc < 200
         section_hits = sum(
             1 for s in EXPECTED
             if _re.search(rf"(?m)^##\s+\d?\.?\s*{_re.escape(s)}", text)
         )
-        if wc < 800 and section_hits < 5 and len(tool_executions) > 0:
+        # Paper default is 5000–8000 words; <2000 with missing sections ≈ cut off.
+        if wc < 2000 and section_hits < 5 and len(tool_executions) > 0:
             return True
-        # Common truncation tail: hanging unfinished sentence or
-        # "Task ended" minimal-fallback content.
-        if wc < 200:
+        if wc < 400:
             return True
         return False
 
@@ -272,7 +274,7 @@ async def finalize_node(state: AgentState, config: RunnableConfig):
     tool_executions = state.get("tool_executions", [])
     protein_ctx = state["protein_context"]
     user_input = state["messages"][-1].content
-    ui_lang = state.get("ui_lang") or _detect_ui_lang(user_input)
+    ui_lang = _resolve_ui_lang(state, user_input)
 
     # Build the full run record for the finalizer
     analysis_log = []
@@ -452,6 +454,27 @@ async def finalize_node(state: AgentState, config: RunnableConfig):
         )
     full_run_record = "\n\n".join(record_parts)
 
+    # Expert default: paper-level manuscript (~5000–8000 words).
+    # full_manuscript=False is legacy; still emit the paper-length directive.
+    short_mode = False
+    length_directive = (
+        "\n\n## LENGTH CONSTRAINT (Science Expert — paper-level manuscript)\n"
+        "Produce a **paper-level** scientific manuscript of about **5000–8000 words** "
+        "(Chinese prose roughly 7000–12000 characters). "
+        "Use the full manuscript structure (Abstract → Introduction → Methods → "
+        "Results → Discussion → Figure/Table Legends → Supplementary Materials → "
+        "Data & Code Availability → References). "
+        "Do NOT write an 800–1500 word short summary. Keep figure/table embeds "
+        "and HTML/PDF-friendly Markdown intact."
+        if ui_lang != "zh" else
+        "\n\n## 篇幅约束（Science Expert — paper 级稿件）\n"
+        "请输出约 **5000–8000 词**（中文正文约 7000–12000 字）的 **paper 级**科学报告。"
+        "使用完整稿件结构：摘要 → 引言 → 方法 → 结果 → 讨论 → 图/表注 → 补充材料 → "
+        "数据与代码可用性 → 参考文献。"
+        "不要写成 800–1500 词的短总结。保留图表嵌入与适合 HTML/PDF 导出的 Markdown。"
+    )
+    full_run_record = full_run_record + length_directive
+
     if history and (
         history[-1].get("phase") == "summarizing"
         or "Summarizing" in history[-1].get("content", "")
@@ -478,7 +501,12 @@ async def finalize_node(state: AgentState, config: RunnableConfig):
         # When detected, retry once via direct chain.invoke (no stream) which
         # is more resilient to one-shot LLM timeouts than token streaming.
         summary = await _maybe_retry_truncated_summary(
-            summary, chains.get("finalizer"), finalizer_inputs, tool_executions, ui_lang
+            summary,
+            chains.get("finalizer"),
+            finalizer_inputs,
+            tool_executions,
+            ui_lang,
+            short_mode=short_mode,
         )
         # Q1: deterministically force-embed any figures the SC LLM forgot.
         # We can't rely on the LLM to follow the "MANDATORY inline image"

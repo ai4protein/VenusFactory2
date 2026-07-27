@@ -27,7 +27,10 @@ def _ui_text(lang: str, key: str, **kwargs) -> str:
         "plan_confirmation_title": "📋 **Computational Biologist** 已制定以下执行计划，请确认或编辑后再执行：\n\n{steps}",
         "iteration_prompt": "🔄 **Scientific Critic** 结果已汇总完毕。请选择下一步操作：",
         "step_checkpoint": "🔍 **第 {step_num} 步已完成。** 请查看上方结果，并决定是否继续执行下一步（第 {next_step} 步：{next_desc}）。",
-        "sub_report_checkpoint": "📄 **小报告 \"{section}\" 已完成。** 还有 {remaining} 个小节待调研。请查看结果并决定是否继续。",
+        "sub_report_checkpoint": (
+            "📄 **「{section}」小报告完成** · 剩余 {remaining} 节。"
+            "请在下方选择继续、修改或跳过至总报告。"
+        ),
         "step_skipped": "⚠️ **第 {step_num} 步失败，但后续步骤不依赖此步骤，已跳过继续执行。**\n\n",
     }
     en = {
@@ -54,7 +57,10 @@ def _ui_text(lang: str, key: str, **kwargs) -> str:
         "plan_confirmation_title": "📋 **Computational Biologist** has designed the following pipeline. Please review and confirm before execution:\n\n{steps}",
         "iteration_prompt": "🔄 **Scientific Critic** Results have been summarized. Please choose what to do next:",
         "step_checkpoint": "🔍 **Step {step_num} complete.** Review the results above and decide whether to continue to the next step (Step {next_step}: {next_desc}).",
-        "sub_report_checkpoint": "📄 **Sub-report \"{section}\" complete.** {remaining} section(s) remaining. Review the results and decide whether to continue.",
+        "sub_report_checkpoint": (
+            "📄 **Sub-report \"{section}\" complete.** {remaining} section(s) remaining. "
+            "Choose Continue, Revise, or Skip to report below."
+        ),
         "step_skipped": "⚠️ **Step {step_num} failed, but no downstream steps depend on it. Skipping and continuing.**\n\n",
     }
     bundle = zh if lang == "zh" else en

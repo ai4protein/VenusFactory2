@@ -1,19 +1,55 @@
 """PI final research report nodes."""
 from __future__ import annotations
 
-import asyncio
+import re
 
 from langchain_core.runnables import RunnableConfig
 
-from agent.graph.common.lang import _detect_ui_lang
+from agent.graph.common.lang import _resolve_ui_lang
 from agent.graph.common.streaming import _stream_chain
 from agent.graph.state import AgentState
+
+
+def _extract_embedded_suggest(report: str) -> str:
+    """Reuse guidance already present in the draft (avoids a second LLM call)."""
+    text = (report or "").strip()
+    if not text:
+        return ""
+    m = re.search(
+        r"(?is)^##\s*(Preliminary guidance|Suggested approach|Suggest(?:ed)? steps)\b.*",
+        text,
+        re.MULTILINE,
+    )
+    if not m:
+        return ""
+    return text[m.start():].strip()
+
+
+def _synthetic_suggest_steps(user_text: str, ui_lang: str) -> str:
+    """Cheap fallback for CB when a dedicated suggest-steps LLM is skipped."""
+    topic = (user_text or "").strip().replace("\n", " ")
+    if len(topic) > 160:
+        topic = topic[:160] + "…"
+    if ui_lang == "zh":
+        return (
+            "## Preliminary guidance\n\n"
+            f"1. **Suggested capabilities** — 根据研究报告与用户请求（{topic or '…'}），"
+            "规划检索/预测/分析所需能力。\n"
+            "2. **Feasible path** — 按依赖顺序执行必要工具，读取产物并做简要分析与可视化。"
+        )
+    return (
+        "## Preliminary guidance\n\n"
+        f"1. **Suggested capabilities** — Based on the research draft and user request "
+        f"({topic or '…'}), plan the retrieval / prediction / analysis capabilities needed.\n"
+        "2. **Feasible path** — Run the necessary tools in dependency order, read outputs, "
+        "and provide brief analysis plus visualization where useful."
+    )
 
 
 async def research_report_start_node(state: AgentState, config: RunnableConfig):
     """Show 'PI is writing draft report' so UI updates before LLM runs."""
     history = list(state.get("history", []))
-    ui_lang = state.get("ui_lang") or _detect_ui_lang(state["messages"][-1].content)
+    ui_lang = _resolve_ui_lang(state)
     history.append({
         "role": "assistant",
         "content": "✍️ **Principal Investigator** 正在撰写研究草案（摘要、引言、相关工作、参考文献）…"
@@ -30,7 +66,7 @@ async def research_report_node(state: AgentState, config: RunnableConfig):
     chains = config.get("configurable", {}).get("chains", {})
     sub_reports_text = "\n\n".join(state.get("research_sub_reports", []))
     text = state["messages"][-1].content
-    ui_lang = state.get("ui_lang") or _detect_ui_lang(text)
+    ui_lang = _resolve_ui_lang(state, text)
     history = list(state.get("history", []))
 
     if history and (
@@ -55,13 +91,16 @@ async def research_report_node(state: AgentState, config: RunnableConfig):
         )
         history.append({"role": "assistant", "content": final_report, "role_id": "principal_investigator"})
 
-    try:
-        suggest_steps = await asyncio.to_thread(
-            chains["pi_suggest_steps_chain"].invoke,
-            {"draft_report": final_report, "input": text},
-        )
-    except Exception:
-        suggest_steps = "执行基础分析。" if ui_lang == "zh" else "Execute basic analysis."
+    # Prefer existing / embedded / synthetic suggest — avoid a second serial LLM.
+    # skip-research never reaches this node; empty prior suggest is normal here.
+    existing = (state.get("pi_suggest_steps") or "").strip()
+    embedded = _extract_embedded_suggest(final_report)
+    if existing:
+        suggest_steps = existing
+    elif embedded:
+        suggest_steps = embedded
+    else:
+        suggest_steps = _synthetic_suggest_steps(text, ui_lang)
 
     return {
         "pi_report": final_report,
