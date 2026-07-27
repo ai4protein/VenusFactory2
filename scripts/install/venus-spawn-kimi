@@ -132,6 +132,7 @@ systemd-run \
   --property=SystemCallFilter="@system-service" \
   --property=SystemCallFilter="~@mount @swap @reboot @raw-io" \
   --property=BindPaths="$SDIR:/workspace" \
+  --property=BindPaths="$SDIR:$SDIR" \
   --property=WorkingDirectory=/workspace \
   --property=Environment="HOME=/workspace" \
   --property=Environment="KIMI_PORT=$PORT" \
