@@ -16,7 +16,7 @@ Back to [Wiki home](./Home.md) · [中文](./Overview_CN.md)
 
 | Agent-first | Three interfaces | Zero to results |
 |:------------|:-----------------|:----------------|
-| Natural language → multi-step flows | Web / REST / CLI | Upload → predict |
+| Natural language → multi-step flows; Web chat **Science Agent** (kimi-code) or **Science Expert** (LangGraph) | Web / REST / CLI | Upload → predict |
 | 40+ models + 11 databases | Same power, different entry points | Or fine-tune in minutes |
 
 ## Architecture

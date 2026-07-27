@@ -44,11 +44,23 @@ Directed Evolution · Sequence Design · Protein Discovery · Protein Function �
 
 Same task families as Quick Tools with more model/parameter control.
 
+### Chat — dual modes
+
+Agent chat (`/agent`) uses a composer toggle (**Science Agent** / **Science Expert**; choice is stored in the browser).
+
+| Mode | Engine | Notes |
+|:-----|:-------|:------|
+| **Science Agent** | kimi-code | Tool-first agent loop (MCP / bash); collapsible thinking blocks and inline tool cards. Backed by the kimi-code daemon (see Configuration). Online hides the model picker. |
+| **Science Expert** | LangGraph (`graph`) | Multi-role pipeline **PI → CB → MLS → SC**; plan review in Plan Editor before run. Tuned for fewer pauses: execution-style tasks skip literature research; after plan confirm, steps default to auto-run; sub-reports default to auto-advance (plan confirm is still required). **Local**: pick the LLM in the model selector. **Online**: no model selector — fixed backend model (client cannot change it). |
+
+Details: [AgentManual_EN.md](../manual/AgentManual_EN.md).
+
 ## Configuration
 
 - Template: `.env.example` → `.env`
 - Agent / LLM: prefer UI **Settings**; env vars documented in `.env.example`
 - Online: `WEBUI_V2_MODE=online`, `WEBUI_V2_SESSION_TOKEN_SECRET`, `WEBUI_V2_*_LIMIT`
+- Online without sudo (kimi-code): default `auto` uses `bwrap` sandbox; or set `KIMI_ONLINE_SPAWN_MODE=bwrap`
 - Skip default kimi-code: `export KIMI_EXTERNAL=1`
 
 ## Weights

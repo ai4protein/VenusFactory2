@@ -10,8 +10,8 @@
 | :--- | :--- |
 | You want a multi-step analysis without wiring tools manually | Agent plans the pipeline for you |
 | You need follow-up questions on the same protein | The conversation keeps full context |
-| You want to inspect / edit the plan before execution | You can reorder, edit, or remove steps |
-| You want to checkpoint long runs | After each step / sub-report you can continue, rewrite, or abort |
+| You want to inspect / edit the plan before execution | You can reorder, edit, or remove steps (Science Expert) |
+| Long Expert runs with optional manual gates | Plan is still confirmed in Plan Editor; steps and sub-reports auto-advance by default (use step-by-step plan confirm only if you need per-step pauses) |
 
 For a *single* prediction with no orchestration, **Quick Tools** is faster.
 For full control over model + dataset selection, use **Advanced Tools**.
@@ -25,52 +25,64 @@ The chat workspace has three columns:
 | Column | What's there |
 | :--- | :--- |
 | **Left — Sessions** | New chat, session list, delete, copy session ID. Each session keeps its own history and uploaded files. |
-| **Center — Conversation** | Message timeline, model picker, file attach (browser upload or Workspace picker), Regenerate / Export / Stop / Send. Inline checkpoint widgets appear here when Agent needs your input. |
+| **Center — Conversation** | Message timeline, **Science Agent / Science Expert** mode switch, model picker (**Local Expert only**; Online Expert uses a fixed backend model with no selector), file attach (browser upload or Workspace picker), Regenerate / Export / Stop / Send. Expert checkpoint widgets (plan, clarification, iteration, optional step/sub-report) appear inline when needed. |
 | **Right — Execution Status** | Live status, last 12 tool runs, tail of the conversation log. Useful for watching long runs. |
 
 In **online** mode, a quota pill shows your remaining daily chats; once exhausted, Send / Regenerate / file upload are disabled.
 
 ---
 
-## 3. The Conversation Flow
+## 3. Two Chat Modes
 
-A typical run cycles through five phases. Agent surfaces each one as a dedicated checkpoint card, so you stay in control without micromanaging.
+Use the segmented control above the composer to pick a mode. The choice is saved in your browser; switching mid-session may change behavior — start a new session if results look inconsistent.
+
+### 3.1 Science Agent (kimi-code)
+
+- **Engine:** local **kimi-code** daemon (not the LangGraph PI/CB/MLS/SC graph).
+- **Behavior:** streaming tool use (VenusFactory MCP, shell where allowed), collapsible **Thinking** blocks, inline tool-run cards in the timeline.
+- **Model:** fixed to kimi-code; configure providers via Settings / `.env` (see WebUI wiki). Online mode may use `bwrap` sandboxing.
+- **When to use:** open-ended tasks where you want a single agent to call tools fluidly without the Expert planning pipeline.
+
+### 3.2 Science Expert (LangGraph)
+
+- **Engine:** LangGraph **`graph`** pipeline with four roles — **PI** (plan / research) → **CB** (concrete step plan) → **MLS** (execution checks) → **SC** (review).
+- **Plan gate:** you still review and confirm the plan in **Plan Editor** (edit, reorder, delete steps).
+- **Flow defaults (fewer stops):**
+  - **Execution-style tasks:** PI may emit no research sections — literature search and sub-reports are skipped.
+  - **After plan confirm:** prefer **Confirm & Auto-execute** (recommended; backend default). Steps run without a pause after each tool step. Choose **Confirm Plan** only if you want per-step checkpoints.
+  - **Sub-reports:** when literature sections do run, the pipeline auto-advances by default instead of stopping on every section; you can still rewrite or skip from the checkpoint if one appears.
+- **Model:** **Local** — pick any graph-engine LLM in the model selector (built-in or custom OpenAI-style). **Online** — no model selector; the platform uses a fixed backend model.
+
+Expert runs still move through the phases below; not every phase appears on every task.
 
 ```
 You ─▶ Clarification ─▶ Plan ─▶ Execution ─▶ Sub-report ─▶ Iteration ─▶ Final report
 ```
 
-### 3.1 Clarification
+#### Clarification
 
 Agent may ask a few short questions before planning — multiple-choice or text. Pick the option that matches your intent (or use the "Other" field). Submit to continue.
 
-> **Tip:** You can use `/loop` `/skip-research` style hints in your initial message to bypass clarification on simple tasks.
+> **Tip:** There are no `/skip-research` / `/loop` slash commands. Use **Skip research** in the clarification form, or send an execution-style request (tool run without literature intent) — the pipeline may skip research automatically.
 
-### 3.2 Plan
+#### Plan
 
 Agent proposes an ordered list of steps. Each step has a tool name and a short task description. In the **Plan Editor** you can:
 
 - Edit any step's description
 - Reorder with ↑ / ↓
 - Remove a step (min 1 required)
-- Toggle **auto-execute** before clicking Confirm
+- **Confirm & Auto-execute** (default path) or **Confirm Plan** for step-by-step gates
 
-### 3.3 Execution
+#### Execution
 
-Steps run sequentially. For each step you may see:
+Steps run sequentially. With auto-execute, the right panel streams tool logs without a step checkpoint. If you confirmed without auto-execute, each step may show **continue / abort**.
 
-- **Step checkpoint:** continue / abort the pipeline
-- A streaming log of the tool call in the right panel
+#### Sub-report (literature only)
 
-### 3.4 Sub-report Checkpoint
+When research sections run, short sub-reports may appear; by default the run continues without waiting on every section. If a checkpoint is shown, you can **Continue Research**, **Comment & Rewrite**, or **Skip to Report**.
 
-After each analytical step, Agent generates a short sub-report and waits for one of three decisions:
-
-- **Continue Research** — accept and move on
-- **Comment & Rewrite** — leave a comment; Agent will redo the sub-report with your feedback
-- **Skip to Report** — drop this branch and head to the final summary
-
-### 3.5 Iteration
+#### Iteration
 
 After the main pipeline finishes you get a final decision:
 
@@ -80,9 +92,7 @@ After the main pipeline finishes you get a final decision:
 
 The final report is exported as a structured bundle — both **HTML** and **PDF** are downloadable via the Export button.
 
----
-
-## 3.6 Example Prompts
+### 3.3 Example Prompts
 
 The Agent is built around natural-language, goal-driven requests. Some patterns that the planner handles well:
 
@@ -115,12 +125,16 @@ Workspace is **local-mode only**. In online mode the picker is disabled.
 
 ## 5. Model Picker
 
-Above the input bar you can switch the LLM that drives the agent:
+**Science Expert (Local):** above the input bar, switch the LLM that drives the LangGraph pipeline:
 
 - **Built-in:** Gemini 2.5 Pro, GPT-4o, Claude 3.7, DeepSeek-R1
 - **Custom OpenAI-style:** Add your own endpoint (display name, model name, API key, base URL). Saved in your browser; **local mode only**.
 
-If you switch models mid-conversation, you'll see a notice — model behavior may differ.
+**Science Expert (Online):** no model selector — the platform pins a fixed backend model (client cannot change it).
+
+**Science Agent:** uses kimi-code only; the selector shows a fixed Agent pill instead of graph models.
+
+If you switch models mid-conversation (Local Expert), you'll see a notice — model behavior may differ.
 
 ---
 
