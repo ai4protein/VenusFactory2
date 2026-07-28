@@ -3,21 +3,22 @@ name: arxiv
 description: arXiv preprint server — keyword search the official API and download papers as PDF / HTML / source tarball. Use whenever the user mentions an arXiv ID (e.g. 2106.04559) or wants preprints on a topic in CS / physics / math / quantitative biology. For biomedical preprints specifically, prefer biorxiv skill.
 license: Unknown (arXiv content under various licenses, see paper metadata)
 metadata:
-    skill-author: VenusFactory2.
+  version: "1.1"
+  skill-author: VenusFactory2
 ---
 
 # arXiv
 
 ## Overview
 
-Two complementary tools: existing `query_arxiv_tool` (text search, returns JSON list inline) + new `download_arxiv_paper_by_id` (fetches the actual paper as PDF / HTML / source tarball to disk).
+Two complementary tools: `query_arxiv` (text search, returns JSON list inline) + `download_arxiv_paper_by_id` (fetches the actual paper as PDF / HTML / source tarball to disk).
 
 ## Project Tools (VenusFactory2)
 
 | Tool | Args | Returns | Description |
 |------|------|---------|--------------|
 | **query_arxiv** | `query` (text), `max_results` (default 5, max 50), `max_content_length` (default 10000) | JSON list of paper records (title, abstract, arxiv_id, authors, etc.) inline | Search-only; small JSON returned to agent context. |
-| **download_arxiv_paper_by_id** | `arxiv_id` (e.g. `2106.04559`, `2106.04559v2`, `hep-th/9510017`), `out_dir`, `format` (`pdf` \| `html` \| `source`; default `pdb`), `timeout` (default 60s) | rich JSON envelope; file at `file_info.file_path` (`arxiv_<id>.pdf` etc.) | Download the actual paper. |
+| **download_arxiv_paper_by_id** | `arxiv_id` (e.g. `2106.04559`, `2106.04559v2`, `hep-th/9510017`), `out_dir`, `format` (`pdf` \| `html` \| `source`; default `pdf`), `timeout` (default 60s) | rich JSON envelope; file at `file_info.file_path` (`arxiv_<id>.pdf` etc.) | Download the actual paper. |
 
 ## When to Use Each
 

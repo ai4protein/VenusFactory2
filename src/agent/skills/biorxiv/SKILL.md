@@ -3,7 +3,8 @@ name: biorxiv
 description: bioRxiv & medRxiv — biology / medicine preprint servers. Search by keyword + date window, fetch a specific preprint's full metadata (with all version history + abstract + JATS XML link) by DOI. Use for cutting-edge biology/medicine work that hasn't gone through peer review yet, or to find the original preprint version of a paper you only have the DOI for.
 license: Unknown (bioRxiv content licensed by individual authors)
 metadata:
-    skill-author: VenusFactory2 (download_biorxiv_by_doi adapted from Google DeepMind).
+  version: "1.0"
+  skill-author: VenusFactory2 (download_biorxiv_by_doi adapted from Google DeepMind).
 ---
 
 # bioRxiv & medRxiv

@@ -4,12 +4,16 @@ This document provides comprehensive technical documentation for programmatic ac
 
 ## Project Integration
 
-VenusFactory2 implements AlphaFold access in `src/tools/database/alphafold/`:
+VenusFactory2 implements AlphaFold access in `src/tools/database/alphafold/` and exposes these **hub `@tool` names** (see main `SKILL.md`):
 
-- **Metadata:** `query_alphafold_metadata(uniprot_id)` returns JSON from `/api/prediction/{uniprot_id}`; `download_alphafold_metadata(uniprot_id, out_dir)` saves it to a file.
-- **Structure:** `query_alphafold_structure(uniprot_id, format, version, fragment)` and `download_alphafold_structure(uniprot_id, out_dir, format, version, fragment)` use the file URL pattern below. Default `version` is `v4`; `format` is `pdb` or `cif`.
+| Hub tool | Notes |
+|----------|--------|
+| `download_alphafold_structure_by_uniprot_id` | Args: `uniprot_id`, `out_dir`, `format` (`pdb`\|`cif`), `version` (default **`v6`**), `fragment` |
+| `download_alphafold_metadata_by_uniprot_id` | Saves prediction metadata JSON |
+| `analyze_alphafold_plddt_by_metadata_file` | Local; input is **metadata JSON path** |
+| `analyze_alphafold_pae_by_pae_file` | Local; no dedicated PAE download tool — fetch via metadata `paeDocUrl` if needed |
 
-Agent tools `alphafold_structure_query` and `alphafold_structure_download` wrap these and support `output_format` (pdb/mmcif) and optional OSS upload.
+Returns use the rich envelope (`status`, `file_info`, …), not `{success, file_path}`. Prefer hub tools over ad-hoc Biopython/URL scripts in agent plans.
 
 ## Table of Contents
 

@@ -82,6 +82,7 @@ python src/webui_v2.py --host 0.0.0.0 --port 7861
 | 文档总览 | **[docs/README.md](docs/README.md)** |
 | 安装 · 目录 · WebUI 地图 · CLI/API | [docs/wiki/Home.md](docs/wiki/Home.md) |
 | 各功能点操作手册 | [docs/manual/](docs/manual/) |
+| Agent Skills（作者指南） | [src/agent/skills/AGENTS.md](src/agent/skills/AGENTS.md) · [docs/agent/SKILLS_INDEX.md](docs/agent/SKILLS_INDEX.md) · [docs/agent/CONTRIBUTING_SKILLS.md](docs/agent/CONTRIBUTING_SKILLS.md) |
 
 English: [README.md](README.md) · [docs/README.md](docs/README.md)
 

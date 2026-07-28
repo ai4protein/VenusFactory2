@@ -82,6 +82,7 @@ Three layers — start at the top; dig only when needed:
 | Map of all docs | **[docs/README.md](docs/README.md)** |
 | Install · catalogs · WebUI map · CLI/API | [docs/wiki/Home.md](docs/wiki/Home.md) |
 | Per-feature how-tos | [docs/manual/](docs/manual/) |
+| Agent skills (authors) | [src/agent/skills/AGENTS.md](src/agent/skills/AGENTS.md) · [docs/agent/SKILLS_INDEX.md](docs/agent/SKILLS_INDEX.md) · [docs/agent/CONTRIBUTING_SKILLS.md](docs/agent/CONTRIBUTING_SKILLS.md) |
 
 中文：[README_CN.md](README_CN.md) · [docs/README.md](docs/README.md)
 

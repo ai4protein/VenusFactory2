@@ -1,12 +1,21 @@
 ---
-name: nature-figure
+name: nature_figure
 description: >-
   Submission-grade Nature/high-impact journal figure workflow for Python or R. Use whenever the user asks to create, revise, audit, or polish manuscript figures, multi-panel scientific plots, figures4papers-style matplotlib plots, or journal-ready SVG/PDF/TIFF outputs, especially for Nature-family or other high-impact journals. Before plotting, define the figure's conclusion, evidence logic, export needs, and review risks. If the user has not chosen Python or R, ask "Python or R?" and stop. Use only the selected backend for figure generation, previewing, exporting, and QA. Supports matplotlib/seaborn and ggplot2/patchwork/ComplexHeatmap. Not for dashboards or Illustrator/Figma-first infographics. Also trigger on general academic-writing figure needs even without the word "Nature", such as making figures/plots for a paper, scientific/academic plotting, data visualization for a manuscript, and Chinese phrasings like 论文配图、学术写作配图、科研绘图、科研作图、画图、作图、出图、论文图表、可视化.
-version: 2.0.0
-author: Community contribution, refactored into static/dynamic layers
+license: Unknown
+metadata:
+  version: "2.0.0"
+  skill-author: VenusFactory2 (community contribution)
 ---
 
 # Nature Figure Making — Router
+
+## VenusFactory execution
+
+- `skill_id` for `read_skill` is **`nature_figure`** (directory name).
+- Load fragments with `read_skill(skill_id="nature_figure", relative_path="manifest.yaml")` then the paths listed under `always_load` / backend maps (e.g. `static/core/contract.md`).
+- Response includes `skill_root` for debugging; prefer `relative_path` over inventing absolute paths.
+- Exploratory (non-publication) plots may use `matplotlib` / `seaborn` skills instead.
 
 This skill is split into two layers:
 
@@ -32,7 +41,7 @@ Backend selection blocks everything else. Decide the `backend` value only from a
 - `python` — matplotlib / seaborn.
 - `r` — ggplot2 / patchwork / ComplexHeatmap.
 
-If the user has **not** explicitly chosen, ask exactly one concise question — **Python or R?** — and stop. Do not default, guess, generate mock data, or write scripts before the answer. Only recommend a backend when the user explicitly asks you to choose; then use `references/backend-selection.md`, state the reason, and proceed. Once selected, the backend is **exclusive** for all drawing, previewing, exporting, and visual QA (see `core/contract.md`).
+If the user has **not** explicitly chosen, ask exactly one concise question — **Python or R?** — and stop. Do not default, guess, generate mock data, or write scripts before the answer. Only recommend a backend when the user explicitly asks you to choose; then use `references/backend-selection.md`, state the reason, and proceed. Once selected, the backend is **exclusive** for all drawing, previewing, exporting, and visual QA (see `static/core/contract.md`).
 
 ### 3. Load the matching backend fragment
 
@@ -42,8 +51,8 @@ After the backend is resolved, Read the mapped fragment (`static/fragments/backe
 
 Apply the loaded material in this order:
 
-1. Figure contract (`core/contract.md`) — write the core conclusion, map the evidence chain, classify the archetype, set the journal/export contract, before any code.
-2. Default stance (`core/stance.md`) — archetype-first composition, hero panel, restrained palette, statistics/integrity as part of the figure.
+1. Figure contract (`static/core/contract.md`) — write the core conclusion, map the evidence chain, classify the archetype, set the journal/export contract, before any code.
+2. Default stance (`static/core/stance.md`) — archetype-first composition, hero panel, restrained palette, statistics/integrity as part of the figure.
 3. Backend fragment — the exclusive Python or R quick-start and execution rule.
 
 The chart serves the scientific logic; aesthetic polish is subordinate to making the core conclusion clear, defensible, and reviewable.

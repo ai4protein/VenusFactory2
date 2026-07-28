@@ -3,7 +3,8 @@ name: workflow_skill_creator
 description: Distills a completed user workflow or interaction into a reusable VenusFactory agent skill. Use when the user says "make this a skill", "create a skill from what we just did", "package this workflow" or similar. Adapts the workflow into the VenusFactory tools wiring + SKILL.md pattern. Do not use for creating skills from scratch without an existing workflow.
 license: Apache-2.0 (adapted from google-deepmind/science-skills)
 metadata:
-    skill-author: VenusFactory2 (adapted from Google DeepMind)
+  version: "1.1"
+  skill-author: VenusFactory2 (adapted from Google DeepMind)
 ---
 
 # Workflow-to-Skill Distiller
@@ -127,17 +128,21 @@ Every skill needs a `SKILL.md` with the VenusFactory frontmatter:
 
 ```markdown
 ---
-name: <snake_case_name>
-description: <≤500 chars; lead with capability, then "Use when...", then "Don't use for...">
+name: <snake_case_name>   # MUST equal directory name / read_skill skill_id
+description: <capability + Use when... + Don't use for... (other skill_ids)>
 license: <e.g. Apache-2.0 / Unknown>
 metadata:
-    skill-author: VenusFactory2.
+  version: "1.0"
+  skill-author: VenusFactory2
 ---
 
 # <Skill Title>
 
 ## Overview
 <1 paragraph>
+
+## VenusFactory execution
+- Hub tools by exact name; progressive files via read_skill(..., relative_path=...)
 
 ## Project Tools (VenusFactory2)
 
@@ -153,6 +158,7 @@ metadata:
 ```
 
 Optional: a `references/` subdirectory for API specs, recipe books, or sample payloads.
+See `src/agent/skills/AGENTS.md` and `docs/agent/CONTRIBUTING_SKILLS.md`.
 
 ### Rule 5: Instruction-Only Pattern (No New Code)
 
@@ -178,10 +184,11 @@ All download tools **MUST** write large payloads to disk and return only `{file_
 
 After implementation:
 
-1. **Import smoke test**: `python -c "from src.tools.<category>.<name> import <fn>"`
-2. **Hub count check**: confirm `get_tools()` count increased.
-3. **Manual invocation** through `chat_agent.py` with a prompt that should trigger the new skill.
-4. **Sample query** from Round 5 (if provided) end-to-end.
+1. **Import smoke test**: `python -c "from src.tools.<category>.<name> import <fn>"` (if new code).
+2. **Hub count check**: confirm `get_tools()` count increased (if new tools).
+3. **Skill validate**: `python scripts/validate_skills.py`
+4. **Manual invocation** through `chat_agent.py` with a prompt that should trigger the new skill.
+5. **Sample query** from Round 5 (if provided) end-to-end.
 
 ## References
 

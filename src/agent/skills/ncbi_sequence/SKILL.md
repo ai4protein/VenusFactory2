@@ -3,7 +3,8 @@ name: ncbi_sequence
 description: NCBI E-utilities for biological sequences — fetch protein/nucleotide FASTA by accession, run BLAST, translate CDS to protein, search NCBI Protein by gene+organism. Use when the user provides an NCBI accession (NP_, XP_, NM_, NR_, etc.), asks for a sequence by gene name + species, or needs to translate a coding sequence. Don't use for ClinVar variants (use ncbi_clinvar) or gene metadata lookup (use ncbi_gene).
 license: Unknown
 metadata:
-    skill-author: VenusFactory2.
+  version: "1.0"
+  skill-author: VenusFactory2.
 ---
 
 # NCBI Sequence Tools

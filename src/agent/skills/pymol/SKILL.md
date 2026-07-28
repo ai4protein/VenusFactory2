@@ -3,7 +3,8 @@ name: pymol
 description: Headless PyMOL rendering of protein structures (PNG + PSE session) and structural superposition with RMSD. Use to produce static publication-style images, color a structure by pLDDT/B-factor/chain/secondary-structure, or compare two structures by cealign. Do NOT use for interactive 3D exploration (use MolstarViewer in the frontend), docking, MD simulation, or sequence-only analysis.
 license: Apache-2.0 (adapted from google-deepmind/science-skills)
 metadata:
-    skill-author: VenusFactory2 (adapted from Google DeepMind)
+  version: "1.0"
+  skill-author: VenusFactory2 (adapted from Google DeepMind)
 ---
 
 # PyMOL Headless Rendering

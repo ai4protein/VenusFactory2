@@ -3,7 +3,8 @@ name: pubmed
 description: PubMed — NCBI's biomedical literature database (>35M citations). Keyword search inline, or batch-fetch full title + structured abstract + authors + DOI for a known list of PMIDs. Use for medical / biological literature lookup, citation resolution, or building an abstract corpus for downstream NLP. Honors NCBI_API_KEY env var.
 license: Unknown
 metadata:
-    skill-author: VenusFactory2 (download_pubmed_abstracts_by_pmids adapted from Google DeepMind).
+  version: "1.0"
+  skill-author: VenusFactory2 (download_pubmed_abstracts_by_pmids adapted from Google DeepMind).
 ---
 
 # PubMed
