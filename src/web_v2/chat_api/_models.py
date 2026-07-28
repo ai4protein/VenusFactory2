@@ -33,6 +33,8 @@ class SessionStateResponse(BaseModel):
     kimi_pending_approval: Optional[dict[str, Any]] = None
     approval_prompt: str = ""
     plan_markdown: str = ""
+    kimi_context: Optional[dict[str, Any]] = None
+    kimi_plan_mode: bool = False
 
 
 class ChatStreamRequest(BaseModel):

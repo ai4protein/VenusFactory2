@@ -19,6 +19,7 @@ const TIMELINE_STRINGS = {
     thought: "Thought",
     thoughtFor: (s: number) => (s < 60 ? `Thought for ${s}s` : `Thought for ${Math.floor(s / 60)}m ${s % 60}s`),
     researchProcess: (n: number) => `Search process (${n})`,
+    compaction: "Context compressed",
   },
   zh: {
     helpful: "有帮助",
@@ -32,13 +33,16 @@ const TIMELINE_STRINGS = {
     thought: "已思考",
     thoughtFor: (s: number) => (s < 60 ? `思考了 ${s}s` : `思考了 ${Math.floor(s / 60)}分 ${s % 60}秒`),
     researchProcess: (n: number) => `检索过程 (${n})`,
+    compaction: "上下文已压缩",
   }
 };
 
 /** Research/status noise that should fold into a single collapsible block. */
 function isResearchStatusItem(item: ChatHistoryItem): boolean {
   if (item.role !== "assistant") return false;
-  if (item.kind === "thinking" || item.kind === "checkpoint") return false;
+  if (item.kind === "thinking" || item.kind === "checkpoint" || item.kind === "compaction") {
+    return false;
+  }
   if (item.kind === "status") return true;
   const phase = item.phase || "";
   if (phase === "sub_report_checkpoint") return false;
@@ -767,6 +771,17 @@ export function ChatTimeline({ items, streamingIndex = -1, onSuggestedPrompt, se
         }
         const idx = unit.idx;
         const item = items[idx];
+        if (item.kind === "compaction" || item.phase === "compaction") {
+          const body = (item.content || "").replace(/^🗜️\s*/, "").trim();
+          return (
+            <details key={idx} className="chat-compaction" open={idx === streamingIndex}>
+              <summary>{t.compaction}</summary>
+              <div className="chat-compaction-body">
+                <ChatMessageBody html={renderMarkdown(body)} />
+              </div>
+            </details>
+          );
+        }
         // Thinking: kimi reasoning stream OR Expert PI placeholders (kind or phase).
         if (item.kind === "thinking" || item.phase === "thinking") {
           const followedByAnswer = items
