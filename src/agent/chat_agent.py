@@ -1052,9 +1052,15 @@ def create_pi_final_report_chain(llm: BaseChatModel):
     return PI_FINAL_REPORT_PROMPT | llm | StrOutputParser()
 
 
-def create_pi_suggest_steps_chain(llm: BaseChatModel):
+def create_pi_suggest_steps_chain(llm: BaseChatModel, all_tools: list[BaseTool] | None = None):
     """PI: draft report + user input → Suggest steps (Tools + Steps for CB/MLS)."""
-    return PI_SUGGEST_STEPS_PROMPT | llm | StrOutputParser()
+    available_tools_list = ", ".join(t.name for t in all_tools) if all_tools else "(none)"
+    available_skills_list = get_skills_metadata_string()
+    prompt = PI_SUGGEST_STEPS_PROMPT.partial(
+        available_tools_list=available_tools_list,
+        available_skills_list=available_skills_list,
+    )
+    return prompt | llm | StrOutputParser()
 
 
 def create_cb_planner_chain(llm: BaseChatModel, tools_description: str, all_tools: list[BaseTool] | None = None):
@@ -1178,7 +1184,7 @@ def _build_chains_for_llm(llm: BaseChatModel, all_tools: list[BaseTool], pi_tool
         'pi_clarification': create_pi_clarification_chain(llm),
         'pi_sub_report': create_pi_sub_report_chain(llm),
         'pi_final_report': create_pi_final_report_chain(llm),
-        'pi_suggest_steps_chain': create_pi_suggest_steps_chain(llm),
+        'pi_suggest_steps_chain': create_pi_suggest_steps_chain(llm, all_tools=all_tools),
         'cb_planner': create_cb_planner_chain(llm, tools_description, all_tools=all_tools),
         'cb_planner_raw': create_cb_planner_raw_chain(llm, tools_description, all_tools=all_tools),
         'pi_answer': create_pi_answer_chain(llm, pi_tools_description),

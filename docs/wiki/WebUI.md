@@ -50,8 +50,8 @@ Agent chat (`/agent`) uses a composer toggle (**Science Agent** / **Science Expe
 
 | Mode | Engine | Notes |
 |:-----|:-------|:------|
-| **Science Agent** | kimi-code | Tool-first agent loop (MCP / bash); collapsible thinking blocks and inline tool cards. Backed by the kimi-code daemon (see Configuration). Online hides the model picker. |
-| **Science Expert** | LangGraph (`graph`) | Multi-role pipeline **PI → CB → MLS → SC**; plan review in Plan Editor before run. Tuned for fewer pauses: execution-style tasks skip literature research; after plan confirm, steps default to auto-run; sub-reports default to auto-advance (plan confirm is still required). **Local**: pick the LLM in the model selector. **Online**: no model selector — fixed backend model (client cannot change it). |
+| **Science Agent** | kimi-code | Tool-first agent loop (MCP / bash); collapsible thinking blocks and inline tool cards. Context bar + controls aligned with Kimi Code: **Compact** (`/compact`), **Plan** (`/plan`), **Fork** (`/fork`), **Clear ctx** (`/new`); auto-compacts when usage ≥ 90%. Backed by the kimi-code daemon (see Configuration). Online hides the model picker. |
+| **Science Expert** | LangGraph (`graph`) | Multi-role pipeline **PI → CB → MLS → SC**; PI clarification first (with explicit Skip Research), then CB plan review. After plan confirm, steps default to auto-run; sub-reports default to auto-advance. SC writes a paper-level report (~5000–8000 words). **Local**: pick the LLM in the model selector. **Online**: no model selector — fixed backend model (client cannot change it). |
 
 Details: [AgentManual_EN.md](../manual/AgentManual_EN.md).
 

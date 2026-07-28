@@ -34,15 +34,20 @@ def _synthetic_suggest_steps(user_text: str, ui_lang: str) -> str:
         return (
             "## Preliminary guidance\n\n"
             f"1. **Suggested capabilities** — 根据研究报告与用户请求（{topic or '…'}），"
-            "规划检索/预测/分析所需能力。\n"
-            "2. **Feasible path** — 按依赖顺序执行必要工具，读取产物并做简要分析与可视化。"
+            "规划检索/预测/分析所需能力；CB 应从 Available skills 中选择编排 skill"
+            "（如 zero_shot_mutation_workflow、protein_structure_pipeline、nature_figure）"
+            "并在执行前插入 read_skill。\n"
+            "2. **Feasible path** — 按依赖顺序：必要时 read_skill → hub 工具 → 读产物 → 可视化。"
         )
     return (
         "## Preliminary guidance\n\n"
         f"1. **Suggested capabilities** — Based on the research draft and user request "
-        f"({topic or '…'}), plan the retrieval / prediction / analysis capabilities needed.\n"
-        "2. **Feasible path** — Run the necessary tools in dependency order, read outputs, "
-        "and provide brief analysis plus visualization where useful."
+        f"({topic or '…'}), plan retrieval / prediction / analysis capabilities; CB should "
+        "pick orchestration skills from Available skills "
+        "(e.g. zero_shot_mutation_workflow, protein_structure_pipeline, nature_figure) "
+        "and insert read_skill before execution.\n"
+        "2. **Feasible path** — Dependency order: read_skill when needed → hub tools → "
+        "read outputs → visualization where useful."
     )
 
 

@@ -40,17 +40,22 @@
 
 - **引擎：** 本地 **kimi-code** 守护进程（不是 LangGraph PI/CB/MLS/SC 图）。
 - **行为：** 流式工具调用（VenusFactory MCP、允许的 shell）、可折叠 **Thinking** 块、时间线内工具执行卡片。
+- **上下文（对齐 [Kimi Code sessions](https://www.kimi.com/code/docs/en/kimi-code-cli/guides/sessions.html)）：**
+  - 占用 ≥ ~90% 时自动压缩；时间线展示压缩摘要。
+  - 输入区控件：**压缩**（`/compact`）、**计划**（`/plan`）、**分叉**（`/fork`）、**清空上下文**（`/new`），以及上下文占用指示。
+  - 停止时尽量 abort 正在运行的 kimi prompt。
 - **模型：** 固定为 kimi-code；在 Settings / `.env` 配置 provider（见 WebUI wiki）。Online 模式可能走 `bwrap` 沙箱。
 - **适用：** 希望单一 agent 流畅调工具、不走 Expert 规划流水线的开放式任务。
 
 ### 3.2 Science Expert（LangGraph）
 
 - **引擎：** LangGraph **`graph`** 流水线，四角色 **PI**（规划 / 调研）→ **CB**（具体步骤）→ **MLS**（执行校验）→ **SC**（审查）。
+- **先 PI：** 新请求一律先走 PI 分析 / 澄清（含显式「跳过 Research」），不再按关键字静默直跳 CB。
 - **计划闸门：** 执行前仍要在 **Plan Editor** 审计划（改描述、排序、删步骤）。
 - **默认更顺（少停顿）：**
-  - **执行型任务：** PI 可不产出调研小节，跳过文献检索与小报告链。
   - **计划确认后：** 推荐 **确认并自动执行**（后端默认）；不在每步工具后暂停。只有点 **确认计划** 才会逐步检查点。
   - **小报告：** 若走文献调研，默认自动推进，不在每个小节都停；若仍出现检查点，可继续 / 重写 / 跳过。
+  - **最终 SC 报告：** paper 级稿件（约 5000–8000 词），不是 800–1500 词短总结。
 - **模型：** **Local** 可在模型选择器切换任意 graph 引擎 LLM（内置或自定义 OpenAI 兼容）；**Online** 无模型选择器，使用平台固定后端模型。
 
 Expert 仍可能经历下列阶段；并非每次任务都会走全链路。

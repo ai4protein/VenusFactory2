@@ -303,21 +303,91 @@ def _extract_skill_ids_from_metadata(skills_metadata: str) -> list[str]:
     return out
 
 
+# Protein-engineering domain rules for auto-inserting read_skill before code steps.
+# Order matters: first matching keyword group wins. Domain/workflow rules MUST
+# precede generic plot/visual rules so "STRING network visualization" does not
+# steal nature_figure over string_database.
+_DOMAIN_SKILL_RULES: list[tuple[tuple[str, ...], list[str]]] = [
+    (
+        ("润色", "polish", "academic english", "manuscript polish"),
+        ["nature_polishing", "nature_writing"],
+    ),
+    (
+        ("写论文", "写摘要", "写引言", "manuscript", "abstract", "introduction draft"),
+        ["nature_writing", "nature_polishing"],
+    ),
+    (
+        ("zero-shot", "zero shot", "突变预测", "beneficial mutation", "mutation prediction", "定向进化", "protssn", "venusplm"),
+        ["zero_shot_mutation_workflow", "biopython"],
+    ),
+    (
+        ("proteinmpnn", "inverse fold", "sequence design", "固定骨架", "de novo"),
+        ["proteinmpnn_design_workflow", "biopython"],
+    ),
+    (("uniprot", "swiss-prot", "uniprotkb"), ["uniprot_database", "biopython"]),
+    (("string", "ppi", "interaction partner", "蛋白互作", "interaction network"), ["string_database"]),
+    (("rcsb", "pdb id", "experimental structure", "crystal structure"), ["rcsb_database", "protein_structure_pipeline"]),
+    (("alphafold", "plddt", "pae"), ["alphafold_database", "protein_structure_pipeline"]),
+    (("foldseek", "structural similar", "结构相似"), ["foldseek_structural_similarity", "rcsb_database"]),
+    (("chembl", "compound", "ic50", "smiles"), ["chembl_database", "rdkit"]),
+    (("rdkit", "分子", "ligand", "小分子"), ["rdkit", "chembl_database"]),
+    (("kegg", "pathway", "通路"), ["kegg_database"]),
+    (("brenda", "ec number", "enzyme kinetic", "km ", "kcat"), ["brenda_database"]),
+    (("interpro", "domain", "结构域", "pfam"), ["interpro_domain_annotation", "uniprot_database"]),
+    (("fda", "openfda", "adverse", "510k"), ["fda"]),
+    (("msa", "clustal", "multiple sequence", "多序列"), ["clustalo_msa", "biopython"]),
+    (("mmseqs", "blast homolog", "序列同源", "similarity search"), ["protein_sequence_similarity_search", "biopython"]),
+    (("pymol", "render structure", "结构渲染"), ["pymol"]),
+    (
+        ("solubility", "optimal temperature", "binding site", "activity site", "物化性质", "功能预测"),
+        ["protein_property_prediction", "biopython"],
+    ),
+    (
+        ("esmfold", "structure prediction", "结构预测", "structure pipeline", "protein_structure_pipeline"),
+        ["protein_structure_pipeline", "alphafold_database", "biopython"],
+    ),
+    (
+        ("hpa", "tissue expression", "subcellular", "蛋白图谱", "表达谱", "human protein atlas"),
+        ["hpa_expression_context"],
+    ),
+    (
+        ("finetune", "fine-tune", "fine tune", "训练模型", "train_protein", "custom model", "微调"),
+        ["venus_finetune_workflow"],
+    ),
+    (
+        ("hypothesis", "定向进化轮次", "下一步实验", "falsif", "工程假设"),
+        ["protein_engineering_hypothesis"],
+    ),
+    (
+        ("maxit", "pdb2cif", "cif2pdb", "chain sequence", "file prep", "apo check", "文件预处理"),
+        ["structure_file_prep", "biopython"],
+    ),
+    (("pubmed", "文献", "literature"), ["pubmed", "openalex", "biorxiv"]),
+    (("arxiv",), ["arxiv", "biorxiv"]),
+    (("biorxiv", "medrxiv"), ["biorxiv", "pubmed"]),
+    # Visualization last — only when no domain keyword matched above
+    (
+        ("配图", "作图", "论文图", "可视化", "出图", "科研绘图", "figure", "plot", "visual", "chart", "draw", "heatmap", "热图"),
+        ["nature_figure", "matplotlib", "seaborn"],
+    ),
+    (("fasta", "genbank", "seqio", "biopython"), ["structure_file_prep", "biopython"]),
+    # Narrow file-prep fallback (avoid bare "sequence"/"structure"/"mutation")
+    (("pdb file", "mmcif", "结构文件"), ["structure_file_prep", "biopython"]),
+]
+
+
 def _pick_skill_for_code_step(task_desc: str, available_skill_ids: list[str]) -> str | None:
+    """Pick a domain skill for a code step; return None if no confident match (do not blind-fallback)."""
     if not available_skill_ids:
         return None
+    available = set(available_skill_ids)
     lower = (task_desc or "").lower()
-    preferred: list[str] = []
-    if any(k in lower for k in ("plot", "figure", "visual", "chart", "draw")):
-        preferred = ["matplotlib", "seaborn", "biopython"]
-    elif any(k in lower for k in ("fasta", "sequence", "pdb", "structure", "mutation")):
-        preferred = ["biopython", "matplotlib", "seaborn"]
-    else:
-        preferred = ["biopython", "matplotlib", "seaborn"]
-    for sid in preferred:
-        if sid in available_skill_ids:
-            return sid
-    return available_skill_ids[0]
+    for keywords, preferred in _DOMAIN_SKILL_RULES:
+        if any(k in lower for k in keywords):
+            for sid in preferred:
+                if sid in available:
+                    return sid
+    return None
 
 
 def _enforce_skill_first_plan(

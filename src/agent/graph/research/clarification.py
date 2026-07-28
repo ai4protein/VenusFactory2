@@ -80,18 +80,29 @@ async def clarification_node(state: AgentState, config: RunnableConfig):
     conversation_history = _format_conversation_history(chains, history, text)
     sections_str = json.dumps(sections, ensure_ascii=False)
 
+    # Bound LLM wait so the "preparing clarification…" Thinking bubble does
+    # not feel stuck for a full minute when the provider is slow.
+    _CLARIFICATION_TIMEOUT_S = 25.0
     questions = []
     try:
-        raw = await asyncio.to_thread(
-            chains["pi_clarification"].invoke,
-            {
-                "input": text,
-                "protein_context_summary": protein_ctx.get_context_summary(),
-                "conversation_history": conversation_history,
-                "research_sections": sections_str,
-            },
+        raw = await asyncio.wait_for(
+            asyncio.to_thread(
+                chains["pi_clarification"].invoke,
+                {
+                    "input": text,
+                    "protein_context_summary": protein_ctx.get_context_summary(),
+                    "conversation_history": conversation_history,
+                    "research_sections": sections_str,
+                },
+            ),
+            timeout=_CLARIFICATION_TIMEOUT_S,
         )
         questions = _parse_clarification_questions(raw)
+    except asyncio.TimeoutError:
+        _logger.warning(
+            "PI clarification generation timed out after %.0fs; using skip-research only",
+            _CLARIFICATION_TIMEOUT_S,
+        )
     except Exception as e:
         _logger.warning("PI clarification generation failed: %s", e)
 
@@ -103,17 +114,10 @@ async def clarification_node(state: AgentState, config: RunnableConfig):
     ):
         history.pop()
 
-    if not questions:
-        return {
-            "clarification_questions": [],
-            "waiting_for": None,
-            "status": "resume_research",
-            "history": history,
-            "ui_lang": ui_lang,
-        }
-
     # At most 2 content questions + an always-present research skip switch.
-    questions = list(questions)[:_MAX_CONTENT_QUESTIONS]
+    # Even if the LLM timed out / failed, still gate on Skip Research so the
+    # user is not silently auto-advanced past clarification.
+    questions = list(questions or [])[:_MAX_CONTENT_QUESTIONS]
 
     # Put "Skip Research" first so it is the easiest default choice.
     if ui_lang == "zh":

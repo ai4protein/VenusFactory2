@@ -23,6 +23,7 @@ from agent.graph.common.streaming import (
     reset_sse_queue,
     sse_config_keys,
 )
+from logger import get_logger
 
 from web_v2.chat_api._hooks_runtime import (
     _dispatch_hook,
@@ -38,6 +39,10 @@ from web_v2.chat_api._shared import (
     clear_agent_gates,
 )
 from web_v2.chat_api._uploads import _archive_conversation, _normalize_uploaded_file
+
+_logger = get_logger("web_v2.chat_api.stream")
+# Keep strong refs so background graph finishers are not GC'd mid-flight.
+_GRAPH_BG_TASKS: set[asyncio.Task] = set()
 
 
 # State keys to copy back from the LangGraph stream into the persistent
@@ -72,6 +77,89 @@ _FAILURE_STATUSES: frozenset[str] = frozenset({
 })
 
 
+def _apply_graph_updates(state: dict[str, Any], data: Any, *, cancelled: bool) -> bool:
+    """Merge LangGraph ``updates`` into session state. Returns True if applied."""
+    if not isinstance(data, dict):
+        return False
+    changed = False
+    for _, updates in data.items():
+        if not updates:
+            continue
+        for key, val in updates.items():
+            if key not in _STREAM_STATE_KEYS:
+                continue
+            if cancelled and key == "status":
+                continue
+            state[key] = val
+            changed = True
+    return changed
+
+
+async def _background_finish_graph(
+    task: asyncio.Task,
+    astream_q: asyncio.Queue,
+    state: dict[str, Any],
+) -> None:
+    """Finish a graph after the SSE client disconnected.
+
+    Navigating away used to cancel the LangGraph task in ``finally``, leaving
+    sessions stuck on PI "preparing clarification…" with no form. Keep the
+    graph running to the next checkpoint, persist, then stop.
+    """
+    session_id = str(state.get("session_id") or "")
+    try:
+        while True:
+            if session_id and await _is_cancelled(session_id):
+                if not task.done():
+                    task.cancel()
+                state["status"] = "stopped"
+                await _session_store.save(session_id)
+                break
+            try:
+                item = await asyncio.wait_for(astream_q.get(), timeout=1.0)
+            except asyncio.TimeoutError:
+                if task.done():
+                    # Drain any trailing updates after the producer finishes.
+                    while True:
+                        try:
+                            item = astream_q.get_nowait()
+                        except asyncio.QueueEmpty:
+                            item = None
+                            break
+                        if item is None:
+                            break
+                        stream_mode, data = item
+                        if stream_mode == "updates":
+                            _apply_graph_updates(state, data, cancelled=False)
+                    break
+                continue
+            if item is None:
+                break
+            stream_mode, data = item
+            if stream_mode == "updates":
+                if _apply_graph_updates(state, data, cancelled=False):
+                    await _session_store.save(session_id)
+        if not task.done():
+            try:
+                await task
+            except (asyncio.CancelledError, Exception):
+                pass
+        user_text = str(state.get("last_user_text") or "")
+        await _finalize_after_stream(state, user_text)
+        await _session_store.save(session_id)
+        _logger.info(
+            "background graph finish saved session=%s status=%s",
+            session_id,
+            state.get("status"),
+        )
+    except Exception:
+        _logger.exception("background graph finish failed session=%s", session_id)
+        try:
+            await _session_store.save(session_id)
+        except Exception:
+            pass
+
+
 async def _drain_graph_astream(
     graph,
     initial_state: dict[str, Any],
@@ -85,6 +173,10 @@ async def _drain_graph_astream(
     LangGraph may buffer ``get_stream_writer()`` custom events until a node
     returns; ``_stream_chain`` / ``_stream_text`` also push into a bound
     asyncio.Queue so the client sees tokens as they are produced.
+
+    If the SSE client disconnects (user navigates away), the graph is **not**
+    cancelled — a background task drains remaining updates and saves the
+    session so returning to the chat can show ClarificationForm / checkpoints.
     """
     sse_q: asyncio.Queue = asyncio.Queue()
     loop = asyncio.get_running_loop()
@@ -118,6 +210,9 @@ async def _drain_graph_astream(
     astream_waiter: asyncio.Task | None = asyncio.create_task(astream_q.get())
     sse_waiter: asyncio.Task | None = asyncio.create_task(sse_q.get())
     astream_done = False
+    # True when the ASGI generator is torn down before astream finishes
+    # (client navigated away / aborted fetch). Graph should keep running.
+    handoff_to_background = False
 
     try:
         while True:
@@ -190,27 +285,31 @@ async def _drain_graph_astream(
                         yield f"event: {event_type}\ndata: {_to_json(data)}\n\n"
                 elif stream_mode == "updates":
                     cancelled = await _is_cancelled(state["session_id"])
-                    for _, updates in data.items():
-                        if updates:
-                            for key, val in updates.items():
-                                if key in _STREAM_STATE_KEYS:
-                                    if cancelled and key == "status":
-                                        continue
-                                    state[key] = val
+                    if _apply_graph_updates(state, data, cancelled=cancelled):
+                        # Persist mid-run so a remounted UI can GET the latest
+                        # Thinking / waiting checkpoint without an open SSE.
+                        try:
+                            await _session_store.save(state["session_id"])
+                        except Exception:
+                            _logger.debug("mid-stream save failed", exc_info=True)
                     yield f"event: state\ndata: {_to_json(_snapshot(state))}\n\n"
                 astream_waiter = asyncio.create_task(astream_q.get())
+    except asyncio.CancelledError:
+        # Client disconnected / fetch aborted — do not kill the graph.
+        handoff_to_background = not task.done()
+        raise
     finally:
         detach_sse_from_session_state(state)
         reset_sse_queue(bind_tokens)
-        if not task.done():
-            task.cancel()
-            try:
-                await task
-            except (asyncio.CancelledError, Exception):
-                pass
         for waiter in (astream_waiter, sse_waiter):
             if waiter is not None and not waiter.done():
                 waiter.cancel()
+        # Avoid awaiting here: during CancelledError teardown, awaits in
+        # finally are themselves cancelled. Schedule work with create_task.
+        if not task.done() and (handoff_to_background or not astream_done):
+            bg = asyncio.create_task(_background_finish_graph(task, astream_q, state))
+            _GRAPH_BG_TASKS.add(bg)
+            bg.add_done_callback(_GRAPH_BG_TASKS.discard)
 
 
 async def _finalize_after_stream(state: dict[str, Any], user_text: str) -> None:
