@@ -1,0 +1,3 @@
+[submodule "third_party/scientific-agent-skills"]
+	path = third_party/scientific-agent-skills
+	url = https://github.com/K-Dense-AI/scientific-agent-skills.git

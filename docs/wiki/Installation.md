@@ -5,9 +5,12 @@
 This is the **canonical** install page (the root README only keeps quick commands). Day-to-day setup:
 
 ```bash
-git clone https://github.com/AI4Protein/VenusFactory2.git && cd VenusFactory2
+git clone --recurse-submodules https://github.com/AI4Protein/VenusFactory2.git && cd VenusFactory2
+# Or after a plain clone: git submodule update --init --recursive
 python scripts/setup_quickstart.py
 ```
+
+Agent skills optionally load the [scientific-agent-skills](https://github.com/K-Dense-AI/scientific-agent-skills) git submodule under `third_party/scientific-agent-skills`. Without it, VenusFactory2 skills still work.
 
 The CLI presents choices; options marked **[recommended]** are defaults. Press Enter to accept the recommended all-in-one plan (deps + frontend + `predict-core` weights).
 

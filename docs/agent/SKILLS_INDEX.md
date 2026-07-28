@@ -2,23 +2,34 @@
 
 Author guide: [`src/agent/skills/AGENTS.md`](../../src/agent/skills/AGENTS.md) · Validate: `python3 scripts/validate_skills.py`
 
+## Dual roots
+
+| Root | Path | Role |
+|------|------|------|
+| **VenusFactory2** | `src/agent/skills/` | Tool-bound protein-engineering skills (prefer for execution) |
+| **scientific-agent-skills** | `third_party/scientific-agent-skills/skills/` (git submodule) | Full reference library via `read_skill`; upstream `scripts/` / `uv` **not** auto-run |
+
+Init: `git clone --recurse-submodules …` or `git submodule update --init --recursive`. Missing submodule → VF2-only, no crash.
+
+**Collisions:** VF2 keeps bare `skill_id`; upstream same directory name → `sas_<id>` (e.g. `sas_biopython`). Catalogs show a short scientific section so prompts stay bounded; call `read_skill` / `list_skills` for full text.
+
 ## Dual chat modes
 
 | Mode | Engine | How skills are loaded |
 |------|--------|------------------------|
-| **Science Expert** | LangGraph PI→CB→MLS | CB sees metadata; plan may **require** `read_skill` before code steps; MLS executes |
-| **Science Agent** | kimi-code | System prompt embeds the skill **catalog**; agent **decides when** to call MCP `read_skill` / `list_skills` (no mandatory skill-first). Online denies kimi built-in `Skill`; use MCP. Local may also use built-in `Skill` via `.kimi-code/skills/`. |
+| **Science Expert** | LangGraph PI→CB→MLS | CB sees graded metadata (VF2 longer, scientific shorter); plan may **require** `read_skill` before code steps; MLS executes |
+| **Science Agent** | kimi-code | System prompt embeds the graded skill **catalog**; agent **decides when** to call MCP `read_skill` / `list_skills` (no mandatory skill-first). Online denies kimi built-in `Skill`; use MCP. Local may also use built-in `Skill` via `.kimi-code/skills/` (VF2 + SAS symlinks by public `skill_id`). |
 
 ### Code ownership
 
 | Layer | Paths | Responsibility |
 |-------|-------|----------------|
-| **Core** | `src/agent/skills.py`, `src/agent/skills/*` | Discover / read packages; shared JSON envelopes (`build_read_skill_response`, `build_list_skills_response`); catalogs |
+| **Core** | `src/agent/skills.py`, `src/agent/skills/*`, optional SAS submodule | Dual-root discover / read; `sas_` collisions; shared JSON envelopes; graded catalogs |
 | **Expert adapter** | `src/tools/skill/tools_agent.py` | LangChain `read_skill` → core envelope → `json.dumps` |
-| **Agent adapter** | `src/tools/skill/tools_mcp.py`, `src/agent/kimi_skills.py` | MCP `read_skill` / `list_skills`; optional `.kimi-code/skills` symlinks |
+| **Agent adapter** | `src/tools/skill/tools_mcp.py`, `src/agent/kimi_skills.py` | MCP `read_skill` / `list_skills`; `.kimi-code/skills` symlinks for VF2 + SAS |
 | **chat_api entry** | `messages.py` → `_stream.py` (Expert) / `_stream_kimi.py` (Agent); mode helpers in `_shared.py` | Route by `chat_mode` / engine; session gates & snapshots — **no** skill business logic in `_shared` |
 
-Policy reminder: **Agent** self-directs when to open a skill; **Expert** may force skill-first via plan helpers. New skills only need a package under `src/agent/skills/` — both adapters pick them up automatically.
+Policy reminder: **Agent** self-directs when to open a skill; **Expert** may force skill-first via plan helpers. New **VF2** skills go under `src/agent/skills/` — both adapters pick them up. Do not vendor-copy the whole scientific library into that tree.
 
 ## Platform workflows (protein engineering)
 
