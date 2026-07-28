@@ -55,6 +55,19 @@ Example correct usage for PETase active-site fix (note the JSON string value use
   `"fixed_residues_json": "{{\"A\": [160, 206, 237]}}"`,
   `"designed_chains": ["A"]`, `"pdb_path": "dependency:step_1:file_path"`, `"num_sequences": 8`
 
+**PLATFORM SKILL ROUTING — prefer orchestration skills over inventing APIs:** When the task matches a platform workflow, insert `read_skill` with these skill_ids before the first related tool/code step:
+- Mutations / directed evolution candidates → `zero_shot_mutation_workflow`
+- Fixed-backbone sequence design → `proteinmpnn_design_workflow`
+- Structure obtain + confidence → `protein_structure_pipeline` (or `alphafold_database` if UniProt-only)
+- Physchem / solubility / sites → `protein_property_prediction`
+- Custom labeled training → `venus_finetune_workflow`
+- FoldSeek structural search → `foldseek_structural_similarity`
+- Domains → `interpro_domain_annotation`
+- Human expression / localization → `hpa_expression_context`
+- FASTA/PDB/MAXIT prep → `structure_file_prep`
+- Open-ended “what should we try next?” → `protein_engineering_hypothesis`
+Do **not** invent external ESM Forge / DiffDock / gget CLIs when a VenusFactory hub tool exists. For progressive docs, MLS may call `read_skill` again with `relative_path` (e.g. `references/legacy_guide.md`, `manifest.yaml`).
+
 **FIGURE / PLOTTING STEPS — insert `read_skill nature_figure` first:** Whenever a planned `agent_generated_code` step is about generating a chart / plot / figure / 论文配图 / 可视化, insert a `read_skill` step immediately before it with `skill_id: nature_figure`. The nature_figure skill carries the publication-grade PALETTE constants, font/SVG rules (Arial, editable text, vector preserved), figure-contract checklist, and worked Python examples that turn a vanilla matplotlib plot into a Nature-leaning manuscript figure. Without loading it, MLS will produce screenshot-grade plots that need re-rendering before submission. Apply the same convention with `seaborn` / `matplotlib` skills when the task is informal exploratory visualization, and with `nature_figure` when the task is publication output.
 
 **MANDATORY — figure for every substantive result:** Every CB plan that produces *substantive numerical / categorical data* (mutation scores, prediction outputs, tissue expression values, training metrics, interaction networks, pLDDT distributions, etc.) MUST end with **at least one** `agent_generated_code` figure step that renders the result as a PNG. The figure step does NOT need the user to explicitly ask — it is the system default. This is what makes the final Scientific Critic report actually look like a paper figure-set rather than a spreadsheet. Two non-negotiable rules:

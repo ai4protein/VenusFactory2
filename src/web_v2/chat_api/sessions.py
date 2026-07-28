@@ -3,7 +3,7 @@ import asyncio
 import shutil
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 
 from agent.chat_agent import initialize_session_state
 
@@ -102,10 +102,13 @@ async def list_sessions(request: Request):
 
 
 @router.get("/sessions/{session_id}", response_model=SessionStateResponse)
-async def get_session(session_id: str, request: Request):
+async def get_session(session_id: str, request: Request, response: Response):
     _record_access_event(request, "/api/chat/sessions/{id}:get")
     state = await _get_session_or_404(session_id)
     _assert_session_access(state, request)
+    # Soft-navigate back must see live checkpoint state, not a cached Thinking bubble.
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
     snap = _snapshot(state)
     return SessionStateResponse(**snap)
 

@@ -40,17 +40,22 @@ Use the segmented control above the composer to pick a mode. The choice is saved
 
 - **Engine:** local **kimi-code** daemon (not the LangGraph PI/CB/MLS/SC graph).
 - **Behavior:** streaming tool use (VenusFactory MCP, shell where allowed), collapsible **Thinking** blocks, inline tool-run cards in the timeline.
+- **Context (aligned with [Kimi Code sessions](https://www.kimi.com/code/docs/en/kimi-code-cli/guides/sessions.html)):**
+  - Auto-compresses when context usage ≥ ~90%; timeline shows compaction summaries.
+  - Composer controls: **Compact** (`/compact`), **Plan** (`/plan`), **Fork** (`/fork`), **Clear ctx** (`/new`), plus a context usage pill.
+  - Stop aborts the in-flight kimi prompt when possible.
 - **Model:** fixed to kimi-code; configure providers via Settings / `.env` (see WebUI wiki). Online mode may use `bwrap` sandboxing.
 - **When to use:** open-ended tasks where you want a single agent to call tools fluidly without the Expert planning pipeline.
 
 ### 3.2 Science Expert (LangGraph)
 
 - **Engine:** LangGraph **`graph`** pipeline with four roles — **PI** (plan / research) → **CB** (concrete step plan) → **MLS** (execution checks) → **SC** (review).
+- **PI first:** every new run starts with PI analysis / clarification (including an explicit Skip Research option). No silent keyword jump straight to CB.
 - **Plan gate:** you still review and confirm the plan in **Plan Editor** (edit, reorder, delete steps).
 - **Flow defaults (fewer stops):**
-  - **Execution-style tasks:** PI may emit no research sections — literature search and sub-reports are skipped.
   - **After plan confirm:** prefer **Confirm & Auto-execute** (recommended; backend default). Steps run without a pause after each tool step. Choose **Confirm Plan** only if you want per-step checkpoints.
   - **Sub-reports:** when literature sections do run, the pipeline auto-advances by default instead of stopping on every section; you can still rewrite or skip from the checkpoint if one appears.
+  - **Final SC report:** paper-level manuscript (~5000–8000 words), not a short 800–1500 word brief.
 - **Model:** **Local** — pick any graph-engine LLM in the model selector (built-in or custom OpenAI-style). **Online** — no model selector; the platform uses a fixed backend model.
 
 Expert runs still move through the phases below; not every phase appears on every task.

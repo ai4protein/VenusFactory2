@@ -289,6 +289,7 @@ FILE_TOOLS: list[BaseTool] = [
     unzip_archive_tool,
     ungzip_file_tool,
     pdb_chain_sequences_tool,
+    get_seq_from_pdb_chain_a_tool,
     pdb_dir_to_fasta_tool,
     check_pdb_apo_tool,
     extract_uniprot_id_from_rcsb_metadata_tool,
