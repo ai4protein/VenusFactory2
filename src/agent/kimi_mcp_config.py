@@ -30,6 +30,12 @@ def ensure_registered(mcp_url: str = DEFAULT_MCP_URL, name: str = VENUSFACTORY_M
     Preserves any other servers already configured. Returns the file path.
     Idempotent: if the entry already matches, no write happens.
     """
+    try:
+        from agent.kimi_skills import ensure_kimi_project_skills
+        ensure_kimi_project_skills()
+    except Exception:
+        pass
+
     path = _config_path()
     path.parent.mkdir(parents=True, exist_ok=True)
 

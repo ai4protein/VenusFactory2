@@ -1,6 +1,8 @@
 """
-Skill tools for CB/MLS: read_skill (get SKILL.md content), optional python_repl (execute code).
-Used so CB can see skill metadata and instruct MLS to read and execute skills; code/plots visible in chat.
+Skill tools for Science Expert (CB/MLS): LangChain ``read_skill`` adapter.
+
+Envelope logic lives in ``agent.skills`` so MCP (Science Agent) and LangChain
+share one implementation.
 """
 import json
 from typing import Optional
@@ -8,45 +10,47 @@ from typing import Optional
 from langchain.tools import tool
 from pydantic import BaseModel, Field
 
-# Import from agent.skills (middleware)
 try:
-    from agent.skills import get_skill_content, list_skill_ids
+    from agent.skills import build_read_skill_response
 except ImportError:
-    def get_skill_content(skill_id: str) -> Optional[str]:
-        return None
-    def list_skill_ids():
-        return []
+    def build_read_skill_response(skill_id: str, relative_path: Optional[str] = None):
+        return {
+            "success": False,
+            "error": "Skills middleware unavailable",
+            "available_ids": [],
+        }
 
 
 class ReadSkillInput(BaseModel):
-    skill_id: str = Field(..., description="Skill directory name, e.g. rdkit, fda, brenda_database")
+    skill_id: str = Field(
+        ...,
+        description="Skill directory name under src/agent/skills/, e.g. rdkit, fda, nature_figure, zero_shot_mutation_workflow",
+    )
+    relative_path: Optional[str] = Field(
+        default=None,
+        description=(
+            "Optional path inside the skill package relative to its root. "
+            "Omit or use SKILL.md for the main skill doc. "
+            "For nature_* routers: manifest.yaml, static/core/contract.md, references/api.md, etc. "
+            "Path traversal (..) is rejected."
+        ),
+    )
 
 
 @tool("read_skill", args_schema=ReadSkillInput)
-def read_skill_tool(skill_id: str) -> str:
+def read_skill_tool(skill_id: str, relative_path: Optional[str] = None) -> str:
     """
-    Read the full SKILL.md content for a skill. Use this when the Computational Biologist or the plan asks you to follow a skill (e.g. rdkit, fda, brenda_database). skill_id is the directory name under src/agent/skills/, e.g. rdkit, fda, brenda_database. Returns the full skill document so you can write and run code (agent_generated_code or python_repl) according to the skill's instructions. Output is returned as JSON with success, content, and available_ids.
+    Read a file from a VenusFactory skill package. Default is SKILL.md.
+    Use when the Computational Biologist or the plan asks you to follow a skill.
+    skill_id is the directory name under src/agent/skills/ (must match Available skills skill_id).
+    For progressive disclosure (nature_figure / nature_writing / nature_polishing, or thick database skills),
+    call again with relative_path to load manifest.yaml, static/, or references/ files.
+    Returns JSON: success, skill_id, skill_root, relative_path, content, available_ids.
     """
-    available = list_skill_ids()
-    if not skill_id or skill_id not in available:
-        return json.dumps({
-            "success": False,
-            "error": f"Unknown skill_id. Available: {available}",
-            "available_ids": available,
-        }, ensure_ascii=False)
-    content = get_skill_content(skill_id)
-    if content is None:
-        return json.dumps({
-            "success": False,
-            "error": f"Could not read skill: {skill_id}",
-            "available_ids": available,
-        }, ensure_ascii=False)
-    return json.dumps({
-        "success": True,
-        "skill_id": skill_id,
-        "content": content,
-        "available_ids": available,
-    }, ensure_ascii=False)
+    return json.dumps(
+        build_read_skill_response(skill_id, relative_path),
+        ensure_ascii=False,
+    )
 
 
 # Optional: Python REPL for interactive code execution (stdout/stderr and plot paths visible in chat)
