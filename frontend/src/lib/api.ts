@@ -9,9 +9,19 @@ export type ChatHistoryItem = {
   /** kimi-code engine writes message kind. "thinking" → collapsible reasoning
    * block rendered above the answer; "status" → foldable research noise;
    * "text" (or undefined) → regular message. */
-  kind?: "text" | "thinking" | "status" | "checkpoint";
+  kind?: "text" | "thinking" | "status" | "checkpoint" | "compaction";
   /** Optional kimi turn id; used to group thinking + text from the same turn. */
   turn_id?: string;
+};
+
+export type KimiContextInfo = {
+  context_tokens?: number;
+  max_context_tokens?: number;
+  context_usage?: number;
+  model?: string;
+  permission?: string;
+  plan_mode?: boolean;
+  status?: string;
 };
 
 export type ClarificationQuestion = {
@@ -83,6 +93,10 @@ export type ChatSnapshot = {
   review_sub_reports?: boolean;
   /** SC paper-level manuscript (default on; kept for API compat). */
   full_manuscript?: boolean;
+  /** Science Agent context window usage from kimi status. */
+  kimi_context?: KimiContextInfo | null;
+  /** Science Agent Plan mode (Kimi /plan). */
+  kimi_plan_mode?: boolean;
 };
 
 /** Stream body fields for POST .../messages/stream (extra keys ignored by older backends). */
@@ -285,7 +299,7 @@ export async function createChatSession() {
 }
 
 export async function listChatSessions() {
-  const res = await fetch(`${API_ROOT}/api/chat/sessions`);
+  const res = await fetch(`${API_ROOT}/api/chat/sessions`, { cache: "no-store" });
   if (!res.ok) {
     const detail = await extractErrorDetail(res);
     throw new Error(parseErrorStatus(res.status, detail));
@@ -304,6 +318,9 @@ export async function listChatSessions() {
 
 export async function getChatSession(sessionId: string) {
   const res = await fetch(`${API_ROOT}/api/chat/sessions/${encodeURIComponent(sessionId)}`, {
+    // Session state changes while the user is on other pages; never reuse a
+    // cached GET or soft-return keeps showing a stale Thinking bubble.
+    cache: "no-store",
     headers: getChatSessionAuthHeaders(sessionId)
   });
   if (!res.ok) {
@@ -384,6 +401,95 @@ export function getAskUserRespondUrl(sessionId: string): string {
 
 export function getApprovalDecideUrl(sessionId: string): string {
   return `${API_ROOT}/api/chat/sessions/${encodeURIComponent(sessionId)}/approval/decide/stream`;
+}
+
+export async function agentCompact(sessionId: string, instruction = "") {
+  const res = await fetch(
+    `${API_ROOT}/api/chat/sessions/${encodeURIComponent(sessionId)}/agent/compact`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...getChatSessionAuthHeaders(sessionId),
+      },
+      body: JSON.stringify({ instruction }),
+    }
+  );
+  if (!res.ok) {
+    const detail = await extractErrorDetail(res);
+    throw new Error(parseErrorStatus(res.status, detail));
+  }
+  return res.json() as Promise<{ success: boolean; snapshot: ChatSnapshot }>;
+}
+
+export async function agentSetPlanMode(sessionId: string, planMode: boolean) {
+  const res = await fetch(
+    `${API_ROOT}/api/chat/sessions/${encodeURIComponent(sessionId)}/agent/profile`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...getChatSessionAuthHeaders(sessionId),
+      },
+      body: JSON.stringify({ plan_mode: planMode }),
+    }
+  );
+  if (!res.ok) {
+    const detail = await extractErrorDetail(res);
+    throw new Error(parseErrorStatus(res.status, detail));
+  }
+  return res.json() as Promise<{ success: boolean; kimi_plan_mode: boolean; snapshot: ChatSnapshot }>;
+}
+
+export async function agentResetContext(sessionId: string) {
+  const res = await fetch(
+    `${API_ROOT}/api/chat/sessions/${encodeURIComponent(sessionId)}/agent/reset-context`,
+    {
+      method: "POST",
+      headers: getChatSessionAuthHeaders(sessionId),
+    }
+  );
+  if (!res.ok) {
+    const detail = await extractErrorDetail(res);
+    throw new Error(parseErrorStatus(res.status, detail));
+  }
+  return res.json() as Promise<{ success: boolean; snapshot: ChatSnapshot }>;
+}
+
+export async function agentForkSession(sessionId: string, title = "") {
+  const res = await fetch(
+    `${API_ROOT}/api/chat/sessions/${encodeURIComponent(sessionId)}/agent/fork`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...getChatSessionAuthHeaders(sessionId),
+      },
+      body: JSON.stringify({ title }),
+    }
+  );
+  if (!res.ok) {
+    const detail = await extractErrorDetail(res);
+    throw new Error(parseErrorStatus(res.status, detail));
+  }
+  return res.json() as Promise<{ success: boolean; kimi_session_id: string; snapshot: ChatSnapshot }>;
+}
+
+export async function agentStatus(sessionId: string) {
+  const res = await fetch(
+    `${API_ROOT}/api/chat/sessions/${encodeURIComponent(sessionId)}/agent/status`,
+    { headers: getChatSessionAuthHeaders(sessionId) }
+  );
+  if (!res.ok) {
+    const detail = await extractErrorDetail(res);
+    throw new Error(parseErrorStatus(res.status, detail));
+  }
+  return res.json() as Promise<{
+    success: boolean;
+    kimi_session_id: string;
+    kimi_context: KimiContextInfo;
+    kimi_plan_mode: boolean;
+  }>;
 }
 
 export function getPlanConfirmUrl(sessionId: string): string {

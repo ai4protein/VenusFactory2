@@ -76,6 +76,12 @@ def _language_policy_block(lang: str) -> str:
 
 
 def _build_system_prompt(lang: str) -> str:
+    try:
+        from agent.skills import get_skills_catalog_for_agent
+        skills_catalog = get_skills_catalog_for_agent()
+    except Exception:  # noqa: BLE001
+        skills_catalog = "(Skills catalog unavailable; call mcp__venusfactory__list_skills.)"
+
     return f"""\
 You are the VenusFactory2 protein-engineering assistant.
 
@@ -91,12 +97,40 @@ You have access to TWO namespaces of tools. They are NOT interchangeable.
 2. **VenusFactory MCP tools** — prefixed `mcp__venusfactory__...`.
    These wrap protein-specific operations (mutation prediction, structure
    download, ESMFold, ProteinMPNN, sequence/structure DB queries, BLAST,
-   ClustalO MSA, KEGG/BRENDA/ChEMBL, PubMed/arXiv search, etc.).
+   ClustalO MSA, KEGG/BRENDA/ChEMBL, PubMed/arXiv search, etc.) **and**
+   VenusFactory skill packages.
 
 **Hard rule**: Only call tools that appear verbatim in your tool catalog.
 Do NOT prefix kimi built-ins with `mcp__venusfactory__`. Do NOT invent
 plausible-sounding names. If a capability is missing, say so in the answer
 instead of fabricating a tool call.
+
+## VenusFactory skills (optional — you decide when to open them)
+
+Below is the skill catalog for this deployment. You **already see** the
+skill_ids and short descriptions; you do **not** need to load a skill on
+every turn.
+
+**Self-directed policy (Science Agent):**
+- Use the catalog to choose a skill_id when you want curated workflows,
+  Project Tools tables, parameter gotchas, or progressive references.
+- Call `mcp__venusfactory__read_skill` **only when you decide** the full
+  SKILL.md (or a `relative_path` fragment) would help — e.g. unfamiliar
+  tool args, Nature figure contracts, SPARQL/MSA recipes.
+- Simple / well-known MCP calls can proceed **without** reading a skill.
+- There is **no** mandatory skill-first gate (unlike Science Expert plans).
+- Prefer MCP `read_skill` / `list_skills` over kimi built-in `Skill`.
+  Online mode blocks built-in `Skill`; MCP skill tools still work.
+- After opening a skill, follow its **Project Tools** names exactly.
+  Do not invent Forge/DiffDock/gget CLIs when a VenusFactory MCP tool exists.
+
+**Available skills:**
+{skills_catalog}
+
+Refresh catalog anytime with `mcp__venusfactory__list_skills`. Progressive
+files: `mcp__venusfactory__read_skill` with `relative_path` such as
+`references/legacy_guide.md`, `manifest.yaml`, or
+`_shared_nature/core/ethics.md`.
 
 Prefer calling tools over reasoning from memory when the user asks for
 protein-specific facts, structures, or computations.
@@ -155,6 +189,16 @@ async def _ensure_kimi_session(client: KimiClient, state: dict[str, Any]) -> str
     else:
         cwd = str(state.get("agent_session_dir") or "")
     os.makedirs(cwd, exist_ok=True)
+    # Project skill symlinks for local kimi built-in Skill discovery.
+    # Online mode still relies on MCP read_skill (Skill tool is security-denied).
+    try:
+        from agent.kimi_skills import ensure_kimi_project_skills
+        ensure_kimi_project_skills()
+    except Exception as exc:  # noqa: BLE001
+        _logger.info("ensure_kimi_project_skills failed: %s", exc)
+    # Plan mode is a session preference (Kimi /plan). Permission stays
+    # "manual" so VF security + ApprovalCard remain the gate — never yolo here.
+    plan_mode = bool(state.get("kimi_plan_mode"))
     sid = await client.create_session(
         cwd=cwd,
         title=f"VenusFactory chat {state.get('session_id', '')[:8]}",
@@ -168,9 +212,86 @@ async def _ensure_kimi_session(client: KimiClient, state: dict[str, Any]) -> str
         model=desired_model,
         system_prompt=_build_system_prompt(str(state.get("user_lang") or "")),
     )
+    if plan_mode:
+        try:
+            await client.update_profile(sid, agent_config={"plan_mode": True})
+        except Exception as exc:  # noqa: BLE001
+            _logger.info("kimi plan_mode profile update failed: %s", exc)
     state["kimi_session_id"] = sid
     state["_kimi_bound_model"] = desired_model or ""
     return sid
+
+
+async def _refresh_kimi_context(client: KimiClient, state: dict[str, Any], kimi_sid: str) -> None:
+    """Pull context_usage / plan_mode into session state for the UI status bar."""
+    try:
+        st = await client.get_status(kimi_sid)
+    except Exception as exc:  # noqa: BLE001
+        _logger.debug("kimi status refresh failed: %s", exc)
+        return
+    if not isinstance(st, dict):
+        return
+    tokens = int(st.get("context_tokens") or 0)
+    max_tokens = int(st.get("max_context_tokens") or 0)
+    usage = st.get("context_usage")
+    try:
+        usage_f = float(usage) if usage is not None else (
+            (tokens / max_tokens) if max_tokens > 0 else 0.0
+        )
+    except (TypeError, ValueError):
+        usage_f = 0.0
+    state["kimi_context"] = {
+        "context_tokens": tokens,
+        "max_context_tokens": max_tokens,
+        "context_usage": max(0.0, min(1.0, usage_f)),
+        "model": str(st.get("model") or ""),
+        "permission": str(st.get("permission") or ""),
+        "plan_mode": bool(st.get("plan_mode")),
+        "status": str(st.get("status") or ""),
+    }
+    if "plan_mode" in st:
+        state["kimi_plan_mode"] = bool(st.get("plan_mode"))
+
+
+async def _maybe_auto_compact(
+    client: KimiClient,
+    state: dict[str, Any],
+    kimi_sid: str,
+    *,
+    ui_lang: str,
+) -> list[str]:
+    """If context is nearly full, compact before submitting the next prompt.
+
+    Matches Kimi Code's auto-compression behavior and surfaces a timeline note.
+    """
+    await _refresh_kimi_context(client, state, kimi_sid)
+    ctx = state.get("kimi_context") or {}
+    usage = float(ctx.get("context_usage") or 0.0)
+    if usage < 0.90:
+        return []
+    instruction = (
+        "Preserve the user's goals, key tool results, file paths, IDs, and recent decisions. "
+        "Drop verbose tool dumps and redundant intermediate chatter."
+    )
+    try:
+        await client.compact(kimi_sid, instruction=instruction)
+    except Exception as exc:  # noqa: BLE001
+        _logger.info("kimi auto-compact skipped/failed: %s", exc)
+        return []
+    note = (
+        "🗜️ **Context compressed** (auto) — usage was high; key task state kept."
+        if ui_lang != "zh"
+        else "🗜️ **上下文已自动压缩** — 占用偏高，已保留关键任务信息。"
+    )
+    state.setdefault("history", []).append({
+        "role": "assistant",
+        "content": note,
+        "kind": "compaction",
+        "phase": "compaction",
+        "role_id": "assistant",
+    })
+    await _refresh_kimi_context(client, state, kimi_sid)
+    return [f"event: state\ndata: {_to_json(_snapshot(state))}\n\n"]
 
 
 def _language_pin(lang: str) -> str:
@@ -504,6 +625,68 @@ def _apply_event(state: dict[str, Any], ev: KimiEvent) -> list[str]:
             )
         ]
         state["status"] = "completed" if not ev.is_error else "error"
+        state.pop("kimi_current_prompt_id", None)
+        frames.append(f"event: state\ndata: {_to_json(_snapshot(state))}\n\n")
+
+    elif ev.kind == "compaction_started":
+        trigger = ev.text or "auto"
+        history.append({
+            "role": "assistant",
+            "content": (
+                f"🗜️ Compressing context ({trigger})…"
+                if str(state.get("user_lang") or state.get("ui_lang") or "") != "zh"
+                else f"🗜️ 正在压缩上下文（{trigger}）…"
+            ),
+            "kind": "compaction",
+            "phase": "compaction",
+            "role_id": "assistant",
+            "compaction_trigger": trigger,
+        })
+        frames.append(f"event: state\ndata: {_to_json(_snapshot(state))}\n\n")
+
+    elif ev.kind == "compaction_completed":
+        result = ev.tool_output if isinstance(ev.tool_output, dict) else {}
+        summary = (ev.text or str(result.get("summary") or "")).strip()
+        before = result.get("tokensBefore")
+        after = result.get("tokensAfter")
+        count = result.get("compactedCount")
+        meta_bits = []
+        if before is not None and after is not None:
+            meta_bits.append(f"{before} → {after} tokens")
+        if count is not None:
+            meta_bits.append(f"{count} msgs")
+        meta = f" ({', '.join(str(x) for x in meta_bits)})" if meta_bits else ""
+        body = summary or (
+            "Context compression finished."
+            if str(state.get("user_lang") or state.get("ui_lang") or "") != "zh"
+            else "上下文压缩完成。"
+        )
+        # Replace in-flight "compressing…" bubble when present.
+        if history and history[-1].get("kind") == "compaction" and "…" in (
+            history[-1].get("content") or ""
+        ):
+            history.pop()
+        history.append({
+            "role": "assistant",
+            "content": f"🗜️ **Context compressed**{meta}\n\n{body}",
+            "kind": "compaction",
+            "phase": "compaction",
+            "role_id": "assistant",
+        })
+        frames.append(f"event: state\ndata: {_to_json(_snapshot(state))}\n\n")
+
+    elif ev.kind in ("compaction_blocked", "compaction_cancelled"):
+        history.append({
+            "role": "assistant",
+            "content": (
+                "🗜️ Context compression skipped."
+                if str(state.get("user_lang") or state.get("ui_lang") or "") != "zh"
+                else "🗜️ 上下文压缩已跳过。"
+            ),
+            "kind": "compaction",
+            "phase": "compaction",
+            "role_id": "assistant",
+        })
         frames.append(f"event: state\ndata: {_to_json(_snapshot(state))}\n\n")
 
     elif ev.kind == "error":
@@ -640,11 +823,17 @@ async def _kimi_event_loop(
     try:
         async for ev in client.stream_session_events(kimi_sid):
             if await _is_cancelled(session_id):
+                prompt_id = str(state.get("kimi_current_prompt_id") or "")
+                if prompt_id:
+                    try:
+                        await client.abort_prompt(kimi_sid, prompt_id)
+                    except Exception as exc:  # noqa: BLE001
+                        _logger.info("kimi abort_prompt failed: %s", exc)
                 state["status"] = "stopped"
                 state["history"].append({
                     "role": "assistant",
                     "content": "Run stopped by user.",
-                    "role_id": "principal_investigator",
+                    "role_id": "assistant",
                 })
                 await _session_store.save(session_id)
                 yield f"event: state\ndata: {_to_json(_snapshot(state))}\n\n"
@@ -665,10 +854,32 @@ async def _kimi_event_loop(
             if ev.kind == "subscribed":
                 if submit_text is not None and not prompt_submitted:
                     prompt_submitted = True
+                    ui_lang = str(state.get("user_lang") or state.get("ui_lang") or "")
+                    for frame in await _maybe_auto_compact(
+                        client, state, kimi_sid, ui_lang=ui_lang,
+                    ):
+                        yield frame
                     pin = _language_pin(str(state.get("user_lang") or ""))
-                    asyncio.create_task(
-                        client.submit_prompt(kimi_sid, pin + submit_text)
-                    )
+
+                    async def _submit_and_track() -> None:
+                        try:
+                            data = await client.submit_prompt(kimi_sid, pin + submit_text)
+                            pid = ""
+                            if isinstance(data, dict):
+                                pid = str(
+                                    data.get("id")
+                                    or data.get("prompt_id")
+                                    or (data.get("prompt") or {}).get("id")
+                                    or ""
+                                )
+                            if pid:
+                                state["kimi_current_prompt_id"] = pid
+                        except Exception as exc:  # noqa: BLE001
+                            _logger.warning("kimi submit_prompt failed: %s", exc)
+                            state["status"] = "error"
+                            state["error"] = str(exc)
+
+                    asyncio.create_task(_submit_and_track())
                 if after_subscribe is not None and not after_subscribe_fired:
                     after_subscribe_fired = True
                     # Await so failures can restore waiting gates and surface
@@ -704,6 +915,9 @@ async def _kimi_event_loop(
 
             for frame in _apply_event(state, ev):
                 yield frame
+            if ev.kind in ("turn_ended", "compaction_completed", "error"):
+                await _refresh_kimi_context(client, state, kimi_sid)
+                yield f"event: state\ndata: {_to_json(_snapshot(state))}\n\n"
             if ev.kind == "turn_ended" or ev.kind == "error":
                 break
     except Exception as exc:  # noqa: BLE001

@@ -19,6 +19,8 @@ from web_v2.chat_api._shared import (
     _extract_client_ip,
     _get_session_or_404,
     _record_access_event,
+    _resolve_chat_mode,
+    _resolve_engine,
     _runtime_mode,
     _session_owner_key_for_request,
     _sse_response,
@@ -31,42 +33,6 @@ router = APIRouter()
 # Online deployments pin Science Expert (graph) to DeepSeek — clients cannot
 # pick GPT/Claude/etc. Science Agent still routes through kimi-code.
 _ONLINE_FIXED_GRAPH_MODEL = "deepseek-v4-pro"
-
-
-def _resolve_engine(
-    payload_engine: str | None,
-    model_id: str | None,
-    chat_mode: str | None = None,
-) -> str:
-    """Decide whether this turn runs through the kimi-code daemon or the
-    LangGraph Science Expert pipeline.
-
-    Precedence:
-      1. Explicit ``chat_mode`` from the UI mode toggle
-         (science_agent→kimi-code, science_expert→graph).
-      2. Model registry ``engine: kimi-code`` (legacy clients that only send
-         model id, e.g. selecting the Science Agent pseudo-model).
-      3. Explicit ``engine`` field on the request payload.
-      4. Default: ``graph``.
-    """
-    if chat_mode == "science_agent":
-        return "kimi-code"
-    if chat_mode == "science_expert":
-        return "graph"
-    if model_id:
-        spec = get_model(model_id)
-        if spec is not None and (spec.engine or "graph") == "kimi-code":
-            return "kimi-code"
-    if payload_engine in ("kimi-code", "graph"):
-        return payload_engine
-    return "graph"
-
-
-def _resolve_chat_mode(engine: str, chat_mode: str | None = None) -> str:
-    """Normalize chat_mode for session state / snapshots."""
-    if chat_mode in ("science_agent", "science_expert"):
-        return chat_mode
-    return "science_agent" if engine == "kimi-code" else "science_expert"
 
 
 @router.post("/sessions/{session_id}/messages/stream")

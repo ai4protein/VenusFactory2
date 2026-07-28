@@ -21,13 +21,17 @@ WebSocket protocol (see /asyncapi.json on the running server):
      "payload": {"type": "<event-type>", ...}}
 
 session_event payload `type` values we map to KimiEvent:
-    thinking.delta    → kind="thinking",  text=delta
-    assistant.delta   → kind="text",      text=delta
-    tool.call.started → kind="tool_call_start"
-    tool.result       → kind="tool_result"
-    turn.started      → kind="turn_started"
-    turn.ended        → kind="turn_ended"
-    error             → kind="error"
+    thinking.delta         → kind="thinking",  text=delta
+    assistant.delta        → kind="text",      text=delta
+    tool.call.started      → kind="tool_call_start"
+    tool.result            → kind="tool_result"
+    turn.started           → kind="turn_started"
+    turn.ended             → kind="turn_ended"
+    compaction.started     → kind="compaction_started"
+    compaction.completed   → kind="compaction_completed"
+    compaction.blocked     → kind="compaction_blocked"
+    compaction.cancelled   → kind="compaction_cancelled"
+    error                  → kind="error"
     (other event types are passed through with kind="other" and the raw payload
     in `raw` so callers can inspect without us hard-coding every variant.)
 
@@ -63,7 +67,7 @@ class KimiAPIError(RuntimeError):
 @dataclass
 class KimiEvent:
     kind: str  # "thinking" | "text" | "tool_call_start" | "tool_result"
-               # | "turn_started" | "turn_ended" | "error" | "other"
+               # | "turn_started" | "turn_ended" | "compaction_*" | "error" | "other"
     turn_id: str = ""
     text: str = ""
     tool_call_id: str = ""
@@ -144,6 +148,25 @@ def _map_event(env: dict[str, Any]) -> KimiEvent:
             is_error=bool(payload.get("error")),
             **common,
         )
+    if et == "compaction.started":
+        return KimiEvent(
+            kind="compaction_started",
+            text=str(payload.get("trigger") or "auto"),
+            **common,
+        )
+    if et == "compaction.completed":
+        result = payload.get("result") if isinstance(payload.get("result"), dict) else {}
+        summary = str((result or {}).get("summary") or payload.get("summary") or "")
+        return KimiEvent(
+            kind="compaction_completed",
+            text=summary,
+            tool_output=result or payload,
+            **common,
+        )
+    if et == "compaction.blocked":
+        return KimiEvent(kind="compaction_blocked", **common)
+    if et == "compaction.cancelled":
+        return KimiEvent(kind="compaction_cancelled", **common)
     if et == "error":
         return KimiEvent(
             kind="error",
@@ -246,6 +269,92 @@ class KimiClient:
         body = {"content": [{"type": "text", "text": text}]}
         return await _unwrap_async(
             self._http.post(f"/api/v1/sessions/{session_id}/prompts", json=body)
+        )
+
+    async def get_status(self, session_id: str) -> dict[str, Any]:
+        """Realtime session status including context_usage / plan_mode."""
+        data = await _unwrap_async(
+            self._http.get(f"/api/v1/sessions/{session_id}/status")
+        )
+        return data if isinstance(data, dict) else {}
+
+    async def update_profile(
+        self,
+        session_id: str,
+        *,
+        agent_config: dict[str, Any] | None = None,
+        title: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        body: dict[str, Any] = {}
+        if agent_config is not None:
+            body["agent_config"] = agent_config
+        if title is not None:
+            body["title"] = title
+        if metadata is not None:
+            body["metadata"] = metadata
+        return await _unwrap_async(
+            self._http.post(f"/api/v1/sessions/{session_id}/profile", json=body)
+        )
+
+    async def compact(
+        self,
+        session_id: str,
+        *,
+        instruction: str | None = None,
+    ) -> dict[str, Any]:
+        """Manually compress session context (Kimi `/compact`)."""
+        body: dict[str, Any] = {}
+        if instruction:
+            body["instruction"] = instruction
+        return await _unwrap_async(
+            self._http.post(f"/api/v1/sessions/{session_id}:compact", json=body)
+        )
+
+    async def fork_session(
+        self,
+        session_id: str,
+        *,
+        title: str | None = None,
+    ) -> dict[str, Any]:
+        body: dict[str, Any] = {}
+        if title:
+            body["title"] = title
+        return await _unwrap_async(
+            self._http.post(f"/api/v1/sessions/{session_id}:fork", json=body)
+        )
+
+    async def undo(self, session_id: str, *, count: int = 1) -> dict[str, Any]:
+        return await _unwrap_async(
+            self._http.post(
+                f"/api/v1/sessions/{session_id}:undo",
+                json={"count": max(1, int(count))},
+            )
+        )
+
+    async def abort_prompt(self, session_id: str, prompt_id: str) -> dict[str, Any]:
+        """Abort a running prompt (`POST .../prompts/{id}:abort`)."""
+        pid = str(prompt_id or "").strip()
+        if not pid:
+            raise KimiAPIError("abort_prompt: empty prompt_id")
+        return await _unwrap_async(
+            self._http.post(f"/api/v1/sessions/{session_id}/prompts/{pid}:abort")
+        )
+
+    async def steer_prompts(
+        self,
+        session_id: str,
+        prompt_ids: list[str],
+    ) -> dict[str, Any]:
+        """Steer queued prompts into the active turn (Ctrl-S equivalent)."""
+        ids = [str(x).strip() for x in (prompt_ids or []) if str(x).strip()]
+        if not ids:
+            raise KimiAPIError("steer_prompts: empty prompt_ids")
+        return await _unwrap_async(
+            self._http.post(
+                f"/api/v1/sessions/{session_id}/prompts:steer",
+                json={"prompt_ids": ids},
+            )
         )
 
     async def list_sessions(self) -> list[dict[str, Any]]:

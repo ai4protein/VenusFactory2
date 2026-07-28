@@ -1,5 +1,13 @@
-"""Shared helpers for chat_api sub-routers (request fingerprinting, snapshot,
-session access control, online quota).
+"""chat_api session / mode / gate / snapshot helpers.
+
+Owns:
+  - session access, request fingerprinting, online quota
+  - chat_mode / engine resolution for streaming entrypoints
+  - agent vs expert waiting-status gates (hard isolation)
+  - session snapshot shaping for the frontend
+
+Does **not** own skill discovery, read envelopes, or Expert plan guards —
+those live in ``agent.skills`` / ``tools.skill`` / graph plan_helpers.
 
 Pydantic models live in ``_models``. Heavy upload/archive helpers live in
 ``_uploads``. Both are re-exported from the package ``__init__`` for
@@ -14,6 +22,7 @@ from typing import Any
 
 from fastapi import HTTPException, Request
 
+from agent.model_registry import get_model
 from web.utils.common_utils import redact_path_text
 from web_v2.analytics_store import analytics_store
 from web_v2.redact import redact_for_frontend
@@ -193,6 +202,39 @@ def _redact_obj(value: Any) -> Any:
     return value
 
 
+def _resolve_engine(
+    payload_engine: str | None,
+    model_id: str | None,
+    chat_mode: str | None = None,
+) -> str:
+    """Decide whether this turn runs through kimi-code or LangGraph.
+
+    Precedence:
+      1. Explicit ``chat_mode`` (science_agent→kimi-code, science_expert→graph)
+      2. Model registry ``engine: kimi-code``
+      3. Explicit ``engine`` on the request payload
+      4. Default: ``graph``
+    """
+    if chat_mode == "science_agent":
+        return "kimi-code"
+    if chat_mode == "science_expert":
+        return "graph"
+    if model_id:
+        spec = get_model(model_id)
+        if spec is not None and (spec.engine or "graph") == "kimi-code":
+            return "kimi-code"
+    if payload_engine in ("kimi-code", "graph"):
+        return payload_engine
+    return "graph"
+
+
+def _resolve_chat_mode(engine: str, chat_mode: str | None = None) -> str:
+    """Normalize chat_mode for session state / snapshots."""
+    if chat_mode in ("science_agent", "science_expert"):
+        return chat_mode
+    return "science_agent" if engine == "kimi-code" else "science_expert"
+
+
 def _infer_chat_mode(state: dict[str, Any]) -> str:
     """Return session chat_mode, inferring from engine when missing."""
     mode = state.get("chat_mode")
@@ -204,7 +246,7 @@ def _infer_chat_mode(state: dict[str, Any]) -> str:
         model_id = getattr(llm, "model_name", "") if llm is not None else ""
         if model_id == "kimi-code":
             engine = "kimi-code"
-    return "science_agent" if engine == "kimi-code" else "science_expert"
+    return _resolve_chat_mode(engine, None)
 
 
 def _is_agent_session(state: dict[str, Any]) -> bool:
@@ -339,6 +381,13 @@ def _snapshot(state: dict[str, Any]) -> dict[str, Any]:
         "kimi_pending_approval": _snapshot_kimi_pending_approval(state),
         "approval_prompt": redact_for_frontend(approval_prompt) if approval_prompt else "",
         "plan_markdown": redact_for_frontend(plan_md) if plan_md else "",
+        # Agent context bar (tokens / usage / plan_mode) — Expert omits.
+        "kimi_context": (
+            dict(state.get("kimi_context") or {})
+            if is_agent and isinstance(state.get("kimi_context"), dict)
+            else None
+        ),
+        "kimi_plan_mode": bool(state.get("kimi_plan_mode")) if is_agent else False,
     }
 
 

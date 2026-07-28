@@ -5081,6 +5081,91 @@ button:disabled {
   max-width: 100%;
 }
 
+/* Science Agent controls (compact / plan / fork / clear) */
+.agent-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  min-width: 0;
+}
+
+.agent-ctrl-btn {
+  appearance: none;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.65);
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.agent-ctrl-btn:hover:not(:disabled) {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line));
+}
+
+.agent-ctrl-btn.is-active {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: color-mix(in srgb, var(--accent) 12%, #fff);
+}
+
+.agent-ctrl-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.agent-context-pill {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.agent-context-pill.is-warn {
+  color: #9a6700;
+  border-color: #e0b040;
+}
+
+.agent-context-pill.is-high {
+  color: #b42318;
+  border-color: #f3a4a0;
+}
+
+.chat-compaction {
+  margin: 0.35rem 0 0.6rem 2.4rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.55);
+  padding: 0.35rem 0.7rem 0.5rem;
+}
+
+.chat-compaction summary {
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+  list-style: none;
+}
+
+.chat-compaction summary::-webkit-details-marker {
+  display: none;
+}
+
+.chat-compaction-body {
+  margin-top: 0.35rem;
+  font-size: 0.86rem;
+  color: var(--text);
+}
+
 /* Mode: Agent | Expert segmented control */
 .composer-mode-switch {
   display: inline-flex;
@@ -5101,33 +5186,39 @@ button:disabled {
   padding: 0 12px;
   border: 1px solid transparent;
   border-radius: 8px;
-  background: transparent;
-  color: var(--muted);
+  /* Unselected: clearly muted / gray so the active mode pops. */
+  background: rgba(120, 120, 120, 0.10);
+  color: #8a8680;
   font-size: 0.78rem;
   font-weight: 600;
   letter-spacing: 0.01em;
   line-height: 1;
   box-shadow: none;
   white-space: nowrap;
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  opacity: 0.72;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
 }
 
 .composer-mode-btn:hover:not(:disabled):not(.is-active) {
-  background: rgba(255, 255, 255, 0.72);
-  color: var(--text);
+  background: rgba(120, 120, 120, 0.16);
+  color: #6a6660;
   border-color: transparent;
+  opacity: 0.9;
   transform: none;
 }
 
 .composer-mode-btn.is-active {
   background: #ffffff;
   color: var(--accent-ink);
-  border-color: rgba(146, 133, 112, 0.16);
+  border-color: rgba(146, 133, 112, 0.22);
   box-shadow: var(--shadow-soft);
+  opacity: 1;
+  font-weight: 700;
 }
 
 .composer-mode-btn:disabled {
-  opacity: 0.55;
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 /* Model / gateway select shells */

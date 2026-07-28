@@ -23,6 +23,7 @@ from web_v2.chat_api._hooks_runtime import (
     _session_store,
 )
 from web_v2.chat_api._shared import get_visible_session_ids
+from web_v2.chat_api.agent_controls import router as agent_controls_router
 from web_v2.chat_api.attachments import router as attachments_router
 from web_v2.chat_api.export import router as export_router
 from web_v2.chat_api.feedback import router as feedback_router
@@ -37,6 +38,7 @@ for _sub in (
     attachments_router,
     messages_router,
     interactive_router,
+    agent_controls_router,
     quota_router,
     feedback_router,
     export_router,

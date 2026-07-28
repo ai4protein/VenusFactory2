@@ -50,7 +50,7 @@ _PERSISTABLE_KEYS: frozenset[str] = frozenset({
     # custom model
     "active_custom_model_id",
     # kimi-code engine: 1:1 mapping to a kimi server session
-    "kimi_session_id",
+    "kimi_session_id", "kimi_model", "kimi_plan_mode", "kimi_context",
     # Security audit trail: kimi tool-call approvals our policy refused
     "security_events",
     # Forced response language ("en" | "zh") pinned from the UI locale.

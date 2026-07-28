@@ -11,6 +11,10 @@ import { StepCheckpoint } from "../components/StepCheckpoint";
 import { SubReportCheckpoint } from "../components/SubReportCheckpoint";
 import { isResearchNoiseTool, type ToolExecution } from "../components/ToolExecutionCard";
 import {
+  agentCompact,
+  agentForkSession,
+  agentResetContext,
+  agentSetPlanMode,
   cancelChatSession,
   createChatSession,
   exportChatSessionBundle,
@@ -167,6 +171,16 @@ const STRINGS = {
     modeScienceExpert: "Science Expert",
     modeAgentShort: "Agent",
     modeExpertShort: "Expert",
+    agentCompact: "Compact",
+    agentCompactTitle: "Compress kimi context (like /compact)",
+    agentClearCtx: "Clear ctx",
+    agentClearCtxTitle: "Start a fresh kimi session (like /new)",
+    agentFork: "Fork",
+    agentForkTitle: "Fork kimi session (like /fork)",
+    agentPlanMode: "Plan",
+    agentPlanModeTitle: "Toggle Plan mode (like /plan)",
+    agentContextUsage: (pct: number, used: number, max: number) =>
+      max > 0 ? `Context ${pct}% (${used}/${max} tok)` : `Context ${pct}%`,
     modelAria: "Model",
     modelLabel: "Model",
     modelViaKimi: "via kimi",
@@ -334,6 +348,16 @@ const STRINGS = {
     modeScienceExpert: "科学专家",
     modeAgentShort: "智能体",
     modeExpertShort: "专家",
+    agentCompact: "压缩",
+    agentCompactTitle: "压缩 kimi 上下文（对应 /compact）",
+    agentClearCtx: "清空上下文",
+    agentClearCtxTitle: "开启新的 kimi session（对应 /new）",
+    agentFork: "分叉",
+    agentForkTitle: "分叉 kimi session（对应 /fork）",
+    agentPlanMode: "计划",
+    agentPlanModeTitle: "切换 Plan 模式（对应 /plan）",
+    agentContextUsage: (pct: number, used: number, max: number) =>
+      max > 0 ? `上下文 ${pct}%（${used}/${max} tok）` : `上下文 ${pct}%`,
     modelAria: "模型",
     modelLabel: "模型",
     modelViaKimi: "经 kimi",
@@ -591,6 +615,8 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   const [modelSwitchNotice, setModelSwitchNotice] = useState("");
   const [chatQuota, setChatQuota] = useState<ChatQuota | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const snapshotRef = useRef<ChatSnapshot | null>(null);
+  const runningRef = useRef(false);
   /** Expert token pump: apply SSE tokens across animation frames so a
    * buffered burst still paints as progressive streaming. */
   const tokenQueueRef = useRef<Array<{ content: string; role_id?: string }>>([]);
@@ -642,6 +668,22 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   useEffect(() => {
     void bootstrapSession();
   }, []);
+
+  // Leaving Chat (other routes / remount) must detach the SSE reader so a
+  // new mount can poll fresh state. Backend keeps the graph running.
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+      abortRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    snapshotRef.current = snapshot;
+  }, [snapshot]);
+  useEffect(() => {
+    runningRef.current = running;
+  }, [running]);
 
   useEffect(() => {
     if (!fileSourceMenuOpen) return;
@@ -698,6 +740,96 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       return prev === "stopping" ? prev : "running";
     });
   }, [snapshot?.status]);
+
+  // Soft-rejoin without hard refresh:
+  // - bfcache / SPA return can restore a frozen Thinking UI
+  // - background graph may finish after the first GET
+  // Pull on mount, focus, pageshow(bfcache), visibility; burst-poll while
+  // in-progress or a Thinking placeholder is still on screen.
+  useEffect(() => {
+    if (!sessionId) return;
+    let cancelled = false;
+    let ticks = 0;
+
+    const hasLiveThinking = (snap: ChatSnapshot | null) => {
+      const hist = snap?.history || [];
+      return hist.some(
+        (h) =>
+          h.kind === "thinking" ||
+          h.phase === "thinking" ||
+          /preparing clarification|准备澄清|analyzing your request|分析你的请求/i.test(
+            h.content || ""
+          )
+      );
+    };
+
+    const isSettled = (status: string) => {
+      const s = status.toLowerCase();
+      return (
+        !s ||
+        s === "stopped" ||
+        s === "completed" ||
+        s === "error" ||
+        s === "planning_failed" ||
+        s === "execution_failed" ||
+        s.startsWith("waiting_")
+      );
+    };
+
+    const pull = (force = false) => {
+      // Interval sync skips while a live SSE owns the UI; focus/bfcache
+      // must force-refresh even if a frozen mount left running=true.
+      if (cancelled || (!force && runningRef.current)) return;
+      void refreshCurrentSession(sessionId).catch(() => {
+        /* transient */
+      });
+    };
+
+    pull(true);
+
+    const onFocus = () => pull(true);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") pull(true);
+    };
+    const onPageShow = (ev: PageTransitionEvent) => {
+      // Back-forward cache restores the old React tree without remounting —
+      // clear a zombie "running" flag so the UI can rejoin the checkpoint.
+      if (ev.persisted) {
+        setRunning(false);
+        setStreamingIdx(-1);
+        setRunStatus("stopped");
+        abortRef.current = null;
+      }
+      pull(true);
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("pageshow", onPageShow);
+
+    const id = window.setInterval(() => {
+      ticks += 1;
+      const snap = snapshotRef.current;
+      const status = String(snap?.status || "");
+      const needsSync = !isSettled(status) || hasLiveThinking(snap);
+      // Always burst a few times after mount (race with background save).
+      if (needsSync || ticks <= 8) pull(false);
+      if (!needsSync && ticks > 8) {
+        window.clearInterval(id);
+      } else if (ticks > 45) {
+        window.clearInterval(id);
+      }
+    }, 1000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("pageshow", onPageShow);
+    };
+    // refreshCurrentSession closes over latest helpers; rebind on session change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId]);
 
   // Keep sidebar label in sync with the first user message of the active chat.
   const activeSessionTitle = titleFromHistory(snapshot?.history);
@@ -991,12 +1123,40 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     });
   }
 
+  function sanitizeLoadedSnapshot(s: ChatSnapshot): ChatSnapshot {
+    const status = String(s.status || "").toLowerCase();
+    const hist = Array.isArray(s.history) ? s.history : [];
+    const isPlaceholder = (h: (typeof hist)[number]) =>
+      h.kind === "thinking" ||
+      h.phase === "thinking" ||
+      /preparing clarification|准备澄清/i.test(h.content || "");
+    // Waiting checkpoints must not keep a live Thinking pulse from a prior
+    // mount — that made "leave and come back" look permanently stuck.
+    if (status.startsWith("waiting_")) {
+      return { ...s, history: hist.filter((h) => !isPlaceholder(h)) };
+    }
+    // Terminal / idle: drop orphaned preparing bubbles left by a cancelled SSE.
+    if (
+      status === "stopped" ||
+      status === "completed" ||
+      status === "error" ||
+      status === "planning_failed" ||
+      status === "execution_failed" ||
+      !status
+    ) {
+      const cleaned = hist.filter((h) => !isPlaceholder(h));
+      return cleaned.length === hist.length ? s : { ...s, history: cleaned };
+    }
+    return s;
+  }
+
   async function refreshCurrentSession(targetId?: string, opts?: { localMode?: boolean }) {
     const sid = targetId || sessionId;
     if (!sid) return;
     try {
-      const s = await getChatSession(sid);
+      const s = sanitizeLoadedSnapshot(await getChatSession(sid));
       setSnapshot(s);
+      setStreamingIdx(-1);
       setSessionId(sid);
       setModelSwitchNotice("");
       sessionStorage.setItem(SESSION_STORAGE_KEY, sid);
@@ -1084,10 +1244,29 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   function handleStreamEvent({ event, data }: { event: string; data: string }) {
     if (event === "state" && data) {
       const payload = JSON.parse(data) as ChatSnapshot;
+      const status = String(payload.status || "").toLowerCase();
+      const isGateStatus =
+        status.startsWith("waiting_") ||
+        status === "completed" ||
+        status === "error" ||
+        status === "planning_failed" ||
+        status === "execution_failed" ||
+        status === "stopped";
       // Merge carefully: graph token events accumulate on the client, while
       // node `updates` may still carry a shorter placeholder. Prefer the
       // longer in-progress assistant tail so Expert streaming isn't wiped.
+      // Exception: once we hit a waiting/terminal gate, trust the server
+      // history and drop Thinking placeholders so ClarificationForm can mount.
       setSnapshot((prev) => {
+        if (isGateStatus) {
+          const hist = Array.isArray(payload.history) ? payload.history : [];
+          return {
+            ...payload,
+            history: hist.filter(
+              (h) => h.kind !== "thinking" && h.phase !== "thinking"
+            ),
+          };
+        }
         if (!prev?.history?.length) return payload;
         const prevHist = prev.history;
         const nextHist = Array.isArray(payload.history) ? [...payload.history] : [];
@@ -1121,15 +1300,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       });
       // Don't kill the streaming caret on every node update — only clear when
       // the run reached a waiting/terminal status (forms need to mount).
-      const status = String(payload.status || "").toLowerCase();
-      if (
-        status.startsWith("waiting_") ||
-        status === "completed" ||
-        status === "error" ||
-        status === "planning_failed" ||
-        status === "execution_failed" ||
-        status === "stopped"
-      ) {
+      if (isGateStatus) {
         tokenQueueRef.current = [];
         tokenPumpScheduledRef.current = false;
         setStreamingIdx(-1);
@@ -1931,6 +2102,53 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     }
   }
 
+  async function applyAgentSnapshot(next: ChatSnapshot | undefined) {
+    if (!next) return;
+    setSnapshot(next);
+    await fetchSessions();
+  }
+
+  async function handleAgentCompact() {
+    if (!sessionId || running) return;
+    try {
+      const res = await agentCompact(sessionId);
+      await applyAgentSnapshot(res.snapshot);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.errStreamMsg);
+    }
+  }
+
+  async function handleAgentResetContext() {
+    if (!sessionId || running) return;
+    try {
+      const res = await agentResetContext(sessionId);
+      await applyAgentSnapshot(res.snapshot);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.errStreamMsg);
+    }
+  }
+
+  async function handleAgentFork() {
+    if (!sessionId || running) return;
+    try {
+      const res = await agentForkSession(sessionId);
+      await applyAgentSnapshot(res.snapshot);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.errStreamMsg);
+    }
+  }
+
+  async function handleAgentPlanModeToggle() {
+    if (!sessionId || running) return;
+    const next = !(snapshot?.kimi_plan_mode);
+    try {
+      const res = await agentSetPlanMode(sessionId, next);
+      await applyAgentSnapshot(res.snapshot);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t.errStreamMsg);
+    }
+  }
+
   function handleModelChange(next: string) {
     // Online: model is server-fixed (no client picker).
     if (!isLocalMode) return;
@@ -2209,9 +2427,10 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                   />
                 </div>
               )}
-            {/* Science Expert (LangGraph PI→CB→MLS→SC) checkpoints only */}
+            {/* Science Expert (LangGraph PI→CB→MLS→SC) checkpoints only.
+                Waiting gates must mount even if streamingIdx briefly lags —
+                otherwise ClarificationForm stays hidden behind a Thinking pulse. */}
             {isExpertSession &&
-              streamingIdx < 0 &&
               isExpertClarification &&
               (snapshot?.clarification_questions?.length ?? 0) > 0 && (
                 <div className="expert-checkpoint-card">
@@ -2226,8 +2445,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
               )}
             {isExpertSession &&
               isExpertPlanGate &&
-              (snapshot?.plan?.length ?? 0) > 0 &&
-              streamingIdx < 0 && (
+              (snapshot?.plan?.length ?? 0) > 0 && (
                 <div className="expert-checkpoint-card">
                   <div className="expert-checkpoint-title">{t.checkpointPlan}</div>
                   <PlanEditor
@@ -2267,6 +2485,62 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
             </div>
           </div>
           <div className="composer">
+            {isAgentSession && sessionId && (
+              <div className="agent-controls" role="group" aria-label="Science Agent controls">
+                {(() => {
+                  const ctx = snapshot?.kimi_context;
+                  const usage = Number(ctx?.context_usage || 0);
+                  const pct = Math.round(Math.max(0, Math.min(1, usage)) * 100);
+                  const used = Number(ctx?.context_tokens || 0);
+                  const max = Number(ctx?.max_context_tokens || 0);
+                  if (!ctx || (!usage && !used && !max)) return null;
+                  return (
+                    <span
+                      className={`agent-context-pill${pct >= 90 ? " is-high" : pct >= 70 ? " is-warn" : ""}`}
+                      title={t.agentContextUsage(pct, used, max)}
+                    >
+                      {t.agentContextUsage(pct, used, max)}
+                    </span>
+                  );
+                })()}
+                <button
+                  type="button"
+                  className={`agent-ctrl-btn${snapshot?.kimi_plan_mode ? " is-active" : ""}`}
+                  title={t.agentPlanModeTitle}
+                  disabled={running}
+                  onClick={() => void handleAgentPlanModeToggle()}
+                >
+                  {t.agentPlanMode}
+                </button>
+                <button
+                  type="button"
+                  className="agent-ctrl-btn"
+                  title={t.agentCompactTitle}
+                  disabled={running}
+                  onClick={() => void handleAgentCompact()}
+                >
+                  {t.agentCompact}
+                </button>
+                <button
+                  type="button"
+                  className="agent-ctrl-btn"
+                  title={t.agentForkTitle}
+                  disabled={running}
+                  onClick={() => void handleAgentFork()}
+                >
+                  {t.agentFork}
+                </button>
+                <button
+                  type="button"
+                  className="agent-ctrl-btn"
+                  title={t.agentClearCtxTitle}
+                  disabled={running}
+                  onClick={() => void handleAgentResetContext()}
+                >
+                  {t.agentClearCtx}
+                </button>
+              </div>
+            )}
             <div className="composer-textarea-wrap">
               <textarea
                 rows={4}
