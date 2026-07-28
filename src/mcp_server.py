@@ -1,6 +1,7 @@
 """
-Unified MCP server: mounts all tools from src/tools * /tools_mcp.py (mutation, predict, search, database, denovo).
-Started by webui or run directly. Uses FastMCP mount() so tools are namespaced (e.g. mutation_*, predict_*).
+Unified MCP server: mounts all tools from src/tools/*/tools_mcp.py
+(mutation, predict, search, database, denovo, skill).
+Started by webui or run directly. Uses FastMCP mount() so tools are namespaced.
 """
 import os
 import logging
@@ -19,6 +20,7 @@ from tools.predict.tools_mcp import mcp as predict_mcp
 from tools.search.tools_mcp import mcp as search_mcp
 from tools.database.tools_mcp import mcp as database_mcp
 from tools.denovo.tools_mcp import mcp as denovo_mcp
+from tools.skill.tools_mcp import mcp as skill_mcp
 
 logging.basicConfig(
     level=logging.INFO,
@@ -32,6 +34,7 @@ mcp.mount(predict_mcp)
 mcp.mount(search_mcp)
 mcp.mount(database_mcp)
 mcp.mount(denovo_mcp)
+mcp.mount(skill_mcp)
 
 
 _http_server_thread: Optional[threading.Thread] = None
