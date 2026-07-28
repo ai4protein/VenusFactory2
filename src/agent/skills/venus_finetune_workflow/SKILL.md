@@ -19,16 +19,20 @@ Orchestrates training hub tools. Expect CSV columns such as `aa_seq` / `sequence
 | Tool | Args | Purpose |
 |------|------|---------|
 | **generate_training_config** | `csv_file` **or** `dataset_path`; optional valid/test CSV; `user_requirements`; `output_name` | Build training JSON |
-| **train_protein_model** | `config_path` | Run training, stream logs |
-| **protein_model_predict** | `config_path` + `sequence` **or** `csv_file` | Inference |
-| **agent_generated_code** | `task_description`, `input_files`, `output_dir` | Splits, metrics plots, CSV cleanup |
+| **train_protein_model** | `config_path` | Run training; **auto-registers** under `ckpt/user_trained/<model_id>/` |
+| **register_trained_model** | `config_path`; optional `model_id` / `output_dir` / `model_path` | Explicit re-register (usually unnecessary after train) |
+| **list_trained_models** | — | List cross-session registered models |
+| **protein_model_predict** | `config_path` **or** `model_id` + `sequence` **or** `csv_file` | Inference |
+| **agent_generated_code** | `task_description`, `input_files`, `output_dir` | Splits, metrics plots, CSV cleanup (Expert only; not MCP) |
+
+**Mode:** local only. Online mode disables these tools (and VenusMine / FoldSeek discovery). Science Agent reaches train tools via MCP; Expert via the LangGraph tool hub.
 
 ## Workflow
 
-1. Validate/split data with `agent_generated_code` if needed (70/15/15).
+1. Validate/split data with `agent_generated_code` if needed (70/15/15) — Expert path.
 2. `generate_training_config` with explicit `user_requirements` (model, epochs, LR, QLoRA…).
-3. `train_protein_model` on the returned config path (`dependency:step_N:file_path`).
-4. `protein_model_predict` for hold-out or new sequences.
+3. `train_protein_model` on the returned config path (`dependency:step_N:file_path`). On success, use `registered_model_id` / `registered_config_path` from the result.
+4. `protein_model_predict` with the registered `model_id` (or config path) for hold-out or new sequences — works across sessions.
 5. Figure: loss/accuracy curves from training metrics (dpi≥300).
 
 ## When NOT to use

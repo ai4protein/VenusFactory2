@@ -10,7 +10,7 @@ Tool inventory (all @tool from mutation, predict, search, train, file, skill):
   PREDICT (4): protein_property_prediction, protein_function_prediction, functional_residue_prediction, esmfold_structure_prediction
   SEARCH (6): query_literature_by_keywords, query_dataset_by_keywords, query_web_by_keywords, query_fda_by_keywords, query_foldseek_search_by_pdb_file, query_sequence_from_pdb_file
   DATABASE (32): by-ID (InterPro, UniProt, NCBI, RCSB, AlphaFold query/download) + BRENDA, ChEMBL, FDA, KEGG, STRING, ClinVar, UniProt search, NCBI BLAST
-  TRAIN (4): generate_training_config, train_protein_model, protein_model_predict, agent_generated_code
+  TRAIN (6): generate_training_config, train_protein_model, protein_model_predict, register_trained_model, list_trained_models, agent_generated_code
   FILE (10): maxit_structure_convert, read_fasta, extract_uids_from_fasta, uid_file_to_chunks, unzip_archive, ungzip_file, pdb_chain_sequences, pdb_dir_to_fasta, check_pdb_apo, extract_uniprot_id_from_rcsb_metadata
   SKILL (1–2): read_skill, python_repl (if langchain_experimental installed)
 """
@@ -131,6 +131,8 @@ from tools.train.tools_agent import (
     train_protein_model_tool,
     agent_generated_code_tool,
     protein_model_predict_tool,
+    register_trained_model_tool,
+    list_trained_models_tool,
 )
 from tools.file.tools_agent import (
     maxit_structure_convert_tool,
@@ -278,6 +280,8 @@ TRAIN_TOOLS: list[BaseTool] = [
     generate_training_config_tool,
     train_protein_model_tool,
     protein_model_predict_tool,
+    register_trained_model_tool,
+    list_trained_models_tool,
     agent_generated_code_tool,
 ]
 
@@ -359,11 +363,8 @@ FASTAPI_TOOL_NAMES = frozenset(t.name for t in ALL_TOOLS) - {
     "esmfold_structure_prediction",
 }
 
-# MCP: all except generate_training_config, train_protein_model, protein_model_predict, agent_generated_code
+# MCP: expose train/config/predict/register/list; keep agent_generated_code Expert-only.
 MCP_TOOL_NAMES = frozenset(t.name for t in ALL_TOOLS) - {
-    "generate_training_config",
-    "train_protein_model",
-    "protein_model_predict",
     "agent_generated_code",
 }
 
@@ -501,6 +502,8 @@ __all__ = [
     "generate_training_config_tool",
     "train_protein_model_tool",
     "protein_model_predict_tool",
+    "register_trained_model_tool",
+    "list_trained_models_tool",
     "agent_generated_code_tool",
     # File
     "maxit_structure_convert_tool",

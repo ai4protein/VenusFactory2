@@ -21,6 +21,7 @@ from tools.search.tools_mcp import mcp as search_mcp
 from tools.database.tools_mcp import mcp as database_mcp
 from tools.denovo.tools_mcp import mcp as denovo_mcp
 from tools.skill.tools_mcp import mcp as skill_mcp
+from tools.runtime_tool_policy import is_local_mode
 
 logging.basicConfig(
     level=logging.INFO,
@@ -35,6 +36,12 @@ mcp.mount(search_mcp)
 mcp.mount(database_mcp)
 mcp.mount(denovo_mcp)
 mcp.mount(skill_mcp)
+# Train / register tools are local-only (GPU + ckpt writes). Online skips mount.
+if is_local_mode():
+    from tools.train.tools_mcp import mcp as train_mcp
+    mcp.mount(train_mcp)
+else:
+    logger.info("Online mode: train MCP tools not mounted")
 
 
 _http_server_thread: Optional[threading.Thread] = None

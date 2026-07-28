@@ -47,6 +47,7 @@ from agent.skills import get_skills_metadata_string
 from agent.tracing import LLMSpanData, start_span
 from config import get_config
 from logger import get_logger
+from tools.runtime_tool_policy import filter_tools as _filter_agent_tools_for_runtime_mode
 from tools.tools_agent_hub import get_pi_tools, get_tools
 from web.utils.common_utils import get_web_v2_area_dir
 
@@ -54,16 +55,6 @@ load_dotenv()
 
 _logger = get_logger("agent.chat")
 _cfg = get_config()
-
-_ONLINE_DISABLED_AGENT_TOOL_NAMES = {
-    # Training-related tools
-    "generate_training_config",
-    "train_protein_model",
-    "protein_model_predict",
-    # Protein-discovery related tools
-    "download_foldseek_results_by_pdb_file",
-    "query_foldseek_search_by_pdb_file",
-}
 
 # Models that support Anthropic-style explicit prompt caching via cache_control blocks.
 # Extend this set as more cache-capable official models are added.
@@ -73,26 +64,6 @@ PROMPT_CACHING_MODELS = {
     "claude-3-5-haiku-20241022",
     "claude-3-opus-20240229",
 }
-
-
-def _is_online_mode() -> bool:
-    return _cfg.server.is_online
-
-
-def _filter_agent_tools_for_runtime_mode(tools: list[BaseTool]) -> tuple[list[BaseTool], list[str]]:
-    """Filter agent tools by runtime mode and return (enabled_tools, disabled_tool_names)."""
-    if not _is_online_mode():
-        return tools, []
-
-    disabled: list[str] = []
-    enabled: list[BaseTool] = []
-    for tool in tools:
-        name = getattr(tool, "name", "") or ""
-        if name in _ONLINE_DISABLED_AGENT_TOOL_NAMES or "foldseek" in name.lower():
-            disabled.append(name)
-            continue
-        enabled.append(tool)
-    return enabled, sorted(set(disabled))
 
 
 class _ChatBufferWindowMemory:

@@ -651,6 +651,21 @@ def decide(
     # set. Pre-init fallback allows prefix `mcp__venusfactory__*` so the
     # very first requests during startup don't get rejected.
     if tool.startswith("mcp__"):
+        # Defense in depth: even if allowlist was built incorrectly, refuse
+        # online-disabled heavy tools (train / FoldSeek / VenusMine).
+        try:
+            from tools.runtime_tool_policy import is_online_mode, is_tool_allowed
+
+            bare = tool.split("__")[-1] if "__" in tool else tool
+            if mode == "online" or is_online_mode():
+                if not is_tool_allowed(bare):
+                    return SecurityDecision(
+                        False,
+                        f"online mode: MCP tool disabled by runtime policy: {bare}",
+                        tool,
+                    )
+        except Exception:
+            pass
         ok, reason = _is_trusted_mcp_tool(tool)
         return SecurityDecision(ok, reason, tool)
 

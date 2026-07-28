@@ -6,6 +6,9 @@ from typing import List, Optional
 from langchain.tools import tool
 from pydantic import BaseModel, Field, model_validator
 
+from tools.runtime_tool_policy import assert_tool_allowed, tool_denied_json
+
+from .model_registry import list_trained_models_json, register_trained_model_json
 from .train_operations import (
     process_csv_and_generate_config,
     generate_and_execute_code,
@@ -77,7 +80,10 @@ class ModelTrainingInput(BaseModel):
 class ModelPredictionInput(BaseModel):
     config_path: str = Field(
         ...,
-        description="Path to the training/prediction configuration JSON (same config used for training). Required.",
+        description=(
+            "Path to the training/prediction configuration JSON, OR a registered "
+            "model_id from list_trained_models / train_protein_model registration. Required."
+        ),
     )
     sequence: Optional[str] = Field(
         default=None,
@@ -95,6 +101,33 @@ class ModelPredictionInput(BaseModel):
         return self
 
 
+class RegisterTrainedModelInput(BaseModel):
+    config_path: str = Field(
+        ...,
+        description="Path to the training configuration JSON used for training (or the registered copy).",
+    )
+    model_id: Optional[str] = Field(
+        default=None,
+        description="Optional stable id for ckpt/user_trained/<model_id>. Auto-generated when omitted.",
+    )
+    output_dir: Optional[str] = Field(
+        default=None,
+        description="Optional override of the training output directory containing the checkpoint.",
+    )
+    model_path: Optional[str] = Field(
+        default=None,
+        description="Optional explicit path to the .pt/.pth checkpoint file.",
+    )
+
+
+def _guard(tool_name: str):
+    try:
+        assert_tool_allowed(tool_name)
+        return None
+    except RuntimeError:
+        return tool_denied_json(tool_name)
+
+
 @tool("generate_training_config", args_schema=CSVTrainingConfigInput)
 def generate_training_config_tool(
     csv_file: Optional[str] = None,
@@ -104,7 +137,10 @@ def generate_training_config_tool(
     output_name: str = "custom_training_config",
     user_requirements: Optional[str] = None,
 ) -> str:
-    """Generate training JSON configuration from CSV files or Hugging Face datasets containing protein sequences and labels."""
+    """Generate training JSON configuration from CSV files or Hugging Face datasets containing protein sequences and labels. Local mode only."""
+    denied = _guard("generate_training_config")
+    if denied:
+        return denied
     try:
         return process_csv_and_generate_config(
             csv_file, valid_csv_file, test_csv_file, output_name,
@@ -120,7 +156,10 @@ def agent_generated_code_tool(
     input_files: Optional[List[str]] = None,
     output_dir: Optional[str] = None,
 ) -> str:
-    """Generate and execute Python code based on task description (agent-generated code runs in a sandbox; malicious patterns are blocked). Use for data processing, splitting, analysis tasks."""
+    """Generate and execute Python code based on task description (agent-generated code runs in a sandbox; malicious patterns are blocked). Use for data processing, splitting, analysis tasks. Local mode only."""
+    denied = _guard("agent_generated_code")
+    if denied:
+        return denied
     try:
         return generate_and_execute_code(task_description, input_files, output_dir=output_dir)
     except Exception as e:
@@ -129,7 +168,10 @@ def agent_generated_code_tool(
 
 @tool("train_protein_model", args_schema=ModelTrainingInput)
 def train_protein_model_tool(config_path: str) -> str:
-    """Train a protein language model using a configuration file. Executes the training process and streams logs."""
+    """Train a protein language model using a configuration file. On success, auto-registers under ckpt/user_trained for cross-session reuse. Local mode only."""
+    denied = _guard("train_protein_model")
+    if denied:
+        return denied
     return run_train_tool(config_path)
 
 
@@ -139,8 +181,45 @@ def protein_model_predict_tool(
     sequence: Optional[str] = None,
     csv_file: Optional[str] = None,
 ) -> str:
-    """Predict protein properties using a trained model. Single sequence or batch from CSV."""
+    """Predict protein properties using a trained / registered model. Single sequence or batch from CSV. Local mode only."""
+    denied = _guard("protein_model_predict")
+    if denied:
+        return denied
     return run_predict_tool(config_path, sequence=sequence, csv_file=csv_file)
+
+
+@tool("register_trained_model", args_schema=RegisterTrainedModelInput)
+def register_trained_model_tool(
+    config_path: str,
+    model_id: Optional[str] = None,
+    output_dir: Optional[str] = None,
+    model_path: Optional[str] = None,
+) -> str:
+    """Register an already-trained checkpoint into ckpt/user_trained for cross-session reuse. Local mode only. Usually unnecessary after train_protein_model (auto-registers)."""
+    denied = _guard("register_trained_model")
+    if denied:
+        return denied
+    try:
+        return register_trained_model_json(
+            config_path=config_path,
+            model_id=model_id,
+            output_dir=output_dir,
+            model_path=model_path,
+        )
+    except Exception as e:
+        return json.dumps({"success": False, "error": f"Register error: {str(e)}"}, ensure_ascii=False)
+
+
+@tool("list_trained_models")
+def list_trained_models_tool() -> str:
+    """List models registered under ckpt/user_trained (cross-session). Local mode only."""
+    denied = _guard("list_trained_models")
+    if denied:
+        return denied
+    try:
+        return list_trained_models_json()
+    except Exception as e:
+        return json.dumps({"success": False, "error": f"List error: {str(e)}"}, ensure_ascii=False)
 
 
 TRAIN_TOOLS = [
@@ -148,4 +227,6 @@ TRAIN_TOOLS = [
     agent_generated_code_tool,
     train_protein_model_tool,
     protein_model_predict_tool,
+    register_trained_model_tool,
+    list_trained_models_tool,
 ]
