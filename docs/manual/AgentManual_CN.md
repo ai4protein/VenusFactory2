@@ -42,7 +42,7 @@
 - **行为：** 流式工具调用（VenusFactory MCP、允许的 shell）、可折叠 **Thinking** 块、时间线内工具执行卡片。
 - **上下文（对齐 [Kimi Code sessions](https://www.kimi.com/code/docs/en/kimi-code-cli/guides/sessions.html)）：**
   - 占用 ≥ ~90% 时自动压缩；时间线展示压缩摘要。
-  - 输入区控件：**压缩**（`/compact`）、**计划**（`/plan`）、**分叉**（`/fork`）、**清空上下文**（`/new`），以及上下文占用指示。
+  - 仅显示只读上下文占用指示，不提供 Plan / Compact / Fork / Clear 等输入区按钮（由 Agent 自行管理上下文）。
   - 停止时尽量 abort 正在运行的 kimi prompt。
 - **模型：** 固定为 kimi-code；在 Settings / `.env` 配置 provider（见 WebUI wiki）。Online 模式可能走 `bwrap` 沙箱。
 - **适用：** 希望单一 agent 流畅调工具、不走 Expert 规划流水线的开放式任务。

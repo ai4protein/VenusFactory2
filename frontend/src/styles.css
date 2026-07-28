@@ -6103,8 +6103,20 @@ input[type="file"]::file-selector-button:hover {
 }
 
 .workspace-page {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
+  flex: 1 0 auto;
+  min-height: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.workspace-page > .chat-footer-note {
+  margin-top: auto;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 5;
 }
 
 .workspace-control-panel,
@@ -7182,9 +7194,19 @@ input[type="file"]::file-selector-button:hover {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  flex: 1 1 auto;
-  min-height: 0;
-  height: 100%;
+  /* Grow with the form so Start/actions are not trapped under the author
+     footer at the bottom of a viewport-tall shell. */
+  flex: 1 0 auto;
+  min-height: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.quick-tools-v2-page > .chat-footer-note {
+  margin-top: auto;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 5;
 }
 
 .quick-tools-v2-switcher {
@@ -7223,9 +7245,11 @@ input[type="file"]::file-selector-button:hover {
   display: grid;
   grid-template-columns: minmax(320px, 440px) 1fr;
   gap: var(--space-3);
-  flex: 1 1 auto;
-  min-height: 0;
+  flex: 0 0 auto;
+  min-height: min-content;
   height: auto;
+  align-items: start;
+  overflow: visible;
 }
 
 .quick-tools-v2-left {
@@ -7236,9 +7260,8 @@ input[type="file"]::file-selector-button:hover {
 
 .chat-panel.left.quick-tools-v2-left {
   min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-  scrollbar-gutter: stable;
+  height: auto;
+  overflow: visible;
 }
 
 .quick-tools-v2-left .custom-section-card {
@@ -7504,28 +7527,49 @@ input[type="file"]::file-selector-button:hover {
   box-shadow: 0 0 0 3px rgba(184, 159, 127, 0.24);
 }
 
+.quick-tools-v2-right.chat-panel.center,
+.advanced-tools-right.chat-panel.center,
+.download-v2-right.chat-panel.center {
+  display: block;
+  grid-template-rows: none;
+  overflow: visible;
+  min-height: 360px;
+  height: auto;
+}
+
 .quick-tools-v2-right {
   display: block;
-  overflow: hidden;
-  min-height: 0;
+  overflow: visible;
+  min-height: 360px;
+  height: auto;
 }
 
 .advanced-tools-page {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  flex: 1 1 auto;
-  min-height: 0;
-  height: 100%;
+  flex: 1 0 auto;
+  min-height: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.advanced-tools-page > .chat-footer-note {
+  margin-top: auto;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 5;
 }
 
 .advanced-tools-grid {
   display: grid;
   grid-template-columns: minmax(340px, 470px) 1fr;
   gap: var(--space-3);
-  flex: 1 1 auto;
-  min-height: 0;
+  flex: 0 0 auto;
+  min-height: min-content;
   height: auto;
+  align-items: start;
+  overflow: visible;
 }
 
 .advanced-tools-left {
@@ -7536,15 +7580,15 @@ input[type="file"]::file-selector-button:hover {
 
 .chat-panel.left.advanced-tools-left {
   min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-  scrollbar-gutter: stable;
+  height: auto;
+  overflow: visible;
 }
 
 .advanced-tools-right {
   display: block;
-  overflow: hidden;
+  overflow: visible;
   min-height: 0;
+  height: auto;
 }
 
 .advanced-tools-left .custom-section-card {
@@ -7938,29 +7982,42 @@ input[type="file"]::file-selector-button:hover {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  flex: 1 1 auto;
-  min-height: 0;
-  height: 100%;
+  flex: 1 0 auto;
+  min-height: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.download-v2-page > .chat-footer-note {
+  margin-top: auto;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 5;
 }
 
 .download-v2-grid {
   display: grid;
   grid-template-columns: minmax(340px, 460px) 1fr;
   gap: var(--space-3);
-  flex: 1 1 auto;
-  min-height: 0;
+  flex: 0 0 auto;
+  min-height: min-content;
   height: auto;
+  align-items: start;
+  overflow: visible;
 }
 
 .download-v2-left {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  height: auto;
+  overflow: visible;
 }
 
 .download-v2-right {
   display: block;
-  overflow: hidden;
+  overflow: visible;
+  height: auto;
 }
 
 .download-field {
@@ -8916,13 +8973,21 @@ input[type="file"]::file-selector-button:hover {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  flex: 1 1 auto;
-  min-height: 0;
-  height: 100%;
+  /* Fill the main column at minimum, then grow with markdown so the
+     author footer is always after the article — never mid-viewport
+     while a sticky TOC is still pinned above empty space. */
+  flex: 1 0 auto;
+  min-height: 100%;
+  height: auto;
+  width: 100%;
+  overflow: visible;
+  box-sizing: border-box;
+  padding-bottom: 8px;
 }
 
 .manual-v2-header {
   align-items: flex-end;
+  flex-shrink: 0;
 }
 
 .manual-v2-language {
@@ -8946,6 +9011,7 @@ input[type="file"]::file-selector-button:hover {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .manual-v2-switch-item {
@@ -8978,9 +9044,11 @@ input[type="file"]::file-selector-button:hover {
   display: grid;
   grid-template-columns: 280px 1fr;
   gap: var(--space-3);
-  flex: 1 1 auto;
-  min-height: 0;
+  flex: 0 0 auto;
+  min-height: min-content;
   height: auto;
+  align-items: start;
+  overflow: visible;
 }
 
 .manual-v2-nav {
@@ -8989,11 +9057,15 @@ input[type="file"]::file-selector-button:hover {
   background: var(--surface);
   backdrop-filter: blur(14px);
   box-shadow: var(--shadow);
-  position: sticky;
-  top: 20px;
-  max-height: calc(100vh - 64px);
-  overflow: auto;
+  /* Do not sticky-pin the outline: inside .vf2-main scrolling it stays
+     glued to the viewport top while the article ends and the author
+     footer appears underneath empty cream — looks like the footer is
+     stuck in the middle of the page. */
+  position: static;
+  max-height: none;
+  overflow: visible;
   padding: 12px;
+  align-self: start;
 }
 
 .manual-v2-nav ul {
@@ -9038,12 +9110,26 @@ input[type="file"]::file-selector-button:hover {
   background: var(--surface);
   backdrop-filter: blur(14px);
   box-shadow: var(--shadow);
-  min-height: 0;
+  min-height: min-content;
+  height: auto;
+  overflow: visible;
 }
 
 .manual-v2-content {
-  padding: 18px 20px;
+  padding: 18px 20px 28px;
   max-width: 1100px;
+}
+
+.manual-v2-page > .chat-footer-note {
+  position: relative;
+  z-index: 10;
+  flex: 0 0 auto;
+  width: 100%;
+  /* Short manuals: sit on the bottom edge of the main column.
+     Long manuals: stay directly under the article (page grows). */
+  margin-top: auto;
+  margin-bottom: 6px;
+  padding-top: 16px;
 }
 
 .manual-v2-markdown h1,
@@ -9211,8 +9297,8 @@ input[type="file"]::file-selector-button:hover {
   }
 
   .manual-v2-nav {
-    position: static;
     max-height: 260px;
+    overflow: auto;
   }
 }
 
