@@ -42,7 +42,7 @@ Use the segmented control above the composer to pick a mode. The choice is saved
 - **Behavior:** streaming tool use (VenusFactory MCP, shell where allowed), collapsible **Thinking** blocks, inline tool-run cards in the timeline.
 - **Context (aligned with [Kimi Code sessions](https://www.kimi.com/code/docs/en/kimi-code-cli/guides/sessions.html)):**
   - Auto-compresses when context usage ≥ ~90%; timeline shows compaction summaries.
-  - Composer controls: **Compact** (`/compact`), **Plan** (`/plan`), **Fork** (`/fork`), **Clear ctx** (`/new`), plus a context usage pill.
+  - Read-only context usage pill only — no Plan / Compact / Fork / Clear composer buttons (agent manages context itself).
   - Stop aborts the in-flight kimi prompt when possible.
 - **Model:** fixed to kimi-code; configure providers via Settings / `.env` (see WebUI wiki). Online mode may use `bwrap` sandboxing.
 - **When to use:** open-ended tasks where you want a single agent to call tools fluidly without the Expert planning pipeline.

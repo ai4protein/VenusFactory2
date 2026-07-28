@@ -11,10 +11,6 @@ import { StepCheckpoint } from "../components/StepCheckpoint";
 import { SubReportCheckpoint } from "../components/SubReportCheckpoint";
 import { isResearchNoiseTool, type ToolExecution } from "../components/ToolExecutionCard";
 import {
-  agentCompact,
-  agentForkSession,
-  agentResetContext,
-  agentSetPlanMode,
   cancelChatSession,
   createChatSession,
   exportChatSessionBundle,
@@ -171,14 +167,6 @@ const STRINGS = {
     modeScienceExpert: "Science Expert",
     modeAgentShort: "Agent",
     modeExpertShort: "Expert",
-    agentCompact: "Compact",
-    agentCompactTitle: "Compress kimi context (like /compact)",
-    agentClearCtx: "Clear ctx",
-    agentClearCtxTitle: "Start a fresh kimi session (like /new)",
-    agentFork: "Fork",
-    agentForkTitle: "Fork kimi session (like /fork)",
-    agentPlanMode: "Plan",
-    agentPlanModeTitle: "Toggle Plan mode (like /plan)",
     agentContextUsage: (pct: number, used: number, max: number) =>
       max > 0 ? `Context ${pct}% (${used}/${max} tok)` : `Context ${pct}%`,
     modelAria: "Model",
@@ -348,14 +336,6 @@ const STRINGS = {
     modeScienceExpert: "科学专家",
     modeAgentShort: "智能体",
     modeExpertShort: "专家",
-    agentCompact: "压缩",
-    agentCompactTitle: "压缩 kimi 上下文（对应 /compact）",
-    agentClearCtx: "清空上下文",
-    agentClearCtxTitle: "开启新的 kimi session（对应 /new）",
-    agentFork: "分叉",
-    agentForkTitle: "分叉 kimi session（对应 /fork）",
-    agentPlanMode: "计划",
-    agentPlanModeTitle: "切换 Plan 模式（对应 /plan）",
     agentContextUsage: (pct: number, used: number, max: number) =>
       max > 0 ? `上下文 ${pct}%（${used}/${max} tok）` : `上下文 ${pct}%`,
     modelAria: "模型",
@@ -779,8 +759,9 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     const pull = (force = false) => {
       // Interval sync skips while a live SSE owns the UI; focus/bfcache
       // must force-refresh even if a frozen mount left running=true.
+      // Never syncComposer — polling must not overwrite Expert/Agent toggle.
       if (cancelled || (!force && runningRef.current)) return;
-      void refreshCurrentSession(sessionId).catch(() => {
+      void refreshCurrentSession(sessionId, { syncComposer: false }).catch(() => {
         /* transient */
       });
     };
@@ -1150,18 +1131,27 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     return s;
   }
 
-  async function refreshCurrentSession(targetId?: string, opts?: { localMode?: boolean }) {
+  async function refreshCurrentSession(
+    targetId?: string,
+    opts?: { localMode?: boolean; syncComposer?: boolean }
+  ) {
     const sid = targetId || sessionId;
     if (!sid) return;
+    // Soft-rejoin / focus polls pass the same session id — only sync the
+    // composer mode when opening a different session (or first bootstrap).
+    const switchingSession = !sessionId || Boolean(targetId && targetId !== sessionId);
+    const syncComposer = opts?.syncComposer ?? switchingSession;
     try {
       const s = sanitizeLoadedSnapshot(await getChatSession(sid));
       setSnapshot(s);
       setStreamingIdx(-1);
       setSessionId(sid);
-      setModelSwitchNotice("");
+      if (syncComposer) setModelSwitchNotice("");
       sessionStorage.setItem(SESSION_STORAGE_KEY, sid);
-      // Empty sessions (no turns yet) always open as Science Agent on refresh.
-      // Sessions with history keep their persisted/inferred mode.
+      if (!syncComposer) return;
+      // Empty sessions default to Science Agent; sessions with history follow
+      // persisted/inferred mode. Do not run this on soft-rejoin polls — that
+      // was flipping Expert → Agent a second after the user toggled.
       const hasHistory = (s.history?.length ?? 0) > 0;
       const nextMode: ChatMode = hasHistory
         ? chatModeFromSnapshot({
@@ -2102,53 +2092,6 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     }
   }
 
-  async function applyAgentSnapshot(next: ChatSnapshot | undefined) {
-    if (!next) return;
-    setSnapshot(next);
-    await fetchSessions();
-  }
-
-  async function handleAgentCompact() {
-    if (!sessionId || running) return;
-    try {
-      const res = await agentCompact(sessionId);
-      await applyAgentSnapshot(res.snapshot);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t.errStreamMsg);
-    }
-  }
-
-  async function handleAgentResetContext() {
-    if (!sessionId || running) return;
-    try {
-      const res = await agentResetContext(sessionId);
-      await applyAgentSnapshot(res.snapshot);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t.errStreamMsg);
-    }
-  }
-
-  async function handleAgentFork() {
-    if (!sessionId || running) return;
-    try {
-      const res = await agentForkSession(sessionId);
-      await applyAgentSnapshot(res.snapshot);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t.errStreamMsg);
-    }
-  }
-
-  async function handleAgentPlanModeToggle() {
-    if (!sessionId || running) return;
-    const next = !(snapshot?.kimi_plan_mode);
-    try {
-      const res = await agentSetPlanMode(sessionId, next);
-      await applyAgentSnapshot(res.snapshot);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t.errStreamMsg);
-    }
-  }
-
   function handleModelChange(next: string) {
     // Online: model is server-fixed (no client picker).
     if (!isLocalMode) return;
@@ -2485,62 +2428,26 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
             </div>
           </div>
           <div className="composer">
-            {isAgentSession && sessionId && (
-              <div className="agent-controls" role="group" aria-label="Science Agent controls">
-                {(() => {
-                  const ctx = snapshot?.kimi_context;
-                  const usage = Number(ctx?.context_usage || 0);
-                  const pct = Math.round(Math.max(0, Math.min(1, usage)) * 100);
-                  const used = Number(ctx?.context_tokens || 0);
-                  const max = Number(ctx?.max_context_tokens || 0);
-                  if (!ctx || (!usage && !used && !max)) return null;
-                  return (
-                    <span
-                      className={`agent-context-pill${pct >= 90 ? " is-high" : pct >= 70 ? " is-warn" : ""}`}
-                      title={t.agentContextUsage(pct, used, max)}
-                    >
-                      {t.agentContextUsage(pct, used, max)}
-                    </span>
-                  );
-                })()}
-                <button
-                  type="button"
-                  className={`agent-ctrl-btn${snapshot?.kimi_plan_mode ? " is-active" : ""}`}
-                  title={t.agentPlanModeTitle}
-                  disabled={running}
-                  onClick={() => void handleAgentPlanModeToggle()}
-                >
-                  {t.agentPlanMode}
-                </button>
-                <button
-                  type="button"
-                  className="agent-ctrl-btn"
-                  title={t.agentCompactTitle}
-                  disabled={running}
-                  onClick={() => void handleAgentCompact()}
-                >
-                  {t.agentCompact}
-                </button>
-                <button
-                  type="button"
-                  className="agent-ctrl-btn"
-                  title={t.agentForkTitle}
-                  disabled={running}
-                  onClick={() => void handleAgentFork()}
-                >
-                  {t.agentFork}
-                </button>
-                <button
-                  type="button"
-                  className="agent-ctrl-btn"
-                  title={t.agentClearCtxTitle}
-                  disabled={running}
-                  onClick={() => void handleAgentResetContext()}
-                >
-                  {t.agentClearCtx}
-                </button>
-              </div>
-            )}
+            {/* Agent context is managed automatically (auto-compact ≥90%).
+                No Plan/Compact/Fork/Clear controls — those are kimi-side decisions. */}
+            {isAgentSession && sessionId && (() => {
+              const ctx = snapshot?.kimi_context;
+              const usage = Number(ctx?.context_usage || 0);
+              const pct = Math.round(Math.max(0, Math.min(1, usage)) * 100);
+              const used = Number(ctx?.context_tokens || 0);
+              const max = Number(ctx?.max_context_tokens || 0);
+              if (!ctx || (!usage && !used && !max)) return null;
+              return (
+                <div className="agent-controls" aria-label="Science Agent context">
+                  <span
+                    className={`agent-context-pill${pct >= 90 ? " is-high" : pct >= 70 ? " is-warn" : ""}`}
+                    title={t.agentContextUsage(pct, used, max)}
+                  >
+                    {t.agentContextUsage(pct, used, max)}
+                  </span>
+                </div>
+              );
+            })()}
             <div className="composer-textarea-wrap">
               <textarea
                 rows={4}
