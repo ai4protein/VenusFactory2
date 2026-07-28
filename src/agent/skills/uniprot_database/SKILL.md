@@ -3,7 +3,8 @@ name: uniprot_database
 description: UniProt — protein sequence, function, taxonomy, cross-references. Search proteins by query, retrieve a UniProt entry, map IDs between databases (PDB↔UniProt etc.), pull FASTA sequence, fetch metadata, run SPARQL against sparql.uniprot.org. Use whenever the user mentions a UniProt accession (e.g. P04637), asks for protein function/sequence/family info, or needs cross-DB ID mapping. Don't use for AlphaFold structures (use alphafold_database) or PDB structures (use rcsb_database).
 license: Unknown
 metadata:
-    skill-author: VenusFactory2.
+  version: "1.0"
+  skill-author: VenusFactory2.
 ---
 
 # UniProt Database

@@ -3,7 +3,8 @@ name: rcsb_database
 description: RCSB Protein Data Bank (PDB) — experimentally determined 3D biomolecular structures. Search by full-text/sequence/structure/attribute, fetch entry metadata, download coordinate files (PDB/mmCIF). Use when the user provides a PDB ID, asks for structures of a protein, wants to find similar structures by sequence, or needs experimental (not predicted) coordinates. Don't use for AlphaFold predictions (use alphafold_database).
 license: Unknown
 metadata:
-    skill-author: VenusFactory2.
+  version: "1.0"
+  skill-author: VenusFactory2.
 ---
 
 # RCSB Protein Data Bank

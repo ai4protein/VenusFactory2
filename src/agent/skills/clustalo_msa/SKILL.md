@@ -3,7 +3,8 @@ name: clustalo_msa
 description: Multiple sequence alignment of proteins via EBI Clustal Omega web service. Use when you have ≥2 protein sequences in a FASTA file (≤4000 sequences, ≤4 MB) and need an alignment to assess conservation, residue importance, or domain structure. Do NOT use for: single sequences, homology search (use protein_sequence_similarity_search), structural alignment (use foldseek), or DNA/RNA alignment.
 license: Apache-2.0 (adapted from google-deepmind/science-skills)
 metadata:
-    skill-author: VenusFactory2 (adapted from Google DeepMind)
+  version: "1.0"
+  skill-author: VenusFactory2 (adapted from Google DeepMind)
 ---
 
 # Clustal Omega MSA (EBI)

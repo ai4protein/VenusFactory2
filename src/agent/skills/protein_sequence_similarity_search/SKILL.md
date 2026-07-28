@@ -3,7 +3,8 @@ name: protein_sequence_similarity_search
 description: Find homologous protein sequences from a query sequence using MMseqs2 (fast, ColabFold web API) or BLAST (comprehensive, EBI). Use when the user provides a protein sequence or FASTA file and wants homologs, function inference by sequence similarity, or input for an MSA. Do NOT use for structural similarity (use foldseek) or DNA/RNA queries.
 license: Apache-2.0 (adapted from google-deepmind/science-skills)
 metadata:
-    skill-author: VenusFactory2 (adapted from Google DeepMind)
+  version: "1.0"
+  skill-author: VenusFactory2 (adapted from Google DeepMind)
 ---
 
 # Protein Sequence Similarity Search
