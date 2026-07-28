@@ -50,7 +50,7 @@ Agent 对话（`/agent`）在输入区上方切换 **Science Agent** / **Science
 
 | 模式 | 引擎 | 说明 |
 |:-----|:-----|:-----|
-| **Science Agent** | kimi-code | 以工具调用为主的 agent 循环（MCP / bash）；可折叠 Thinking、内联工具卡片。上下文占用以只读指示显示；占用 ≥ ~90% 时由 Agent **自动压缩**（不提供 Plan/Compact/Fork 等输入区按钮）。走 kimi-code 守护进程（见下方配置）。Online 无模型选择器。 |
+| **Science Agent** | kimi-code | 以工具调用为主的 agent 循环（MCP / bash）；可折叠 Thinking、内联工具卡片。上下文占用以只读指示显示；占用 ≥ ~90% 时由 Agent **自动压缩**（不提供 Plan/Compact/Fork 等输入区按钮）。走 kimi-code 守护进程（见下方配置）。Online 无模型选择器。**Local** 可通过 MCP 调用训练工具（`generate_training_config` / `train_protein_model` / `protein_model_predict` / `register_trained_model` / `list_trained_models`）；训练成功后自动注册到 `ckpt/user_trained/` 供跨会话复用。**Online** 硬禁用训练、VenusMine / FoldSeek 等高算力能力（API 返回 403，工具层直接拒绝）。 |
 | **Science Expert** | LangGraph（`graph`） | 多角色流水线 **PI → CB → MLS → SC**；先走 PI 澄清（含显式「跳过 Research」），再 CB 计划确认。计划确认后步骤默认自动执行；小报告默认自动推进。SC 输出 paper 级报告（约 5000–8000 词）。**Local** 可在模型选择器切换 LLM；**Online** 无模型选择器，使用平台固定后端模型。 |
 
 详见 [AgentManual_CN.md](../manual/AgentManual_CN.md)。

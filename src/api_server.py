@@ -114,8 +114,15 @@ async def lifespan(app: FastAPI):
         from mcp_server import mcp as _vf_mcp
         from agent.kimi_mcp_config import VENUSFACTORY_MCP_NAME
         from agent.kimi_security import install_trusted_mcp_tools
+        from tools.runtime_tool_policy import is_tool_allowed
         tools = await _vf_mcp.list_tools()
-        prefixed = [f"mcp__{VENUSFACTORY_MCP_NAME}__{t.name}" for t in tools]
+        # Online mode drops train / VenusMine / FoldSeek from the kimi allowlist
+        # so the model cannot even request them (tools also hard-refuse).
+        prefixed = [
+            f"mcp__{VENUSFACTORY_MCP_NAME}__{t.name}"
+            for t in tools
+            if is_tool_allowed(t.name)
+        ]
         install_trusted_mcp_tools(prefixed)
         logger.info("kimi_security: installed %d trusted MCP tool names", len(prefixed))
     except Exception:

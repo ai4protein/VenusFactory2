@@ -50,7 +50,7 @@ Agent chat (`/agent`) uses a composer toggle (**Science Agent** / **Science Expe
 
 | Mode | Engine | Notes |
 |:-----|:-------|:------|
-| **Science Agent** | kimi-code | Tool-first agent loop (MCP / bash); collapsible thinking blocks and inline tool cards. Context usage is shown as a read-only pill; the agent auto-compacts when usage ≥ ~90% (no Plan/Compact/Fork composer buttons). Backed by the kimi-code daemon (see Configuration). Online hides the model picker. |
+| **Science Agent** | kimi-code | Tool-first agent loop (MCP / bash); collapsible thinking blocks and inline tool cards. Context usage is shown as a read-only pill; the agent auto-compacts when usage ≥ ~90% (no Plan/Compact/Fork composer buttons). Backed by the kimi-code daemon (see Configuration). Online hides the model picker. **Local:** MCP training tools (`generate_training_config` / `train_protein_model` / `protein_model_predict` / `register_trained_model` / `list_trained_models`); successful training auto-registers under `ckpt/user_trained/` for cross-session reuse. **Online:** hard-disables training and VenusMine / FoldSeek (API 403 + tool refusal). |
 | **Science Expert** | LangGraph (`graph`) | Multi-role pipeline **PI → CB → MLS → SC**; PI clarification first (with explicit Skip Research), then CB plan review. After plan confirm, steps default to auto-run; sub-reports default to auto-advance. SC writes a paper-level report (~5000–8000 words). **Local**: pick the LLM in the model selector. **Online**: no model selector — fixed backend model (client cannot change it). |
 
 Details: [AgentManual_EN.md](../manual/AgentManual_EN.md).

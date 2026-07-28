@@ -13,6 +13,7 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
+from tools.runtime_tool_policy import assert_local_feature
 from web.utils.common_utils import (
     build_web_v2_download_url,
     build_run_id_utc,
@@ -137,6 +138,13 @@ _SORTINGSIGNAL_LABELS = ["MT", "SP", "GPI", "NLS", "PTS", "CH", "NES", "TH", "TM
 def _runtime_mode() -> str:
     mode = os.getenv("WEBUI_V2_MODE", "local").strip().lower()
     return mode if mode in {"local", "online"} else "local"
+
+
+def _require_local_venusmine() -> None:
+    try:
+        assert_local_feature("venusmine")
+    except RuntimeError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
 
 
 def _online_fasta_limit_enabled() -> bool:
@@ -730,6 +738,7 @@ async def run_quick_tool_sequence_design(body: SequenceDesignRunBody):
 
 @router.post("/run/protein-discovery")
 async def run_quick_tool_protein_discovery(body: ProteinDiscoveryRunBody):
+    _require_local_venusmine()
     # Reuse advanced VenusMine backend and keep all advanced parameters server-side defaults.
     advanced_payload = AdvancedProteinDiscoveryBody(pdb_file=body.pdb_file)
     return await run_advanced_protein_discovery(advanced_payload)
@@ -1025,6 +1034,8 @@ async def run_quick_tool_sequence_design_stream(body: SequenceDesignRunBody):
 
 @router.post("/run/protein-discovery/stream")
 async def run_quick_tool_protein_discovery_stream(body: ProteinDiscoveryRunBody):
+    _require_local_venusmine()
+
     async def event_stream():
         start = time.perf_counter()
         yield _sse("progress", {"progress": 0.08, "message": "Validating Protein Discovery input..."})

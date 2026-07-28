@@ -277,7 +277,13 @@ def mcp_download_foldseek_results(
     protect_end: int,
     out_dir: Optional[str] = None,
 ) -> str:
-    """Run FoldSeek search with PDB file and download results (submit + wait + download)."""
+    """Run FoldSeek search with PDB file and download results (submit + wait + download). Local only."""
+    from tools.runtime_tool_policy import assert_tool_allowed, tool_denied_json
+
+    try:
+        assert_tool_allowed("download_foldseek_results")
+    except RuntimeError:
+        return tool_denied_json("download_foldseek_results")
     out_dir = out_dir or str(get_save_path("FoldSeek", "Download_data"))
     result = download_foldseek_results_by_pdb_file(
         pdb_file_path, protect_start, protect_end, out_dir=out_dir

@@ -1798,7 +1798,7 @@ def run_train_tool(config_path: str) -> str:
             output_dir = config.get("output_dir", "ckpt/custom_model")
             output_model = config.get("output_model_name", "model.pt")
             model_path = os.path.join(output_dir, output_model)
-            
+
             result = {
                 "success": True,
                 "message": "Model training completed successfully!",
@@ -1807,6 +1807,30 @@ def run_train_tool(config_path: str) -> str:
                 "command": cmd_str,
                 "logs": "\n".join(logs[-20:])  # Return last 20 lines of logs
             }
+            # Local-only auto-register into ckpt/user_trained for cross-session reuse.
+            try:
+                from tools.runtime_tool_policy import is_local_mode
+                from tools.train.model_registry import register_trained_model
+
+                if is_local_mode():
+                    reg = register_trained_model(
+                        config_path,
+                        output_dir=output_dir,
+                        model_path=model_path if os.path.isfile(model_path) else None,
+                    )
+                    result["registration"] = reg
+                    if reg.get("success"):
+                        result["registered_model_id"] = reg.get("model_id")
+                        result["registered_config_path"] = reg.get("config_path")
+                        result["message"] = (
+                            "Model training completed successfully and registered under "
+                            f"ckpt/user_trained/{reg.get('model_id')} for cross-session reuse."
+                        )
+            except Exception as reg_exc:
+                result["registration"] = {
+                    "success": False,
+                    "error": f"Auto-register failed: {reg_exc}",
+                }
         else:
             result = {
                 "success": False,
@@ -1828,6 +1852,13 @@ def run_train_tool(config_path: str) -> str:
 def run_predict_tool(config_path: str, sequence: Optional[str] = None, csv_file: Optional[str] = None) -> str:
     """Predict protein properties using a user trained model. Can perform single sequence prediction or batch prediction from CSV file."""
     try:
+        # Accept registered model_id or filesystem config path.
+        try:
+            from tools.train.model_registry import resolve_registered_config_path
+            config_path = resolve_registered_config_path(config_path)
+        except Exception:
+            pass
+
         if not os.path.exists(config_path):
             return json.dumps({
                 "success": False,

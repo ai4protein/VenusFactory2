@@ -335,7 +335,13 @@ def download_foldseek_results_by_pdb_file_tool(
     protect_end: int,
     out_dir: str = None,
 ) -> str:
-    """Download FoldSeek results by PDB file (submit + wait + download pipeline). Returns rich JSON: status, file_info, content_preview, biological_metadata, execution_context."""
+    """Download FoldSeek results by PDB file (submit + wait + download pipeline). Returns rich JSON: status, file_info, content_preview, biological_metadata, execution_context. Local only."""
+    from tools.runtime_tool_policy import assert_tool_allowed, tool_denied_json
+
+    try:
+        assert_tool_allowed("download_foldseek_results_by_pdb_file")
+    except RuntimeError:
+        return tool_denied_json("download_foldseek_results_by_pdb_file")
     try:
         out_dir = get_save_path("FoldSeek", "Download_data") if out_dir is None else out_dir
         return download_foldseek_results_by_pdb_file(pdb_file_path, protect_start, protect_end, out_dir=out_dir)

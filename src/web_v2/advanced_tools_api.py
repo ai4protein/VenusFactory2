@@ -14,6 +14,7 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
+from tools.runtime_tool_policy import assert_local_feature
 from web.advanced_tool_tab import (
     handle_VenusMine,
     handle_mutation_prediction_advance,
@@ -90,6 +91,13 @@ _ALLOWED_DOWNLOAD_EXT = {
 def _runtime_mode() -> str:
     mode = os.getenv("WEBUI_V2_MODE", "local").strip().lower()
     return mode if mode in {"local", "online"} else "local"
+
+
+def _require_local_venusmine() -> None:
+    try:
+        assert_local_feature("venusmine")
+    except RuntimeError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
 
 
 def _online_fasta_limit_enabled() -> bool:
@@ -1081,6 +1089,7 @@ async def run_sequence_design(body: SequenceDesignBody):
 
 @router.post("/protein-discovery/run")
 async def run_protein_discovery(body: ProteinDiscoveryBody):
+    _require_local_venusmine()
     if not body.pdb_file:
         raise HTTPException(status_code=400, detail="PDB file is required.")
     safe_pdb_file = _resolve_upload_file(body.pdb_file)
@@ -1367,6 +1376,8 @@ async def run_sequence_design_stream(body: SequenceDesignBody):
 
 @router.post("/protein-discovery/run/stream")
 async def run_protein_discovery_stream(body: ProteinDiscoveryBody):
+    _require_local_venusmine()
+
     async def event_stream():
         start = time.perf_counter()
         yield _sse("progress", {"progress": 0.08, "message": "Validating Protein Discovery input..."})

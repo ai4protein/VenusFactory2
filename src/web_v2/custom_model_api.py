@@ -19,6 +19,7 @@ from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
+from tools.runtime_tool_policy import assert_local_feature
 from web.utils.command import preview_command, preview_eval_command, preview_predict_command
 from web.utils.common_utils import (
     build_web_v2_download_url,
@@ -33,6 +34,20 @@ from web.utils.common_utils import (
     to_project_relative_path,
     to_web_v2_public_path,
 )
+
+
+def _require_local_training() -> None:
+    try:
+        assert_local_feature("training")
+    except RuntimeError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+
+def _require_local_custom_model(feature: str) -> None:
+    try:
+        assert_local_feature(feature)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
 
 
 router = APIRouter(prefix="/api/custom-model", tags=["custom-model-v2"])
@@ -1321,6 +1336,7 @@ async def dataset_preview(payload: DatasetPreviewRequest):
 
 @router.post("/training/preview")
 async def training_preview(payload: GenericArgsRequest):
+    _require_local_training()
     constant = _safe_read_json(_CONSTANT_PATH)
     args = _normalize_training_args(payload.args, constant)
     return {"command": redact_path_text(preview_command(args)), "args": args}
@@ -1328,6 +1344,7 @@ async def training_preview(payload: GenericArgsRequest):
 
 @router.post("/evaluation/preview")
 async def evaluation_preview(payload: GenericArgsRequest):
+    _require_local_custom_model("custom_model_evaluation")
     constant = _safe_read_json(_CONSTANT_PATH)
     args = _normalize_evaluation_args(payload.args, constant)
     return {"command": redact_path_text(preview_eval_command(args)), "args": args}
@@ -1335,6 +1352,7 @@ async def evaluation_preview(payload: GenericArgsRequest):
 
 @router.post("/predict/preview")
 async def predict_preview(payload: GenericArgsRequest):
+    _require_local_custom_model("custom_model_predict")
     constant = _safe_read_json(_CONSTANT_PATH)
     args = _normalize_predict_args(payload.args, constant)
     return {
@@ -1345,6 +1363,7 @@ async def predict_preview(payload: GenericArgsRequest):
 
 @router.post("/training/start")
 async def training_start(payload: GenericArgsRequest):
+    _require_local_training()
     constant = _safe_read_json(_CONSTANT_PATH)
     args = _normalize_training_args(payload.args, constant)
     return StreamingResponse(_task_stream("training", "src/train.py", args), media_type="text/event-stream")
@@ -1352,6 +1371,7 @@ async def training_start(payload: GenericArgsRequest):
 
 @router.post("/evaluation/start")
 async def evaluation_start(payload: GenericArgsRequest):
+    _require_local_custom_model("custom_model_evaluation")
     constant = _safe_read_json(_CONSTANT_PATH)
     args = _normalize_evaluation_args(payload.args, constant)
     return StreamingResponse(_task_stream("evaluation", "src/evaluate.py", args), media_type="text/event-stream")
@@ -1359,6 +1379,7 @@ async def evaluation_start(payload: GenericArgsRequest):
 
 @router.post("/predict/start")
 async def predict_start(payload: GenericArgsRequest):
+    _require_local_custom_model("custom_model_predict")
     constant = _safe_read_json(_CONSTANT_PATH)
     args = _normalize_predict_args(payload.args, constant)
     return StreamingResponse(_task_stream("predict", "src/predict.py", args), media_type="text/event-stream")
