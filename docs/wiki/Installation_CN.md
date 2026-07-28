@@ -5,9 +5,12 @@
 本文是**权威**安装页（根 README 只保留最短命令）。日常上手：
 
 ```bash
-git clone https://github.com/AI4Protein/VenusFactory2.git && cd VenusFactory2
+git clone --recurse-submodules https://github.com/AI4Protein/VenusFactory2.git && cd VenusFactory2
+# 若已普通 clone：git submodule update --init --recursive
 python scripts/setup_quickstart.py
 ```
+
+Agent 技能可选加载 git submodule `third_party/scientific-agent-skills`（[scientific-agent-skills](https://github.com/K-Dense-AI/scientific-agent-skills)）。未初始化时仍可使用 VenusFactory2 自有技能。
 
 终端会给出选项，带 **[recommended]** 的为推荐项；直接回车即可按推荐方案安装（依赖 + 前端 + `predict-core` 权重）。
 

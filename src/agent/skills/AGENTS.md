@@ -1,24 +1,44 @@
 # VenusFactory2 Agent Skills Guide
 
-Skills live in `src/agent/skills/<skill_id>/`. The agent loads **metadata** into the Computational Biologist (CB) prompt and full skill files into the Machine Learning Specialist (MLS) via `read_skill`.
+Skills are discovered from **two roots** (see `src/agent/skills.py`):
 
-This profile is inspired by the open [Agent Skills](https://agentskills.io/) standard and [scientific-agent-skills](https://github.com/K-Dense-AI/scientific-agent-skills), adapted for VenusFactory2’s **tool-bound** protein-engineering agent (not a generic science mega-catalog).
+1. **VenusFactory2 (tool-bound):** `src/agent/skills/<skill_id>/`
+2. **scientific-agent-skills (reference library, optional git submodule):**  
+   `third_party/scientific-agent-skills/skills/<id>/`
+
+The agent loads **metadata** into the Computational Biologist (CB) prompt and full skill files into the Machine Learning Specialist (MLS) via `read_skill`. Protein-engineering **execution** should prefer VF2 tool-bound skills; the scientific library is knowledge for `read_skill` / `list_skills`. Upstream `scripts/` and `uv` runners are **not** auto-executed.
 
 Catalog: [`docs/agent/SKILLS_INDEX.md`](../../../docs/agent/SKILLS_INDEX.md) · Validate: `python scripts/validate_skills.py`
+
+## Submodule init
+
+```bash
+git clone --recurse-submodules https://github.com/AI4Protein/VenusFactory2.git
+# or, after a plain clone:
+git submodule update --init --recursive
+```
+
+If the submodule is missing, the loader uses VF2 skills only (no crash).
+
+## Name collisions (`sas_`)
+
+VF2 keeps the bare `skill_id`. If scientific-agent-skills has the same directory name, it registers as `sas_<dirname>` (e.g. VF2 `biopython` wins; upstream is `sas_biopython`). Non-colliding upstream packages keep their original directory name as `skill_id`.
 
 ## Layout
 
 ```text
-src/agent/skills/
-├── AGENTS.md                 # this file
-├── <skill_id>/               # skill_id == directory == read_skill argument
-│   ├── SKILL.md              # required
-│   ├── references/           # optional progressive disclosure
-│   ├── assets/               # optional
-│   └── static/ + manifest.yaml   # only for nature_* routers (legacy pattern)
-└── _shared_<domain>/         # NOT a skill — no SKILL.md; skipped by loader
-```
+src/agent/skills/                          # VF2 root
+├── AGENTS.md                              # this file
+├── <skill_id>/                            # skill_id == directory == read_skill argument
+│   ├── SKILL.md                           # required
+│   ├── references/                        # optional progressive disclosure
+│   ├── assets/                            # optional
+│   └── static/ + manifest.yaml            # only for nature_* routers (legacy pattern)
+└── _shared_<domain>/                      # NOT a skill — no SKILL.md; skipped by loader
 
+third_party/scientific-agent-skills/skills/   # optional submodule root
+└── <id>/SKILL.md                          # may appear as sas_<id> on collision
+```
 ## Frontmatter (VF2 profile)
 
 ```yaml
@@ -71,7 +91,7 @@ Use `workflow_skill_creator` for distillation from a completed session, or follo
 
 ## Do not
 
-- Copy all 154 skills from scientific-agent-skills into this tree.
-- Add `uv` / `# /// script` per-skill runners (use `src/tools/` + conda).
+- Vendor/copy the scientific-agent-skills tree into `src/agent/skills/` (use the submodule + dual-root loader).
+- Auto-run upstream `scripts/` / `uv` / `# /// script` isolation (use `src/tools/` + conda; `read_skill` may still show those files).
 - Register `_shared_*` directories as skills.
 - Put skill unit tests inside the skill directory (use `tests/`).

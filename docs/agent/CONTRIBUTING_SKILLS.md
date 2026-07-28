@@ -57,8 +57,20 @@ metadata:
 - `references/….md`
 ```
 
-## What not to port from scientific-agent-skills
+## scientific-agent-skills (submodule)
 
-- Entire mega-skills unrelated to protein engineering (scanpy, geospatial, clinical decision support, lab robots).
-- Per-skill `scripts/` + `uv` isolation — VF2 uses `src/tools/` + project conda.
-- `allowed-tools` as a permission model.
+The full upstream library is already wired via git submodule
+`third_party/scientific-agent-skills` and the dual-root loader. Contributors
+normally **do not** copy packages into `src/agent/skills/`.
+
+| Topic | Rule |
+|-------|------|
+| Init | `git submodule update --init --recursive` (or clone with `--recurse-submodules`) |
+| Addressing | VF2 same-name wins; upstream collision → `sas_<id>` |
+| Execution | Prefer VF2 tool-bound skills; SAS is reference knowledge via `read_skill` |
+| Upstream scripts | Not auto-run; no per-skill `uv` runners in VF2 |
+| Validate | `validate_skills.py` strictly checks VF2; SAS only needs `SKILL.md` present |
+
+**Still do not** treat `allowed-tools` as VF2’s permission model, and do not
+rewrite upstream SKILL bodies just to bind hub tools unless you are creating a
+first-class VF2 skill under `src/agent/skills/`.

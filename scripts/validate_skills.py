@@ -1,13 +1,17 @@
 #!/usr/bin/env python3
 """Validate VenusFactory2 agent skills (Agent Skills–inspired VF2 profile).
 
-Checks:
+Checks (VF2 tree — strict):
   - Each skill dir (non-_*) has SKILL.md
   - Frontmatter has name + description
   - name == directory name (skill_id)
   - Top-level keys ⊆ Agent Skills closed set (+ legacy version/author warned)
   - metadata.version present (warn if missing)
   - SKILL.md line count soft-cap (default 500)
+
+Checks (scientific-agent-skills submodule — loose):
+  - If ``third_party/scientific-agent-skills/skills`` exists, each package
+    dir must contain SKILL.md. Frontmatter differences do not fail CI.
 
 Usage:
   python3 scripts/validate_skills.py
@@ -23,6 +27,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SKILLS_DIR = ROOT / "src" / "agent" / "skills"
+SAS_SKILLS_DIR = ROOT / "third_party" / "scientific-agent-skills" / "skills"
 ALLOWED_TOP = {
     "name",
     "description",
@@ -198,6 +203,24 @@ def validate(strict: bool = False, check_refs: bool = False) -> int:
         for msg in _check_referenced_paths(path.name, body, check_refs):
             (errors if strict else warnings).append(msg)
 
+    # Loose scan of optional scientific-agent-skills submodule
+    sas_count = 0
+    if SAS_SKILLS_DIR.is_dir():
+        for path in sorted(SAS_SKILLS_DIR.iterdir()):
+            if not path.is_dir() or path.name.startswith("_"):
+                continue
+            sas_count += 1
+            if not (path / "SKILL.md").is_file():
+                errors.append(
+                    f"scientific/{path.name}: missing SKILL.md "
+                    "(loose submodule check)"
+                )
+    elif (ROOT / "third_party" / "scientific-agent-skills").exists():
+        warnings.append(
+            "scientific-agent-skills present but skills/ missing — "
+            "run: git submodule update --init --recursive"
+        )
+
     # Loader smoke (optional if import path works)
     sys.path.insert(0, str(ROOT / "src"))
     try:
@@ -205,12 +228,19 @@ def validate(strict: bool = False, check_refs: bool = False) -> int:
 
         invalidate_skills_cache()
         loaded = get_skills_metadata()
-        loaded_ids = {m["skill_id"] for m in loaded}
-        if len(loaded_ids) != skill_count:
+        vf_loaded = [m for m in loaded if m.get("source") == "venusfactory"]
+        sas_loaded = [m for m in loaded if m.get("source") == "scientific"]
+        if len(vf_loaded) != skill_count:
             errors.append(
-                f"loader registered {len(loaded_ids)} skills but filesystem has {skill_count}"
+                f"loader registered {len(vf_loaded)} venusfactory skills "
+                f"but filesystem has {skill_count}"
             )
-        for m in loaded:
+        if SAS_SKILLS_DIR.is_dir() and sas_count and len(sas_loaded) == 0:
+            errors.append(
+                "scientific skills dir present but loader registered 0 "
+                "scientific skills"
+            )
+        for m in vf_loaded:
             if not m.get("name_matches_dir"):
                 warnings.append(
                     f"{m['skill_id']}: loader reports name_matches_dir=False "
@@ -224,7 +254,11 @@ def validate(strict: bool = False, check_refs: bool = False) -> int:
     for e in errors:
         print(f"ERROR: {e}", file=sys.stderr)
 
-    print(f"Validated {skill_count} skills — {len(errors)} error(s), {len(warnings)} warning(s)")
+    print(
+        f"Validated {skill_count} VF2 skills"
+        + (f" + {sas_count} scientific (loose)" if sas_count else "")
+        + f" — {len(errors)} error(s), {len(warnings)} warning(s)"
+    )
     if errors:
         return 1
     if strict and warnings:

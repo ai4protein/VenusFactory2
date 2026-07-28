@@ -54,7 +54,9 @@ Try online: [venusfactory.bio](https://venusfactory.bio/)
 Slow Hugging Face access: `export HF_ENDPOINT=https://hf-mirror.com`
 
 ```bash
-git clone https://github.com/AI4Protein/VenusFactory2.git && cd VenusFactory2
+git clone --recurse-submodules https://github.com/AI4Protein/VenusFactory2.git && cd VenusFactory2
+# If you already cloned without submodules:
+#   git submodule update --init --recursive
 python scripts/setup_quickstart.py          # interactive one-click install
 # python scripts/setup_quickstart.py -y     # CI / non-interactive
 

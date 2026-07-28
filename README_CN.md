@@ -54,7 +54,8 @@ VenusFactory2 把蛋白质语言模型、数据库与 Agent 编排放在同一�
 国内 HF 较慢时可先：`export HF_ENDPOINT=https://hf-mirror.com`
 
 ```bash
-git clone https://github.com/AI4Protein/VenusFactory2.git && cd VenusFactory2
+git clone --recurse-submodules https://github.com/AI4Protein/VenusFactory2.git && cd VenusFactory2
+# 若已普通 clone：git submodule update --init --recursive
 python scripts/setup_quickstart.py          # 交互一键安装（推荐）
 # python scripts/setup_quickstart.py -y     # CI / 无交互
 
