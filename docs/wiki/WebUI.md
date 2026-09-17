@@ -58,7 +58,8 @@ Details: [AgentManual_EN.md](../manual/AgentManual_EN.md).
 ## Configuration
 
 - Template: `.env.example` → `.env`
-- Agent / LLM: prefer UI **Settings**; env vars documented in `.env.example`
+- LLM endpoints: `cp model-config.yaml.example model-config.yaml`, then set `active: dmx|gpt|claude|…`
+- Agent / LLM keys: prefer UI **Settings**; env vars documented in `.env.example`
 - Online: `WEBUI_V2_MODE=online`, `WEBUI_V2_SESSION_TOKEN_SECRET`, `WEBUI_V2_*_LIMIT`
 - Online without sudo (kimi-code): default `auto` uses `bwrap` sandbox; or set `KIMI_ONLINE_SPAWN_MODE=bwrap`
 - Skip default kimi-code: `export KIMI_EXTERNAL=1`

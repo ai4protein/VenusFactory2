@@ -70,7 +70,13 @@ The installer detects older setups (`.venv` / frontend / weights) and can reuse 
 **After launch**
 
 1. Open the UI → Quick Tools work without an LLM key  
-2. Agent: set an API key in Settings, or `cp .env.example .env` (see `.env.example`)  
+2. Agent / Science Expert LLM: copy the endpoint config, pick a provider, then set the key  
+   ```bash
+   cp model-config.yaml.example model-config.yaml
+   # set `active: dmx` | `gpt` | `claude` | `gemini` | `deepseek` | …
+   cp .env.example .env   # fill DMXAPI_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY / …
+   ```
+   The yaml is re-read on every page load and chat request — change `active`, `model`, or `base_url` and refresh. See [`model-config.yaml.example`](model-config.yaml.example).  
 3. Optional check: `python scripts/check_env.py`
 
 ---

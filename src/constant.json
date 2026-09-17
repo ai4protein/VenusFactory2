@@ -473,6 +473,7 @@
       ]
     },
     "llm_models": {
+      "GLM-4-Flash": "glm-4-flash",
       "DeepSeek": "deepseek-chat",
       "Gemini-2.5-Pro": "gemini-2.5-pro",
       "ChatGPT-4o": "gpt-4o",

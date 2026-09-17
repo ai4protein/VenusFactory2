@@ -69,7 +69,13 @@ python src/webui_v2.py --host 0.0.0.0 --port 7861
 **装完之后**
 
 1. 打开网页 → Quick Tools 无需 LLM Key 即可试用  
-2. Agent：在界面 Settings 配置 API Key，或 `cp .env.example .env` 后填写（见 `.env.example`）  
+2. Agent / Science Expert 的 LLM：复制端点配置、选中提供商，再填 Key  
+   ```bash
+   cp model-config.yaml.example model-config.yaml
+   # 把 `active` 改成 dmx / gpt / claude / gemini / deepseek / …
+   cp .env.example .env   # 填写 DMXAPI_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY / …
+   ```
+   每次刷新页面或发消息都会重新读取该 yaml，改 `active`、`model`、`base_url` 立即生效。模板见 [`model-config.yaml.example`](model-config.yaml.example)。  
 3. 验证环境：`python scripts/check_env.py`
 
 ---

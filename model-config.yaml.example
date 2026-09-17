@@ -1,0 +1,89 @@
+# VenusFactory LLM endpoints
+#
+# 1. cp model-config.yaml.example model-config.yaml
+# 2. set `active` to the endpoint you want
+# 3. put the key in .env (see api_key_env) — do not commit real keys
+#
+# Re-read on every page load / Science Expert request.
+# Override path: VENUS_MODEL_CONFIG=/abs/path/model-config.yaml
+
+active: dmx
+
+temperature: 0.2
+max_tokens: 8192
+code_max_tokens: 10000
+
+endpoints:
+  dmx:
+    model: glm-4-flash
+    label: GLM 4 Flash (DMXAPI)
+    provider: dmx
+    base_url: https://www.dmxapi.cn/v1
+    api_compatible: openai
+    api_key_env: DMXAPI_API_KEY
+
+  gpt:
+    model: gpt-4o
+    label: ChatGPT 4o
+    provider: openai
+    base_url: https://api.openai.com/v1
+    api_compatible: openai
+    api_key_env: OPENAI_API_KEY
+
+  claude:
+    model: claude-3-7-sonnet-20250219
+    label: Claude 3.7 Sonnet
+    provider: anthropic
+    base_url: https://api.anthropic.com/v1
+    api_compatible: anthropic
+    api_key_env: ANTHROPIC_API_KEY
+
+  gemini:
+    model: gemini-2.5-pro
+    label: Gemini 2.5 Pro
+    provider: google
+    base_url: https://generativelanguage.googleapis.com/v1beta/openai
+    api_compatible: openai
+    api_key_env: GOOGLE_API_KEY
+
+  deepseek:
+    model: deepseek-v4-pro
+    label: DeepSeek V4 Pro
+    provider: deepseek
+    base_url: https://api.deepseek.com
+    api_compatible: openai
+    api_key_env: DEEPSEEK_API_KEY
+
+  zhipu:
+    model: glm-4-flash
+    label: GLM 4 Flash (Zhipu)
+    provider: zhipu
+    base_url: https://open.bigmodel.cn/api/paas/v4
+    api_compatible: openai
+    api_key_env: ZHIPU_API_KEY
+
+  qwen:
+    model: qwen-plus
+    label: Qwen Plus
+    provider: alibaba
+    base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+    api_compatible: openai
+    api_key_env: DASHSCOPE_API_KEY
+
+  moonshot:
+    model: moonshot-v1-128k
+    label: Kimi (Moonshot v1 128k)
+    provider: moonshot
+    base_url: https://api.moonshot.cn/v1
+    api_compatible: openai
+    api_key_env: MOONSHOT_API_KEY
+
+  # Custom OpenAI-compatible gateway — copy this block and change `active`.
+  # custom:
+  #   model: my-model-name
+  #   label: My Gateway
+  #   provider: custom
+  #   base_url: https://example.com/v1
+  #   api_compatible: openai
+  #   api_key_env: CHAT_API_KEY
+  #   # api_key: ${CHAT_API_KEY}

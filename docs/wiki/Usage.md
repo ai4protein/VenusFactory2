@@ -18,7 +18,14 @@ You: "Design thermostable mutations for PDB:1ABC"
 | Planning | Multi-step automation · tool routing |
 | Research | Literature · family analysis · reports |
 
-Needs an LLM API key (UI Settings or `.env`; see `.env.example`).  
+Needs an LLM API key. Science Expert reads [`model-config.yaml.example`](../../model-config.yaml.example) on every request:
+
+```bash
+cp model-config.yaml.example model-config.yaml
+# set `active: dmx` | `gpt` | `claude` | `gemini` | `deepseek` | …
+# put the matching key in `.env` or UI Settings
+```
+
 Manual: [AgentManual_EN.md](../manual/AgentManual_EN.md)
 
 ## CLI (examples)

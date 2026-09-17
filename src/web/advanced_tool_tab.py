@@ -1431,7 +1431,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                                     with gr.Group(visible=False) as ai_box_zshot_seq:
                                         llm_dd_seq_zshot = gr.Dropdown(
                                             choices=list(LLM_MODELS.keys()), 
-                                            value="DeepSeek", 
+                                            value="GLM-4-Flash", 
                                             label="Select AI Model"
                                         )
                                         ai_status_seq_zshot = gr.HTML(
@@ -1476,7 +1476,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                                     with gr.Group(visible=False) as ai_box_zshot_stru:
                                         llm_dd_stru_zshot = gr.Dropdown(
                                             choices=list(LLM_MODELS.keys()), 
-                                            value="DeepSeek", 
+                                            value="GLM-4-Flash", 
                                             label="Select AI Model"
                                         )
                                         ai_status_stru_zshot = gr.HTML(
@@ -1620,7 +1620,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                                 llm_dd_seq_func = gr.Dropdown(
                                     choices=list(LLM_MODELS.keys()), 
                                     label="Select AI Model", 
-                                    value="DeepSeek"
+                                    value="GLM-4-Flash"
                                 )
                                 ai_status_seq_func = gr.HTML(
                                     value="<span style='color:#059669;font-size:0.9em;'>✓ Using provided API Key</span>" if os.getenv("DEEPSEEK_API_KEY") or os.getenv("OPENAI_API_KEY") else "<span style='color:#d97706;font-size:0.9em;'>⚠ No API Key found in .env file</span>",
@@ -1685,7 +1685,7 @@ def create_advanced_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                                     llm_dd_residue_function = gr.Dropdown(
                                         choices=list(LLM_MODELS.keys()),
                                         label="Select AI Model",
-                                        value="DeepSeek"
+                                        value="GLM-4-Flash"
                                     )
                                     ai_status_residue_function = gr.HTML(
                                         value="<span style='color:#059669;font-size:0.9em;'>✓ Using provided API Key</span>" if os.getenv("DEEPSEEK_API_KEY") or os.getenv("OPENAI_API_KEY") else "<span style='color:#d97706;font-size:0.9em;'>⚠ No API Key found in .env file</span>",

@@ -96,7 +96,7 @@ class LLMConfig:
     # Empty base_url means "resolve per-model via agent.model_registry".
     # Setting CHAT_BASE_URL still forces a single endpoint (legacy / gateway mode).
     base_url: str = ""
-    model_name: str = "deepseek-v4-pro"
+    model_name: str = ""
     temperature: float = 0.2
     max_tokens: int = 8192
     code_max_tokens: int = 10000
@@ -111,14 +111,27 @@ class LLMConfig:
     def from_env(cls) -> LLMConfig:
         # Import here to avoid a circular import at module load time (config <- agent.*).
         try:
-            from agent.model_registry import get_default_model_id
-            default_model = get_default_model_id()
+            from agent.model_config import load_model_config
+            runtime = load_model_config()
+            default_model = runtime.model
+            runtime_key = runtime.resolve_api_key()
+            default_temperature = runtime.temperature
+            default_max_tokens = runtime.max_tokens
+            default_code_max_tokens = runtime.code_max_tokens
         except Exception:
-            default_model = "deepseek-v4-pro"
-        # API key precedence: CHAT_API_KEY > OPENAI_API_KEY > DEEPSEEK_API_KEY (legacy).
-        # Per-model/provider keys are resolved separately by model_registry from
-        # ~/.venusfactory/keys.json or the model's api_key_env field.
-        api_key = _env("CHAT_API_KEY") or _env("OPENAI_API_KEY") or _env("DEEPSEEK_API_KEY")
+            default_model = "glm-4-flash"
+            runtime_key = ""
+            default_temperature = 0.2
+            default_max_tokens = 8192
+            default_code_max_tokens = 10000
+        # API key: env > model-config.yaml > legacy provider envs.
+        api_key = (
+            _env("CHAT_API_KEY")
+            or runtime_key
+            or _env("DMXAPI_API_KEY")
+            or _env("OPENAI_API_KEY")
+            or _env("DEEPSEEK_API_KEY")
+        )
         # base_url: empty (default) = let Chat_LLM resolve per-model via registry.
         # An explicit CHAT_BASE_URL still forces a single endpoint (legacy / gateway mode).
         base_url = _env("CHAT_BASE_URL", "")
@@ -126,9 +139,9 @@ class LLMConfig:
             api_key=api_key,
             base_url=base_url,
             model_name=_env("CHAT_MODEL_NAME") or default_model,
-            temperature=_env_float("CHAT_TEMPERATURE", 0.2),
-            max_tokens=_env_int("CHAT_MAX_TOKENS", 8192),
-            code_max_tokens=_env_int("CHAT_CODE_MAX_TOKENS", 10000),
+            temperature=_env_float("CHAT_TEMPERATURE", default_temperature),
+            max_tokens=_env_int("CHAT_MAX_TOKENS", default_max_tokens),
+            code_max_tokens=_env_int("CHAT_CODE_MAX_TOKENS", default_code_max_tokens),
         )
 
     def with_overrides(self, **kwargs: Any) -> LLMConfig:

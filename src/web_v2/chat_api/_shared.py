@@ -172,7 +172,7 @@ _SECRET_KEY_NAMES_LOWER = frozenset({
     "access_token", "access-token", "refresh_token", "refresh-token",
     "bearer", "password", "passwd",
     "private_key", "private-key", "client_secret", "client-secret",
-    "openai_api_key", "anthropic_api_key", "deepseek_api_key",
+    "openai_api_key", "anthropic_api_key", "deepseek_api_key", "dmxapi_api_key",
     "moonshot_api_key", "google_api_key", "hf_token", "huggingface_token",
     "aws_access_key_id", "aws_secret_access_key", "aws_session_token",
     "github_token", "gh_token",

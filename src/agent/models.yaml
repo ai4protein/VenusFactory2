@@ -8,7 +8,7 @@
 #   id                   stable backend model id (passed to provider as "model")
 #   label                user-facing name in UI
 #   provider             logical owner (deepseek, openai, google, anthropic, ...)
-#   base_url             official provider HTTP endpoint (no third-party gateway)
+#   base_url             catalog default URL; Science Expert overlays model-config.yaml
 #   api_compatible       openai | anthropic   (determines request/response schema)
 #   api_key_env          env var consulted first if user key not set in keys.json
 #   supports_tool_use    OpenAI-style function-calling supported
@@ -171,5 +171,6 @@ models:
     max_context_tokens: 128000
     max_output_tokens: 8192
 
-# No third-party gateways. Every model uses its official base_url above.
+# Science Expert / graph default endpoint lives in model-config.yaml
+# (`active: dmx|gpt|claude|…`). This catalog is the picker + fallback.
 gateways: []

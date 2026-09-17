@@ -48,7 +48,7 @@ import {
   isKimiEngineModel,
   isGraphEngineModel,
   SCIENCE_AGENT_MODEL_ID,
-  ONLINE_FIXED_EXPERT_MODEL_ID,
+  getExpertModelId,
   type ChatMode,
   type ModelSpec,
 } from "../lib/useModelRegistry";
@@ -961,19 +961,22 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         }
       }
       if (runtimeMode !== "local") {
-        // Online: Agent → kimi sentinel; Expert → fixed DeepSeek.
+        // Online: Agent → kimi sentinel; Expert → model-config.yaml pin.
+        const expertId = getExpertModelId(registry.data);
         setSelectedModel(
-          chatMode === "science_agent" ? SCIENCE_AGENT_MODEL_ID : ONLINE_FIXED_EXPERT_MODEL_ID
+          chatMode === "science_agent" ? SCIENCE_AGENT_MODEL_ID : expertId
         );
         if (chatMode !== "science_agent") {
-          rememberModelFromSession(ONLINE_FIXED_EXPERT_MODEL_ID);
+          rememberModelFromSession(expertId);
         }
       } else {
         // Local: both modes pick a concrete registry/custom model.
         const createdId = modelLabelFromInternal(created.model_name);
         const nextId =
           isKimiEngineModel({ id: createdId, engine: undefined }) || !createdId
-            ? pickExpertModelId(registry.data?.models || [], selectedModel)
+            ? pickExpertModelId(registry.data?.models || [], selectedModel, {
+                expertModel: getExpertModelId(registry.data),
+              })
             : createdId;
         setSelectedModel(nextId);
         rememberModelFromSession(nextId);
@@ -1169,7 +1172,9 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         setSelectedModel(SCIENCE_AGENT_MODEL_ID);
       } else {
         const graphId = isKimiEngineModel({ id: modelId, engine: s.engine })
-          ? pickExpertModelId(registry.data?.models || [], null)
+          ? pickExpertModelId(registry.data?.models || [], null, {
+              expertModel: getExpertModelId(registry.data),
+            })
           : modelId;
         setSelectedModel(graphId);
         rememberModelFromSession(s.model_name);
@@ -1453,7 +1458,9 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         } else {
           const createdId = modelLabelFromInternal(created.model_name);
           const nextId = isKimiEngineModel({ id: createdId, engine: undefined })
-            ? pickExpertModelId(registry.data?.models || [], null)
+            ? pickExpertModelId(registry.data?.models || [], null, {
+              expertModel: getExpertModelId(registry.data),
+            })
             : createdId;
           setSelectedModel(nextId);
           rememberModelFromSession(created.model_name);
@@ -1503,7 +1510,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         : !isLocalMode
           ? chatMode === "science_agent"
             ? SCIENCE_AGENT_MODEL_ID
-            : ONLINE_FIXED_EXPERT_MODEL_ID
+            : getExpertModelId(registry.data)
           : chatMode === "science_agent" && isKimiEngineModel({ id: selectedModel, engine: "kimi-code" })
             ? SCIENCE_AGENT_MODEL_ID
             : selectedModel;
@@ -1994,10 +2001,10 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   // Keep selected model aligned with chat mode once registry is available.
   useEffect(() => {
     if (registry.loading || !registry.data) return;
-    // Online locks: Agent → kimi sentinel, Expert → fixed DeepSeek.
+    // Online locks: Agent → kimi sentinel, Expert → model-config.yaml pin.
     if (!isLocalMode) {
       const locked =
-        chatMode === "science_agent" ? SCIENCE_AGENT_MODEL_ID : ONLINE_FIXED_EXPERT_MODEL_ID;
+        chatMode === "science_agent" ? SCIENCE_AGENT_MODEL_ID : getExpertModelId(registry.data);
       if (selectedModel !== locked) setSelectedModel(locked);
       return;
     }
@@ -2006,7 +2013,11 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       chatMode === "science_expert" && customModels.some((m) => m.id === selectedModel);
     const isExpertRegistryId = expertRegistryModels.some((m) => m.id === selectedModel);
     if (!isExpertRegistryId && !isCustomId) {
-      setSelectedModel(pickExpertModelId(registryModels, selectedModel));
+      setSelectedModel(
+        pickExpertModelId(registryModels, selectedModel, {
+          expertModel: getExpertModelId(registry.data),
+        })
+      );
     }
   }, [
     registry.loading,
@@ -2025,7 +2036,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       setSelectedModel(
         chatMode === "science_agent"
           ? SCIENCE_AGENT_MODEL_ID
-          : ONLINE_FIXED_EXPERT_MODEL_ID
+          : getExpertModelId(registry.data)
       );
     }
   }, [isLocalMode, selectedModel, customModels, chatMode]);
@@ -2060,7 +2071,9 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         );
         const nextModel = keepCurrent
           ? selectedModel
-          : pickExpertModelId(registryModels, selectedModel);
+          : pickExpertModelId(registryModels, selectedModel, {
+              expertModel: getExpertModelId(registry.data),
+            });
         setSelectedModel(nextModel);
         setKeyPanelProvider("");
       }
@@ -2068,7 +2081,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       setChatMode("science_expert");
       persistChatMode("science_expert");
       if (!isLocalMode) {
-        setSelectedModel(ONLINE_FIXED_EXPERT_MODEL_ID);
+        setSelectedModel(getExpertModelId(registry.data));
         setKeyPanelProvider("");
       } else {
         const currentSpec = registryModels.find((m) => m.id === selectedModel);
@@ -2077,7 +2090,9 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
           customModels.some((m) => m.id === selectedModel);
         const nextModel = keepCurrent
           ? selectedModel
-          : pickExpertModelId(registryModels, selectedModel);
+          : pickExpertModelId(registryModels, selectedModel, {
+              expertModel: getExpertModelId(registry.data),
+            });
         setSelectedModel(nextModel);
         const spec = registryModels.find((m) => m.id === nextModel);
         if (spec && keyStatus[spec.provider] !== true && !isKimiEngineModel(spec)) {
@@ -2219,7 +2234,9 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         setSelectedModel(
           chatMode === "science_agent"
             ? SCIENCE_AGENT_MODEL_ID
-            : pickExpertModelId(registryModels, defaultModelId)
+            : pickExpertModelId(registryModels, defaultModelId, {
+                expertModel: getExpertModelId(registry.data),
+              })
         );
         setModelSwitchNotice(t.noticeCustomRemoved);
       }

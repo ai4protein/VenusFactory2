@@ -9,19 +9,32 @@ import gradio as gr
 
 from .constants import LLM_MODELS
 
-# api_base and API key come from .env (CHAT_BASE_URL, OPENAI_API_KEY).
-# Default is DeepSeek official; prefer per-model URLs from models.yaml in v2.
-CHAT_BASE_URL_DEFAULT = "https://api.deepseek.com"
-
-
 def get_chat_base_url() -> str:
-    """API base URL for chat/LLM (from .env)."""
-    return os.getenv("CHAT_BASE_URL", CHAT_BASE_URL_DEFAULT)
+    """API base URL for chat/LLM (CHAT_BASE_URL, else model-config.yaml)."""
+    env_url = os.getenv("CHAT_BASE_URL", "").strip()
+    if env_url:
+        return env_url
+    try:
+        from agent.model_config import load_model_config
+        return load_model_config().base_url or "https://www.dmxapi.cn/v1"
+    except Exception:
+        return "https://www.dmxapi.cn/v1"
 
 
 def get_api_key(llm_provider: str, user_input_key: str = "") -> Optional[str]:
     """Get API key from .env (OPENAI_API_KEY) or user input."""
-    env_api_key = os.getenv("OPENAI_API_KEY")
+    try:
+        from agent.model_config import load_model_config
+        runtime_key = load_model_config().resolve_api_key()
+    except Exception:
+        runtime_key = ""
+    env_api_key = (
+        os.getenv("CHAT_API_KEY")
+        or runtime_key
+        or os.getenv("DMXAPI_API_KEY")
+        or os.getenv("OPENAI_API_KEY")
+        or os.getenv("DEEPSEEK_API_KEY")
+    )
     if env_api_key and env_api_key.strip():
         return env_api_key.strip()
     if user_input_key and user_input_key.strip():
@@ -129,17 +142,17 @@ def call_llm_api(config: LLMConfig, prompt: str) -> str:
 
 def check_llm_config_status(llm_provider: str, user_api_key: str) -> Tuple[bool, str]:
     """Check LLM configuration status and return validity and message."""
-    env_api_key = os.getenv("OPENAI_API_KEY")
+    env_api_key = get_api_key(llm_provider)
     if env_api_key and env_api_key.strip():
         return True, "✓ Using the Provided API Key"
     if user_api_key and user_api_key.strip():
         return True, "✓ The server will not save your API Key"
-    return False, "⚠ No API Key found in .env file"
+    return False, "⚠ No API Key found in .env / model-config.yaml"
 
 
 def on_llm_change(llm_provider: str) -> Tuple:
     """Handle LLM selection change."""
-    env_api_key = os.getenv("OPENAI_API_KEY")
+    env_api_key = get_api_key(llm_provider)
     if env_api_key and env_api_key.strip():
         status_msg = "<span style='color:#059669;font-size:0.9em;'>✓ Using API Key from .env file</span>"
         show_input = False

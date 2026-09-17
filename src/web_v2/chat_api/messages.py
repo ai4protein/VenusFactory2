@@ -5,6 +5,7 @@ from agent.chat_agent import (
     update_llm_model,
     update_llm_openai_style_config,
 )
+from agent.model_config import apply_to_llm, get_expert_model_id, load_model_config
 from agent.model_registry import get_model
 
 from web_v2.chat_api._hooks_runtime import (
@@ -29,11 +30,6 @@ from web_v2.chat_api._stream import _stream_graph
 from web_v2.chat_api._stream_kimi import _stream_kimi
 
 router = APIRouter()
-
-# Online deployments pin Science Expert (graph) to DeepSeek — clients cannot
-# pick GPT/Claude/etc. Science Agent still routes through kimi-code.
-_ONLINE_FIXED_GRAPH_MODEL = "deepseek-v4-pro"
-
 
 @router.post("/sessions/{session_id}/messages/stream")
 async def stream_message(session_id: str, payload: ChatStreamRequest, request: Request):
@@ -70,13 +66,22 @@ async def stream_message(session_id: str, payload: ChatStreamRequest, request: R
 
     engine = _resolve_engine(payload.engine, payload.model, payload.chat_mode)
     chat_mode = _resolve_chat_mode(engine, payload.chat_mode)
-    # Online: ignore client model for graph / Science Expert — always DeepSeek.
+    # Online: ignore client model for graph / Science Expert — always model-config.yaml.
     # Science Agent (kimi-code) keeps client model in local mode so the picker
     # can choose the underlying LLM forwarded to kimi create_session.
     graph_model = payload.model
-    if _runtime_mode() != "local" and engine != "kimi-code":
-        graph_model = _ONLINE_FIXED_GRAPH_MODEL
-        state["active_custom_model_id"] = ""
+    runtime = load_model_config()
+    if engine != "kimi-code":
+        llm = state.get("llm")
+        if _runtime_mode() != "local":
+            graph_model = runtime.model
+            state["active_custom_model_id"] = ""
+            if llm is not None:
+                llm._uses_runtime_config = True
+            apply_to_llm(llm)
+        elif getattr(llm, "_uses_runtime_config", False) or graph_model in runtime.model_ids():
+            graph_model = runtime.model
+            apply_to_llm(llm)
 
     if engine == "kimi-code":
         from agent.kimi_model import to_kimi_model_id
@@ -144,11 +149,12 @@ async def stream_retry(session_id: str, request: Request):
     model_id = getattr(llm, "model_name", "") if llm is not None else ""
     engine = _resolve_engine(state.get("engine"), model_id, state.get("chat_mode"))
     chat_mode = _resolve_chat_mode(engine, state.get("chat_mode"))
-    # Online graph retries stay pinned to DeepSeek even if session LLM drifted.
+    # Online graph retries stay pinned to model-config.yaml even if session LLM drifted.
     if _runtime_mode() != "local" and engine != "kimi-code":
-        update_llm_model(_ONLINE_FIXED_GRAPH_MODEL, state)
+        update_llm_model(get_expert_model_id(), state)
         state["active_custom_model_id"] = ""
         llm = state.get("llm")
+        apply_to_llm(llm)
     state["engine"] = engine
     state["chat_mode"] = chat_mode
     streamer = _stream_kimi if engine == "kimi-code" else _stream_graph

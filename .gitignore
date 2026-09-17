@@ -122,6 +122,8 @@ celerybeat.pid
 # Environments
 .env
 .venv
+# Local LLM endpoint config may contain api_key. Commit only the example.
+/model-config.yaml
 env/
 venv/
 ENV/

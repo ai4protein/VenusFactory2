@@ -42,6 +42,7 @@ from agent.prompts import (
     SC_PROMPT,
 )
 from agent.hooks import get_default_hooks
+from agent.model_config import applies_to_model, apply_to_llm, load_model_config
 from agent.model_registry import get_default_model_id, resolve_endpoint
 from agent.skills import get_skills_metadata_string
 from agent.tracing import LLMSpanData, start_span
@@ -138,11 +139,12 @@ def _tools_to_openai_schema(tools: Sequence) -> list[dict[str, Any]]:
 
 class Chat_LLM(BaseChatModel):
     api_key: str = None
-    base_url: str = "https://api.deepseek.com"
-    model_name: str = "deepseek-v4-pro"
+    base_url: str = ""
+    model_name: str = ""
     temperature: float = 0.2
     max_tokens: int = 8192
     _bound_tools: list | None = None
+    _uses_runtime_config: bool = False
 
     def __init__(self, **kwargs: Any):
         super().__init__(**kwargs)
@@ -155,7 +157,9 @@ class Chat_LLM(BaseChatModel):
         cfg_base_url = llm_cfg.base_url or ""
         cfg_api_key = llm_cfg.api_key or ""
 
-        model_name = explicit_model or llm_cfg.model_name or get_default_model_id()
+        runtime = load_model_config()
+        model_name = explicit_model or llm_cfg.model_name or runtime.model or get_default_model_id()
+        self._uses_runtime_config = applies_to_model(model_name)
 
         # If caller (or legacy .env) fully specifies both base_url and api_key,
         # honor that pair verbatim — this is the "custom OpenAI-style endpoint" path
@@ -163,7 +167,7 @@ class Chat_LLM(BaseChatModel):
         forced_base_url = explicit_base_url or cfg_base_url
         forced_api_key = explicit_api_key or cfg_api_key
 
-        if forced_base_url and forced_api_key:
+        if forced_base_url and forced_api_key and not self._uses_runtime_config:
             self.api_key = forced_api_key
             self.base_url = forced_base_url
             self.model_name = model_name
@@ -173,8 +177,14 @@ class Chat_LLM(BaseChatModel):
             self.base_url = forced_base_url or resolved.base_url
             # resolved.model_id may differ from model_name when routed through a gateway alias.
             self.model_name = resolved.model_id or model_name
+        if self._uses_runtime_config:
+            apply_to_llm(self)
         if "max_tokens" not in kwargs and llm_cfg.max_tokens:
             self.max_tokens = llm_cfg.max_tokens
+
+    def _refresh_runtime_config(self) -> None:
+        if getattr(self, "_uses_runtime_config", False):
+            apply_to_llm(self)
 
     def bind_tools(self, tools: Sequence, **kwargs: Any):
         """Return a copy of this model with tools bound so that _generate can send tools and parse tool_calls."""
@@ -185,6 +195,7 @@ class Chat_LLM(BaseChatModel):
     def _generate(
         self, messages: list[BaseMessage], stop: list[str] | None = None,
         run_manager: CallbackManagerForLLMRun | None = None, **kwargs: Any,) -> ChatResult:
+        self._refresh_runtime_config()
         if not self.api_key:
             raise ValueError("OpenAI API key is not configured.")
 
@@ -271,6 +282,7 @@ class Chat_LLM(BaseChatModel):
         self, messages: list[BaseMessage], stop: list[str] | None = None,
         run_manager: CallbackManagerForLLMRun | None = None, **kwargs: Any,
     ):
+        self._refresh_runtime_config()
         if not self.api_key:
             raise ValueError("OpenAI API key is not configured.")
 
@@ -337,6 +349,7 @@ class Chat_LLM(BaseChatModel):
         run_manager: CallbackManagerForLLMRun | None = None, **kwargs: Any,
     ):
         """Native async SSE streaming — keeps the event loop free to flush Expert tokens."""
+        self._refresh_runtime_config()
         if not self.api_key:
             raise ValueError("OpenAI API key is not configured.")
 
@@ -474,6 +487,7 @@ class Chat_LLM(BaseChatModel):
         self, messages: list[BaseMessage], stop: list[str] | None = None,
         run_manager: CallbackManagerForLLMRun | None = None, **kwargs: Any,) -> ChatResult:
         """Asynchronous generation for concurrent execution"""
+        self._refresh_runtime_config()
         if not self.api_key:
             raise ValueError("OpenAI API key is not configured.")
 
@@ -566,8 +580,8 @@ def make_llm(model_name: str | None = None, **kwargs: Any) -> BaseChatModel:
     correct adapter is picked per model id without callers having to know about
     multiple LLM classes.
 
-    Each model uses its official provider endpoint from ``models.yaml``
-    (no third-party gateway aggregation).
+    Each model uses its ``base_url`` from ``models.yaml``
+    (glm-4-flash goes through DMXAPI; others stay on official endpoints).
     """
     effective = model_name or get_default_model_id()
     resolved = resolve_endpoint(effective, api_key=kwargs.get("api_key", "") or "")

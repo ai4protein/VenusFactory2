@@ -18,7 +18,14 @@
 | 规划 | 多步自动化 · 工具编排 |
 | 研究 | 文献 · 家族分析 · 报告 |
 
-需要 LLM API Key（界面 Settings 或 `.env`，见 `.env.example`）。  
+需要 LLM API Key。Science Expert 每次请求都会读取 [`model-config.yaml.example`](../../model-config.yaml.example)：
+
+```bash
+cp model-config.yaml.example model-config.yaml
+# 把 `active` 改成 dmx / gpt / claude / gemini / deepseek / …
+# 对应 Key 写在 `.env` 或界面 Settings
+```
+
 详细手册：[AgentManual_CN.md](../manual/AgentManual_CN.md)
 
 ## CLI（示例）
