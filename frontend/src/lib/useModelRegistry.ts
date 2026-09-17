@@ -27,8 +27,13 @@ export type ChatMode = "science_agent" | "science_expert";
 
 export const CHAT_MODE_STORAGE_KEY = "vf.chatMode";
 export const SCIENCE_AGENT_MODEL_ID = "kimi-code";
-/** Online mode locks Science Expert (and any graph send) to this model. */
-export const ONLINE_FIXED_EXPERT_MODEL_ID = "deepseek-v4-pro";
+/** Fallback only — live pin comes from GET /api/models `expert_model`. */
+export const ONLINE_FIXED_EXPERT_MODEL_ID = "glm-4-flash";
+
+export function getExpertModelId(registry?: ModelRegistryResponse | null): string {
+  const fromApi = (registry?.expert_model || "").trim();
+  return fromApi || ONLINE_FIXED_EXPERT_MODEL_ID;
+}
 
 export function isKimiEngineModel(m: Pick<ModelSpec, "id" | "engine" | "chat_mode">): boolean {
   if (m.chat_mode === "science_agent") return true;
@@ -57,23 +62,24 @@ export function persistChatMode(mode: ChatMode) {
 export function pickExpertModelId(
   models: ModelSpec[],
   preferred?: string | null,
-  opts?: { onlineFixed?: boolean }
+  opts?: { onlineFixed?: boolean; expertModel?: string | null }
 ): string {
+  const expertId = (opts?.expertModel || "").trim() || ONLINE_FIXED_EXPERT_MODEL_ID;
   if (opts?.onlineFixed) {
-    return ONLINE_FIXED_EXPERT_MODEL_ID;
+    return expertId;
   }
   const graphModels = models.filter((m) => isGraphEngineModel(m) && !m.disabled);
   if (preferred) {
     const hit = graphModels.find((m) => m.id === preferred);
     if (hit) return hit.id;
   }
-  const fallbacks = [ONLINE_FIXED_EXPERT_MODEL_ID, "gemini-2.5-pro"];
+  const fallbacks = [expertId, "gemini-2.5-pro"];
   for (const id of fallbacks) {
     const hit = graphModels.find((m) => m.id === id);
     if (hit) return hit.id;
   }
   if (graphModels[0]) return graphModels[0].id;
-  return preferred || ONLINE_FIXED_EXPERT_MODEL_ID;
+  return preferred || expertId;
 }
 
 export function chatModeFromSnapshot(opts: {
@@ -106,6 +112,22 @@ export type GatewaySpec = {
 
 export type ModelRegistryResponse = {
   default_model: string;
+  expert_model?: string;
+  runtime_model?: string;
+  runtime_base_url?: string;
+  runtime_provider?: string;
+  runtime_label?: string;
+  runtime_endpoint?: string;
+  runtime_endpoints?: Array<{
+    id: string;
+    model: string;
+    label: string;
+    provider: string;
+    base_url: string;
+    api_compatible: string;
+    api_key_env: string;
+    has_key: boolean;
+  }>;
   models: ModelSpec[];
   gateways: GatewaySpec[];
   active_gateway: string | null;
@@ -116,6 +138,11 @@ export type ModelRegistryResponse = {
 // rather than crashing. Should mirror the backend default as closely as possible.
 export const FALLBACK_REGISTRY: ModelRegistryResponse = {
   default_model: "kimi-code",
+  expert_model: "glm-4-flash",
+  runtime_model: "glm-4-flash",
+  runtime_base_url: "https://www.dmxapi.cn/v1",
+  runtime_provider: "dmx",
+  runtime_label: "GLM 4 Flash (DMXAPI)",
   models: [
     {
       id: "kimi-code",
@@ -134,17 +161,17 @@ export const FALLBACK_REGISTRY: ModelRegistryResponse = {
       chat_mode: "science_agent",
     },
     {
-      id: "deepseek-v4-pro",
-      label: "DeepSeek V4 Pro",
-      provider: "deepseek",
-      base_url: "https://api.deepseek.com",
+      id: "glm-4-flash",
+      label: "GLM 4 Flash (DMXAPI)",
+      provider: "dmx",
+      base_url: "https://www.dmxapi.cn/v1",
       api_compatible: "openai",
-      api_key_env: "DEEPSEEK_API_KEY",
+      api_key_env: "DMXAPI_API_KEY",
       supports_tool_use: true,
       supports_json_schema: false,
       supports_prompt_caching: false,
       max_context_tokens: 128000,
-      max_output_tokens: 8192,
+      max_output_tokens: 4096,
       requires_adapter: false,
       engine: "graph",
       chat_mode: "science_expert",
@@ -152,7 +179,7 @@ export const FALLBACK_REGISTRY: ModelRegistryResponse = {
   ],
   gateways: [],
   active_gateway: null,
-  key_status: { deepseek: false },
+  key_status: { dmx: false },
 };
 
 export function useModelRegistry() {

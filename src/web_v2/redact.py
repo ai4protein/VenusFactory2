@@ -53,7 +53,7 @@ _KEY_VALUE_RE = re.compile(
     r"(?i)("
     r"(?:api[_-]?key|secret(?:_key)?|access[_-]?token|bearer|"
     r"password|passwd|private[_-]?key|client[_-]?secret|refresh[_-]?token|"
-    r"openai[_-]?api[_-]?key|anthropic[_-]?api[_-]?key|deepseek[_-]?api[_-]?key|"
+    r"openai[_-]?api[_-]?key|anthropic[_-]?api[_-]?key|deepseek[_-]?api[_-]?key|dmxapi[_-]?api[_-]?key|"
     r"hf[_-]?token|huggingface[_-]?token|aws[_-]?(?:access[_-]?key[_-]?id|secret[_-]?access[_-]?key|session[_-]?token))"
     r"[\"']?\s*[:=]\s*[\"']?)"
     # Value: 16+ chars of base62 / hyphen / underscore / dot, until end-of-token or quote
@@ -131,7 +131,7 @@ _SECRET_KEY_NAME_RE = re.compile(
     r"(?i)(?:^|[_-])(?:"
     r"api[_-]?key|secret(?:[_-]?key)?|access[_-]?token|refresh[_-]?token|"
     r"bearer|password|passwd|private[_-]?key|client[_-]?secret|"
-    r"openai[_-]?key|anthropic[_-]?key|deepseek[_-]?key|moonshot[_-]?key|"
+    r"openai[_-]?key|anthropic[_-]?key|deepseek[_-]?key|dmxapi[_-]?key|moonshot[_-]?key|"
     r"hf[_-]?token|huggingface[_-]?token|"
     r"aws[_-]?(?:access[_-]?key[_-]?id|secret[_-]?access[_-]?key|session[_-]?token)|"
     r"github[_-]?token|gh[_-]?token"

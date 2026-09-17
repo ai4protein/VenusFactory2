@@ -1198,7 +1198,7 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                             with gr.Group(visible=False) as ai_box_zshot:
                                 llm_dd_zshot = gr.Dropdown(
                                     choices=list(LLM_MODELS.keys()), 
-                                    value="DeepSeek", 
+                                    value="GLM-4-Flash", 
                                     label="Select AI Model"
                                 )
                                 ai_status_zshot = gr.Markdown(
@@ -1267,7 +1267,7 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                                     llm_dd_func = gr.Dropdown(
                                         choices=list(LLM_MODELS.keys()), 
                                         label="Select AI Model", 
-                                        value="DeepSeek"
+                                        value="GLM-4-Flash"
                                     )
                                     ai_status_func = gr.Markdown(
                                         value="✓ Using provided API Key" if os.getenv("OPENAI_API_KEY") else "⚠ No API Key found in .env file",
@@ -1329,7 +1329,7 @@ def create_quick_tool_tab(constant: Dict[str, Any]) -> Dict[str, Any]:
                                     llm_dd_residue_function = gr.Dropdown(
                                         choices=list(LLM_MODELS.keys()),
                                         label="Select AI Model",
-                                        value="DeepSeek"
+                                        value="GLM-4-Flash"
                                     )
                                     ai_status_residue_function = gr.Markdown(
                                         value="✓ Using provided API Key" if os.getenv("OPENAI_API_KEY") else "⚠ No API Key found in .env file",

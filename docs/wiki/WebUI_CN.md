@@ -58,7 +58,8 @@ Agent 对话（`/agent`）在输入区上方切换 **Science Agent** / **Science
 ## 配置
 
 - 模板：`.env.example` → `.env`
-- Agent / LLM：优先界面 **Settings**；也可写环境变量（见 `.env.example`）
+- LLM 端点：`cp model-config.yaml.example model-config.yaml`，再设 `active: dmx|gpt|claude|…`
+- Agent / LLM Key：优先界面 **Settings**；也可写环境变量（见 `.env.example`）
 - Online：`WEBUI_V2_MODE=online`、`WEBUI_V2_SESSION_TOKEN_SECRET`、`WEBUI_V2_*_LIMIT`
 - Online 无 sudo 时 kimi-code：默认 `auto` 会走 `bwrap` 沙箱；也可显式 `KIMI_ONLINE_SPAWN_MODE=bwrap`
 - 跳过默认 kimi-code：`export KIMI_EXTERNAL=1`

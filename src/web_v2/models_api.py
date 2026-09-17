@@ -18,6 +18,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from agent.kimi_daemon import base_url as kimi_base_url
+from agent.model_config import get_expert_model_id, runtime_model_public_fields
 from agent.model_registry import (
     get_active_gateway,
     get_default_model_id,
@@ -36,10 +37,6 @@ _logger = get_logger("web_v2.models_api")
 router = APIRouter(prefix="/api/models", tags=["models"])
 
 _PROVIDER_RE = re.compile(r"^[a-z0-9_-]{1,32}$")
-# Online Science Expert is pinned to this graph model (see chat_api.messages).
-_ONLINE_FIXED_GRAPH_MODEL = "deepseek-v4-pro"
-
-
 def _runtime_mode() -> str:
     return get_config().server.mode
 
@@ -112,29 +109,33 @@ async def list_all_models() -> dict:
     """
     kimi_ready, kimi_reason = await _kimi_ready_status()
     online = _runtime_mode() != "local"
+    expert_model = get_expert_model_id()
     models_out = []
     for m in list_models():
         d = m.to_public_dict()
         if d.get("engine") == "kimi-code" and not kimi_ready:
             d["disabled"] = True
             d["disabled_reason"] = kimi_reason
-        # Online: only expose Science Agent (kimi) + fixed DeepSeek Expert model.
+        # Online: only expose Science Agent (kimi) + configured Expert graph model.
         if online:
             engine = d.get("engine") or "graph"
             mid = d.get("id") or ""
-            if engine == "kimi-code" or mid == _ONLINE_FIXED_GRAPH_MODEL:
+            if engine == "kimi-code" or mid == expert_model:
                 models_out.append(d)
             continue
         models_out.append(d)
-    return {
+    payload = {
         "default_model": (
-            _ONLINE_FIXED_GRAPH_MODEL if online else get_default_model_id()
+            expert_model if online else get_default_model_id()
         ),
+        "expert_model": expert_model,
         "models": models_out,
         "gateways": [] if online else [g.to_public_dict() for g in list_gateways()],
         "active_gateway": None if online else get_active_gateway(),
         "key_status": list_user_key_providers(),
     }
+    payload.update(runtime_model_public_fields())
+    return payload
 
 
 @router.get("/keys")

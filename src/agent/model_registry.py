@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 import os
 import threading
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Optional
@@ -196,22 +196,60 @@ def reload_registry() -> None:
 # ---------------------------------------------------------------------------
 
 
+def _runtime_overlay_spec(spec: Optional[ModelSpec], model_id: str) -> Optional[ModelSpec]:
+    """Apply model-config.yaml onto the active expert/runtime model (fresh each call)."""
+    from agent.model_config import load_model_config
+
+    cfg = load_model_config()
+    if model_id not in cfg.model_ids():
+        return spec
+    if spec is None:
+        return ModelSpec(
+            id=cfg.model,
+            label=cfg.label or cfg.model,
+            provider=cfg.provider or "custom",
+            base_url=cfg.base_url,
+            api_compatible=cfg.api_compatible or "openai",
+            api_key_env=cfg.api_key_env,
+            engine="graph",
+        )
+    return replace(
+        spec,
+        id=cfg.model if model_id == cfg.model else spec.id,
+        label=cfg.label or spec.label,
+        provider=cfg.provider or spec.provider,
+        base_url=cfg.base_url or spec.base_url,
+        api_compatible=cfg.api_compatible or spec.api_compatible,
+        api_key_env=cfg.api_key_env or spec.api_key_env,
+    )
+
+
 def get_default_model_id() -> str:
     raw = _load_yaml()
-    return raw.get("default_model") or "deepseek-v4-pro"
+    from agent.model_config import get_expert_model_id
+    return raw.get("default_model") or get_expert_model_id()
 
 
 def list_models(include_hidden: bool = False) -> list[ModelSpec]:
-    out = []
+    from agent.model_config import load_model_config
+
+    seen: dict[str, ModelSpec] = {}
     for spec in _load_models().values():
-        if not include_hidden and spec.hidden:
+        overlaid = _runtime_overlay_spec(spec, spec.id) or spec
+        if not include_hidden and overlaid.hidden:
             continue
-        out.append(spec)
-    return out
+        seen[overlaid.id] = overlaid
+    cfg = load_model_config()
+    if cfg.model and cfg.model not in seen:
+        injected = _runtime_overlay_spec(None, cfg.model)
+        if injected is not None:
+            seen[injected.id] = injected
+    return list(seen.values())
 
 
 def get_model(model_id: str) -> Optional[ModelSpec]:
-    return _load_models().get(model_id)
+    spec = _load_models().get(model_id)
+    return _runtime_overlay_spec(spec, model_id)
 
 
 def list_gateways() -> list[GatewaySpec]:
@@ -339,10 +377,15 @@ def list_user_key_providers() -> dict[str, bool]:
         gateway using the gateway's key.
     The UI uses this to decide whether to prompt the user for a key.
     """
+    from agent.model_config import load_model_config
+
     models = list(_load_models().values())
     gateways = list(_load_gateways().values())
     providers = {spec.provider for spec in models}
     providers.update({gw.id for gw in gateways})
+    runtime = load_model_config()
+    if runtime.provider:
+        providers.add(runtime.provider)
 
     data = _load_keys()
     stored = data.get("providers") or {}
@@ -388,6 +431,9 @@ def list_user_key_providers() -> dict[str, bool]:
         if p in gateway_lifted:
             result[p] = True
             continue
+        if p == runtime.provider and runtime.resolve_api_key():
+            result[p] = True
+            continue
         result[p] = False
     return result
 
@@ -408,6 +454,28 @@ def resolve_endpoint(model_id: str, api_key: str = "") -> ResolvedEndpoint:
         3. env var named by ``api_key_env`` on the model/gateway
         4. legacy fallback: OPENAI_API_KEY (for backward-compat with old single-key setups)
     """
+    from agent.model_config import load_model_config
+
+    cfg = load_model_config()
+    if model_id in cfg.model_ids():
+        spec = get_model(cfg.model)
+        resolved_key = (
+            api_key
+            or cfg.resolve_api_key()
+            or (get_user_key(cfg.provider) if cfg.provider else "")
+            or (os.getenv(cfg.api_key_env) if cfg.api_key_env else "")
+            or os.getenv("CHAT_API_KEY", "")
+            or os.getenv("OPENAI_API_KEY", "")
+        )
+        return ResolvedEndpoint(
+            model_id=cfg.model,
+            base_url=cfg.base_url or (spec.base_url if spec else ""),
+            api_key=resolved_key or "",
+            api_compatible=cfg.api_compatible or (spec.api_compatible if spec else "openai"),
+            via_gateway=None,
+            spec=spec,
+        )
+
     spec = get_model(model_id)
     active_gw_id = get_active_gateway()
     if active_gw_id:
@@ -434,8 +502,11 @@ def resolve_endpoint(model_id: str, api_key: str = "") -> ResolvedEndpoint:
         _logger.warning("resolve_endpoint: unknown model_id=%s; using env-only fallback", model_id)
         return ResolvedEndpoint(
             model_id=model_id,
-            base_url=os.getenv("CHAT_BASE_URL", "https://api.deepseek.com"),
-            api_key=api_key or os.getenv("OPENAI_API_KEY", "") or os.getenv("DEEPSEEK_API_KEY", ""),
+            base_url=os.getenv("CHAT_BASE_URL") or cfg.base_url or "https://www.dmxapi.cn/v1",
+            api_key=api_key
+            or cfg.resolve_api_key()
+            or os.getenv("OPENAI_API_KEY", "")
+            or os.getenv("DEEPSEEK_API_KEY", ""),
             api_compatible="openai",
             via_gateway=None,
             spec=None,
@@ -445,6 +516,7 @@ def resolve_endpoint(model_id: str, api_key: str = "") -> ResolvedEndpoint:
         api_key
         or get_user_key(spec.provider)
         or (os.getenv(spec.api_key_env) if spec.api_key_env else "")
+        or os.getenv("CHAT_API_KEY", "")
         or os.getenv("OPENAI_API_KEY", "")
     )
     return ResolvedEndpoint(

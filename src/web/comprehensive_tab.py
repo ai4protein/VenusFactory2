@@ -796,7 +796,7 @@ def generate_expert_analysis_report(report: str) -> str:
     {report}    
     """
     api_key = get_api_key("DeepSeek")
-    llm_config = LLMConfig(api_key, "DeepSeek", get_chat_base_url(), LLM_MODELS.get("DeepSeek", "deepseek-chat"))
+    llm_config = LLMConfig(api_key, "GLM-4-Flash", get_chat_base_url(), LLM_MODELS.get("GLM-4-Flash", "glm-4-flash"))
     ai_response = call_llm_api(llm_config, prompt)
     return ai_response
 

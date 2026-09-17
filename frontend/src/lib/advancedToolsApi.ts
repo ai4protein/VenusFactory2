@@ -122,7 +122,7 @@ const DEFAULT_META: AdvancedToolsMeta = {
   residue_model_mapping_function: ["ESM2-650M"],
   dataset_mapping_function: { Solubility: ["DeepSol"] },
   residue_mapping_function: { "Activity Site": ["Protein_Mutation"] },
-  llm_models: ["DeepSeek", "ChatGPT", "Gemini"],
+  llm_models: ["GLM-4-Flash", "DeepSeek", "ChatGPT", "Gemini"],
   proteinmpnn_model_options: {
     vanilla: ["v_48_020", "v_48_002"],
     soluble: ["v_48_020", "v_48_002"],

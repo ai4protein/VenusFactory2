@@ -393,11 +393,19 @@ def generate_and_execute_code(
         # OPENAI_API_KEY → DEEPSEEK_API_KEY → CHAT_API_KEY) and the model
         # registry (per-model base_url). Falls back to env vars to remain
         # compatible with legacy CHAT_BASE_URL / CHAT_MODEL_NAME pinning.
+        from agent.model_config import load_model_config as _load_model_cfg
         from config import get_config as _get_cfg
         _cfg = _get_cfg()
-        chat_api_key = _cfg.llm.api_key or os.getenv("OPENAI_API_KEY") or os.getenv("DEEPSEEK_API_KEY") or ""
-        chat_model_name = os.getenv("CHAT_MODEL_NAME") or _cfg.llm.model_name or "deepseek-v4-pro"
-        chat_base_url = _cfg.llm.base_url or os.getenv("CHAT_BASE_URL", "")
+        _runtime = _load_model_cfg()
+        chat_api_key = (
+            _cfg.llm.api_key
+            or _runtime.resolve_api_key()
+            or os.getenv("OPENAI_API_KEY")
+            or os.getenv("DEEPSEEK_API_KEY")
+            or ""
+        )
+        chat_model_name = os.getenv("CHAT_MODEL_NAME") or _cfg.llm.model_name or _runtime.model
+        chat_base_url = _cfg.llm.base_url or os.getenv("CHAT_BASE_URL", "") or _runtime.base_url
         if not chat_base_url:
             try:
                 from agent.model_registry import resolve_endpoint as _resolve
@@ -408,14 +416,14 @@ def generate_and_execute_code(
                 # gateway alias may rewrite the model id
                 chat_model_name = _resolved.model_id or chat_model_name
             except Exception:
-                chat_base_url = "https://api.deepseek.com"
+                chat_base_url = _runtime.base_url
         if not chat_api_key:
             return json.dumps({
                 "success": False,
                 "error": (
-                    "No LLM API key configured. Set one of OPENAI_API_KEY / "
-                    "DEEPSEEK_API_KEY / CHAT_API_KEY in your environment, "
-                    "or save a per-provider key via the UI (Settings → keys)."
+                    "No LLM API key configured. Set api_key / api_key_env in "
+                    "model-config.yaml, or one of DMXAPI_API_KEY / "
+                    "OPENAI_API_KEY / DEEPSEEK_API_KEY / CHAT_API_KEY."
                 ),
             })
         max_tokens = int(os.getenv("CHAT_CODE_MAX_TOKENS", "10000"))  # Increased to prevent code truncation
@@ -1454,13 +1462,26 @@ def generate_ai_training_config(analysis: dict, user_requirements: Optional[str]
         try:
             from config import get_config as _get_cfg
             _cfg = _get_cfg()
-            api_key = _cfg.llm.api_key or os.getenv("OPENAI_API_KEY") or os.getenv("DEEPSEEK_API_KEY") or ""
-            base_url = _cfg.llm.base_url or "https://api.deepseek.com"
-            model_name = _cfg.llm.model_name or "deepseek-chat"
+            from agent.model_config import load_model_config as _load_model_cfg
+            _runtime = _load_model_cfg()
+            api_key = (
+                _cfg.llm.api_key
+                or _runtime.resolve_api_key()
+                or os.getenv("OPENAI_API_KEY")
+                or os.getenv("DEEPSEEK_API_KEY")
+                or ""
+            )
+            base_url = _cfg.llm.base_url or _runtime.base_url
+            model_name = _cfg.llm.model_name or _runtime.model
         except Exception:
-            api_key = os.getenv("OPENAI_API_KEY") or os.getenv("DEEPSEEK_API_KEY") or ""
-            base_url = "https://api.deepseek.com"
-            model_name = "deepseek-chat"
+            api_key = (
+                os.getenv("OPENAI_API_KEY")
+                or os.getenv("DMXAPI_API_KEY")
+                or os.getenv("DEEPSEEK_API_KEY")
+                or ""
+            )
+            base_url = "https://www.dmxapi.cn/v1"
+            model_name = "glm-4-flash"
         if not api_key:
             return _apply_user_overrides(get_default_config(analysis), user_requirements)
         
