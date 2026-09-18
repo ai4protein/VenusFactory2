@@ -1,12 +1,16 @@
 {
-  "name": "VenusFactory2 — Agent-Driven Protein Engineering Platform",
+  "name": "VenusFactory2 — Self-Evolving AI Agents",
   "short_name": "VenusFactory2",
-  "description": "Unified open-source platform for protein engineering: prediction, training, design and discovery powered by 40+ AI models and 11 biological databases.",
+  "description": "Self-evolving AI agents for protein discovery and directed evolution.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f4f1ea",
   "theme_color": "#c8a86b",
   "icons": [
-    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+    { "src": "/favicon-16.png", "sizes": "16x16", "type": "image/png", "purpose": "any" },
+    { "src": "/favicon-32.png", "sizes": "32x32", "type": "image/png", "purpose": "any" },
+    { "src": "/logo-venus-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/logo-venus-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png", "purpose": "any" }
   ]
 }

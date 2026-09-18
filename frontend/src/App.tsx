@@ -253,6 +253,16 @@ const NON_SPA_PREFIXES = [
 const NON_SPA_FILES = new Set([
   "/favicon.svg",
   "/favicon.ico",
+  "/favicon-16.png",
+  "/favicon-32.png",
+  "/favicon-venus.png",
+  "/apple-touch-icon.png",
+  "/logo-venus.png",
+  "/logo-venus-192.png",
+  "/logo-venus-256.png",
+  "/logo-venus-512.png",
+  "/logo-venus-avatar.png",
+  "/og-image.png",
   "/robots.txt",
   "/sitemap.xml",
   "/site.webmanifest",
@@ -383,7 +393,8 @@ function LocalizedApp() {
       <aside className={`vf2-sidebar ${sidebarCollapsed ? "collapsed" : ""}`}>
         <div className="vf2-sidebar-top">
           <LangNavLink to="/" className="vf2-brand vf2-brand-link" title={t.brandHome}>
-            <h1>{sidebarCollapsed ? "VF2" : "VenusFactory2"}</h1>
+            <img className="vf2-brand-mark" src="/logo-venus.png" alt="" width={32} height={32} />
+            {!sidebarCollapsed && <h1>VenusFactory2</h1>}
           </LangNavLink>
           <button
             className="vf2-sidebar-toggle"

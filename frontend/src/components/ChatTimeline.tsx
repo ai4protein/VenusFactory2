@@ -117,7 +117,7 @@ function ResearchStatusFold({
   );
 }
 
-const DEFAULT_AVATAR = "https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png";
+const DEFAULT_AVATAR = "/logo-venus.png";
 const USER_AVATAR =
   "data:image/svg+xml;utf8," +
   encodeURIComponent(
@@ -736,7 +736,7 @@ export function ChatTimeline({ items, streamingIndex = -1, onSuggestedPrompt, se
         <div className="chat-empty-state">
           <img
             className="chat-empty-logo"
-            src="https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png"
+            src="/logo-venus.png"
             alt="VenusFactory"
           />
           <h3 className="chat-empty-title">How can I help with your protein research?</h3>
