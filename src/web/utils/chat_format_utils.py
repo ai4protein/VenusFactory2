@@ -69,7 +69,7 @@ def _assistant_msg(content: str, role_id: str) -> Dict[str, Any]:
 
 # Cache role avatar as base64 data URL so we can embed in HTML (per-role avatar in chat)
 _AVATAR_B64_CACHE: Dict[str, str] = {}
-_DEFAULT_BOT_AVATAR_URL = "https://blog-img-1259433191.cos.ap-shanghai.myqcloud.com/venus/img/venus_logo.png"
+_DEFAULT_BOT_AVATAR_URL = "/logo-venus.png"
 
 def _avatar_data_url(role_id: str) -> str:
     """Return a data URL for the role avatar image (base64), or default URL if not found."""

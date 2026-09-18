@@ -57,8 +57,8 @@ import { useDocumentMeta } from "../lib/useDocumentMeta";
 
 const STRINGS = {
   en: {
-    docTitle: "Science Chat — VenusFactory2",
-    docDescription: "Science Agent and Science Expert chat for protein engineering predictions, training and analysis.",
+    docTitle: "Self-Evolving Agents — Science Chat — VenusFactory2",
+    docDescription: "Talk to self-evolving AI agents for protein discovery and directed evolution. Science Agent and Science Expert plan, run, critique and iterate.",
     // Error hints (friendlyErrorHint)
     errHintQuota: "You've reached the daily usage limit for online mode. Try again tomorrow, or deploy locally for unlimited access.",
     errHintTimeout: "The request took too long. This can happen with complex tasks or heavy server load. Please try again.",
@@ -226,8 +226,8 @@ const STRINGS = {
     deleteBtn: "Delete",
   },
   zh: {
-    docTitle: "科学对话 — VenusFactory2",
-    docDescription: "通过 Science Agent / Science Expert 双模式对话，运行蛋白质工程预测、训练与分析任务。",
+    docTitle: "自进化智能体 — 科学对话 — VenusFactory2",
+    docDescription: "与面向蛋白质发现与定向进化的自进化智能体对话。Science Agent 与 Science Expert 会规划、执行、批评并迭代。",
     // Error hints (friendlyErrorHint)
     errHintQuota: "您已达到在线模式的每日使用上限。请明天再试，或本地部署以获得无限制访问。",
     errHintTimeout: "请求耗时过长。复杂任务或服务器负载较高时可能出现此问题，请重试。",

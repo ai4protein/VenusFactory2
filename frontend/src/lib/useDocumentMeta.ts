@@ -4,14 +4,15 @@ import { useLocation } from "react-router-dom";
 interface Meta {
   title: string;
   description?: string;
+  keywords?: string;
 }
 
-function setOrCreateMeta(name: string, content: string) {
-  let tag = document.querySelector(`meta[name="${name}"]`) as HTMLMetaElement | null;
+function setOrCreateMeta(attr: "name" | "property", key: string, content: string) {
+  let tag = document.querySelector(`meta[${attr}="${key}"]`) as HTMLMetaElement | null;
   let created = false;
   if (!tag) {
     tag = document.createElement("meta");
-    tag.setAttribute("name", name);
+    tag.setAttribute(attr, key);
     document.head.appendChild(tag);
     created = true;
   }
@@ -65,7 +66,7 @@ function buildLangUrl(currentPath: string, currentLang: string, targetLang: stri
  *  <link rel="alternate" hreflang="..."> at runtime. SPA routes don't get
  *  unique titles or per-locale canonical URLs automatically; call this from
  *  a page so search engines see the right metadata per route AND per lang. */
-export function useDocumentMeta({ title, description }: Meta) {
+export function useDocumentMeta({ title, description, keywords }: Meta) {
   const { pathname } = useLocation();
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -79,7 +80,14 @@ export function useDocumentMeta({ title, description }: Meta) {
     });
 
     if (description !== undefined) {
-      restorers.push(setOrCreateMeta("description", description));
+      restorers.push(setOrCreateMeta("name", "description", description));
+      restorers.push(setOrCreateMeta("property", "og:description", description));
+      restorers.push(setOrCreateMeta("name", "twitter:description", description));
+    }
+    restorers.push(setOrCreateMeta("property", "og:title", title));
+    restorers.push(setOrCreateMeta("name", "twitter:title", title));
+    if (keywords !== undefined) {
+      restorers.push(setOrCreateMeta("name", "keywords", keywords));
     }
 
     // Determine the active lang from URL: /en/* or /zh/*
@@ -99,5 +107,5 @@ export function useDocumentMeta({ title, description }: Meta) {
       // Run restorers in reverse order.
       for (let i = restorers.length - 1; i >= 0; i--) restorers[i]();
     };
-  }, [title, description, pathname]);
+  }, [title, description, keywords, pathname]);
 }
