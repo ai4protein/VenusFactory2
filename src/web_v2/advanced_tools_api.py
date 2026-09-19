@@ -719,8 +719,8 @@ async def advanced_tools_meta():
     mpnn_options = _proteinmpnn_model_options()
     return {
         "dataset_mapping_zero_shot": web_ui.get("dataset_mapping_zero_shot", []),
-        "sequence_model_options": ["VenusPLM", "ESM2-650M", "ESM-1v", "ESM-1b"],
-        "structure_model_options": ["VenusREM (foldseek-based)", "ProSST-2048", "ProtSSN", "ESM-IF1", "SaProt", "MIF-ST"],
+        "sequence_model_options": web_ui.get("sequence_model_options", ["VenusPLM", "ESM2-650M", "ESM-1v", "ESM-1b"]),
+        "structure_model_options": web_ui.get("structure_model_options", ["VenusREM (foldseek-based)", "ProSST-2048", "ProtSSN", "ESM-IF1", "SaProt", "MIF-ST"]),
         "model_mapping_function": list(web_ui.get("model_mapping_function", {}).keys()),
         "residue_model_mapping_function": list(web_ui.get("model_residue_mapping_function", {}).keys()),
         "dataset_mapping_function": web_ui.get("dataset_mapping_function", {}),

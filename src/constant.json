@@ -292,6 +292,8 @@
       "VenusPLM": "venusplm",
       "VenusREM (foldseek-based)": "venusrem"
     },
+    "sequence_model_options": ["VenusPLM", "ESM2-650M", "ESM-1v", "ESM-1b"],
+    "structure_model_options": ["VenusREM (foldseek-based)", "ProSST-2048", "ProtSSN", "ESM-IF1", "SaProt", "MIF-ST"],
     "dataset_mapping_zero_shot": [
       "Activity",
       "Binding",
