@@ -5,6 +5,7 @@ import { renderMarkdown } from "../lib/markdown";
 import { ToolExecutionList, isResearchNoiseTool, type ToolExecution } from "./ToolExecutionCard";
 import { MolstarViewer } from "./MolstarViewer";
 import { useLang } from "../lib/i18n";
+import { LOGO_VENUS_URL } from "../lib/brandAssets";
 
 const TIMELINE_STRINGS = {
   en: {
@@ -117,7 +118,7 @@ function ResearchStatusFold({
   );
 }
 
-const DEFAULT_AVATAR = "/logo-venus.png";
+const DEFAULT_AVATAR = LOGO_VENUS_URL;
 const USER_AVATAR =
   "data:image/svg+xml;utf8," +
   encodeURIComponent(
@@ -736,7 +737,7 @@ export function ChatTimeline({ items, streamingIndex = -1, onSuggestedPrompt, se
         <div className="chat-empty-state">
           <img
             className="chat-empty-logo"
-            src="/logo-venus.png"
+            src={LOGO_VENUS_URL}
             alt="VenusFactory"
           />
           <h3 className="chat-empty-title">How can I help with your protein research?</h3>

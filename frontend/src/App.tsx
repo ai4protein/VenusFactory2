@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { LangNavLink, LangNavigate } from "./components/LangLink";
+import { LOGO_VENUS_URL } from "./lib/brandAssets";
 import { readDefaultLang, langFromPath } from "./lib/i18n";
 import { ChatPage } from "./pages/ChatPage";
 import { ReportPage } from "./pages/ReportPage";
@@ -393,7 +394,7 @@ function LocalizedApp() {
       <aside className={`vf2-sidebar ${sidebarCollapsed ? "collapsed" : ""}`}>
         <div className="vf2-sidebar-top">
           <LangNavLink to="/" className="vf2-brand vf2-brand-link" title={t.brandHome}>
-            <img className="vf2-brand-mark" src="/logo-venus.png" alt="" width={32} height={32} />
+            <img className="vf2-brand-mark" src={LOGO_VENUS_URL} alt="" width={32} height={32} />
             {!sidebarCollapsed && <h1>VenusFactory2</h1>}
           </LangNavLink>
           <button
