@@ -504,7 +504,21 @@ async def webui_v2_entry():
     )
 
 
-@app.get("/{full_path:path}", response_class=HTMLResponse)
+def _frontend_dist_file(rel_path: str) -> Path | None:
+    """Return a real file under the built frontend dist, or None."""
+    if not rel_path or rel_path.endswith("/") or ".." in Path(rel_path).parts:
+        return None
+    if not _frontend_dist.exists():
+        return None
+    candidate = (_frontend_dist / rel_path).resolve()
+    if not ensure_within_roots(candidate, [_frontend_dist.resolve()]):
+        return None
+    if candidate.is_file():
+        return candidate
+    return None
+
+
+@app.get("/{full_path:path}")
 async def webui_v2_spa_fallback(full_path: str):
     frontend_dev_mode = _cfg.server.dev_mode
     frontend_dev_url = _cfg.server.frontend_dev_url
@@ -512,6 +526,10 @@ async def webui_v2_spa_fallback(full_path: str):
 
     if full_path.startswith("api/"):
         raise HTTPException(status_code=404, detail="Not found")
+
+    static_file = _frontend_dist_file(full_path)
+    if static_file is not None:
+        return FileResponse(path=str(static_file))
 
     if frontend_dev_mode:
         return HTMLResponse(

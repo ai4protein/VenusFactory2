@@ -4,6 +4,7 @@ import { useLang } from "../lib/i18n";
 import { LanguageSwitch } from "../components/LanguageSwitch";
 import { LangLink } from "../components/LangLink";
 import { useDocumentMeta } from "../lib/useDocumentMeta";
+import { LOGO_VENUS_URL } from "../lib/brandAssets";
 
 const PAPER_URL = "http://arxiv.org/abs/2603.27303";
 const ACL_URL = "https://aclanthology.org/2025.acl-demo.23/";
@@ -29,7 +30,7 @@ const STRINGS = {
     navManual: "Manual",
     navPapers: "Papers",
     banner: "Maintained by Shanghai Jiao Tong University & Shanghai Innovation Institute — free for academic use.",
-    headline: "Self-evolving agents for protein discovery",
+    headline: "Self-evolving agents for proteins",
     lede: "VenusFactory2 plans a campaign, runs models and databases, critiques the evidence, then iterates — so you can spend time on the science.",
     composer: "Plan a directed-evolution campaign, then iterate on the top variants…",
     composerGo: "Start the agent",
@@ -105,7 +106,7 @@ const STRINGS = {
     navManual: "手册",
     navPapers: "论文",
     banner: "由上海交通大学 & 上海创智学院维护 — 学术使用免费。",
-    headline: "面向蛋白质发现的自进化智能体",
+    headline: "面向蛋白质的自进化智能体",
     lede: "VenusFactory2 会规划实验、运行模型与数据库、审查证据，再迭代推进——把时间留给科学本身。",
     composer: "规划一轮定向进化，并对最优变体继续迭代…",
     composerGo: "开始对话",
@@ -402,7 +403,7 @@ function Mark() {
   return (
     <img
       className="vf2-home-mark"
-      src="/logo-venus.png"
+      src={LOGO_VENUS_URL}
       alt=""
       width={32}
       height={32}
