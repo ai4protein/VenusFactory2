@@ -37,3 +37,15 @@ def test_safe_zip_and_private_zip_have_different_outcomes():
 
 def test_corrupt_archives_fail_closed():
     assert guard.inspect_bytes('example.zip', b'not a zip')
+
+
+def test_legacy_project_trees_cannot_return_to_release_sources():
+    for path in ['archive/gradio/app.py', 'third_party/README.md', 'epitope_miner/model.py', 'insulin_variants/data.json']:
+        assert guard.private_path(path)
+
+
+def test_other_provider_credentials_are_detected_without_echoing():
+    for prefix, body in [(b'sk-', b'a1' * 16), (b'sk-proj-', b'ab12_' * 12), (b'ghp_', b'ab12' * 10), (b'github_pat_', b'ab12_' * 12), (b'AKIA', b'ABC12345' * 2), (b'AIza', b'ab12_' * 8), (b'tvly-', b'ab12_' * 8)]:
+        secret = prefix + body
+        findings = guard.inspect_bytes('settings.py', secret)
+        assert findings and secret.decode() not in '\n'.join(findings)

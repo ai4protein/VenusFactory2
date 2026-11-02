@@ -12,7 +12,7 @@
 services:
   venus-gpu:
     profiles: ["gpu"]
-    image: venusfactory/ce:gpu-${VENUS_FACTORY_VERSION:-0.1.0}
+    image: venusfactory/ce:gpu-${VENUS_FACTORY_VERSION:-0.3.0}
     build:
       context: .
       dockerfile: docker/Dockerfile
@@ -40,7 +40,7 @@ services:
 
   venus-cpu:
     profiles: ["cpu"]
-    image: venusfactory/ce:cpu-${VENUS_FACTORY_VERSION:-0.1.0}
+    image: venusfactory/ce:cpu-${VENUS_FACTORY_VERSION:-0.3.0}
     build:
       context: .
       dockerfile: docker/Dockerfile

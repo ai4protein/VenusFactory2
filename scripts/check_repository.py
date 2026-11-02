@@ -14,13 +14,20 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 MAX_FILE = 10 * 1024**2
-PRIVATE_ROOTS = {'runtime', 'research_runs', 'temp_outputs', 'temp_downloads', '.venvs', '.venv', '.kimi-code', '.claude'}
+PRIVATE_ROOTS = {'archive', 'third_party', 'epitope_miner', 'insulin_variants', 'runtime', 'research_runs', 'temp_outputs', 'temp_downloads', '.venvs', '.venv', '.kimi-code', '.claude'}
 PRIVATE_PARTS = {'node_modules', '__pycache__', '.pytest_cache', '.ruff_cache'}
 PRIVATE_FILES = {'model-config.yaml', 'configs/model_runtimes.json', 'configs/rsi/paper_steps.json'}
 SECRET_PATTERNS = tuple(re.compile(pattern) for pattern in (
     rb'sk-or-v1-[A-Za-z0-9]{40,}',
     rb'sk-ant-[A-Za-z0-9_-]{40,}',
     rb'olp_[A-Za-z0-9]{25,}',
+    rb'\bsk-[A-Za-z0-9]{32,}\b',
+    rb'\bsk-proj-[A-Za-z0-9_-]{40,}',
+    rb'\bgh[pousr]_[A-Za-z0-9]{30,}',
+    rb'\bgithub_pat_[A-Za-z0-9_]{40,}',
+    rb'\bAKIA[0-9A-Z]{16}\b',
+    rb'\bAIza[0-9A-Za-z_-]{30,}',
+    rb'\btvly-[A-Za-z0-9_-]{25,}',
     rb'-----BEGIN (?:RSA |OPENSSH |EC )?PRIVATE KEY-----',
 ))
 

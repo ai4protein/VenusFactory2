@@ -1,0 +1,30 @@
+title = "VenusFactory2 source secret checks"
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+[[rules.allowlists]]
+description = "Deliberate redaction fixture in one security test"
+condition = "AND"
+paths = ['''(^|/)tests/harness/test_session_boundary\.py$''']
+regexTarget = "line"
+regexes = ['''fixture_secret''']
+[[rules.allowlists]]
+description = "Guest isolation uses a synthetic private environment variable"
+condition = "AND"
+paths = ['''(^|/)tests/harness/test_session_isolation_regressions\.py$''']
+regexTarget = "line"
+regexes = ['''monkeypatch\.setenv\('PRIVATE_TEST_KEY',''']
+[[rules.allowlists]]
+description = "Published dataset SHA-256 digests, not credentials"
+condition = "AND"
+paths = ['''(^|/)scripts/rsi/prepare_mutation_landscape_tasks\.py$''']
+regexTarget = "line"
+regexes = ['''^\s*"gfp_api_[^"]+\.(?:tsv|ipynb|txt)": "[a-f0-9]{64}",?\s*$''']
+[[rules.allowlists]]
+description = "NCBI nucleotide accessions in a public XML example"
+condition = "AND"
+paths = ['''(^|/)example/database/ncbi/ncbi_clinvar_efetch\.xml$''']
+regexTarget = "line"
+regexes = ['''<NucleotideExpression sequenceAccessionVersion="N[CMGRTW]_[0-9]+\.[0-9]+"''']

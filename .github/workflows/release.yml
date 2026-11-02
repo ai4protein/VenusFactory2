@@ -1,0 +1,50 @@
+name: Publish release
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    uses: ./.github/workflows/checks.yml
+  publish:
+    needs: checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate the release target
+        run: |
+          python scripts/check_release.py --version "${GITHUB_REF_NAME#v}"
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+      - name: Build and scan the source archive
+        run: |
+          set -euo pipefail
+          tag="$GITHUB_REF_NAME"
+          archive="VenusFactory2-${tag}.tar.gz"
+          git archive --format=tar.gz --prefix="VenusFactory2-${tag}/" -o "$RUNNER_TEMP/$archive" "$GITHUB_SHA"
+          mkdir "$RUNNER_TEMP/release-source"
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP/release-source"
+          curl --fail --location --retry 3 -o "$RUNNER_TEMP/gitleaks.tar.gz" https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $RUNNER_TEMP/gitleaks.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP" gitleaks
+          "$RUNNER_TEMP/gitleaks" dir "$RUNNER_TEMP/release-source" --config .gitleaks.toml --redact --no-banner
+          cd "$RUNNER_TEMP"
+          sha256sum "$archive" > SHA256SUMS.txt
+      - name: Publish tagged release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            "$RUNNER_TEMP/VenusFactory2-${GITHUB_REF_NAME}.tar.gz" "$RUNNER_TEMP/SHA256SUMS.txt" \
+            --verify-tag --title "VenusFactory2 ${GITHUB_REF_NAME}" \
+            --notes-file "docs/releases/${GITHUB_REF_NAME}.md"

@@ -2,6 +2,7 @@ name: Repository checks
 on:
   push:
   pull_request:
+  workflow_call:
 
 permissions:
   contents: read
@@ -22,6 +23,7 @@ jobs:
       - name: Check source boundaries and tutorials
         run: |
           python scripts/check_repository.py
+          python scripts/check_release.py
           python scripts/check_layout.py
           python scripts/validate_skills.py
           python scripts/sync_platform_docs.py --check

@@ -67,3 +67,12 @@ checks, not implied by offline regression. CI checks source boundaries, tutorial
 consistency and the frontend; full backend validation uses the installed platform
 environment. Refresh README screenshots when navigation changes, recording their
 capture details in `docs/images/manifest.json`.
+
+
+## Publishing a release
+
+Update the Python, frontend, lockfile and container-default versions together and add `docs/releases/vX.Y.Z.md`. Run `python scripts/check_release.py`. Merge the reviewed source into `main` before creating the corresponding annotated tag.
+
+The tag workflow reruns repository/frontend checks, verifies that the tagged commit belongs to `main`, scans the source archive with the checksum-pinned Gitleaks binary, and publishes the archive with SHA-256 checksums. It uses the repository's ephemeral Actions token; no publishing credential belongs in `.env` or the source tree.
+
+Scan Git history separately before a release. Removing a secret from the current tree does not revoke a historical credential; credential rotation and any coordinated history rewrite are separate operations. Gitleaks exceptions must be narrowly scoped to reviewed synthetic fixtures or public data identifiers, never whole test directories or historical secret commits.
