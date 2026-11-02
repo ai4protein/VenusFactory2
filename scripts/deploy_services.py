@@ -137,6 +137,7 @@ def main(argv=None):
             ports.append(args.local_kimi_port)
         for port in ports:
             with socket.socket() as probe:
+                probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
                 probe.bind(("127.0.0.1", port))
     children, streams, owned = [], [], {}
     stopping = False
