@@ -13,11 +13,11 @@ const STRINGS = {
   }
 };
 
-export function PageFooter() {
+export function PageFooter({ showNotice = true }: { showNotice?: boolean }) {
   const t = useLang().t(STRINGS);
   return (
     <footer className="chat-footer-note">
-      <span>{t.notice}</span>
+      {showNotice && <span>{t.notice}</span>}
       <span>
         {t.builtBy}{" "}
         <a href="https://tyang816.github.io/" target="_blank" rel="noreferrer">

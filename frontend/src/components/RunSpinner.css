@@ -1,0 +1,8 @@
+.run-spinner { display:inline-block; width:13px; height:13px; flex:0 0 13px; box-sizing:border-box; border:1.5px solid currentColor; border-right-color:transparent; border-radius:50%; animation:run-spin .9s linear infinite; color:#64766e; vertical-align:middle; }
+@keyframes run-spin { to { transform:rotate(360deg); } }
+@media (prefers-reduced-motion:reduce) { .run-spinner { animation:none; } }
+.session-select-btn .run-spinner { margin-right:7px; }
+.workspace-mode-switch .run-spinner { width:11px; height:11px; flex-basis:11px; margin-left:3px; }
+
+.app-sidebar .chat-panel.left .session-list .session-select-btn:has(> .run-spinner) { flex-direction:row; align-items:center; }
+.app-sidebar .chat-panel.left .session-list .session-select-btn:has(> .run-spinner) > .session-title-label { flex:1; min-width:0; }

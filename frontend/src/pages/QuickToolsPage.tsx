@@ -1,3 +1,4 @@
+import { validateUploads } from "../lib/uploadLimits";
 import { useEffect, useMemo, useState } from "react";
 import { CopyableTextBlock } from "../components/CommandPreviewCard";
 import { SegmentedSwitch } from "../components/SegmentedSwitch";
@@ -89,6 +90,7 @@ export function QuickToolsPage({ workspaceEnabled = false }: QuickToolsPageProps
   }
 
   async function uploadFileAndGetPath(file: File) {
+    await validateUploads([file]);
     const form = new FormData();
     form.append("file", file);
     const res = await fetch("/api/quick-tools/upload", { method: "POST", body: form });

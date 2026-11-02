@@ -1,3 +1,21 @@
+import { shareRead } from "./readRequests";
+import { validateUploads } from "./uploadLimits";
+import { quotaHeaders, quotaError, fetchQuota } from "./onlineQuota";
+export type AgentExecutionSelection = { harness: string; model_id: string };
+export type AgentExecutionOptions = {
+  default: AgentExecutionSelection;
+  shared_default_model: string;
+  combinations: Array<{ harness: string; model_id: string; ready: boolean; reasons: string[] }>;
+  models: Array<{ id: string; label: string; provider: string; model: string; ready: boolean }>;
+  harnesses: Array<{ id: string; label: string; ready: boolean; reason?: string; model_catalog: string }>;
+};
+
+export async function getAgentExecutionOptions(): Promise<AgentExecutionOptions> {
+  const response = await fetch(`${API_ROOT}/api/chat/agent-execution-options`);
+  if (!response.ok) throw new Error(`Execution options: HTTP ${response.status}`);
+  return response.json();
+}
+
 export type ChatHistoryItem = {
   role: string;
   content: string;
@@ -12,6 +30,16 @@ export type ChatHistoryItem = {
   kind?: "text" | "thinking" | "status" | "checkpoint" | "compaction";
   /** Optional kimi turn id; used to group thinking + text from the same turn. */
   turn_id?: string;
+};
+
+/** Prepared input estimate from the last Agent request, after any compaction. */
+export type AgentContextInfo = {
+  estimated_tokens?: number;
+  budget?: number;
+  compacted?: boolean;
+  previous_estimated_tokens?: number;
+  retained_turns?: number;
+  summarized_turns?: number;
 };
 
 export type KimiContextInfo = {
@@ -68,6 +96,12 @@ export type SecurityEvent = {
 };
 
 export type ChatSnapshot = {
+  pending_interaction?: import("./interactions").UserInteraction | null;
+  active_run?: { id: string; kind: string; status: string } | null;
+  event_cursor?: string;
+  execution?: (AgentExecutionSelection & { provider: string; model: string; profile_sha256: string }) | null;
+  agent_last_outcome?: string;
+  agent_context?: AgentContextInfo | null;
   session_id: string;
   model_name: string;
   created_at: string;
@@ -101,6 +135,7 @@ export type ChatSnapshot = {
 
 /** Stream body fields for POST .../messages/stream (extra keys ignored by older backends). */
 export type ChatStreamBody = {
+  execution?: AgentExecutionSelection;
   text: string;
   model?: string;
   custom_model_config?: {
@@ -255,7 +290,7 @@ function readSessionToken(sessionId: string): string {
 
 export function getChatSessionAuthHeaders(sessionId: string): Record<string, string> {
   const token = readSessionToken(sessionId);
-  return token ? { "x-session-access-token": token } : {};
+  return { ...quotaHeaders(), ...(token ? { "x-session-access-token": token } : {}) };
 }
 
 function parseErrorStatus(status: number, detail: string): string {
@@ -268,6 +303,7 @@ function parseErrorStatus(status: number, detail: string): string {
 async function extractErrorDetail(res: Response): Promise<string> {
   try {
     const payload = (await res.json()) as { detail?: string | { message?: string } };
+    quotaError(payload);
     const detail = payload?.detail;
     if (typeof detail === "string") return detail;
     if (detail && typeof detail === "object" && typeof detail.message === "string") return detail.message;
@@ -277,9 +313,11 @@ async function extractErrorDetail(res: Response): Promise<string> {
   return "";
 }
 
-export async function createChatSession() {
+export async function createChatSession(chatMode: "science_agent" | "science_expert" = "science_agent") {
   const res = await fetch(`${API_ROOT}/api/chat/sessions`, {
-    method: "POST"
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...quotaHeaders() },
+    body: JSON.stringify({ chat_mode: chatMode }),
   });
   if (!res.ok) {
     const detail = await extractErrorDetail(res);
@@ -299,6 +337,7 @@ export async function createChatSession() {
 }
 
 export async function listChatSessions() {
+  return shareRead("sessions:" + JSON.stringify(quotaHeaders()), async () => {
   const res = await fetch(`${API_ROOT}/api/chat/sessions`, { cache: "no-store" });
   if (!res.ok) {
     const detail = await extractErrorDetail(res);
@@ -312,11 +351,15 @@ export async function listChatSessions() {
       history_size: number;
       status: string;
       title?: string;
+      has_content?: boolean;
+      chat_mode: "science_agent" | "science_expert";
     }>;
   }>;
+  });
 }
 
 export async function getChatSession(sessionId: string) {
+  return shareRead("session:" + sessionId + JSON.stringify(getChatSessionAuthHeaders(sessionId)), async () => {
   const res = await fetch(`${API_ROOT}/api/chat/sessions/${encodeURIComponent(sessionId)}`, {
     // Session state changes while the user is on other pages; never reuse a
     // cached GET or soft-return keeps showing a stale Thinking bubble.
@@ -328,6 +371,7 @@ export async function getChatSession(sessionId: string) {
     throw new Error(parseErrorStatus(res.status, detail));
   }
   return res.json() as Promise<ChatSnapshot>;
+  });
 }
 
 export async function deleteChatSession(sessionId: string) {
@@ -339,10 +383,15 @@ export async function deleteChatSession(sessionId: string) {
     const detail = await extractErrorDetail(res);
     throw new Error(parseErrorStatus(res.status, detail));
   }
-  return res.json() as Promise<{ success: boolean; session_id: string }>;
+  const result = await res.json() as { success: boolean; session_id: string };
+  const tokens = loadTokenMap(); delete tokens[sessionId]; saveTokenMap(tokens);
+  localStorage.setItem('vf_library_revision', String(Date.now()));
+  window.dispatchEvent(new Event('vf:library-changed'));
+  return result;
 }
 
 export async function uploadFiles(sessionId: string, files: File[]) {
+  await validateUploads(files);
   const form = new FormData();
   files.forEach((file) => form.append("files", file));
   const res = await fetch(
@@ -383,13 +432,7 @@ export async function deleteCustomModelCache(customModelId: string) {
   return res.json() as Promise<{ success: boolean; custom_model_id: string; cleared_sessions: string[] }>;
 }
 
-export async function getChatQuota() {
-  const res = await fetch(`${API_ROOT}/api/chat/quota`);
-  if (!res.ok) {
-    throw new Error(`Fetch chat quota failed: ${res.status}`);
-  }
-  return res.json() as Promise<ChatQuota>;
-}
+export async function getChatQuota() { return fetchQuota() as Promise<ChatQuota>; }
 
 export function getClarificationRespondUrl(sessionId: string): string {
   return `${API_ROOT}/api/chat/sessions/${encodeURIComponent(sessionId)}/clarification/respond/stream`;

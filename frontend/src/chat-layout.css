@@ -1,0 +1,111 @@
+/* Agent, Scientist and Researcher share one reading column and composer. */
+.chat-first-layout .chat-page {
+  --conversation-width: 900px;
+  --conversation-gutter: 16px;
+  --conversation-input-height: 108px;
+}
+.chat-first-layout .chat-page .timeline-wrap {
+  padding: 0 var(--conversation-gutter) 12px;
+  scrollbar-gutter: stable both-edges;
+}
+.chat-first-layout .chat-page .timeline-wrap > :is(.chat-timeline, .science-goal-panel, .rr-panel) {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--conversation-width);
+  margin: 0 auto;
+  padding: 24px 0 40px;
+}
+.chat-first-layout .chat-page .rr-start {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+}
+.chat-first-layout .chat-page .composer {
+  box-sizing: border-box;
+  width: calc(100% - 2 * var(--conversation-gutter) - var(--conversation-scrollbar-gutter, 0px));
+  max-width: var(--conversation-width);
+  margin: 0 auto 10px;
+  padding: 10px 0 0;
+}
+.chat-first-layout .chat-page .composer textarea {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  height: var(--conversation-input-height);
+  min-height: var(--conversation-input-height);
+  max-height: var(--conversation-input-height);
+  padding: 8px 10px;
+  resize: none;
+  overflow: auto;
+}
+.app-sidebar-history .rr-history {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0;
+}
+.app-sidebar-history :is(.sidebar-history-heading, .session-new-btn, .session-search) { flex-shrink: 0; }
+@media (max-width: 620px) {
+  .chat-first-layout .chat-page {
+    --conversation-gutter: 12px;
+    --conversation-input-height: 88px;
+  }
+  .chat-first-layout .chat-page .timeline-wrap > :is(.chat-timeline, .science-goal-panel, .rr-panel) {
+    padding-top: 16px;
+    padding-bottom: 24px;
+  }
+}
+
+/* Keep scrolling messages below the fixed quota and file controls. */
+.chat-first-layout .chat-page .timeline-column { padding-top:48px; }
+
+/* File transfer feedback is transient and does not alter composer geometry. */
+.composer.is-file-dragover, .research-revision form.is-file-dragover { position:relative; outline:2px solid #718c7b; outline-offset:-2px; }
+.is-file-dragover::after { content:attr(data-file-drop-label); position:absolute; inset:4px; z-index:10; display:flex; align-items:center; justify-content:center; background:#fffffff2; color:#365842; font-size:13px; font-weight:500; pointer-events:none; border-radius:4px; }
+
+/* One action group keeps context, attachment and send equally spaced. */
+.chat-first-layout .chat-page .composer-row > .composer-actions {
+  width: auto;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+.chat-first-layout .chat-page .composer-actions > .file-source-inline { margin: 0; gap: 0; }
+.chat-first-layout .chat-page :is(.scientist-composer-actions, .rr-actions) {
+  width: auto;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.chat-first-layout .chat-page .scientist-composer-actions > .composer-send-btn { order: 1; }
+.chat-first-layout .chat-page .composer-actions .context-usage {
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+}
+.chat-first-layout .chat-page .composer .composer-row .composer-actions :is(.file-upload-icon-btn, .research-attach-button, .rr-attach) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 34px;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted);
+}
+.chat-first-layout .chat-page .composer .composer-row .composer-actions :is(.file-upload-icon-btn, .research-attach-button, .rr-attach):is(:hover:not(:disabled), [aria-expanded="true"]) {
+  background: #f0f3f1;
+  color: var(--text);
+}
+.chat-first-layout .chat-page .composer .composer-row .composer-actions :is(.file-upload-icon-btn, .research-attach-button, .rr-attach):focus-visible {
+  outline: 2px solid #8d9b92;
+  outline-offset: 2px;
+}
+@container (min-width: 421px) and (max-width: 600px) {
+  .chat-first-layout .chat-page .composer-row { grid-template-columns: minmax(0, 1fr) auto; }
+}

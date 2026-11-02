@@ -1,0 +1,56 @@
+import { unavailableLabel } from '../lib/capabilityAvailability';
+import { JobHistory } from '../components/JobHistory';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useLang } from '../lib/i18n';
+import { Catalog, ModelCard, plazaCategories, categoryNames, platform, sourceNames, modelTypeNames } from '../lib/modelPlatform';
+import { ModelGlyph } from '../components/ModelPlatformShared';
+import { RegisteredToolDrawer } from '../components/RegisteredToolDrawer';
+import { ModelPredictionDrawer as ModelDrawer } from '../components/ModelPredictionDrawer';
+import '../model-platform.css';
+import { modelWorkspaceRoute } from '../lib/modelPlazaNavigation';
+
+export function ModelPlazaPage() {
+  const { lang } = useLang(); const zh = lang === 'zh'; const navigate = useNavigate();
+  const [params, setParams] = useSearchParams(); const mine = params.get('view') === 'mine';
+  const [query, setQuery] = useState(''), [category, setCategory] = useState(params.get('category') || ''), [source, setSource] = useState(''), [kind, setKind] = useState(''), [page, setPage] = useState(0);
+  const [catalog, setCatalog] = useState<Catalog>(), [error, setError] = useState(''), [loading, setLoading] = useState(true), [revision, setRevision] = useState(0);
+  const [selected, setSelected] = useState<ModelCard>();
+  function showView(own: boolean) { setParams(own ? { view: 'mine' } : {}); setQuery(''); setCategory(''); setSource(''); setKind(''); setPage(0); }
+  useEffect(() => { if (params.has('mode')) { const next = new URLSearchParams(params); next.delete('mode'); setParams(next, { replace: true }); } }, [params, setParams]);
+  useEffect(() => { setPage(0); }, [query, category, source, mine, kind]);
+  useEffect(() => { const id = params.get('model'); if (!id) return; let alive = true; void platform<ModelCard>('/models/' + encodeURIComponent(id)).then(m => { if (alive) setSelected(m); }).catch(e => { if (alive) setError(e.message); }); return () => { alive = false; }; }, [params.get('model')]);
+  function closeModel() { setSelected(undefined); if (params.has('model')) { const next = new URLSearchParams(params); next.delete('model'); setParams(next, { replace: true }); } }
+  useEffect(() => {
+    let alive = true; setLoading(true);
+    const timer = setTimeout(() => { void platform<Catalog>('/catalog?' + new URLSearchParams({ query, category, source, kind: ['model','tool'].includes(kind) ? kind : '', model_type: ['model','tool'].includes(kind) ? '' : kind, mine: String(mine), offset: String(page * 24) })).then(c => { if (alive) { setCatalog(c); setError(''); } }).catch(e => { if (alive) setError(e.message); }).finally(() => { if (alive) setLoading(false); }); }, query ? 180 : 0);
+    return () => { alive = false; clearTimeout(timer); };
+  }, [query, category, source, mine, kind, page, revision]);
+  useEffect(() => { const refresh = () => { if (document.visibilityState !== "hidden") setRevision(r=>r+1); }; window.addEventListener('focus',refresh); const timer=window.setInterval(refresh,30000); return()=>{window.removeEventListener('focus',refresh);window.clearInterval(timer);}; }, []);
+  const [notice,setNotice] = useState('');
+  function chooseModel(m:ModelCard) { if(m.available===false){setNotice(unavailableLabel(m,zh));return;} setNotice(''); if(m.category==='foundation')navigate(`/${lang}${modelWorkspaceRoute(m)}`);else setSelected(m); }
+  return <div className="mp-page mp-explore-page">
+    <JobHistory/>
+    {notice && <div className="mp-cap-notice" role="status">{notice}<button aria-label={zh?"关闭提示":"Dismiss notice"} onClick={()=>setNotice('')}>×</button></div>}
+    <div className="mp-topline"><div className="mp-tabs"><button aria-pressed={!mine} className={!mine ? 'active' : ''} onClick={() => showView(false)}>{zh ? '工具与模型' : 'Tools & models'}</button><button aria-pressed={mine} className={mine ? 'active' : ''} onClick={() => showView(true)}>{zh ? '我的模型' : 'My models'}</button></div><Link className="mp-text-link" to={`/${lang}/workflows`}><ModelGlyph kind="workflow" size={17}/>{zh ? '工作流画布' : 'Workflow studio'} ↗</Link></div>
+    <div className="mp-mobile-filters">
+      <select className="mp-mobile-category" aria-label={zh ? '功能分类' : 'Function category'} value={category} onChange={e => setCategory(e.target.value)}><option value="">{zh ? '全部功能' : 'All functions'}</option>{plazaCategories.map(c => <option key={c} value={c}>{categoryNames[c][zh ? 1 : 0]} · {catalog?.categories[c] ?? '—'}</option>)}</select>
+      <select aria-label={zh ? '来源' : 'Source'} value={source} onChange={e => setSource(e.target.value)}><option value="">{zh ? '全部来源' : 'All sources'}</option>{Object.entries(sourceNames).map(([k,v]) => <option key={k} value={k}>{v[zh ? 1 : 0]}</option>)}</select>
+      <select aria-label={zh ? '条目类型' : 'Item type'} value={kind} onChange={e => setKind(e.target.value)}><option value="">{zh ? '全部类型' : 'All types'}</option><option value="model">{zh ? '模型' : 'Models'}</option><option value="tool">{zh ? '工具' : 'Tools'}</option>{Object.entries(modelTypeNames).filter(([k])=>k!=='tool').map(([k,v])=><option key={k} value={k}>{v[zh ? 1 : 0]}</option>)}</select>
+    </div>
+    <div className="mp-explore"><aside className="mp-filters"><div className="mp-filter-label">{zh ? '功能分类' : 'FUNCTION'}</div><button aria-pressed={!category} className={!category ? 'active' : ''} onClick={() => setCategory('')}><span>{zh ? '全部功能' : 'All functions'}</span><small>{catalog ? Object.values(catalog.categories).reduce((a,b) => a+b,0) : '—'}</small></button>{plazaCategories.map(c => <button key={c} aria-pressed={category === c} className={category === c ? 'active' : ''} onClick={() => setCategory(c)}><span>{categoryNames[c][zh ? 1 : 0]}</span><small>{catalog?.categories[c] ?? 0}</small></button>)}<div className="mp-filter-label">{zh ? '来源' : 'SOURCE'}</div><select aria-label={zh ? '来源' : 'Source'} value={source} onChange={e => setSource(e.target.value)}><option value="">{zh ? '全部来源' : 'All sources'}</option>{Object.entries(sourceNames).map(([k,v]) => <option key={k} value={k}>{v[zh ? 1 : 0]}</option>)}</select><div className="mp-filter-label">{zh ? '类型' : 'TYPE'}</div><select aria-label={zh ? '条目类型' : 'Item type'} value={kind} onChange={e => setKind(e.target.value)}><option value="">{zh ? '全部类型' : 'All types'}</option><option value="model">{zh ? '模型' : 'Models'}</option><option value="tool">{zh ? '工具' : 'Tools'}</option>{Object.entries(modelTypeNames).filter(([k])=>k!=='tool').map(([k,v])=><option key={k} value={k}>{v[zh ? 1 : 0]}</option>)}</select></aside>
+      <section className="mp-catalog"><div className="mp-search-row"><div className="mp-search"><ModelGlyph kind="discovery" size={18}/><input aria-label={zh ? '搜索工具与模型' : 'Search tools and models'} placeholder={zh ? '搜索工具、模型、蛋白、性质…' : 'Search tools, models, proteins, properties…'} value={query} onChange={e => setQuery(e.target.value)}/>{query && <button aria-label="Clear search" onClick={() => setQuery('')}>×</button>}</div><span className="mp-muted">{catalog?.total ?? '—'} {zh ? '个结果' : 'results'}</span></div>
+      {!mine && <div className="mp-task-shortcuts" aria-label={zh ? '常用预测性质' : 'Common properties'}>{[['Solubility','Solubility','溶解度'],['Stability','Stability','稳定性'],['Kcat','Enzyme kinetics','酶催化动力学'],['Protein descriptors','Protein properties','理化性质']].map(([value,en,cn]) => <button key={value} type="button" aria-pressed={query === value} onClick={() => { setCategory(''); setSource(''); setKind(''); setQuery(query === value ? '' : value); }}>{zh ? cn : en}</button>)}</div>}
+      {error && <p role="alert" className="mp-error">{error} <button onClick={() => setRevision(r => r + 1)}>{zh ? '重试' : 'Retry'}</button></p>}
+      {!!((catalog?.unavailable_sources.length || 0) + (catalog?.unavailable_tools?.length || 0)) && <p className="mp-error">{zh ? '部分来源暂时无法加载' : 'Some sources could not be loaded'} · <button onClick={() => setRevision(r => r + 1)}>{zh ? '重试' : 'Retry'}</button></p>}
+      <div className="mp-grid" aria-busy={loading}>{catalog?.items.map(m => <article className={`mp-card${m.available === false ? " is-unavailable" : ""}`} key={m.id} title={m.available===false ? unavailableLabel(m,zh) : undefined} draggable={m.workflow && m.available !== false} onDragStart={e => { e.dataTransfer.setData('application/venus-model', m.id); e.dataTransfer.effectAllowed = 'copy'; }}>
+        <button className="mp-card-main" aria-disabled={m.available === false} onClick={() => chooseModel(m)}><div className="mp-card-heading"><span className={'mp-model-mark compact ' + m.category}><ModelGlyph kind={m.category} size={20}/></span><div className="mp-card-title"><h2>{m.name}</h2><span className="mp-source">{sourceNames[m.source]?.[zh ? 1 : 0] || m.source}</span></div></div><p>{m.description.replace(/\.+$/, '.')}</p><div className="mp-tags"><span>{categoryNames[m.category]?.[zh ? 1 : 0]}</span><span>{modelTypeNames[m.model_type || (m.node_kind === 'tool' ? 'tool' : '')]?.[zh ? 1 : 0] || (zh ? '模型' : 'Model')}</span><span>{m.visibility === 'private' ? (zh ? '仅自己' : 'Private') : m.standalone ? (zh ? '文本检索' : 'Text query') : m.input_format ? m.input_format : m.input_kind === 'structure' ? (m.input_accept || '.pdb').replace('.','').toUpperCase() : (zh ? '序列 / 表格' : 'Sequence / table')}</span></div></button>
+        <div className="mp-card-bottom"><button aria-disabled={m.available === false} onClick={() => chooseModel(m)}>{m.available === false ? unavailableLabel(m,zh) : m.category === 'foundation' ? (zh ? '微调模型' : 'Fine-tune model') : m.node_kind === 'tool' ? (zh ? '使用工具' : 'Use tool') : (zh ? '使用模型' : 'Use model')} <span>↗</span></button>{m.workflow && <button disabled={m.available === false} title={zh ? '加入工作流' : 'Add to workflow'} aria-label={(zh ? '加入工作流：' : 'Add to workflow: ') + m.name} onClick={() => navigate(`/${lang}/workflows?model=${encodeURIComponent(m.id)}`)}><ModelGlyph kind="workflow" size={17}/></button>}</div>
+      </article>)}</div>
+      {loading && !catalog && <div className="mp-empty">{zh ? '正在加载…' : 'Loading…'}</div>}
+      {!loading && catalog?.total === 0 && <div className="mp-empty"><ModelGlyph size={36}/><h2>{mine ? (zh ? '从你的数据开始' : 'Start with your data') : (zh ? '没有匹配的工具或模型' : 'No matching tools or models')}</h2><p>{mine ? (zh ? '训练第一个模型，自用或分享。' : 'Train your first model. Keep it private or share it.') : (zh ? '试试其他名称或分类。' : 'Try another name or category.')}</p>{mine && <Link className="mp-button primary" to={`/${lang}/models/new`}>{zh ? '创建模型' : 'Create a model'}</Link>}</div>}
+      {(catalog?.total || 0) > 24 && <div className="mp-pagination"><button disabled={page === 0} onClick={() => setPage(p => p - 1)}>← {zh ? '上一页' : 'Previous'}</button><span>{page + 1} / {Math.ceil((catalog?.total || 0) / 24)}</span><button disabled={(page + 1) * 24 >= (catalog?.total || 0)} onClick={() => setPage(p => p + 1)}>{zh ? '下一页' : 'Next'} →</button></div>}
+      </section></div>
+    {selected && (selected.adapter === 'registered-tool' ? <RegisteredToolDrawer key={selected.id} tool={selected} onClose={closeModel}/> : <ModelDrawer key={selected.id} model={selected} onClose={closeModel} onUpdate={() => setRevision(r => r + 1)}/>)}
+  </div>;
+}

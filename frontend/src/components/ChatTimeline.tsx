@@ -3,9 +3,11 @@ import type { ChatHistoryItem, SecurityEvent } from "../lib/api";
 import { submitFeedback } from "../lib/api";
 import { renderMarkdown } from "../lib/markdown";
 import { ToolExecutionList, isResearchNoiseTool, type ToolExecution } from "./ToolExecutionCard";
-import { MolstarViewer } from "./MolstarViewer";
+import { StructureFileButton } from "./StructureFileButton";
+import { isStructureFile, openStructure, structurePathFromLink } from "../lib/structurePreview";
 import { useLang } from "../lib/i18n";
 import { LOGO_VENUS_URL } from "../lib/brandAssets";
+import { buildConversationProcesses, isProcessItem, isResearchStatusItem, toolActivityLabel, toolState, type ConversationProcess } from "../lib/conversationProcess";
 
 const TIMELINE_STRINGS = {
   en: {
@@ -15,8 +17,7 @@ const TIMELINE_STRINGS = {
     copy: "Copy",
     copied: "Copied!",
     downloadCard: "Download",
-    thinking: "Thinking…",
-    thinkingFor: (s: number) => `Thinking… ${s}s`,
+    thinking: "Thinking",
     thought: "Thought",
     thoughtFor: (s: number) => (s < 60 ? `Thought for ${s}s` : `Thought for ${Math.floor(s / 60)}m ${s % 60}s`),
     researchProcess: (n: number) => `Search process (${n})`,
@@ -29,44 +30,13 @@ const TIMELINE_STRINGS = {
     copy: "复制",
     copied: "已复制！",
     downloadCard: "下载",
-    thinking: "思考中…",
-    thinkingFor: (s: number) => `思考中… ${s}s`,
+    thinking: "正在思考中",
     thought: "已思考",
     thoughtFor: (s: number) => (s < 60 ? `思考了 ${s}s` : `思考了 ${Math.floor(s / 60)}分 ${s % 60}秒`),
     researchProcess: (n: number) => `检索过程 (${n})`,
     compaction: "上下文已压缩",
   }
 };
-
-/** Research/status noise that should fold into a single collapsible block. */
-function isResearchStatusItem(item: ChatHistoryItem): boolean {
-  if (item.role !== "assistant") return false;
-  if (item.kind === "thinking" || item.kind === "checkpoint" || item.kind === "compaction") {
-    return false;
-  }
-  if (item.kind === "status") return true;
-  const phase = item.phase || "";
-  if (phase === "sub_report_checkpoint") return false;
-  if (phase.startsWith("research_")) return true;
-  const c = (item.content || "").trim();
-  // Sub-report checkpoints ask the user to Continue/Rewrite — never fold them
-  // into the silent "search process" group or the action card looks missing.
-  if (
-    c.startsWith("📄") ||
-    /sub-report .+ complete/i.test(c) ||
-    /小报告完成/.test(c) ||
-    /decide whether to continue/i.test(c) ||
-    /请.*决定是否继续/.test(c)
-  ) {
-    return false;
-  }
-  // Compact search summaries / section headers without structured markers.
-  if (c.startsWith("🔎") || (c.startsWith("🔍") && c.length < 220)) return true;
-  if (/^\*\*(第\s*\d+|Section\s+\d+)/i.test(c) && c.length < 180) return true;
-  // Legacy per-source search chatter from older Expert runs.
-  if (/^\*\*Query\s+\w+/i.test(c) && c.length < 500) return true;
-  return false;
-}
 
 /** PI/SC long-form reports that start with a markdown H1. */
 function isHighlightReport(item: ChatHistoryItem): boolean {
@@ -75,48 +45,6 @@ function isHighlightReport(item: ChatHistoryItem): boolean {
   return c.startsWith("# ") && c.length >= 160;
 }
 
-
-function ResearchStatusFold({
-  items,
-  indices,
-  streamingIndex,
-  label,
-}: {
-  items: ChatHistoryItem[];
-  indices: number[];
-  streamingIndex: number;
-  label: string;
-}) {
-  const groupEnd = indices[indices.length - 1] ?? -1;
-  const followedByMore = groupEnd >= 0 && groupEnd < items.length - 1;
-  const stillActive =
-    indices.includes(streamingIndex) ||
-    (!followedByMore && streamingIndex >= 0 && groupEnd === items.length - 1);
-  const [open, setOpen] = useState(stillActive);
-  useEffect(() => {
-    // Auto-expand while searching; collapse once the group is complete.
-    setOpen(stillActive);
-  }, [stillActive]);
-  return (
-    <details
-      className="chat-research-fold"
-      open={open}
-      onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}
-    >
-      <summary>
-        <span className="chat-research-fold-icon">🔍</span>
-        <span className="chat-research-fold-label">{label}</span>
-      </summary>
-      <div className="chat-research-fold-body">
-        {indices.map((i) => (
-          <div key={i} className="chat-research-fold-item">
-            <ChatMessageBody html={renderMarkdown(items[i].content || "")} />
-          </div>
-        ))}
-      </div>
-    </details>
-  );
-}
 
 const DEFAULT_AVATAR = LOGO_VENUS_URL;
 const USER_AVATAR =
@@ -210,7 +138,7 @@ function statusMsgClass(content: string): string {
   return "";
 }
 
-const STRUCTURE_EXT_RE = /(?:[\w.\/~-]+\/)*[\w.-]+\.(?:pdb|cif|mmcif|ent)\b/gi;
+const STRUCTURE_EXT_RE = /(?:[\w.\/~-]+\/)*[\w.-]+\.(?:pdb|cif|mmcif|ent|mol|sdf|mol2|bcif)\b/gi;
 
 function extractStructurePaths(text: string): string[] {
   const matches = text.match(STRUCTURE_EXT_RE) || [];
@@ -304,6 +232,7 @@ function fileIcon(filename: string): string {
 function DownloadCard({ filename, url }: { filename: string; url: string }) {
   const icon = fileIcon(filename);
   const t = useLang().t(TIMELINE_STRINGS);
+  if (isStructureFile(filename)) return <StructureFileButton filePath={structurePathFromLink(url)} label={filename}/>;
   return (
     <a className="rich-download-card" href={url} target="_blank" rel="noopener noreferrer" download={filename}>
       <span className={`rich-file-icon icon-${icon}`} />
@@ -468,6 +397,7 @@ function ChatMessageBody({ html }: { html: string }) {
     <div
       ref={ref}
       className="chat-msg-body"
+      onClick={e => { const a = (e.target as HTMLElement).closest("a"); const href = a?.getAttribute("href"); if (href && isStructureFile(href) && !e.ctrlKey && !e.metaKey && !e.shiftKey) { e.preventDefault(); openStructure({ path: structurePathFromLink(href), name: a?.textContent || undefined }); } }}
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );
@@ -516,64 +446,37 @@ function SecurityEventsBanner({ events }: { events: SecurityEvent[] }) {
   );
 }
 
-/**
- * Collapsible reasoning block (kimi `thinking.delta` stream).
- * - Open by default while streaming; auto-collapses once a real answer
- *   message follows (parent passes `defaultOpen=false` after streaming ends).
- * - Summary shows "Thought for Xs" — the X updates live while streaming.
- */
-function ThinkingBlock({
-  content,
-  startedAt,
-  endedAt,
-  streaming,
-  defaultOpen,
-}: {
-  content: string;
-  startedAt?: number;
-  endedAt: number | null;
-  streaming: boolean;
-  defaultOpen: boolean;
-}) {
-  const t = useLang().t(TIMELINE_STRINGS);
-  // Tick once per second while streaming so the duration label stays fresh.
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    if (!streaming) return;
-    const id = window.setInterval(() => setTick((x) => x + 1), 1000);
-    return () => window.clearInterval(id);
-  }, [streaming]);
-
-  const elapsedMs =
-    startedAt != null ? (endedAt ?? Date.now()) - startedAt : null;
-  const label = (() => {
-    if (elapsedMs == null) return streaming ? t.thinking : t.thought;
-    const s = Math.max(0, Math.round(elapsedMs / 1000));
-    if (streaming) return t.thinkingFor(s);
-    return t.thoughtFor(s);
-  })();
-
-  return (
-    <details className="chat-thinking-block" open={defaultOpen}>
-      <summary>
-        <span className="chat-thinking-icon">{streaming ? "💭" : "✦"}</span>
-        <span className="chat-thinking-label">{label}</span>
-      </summary>
-      {content ? <ChatMessageBody html={renderMarkdown(content)} /> : null}
-    </details>
-  );
-}
-
-function formatTime(ts: number): string {
-  const d = new Date(ts);
-  return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
-}
-
-function formatDuration(ms: number): string | null {
-  if (ms < 1500) return null;
-  const secs = Math.round(ms / 1000);
-  if (secs < 60) return `${secs}s`;
-  return `${Math.floor(secs / 60)}m ${secs % 60}s`;
+/** A quiet progress label; reasoning remains expandable when available. */
+function ConversationProcessView({ process }: { process: ConversationProcess }) {
+  const { lang } = useLang();
+  const zh = lang === "zh";
+  const [open, setOpen] = useState(process.live);
+  useEffect(() => setOpen(process.live), [process.live]);
+  const runningTools = process.tools.filter(tool => toolState(tool, process.live) === "running");
+  const stopped = process.tools.filter(tool => toolState(tool, process.live) === "stopped").length;
+  const count = process.tools.length;
+  const latest = runningTools[runningTools.length - 1];
+  const label = process.live
+    ? latest ? toolActivityLabel(latest, zh) : zh ? "正在思考中" : "Thinking"
+    : count ? (zh ? `${count} 个执行步骤` : `${count} ${count === 1 ? "step" : "steps"}`) : (zh ? "已思考" : "Thought");
+  const status = stopped ? (zh ? `${stopped} 项已停止` : `${stopped} stopped`) : "";
+  const className = `conversation-process${process.live ? " is-active" : ""}`;
+  const messages = process.messages.filter(({ item }) => item.content.trim());
+  if (!count && !messages.length && !process.live) return null;
+  if (!count && !messages.length) return <div className={className} role="status"><span className="process-label">{label}</span></div>;
+  return <details className={className} open={open} onToggle={e => setOpen(e.currentTarget.open)}>
+    <summary>
+      <span className="process-label" aria-live="polite">{label}</span>
+      {status && <span className="process-step-count">{status}</span>}
+      <svg className="process-chevron" width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m6 4 4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+    </summary>
+    <div className="process-body">
+      {messages.map(({ item, index }) => item.kind === "thinking" || item.phase === "thinking"
+        ? <details className="process-note" key={index}><summary>{zh ? "思考" : "Thinking"}</summary><ChatMessageBody html={renderMarkdown(item.content)}/></details>
+        : <div className="process-status-note" key={index}><ChatMessageBody html={renderMarkdown(item.content)}/></div>)}
+      <ToolExecutionList tools={process.tools} recentCount={process.tools.length} variant="process" live={process.live}/>
+    </div>
+  </details>;
 }
 
 function QuoteButton({ content, onQuote }: { content: string; onQuote: (text: string) => void }) {
@@ -591,38 +494,39 @@ function QuoteButton({ content, onQuote }: { content: string; onQuote: (text: st
   );
 }
 
-const SUGGESTED_PROMPTS = [
-  {
-    title: "Enzyme Redesign",
-    desc: "Search PubMed for PETase studies, download PDB 5XJH, redesign active-site with ProteinMPNN for thermostability",
-    text: "Search PubMed for recent PETase engineering studies, download PDB 5XJH, and use ProteinMPNN to redesign the active-site region for improved thermostability",
-  },
-  {
-    title: "Mutation Prediction",
-    desc: "Get AlphaFold structure for myoglobin (P02185, 154 aa), predict stabilizing mutations with ESM2 and ProSST",
-    text: "Download AlphaFold structure for sperm whale myoglobin (P02185), predict beneficial mutations with ESM2 and ProSST, and identify top 10 stabilizing candidates",
-  },
-  {
-    title: "Homolog Survey",
-    desc: "Get UniProt sequence for carbonic anhydrase II (P00918), find homologs via MMseqs2, compare physicochemical properties across the family",
-    text: "Download UniProt sequence for human carbonic anhydrase II (P00918), find its top homologs via MMseqs2 against UniRef, and compute physicochemical properties (MW, pI, GRAVY) for each to compare the family",
-  },
-  {
-    title: "Functional Analysis",
-    desc: "Predict function of P04637, find interaction partners on STRING, check tissue expression on HPA",
-    text: "Predict the function of protein P04637, find its interaction partners on STRING, and check tissue expression from Human Protein Atlas",
-  },
-];
+const SUGGESTED_PROMPTS = {
+  "en": [
+    {
+      "title": "Explore a protein",
+      "desc": "Look up function, domains and related structures.",
+      "text": "Find the function, domains and available structures of mouse ABL1 (P00520), with links to the sources."
+    },
+    {
+      "title": "Analyze my data",
+      "desc": "Inspect an uploaded table and visualize the results.",
+      "text": "Inspect the data I upload, check missing values and units, and suggest useful plots for the measurements."
+    },
+    {
+      "title": "Find a prediction tool",
+      "desc": "Choose an available model for your experiment.",
+      "text": "Which available tools can predict protein solubility? Compare their inputs and suitable use cases, and help me choose one."
+    },
+    {
+      "title": "Search the literature",
+      "desc": "Gather evidence for a protein engineering question.",
+      "text": "Find studies on improving PETase stability and activity. Summarize the experimental evidence and link the papers."
+    }
+  ]
+};
 
 interface ChatTimelineProps {
   items: ChatHistoryItem[];
   streamingIndex?: number;
+  running?: boolean;
   onSuggestedPrompt?: (text: string) => void;
   sessionId?: string;
   onQuoteReply?: (text: string) => void;
-  /** Live list of tool executions; rows with status="running" render as
-   * spinner pills under the timeline so the user sees activity while a
-   * long-running MCP tool is in flight. */
+  /** Tool executions grouped into the process preceding each turn's answer. */
   toolExecutions?: Array<Record<string, unknown>>;
   /** Retry the last user message; shown as an icon on the latest assistant
    * message when the run is not in flight. */
@@ -634,251 +538,36 @@ interface ChatTimelineProps {
   securityEvents?: SecurityEvent[];
 }
 
-export function ChatTimeline({ items, streamingIndex = -1, onSuggestedPrompt, sessionId, onQuoteReply, toolExecutions = [], onRetry, retryDisabled = false, securityEvents = [] }: ChatTimelineProps) {
+export function ChatTimeline({ items, streamingIndex = -1, running = false, onSuggestedPrompt, sessionId, onQuoteReply, toolExecutions = [], onRetry, retryDisabled = false, securityEvents = [] }: ChatTimelineProps) {
+  const { lang } = useLang();
   const t = useLang().t(TIMELINE_STRINGS);
-  const msgTimesRef = useRef<Map<number, number>>(new Map());
-  const prevSessionRef = useRef<string | undefined>(undefined);
-  // Index of the last non-thinking assistant message (used to anchor the
-  // per-message Retry icon — retrying a thinking block makes no sense).
-  const lastAssistantIdx = items.reduce<number>(
-    (acc, it, i) => (it.role === "assistant" && it.kind !== "thinking" ? i : acc),
-    -1
-  );
-  // Same index but with a fallback to the last assistant message of ANY
-  // kind (including thinking). Used to anchor orphan tool cards so a turn
-  // that produced thinking + tool calls but no final text still surfaces
-  // the tools in the UI (instead of silently discarding them).
-  const lastAssistantAnyIdx = lastAssistantIdx !== -1
-    ? lastAssistantIdx
-    : items.reduce<number>(
-        (acc, it, i) => (it.role === "assistant" ? i : acc),
-        -1
-      );
-
-  // Bucket tool executions by their kimi turn_id so each turn's tools render
-  // INLINE with that turn's answer message instead of all piling up at the
-  // bottom of the chat.
-  //
-  // Some kimi events arrive with an empty turn_id (kimi's own bookkeeping is
-  // inconsistent across turns); those get collected as "orphans" and pinned
-  // to the LAST non-thinking assistant message so they still surface next to
-  // the answer they belong to instead of disappearing into a bottom dump.
-  const toolsByTurn = new Map<string, ToolExecution[]>();
-  const orphanTools: ToolExecution[] = [];
-  for (const t of toolExecutions as ToolExecution[]) {
-    if (isResearchNoiseTool(t)) continue;
-    const k = String(t.turn_id || "");
-    if (k) {
-      const arr = toolsByTurn.get(k);
-      if (arr) arr.push(t); else toolsByTurn.set(k, [t]);
-    } else {
-      orphanTools.push(t);
+  const processes = buildConversationProcesses(items, (toolExecutions as ToolExecution[]).filter(tool => !isResearchNoiseTool(tool)), running);
+  const processAt = new Map(processes.map(process => [process.anchor, process]));
+  const lastAssistantIdx = items.reduce((last, item, idx) => item.role === "assistant" && !isProcessItem(item) && item.content.trim() ? idx : last, -1);
+  const renderProcess = (index: number) => {
+    const process = processAt.get(index);
+    return process ? <ConversationProcessView key={`${sessionId}/${process.key}`} process={process}/> : null;
+  };
+  const renderMessage = (item: ChatHistoryItem, idx: number) => {
+    if (isProcessItem(item)) return null;
+    if (item.kind === "compaction" || item.phase === "compaction") {
+      return <details className="chat-compaction"><summary>{t.compaction}</summary><div className="chat-compaction-body"><ChatMessageBody html={renderMarkdown((item.content || "").replace(/^🗜️\s*/, "").trim())}/></div></details>;
     }
-  }
-  const usedTurnIds = new Set<string>();
-
-  useEffect(() => {
-    if (prevSessionRef.current !== sessionId) {
-      msgTimesRef.current.clear();
-      prevSessionRef.current = sessionId;
-    }
-    items.forEach((_, idx) => {
-      if (!msgTimesRef.current.has(idx)) {
-        msgTimesRef.current.set(idx, Date.now());
-      }
-    });
-  }, [items.length, sessionId]);
-
-  const getDuration = useCallback(
-    (idx: number): string | null => {
-      const item = items[idx];
-      if (item.role === "user") return null;
-      const nextIdx = idx + 1;
-      if (nextIdx < items.length && items[nextIdx].role !== "user") return null;
-      let userIdx = idx - 1;
-      while (userIdx >= 0 && items[userIdx].role !== "user") userIdx--;
-      if (userIdx < 0) return null;
-      const userTime = msgTimesRef.current.get(userIdx);
-      const assistantTime = msgTimesRef.current.get(idx);
-      if (!userTime || !assistantTime) return null;
-      return formatDuration(assistantTime - userTime);
-    },
-    [items]
-  );
-
-  // Group consecutive research/status bubbles into one foldable block.
-  type RenderUnit =
-    | { type: "single"; idx: number }
-    | { type: "research_fold"; indices: number[] };
-  const units: RenderUnit[] = [];
-  for (let i = 0; i < items.length; ) {
-    if (items[i].kind !== "thinking" && isResearchStatusItem(items[i])) {
-      const indices = [i];
-      let j = i + 1;
-      while (j < items.length && items[j].kind !== "thinking" && isResearchStatusItem(items[j])) {
-        indices.push(j);
-        j++;
-      }
-      if (indices.length >= 2) {
-        units.push({ type: "research_fold", indices });
-      } else {
-        units.push({ type: "single", idx: i });
-      }
-      i = j;
-      continue;
-    }
-    units.push({ type: "single", idx: i });
-    i++;
-  }
-
-  return (
-    <div className="chat-timeline">
-      {items.length === 0 && (
-        <div className="chat-empty-state">
-          <img
-            className="chat-empty-logo"
-            src={LOGO_VENUS_URL}
-            alt="VenusFactory"
-          />
-          <h3 className="chat-empty-title">How can I help with your protein research?</h3>
-          <p className="chat-empty-subtitle">
-            Use Science Agent or Science Expert for structure prediction, mutation analysis, database search, or protein engineering.
-          </p>
-          <div className="chat-suggested-prompts">
-            {SUGGESTED_PROMPTS.map((prompt, i) => (
-              <button
-                key={i}
-                className="chat-suggested-btn"
-                onClick={() => onSuggestedPrompt?.(prompt.text)}
-              >
-                <span className="chat-suggested-title">{prompt.title}</span>
-                <span className="chat-suggested-desc">{prompt.desc}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-      {units.map((unit) => {
-        if (unit.type === "research_fold") {
-          return (
-            <ResearchStatusFold
-              key={`rf-${unit.indices[0]}`}
-              items={items}
-              indices={unit.indices}
-              streamingIndex={streamingIndex}
-              label={t.researchProcess(unit.indices.length)}
-            />
-          );
-        }
-        const idx = unit.idx;
-        const item = items[idx];
-        if (item.kind === "compaction" || item.phase === "compaction") {
-          const body = (item.content || "").replace(/^🗜️\s*/, "").trim();
-          return (
-            <details key={idx} className="chat-compaction" open={idx === streamingIndex}>
-              <summary>{t.compaction}</summary>
-              <div className="chat-compaction-body">
-                <ChatMessageBody html={renderMarkdown(body)} />
-              </div>
-            </details>
-          );
-        }
-        // Thinking: kimi reasoning stream OR Expert PI placeholders (kind or phase).
-        if (item.kind === "thinking" || item.phase === "thinking") {
-          const followedByAnswer = items
-            .slice(idx + 1)
-            .some((it) => it.role === "assistant" && it.kind !== "thinking");
-          const isStreamingThinking =
-            !followedByAnswer && (idx === streamingIndex || idx === items.length - 1);
-          const startedAt = msgTimesRef.current.get(idx);
-          // End: next non-thinking assistant's start time, OR null (= still going)
-          let endedAt: number | null = null;
-          for (let j = idx + 1; j < items.length; j++) {
-            if (items[j].role === "assistant" && items[j].kind !== "thinking") {
-              endedAt = msgTimesRef.current.get(j) ?? null;
-              break;
-            }
-          }
-          return (
-            <ThinkingBlock
-              key={idx}
-              content={item.content || ""}
-              startedAt={startedAt}
-              endedAt={endedAt}
-              streaming={isStreamingThinking}
-              defaultOpen={isStreamingThinking}
-            />
-          );
-        }
-        const isUser = item.role === "user";
-        const roleId = normalizeRoleId(item.role_id, item.role);
-        const roleLabel = roleDisplayName(roleId, isUser);
-        const avatar = roleAvatar(roleId, isUser);
-        const isStreaming = idx === streamingIndex;
-        const rawContent = item.content || "";
-        const { cleanText, attachments } = isUser || isStreaming
-          ? { cleanText: rawContent, attachments: [] as RichAttachment[] }
-          : extractRichAttachments(rawContent);
-        const structurePaths = isUser || isStreaming ? [] : extractStructurePaths(cleanText);
-        const statusCls = isUser ? "" : statusMsgClass(rawContent);
-        const isStatus = !isUser && isResearchStatusItem(item);
-        const isReport = !isUser && isHighlightReport(item);
-        const msgTime = msgTimesRef.current.get(idx);
-        const duration = getDuration(idx);
-        // Tools belonging to THIS assistant message's turn — render inside
-        // the bubble. Also: orphan tools (kimi sometimes emits empty turn_id)
-        // pin to the LAST non-thinking assistant message so they don't fall
-        // off into a bottom dump.
-        const turnId = String(item.turn_id || "");
-        let turnTools: ToolExecution[] = [];
-        if (!isUser && turnId && toolsByTurn.has(turnId)) {
-          turnTools = [...(toolsByTurn.get(turnId) as ToolExecution[])];
-          usedTurnIds.add(turnId);
-        }
-        if (!isUser && idx === lastAssistantAnyIdx && orphanTools.length > 0) {
-          turnTools = [...turnTools, ...orphanTools];
-        }
-        // Blank assistant bubbles (common before kimi thinking.delta) look like
-        // an empty reply. Show Thinking instead, or skip once the turn moved on.
-        // Expert text streams use kind:"text" — keep an empty streaming bubble
-        // with caret instead of swapping to ThinkingBlock (that hid tokens).
-        if (!isUser && !rawContent.trim() && turnTools.length === 0) {
-          if (isStreaming && item.kind === "text") {
-            return (
-              <div
-                key={idx}
-                className="chat-msg assistant with-avatar streaming"
-              >
-                <img
-                  className="chat-msg-avatar"
-                  src={avatar}
-                  alt={roleLabel}
-                  onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).src = DEFAULT_AVATAR;
-                  }}
-                />
-                <div className="chat-msg-content">
-                  <ChatMessageBody html="" />
-                </div>
-              </div>
-            );
-          }
-          if (isStreaming || idx === items.length - 1) {
-            return (
-              <ThinkingBlock
-                key={idx}
-                content=""
-                startedAt={msgTimesRef.current.get(idx)}
-                endedAt={null}
-                streaming
-                defaultOpen
-              />
-            );
-          }
-          return null;
-        }
-        return (
-          <Fragment key={idx}>
+    const isUser = item.role === "user";
+    const rawContent = item.content || "";
+    if (!rawContent.trim()) return null;
+    const roleId = normalizeRoleId(item.role_id, item.role);
+    const roleLabel = roleDisplayName(roleId, isUser);
+    const avatar = roleAvatar(roleId, isUser);
+    const isStreaming = item.role === "assistant" && idx === streamingIndex;
+    const { cleanText, attachments } = isUser || isStreaming
+      ? { cleanText: rawContent, attachments: [] as RichAttachment[] }
+      : extractRichAttachments(rawContent);
+    const structurePaths = isUser || isStreaming ? [] : extractStructurePaths(cleanText);
+    const statusCls = isUser ? "" : statusMsgClass(rawContent);
+    const isStatus = !isUser && isResearchStatusItem(item);
+    const isReport = !isUser && isHighlightReport(item);
+    return (
           <div
             className={`chat-msg ${isUser ? "user" : "assistant"} with-avatar${isStreaming ? " streaming" : ""}${statusCls ? ` ${statusCls}` : ""}${isStatus ? " msg-status-muted" : ""}${isReport ? " msg-report-highlight" : ""}`}
           >
@@ -891,18 +580,12 @@ export function ChatTimeline({ items, streamingIndex = -1, onSuggestedPrompt, se
               }}
             />
             <div className="chat-msg-content">
-              {(msgTime || duration) && !isStatus && (
-                <div className="chat-msg-role">
-                  {msgTime && <span className="chat-msg-time">{formatTime(msgTime)}</span>}
-                  {duration && <span className="chat-msg-duration">{duration}</span>}
-                </div>
-              )}
               <ChatMessageBody html={renderMarkdown(cleanText)} />
               <RichAttachmentList attachments={attachments} />
               {structurePaths.length > 0 && (
                 <div className="chat-msg-structures">
                   {structurePaths.map((sp) => (
-                    <MolstarViewer
+                    <StructureFileButton
                       key={sp}
                       filePath={sp}
                       label={sp.split("/").pop() || sp}
@@ -922,7 +605,7 @@ export function ChatTimeline({ items, streamingIndex = -1, onSuggestedPrompt, se
                       className="chat-msg-retry-btn"
                       onClick={onRetry}
                       disabled={retryDisabled}
-                      title="Retry this turn"
+                      title={lang === "zh" ? "重新生成" : "Retry this turn"}
                     >
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M3 12a9 9 0 1 0 3-6.7" />
@@ -934,37 +617,33 @@ export function ChatTimeline({ items, streamingIndex = -1, onSuggestedPrompt, se
               )}
             </div>
           </div>
-          {turnTools.length > 0 && (
-            <div className={`chat-tools-row ${isUser ? "user" : "assistant"}`}>
-              <ToolExecutionList tools={turnTools} recentCount={3} />
-            </div>
-          )}
-          </Fragment>
-        );
-      })}
-      {/* Bottom catch-all: only NON-orphan tools whose turn_id didn't match
-          any rendered assistant message (would happen if a turn_id exists
-          but the corresponding assistant message hasn't streamed yet). True
-          orphans (empty turn_id) are pinned to the last assistant message
-          above instead of falling into this dump. */}
-      {(() => {
-        const noAssistantToPin = lastAssistantAnyIdx === -1;
-        const stranded = (toolExecutions as ToolExecution[]).filter((t) => {
-          if (isResearchNoiseTool(t)) return false;
-          const k = String(t.turn_id || "");
-          if (k) return !usedTurnIds.has(k);
-          // Empty turn_id normally pins to lastAssistantAnyIdx above; only
-          // dump here when there's literally no assistant message yet.
-          return noAssistantToPin;
-        });
-        if (stranded.length === 0) return null;
-        return (
-          <div className="chat-tool-card-list">
-            <ToolExecutionList tools={stranded} recentCount={3} />
+    );
+  };
+  return <div className="chat-timeline">
+      {items.length === 0 && !running && (
+        <div className="chat-empty-state">
+          <img
+            className="chat-empty-logo"
+            src={LOGO_VENUS_URL}
+            alt="VenusFactory"
+          />
+          <h3 className="chat-empty-title">{lang === "zh" ? "从一个研究问题开始" : "Start with a research question"}</h3>
+          <div className="chat-suggested-prompts">
+            {SUGGESTED_PROMPTS.en.map((prompt, i) => (
+              <button
+                key={i}
+                className="chat-suggested-btn"
+                onClick={() => onSuggestedPrompt?.(prompt.text)}
+              >
+                <span className="chat-suggested-title">{prompt.title}</span>
+                <span className="chat-suggested-desc">{prompt.desc}</span>
+              </button>
+            ))}
           </div>
-        );
-      })()}
-      {securityEvents.length > 0 && <SecurityEventsBanner events={securityEvents} />}
-    </div>
-  );
+        </div>
+      )}
+    {items.map((item, index) => <Fragment key={index}>{renderProcess(index)}{renderMessage(item, index)}</Fragment>)}
+    {renderProcess(items.length)}
+    {securityEvents.length > 0 && <SecurityEventsBanner events={securityEvents}/>}
+  </div>;
 }

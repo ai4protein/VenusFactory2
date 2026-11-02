@@ -1,5 +1,7 @@
-import { useMemo, useState } from "react";
-import { MolstarViewer } from "./MolstarViewer";
+import { useId, useMemo, useState } from "react";
+import { useLang } from "../lib/i18n";
+import { toolActivityLabel, toolState } from "../lib/conversationProcess";
+import { StructureFileButton } from "./StructureFileButton";
 import {
   extractMediaFromValue,
   fileUrlFor,
@@ -10,10 +12,10 @@ import {
 } from "../lib/richContent";
 
 /**
- * Renders one kimi tool invocation as a card with three visual states:
+ * Renders a tool invocation with a quiet, expandable activity summary:
  *   - running:  spinner + elapsed seconds
  *   - ok:       check + duration, click to expand args+output
- *   - error:    red border + error preview
+ *   - other:    neutral marker; original output remains in the details
  *
  * When expanded:
  *   - Input args rendered as pretty JSON
@@ -62,13 +64,7 @@ function hasSettledOutput(t: ToolExecution): boolean {
 }
 
 function isToolRunning(t: ToolExecution): boolean {
-  const status = String(t.status || "").toLowerCase();
-  if (status === "running") return true;
-  if (status === "error" || status === "ok" || status === "success") return false;
-  // Graph-era search rows often only have `timestamp` + `outputs` and no
-  // finished_at — treat those as completed so they don't grow a live timer.
-  if (hasSettledOutput(t) || t.finished_at) return false;
-  return !t.finished_at && Boolean(t.started_at || t.timestamp);
+  return toolState(t) === "running";
 }
 
 function durationMs(t: ToolExecution): number | null {
@@ -87,7 +83,8 @@ function durationMs(t: ToolExecution): number | null {
     endMs = Date.now();
   }
   if (isNaN(endMs)) return null;
-  return endMs - startMs;
+  // Server timestamps may be slightly ahead of the browser clock.
+  return Math.max(0, endMs - startMs);
 }
 
 function formatDuration(ms: number | null): string {
@@ -117,19 +114,7 @@ function MediaPreview({ m }: { m: MediaRef }) {
   const basename = (m.path.split("?")[0].split("/").pop() || m.path);
   switch (m.kind) {
     case "structure":
-      // MolstarViewer fetches via /api/structure/content which only handles
-      // local files. Remote PDB/CIF URLs render as a link instead — the user
-      // can click through and kimi can `download_rcsb_structure` to make it
-      // local if they need 3D rendering.
-      if (remote) {
-        return (
-          <div className="tool-media tool-media-link">
-            <span className="tool-media-icon">🧪</span>
-            <a href={url} target="_blank" rel="noopener noreferrer">{basename} (remote structure)</a>
-          </div>
-        );
-      }
-      return <MolstarViewer filePath={m.path} label={basename} />;
+      return <StructureFileButton filePath={m.path} label={basename} />;
     case "image":
       return (
         <figure className="tool-media tool-media-image">
@@ -190,9 +175,13 @@ function MediaPreview({ m }: { m: MediaRef }) {
 export function ToolExecutionList({
   tools,
   recentCount = 3,
+  variant = "card",
+  live = true,
 }: {
   tools: ToolExecution[];
   recentCount?: number;
+  variant?: "card" | "process";
+  live?: boolean;
 }) {
   // Drop Expert literature fan-out noise (old sessions can have dozens of
   // query_* rows that otherwise pin under the last PI message).
@@ -203,7 +192,7 @@ export function ToolExecutionList({
   const running: ToolExecution[] = [];
   const completed: ToolExecution[] = [];
   for (const t of filtered) {
-    if (isToolRunning(t)) running.push(t);
+    if (toolState(t, live) === "running") running.push(t);
     else completed.push(t);
   }
   const visibleCompleted = completed.slice(-recentCount);
@@ -218,51 +207,41 @@ export function ToolExecutionList({
             <span className="tool-history-label">
               {hidden.length} earlier tool {hidden.length === 1 ? "call" : "calls"}
             </span>
-            <span className="tool-history-summary">
-              {(() => {
-                let ok = 0, err = 0;
-                for (const t of hidden) {
-                  if (String(t.status || "").toLowerCase() === "error" || t.is_error) err++;
-                  else ok++;
-                }
-                const parts: string[] = [];
-                if (ok) parts.push(`${ok} ✓`);
-                if (err) parts.push(`${err} ✕`);
-                return parts.join(" · ");
-              })()}
-            </span>
           </summary>
           <div className="tool-history-body">
             {hidden.map((t, i) => (
               <ToolExecutionCard
                 key={String(t.tool_call_id || `hidden-${i}`)}
-                t={t}
+                t={t} variant={variant} live={live}
               />
             ))}
           </div>
         </details>
       )}
       {visibleCompleted.map((t, i) => (
-        <ToolExecutionCard key={String(t.tool_call_id || `recent-${i}`)} t={t} />
+        <ToolExecutionCard key={String(t.tool_call_id || `recent-${i}`)} t={t} variant={variant} live={live} />
       ))}
       {running.map((t, i) => (
-        <ToolExecutionCard key={String(t.tool_call_id || `running-${i}`)} t={t} />
+        <ToolExecutionCard key={String(t.tool_call_id || `running-${i}`)} t={t} variant={variant} live={live} />
       ))}
     </>
   );
 }
 
 
-export function ToolExecutionCard({ t }: { t: ToolExecution }) {
+export function ToolExecutionCard({ t, variant = "card", live = true }: { t: ToolExecution; variant?: "card" | "process"; live?: boolean }) {
+  const { lang } = useLang();
+  const zh = lang === "zh";
+  const detailId = useId();
   const [open, setOpen] = useState(false);
-  const status = String(t.status || "").toLowerCase();
-  const isRunning = isToolRunning(t);
-  const isError = status === "error" || t.is_error === true;
-  const isOk = !isRunning && !isError;
+  const state = toolState(t, live);
+  const isRunning = state === "running";
+  const isError = state === "error";
+  const isOk = state === "complete";
 
   const args = t.args ?? t.inputs;
   const rawOutput = t.output ?? t.outputs;
-  const dur = formatDuration(durationMs(t));
+  const dur = state === "stopped" ? "" : formatDuration(durationMs(t));
   const name = shortToolName(String(t.tool_name || t.name || "tool"));
 
   // Parse output JSON-string once, then scan for media references.
@@ -281,7 +260,6 @@ export function ToolExecutionCard({ t }: { t: ToolExecution }) {
     "tool-card",
     isRunning && "tool-card-running",
     isOk && "tool-card-ok",
-    isError && "tool-card-error",
   ]
     .filter(Boolean)
     .join(" ");
@@ -291,14 +269,18 @@ export function ToolExecutionCard({ t }: { t: ToolExecution }) {
       <button
         type="button"
         className="tool-card-header"
-        onClick={() => !isRunning && setOpen((v) => !v)}
-        disabled={isRunning}
-        title={isRunning ? "" : open ? "Hide details" : "Show details"}
+        onClick={() => setOpen(v => !v)}
+        aria-expanded={open}
+        aria-controls={open ? detailId : undefined}
+        title={open ? (zh ? "收起详情" : "Hide details") : (zh ? "查看详情" : "Show details")}
       >
         <span className="tool-card-icon">
-          {isRunning ? <span className="chat-tool-spinner" /> : isError ? "✕" : "✓"}
+          {isRunning ? <span className="chat-tool-spinner" /> : isOk ? "✓" : "·"}
         </span>
-        <code className="tool-card-name">{name}</code>
+        {variant === "process"
+          ? <span className="tool-card-name process-label">{toolActivityLabel(t, zh)}</span>
+          : <code className="tool-card-name">{name}</code>}
+        {variant === "process" && state === "stopped" && <span className="process-tool-status">{zh ? "已停止" : "Stopped"}</span>}
         {showMediaCollapsed && (
           <span className="tool-card-media-count" title={`${media.length} preview(s)`}>
             {media.length} 📎
@@ -325,8 +307,9 @@ export function ToolExecutionCard({ t }: { t: ToolExecution }) {
         </div>
       )}
 
-      {open && !isRunning && (
-        <div className="tool-card-body">
+      {open && (
+        <div className="tool-card-body" id={detailId}>
+          {variant === "process" && <div className="process-tool-name">{name}</div>}
           {media.length > 0 && (
             <div className="tool-card-section">
               <div className="tool-card-section-label">Outputs ({media.length})</div>
@@ -355,7 +338,7 @@ export function ToolExecutionCard({ t }: { t: ToolExecution }) {
               </pre>
             </div>
           )}
-          {!args && !parsedOutput && t.error && (
+          {parsedOutput === undefined && t.error && (
             <div className="tool-card-section">
               <div className="tool-card-section-label">Error</div>
               <pre>

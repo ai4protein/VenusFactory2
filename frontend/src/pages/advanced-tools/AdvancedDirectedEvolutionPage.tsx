@@ -62,7 +62,7 @@ const STRINGS = {
 const DEFAULT_META: AdvancedToolsMeta = {
   dataset_mapping_zero_shot: ["Activity", "Binding", "Expression", "Organismal Fitness", "Stability"],
   sequence_model_options: ["VenusPLM", "ESM2-650M", "ESM-1v", "ESM-1b"],
-  structure_model_options: ["VenusREM (foldseek-based)", "ProSST-2048", "ProtSSN", "ESM-IF1", "SaProt", "MIF-ST"],
+  structure_model_options: ["VenusREM (foldseek-based)", "ProSST-20", "ProSST-128", "ProSST-512", "ProSST-1024", "ProSST-2048", "ProSST-4096", "ProtSSN", "ESM-IF1", "SaProt", "MIF-ST"],
   model_mapping_function: ["ESM2-650M"],
   residue_model_mapping_function: ["ESM2-650M"],
   dataset_mapping_function: { Solubility: ["DeepSol"] },

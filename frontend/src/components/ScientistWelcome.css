@@ -1,0 +1,22 @@
+.scientist-welcome { width:100%; max-width:680px; margin:0 auto; }
+.scientist-research-cycle { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); margin:0 0 20px; padding:0; list-style:none; }
+.scientist-research-cycle li { position:relative; min-width:0; padding:5px 12px; text-align:center; }
+.scientist-research-cycle strong { display:block; color:#49535e; font-size:14px; font-weight:600; line-height:1.5; }
+.scientist-research-cycle li > span { display:block; margin-top:4px; color:#858c95; font-size:12px; line-height:1.5; }
+.scientist-research-cycle i { position:absolute; top:11px; right:-5px; font-size:15px; color:#b2b8bf; font-style:normal; }
+.scientist-start-examples { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+.scientist-start-examples button { position:relative; display:flex; flex-direction:column; gap:5px; min-width:0; padding:12px 30px 12px 13px; border:1px solid #e8ebee; border-radius:5px; background:#fff; text-align:left; cursor:pointer; font:inherit; }
+.scientist-start-examples strong { color:#454e59; font-size:13px; font-weight:550; line-height:1.4; }
+.scientist-start-examples button > span { color:#858c95; font-size:12px; line-height:1.5; }
+.scientist-start-examples svg { position:absolute; top:14px; right:12px; width:12px; height:12px; fill:none; stroke:#a0a8b1; stroke-width:1.3; stroke-linecap:round; stroke-linejoin:round; }
+.scientist-start-examples button:hover:not(:disabled) { border-color:#cbd3db; background:#fafbfc; }
+.scientist-start-examples button:focus-visible { outline:2px solid #91a6bc; outline-offset:2px; }
+.scientist-start-examples button:disabled { cursor:default; opacity:.55; }
+@media (max-width:620px) {
+  .scientist-research-cycle { grid-template-columns:repeat(3,minmax(0,1fr)); row-gap:10px; margin-bottom:16px; }
+  .scientist-research-cycle li { padding:4px 5px; }
+  .scientist-research-cycle i { display:none; }
+  .scientist-research-cycle li:nth-child(4) { grid-column:1 / 2; }
+  .scientist-research-cycle li:last-child { grid-column:2 / 4; }
+  .scientist-start-examples { grid-template-columns:1fr; }
+}

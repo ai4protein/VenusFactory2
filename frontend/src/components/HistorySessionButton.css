@@ -1,0 +1,7 @@
+.history-date-tooltip { position:fixed; z-index:1400; box-sizing:border-box; padding:10px 12px; border:1px solid #e3e5e8;
+  border-radius:6px; background:#fff; color:#535d68; box-shadow:0 4px 18px #17212b14; pointer-events:none; font-size:11px; line-height:1.6; }
+.history-date-tooltip strong { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; font-size:12px; font-weight:500; color:#353e48; margin-bottom:3px; }
+.history-date-tooltip span { display:block; }
+.app-sidebar-history .history-entry .session-select-btn { min-height:38px; padding-top:10px; padding-bottom:10px; }
+.app-sidebar-history .history-entry .session-title-label { display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.app-sidebar-history .history-entry :is(.history-pin-button,.session-delete-btn) { top:50%; transform:translateY(-50%); }

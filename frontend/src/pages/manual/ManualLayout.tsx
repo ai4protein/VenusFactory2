@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useMemo } from "react";
+import "./manual-guide.css";
 import { MANUAL_SECTIONS, langToManual, type ManualLanguage } from "../../lib/manualContent";
 import { PageFooter } from "../../components/PageFooter";
 import { useLang } from "../../lib/i18n";
@@ -11,36 +12,14 @@ export type ManualLayoutContext = {
 
 const STRINGS = {
   en: {
-    title: "Manual",
-    subtitle: "Browse product documentation and usage guidance.",
-    indexLabel: "Index",
-    sectionLabels: {
-      report: "Report",
-      agent: "Agent",
-      training: "Training",
-      prediction: "Prediction",
-      evaluation: "Evaluation",
-      "quick-tools": "Quick Tools",
-      "advanced-tools": "Advanced Tools",
-      download: "Download",
-      faq: "FAQ"
-    } as Record<string, string>
+    title: "User guide",
+    subtitle: "From your first question to a reusable research result.",
+    indexLabel: "Guide overview",
   },
   zh: {
     title: "手册",
-    subtitle: "浏览产品文档与使用指南。",
-    indexLabel: "目录",
-    sectionLabels: {
-      report: "报告",
-      agent: "智能体",
-      training: "训练",
-      prediction: "预测",
-      evaluation: "评估",
-      "quick-tools": "快速工具",
-      "advanced-tools": "高级工具",
-      download: "下载",
-      faq: "常见问题"
-    } as Record<string, string>
+    subtitle: "从第一次提问，到可复用的研究结果。",
+    indexLabel: "手册目录",
   }
 };
 
@@ -55,10 +34,10 @@ export function ManualLayout() {
       { path: "index", label: t.indexLabel },
       ...MANUAL_SECTIONS.map((item) => ({
         path: item.key,
-        label: t.sectionLabels[item.key] ?? item.label
+        label: item.title[lang]
       }))
     ],
-    [t]
+    [t, lang]
   );
 
   return (
@@ -83,7 +62,7 @@ export function ManualLayout() {
       </nav>
 
       <Outlet context={{ language } satisfies ManualLayoutContext} />
-      <PageFooter />
+      <PageFooter showNotice={false} />
     </div>
   );
 }

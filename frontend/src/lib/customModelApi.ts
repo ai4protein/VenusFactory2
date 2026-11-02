@@ -1,7 +1,12 @@
+import { validateUploads } from "./uploadLimits";
+import { ensureJobSession } from './jobSession';
+import type { QueueStatus } from '../components/QueueState';
 import { streamSSEFromPost } from "./sse";
 
 export type CustomModelMeta = {
   plm_models: Record<string, string>;
+  training_plm_models?: Record<string, string>;
+  online_training?: boolean;
   dataset_configs: Record<string, string>;
   training_methods: string[];
   pooling_methods: string[];
@@ -35,8 +40,10 @@ export type UploadedDatasetFile = {
   run_id?: string;
 };
 
+const activeJobs: Record<string,string> = {};
 export type StreamEventPayload =
-  | { type: "start"; data: { run_id: string; command: string; task: string } }
+  | { type: "queue"; data: QueueStatus }
+  | { type: "start"; data: { run_id: string; job_number?: string; title?: string; command: string; task: string } }
   | { type: "progress"; data: { progress: number; message: string } }
   | { type: "log"; data: { line: string } }
   | { type: "training_metrics"; data: { epochs: number[]; train_loss: Array<number | null>; val_loss: Array<number | null>; val_metrics: Record<string, Array<number | null>> } }
@@ -62,10 +69,13 @@ export type StreamEventPayload =
   | { type: "error"; data: { message: string } };
 
 async function requestJSON<T>(url: string, init?: RequestInit): Promise<T> {
+  await ensureJobSession('custom');
   const res = await fetch(url, init);
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(text || `Request failed (${res.status})`);
+    let message = text;
+    try { const body = JSON.parse(text); message = typeof body.detail === "string" ? body.detail : body.message || text; } catch { /* Plain text response. */ }
+    throw new Error(message || `Request failed (${res.status})`);
   }
   return (await res.json()) as T;
 }
@@ -95,6 +105,10 @@ export async function previewDataset(payload: {
   train_file?: string;
   valid_file?: string;
   test_file?: string;
+  training?: boolean;
+  sequence_column_name?: string;
+  label_column_name?: string;
+  problem_type?: string;
 }) {
   return requestJSON<DatasetPreviewResult>("/api/custom-model/dataset/preview", {
     method: "POST",
@@ -104,8 +118,10 @@ export async function previewDataset(payload: {
 }
 
 export async function uploadCustomModelDatasetFile(file: File) {
+  await validateUploads([file]);
   const form = new FormData();
   form.append("file", file);
+  await ensureJobSession('custom');
   const res = await fetch("/api/custom-model/upload", {
     method: "POST",
     body: form
@@ -118,8 +134,10 @@ export async function uploadCustomModelDatasetFile(file: File) {
 }
 
 export async function uploadCustomModelPredictBatchFile(file: File) {
+  await validateUploads([file]);
   const form = new FormData();
   form.append("file", file);
+  await ensureJobSession('custom');
   const res = await fetch("/api/custom-model/predict/upload", {
     method: "POST",
     body: form
@@ -170,15 +188,15 @@ export async function previewPredict(args: Record<string, unknown>) {
 }
 
 export async function abortTraining() {
-  return requestJSON<{ aborted: boolean }>("/api/custom-model/training/abort", { method: "POST" });
+  return requestJSON<{ aborted: boolean }>("/api/custom-model/training/abort?job_id=" + encodeURIComponent(activeJobs.training || ""), { method: "POST" });
 }
 
 export async function abortEvaluation() {
-  return requestJSON<{ aborted: boolean }>("/api/custom-model/evaluation/abort", { method: "POST" });
+  return requestJSON<{ aborted: boolean }>("/api/custom-model/evaluation/abort?job_id=" + encodeURIComponent(activeJobs.evaluation || ""), { method: "POST" });
 }
 
 export async function abortPredict() {
-  return requestJSON<{ aborted: boolean }>("/api/custom-model/predict/abort", { method: "POST" });
+  return requestJSON<{ aborted: boolean }>("/api/custom-model/predict/abort?job_id=" + encodeURIComponent(activeJobs.predict || ""), { method: "POST" });
 }
 
 function parseEventData(data: string) {
@@ -195,18 +213,21 @@ export async function startTrainingStream(
   onEvent: (payload: StreamEventPayload) => void,
   signal?: AbortSignal
 ) {
+  await ensureJobSession('custom');
   await streamSSEFromPost(
     "/api/custom-model/training/start",
     { args },
     ({ event, data }) => {
       const payload = parseEventData(data);
-      if (event === "start") onEvent({ type: "start", data: payload as StreamEventPayload["data"] & { run_id: string } });
-      else if (event === "progress") onEvent({ type: "progress", data: payload as StreamEventPayload["data"] & { progress: number } });
-      else if (event === "log") onEvent({ type: "log", data: payload as StreamEventPayload["data"] & { line: string } });
-      else if (event === "training_metrics") onEvent({ type: "training_metrics", data: payload as StreamEventPayload["data"] & { epochs: number[] } });
-      else if (event === "test_results") onEvent({ type: "test_results", data: payload as StreamEventPayload["data"] & { metrics: Record<string, number> } });
-      else if (event === "error") onEvent({ type: "error", data: payload as StreamEventPayload["data"] & { message: string } });
-      else if (event === "done") onEvent({ type: "done", data: payload as StreamEventPayload["data"] & { success: boolean } });
+      if(event === 'start')activeJobs.training=String(payload.run_id);
+      if(event === 'queue')onEvent({type:'queue',data:payload as QueueStatus});
+      if (event === "start") onEvent({ type: "start", data: payload as Extract<StreamEventPayload, { type: "start" }>["data"] });
+      else if (event === "progress") onEvent({ type: "progress", data: payload as Extract<StreamEventPayload, { type: "progress" }>["data"] });
+      else if (event === "log") onEvent({ type: "log", data: payload as Extract<StreamEventPayload, { type: "log" }>["data"] });
+      else if (event === "training_metrics") onEvent({ type: "training_metrics", data: payload as Extract<StreamEventPayload, { type: "training_metrics" }>["data"] });
+      else if (event === "test_results") onEvent({ type: "test_results", data: payload as Extract<StreamEventPayload, { type: "test_results" }>["data"] });
+      else if (event === "error") onEvent({ type: "error", data: payload as Extract<StreamEventPayload, { type: "error" }>["data"] });
+      else if (event === "done") onEvent({ type: "done", data: payload as Extract<StreamEventPayload, { type: "done" }>["data"] });
     },
     signal
   );
@@ -217,16 +238,19 @@ export async function startEvaluationStream(
   onEvent: (payload: StreamEventPayload) => void,
   signal?: AbortSignal
 ) {
+  await ensureJobSession('custom');
   await streamSSEFromPost(
     "/api/custom-model/evaluation/start",
     { args },
     ({ event, data }) => {
       const payload = parseEventData(data);
-      if (event === "start") onEvent({ type: "start", data: payload as StreamEventPayload["data"] & { run_id: string } });
-      else if (event === "progress") onEvent({ type: "progress", data: payload as StreamEventPayload["data"] & { progress: number } });
-      else if (event === "log") onEvent({ type: "log", data: payload as StreamEventPayload["data"] & { line: string } });
-      else if (event === "error") onEvent({ type: "error", data: payload as StreamEventPayload["data"] & { message: string } });
-      else if (event === "done") onEvent({ type: "done", data: payload as StreamEventPayload["data"] & { success: boolean } });
+      if(event === 'start')activeJobs.evaluation=String(payload.run_id);
+      if(event === 'queue')onEvent({type:'queue',data:payload as QueueStatus});
+      if (event === "start") onEvent({ type: "start", data: payload as Extract<StreamEventPayload, { type: "start" }>["data"] });
+      else if (event === "progress") onEvent({ type: "progress", data: payload as Extract<StreamEventPayload, { type: "progress" }>["data"] });
+      else if (event === "log") onEvent({ type: "log", data: payload as Extract<StreamEventPayload, { type: "log" }>["data"] });
+      else if (event === "error") onEvent({ type: "error", data: payload as Extract<StreamEventPayload, { type: "error" }>["data"] });
+      else if (event === "done") onEvent({ type: "done", data: payload as Extract<StreamEventPayload, { type: "done" }>["data"] });
     },
     signal
   );
@@ -237,16 +261,19 @@ export async function startPredictStream(
   onEvent: (payload: StreamEventPayload) => void,
   signal?: AbortSignal
 ) {
+  await ensureJobSession('custom');
   await streamSSEFromPost(
     "/api/custom-model/predict/start",
     { args },
     ({ event, data }) => {
       const payload = parseEventData(data);
-      if (event === "start") onEvent({ type: "start", data: payload as StreamEventPayload["data"] & { run_id: string } });
-      else if (event === "progress") onEvent({ type: "progress", data: payload as StreamEventPayload["data"] & { progress: number } });
-      else if (event === "log") onEvent({ type: "log", data: payload as StreamEventPayload["data"] & { line: string } });
-      else if (event === "error") onEvent({ type: "error", data: payload as StreamEventPayload["data"] & { message: string } });
-      else if (event === "done") onEvent({ type: "done", data: payload as StreamEventPayload["data"] & { success: boolean } });
+      if(event === 'start')activeJobs.predict=String(payload.run_id);
+      if(event === 'queue')onEvent({type:'queue',data:payload as QueueStatus});
+      if (event === "start") onEvent({ type: "start", data: payload as Extract<StreamEventPayload, { type: "start" }>["data"] });
+      else if (event === "progress") onEvent({ type: "progress", data: payload as Extract<StreamEventPayload, { type: "progress" }>["data"] });
+      else if (event === "log") onEvent({ type: "log", data: payload as Extract<StreamEventPayload, { type: "log" }>["data"] });
+      else if (event === "error") onEvent({ type: "error", data: payload as Extract<StreamEventPayload, { type: "error" }>["data"] });
+      else if (event === "done") onEvent({ type: "done", data: payload as Extract<StreamEventPayload, { type: "done" }>["data"] });
     },
     signal
   );
@@ -254,4 +281,11 @@ export async function startPredictStream(
 
 export function buildArtifactDownloadUrl(path: string) {
   return `/api/custom-model/artifacts/download?path=${encodeURIComponent(path)}`;
+}
+
+export async function watchCustomJob(id:string,onEvent:(event:StreamEventPayload)=>void,signal?:AbortSignal){
+  await ensureJobSession('custom');
+  await streamSSEFromPost('/api/custom-model/jobs/'+encodeURIComponent(id)+'/stream',{},({event,data})=>{
+    if(['start','queue','progress','log','training_metrics','test_results','error','done'].includes(event))onEvent({type:event,data:parseEventData(data)} as StreamEventPayload);
+  },signal);
 }

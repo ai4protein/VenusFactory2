@@ -1,0 +1,101 @@
+/* One navigation rail, with conversations as its primary content. */
+.vf2-layout.chat-first-layout { display:grid!important; grid-template-columns:248px minmax(0,1fr); height:100dvh; min-height:0; background:#fff; gap:0; }
+.vf2-layout.chat-first-layout.sidebar-collapsed { grid-template-columns:64px minmax(0,1fr); }
+.chat-first-layout > .app-sidebar { display:flex; flex-direction:column; height:100dvh!important; max-height:none!important; width:100%; min-width:0; padding:12px 10px 10px!important; overflow:visible!important; scrollbar-gutter:auto; border:0; border-right:1px solid #e9ebee; background:#fff; box-shadow:none; backdrop-filter:none; }
+.app-sidebar-top { display:flex; align-items:center; gap:8px; height:42px; flex:none; margin-bottom:18px; }
+.app-sidebar-brand { min-width:0; display:flex; align-items:center; gap:9px; color:#22272e; text-decoration:none; font-size:14px; font-weight:600; letter-spacing:-.3px; flex:1; white-space:nowrap; }
+.app-sidebar-brand img { object-fit:contain; flex:none; }
+.app-sidebar-icon { width:18px; height:18px; flex:none; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+.app-sidebar-toggle { width:30px; height:30px; padding:6px; border:0; border-radius:5px; background:transparent; color:#8b929c; cursor:pointer; }
+.app-sidebar-toggle:hover { background:#f0f1f3; color:#303740; }
+.chat-first-layout .app-sidebar-primary { display:grid!important; gap:3px; flex:none; margin:0 0 22px; }
+.app-sidebar .app-sidebar-link { display:flex; width:100%; min-height:38px; align-items:center; gap:11px; padding:9px 11px; border:0; border-radius:6px; background:transparent; color:#5d6570; font:inherit; font-size:13px; font-weight:450; line-height:20px; text-decoration:none; cursor:pointer; text-align:left; }
+.app-sidebar .app-sidebar-link.active { color:#20262e; background:#f0f1f3; font-weight:550; }
+.app-sidebar .app-sidebar-link:hover { background:#f5f6f7; color:#252b33; }
+.app-sidebar .app-sidebar-link:disabled { color:#a8adb5; cursor:not-allowed; background:transparent; opacity:1; }
+.app-sidebar-link small { margin-left:auto; color:#b2b7bf; font-size:10px; }
+.app-sidebar-history { flex:1; min-height:0; overflow:hidden; }
+.app-sidebar-history > .chat-panel.left { display:flex!important; flex-direction:column; width:100%!important; height:100%; max-height:none; min-height:0; padding:0; border:0; border-radius:0; background:transparent; box-shadow:none; overflow:hidden; }
+.sidebar-history-heading { font-size:11px; font-weight:500; color:#9299a3; margin:0 10px 12px; }
+.app-sidebar-history .session-new-btn { display:block; margin:0 0 9px; padding:9px 11px; width:100%; text-align:left; font-size:13px; font-weight:450; border:0; border-radius:5px; color:#414955; background:transparent; }
+.app-sidebar-history .session-new-btn:hover { background:#f4f5f7; }
+.app-sidebar-history .session-search { display:block; margin:0 0 14px; }
+.app-sidebar-history .session-search input { width:100%; min-width:0; border:1px solid #eceef1; border-radius:5px; padding:8px 10px; background:#fff; font-size:12px; }
+.app-sidebar-history .session-list { display:flex; flex:1; flex-direction:column; gap:2px; overflow:auto; min-height:0; padding:0; scrollbar-width:thin; }
+.app-sidebar-history .session-item { position:relative; display:flex; flex:none; width:100%; padding:0; border:0; border-radius:5px; background:transparent; box-shadow:none; }
+.app-sidebar-history .session-item:hover { background:#f6f7f8; }
+.app-sidebar-history .session-item.active { background:#f0f1f3; }
+.app-sidebar-history .session-select-btn { display:flex; flex-direction:column; gap:5px; padding:10px 54px 10px 10px; width:100%; min-width:0; color:#515a66; background:transparent; border:0; text-align:left; }
+.app-sidebar-history .session-title-label { display:block; width:100%; font-size:12px; font-weight:450; line-height:1.5; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; }
+.app-sidebar-history .session-time-label { color:#a1a7af; font-size:10px; }
+.app-sidebar-history .session-meta-label { display:none; }
+.app-sidebar-history .session-delete-btn { position:absolute; right:3px; top:8px; width:24px; height:24px; padding:3px; border:0; border-radius:4px; font-size:12px; color:#9299a3; background:transparent; opacity:0; cursor:pointer; }
+.app-sidebar-history .session-item:hover .session-delete-btn,.app-sidebar-history .session-item:focus-within .session-delete-btn { opacity:1; }
+.app-sidebar-history .session-delete-btn:hover { color:#a44646; background:#fff; }
+.app-sidebar-history .session-empty { padding:15px 10px; color:#9299a3; font-size:12px; }
+.app-sidebar-footer { flex:none; margin-top:14px; padding-top:10px; border-top:1px solid #eff0f2; }
+.app-sidebar-preferences { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:9px 10px 0; }
+.app-sidebar-preferences .vf2-lang { background:#fff; border:1px solid #e7e9ec; border-radius:5px; padding:2px; }
+.app-sidebar-preferences .vf2-lang-btn { min-width:27px; padding:4px 6px; border-radius:3px; font-size:11px; color:#9299a3; background:transparent; }
+.app-sidebar-preferences .vf2-lang-btn.active { color:#353d47; background:#eff1f3; box-shadow:none; }
+.app-sidebar-mode { font-size:10px; color:#a1a7af; }
+.app-sidebar.collapsed .app-sidebar-top { flex-direction:column; height:72px; gap:12px; margin-bottom:10px; }
+.app-sidebar.collapsed .app-sidebar-brand { flex:none; justify-content:center; }
+.app-sidebar.collapsed :is(.app-sidebar-brand span,.app-sidebar-link span,.app-sidebar-link small,.app-sidebar-mode,.app-sidebar-history) { display:none; }
+.app-sidebar.collapsed .app-sidebar-primary { flex:1; align-content:start; }
+.app-sidebar.collapsed .app-sidebar-link { justify-content:center; padding:10px; }
+.app-sidebar.collapsed .app-sidebar-preferences { padding:7px 0 0; justify-content:center; }
+.app-sidebar.collapsed .vf2-lang { display:flex; flex-direction:column; width:32px; }
+.app-sidebar.collapsed .app-sidebar-footer { margin-top:auto; }
+.app-sidebar :is(button,a,input):focus-visible { outline:2px solid #b5c5d8; outline-offset:2px; }
+.app-sidebar-backdrop { display:none; }
+.chat-first-layout > .vf2-main { min-width:0; min-height:0; height:100dvh; background:#fff; }
+.chat-first-layout:has(.chat-page) > .vf2-main { padding:0!important; overflow:hidden; }
+.chat-first-layout .chat-page { height:100%; min-height:0; padding:0; }
+.chat-first-layout .chat-page .chat-grid { display:flex!important; flex-direction:row!important; flex:1; min-height:0; height:100%; gap:0; margin:0; padding:0; position:relative; }
+.chat-first-layout .chat-panel.center { flex:1; width:0; min-width:0; border:0; border-radius:0; margin:0; padding:0; }
+.chat-first-layout .workspace-library { max-width:1200px; margin:0 auto; }
+.library-unavailable { height:70vh; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; color:#9198a3; }
+.library-unavailable h1 { margin:0; color:#303741; font-size:23px; font-weight:550; }
+.library-unavailable p { margin:0; font-size:13px; }
+.library-unavailable a { color:#596c86; font-size:13px; text-decoration:none; margin-top:8px; }
+@media(max-width:900px) {
+  .vf2-layout.chat-first-layout,.vf2-layout.chat-first-layout.sidebar-collapsed { grid-template-columns:64px minmax(0,1fr); }
+  .chat-first-layout > .app-sidebar:not(.collapsed) { position:fixed; z-index:100; inset:0 auto 0 0; width:248px; }
+  .chat-first-layout .app-sidebar-backdrop { display:block; position:fixed; z-index:99; inset:0; border:0; background:#20263128; }
+  .chat-first-layout > .vf2-main { grid-column:2; }
+}
+@media(prefers-reduced-motion:reduce) { .vf2-layout.chat-first-layout { transition:none; } }
+
+@container (max-width:420px) {
+  .chat-first-layout .composer-row { grid-template-columns:minmax(0,1fr); }
+  .chat-first-layout .composer-controls .research-workspace-header { grid-column:1; grid-row:1; }
+  .chat-first-layout .composer-controls .workspace-mode-switch { width:100%; }
+  .chat-first-layout .composer-controls .workspace-mode-switch button { flex:1; }
+  .chat-first-layout .research-execution-controls { grid-column:1; grid-row:2; }
+  .chat-first-layout .composer-row > .composer-actions { grid-column:1; grid-row:3; justify-self:end; }
+  .chat-first-layout .research-execution-controls .scientist-execution-controls > label,
+  .chat-first-layout .research-execution-controls .composer-select-shell { flex:1 1 0; min-width:0; max-width:none; }
+  .chat-first-layout .scientist-execution-controls::after { display:none; }
+  .chat-first-layout .composer-guidance .scientist-composer-footer > span { display:none; }
+}
+
+/* Adjacent panels share a boundary, without an outer card or gutter. */
+.chat-first-layout .agent-shell-page { padding:0; margin:0; border:0; }
+.chat-first-layout .app-sidebar-history { margin:0; padding:0; }
+.chat-first-layout .session-files-sidebar { border-radius:0; }
+
+/* Preferences open in place so the current conversation remains visible. */
+.app-sidebar-footer { position:relative; }
+.sidebar-settings-menu { position:absolute; z-index:120; left:0; bottom:calc(100% + 6px); width:268px; max-width:calc(100vw - 28px); padding:7px; border:1px solid #e4e6e9; border-radius:8px; background:#fff; color:#424a55; box-shadow:0 8px 30px #17202c14,0 2px 6px #17202c08; }
+.sidebar-settings-language { display:flex; align-items:center; gap:10px; padding:10px 9px; font-size:12px; }
+.app-sidebar .sidebar-settings-menu .vf2-lang { display:flex; flex-direction:row; width:auto; margin-left:auto; padding:2px; background:#f3f4f6; border:0; border-radius:5px; }
+.app-sidebar .sidebar-settings-menu .vf2-lang-btn { min-width:29px; padding:5px 7px; font-size:11px; border-radius:3px; border:0; color:#818995; background:transparent; box-shadow:none; }
+.app-sidebar .sidebar-settings-menu .vf2-lang-btn.active { background:#fff; color:#303844; box-shadow:0 1px 3px #17202c0c; }
+.sidebar-settings-divider { height:1px; background:#eff0f2; margin:4px 3px; }
+.app-sidebar .sidebar-settings-item { display:flex; align-items:center; gap:10px; width:100%; min-height:39px; padding:10px 9px; color:#424a55; background:transparent; border:0; border-radius:5px; text-decoration:none; font-family:inherit; font-size:12px; text-align:left; cursor:pointer; }
+.app-sidebar .sidebar-settings-item:hover { background:#f3f4f6; }
+.app-sidebar .sidebar-settings-item:disabled { color:#a1a7b0; background:transparent; cursor:not-allowed; }
+.sidebar-settings-item small { margin-left:auto; font-size:10px; color:#a1a7b0; }
+.app-sidebar.collapsed .sidebar-settings-menu { left:0; }
+.sidebar-settings-menu .app-sidebar-icon { width:16px; height:16px; color:#8a929d; }

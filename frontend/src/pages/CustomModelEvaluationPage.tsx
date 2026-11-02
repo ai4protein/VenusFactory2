@@ -1,3 +1,5 @@
+import { ModelLabDataSource, ModelLabFileInput } from "../components/ModelLabSetup";
+import { JobHistory } from '../components/JobHistory';
 import { useEffect, useMemo, useState } from "react";
 import {
   abortEvaluation,
@@ -16,7 +18,6 @@ import {
   type ModelOption
 } from "../lib/customModelApi";
 import { SegmentedSwitch } from "../components/SegmentedSwitch";
-import { PageFooter } from "../components/PageFooter";
 import { WorkspaceFilePicker } from "../components/WorkspaceFilePicker";
 import { useLang } from "../lib/i18n";
 import { useDocumentMeta } from "../lib/useDocumentMeta";
@@ -29,19 +30,19 @@ const STRINGS = {
   en: {
     docTitle: "Evaluate — VenusFactory2",
     docDescription: "Evaluate trained checkpoints on protein datasets.",
-    headerTitle: "Custom Model Evaluation",
-    headerSubtitle: "Evaluate trained models with configurable metrics and transparent commands.",
-    readonlyBanner: "Online mode: custom model controls are view-only in this deployment.",
+    headerTitle: "Evaluate a model",
+    headerSubtitle: "Measure model performance on a held-out dataset.",
+    readonlyBanner: "Checkpoint evaluation and prediction are available in local mode.",
     onlineUnavailable: "Online mode: unavailable",
     noOptions: "No options available",
     failedLoadMeta: "Failed to load metadata.",
-    modelFolder: "Model Folder",
-    modelPath: "Model Path",
+    modelFolder: "Model collection",
+    modelPath: "Saved model",
     selectModel: "Select model",
     dataset: "Dataset",
     datasetMode: "Dataset mode switch",
     custom: "Custom",
-    defaultDataset: "default",
+    defaultDataset: "Presets",
     datasetPath: "Dataset Path",
     source: "Source",
     sourceMode: "Custom dataset source mode",
@@ -51,7 +52,7 @@ const STRINGS = {
     hfPlaceholder: "hf dataset id or local dataset path",
     testLabel: "Test",
     chooseFile: "Choose File",
-    fromWorkspace: "From Workspace",
+    fromWorkspace: "From Library",
     useExample: "Use Example",
     previewDatasetBtn: "Preview Dataset",
     loading: "Loading...",
@@ -59,8 +60,8 @@ const STRINGS = {
     sampleRows: "Sample Rows",
     noSampleRows: "No sample rows available.",
     noPreviewYet: "No preview yet.",
-    evaluationParams: "Evaluation Params",
-    datasetPresetsLocked: "Default dataset presets are loaded from dataset JSON and locked.",
+    evaluationParams: "Evaluation settings",
+    datasetPresetsLocked: "Task settings follow the selected dataset.",
     taskSettings: "Task Settings",
     plm: "PLM",
     evalMethod: "Eval Method",
@@ -82,7 +83,7 @@ const STRINGS = {
     previewCommand: "Preview Command",
     startEvaluation: "Start Evaluation",
     abort: "Abort",
-    outputPanel: "Output Panel",
+    outputPanel: "Run monitor",
     commandPreview: "Command Preview",
     clickPreview: "Click Preview Command to generate CLI command.",
     progress: "Progress",
@@ -114,14 +115,14 @@ const STRINGS = {
   zh: {
     docTitle: "评估 — VenusFactory2",
     docDescription: "在蛋白质数据集上评估已训练的检查点。",
-    headerTitle: "自定义模型评估",
-    headerSubtitle: "使用可配置的评估指标和透明的命令评估已训练的模型。",
-    readonlyBanner: "在线模式：当前部署下自定义模型控件仅供查看。",
+    headerTitle: "评估模型",
+    headerSubtitle: "使用独立测试数据，查看模型的预测表现。",
+    readonlyBanner: "自定义检查点评估与预测可在本地运行。",
     onlineUnavailable: "在线模式：不可用",
     noOptions: "暂无可选项",
     failedLoadMeta: "加载元数据失败。",
-    modelFolder: "模型文件夹",
-    modelPath: "模型路径",
+    modelFolder: "模型集合",
+    modelPath: "已保存的模型",
     selectModel: "请选择模型",
     dataset: "数据集",
     datasetMode: "数据集模式切换",
@@ -136,7 +137,7 @@ const STRINGS = {
     hfPlaceholder: "HF 数据集 id 或本地数据集路径",
     testLabel: "测试",
     chooseFile: "选择文件",
-    fromWorkspace: "从工作区",
+    fromWorkspace: "从文件库",
     useExample: "使用示例",
     previewDatasetBtn: "预览数据集",
     loading: "加载中…",
@@ -167,7 +168,7 @@ const STRINGS = {
     previewCommand: "预览命令",
     startEvaluation: "开始评估",
     abort: "中止",
-    outputPanel: "输出面板",
+    outputPanel: "运行监控",
     commandPreview: "命令预览",
     clickPreview: "点击「预览命令」生成 CLI 命令。",
     progress: "进度",
@@ -209,11 +210,12 @@ type CustomModelEvaluationPageProps = {
 };
 
 export function CustomModelEvaluationPage({ readonly = false, workspaceEnabled = false }: CustomModelEvaluationPageProps) {
+  const { lang } = useLang();
   const t = useLang().t(STRINGS);
   useDocumentMeta({ title: t.docTitle, description: t.docDescription });
   const [meta, setMeta] = useState<CustomModelMeta | null>(null);
-  const [datasetSelection, setDatasetSelection] = useState<"Custom" | "Pre-defined">("Pre-defined");
-  const [customDataSourceMode, setCustomDataSourceMode] = useState<"hf_local" | "upload">("hf_local");
+  const [datasetSelection, setDatasetSelection] = useState<"Custom" | "Pre-defined">("Custom");
+  const [customDataSourceMode, setCustomDataSourceMode] = useState<"hf_local" | "upload">("upload");
   const [datasetConfig, setDatasetConfig] = useState("");
   const [datasetCustom, setDatasetCustom] = useState("");
   const [testFile, setTestFile] = useState("");
@@ -532,11 +534,6 @@ export function CustomModelEvaluationPage({ readonly = false, workspaceEnabled =
     await onUploadTestFile(file);
   }
 
-  function displayUploadedName(pathValue: string) {
-    const normalized = String(pathValue || "").trim();
-    if (!normalized) return t.noFileSelected;
-    return normalized.split("/").pop() || normalized;
-  }
 
   async function onPreviewDataset() {
     setError("");
@@ -588,6 +585,10 @@ export function CustomModelEvaluationPage({ readonly = false, workspaceEnabled =
           setStatusText(t.statusRunning);
           return;
         }
+        if (evt.type === "queue") {
+          setStatusText(evt.data.cancel_requested ? (lang === 'zh' ? '正在停止…' : 'Stopping…') : evt.data.status === 'queued' ? (lang === 'zh' ? '等待计算资源 · 队列位置 ' : 'Waiting for resources · Queue position ') + evt.data.position : t.statusRunning);
+          return;
+        }
         if (evt.type === "progress") {
           const nextProgress = Number.isFinite(evt.data.progress) ? evt.data.progress : 0;
           const nextMessage = evt.data.message || t.statusRunning;
@@ -602,7 +603,8 @@ export function CustomModelEvaluationPage({ readonly = false, workspaceEnabled =
         if (evt.type === "error") setError(evt.data.message || t.errEvaluationFailed);
         if (evt.type === "done") {
           if (typeof evt.data.final_progress === "number") {
-            setProgress((prev) => Math.max(prev, evt.data.final_progress));
+            const finalProgress = evt.data.final_progress;
+            setProgress((prev) => Math.max(prev, finalProgress));
           }
           setStatusText(evt.data.message || (evt.data.success ? t.statusCompleted : t.statusFailed));
           setProgress((prev) => (evt.data.success ? 1 : prev));
@@ -631,7 +633,7 @@ export function CustomModelEvaluationPage({ readonly = false, workspaceEnabled =
   }
 
   return (
-    <div className={`custom-model-page ${readonly ? "readonly-mode" : ""}`}>
+    <div className={`custom-model-page model-lab-page ${readonly ? "readonly-mode" : ""}`}>
       <header className="chat-header">
         <div>
           <h2>{t.headerTitle}</h2>
@@ -641,7 +643,7 @@ export function CustomModelEvaluationPage({ readonly = false, workspaceEnabled =
           <span className="run-status-dot" />
           <span className="run-status-text">{statusText || t.statusIdle}</span>
         </div>
-      </header>
+      </header><JobHistory customTask="evaluation"/>
       {readonly && (
         <div className="readonly-banner" role="status" aria-live="polite">
           {t.readonlyBanner}
@@ -650,123 +652,62 @@ export function CustomModelEvaluationPage({ readonly = false, workspaceEnabled =
 
       <section className="custom-model-grid">
         <aside className="chat-panel left custom-model-controls">
-          <fieldset className="readonly-fieldset" disabled={readonly}>
-          <div className="custom-top-line-grid">
-            <section className="custom-section-card custom-section-line custom-section-line-eval-model custom-section-line-top">
-              <label className="left-controls custom-line-field">{t.modelFolder}
+          <fieldset className="readonly-fieldset" disabled={readonly || running}>
+          <div className="lab-setup-stack">
+            <section className="custom-section-card lab-model-card">
+              <div className="lab-model-fields">
+              <label className="lab-field">{t.modelFolder}
                 <select value={selectedFolder} onChange={(e) => setSelectedFolder(e.target.value)}>
                   {folderOptions.map((f) => <option key={f} value={f}>{f}</option>)}
                 </select>
               </label>
-              <label className="left-controls custom-line-field">{t.modelPath}
+              <label className="lab-field">{t.modelPath}
                 <select value={modelPath} onChange={(e) => setModelPath(e.target.value)}>
                   <option value="">{t.selectModel}</option>
                   {modelOptions.map((m) => <option key={m.path} value={m.path}>{m.label}</option>)}
                 </select>
               </label>
+              </div>
             </section>
 
-            <section className="custom-section-card custom-section-line custom-section-line-dataset custom-section-line-top">
-              <div className="custom-dataset-line-main">
-                <label className="left-controls custom-line-field custom-dataset-main-dataset">{t.dataset}
-                  <SegmentedSwitch
-                    value={datasetSelection}
-                    onChange={setDatasetSelection}
-                    ariaLabel={t.datasetMode}
-                    className="custom-segment-switch-wide"
-                    options={[
-                      { value: "Custom", label: t.custom },
-                      { value: "Pre-defined", label: t.defaultDataset }
-                    ]}
-                  />
-                </label>
-                <div className="custom-dataset-line-inputs custom-dataset-main-inputs">
-                  {datasetSelection === "Pre-defined" ? (
-                    <label className="left-controls custom-line-field">{t.datasetPath}
+            <ModelLabDataSource
+              value={datasetSelection === "Pre-defined" ? "preset" : customDataSourceMode}
+              onChange={(value) => {
+                setDatasetSelection(value === "preset" ? "Pre-defined" : "Custom");
+                if (value !== "preset") setCustomDataSourceMode(value);
+              }}
+              action={<button type="button" className="custom-btn-secondary" onClick={() => void onPreviewDataset()} disabled={previewLoading}>
+                {previewLoading ? t.loading : t.previewDatasetBtn}
+              </button>}
+            >
+              {datasetSelection === "Pre-defined" ? (
+                <label className="lab-field">{lang === "zh" ? "内置数据集" : "Built-in dataset"}
                       <select value={datasetConfig} onChange={(e) => setDatasetConfig(e.target.value)}>
                         {datasetConfigKeys.length === 0 && <option value="">{emptySelectLabel}</option>}
                         {datasetConfigKeys.map((k) => <option key={k} value={k}>{k}</option>)}
                       </select>
                     </label>
-                  ) : (
-                    <>
-                      <label className="left-controls custom-line-field">
-                        {t.source}
-                        <SegmentedSwitch
-                          value={customDataSourceMode}
-                          onChange={(value) => setCustomDataSourceMode(value as "hf_local" | "upload")}
-                          ariaLabel={t.sourceMode}
-                          className="custom-segment-switch-wide"
-                          options={[
-                            { value: "hf_local", label: t.hfPath },
-                            { value: "upload", label: t.upload }
-                          ]}
-                        />
-                      </label>
-                      {customDataSourceMode === "hf_local" ? (
-                        <label className="left-controls custom-line-field">{t.testFileHfId}
+              ) : customDataSourceMode === "hf_local" ? (
+                <label className="lab-field">{t.testFileHfId}
                           <input
                             value={datasetCustom}
                             onChange={(e) => setDatasetCustom(e.target.value)}
                             placeholder={t.hfPlaceholder}
                           />
                         </label>
-                      ) : (
-                        <div className="custom-upload-dropzone-wrap">
-                          <div className="custom-upload-dropzone-grid custom-upload-dropzone-grid-single">
-                            <div className="custom-upload-item upload-source-stack">
-                              <span className="custom-upload-item-label">{t.testLabel}</span>
-                              <label className="custom-upload-trigger">
-                                <input
-                                  type="file"
-                                  accept=".csv,.tsv,.xlsx,.xls"
-                                  onChange={(e) => void onUploadTestFile(e.target.files?.[0] || null)}
-                                />
-                                {t.chooseFile}
-                              </label>
-                              <WorkspaceFilePicker
-                                workspaceEnabled={workspaceEnabled}
-                                disabled={readonly || running}
-                                acceptedCategories={["table_or_text"]}
-                                buttonLabel={t.fromWorkspace}
-                                onPick={(picked) => {
-                                  const selected = picked[0];
-                                  if (!selected) return;
-                                  setTestFile(selected.storage_path);
-                                }}
-                              />
-                              <button
-                                type="button"
-                                className="custom-btn-secondary"
-                                onClick={() => void onUseTestExample()}
-                                disabled={readonly || running}
-                              >
-                                {t.useExample}
-                              </button>
-                              <span className="custom-upload-file-chip custom-upload-file-name" title={displayUploadedName(testFile)}>
-                                {displayUploadedName(testFile)}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-                <div className="custom-dataset-preview-slot">
-                  <button type="button" className="custom-btn-secondary custom-line-action" onClick={() => void onPreviewDataset()} disabled={previewLoading}>
-                    {previewLoading ? t.loading : t.previewDatasetBtn}
-                  </button>
-                </div>
-              </div>
-            </section>
+              ) : (
+                <ModelLabFileInput label={t.testLabel} value={testFile} workspaceEnabled={workspaceEnabled}
+                disabled={readonly || running} onUpload={(file) => void onUploadTestFile(file)}
+                onPick={setTestFile} onExample={() => void onUseTestExample()} onClear={() => setTestFile("")} />
+              )}
+            </ModelLabDataSource>
           </div>
           </fieldset>
         </aside>
 
         <section className="custom-bottom-split">
           <aside className="chat-panel left custom-bottom-left custom-model-controls">
-            <fieldset className="readonly-fieldset" disabled={readonly}>
+            <fieldset className="readonly-fieldset" disabled={readonly || running}>
             <section className="custom-section-card custom-section-wide custom-dataset-preview-card">
               <div className="custom-dataset-preview-header">
                 <h3 className="custom-panel-title custom-dataset-preview-title">{t.datasetPreview}</h3>
@@ -946,8 +887,8 @@ export function CustomModelEvaluationPage({ readonly = false, workspaceEnabled =
 
               <div className="custom-actions-inline-status">
                 <div className="custom-row custom-actions">
-                  <button type="button" className="custom-btn-secondary" onClick={() => void onPreviewCommand()}>{t.previewCommand}</button>
-                  <button type="button" className="custom-btn-primary" disabled={running} onClick={() => void onStart()}>{t.startEvaluation}</button>
+                  <button type="button" className="custom-btn-secondary" disabled={running || !meta} onClick={() => void onPreviewCommand()}>{t.previewCommand}</button>
+                  <button type="button" className="custom-btn-primary" disabled={running || !meta || !modelPath} onClick={() => void onStart()}>{t.startEvaluation}</button>
                   <button type="button" className="custom-btn-danger" disabled={!running} onClick={() => void onAbort()}>{t.abort}</button>
                 </div>
               </div>
@@ -982,7 +923,7 @@ export function CustomModelEvaluationPage({ readonly = false, workspaceEnabled =
           </div>
         </section>
       </section>
-      <PageFooter />
+
     </div>
   );
 }

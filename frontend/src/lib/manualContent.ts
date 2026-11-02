@@ -1,128 +1,21 @@
 import DOMPurify from "dompurify";
 import { marked, type Tokens } from "marked";
-import type { Lang } from "./i18n";
+import { getManualSection, type ManualLanguage, type ManualSectionKey } from "./manualCatalog";
+export { getManualSection, MANUAL_SECTIONS, langToManual } from "./manualCatalog";
+export type { ManualLanguage, ManualSectionKey } from "./manualCatalog";
 
-export type ManualLanguage = "English" | "Chinese";
+export type TocItem = { id: string; title: string; level: 1 | 2 | 3 };
+marked.setOptions({gfm: true, breaks: true});
 
-export function langToManual(lang: Lang): ManualLanguage {
-  return lang === "zh" ? "Chinese" : "English";
-}
-
-export type ManualSectionKey =
-  | "report"
-  | "agent"
-  | "training"
-  | "prediction"
-  | "evaluation"
-  | "quick-tools"
-  | "advanced-tools"
-  | "download"
-  | "faq";
-
-export type TocItem = {
-  id: string;
-  title: string;
-  level: 1 | 2 | 3;
-};
-
-type ManualSectionDef = {
-  key: ManualSectionKey;
-  label: string;
-  files: Record<ManualLanguage, string>;
-};
-
-const ERROR_FALLBACK_TITLE: Record<ManualSectionKey, string> = {
-  report: "# Error loading Report manual",
-  agent: "# Error loading Agent manual",
-  training: "# Error loading manual",
-  prediction: "# Error loading manual",
-  evaluation: "# Error loading manual",
-  "quick-tools": "# Error loading Quick Tools manual",
-  "advanced-tools": "# Error loading Advanced Tools manual",
-  download: "# Error loading manual",
-  faq: "# FAQ"
-};
-
-export const MANUAL_SECTIONS: ManualSectionDef[] = [
-  {
-    key: "report",
-    label: "Report",
-    files: { English: "ReportManual_EN.md", Chinese: "ReportManual_CN.md" }
-  },
-  {
-    key: "agent",
-    label: "Agent",
-    files: { English: "AgentManual_EN.md", Chinese: "AgentManual_CN.md" }
-  },
-  {
-    key: "training",
-    label: "Training",
-    files: { English: "TrainingManual_EN.md", Chinese: "TrainingManual_ZH.md" }
-  },
-  {
-    key: "prediction",
-    label: "Prediction",
-    files: { English: "PredictionManual_EN.md", Chinese: "PredictionManual_ZH.md" }
-  },
-  {
-    key: "evaluation",
-    label: "Evaluation",
-    files: { English: "EvaluationManual_EN.md", Chinese: "EvaluationManual_ZH.md" }
-  },
-  {
-    key: "quick-tools",
-    label: "Quick Tools",
-    files: { English: "QuickTools_EN.md", Chinese: "QuickTools_CN.md" }
-  },
-  {
-    key: "advanced-tools",
-    label: "Advanced Tools",
-    files: { English: "AdvancedToolsManual_EN.md", Chinese: "AdvancedToolsManual_CN.md" }
-  },
-  {
-    key: "download",
-    label: "Download",
-    files: { English: "DownloadManual_EN.md", Chinese: "DownloadManual_ZH.md" }
-  },
-  {
-    key: "faq",
-    label: "FAQ",
-    files: { English: "QAManual_EN.md", Chinese: "QAManual_ZH.md" }
-  }
-];
-
-const MANUAL_SECTION_MAP = new Map(MANUAL_SECTIONS.map((item) => [item.key, item]));
-
-marked.setOptions({
-  gfm: true,
-  breaks: true
-});
-
-export function getManualSection(key: string | undefined): ManualSectionDef | null {
-  if (!key) return null;
-  return MANUAL_SECTION_MAP.get(key as ManualSectionKey) ?? null;
-}
-
-export async function loadManualMarkdown(
-  sectionKey: ManualSectionKey,
-  language: ManualLanguage
-): Promise<string> {
-  const section = MANUAL_SECTION_MAP.get(sectionKey);
-  if (!section) {
-    return "# Error loading manual\n\nUnknown manual section.";
-  }
-  const fileName = section.files[language];
+export async function loadManualMarkdown(sectionKey: ManualSectionKey, language: ManualLanguage): Promise<string> {
+  const section = getManualSection(sectionKey);
+  if (!section) return language === "Chinese" ? "# 未找到教程" : "# Guide not found";
   try {
-    const response = await fetch(`/manual-docs/${fileName}`, {
-      cache: "no-store"
-    });
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
+    const response = await fetch(`/manual-docs/${section.files[language]}`, {cache: "no-store"});
+    if (!response.ok || response.headers.get('content-type')?.includes('text/html')) throw new Error('unavailable');
     return await response.text();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    return `${ERROR_FALLBACK_TITLE[sectionKey]}\n\n${message}`;
+  } catch {
+    return language === "Chinese" ? "# 教程暂不可用\n\n请刷新页面重试。" : "# Guide temporarily unavailable\n\nRefresh the page to try again.";
   }
 }
 
@@ -138,7 +31,7 @@ function resolveImagePath(src: string): string {
   return `/manual-docs/${cleaned}`;
 }
 
-export function renderManualHtml(markdownText: string): { toc: TocItem[]; html: string } {
+export function renderManualHtml(markdownText: string, language: ManualLanguage = "English"): { toc: TocItem[]; html: string } {
   const tokens = marked.lexer(markdownText || "");
   const toc: TocItem[] = [];
   let headingIndex = 0;
@@ -166,6 +59,14 @@ export function renderManualHtml(markdownText: string): { toc: TocItem[]; html: 
       return `<h${depth}><span id="${id}"></span>${titleHtml}</h${depth}>`;
     }
     return `<h${depth}>${titleHtml}</h${depth}>`;
+  };
+
+  renderer.link = (link: Tokens.Link) => {
+    const lang = language === "Chinese" ? "zh" : "en";
+    const section = link.href?.startsWith("manual:") ? getManualSection(link.href.slice(7)) : null;
+    const href = section ? `/${lang}/manual/${section.key}` : (link.href || "");
+    const escaped = href.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+    return `<a href="${escaped}">${marked.Parser.parseInline(link.tokens)}</a>`;
   };
 
   renderer.image = (image: Tokens.Image) => {

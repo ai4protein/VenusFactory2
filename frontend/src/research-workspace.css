@@ -1,0 +1,243 @@
+/* Research workspace: keep navigation secondary and work in the viewport. */
+.research-workspace-header { display:flex; align-items:center; gap:20px; padding:4px 2px 18px; flex:none; }
+.research-workspace-heading { flex:1; min-width:0; }
+.research-workspace-heading h1 { margin:0; font-size:21px; font-weight:650; letter-spacing:-.025em; }
+.research-workspace-heading p { margin:6px 0 0; color:var(--muted); font-size:12px; line-height:1.5; }
+.workspace-mode-switch { display:flex; gap:4px; padding:4px; border:1px solid var(--line); border-radius:14px; background:#eeeae3; flex:none; }
+.workspace-mode-switch button { display:flex; gap:9px; align-items:center; border:1px solid transparent; border-radius:10px; padding:9px 15px; background:transparent; color:var(--muted); cursor:pointer; text-align:left; }
+.workspace-mode-switch button[aria-pressed="true"] { background:#fffefa; border-color:#d7d3c7; color:#334f40; box-shadow:0 1px 3px #293d3510; }
+.workspace-mode-switch button:disabled { opacity:.55; cursor:wait; }
+.workspace-mode-switch svg { width:19px; height:19px; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+.workspace-mode-switch span { font-size:13px; font-weight:650; }
+.workspace-mode-switch small { display:block; font-size:10px; font-weight:400; margin-top:2px; }
+.workspace-state { display:flex; align-items:center; gap:7px; font-size:11px; color:var(--muted); white-space:nowrap; }
+.workspace-state i,.connection-dot { display:inline-block; width:6px; height:6px; border-radius:50%; background:#aaa496; }
+.workspace-state.is-running i,.connection-dot.ready { background:#648570; }
+.session-search { margin:8px 10px; display:grid; gap:7px; }
+.session-search input { width:100%; min-width:0; padding:9px 10px; border:1px solid var(--line); background:var(--surface-strong); border-radius:8px; font:inherit; font-size:12px; }
+.session-search small { color:var(--muted); font-size:10px; }
+.chat-page .session-delete-btn { opacity:0; }
+.chat-page .session-item:hover .session-delete-btn,.chat-page .session-item:focus-within .session-delete-btn { opacity:1; }
+.chat-page .chat-grid { min-width:0; height:auto; }
+.chat-page .chat-panel.center { min-width:0; }
+.chat-page .composer { position:relative; }
+.chat-page .composer-controls { gap:12px; }
+.chat-page .composer-controls .composer-select-meta { display:flex; }
+.chat-page .composer-controls .composer-select-shell { flex:1 1 170px; max-width:300px; }
+.chat-page .composer-model-select { width:100%; }
+.composer-guidance { display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; padding:7px 2px 0; color:var(--muted); font-size:10px; }
+.composer-blocker { padding:9px 11px; margin-top:8px; border:1px solid #e6d9bb; background:#fbf5e9; border-radius:8px; font-size:12px; color:#786143; }
+.execution-availability { align-self:flex-end; flex:0 0 auto; position:static; font-size:11px; color:var(--muted); }
+.execution-availability summary { display:flex; align-items:center; justify-content:center; gap:7px; min-height:34px; box-sizing:border-box; white-space:nowrap; cursor:pointer; padding:0 10px; border:1px solid var(--line); border-radius:8px; }
+.execution-availability-panel { position:absolute; bottom:calc(100% - 5px); left:12px; right:12px; margin:0 auto; max-width:440px; max-height:48dvh; overflow:auto; border:1px solid var(--line-strong); border-radius:13px; padding:16px; box-shadow:0 12px 36px #18291d26; background:#fffefa; z-index:60; color:var(--text); }
+.execution-availability-header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:-4px -4px 8px 0; }
+.execution-availability-header strong { font-size:13px; font-weight:600; }
+.execution-availability-close { display:grid; place-items:center; width:32px; min-width:32px; height:32px; padding:0; border:0; border-radius:7px; background:transparent; color:var(--muted); font-size:24px; line-height:1; cursor:pointer; box-shadow:none; }
+.execution-availability-close:hover { background:#edf1e9; color:var(--text); }
+.execution-availability-panel p { font-size:11px; line-height:1.6; color:var(--muted); margin:7px 0; }
+.execution-availability-item { padding:11px 0; border-top:1px solid var(--line); }
+.execution-availability-item > div { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.execution-availability-item b { font-weight:550; }
+.execution-availability-item span { font-size:10px; color:#8b7250; }
+.execution-availability-item span.is-ready { color:#486f54; }
+.chat-page .science-goal-panel { margin:0; border:0; border-radius:0; background:transparent; padding:clamp(16px,2.3vw,28px); }
+.goal-step-caption { display:flex; align-items:center; gap:8px; color:#536650; font-size:11px; font-weight:600; margin:18px 0 10px; }
+.goal-step-caption span { display:grid; place-items:center; width:21px; height:21px; background:#e6ede2; border-radius:50%; font-size:10px; }
+.goal-requirements { border:1px solid var(--line); background:#f6f7f0; border-radius:10px; margin:14px 0; padding:11px 14px; }
+.goal-requirements > summary { cursor:pointer; font-size:12px; font-weight:550; color:#4d634e; }
+.goal-requirements .goal-acceptance { background:transparent; padding:5px 0; border:0; margin:10px 0; }
+.goal-start-hint { color:var(--muted); font-size:11px; margin:0 0 8px; }
+.goal-action-needed { padding:10px 12px; border:1px solid #dfd1ad; background:#fcf7eb; border-radius:8px; color:#77603b; font-size:12px; line-height:1.6; }
+.goal-budget-overview { font-size:11px; color:var(--muted); font-weight:400; }
+.chat-page .chat-empty-state { padding:clamp(24px,5vh,64px) 16px 20px; }
+.chat-page :is(button,input,textarea,select,summary,[role="button"]):focus-visible { outline:2px solid #587764; outline-offset:3px; }
+@media (max-width:1450px) { .workspace-state { display:none; } .research-workspace-header { gap:12px; } }
+@media (max-width:1200px) {
+  .vf2-layout:has(.chat-page) { display:flex; flex-direction:column; height:100dvh; min-height:0; overflow:hidden; }
+  .vf2-layout:has(.chat-page) > .vf2-sidebar { flex:none; height:auto; max-height:48dvh; overflow-y:auto; border-bottom:1px solid var(--line); padding:8px 12px; }
+  .vf2-layout:has(.chat-page) > .vf2-sidebar.collapsed .vf2-sidebar-top { flex-direction:row; align-items:center; margin:0; }
+  .vf2-layout:has(.chat-page) > .vf2-sidebar.collapsed .vf2-brand { padding:4px 8px; }
+  .vf2-layout:has(.chat-page) > .vf2-sidebar.collapsed .vf2-brand-link { justify-content:flex-start; }
+  .vf2-layout:has(.chat-page) > .vf2-sidebar.collapsed .vf2-brand h1 { display:block; font-size:1rem; }
+  .vf2-layout:has(.chat-page) > .vf2-sidebar.collapsed .vf2-brand-mark { width:28px; height:28px; }
+  .vf2-layout:has(.chat-page) > .vf2-sidebar.collapsed :is(nav,.runtime-mode-badge-wrap--sidebar) { display:none; }
+  .vf2-layout:has(.chat-page) > .vf2-sidebar.collapsed .vf2-sidebar-toggle { width:36px; min-width:36px; height:36px; }
+  .vf2-layout:has(.chat-page) > .vf2-main { flex:1; height:auto; min-height:0; overflow:hidden; padding:14px; }
+  .chat-page { min-height:0; }
+  .research-workspace-header { padding:0 0 12px; }
+  .chat-page .chat-grid { display:flex; flex-direction:column; min-height:0; overflow:hidden; gap:8px; }
+  .chat-page .chat-panel.left { flex:none; max-height:32dvh; min-height:0; overflow:hidden; }
+  .chat-page .chat-panel.left.collapsed { height:34px; min-height:34px; }
+  .chat-page .chat-panel.center { flex:1 1 0; min-height:0; max-height:none; }
+  .chat-page .chat-panel.right { flex:none; min-height:0; max-height:25dvh; }
+  .chat-page .chat-panel.right.collapsed { height:30px; min-height:30px; }
+  .chat-page .session-list { min-height:0; overflow:auto; }
+  .chat-page .session-sidebar-footer { display:none; }
+  .chat-page .session-search { display:flex; align-items:center; margin:4px 10px; gap:10px; }
+  .chat-page .session-search small { white-space:nowrap; }
+  .chat-page .timeline-wrap { padding:8px; }
+  .chat-page .composer { padding:12px; }
+  .chat-page .composer textarea { min-height:64px; max-height:22dvh; }
+}
+@media (max-width:620px) {
+  .vf2-layout:has(.chat-page) > .vf2-main { padding:10px; }
+  .research-workspace-header { flex-wrap:wrap; gap:10px; }
+  .research-workspace-heading { flex-basis:100%; }
+  .research-workspace-heading h1 { font-size:18px; }
+  .research-workspace-heading p { display:none; }
+  .workspace-mode-switch { width:100%; }
+  .workspace-mode-switch button { flex:1; justify-content:center; padding:7px 10px; }
+  .workspace-mode-switch small { display:none; }
+  .chat-page .composer-controls { flex-basis:100%; gap:8px; }
+  .chat-page .composer-controls .composer-select-shell { flex:1 1 130px; max-width:none; }
+  .chat-page .composer-select-hint { display:none; }
+  .chat-page .composer-row > .composer-actions { flex-basis:auto; margin-left:auto; }
+  .chat-page .composer-guidance span:first-child { display:none; }
+  .chat-page .chat-empty-title { font-size:21px; }
+  .chat-page .chat-empty-logo { width:46px; height:46px; }
+  .chat-page .chat-suggested-prompts { grid-template-columns:1fr; }
+  .chat-page .science-goal-panel { padding:10px 8px; }
+  .chat-page .goal-header h2 { font-size:20px; }
+  .chat-page .goal-workflow { margin:14px 0 18px; }
+  .chat-page .goal-header .goal-team-badge { display:none; }
+}
+
+.chat-page .composer textarea { font-family:inherit; font-size:14px; line-height:1.6; }
+@media (max-width:620px) {
+  .chat-page .chat-footer-note { padding-top:7px; margin-top:7px; font-size:9px; line-height:1.3; gap:3px; }
+  .chat-page .chat-footer-note > span:not(:first-child) { display:none; }
+}
+
+/* Keep task controls compact after removing explanatory copy. */
+.chat-page .goal-workflow { margin:0 0 24px; }
+.chat-page .science-goal-panel { max-width:1100px; margin:0 auto; }
+.chat-page .goal-submit { padding-top:20px; }
+.chat-page .goal-requirements p { margin:10px 0 2px; line-height:1.6; font-size:12px; color:var(--muted); }
+.chat-page .chat-empty-title { margin-bottom:26px; }
+.composer-select-hint:empty { display:none; }
+
+select option:disabled, select option.model-unavailable { color: #929aa7; background-color: #f4f5f7; }
+
+/* Keep mode, execution settings and actions beside the message input. */
+.vf2-main:has(.chat-page) { padding-top:0; }
+.chat-page .composer-row { align-items:center; flex-wrap:nowrap; gap:10px; }
+.chat-page .composer-row > .composer-controls { display:flex; align-items:center; flex:1 1 auto; flex-wrap:nowrap; gap:12px; overflow:visible; }
+.chat-page .composer-row > .composer-actions { display:flex; flex:0 0 auto; align-items:center; flex-wrap:nowrap; overflow:visible; padding:0; }
+.composer-controls .research-workspace-header { padding:0; gap:8px; flex-wrap:nowrap; }
+.composer-controls .workspace-mode-switch { width:auto; border-radius:4px; padding:2px; background:transparent; }
+.chat-page .composer-row .research-workspace-header .workspace-mode-switch button[aria-pressed] { height:30px; min-height:30px; min-width:0; padding:0 8px; gap:6px; border-radius:3px; box-shadow:none; white-space:nowrap; }
+.composer-controls .workspace-mode-switch svg { width:15px; height:15px; }
+.composer-controls .workspace-mode-switch span { font-size:12px; font-weight:550; }
+.composer-controls .workspace-state { display:none; }
+.research-execution-controls, .scientist-execution-controls { display:flex; align-items:center; flex-wrap:nowrap; gap:10px; min-width:0; flex:1 1 auto; }
+.research-execution-controls:empty { display:none; }
+.chat-page .research-execution-controls .composer-select-shell, .scientist-execution-controls > label { display:flex; align-items:center; gap:6px; min-width:0; flex:1 1 160px; max-width:280px; margin:0; font-size:11px; font-weight:400; color:var(--muted); }
+.chat-page .research-execution-controls .composer-select-shell:first-child, .scientist-execution-controls > label:first-child { flex:0 1 170px; max-width:170px; }
+.chat-page .research-execution-controls .composer-select-meta { display:none; }
+.research-execution-controls .composer-select-field { flex:1; min-width:0; }
+.research-execution-controls select { width:100%; height:34px; padding:5px 9px; border:1px solid var(--line); border-radius:4px; background:var(--surface-strong); color:var(--text); font-size:12px; min-width:0; max-width:none; text-overflow:ellipsis; }
+.research-execution-controls .execution-availability { position:static; align-self:center; }
+.research-execution-controls .execution-availability summary { border-radius:4px; }
+.chat-page .composer-row .research-execution-controls .execution-availability-panel button.execution-availability-close { width:32px; min-width:32px; height:32px; min-height:32px; padding:0; }
+.research-execution-controls .execution-availability-panel { top:auto; bottom:calc(100% - 4px); left:12px; right:auto; width:min(320px, calc(100% - 24px)); margin:0; border-radius:5px; box-shadow:0 6px 18px #18291d16; }
+.scientist-composer-actions { display:flex; align-items:center; }
+.scientist-composer-input:empty, .scientist-composer-actions:empty { display:none; }
+.scientist-goal-form { margin:0; }
+.scientist-goal-form .research-settings { padding:8px 0 0; margin:0; border:0; font-size:11px; }
+.scientist-goal-form .goal-options { margin:10px 0; }
+.scientist-goal-form .goal-options label { display:grid; gap:6px; color:var(--muted); font-size:12px; }
+.scientist-goal-form .goal-options input { width:100%; min-width:0; padding:8px 10px; border:1px solid var(--line); background:var(--surface-strong); color:var(--text); }
+.chat-page .composer { container-type:inline-size; }
+@container (max-width:800px) {
+  .chat-page .composer-row, .chat-page .composer-row > .composer-controls, .research-execution-controls, .scientist-execution-controls { gap:6px; }
+  .chat-page .composer-row .research-workspace-header .workspace-mode-switch button[aria-pressed] { padding:0 6px; }
+  .composer-controls .workspace-mode-switch svg { display:none; }
+  .research-execution-controls select { font-size:11px; padding-left:6px; }
+  .research-execution-controls .execution-availability summary { font-size:0; padding:0; width:28px; min-height:30px; }
+}
+@container (max-width:520px) {
+  .chat-page .composer-row .research-workspace-header .workspace-mode-switch button[aria-pressed] { padding:0 6px; }
+  .composer-controls .workspace-mode-switch svg { display:block; }
+  .composer-controls .workspace-mode-switch span { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+  .scientist-execution-controls > label { font-size:0; gap:0; }
+  .chat-page .composer-actions > .composer-icon-btn:not(.composer-send-btn):not(.composer-stop-btn) { display:none; }
+  .chat-page .composer-row .composer-icon-btn, .chat-page .composer-row .file-upload-icon-btn { width:30px; min-width:30px; height:30px; min-height:30px; padding:0; }
+}
+.chat-page :is(.chat-panel,.science-goal-card,.composer textarea,.chat-suggested-prompt,.research-live-panel) { border-radius:5px; box-shadow:none; }
+.chat-page :is(button,input,textarea,select) { border-radius:4px; }
+.chat-page .goal-workflow span { border-radius:4px; }
+.chat-page .goal-status { border-radius:4px; }
+.research-live-panel { border:1px solid var(--line); margin:14px 0; padding:12px; }
+.research-tool-state,.research-training-heading { display:flex; align-items:center; gap:9px; font-size:12px; margin-bottom:10px; }
+.research-tool-state > span:last-child,.research-training-heading > span { margin-left:auto; color:var(--muted); }
+.research-training-progress { display:flex; align-items:center; gap:12px; font-size:11px; margin:10px 0; }
+.research-training-progress progress { flex:1; width:100%; height:5px; accent-color:#587764; }
+.research-output { max-height:220px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; padding:12px; margin:10px 0; border:1px solid var(--line); background:var(--bg-soft); font:11px/1.6 ui-monospace,monospace; }
+.research-live-panel summary { cursor:pointer; font-size:12px; color:var(--muted); }
+.research-file-list { list-style:none; padding:0; font-size:12px; }
+.research-file-list li { display:flex; gap:12px; padding:6px 0; border-bottom:1px solid var(--line); }
+.research-file-list small { margin-left:auto; color:var(--muted); white-space:nowrap; }
+
+/* Both modes share the same workspace geometry and composer slots. */
+.chat-page [hidden] { display:none !important; }
+.chat-page .chat-grid { transition:none; }
+.chat-page .chat-panel.center { grid-template-rows:minmax(0,1fr) auto; }
+.chat-page .timeline-wrap { scrollbar-gutter:stable; overscroll-behavior:contain; }
+.chat-page .composer textarea { display:block; height:108px; min-height:64px; max-height:22dvh; resize:none; overflow-y:auto; box-sizing:border-box; }
+.chat-page .composer-guidance { height:23px; min-height:23px; padding:6px 0 0; flex-wrap:nowrap; align-items:center; }
+.scientist-composer-footer { display:flex; align-items:center; justify-content:space-between; gap:12px; flex:1; min-width:0; }
+.scientist-composer-footer:empty { display:none; }
+.agent-execution-controls { display:flex; align-items:center; flex:1; min-width:0; gap:10px; }
+.scientist-execution-controls { gap:10px; }
+.scientist-execution-controls::after { content:""; width:28px; flex:0 0 28px; }
+.scientist-select-label { display:none; }
+.chat-page .composer-row > .composer-actions { width:114px; min-height:36px; flex:0 0 114px; gap:6px; }
+.scientist-composer-actions { width:100%; justify-content:space-between; gap:6px; }
+.chat-page .composer-row .research-attach-button { width:34px; min-width:34px; height:34px; padding:0; justify-content:center; }
+.research-execution-controls select { appearance:auto; box-shadow:none; }
+.chat-page .research-execution-controls :is(.composer-select-shell,.scientist-execution-controls > label) { max-width:none; flex:1 1 0; }
+.chat-page .research-execution-controls :is(.composer-select-shell:first-child,.scientist-execution-controls > label:first-child) { flex:0 1 150px; max-width:150px; }
+.research-execution-controls .execution-availability summary { width:28px; min-height:34px; padding:0; font-size:0; }
+.scientist-composer-footer .research-settings { border:0; padding:0; margin:0; font-size:10px; }
+.research-settings-popover { position:absolute; bottom:calc(100% + 8px); left:12px; width:min(340px,calc(100% - 24px)); max-height:55dvh; overflow:auto; padding:14px; background:#fff; border:1px solid var(--line); border-radius:6px; box-shadow:0 8px 28px #20302918; z-index:60; font-size:12px; }
+.research-settings-heading { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.research-settings-heading strong { font-size:12px; font-weight:600; }
+.research-settings-heading button { border:0; background:none; width:26px; height:26px; font-size:20px; color:var(--muted); cursor:pointer; }
+.research-settings-popover .goal-options { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:12px 0 0; }
+.research-settings-popover label { display:grid; gap:8px; min-width:0; color:var(--muted); font-size:11px; }
+.research-settings-popover .goal-options label:first-child { grid-column:auto; }
+.research-settings-popover input { width:100%; min-width:0; height:34px; padding:6px 9px; border:1px solid var(--line); background:#fff; color:var(--text); font:inherit; box-sizing:border-box; }
+.chat-page .file-source-menu { left:auto; right:0; min-width:min(240px,calc(100vw - 48px)); max-width:calc(100vw - 48px); background:#fff; border-radius:6px; box-shadow:0 6px 24px #20302918; }
+.chat-page .file-preview { max-height:82px; overflow:auto; }
+.chat-page .file-preview > span { display:inline-flex; align-items:center; gap:6px; max-width:100%; }
+.chat-page .file-preview > span > span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.chat-page .file-preview button { border:0; padding:0 3px; background:none; color:var(--muted); cursor:pointer; font-size:15px; }
+.chat-page .chat-panel.right > .term-head { width:100%; border:0; border-bottom:1px solid var(--line); background:#fff; color:var(--muted); font:inherit; border-radius:0; }
+.chat-page .chat-panel.right.collapsed::after { display:none; }
+.chat-page .chat-panel.right.collapsed > .term-head { display:flex; flex:1; justify-content:center; border:0; padding:8px; writing-mode:vertical-rl; font-size:11px; }
+.chat-page .chat-panel.right.collapsed :is(.term-head-dots,.panel-toggle-icon) { display:none; }
+@container (max-width:800px) { .agent-execution-controls,.scientist-execution-controls { gap:6px; } }
+@container (max-width:600px) {
+  .chat-page .composer-row { display:grid; grid-template-columns:minmax(0,1fr) 114px; gap:8px; }
+  .chat-page .composer-row > .composer-controls { display:contents; }
+  .composer-controls .research-workspace-header { grid-row:1; grid-column:1; }
+  .chat-page .composer-row > .composer-actions { grid-row:1; grid-column:2; justify-self:end; }
+  .research-execution-controls { grid-row:2; grid-column:1 / -1; width:100%; }
+  .composer-controls .workspace-mode-switch span { position:static; width:auto; height:auto; overflow:visible; clip-path:none; }
+  .composer-controls .workspace-mode-switch svg { display:none; }
+  .chat-page .composer-row .research-workspace-header .workspace-mode-switch button[aria-pressed] { padding:0 9px; }
+  .chat-page .composer-actions > .composer-icon-btn:not(.composer-send-btn):not(.composer-stop-btn) { display:flex; }
+  .chat-page .composer-row :is(.composer-icon-btn,.file-upload-icon-btn) { width:34px; min-width:34px; height:34px; min-height:34px; }
+  .chat-page .composer-guidance span:first-child { display:inline; }
+  .research-execution-controls .execution-availability-panel { bottom:calc(100% + 8px); }
+}
+@media(max-width:1200px) { .chat-page .chat-panel.right.collapsed > .term-head { writing-mode:horizontal-tb; padding:5px 10px; } }
+@media(max-width:620px) { .chat-page .composer textarea { height:88px; } .scientist-composer-footer > span { font-size:9px; } }
+
+@media(max-width:1200px) { .chat-page .session-files-toggle { top:0; } }
+
+.chat-page .composer-guidance .composer-help { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.chat-page .composer-guidance .agent-controls { flex:0 0 auto; margin:0 0 0 auto; padding:0; }
+.chat-page .composer-guidance .agent-context-pill { font-size:9px; padding:0; border:0; }
+.chat-page .research-execution-controls > .composer-select-shell .composer-select-meta { display:none; }
+@container (max-width:600px) { .chat-page .composer-guidance .agent-controls { display:none; } }

@@ -1,7 +1,36 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { mergeHistoryActivity, submissionHistoryRow, type HistoryActivity } from "../lib/optimisticHistory";
+import { NewChatStart } from "../components/NewChatStart";
+import { ChatModeIcon } from "../components/ChatModeIcon";
+import { UnifiedChatHistory } from "../components/UnifiedChatHistory";
+import { claimNewChatDraft, newChatLocation, CHAT_MODE_LABELS, historyRowKey, type ChatHistoryRow, type ResearchHistoryRow } from "../lib/unifiedChatHistory";
+import { InteractionCard } from "../components/InteractionCard";
+import type { UserResponse } from "../lib/interactions";
+import { manualQuestion } from "../lib/manualCatalog";
+import { moveResearchDraft } from "../lib/researchContinuity";
+import { chatHistoryWithPending, hasAcceptedTurn, type PendingChatTurn } from "../lib/pendingChatTurn";
+import { useFileTransfer } from "../lib/useFileTransfer";
+import { mergeFiles } from "../lib/fileTransfer";
+import { validateUploads } from "../lib/uploadLimits";
+import { QuotaNotice } from "../components/QuotaNotice";
+import { openQuota, QUOTA_CHANGED, quotaRetryLabel, isDailyQuotaMessage } from "../lib/onlineQuota";
+import { SidebarContent, useSidebar } from "../components/AppSidebar";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { chatSessionLocation, chatRouteKey } from "../lib/chatSessionRoute";
+import { ResearcherPanel, type ResearcherPanelHandle } from "../components/ResearcherPanel";
+import "../researcher.css";
+import "../chat-layout.css";
+import { ChatNotice, useDismissibleError } from "../components/ChatNotice";
+import { AgentExecutionPicker } from "../components/AgentExecutionPicker";
+import { ContextUsageRing } from "../components/ContextUsageRing";
+import { isRunActive } from "../lib/runProgress";
+import { RunSpinner } from "../components/RunSpinner";
+import { activeSessionStorageKey, sessionsForMode, sessionCandidates } from "../lib/chatSessions";
+import { isFreeResearchModel } from "../lib/researchUi";
+import { ScienceGoalPanel } from "../components/ScienceGoalPanel";
 import { ChatTimeline } from "../components/ChatTimeline";
+import { openStructure, isStructureFile } from "../lib/structurePreview";
 import { SessionFilesPanel } from "../components/SessionFilesPanel";
-import { PipelineProgress } from "../components/PipelineProgress";
 import { AskUserCard } from "../components/AskUserCard";
 import { ApprovalCard, type ApprovalDecision } from "../components/ApprovalCard";
 import { ClarificationForm } from "../components/ClarificationForm";
@@ -28,14 +57,14 @@ import {
   getSubReportDecideUrl,
   iterationDecide,
   listChatSessions,
+  type AgentExecutionSelection,
   type ChatQuota,
   type ChatSnapshot,
   type ClarificationAnswer,
   type PlanStep,
   uploadFiles
 } from "../lib/api";
-import { streamSSEFromPost } from "../lib/sse";
-import { PageFooter } from "../components/PageFooter";
+import { streamSSEFromPost, streamSSEFromGet } from "../lib/sse";
 import { WorkspaceFilePicker } from "../components/WorkspaceFilePicker";
 import { type WorkspaceFile } from "../lib/workspaceApi";
 import {
@@ -44,7 +73,6 @@ import {
   setActiveGateway,
   persistChatMode,
   pickExpertModelId,
-  chatModeFromSnapshot,
   isKimiEngineModel,
   isGraphEngineModel,
   SCIENCE_AGENT_MODEL_ID,
@@ -60,16 +88,16 @@ const STRINGS = {
     docTitle: "Self-Evolving Agents — Science Chat — VenusFactory2",
     docDescription: "Talk to self-evolving AI agents for protein discovery and directed evolution. Science Agent and Science Expert plan, run, critique and iterate.",
     // Error hints (friendlyErrorHint)
-    errHintQuota: "You've reached the daily usage limit for online mode. Try again tomorrow, or deploy locally for unlimited access.",
-    errHintTimeout: "The request took too long. This can happen with complex tasks or heavy server load. Please try again.",
-    errHintNetwork: "A network issue occurred. Please check your connection and try again.",
-    errHintAuth: "Authentication failed. Your session may have expired — try refreshing the page.",
-    errHintForbidden: "Access was denied. You may not have permission for this action.",
-    errHintRate: "Too many requests in a short time. Please wait a moment and try again.",
-    errHintServer: "The server encountered an internal error. This is usually temporary — please retry shortly.",
-    errHintModel: "There was an issue with the AI model service. The model may be temporarily unavailable.",
-    errHintSession: "The session could not be found. It may have expired — try creating a new session.",
-    errHintGeneric: "Something went wrong. This is usually temporary — please try again or start a new session.",
+    errHintQuota: "Please try again later.",
+    errHintTimeout: "Request timed out. Please retry.",
+    errHintNetwork: "Connection lost. Please reconnect and retry.",
+    errHintAuth: "Authentication failed. Check your sign-in or API key.",
+    errHintForbidden: "You do not have access to this action.",
+    errHintRate: "Too many requests. Please try again shortly.",
+    errHintServer: "Service unavailable. Please try again shortly.",
+    errHintModel: "Model unavailable. Choose another model.",
+    errHintSession: "Conversation not found. Start a new conversation.",
+    errHintGeneric: "Could not complete this action. Please retry.",
     // ErrorAlert
     dismiss: "Dismiss",
     details: "Details",
@@ -98,10 +126,10 @@ const STRINGS = {
     errEndpointConflict: "A model with the same model name and base URL already exists.",
     errRemoveCustomModel: "Failed to remove custom model.",
     // Notices
-    noticeModelSwitched: "Model/provider switched. Existing context may not be consistent across providers. Start a new session if results look off.",
-    noticeModeSwitched: "Chat mode switched. Existing context may not be consistent across modes. Start a new session if results look off.",
-    noticeCustomRemoved: "Custom model removed. Active session switched back to default model context.",
-    noticeAgentDisabled: "Science Agent is currently unavailable. Check kimi-code setup, or switch to Science Expert.",
+    noticeModelSwitched: "",
+    noticeModeSwitched: "",
+    noticeCustomRemoved: "Model removed.",
+    noticeAgentDisabled: "Choose another executor.",
     noticeAskUserSubmitted: "Answers submitted — agent continuing…",
     noticeApprovalApproved: "Approved — agent continuing…",
     noticeApprovalRejected: "Rejected — agent continuing…",
@@ -111,13 +139,12 @@ const STRINGS = {
     titleModelInfo: (label: string, provider: string) => `${label} (${provider})`,
     titleProviderWithKey: (provider: string) => `Provider: ${provider} (key configured)`,
     titleProviderNoKey: (provider: string) => `Provider: ${provider} (no API key)`,
-    titleKeyConfigured: (provider: string) => `API key saved for ${provider} in ~/.venusfactory/keys.json. Click to update or clear.`,
+    titleKeyConfigured: (provider: string) => `Manage ${provider} API key`,
     // Tooltips
     sendMessage: "Send message",
     regenerateLast: "Regenerate last message",
-    quotaReached: (used: number, limit: number) => `Daily quota reached (${used}/${limit}).`,
     quotaRemaining: (remaining: number, limit: number) => `Online mode quota: ${remaining}/${limit} chats remaining for this IP today.`,
-    quotaRegenerate: (remaining: number, limit: number) => `Regenerate also consumes quota. Remaining: ${remaining}/${limit}.`,
+    quotaRegenerate: (remaining: number, limit: number) => `Retries stay in the same conversation. New conversations remaining: ${remaining}/${limit}.`,
     // Header
     chat: "Chat",
     running: "Running",
@@ -159,19 +186,19 @@ const STRINGS = {
     checkpointIteration: "Next step",
     composerPlaceholder: "Ask anything about AI protein engineering...",
     quotaPillTitle: (remaining: number, limit: number) =>
-      `Online daily quota: ${remaining} sends left of ${limit} per IP. Counts each Send/Regenerate, not tool calls or streaming.`,
+      `${remaining} of ${limit} new conversations left today, shared by Agent, Scientist and Researcher. Follow-ups and retries do not use another conversation.`,
     quotaPillLabel: (remaining: number, limit: number) => `${remaining} left / ${limit}`,
     quotaPillExhausted: (used: number, limit: number) => `${used}/${limit} used`,
     chatModeAria: "Chat mode",
-    modeScienceAgent: "Science Agent",
-    modeScienceExpert: "Science Expert",
+    modeScienceAgent: "Agent · Questions and tasks with tools as needed",
+    modeScienceExpert: "Science · Expert team pursuing a persistent goal",
     modeAgentShort: "Agent",
-    modeExpertShort: "Expert",
+    modeExpertShort: "Scientist",
     agentContextUsage: (pct: number, used: number, max: number) =>
       max > 0 ? `Context ${pct}% (${used}/${max} tok)` : `Context ${pct}%`,
     modelAria: "Model",
     modelLabel: "Model",
-    modelViaKimi: "via kimi",
+    modelViaKimi: "",
     gatewayRequiredSuffix: " (gateway required)",
     otherModel: "Other Model...",
     noKeySuffix: " (no key)",
@@ -200,7 +227,7 @@ const STRINGS = {
     keyPanelAria: (provider: string) => `Set API key for ${provider}`,
     keyPanelLabelPre: "API key for ",
     keyPanelLabelPost: ":",
-    keyPanelHint: "Paste a new key to update, or click Clear to remove the saved key.",
+    keyPanelHint: "",
     keyPanelSaving: "Saving...",
     save: "Save",
     clearKey: "Clear",
@@ -208,10 +235,6 @@ const STRINGS = {
     // File preview
     workspaceSuffix: "(workspace)",
     // Execution status (right panel)
-    executionStatus: "Execution Status",
-    termWaiting: "$ waiting for session...",
-    termMessagesTools: (msgs: number, tools: number) => `${msgs} messages, ${tools} tool runs`,
-    termEmpty: "(empty)",
     // Custom model modal
     addCustomModel: "Add OpenAI-Style Model",
     displayName: "Display Name",
@@ -229,16 +252,16 @@ const STRINGS = {
     docTitle: "自进化智能体 — 科学对话 — VenusFactory2",
     docDescription: "与面向蛋白质发现与定向进化的自进化智能体对话。Science Agent 与 Science Expert 会规划、执行、批评并迭代。",
     // Error hints (friendlyErrorHint)
-    errHintQuota: "您已达到在线模式的每日使用上限。请明天再试，或本地部署以获得无限制访问。",
-    errHintTimeout: "请求耗时过长。复杂任务或服务器负载较高时可能出现此问题，请重试。",
-    errHintNetwork: "出现网络问题。请检查您的网络连接后重试。",
-    errHintAuth: "身份验证失败。您的会话可能已过期 — 请尝试刷新页面。",
-    errHintForbidden: "访问被拒绝。您可能没有执行此操作的权限。",
-    errHintRate: "短时间内请求过多。请稍候再试。",
-    errHintServer: "服务器遇到内部错误。通常为临时问题 — 请稍后重试。",
-    errHintModel: "AI 模型服务出现问题。该模型可能暂时不可用。",
-    errHintSession: "未找到该会话。可能已过期 — 请尝试创建新会话。",
-    errHintGeneric: "出现错误。通常为临时问题 — 请重试或开启新会话。",
+    errHintQuota: "请稍后重试。",
+    errHintTimeout: "请求超时，请重试。",
+    errHintNetwork: "连接中断，请检查网络后重试。",
+    errHintAuth: "认证失败，请检查登录状态或 API Key。",
+    errHintForbidden: "当前账号没有此操作权限。",
+    errHintRate: "请求过于频繁，请稍后重试。",
+    errHintServer: "服务暂不可用，请稍后重试。",
+    errHintModel: "模型暂不可用，请选择其他模型。",
+    errHintSession: "未找到会话，请新建会话。",
+    errHintGeneric: "操作未完成，请重试。",
     // ErrorAlert
     dismiss: "关闭",
     details: "详情",
@@ -267,10 +290,10 @@ const STRINGS = {
     errEndpointConflict: "已存在相同模型名称和 Base URL 的模型。",
     errRemoveCustomModel: "删除自定义模型失败。",
     // Notices
-    noticeModelSwitched: "已切换模型 / 服务商。已有上下文在不同服务商之间可能不一致，如结果异常请新建会话。",
-    noticeModeSwitched: "已切换对话模式。已有上下文在不同模式之间可能不一致，如结果异常请新建会话。",
-    noticeCustomRemoved: "自定义模型已删除。当前会话已切换回默认模型上下文。",
-    noticeAgentDisabled: "Science Agent 当前不可用。请检查 kimi-code 配置，或切换到 Science Expert。",
+    noticeModelSwitched: "",
+    noticeModeSwitched: "",
+    noticeCustomRemoved: "模型已删除。",
+    noticeAgentDisabled: "请选择其他执行器。",
     noticeAskUserSubmitted: "已提交回答 — Agent 继续执行…",
     noticeApprovalApproved: "已批准 — Agent 继续执行…",
     noticeApprovalRejected: "已拒绝 — Agent 继续执行…",
@@ -280,13 +303,12 @@ const STRINGS = {
     titleModelInfo: (label: string, provider: string) => `${label}（${provider}）`,
     titleProviderWithKey: (provider: string) => `服务商：${provider}（密钥已配置）`,
     titleProviderNoKey: (provider: string) => `服务商：${provider}（无 API 密钥）`,
-    titleKeyConfigured: (provider: string) => `已在 ~/.venusfactory/keys.json 保存 ${provider} 的密钥。点击可更新或清空。`,
+    titleKeyConfigured: (provider: string) => `管理 ${provider} API Key`,
     // Tooltips
     sendMessage: "发送消息",
     regenerateLast: "重新生成上一条消息",
-    quotaReached: (used: number, limit: number) => `每日配额已用尽（${used}/${limit}）。`,
     quotaRemaining: (remaining: number, limit: number) => `在线模式配额：本 IP 今日剩余 ${remaining}/${limit} 次对话。`,
-    quotaRegenerate: (remaining: number, limit: number) => `重新生成同样会消耗配额。剩余：${remaining}/${limit}。`,
+    quotaRegenerate: (remaining: number, limit: number) => `重新生成不占新对话额度。今日剩余：${remaining}/${limit}。`,
     // Header
     chat: "对话",
     running: "运行中",
@@ -328,19 +350,19 @@ const STRINGS = {
     checkpointIteration: "下一步",
     composerPlaceholder: "随时提问 AI 蛋白质工程相关的任何问题……",
     quotaPillTitle: (remaining: number, limit: number) =>
-      `在线日配额：本 IP 今日还剩 ${remaining}/${limit} 次发送。按每次点「发送」计数，工具调用/流式输出不另计。`,
+      `今日还可开启 ${remaining}/${limit} 个新对话，三个模式共享；补充消息和重试不重复占用。`,
     quotaPillLabel: (remaining: number, limit: number) => `剩余 ${remaining}/${limit}`,
     quotaPillExhausted: (used: number, limit: number) => `已用 ${used}/${limit}`,
     chatModeAria: "对话模式",
-    modeScienceAgent: "科学智能体",
-    modeScienceExpert: "科学专家",
+    modeScienceAgent: "Agent · 自由问答与按需调用工具",
+    modeScienceExpert: "Science · 专家团围绕目标持续执行",
     modeAgentShort: "智能体",
-    modeExpertShort: "专家",
+    modeExpertShort: "Scientist",
     agentContextUsage: (pct: number, used: number, max: number) =>
       max > 0 ? `上下文 ${pct}%（${used}/${max} tok）` : `上下文 ${pct}%`,
     modelAria: "模型",
     modelLabel: "模型",
-    modelViaKimi: "经 kimi",
+    modelViaKimi: "",
     gatewayRequiredSuffix: "（需要网关）",
     otherModel: "其他模型……",
     noKeySuffix: "（无密钥）",
@@ -369,7 +391,7 @@ const STRINGS = {
     keyPanelAria: (provider: string) => `为 ${provider} 设置 API 密钥`,
     keyPanelLabelPre: "为 ",
     keyPanelLabelPost: " 设置 API 密钥：",
-    keyPanelHint: "留空后点「清空」可删除已保存的密钥。",
+    keyPanelHint: "",
     keyPanelSaving: "保存中……",
     save: "保存",
     clearKey: "清空",
@@ -377,10 +399,6 @@ const STRINGS = {
     // File preview
     workspaceSuffix: "（工作区）",
     // Execution status (right panel)
-    executionStatus: "执行状态",
-    termWaiting: "$ 等待会话……",
-    termMessagesTools: (msgs: number, tools: number) => `${msgs} 条消息，${tools} 次工具调用`,
-    termEmpty: "（空）",
     // Custom model modal
     addCustomModel: "添加 OpenAI 风格模型",
     displayName: "显示名称",
@@ -403,6 +421,8 @@ type SessionMeta = {
   history_size: number;
   status: string;
   title?: string;
+  has_content?: boolean;
+  chat_mode?: ChatMode;
 };
 
 const TITLE_SKIP_PREFIXES = [
@@ -527,7 +547,7 @@ function friendlyErrorHint(msg: string, t: ErrorHintStrings): string {
     return t.errHintQuota;
   if (m.includes("timeout") || m.includes("timed out"))
     return t.errHintTimeout;
-  if (m.includes("network") || m.includes("fetch") || m.includes("failed to fetch"))
+  if (m.includes("network") || m.includes("fetch") || /connection (lost|closed|reset|interrupted)/.test(m))
     return t.errHintNetwork;
   if (m.includes("401") || m.includes("unauthorized") || m.includes("auth"))
     return t.errHintAuth;
@@ -544,24 +564,6 @@ function friendlyErrorHint(msg: string, t: ErrorHintStrings): string {
   return t.errHintGeneric;
 }
 
-type ErrorAlertStrings = ErrorHintStrings & { dismiss: string; details: string };
-
-function ErrorAlert({ message, onDismiss, t }: { message: string; onDismiss: () => void; t: ErrorAlertStrings }) {
-  return (
-    <div className="error-box">
-      <div className="error-box-header">
-        <span className="error-box-icon">!</span>
-        <span className="error-box-hint">{friendlyErrorHint(message, t)}</span>
-        <button className="error-box-dismiss" onClick={onDismiss} title={t.dismiss}>&times;</button>
-      </div>
-      <details className="error-box-details">
-        <summary>{t.details}</summary>
-        <pre className="error-box-raw">{message}</pre>
-      </details>
-    </div>
-  );
-}
-
 type ChatPageProps = {
   workspaceEnabled?: boolean;
 };
@@ -570,18 +572,60 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   const { lang, t: translate } = useLang();
   const t = translate(STRINGS);
   useDocumentMeta({ title: t.docTitle, description: t.docDescription });
+  const { sessionId: routeSessionId = "" } = useParams();
+  const navigate = useNavigate();
+  const handledRoute = useRef<string | null>(null);
+  const routeInitialized = useRef(false);
   const [sessionId, setSessionId] = useState<string>("");
+  const sessionLoad = useRef({ target: "", revision: 0, pending: false });
+  const sessionCreation = useRef<Promise<string> | null>(null);
+  useLayoutEffect(() => {
+    if (!sessionLoad.current.pending && sessionLoad.current.target !== sessionId) {
+      sessionLoad.current = { target: sessionId, revision: sessionLoad.current.revision + 1, pending: false };
+    }
+  }, [sessionId]);
   const [snapshot, setSnapshot] = useState<ChatSnapshot | null>(null);
+  const [pendingTurn, setPendingTurn] = useState<PendingChatTurn | null>(null);
   const [sessions, setSessions] = useState<SessionMeta[]>([]);
+  const [historyActivity, setHistoryActivity] = useState<Record<string, HistoryActivity>>({});
+  const sessionHistoryRevision = useRef(0);
+  const onHistoryActivity = useCallback((key: string, row: HistoryActivity | null) => {
+    sessionHistoryRevision.current++;
+    setHistoryActivity(previous => { const next = { ...previous }; if (row) next[key] = row; else delete next[key]; return next; });
+  }, []);
   const [message, setMessage] = useState("");
   const [files, setFiles] = useState<File[]>([]);
+  const [composerElement, setComposerElement] = useState<HTMLDivElement | null>(null);
+  const [addingFiles, setAddingFiles] = useState(false);
+  const addingFilesRef = useRef(false);
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFile[]>([]);
   const [running, setRunning] = useState(false);
+  const [scientistRunning, setGoalRunning] = useState(false);
+  const [scientistSessionId, setScientistSessionId] = useState("");
+  const [scientistDraftRevision, setScientistDraftRevision] = useState(0);
+  const [goalStatuses, setGoalStatuses] = useState<Record<string, string>>({});
   const [runStatus, setRunStatus] = useState<RunStatus>("stopped");
   const [streamingIdx, setStreamingIdx] = useState(-1);
-  const [error, setError] = useState<string>("");
-  const [selectedModel, setSelectedModel] = useState<string>(FALLBACK_MODEL_ID);
-  const [chatMode, setChatMode] = useState<ChatMode>("science_agent");
+  const [error, setError, dismissError] = useDismissibleError();
+  const [noticeTarget, setNoticeTarget] = useState<HTMLDivElement | null>(null);
+  const [selectedModel, setSelectedModel] = useState<string>("");
+  const pendingSessionModel = useRef<string | null>(null);
+  const [workspaceParams, setWorkspaceParams] = useSearchParams();
+  const researcherMode = workspaceParams.get('mode') === 'researcher';
+  const visibleModeRef = useRef(workspaceParams.get('mode'));
+  visibleModeRef.current = workspaceParams.get('mode');
+  const [researcherRunning, setResearcherRunning] = useState(false);
+  const [chatMode, setChatMode] = useState<ChatMode>(() => workspaceParams.get("mode") === "scientist" ? "science_expert" : "science_agent");
+  const activeModeRef = useRef(chatMode);
+  const researcherPanelRef = useRef<ResearcherPanelHandle>(null);
+  const [researchReports, setResearchReports] = useState<ResearchHistoryRow[]>([]);
+  const goalRunning = chatMode === "science_expert" && scientistRunning;
+  const [researchToolbar, setResearchToolbar] = useState<HTMLDivElement | null>(null);
+  const [scienceComposer, setScienceComposer] = useState<HTMLDivElement | null>(null);
+  const [scienceActions, setScienceActions] = useState<HTMLDivElement | null>(null);
+  const [scienceFooter, setScienceFooter] = useState<HTMLDivElement | null>(null);
+  const scrollPositions = useRef<Record<string, number>>({});
+  const [agentExecution, setAgentExecution] = useState<AgentExecutionSelection | null>(null);
   const registry = useModelRegistry();
   const [keyPanelProvider, setKeyPanelProvider] = useState<string>("");
   const [keyPanelValue, setKeyPanelValue] = useState<string>("");
@@ -594,7 +638,19 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   const [customModelBaseUrl, setCustomModelBaseUrl] = useState("https://api.openai.com/v1");
   const [modelSwitchNotice, setModelSwitchNotice] = useState("");
   const [chatQuota, setChatQuota] = useState<ChatQuota | null>(null);
+  const [startingTurn, setStartingTurn] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const agentWorking = !researcherMode && chatMode === "science_agent" && (running || isRunActive(snapshot?.status));
+  function detachStream() {
+    const controller = abortRef.current;
+    abortRef.current = null;
+    controller?.abort();
+    runningRef.current = false;
+    tokenQueueRef.current = [];
+    setPendingTurn(null);
+    setRunning(false); setStartingTurn(false); setStreamingIdx(-1);
+  }
+
   const snapshotRef = useRef<ChatSnapshot | null>(null);
   const runningRef = useRef(false);
   /** Expert token pump: apply SSE tokens across animation frames so a
@@ -602,17 +658,32 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   const tokenQueueRef = useRef<Array<{ content: string; role_id?: string }>>([]);
   const tokenPumpScheduledRef = useRef(false);
   const timelineRef = useRef<HTMLDivElement | null>(null);
+  const chatLayoutRef = useRef<HTMLDivElement | null>(null);
+  useLayoutEffect(() => {
+    const timeline = timelineRef.current;
+    const layout = chatLayoutRef.current;
+    if (!timeline || !layout) return;
+    // Keep the composer aligned with content even with non-overlay scrollbars.
+    const align = () => layout.style.setProperty(
+      "--conversation-scrollbar-gutter", `${timeline.offsetWidth - timeline.clientWidth}px`,
+    );
+    align();
+    const observer = new ResizeObserver(align);
+    observer.observe(timeline);
+    return () => observer.disconnect();
+  }, []);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const fileSourceMenuRef = useRef<HTMLDivElement | null>(null);
   const [fileSourceMenuOpen, setFileSourceMenuOpen] = useState(false);
   const [workspacePickerOpen, setWorkspacePickerOpen] = useState(false);
-  const SESSION_STORAGE_KEY = "vf2_active_session_id";
-  const SESSION_CACHE_KEY = "vf2_session_list_cache";
+  const LEGACY_SESSION_STORAGE_KEY = "vf2_active_session_id";
+  const SESSION_CACHE_KEY = "vf2_session_list_cache_v2";
   const SESSION_OWNED_KEY = "vf2_owned_session_ids";
   const COPY_HINT_MS = 1200;
   const [copiedSessionId, setCopiedSessionId] = useState("");
-  const [sessionsCollapsed, setSessionsCollapsed] = useState(false);
-  const [logsCollapsed, setLogsCollapsed] = useState(false);
+  const modeChoiceRevision = useRef(0);
+  const [agentCatalogReady, setAgentCatalogReady] = useState(false);
+  const { closeOnNarrow } = useSidebar();
   const [pipelineDismissed, setPipelineDismissed] = useState(false);
   const CUSTOM_MODELS_STORAGE_KEY = "vf2_custom_openai_style_models";
 
@@ -645,9 +716,55 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     });
   }, [registry.data]);
 
+  const freshDraftId = workspaceParams.get("new") || "";
+  const routeMode = researcherMode ? "researcher" : workspaceParams.get("mode") === "scientist" ? "science_expert" : "science_agent";
   useEffect(() => {
-    void bootstrapSession();
-  }, []);
+    const helpQuestion = !routeSessionId && routeMode === "science_agent" ? manualQuestion(workspaceParams.get("help"), lang) : "";
+    const key = chatRouteKey(routeSessionId, routeMode) + (helpQuestion ? ":help:" + workspaceParams.get("help") : "") + (!routeSessionId && freshDraftId ? ":new:" + freshDraftId : "");
+    if (handledRoute.current === key) return;
+    const initial = !routeInitialized.current;
+    routeInitialized.current = true;
+    handledRoute.current = key;
+    if (runningRef.current && (routeSessionId !== sessionLoad.current.target || routeMode !== activeModeRef.current)) {
+      abortRef.current?.abort();
+      abortRef.current = null;
+      runningRef.current = false;
+      setRunning(false);
+    }
+    if (freshDraftId && !routeSessionId) {
+      if (routeMode !== "researcher") {
+        if (routeMode !== activeModeRef.current || researcherMode) handleChatModeChange(routeMode, "", false);
+        createAndActivateSession(false, claimNewChatDraft(routeMode, freshDraftId, sessionStorage));
+      }
+      void refreshChatQuota().then(q => fetchSessions(q?.mode === "local")).catch(() => {});
+      return;
+    }
+    if (routeMode === "researcher") {
+      void refreshChatQuota().then(q => fetchSessions(q?.mode === "local")).catch(() => {});
+      return;
+    }
+    if (helpQuestion) {
+      if (activeModeRef.current !== 'science_agent') handleChatModeChange('science_agent', undefined, false);
+      createAndActivateSession(false);
+      setMessage(helpQuestion);
+      void refreshChatQuota().then(q => fetchSessions(q?.mode === 'local')).catch(() => {});
+      return;
+    }
+    // A URL is an explicit selection. Never replace it with a cached or
+    // newest conversation when loading fails or the history list is stale.
+    if (routeMode !== activeModeRef.current) {
+      handleChatModeChange(routeMode, routeSessionId || undefined, false);
+    } else if (routeSessionId) {
+      void refreshChatQuota();
+      void fetchSessions().catch(() => {});
+      void refreshCurrentSession(routeSessionId, { syncComposer: true, updateUrl: false })
+        .catch(err => setError(err instanceof Error ? err.message : t.errHintSession));
+    } else if (initial) {
+      void bootstrapSession();
+    } else {
+      createAndActivateSession(false);
+    }
+  }, [routeSessionId, routeMode, workspaceParams.get('help'), freshDraftId]);
 
   // Leaving Chat (other routes / remount) must detach the SSE reader so a
   // new mount can poll fresh state. Backend keeps the graph running.
@@ -685,15 +802,28 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     };
   }, [fileSourceMenuOpen]);
 
-  const lastContentLen = snapshot?.history?.[snapshot.history.length - 1]?.content?.length ?? 0;
+  const visibleHistory = useMemo(() => chatHistoryWithPending(snapshot?.history || [], pendingTurn, sessionId), [snapshot?.history, pendingTurn, sessionId]);
+  useEffect(() => {
+    if (pendingTurn?.sessionId === sessionId && hasAcceptedTurn(snapshot?.history || [], pendingTurn)) setPendingTurn(null);
+  }, [snapshot?.history, pendingTurn, sessionId]);
+  useLayoutEffect(() => {
+    if (pendingTurn && chatMode === "science_agent" && !researcherMode && timelineRef.current) timelineRef.current.scrollTop = timelineRef.current.scrollHeight;
+  }, [pendingTurn, chatMode, researcherMode]);
+  const lastContentLen = visibleHistory[visibleHistory.length - 1]?.content?.length ?? 0;
   useEffect(() => {
     const el = timelineRef.current;
-    if (!el) return;
+    if (!el || chatMode === "science_expert" || !visibleHistory.length) return;
     const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
     if (distanceFromBottom < 150) {
       el.scrollTop = el.scrollHeight;
     }
-  }, [snapshot?.history.length, lastContentLen]);
+  }, [visibleHistory.length, lastContentLen, chatMode]);
+
+  useLayoutEffect(() => {
+    const el = timelineRef.current;
+    if (el) el.scrollTop = scrollPositions.current[`${sessionId}:${chatMode}`] ??
+      (chatMode === "science_agent" ? el.scrollHeight : 0);
+  }, [chatMode, sessionId]);
 
   useEffect(() => {
     const s = (snapshot?.status || "").toLowerCase();
@@ -705,6 +835,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       s === "planning_failed" ||
       s === "execution_failed" ||
       s === "waiting_for_clarification" ||
+      s === "waiting_for_input" ||
       s === "waiting_for_kimi_question" ||
       s === "waiting_for_kimi_approval" ||
       s === "waiting_for_plan_confirmation" ||
@@ -727,9 +858,9 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   // Pull on mount, focus, pageshow(bfcache), visibility; burst-poll while
   // in-progress or a Thinking placeholder is still on screen.
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionId || researcherMode || chatMode !== "science_agent") return;
     let cancelled = false;
-    let ticks = 0;
+    let ticks = 0; let pulling = false;
 
     const hasLiveThinking = (snap: ChatSnapshot | null) => {
       const hist = snap?.history || [];
@@ -760,10 +891,11 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       // Interval sync skips while a live SSE owns the UI; focus/bfcache
       // must force-refresh even if a frozen mount left running=true.
       // Never syncComposer — polling must not overwrite Expert/Agent toggle.
-      if (cancelled || (!force && runningRef.current)) return;
+      if (cancelled || pulling || document.visibilityState === "hidden" || (!force && runningRef.current)) return;
+      pulling = true;
       void refreshCurrentSession(sessionId, { syncComposer: false }).catch(() => {
         /* transient */
-      });
+      }).finally(() => { pulling = false; });
     };
 
     pull(true);
@@ -793,13 +925,12 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       const status = String(snap?.status || "");
       const needsSync = !isSettled(status) || hasLiveThinking(snap);
       // Always burst a few times after mount (race with background save).
-      if (needsSync || ticks <= 8) pull(false);
-      if (!needsSync && ticks > 8) {
+      if (needsSync || ticks <= 2) pull(false);
+      if (!needsSync && ticks > 2) {
         window.clearInterval(id);
-      } else if (ticks > 45) {
-        window.clearInterval(id);
+
       }
-    }, 1000);
+    }, 3000);
 
     return () => {
       cancelled = true;
@@ -810,7 +941,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     };
     // refreshCurrentSession closes over latest helpers; rebind on session change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId]);
+  }, [sessionId, chatMode, researcherMode]);
 
   // Keep sidebar label in sync with the first user message of the active chat.
   const activeSessionTitle = titleFromHistory(snapshot?.history);
@@ -824,10 +955,16 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       const next = prev.map((item) => {
         if (item.session_id !== sessionId) return item;
         const nextTitle = activeSessionTitle || item.title || "";
-        if ((item.title || "") === nextTitle && item.history_size === historySize) return item;
+        if ((item.title || "") === nextTitle && item.history_size === historySize && item.status === snapshot?.status) return item;
         changed = true;
-        return { ...item, title: nextTitle, history_size: historySize };
+        return { ...item, title: nextTitle, history_size: historySize, status: snapshot?.status || "" };
       });
+      if (!prev.some(item => item.session_id === sessionId)) {
+        changed = true;
+        next.unshift({ session_id: sessionId, created_at: snapshot?.created_at || new Date().toISOString(),
+          model_name: snapshot?.model_name || "", history_size: historySize,
+          status: snapshot?.status || "", title: activeSessionTitle, has_content: true, chat_mode: activeModeRef.current });
+      }
       if (!changed) return prev;
       try {
         localStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(next));
@@ -836,33 +973,29 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       }
       return next;
     });
-  }, [sessionId, activeSessionTitle, snapshot?.history?.length]);
+  }, [sessionId, activeSessionTitle, snapshot?.history?.length, snapshot?.status]);
 
-  const terminalData = useMemo(() => {
-    if (!snapshot) return null;
-    return {
-      status: snapshot.status || "idle",
-      messages: snapshot.history.length,
-      toolRuns: snapshot.tool_executions.length,
-      conv: snapshot.conversation_log.slice(-6).map((e) => ({
-        role: (e.role as string) || "unknown",
-        content: ((e.content as string) || "").slice(0, 200),
-      })),
-      tools: snapshot.tool_executions.slice(-12).map((e) => ({
-        name: String(e.tool_name || "tool"),
-        ts: String(e.timestamp || ""),
-        status: String(e.status || ""),
-      })),
+  useEffect(() => {
+    let alive = true, pending = false;
+    const refresh = async () => {
+      if (!alive || pending) return;
+      pending = true;
+      try { await fetchSessions(); } catch { /* Reconnect on the next tick. */ }
+      finally { pending = false; }
     };
-  }, [snapshot]);
+    const timer = window.setInterval(() => void refresh(), 3000);
+    return () => { alive = false; window.clearInterval(timer); };
+  }, [chatQuota?.mode]);
 
-  async function fetchSessions() {
+  async function fetchSessions(localMode = chatQuota?.mode === "local") {
+    const revision = sessionHistoryRevision.current;
     const data = await listChatSessions();
-    const allServer = data.sessions || [];
-    const list = filterOwnedSessions(allServer);
+    const allServer = (data.sessions || []).filter(hasSessionContent);
+    const list = localMode ? allServer : filterOwnedSessions(allServer);
     // Preserve locally derived titles when the API omits them (older server
     // process, or race before the first message is persisted).
     let merged: SessionMeta[] = [];
+    if (revision !== sessionHistoryRevision.current) return list;
     setSessions((prev) => {
       const prevById = new Map(prev.map((item) => [item.session_id, item]));
       merged = list.map((item) => {
@@ -885,7 +1018,8 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       }
       return merged;
     });
-    return merged;
+    // React may defer the updater; return the fetched identities immediately.
+    return list;
   }
 
   function readOwnedSessionIds(): string[] {
@@ -929,149 +1063,138 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     }
   }
 
-  /** Optimistic local decrement so the pill moves as soon as Send starts. */
-  function noteQuotaSendStarted() {
-    setChatQuota((prev) => {
-      if (!prev?.enforced) return prev;
-      const used = (prev.used ?? 0) + 1;
-      const limit = prev.limit ?? 0;
-      return {
-        ...prev,
-        used,
-        remaining: Math.max(0, limit - used),
-      };
-    });
+  useEffect(() => {
+    const changed = () => { void refreshChatQuota(); };
+    window.addEventListener(QUOTA_CHANGED, changed);
+    window.addEventListener("focus", changed);
+    window.addEventListener("storage", changed);
+    return () => { window.removeEventListener(QUOTA_CHANGED, changed); window.removeEventListener("focus", changed); window.removeEventListener("storage", changed); };
+  }, []);
+
+  function hasSessionContent(item: SessionMeta) {
+    return item.has_content ?? Boolean(item.history_size || item.title?.trim());
   }
 
-  async function createAndActivateSession() {
-    if (running) return;
-    setError("");
-    try {
-      const created = await createChatSession();
+  function syncSessionUrl(sid: string, mode: ChatMode | "researcher", replace = false) {
+    handledRoute.current = chatRouteKey(sid, mode);
+    navigate(chatSessionLocation(lang, sid, mode, workspaceParams), { replace });
+  }
+
+  function rememberActiveSession(mode: ChatMode, sid: string) {
+    sessionStorage.setItem(activeSessionStorageKey(mode), sid);
+    if (mode === "science_expert") setScientistSessionId(sid);
+  }
+
+  async function ensureGoalSession() {
+    if (scientistSessionId) return scientistSessionId;
+    if (sessionCreation.current) return sessionCreation.current;
+    sessionCreation.current = (async () => {
+      const created = await createChatSession("science_expert");
       rememberOwnedSession(created.session_id);
-      setSessionId(created.session_id);
-      setModelSwitchNotice("");
-      sessionStorage.setItem(SESSION_STORAGE_KEY, created.session_id);
-      let runtimeMode = chatQuota?.mode;
-      if (!runtimeMode) {
-        try {
-          runtimeMode = (await getChatQuota()).mode;
-        } catch {
-          runtimeMode = undefined;
-        }
+      moveResearchDraft("scientist:draft", "scientist:" + created.session_id);
+      rememberActiveSession("science_expert", created.session_id);
+      if (activeModeRef.current === "science_expert" && visibleModeRef.current !== "researcher") {
+        setSessionId(created.session_id);
+        syncSessionUrl(created.session_id, "science_expert", true);
       }
-      if (runtimeMode !== "local") {
-        // Online: Agent → kimi sentinel; Expert → model-config.yaml pin.
-        const expertId = getExpertModelId(registry.data);
-        setSelectedModel(
-          chatMode === "science_agent" ? SCIENCE_AGENT_MODEL_ID : expertId
-        );
-        if (chatMode !== "science_agent") {
-          rememberModelFromSession(expertId);
-        }
-      } else {
-        // Local: both modes pick a concrete registry/custom model.
-        const createdId = modelLabelFromInternal(created.model_name);
-        const nextId =
-          isKimiEngineModel({ id: createdId, engine: undefined }) || !createdId
-            ? pickExpertModelId(registry.data?.models || [], selectedModel, {
-                expertModel: getExpertModelId(registry.data),
-              })
-            : createdId;
-        setSelectedModel(nextId);
-        rememberModelFromSession(nextId);
-      }
-      const newMeta: SessionMeta = {
-        session_id: created.session_id,
-        created_at: created.created_at,
-        model_name: created.model_name,
-        history_size: 0,
-        status: "",
-        title: "",
-      };
-      setSessions((prev) => {
-        const exists = prev.some((s) => s.session_id === created.session_id);
-        return exists ? prev : [newMeta, ...prev];
-      });
-      setSnapshot({
-        session_id: created.session_id,
-        model_name: created.model_name,
-        created_at: created.created_at,
-        history: [],
-        conversation_log: [],
-        tool_executions: [],
-        status: "",
-        clarification_questions: [],
-        plan: [],
-        waiting_for: "",
-      });
-      try { await fetchSessions(); } catch { /* optimistic update above is sufficient */ }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t.errCreateSession);
+      return created.session_id;
+    })();
+    try { return await sessionCreation.current; }
+    finally { sessionCreation.current = null; }
+  }
+
+  function createAndActivateSession(updateUrl = true, resetDraft = true) {
+    if (startingTurn || sessionCreation.current) return;
+    detachStream();
+    if (updateUrl) syncSessionUrl("", activeModeRef.current);
+    // A new conversation starts as a local draft, not a persisted empty row.
+    sessionLoad.current = { target: "", revision: sessionLoad.current.revision + 1, pending: false };
+    rememberActiveSession(activeModeRef.current, "");
+    setSessionId("");
+    setSnapshot(null);
+    snapshotRef.current = null;
+    if (activeModeRef.current === "science_agent") {
+      if (resetDraft) { setMessage(""); setFiles([]); setWorkspaceFiles([]); }
+    } else if (resetDraft) {
+      setScientistDraftRevision(value => value + 1);
     }
+    setError("");
+    setRunStatus("stopped");
+    setStreamingIdx(-1);
+    setModelSwitchNotice("");
+    closeOnNarrow();
   }
 
   async function deleteAndSelectNextSession(targetId: string) {
-    if (running && targetId === sessionId) return;
+    const deletingActive = !researcherMode && targetId === sessionId;
+    if (running && deletingActive) return false;
     setError("");
     try {
       await deleteChatSession(targetId);
       forgetOwnedSession(targetId);
-      if (targetId === sessionId) {
-        sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      if (deletingActive) {
+        rememberActiveSession(activeModeRef.current, "");
         setSessionId("");
         setSnapshot(null);
+        syncSessionUrl("", activeModeRef.current, true);
       }
       const list = await fetchSessions();
-      if (targetId !== sessionId) return;
+      if (!deletingActive) return true;
 
-      const next = list.find((item) => item.session_id !== targetId);
+      const next = sessionsForMode(list, activeModeRef.current).find((item) => item.session_id !== targetId);
       if (next) {
         await refreshCurrentSession(next.session_id);
       }
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : t.errDeleteSession);
+      return false;
     }
   }
 
   async function bootstrapSession() {
+    let bootstrapRevision = sessionLoad.current.revision;
     setError("");
-    const quota = await refreshChatQuota();
-    const localMode = quota?.mode === "local";
+    const quotaRequest = refreshChatQuota();
+    const sessionsRequest = listChatSessions().catch(() => null);
     let list: SessionMeta[] = [];
     try {
       const raw = localStorage.getItem(SESSION_CACHE_KEY);
       if (raw) {
         const cached = JSON.parse(raw) as SessionMeta[];
         if (Array.isArray(cached) && cached.length > 0) {
-          setSessions(cached);
-          list = cached;
+          list = cached.filter(hasSessionContent);
+          setSessions(list);
         }
       }
     } catch {
       // best effort cache read
     }
     try {
-      list = await fetchSessions();
+      const [quota, data] = await Promise.all([quotaRequest, sessionsRequest]);
+      if (data) { list = (data.sessions || []).filter(hasSessionContent); if (quota?.mode !== "local") list = filterOwnedSessions(list); setSessions(list); }
     } catch {
       // keep cached list if server refresh fails
     }
-    const remembered = sessionStorage.getItem(SESSION_STORAGE_KEY);
-    const candidates = remembered
-      ? [remembered, ...list.filter((s) => s.session_id !== remembered).map((s) => s.session_id)]
-      : list.map((s) => s.session_id);
+    const mode = activeModeRef.current;
+    const remembered = sessionStorage.getItem(activeSessionStorageKey(mode));
+    if (remembered === "") return;
+    const candidates = sessionCandidates(list, mode, remembered, sessionStorage.getItem(LEGACY_SESSION_STORAGE_KEY));
 
     for (const sid of candidates) {
+      if (sessionLoad.current.revision !== bootstrapRevision) return;
       if (!list.find((s) => s.session_id === sid)) continue;
       try {
-        await refreshCurrentSession(sid, { localMode });
+        await refreshCurrentSession(sid, { localMode: (await quotaRequest)?.mode === "local", syncComposer: modeChoiceRevision.current === 0 });
         return;
       } catch {
+        if (sessionLoad.current.target !== sid) return;
+        bootstrapRevision = sessionLoad.current.revision;
         // inaccessible session — already cleaned up by refreshCurrentSession, try next
       }
     }
 
-    await createAndActivateSession();
+    if (sessionLoad.current.revision === bootstrapRevision) createAndActivateSession();
   }
 
   // Translate a backend model identifier to the value used in the selector.
@@ -1136,37 +1259,59 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
 
   async function refreshCurrentSession(
     targetId?: string,
-    opts?: { localMode?: boolean; syncComposer?: boolean }
+    opts?: { localMode?: boolean; syncComposer?: boolean; mode?: ChatMode; updateUrl?: boolean }
   ) {
     const sid = targetId || sessionId;
+    const requestedMode = opts?.mode ?? activeModeRef.current;
     if (!sid) return;
     // Soft-rejoin / focus polls pass the same session id — only sync the
     // composer mode when opening a different session (or first bootstrap).
     const switchingSession = !sessionId || Boolean(targetId && targetId !== sessionId);
     const syncComposer = opts?.syncComposer ?? switchingSession;
+    const requestedModeRevision = modeChoiceRevision.current;
+    const navigation = syncComposer || !sessionLoad.current.target;
+    if (navigation) {
+      if (sid !== sessionLoad.current.target) detachStream();
+      sessionLoad.current = { target: sid, revision: sessionLoad.current.revision + 1, pending: true };
+      setSessionId(sid);
+      setSnapshot(null);
+      snapshotRef.current = null;
+      if (opts?.updateUrl !== false) syncSessionUrl(sid, requestedMode);
+    } else if (sessionLoad.current.pending || sessionLoad.current.target !== sid) return;
+    const requestedSessionRevision = sessionLoad.current.revision;
+    const isCurrentRequest = () => activeModeRef.current === requestedMode && sessionLoad.current.revision === requestedSessionRevision && sessionLoad.current.target === sid;
     try {
       const s = sanitizeLoadedSnapshot(await getChatSession(sid));
+      if (!isCurrentRequest()) return;
+      const savedMode = s.chat_mode === "science_expert" ? "science_expert" : "science_agent";
+      if (syncComposer && savedMode !== requestedMode) {
+        sessionLoad.current.pending = false;
+        handleChatModeChange(savedMode, sid);
+        return;
+      }
       setSnapshot(s);
       setStreamingIdx(-1);
       setSessionId(sid);
       if (syncComposer) setModelSwitchNotice("");
-      sessionStorage.setItem(SESSION_STORAGE_KEY, sid);
-      if (!syncComposer) return;
-      // Empty sessions default to Science Agent; sessions with history follow
-      // persisted/inferred mode. Do not run this on soft-rejoin polls — that
-      // was flipping Expert → Agent a second after the user toggled.
+      rememberActiveSession(requestedMode, sid);
+      if (requestedMode === "science_agent" && s.active_run?.kind === "agent" && isRunActive(s.active_run.status) && !abortRef.current) void reconnectRun(s, isCurrentRequest);
+      if (!syncComposer || requestedModeRevision !== modeChoiceRevision.current) return;
       const hasHistory = (s.history?.length ?? 0) > 0;
-      const nextMode: ChatMode = hasHistory
-        ? chatModeFromSnapshot({
-            chat_mode: s.chat_mode,
-            engine: s.engine,
-            model_name: s.model_name,
-            models: registry.data?.models,
-          })
-        : "science_agent";
-      setChatMode(nextMode);
-      persistChatMode(nextMode);
-      const modelId = modelLabelFromInternal(s.model_name);
+      const nextMode = requestedMode;
+      // Opening a row cannot change its workspace or borrow another mode's model.
+      if (nextMode === "science_expert") return;
+      setAgentExecution(s.execution ? { harness: s.execution.harness, model_id: s.execution.model_id } : null);
+      const savedModel = hasHistory ? String(s.kimi_context?.model || s.model_name || "") : "";
+      const preferredModel = savedModel === SCIENCE_AGENT_MODEL_ID ? "" : savedModel;
+      // Session and registry requests finish independently. Defer resolution
+      // rather than freezing the old fallback before metadata is available.
+      if (!registry.data) {
+        pendingSessionModel.current = preferredModel;
+        setSelectedModel("");
+        return;
+      }
+      const normalizedModel = registry.data.models.find(m => m.id === preferredModel || `${m.provider}/${m.id}` === preferredModel)?.id || preferredModel;
+      const modelId = normalizedModel || getExpertModelId(registry.data);
       const isLocal = opts?.localMode ?? chatQuota?.mode === "local";
       if (nextMode === "science_agent" && !isLocal) {
         setSelectedModel(SCIENCE_AGENT_MODEL_ID);
@@ -1180,17 +1325,41 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         rememberModelFromSession(s.model_name);
       }
     } catch (err) {
+      if (!isCurrentRequest()) return;
       const msg = err instanceof Error ? err.message : "";
       if (msg.includes("404") || msg.includes("not found") || msg.includes("Not Found")) {
         forgetOwnedSession(sid);
-        if (sid === sessionId) {
+        if (sid === sessionId && routeSessionId !== sid) {
           setSessionId("");
           setSnapshot(null);
-          sessionStorage.removeItem(SESSION_STORAGE_KEY);
+          rememberActiveSession(activeModeRef.current, "");
         }
         setSessions((prev) => prev.filter((s) => s.session_id !== sid));
       }
       throw err;
+    } finally {
+      if (isCurrentRequest()) sessionLoad.current.pending = false;
+    }
+  }
+
+  async function reconnectRun(saved: ChatSnapshot, current: () => boolean) {
+    const run = saved.active_run;
+    if (!run || abortRef.current || !current()) return;
+    const controller = new AbortController();
+    abortRef.current = controller; runningRef.current = true; setRunning(true);
+    const ownsView = () => abortRef.current === controller && current();
+    try {
+      await streamSSEFromGet(`/api/chat/sessions/${encodeURIComponent(saved.session_id)}/runs/${encodeURIComponent(run.id)}/events`,
+        event => { if (ownsView()) handleStreamEvent(event); }, controller.signal,
+        getChatSessionAuthHeaders(saved.session_id), saved.event_cursor || "");
+    } catch (error) {
+      if (ownsView() && !controller.signal.aborted) setError(error instanceof Error ? error.message : t.errStreamMsg);
+    } finally {
+      if (ownsView()) {
+        abortRef.current = null; runningRef.current = false; setRunning(false); setStreamingIdx(-1);
+        await refreshCurrentSession(saved.session_id, { syncComposer: false });
+      }
+      await fetchSessions();
     }
   }
 
@@ -1239,6 +1408,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   function handleStreamEvent({ event, data }: { event: string; data: string }) {
     if (event === "state" && data) {
       const payload = JSON.parse(data) as ChatSnapshot;
+      if (payload.execution) setAgentExecution({ harness: payload.execution.harness, model_id: payload.execution.model_id });
       const status = String(payload.status || "").toLowerCase();
       const isGateStatus =
         status.startsWith("waiting_") ||
@@ -1415,26 +1585,55 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     }
   }
 
+  async function addComposerFiles(picked: File[]) {
+    if (!picked.length) return;
+    if (addingFilesRef.current || running || goalRunning || isWaitingForInteraction) { setError(lang === "zh" ? "请等待当前操作完成后添加文件。" : "Wait for the current operation before attaching files."); return; }
+    addingFilesRef.current = true; setAddingFiles(true);
+    try {
+      await validateUploads(picked);
+      setFiles(previous => mergeFiles(previous, picked));
+      setFileSourceMenuOpen(false); setError("");
+    } catch (error) { setError((error as Error).message); }
+    finally { addingFilesRef.current = false; setAddingFiles(false); }
+  }
+
   async function sendMessage() {
+    if (addingFilesRef.current || runningRef.current) return;
+    if (goalRunning || ["science_expert"].includes(chatMode) || agentBlockedReason || isWaitingForInteraction) return;
+    if (sessionLoad.current.pending || ((sessionId || routeSessionId) && !snapshot)) return;
     const composedText = message;
     const selectedCustomModel = customModels.find((item) => item.id === selectedModel);
-    if (running) return;
+    if (agentWorking) return;
     if (!message.trim() && files.length === 0 && workspaceFiles.length === 0) return;
-    if (chatQuota?.enforced && (chatQuota.remaining ?? 0) <= 0) {
-      const limit = chatQuota.limit ?? 3;
-      setError(t.errOnlineLimit(limit));
-      return;
-    }
+    const submittedFiles = files;
+    const submittedWorkspaceFiles = workspaceFiles;
+    let pending: PendingChatTurn = {
+      sessionId, text: composedText,
+      attachments: [...files.map(file => file.name), ...workspaceFiles.map(file => file.display_name)],
+      previousUsers: (snapshot?.history || []).filter(item => item.role === "user"),
+    };
+    // Paint this turn before creating the session, uploading files or waiting
+    // for the first SSE state. Do not insert it into persisted server history.
+    setPendingTurn(pending);
+    runningRef.current = true;
     setError("");
     setRunning(true);
     setRunStatus("running");
     setMessage("");
-    abortRef.current = new AbortController();
-    // Backend consumes one quota unit when the stream request is accepted;
-    // update the pill immediately so a long Agent turn doesn't look "stuck".
-    if (chatQuota?.enforced) noteQuotaSendStarted();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setStartingTurn(true);
+    const ownsView = () => abortRef.current === controller;
+    let activeSessionId = sessionId;
+    let accepted = false;
+    const checkSubmission = () => {
+      if (!ownsView() || controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
+    };
     // Optimistic sidebar title from the first user turn.
-    const optimisticTitle = abbreviateSessionTitle(composedText);
+    const optimisticTitle = abbreviateSessionTitle(composedText || pending.attachments.join(", ")) || t.newChat;
+    const activityKey = crypto.randomUUID(), activityDate = Date.now();
+    const showActivity = (id: string) => onHistoryActivity(activityKey, submissionHistoryRow("science_agent", activityKey, optimisticTitle, id, activityDate));
+    showActivity(sessionId);
     if (optimisticTitle && sessionId) {
       setSessions((prev) =>
         prev.map((item) =>
@@ -1446,25 +1645,18 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     }
 
     try {
-      let activeSessionId = sessionId;
       if (!activeSessionId) {
-        const created = await createChatSession();
+        const created = await createChatSession("science_agent");
         activeSessionId = created.session_id;
         rememberOwnedSession(activeSessionId);
+        checkSubmission();
+        pending = { ...pending, sessionId: activeSessionId };
+        showActivity(activeSessionId);
+        setPendingTurn(pending);
+        sessionLoad.current = { target: activeSessionId, revision: sessionLoad.current.revision + 1, pending: false };
         setSessionId(activeSessionId);
-        sessionStorage.setItem(SESSION_STORAGE_KEY, activeSessionId);
-        if (chatMode === "science_agent") {
-          setSelectedModel(SCIENCE_AGENT_MODEL_ID);
-        } else {
-          const createdId = modelLabelFromInternal(created.model_name);
-          const nextId = isKimiEngineModel({ id: createdId, engine: undefined })
-            ? pickExpertModelId(registry.data?.models || [], null, {
-              expertModel: getExpertModelId(registry.data),
-            })
-            : createdId;
-          setSelectedModel(nextId);
-          rememberModelFromSession(created.model_name);
-        }
+        rememberActiveSession("science_agent", activeSessionId);
+        syncSessionUrl(activeSessionId, "science_agent", true);
         setSessions((prev) => {
           const exists = prev.some((s) => s.session_id === activeSessionId);
           if (exists) {
@@ -1481,6 +1673,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
             history_size: 0,
             status: "",
             title: optimisticTitle || "",
+            chat_mode: "science_agent",
           }, ...prev];
         });
       } else if (optimisticTitle) {
@@ -1494,13 +1687,15 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       }
 
       let attachmentPaths: string[] = [];
-      if (files.length > 0) {
-        const uploaded = await uploadFiles(activeSessionId, files);
+      if (submittedFiles.length > 0) {
+        const uploaded = await uploadFiles(activeSessionId, submittedFiles);
+        checkSubmission();
         attachmentPaths = uploaded.files.map((f) => f.path);
       }
-      if (workspaceFiles.length > 0) {
-        attachmentPaths = [...attachmentPaths, ...workspaceFiles.map((item) => item.storage_path)];
+      if (submittedWorkspaceFiles.length > 0) {
+        attachmentPaths = [...attachmentPaths, ...submittedWorkspaceFiles.map((item) => item.storage_path)];
       }
+      checkSubmission();
 
       // Online Agent always sends the kimi sentinel; local Agent sends the
       // picker value so the backend can map it into kimi agent_config.model.
@@ -1514,13 +1709,15 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
           : chatMode === "science_agent" && isKimiEngineModel({ id: selectedModel, engine: "kimi-code" })
             ? SCIENCE_AGENT_MODEL_ID
             : selectedModel;
+      if (ownsView()) { setFiles([]); setWorkspaceFiles([]); }
       await streamSSEFromPost(
         `/api/chat/sessions/${encodeURIComponent(activeSessionId)}/messages/stream`,
         {
           text: composedText,
-          model: streamModel,
+          execution: chatMode === "science_agent" && agentExecution ? agentExecution : undefined,
+          model: agentExecution && chatMode === "science_agent" ? undefined : streamModel,
           chat_mode: chatMode,
-          engine: chatMode === "science_agent" ? "kimi-code" : "graph",
+          engine: agentExecution && chatMode === "science_agent" ? undefined : chatMode === "science_agent" ? "kimi-code" : "graph",
           custom_model_config:
             selectedCustomModel && chatMode === "science_expert"
               ? {
@@ -1536,37 +1733,57 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
           // session state, so retries and follow-up actions inherit it.
           lang,
         },
-        handleStreamEvent,
-        abortRef.current.signal,
+        (event) => {
+          if (ownsView() && sessionLoad.current.target === activeSessionId) {
+            if (event.event === "state" && event.data) {
+              const state = JSON.parse(event.data) as ChatSnapshot;
+              if (hasAcceptedTurn(state.history || [], pending)) { accepted = true; setPendingTurn(null); }
+            }
+            setStartingTurn(false); handleStreamEvent(event);
+          }
+        },
+        controller.signal,
         getChatSessionAuthHeaders(activeSessionId)
       );
-      await fetchSessions();
+      void fetchSessions().catch(() => {});
+      if (ownsView()) {
+        const delivered = accepted || hasAcceptedTurn(snapshotRef.current?.history || [], pending);
+        setMessage(delivered ? "" : composedText);
+        setFiles(delivered ? [] : submittedFiles);
+        setWorkspaceFiles(delivered ? [] : submittedWorkspaceFiles);
+      }
     } catch (err) {
+      if (!ownsView()) return;
       if (err instanceof DOMException && err.name === "AbortError") {
         setRunStatus("stopped");
       } else {
-        setMessage(composedText);
-        setError(err instanceof Error ? err.message : t.errStreamMsg);
+        const text = err instanceof Error ? err.message : t.errStreamMsg;
+        setError(text.includes("new conversation allowance") || text.includes("quota key is invalid") ? "" : text);
         setRunStatus("stopped");
       }
+      // Restore a rejected draft; an accepted turn must not become a duplicate
+      // message in the composer after a later stream disconnect.
+      if (!accepted && !hasAcceptedTurn(snapshotRef.current?.history || [], pending)) {
+        setMessage(composedText); setFiles(submittedFiles); setWorkspaceFiles(submittedWorkspaceFiles);
+      }
     } finally {
-      setRunning(false);
-      setStreamingIdx(-1);
-      setMessage("");
-      setFiles([]);
-      setWorkspaceFiles([]);
-      abortRef.current = null;
+      onHistoryActivity(activityKey, null);
+      if (!accepted && !pending.previousUsers.length && !hasAcceptedTurn(snapshotRef.current?.history || [], pending)) {
+        setSessions(previous => previous.filter(item => item.session_id !== activeSessionId));
+      }
+      if (ownsView()) {
+        runningRef.current = false;
+        setPendingTurn(null);
+        setRunning(false); setStartingTurn(false);
+        setStreamingIdx(-1);
+        abortRef.current = null;
+      }
       await refreshChatQuota();
     }
   }
 
   async function retryLastMessage() {
-    if (!sessionId || running) return;
-    if (chatQuota?.enforced && (chatQuota.remaining ?? 0) <= 0) {
-      const limit = chatQuota.limit ?? 3;
-      setError(t.errOnlineLimit(limit));
-      return;
-    }
+    if (!sessionId || agentWorking) return;
     if (!snapshot?.history?.some((h) => h.role === "user")) {
       setError(t.errNoUserMsg);
       return;
@@ -1574,18 +1791,21 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     setError("");
     setRunning(true);
     setRunStatus("running");
-    abortRef.current = new AbortController();
-    if (chatQuota?.enforced) noteQuotaSendStarted();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setStartingTurn(true);
+    const ownsView = () => abortRef.current === controller;
     try {
       await streamSSEFromPost(
         `/api/chat/sessions/${encodeURIComponent(sessionId)}/messages/retry/stream`,
         {},
-        handleStreamEvent,
-        abortRef.current.signal,
+        event => { if (ownsView()) { setStartingTurn(false); handleStreamEvent(event); } },
+        controller.signal,
         getChatSessionAuthHeaders(sessionId)
       );
       await fetchSessions();
     } catch (err) {
+      if (!ownsView()) return;
       if (err instanceof DOMException && err.name === "AbortError") {
         setRunStatus("stopped");
       } else {
@@ -1593,9 +1813,11 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         setRunStatus("stopped");
       }
     } finally {
-      setRunning(false);
-      setStreamingIdx(-1);
-      abortRef.current = null;
+      if (ownsView()) {
+        setRunning(false); setStartingTurn(false);
+        setStreamingIdx(-1);
+        abortRef.current = null;
+      }
       await refreshChatQuota();
     }
   }
@@ -1618,21 +1840,25 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   }
 
   async function submitClarification(answers: ClarificationAnswer[]) {
-    if (!sessionId || running) return;
+    if (!sessionId || agentWorking) return;
     setError("");
     setRunning(true);
     setRunStatus("running");
-    abortRef.current = new AbortController();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setStartingTurn(true);
+    const ownsView = () => abortRef.current === controller;
     try {
       await streamSSEFromPost(
         getClarificationRespondUrl(sessionId),
         { answers },
-        handleStreamEvent,
-        abortRef.current.signal,
+        event => { if (ownsView()) { setStartingTurn(false); handleStreamEvent(event); } },
+        controller.signal,
         getChatSessionAuthHeaders(sessionId)
       );
       await fetchSessions();
     } catch (err) {
+      if (!ownsView()) return;
       if (err instanceof DOMException && err.name === "AbortError") {
         setRunStatus("stopped");
         return;
@@ -1640,29 +1866,56 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       setError(err instanceof Error ? err.message : t.errClarification);
       setRunStatus("stopped");
     } finally {
-      setRunning(false);
-      setStreamingIdx(-1);
-      abortRef.current = null;
+      if (ownsView()) {
+        setRunning(false); setStartingTurn(false);
+        setStreamingIdx(-1);
+        abortRef.current = null;
+      }
+    }
+  }
+
+  async function submitInteraction(answer: UserResponse) {
+    if (!sessionId || agentWorking) return;
+    const sid = sessionId;
+    setError(""); setRunning(true); setRunStatus("running"); setStartingTurn(true);
+    const controller = new AbortController(); abortRef.current = controller;
+    const ownsView = () => abortRef.current === controller;
+    try {
+      await streamSSEFromPost(`/api/chat/sessions/${encodeURIComponent(sid)}/interactions/respond/stream`, answer,
+        event => { if (ownsView()) { setStartingTurn(false); handleStreamEvent(event); } },
+        controller.signal, getChatSessionAuthHeaders(sid));
+      await fetchSessions();
+    } catch (err) {
+      if (ownsView() && !(err instanceof DOMException && err.name === "AbortError")) {
+        setError(err instanceof Error ? err.message : t.errAskUser);
+        await refreshCurrentSession(sid);
+      }
+    } finally {
+      if (ownsView()) { setRunning(false); setStartingTurn(false); setStreamingIdx(-1); abortRef.current = null; }
     }
   }
 
   async function submitAskUser(answers: ClarificationAnswer[]) {
-    if (!sessionId || running) return;
+    if (!sessionId || agentWorking) return;
     setError("");
     setModelSwitchNotice(t.noticeAskUserSubmitted);
     setRunning(true);
     setRunStatus("running");
-    abortRef.current = new AbortController();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setStartingTurn(true);
+    const ownsView = () => abortRef.current === controller;
     try {
       await streamSSEFromPost(
         getAskUserRespondUrl(sessionId),
         { answers },
-        handleStreamEvent,
-        abortRef.current.signal,
+        event => { if (ownsView()) { setStartingTurn(false); handleStreamEvent(event); } },
+        controller.signal,
         getChatSessionAuthHeaders(sessionId)
       );
       await fetchSessions();
     } catch (err) {
+      if (!ownsView()) return;
       if (err instanceof DOMException && err.name === "AbortError") {
         setRunStatus("stopped");
         return;
@@ -1670,21 +1923,26 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       setError(err instanceof Error ? err.message : t.errAskUser);
       setRunStatus("stopped");
     } finally {
-      setRunning(false);
-      setStreamingIdx(-1);
-      abortRef.current = null;
+      if (ownsView()) {
+        setRunning(false); setStartingTurn(false);
+        setStreamingIdx(-1);
+        abortRef.current = null;
+      }
     }
   }
 
   async function submitApproval(decision: ApprovalDecision) {
-    if (!sessionId || running) return;
+    if (!sessionId || agentWorking) return;
     setError("");
     setModelSwitchNotice(
       decision.decision === "approved" ? t.noticeApprovalApproved : t.noticeApprovalRejected
     );
     setRunning(true);
     setRunStatus("running");
-    abortRef.current = new AbortController();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setStartingTurn(true);
+    const ownsView = () => abortRef.current === controller;
     try {
       await streamSSEFromPost(
         getApprovalDecideUrl(sessionId),
@@ -1693,12 +1951,13 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
           selected_label: decision.selected_label || "",
           feedback: decision.feedback || "",
         },
-        handleStreamEvent,
-        abortRef.current.signal,
+        event => { if (ownsView()) { setStartingTurn(false); handleStreamEvent(event); } },
+        controller.signal,
         getChatSessionAuthHeaders(sessionId)
       );
       await fetchSessions();
     } catch (err) {
+      if (!ownsView()) return;
       if (err instanceof DOMException && err.name === "AbortError") {
         setRunStatus("stopped");
         return;
@@ -1706,28 +1965,34 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       setError(err instanceof Error ? err.message : t.errApproval);
       setRunStatus("stopped");
     } finally {
-      setRunning(false);
-      setStreamingIdx(-1);
-      abortRef.current = null;
+      if (ownsView()) {
+        setRunning(false); setStartingTurn(false);
+        setStreamingIdx(-1);
+        abortRef.current = null;
+      }
     }
   }
 
   async function confirmPlan(plan: PlanStep[], autoExecute: boolean) {
-    if (!sessionId || running) return;
+    if (!sessionId || agentWorking) return;
     setError("");
     setRunning(true);
     setRunStatus("running");
-    abortRef.current = new AbortController();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setStartingTurn(true);
+    const ownsView = () => abortRef.current === controller;
     try {
       await streamSSEFromPost(
         getPlanConfirmUrl(sessionId),
         { plan, auto_execute: autoExecute },
-        handleStreamEvent,
-        abortRef.current.signal,
+        event => { if (ownsView()) { setStartingTurn(false); handleStreamEvent(event); } },
+        controller.signal,
         getChatSessionAuthHeaders(sessionId)
       );
       await fetchSessions();
     } catch (err) {
+      if (!ownsView()) return;
       if (err instanceof DOMException && err.name === "AbortError") {
         setRunStatus("stopped");
         return;
@@ -1735,14 +2000,16 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       setError(err instanceof Error ? err.message : t.errConfirmPlan);
       setRunStatus("stopped");
     } finally {
-      setRunning(false);
-      setStreamingIdx(-1);
-      abortRef.current = null;
+      if (ownsView()) {
+        setRunning(false); setStartingTurn(false);
+        setStreamingIdx(-1);
+        abortRef.current = null;
+      }
     }
   }
 
   async function handleIterationDecision(action: "satisfied" | "modify_plan" | "continue") {
-    if (!sessionId || running) return;
+    if (!sessionId || agentWorking) return;
     setError("");
     try {
       const result = await iterationDecide(sessionId, action);
@@ -1767,21 +2034,25 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   }
 
   async function handleStepDecision(action: "continue" | "abort") {
-    if (!sessionId || running) return;
+    if (!sessionId || agentWorking) return;
     setError("");
     setRunning(true);
     setRunStatus("running");
-    abortRef.current = new AbortController();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setStartingTurn(true);
+    const ownsView = () => abortRef.current === controller;
     try {
       await streamSSEFromPost(
         getStepDecideUrl(sessionId),
         { action },
-        handleStreamEvent,
-        abortRef.current.signal,
+        event => { if (ownsView()) { setStartingTurn(false); handleStreamEvent(event); } },
+        controller.signal,
         getChatSessionAuthHeaders(sessionId)
       );
       await fetchSessions();
     } catch (err) {
+      if (!ownsView()) return;
       if (err instanceof DOMException && err.name === "AbortError") {
         setRunStatus("stopped");
         return;
@@ -1789,9 +2060,11 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       setError(err instanceof Error ? err.message : t.errStepDecision);
       setRunStatus("stopped");
     } finally {
-      setRunning(false);
-      setStreamingIdx(-1);
-      abortRef.current = null;
+      if (ownsView()) {
+        setRunning(false); setStartingTurn(false);
+        setStreamingIdx(-1);
+        abortRef.current = null;
+      }
     }
   }
 
@@ -1803,18 +2076,22 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     setError("");
     setRunning(true);
     setRunStatus("running");
-    abortRef.current = new AbortController();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    setStartingTurn(true);
+    const ownsView = () => abortRef.current === controller;
     try {
       await streamSSEFromPost(
         getSubReportDecideUrl(sessionId),
         { action, comment: comment || "" },
-        handleStreamEvent,
-        abortRef.current.signal,
+        event => { if (ownsView()) { setStartingTurn(false); handleStreamEvent(event); } },
+        controller.signal,
         getChatSessionAuthHeaders(sessionId)
       );
       await fetchSessions();
       return true;
     } catch (err) {
+      if (!ownsView()) return false;
       if (err instanceof DOMException && err.name === "AbortError") {
         setRunStatus("stopped");
         return false;
@@ -1823,9 +2100,11 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       setRunStatus("stopped");
       return false;
     } finally {
-      setRunning(false);
-      setStreamingIdx(-1);
-      abortRef.current = null;
+      if (ownsView()) {
+        setRunning(false); setStartingTurn(false);
+        setStreamingIdx(-1);
+        abortRef.current = null;
+      }
     }
   }
 
@@ -1908,6 +2187,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   const isExpertIterationGate =
     isExpertSession && snapStatus === "waiting_for_iteration";
   const isWaitingForInteraction =
+    Boolean(snapshot?.pending_interaction) ||
     isKimiAskUser ||
     isKimiApproval ||
     isExpertClarification ||
@@ -1915,7 +2195,15 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     isExpertStepGate ||
     isExpertIterationGate ||
     isSubReportGate;
+  useFileTransfer(composerElement, {
+    disabled: running || goalRunning || addingFiles || isWaitingForInteraction,
+    label: lang === "zh" ? "松开以添加文件" : "Drop files to attach",
+    unavailable: lang === "zh" ? "请等待当前操作完成后添加文件。" : "Wait for the current operation before attaching files.",
+    unreadable: lang === "zh" ? "请选择文件，暂不支持文件夹。" : "Choose files; folders are not supported.",
+    onFiles: addComposerFiles, onError: setError,
+  }, !researcherMode && chatMode === "science_agent");
   const composerWaitingText = (() => {
+    if (snapshot?.pending_interaction) return t.composerWaitingAskUser;
     if (isKimiApproval) return t.composerWaitingApproval;
     if (isKimiAskUser) return t.composerWaitingAskUser;
     switch (snapStatus) {
@@ -1941,7 +2229,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   const quotaExhausted = Boolean(chatQuota?.enforced && (chatQuota.remaining ?? 0) <= 0);
   const sendTooltip = chatQuota?.enforced
     ? quotaExhausted
-      ? t.quotaReached(chatQuota.limit ?? 3, chatQuota.limit ?? 3)
+      ? quotaRetryLabel(chatQuota, lang)
       : t.quotaRemaining(chatQuota.remaining ?? 0, chatQuota.limit ?? 3)
     : t.sendMessage;
   const isLocalMode = chatQuota?.mode === "local";
@@ -1968,7 +2256,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       const hasKey = keyStatus[m.provider] === true;
       const requiresAdapter = m.requires_adapter === true;
       const adapterReady = requiresAdapter ? Boolean(registry.data?.active_gateway) : true;
-      const disabled = (requiresAdapter && !adapterReady) || m.disabled === true;
+      const disabled = !hasKey || !isFreeResearchModel(m) || (requiresAdapter && !adapterReady) || m.disabled === true;
       const title = m.disabled
         ? (m.disabled_reason || t.titleGatewayRequired)
         : requiresAdapter && !adapterReady
@@ -1996,11 +2284,18 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   const selectedProvider = selectedModelSpec?.provider || "";
   const selectedProviderHasKey = selectedProvider ? keyStatus[selectedProvider] === true : true;
   // Local: model picker for both Agent (→ kimi) and Expert (→ graph).
-  const showLocalModelControls = isLocalMode;
+  const showLocalModelControls = isLocalMode && ["science_agent"].includes(chatMode) && !agentExecution;
 
   // Keep selected model aligned with chat mode once registry is available.
   useEffect(() => {
     if (registry.loading || !registry.data) return;
+    if (isLocalMode && pendingSessionModel.current !== null) {
+      const saved = pendingSessionModel.current;
+      pendingSessionModel.current = null;
+      const preferred = registryModels.find(m => m.id === saved || `${m.provider}/${m.id}` === saved)?.id;
+      setSelectedModel(pickExpertModelId(registryModels, preferred, {expertModel: getExpertModelId(registry.data)}));
+      return;
+    }
     // Online locks: Agent → kimi sentinel, Expert → model-config.yaml pin.
     if (!isLocalMode) {
       const locked =
@@ -2046,65 +2341,30 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     setKeyPanelValue("");
   }
 
-  function handleChatModeChange(next: ChatMode) {
-    if (running || next === chatMode) return;
-    if (next === "science_agent") {
-      const agent = registryModels.find((m) => isKimiEngineModel(m));
-      if (agent?.disabled) {
-        setModelSwitchNotice(agent.disabled_reason || t.noticeAgentDisabled);
-        return;
-      }
-      if (!agent && registry.data) {
-        setModelSwitchNotice(t.noticeAgentDisabled);
-        return;
-      }
-      setChatMode("science_agent");
-      persistChatMode("science_agent");
-      if (!isLocalMode) {
-        setSelectedModel(SCIENCE_AGENT_MODEL_ID);
-        setKeyPanelProvider("");
-      } else {
-        // Keep current graph model as the kimi underlying LLM when possible.
-        const currentSpec = registryModels.find((m) => m.id === selectedModel);
-        const keepCurrent = Boolean(
-          currentSpec && isGraphEngineModel(currentSpec) && !currentSpec.disabled
-        );
-        const nextModel = keepCurrent
-          ? selectedModel
-          : pickExpertModelId(registryModels, selectedModel, {
-              expertModel: getExpertModelId(registry.data),
-            });
-        setSelectedModel(nextModel);
-        setKeyPanelProvider("");
-      }
-    } else {
-      setChatMode("science_expert");
-      persistChatMode("science_expert");
-      if (!isLocalMode) {
-        setSelectedModel(getExpertModelId(registry.data));
-        setKeyPanelProvider("");
-      } else {
-        const currentSpec = registryModels.find((m) => m.id === selectedModel);
-        const keepCurrent =
-          Boolean(currentSpec && isGraphEngineModel(currentSpec) && !currentSpec.disabled) ||
-          customModels.some((m) => m.id === selectedModel);
-        const nextModel = keepCurrent
-          ? selectedModel
-          : pickExpertModelId(registryModels, selectedModel, {
-              expertModel: getExpertModelId(registry.data),
-            });
-        setSelectedModel(nextModel);
-        const spec = registryModels.find((m) => m.id === nextModel);
-        if (spec && keyStatus[spec.provider] !== true && !isKimiEngineModel(spec)) {
-          openKeyPanelForProvider(spec.provider);
-        } else {
-          setKeyPanelProvider("");
-        }
-      }
-    }
-    if ((snapshot?.history?.length || 0) > 0) {
-      setModelSwitchNotice(t.noticeModeSwitched);
-    }
+  function handleChatModeChange(next: ChatMode, targetId?: string, updateUrl = true) {
+    if (startingTurn || (next === activeModeRef.current && !researcherMode)) return;
+    detachStream();
+    modeChoiceRevision.current += 1;
+    activeModeRef.current = next;
+    setChatMode(next);
+    persistChatMode(next);
+    setFileSourceMenuOpen(false);
+    setWorkspacePickerOpen(false);
+    setModelSwitchNotice("");
+    setKeyPanelProvider("");
+    setError("");
+    setStreamingIdx(-1);
+    setRunStatus("stopped");
+    const remembered = sessionStorage.getItem(activeSessionStorageKey(next));
+    const nextId = targetId ?? remembered ?? ((next === "science_expert" ? scientistSessionId : "") || sessionCandidates(sessions, next, null, sessionStorage.getItem(LEGACY_SESSION_STORAGE_KEY))[0] || "");
+    sessionLoad.current = { target: nextId, revision: sessionLoad.current.revision + 1, pending: false };
+    setSessionId(nextId);
+    setSnapshot(null);
+    snapshotRef.current = null;
+    rememberActiveSession(next, nextId);
+    if (updateUrl) syncSessionUrl(nextId, next);
+    if (nextId) void refreshCurrentSession(nextId, { syncComposer: true, mode: next, updateUrl: false })
+      .catch(err => setError(err instanceof Error ? err.message : t.errCreateSession));
   }
 
   function handleModelChange(next: string) {
@@ -2113,8 +2373,10 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     if (next === OTHER_MODEL_OPTION) {
       // Custom endpoints are Expert-only.
       if (chatMode !== "science_expert") {
-        setChatMode("science_expert");
-        persistChatMode("science_expert");
+        handleChatModeChange("science_expert");
+        const nextParams = new URLSearchParams(workspaceParams);
+        nextParams.set("mode", "scientist");
+        setWorkspaceParams(nextParams, { replace: true });
       }
       setShowCustomModelModal(true);
       return;
@@ -2245,128 +2507,96 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     }
   }
 
-  return (
-    <div className="chat-page">
-      <section className={`chat-grid${sessionsCollapsed ? " left-collapsed" : ""}${logsCollapsed ? " right-collapsed" : ""}`}>
-        <aside
-          className={`chat-panel left${sessionsCollapsed ? " collapsed" : ""}`}
-          data-collapsed-label={t.sessions}
-          onClick={sessionsCollapsed ? () => setSessionsCollapsed(false) : undefined}
-        >
-          <div className="session-panel-head" onClick={() => setSessionsCollapsed(!sessionsCollapsed)}>
-            <h3>{t.sessions} <span className="panel-toggle-icon">{sessionsCollapsed ? "›" : "‹"}</span></h3>
-          </div>
-          {!sessionsCollapsed && (
-            <>
-              <button
-                type="button"
-                className="session-new-btn"
-                onClick={() => void createAndActivateSession()}
-                disabled={running}
-              >
-                {t.newSession}
-              </button>
-              <div className="session-list">
-                {sessions.map((s) => {
-                  const raw =
-                    (s.session_id === sessionId ? activeSessionTitle : "") ||
-                    s.title?.trim() ||
-                    "";
-                  const label = abbreviateSessionTitle(raw) || raw || t.newChat;
-                  return (
-                  <div
-                    key={s.session_id}
-                    className={s.session_id === sessionId ? "session-item active" : "session-item"}
-                  >
-                    <button
-                      className="session-select-btn"
-                      onClick={() => void refreshCurrentSession(s.session_id)}
-                      disabled={running && s.session_id === sessionId}
-                      title={label}
-                    >
-                      <span className="session-title-label">{label}</span>
-                      <small className="session-time-label">{new Date(s.created_at).toLocaleString()}</small>
-                      <small className="session-meta-label">{s.status || t.idle} · {s.history_size} {t.msgs}</small>
-                    </button>
-                    <button
-                      type="button"
-                      className="session-delete-btn"
-                      onClick={(e) => { e.stopPropagation(); void deleteAndSelectNextSession(s.session_id); }}
-                      disabled={running}
-                      title={t.deleteSession}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                  );
-                })}
-                {sessions.length === 0 && <div className="session-empty">{t.noSessions}</div>}
-              </div>
-              {sessionId && (
-                <div className="session-sidebar-footer">
-                  <button
-                    type="button"
-                    className="session-copy-btn"
-                    onClick={() => void copySessionId(sessionId)}
-                    title={t.copyFullId}
-                  >
-                    {copiedSessionId === sessionId ? t.copied : t.copySessionId}
-                  </button>
-                </div>
-              )}
-            </>
-          )}
-        </aside>
+  function historyIsRunning(row: { session_id: string; status?: string }) {
+    if (row.session_id === scientistSessionId && isRunActive(goalStatuses[row.session_id])) return true;
+    if (row.session_id === sessionId && agentWorking) return true;
+    return isRunActive(row.status);
+  }
 
-        <section className="chat-panel center">
+  const isNewChat = !routeSessionId && (researcherMode || !sessionId) && !startingTurn && !pendingTurn;
+  const sharedHistory: ChatHistoryRow[] = mergeHistoryActivity([
+    ...sessions.map(s => ({ id: s.session_id, mode: s.chat_mode || "science_agent" as const,
+      title: (!researcherMode && s.session_id === sessionId ? activeSessionTitle : "") || s.title?.trim() || t.newChat,
+      date: s.created_at, running: historyIsRunning(s), canDelete: true })),
+    ...researchReports.map(r => ({ id: r.id, mode: "researcher" as const, title: r.title,
+      date: r.created * 1000, running: ["queued", "running"].includes(r.status), canDelete: chatQuota?.mode === "online" })),
+  ], historyActivity);
+  const visibleHistoryMode = researcherMode ? "researcher" : chatMode;
+  const historyActiveId = (researcherMode ? routeSessionId : sessionId) || Object.values(historyActivity).find(row => row.mode === visibleHistoryMode)?.id || "";
+  const nativeUnavailable = registryModels.find(m => isKimiEngineModel(m))?.disabled;
+  const agentBlockedReason = !agentCatalogReady
+    ? (lang === "zh" ? "请选择可用的执行器和模型。" : "Choose an available executor and model.")
+    : !isLocalMode ? ""
+    : !agentExecution && nativeUnavailable
+    ? (lang === "zh" ? "Kimi 暂不可用，请选择其他执行器。" : "Kimi is unavailable. Choose another executor.")
+    : !agentExecution && (!selectedModelSpec || !isFreeResearchModel(selectedModelSpec))
+    ? (lang === "zh" ? "请选择免费模型。" : "Select a free model.")
+    : !agentExecution && !selectedProviderHasKey
+    ? (lang === "zh" ? "请配置 API Key。" : "Add an API key for this model.") : "";
+
+  return (
+    <div className="chat-page" ref={chatLayoutRef} data-new-chat={isNewChat} data-research-mode={researcherMode ? "researcher" : chatMode}>
+      <section className="chat-grid">
+        <SidebarContent>
+          <UnifiedChatHistory rows={sharedHistory} activeKey={historyRowKey({ id: historyActiveId, mode: visibleHistoryMode })}
+            lang={lang} disabled={startingTurn}
+            onOpen={row => { navigate(chatSessionLocation(lang, row.id, row.mode)); closeOnNarrow(); }}
+            onDelete={row => row.mode === "researcher" ? researcherPanelRef.current?.deleteReport(row.id) || Promise.resolve(false) : deleteAndSelectNextSession(row.id)}/>
+        </SidebarContent>
+
+        <section className="chat-panel center quota-notice-anchor">
+          <div className="chat-notice-stack" ref={setNoticeTarget}>
+            <QuotaNotice quota={chatQuota} lang={lang} />
+            {error && !isDailyQuotaMessage(error) && <ChatNotice lang={lang} message={/exceeds 10 MB|超过 10 MB|Each file must be 10 MB|turn limit|轮上限|message is too long|消息太长/i.test(error) ? error : friendlyErrorHint(error, t)} onDismiss={dismissError} />}
+          </div>
           <div className="timeline-column">
-            <div className="timeline-wrap" ref={timelineRef}>
-            {/* Expert 模式：时间线上方轻量流水线进度（不跟 Agent/kimi 耦合） */}
-            {isExpertSession && snapshot?.status && (
-              <PipelineProgress
-                status={snapshot.status}
-                plan={snapshot.plan || []}
-                toolExecutions={(snapshot.tool_executions || []).filter(
-                  (e) => !isResearchNoiseTool(e as ToolExecution)
-                )}
-              />
-            )}
-            <ChatTimeline
-              items={snapshot?.history || []}
+            <div className="timeline-wrap" ref={timelineRef} onScroll={e => { scrollPositions.current[`${sessionId}:${chatMode}`] = e.currentTarget.scrollTop; }}>
+            {isNewChat && <NewChatStart mode={routeMode} lang={lang} onChange={next => navigate(newChatLocation(lang, next, freshDraftId || crypto.randomUUID()), { replace: true })}/>}
+            <ResearcherPanel onHistoryActivity={onHistoryActivity} ref={researcherPanelRef} freshDraftId={freshDraftId} onHistoryChange={setResearchReports} routeJobId={researcherMode ? routeSessionId : undefined} onJobChange={(id, replace = false) => { if (visibleModeRef.current === "researcher") syncSessionUrl(id, "researcher", replace); }} noticeTarget={noticeTarget} online={chatQuota?.mode === "online"} active={researcherMode} lang={lang} toolbarTarget={researchToolbar} composerTarget={scienceComposer} actionsTarget={scienceActions} footerTarget={scienceFooter} onRunning={setResearcherRunning}/>
+            <ScienceGoalPanel onHistoryActivity={onHistoryActivity} noticeTarget={noticeTarget} online={!isLocalMode} toolbarTarget={researchToolbar} composerTarget={scienceComposer} actionsTarget={scienceActions} footerTarget={scienceFooter} sessionId={chatMode === "science_expert" ? sessionId : scientistSessionId} draftRevision={scientistDraftRevision} science={!researcherMode && chatMode === "science_expert"} busy={running}
+              ensureSession={ensureGoalSession} onRunning={setGoalRunning}
+              onGoalStatus={(sid, status) => setGoalStatuses(previous => previous[sid] === status ? previous : { ...previous, [sid]: status })}
+              onChanged={async (sid) => { if (visibleModeRef.current !== "researcher" && activeModeRef.current === "science_expert" && sid === scientistSessionId) void refreshCurrentSession(sid, { syncComposer: false }); await fetchSessions(); }} />
+            {!researcherMode && chatMode === "science_agent" && <ChatTimeline
+              running={running}
+              items={visibleHistory}
               streamingIndex={streamingIdx}
-              onSuggestedPrompt={(text) => setMessage(text)}
+              onSuggestedPrompt={(text) => { setMessage(text); composerElement?.querySelector<HTMLTextAreaElement>("textarea")?.focus(); }}
               sessionId={sessionId}
               toolExecutions={(snapshot?.tool_executions || []).filter(
                 (e) => !isResearchNoiseTool(e as ToolExecution)
               )}
-              securityEvents={snapshot?.security_events || []}
+              securityEvents={!researcherMode && snapshot?.security_events || []}
               onRetry={() => void retryLastMessage()}
-              retryDisabled={running || quotaExhausted}
+              retryDisabled={running || goalRunning || Boolean(agentBlockedReason)}
               onQuoteReply={(text) => {
                 const lines = text.split("\n").slice(0, 3);
                 const quoted = lines.map((l) => `> ${l}`).join("\n");
                 setMessage((prev) => `${quoted}\n\n${prev}`);
               }}
-            />
+            />}
+            {!researcherMode && chatMode === "science_agent" && snapshot?.pending_interaction &&
+              <InteractionCard key={snapshot.pending_interaction.id} interaction={snapshot.pending_interaction}
+                sessionId={sessionId} disabled={agentWorking} onSubmit={submitInteraction}/>}
             {/* Science Agent (kimi-code) gates — never mix with Expert forms */}
-            {isAgentSession &&
+            {!researcherMode && isAgentSession &&
               streamingIdx < 0 &&
               isKimiAskUser &&
               (snapshot?.clarification_questions?.length ?? 0) > 0 && (
                 <div className="agent-gate-wrap">
                   <AskUserCard
-                    key={`ask-${waitingFor}-${snapshot?.kimi_pending_question?.question_id || ""}-${(snapshot?.clarification_questions || []).map((q) => q.question).join("|").slice(0, 80)}`}
+                    key={`ask-${waitingFor}-${!researcherMode && snapshot?.kimi_pending_question?.question_id || ""}-${(snapshot?.clarification_questions || []).map((q) => q.question).join("|").slice(0, 80)}`}
                     questions={snapshot!.clarification_questions}
                     onSubmit={submitAskUser}
                     disabled={running}
                   />
                 </div>
               )}
-            {isAgentSession && streamingIdx < 0 && isKimiApproval && (
+            {!researcherMode && isAgentSession && streamingIdx < 0 && isKimiApproval && (
                 <div className="agent-gate-wrap">
                   <ApprovalCard
-                    key={`appr-${waitingFor}-${snapshot?.kimi_pending_approval?.approval_id || ""}`}
-                    toolName={snapshot?.kimi_pending_approval?.tool_name || ""}
+                    key={`appr-${waitingFor}-${!researcherMode && snapshot?.kimi_pending_approval?.approval_id || ""}`}
+                    toolName={!researcherMode && snapshot?.kimi_pending_approval?.tool_name || ""}
                     prompt={
                       snapshot?.kimi_pending_approval?.approval_prompt ||
                       snapshot?.approval_prompt ||
@@ -2390,20 +2620,20 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
             {/* Science Expert (LangGraph PI→CB→MLS→SC) checkpoints only.
                 Waiting gates must mount even if streamingIdx briefly lags —
                 otherwise ClarificationForm stays hidden behind a Thinking pulse. */}
-            {isExpertSession &&
+            {!researcherMode && isExpertSession &&
               isExpertClarification &&
               (snapshot?.clarification_questions?.length ?? 0) > 0 && (
                 <div className="expert-checkpoint-card">
                   <div className="expert-checkpoint-title">{t.checkpointClarify}</div>
                   <ClarificationForm
-                    key={`${snapshot?.waiting_for}-${(snapshot?.clarification_questions || []).map((q) => q.question).join("|").slice(0, 120)}`}
+                    key={`${!researcherMode && snapshot?.waiting_for}-${(snapshot?.clarification_questions || []).map((q) => q.question).join("|").slice(0, 120)}`}
                     questions={snapshot!.clarification_questions}
                     onSubmit={submitClarification}
                     disabled={running}
                   />
                 </div>
               )}
-            {isExpertSession &&
+            {!researcherMode && isExpertSession &&
               isExpertPlanGate &&
               (snapshot?.plan?.length ?? 0) > 0 && (
                 <div className="expert-checkpoint-card">
@@ -2415,7 +2645,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                   />
                 </div>
               )}
-            {isExpertSession && isSubReportGate && (
+            {!researcherMode && isExpertSession && isSubReportGate && (
               <div className="expert-checkpoint-card">
                 <div className="expert-checkpoint-title">{t.checkpointSubReport}</div>
                 <SubReportCheckpoint
@@ -2424,7 +2654,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                 />
               </div>
             )}
-            {isExpertSession && isExpertStepGate && (
+            {!researcherMode && isExpertSession && isExpertStepGate && (
               <div className="expert-checkpoint-card">
                 <div className="expert-checkpoint-title">{t.checkpointStep}</div>
                 <StepCheckpoint
@@ -2433,7 +2663,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                 />
               </div>
             )}
-            {isExpertSession && isExpertIterationGate && (
+            {!researcherMode && isExpertSession && isExpertIterationGate && (
               <div className="expert-checkpoint-card">
                 <div className="expert-checkpoint-title">{t.checkpointIteration}</div>
                 <IterationDecision
@@ -2444,67 +2674,39 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
             )}
             </div>
           </div>
-          <div className="composer">
-            {/* Agent context is managed automatically (auto-compact ≥90%).
-                No Plan/Compact/Fork/Clear controls — those are kimi-side decisions. */}
-            {isAgentSession && sessionId && (() => {
-              const ctx = snapshot?.kimi_context;
-              const usage = Number(ctx?.context_usage || 0);
-              const pct = Math.round(Math.max(0, Math.min(1, usage)) * 100);
-              const used = Number(ctx?.context_tokens || 0);
-              const max = Number(ctx?.max_context_tokens || 0);
-              if (!ctx || (!usage && !used && !max)) return null;
-              return (
-                <div className="agent-controls" aria-label="Science Agent context">
-                  <span
-                    className={`agent-context-pill${pct >= 90 ? " is-high" : pct >= 70 ? " is-warn" : ""}`}
-                    title={t.agentContextUsage(pct, used, max)}
-                  >
-                    {t.agentContextUsage(pct, used, max)}
-                  </span>
-                </div>
-              );
-            })()}
-            <div className="composer-textarea-wrap">
+          <div className="composer" ref={setComposerElement} data-science={!researcherMode && chatMode === "science_expert"}>
+            <div className="scientist-composer-input" ref={setScienceComposer} />
+            {!researcherMode && chatMode === "science_agent" && (<div className="composer-textarea-wrap">
               <textarea
                 rows={4}
+                aria-label={lang === "zh" ? "消息" : "Message"}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyDown={onComposerKeyDown}
                 placeholder={isWaitingForInteraction ? composerWaitingText : t.composerPlaceholder}
-                disabled={running || quotaExhausted || isWaitingForInteraction}
+                disabled={agentWorking || goalRunning || isWaitingForInteraction}
               />
-            </div>
+            </div>)}
             <div className={`composer-row${showLocalModelControls ? " composer-row--expert" : ""}`}>
-              <div className="composer-controls">
-                <div className="composer-mode-switch" role="group" aria-label={t.chatModeAria}>
-                  <button
-                    type="button"
-                    className={`composer-mode-btn${chatMode === "science_agent" ? " is-active" : ""}`}
-                    aria-pressed={chatMode === "science_agent"}
-                    title={t.modeScienceAgent}
-                    disabled={running}
-                    onClick={() => handleChatModeChange("science_agent")}
-                  >
-                    {t.modeAgentShort}
-                  </button>
-                  <button
-                    type="button"
-                    className={`composer-mode-btn${chatMode === "science_expert" ? " is-active" : ""}`}
-                    aria-pressed={chatMode === "science_expert"}
-                    title={t.modeScienceExpert}
-                    disabled={running}
-                    onClick={() => handleChatModeChange("science_expert")}
-                  >
-                    {t.modeExpertShort}
-                  </button>
-                </div>
-                {showLocalModelControls && (
+              <div className={`composer-controls${!researcherMode && chatMode === "science_agent" ? " composer-controls--agent" : ""}`}>
+        <span className="research-workspace-header chat-current-mode" aria-label={lang === "zh" ? "当前模式" : "Current mode"}>
+          <ChatModeIcon mode={researcherMode ? "researcher" : chatMode}/><span>{CHAT_MODE_LABELS[researcherMode ? "researcher" : chatMode]}</span>
+        </span>
+        <div className="research-execution-controls" ref={setResearchToolbar}>
+{<div className="agent-execution-controls" hidden={researcherMode || chatMode !== "science_agent"}><AgentExecutionPicker online={!isLocalMode}
+                  value={agentExecution} onChange={(next, userInitiated = true) => {
+                    if (userInitiated) modeChoiceRevision.current += 1;
+                    setAgentExecution(next);
+                  }} lang={lang} onReadyChange={setAgentCatalogReady}
+                  locked={Boolean(snapshot?.execution) || Boolean(snapshot?.history?.some(h => h.role === "user"))}
+                  busy={running || goalRunning || Boolean(sessionId && !snapshot)}
+                /></div>}
+                {!researcherMode && showLocalModelControls && (
                   <>
                     <label className="composer-select-shell">
                       <span className="composer-select-meta">
                         <span className="composer-select-label">{t.modelLabel}</span>
-                        {chatMode === "science_agent" && (
+                        {!researcherMode && chatMode === "science_agent" && (
                           <span className="composer-select-hint">{t.modelViaKimi}</span>
                         )}
                       </span>
@@ -2528,7 +2730,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                               {m.disabled ? t.gatewayRequiredSuffix : ""}
                             </option>
                           ))}
-                          {chatMode === "science_expert" && (
+                          {!researcherMode && chatMode === "science_expert" && (
                             <option value={OTHER_MODEL_OPTION}>{t.otherModel}</option>
                           )}
                         </select>
@@ -2540,7 +2742,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                       </span>
                     </label>
                     {/* VF provider keys apply to Expert/graph only; Agent uses kimi's own catalog. */}
-                    {chatMode === "science_expert" &&
+                    {!researcherMode && chatMode === "science_expert" &&
                       selectedModelSpec &&
                       !isKimiEngineModel(selectedModelSpec) && (
                       <button
@@ -2557,7 +2759,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                         {selectedProviderHasKey ? t.keyOk : t.setKey}
                       </button>
                     )}
-                    {chatMode === "science_expert" && (registry.data?.gateways?.length ?? 0) > 0 && (
+                    {!researcherMode && chatMode === "science_expert" && (registry.data?.gateways?.length ?? 0) > 0 && (
                       <label className="composer-select-shell composer-select-shell--compact">
                         <span className="composer-select-meta">
                           <span className="composer-select-label">{t.gatewayLabel}</span>
@@ -2587,17 +2789,21 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                     )}
                   </>
                 )}
+        </div>
               </div>
               <div className="composer-actions">
+                <div className="scientist-composer-actions" ref={setScienceActions} />
+                {!researcherMode && chatMode === "science_agent" && <>
+                <ContextUsageRing context={snapshot?.agent_context} nativeContext={snapshot?.kimi_context} lang={lang} />
                 <div className="file-source-inline" ref={fileSourceMenuRef}>
                   <button
                     type="button"
-                    className={`file-upload-icon-btn${running || quotaExhausted ? " disabled" : ""}${fileSourceMenuOpen ? " is-open" : ""}`}
+                    className={`file-upload-icon-btn${running ? " disabled" : ""}${fileSourceMenuOpen ? " is-open" : ""}`}
                     title={t.uploadFiles}
                     aria-label={t.fileSourceAria}
                     aria-haspopup="menu"
                     aria-expanded={fileSourceMenuOpen}
-                    disabled={running || quotaExhausted}
+                    disabled={running}
                     onClick={() => setFileSourceMenuOpen((v) => !v)}
                   >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -2609,11 +2815,12 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                     type="file"
                     multiple
                     onChange={(e) => {
-                      setFiles(Array.from(e.target.files || []));
-                      setFileSourceMenuOpen(false);
+                      const picked = Array.from(e.target.files || []);
+                      e.target.value = "";
+                      void addComposerFiles(picked);
                     }}
-                    disabled={running || quotaExhausted}
-                    className="file-upload-hidden"
+                    disabled={running}
+                    className="file-upload-hidden" hidden tabIndex={-1}
                   />
                   {fileSourceMenuOpen && (
                     <div className="file-source-menu" role="menu" aria-label={t.fileSourceAria}>
@@ -2650,43 +2857,20 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                   )}
                   <WorkspaceFilePicker
                     workspaceEnabled={workspaceEnabled}
-                    disabled={running || quotaExhausted}
+                    disabled={running}
                     allowMultiple
                     hideTrigger
                     open={workspacePickerOpen}
                     onOpenChange={setWorkspacePickerOpen}
                     buttonLabel={t.fromWorkspace}
                     onPick={(picked) => {
-                      setWorkspaceFiles(picked);
+                      setWorkspaceFiles(previous => [...previous, ...picked.filter(file => !previous.some(old => old.id === file.id))]);
                       setWorkspacePickerOpen(false);
                     }}
                   />
                 </div>
-                {chatQuota?.enforced && (
-                  <span
-                    className={`chat-quota-pill${quotaExhausted ? " exhausted" : ""}`}
-                    title={t.quotaPillTitle(chatQuota.remaining ?? 0, chatQuota.limit ?? 3)}
-                  >
-                    {quotaExhausted
-                      ? t.quotaPillExhausted(chatQuota.used ?? 0, chatQuota.limit ?? 3)
-                      : t.quotaPillLabel(chatQuota.remaining ?? 0, chatQuota.limit ?? 3)}
-                  </span>
-                )}
-                <button
-                  type="button"
-                  className="composer-icon-btn"
-                  onClick={() => void exportCurrentSession()}
-                  disabled={running || !sessionId}
-                  title={t.exportTooltip}
-                  aria-label={t.export}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="7 10 12 15 17 10" />
-                    <line x1="12" y1="15" x2="12" y2="3" />
-                  </svg>
-                </button>
-                {running ? (
+
+                {agentWorking ? (
                   <button
                     type="button"
                     className="composer-icon-btn composer-stop-btn"
@@ -2701,7 +2885,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                     type="button"
                     className="composer-icon-btn composer-send-btn"
                     onClick={() => void sendMessage()}
-                    disabled={quotaExhausted}
+                    disabled={addingFiles || Boolean((sessionId || routeSessionId) && !snapshot) || goalRunning || Boolean(agentBlockedReason) || isWaitingForInteraction || (!message.trim() && !files.length && !workspaceFiles.length)}
                     title={sendTooltip}
                     aria-label={t.sendTooltipShort}
                   >
@@ -2711,13 +2895,15 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                     </svg>
                   </button>
                 )}
+                </>}
               </div>
             </div>
-            {modelSwitchNotice && (
-              <div className="model-switch-notice" role="status">
-                {modelSwitchNotice}
-              </div>
-            )}
+            <div className="composer-guidance">
+              {!researcherMode && chatMode === "science_agent" && <span className="composer-help" role={agentBlockedReason || modelSwitchNotice ? "status" : undefined} title={agentBlockedReason || modelSwitchNotice || undefined}>{agentBlockedReason || modelSwitchNotice || (lang === "zh" ? "Enter 发送 · Shift + Enter 换行" : "Enter to send · Shift + Enter for a new line")}</span>}
+
+
+              <div className="scientist-composer-footer" ref={setScienceFooter}/>
+            </div>
             {keyPanelProvider && (
               <div
                 className="model-key-panel"
@@ -2792,90 +2978,54 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
                 </button>
               </div>
             )}
-            {(files.length > 0 || workspaceFiles.length > 0) && (
-              <div className="file-preview">
-                {files.map((f) => (
-                  <span key={f.name}>{f.name}</span>
+            {!researcherMode && chatMode === "science_agent" && (files.length > 0 || workspaceFiles.length > 0) && (
+              <div className="file-preview" aria-label={lang === "zh" ? "待发送文件" : "Attached files"}>
+                {files.map((f, index) => (
+                  <span key={`${f.name}:${f.size}:${f.lastModified}`}><span title={f.name}>{isStructureFile(f.name) ? <button type="button" className="attachment-structure-link" onClick={() => { const url = URL.createObjectURL(f); openStructure({ path: f.name, name: f.name, url }); }}>{f.name}</button> : f.name}</span><button type="button" disabled={running} aria-label={`${lang === "zh" ? "移除 " : "Remove "}${f.name}`} onClick={() => setFiles(previous => previous.filter((_, i) => i !== index))}>×</button></span>
                 ))}
                 {workspaceFiles.map((f) => (
-                  <span key={f.id}>{f.display_name} {t.workspaceSuffix}</span>
+                  <span key={f.id}><span title={f.display_name}>{f.display_name} {t.workspaceSuffix}</span><button type="button" disabled={running} aria-label={`${lang === "zh" ? "移除 " : "Remove "}${f.display_name}`} onClick={() => setWorkspaceFiles(previous => previous.filter(file => file.id !== f.id))}>×</button></span>
                 ))}
               </div>
             )}
-            {error && <ErrorAlert message={error} onDismiss={() => setError("")} t={t} />}
           </div>
         </section>
 
-        <aside
-          className={`chat-panel right${logsCollapsed ? " collapsed" : ""}`}
-          data-collapsed-label={t.executionStatus}
-          onClick={logsCollapsed ? () => setLogsCollapsed(false) : undefined}
-        >
-          <div className="panel-toggle-head term-head" onClick={() => setLogsCollapsed(!logsCollapsed)}>
-            <span className="term-head-dots">
-              <span className="term-dot dot-red" />
-              <span className="term-dot dot-yellow" />
-              <span className="term-dot dot-green" />
-            </span>
-            <span className="term-head-title">{t.executionStatus}</span>
-            <span className="panel-toggle-icon">{logsCollapsed ? "+" : "-"}</span>
-          </div>
-          {!logsCollapsed && (
-            <>
-              <div className="term-body">
-                {!terminalData ? (
-                  <div className="term-line"><span className="term-muted">{t.termWaiting}</span></div>
-                ) : (
-                  <>
-                    <div className="term-section">
-                      <div className="term-line">
-                        <span className="term-prompt">$</span>
-                        <span className="term-cmd">status</span>
-                        <span className={`term-status-badge ${terminalData.status === "completed" ? "st-done" : runStatus === "running" ? "st-run" : "st-idle"}`}>
-                          {terminalData.status}
-                        </span>
-                      </div>
-                      <div className="term-line">
-                        <span className="term-prompt">$</span>
-                        <span className="term-cmd">info</span>
-                        <span className="term-val">{t.termMessagesTools(terminalData.messages, terminalData.toolRuns)}</span>
-                      </div>
-                    </div>
-                    {terminalData.tools.length > 0 && (
-                      <div className="term-section">
-                        <div className="term-line"><span className="term-prompt">$</span><span className="term-cmd">tools --recent</span></div>
-                        {terminalData.tools.map((t, i) => (
-                          <div key={i} className="term-line term-indent">
-                            <span className={`term-tool-dot ${t.status === "failed" ? "dot-fail" : "dot-ok"}`} />
-                            <span className="term-tool-name">{t.name}</span>
-                            {t.ts && <span className="term-ts">{t.ts.split("T")[1]?.slice(0, 8) || t.ts}</span>}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {terminalData.conv.length > 0 && (
-                      <div className="term-section">
-                        <div className="term-line"><span className="term-prompt">$</span><span className="term-cmd">log --tail 6</span></div>
-                        {terminalData.conv.map((c, i) => (
-                          <div key={i} className="term-line term-indent term-log-line">
-                            <span className={`term-role ${c.role === "user" ? "role-user" : "role-agent"}`}>{c.role}</span>
-                            <span className="term-log-content">{c.content || t.termEmpty}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-              <SessionFilesPanel
-                sessionId={sessionId}
-                authHeaders={sessionId ? getChatSessionAuthHeaders(sessionId) : undefined}
-                liveRefresh={running}
-                pollMs={5000}
-              />
-            </>
-          )}
-        </aside>
+        {researcherMode && <div className="chat-file-actions">{chatQuota?.enforced && (
+                  <span
+                    className={`chat-quota-pill${quotaExhausted ? " exhausted" : ""}`}
+                    role="button" tabIndex={0} onClick={() => openQuota()} onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openQuota(); } }}
+                    title={t.quotaPillTitle(chatQuota.remaining ?? 0, chatQuota.limit ?? 3)}
+                  >
+                    {quotaExhausted
+                      ? t.quotaPillExhausted(chatQuota.used ?? 0, chatQuota.limit ?? 3)
+                      : t.quotaPillLabel(chatQuota.remaining ?? 0, chatQuota.limit ?? 3)}
+                  </span>
+                )}</div>}
+        {!researcherMode && <SessionFilesPanel sessionId={sessionId} authHeaders={sessionId ? getChatSessionAuthHeaders(sessionId) : undefined} liveRefresh={running || goalRunning} pollMs={5000} actions={<button
+                  type="button"
+                  className="session-files-toggle chat-export-button"
+                  onClick={() => void exportCurrentSession()}
+                  disabled={running || goalRunning || !sessionId}
+                  title={t.exportTooltip}
+                  aria-label={t.export}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                </button>} quota={<>{chatQuota?.enforced && (
+                  <span
+                    className={`chat-quota-pill${quotaExhausted ? " exhausted" : ""}`}
+                    role="button" tabIndex={0} onClick={() => openQuota()} onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openQuota(); } }}
+                    title={t.quotaPillTitle(chatQuota.remaining ?? 0, chatQuota.limit ?? 3)}
+                  >
+                    {quotaExhausted
+                      ? t.quotaPillExhausted(chatQuota.used ?? 0, chatQuota.limit ?? 3)
+                      : t.quotaPillLabel(chatQuota.remaining ?? 0, chatQuota.limit ?? 3)}
+                  </span>
+                )}</>}/>}
       </section>
       {showCustomModelModal && isLocalMode && (
         <div className="modal-backdrop">
@@ -2922,7 +3072,6 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
           </div>
         </div>
       )}
-      <PageFooter />
     </div>
   );
 }

@@ -1,0 +1,3 @@
+.app-sidebar-history .session-select-btn { flex-direction:row; align-items:center; gap:7px; }
+.app-sidebar-history .session-select-btn .run-spinner { display:inline-flex; flex:0 0 13px; width:13px; height:13px; margin:0; }
+.app-sidebar-history .session-title-label { flex:1; min-width:0; width:auto; }

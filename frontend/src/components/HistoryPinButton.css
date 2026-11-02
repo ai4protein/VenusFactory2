@@ -1,0 +1,9 @@
+.history-entry { position:relative; }
+.history-entry .history-pin-button { position:absolute; right:28px; top:8px; display:grid; place-items:center; width:24px; height:24px; padding:4px; border:0; border-radius:4px; color:#9299a3; background:transparent; opacity:0; cursor:pointer; transition:opacity .12s; }
+.history-entry .history-pin-button svg { width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+.history-entry:hover .history-pin-button,.history-entry:focus-within .history-pin-button,.history-entry .history-pin-button[aria-pressed="true"] { opacity:1; }
+.history-entry .history-pin-button[aria-pressed="true"] { color:#606b78; }
+.history-entry .history-pin-button[aria-pressed="true"] svg path:first-child { fill:#e3e7ec; }
+.history-entry .history-pin-button:hover { color:#374151; background:#fff; }
+.history-entry .history-pin-button:focus-visible { opacity:1; outline:2px solid #8598ae; outline-offset:1px; }
+@media (hover:none) { .history-entry .history-pin-button { opacity:1; } }

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useOutletContext, useParams } from "react-router-dom";
+import { Link, useOutletContext, useParams } from "react-router-dom";
 import {
   getManualSection,
   loadManualMarkdown,
   renderManualHtml,
   type TocItem
 } from "../../lib/manualContent";
+import { manualChatHref } from "../../lib/manualCatalog";
 import type { ManualLayoutContext } from "./ManualLayout";
 import { useLang } from "../../lib/i18n";
 
@@ -16,7 +17,7 @@ const STRINGS = {
     loadingOutline: "Loading outline...",
     noHeadings: "No headings found.",
     imageAlt: "Manual image",
-    imageMissing: "[Image does not exist:"
+    imageMissing: "Image unavailable."
   },
   zh: {
     notFoundTitle: "未找到手册章节",
@@ -24,7 +25,7 @@ const STRINGS = {
     loadingOutline: "目录加载中…",
     noHeadings: "未找到标题。",
     imageAlt: "手册图片",
-    imageMissing: "[图片不存在："
+    imageMissing: "图片暂不可用。"
   }
 };
 
@@ -58,7 +59,7 @@ export function ManualDocPage() {
       }
       const markdown = await loadManualMarkdown(section.key, language);
       if (!alive) return;
-      const rendered = renderManualHtml(markdown);
+      const rendered = renderManualHtml(markdown, language);
       setToc(rendered.toc);
       setHtml(rendered.html);
       setLoading(false);
@@ -87,7 +88,7 @@ export function ManualDocPage() {
       const onError = () => {
         const holder = document.createElement("div");
         holder.className = "manual-v2-image-error";
-        holder.textContent = `${t.imageMissing} ${image.getAttribute("src") || "unknown"}]`;
+        holder.textContent = t.imageMissing;
         image.replaceWith(holder);
       };
       image.addEventListener("error", onError, { once: true });
@@ -147,6 +148,7 @@ export function ManualDocPage() {
       </aside>
 
       <div className="manual-v2-content-wrap">
+        {section && <div className="manual-guide-actions"><Link to={manualChatHref(section.key, language === 'Chinese' ? 'zh' : 'en')} className="manual-guide-ask">{language === 'Chinese' ? '询问 Agent' : 'Ask Agent'} <span aria-hidden="true">↗</span></Link></div>}
         <article
           ref={contentRef}
           className="manual-v2-content manual-v2-markdown"

@@ -1,0 +1,55 @@
+.context-usage {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 34px;
+  color: #67716b;
+}
+.context-usage-meter {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: default;
+}
+.context-usage-meter:focus-visible { outline: 2px solid #8d9b92; outline-offset: 3px; }
+.context-usage-meter svg { width: 28px; height: 28px; fill: none; stroke-width: 2; }
+.context-usage-track { stroke: #e8ebe9; }
+.context-usage-fill { stroke: currentColor; stroke-linecap: round; transition: stroke-dasharray .25s ease; }
+.context-usage-number { position: absolute; font-size: 8px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+.context-usage.is-unknown { color: #a2aaa5; }
+.context-usage.is-warn { color: #a37931; }
+.context-usage.is-high { color: #ac613d; }
+.context-usage-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: -4px;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: max-content;
+  max-width: 240px;
+  padding: 10px 12px;
+  border: 1px solid #e4e7e5;
+  border-radius: 8px;
+  background: #fff;
+  color: #505852;
+  box-shadow: 0 4px 18px #1b2e2112;
+  font-size: 11px;
+  line-height: 1.5;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+.context-usage-tooltip strong { font-size: 12px; font-weight: 600; color: #303b34; }
+.context-usage-tooltip small { font-size: 10px; color: #7a837d; }
+.context-usage:not(.is-dismissed):hover .context-usage-tooltip,
+.context-usage:not(.is-dismissed):focus-within .context-usage-tooltip { visibility: visible; opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .context-usage-fill { transition: none; } }

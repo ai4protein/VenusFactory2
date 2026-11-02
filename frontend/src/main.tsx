@@ -5,6 +5,10 @@ import App from "./App";
 import { LanguageProvider } from "./lib/i18n";
 import "highlight.js/styles/github.css";
 import "./styles.css";
+import "./research-workspace.css";
+import "./conversation.css";
+import "./research-pages.css";
+import "./app-sidebar.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

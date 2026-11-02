@@ -1,2 +1,2 @@
-/** Bundled under /assets so the current StaticFiles mount can serve it without a backend restart. */
-export const LOGO_VENUS_URL = "/assets/logo-venus.png";
+/** Vite emits a versioned asset in every build, including a clean deployment. */
+export const LOGO_VENUS_URL = new URL("../assets/logo-venus.png", import.meta.url).href;

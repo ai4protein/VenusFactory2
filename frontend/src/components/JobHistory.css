@@ -1,0 +1,20 @@
+.job-history{border:1px solid #e4e8e5;border-radius:4px;background:#fff;margin:0 0 20px;padding:14px 16px;font-size:12px;flex-shrink:0}
+.job-history>summary{cursor:pointer;color:#344b3e;font-weight:550}.job-history>summary>span{margin-left:12px;color:#6f7f75;font-size:11px;font-weight:400}
+.job-history-filters{display:flex;gap:8px;margin:16px 0 4px}.job-history-filters input,.job-history-filters select{min-width:0;border:1px solid #e1e6e2;border-radius:4px;background:#fff;color:#415449;padding:8px 10px;font:inherit}.job-history-filters input{flex:1}.job-history-filters select{max-width:160px}
+.job-history-list{max-height:480px;overflow:auto;margin-top:12px}.job-history-list>article{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 18px;padding:14px 0;border-top:1px solid #edf0ee}
+.job-history-main{min-width:0}.job-history-main>strong{display:block;font-weight:550;color:#31483a;margin-bottom:5px;overflow-wrap:anywhere}.job-history-meta{display:flex;flex-wrap:wrap;gap:12px;color:#7a857e;font-size:11px;margin-top:6px}.job-history-meta .completed{color:#35664b}.job-history-meta .failed,.job-history-meta .interrupted{color:#986035}
+.job-number{display:inline-flex;align-items:center;gap:6px;color:#7d8981}.job-number code{font-size:11px;user-select:all}.job-number button{border:0!important;background:transparent!important;font-size:15px!important;padding:0 3px!important;color:#6e7f74;cursor:pointer}
+.job-history-actions{display:flex;gap:8px;align-items:flex-start}.job-history button{border:1px solid #e0e5e1;border-radius:4px;background:white;color:#52665a;font:inherit;padding:5px 9px;cursor:pointer}.job-history button:disabled{opacity:.5;cursor:default}.job-history button:focus-visible,.job-history input:focus-visible,.job-history select:focus-visible{outline:2px solid #739884;outline-offset:2px}
+.job-history-detail{grid-column:1/-1;min-width:0}.job-history pre{max-height:240px;overflow:auto;font-size:11px;white-space:pre-wrap;overflow-wrap:anywhere;background:#f7f9f8;padding:12px}
+.job-history-empty{color:#89938c;margin:20px 0}.job-history-pagination{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding-top:12px;border-top:1px solid #edf0ee;color:#7d8981}.job-history-pagination>span{margin-right:auto}
+.job-queue-state{font-size:12px;color:#708476;line-height:1.6;margin:10px 0}.mp-job-controls{display:flex;align-items:center;gap:10px;margin-top:12px}.mp-job-controls button{padding:6px 10px;font-size:12px}
+.mp-studio>.job-history{margin:8px 16px}.mp-studio>.job-history[open]{max-height:40vh;overflow:auto}
+@media(max-width:600px){.job-history-list>article{gap:8px}.job-history-filters{flex-wrap:wrap}.job-history-filters input{flex-basis:100%}.job-history-filters select{flex:1;max-width:none}.job-history-meta{gap:6px 10px}}
+
+/* Keep job filters independent of the surrounding tool form's full-width fields. */
+.job-history .job-history-filters > input { flex:1 1 240px; width:0; min-width:0; }
+.job-history .job-history-filters > select { flex:0 1 160px; width:160px; max-width:160px; min-width:0; }
+@media (max-width:600px) {
+  .job-history .job-history-filters > input { flex:1 0 100%; width:100%; }
+  .job-history .job-history-filters > select { flex:1 1 120px; width:0; max-width:100%; }
+}

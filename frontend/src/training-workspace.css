@@ -1,0 +1,17 @@
+.training-monitor-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.training-model-note { display:inline-flex; margin:0 0 14px; padding:5px 10px; border:1px solid var(--line); border-radius:4px; color:var(--muted); font-size:12px; }
+.model-lab-page .custom-advanced-panel > .model-lab-advanced { padding:12px 0; }
+.model-lab-page .custom-advanced-panel > .model-lab-advanced > summary { cursor:pointer; font-weight:500; }
+.model-lab-page .custom-advanced-panel > .model-lab-advanced > .custom-advanced-grid { margin-top:16px; }
+.model-lab-page .custom-dataset-preview-stats-compact { white-space:normal; line-height:1.6; }
+.model-lab-page .custom-actions-inline-status { position:sticky; bottom:0; background:#fff; padding:12px 0 0; border-top:1px solid var(--line); z-index:2; }
+.model-lab-page .custom-model-output > .custom-btn-danger { margin-bottom:12px; }
+
+.custom-model-page.model-lab-page.training-page > .job-history { margin-bottom:0; padding:10px 16px; }
+.custom-model-page.model-lab-page.training-page > .model-lab-nav { padding:0 0 10px; }
+.custom-model-page.model-lab-page.training-page > .chat-header { padding-bottom:18px; }
+
+.custom-model-page.model-lab-page.training-page .custom-table-wrap table { min-width:0 !important; width:100%; }
+.custom-model-page.model-lab-page.training-page .custom-table-wrap td { white-space:normal; overflow-wrap:anywhere; }
+
+.model-lab-page .custom-model-controls, .model-lab-page .custom-model-output { max-height:none !important; height:auto !important; }

@@ -19,6 +19,7 @@ import { renderMarkdown } from "../lib/markdown";
 export interface PreviewableFile {
   name: string;
   abs: string;
+  url?: string;
   size: number;
   ext: string;
 }
@@ -141,13 +142,13 @@ export function FilePreviewModal({
 
   if (!file) return null;
   const ext = (file.ext || "").toLowerCase();
-  const url = fileUrlFor(file.abs);
+  const url = file.url || fileUrlFor(file.abs);
 
   let body: React.ReactNode;
   if (STRUCT_EXTS.has(ext)) {
     body = (
       <div className="fpm-molstar-wrap">
-        <MolstarViewer filePath={file.abs} label={file.name} />
+        <MolstarViewer filePath={file.abs} sourceUrl={url} format={file.ext} label={file.name} />
       </div>
     );
   } else if (IMAGE_EXTS.has(ext)) {
@@ -156,6 +157,8 @@ export function FilePreviewModal({
         <img src={url} alt={file.name} />
       </div>
     );
+  } else if (ext === "pdf") {
+    body = <iframe className="fpm-iframe" src={url} title={file.name} referrerPolicy="no-referrer"/>;
   } else if (HTML_EXTS.has(ext)) {
     body = (
       <iframe
@@ -187,7 +190,7 @@ export function FilePreviewModal({
     <div className="fpm-backdrop" onClick={onClose}>
       <div className="fpm-modal" onClick={(e) => e.stopPropagation()}>
         <header className="fpm-head">
-          <span className="fpm-name" title={file.abs}>{file.name}</span>
+          <span className="fpm-name" title={file.name}>{file.name}</span>
           <span className="fpm-meta">
             <span>{fmtSize(file.size)}</span>
             <span>·</span>

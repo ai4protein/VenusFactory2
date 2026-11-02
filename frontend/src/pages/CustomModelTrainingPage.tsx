@@ -1,4 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { ModelLabDataSource, ModelLabFileInput } from "../components/ModelLabSetup";
+import { useSearchParams } from "react-router-dom";
+import { initialProteinModel } from "../lib/modelPlazaNavigation";
+import { QueueState, type QueueStatus } from "../components/QueueState";
+import { JobNumber } from "../components/JobNumber";
+import "../training-workspace.css";
+import { JobHistory } from '../components/JobHistory';
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   abortTraining,
   fetchCustomModelMeta,
@@ -16,7 +23,6 @@ import {
   type ModelOption
 } from "../lib/customModelApi";
 import { SegmentedSwitch } from "../components/SegmentedSwitch";
-import { PageFooter } from "../components/PageFooter";
 import { WorkspaceFilePicker } from "../components/WorkspaceFilePicker";
 import { useLang } from "../lib/i18n";
 import { useDocumentMeta } from "../lib/useDocumentMeta";
@@ -30,39 +36,39 @@ const STRINGS = {
   en: {
     docTitle: "Train — VenusFactory2",
     docDescription: "Fine-tune protein language models with PEFT methods.",
-    headerTitle: "Custom Model Training",
-    headerSubtitle: "Train your own protein model with configurable datasets and hyperparameters.",
-    readonlyBanner: "Online mode: custom model controls are view-only in this deployment.",
+    headerTitle: "Train a protein model",
+    headerSubtitle: "Upload protein sequences and measurements, then train a model.",
+    readonlyBanner: "Loading training options…",
     onlineUnavailable: "Online mode: unavailable",
     noOptions: "No options available",
     failedLoadMeta: "Failed to load metadata.",
     epoch: "Epoch",
     trainingMode: "Training Mode",
     trainingModeSwitch: "Training mode switch",
-    fromScratch: "From Scratch",
+    fromScratch: "New model",
     continueTraining: "Continue Training",
-    modelFolder: "Model Folder",
+    modelFolder: "Model collection",
     checkpoint: "Checkpoint",
     selectModel: "Select model",
-    plmModel: "PLM Model",
-    outputDir: "Output Dir",
+    plmModel: "Protein model",
+    outputDir: "Model name",
     outputName: "Output Name",
     dataset: "Dataset",
     datasetMode: "Dataset mode switch",
     custom: "Custom",
-    defaultDataset: "default",
+    defaultDataset: "Presets",
     datasetPath: "Dataset Path",
-    source: "Source",
+    source: "Data source",
     sourceMode: "Custom dataset source mode",
-    hfPath: "HF Path",
+    hfPath: "Dataset ID",
     upload: "Upload",
     trainFileHfId: "Train File / HF id",
     hfPlaceholder: "hf dataset id or local dataset path",
-    trainLabel: "Train",
-    validLabel: "Valid",
-    testLabel: "Test",
+    trainLabel: "Training data",
+    validLabel: "Validation (optional)",
+    testLabel: "Test (optional)",
     chooseFile: "Choose File",
-    fromWorkspace: "From Workspace",
+    fromWorkspace: "From Library",
     useExample: "Use Example",
     previewDatasetBtn: "Preview Dataset",
     loading: "Loading...",
@@ -70,17 +76,17 @@ const STRINGS = {
     sampleRows: "Sample Rows",
     noSampleRows: "No sample rows available.",
     noPreviewYet: "No dataset preview yet.",
-    hyperParameters: "Hyper Parameters",
-    datasetPresetsLocked: "Default dataset presets are loaded from dataset JSON and locked.",
+    hyperParameters: "Training settings",
+    datasetPresetsLocked: "Task settings follow the selected dataset.",
     taskSettings: "Task Settings",
     trainingMethod: "Training Method",
     pooling: "Pooling",
     structureSeq: "Structure Seq",
     pdbFolder: "PDB Folder",
     structureRequirePdb: "Selected structure model requires PDB Folder.",
-    problemType: "Problem Type",
-    numLabels: "Num Labels",
-    labelColumn: "Label Column",
+    problemType: "Prediction type",
+    numLabels: "Number of classes / outputs",
+    labelColumn: "Measurement column",
     sequenceColumn: "Sequence Column",
     metrics: "Metrics",
     optimization: "Optimization",
@@ -109,9 +115,9 @@ const STRINGS = {
     wandbProject: "wandb Project",
     wandbEntity: "wandb Entity",
     previewCommand: "Preview Command",
-    startTraining: "Start Training",
+    startTraining: "Submit training",
     abort: "Abort",
-    outputPanel: "Output Panel",
+    outputPanel: "Run monitor",
     commandPreview: "Command Preview",
     clickPreview: "Click Preview Command to generate CLI command.",
     progress: "Progress",
@@ -151,22 +157,22 @@ const STRINGS = {
   zh: {
     docTitle: "训练 — VenusFactory2",
     docDescription: "使用 PEFT 方法对蛋白质语言模型进行微调。",
-    headerTitle: "自定义模型训练",
-    headerSubtitle: "使用可配置的数据集和超参数训练您自己的蛋白模型。",
-    readonlyBanner: "在线模式：当前部署下自定义模型控件仅供查看。",
+    headerTitle: "微调蛋白模型",
+    headerSubtitle: "上传蛋白序列与实验测量值，训练自己的预测模型。",
+    readonlyBanner: "正在加载训练选项…",
     onlineUnavailable: "在线模式：不可用",
     noOptions: "暂无可选项",
     failedLoadMeta: "加载元数据失败。",
     epoch: "轮次",
     trainingMode: "训练模式",
     trainingModeSwitch: "训练模式切换",
-    fromScratch: "从零训练",
+    fromScratch: "新建模型",
     continueTraining: "继续训练",
-    modelFolder: "模型文件夹",
+    modelFolder: "模型集合",
     checkpoint: "检查点",
     selectModel: "请选择模型",
-    plmModel: "PLM 模型",
-    outputDir: "输出目录",
+    plmModel: "蛋白基础模型",
+    outputDir: "模型名称",
     outputName: "输出名称",
     dataset: "数据集",
     datasetMode: "数据集模式切换",
@@ -180,10 +186,10 @@ const STRINGS = {
     trainFileHfId: "训练文件 / HF id",
     hfPlaceholder: "HF 数据集 id 或本地数据集路径",
     trainLabel: "训练",
-    validLabel: "验证",
-    testLabel: "测试",
+    validLabel: "验证集（可选）",
+    testLabel: "测试集（可选）",
     chooseFile: "选择文件",
-    fromWorkspace: "从工作区",
+    fromWorkspace: "从文件库",
     useExample: "使用示例",
     previewDatasetBtn: "预览数据集",
     loading: "加载中…",
@@ -191,8 +197,8 @@ const STRINGS = {
     sampleRows: "样本行",
     noSampleRows: "暂无样本行。",
     noPreviewYet: "暂无数据集预览。",
-    hyperParameters: "超参数",
-    datasetPresetsLocked: "已从数据集 JSON 加载默认预设并锁定。",
+    hyperParameters: "训练设置",
+    datasetPresetsLocked: "已使用所选数据集的任务设置。",
     taskSettings: "任务设置",
     trainingMethod: "训练方法",
     pooling: "池化方式",
@@ -201,7 +207,7 @@ const STRINGS = {
     structureRequirePdb: "所选结构模型需要提供 PDB 文件夹。",
     problemType: "任务类型",
     numLabels: "类别数",
-    labelColumn: "标签列",
+    labelColumn: "测量值列",
     sequenceColumn: "序列列",
     metrics: "评估指标",
     optimization: "优化设置",
@@ -230,9 +236,9 @@ const STRINGS = {
     wandbProject: "wandb 项目",
     wandbEntity: "wandb 用户/团队",
     previewCommand: "预览命令",
-    startTraining: "开始训练",
+    startTraining: "提交训练",
     abort: "中止",
-    outputPanel: "输出面板",
+    outputPanel: "运行监控",
     commandPreview: "命令预览",
     clickPreview: "点击「预览命令」生成 CLI 命令。",
     progress: "进度",
@@ -446,7 +452,7 @@ function SimpleLineChart({
         })}
         {xTickIndices.map((idx) => {
           const x = paddingLeft + (idx / xCount) * drawableW;
-          const label = epochs[idx] ?? idx;
+          const label = (epochs[idx] ?? idx) + 1;
           return (
             <g key={`x-${idx}`}>
               <line x1={x} y1={height - paddingBottom} x2={x} y2={height - paddingBottom + 4} stroke="rgba(90,72,50,0.35)" />
@@ -491,12 +497,20 @@ type CustomModelTrainingPageProps = {
 };
 
 export function CustomModelTrainingPage({ readonly = false, workspaceEnabled = false }: CustomModelTrainingPageProps) {
+  const { lang } = useLang();
   const t = useLang().t(STRINGS);
   useDocumentMeta({ title: t.docTitle, description: t.docDescription });
+  const [searchParams] = useSearchParams();
+  const requestedModel = searchParams.get("plm");
   const [meta, setMeta] = useState<CustomModelMeta | null>(null);
+  const [queueStatus, setQueueStatus] = useState<QueueStatus>();
+  const [jobNumber, setJobNumber] = useState("");
+  const submitLock = useRef(false);
+  const datasetRevision = useRef(0);
+  const [uploadingFiles, setUploadingFiles] = useState(0);
   const [trainingMode, setTrainingMode] = useState<"From Scratch" | "Continue Training">("From Scratch");
-  const [datasetSelection, setDatasetSelection] = useState<"Custom" | "Pre-defined">("Pre-defined");
-  const [customDataSourceMode, setCustomDataSourceMode] = useState<"hf_local" | "upload">("hf_local");
+  const [datasetSelection, setDatasetSelection] = useState<"Custom" | "Pre-defined">("Custom");
+  const [customDataSourceMode, setCustomDataSourceMode] = useState<"hf_local" | "upload">("upload");
   const [datasetConfig, setDatasetConfig] = useState("");
   const [datasetCustom, setDatasetCustom] = useState("");
   const [trainFile, setTrainFile] = useState("");
@@ -558,7 +572,7 @@ export function CustomModelTrainingPage({ readonly = false, workspaceEnabled = f
   const [testCsvUrl, setTestCsvUrl] = useState("");
   const [datasetDefaults, setDatasetDefaults] = useState<DatasetConfigDefaults | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
-  const emptySelectLabel = readonly ? t.onlineUnavailable : t.noOptions;
+  const emptySelectLabel = !meta ? t.loading : t.noOptions;
 
   useEffect(() => {
     if (readonly) return;
@@ -566,7 +580,7 @@ export function CustomModelTrainingPage({ readonly = false, workspaceEnabled = f
       try {
         const data = await fetchCustomModelMeta();
         setMeta(data);
-        const firstPlm = Object.keys(data.plm_models)[0] || "";
+        const firstPlm = initialProteinModel(requestedModel, data.training_plm_models || data.plm_models);
         const firstDataset = Object.keys(data.dataset_configs)[0] || "";
         setPlmModel(firstPlm);
         setDatasetConfig(firstDataset);
@@ -574,7 +588,7 @@ export function CustomModelTrainingPage({ readonly = false, workspaceEnabled = f
         setError(err instanceof Error ? err.message : t.failedLoadMeta);
       }
     })();
-  }, [readonly]);
+  }, [readonly, requestedModel]);
 
   useEffect(() => {
     if (readonly) return;
@@ -611,8 +625,9 @@ export function CustomModelTrainingPage({ readonly = false, workspaceEnabled = f
       try {
         const cfg = (await fetchModelConfig(selectedModelPath)).config;
         if (typeof cfg.plm_model === "string" && meta) {
-          const display = Object.entries(meta.plm_models).find(([, v]) => v === cfg.plm_model)?.[0];
-          if (display) setPlmModel(display);
+          const display = Object.entries(meta.training_plm_models || meta.plm_models).find(([, v]) => v === cfg.plm_model)?.[0];
+          setPlmModel(display || "");
+          if (!display) setError(lang === "zh" ? "此检查点的基础模型不适用于当前训练环境。" : "This checkpoint uses a protein model unavailable for training here.");
         }
         if (typeof cfg.training_method === "string") setTrainingMethod(cfg.training_method);
         if (typeof cfg.pooling_method === "string") setPoolingMethod(cfg.pooling_method);
@@ -630,9 +645,11 @@ export function CustomModelTrainingPage({ readonly = false, workspaceEnabled = f
       setDatasetDefaults(null);
       return;
     }
+    let cancelled = false;
     void (async () => {
       try {
         const cfg = await fetchDatasetConfigDefaults(datasetConfig);
+        if (cancelled) return;
         setDatasetDefaults(cfg);
         if (typeof cfg.problem_type === "string") setProblemType(cfg.problem_type);
         if (typeof cfg.num_labels === "number") setNumLabels(cfg.num_labels);
@@ -642,20 +659,13 @@ export function CustomModelTrainingPage({ readonly = false, workspaceEnabled = f
         if (Array.isArray(cfg.structure_seq)) setStructureSeq(cfg.structure_seq);
         if (typeof cfg.pdb_dir === "string") setPdbDir(cfg.pdb_dir);
       } catch {
-        setDatasetDefaults(null);
+        if (!cancelled) setDatasetDefaults(null);
       }
     })();
+    return () => { cancelled = true; };
   }, [datasetSelection, datasetConfig, readonly]);
 
-  useEffect(() => {
-    if (datasetSelection === "Pre-defined") {
-      setTrainFile("");
-      setValidFile("");
-      setTestFile("");
-      setColumnOptions([]);
-      setCustomDataSourceMode("hf_local");
-    }
-  }, [datasetSelection]);
+
 
   useEffect(() => {
     setDatasetRowsExpanded(Boolean(datasetPreview));
@@ -682,7 +692,7 @@ export function CustomModelTrainingPage({ readonly = false, workspaceEnabled = f
     const base = ["linear", "cosine", "step"];
     return base.includes(scheduler) ? base : [...base, scheduler].filter(Boolean);
   }, [scheduler]);
-  const plmModelKeys = useMemo(() => Object.keys(meta?.plm_models || {}), [meta?.plm_models]);
+  const plmModelKeys = useMemo(() => Object.keys(meta?.plm_models || {}), [meta?.plm_models, meta?.training_plm_models]);
   const datasetConfigKeys = useMemo(() => Object.keys(meta?.dataset_configs || {}), [meta?.dataset_configs]);
   const isSesAdapter = useMemo(() => {
     const method = String(trainingMethod || "").toLowerCase();
@@ -736,6 +746,32 @@ export function CustomModelTrainingPage({ readonly = false, workspaceEnabled = f
     if (datasetSelection !== "Custom" || customDataSourceMode !== "upload") return "";
     return testFile;
   }, [datasetSelection, customDataSourceMode, testFile]);
+  useEffect(() => {
+    datasetRevision.current += 1;
+    setDatasetPreview(null); setCommandPreview("");
+  }, [datasetSelection, datasetConfig, customDataSourceMode, datasetCustom, trainFile, validFile, testFile, sequenceColumn, labelColumn, problemType]);
+  useEffect(() => { setColumnOptions([]); }, [datasetSelection, datasetConfig, customDataSourceMode, datasetCustom]);
+  const dataReady = datasetSelection === "Pre-defined" ? Boolean(datasetConfig) : customDataSourceMode === "upload" ? Boolean(trainFile) : Boolean(datasetCustom.trim());
+  function chooseProblemType(value: string) {
+    setProblemType(value);
+    const regression = value.includes("regression");
+    setNumLabels(regression ? 1 : 2);
+    setMetrics(regression ? ["mse", "spearman_corr"] : DEFAULT_METRICS);
+    setMonitoredMetrics(regression ? "mse" : "accuracy");
+    setMonitoredStrategy(regression ? "min" : "max");
+  }
+  function problemLabel(value: string) {
+    const labels: Record<string, [string, string]> = {
+      single_label_classification: ["Protein category (one class)", "蛋白类别（单标签）"],
+      multi_label_classification: ["Protein categories (multiple labels)", "蛋白类别（多标签）"],
+      regression: ["Measured value, e.g. activity or solubility", "测量数值，如活性、溶解度"],
+      residue_single_label_classification: ["Residue category (one class)", "残基类别（单标签）"],
+      residue_multi_label_classification: ["Residue categories (multiple labels)", "残基类别（多标签）"],
+      residue_regression: ["Measured value per residue", "每个残基的测量数值"]
+    };
+    return labels[value]?.[lang === "zh" ? 1 : 0] || value;
+  }
+  const formReady = dataReady && Boolean(plmModel) && (trainingMode !== "Continue Training" || Boolean(selectedModelPath)) && !trainingRuleError && !uploadingFiles;
   const latestEpoch = curveEpochs.length ? curveEpochs[curveEpochs.length - 1] : null;
   const latestTrainLoss = lastNumeric(trainLossSeries);
   const latestValLoss = lastNumeric(valLossSeries);
@@ -780,15 +816,16 @@ export function CustomModelTrainingPage({ readonly = false, workspaceEnabled = f
 
   async function onUploadDatasetFile(file: File | null, kind: "train" | "valid" | "test") {
     if (!file) return;
+    setUploadingFiles(n => n + 1);
     setError("");
     try {
       const result = await uploadCustomModelDatasetFile(file);
       if (kind === "train") setTrainFile(result.file_path);
       if (kind === "valid") setValidFile(result.file_path);
       if (kind === "test") setTestFile(result.file_path);
-      if (Array.isArray(result.columns)) {
-        setColumnOptions((prev) => {
-          const merged = new Set<string>([...prev, ...result.columns]);
+      if (kind === "train" && Array.isArray(result.columns)) {
+        setColumnOptions(() => {
+          const merged = new Set<string>(result.columns);
           return Array.from(merged).filter(Boolean);
         });
         if (result.columns.includes("aa_seq")) setSequenceColumn("aa_seq");
@@ -796,21 +833,19 @@ export function CustomModelTrainingPage({ readonly = false, workspaceEnabled = f
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : t.errFileUploadFailed);
-    }
+    } finally { setUploadingFiles(n => n - 1); }
   }
 
   async function onUseDatasetExample(kind: "train" | "valid" | "test") {
     if (readonly) return;
-    const content = "aa_seq,label\nMKTAYIAKQRQISFVKSHFSRQ,1\nGAVLILKKKGHHEAELKPLAQSHATKHKIPIKYLEFISEAIIHVLHSR,0\n";
+    const aminoAcids = "ACDEFGHIKLMNPQRSTVWY";
+    const marker = kind === "train" ? "AA" : kind === "valid" ? "CC" : "DD";
+    const rows = Array.from({ length: 40 }, (_, i) => `MKTAYIAKQRQISFVKSHFSRQ${marker}${aminoAcids[i % 20]}${i < 20 ? "A" : "C"},${i % 2}`);
+    const content = "aa_seq,label\n" + rows.join("\n") + "\n";
     const file = new File([content], `${kind}_example.csv`, { type: "text/csv" });
     await onUploadDatasetFile(file, kind);
   }
 
-  function displayUploadedName(pathValue: string) {
-    const normalized = String(pathValue || "").trim();
-    if (!normalized) return t.noFileSelected;
-    return normalized.split("/").pop() || normalized;
-  }
 
   function syncProgressToEpoch(epoch: number) {
     const totalEpochs = Number(numEpochs) || 0;
@@ -1022,6 +1057,7 @@ export function CustomModelTrainingPage({ readonly = false, workspaceEnabled = f
   async function onPreviewDataset() {
     setError("");
     setPreviewLoading(true);
+    const revision = datasetRevision.current;
     try {
       const result = await previewDataset({
         dataset_selection: datasetSelection,
@@ -1029,8 +1065,13 @@ export function CustomModelTrainingPage({ readonly = false, workspaceEnabled = f
         dataset_custom: effectiveDatasetCustom,
         train_file: effectiveTrainFile,
         valid_file: effectiveValidFile,
-        test_file: effectiveTestFile
+        test_file: effectiveTestFile,
+        training: true,
+        sequence_column_name: sequenceColumn,
+        label_column_name: labelColumn,
+        problem_type: problemType
       });
+      if (revision !== datasetRevision.current) return;
       setDatasetPreview(result);
       if (Array.isArray(result.column_options)) {
         setColumnOptions(result.column_options.filter(Boolean));
@@ -1057,11 +1098,10 @@ export function CustomModelTrainingPage({ readonly = false, workspaceEnabled = f
   }
 
   async function onStart() {
+    if (submitLock.current || !formReady) return;
+    submitLock.current = true;
+    setQueueStatus(undefined); setJobNumber("");
     setError("");
-    if (trainingRuleError) {
-      setError(trainingRuleError);
-      return;
-    }
     setLogs([]);
     setProgress(0);
     setStatusText(t.statusStarting);
@@ -1076,7 +1116,13 @@ export function CustomModelTrainingPage({ readonly = false, workspaceEnabled = f
       await startTrainingStream(trainingArgs, (evt) => {
         if (evt.type === "start") {
           setCommandPreview(evt.data.command || "");
-          setStatusText(t.statusRunning);
+          setJobNumber(evt.data.job_number || evt.data.run_id);
+          setStatusText(lang === "zh" ? "已提交" : "Submitted");
+          return;
+        }
+        if (evt.type === "queue") {
+          setQueueStatus(evt.data);
+          setStatusText(evt.data.cancel_requested ? (lang === 'zh' ? '正在停止…' : 'Stopping…') : evt.data.status === 'queued' ? (lang === 'zh' ? '等待计算资源 · 队列位置 ' : 'Waiting for resources · Queue position ') + evt.data.position : t.statusRunning);
           return;
         }
         if (evt.type === "progress") {
@@ -1129,17 +1175,20 @@ export function CustomModelTrainingPage({ readonly = false, workspaceEnabled = f
       setStatusText(t.statusFailed);
     } finally {
       setRunning(false);
+      submitLock.current = false;
     }
   }
 
   async function onAbort() {
-    await abortTraining();
-    setStatusText(t.statusAborted);
-    setRunning(false);
+    try {
+      await abortTraining();
+      setQueueStatus(previous => previous ? { ...previous, cancel_requested: true } : previous);
+      setStatusText(lang === "zh" ? "正在取消…" : "Cancelling…");
+    } catch (err) { setError(err instanceof Error ? err.message : t.errTrainingFailed); }
   }
 
   return (
-    <div className={`custom-model-page ${readonly ? "readonly-mode" : ""}`}>
+    <div className={`custom-model-page model-lab-page training-page ${readonly ? "readonly-mode" : ""}`}>
       <header className="chat-header">
         <div>
           <h2>{t.headerTitle}</h2>
@@ -1149,7 +1198,8 @@ export function CustomModelTrainingPage({ readonly = false, workspaceEnabled = f
           <span className="run-status-dot" />
           <span className="run-status-text">{statusText || t.statusIdle}</span>
         </div>
-      </header>
+      </header><JobHistory customTask="training"/>
+      {meta?.online_training && <div className="training-model-note">ESM2 8M</div>}
       {readonly && (
         <div className="readonly-banner" role="status" aria-live="polite">
           {t.readonlyBanner}
@@ -1158,36 +1208,34 @@ export function CustomModelTrainingPage({ readonly = false, workspaceEnabled = f
 
       <section className="custom-model-grid">
         <aside className="chat-panel left custom-model-controls">
-          <fieldset className="readonly-fieldset" disabled={readonly}>
-          <div className="custom-top-line-grid">
-            <section
-              className={`custom-section-card custom-section-line ${
-                trainingMode === "Continue Training" ? "custom-section-line-continue" : "custom-section-line-basic"
-              } custom-section-line-top`}
-            >
-              <label className="left-controls custom-line-field">
-                {t.trainingMode}
+          <fieldset className="readonly-fieldset" disabled={readonly || running || uploadingFiles > 0}>
+          <div className="lab-setup-stack">
+            <section className="custom-section-card lab-model-card">
+              <div className="lab-card-heading">
+                <h3>
+                {t.trainingMode}</h3>
                 <SegmentedSwitch
                   value={trainingMode}
                   onChange={setTrainingMode}
                   ariaLabel={t.trainingModeSwitch}
-                  className="custom-segment-switch-wide"
+                  className="lab-mode-switch"
                   options={[
                     { value: "From Scratch", label: t.fromScratch },
                     { value: "Continue Training", label: t.continueTraining }
                   ]}
                 />
-              </label>
+              </div>
 
-              {trainingMode === "Continue Training" && (
+              <div className="lab-model-fields">
+{trainingMode === "Continue Training" && (
                 <>
-                  <label className="left-controls custom-line-field">{t.modelFolder}
+                  <label className="lab-field">{t.modelFolder}
                     <select value={selectedFolder} onChange={(e) => setSelectedFolder(e.target.value)}>
                       {folderOptions.length === 0 && <option value="">{emptySelectLabel}</option>}
                       {folderOptions.map((f) => <option key={f} value={f}>{f}</option>)}
                     </select>
                   </label>
-                  <label className="left-controls custom-line-field">{t.checkpoint}
+                  <label className="lab-field">{t.checkpoint}
                     <select value={selectedModelPath} onChange={(e) => setSelectedModelPath(e.target.value)}>
                       <option value="">{t.selectModel}</option>
                       {modelOptions.map((m) => <option key={m.path} value={m.path}>{m.label}</option>)}
@@ -1198,63 +1246,41 @@ export function CustomModelTrainingPage({ readonly = false, workspaceEnabled = f
 
               {trainingMode === "From Scratch" && (
                 <>
-                  <label className="left-controls custom-line-field">{t.plmModel}
+                  <label className="lab-field">{t.plmModel}
                     <select value={plmModel} onChange={(e) => setPlmModel(e.target.value)}>
                       {plmModelKeys.length === 0 && <option value="">{emptySelectLabel}</option>}
-                      {plmModelKeys.map((k) => <option key={k} value={k}>{k}</option>)}
+                      {plmModelKeys.map((k) => { const unavailable = Boolean(meta?.online_training && !meta?.training_plm_models?.[k]); return <option key={k} value={k} disabled={unavailable}>{k}{unavailable ? (lang === "zh" ? " · 本地运行" : " · Local only") : ""}</option>; })}
                     </select>
                   </label>
-                  <label className="left-controls custom-line-field">{t.outputDir}
+                  <label className="lab-field">{t.outputDir}
                     <input value={outputDir} onChange={(e) => setOutputDir(e.target.value)} />
                   </label>
-                  <label className="left-controls custom-line-field">{t.outputName}
-                    <input value={outputModelName} onChange={(e) => setOutputModelName(e.target.value)} />
-                  </label>
+
                 </>
               )}
+              </div>
             </section>
 
-            <section className="custom-section-card custom-section-line custom-section-line-dataset custom-section-line-top">
-              <div className="custom-dataset-line-main">
-                <label className="left-controls custom-line-field custom-dataset-main-dataset">
-                  {t.dataset}
-                  <SegmentedSwitch
-                    value={datasetSelection}
-                    onChange={setDatasetSelection}
-                    ariaLabel={t.datasetMode}
-                    className="custom-segment-switch-wide"
-                    options={[
-                      { value: "Custom", label: t.custom },
-                      { value: "Pre-defined", label: t.defaultDataset }
-                    ]}
-                  />
-                </label>
-                <div className="custom-dataset-line-inputs custom-dataset-main-inputs">
-                  {datasetSelection === "Pre-defined" ? (
-                    <label className="left-controls custom-line-field">
-                      {t.datasetPath}
+            <ModelLabDataSource
+              value={datasetSelection === "Pre-defined" ? "preset" : customDataSourceMode}
+              onChange={(value) => {
+                setDatasetSelection(value === "preset" ? "Pre-defined" : "Custom");
+                if (value !== "preset") setCustomDataSourceMode(value);
+              }}
+              action={<button type="button" className="custom-btn-secondary" onClick={() => void onPreviewDataset()} disabled={previewLoading}>
+                {previewLoading ? t.loading : t.previewDatasetBtn}
+              </button>}
+            >
+              {datasetSelection === "Pre-defined" ? (
+                <label className="lab-field">
+                      {lang === "zh" ? "内置数据集" : "Built-in dataset"}
                       <select value={datasetConfig} onChange={(e) => setDatasetConfig(e.target.value)}>
                         {datasetConfigKeys.length === 0 && <option value="">{emptySelectLabel}</option>}
                         {datasetConfigKeys.map((k) => <option key={k} value={k}>{k}</option>)}
                       </select>
                     </label>
-                  ) : (
-                    <>
-                      <label className="left-controls custom-line-field">
-                        {t.source}
-                        <SegmentedSwitch
-                          value={customDataSourceMode}
-                          onChange={(value) => setCustomDataSourceMode(value as "hf_local" | "upload")}
-                          ariaLabel={t.sourceMode}
-                          className="custom-segment-switch-wide"
-                          options={[
-                            { value: "hf_local", label: t.hfPath },
-                            { value: "upload", label: t.upload }
-                          ]}
-                        />
-                      </label>
-                      {customDataSourceMode === "hf_local" ? (
-                        <label className="left-controls custom-line-field">
+              ) : customDataSourceMode === "hf_local" ? (
+                <label className="lab-field">
                           {t.trainFileHfId}
                           <input
                             value={datasetCustom}
@@ -1262,135 +1288,46 @@ export function CustomModelTrainingPage({ readonly = false, workspaceEnabled = f
                             placeholder={t.hfPlaceholder}
                           />
                         </label>
-                      ) : (
-                        <div className="custom-upload-dropzone-wrap">
-                          <div className="custom-upload-dropzone-grid">
-                            <div className="custom-upload-item upload-source-stack">
-                              <span className="custom-upload-item-label">{t.trainLabel}</span>
-                              <label className="custom-upload-trigger">
-                                <input
-                                  type="file"
-                                  accept=".csv,.tsv,.xlsx,.xls"
-                                  onChange={(e) => void onUploadDatasetFile(e.target.files?.[0] || null, "train")}
-                                />
-                                {t.chooseFile}
-                              </label>
-                              <WorkspaceFilePicker
-                                workspaceEnabled={workspaceEnabled}
-                                disabled={readonly || running}
-                                acceptedCategories={["table_or_text"]}
-                                buttonLabel={t.fromWorkspace}
-                                onPick={(picked) => {
-                                  const selected = picked[0];
-                                  if (!selected) return;
-                                  setTrainFile(selected.storage_path);
-                                }}
-                              />
-                              <button
-                                type="button"
-                                className="custom-btn-secondary"
-                                onClick={() => void onUseDatasetExample("train")}
-                                disabled={readonly || running}
-                              >
-                                {t.useExample}
-                              </button>
-                              <span className="custom-upload-file-chip custom-upload-file-name" title={displayUploadedName(trainFile)}>
-                                {displayUploadedName(trainFile)}
-                              </span>
-                            </div>
-                            <div className="custom-upload-item upload-source-stack">
-                              <span className="custom-upload-item-label">{t.validLabel}</span>
-                              <label className="custom-upload-trigger">
-                                <input
-                                  type="file"
-                                  accept=".csv,.tsv,.xlsx,.xls"
-                                  onChange={(e) => void onUploadDatasetFile(e.target.files?.[0] || null, "valid")}
-                                />
-                                {t.chooseFile}
-                              </label>
-                              <WorkspaceFilePicker
-                                workspaceEnabled={workspaceEnabled}
-                                disabled={readonly || running}
-                                acceptedCategories={["table_or_text"]}
-                                buttonLabel={t.fromWorkspace}
-                                onPick={(picked) => {
-                                  const selected = picked[0];
-                                  if (!selected) return;
-                                  setValidFile(selected.storage_path);
-                                }}
-                              />
-                              <button
-                                type="button"
-                                className="custom-btn-secondary"
-                                onClick={() => void onUseDatasetExample("valid")}
-                                disabled={readonly || running}
-                              >
-                                {t.useExample}
-                              </button>
-                              <span className="custom-upload-file-chip custom-upload-file-name" title={displayUploadedName(validFile)}>
-                                {displayUploadedName(validFile)}
-                              </span>
-                            </div>
-                            <div className="custom-upload-item upload-source-stack">
-                              <span className="custom-upload-item-label">{t.testLabel}</span>
-                              <label className="custom-upload-trigger">
-                                <input
-                                  type="file"
-                                  accept=".csv,.tsv,.xlsx,.xls"
-                                  onChange={(e) => void onUploadDatasetFile(e.target.files?.[0] || null, "test")}
-                                />
-                                {t.chooseFile}
-                              </label>
-                              <WorkspaceFilePicker
-                                workspaceEnabled={workspaceEnabled}
-                                disabled={readonly || running}
-                                acceptedCategories={["table_or_text"]}
-                                buttonLabel={t.fromWorkspace}
-                                onPick={(picked) => {
-                                  const selected = picked[0];
-                                  if (!selected) return;
-                                  setTestFile(selected.storage_path);
-                                }}
-                              />
-                              <button
-                                type="button"
-                                className="custom-btn-secondary"
-                                onClick={() => void onUseDatasetExample("test")}
-                                disabled={readonly || running}
-                              >
-                                {t.useExample}
-                              </button>
-                              <span className="custom-upload-file-chip custom-upload-file-name" title={displayUploadedName(testFile)}>
-                                {displayUploadedName(testFile)}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  )}
+              ) : (
+                <>
+              <ModelLabFileInput label={t.trainLabel} value={trainFile} workspaceEnabled={workspaceEnabled}
+                disabled={readonly || running || uploadingFiles > 0}
+                onUpload={(file) => void onUploadDatasetFile(file, "train")}
+                onPick={setTrainFile} onExample={() => void onUseDatasetExample("train")}
+                onClear={() => setTrainFile("")} />
+              <p className="lab-data-hint">{lang === "zh" ? "表格需包含蛋白序列和测量值。单表按相同序列分组，约 80/10/10 划分训练、验证和测试集。" : "Include protein sequences and measurements. A single table is split approximately 80/10/10 for training, validation and testing, keeping identical sequences together."}</p>
+              <details className="lab-optional-splits">
+                <summary>{lang === "zh" ? "单独提供验证集与测试集（可选）" : "Separate validation and test data (optional)"}</summary>
+                <div className="lab-split-files">
+                  <ModelLabFileInput label={t.validLabel} value={validFile} workspaceEnabled={workspaceEnabled}
+                disabled={readonly || running || uploadingFiles > 0}
+                onUpload={(file) => void onUploadDatasetFile(file, "valid")}
+                onPick={setValidFile} onExample={() => void onUseDatasetExample("valid")}
+                onClear={() => setValidFile("")} />
+                  <ModelLabFileInput label={t.testLabel} value={testFile} workspaceEnabled={workspaceEnabled}
+                disabled={readonly || running || uploadingFiles > 0}
+                onUpload={(file) => void onUploadDatasetFile(file, "test")}
+                onPick={setTestFile} onExample={() => void onUseDatasetExample("test")}
+                onClear={() => setTestFile("")} />
                 </div>
-                <div className="custom-dataset-preview-slot">
-                  <button type="button" className="custom-btn-secondary custom-line-action" onClick={() => void onPreviewDataset()} disabled={previewLoading}>
-                    {previewLoading ? t.loading : t.previewDatasetBtn}
-                  </button>
-                </div>
-              </div>
-            </section>
+              </details>
+            </>
+              )}
+            </ModelLabDataSource>
           </div>
           </fieldset>
         </aside>
 
         <section className="custom-bottom-split">
           <aside className="chat-panel left custom-bottom-left custom-model-controls">
-          <fieldset className="readonly-fieldset" disabled={readonly}>
+          <fieldset className="readonly-fieldset" disabled={readonly || running || uploadingFiles > 0}>
           <section className="custom-section-card custom-section-wide custom-dataset-preview-card">
             <div className="custom-dataset-preview-header">
               <h3 className="custom-panel-title custom-dataset-preview-title">{t.datasetPreview}</h3>
               {datasetPreview && (
                 <div className="custom-dataset-preview-controls">
                   <span className="custom-dataset-preview-stats-compact" aria-label={`Train ${datasetPreview.stats.train}, Validation ${datasetPreview.stats.validation}, Test ${datasetPreview.stats.test}`}>
-                    {datasetPreview.stats.train}/{datasetPreview.stats.validation}/{datasetPreview.stats.test}
+                    {lang === "zh" ? "训练" : "Train"} {datasetPreview.stats.train} · {lang === "zh" ? "验证" : "Validation"} {datasetPreview.stats.validation} · {lang === "zh" ? "测试" : "Test"} {datasetPreview.stats.test}
                   </span>
                   {datasetPreview.preview.columns.length > 0 && datasetPreview.preview.rows.length > 0 && (
                     <button
@@ -1449,6 +1386,52 @@ export function CustomModelTrainingPage({ readonly = false, workspaceEnabled = f
               </div>
             )}
             <div className="custom-param-group-title custom-field-span-full">{t.taskSettings}</div>
+            <label className="left-controls custom-field-short">{t.problemType}
+              <select value={problemType} onChange={(e) => chooseProblemType(e.target.value)} disabled={lockByDatasetConfig}>
+                {(meta?.problem_types || []).length === 0 && <option value="">{emptySelectLabel}</option>}
+                {(meta?.problem_types || []).map((x) => <option key={x} value={x}>{problemLabel(x)}</option>)}
+              </select>
+            </label>
+            <label className="left-controls custom-field-short">{t.numLabels}<input type="number" value={numLabels} onChange={(e) => setNumLabels(Number(e.target.value) || 1)} disabled={lockByDatasetConfig} /></label>
+            <label className="left-controls custom-field-short">{t.labelColumn}
+              {selectableColumns.length > 0 && !lockByDatasetConfig ? (
+                <select value={labelColumn} onChange={(e) => setLabelColumn(e.target.value)}>
+                  {selectableColumns.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              ) : (
+                <input value={labelColumn} onChange={(e) => setLabelColumn(e.target.value)} disabled={lockByDatasetConfig} />
+              )}
+            </label>
+            <label className="left-controls custom-field-short">{t.sequenceColumn}
+              {selectableColumns.length > 0 && !lockByDatasetConfig ? (
+                <select value={sequenceColumn} onChange={(e) => setSequenceColumn(e.target.value)}>
+                  {selectableColumns.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              ) : (
+                <input value={sequenceColumn} onChange={(e) => setSequenceColumn(e.target.value)} disabled={lockByDatasetConfig} />
+              )}
+            </label>
+            <details className="model-lab-advanced custom-field-span-full"><summary>{lang === "zh" ? "高级训练设置" : "Advanced training settings"}</summary><div className="custom-advanced-grid">
+            <div className="left-controls custom-field-span-full">
+              <span>{t.metrics}</span>
+              <div className="custom-multi-grid">
+                {metricOptions.map((item) => {
+                  const checked = metrics.includes(item);
+                  return (
+                    <button
+                      key={item}
+                      type="button"
+                      className={`custom-multi-item ${checked ? "active" : ""}`}
+                      aria-pressed={checked}
+                      onClick={() => toggleMetric(item)}
+                      disabled={lockByDatasetConfig}
+                    >
+                      <span className="custom-multi-item-label">{item}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             <label className="left-controls custom-field-short">{t.trainingMethod}
               <select value={trainingMethod} onChange={(e) => setTrainingMethod(e.target.value)}>
                 {(meta?.training_methods || []).length === 0 && <option value="">{emptySelectLabel}</option>}
@@ -1497,51 +1480,6 @@ export function CustomModelTrainingPage({ readonly = false, workspaceEnabled = f
             )}
             {trainingRuleError && <div className="custom-readonly-note custom-field-span-full">{trainingRuleError}</div>}
             <div className="custom-field-span-full" />
-            <label className="left-controls custom-field-short">{t.problemType}
-              <select value={problemType} onChange={(e) => setProblemType(e.target.value)} disabled={lockByDatasetConfig}>
-                {(meta?.problem_types || []).length === 0 && <option value="">{emptySelectLabel}</option>}
-                {(meta?.problem_types || []).map((x) => <option key={x} value={x}>{x}</option>)}
-              </select>
-            </label>
-            <label className="left-controls custom-field-short">{t.numLabels}<input type="number" value={numLabels} onChange={(e) => setNumLabels(Number(e.target.value) || 1)} disabled={lockByDatasetConfig} /></label>
-            <label className="left-controls custom-field-short">{t.labelColumn}
-              {selectableColumns.length > 0 && !lockByDatasetConfig ? (
-                <select value={labelColumn} onChange={(e) => setLabelColumn(e.target.value)}>
-                  {selectableColumns.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
-              ) : (
-                <input value={labelColumn} onChange={(e) => setLabelColumn(e.target.value)} disabled={lockByDatasetConfig} />
-              )}
-            </label>
-            <label className="left-controls custom-field-short">{t.sequenceColumn}
-              {selectableColumns.length > 0 && !lockByDatasetConfig ? (
-                <select value={sequenceColumn} onChange={(e) => setSequenceColumn(e.target.value)}>
-                  {selectableColumns.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
-              ) : (
-                <input value={sequenceColumn} onChange={(e) => setSequenceColumn(e.target.value)} disabled={lockByDatasetConfig} />
-              )}
-            </label>
-            <div className="left-controls custom-field-span-full">
-              <span>{t.metrics}</span>
-              <div className="custom-multi-grid">
-                {metricOptions.map((item) => {
-                  const checked = metrics.includes(item);
-                  return (
-                    <button
-                      key={item}
-                      type="button"
-                      className={`custom-multi-item ${checked ? "active" : ""}`}
-                      aria-pressed={checked}
-                      onClick={() => toggleMetric(item)}
-                      disabled={lockByDatasetConfig}
-                    >
-                      <span className="custom-multi-item-label">{item}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
             <div className="custom-param-group-title custom-field-span-full">{t.optimization}</div>
             <label className="left-controls custom-field-short">{t.batchMode}
               <select value={batchMode} onChange={(e) => setBatchMode(e.target.value as "Batch Size Mode" | "Batch Token Mode")}>
@@ -1566,6 +1504,7 @@ export function CustomModelTrainingPage({ readonly = false, workspaceEnabled = f
             <label className="left-controls custom-field-short">{t.learningRate}<input type="number" step="0.0001" value={learningRate} onChange={(e) => setLearningRate(Number(e.target.value) || 0)} /></label>
             <label className="left-controls custom-field-short">{t.epochs}<input type="number" value={numEpochs} onChange={(e) => setNumEpochs(Number(e.target.value) || 1)} /></label>
             <label className="left-controls custom-field-short">{t.maxSeqLen}<input type="number" value={maxSeqLen} onChange={(e) => setMaxSeqLen(Number(e.target.value) || 1)} /></label>
+<label className="left-controls custom-field-short">{t.outputName}<input value={outputModelName} onChange={e => setOutputModelName(e.target.value)}/></label>
             <label className="left-controls custom-field-short">{t.gradAccum}<input type="number" value={gradAccumulation} onChange={(e) => setGradAccumulation(Number(e.target.value) || 1)} /></label>
             <label className="left-controls custom-field-short">{t.maxGradNorm}<input type="number" value={maxGradNorm} onChange={(e) => setMaxGradNorm(Number(e.target.value))} /></label>
             <label className="left-controls custom-field-short">{t.numWorkers}<input type="number" value={numWorkers} onChange={(e) => setNumWorkers(Number(e.target.value) || 0)} /></label>
@@ -1609,13 +1548,14 @@ export function CustomModelTrainingPage({ readonly = false, workspaceEnabled = f
                 </>
               )}
             </div>
+            </div></details>
             </div>
 
             <div className="custom-actions-inline-status">
               <div className="custom-row custom-actions">
-                <button type="button" className="custom-btn-secondary" onClick={() => void onPreviewCommand()}>{t.previewCommand}</button>
-                <button type="button" className="custom-btn-primary" disabled={running} onClick={() => void onStart()}>{t.startTraining}</button>
-                <button type="button" className="custom-btn-danger" disabled={!running} onClick={() => void onAbort()}>{t.abort}</button>
+                <button type="button" className="custom-btn-secondary" disabled={running || !meta || !formReady} onClick={() => void onPreviewCommand()}>{t.previewCommand}</button>
+                <button type="button" className="custom-btn-primary" disabled={running || !meta || !formReady} onClick={() => void onStart()}>{t.startTraining}</button>
+
               </div>
             </div>
           </section>
@@ -1623,7 +1563,9 @@ export function CustomModelTrainingPage({ readonly = false, workspaceEnabled = f
           </aside>
 
         <div className="chat-panel right custom-model-output custom-bottom-right">
-          <h3 className="custom-output-panel-title custom-panel-title">{t.outputPanel}</h3>
+          <div className="training-monitor-heading"><h3 className="custom-output-panel-title custom-panel-title">{t.outputPanel}</h3>{jobNumber && <JobNumber number={jobNumber}/>}</div>
+          <QueueState queue={queueStatus}/>
+          {running && <button type="button" className="custom-btn-danger" disabled={Boolean(queueStatus?.cancel_requested) || !jobNumber} onClick={() => void onAbort()}>{queueStatus?.cancel_requested ? (lang === "zh" ? "正在取消…" : "Cancelling…") : (lang === "zh" ? "取消作业" : "Cancel job")}</button>}
           {visibleError && <div className="error-box">{visibleError}</div>}
           <div className="custom-inline-status-panel custom-inline-status-panel-compact">
             <details className="custom-preview-collapse custom-command-preview-collapse">
@@ -1642,7 +1584,7 @@ export function CustomModelTrainingPage({ readonly = false, workspaceEnabled = f
                 <div className="custom-progress-fill" style={{ width: `${Math.max(0, Math.min(100, progress * 100))}%` }} />
               </div>
               <div className="custom-progress-brief">
-                <span>{t.epochLabel}: {latestEpoch != null ? `${latestEpoch}/${numEpochs}` : `-/${numEpochs}`}</span>
+                <span>{t.epochLabel}: {latestEpoch != null ? `${latestEpoch + 1}/${numEpochs}` : `-/${numEpochs}`}</span>
                 <span>{t.stepLabel}: {stepText || "-"}</span>
                 <span>{t.trainLossLabel}: {formatMetricValue(latestTrainLoss)}</span>
                 <span>{t.valLossLabel}: {formatMetricValue(latestValLoss)}</span>
@@ -1653,14 +1595,14 @@ export function CustomModelTrainingPage({ readonly = false, workspaceEnabled = f
             </div>
           </div>
           <h3>{t.trainingCurves}</h3>
-          <div className="custom-chart-grid">
+          {curveEpochs.length > 0 ? <div className="custom-chart-grid">
             <SimpleLineChart
               title={t.lossCurve}
               xAxisLabel={t.epoch}
               epochs={curveEpochs}
               series={[
-                { name: t.trainLossSeries, values: trainLossSeries, color: "#8a6b45" },
-                { name: t.valLossSeries, values: valLossSeries, color: "#c17d63" }
+                { name: t.trainLossSeries, values: trainLossSeries, color: "#3b82f6" },
+                { name: t.valLossSeries, values: valLossSeries, color: "#14b8a6" }
               ]}
             />
             <SimpleLineChart
@@ -1669,7 +1611,7 @@ export function CustomModelTrainingPage({ readonly = false, workspaceEnabled = f
               epochs={curveEpochs}
               series={validationChartSeries}
             />
-          </div>
+          </div> : <div className="research-empty model-lab-chart-empty"><span>⌁</span><p>{t.trainingCurves}</p><small>{t.statusIdle}</small></div>}
           <h3>{t.testResults}</h3>
           <div className="custom-preview-block">
             {Object.keys(testMetrics).length > 0 ? (
@@ -1702,13 +1644,13 @@ export function CustomModelTrainingPage({ readonly = false, workspaceEnabled = f
               </div>
             )}
           </div>
-          <div className="custom-log-box">
+          <details className="model-lab-logs"><summary>{t.commandPreview === 'Command Preview' ? 'Execution logs' : '执行日志'}</summary><div className="custom-log-box">
             {logs.length ? logs.map((line, idx) => <div key={`${idx}-${line.slice(0, 20)}`}>{line}</div>) : t.noLogs}
-          </div>
+          </div></details>
         </div>
         </section>
       </section>
-      <PageFooter />
+
     </div>
   );
 }

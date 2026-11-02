@@ -1,3 +1,4 @@
+import { validateUploads } from "./uploadLimits";
 export type WorkspaceFile = {
   id: string;
   display_name: string;
@@ -9,13 +10,15 @@ export type WorkspaceFile = {
   created_at: string;
   tags: string[];
   category: string;
-  bucket: "user_upload" | "chat_session" | "tool_upload" | "other";
+  bucket: "user_upload" | "chat_session" | "tool_upload" | "generated" | "other";
   ttl_policy: string;
 };
 
 export type ListWorkspaceFilesResponse = {
   items: WorkspaceFile[];
   total: number;
+  total_size?: number;
+  sources?: string[];
   page: number;
   page_size: number;
   mode: "local" | "online";
@@ -37,6 +40,8 @@ type ListParams = {
   pageSize?: number;
   sort?: "created_desc" | "name_asc" | "size_desc";
   includeSessions?: boolean;
+  bucket?: string;
+  modifiedAfter?: string;
 };
 
 function withQuery(path: string, params: Record<string, string | number | boolean | undefined>): string {
@@ -62,6 +67,8 @@ async function parseError(res: Response): Promise<string> {
 export async function listWorkspaceFiles(params: ListParams = {}): Promise<ListWorkspaceFilesResponse> {
   const url = withQuery("/api/workspace/files", {
     q: params.q,
+    bucket: params.bucket,
+    modified_after: params.modifiedAfter,
     source: params.source,
     file_type: params.fileType,
     page: params.page ?? 1,
@@ -77,6 +84,7 @@ export async function listWorkspaceFiles(params: ListParams = {}): Promise<ListW
 }
 
 export async function uploadWorkspaceFile(file: File): Promise<WorkspaceFile> {
+  await validateUploads([file]);
   const form = new FormData();
   form.append("file", file);
   const res = await fetch("/api/workspace/upload", {
@@ -118,6 +126,7 @@ export async function readWorkspaceTextFile(
 
 export async function replaceWorkspaceFile(storagePath: string, file: File): Promise<WorkspaceFile> {
   const url = withQuery("/api/workspace/file", { storage_path: storagePath });
+  await validateUploads([file]);
   const form = new FormData();
   form.append("file", file);
   const res = await fetch(url, {
@@ -138,4 +147,15 @@ export async function deleteWorkspaceFile(storagePath: string): Promise<{ ok: bo
     throw new Error(await parseError(res));
   }
   return (await res.json()) as { ok: boolean; deleted_path: string };
+}
+
+export function workspaceContentUrl(path: string) {
+  return withQuery('/api/workspace/file/content', {storage_path:path});
+}
+export async function downloadWorkspaceArchive(paths: string[]) {
+  const res = await fetch('/api/workspace/archive', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({paths})});
+  if (!res.ok) throw new Error(await parseError(res));
+  const url=URL.createObjectURL(await res.blob());
+  const a=document.createElement('a'); a.href=url; a.download='workspace-files.zip'; a.click();
+  window.setTimeout(()=>URL.revokeObjectURL(url), 10000);
 }

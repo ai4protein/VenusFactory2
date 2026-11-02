@@ -1,0 +1,38 @@
+.model-lab-page .lab-setup-stack { display: grid; gap: 16px; min-width: 0; }
+.model-lab-page .lab-model-card, .model-lab-page .lab-data-card { display: grid; gap: 16px; min-width: 0; }
+.model-lab-page .lab-card-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+.model-lab-page .lab-card-heading h3 { margin: 0; font-size: 14px; font-weight: 600; color: #24292f; }
+.model-lab-page .lab-model-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 16px; align-items: start; }
+.model-lab-page .lab-field { display: flex; flex-direction: column; gap: 8px; min-width: 0; margin: 0; color: #414851; font-size: 13px; font-weight: 500; }
+.model-lab-page .lab-field :is(input, select) { box-sizing: border-box; width: 100%; max-width: none; min-width: 0; height: 38px; border: 1px solid #dce0e5; border-radius: 5px; padding: 8px 10px; background: #fff; color: #24292f; font: inherit; font-weight: 400; text-overflow: ellipsis; }
+.model-lab-page :is(.lab-mode-switch, .lab-source-switch) { display: inline-flex; justify-self: start; width: auto; max-width: 100%; min-width: 0; padding: 3px; gap: 3px; border: 1px solid #e7e9ed; border-radius: 6px; background: #f5f6f8; }
+.model-lab-page :is(.lab-mode-switch, .lab-source-switch) .custom-segment-option { flex: 0 1 auto; min-width: 0; padding: 8px 12px; border-radius: 4px; white-space: nowrap; font-size: 13px; line-height: 18px; color: #606872; }
+.model-lab-page :is(.lab-mode-switch, .lab-source-switch) .custom-segment-option.active { color: #20252b; background: #fff; box-shadow: 0 1px 3px #172b4d12; }
+.model-lab-page .lab-source-content { min-width: 0; display: grid; gap: 12px; }
+.model-lab-page .lab-data-hint { margin: 0; color: #717985; font-size: 12px; line-height: 1.6; }
+.model-lab-page .lab-file-input { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px 20px; padding: 16px; border: 1px dashed #d9dee5; border-radius: 6px; background: #fcfcfd; min-width: 0; }
+.model-lab-page .lab-file-info { display: grid; flex: 1 1 160px; min-width: 0; gap: 5px; }
+.model-lab-page .lab-file-label { color: #303740; font-size: 13px; font-weight: 500; }
+.model-lab-page .lab-file-name { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #79818b; font-size: 12px; }
+.model-lab-page .lab-file-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.model-lab-page .lab-file-actions :is(button, .lab-file-upload) { width: auto; min-height: 34px; margin: 0; padding: 7px 10px; font-size: 12px; line-height: 18px; border-radius: 5px; }
+.model-lab-page .lab-file-upload { position: relative; display: inline-flex; align-items: center; overflow: hidden; border: 1px solid #dce0e5; background: #fff; color: #303740; cursor: pointer; }
+.model-lab-page .lab-file-upload input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.model-lab-page .lab-file-upload:focus-within { outline: 2px solid #6788b7; outline-offset: 2px; }
+.model-lab-page .lab-file-upload:has(input:disabled) { opacity: .5; cursor: default; }
+.model-lab-page .lab-file-clear { border: 0; background: transparent; font-size: 18px; color: #707883; }
+.model-lab-page .custom-model-controls details.lab-optional-splits { display: block; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; min-width: 0; }
+.model-lab-page .lab-optional-splits summary { color: #58616d; font-size: 12px; cursor: pointer; padding: 4px 0; }
+.model-lab-page .lab-split-files { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+.model-lab-page .lab-batch-file { grid-column: 1 / -1; min-width: 0; }
+.model-lab-page .custom-bottom-split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+@media (max-width: 1000px) {
+  .model-lab-page .custom-bottom-split { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 700px) {
+  .model-lab-page .lab-model-fields, .model-lab-page .lab-split-files { grid-template-columns: minmax(0, 1fr); }
+  .model-lab-page .lab-card-heading { align-items: flex-start; }
+  .model-lab-page :is(.lab-mode-switch, .lab-source-switch) { flex-wrap: wrap; }
+  .model-lab-page :is(.lab-mode-switch, .lab-source-switch) .custom-segment-option { padding: 7px 9px; font-size: 12px; }
+  .model-lab-page .lab-file-input { padding: 12px; }
+}

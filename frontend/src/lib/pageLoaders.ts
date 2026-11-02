@@ -1,0 +1,35 @@
+// Import only the destination page. Hover/focus warms code, never private data.
+export const pageLoaders = {
+  OnlineLibraryPage: () => import("../pages/OnlineLibraryPage"),
+  AdminPage: () => import("../pages/AdminPage"),
+  ModelPlazaPage: () => import("../pages/ModelPlazaPage"),
+  ModelCreatePage: () => import("../pages/ModelCreatePage"),
+  ModelWorkflowPage: () => import("../pages/ModelWorkflowPage"),
+  ChatPage: () => import("../pages/ChatPage"),
+  ReportPage: () => import("../pages/ReportPage"),
+  CustomModelTrainingPage: () => import("../pages/CustomModelTrainingPage"),
+  CustomModelEvaluationPage: () => import("../pages/CustomModelEvaluationPage"),
+  CustomModelPredictPage: () => import("../pages/CustomModelPredictPage"),
+  DirectedEvolutionPage: () => import("../pages/quick-tools/DirectedEvolutionPage"),
+  ProteinFunctionPage: () => import("../pages/quick-tools/ProteinFunctionPage"),
+  FunctionalResiduePage: () => import("../pages/quick-tools/FunctionalResiduePage"),
+  PhysicochemicalPropertyPage: () => import("../pages/quick-tools/PhysicochemicalPropertyPage"),
+  SequenceDesignPage: () => import("../pages/quick-tools/SequenceDesignPage"),
+  ProteinDiscoveryPage: () => import("../pages/quick-tools/ProteinDiscoveryPage"),
+  AdvancedDirectedEvolutionPage: () => import("../pages/advanced-tools/AdvancedDirectedEvolutionPage"),
+  AdvancedProteinDiscoveryPage: () => import("../pages/advanced-tools/AdvancedProteinDiscoveryPage"),
+  AdvancedProteinFunctionPage: () => import("../pages/advanced-tools/AdvancedProteinFunctionPage"),
+  AdvancedFunctionalResiduePage: () => import("../pages/advanced-tools/AdvancedFunctionalResiduePage"),
+  AdvancedSequenceDesignPage: () => import("../pages/advanced-tools/AdvancedSequenceDesignPage"),
+  SettingsInsightsPage: () => import("../pages/SettingsInsightsPage"),
+  ManualLayout: () => import("../pages/manual/ManualLayout"),
+  ManualIndexPage: () => import("../pages/manual/ManualIndexPage"),
+  ManualDocPage: () => import("../pages/manual/ManualDocPage"),
+  AgentShellPage: () => import("../pages/AgentShellPage"),
+  WorkspacePage: () => import("../pages/WorkspacePage"),
+  HomePage: () => import("../pages/HomePage"),
+  LeaderboardsPage: () => import("../pages/LeaderboardsPage"),
+};
+export function warmPage(page: 'ChatPage' | 'ModelPlazaPage' | 'ModelWorkflowPage') {
+  void pageLoaders[page]().catch(() => { /* A click can retry a transient download. */ });
+}

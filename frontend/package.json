@@ -4,13 +4,15 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=25 <26",
+    "node": ">=24 <25",
     "npm": ">=11 <12"
   },
   "scripts": {
     "dev": "vite",
     "build": "vite build && node ./scripts/copy-public-to-assets.mjs",
-    "preview": "vite preview --host 0.0.0.0 --port 5173"
+    "preview": "vite preview --host 0.0.0.0 --port 5173",
+    "test": "node --import ./tests/register-ts.mjs --test tests/*.test.mjs",
+    "prebuild": "python ../scripts/sync_platform_docs.py --check"
   },
   "dependencies": {
     "dompurify": "^3.2.6",

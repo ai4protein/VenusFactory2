@@ -1,0 +1,46 @@
+.molstar-workbench { display:flex; flex-direction:column; min-height:460px; height:600px; position:relative; background:#fff; overflow:hidden; }
+.molstar-workbench.is-embedded { height:100%; min-height:0; flex:1; }
+.structure-viewer-title { display:flex; justify-content:space-between; gap:12px; padding:10px 12px; font-size:12px; }
+.structure-viewer-title strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.structure-quick-tools { display:flex; flex-wrap:wrap; align-items:center; gap:5px; padding:8px 10px; border-bottom:1px solid #e9ecea; background:#fff; flex-shrink:0; }
+.structure-quick-tools select,.structure-quick-tools button { height:29px; max-width:160px; border:1px solid #e3e7e4; border-radius:4px; background:#fff; color:#4d5952; padding:3px 7px; font:inherit; font-size:11px; cursor:pointer; }
+.structure-quick-tools button:hover,.structure-quick-tools button[aria-pressed=true] { background:#edf3ef; }
+.structure-quick-tools :disabled { opacity:.4; cursor:default; }
+.structure-canvas-wrap { flex:1; min-height:260px; position:relative; }
+.structure-molstar-host { position:absolute; inset:0; }
+.structure-loading { position:absolute; inset:0; z-index:9; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; background:#ffffffed; color:#6b756e; font-size:12px; }
+.structure-loading small { max-width:80%; overflow-wrap:anywhere; }
+.structure-loading button { padding:6px 14px; background:#fff; border:1px solid #ddd; border-radius:4px; }
+.structure-interaction-hint { display:flex; flex-wrap:wrap; justify-content:space-between; gap:6px; padding:8px 12px; border-top:1px solid #edf0ee; font-size:10px; color:#869089; }
+.structure-interaction-hint strong { font-weight:500; color:#486954; }
+.structure-action-error { padding:6px 10px; font-size:11px; color:#9e6144; }
+.structure-file-button { display:inline-flex; align-items:center; gap:9px; max-width:100%; padding:10px 12px; border:1px solid #e2e7e4; border-radius:6px; color:#476452; background:#fff; cursor:pointer; text-align:left; font:inherit; font-size:12px; }
+.structure-file-button:hover { background:#f5f8f6; border-color:#b7c9bf; }
+.structure-file-button>span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.structure-file-button svg { flex-shrink:0; }
+.structure-file-button small { font-size:10px; white-space:nowrap; color:#7d8981; }
+.structure-molstar-host .msp-plugin { --msp-background:#fff; font-family:var(--font-sans,system-ui,sans-serif); }
+.structure-molstar-host .msp-layout-standard { border:0; }
+.structure-molstar-host .msp-sequence-wrapper { cursor:crosshair; }
+.structure-molstar-host .msp-plugin,
+.structure-molstar-host .msp-viewport,
+.structure-molstar-host .msp-layout-region,
+.structure-molstar-host .msp-layout-static,
+.structure-molstar-host .msp-sequence,
+.structure-molstar-host .msp-sequence-wrapper,
+.structure-molstar-host .msp-sequence-wrapper-non-empty,
+.structure-molstar-host .msp-scrollable-container,
+.structure-molstar-host .msp-control-group-wrapper,
+.structure-molstar-host .msp-control-row,
+.structure-molstar-host .msp-flex-row,
+.structure-molstar-host .msp-semi-transparent-background,
+.structure-molstar-host .msp-hover-box-body { background:#fff; }
+.structure-molstar-host .msp-plugin .msp-btn,
+.structure-molstar-host .msp-plugin .msp-control-group-header { background:#f3f5f4; color:#4e5953; }
+.structure-molstar-host .msp-plugin .msp-btn:hover { background:#e7eee9; }
+.structure-molstar-host .msp-plugin .msp-sequence-wrapper { font-size:13px; line-height:2; }
+.structure-molstar-host .msp-plugin .msp-sequence-select { background:#f5f7f6; }
+.structure-molstar-host .msp-plugin .msp-section-header,
+.structure-molstar-host .msp-plugin .msp-control-row-ctrl,
+.structure-molstar-host .msp-plugin .msp-highlight-info,
+.structure-molstar-host .msp-plugin .msp-hover-box-body { background:#f5f7f6; color:#4e5953; }

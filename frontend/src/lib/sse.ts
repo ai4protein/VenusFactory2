@@ -1,4 +1,6 @@
-type EventHandler = (event: { event: string; data: string }) => void;
+import { quotaError } from "./onlineQuota";
+export type SseEvent = { event: string; data: string; id?: string };
+type EventHandler = (event: SseEvent) => void;
 
 function redactAbsolutePath(detail: unknown): string {
   const text = typeof detail === "string" ? detail : String(detail || "");
@@ -41,79 +43,104 @@ function toFriendlySseError(status: number, detail: string): string {
   return `Request failed (${status}).`;
 }
 
-export async function streamSSEFromPost(
-  url: string,
-  body: unknown,
-  onEvent: EventHandler,
-  signal?: AbortSignal,
-  headers?: Record<string, string>
-) {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...(headers || {}) },
-    body: JSON.stringify(body),
-    signal
-  });
+/** Parse one SSE frame without dropping whitespace or multiline data. */
+export function parseSseFrame(frame: string): SseEvent | null {
+  let event = "message", id: string | undefined;
+  const data: string[] = [];
+  for (const line of frame.split("\n")) {
+    if (!line || line.startsWith(":")) continue;
+    const colon = line.indexOf(":");
+    const key = colon < 0 ? line : line.slice(0, colon);
+    let value = colon < 0 ? "" : line.slice(colon + 1);
+    if (value.startsWith(" ")) value = value.slice(1);
+    if (key === "event") event = value;
+    else if (key === "data") data.push(value);
+    else if (key === "id" && !value.includes("\0")) id = value;
+  }
+  return data.length ? { event, data: data.join("\n"), id } : null;
+}
 
-  if (!response.ok) {
-    let detail = "";
+class ResponseError extends Error {}
+
+async function checkedResponse(response: Response) {
+  if (response.ok && response.body) return response;
+  let detail = "";
+  try {
+    const raw = await response.text();
     try {
-      const maybeJson = (await response.json()) as {
-        detail?: string | { message?: string };
-        error?: string;
-        message?: string;
-      };
-      const detailValue = maybeJson?.detail;
-      if (typeof detailValue === "string") {
-        detail = detailValue;
-      } else if (detailValue && typeof detailValue === "object" && typeof detailValue.message === "string") {
-        detail = detailValue.message;
-      } else {
-        detail = maybeJson?.error || maybeJson?.message || "";
-      }
-    } catch {
-      try {
-        detail = await response.text();
-      } catch {
-        detail = "";
-      }
-    }
-    throw new Error(toFriendlySseError(response.status, detail));
-  }
+      const parsed = JSON.parse(raw); quotaError(parsed);
+      detail = typeof parsed.detail === "string" ? parsed.detail : parsed.detail?.message || parsed.error || parsed.message || "";
+    } catch { detail = raw; }
+  } catch { /* Network errors are handled by the reconnect loop. */ }
+  throw new ResponseError(toFriendlySseError(response.status, detail));
+}
 
-  if (!response.body) {
-    throw new Error(`SSE response body is empty: ${response.status}`);
-  }
+function reconnectDelay(ms: number, signal?: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    const abort = () => { clearTimeout(timer); reject(new DOMException("Aborted", "AbortError")); };
+    const timer = setTimeout(() => { signal?.removeEventListener("abort", abort); resolve(); }, ms);
+    if (signal?.aborted) abort(); else signal?.addEventListener("abort", abort, { once: true });
+  });
+}
 
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-
+async function streamSSE(url: string, body: unknown, onEvent: EventHandler, signal?: AbortSignal,
+                         headers?: Record<string, string>, initialCursor = "", method: "GET" | "POST" = "POST") {
+  const requestKey = crypto.randomUUID();
+  let cursor = initialCursor, endpoint = url, runId = initialCursor.split(":")[0] || "", attempts = 0;
+  let verb = method;
+  const managedSubmission = Boolean(body && typeof body === "object" && "execution" in body && body.execution);
   while (true) {
-    const { value, done } = await reader.read();
-    if (done) {
-      break;
-    }
-
-    buffer += decoder.decode(value, { stream: true });
-    const parts = buffer.split("\n\n");
-    buffer = parts.pop() || "";
-
-    for (const part of parts) {
-      const lines = part.split("\n");
-      let event = "message";
-      let data = "";
-      for (const line of lines) {
-        if (line.startsWith("event:")) {
-          event = line.slice(6).trim();
-        } else if (line.startsWith("data:")) {
-          data += line.slice(5).trim();
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    try {
+      const response = await checkedResponse(await fetch(endpoint, {
+        method: verb, signal,
+        headers: { ...(verb === "POST" ? { "Content-Type": "application/json", "Idempotency-Key": requestKey } : {}),
+                   ...(headers || {}), ...(cursor ? { "Last-Event-ID": cursor } : {}) },
+        ...(verb === "POST" ? { body: JSON.stringify(body) } : {})
+      }));
+      const returnedRun = response.headers.get("X-Run-ID");
+      const resume = response.headers.get("X-Event-Stream");
+      if (returnedRun) {
+        if (runId && returnedRun !== runId) throw new ResponseError("The run changed while reconnecting.");
+        runId = returnedRun;
+        if (resume?.startsWith("/api/chat/sessions/")) { endpoint = resume; verb = "GET"; }
+      }
+      const reader = response.body!.getReader(), decoder = new TextDecoder();
+      let buffer = "";
+      try {
+        while (true) {
+          const { value, done } = await reader.read();
+          buffer += decoder.decode(value, { stream: !done });
+          buffer = buffer.replace(/\r\n/g, "\n");
+          const parts = buffer.split("\n\n"); buffer = parts.pop() || "";
+          for (const part of parts) {
+            const event = parseSseFrame(part);
+            if (!event) continue;
+            if (event.id) {
+              const [identity, ordinal] = event.id.split(":");
+              if (runId && identity !== runId) throw new ResponseError("Event belongs to another run.");
+              if (cursor && identity === cursor.split(":")[0] && Number(ordinal) <= Number(cursor.split(":")[1])) continue;
+              cursor = event.id;
+            }
+            onEvent(event); attempts = 0;
+            if (event.event === "done") return;
+          }
+          if (done) break;
         }
-      }
-      onEvent({ event, data });
-      if (event === "done") {
-        return;
-      }
+      } finally { await reader.cancel().catch(() => {}); reader.releaseLock(); }
+      if (!runId) return; // Legacy endpoints retain their original EOF contract.
+      throw new TypeError("Event stream disconnected");
+    } catch (error) {
+      if (signal?.aborted || error instanceof ResponseError || (!runId && !managedSubmission) || attempts >= 7) throw error;
+      await reconnectDelay(Math.min(500 * 2 ** attempts++, 5000), signal);
     }
   }
+}
+
+export async function streamSSEFromPost(url: string, body: unknown, onEvent: EventHandler, signal?: AbortSignal, headers?: Record<string, string>) {
+  return streamSSE(url, body, onEvent, signal, headers);
+}
+
+export async function streamSSEFromGet(url: string, onEvent: EventHandler, signal?: AbortSignal, headers?: Record<string, string>, after = "") {
+  return streamSSE(url, undefined, onEvent, signal, headers, after, "GET");
 }

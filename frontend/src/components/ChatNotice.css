@@ -1,0 +1,9 @@
+.chat-notice-stack { position:absolute; z-index:35; top:14px; left:16px; right:16px; display:flex; flex-direction:column; align-items:center; gap:8px; pointer-events:none; }
+.chat-notice-stack > .chat-quota-notice-slot { position:static; width:100%; }
+.chat-toast { display:flex; align-items:center; gap:9px; width:max-content; max-width:min(620px,100%); box-sizing:border-box; padding:8px 10px 8px 12px; background:rgba(255,255,255,.98); border:1px solid #e5e7eb; border-radius:6px; box-shadow:0 3px 14px #0000000d; color:#555e6a; font:12px/1.5 system-ui; pointer-events:auto; }
+.chat-toast > svg { width:15px; height:15px; flex-shrink:0; color:#8b929c; }
+.chat-toast-message { min-width:0; overflow-wrap:anywhere; }
+.chat-toast > button { display:grid; place-items:center; flex-shrink:0; width:24px; height:24px; padding:0; border:0; border-radius:4px; background:transparent; color:#858d97; cursor:pointer; font:18px/1 system-ui; }
+.chat-toast > button:hover { background:#f2f3f5; color:#303740; }
+.chat-toast > button:focus-visible { outline:2px solid #a9b9cc; outline-offset:2px; }
+@media(max-width:600px) { .chat-notice-stack { top:10px; left:10px; right:10px; } }

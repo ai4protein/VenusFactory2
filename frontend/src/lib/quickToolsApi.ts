@@ -1,3 +1,4 @@
+import { validateUploads } from "./uploadLimits";
 import { streamSSEFromPost } from "./sse";
 
 export type QuickToolsMeta = {
@@ -132,6 +133,7 @@ export async function fetchQuickToolsMeta(): Promise<QuickToolsMeta> {
 }
 
 export async function uploadQuickToolFile(file: File): Promise<UploadResponse> {
+  await validateUploads([file]);
   const form = new FormData();
   form.append("file", file);
   return requestJSON<UploadResponse>("/api/quick-tools/upload", {

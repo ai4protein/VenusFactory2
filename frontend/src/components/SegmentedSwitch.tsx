@@ -26,6 +26,7 @@ export function SegmentedSwitch<T extends string>({
           type="button"
           className={`custom-segment-option ${value === option.value ? "active" : ""}`}
           onClick={() => onChange(option.value)}
+          aria-label={option.label}
           aria-pressed={value === option.value}
         >
           {option.label}

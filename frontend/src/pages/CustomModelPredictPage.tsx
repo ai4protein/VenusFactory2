@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { ModelLabFileInput } from "../components/ModelLabSetup";
+import { JobHistory } from '../components/JobHistory';
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   abortPredict,
   fetchCustomModelMeta,
@@ -13,7 +15,6 @@ import {
   type ModelOption
 } from "../lib/customModelApi";
 import { SegmentedSwitch } from "../components/SegmentedSwitch";
-import { PageFooter } from "../components/PageFooter";
 import { WorkspaceFilePicker } from "../components/WorkspaceFilePicker";
 import { useLang } from "../lib/i18n";
 import { useDocumentMeta } from "../lib/useDocumentMeta";
@@ -25,16 +26,16 @@ const STRINGS = {
   en: {
     docTitle: "Predict — VenusFactory2",
     docDescription: "Run predictions with your custom-trained models.",
-    headerTitle: "Custom Model Predict",
+    headerTitle: "Run predictions",
     headerSubtitle: "Run single or batch inference with your selected custom model.",
-    readonlyBanner: "Online mode: custom model controls are view-only in this deployment.",
+    readonlyBanner: "Checkpoint evaluation and prediction are available in local mode.",
     onlineUnavailable: "Online mode: unavailable",
     noOptions: "No options available",
     failedLoadMeta: "Failed to load metadata.",
-    modelFolder: "Model Folder",
-    modelPath: "Model Path",
+    modelFolder: "Model collection",
+    modelPath: "Saved model",
     selectModel: "Select model",
-    predictParams: "Predict Parameters",
+    predictParams: "Prediction input",
     modelSettings: "Model Settings",
     plm: "PLM",
     evalMethod: "Eval Method",
@@ -48,7 +49,7 @@ const STRINGS = {
     batchSize: "Batch Size",
     inputSettings: "Input Settings",
     structureModelNote: "Selected structure model uses PDB Folder based input.",
-    aaSequence: "AA Sequence",
+    aaSequence: "Protein sequence",
     aaSeqPlaceholder: "Paste protein sequence...",
     batchSource: "Batch Source",
     batchSourceSwitch: "Batch input source switch",
@@ -57,7 +58,7 @@ const STRINGS = {
     pathTab: "Path",
     fileLabel: "File",
     chooseFile: "Choose File",
-    fromWorkspace: "From Workspace",
+    fromWorkspace: "From Library",
     useExample: "Use Example",
     clear: "Clear",
     pasteFasta: "Paste FASTA",
@@ -70,9 +71,9 @@ const STRINGS = {
     pdbDir: "PDB Dir",
     structureRequirePdb: "Selected structure model requires PDB Folder.",
     previewCommand: "Preview Command",
-    startPredict: "Start Predict",
+    startPredict: "Run prediction",
     abort: "Abort",
-    outputPanel: "Output Panel",
+    outputPanel: "Run monitor",
     commandPreview: "Command Preview",
     clickPreview: "Click Preview Command to generate CLI command.",
     progress: "Progress",
@@ -90,7 +91,7 @@ const STRINGS = {
     problemTypeCfgFallback: "problem_type missing in ckpt config, fallback to default problem type.",
     numLabelsCfgFallback: "num_labels missing in ckpt config, fallback to default label count.",
     valuesAutoFilled: "Values auto-filled from selected model.",
-    valuesAutoFilledLocked: "Values auto-filled from selected model and locked for consistency.",
+    valuesAutoFilledLocked: "Settings from the selected checkpoint.",
     modelConfigNotFound: "Model config not found. Parameters remain editable with current/default values.",
     errStructurePdb: "Structure PLM (ProSST/ProtSSN/SaProt) requires PDB Folder.",
     errBatchFastaEmpty: "Batch FASTA text cannot be empty.",
@@ -109,12 +110,12 @@ const STRINGS = {
     docDescription: "使用您自定义训练的模型进行预测。",
     headerTitle: "自定义模型预测",
     headerSubtitle: "使用您选择的自定义模型进行单条或批量推理。",
-    readonlyBanner: "在线模式：当前部署下自定义模型控件仅供查看。",
+    readonlyBanner: "自定义检查点评估与预测可在本地运行。",
     onlineUnavailable: "在线模式：不可用",
     noOptions: "暂无可选项",
     failedLoadMeta: "加载元数据失败。",
-    modelFolder: "模型文件夹",
-    modelPath: "模型路径",
+    modelFolder: "模型集合",
+    modelPath: "已保存的模型",
     selectModel: "请选择模型",
     predictParams: "预测参数",
     modelSettings: "模型设置",
@@ -139,7 +140,7 @@ const STRINGS = {
     pathTab: "路径",
     fileLabel: "文件",
     chooseFile: "选择文件",
-    fromWorkspace: "从工作区",
+    fromWorkspace: "从文件库",
     useExample: "使用示例",
     clear: "清除",
     pasteFasta: "粘贴 FASTA",
@@ -154,7 +155,7 @@ const STRINGS = {
     previewCommand: "预览命令",
     startPredict: "开始预测",
     abort: "中止",
-    outputPanel: "输出面板",
+    outputPanel: "运行监控",
     commandPreview: "命令预览",
     clickPreview: "点击「预览命令」生成 CLI 命令。",
     progress: "进度",
@@ -199,6 +200,7 @@ type CustomModelPredictPageProps = {
 };
 
 export function CustomModelPredictPage({ readonly = false, workspaceEnabled = false }: CustomModelPredictPageProps) {
+  const { lang } = useLang();
   const t = useLang().t(STRINGS);
   useDocumentMeta({ title: t.docTitle, description: t.docDescription });
   const [meta, setMeta] = useState<CustomModelMeta | null>(null);
@@ -224,6 +226,8 @@ export function CustomModelPredictPage({ readonly = false, workspaceEnabled = fa
   const [pdbDir, setPdbDir] = useState("");
 
   const [running, setRunning] = useState(false);
+  const submitPending = useRef(false);
+  const [uploading, setUploading] = useState(false);
   const [statusText, setStatusText] = useState("");
   const [progress, setProgress] = useState(0);
   const [logs, setLogs] = useState<string[]>([]);
@@ -398,6 +402,7 @@ export function CustomModelPredictPage({ readonly = false, workspaceEnabled = fa
     t
   ]);
 
+  const formReady = Boolean(modelPath && plmModel) && !predictRuleError && !uploading && (predictionMode === "batch" || Boolean(aaSeq.trim()));
   const predictArgs = useMemo(
     () => ({
       prediction_mode: predictionMode,
@@ -434,7 +439,7 @@ export function CustomModelPredictPage({ readonly = false, workspaceEnabled = fa
   );
 
   async function onPreviewCommand() {
-    if (readonly) return;
+    if (readonly || running || !formReady) return;
     if (predictRuleError) {
       setError(predictRuleError);
       return;
@@ -450,12 +455,13 @@ export function CustomModelPredictPage({ readonly = false, workspaceEnabled = fa
   }
 
   async function onStart() {
-    if (readonly) return;
+    if (readonly || running || !formReady || submitPending.current) return;
     if (predictRuleError) {
       setError(predictRuleError);
       return;
     }
     setError("");
+    submitPending.current = true;
     setRunning(true);
     setLogs([]);
     setProgress(0);
@@ -466,6 +472,10 @@ export function CustomModelPredictPage({ readonly = false, workspaceEnabled = fa
         if (evt.type === "start") {
           setCommandPreview(evt.data.command || "");
           setStatusText(t.statusRunning);
+          return;
+        }
+        if (evt.type === "queue") {
+          setStatusText(evt.data.cancel_requested ? (lang === 'zh' ? '正在停止…' : 'Stopping…') : evt.data.status === 'queued' ? (lang === 'zh' ? '等待计算资源 · 队列位置 ' : 'Waiting for resources · Queue position ') + evt.data.position : t.statusRunning);
           return;
         }
         if (evt.type === "progress") {
@@ -493,15 +503,17 @@ export function CustomModelPredictPage({ readonly = false, workspaceEnabled = fa
       setError(err instanceof Error ? err.message : t.errPredictStartFailed);
       setStatusText(t.statusFailed);
     } finally {
+      submitPending.current = false;
       setRunning(false);
     }
   }
 
   async function onAbort() {
     if (readonly) return;
-    await abortPredict();
-    setStatusText(t.statusAborted);
-    setRunning(false);
+    try {
+      await abortPredict();
+      setStatusText(lang === "zh" ? "正在取消…" : "Cancelling…");
+    } catch (err) { setError(err instanceof Error ? err.message : t.errPredictFailed); }
   }
 
   function toggleStructureSeqOption(option: string) {
@@ -512,6 +524,7 @@ export function CustomModelPredictPage({ readonly = false, workspaceEnabled = fa
   async function onUploadBatchFile(file: File | null) {
     if (readonly) return;
     if (!file) return;
+    setUploading(true);
     setError("");
     try {
       const result = await uploadCustomModelPredictBatchFile(file);
@@ -521,7 +534,7 @@ export function CustomModelPredictPage({ readonly = false, workspaceEnabled = fa
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : t.errFileUploadFailed);
-    }
+    } finally { setUploading(false); }
   }
 
   async function onUseBatchExample() {
@@ -549,15 +562,10 @@ export function CustomModelPredictPage({ readonly = false, workspaceEnabled = fa
     setBatchColumns([]);
   }
 
-  function displayUploadedName(pathValue: string) {
-    const normalized = String(pathValue || "").trim();
-    if (!normalized) return t.noFileSelected;
-    return normalized.split("/").pop() || normalized;
-  }
   const visibleError = readonly && isNotFoundLikeError(error) ? "" : error;
 
   return (
-    <div className={`custom-model-page ${readonly ? "readonly-mode" : ""}`}>
+    <div className={`custom-model-page model-lab-page ${readonly ? "readonly-mode" : ""}`}>
       <header className="chat-header">
         <div>
           <h2>{t.headerTitle}</h2>
@@ -567,7 +575,7 @@ export function CustomModelPredictPage({ readonly = false, workspaceEnabled = fa
           <span className="run-status-dot" />
           <span className="run-status-text">{statusText || t.statusIdle}</span>
         </div>
-      </header>
+      </header><JobHistory customTask="predict"/>
       {readonly && (
         <div className="readonly-banner" role="status" aria-live="polite">
           {t.readonlyBanner}
@@ -576,31 +584,33 @@ export function CustomModelPredictPage({ readonly = false, workspaceEnabled = fa
 
       <section className="custom-model-grid">
         <aside className="chat-panel left custom-model-controls">
-          <fieldset className="readonly-fieldset" disabled={readonly}>
-          <section className="custom-section-card custom-section-wide">
-            <label className="left-controls custom-field-short">{t.modelFolder}
+          <fieldset className="readonly-fieldset" disabled={readonly || running || uploading}>
+          <section className="custom-section-card lab-model-card">
+            <div className="lab-model-fields">
+            <label className="lab-field">{t.modelFolder}
               <select value={selectedFolder} onChange={(e) => setSelectedFolder(e.target.value)}>
                 {folderOptions.map((f) => <option key={f} value={f}>{f}</option>)}
               </select>
             </label>
-            <label className="left-controls custom-field-medium">{t.modelPath}
+            <label className="lab-field">{t.modelPath}
               <select value={modelPath} onChange={(e) => setModelPath(e.target.value)}>
                 <option value="">{t.selectModel}</option>
                 {modelOptions.map((m) => <option key={m.path} value={m.path}>{m.label}</option>)}
               </select>
             </label>
+            </div>
           </section>
           </fieldset>
         </aside>
 
         <section className="custom-bottom-split">
           <aside className="chat-panel left custom-bottom-left custom-model-controls">
-            <fieldset className="readonly-fieldset" disabled={readonly}>
+            <fieldset className="readonly-fieldset" disabled={readonly || running || uploading}>
             <section className="custom-section-card custom-section-wide">
               <h3 className="custom-panel-title">{t.predictParams}</h3>
               <div className="custom-advanced-grid custom-advanced-panel custom-predict-params">
+                <details className="model-lab-advanced custom-field-span-full"><summary>{t.modelSettings}</summary><div className="custom-advanced-grid">
                 {ckptConfigNote && <div className="custom-readonly-note custom-field-span-full">{ckptConfigNote}</div>}
-                <div className="custom-param-group-title custom-field-span-full">{t.modelSettings}</div>
             <label className="left-controls custom-field-short">{t.plm}
               <select value={plmModel} onChange={(e) => setPlmModel(e.target.value)} disabled={ckptLocked}>
                 {plmModelKeys.length === 0 && <option value="">{emptySelectLabel}</option>}
@@ -626,6 +636,7 @@ export function CustomModelPredictPage({ readonly = false, workspaceEnabled = fa
               </select>
             </label>
             <label className="left-controls custom-field-short">{t.numLabels}<input type="number" value={numLabels} onChange={(e) => setNumLabels(Number(e.target.value) || 1)} disabled={ckptLocked} /></label>
+                </div></details>
                 <div className="custom-field-span-full predict-mode-row">
                   <div className="custom-mode-inline" role="group" aria-label={t.predictionMode}>
                     <span className="custom-mode-inline-label">{t.predictionMode}</span>
@@ -673,44 +684,12 @@ export function CustomModelPredictPage({ readonly = false, workspaceEnabled = fa
                       />
                     </div>
                     {batchInputSource === "upload" ? (
-                      <div className="custom-upload-dropzone-wrap custom-field-span-2 predict-batch-input-row">
-                        <div className="custom-upload-dropzone-grid">
-                          <div className="custom-upload-item upload-source-stack">
-                            <span className="custom-upload-item-label">{t.fileLabel}</span>
-                            <label className="custom-upload-trigger">
-                              <input
-                                type="file"
-                                accept=".csv,.tsv,.xlsx,.xls,.fasta,.fa,.txt"
-                                onChange={(e) => void onUploadBatchFile(e.target.files?.[0] || null)}
-                              />
-                              {t.chooseFile}
-                            </label>
-                            <WorkspaceFilePicker
-                              workspaceEnabled={workspaceEnabled}
-                              disabled={readonly || running}
-                              acceptedCategories={["table_or_text", "sequence"]}
-                              buttonLabel={t.fromWorkspace}
-                              onPick={(picked) => {
-                                const selected = picked[0];
-                                if (!selected) return;
-                                setInputFile(selected.storage_path);
-                                setBatchColumns([]);
-                              }}
-                            />
-                            <button
-                              type="button"
-                              className="custom-btn-secondary"
-                              onClick={() => void onUseBatchExample()}
-                              disabled={readonly || running}
-                            >
-                              {t.useExample}
-                            </button>
-                            <span className="custom-upload-file-chip">{displayUploadedName(inputFile)}</span>
-                            <button type="button" className="custom-upload-clear-btn" onClick={clearBatchInputFile}>
-                              {t.clear}
-                            </button>
-                          </div>
-                        </div>
+                      <div className="lab-batch-file">
+                        <ModelLabFileInput label={t.fileLabel} value={inputFile} workspaceEnabled={workspaceEnabled}
+                          accept=".csv,.tsv,.xlsx,.xls,.fasta,.fa,.txt" sequences disabled={readonly || running || uploading}
+                          onUpload={(file) => void onUploadBatchFile(file)}
+                          onPick={(path) => { setInputFile(path); setBatchColumns([]); }}
+                          onExample={() => void onUseBatchExample()} onClear={clearBatchInputFile} />
                       </div>
                     ) : batchInputSource === "paste" ? (
                       <label className="left-controls custom-field-span-2 predict-batch-input-row">{t.pasteFasta}
@@ -777,9 +756,8 @@ export function CustomModelPredictPage({ readonly = false, workspaceEnabled = fa
 
               <div className="custom-actions-inline-status">
                 <div className="custom-row custom-actions">
-                  <button type="button" className="custom-btn-secondary" disabled={readonly} onClick={() => void onPreviewCommand()}>{t.previewCommand}</button>
-                  <button type="button" className="custom-btn-primary" disabled={readonly || running} onClick={() => void onStart()}>{t.startPredict}</button>
-                  <button type="button" className="custom-btn-danger" disabled={readonly || !running} onClick={() => void onAbort()}>{t.abort}</button>
+                  <button type="button" className="custom-btn-secondary" disabled={readonly || running || !formReady} onClick={() => void onPreviewCommand()}>{t.previewCommand}</button>
+                  <button type="button" className="custom-btn-primary" disabled={readonly || running || !formReady} onClick={() => void onStart()}>{t.startPredict}</button>
                 </div>
               </div>
             </section>
@@ -788,6 +766,7 @@ export function CustomModelPredictPage({ readonly = false, workspaceEnabled = fa
 
           <div className="chat-panel right custom-model-output custom-bottom-right">
             <h3 className="custom-output-panel-title custom-panel-title">{t.outputPanel}</h3>
+            {running && <button type="button" className="custom-btn-danger" onClick={() => void onAbort()}>{t.abort}</button>}
             {visibleError && <div className="error-box">{visibleError}</div>}
             <div className="custom-inline-status-panel custom-inline-status-panel-compact">
               <details className="custom-preview-collapse custom-command-preview-collapse">
@@ -813,7 +792,7 @@ export function CustomModelPredictPage({ readonly = false, workspaceEnabled = fa
           </div>
         </section>
       </section>
-      <PageFooter />
+
     </div>
   );
 }
