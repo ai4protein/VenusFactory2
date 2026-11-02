@@ -624,7 +624,7 @@ def _is_trusted_mcp_tool(tool: str) -> tuple[bool, str]:
             "kimi_security: MCP allowlist not initialized yet, "
             "falling back to prefix match for %s", tool,
         )
-        return True, "venusfactory MCP allowlist (prefix, pre-init)"
+        return False, "MCP tool catalog is not ready"
     return False, f"unknown MCP tool: {tool}"
 
 
@@ -647,6 +647,10 @@ def decide(
     if not isinstance(args, dict):
         args = {}
 
+    if tool in {"Bash", "Write", "Edit", "NotebookEdit", "Skill", "ReadMediaFile", "Agent"}:
+        return SecurityDecision(False, "Use the isolated session tools", tool)
+    mode = "online"  # Same session boundary in local Web and online Web.
+
     # 1. MCP tools — must exactly match the introspected venusfactory tool
     # set. Pre-init fallback allows prefix `mcp__venusfactory__*` so the
     # very first requests during startup don't get rejected.
@@ -654,7 +658,7 @@ def decide(
         # Defense in depth: even if allowlist was built incorrectly, refuse
         # online-disabled heavy tools (train / FoldSeek / VenusMine).
         try:
-            from tools.runtime_tool_policy import is_online_mode, is_tool_allowed
+            from mcp_tools.tools.runtime_tool_policy import is_online_mode, is_tool_allowed
 
             bare = tool.split("__")[-1] if "__" in tool else tool
             if mode == "online" or is_online_mode():
@@ -665,13 +669,18 @@ def decide(
                         tool,
                     )
         except Exception:
-            pass
+            return SecurityDecision(False, "Tool policy unavailable", tool)
         ok, reason = _is_trusted_mcp_tool(tool)
         return SecurityDecision(ok, reason, tool)
 
-    # 2. Read-like kimi builtins
+    # Legacy file operations have no authority outside this conversation.
     if tool in ("Read", "Glob", "Grep"):
-        return _decide_read_like(tool, args, session_dir, mode)
+        from agent.harness.session_boundary import session_path
+        path = args.get("file_path") or args.get("path") or "."
+        try: session_path(session_dir, path)
+        except (ValueError, OSError):
+            return SecurityDecision(False, "Use a file from this conversation", tool)
+        return SecurityDecision(True, "session file allowed", tool)
 
     # 3. Write-like
     if tool in ("Write", "Edit", "NotebookEdit"):

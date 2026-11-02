@@ -227,7 +227,7 @@ class AnalyticsHooks(RunHooks):
         try:
             from datetime import datetime
 
-            from web_v2.analytics_store import analytics_store
+            from backend.web_v2.analytics_store import analytics_store
             await _run_in_thread(
                 analytics_store.record_tool_call,
                 ts=datetime.now().isoformat(),
@@ -264,7 +264,7 @@ class WebhookHooks(RunHooks):
         self, *, session_id: str, success: bool, **kwargs: Any
     ) -> None:
         try:
-            from web_v2.feedback_webhook import dispatch_webhook
+            from backend.web_v2.feedback_webhook import dispatch_webhook
             payload = {
                 "session_id": session_id,
                 "success": success,

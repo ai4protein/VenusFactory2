@@ -6,11 +6,11 @@ When planning the pipeline, follow these rules. MLS executes one step at a time;
 
 Plan steps to cover **execution**, **analysis**, and **visualization**:
 - **Execution:** Data download, prediction, running tools (one step per main action).
-- **Analysis:** Steps that **read output files** (e.g. from previous steps), parse results, and summarize—use `python_repl` or skills with explicit file paths from `dependency:step_N:file_path` (or similar).
+- **Analysis:** Steps that **read output files** (e.g. from previous steps), parse results, and summarize—use `run_session_python` or skills with explicit file paths from `dependency:step_N:file_path` (or similar).
   - Always pass file locations via dependency fields (prefer absolute path values returned in `file_info.file_path`).
   - Do not plan read steps that rely on bare filenames like `open('result.csv')` without dependency-based path binding.
-  - If a step uses `python_repl` or `agent_generated_code` for analysis/parsing/plotting, add a preceding `read_skill` step first (choose the most relevant available skill, e.g. `biopython`, `matplotlib`, `seaborn`) before executing code.
-- **Visualization:** Steps that **produce plots/figures** (e.g. via skills or `python_repl` with matplotlib/seaborn). Planned figures are shown in the chat; include plotting steps when the task benefits from visual output.
+  - If a step uses `write_session_file` followed by `run_session_python` for analysis/parsing/plotting, add a preceding `read_skill` step first (choose the most relevant available skill, e.g. `biopython`, `matplotlib`, `seaborn`) before executing code.
+- **Visualization:** Steps that **produce plots/figures** (e.g. via skills or `run_session_python` with matplotlib/seaborn). Planned figures are shown in the chat; include plotting steps when the task benefits from visual output.
 
 ## 2. Fine-grained task splitting
 

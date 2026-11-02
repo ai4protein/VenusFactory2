@@ -1,7 +1,7 @@
 ---
 name: seaborn
 description: >-
-  Seaborn statistical plots for exploratory analysis via agent_generated_code. Use for quick relational/distribution/categorical charts. Do NOT use for submission-grade Nature figures (nature_figure) or low-level artists control (matplotlib).
+  Seaborn statistical plots for exploratory analysis via session Python tools. Use for quick relational/distribution/categorical charts. Do NOT use for submission-grade Nature figures (nature_figure) or low-level artists control (matplotlib).
 license: Unknown
 metadata:
   version: "1.2"
@@ -12,11 +12,11 @@ metadata:
 
 ## Overview
 
-High-level statistical viz on top of matplotlib. In VenusFactory, plots run through **`agent_generated_code`** / `python_repl`. Publication figures must load **`nature_figure`** first.
+High-level statistical viz on top of matplotlib. In VenusFactory, plots run through **`write_session_file` then `run_session_python`**. Publication figures must load **`nature_figure`** first.
 
 ## VenusFactory execution
 
-- No `seaborn_*` `@tool`. Optional helpers: `src/tools/visualize/matplotlib/plot_template.py`, `style_configurator.py`.
+- No `seaborn_*` `@tool`. Optional helpers: `mcp_tools/tools/visualize/matplotlib/plot_template.py`, `style_configurator.py`.
 - Deep API: `read_skill("seaborn", relative_path="references/function_reference.md")` or `references/legacy_guide.md`.
 
 ## When to use / NOT
@@ -61,3 +61,6 @@ read_skill(skill_id="seaborn", relative_path="references/legacy_guide.md")
 ```
 
 Load legacy only after the hub workflow in this file is insufficient.
+
+### Session execution
+Use `write_session_file(path, content)` to write actual Python source and `run_session_python(path)` to execute it. Paths are relative to the server-assigned session workspace. Installed Python packages are available; repository source paths in this guide are host implementation references, not guest imports. Networking uses registered database/search/download tools; the analysis sandbox has no network access. Verify exit_code and actual output files.

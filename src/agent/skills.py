@@ -4,7 +4,7 @@ Skills middleware: load SKILL.md metadata and content for CB/MLS.
 Discovers two roots:
   1. VenusFactory2 native: ``src/agent/skills/``
   2. scientific-agent-skills (optional submodule):
-     ``third_party/scientific-agent-skills/skills/``
+     ``src/agent/skills/vendor/scientific-agent-skills/skills/``
 
 On name collisions, VF2 keeps the bare ``skill_id``; the scientific package is
 registered as ``sas_<dirname>`` so the full upstream library stays addressable.
@@ -17,8 +17,14 @@ from typing import Any, Dict, List, Optional, Tuple
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _VF_SKILLS_DIR = Path(__file__).resolve().parent / "skills"
-_SAS_SKILLS_DIR = _REPO_ROOT / "third_party" / "scientific-agent-skills" / "skills"
+_SAS_SKILLS_DIR = _REPO_ROOT / "src" / "agent" / "skills" / "vendor" / "scientific-agent-skills" / "skills"
 # Back-compat alias used by older callers/tests.
+from agent.rsi.context import get_resources as _get_research_resources
+_research_resources = _get_research_resources()
+if _research_resources is not None:
+    _VF_SKILLS_DIR = _research_resources.skills
+    # Third-party skills must be explicitly copied into this version's root.
+    _SAS_SKILLS_DIR = _research_resources.workspace / "disabled_external_skills"
 _SKILLS_DIR = _VF_SKILLS_DIR
 
 _SAS_PREFIX = "sas_"
@@ -190,7 +196,7 @@ def resolve_skill_path(skill_id: str, relative_path: Optional[str] = None) -> Op
     rel_str = relative_path.replace("\\", "/").lstrip("./")
     # Shared-nature whitelist only applies to VF2 packages.
     vf_root = _VF_SKILLS_DIR.resolve()
-    if str(root).startswith(str(vf_root)):
+    if root.parent == vf_root:
         for prefix, mapped in _SHARED_PATH_ALIASES:
             if rel_str.startswith(prefix) or relative_path.replace("\\", "/").startswith(prefix):
                 raw = relative_path.replace("\\", "/")
@@ -208,7 +214,7 @@ def resolve_skill_path(skill_id: str, relative_path: Optional[str] = None) -> Op
     if rel.is_absolute() or ".." in rel.parts:
         return None
     path = (root / rel).resolve()
-    if not str(path).startswith(str(root)):
+    if not path.is_relative_to(root):
         return None
     return path if path.is_file() else None
 
@@ -256,10 +262,10 @@ def get_skills_metadata() -> List[Dict[str, Any]]:
         name = meta.get("name", skill_id)
         source = root_source.get(str(pkg.parent.resolve()), "venusfactory")
         # pkg.parent is skills root; for VF2 pkg is under _VF_SKILLS_DIR
-        if str(pkg.resolve()).startswith(str(_VF_SKILLS_DIR.resolve())):
-            source = "venusfactory"
-        elif _SAS_SKILLS_DIR.is_dir() and str(pkg.resolve()).startswith(str(_SAS_SKILLS_DIR.resolve())):
+        if _SAS_SKILLS_DIR.is_dir() and pkg.resolve().is_relative_to(_SAS_SKILLS_DIR.resolve()):
             source = "scientific"
+        elif pkg.parent.resolve() == _VF_SKILLS_DIR.resolve():
+            source = "venusfactory"
         result.append({
             "skill_id": skill_id,
             "name": name,

@@ -1,0 +1,5 @@
+{
+  "schema": 2,
+  "policy_id": "server-configured-free-models-v1",
+  "catalog": "../harness/free_execution_catalog.json"
+}

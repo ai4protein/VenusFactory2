@@ -1,6 +1,6 @@
 ---
 name: ncbi_clinvar
-description: Query NCBI ClinVar for variant clinical significance. Search by gene/condition/CLNSIG, interpret pathogenicity, use E-utilities or FTP; annotate VCFs. Use project tools in src.tools.database.ncbi.
+description: Query NCBI ClinVar for variant clinical significance. Search by gene/condition/CLNSIG, interpret pathogenicity, use E-utilities or FTP; annotate VCFs. Use project tools in mcp_tools.tools.database.ncbi.
 license: Unknown
 metadata:
   version: "1.0"
@@ -24,7 +24,7 @@ ClinVar is NCBI's archive of relationships between human genetic variants and ph
 ## Quick Start
 
 The skill provides:
-1. **Project modules** in `src/tools/database/ncbi/`: `ncbi_clinvar.py` (atomic E-utilities, term builder, FTP), `ncbi_operations.py` (query/download operations); ClinVar download functions re-exported via package.
+1. **Project modules** in `mcp_tools/tools/database/ncbi/`: `ncbi_clinvar.py` (atomic E-utilities, term builder, FTP), `ncbi_operations.py` (query/download operations); ClinVar download functions re-exported via package.
 2. References: `references/api_reference.md`, `references/clinical_significance.md`, `references/data_formats.md`
 
 ### Agent Tools (Download Only)
@@ -70,7 +70,7 @@ Also available as general NCBI tools (not ClinVar-specific but useful in ClinVar
 ### 1. Search ClinVar Variants (download)
 
 ```python
-from src.tools.database.ncbi import download_ncbi_clinvar_variants
+from mcp_tools.tools.database.ncbi import download_ncbi_clinvar_variants
 
 # Simple gene search
 result = download_ncbi_clinvar_variants("BRCA1[gene]", "output/clinvar_brca1.json", retmax=50)
@@ -86,7 +86,7 @@ result = download_ncbi_clinvar_variants(
 ### 2. Build Search Terms (programmatic)
 
 ```python
-from src.tools.database.ncbi.ncbi_clinvar import build_clinvar_term
+from mcp_tools.tools.database.ncbi.ncbi_clinvar import build_clinvar_term
 
 # Build term with filters
 term = build_clinvar_term(
@@ -104,7 +104,7 @@ term = build_clinvar_term(condition="breast cancer")
 ### 3. Atomic E-utilities Workflow (programmatic)
 
 ```python
-from src.tools.database.ncbi.ncbi_clinvar import (
+from mcp_tools.tools.database.ncbi.ncbi_clinvar import (
     build_clinvar_term, query_clinvar, parse_esearch_ids,
     get_clinvar_summary, fetch_clinvar_records,
 )
@@ -124,7 +124,7 @@ records = fetch_clinvar_records(variation_ids, rettype="vcv")
 ### 4. Download Atomic Results
 
 ```python
-from src.tools.database.ncbi import (
+from mcp_tools.tools.database.ncbi import (
     download_ncbi_clinvar_esearch,
     download_ncbi_clinvar_esummary,
     download_ncbi_clinvar_efetch,
@@ -143,7 +143,7 @@ download_ncbi_clinvar_efetch(["12345", "67890"], "output/clinvar_efetch.xml")
 ### 5. FTP Bulk Downloads (programmatic)
 
 ```python
-from src.tools.database.ncbi.ncbi_clinvar import get_clinvar_ftp_url, download_clinvar_ftp
+from mcp_tools.tools.database.ncbi.ncbi_clinvar import get_clinvar_ftp_url, download_clinvar_ftp
 
 # Get FTP URL
 url = get_clinvar_ftp_url("variant_summary")  # Or: vcf_grch37, vcf_grch38, xml_latest, var_citations, cross_references

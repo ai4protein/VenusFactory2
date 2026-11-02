@@ -15,7 +15,7 @@ from logger import get_logger
 
 from agent.chat_agent_utils import _get_output_file_path_from_raw
 from agent.graph.execution.context import ExecutionContext
-from web.utils.file_oss import upload_file_to_cloud_async
+from mcp_tools.common.file_oss import upload_file_to_cloud_async
 
 _logger = get_logger("agent.graph")
 

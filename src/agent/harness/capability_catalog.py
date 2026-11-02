@@ -1,0 +1,43 @@
+"""Compact discovery index. Full source, schemas and evidence are loaded on demand."""
+from contextlib import contextmanager
+import json
+from pathlib import Path
+import sqlite3
+import time
+
+@contextmanager
+def database(library):
+    library = Path(library); library.mkdir(parents=True, exist_ok=True)
+    con = sqlite3.connect(library/'catalog.sqlite3', timeout=20)
+    con.execute('PRAGMA journal_mode=WAL')
+    con.execute('CREATE TABLE IF NOT EXISTS capabilities (id TEXT PRIMARY KEY, creator TEXT NOT NULL, name TEXT NOT NULL, version TEXT NOT NULL, search_text TEXT NOT NULL, card TEXT NOT NULL, receipt_hash TEXT NOT NULL, created REAL NOT NULL, UNIQUE(creator,name,version))')
+    try:
+        with con: yield con
+    finally: con.close()
+
+def register(library, manifest, receipt, goal_id, visibility='public'):
+    spec = manifest['review_spec']
+    card = {k: manifest[k] for k in ['id', 'name', 'description', 'validation']}
+    card.update(author=spec['author'], version=spec['version'], kind=spec['kind'], scope=spec['scope'], review_status='approved', visibility=visibility, origin_goal=goal_id)
+    search = ' '.join([card['name'], card['description'], spec['author'], *[x for values in spec['scope'].values() for x in values]]).casefold()
+    with database(library) as con:
+        con.execute('INSERT OR IGNORE INTO capabilities VALUES (?,?,?,?,?,?,?,?)', (manifest['id'], goal_id, manifest['name'], spec['version'], search, json.dumps(card, ensure_ascii=False), receipt['receipt_sha256'], time.time()))
+        row = con.execute('SELECT id FROM capabilities WHERE creator=? AND name=? AND version=?', (goal_id, manifest['name'], spec['version'])).fetchone()
+        if not row or row[0] != manifest['id']: raise ValueError('Publish a new version instead of replacing an existing one')
+    return card
+
+def search(library, query='', limit=10, offset=0):
+    terms = str(query).casefold().split()[:20]
+    conditions = ' AND '.join('search_text LIKE ? ESCAPE \'\\\'' for _ in terms) or '1=1'
+    values = ['%'+word.replace('\\','\\\\').replace('%','\\%').replace('_','\\_')+'%' for word in terms]
+    with database(library) as con:
+        total = con.execute('SELECT COUNT(*) FROM capabilities WHERE '+conditions, values).fetchone()[0]
+        rows = con.execute('SELECT card FROM capabilities WHERE '+conditions+' ORDER BY created DESC,id LIMIT ? OFFSET ?', [*values, max(1,min(int(limit),50)), max(0,int(offset))]).fetchall()
+    return {'total': total, 'items': [json.loads(row[0]) for row in rows]}
+
+def cards(library):
+    with database(library) as con: return [json.loads(row[0]) for row in con.execute('SELECT card FROM capabilities ORDER BY created DESC,id')]
+
+def require_registered(library, identity, receipt_hash):
+    with database(library) as con: row = con.execute('SELECT receipt_hash FROM capabilities WHERE id=?', (identity,)).fetchone()
+    if not row or row[0] != receipt_hash: raise ValueError('Capability is not admitted to this registry')

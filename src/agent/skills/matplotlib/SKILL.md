@@ -1,7 +1,7 @@
 ---
 name: matplotlib
 description: >-
-  Matplotlib OO/pyplot guidance for custom plots via agent_generated_code. Use for fine-grained control. Prefer nature_figure for manuscript figures and seaborn for quick statistical EDA.
+  Matplotlib OO/pyplot guidance for custom plots via session Python tools. Use for fine-grained control. Prefer nature_figure for manuscript figures and seaborn for quick statistical EDA.
 license: https://github.com/matplotlib/matplotlib/tree/main/LICENSE
 metadata:
   version: "1.2"
@@ -12,7 +12,7 @@ metadata:
 
 ## Overview
 
-Foundational plotting. In VenusFactory execute via **`agent_generated_code`**. Helpers: `src/tools/visualize/matplotlib/plot_template.py`, `style_configurator.py`.
+Foundational plotting. In VenusFactory execute via **`write_session_file` then `run_session_python`**. Helpers: `mcp_tools/tools/visualize/matplotlib/plot_template.py`, `style_configurator.py`.
 
 ## When to use / NOT
 
@@ -50,3 +50,6 @@ read_skill(skill_id="matplotlib", relative_path="references/legacy_guide.md")
 ```
 
 Load legacy only after the hub workflow in this file is insufficient.
+
+### Session execution
+Use `write_session_file(path, content)` to write actual Python source and `run_session_python(path)` to execute it. Paths are relative to the server-assigned session workspace. Installed Python packages are available; repository source paths in this guide are host implementation references, not guest imports. Networking uses registered database/search/download tools; the analysis sandbox has no network access. Verify exit_code and actual output files.

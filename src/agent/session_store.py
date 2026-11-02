@@ -35,6 +35,7 @@ _PERSISTABLE_KEYS: frozenset[str] = frozenset({
     "clarification_questions", "clarification_answers",
     "waiting_for", "status", "error",
     # Science Agent (kimi-code) interactive gates
+    "pending_interaction", "interaction_history",
     "kimi_pending_question", "kimi_pending_approval",
     "approval_prompt", "plan_markdown",
     "execution_failed", "failed_step", "failed_reason",
@@ -58,6 +59,9 @@ _PERSISTABLE_KEYS: frozenset[str] = frozenset({
     "user_lang",
     # Dual-chat mode: science_agent (kimi-code) | science_expert (graph).
     "chat_mode", "engine",
+    "_agent_run_id", "_agent_event_seq",
+    "agent_execution", "agent_messages", "agent_retry_base", "agent_last_outcome", "agent_pending_turn",
+    "agent_memory", "agent_retry_memory", "agent_context", "agent_turn_count", "kimi_compacted_turns",
     # Expert optional flags (SC is paper-level by default; full_manuscript kept for compat).
     "review_sub_reports", "full_manuscript",
 })
@@ -169,6 +173,30 @@ def session_title_from_history(history: Any, *, max_len: int = 22) -> str:
     return ""
 
 
+def session_chat_mode(state: dict[str, Any]) -> str:
+    """Classify legacy records without rewriting their stored conversation."""
+    history = state.get("history") or []
+    if any(isinstance(item, dict) and item.get("science_goal_id") for item in history):
+        return "science_expert"
+    mode = state.get("chat_mode")
+    if mode in {"science_agent", "science_expert"}:
+        return mode
+    if history and state.get("engine") == "graph":
+        return "science_expert"
+    return "science_agent"
+
+
+def session_has_content(state: dict[str, Any]) -> bool:
+    """A draft's identity and default settings are not conversation content."""
+    return any(state.get(key) for key in (
+        "history", "last_user_text", "last_attachment_paths", "temp_files",
+        "conversation_log", "tool_executions", "plan", "plan_markdown",
+        "research_sub_reports", "pi_report", "step_results", "waiting_for",
+    )) or str(state.get("status", "")).lower() in {
+        "running", "queued", "active", "stopping", "paused",
+    }
+
+
 class SqliteBackend:
     """Thread-safe SQLite K-V backend for session persistence.
 
@@ -238,6 +266,10 @@ class SqliteBackend:
             """,
             (session_id, owner_key, now, now, data_json),
         )
+
+    def revision(self, session_id: str):
+        row = self._get_conn().execute("SELECT last_accessed FROM sessions WHERE session_id=?", (session_id,)).fetchone()
+        return row[0] if row else None
 
     def load(self, session_id: str) -> Optional[dict]:
         conn = self._get_conn()
@@ -318,7 +350,9 @@ class SqliteBackend:
                 "status": d.get("status") or "",
                 "history_size": len(history) if isinstance(history, list) else 0,
                 "model_name": d.get("default_llm_model_name") or "",
-                "title": session_title_from_history(history),
+                "title": session_title_from_history(history) or shorten_session_title(d.get("last_user_text", "")),
+                "has_content": session_has_content(d),
+                "chat_mode": session_chat_mode(d),
             })
         return summaries
 
@@ -333,6 +367,7 @@ class SessionStore:
     ):
         self._backend = backend
         self._mem: dict[str, dict[str, Any]] = {}
+        self._mem_revision: dict[str, float] = {}
         # Tracks the most recent time each mem entry was touched (created/get/save).
         # Used by cleanup_loop to evict idle mem entries -- created_at alone is wrong
         # because reloaded sessions store created_at as an ISO string, not datetime.
@@ -357,9 +392,13 @@ class SessionStore:
             self._touch(sid)
         owner = str(state.get("owner_key", ""))
         await asyncio.to_thread(self._backend.upsert, sid, owner, persistable_state(state))
+        self._mem_revision[sid] = await asyncio.to_thread(self._backend.revision, sid)
 
     async def get(self, session_id: str) -> Optional[dict[str, Any]]:
+        revision = await asyncio.to_thread(self._backend.revision, session_id)
         async with self._lock:
+            if self._mem_revision.get(session_id) != revision:
+                self._mem.pop(session_id, None)
             cached = self._mem.get(session_id)
             if cached is not None:
                 self._touch(session_id)
@@ -386,6 +425,7 @@ class SessionStore:
         full = self._ensure_runtime(payload)
         async with self._lock:
             self._mem[session_id] = full
+            self._mem_revision[session_id] = revision
             self._touch(session_id)
         return full
 
@@ -398,6 +438,7 @@ class SessionStore:
             return
         owner = str(state.get("owner_key", ""))
         await asyncio.to_thread(self._backend.upsert, session_id, owner, persistable_state(state))
+        self._mem_revision[session_id] = await asyncio.to_thread(self._backend.revision, session_id)
 
     async def delete(self, session_id: str) -> None:
         async with self._lock:
@@ -461,12 +502,12 @@ class SessionStore:
                 "status": state.get("status", ""),
                 "history_size": len(history) if isinstance(history, list) else 0,
                 "model_name": model_name,
-                "title": session_title_from_history(history),
+                "title": session_title_from_history(history) or shorten_session_title(state.get("last_user_text", "")),
+                "has_content": session_has_content(state),
+                "chat_mode": session_chat_mode(state),
             }
             existing = by_id.get(sid)
             if existing is not None:
-                # Prefer in-memory history for title/size — DB may lag mid-turn.
-                existing.update(mem_fields)
                 continue
             by_id[sid] = {
                 "session_id": sid,

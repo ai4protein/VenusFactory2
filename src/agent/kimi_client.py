@@ -167,6 +167,14 @@ def _map_event(env: dict[str, Any]) -> KimiEvent:
         return KimiEvent(kind="compaction_blocked", **common)
     if et == "compaction.cancelled":
         return KimiEvent(kind="compaction_cancelled", **common)
+    if et == "turn.step.interrupted" and payload.get("reason") == "error":
+        return KimiEvent(
+            kind="error",
+            text=str(payload.get("message") or "Agent execution was interrupted by an upstream error"),
+            error_code=str(payload.get("code") or "step_interrupted"),
+            is_error=True,
+            **common,
+        )
     if et == "error":
         return KimiEvent(
             kind="error",

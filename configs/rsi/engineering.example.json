@@ -1,0 +1,11 @@
+{
+  "suite": "engineering_smoke",
+  "variants": 1,
+  "concurrency": 1,
+  "task_timeout_s": 180,
+  "max_tool_calls": 12,
+  "kimi_bin": "/absolute/path/to/installed/kimi",
+  "kimi_config": "/absolute/path/to/private/config.toml",
+  "python_root": "/absolute/path/to/python/environment",
+  "claim_scope": "Engineering validation only; no RSI efficacy claim"
+}

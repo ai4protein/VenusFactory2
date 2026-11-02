@@ -4,7 +4,7 @@ This document provides comprehensive technical documentation for programmatic ac
 
 ## Project Integration
 
-VenusFactory2 implements AlphaFold access in `src/tools/database/alphafold/` and exposes these **hub `@tool` names** (see main `SKILL.md`):
+VenusFactory2 implements AlphaFold access in `mcp_tools/tools/database/alphafold/` and exposes these **hub `@tool` names** (see main `SKILL.md`):
 
 | Hub tool | Notes |
 |----------|--------|

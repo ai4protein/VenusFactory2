@@ -32,8 +32,8 @@ This skill should be used when:
 ## Quick Start
 
 The skill provides:
-1. **Agent tools (download only)** in `src/tools/database/tools_agent.py`: the agent exposes only **download** operations; each returns a rich JSON envelope with `file_info`. See table below.
-2. **Project modules** in `src/tools/database/brenda/`: `brenda_client.py` (SOAP), `brenda_queries.py`, `enzyme_pathway_builder.py`, `brenda_operations.py`; all re-exported via package. For programmatic use (including query-style APIs), import e.g. `from src.tools.database.brenda import download_brenda_km_values_by_ec_number, query_brenda_km_values_by_ec_number, ...`.
+1. **Agent tools (download only)** in `mcp_tools/tools/database/tools_agent.py`: the agent exposes only **download** operations; each returns a rich JSON envelope with `file_info`. See table below.
+2. **Project modules** in `mcp_tools/tools/database/brenda/`: `brenda_client.py` (SOAP), `brenda_queries.py`, `enzyme_pathway_builder.py`, `brenda_operations.py`; all re-exported via package. For programmatic use (including query-style APIs), import e.g. `from mcp_tools.tools.database.brenda import download_brenda_km_values_by_ec_number, query_brenda_km_values_by_ec_number, ...`.
 3. Reference: `references/api_reference.md`
 
 ### Agent Tools (Download Only)
@@ -82,7 +82,7 @@ Access comprehensive kinetic data for enzymes:
 
 **Get Km Values by EC Number**:
 ```python
-from src.tools.database.brenda import get_km_values
+from mcp_tools.tools.database.brenda import get_km_values
 
 # Get Km values for all organisms
 km_data = get_km_values("1.1.1.1")  # Alcohol dehydrogenase
@@ -103,7 +103,7 @@ for entry in km_data:
 
 **Extract Specific Information**:
 ```python
-from src.tools.database.brenda import parse_km_entry, extract_organism_data
+from mcp_tools.tools.database.brenda import parse_km_entry, extract_organism_data
 
 for entry in km_data:
     parsed = parse_km_entry(entry)
@@ -121,7 +121,7 @@ Retrieve reaction equations and details:
 
 **Get Reactions by EC Number**:
 ```python
-from src.tools.database.brenda import get_reactions
+from mcp_tools.tools.database.brenda import get_reactions
 
 # Get all reactions for EC number
 reactions = get_reactions("1.1.1.1")
@@ -135,7 +135,7 @@ reactions = get_reactions("1.1.1.1", reaction="ethanol + NAD+")
 
 **Process Reaction Data**:
 ```python
-from src.tools.database.brenda import parse_reaction_entry, extract_substrate_products
+from mcp_tools.tools.database.brenda import parse_reaction_entry, extract_substrate_products
 
 for reaction in reactions:
     parsed = parse_reaction_entry(reaction)
@@ -153,7 +153,7 @@ Find enzymes for specific biochemical transformations:
 
 **Find Enzymes by Substrate**:
 ```python
-from src.tools.database.brenda import search_enzymes_by_substrate
+from mcp_tools.tools.database.brenda import search_enzymes_by_substrate
 
 # Find enzymes that act on glucose
 enzymes = search_enzymes_by_substrate("glucose", limit=20)
@@ -166,7 +166,7 @@ for enzyme in enzymes:
 
 **Find Enzymes by Product**:
 ```python
-from src.tools.database.brenda import search_enzymes_by_product
+from mcp_tools.tools.database.brenda import search_enzymes_by_product
 
 # Find enzymes that produce lactate
 enzymes = search_enzymes_by_product("lactate", limit=10)
@@ -174,7 +174,7 @@ enzymes = search_enzymes_by_product("lactate", limit=10)
 
 **Search by Reaction Pattern**:
 ```python
-from src.tools.database.brenda import search_by_pattern
+from mcp_tools.tools.database.brenda import search_by_pattern
 
 # Find oxidation reactions
 enzymes = search_by_pattern("oxidation", limit=15)
@@ -186,7 +186,7 @@ Compare enzyme properties across organisms:
 
 **Get Enzyme Data for Multiple Organisms**:
 ```python
-from src.tools.database.brenda import compare_across_organisms
+from mcp_tools.tools.database.brenda import compare_across_organisms
 
 organisms = ["Escherichia coli", "Saccharomyces cerevisiae", "Homo sapiens"]
 comparison = compare_across_organisms("1.1.1.1", organisms)
@@ -200,7 +200,7 @@ for org_data in comparison:
 
 **Find Organisms with Specific Enzyme**:
 ```python
-from src.tools.database.brenda import get_organisms_for_enzyme
+from mcp_tools.tools.database.brenda import get_organisms_for_enzyme
 
 organisms = get_organisms_for_enzyme("6.3.5.5")  # Glutamine synthetase
 print(f"Found {len(organisms)} organisms with this enzyme")
@@ -212,7 +212,7 @@ Access optimal conditions and environmental parameters:
 
 **Get pH and Temperature Data**:
 ```python
-from src.tools.database.brenda import get_environmental_parameters
+from mcp_tools.tools.database.brenda import get_environmental_parameters
 
 params = get_environmental_parameters("1.1.1.1")
 
@@ -224,7 +224,7 @@ print(f"Temperature stability: {params['temperature_stability']}")
 
 **Cofactor Requirements**:
 ```python
-from src.tools.database.brenda import get_cofactor_requirements
+from mcp_tools.tools.database.brenda import get_cofactor_requirements
 
 cofactors = get_cofactor_requirements("1.1.1.1")
 for cofactor in cofactors:
@@ -239,7 +239,7 @@ Analyze enzyme substrate preferences:
 
 **Get Substrate Specificity Data**:
 ```python
-from src.tools.database.brenda import get_substrate_specificity
+from mcp_tools.tools.database.brenda import get_substrate_specificity
 
 specificity = get_substrate_specificity("1.1.1.1")
 
@@ -253,7 +253,7 @@ for substrate in specificity:
 
 **Compare Substrate Preferences**:
 ```python
-from src.tools.database.brenda import compare_substrate_affinity
+from mcp_tools.tools.database.brenda import compare_substrate_affinity
 
 comparison = compare_substrate_affinity("1.1.1.1")
 sorted_by_km = sorted(comparison, key=lambda x: x['km'])
@@ -268,7 +268,7 @@ Access enzyme regulation data:
 
 **Get Inhibitor Information**:
 ```python
-from src.tools.database.brenda import get_inhibitors
+from mcp_tools.tools.database.brenda import get_inhibitors
 
 inhibitors = get_inhibitors("1.1.1.1")
 
@@ -281,7 +281,7 @@ for inhibitor in inhibitors:
 
 **Get Activator Information**:
 ```python
-from src.tools.database.brenda import get_activators
+from mcp_tools.tools.database.brenda import get_activators
 
 activators = get_activators("1.1.1.1")
 
@@ -297,7 +297,7 @@ Find engineering targets and alternatives:
 
 **Find Thermophilic Homologs**:
 ```python
-from src.tools.database.brenda import find_thermophilic_homologs
+from mcp_tools.tools.database.brenda import find_thermophilic_homologs
 
 thermophilic = find_thermophilic_homologs("1.1.1.1", min_temp=50)
 
@@ -309,7 +309,7 @@ for enzyme in thermophilic:
 
 **Find Alkaline/ Acid Stable Variants**:
 ```python
-from src.tools.database.brenda import find_ph_stable_variants
+from mcp_tools.tools.database.brenda import find_ph_stable_variants
 
 alkaline = find_ph_stable_variants("1.1.1.1", min_ph=8.0)
 acidic = find_ph_stable_variants("1.1.1.1", max_ph=6.0)
@@ -321,7 +321,7 @@ Prepare data for kinetic modeling:
 
 **Get Kinetic Parameters for Modeling**:
 ```python
-from src.tools.database.brenda import get_modeling_parameters
+from mcp_tools.tools.database.brenda import get_modeling_parameters
 
 model_data = get_modeling_parameters("1.1.1.1", substrate="ethanol")
 
@@ -363,7 +363,7 @@ export BRENDA_PASSWORD="your_brenda_password"
 
 ## Helper Scripts
 
-Scripts live in `src/tools/database/brenda/`. Import from package: `from src.tools.database.brenda import ...`
+Scripts live in `mcp_tools/tools/database/brenda/`. Import from package: `from mcp_tools.tools.database.brenda import ...`
 
 ### brenda_queries.py
 
@@ -388,7 +388,7 @@ Provides high-level functions for enzyme data analysis:
 
 **Usage**:
 ```python
-from src.tools.database.brenda import search_enzymes_by_substrate, compare_across_organisms
+from mcp_tools.tools.database.brenda import search_enzymes_by_substrate, compare_across_organisms
 
 # Search for enzymes
 enzymes = search_enzymes_by_substrate("glucose", limit=20)
@@ -411,7 +411,7 @@ Build enzymatic pathways and retrosynthetic routes:
 
 **Usage**:
 ```python
-from src.tools.database.brenda import find_pathway_for_product, build_retrosynthetic_tree
+from mcp_tools.tools.database.brenda import find_pathway_for_product, build_retrosynthetic_tree
 
 # Find pathway to product
 pathway = find_pathway_for_product("lactate", max_steps=3)
@@ -439,7 +439,7 @@ tree = build_retrosynthetic_tree("lactate", depth=2)
 
 **Error Handling**:
 ```python
-from src.tools.database.brenda import get_km_values, get_reactions
+from mcp_tools.tools.database.brenda import get_km_values, get_reactions
 from zeep.exceptions import Fault, TransportError  # if using zeep directly
 
 try:
@@ -461,8 +461,8 @@ except Exception as e:
 Find suitable enzymes for a specific substrate:
 
 ```python
-from src.tools.database.brenda import get_km_values
-from src.tools.database.brenda import search_enzymes_by_substrate, compare_substrate_affinity
+from mcp_tools.tools.database.brenda import get_km_values
+from mcp_tools.tools.database.brenda import search_enzymes_by_substrate, compare_substrate_affinity
 
 # Search for enzymes that act on substrate
 substrate = "2-phenylethanol"
@@ -488,7 +488,7 @@ if enzymes:
 Compare enzyme properties across different organisms:
 
 ```python
-from src.tools.database.brenda import compare_across_organisms, get_environmental_parameters
+from mcp_tools.tools.database.brenda import compare_across_organisms, get_environmental_parameters
 
 # Define organisms for comparison
 organisms = [
@@ -518,7 +518,7 @@ print(f"\nOverall optimal pH range: {env_params['ph_range']}")
 Find engineering opportunities for enzyme improvement:
 
 ```python
-from src.tools.database.brenda import (
+from mcp_tools.tools.database.brenda import (
     find_thermophilic_homologs,
     find_ph_stable_variants,
     compare_substrate_affinity
@@ -544,7 +544,7 @@ for i, sub in enumerate(specificity[:5]):
 Build enzymatic synthesis pathways:
 
 ```python
-from src.tools.database.brenda import (
+from mcp_tools.tools.database.brenda import (
     find_pathway_for_product,
     build_retrosynthetic_tree,
     calculate_pathway_feasibility
@@ -572,8 +572,8 @@ print(f"Potential issues: {feasibility['warnings']}")
 Comprehensive kinetic analysis for enzyme selection:
 
 ```python
-from src.tools.database.brenda import get_km_values
-from src.tools.database.brenda.brenda_queries import parse_km_entry, get_modeling_parameters
+from mcp_tools.tools.database.brenda import get_km_values
+from mcp_tools.tools.database.brenda.brenda_queries import parse_km_entry, get_modeling_parameters
 
 # Get comprehensive kinetic data
 ec_number = "1.1.1.1"
@@ -608,7 +608,7 @@ print(f"  Vmax: {model_data['vmax']}")
 Select enzymes for industrial applications:
 
 ```python
-from src.tools.database.brenda import (
+from mcp_tools.tools.database.brenda import (
     find_thermophilic_homologs,
     get_environmental_parameters,
     get_inhibitors

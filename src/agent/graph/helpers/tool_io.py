@@ -14,7 +14,7 @@ from agent.graph.helpers._path_resolve import (
 )
 from agent.graph.helpers.plan_helpers import _normalize_step_number
 from logger import get_logger
-from web.utils.common_utils import get_project_root
+from mcp_tools.common.common_utils import get_project_root
 
 _logger = get_logger("agent.graph")
 

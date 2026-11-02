@@ -1,0 +1,2 @@
+# Historical verifier bytes are content-addressed, including line endings.
+*.py -text

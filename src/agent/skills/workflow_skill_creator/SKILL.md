@@ -34,7 +34,7 @@ For each step:
 
 ### Round 3: Reuse Existing VenusFactory Tools
 
-Before asking these questions, check `src/tools/database/`, `src/tools/visualize/`, `src/tools/predict/`, `src/tools/mutation/`, `src/tools/search/`, `src/tools/train/`, `src/tools/file/`, `src/tools/bioinfo/` for overlap. **If an existing tool covers a step, the new skill MUST reference it — do not reimplement.**
+Before asking these questions, check `mcp_tools/tools/database/`, `mcp_tools/tools/visualize/`, `mcp_tools/tools/predict/`, `mcp_tools/models/pretrained/mutation/`, `mcp_tools/tools/search/`, `mcp_tools/models/factory/training/`, `mcp_tools/tools/file/`, `mcp_tools/tools/bioinfo/` for overlap. **If an existing tool covers a step, the new skill MUST reference it — do not reimplement.**
 
 1. "I noticed the workflow uses [tool X, tool Y] that already exist. The new skill will reference these. Anything else to incorporate?"
 2. "Are there rate limits for new external APIs that aren't covered?"
@@ -44,7 +44,7 @@ Before asking these questions, check `src/tools/database/`, `src/tools/visualize
 
 1. "Should the skill cover [X, Y, Z] from the workflow, or include/exclude anything?"
 2. Determine whether the skill needs new code:
-    - **Needs new code** if any step calls an external API not yet wrapped, processes files, or computes results not already in `src/tools/`. → Follow the **6-file wiring recipe** below.
+    - **Needs new code** if any step calls an external API not yet wrapped, processes files, or computes results not already in `mcp_tools/tools/`. → Follow the **6-file wiring recipe** below.
     - **Instruction-only** if every step orchestrates existing VenusFactory tools. → Write SKILL.md only, no Python.
 3. Propose a name: `{verb}_{noun}_database` for new DB wrappers, `{noun}` for analysis/visualization, matching existing folders (`alphafold_database`, `pymol`, `clustalo_msa`, etc.).
 
@@ -84,16 +84,16 @@ Produce a **design document** (markdown plan) and present for approval:
 ### Guiding Principles
 
 - Match the project's existing Python style — use the conda env at `~/miniconda3/envs/venus/bin/python` (see `environment.yaml`); do NOT introduce `uv` or per-script `# /// script` headers.
-- Prefer `requests` + `urllib3.util.retry.Retry` for HTTP (this is the established pattern, e.g. `src/tools/database/alphafold/alphafold_structure.py`).
+- Prefer `requests` + `urllib3.util.retry.Retry` for HTTP (this is the established pattern, e.g. `mcp_tools/tools/database/alphafold/alphafold_structure.py`).
 - All public download/query functions return a JSON **string** with the rich envelope:
   - Success: `{"status": "success", "file_info": {...} | "content": "...", "content_preview": str, "biological_metadata": {...}, "execution_context": {...}}`
   - Error: `{"status": "error", "error": {"type", "message", "suggestion"}, "file_info": null}`
-- Use `to_client_file_path()` from `src/tools/path_sanitizer.py` for any `file_path` in responses.
+- Use `to_client_file_path()` from `mcp_tools/tools/path_sanitizer.py` for any `file_path` in responses.
 - Document rate limits in comments and respect them with `time.sleep` between polls.
 
 ### Rule 1: Reuse Existing Tools
 
-When the workflow uses functionality already in `src/tools/`, the new SKILL.md **MUST** reference the existing tool by name in its `## Project Tools` table — do not duplicate the implementation.
+When the workflow uses functionality already in `mcp_tools/tools/`, the new SKILL.md **MUST** reference the existing tool by name in its `## Project Tools` table — do not duplicate the implementation.
 
 ### Rule 2: Rate Limiting for New APIs
 
@@ -109,16 +109,16 @@ For any new external API, the implementation **MUST** handle rate limits:
 
 To add a new database/visualization/etc tool to VenusFactory, touch exactly these files in this order:
 
-1. **`src/tools/<category>/<name>/__init__.py`** — export the public function(s).
-2. **`src/tools/<category>/<name>/<name>_operations.py`** — copy the `_error_response()` / `_download_success_response()` envelope builders from `src/tools/database/alphafold/alphafold_operations.py`, then implement the entry function returning the JSON string.
-3. **`src/tools/database/tools_agent.py`** (or category equivalent) — add `from .<name> import ...`, define `class <Tool>Input(BaseModel)`, write the `@tool("…", args_schema=<Tool>Input)` wrapper with a try/except, and append to `DATABASE_TOOLS`.
-4. **`src/tools/database/tools_api.py`** — add a `@router.get` / `@router.post` route calling the same core function.
-5. **`src/tools/database/tools_mcp.py`** — add a `@mcp.tool(name="…")` wrapper (no Pydantic schema; positional + typed args).
-6. **`src/tools/tools_agent_hub.py`** — add the new `_tool` name to (a) the top `from tools.database.tools_agent import (...)` block, (b) the `DATABASE_TOOLS` list, and (c) the `__all__` re-export list.
+1. **`mcp_tools/tools/<category>/<name>/__init__.py`** — export the public function(s).
+2. **`mcp_tools/tools/<category>/<name>/<name>_operations.py`** — copy the `_error_response()` / `_download_success_response()` envelope builders from `mcp_tools/tools/database/alphafold/alphafold_operations.py`, then implement the entry function returning the JSON string.
+3. **`mcp_tools/tools/database/tools_agent.py`** (or category equivalent) — add `from .<name> import ...`, define `class <Tool>Input(BaseModel)`, write the `@tool("…", args_schema=<Tool>Input)` wrapper with a try/except, and append to `DATABASE_TOOLS`.
+4. **`mcp_tools/tools/database/tools_api.py`** — add a `@router.get` / `@router.post` route calling the same core function.
+5. **`mcp_tools/tools/database/tools_mcp.py`** — add a `@mcp.tool(name="…")` wrapper (no Pydantic schema; positional + typed args).
+6. **`mcp_tools/tools/tools_agent_hub.py`** — add the new `_tool` name to (a) the top `from mcp_tools.tools.database.tools_agent import (...)` block, (b) the `DATABASE_TOOLS` list, and (c) the `__all__` re-export list.
 
 After wiring, verify:
 ```bash
-~/miniconda3/envs/venus/bin/python -c "from src.tools.tools_agent_hub import get_tools; print(len(get_tools()))"
+~/miniconda3/envs/venus/bin/python -c "from mcp_tools.tools.tools_agent_hub import get_tools; print(len(get_tools()))"
 ```
 The count must have increased by the number of new tools.
 
@@ -184,7 +184,7 @@ All download tools **MUST** write large payloads to disk and return only `{file_
 
 After implementation:
 
-1. **Import smoke test**: `python -c "from src.tools.<category>.<name> import <fn>"` (if new code).
+1. **Import smoke test**: `python -c "from mcp_tools.tools.<category>.<name> import <fn>"` (if new code).
 2. **Hub count check**: confirm `get_tools()` count increased (if new tools).
 3. **Skill validate**: `python scripts/validate_skills.py`
 4. **Manual invocation** through `chat_agent.py` with a prompt that should trigger the new skill.
@@ -193,5 +193,5 @@ After implementation:
 ## References
 
 - `references/cli_script_template.py` — original google-deepmind template, kept for reference (NOT used directly in VenusFactory; we don't use `uv` / inline scripts).
-- Canonical VenusFactory wiring example: `src/tools/database/alphafold/` end-to-end (see also `alphafold_analyze.py` for a pure-local-analysis pattern, no external API).
-- Canonical submit-poll-download example: `src/tools/database/foldseek/`.
+- Canonical VenusFactory wiring example: `mcp_tools/tools/database/alphafold/` end-to-end (see also `alphafold_analyze.py` for a pure-local-analysis pattern, no external API).
+- Canonical submit-poll-download example: `mcp_tools/tools/database/foldseek/`.

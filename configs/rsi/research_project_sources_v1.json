@@ -1,0 +1,178 @@
+{
+  "schema": "research_project_sources.v1",
+  "target_models": 10000,
+  "count_unit": "trained_validated_callable_protein_property_scenario_model",
+  "same_algorithm_across_distinct_scopes_allowed": true,
+  "source_discovery_is_not_model_publication": true,
+  "sources": [
+    {
+      "id": "esol",
+      "research_use": "Recombinant protein solubility and expression under measured chaperone contexts",
+      "url": "https://dbarchive.biosciencedbc.jp/en/esol/desc.html",
+      "papers": [
+        "10.1073/pnas.0811922106",
+        "10.1073/pnas.1201380109"
+      ],
+      "status": "existing_curated_annotated_enzyme_tasks",
+      "license_reference": "https://dbarchive.biosciencedbc.jp/en/esol/lic.html",
+      "model_opportunities": [
+        "protein-family solubility",
+        "context-specific expression",
+        "project-level solubility"
+      ],
+      "constraint": "A single observation per protein does not support fitting a dedicated predictor."
+    },
+    {
+      "id": "sodope",
+      "research_use": "Protein production projects with measured expression and solubility outcomes",
+      "url": "https://github.com/Gardner-BinfLab/SoDoPE_paper_2020",
+      "papers": [
+        "10.1093/bioinformatics/btaa578"
+      ],
+      "status": "source_identified_not_imported",
+      "model_opportunities": [
+        "family-specific solubility",
+        "domain-context prediction"
+      ],
+      "constraint": "Verify original project metadata, data reuse terms and overlap with fixed SWI training data."
+    },
+    {
+      "id": "designed_domain_stability",
+      "research_use": "Stability measurements for previously designed small proteins",
+      "url": "https://www.nature.com/articles/s41586-023-06328-6",
+      "papers": [
+        "10.1038/s41586-023-06328-6"
+      ],
+      "status": "existing_curated_topology_and_individual_protein_tasks",
+      "model_opportunities": [
+        "individual designed-protein stability",
+        "design-family stability"
+      ],
+      "constraint": "Within-protein prediction and transfer to an unseen parent protein require different evaluations."
+    },
+    {
+      "id": "fireprotdb",
+      "research_use": "Protein stability measurements with mutation and assay metadata",
+      "url": "https://doi.org/10.1093/nar/gkaf1211",
+      "papers": [
+        "10.1093/nar/gkaa981",
+        "10.1093/nar/gkaf1211"
+      ],
+      "status": "source_identified_not_imported",
+      "model_opportunities": [
+        "protein-specific stability",
+        "assay-context stability"
+      ],
+      "constraint": "Deduplicate original experiments shared with ProTherm, ProtaBank or other source papers; keep thermodynamic endpoints distinct."
+    },
+    {
+      "id": "protabank",
+      "research_use": "Researcher-contributed protein engineering studies and assay tables",
+      "url": "https://doi.org/10.1002/pro.3406",
+      "papers": [
+        "10.1002/pro.3406"
+      ],
+      "status": "source_identified_not_imported",
+      "model_opportunities": [
+        "project-specific property prediction",
+        "multiple endpoints for one protein"
+      ],
+      "constraint": "Review individual study scope, accessibility, permissions, measurement definitions and source overlap before import."
+    },
+    {
+      "id": "sabiork",
+      "research_use": "Published biochemical reaction kinetics with substrate and experimental context",
+      "url": "https://doi.org/10.1093/nar/gkx1065",
+      "papers": [
+        "10.1093/nar/gkx1065"
+      ],
+      "status": "source_identified_not_imported",
+      "model_opportunities": [
+        "enzyme-family kinetics",
+        "substrate-context prediction",
+        "condition-dependent enzyme properties"
+      ],
+      "constraint": "Separate Km, kcat and derived efficiencies; normalize units and retain substrate, temperature and pH metadata."
+    },
+    {
+      "id": "researcher_projects",
+      "research_use": "Researcher-supplied industrial-enzyme and protein-production project data",
+      "url": null,
+      "papers": [],
+      "status": "adapter_contract_available_data_required",
+      "model_opportunities": [
+        "specific protein",
+        "new property",
+        "new measured application context"
+      ],
+      "constraint": "Bind original measurements, reuse permission and a concrete intended prediction; register only after independent validation."
+    },
+    {
+      "id": "arabidopsis_thermal_context",
+      "research_use": "Measured protein-specific thermal response in Arabidopsis",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC6356070/",
+      "papers": [
+        "10.1074/mcp.RA118.001124"
+      ],
+      "status": "imported_context_tasks",
+      "model_opportunities": [
+        "protein-specific thermal response",
+        "assay-context stability"
+      ],
+      "constraint": "The admitted tasks share a study cohort; preserve independent sample groups, source reference normalization and predeclared final partitions."
+    },
+    {
+      "id": "yeast_population_expression",
+      "research_use": "Measured protein abundance in food and fermentation yeast populations",
+      "url": "https://doi.org/10.1073/pnas.2319211121",
+      "papers": [
+        "10.1073/pnas.2319211121"
+      ],
+      "status": "imported_context_tasks",
+      "model_opportunities": [
+        "protein-specific expression",
+        "RNA and culture-context expression"
+      ],
+      "constraint": "The admitted tasks share a population cohort and pooled QC; distinguish retrospective QC-relative measurements from prospective biological validation."
+    },
+    {
+      "id": "protpredict_amino_acid_abundance",
+      "research_use": "Protein-specific abundance prediction from measured amino-acid concentrations in laboratory S288c-derived yeast deletion strains",
+      "url": "https://github.com/DanielBrunnsaker/ProtPredict",
+      "papers": [
+        "10.1093/bioinformatics/btae050",
+        "10.1016/j.cell.2023.03.026",
+        "10.1016/j.cell.2016.09.007"
+      ],
+      "status": "imported_context_tasks",
+      "model_opportunities": [
+        "protein-specific abundance under deletion-genotype contexts"
+      ],
+      "constraint": "2292 source-bound protein tasks admitted with all 19 measured covariates and common deleted-genotype partitions (600/200/200 per task). Cross-study genotype matching is not same-sample pairing. Preparation created no trained or published models; feature variants do not add scientific scopes."
+    }
+  ],
+  "domain_baselines": [
+    {
+      "id": "swi",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/32559287/",
+      "status": "planned"
+    },
+    {
+      "id": "protein_sol",
+      "url": "https://protein-sol.manchester.ac.uk/software",
+      "status": "planned"
+    },
+    {
+      "id": "camsol",
+      "url": "https://doi.org/10.1016/j.jmb.2014.09.026",
+      "status": "planned_if_endpoint_compatible"
+    },
+    {
+      "id": "protpredict_amino_acid_xgboost",
+      "url": "https://doi.org/10.1093/bioinformatics/btae050",
+      "status": "validated_frozen_four_task_final_comparison",
+      "evidence": "research_runs/rsi/20261025_protpredict_scientist_pilot_v1/final_evaluation_audit_v1/audit.json",
+      "scope": "Partial author-method reproduction with 19 measured covariates, author core package versions and a frozen 50-iteration five-fold reference-protein search. Four-task final prediction comparison independently replayed; two Scientist scopes published, one completed two generations, neither final generated model beat its strongest fixed control."
+    }
+  ]
+}

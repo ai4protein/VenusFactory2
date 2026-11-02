@@ -1,0 +1,8 @@
+{
+  "provider": "dmx",
+  "model": "glm-5.2",
+  "base_url": "https://www.dmxapi.cn/v1",
+  "protocol": "chat_completions",
+  "credential_env": "VENUS_RESEARCH_API_KEY",
+  "context_tokens": 131072
+}

@@ -1,0 +1,21 @@
+{
+  "mode": "science_expert",
+  "harness": "expert-deepseek-harness",
+  "model": {
+    "provider": "dmx",
+    "model": "unisound-u2-flash",
+    "base_url": "https://www.dmxapi.cn/v1",
+    "protocol": "chat_completions",
+    "credential_env": "DMXAPI_API_KEY",
+    "context_tokens": 1000000
+  },
+  "budget": {
+    "wall_seconds": 900,
+    "request_seconds": 300,
+    "model_calls": 24,
+    "tool_calls": 12,
+    "output_tokens": 4096,
+    "temperature": 0.2,
+    "thinking": "disabled"
+  }
+}

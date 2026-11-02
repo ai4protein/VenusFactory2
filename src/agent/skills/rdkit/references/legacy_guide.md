@@ -18,7 +18,7 @@ RDKit is a comprehensive cheminformatics library providing Python APIs for molec
 
 ## Quick Start and Project Scripts
 
-Scripts live in `src/tools/bioinfo/rdkit/`. Each module is an executable atomic script with `if __name__ == "__main__"` (CLI via argparse).
+Scripts live in `mcp_tools/tools/bioinfo/rdkit/`. Each module is an executable atomic script with `if __name__ == "__main__"` (CLI via argparse).
 
 | Script | Purpose | Main |
 |--------|---------|------|
@@ -28,7 +28,7 @@ Scripts live in `src/tools/bioinfo/rdkit/`. Each module is an executable atomic 
 
 Import from package:
 ```python
-from src.tools.bioinfo.rdkit import (
+from mcp_tools.tools.bioinfo.rdkit import (
     calculate_properties,
     process_single_molecule,
     process_file,
@@ -42,21 +42,21 @@ from src.tools.bioinfo.rdkit import (
 # Example: single-molecule properties
 props = calculate_properties(Chem.MolFromSmiles("CCO"))
 # Example: substructure filter (mols from load_molecules_filter)
-from src.tools.bioinfo.rdkit.substructure_filter import load_molecules as load_mols
+from mcp_tools.tools.bioinfo.rdkit.substructure_filter import load_molecules as load_mols
 mols = load_mols("molecules.smi")
 filtered, info = filter_molecules(mols, include_patterns=[("benzene", Chem.MolFromSmarts("c1ccccc1"))])
 # Example: similarity (query_mol + list of dicts with 'mol', 'smiles', 'name', 'index')
-from src.tools.bioinfo.rdkit.similarity_search import load_molecules as load_db
+from mcp_tools.tools.bioinfo.rdkit.similarity_search import load_molecules as load_db
 db = load_db("database.smi")
 hits = similarity_search(query_mol, db, method="morgan", threshold=0.7)
 ```
 
 Run as CLI (each has `main()`):
 ```bash
-python -m src.tools.bioinfo.rdkit.molecular_properties "CCO"
-python -m src.tools.bioinfo.rdkit.molecular_properties --file molecules.smi --output props.csv
-python -m src.tools.bioinfo.rdkit.substructure_filter molecules.smi --pattern "c1ccccc1" -o filtered.smi
-python -m src.tools.bioinfo.rdkit.similarity_search "CCO" database.smi --threshold 0.7 -o hits.csv
+python -m mcp_tools.tools.bioinfo.rdkit.molecular_properties "CCO"
+python -m mcp_tools.tools.bioinfo.rdkit.molecular_properties --file molecules.smi --output props.csv
+python -m mcp_tools.tools.bioinfo.rdkit.substructure_filter molecules.smi --pattern "c1ccccc1" -o filtered.smi
+python -m mcp_tools.tools.bioinfo.rdkit.similarity_search "CCO" database.smi --threshold 0.7 -o hits.csv
 ```
 
 References: `references/api_reference.md`, `references/descriptors_reference.md`, `references/smarts_patterns.md`.

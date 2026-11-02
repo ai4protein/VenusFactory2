@@ -252,7 +252,7 @@ def _maybe_read_json_file_as_string(value: Any, key_hint: str) -> Any:
     try:
         if not _os.path.isabs(candidate_path):
             from pathlib import Path as _Path
-            for root in (_Path.cwd(), _Path("/inspire/hdd/global_user/tanyang-253108120165/workspace/research/VenusFactory")):
+            for root in (_Path.cwd(), _Path(__file__).resolve().parents[4]):
                 cand = root / candidate_path
                 if cand.exists():
                     candidate_path = str(cand.resolve())

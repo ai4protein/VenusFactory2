@@ -32,7 +32,7 @@ This skill should be used when:
 ## Quick Start
 
 The skill provides:
-1. **Project modules** in `src/tools/database/chembl/`: `chembl_client.py` (API client), `chembl_molecule.py`, `chembl_target.py`, `chembl_activity.py`, `chembl_similarity.py`, `chembl_substructure.py`, `chembl_drug.py` (atomic modules), `chembl_queries.py` (high-level helpers), `chembl_operations.py` (query/download operations); all re-exported via package. For programmatic use (including query-style APIs), import e.g. `from src.tools.database.chembl import download_chembl_molecule_by_id, ...`.
+1. **Project modules** in `mcp_tools/tools/database/chembl/`: `chembl_client.py` (API client), `chembl_molecule.py`, `chembl_target.py`, `chembl_activity.py`, `chembl_similarity.py`, `chembl_substructure.py`, `chembl_drug.py` (atomic modules), `chembl_queries.py` (high-level helpers), `chembl_operations.py` (query/download operations); all re-exported via package. For programmatic use (including query-style APIs), import e.g. `from mcp_tools.tools.database.chembl import download_chembl_molecule_by_id, ...`.
 2. Reference: `references/api_reference.md`
 
 ### Agent Tools (Download Only)
@@ -89,7 +89,7 @@ Optional for export: `uv pip install pandas`
 
 **Download molecule by ChEMBL ID:**
 ```python
-from src.tools.database.chembl import download_chembl_molecule_by_id
+from mcp_tools.tools.database.chembl import download_chembl_molecule_by_id
 
 result = download_chembl_molecule_by_id("CHEMBL25", "output/chembl_aspirin.json")
 # Returns rich JSON: {status, file_info, content_preview, biological_metadata, execution_context}
@@ -97,7 +97,7 @@ result = download_chembl_molecule_by_id("CHEMBL25", "output/chembl_aspirin.json"
 
 **Query molecule (in-memory, no file):**
 ```python
-from src.tools.database.chembl.chembl_operations import query_chembl_molecule_by_id
+from mcp_tools.tools.database.chembl.chembl_operations import query_chembl_molecule_by_id
 
 result = query_chembl_molecule_by_id("CHEMBL25")
 # Returns rich JSON: {status, content, content_preview, biological_metadata, execution_context}
@@ -107,7 +107,7 @@ result = query_chembl_molecule_by_id("CHEMBL25")
 
 **Download similar compounds by SMILES:**
 ```python
-from src.tools.database.chembl import download_chembl_similarity_by_smiles
+from mcp_tools.tools.database.chembl import download_chembl_similarity_by_smiles
 
 result = download_chembl_similarity_by_smiles(
     "CC(=O)Oc1ccccc1C(=O)O",  # Aspirin SMILES
@@ -119,7 +119,7 @@ result = download_chembl_similarity_by_smiles(
 
 **Query similarity (in-memory):**
 ```python
-from src.tools.database.chembl.chembl_operations import query_chembl_similarity_by_smiles
+from mcp_tools.tools.database.chembl.chembl_operations import query_chembl_similarity_by_smiles
 
 result = query_chembl_similarity_by_smiles("CC(=O)Oc1ccccc1C(=O)O", threshold=85)
 ```
@@ -128,7 +128,7 @@ result = query_chembl_similarity_by_smiles("CC(=O)Oc1ccccc1C(=O)O", threshold=85
 
 **Download substructure matches:**
 ```python
-from src.tools.database.chembl import download_chembl_substructure_by_smiles
+from mcp_tools.tools.database.chembl import download_chembl_substructure_by_smiles
 
 result = download_chembl_substructure_by_smiles(
     "c1ccccc1",               # Benzene substructure
@@ -139,7 +139,7 @@ result = download_chembl_substructure_by_smiles(
 
 **Query substructure (in-memory):**
 ```python
-from src.tools.database.chembl.chembl_operations import query_chembl_substructure_by_smiles
+from mcp_tools.tools.database.chembl.chembl_operations import query_chembl_substructure_by_smiles
 
 result = query_chembl_substructure_by_smiles("c1ccccc1", max_results=50)
 ```
@@ -148,7 +148,7 @@ result = query_chembl_substructure_by_smiles("c1ccccc1", max_results=50)
 
 **Download drug info (drug, mechanisms, indications):**
 ```python
-from src.tools.database.chembl import download_chembl_drug_by_id
+from mcp_tools.tools.database.chembl import download_chembl_drug_by_id
 
 result = download_chembl_drug_by_id(
     "CHEMBL25",
@@ -159,7 +159,7 @@ result = download_chembl_drug_by_id(
 
 **Query drug info (in-memory):**
 ```python
-from src.tools.database.chembl.chembl_operations import query_chembl_drug_by_id
+from mcp_tools.tools.database.chembl.chembl_operations import query_chembl_drug_by_id
 
 result = query_chembl_drug_by_id("CHEMBL25")
 ```
@@ -169,7 +169,7 @@ result = query_chembl_drug_by_id("CHEMBL25")
 For direct programmatic access (not exposed as agent tools):
 
 ```python
-from src.tools.database.chembl import (
+from mcp_tools.tools.database.chembl import (
     get_client, get_molecule, filter_molecules,
     get_target, filter_targets,
     filter_activities,
@@ -210,7 +210,7 @@ indications = get_indications("CHEMBL25")
 ### Workflow 1: Analyzing a Known Drug (download)
 
 ```python
-from src.tools.database.chembl import (
+from mcp_tools.tools.database.chembl import (
     download_chembl_molecule_by_id,
     download_chembl_drug_by_id,
     download_chembl_similarity_by_smiles,
@@ -231,7 +231,7 @@ sim_result = download_chembl_similarity_by_smiles(
 ### Workflow 2: Structure-Activity Relationship (SAR) Study
 
 ```python
-from src.tools.database.chembl import (
+from mcp_tools.tools.database.chembl import (
     download_chembl_similarity_by_smiles,
     download_chembl_substructure_by_smiles,
 )
@@ -250,9 +250,9 @@ download_chembl_substructure_by_smiles(
 ### Workflow 3: Finding Inhibitors (programmatic)
 
 ```python
-from src.tools.database.chembl.chembl_molecule import get_molecule
-from src.tools.database.chembl.chembl_target import filter_targets
-from src.tools.database.chembl.chembl_activity import filter_activities
+from mcp_tools.tools.database.chembl.chembl_molecule import get_molecule
+from mcp_tools.tools.database.chembl.chembl_target import filter_targets
+from mcp_tools.tools.database.chembl.chembl_activity import filter_activities
 
 targets = filter_targets(pref_name__icontains="EGFR")
 target_id = targets[0]["target_chembl_id"] if targets else None
@@ -319,7 +319,7 @@ ChEMBL supports Django-style query filters for the low-level atomic functions:
 
 ## Helper Scripts
 
-Scripts live in `src/tools/database/chembl/`. Import from package: `from src.tools.database.chembl import ...`
+Scripts live in `mcp_tools/tools/database/chembl/`. Import from package: `from mcp_tools.tools.database.chembl import ...`
 
 ### chembl_operations.py
 

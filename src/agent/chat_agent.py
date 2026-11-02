@@ -48,9 +48,9 @@ from agent.skills import get_skills_metadata_string
 from agent.tracing import LLMSpanData, start_span
 from config import get_config
 from logger import get_logger
-from tools.runtime_tool_policy import filter_tools as _filter_agent_tools_for_runtime_mode
-from tools.tools_agent_hub import get_pi_tools, get_tools
-from web.utils.common_utils import get_web_v2_area_dir
+from mcp_tools.tools.runtime_tool_policy import filter_tools as _filter_agent_tools_for_runtime_mode
+from mcp_tools.tools.tools_agent_hub import get_pi_tools, get_tools
+from mcp_tools.common.common_utils import get_web_v2_area_dir
 
 load_dotenv()
 

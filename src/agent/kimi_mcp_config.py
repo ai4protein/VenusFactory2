@@ -6,7 +6,7 @@ kimi-code reads MCP server declarations from (in order, last write wins per name
   - <cwd>/.mcp.json           (Claude-compatible, also honored)
 
 Schema is the Claude-compatible `mcpServers` map. We register one entry
-pointing at the HTTP MCP server already exposed by src/mcp_server.py.
+pointing at the HTTP MCP server already exposed by mcp_tools/mcp_server.py.
 """
 from __future__ import annotations
 

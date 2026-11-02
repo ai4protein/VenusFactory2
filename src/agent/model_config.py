@@ -85,14 +85,9 @@ class ModelRuntimeConfig:
             from_env = os.getenv(self.api_key_env, "").strip()
             if from_env:
                 return from_env
-        return (
-            os.getenv("CHAT_API_KEY", "").strip()
-            or os.getenv("DMXAPI_API_KEY", "").strip()
-            or os.getenv("OPENAI_API_KEY", "").strip()
-            or os.getenv("ANTHROPIC_API_KEY", "").strip()
-            or os.getenv("GOOGLE_API_KEY", "").strip()
-            or os.getenv("DEEPSEEK_API_KEY", "").strip()
-        )
+        if self.api_key_env:
+            return ""
+        return os.getenv("CHAT_API_KEY", "").strip()
 
     def model_ids(self) -> set[str]:
         return {item for item in (self.model, self.expert_model) if item}

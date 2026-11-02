@@ -14,7 +14,7 @@
 
 ## VenusFactory execution
 
-Primary agent tool: **`query_fda`** (`src/tools/search/tools_agent.py`). Prefer it over ad-hoc openFDA scripts. For deep API recipes see `references/`.
+Primary agent tool: **`query_fda`** (`mcp_tools/tools/search/tools_agent.py`). Prefer it over ad-hoc openFDA scripts. For deep API recipes see `references/`.
 
 ## Overview
 
@@ -45,7 +45,7 @@ This skill should be used when working with:
 
 ### 1. Project Scripts and Import
 
-Scripts live in `src/tools/search/deepsearch/fda/`. Each module is runnable with `python -m src.tools.search.deepsearch.fda.<module>`.
+Scripts live in `mcp_tools/tools/search/deepsearch/fda/`. Each module is runnable with `python -m mcp_tools.tools.search.deepsearch.fda.<module>`.
 
 | Script | Purpose | Main |
 |--------|---------|------|
@@ -58,7 +58,7 @@ Scripts live in `src/tools/search/deepsearch/fda/`. Each module is runnable with
 Import the client:
 
 ```python
-from src.tools.search.deepsearch.fda import FDAQuery
+from mcp_tools.tools.search.deepsearch.fda import FDAQuery
 
 # Initialize (API key optional but recommended)
 fda = FDAQuery(api_key="YOUR_API_KEY")
@@ -92,15 +92,15 @@ export FDA_API_KEY="your_key_here"
 
 ```bash
 # Full query module (minimal drug/label examples)
-python -m src.tools.search.deepsearch.fda.fda_query
+python -m mcp_tools.tools.search.deepsearch.fda.fda_query
 
 # Comprehensive examples (drug, device, food, substance, comparative, veterinary)
-python -m src.tools.search.deepsearch.fda.fda_examples
+python -m mcp_tools.tools.search.deepsearch.fda.fda_examples
 
 # Domain-specific demos
-python -m src.tools.search.deepsearch.fda.fda_drug
-python -m src.tools.search.deepsearch.fda.fda_device
-python -m src.tools.search.deepsearch.fda.fda_substance
+python -m mcp_tools.tools.search.deepsearch.fda.fda_drug
+python -m mcp_tools.tools.search.deepsearch.fda.fda_device
+python -m mcp_tools.tools.search.deepsearch.fda.fda_substance
 ```
 
 ## FDA Database Categories
@@ -119,7 +119,7 @@ Access 6 drug-related endpoints covering the full drug lifecycle from approval t
 
 **Common use cases:**
 ```python
-from src.tools.search.deepsearch.fda import FDAQuery
+from mcp_tools.tools.search.deepsearch.fda import FDAQuery
 fda = FDAQuery(api_key="YOUR_API_KEY")
 
 # Safety signal detection
@@ -157,7 +157,7 @@ Access 9 device-related endpoints covering medical device safety, approvals, and
 
 **Common use cases:**
 ```python
-from src.tools.search.deepsearch.fda import FDAQuery
+from mcp_tools.tools.search.deepsearch.fda import FDAQuery
 fda = FDAQuery(api_key="YOUR_API_KEY")
 
 # Monitor device safety
@@ -186,7 +186,7 @@ Access 2 food-related endpoints for safety monitoring and recalls.
 
 **Common use cases:**
 ```python
-from src.tools.search.deepsearch.fda import FDAQuery
+from mcp_tools.tools.search.deepsearch.fda import FDAQuery
 fda = FDAQuery(api_key="YOUR_API_KEY")
 
 # Monitor allergen recalls
@@ -210,7 +210,7 @@ Access veterinary drug adverse event data with species-specific information.
 
 **Common use cases:**
 ```python
-from src.tools.search.deepsearch.fda import FDAQuery
+from mcp_tools.tools.search.deepsearch.fda import FDAQuery
 fda = FDAQuery(api_key="YOUR_API_KEY")
 
 # Species-specific events
@@ -234,7 +234,7 @@ Access molecular-level substance data with UNII codes, chemical structures, and 
 
 **Common use cases:**
 ```python
-from src.tools.search.deepsearch.fda import FDAQuery
+from mcp_tools.tools.search.deepsearch.fda import FDAQuery
 fda = FDAQuery(api_key="YOUR_API_KEY")
 
 # UNII to CAS mapping
@@ -257,7 +257,7 @@ structure = fda.query("other", "substance",
 Create comprehensive safety profiles combining multiple data sources:
 
 ```python
-from src.tools.search.deepsearch.fda import FDAQuery
+from mcp_tools.tools.search.deepsearch.fda import FDAQuery
 fda = FDAQuery(api_key="YOUR_API_KEY")
 
 def drug_safety_profile(fda, drug_name):
@@ -393,7 +393,7 @@ All API responses follow this structure:
 Always handle potential errors:
 
 ```python
-from src.tools.search.deepsearch.fda import FDAQuery
+from mcp_tools.tools.search.deepsearch.fda import FDAQuery
 fda = FDAQuery(api_key="YOUR_API_KEY")
 result = fda.query_drug_events("aspirin", limit=10)
 
@@ -456,7 +456,7 @@ The `FDAQuery` class handles rate limiting automatically, but be aware of limits
 The `FDAQuery` class includes built-in caching (enabled by default):
 
 ```python
-from src.tools.search.deepsearch.fda import FDAQuery
+from mcp_tools.tools.search.deepsearch.fda import FDAQuery
 fda = FDAQuery(api_key=api_key, use_cache=True, cache_ttl=3600)
 ```
 
@@ -496,15 +496,15 @@ For detailed information about:
 
 ## Scripts
 
-All under `src/tools/search/deepsearch/fda/`; each file has `if __name__ == "__main__"` and can be run with `python -m src.tools.search.deepsearch.fda.<module>`.
+All under `mcp_tools/tools/search/deepsearch/fda/`; each file has `if __name__ == "__main__"` and can be run with `python -m mcp_tools.tools.search.deepsearch.fda.<module>`.
 
 ### `fda_query.py`
 
-Main query module with `FDAQuery` class: unified interface to all openFDA endpoints, rate limiting, caching, error handling. Run: `python -m src.tools.search.deepsearch.fda.fda_query`
+Main query module with `FDAQuery` class: unified interface to all openFDA endpoints, rate limiting, caching, error handling. Run: `python -m mcp_tools.tools.search.deepsearch.fda.fda_query`
 
 ### `fda_examples.py`
 
-Comprehensive examples: drug safety profile, device surveillance, food recall, substance lookup, comparative drug analysis, veterinary. Run: `python -m src.tools.search.deepsearch.fda.fda_examples`
+Comprehensive examples: drug safety profile, device surveillance, food recall, substance lookup, comparative drug analysis, veterinary. Run: `python -m mcp_tools.tools.search.deepsearch.fda.fda_examples`
 
 ### `fda_drug.py` / `fda_device.py` / `fda_substance.py`
 

@@ -4,7 +4,7 @@ Skills are discovered from **two roots** (see `src/agent/skills.py`):
 
 1. **VenusFactory2 (tool-bound):** `src/agent/skills/<skill_id>/`
 2. **scientific-agent-skills (reference library, optional git submodule):**  
-   `third_party/scientific-agent-skills/skills/<id>/`
+   `src/agent/skills/vendor/scientific-agent-skills/skills/<id>/`
 
 The agent loads **metadata** into the Computational Biologist (CB) prompt and full skill files into the Machine Learning Specialist (MLS) via `read_skill`. Protein-engineering **execution** should prefer VF2 tool-bound skills; the scientific library is knowledge for `read_skill` / `list_skills`. Upstream `scripts/` and `uv` runners are **not** auto-executed.
 
@@ -36,7 +36,7 @@ src/agent/skills/                          # VF2 root
 │   └── static/ + manifest.yaml            # only for nature_* routers (legacy pattern)
 └── _shared_<domain>/                      # NOT a skill — no SKILL.md; skipped by loader
 
-third_party/scientific-agent-skills/skills/   # optional submodule root
+src/agent/skills/vendor/scientific-agent-skills/skills/   # optional submodule root
 └── <id>/SKILL.md                          # may appear as sas_<id> on collision
 ```
 ## Frontmatter (VF2 profile)
@@ -65,7 +65,7 @@ Notes:
 
 | Type | When | Must include |
 |------|------|----------------|
-| **A — Tool-bound** | Wraps `src/tools/**` APIs | `## Project Tools (VenusFactory2)` with exact `@tool` names |
+| **A — Tool-bound** | Wraps `mcp_tools/tools/**` APIs | `## Project Tools (VenusFactory2)` with exact `@tool` names |
 | **B — Orchestration** | Chains existing tools | `## Workflow` steps with tool names + JSON envelope notes |
 | **C — Nature router** | writing / polishing / figures | Short router + `read_skill(..., relative_path=…)` fragments |
 
@@ -79,7 +79,7 @@ Rules:
 ## Runtime
 
 - Discovery: `src/agent/skills.py` → `get_skills_metadata()` / `get_skills_metadata_string()`
-- **Science Expert** (LangGraph): LangChain `read_skill` in `src/tools/skill/tools_agent.py`; CB prompt injects metadata; plan helper may enforce skill-first before code steps; MLS executes
+- **Science Expert** (LangGraph): LangChain `read_skill` in `mcp_tools/tools/skill/tools_agent.py`; CB prompt injects metadata; plan helper may enforce skill-first before code steps; MLS executes
 - **Science Agent** (kimi-code): system prompt embeds compact catalog (`get_skills_catalog_for_agent`); agent **self-decides** when to open MCP `read_skill` / `list_skills` (no mandatory gate); local optional kimi `Skill` via `.kimi-code/skills/` (`agent.kimi_skills.ensure_kimi_project_skills`); online denies built-in `Skill`
 - Plan helper auto-inserts `read_skill` before code steps using domain keyword rules in `plan_helpers.py`
 - Validate: `python3 scripts/validate_skills.py`
@@ -91,7 +91,15 @@ Use `workflow_skill_creator` for distillation from a completed session, or follo
 
 ## Do not
 
-- Vendor/copy the scientific-agent-skills tree into `src/agent/skills/` (use the submodule + dual-root loader).
-- Auto-run upstream `scripts/` / `uv` / `# /// script` isolation (use `src/tools/` + conda; `read_skill` may still show those files).
+- Flatten/copy scientific-agent-skills packages into native skill folders (keep the intact submodule under `vendor/` and the dual-root loader).
+- Auto-run upstream `scripts/` / `uv` / `# /// script` isolation (use `mcp_tools/tools/` + conda; `read_skill` may still show those files).
 - Register `_shared_*` directories as skills.
 - Put skill unit tests inside the skill directory (use `tests/`).
+
+## Session code execution
+
+Custom analysis uses `write_session_file(path, content)` followed by `run_session_python(path)`, shared by Agent and Scientist. Do not advertise a host Python REPL or a second code-generation model. Guest code can import installed packages and access relative session files; repository paths in references are implementation notes, not mounted guest modules. External searches and downloads use registered scientific tools. Scientist model evaluation and public admission remain separate from successful code execution.
+
+## Vendored reference library
+
+The intact scientific-agent-skills Git submodule belongs at `vendor/scientific-agent-skills/`. Keep its upstream revision and license; do not merge its packages into native skill folders. The loader distinguishes native and scientific sources and preserves `sas_` collision IDs.

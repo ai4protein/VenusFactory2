@@ -57,3 +57,4 @@ class AgentState(TypedDict):
     # Explicit opt-ins (must be declared or LangGraph drops them from state).
     review_sub_reports: bool
     full_manuscript: bool
+    finalizer_succeeded: bool

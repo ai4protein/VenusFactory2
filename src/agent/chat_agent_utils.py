@@ -13,7 +13,7 @@ from langchain_classic.schema import HumanMessage
 from agent.prompts import MLS_SELF_CHECK_TEMPLATE
 from config import get_config
 from logger import get_logger
-from web.utils.common_utils import (
+from mcp_tools.common.common_utils import (
     get_project_root,
     get_temp_outputs_base_dir,
     get_web_v2_root_dir,
@@ -112,7 +112,7 @@ MAX_STEP_RETRIES = _cfg.agent.max_step_retries
 TOOL_EXECUTION_TIMEOUT = _cfg.agent.tool_execution_timeout
 PI_SEARCH_TOOL_NAMES = [
     "query_pubmed", "query_semantic_scholar", "query_arxiv",
-    "query_tavily", "query_duckduckgo",
+    "query_web", "query_serpapi", "query_tavily", "query_duckduckgo",
     "query_github", "query_hugging_face"
 ]
 
@@ -324,7 +324,7 @@ def _fetch_literature_for_pi(user_text: str, max_results: int = None) -> tuple:
         max_results = SEARCH_MAX_RESULTS
     empty = ("", {}, "")
     try:
-        from tools.tools_agent_hub import get_tools
+        from mcp_tools.tools.tools_agent_hub import get_tools
         tools = get_tools()
         lit_tool = next((t for t in tools if getattr(t, "name", "") == "query_literature_by_keywords"), None)
         if not lit_tool:
@@ -491,7 +491,7 @@ async def _run_mls_debug_with_tools(
     context = (
         f"Step {step_num} failed during tool execution.\n\n"
         f"**Task:** {task_desc}\n**Tool:** {tool_name}\n**Current input:** {json.dumps(merged_tool_input, ensure_ascii=False)}\n**Error:** {error_str}\n\n"
-        "You may call read_skill, python_repl, agent_generated_code or other tools to diagnose or fix. Then output exactly one JSON: {\"retry_input\": {...}} or {\"report_for_cb\": \"...\"}."
+        "Use available read_skill and session tools to diagnose or fix: write_session_file stores actual source; run_session_python executes that file in the sandbox. Then output exactly one JSON: {\"retry_input\": {...}} or {\"report_for_cb\": \"...\"}."
     )
     executor = session_state.get("mls_debug_executor")
     if not executor:
@@ -977,7 +977,7 @@ def _translate_user_query_to_english(user_text: str, llm) -> str:
     return ""
 
 
-from web.utils.chat_format_utils import (
+from mcp_tools.common.citations import (
     _format_dataset_citations,
     _format_literature_citations,
     _format_literature_for_reading,
@@ -991,8 +991,8 @@ def _run_section_search(query: str, max_results: int = None, mode: str = "full")
     merge/dedupe, then fall back to structural-DB metadata if empty.
 
     ``mode``:
-      - ``full``: PubMed + S2 + arXiv + bioRxiv + Tavily + DuckDuckGo
-      - ``lite``: PubMed + Semantic Scholar + Tavily (Expert timeline-friendly)
+      - ``full``: PubMed + S2 + arXiv + bioRxiv + configured web routes
+      - ``lite``: PubMed + Semantic Scholar + configured web routes (Expert timeline-friendly)
     """
     import concurrent.futures as _cf
 
@@ -1002,7 +1002,7 @@ def _run_section_search(query: str, max_results: int = None, mode: str = "full")
     if not query:
         return ([], [])
     try:
-        from tools.tools_agent_hub import get_tools
+        from mcp_tools.tools.tools_agent_hub import get_tools
         tools = get_tools()
         tools_dict = {getattr(t, "name", ""): t for t in tools}
     except Exception:
@@ -1013,10 +1013,10 @@ def _run_section_search(query: str, max_results: int = None, mode: str = "full")
 
     if (mode or "full").strip().lower() == "lite":
         LITERATURE = ["query_pubmed", "query_semantic_scholar"]
-        WEB = ["query_tavily"]
+        WEB = ["query_web"]
     else:
         LITERATURE = ["query_pubmed", "query_semantic_scholar", "query_arxiv", "query_biorxiv"]
-        WEB = ["query_tavily", "query_duckduckgo"]
+        WEB = ["query_web"]
     plan = [(tn, {"query": query, "max_results": max_results})
             for tn in LITERATURE + WEB]
 
@@ -1035,7 +1035,7 @@ def _run_section_search(query: str, max_results: int = None, mode: str = "full")
     results_by_tool: dict = {}
     with _cf.ThreadPoolExecutor(max_workers=min(6, len(plan))) as ex:
         futures = {ex.submit(_invoke, tn, ti): (tn, ti) for tn, ti in plan}
-        for fut in _cf.as_completed(futures, timeout=30):
+        for fut in _cf.as_completed(futures, timeout=120):
             try:
                 tn, ti, raw = fut.result()
                 results_by_tool[tn] = raw
@@ -1246,7 +1246,7 @@ def _fetch_search_for_pi_report(user_text: str, max_results: int = None, llm=Non
 
     Source coverage (was fallback-chain, now merge):
     - Literature: PubMed + Semantic Scholar + arXiv + bioRxiv (4)
-    - Web:        Tavily + DuckDuckGo (2)
+    - Web:        configured web routes (2)
     - Datasets:   GitHub + HuggingFace (2)
     - FDA:        query_fda when query mentions a drug-related keyword (1)
     - DB metadata fallback: RCSB/UniProt/HPA/STRING when bio identifiers
@@ -1268,7 +1268,7 @@ def _fetch_search_for_pi_report(user_text: str, max_results: int = None, llm=Non
         return ("", [])
 
     try:
-        from tools.tools_agent_hub import get_tools
+        from mcp_tools.tools.tools_agent_hub import get_tools
         tools = get_tools()
         tools_dict = {getattr(t, "name", ""): t for t in tools}
 
@@ -1322,7 +1322,7 @@ def _fetch_search_for_pi_report(user_text: str, max_results: int = None, llm=Non
 
         # Build the parallel invocation plan
         LITERATURE = ["query_pubmed", "query_semantic_scholar", "query_arxiv", "query_biorxiv"]
-        WEB = ["query_tavily", "query_duckduckgo"]
+        WEB = ["query_web"]
         DATASETS = ["query_github", "query_hugging_face"]
 
         # FDA only triggered when query looks drug/clinical-related
@@ -1339,7 +1339,7 @@ def _fetch_search_for_pi_report(user_text: str, max_results: int = None, llm=Non
         results_by_tool: dict[str, str] = {}
         with _cf.ThreadPoolExecutor(max_workers=min(6, len(plan))) as ex:
             futures = {ex.submit(_invoke_one, tn, ti): (tn, ti) for tn, ti in plan}
-            for fut in _cf.as_completed(futures, timeout=30):
+            for fut in _cf.as_completed(futures, timeout=120):
                 try:
                     tn, ti, raw = fut.result()
                     results_by_tool[tn] = raw
@@ -1364,7 +1364,7 @@ def _fetch_search_for_pi_report(user_text: str, max_results: int = None, llm=Non
                 source_tag = ", ".join(t.replace("query_", "") for t in productive) or "literature"
                 sections.append(f"**Literature ({source_tag}; cite as [1], [2], ...)**\n" + "\n".join(lines))
 
-        # Merge web across Tavily + DuckDuckGo
+        # Merge web across configured web routes
         web_refs: list = []
         for tn in WEB:
             web_refs.extend(_parse_results(results_by_tool.get(tn, "")))

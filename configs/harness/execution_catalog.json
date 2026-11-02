@@ -1,0 +1,30 @@
+{
+  "models": [
+    {
+      "id": "dmx-glm51",
+      "label": "GLM 5.1 (DMXAPI)",
+      "binding": {
+        "provider": "dmx",
+        "model": "glm-5.1",
+        "base_url": "https://www.dmxapi.cn/v1",
+        "protocol": "chat_completions",
+        "credential_env": "VENUS_RESEARCH_API_KEY",
+        "context_tokens": 131072
+      },
+      "credential_toml": "research_runs/rsi/runtime_configs/glm51/config.toml"
+    },
+    {
+      "id": "dmx-glm52",
+      "label": "GLM 5.2 (DMXAPI)",
+      "binding": {
+        "provider": "dmx",
+        "model": "glm-5.2",
+        "base_url": "https://www.dmxapi.cn/v1",
+        "protocol": "chat_completions",
+        "credential_env": "VENUS_RESEARCH_API_KEY",
+        "context_tokens": 131072
+      },
+      "credential_toml": "research_runs/rsi/runtime_configs/glm51/config.toml"
+    }
+  ]
+}

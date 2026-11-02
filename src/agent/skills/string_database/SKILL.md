@@ -12,7 +12,7 @@ metadata:
 
 ## Overview
 
-Hub exposes **`download_string_*`** tools only. Lower-level `query_string_*` helpers in `src/tools/database/string/` are not LangChain tools.
+Hub exposes **`download_string_*`** tools only. Lower-level `query_string_*` helpers in `mcp_tools/tools/database/string/` are not LangChain tools.
 
 ## Project Tools (VenusFactory2)
 

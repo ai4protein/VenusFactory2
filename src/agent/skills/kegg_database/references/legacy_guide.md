@@ -25,7 +25,7 @@ This skill should be used when querying pathways, genes, compounds, enzymes, dis
 ## Quick Start
 
 The skill provides:
-1. **Project modules** in `src/tools/database/kegg/`: `kegg_rest.py` (base HTTP client), `kegg_operations.py` (query/download operations), `kegg_api.py` (backward-compat re-exports); all download functions re-exported via package. For programmatic use, import e.g. `from src.tools.database.kegg import download_kegg_entry_by_id, ...`.
+1. **Project modules** in `mcp_tools/tools/database/kegg/`: `kegg_rest.py` (base HTTP client), `kegg_operations.py` (query/download operations), `kegg_api.py` (backward-compat re-exports); all download functions re-exported via package. For programmatic use, import e.g. `from mcp_tools.tools.database.kegg import download_kegg_entry_by_id, ...`.
 2. Reference: `references/kegg_reference.md`
 
 ### Agent Tools (Download Only)
@@ -70,14 +70,14 @@ All return rich JSON: `{status, file_info, content_preview, biological_metadata,
 
 **Download database info:**
 ```python
-from src.tools.database.kegg import download_kegg_info_by_database
+from mcp_tools.tools.database.kegg import download_kegg_info_by_database
 
 result = download_kegg_info_by_database("pathway", "output/kegg_info_pathway.txt")
 ```
 
 **Query in-memory:**
 ```python
-from src.tools.database.kegg.kegg_operations import query_kegg_info_by_database
+from mcp_tools.tools.database.kegg.kegg_operations import query_kegg_info_by_database
 
 result = query_kegg_info_by_database("pathway")
 ```
@@ -88,7 +88,7 @@ result = query_kegg_info_by_database("pathway")
 
 **Download entry list:**
 ```python
-from src.tools.database.kegg import download_kegg_list_by_database
+from mcp_tools.tools.database.kegg import download_kegg_list_by_database
 
 # List all reference pathways
 result = download_kegg_list_by_database("pathway", "output/kegg_pathways.txt")
@@ -103,7 +103,7 @@ result = download_kegg_list_by_database("pathway", "output/kegg_hsa_pathways.txt
 
 **Download search results:**
 ```python
-from src.tools.database.kegg import download_kegg_find_by_database
+from mcp_tools.tools.database.kegg import download_kegg_find_by_database
 
 # Keyword search
 result = download_kegg_find_by_database("genes", "p53", "output/kegg_find_p53.txt")
@@ -121,7 +121,7 @@ result = download_kegg_find_by_database("drug", "300-310", "output/kegg_find_mas
 
 **Download entry data:**
 ```python
-from src.tools.database.kegg import download_kegg_entry_by_id
+from mcp_tools.tools.database.kegg import download_kegg_entry_by_id
 
 # Get pathway entry
 result = download_kegg_entry_by_id("hsa00010", "output/kegg_glycolysis.txt")
@@ -144,7 +144,7 @@ result = download_kegg_entry_by_id("hsa05130", "output/kegg_pathway.json", forma
 
 **Download ID conversion:**
 ```python
-from src.tools.database.kegg import download_kegg_conv_by_id
+from mcp_tools.tools.database.kegg import download_kegg_conv_by_id
 
 # Convert KEGG gene to NCBI Gene ID
 result = download_kegg_conv_by_id("ncbi-geneid", "hsa:10458", "output/kegg_conv.txt")
@@ -159,7 +159,7 @@ result = download_kegg_conv_by_id("uniprot", "hsa:10458", "output/kegg_conv_unip
 
 **Download cross-references:**
 ```python
-from src.tools.database.kegg import download_kegg_link_by_id
+from mcp_tools.tools.database.kegg import download_kegg_link_by_id
 
 # Get genes in a specific pathway
 result = download_kegg_link_by_id("genes", "hsa00010", "output/kegg_link_glycolysis.txt")
@@ -177,7 +177,7 @@ result = download_kegg_link_by_id("compound", "hsa00010", "output/kegg_link_comp
 
 **Download DDI data:**
 ```python
-from src.tools.database.kegg import download_kegg_ddi_by_id
+from mcp_tools.tools.database.kegg import download_kegg_ddi_by_id
 
 result = download_kegg_ddi_by_id("D00001", "output/kegg_ddi.txt")
 ```
@@ -187,7 +187,7 @@ result = download_kegg_ddi_by_id("D00001", "output/kegg_ddi.txt")
 ### Workflow 1: Gene to Pathway Mapping (download)
 
 ```python
-from src.tools.database.kegg import (
+from mcp_tools.tools.database.kegg import (
     download_kegg_find_by_database,
     download_kegg_link_by_id,
     download_kegg_entry_by_id,
@@ -206,7 +206,7 @@ download_kegg_entry_by_id("hsa05200", "output/kegg_cancer_pathway.txt")
 ### Workflow 2: Compound to Pathway Analysis (download)
 
 ```python
-from src.tools.database.kegg import (
+from mcp_tools.tools.database.kegg import (
     download_kegg_find_by_database,
     download_kegg_link_by_id,
     download_kegg_entry_by_id,
@@ -226,7 +226,7 @@ download_kegg_entry_by_id("map00010", "output/kegg_glycolysis.txt")
 ### Workflow 3: Cross-Database Integration (download)
 
 ```python
-from src.tools.database.kegg import (
+from mcp_tools.tools.database.kegg import (
     download_kegg_conv_by_id,
     download_kegg_entry_by_id,
 )
@@ -242,7 +242,7 @@ download_kegg_entry_by_id("hsa:10458", "output/kegg_gene_seq.fasta", format="aas
 ### Workflow 4: Organism-Specific Pathway Analysis (programmatic)
 
 ```python
-from src.tools.database.kegg.kegg_operations import (
+from mcp_tools.tools.database.kegg.kegg_operations import (
     query_kegg_list_by_database,
     query_kegg_entry_by_id,
 )
@@ -322,7 +322,7 @@ Reference `references/kegg_reference.md` for detailed pathway lists and classifi
 
 ## Helper Scripts
 
-Scripts live in `src/tools/database/kegg/`. Import from package: `from src.tools.database.kegg import ...`
+Scripts live in `mcp_tools/tools/database/kegg/`. Import from package: `from mcp_tools.tools.database.kegg import ...`
 
 ### kegg_operations.py
 

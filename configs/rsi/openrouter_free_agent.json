@@ -1,0 +1,27 @@
+{
+  "mode": "science_agent",
+  "harness": "kimi-code",
+  "model": {
+    "provider": "openrouter",
+    "model": "cohere/north-mini-code:free",
+    "base_url": "https://openrouter.ai/api/v1",
+    "protocol": "chat_completions",
+    "credential_env": "OPENROUTER_API_KEY",
+    "context_tokens": 256000
+  },
+  "budget": {
+    "wall_seconds": 900,
+    "request_seconds": 300,
+    "model_calls": 24,
+    "tool_calls": 12,
+    "output_tokens": 8192,
+    "temperature": 0.1,
+    "thinking": "disabled"
+  },
+  "required_controls": [
+    "mcp",
+    "filesystem_isolation",
+    "request_gateway",
+    "events"
+  ]
+}

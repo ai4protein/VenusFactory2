@@ -27,7 +27,7 @@ Call hub tools by exact name. Extended Biopython/GCP examples: `read_skill(..., 
 | **analyze_alphafold_plddt_by_metadata_file** | `metadata_path` | pLDDT fractions + verdict | Local analysis |
 | **analyze_alphafold_pae_by_pae_file** | `pae_path`, optional cutoffs | domains + PAE stats | Local analysis |
 
-There is **no** dedicated PAE download `@tool`. Obtain PAE via metadata `paeDocUrl` + `agent_generated_code`, then analyze.
+There is **no** dedicated PAE download `@tool` in this skill. Use an uploaded PAE file or an available registered downloader for the metadata's `paeDocUrl`. The session sandbox has no network access; if no downloader is available, report PAE as unavailable instead of attempting a network request in Python.
 
 ## Recommended workflow
 
@@ -53,3 +53,6 @@ There is **no** dedicated PAE download `@tool`. Obtain PAE via metadata `paeDocU
 
 - `references/api_reference.md` — REST/URL details
 - `references/legacy_guide.md` — archived tutorials (Biopython, GCP bulk)
+
+### Session execution
+Use `write_session_file(path, content)` to write actual Python source and `run_session_python(path)` to execute it. Paths are relative to the server-assigned session workspace. Installed Python packages are available; repository source paths in this guide are host implementation references, not guest imports. Networking uses registered database/search/download tools; the analysis sandbox has no network access. Verify exit_code and actual output files.

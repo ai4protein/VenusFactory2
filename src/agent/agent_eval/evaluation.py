@@ -1,11 +1,14 @@
-import re
 import asyncio
 import pandas as pd
 from typing import Dict, List
 from itertools import combinations
 
-from llm import LLM_Model
-from prompts import PAIRWISE_ANALYST_PROMPT, JUDGE_PROMPT
+try:
+    from .llm import LLM_Model
+    from .prompts import PAIRWISE_ANALYST_PROMPT, JUDGE_PROMPT
+except ImportError:  # Preserve the existing direct-script entry point.
+    from llm import LLM_Model
+    from prompts import PAIRWISE_ANALYST_PROMPT, JUDGE_PROMPT
 
 async def analyze_pair_agent(llm: LLM_Model, question: str, 
                              response_a: str, response_b: str) -> str:
@@ -21,26 +24,20 @@ async def analyze_pair_agent(llm: LLM_Model, question: str,
     except Exception as e:
         return f"Analysis failed: {str(e)}"
 
+def parse_judgment(content: str) -> str:
+    """Accept only an explicit decision; prose and malformed answers are invalid."""
+    decision = str(content).strip().upper()
+    return decision if decision in {"A", "B", "TIE"} else "INVALID"
+
+
 async def judge_pair_agent(llm: LLM_Model, question: str, analysis: str) -> str:
-    """Agent 2: Determine winner"""
     chain = JUDGE_PROMPT | llm
     try:
-        result = await chain.ainvoke({
-            "question": question,
-            "analysis": analysis
-        })
-        # Clean output
-        content = result.content.strip().upper()
-        # Extract A or B
-        match = re.search(r'\b([AB])\b', content)
-        if match:
-            return match.group(1)
-        if "A" in content: return "A"
-        if "B" in content: return "B"
-        return "A" # Fallback
-    except Exception as e:
-        print(f"Judge failed: {e}")
-        return "A"
+        result = await chain.ainvoke({"question": question, "analysis": analysis})
+        return parse_judgment(result.content)
+    except Exception:
+        return "ERROR"
+
 
 async def run_matchup(llm: LLM_Model, question: str, 
                       name_a: str, response_a: str, 
@@ -57,15 +54,17 @@ async def run_matchup(llm: LLM_Model, question: str,
     analysis = await analyze_pair_agent(llm, question, response_a, response_b)
     
     # 2. Run Judge Agent
-    winner_code = await judge_pair_agent(llm, question, analysis)
+    winner_code = "ERROR" if analysis.startswith("Analysis failed:") else await judge_pair_agent(llm, question, analysis)
     
-    winner_name = name_a if winner_code == 'A' else name_b
+    winner_name = {"A": name_a, "B": name_b}.get(winner_code)
     
     return {
         "pair_key": f"{name_a}_vs_{name_b}",
         "winner_name": winner_name,
         "analysis": analysis,
-        "winner_code": winner_code # A or B
+        "winner_code": winner_code,
+        "status": "valid" if winner_code in {"A", "B", "TIE"} else winner_code.lower(),
+        "names": [name_a, name_b]
     }
 
 async def process_single_question(row: pd.Series, model_columns: List[str], llm: LLM_Model):
@@ -105,24 +104,26 @@ async def process_single_question(row: pd.Series, model_columns: List[str], llm:
     
     for res in matchup_results:
         # Tally scores
-        scores[res['winner_name']] += 1
+        if res["winner_code"] in {"A", "B"}:
+            scores[res["winner_name"]] += 1
+        elif res["winner_code"] == "TIE":
+            for name in res["names"]:
+                scores[name] += 0.5
         
         # Record detailed analysis for each match
         pair_key = res['pair_key']
         result_row[f'Analysis_{pair_key}'] = res['analysis']
         result_row[f'Winner_{pair_key}'] = res['winner_name']
+        result_row[f'Status_{pair_key}'] = res['status']
+        result_row[f'Decision_{pair_key}'] = res['winner_code']
     
-    # 5. Calculate final rankings
-    ranked_models = sorted(scores.items(), key=lambda item: item[1], reverse=True)
-    
-    ranks = {}
-    for i, (name, score) in enumerate(ranked_models):
-        ranks[name] = i + 1 # Rank 1 is best
-        
-    # Record rankings and scores
-    for name, rank in ranks.items():
-        result_row[f'Rank_{name}'] = rank
-    
+    # Do not manufacture a complete ranking from failed matchups.
+    complete = all(res["status"] == "valid" for res in matchup_results)
+    result_row["Evaluation_Complete"] = complete
+    result_row["Invalid_Matchups"] = sum(res["status"] != "valid" for res in matchup_results)
+    for name, score in scores.items():
+        result_row[f"Rank_{name}"] = 1 + sum(v > score for v in scores.values()) if complete else None
+
     result_row['Score_Matrix'] = str(scores)
     
     print(f"Finished Question ID {row.get('index', '?')}: Scores = {scores}")

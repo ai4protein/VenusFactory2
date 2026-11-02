@@ -91,7 +91,7 @@ DECISION RULES (in strict order):
 4. **PRESENTATION** (tie-breaker only)
    - Clear conclusions beat verbose explanations
 
-Base decision ONLY on the expert analysis. Output ONLY "A" or "B".
+Base decision ONLY on the expert analysis. Output ONLY "A", "B", or "TIE". Use TIE when neither answer has a defensible advantage.
 """),
     ("user", """
 Question: {question}

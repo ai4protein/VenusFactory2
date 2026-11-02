@@ -1,0 +1,52 @@
+{
+  "schema": 1,
+  "cases": [
+    "alde_parpgb",
+    "mcba_itopride"
+  ],
+  "replicates": 1,
+  "profiles": [
+    {
+      "mode": "science_agent",
+      "harness": "kimi-code",
+      "model": {
+        "provider": "dmx",
+        "model": "glm-5.1",
+        "base_url": "https://www.dmxapi.cn/v1",
+        "protocol": "chat_completions",
+        "credential_env": "VENUS_RESEARCH_API_KEY",
+        "context_tokens": 131072
+      },
+      "budget": {
+        "wall_seconds": 900,
+        "request_seconds": 300,
+        "model_calls": 24,
+        "tool_calls": 12,
+        "output_tokens": 12288,
+        "temperature": 0.1,
+        "thinking": "enabled"
+      }
+    },
+    {
+      "mode": "science_agent",
+      "harness": "deepseek-harness",
+      "model": {
+        "provider": "dmx",
+        "model": "glm-5.1",
+        "base_url": "https://www.dmxapi.cn/v1",
+        "protocol": "chat_completions",
+        "credential_env": "VENUS_RESEARCH_API_KEY",
+        "context_tokens": 131072
+      },
+      "budget": {
+        "wall_seconds": 900,
+        "request_seconds": 300,
+        "model_calls": 24,
+        "tool_calls": 12,
+        "output_tokens": 12288,
+        "temperature": 0.1,
+        "thinking": "enabled"
+      }
+    }
+  ]
+}

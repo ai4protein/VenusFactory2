@@ -13,8 +13,6 @@ from typing import Any
 
 from langchain_core.runnables import RunnableConfig
 
-from logger import get_logger
-
 from agent.chat_agent_utils import _tool_output_indicates_failure
 from agent.graph.execution.artifacts import register_artifacts_to_context
 from agent.graph.execution.context import ExecutionContext, ExecutionResult
@@ -30,15 +28,19 @@ from agent.graph.execution.path_repair import (
     PathRepairScope,
     repair_missing_file_paths,
 )
-from agent.graph.execution.prepare import prepare_invoke_input, run_pre_checks
+from agent.graph.execution.prepare import (
+    PreCheckResult,
+    materialize_deferred_input,
+    prepare_invoke_input,
+    run_pre_checks,
+)
 from agent.graph.execution.retry_orchestrator import RetryOrchestrator
+from logger import get_logger
 
 _logger = get_logger("agent.graph")
 
 
-def _failure_payload_to_result(
-    raw_output: str, failure_reason: str, failure_type: str
-) -> ExecutionResult:
+def _failure_payload_to_result(raw_output: str, failure_reason: str, failure_type: str) -> ExecutionResult:
     return ExecutionResult(
         success=False,
         raw_output=raw_output,
@@ -82,15 +84,24 @@ async def execute_node_impl(state: dict, config: RunnableConfig) -> dict:
 
         # ---- 2. Pre-checks (skill precondition, disabled, missing tool) ----
         pre_check = run_pre_checks(ctx)
+        if pre_check.ok:
+            try:
+                ctx.merged_tool_input = await materialize_deferred_input(ctx)
+            except Exception as exc:
+                message = f"Deferred tool argument generation failed: {exc}"
+                pre_check = PreCheckResult(
+                    ok=False,
+                    failure_type="tool",
+                    reason=message,
+                    raw_output=json.dumps({"success": False, "error": message}),
+                )
         if not pre_check.ok:
             failure_reason = pre_check.reason
             last_output = pre_check.raw_output
         else:
             # ---- 3. Sanitize / normalize / repair file inputs ----
             ctx.invoke_input = prepare_invoke_input(ctx)
-            ctx.invoke_input = repair_missing_file_paths(
-                ctx, scope=PathRepairScope.SESSION_AND_PREV_STEPS
-            )
+            ctx.invoke_input = repair_missing_file_paths(ctx, scope=PathRepairScope.SESSION_AND_PREV_STEPS)
 
             # ---- 4. Cache lookup ----
             cached = lookup_cache(ctx)
@@ -131,9 +142,7 @@ async def execute_node_impl(state: dict, config: RunnableConfig) -> dict:
     if not failure_reason:
         failure_reason = parsed_failure_reason
 
-    feedback_content, _out_data, out_file, sse_writer = build_feedback_content(
-        ctx, last_output, is_failure
-    )
+    feedback_content, _out_data, out_file, sse_writer = build_feedback_content(ctx, last_output, is_failure)
     feedback_content += schedule_artifact_uploads(ctx, last_output, out_file, sse_writer)
 
     record_execution_entry(ctx, last_output, oss_url=None)
@@ -161,9 +170,7 @@ async def execute_node_impl(state: dict, config: RunnableConfig) -> dict:
             if isinstance(future_input, dict):
                 for _fv in future_input.values():
                     if isinstance(_fv, str) and _fv.startswith("dependency:"):
-                        dep_token = (
-                            _fv.split(":")[1].replace("step_", "").replace("step", "").strip()
-                        )
+                        dep_token = _fv.split(":")[1].replace("step_", "").replace("step", "").strip()
                         if dep_token == failed_step_str:
                             has_downstream_dep = True
                             break

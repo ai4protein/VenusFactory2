@@ -86,6 +86,38 @@ async def research_plan_node(state: AgentState, config: RunnableConfig):
         _logger.warning("PI sections failed: %s", e)
         sections_list = []
 
+    if not sections_list and chains.get("scientific_workflow_required") is True:
+        # The host has already admitted a scientific episode. Empty PI output
+        # cannot change that contract into ordinary chat. Keep the failed/empty
+        # planning evidence and let CB plan from the actual remaining objective.
+        history = _pop_plan_thinking(history)
+        history.append({
+            "role": "assistant",
+            "content": (
+                "🧭 **Principal Investigator**：未生成可用的研究章节；目标仍未完成，"
+                "交由 Computational Biologist 根据当前目标和已有证据规划下一步。"
+                if ui_lang == "zh" else
+                "🧭 **Principal Investigator**: No usable research sections were returned. "
+                "The objective remains active; the Computational Biologist will plan "
+                "the next step from the objective and available evidence."
+            ),
+            "role_id": "principal_investigator",
+            "phase": "research_plan",
+        })
+        return {
+            "status": "resume_plan",
+            "pi_report": (
+                "No usable PI research sections were returned. Plan from the explicit "
+                "objective and available evidence; unresolved evidence requirements remain.\n\n"
+                + text
+            ),
+            "pi_suggest_steps": "Advance the remaining goal criteria using the declared scientific tools.",
+            "research_sections": [],
+            "waiting_for": None,
+            "history": history,
+            "ui_lang": ui_lang,
+        }
+
     if (
         not sections_list
         and _looks_like_execution_request(text)

@@ -1,7 +1,7 @@
 ---
 name: biopython
 description: >-
-  Biopython guidance for sequence I/O, alignments, Bio.PDB, and Entrez parsing. Use for custom bioinformatics code via agent_generated_code. Prefer VenusFactory download tools for NCBI/UniProt/AlphaFold bulk fetches so large payloads stay on disk. Do NOT use as a substitute for protein_sequence_similarity_search or alphafold_database hub tools.
+  Biopython guidance for sequence I/O, alignments, Bio.PDB, and Entrez parsing. Use for custom bioinformatics code via session Python tools. Prefer VenusFactory download tools for NCBI/UniProt/AlphaFold bulk fetches so large payloads stay on disk. Do NOT use as a substitute for protein_sequence_similarity_search or alphafold_database hub tools.
 license: Unknown
 metadata:
   version: "1.2"
@@ -23,7 +23,7 @@ Library skill for parsing and analysis. Prefer hub download tools when fetching 
 | NCBI sequence/BLAST | **download_ncbi_sequence**, **download_ncbi_blast** (`ncbi_sequence`) |
 | UniProt | `uniprot_database` tools |
 | AlphaFold structure | `alphafold_database` tools |
-| Custom parse/plot | **agent_generated_code** + this skill |
+| Custom parse/plot | **write_session_file → run_session_python** + this skill |
 
 ## Module map (on-demand references)
 
@@ -59,3 +59,6 @@ if k := os.environ.get("NCBI_API_KEY"):
 ## References
 
 - See Module map above; full cookbook: `references/legacy_guide.md`
+
+### Session execution
+Use `write_session_file(path, content)` to write actual Python source and `run_session_python(path)` to execute it. Paths are relative to the server-assigned session workspace. Installed Python packages are available; repository source paths in this guide are host implementation references, not guest imports. Networking uses registered database/search/download tools; the analysis sandbox has no network access. Verify exit_code and actual output files.

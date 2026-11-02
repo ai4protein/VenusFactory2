@@ -1,0 +1,1123 @@
+{
+  "schema_version": 1,
+  "updated": "2026-10-14",
+  "paper_title": "Self-evolving AI agents for protein discovery and directed evolution",
+  "active_evaluation": "paper_case_reproduction",
+  "legacy_evaluation": {
+    "VenusAgentEval": "retired_from_active_research",
+    "allergenicity_pet_vhh_small_cases": "historical_illustrations_only"
+  },
+  "model": {
+    "provider": "dmx",
+    "model": "glm-4-flash",
+    "snapshot_pinned": false
+  },
+  "tracks": [
+    "author_reproduction_open_book",
+    "restricted_evidence_transfer",
+    "prospective_experimental_validation_optional"
+  ],
+  "cases": [
+    {
+      "id": "alde_parpgb",
+      "tier": "core",
+      "paper": {
+        "title": "Active learning-assisted directed evolution",
+        "doi": "10.1038/s41467-025-55987-8",
+        "url": "https://doi.org/10.1038/s41467-025-55987-8",
+        "year": 2025,
+        "venue": "Nature Communications"
+      },
+      "source": {
+        "repository": "jsunn-y/ALDE",
+        "commit": "d0b3593dd17987c9864830d36f5976b1ad04a619",
+        "default_branch": "master",
+        "license": "MIT",
+        "tree_truncated": false,
+        "audited_on": "2026-10-11",
+        "files": [
+          {
+            "path": "README.md",
+            "sha256": "a66fd06498d1eb1495cb760e4da752bf5153c82693c6a80ffc250d45500652d7",
+            "bytes": 8642
+          },
+          {
+            "path": "analysis/ParPgb_fitness_all.csv",
+            "bytes": 56653,
+            "sha256": "5d8497bef5fe85b3e3c0dc70d2864a9d7c1c5dc8b21805f856b1860733648706"
+          },
+          {
+            "path": "data/ParPgb/fitness_round1_training.csv",
+            "bytes": 31002,
+            "sha256": "47c1314955b4f131d3eb805059d4d72db57304baf7e71b7a8e5067a94ee78e3a"
+          },
+          {
+            "path": "analysis/ParPgb/trajectory_visualization.ipynb",
+            "bytes": 711655,
+            "sha256": "5a07aa3453a6f5630140beac80043ed765bd368f6f848395994d5539866da157"
+          },
+          {
+            "path": "src/objectives.py",
+            "bytes": 4176,
+            "sha256": "f2f222739ded43de3c278d5e72e3d89010915c2854a4f90c5e2d84c6e4a9c3f8"
+          },
+          {
+            "path": "alde.yml",
+            "bytes": 524,
+            "sha256": "54b54ca69bbbb16130aaef1dd078b7cb29a75178f1343c0073dc7e6267886657"
+          }
+        ]
+      },
+      "cache_subdir": "ALDE",
+      "data_sources": [
+        "https://zenodo.org/records/12196802",
+        "https://doi.org/10.5281/zenodo.14194551"
+      ],
+      "family_blocks": [
+        "ParPgb"
+      ],
+      "candidate_split": "development_candidate",
+      "computational_chain": [
+        "assay normalization",
+        "sequence encoding",
+        "surrogate fitting",
+        "batch acquisition",
+        "round feedback",
+        "trajectory reconstruction"
+      ],
+      "outputs": [
+        "roundwise observed yield/selectivity",
+        "author-referenced acquisition outputs",
+        "query cost",
+        "failure/intervention count"
+      ],
+      "capabilities_to_test": [
+        "validated assay adapter",
+        "budgeted batch acquisition plugin"
+      ],
+      "limitations": [
+        "Only measured variants support historical label queries; unmeasured production labels are zero placeholders in author code, not measurements.",
+        "GB1/TrpB complete landscapes are ancillary algorithm controls, not extra independent case papers."
+      ],
+      "status": {
+        "source_metadata_audited": true,
+        "some_assets_downloaded": true,
+        "author_version_alignment_verified": false,
+        "author_baseline_completed": false,
+        "agent_end_to_end_completed": false,
+        "ready_for_blind_evaluation": false
+      },
+      "acceptance": {
+        "metric_tolerances": null,
+        "compute_budget": null,
+        "gate": "Freeze source versions, paper correspondence, complete input contract, baseline output, tolerances, split IDs, label isolation and budget before agent comparison."
+      },
+      "model_lifecycle_pilot": {
+        "status": "completed",
+        "report": "research_runs/rsi/20261011_alde_model_lifecycle_glm_v2/report.json",
+        "rows": {
+          "training": 216,
+          "validation": 90,
+          "future": 90
+        },
+        "development_type": "configured_task_specific_model",
+        "same_assay_fresh_session_reuse": true,
+        "full_paper_reproduction": false,
+        "cross_family_transfer": false,
+        "generated_model_code": false
+      }
+    },
+    {
+      "id": "mcba_multisubstrate",
+      "tier": "core",
+      "paper": {
+        "title": "Accelerated enzyme engineering by machine-learning guided cell-free expression",
+        "doi": "10.1038/s41467-024-55399-0",
+        "url": "https://doi.org/10.1038/s41467-024-55399-0",
+        "year": 2025,
+        "venue": "Nature Communications"
+      },
+      "source": {
+        "repository": "grantlandwehr/accelerated-enzyme-engineering",
+        "commit": "0882f67317f56dfd2a39474f8f548e73197c1e8d",
+        "default_branch": "main",
+        "license": "MIT",
+        "tree_truncated": false,
+        "audited_on": "2026-10-11",
+        "files": [
+          {
+            "path": "README.md",
+            "sha256": "7cc34d922d4303bb0123a7cc266f2e75412a0ab3e6a9e3aa59b9c142e048eb7c",
+            "bytes": 1172
+          },
+          {
+            "path": "environment.yml",
+            "sha256": "1104068cdfa74251da57a6f8eecdd8ba9ee37a568315ddc78e2d8c83599883f1",
+            "bytes": 8344
+          },
+          {
+            "path": "notebooks/Model Selection.ipynb",
+            "bytes": 80221,
+            "sha256": "927a7dca420fc79237804dc2112afab16e957098b51727abe4a8fa4335376ca3"
+          },
+          {
+            "path": "notebooks/Extended Predictions.ipynb",
+            "bytes": 44911,
+            "sha256": "e615e1b585f306791fa3bbc2d7528c281508bac4de939c2277f7263e11f25d1a"
+          },
+          {
+            "path": "src/AugmentedMLDE_Class.py",
+            "bytes": 16561,
+            "sha256": "97e6b3f06fd0aa9b6e161fb744eefc373bcedbb04ce3c335fbe83163271713a2"
+          },
+          {
+            "path": "src/AugmentedMLDE_HelperFuncs.py",
+            "bytes": 15600,
+            "sha256": "a6b3ac4c30f0133763089ef72fc58a745f5ad117fe2f23a7c8524a2d9d2f1f46"
+          },
+          {
+            "path": "src/Predict_EVCouplings.py",
+            "bytes": 1718,
+            "sha256": "9b231ffb4a5923b1d2094863b54e9850f8f35c453030d4ac33f6975e7327ae1c"
+          },
+          {
+            "path": "data/HSS/itopride_train.xlsx",
+            "bytes": 10906,
+            "sha256": "213ee7ff4b78b3b1b5d1f8fcaceeea36fea35d94d36a01f8379c699f36f8b8fe"
+          },
+          {
+            "path": "data/zero-shot_predictions/itopride_zeroshot_EC.csv",
+            "bytes": 16441659,
+            "sha256": "966de157579dc035eba1f3dd3e76917040a0c7f0f4746e27673182ff80d44bef"
+          }
+        ]
+      },
+      "cache_subdir": "accelerated-enzyme-engineering",
+      "data_sources": [],
+      "family_blocks": [
+        "McbA"
+      ],
+      "candidate_split": "development_candidate",
+      "computational_chain": [
+        "assay table validation",
+        "zero-shot score alignment",
+        "feature/model selection",
+        "higher-order prediction",
+        "candidate ranking",
+        "transfer to other substrates"
+      ],
+      "outputs": [
+        "Spearman",
+        "NDCG with explicit gain convention",
+        "top-k observed yield",
+        "cross-substrate applicability"
+      ],
+      "capabilities_to_test": [
+        "augmented-regression plugin",
+        "substrate-aware applicability contract"
+      ],
+      "limitations": [
+        "Nine substrates share one scaffold and are not nine independent protein families.",
+        "Authors report code/publication differences in CV and predictions; reproduce archived public code separately from original figure values.",
+        "Public test campaigns used by authors for model selection are not fresh blind tests for VenusFactory."
+      ],
+      "status": {
+        "source_metadata_audited": true,
+        "some_assets_downloaded": true,
+        "author_version_alignment_verified": false,
+        "author_baseline_completed": false,
+        "agent_end_to_end_completed": false,
+        "ready_for_blind_evaluation": false,
+        "author_subcampaigns_verified": [
+          "itopride_processed_inputs_to_full_combinatorial_ranking"
+        ]
+      },
+      "acceptance": {
+        "metric_tolerances": null,
+        "compute_budget": null,
+        "gate": "Freeze source versions, paper correspondence, complete input contract, baseline output, tolerances, split IDs, label isolation and budget before agent comparison."
+      },
+      "partial_reference_result": {
+        "path": "research_runs/rsi/20261011_mcba_itopride_author_v1/baseline.json",
+        "training_rows": 77,
+        "predicted_candidates": 160000,
+        "cached_author_top24_exact_order_match": true,
+        "agent_run": false,
+        "full_paper_reproduced": false
+      },
+      "autonomous_model_development": {
+        "status": "proposed_not_executed",
+        "objective": "substrate-conditioned activity/yield regression and model selection",
+        "validation_requirement": "Hold out higher-order variants and declared substrate conditions; compare author and standard models under equal budgets.",
+        "requires_new_task_specific_model_to_be_validated": true,
+        "agent_authored_model_verified": false
+      },
+      "model_lifecycle_pilot": {
+        "status": "completed",
+        "report": "research_runs/rsi/20261011_mcba_model_lifecycle_glm_v2/report.json",
+        "rows": {
+          "training": 49,
+          "validation": 14,
+          "future": 14
+        },
+        "development_type": "configured_task_specific_model",
+        "same_assay_fresh_session_reuse": true,
+        "full_paper_reproduction": false,
+        "cross_family_transfer": false,
+        "generated_model_code": false
+      }
+    },
+    {
+      "id": "nucb_screening",
+      "tier": "core",
+      "paper": {
+        "title": "Engineering of highly active and diverse nuclease enzymes by combining machine learning and ultra-high-throughput screening",
+        "doi": "10.1101/2024.03.21.585615",
+        "url": "https://doi.org/10.1101/2024.03.21.585615",
+        "year": 2024,
+        "venue": "bioRxiv"
+      },
+      "source": {
+        "repository": "google-deepmind/nuclease_design",
+        "commit": "702284847c4558567d8288169a86dc147cfaab32",
+        "default_branch": "main",
+        "license": "Apache-2.0",
+        "tree_truncated": false,
+        "audited_on": "2026-10-11",
+        "files": [
+          {
+            "path": "README.md",
+            "sha256": "f0b890d3cff0b6cd5502800b509ac575f0ebce78cb7a0cd252dbdef118e41b0b",
+            "bytes": 6278
+          },
+          {
+            "path": "requirements.txt",
+            "sha256": "7193fa4b19871e9963a2de8c158f6e8caa4bebf95ce1856d09cdf48169f7e5e1",
+            "bytes": 228
+          },
+          {
+            "path": "data/landscape.csv",
+            "bytes": 16172801,
+            "sha256": "e306b510ffe3542c48900ddf96bb4ea912746a7ed836f6cf322b5df27454e0e8"
+          },
+          {
+            "path": "data/liquid_culture.csv",
+            "bytes": 47708,
+            "sha256": "6838be033fcc1408e600464e4e7882ab702632c3429998e3dce10033543bba34"
+          },
+          {
+            "path": "nuclease_design/data_utils.py",
+            "bytes": 4357,
+            "sha256": "01bf04901f5692cbd3bcee739bd841b8b81290822241937e92d8908ac4b19a9d"
+          },
+          {
+            "path": "notebooks/plot_landscape_analysis.ipynb",
+            "bytes": 466121,
+            "sha256": "3385232a6175379aba9019f9331f41dca95234f6a3427da69929187086ab6600"
+          },
+          {
+            "path": "notebooks/get_landscape.ipynb",
+            "bytes": 22847,
+            "sha256": "b4f535c7dec61ff34bc7dff235d94d3e2eb65cdd0405203e52f2d5fa33781d60"
+          }
+        ]
+      },
+      "cache_subdir": "nuclease_design",
+      "data_sources": [
+        "https://storage.googleapis.com/nuclease_design"
+      ],
+      "family_blocks": [
+        "NucB"
+      ],
+      "candidate_split": "development_candidate",
+      "computational_chain": [
+        "raw NGS counts",
+        "fiducial normalization",
+        "enrichment and uncertainty",
+        "activity class assignment",
+        "model fitting",
+        "activity-diversity selection",
+        "plate assay comparison"
+      ],
+      "outputs": [
+        "count-to-enrichment agreement",
+        "activity-label agreement",
+        "hit rate",
+        "sequence-cluster diversity",
+        "plate-assay concordance"
+      ],
+      "capabilities_to_test": [
+        "NGS/assay evidence plugin",
+        "activity-diversity selector"
+      ],
+      "limitations": [
+        "Repository processed landscape is not raw NGS data.",
+        "Sequences recurring across generations must not leak across splits.",
+        "Observed libraries are selection-biased; closed-loop counterfactuals are restricted to a declared measured pool."
+      ],
+      "status": {
+        "source_metadata_audited": true,
+        "some_assets_downloaded": true,
+        "author_version_alignment_verified": false,
+        "author_baseline_completed": false,
+        "agent_end_to_end_completed": false,
+        "ready_for_blind_evaluation": false
+      },
+      "acceptance": {
+        "metric_tolerances": null,
+        "compute_budget": null,
+        "gate": "Freeze source versions, paper correspondence, complete input contract, baseline output, tolerances, split IDs, label isolation and budget before agent comparison."
+      },
+      "autonomous_model_development": {
+        "status": "proposed_not_executed",
+        "objective": "activity class or ordinal predictor with confidence calibration",
+        "validation_requirement": "Preserve generation/sequence groups and assay uncertainty; compare held-out labels.",
+        "requires_new_task_specific_model_to_be_validated": true,
+        "agent_authored_model_verified": false
+      }
+    },
+    {
+      "id": "gb1_extrapolation",
+      "tier": "core",
+      "paper": {
+        "title": "Neural network extrapolation to distant regions of the protein fitness landscape",
+        "doi": "10.1038/s41467-024-50712-3",
+        "url": "https://doi.org/10.1038/s41467-024-50712-3",
+        "year": 2024,
+        "venue": "Nature Communications"
+      },
+      "source": {
+        "repository": "RomeroLab/nn-extrapolation",
+        "commit": "c0d553b7d3a42b9968c569c3d0ed48792b708cd4",
+        "default_branch": "main",
+        "license": "GPL-3.0",
+        "tree_truncated": false,
+        "audited_on": "2026-10-11",
+        "files": [
+          {
+            "path": "README.md",
+            "sha256": "9738bb1da51a72f39cea2f267d802d0cd63c8690ec52e6dec1f29cd6b87e4c35",
+            "bytes": 3210
+          },
+          {
+            "path": "env_inference.yml",
+            "sha256": "e8a8c0cada4b2dc15ff73980e145589fa9d3a34199f07dabece148d984456056",
+            "bytes": 521
+          },
+          {
+            "path": "env_notebook.yml",
+            "sha256": "4119ba3c7f4376b791f500d9d5013c9adf0ec42c9eabb1ac1860fb3ccae6ab94",
+            "bytes": 390
+          },
+          {
+            "path": "designs_counts.csv",
+            "bytes": 1428261,
+            "sha256": "ea19d056565e6f7fceb114693777b18b5dfba3ad564361242919359c5ff18eee"
+          },
+          {
+            "path": "designs_scores.csv",
+            "bytes": 2121965,
+            "sha256": "6695b581bf1f611dea7b9bc4d305d916ca9557f766e2259e4c153af4607c8bb1"
+          },
+          {
+            "path": "data/05_ysd_low-throughput_measurements.csv",
+            "bytes": 2853,
+            "sha256": "f97ea81ed477871c5a49e2f843b50c09acfd42738e10ec44571ea5bada89b66c"
+          }
+        ]
+      },
+      "cache_subdir": "nn-extrapolation",
+      "data_sources": [
+        "https://doi.org/10.5281/zenodo.12518821",
+        "https://www.ncbi.nlm.nih.gov/bioproject/PRJNA1117877"
+      ],
+      "family_blocks": [
+        "GB1"
+      ],
+      "candidate_split": "transfer_candidate_not_sealed",
+      "computational_chain": [
+        "local fitness data",
+        "model fitting",
+        "distant sequence proposal",
+        "count processing",
+        "binding/display analysis",
+        "distance-stratified function assessment"
+      ],
+      "outputs": [
+        "held-out distance-stratified binding",
+        "functional fraction",
+        "count-to-score agreement",
+        "design diversity"
+      ],
+      "capabilities_to_test": [
+        "sequence-distance validator",
+        "count-to-function analysis"
+      ],
+      "limitations": [
+        "Shared GB1 data with ALDE are one family block; no independent-fold double counting.",
+        "Counts have 2000 designs and scored output 1950 rows; exclusion/aggregation rules require reconstruction.",
+        "Folding or display is not equivalent to binding function."
+      ],
+      "status": {
+        "source_metadata_audited": true,
+        "some_assets_downloaded": true,
+        "author_version_alignment_verified": false,
+        "author_baseline_completed": false,
+        "agent_end_to_end_completed": false,
+        "ready_for_blind_evaluation": false
+      },
+      "acceptance": {
+        "metric_tolerances": null,
+        "compute_budget": null,
+        "gate": "Freeze source versions, paper correspondence, complete input contract, baseline output, tolerances, split IDs, label isolation and budget before agent comparison."
+      },
+      "autonomous_model_development": {
+        "status": "proposed_not_executed",
+        "objective": "distance-aware predictor or ensemble and applicability model",
+        "validation_requirement": "Assess binding on held-out mutation-distance groups; do not substitute folding/display for function.",
+        "requires_new_task_specific_model_to_be_validated": true,
+        "agent_authored_model_verified": false
+      }
+    },
+    {
+      "id": "turbo_petase",
+      "tier": "core",
+      "paper": {
+        "title": "Computational redesign of a hydrolase for nearly complete PET depolymerization at industrially relevant high-solids loading",
+        "doi": "10.1038/s41467-024-45662-9",
+        "url": "https://doi.org/10.1038/s41467-024-45662-9",
+        "year": 2024,
+        "venue": "Nature Communications"
+      },
+      "source": {
+        "repository": "Wublab/code-for-TurboPETase",
+        "commit": "b83bbfb3298176465d43e0803f8ba810b183c0bd",
+        "default_branch": "main",
+        "license": "Apache-2.0",
+        "audited_on": "2026-10-11",
+        "files": [
+          {
+            "path": "LICENSE",
+            "bytes": 11357,
+            "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+          },
+          {
+            "path": "README.md",
+            "bytes": 1019,
+            "sha256": "775da26232f556715e7f69859cbeb6afef0de6dfd1be9d1924b41f80966c6a15"
+          }
+        ]
+      },
+      "cache_subdir": "code-for-TurboPETase",
+      "data_sources": [],
+      "family_blocks": [
+        "PET hydrolases"
+      ],
+      "candidate_split": "transfer_candidate_not_sealed",
+      "computational_chain": [
+        "homologue/MSA provenance",
+        "language-model mutation scoring",
+        "structural filtering",
+        "stability/activity tradeoff",
+        "condition-aware comparison with published assays"
+      ],
+      "outputs": [
+        "mutation-score agreement",
+        "candidate recovery/ranking",
+        "assay-condition completeness",
+        "observed stability/activity Pareto coverage"
+      ],
+      "capabilities_to_test": [
+        "mutation mapping validator",
+        "assay-condition schema",
+        "multiobjective selector"
+      ],
+      "limitations": [
+        "Transformer release does not establish availability of all force-field/MSA steps.",
+        "Author README explicitly marks *_new.pt checkpoints as untested.",
+        "PET conversion cannot be inferred from a sequence score; pH, temperature, crystallinity, loading and reaction time must remain attached."
+      ],
+      "status": {
+        "source_metadata_audited": true,
+        "some_assets_downloaded": true,
+        "author_version_alignment_verified": false,
+        "author_baseline_completed": false,
+        "agent_end_to_end_completed": false,
+        "ready_for_blind_evaluation": false
+      },
+      "acceptance": {
+        "metric_tolerances": null,
+        "compute_budget": null,
+        "gate": "Freeze source versions, paper correspondence, complete input contract, baseline output, tolerances, split IDs, label isolation and budget before agent comparison."
+      },
+      "autonomous_model_development": {
+        "status": "proposed_not_executed",
+        "objective": "condition-aware activity/stability surrogate or candidate ranker",
+        "validation_requirement": "Only after sufficiently comparable measured labels are verified; retain assay conditions and support abstention.",
+        "requires_new_task_specific_model_to_be_validated": true,
+        "agent_authored_model_verified": false
+      },
+      "execution_evidence": {
+        "run": "research_runs/rsi/20261011_turbopetase_author_inference_v1",
+        "original_checkpoint_inference": "completed_for_three_weights",
+        "indexing_audit": "author_and_corrected_outputs_separate",
+        "full_paper_reproduced": false
+      }
+    },
+    {
+      "id": "rfantibody_design",
+      "tier": "core",
+      "paper": {
+        "title": "Atomically accurate de novo design of antibodies with RFdiffusion",
+        "doi": "10.1038/s41586-025-09721-5",
+        "url": "https://doi.org/10.1038/s41586-025-09721-5",
+        "year": 2025,
+        "venue": "Nature"
+      },
+      "source": {
+        "repository": "RosettaCommons/RFantibody",
+        "commit": "3e5a5bb1cb98befde9fc049ae3ff58cabb491f67",
+        "default_branch": "main",
+        "license": "MIT",
+        "tree_truncated": false,
+        "audited_on": "2026-10-11",
+        "files": [
+          {
+            "path": "README.md",
+            "sha256": "1a1bd53922d063af09148e01d7486bb6829f233bc8559e6112f681f6b970ed5a",
+            "bytes": 30816
+          }
+        ]
+      },
+      "cache_subdir": "RFantibody",
+      "data_sources": [
+        "https://zenodo.org/records/15741710"
+      ],
+      "family_blocks": [
+        "antibody targets"
+      ],
+      "candidate_split": "transfer_candidate_not_sealed",
+      "computational_chain": [
+        "target/framework preparation",
+        "CDR numbering",
+        "RFdiffusion backbone design",
+        "ProteinMPNN sequence design",
+        "RoseTTAFold validation",
+        "candidate filtering",
+        "published assay comparison"
+      ],
+      "outputs": [
+        "valid complete design fraction",
+        "CDR/framework/epitope compliance",
+        "structural agreement",
+        "assay concordance for actually tested designs",
+        "GPU cost"
+      ],
+      "capabilities_to_test": [
+        "antibody numbering plugin",
+        "structure/sequence workflow",
+        "binding-evidence adapter"
+      ],
+      "limitations": [
+        "Current repository includes post-paper changes; paper-version commit, weights and configurations must be aligned before author reproduction.",
+        "Structure confidence does not establish affinity.",
+        "Initial paper-design replay and new-target generalization are separate experiments."
+      ],
+      "status": {
+        "source_metadata_audited": true,
+        "some_assets_downloaded": true,
+        "author_version_alignment_verified": false,
+        "author_baseline_completed": false,
+        "agent_end_to_end_completed": false,
+        "ready_for_blind_evaluation": false
+      },
+      "acceptance": {
+        "metric_tolerances": null,
+        "compute_budget": null,
+        "gate": "Freeze source versions, paper correspondence, complete input contract, baseline output, tolerances, split IDs, label isolation and budget before agent comparison."
+      },
+      "autonomous_model_development": {
+        "status": "proposed_not_executed",
+        "objective": "binding/developability predictor or candidate ranker after measurement feedback",
+        "validation_requirement": "Only with verified suitable assay labels; separate VHH from other antibody formats and structure scores from binding.",
+        "requires_new_task_specific_model_to_be_validated": true,
+        "agent_authored_model_verified": false
+      },
+      "execution_evidence": {
+        "run": "research_runs/rsi/20261011_rfantibody_ha_chain_v1",
+        "three_stage_chain": "completed",
+        "backbones": 2,
+        "sequences": 4,
+        "agent_orchestrated": false,
+        "full_paper_reproduced": false
+      }
+    },
+    {
+      "id": "reap_ranked_evolution",
+      "tier": "extension",
+      "paper": {
+        "title": "Rank-guided learning accelerates automated enzyme engineering",
+        "doi": "10.1038/s41467-026-76264-2",
+        "url": "https://doi.org/10.1038/s41467-026-76264-2",
+        "year": 2026,
+        "venue": "Nature Communications"
+      },
+      "source": {
+        "repository": "zyan-y/REAP",
+        "commit": "96c69e94b3b39c33ffb70ac394bd06022b4f035f",
+        "default_branch": "main",
+        "license": "AGPL-3.0",
+        "tree_truncated": false,
+        "audited_on": "2026-10-11",
+        "files": [
+          {
+            "path": "README.md",
+            "sha256": "a9525a54b70303d0737e8bf5b958325a56d04bbaf4a33c8bbd9ac65af3fd3e5d",
+            "bytes": 10095
+          },
+          {
+            "path": "requirements.txt",
+            "sha256": "3baeb3241dbdacbb340d7c96fc680cd3266f23e01ad7c633eb9c1baca160c41e",
+            "bytes": 136
+          }
+        ]
+      },
+      "cache_subdir": "REAP",
+      "data_sources": [
+        "https://doi.org/10.5281/zenodo.21482623",
+        "https://doi.org/10.5281/zenodo.21358555"
+      ],
+      "family_blocks": [
+        "P450 BM3",
+        "SaSrtA"
+      ],
+      "candidate_split": "reserve_transfer_candidate",
+      "computational_chain": [
+        "assay cleaning",
+        "PLM features",
+        "rank-based fitting",
+        "batch ranking",
+        "historical multi-round validation"
+      ],
+      "outputs": [
+        "rank accuracy",
+        "observed batch improvement",
+        "assay calibration",
+        "total cost"
+      ],
+      "capabilities_to_test": [
+        "rank-learning plugin",
+        "assay cleaning adapter"
+      ],
+      "limitations": [
+        "Strict cohort, ESM features and 100 author-function extrapolation fits completed; two source conflicts, original-table numerical alignment, full author baseline and autonomous asset-to-report reconstruction remain incomplete.",
+        "Robotics and wet lab execution are outside computational reproduction.",
+        "AGPL source requires isolated use and license review before any product integration."
+      ],
+      "status": {
+        "source_metadata_audited": true,
+        "some_assets_downloaded": true,
+        "author_version_alignment_verified": false,
+        "author_baseline_completed": false,
+        "agent_end_to_end_completed": false,
+        "ready_for_blind_evaluation": false
+      },
+      "acceptance": {
+        "metric_tolerances": null,
+        "compute_budget": null,
+        "gate": "Freeze source versions, paper correspondence, complete input contract, baseline output, tolerances, split IDs, label isolation and budget before agent comparison."
+      },
+      "published_code_archive": {
+        "doi": "10.5281/zenodo.21358555",
+        "version": "v1.0.0",
+        "archive_root": "zyan-y-REAP-953bf52",
+        "sha256": "5a484aeb8ebb3801a6d6e8ffadf1b457c9f2a909b93fb4b18322b516c9c43503",
+        "publisher_checksum_verified": true,
+        "note": "Separate from the previously audited GitHub-main commit; no full commit inferred from archive root."
+      },
+      "asset_bundle": {
+        "path": "research_runs/rsi/case_assets/REAP/zenodo_20261013",
+        "metadata_manifest": "manifest.json",
+        "downloads": "download_manifest.json",
+        "measurement_archives": "measurement_archive_manifest.json",
+        "sheet_inventory": "sheet_inventory.json",
+        "excel_files": 12,
+        "sequence_rounds_observed": [
+          "P450 BM3 FL#62 Zero-shot and Round1-Round5",
+          "SaSrtA Zero-shot and Round1-Round5"
+        ],
+        "state": "strict_campaign_admission_complete_with_two_source_conflicts",
+        "admission": {
+          "path": "research_runs/rsi/20261013_reap_admission_v2",
+          "campaign_records": 1457,
+          "raw_assays": 2071,
+          "excluded_campaign_plots": 2,
+          "plot_controls": 49,
+          "independent_saturation_sequences": 605,
+          "source_conflicts": [
+            "SaSrtA D170W versus raw M155S",
+            "SaSrtA D170H versus raw K173D"
+          ]
+        },
+        "embedding_run": "research_runs/rsi/20261013_reap_esm2_features_v1",
+        "strict_extrapolation": {
+          "run": "research_runs/rsi/20261013_reap_extrapolation_v1",
+          "audit": "research_runs/rsi/20261013_reap_extrapolation_audit_v1",
+          "completed_fits": 100,
+          "families": 2,
+          "seeds": 10,
+          "methods": 5,
+          "scope": "Strict-cohort single-to-multiple author-function computation, not original table agreement or complete author baseline"
+        },
+        "generated_feature_pilot": {
+          "run": "research_runs/rsi/20261013_reap_generated_glm52_v1",
+          "audit": "research_runs/rsi/20261013_reap_generated_glm52_audit_v1",
+          "model": "glm-5.2",
+          "allocations": 4,
+          "independently_replayed_candidates": 4,
+          "accepted_and_reused": 2,
+          "scope": "Bounded workflow components; no end-to-end feature preparation or mode superiority claim"
+        },
+        "persistent_feature_goal": {
+          "run": "research_runs/rsi/20261013_reap_persistent_glm52_v1",
+          "audit": "research_runs/rsi/20261013_reap_persistent_glm52_audit_v1",
+          "mode": "science_expert",
+          "model": "glm-5.2",
+          "family": "SaSrtA",
+          "episodes": 6,
+          "accepted_and_reused": true,
+          "source_experience_registered": true,
+          "future_spearman": -0.3921512361787866,
+          "scope": "Operational goal completion with adverse higher-order ranking; not efficacy, blind evaluation, cross-family transfer or improver evolution"
+        },
+        "fixed_donor_experience_ablation": {
+          "run": "research_runs/rsi/20261014_reap_transfer_glm52_v1",
+          "audit": "research_runs/rsi/20261014_reap_transfer_glm52_audit_v1",
+          "model": "glm-5.2",
+          "allocations": 36,
+          "independently_replayed_candidates": 35,
+          "accepted_and_reused": 26,
+          "candidate_rejected": 9,
+          "development_failed": 1,
+          "direct_source_controls": 6,
+          "paired_contrasts": 24,
+          "positive_transfer_established": false,
+          "recursive_improvement_established": false,
+          "scope": "Fixed-donor cross-protein exposure on overlapping retrospective partitions; no consistent higher-order benefit, no biological replication or full paper reproduction."
+        }
+      }
+    },
+    {
+      "id": "germinal_antibody",
+      "tier": "extension",
+      "paper": {
+        "title": "Efficient generation of epitope-targeted antibodies with Germinal",
+        "doi": "10.1038/s41587-026-03187-0",
+        "url": "https://doi.org/10.1038/s41587-026-03187-0",
+        "year": 2026,
+        "venue": "Nature Biotechnology"
+      },
+      "source": {
+        "repository": "SantiagoMille/germinal",
+        "commit": "1e1c1a5b79884ae45abae030c9df90d9423a990a",
+        "default_branch": "main",
+        "license": "Apache-2.0",
+        "tree_truncated": false,
+        "audited_on": "2026-10-11",
+        "files": [
+          {
+            "path": "README.md",
+            "sha256": "aed33e868f5afe16c1077165cbcb1a3fde7e22a93431603c2c367973884ab3f5",
+            "bytes": 35046
+          },
+          {
+            "path": "environment.yml",
+            "sha256": "fa90497076f25bc9edc7fa91c6851ab90979c3af3f7b9e8fe0a062d95d7154ea",
+            "bytes": 483
+          }
+        ]
+      },
+      "cache_subdir": "germinal",
+      "data_sources": [
+        "https://doi.org/10.5281/zenodo.20221721"
+      ],
+      "family_blocks": [
+        "antibody targets"
+      ],
+      "candidate_split": "reserve_transfer_candidate",
+      "computational_chain": [
+        "epitope/framework setup",
+        "joint sequence/structure optimization",
+        "antibody PLM scoring",
+        "structure filtering",
+        "assay comparison"
+      ],
+      "outputs": [
+        "valid design fraction",
+        "epitope compliance",
+        "published binding-data concordance",
+        "GPU cost"
+      ],
+      "capabilities_to_test": [
+        "transferable antibody validation",
+        "backend-specific filter calibration"
+      ],
+      "limitations": [
+        "Published version must be aligned; current README includes alternate backends and unvalidated settings.",
+        "README recommends 40GB+ VRAM (larger systems 60GB+); compute availability is unverified.",
+        "IgLM and PyRosetta have separate licenses; no automatic install or license acceptance."
+      ],
+      "status": {
+        "source_metadata_audited": true,
+        "some_assets_downloaded": true,
+        "author_version_alignment_verified": false,
+        "author_baseline_completed": false,
+        "agent_end_to_end_completed": false,
+        "ready_for_blind_evaluation": false
+      },
+      "acceptance": {
+        "metric_tolerances": null,
+        "compute_budget": null,
+        "gate": "Freeze source versions, paper correspondence, complete input contract, baseline output, tolerances, split IDs, label isolation and budget before agent comparison."
+      }
+    },
+    {
+      "id": "alde_gb1_landscape",
+      "tier": "transfer",
+      "family_block": "GB1",
+      "paper": {
+        "title": "Active learning-assisted directed evolution",
+        "doi": "10.1038/s41467-025-55987-8"
+      },
+      "source": {
+        "record": "https://zenodo.org/records/12196802",
+        "manifest": "research_runs/rsi/case_assets/alde_landscapes/source_manifest.json"
+      },
+      "protocol": {
+        "adapter": "agent.rsi.landscape_cases",
+        "training_rows": 256,
+        "acceptance_rows": 512,
+        "later_rows": 1024,
+        "split_seed": 20261011,
+        "zeros": "retain author-recorded values; never impute absent variants"
+      },
+      "execution_evidence": {
+        "run": "research_runs/rsi/20261011_generated_transfer_gb1_trpb_glm51_v2/GB1",
+        "status": "negative_later_transfer",
+        "full_paper_reproduced": false
+      }
+    },
+    {
+      "id": "alde_trpb_landscape",
+      "tier": "transfer",
+      "family_block": "TrpB",
+      "paper": {
+        "title": "Active learning-assisted directed evolution",
+        "doi": "10.1038/s41467-025-55987-8"
+      },
+      "source": {
+        "record": "https://zenodo.org/records/12196802",
+        "manifest": "research_runs/rsi/case_assets/alde_landscapes/source_manifest.json"
+      },
+      "protocol": {
+        "adapter": "agent.rsi.landscape_cases",
+        "training_rows": 256,
+        "acceptance_rows": 512,
+        "later_rows": 1024,
+        "split_seed": 20261011,
+        "zeros": "retain author-recorded values; never impute absent variants"
+      },
+      "execution_evidence": {
+        "run": "research_runs/rsi/20261011_generated_transfer_gb1_trpb_glm51_v2/TrpB",
+        "status": "candidate_rejected",
+        "full_paper_reproduced": false
+      }
+    },
+    {
+      "id": "phl7_computational_engineering",
+      "tier": "additional",
+      "paper": {
+        "title": "Computational engineering of the polyester hydrolase PHL7 for efficient poly(ethylene terephthalate) degradation in biocatalytic recycling processes",
+        "doi": "10.1038/s41467-026-70868-4",
+        "url": "https://www.nature.com/articles/s41467-026-70868-4",
+        "year": 2026,
+        "venue": "Nature Communications"
+      },
+      "source": {
+        "doi": "10.5281/zenodo.18650810",
+        "archive": "MD_simulations_PHL7.zip",
+        "archive_sha256": "3dd9cb3d0bfcfa53d02ae528bdd940d3fc815e5570ba071f3f439daaabae9f91",
+        "license": "CC-BY-4.0",
+        "authors": [
+          "Georg Kuenze",
+          "Alexander Zlobin"
+        ],
+        "audited_on": "2026-10-14"
+      },
+      "cache_subdir": "PHL7",
+      "family_blocks": [
+        "PHL7"
+      ],
+      "candidate_split": "author_reproduction_open_book_not_blind",
+      "computational_chain": [
+        "PROSS/ENDURE design reconstruction",
+        "all equilibrated MD-system construction",
+        "unbiased MD",
+        "both HREX experiments",
+        "both OPES experiments",
+        "geometry and free-energy analysis",
+        "ligand-conformation clustering",
+        "all-chain crystal-structure comparison"
+      ],
+      "implemented_plugin": "phl7.opes_analysis.v1",
+      "outputs": [
+        "24 independently compared OPES free-energy grids",
+        "22 complete CA chain-pair comparisons with two alignment solvers",
+        "source-protocol discrepancies and missing-input manifest"
+      ],
+      "asset_bundle": {
+        "opes_protocol": "research_runs/rsi/20261014_phl7_opes_replay_v1/protocol.json",
+        "opes_report": "research_runs/rsi/20261014_phl7_opes_replay_v1/report.json",
+        "structural_report": "research_runs/rsi/20261014_phl7_structural_replay_v1/report.json",
+        "pdb_sources": [
+          {
+            "id": "7NEI",
+            "url": "https://files.rcsb.org/download/7NEI.cif",
+            "bytes": 1412748,
+            "sha256": "16ad8f296828aa413b3239cfd2efc2e1217e3065322bb54c9dbc105ac5c1ac82"
+          },
+          {
+            "id": "9QNM",
+            "url": "https://files.rcsb.org/download/9QNM.cif",
+            "bytes": 1284275,
+            "sha256": "9b681c02fe3a39b15c8d4d419effb4fa44ed9d998988bb9024f60641f0f8183a"
+          },
+          {
+            "id": "9QT8",
+            "url": "https://files.rcsb.org/download/9QT8.cif",
+            "bytes": 1312945,
+            "sha256": "4a6e6e7f8d7640bb796a2ced22ae4fa8a7588c5f9c644dd7f3ff3fe8da0d1d49"
+          },
+          {
+            "id": "9QV8",
+            "url": "https://files.rcsb.org/download/9QV8.cif",
+            "bytes": 1252279,
+            "sha256": "eccfbccf2a60825e079bc24fc0ec2320041fa30d203df630b2d4571041995553"
+          },
+          {
+            "id": "9QVA",
+            "url": "https://files.rcsb.org/download/9QVA.cif",
+            "bytes": 1031134,
+            "sha256": "3522236cd551c1804c1de75c0858ca9e692d2598690cf27d37a936768cb7314d"
+          },
+          {
+            "id": "9QYA",
+            "url": "https://files.rcsb.org/download/9QYA.cif",
+            "bytes": 673641,
+            "sha256": "f243c03348405ebb3f838854281cb8c3315cd63cabd4626b88e43e3e85676650"
+          },
+          {
+            "id": "9QYB",
+            "url": "https://files.rcsb.org/download/9QYB.cif",
+            "bytes": 697288,
+            "sha256": "fd3a12606bf8aa20d535578ec30c7fe5beb3d6fd64cfadf1459be88ae0df88da"
+          },
+          {
+            "id": "9QYC",
+            "url": "https://files.rcsb.org/download/9QYC.cif",
+            "bytes": 731679,
+            "sha256": "4f94fd0c0aaa30122ddc9bfb8a52313e35f9958ec86fa3140d3c6beffc819d51"
+          }
+        ],
+        "opes_audit": "research_runs/rsi/20261014_phl7_opes_audit_v1/audit.json",
+        "bitwise_grid_matches": 24,
+        "independent_audit_passed": true
+      },
+      "status": {
+        "source_metadata_audited": true,
+        "some_assets_downloaded": true,
+        "author_version_alignment_verified": false,
+        "author_baseline_completed": false,
+        "agent_end_to_end_completed": false,
+        "ready_for_blind_evaluation": false,
+        "full_paper_reproduced": false,
+        "partial_computations_completed": [
+          "all_22_crystallographic_CA_chain_pairs",
+          "all_24_author_OPES_output_reweighting_analyses"
+        ],
+        "partial_computations_running": []
+      },
+      "limitations": [
+        "Main Methods discard 100 ns of HREX; Supplementary Methods specify analysis of 200-500 ns.",
+        "Supplementary Methods describe all OPES runs as explore; archived plumed.dat actions vary by system. Exact actions are recorded per allocation.",
+        "Open/closed reweighting ignores timestamps and pairs CV/DD rows; DD driver timestamps are frame indices, with two ps per frame in CV.",
+        "Full unbiased-MD, HREX and OPES trajectories (no XTC/TRR/DCD/TPR in the released archive).",
+        "All equilibrated systems and their run topologies; HREX preparation releases the WT example, not all variants.",
+        "Complete PROSS/ENDURE design inputs, environment and intermediate decisions.",
+        "Gromacs 2023 with Plumed 2.9 integration and the specified QM/MM setup for force-field calibration.",
+        "Resolution or separately reported replay of main-text/supplementary/script protocol discrepancies.",
+        "Eight crystal structures and four variants are one protein family, not independent cross-protein cases.",
+        "Existing public simulation outputs are exposed author references; their reanalysis does not establish autonomous agent or RSI efficacy."
+      ],
+      "acceptance": {
+        "opes_numerical_tolerances": {
+          "coordinates": 1e-06,
+          "free_energy_kj_mol": 5e-05,
+          "derivatives": 0.001
+        },
+        "required_opes_allocations": 24,
+        "structural_comparison": "All available WT/variant chain pairs; no outlier removal and no favorable-chain selection; two alignment solvers must agree within 1e-8 angstrom.",
+        "gate": "Analysis-only completion must remain separate from new MD, original design replication and full computational paper reproduction."
+      }
+    }
+  ],
+  "additional_transfer_papers": [
+    {
+      "id": "fast_petase",
+      "doi": "10.1038/s41586-022-04599-z",
+      "year": 2022,
+      "scope": "Structure-based mutation proposal and assay comparison",
+      "source_audit": "paper_checked_only; executable chain not yet verified"
+    },
+    {
+      "id": "hot_petase",
+      "doi": "10.1038/s41929-022-00821-3",
+      "year": 2022,
+      "scope": "Historical directed-evolution trajectory and PET condition transfer",
+      "source_audit": "paper_checked_only; computational code not yet verified"
+    }
+  ],
+  "contribution_axes": [
+    "dual_mode_scientific_workflows",
+    "end_to_end_protein_study_reproduction",
+    "autonomous_model_development_and_validated_reuse"
+  ],
+  "execution_modes": {
+    "scientist": {
+      "internal_chat_mode": "science_expert",
+      "runtime": "graph",
+      "route_implemented": true,
+      "matched_glm_case_comparison_completed": false
+    },
+    "agent": {
+      "internal_chat_mode": "science_agent",
+      "runtime": "kimi-code",
+      "route_implemented": true,
+      "matched_glm_case_comparison_completed": false
+    },
+    "automatic_handoff_verified": false,
+    "cross_mode_model_reuse_verified": false
+  },
+  "capability_evolution_definition": "Validated task-specific model/code capabilities persist and improve later independent cases; recursive U improvement is tested separately.",
+  "model_profiles": {
+    "configured_model_pilots": {
+      "provider": "dmx",
+      "model": "glm-4-flash"
+    },
+    "generated_source_pilots": {
+      "provider": "dmx",
+      "model": "glm-5.1",
+      "snapshot_pinned": false
+    }
+  }
+}

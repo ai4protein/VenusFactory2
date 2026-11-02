@@ -1,9 +1,11 @@
 """CB planning nodes: produce normalized pipeline JSON from PI inputs."""
+
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from datetime import datetime
-from typing import Any, Iterable
+from typing import Any
 
 from langchain_core.runnables import RunnableConfig
 
@@ -21,7 +23,7 @@ from agent.graph.state import AgentState
 from agent.skills import get_skills_metadata_string
 from agent.tracing import AgentSpanData, start_span
 from logger import get_logger
-from web.utils.common_utils import to_project_relative_path
+from mcp_tools.common.common_utils import to_project_relative_path
 
 _logger = get_logger("agent.graph")
 
@@ -50,11 +52,13 @@ def _sanitize_dependency_tokens(value: Any, *, step_no: int, tool_name: str) -> 
     """
     if isinstance(value, str):
         if value.startswith("dependency:") and not _LEGAL_DEP_TOKEN_RE.match(value):
-            stripped = value[len("dependency:"):]
+            stripped = value[len("dependency:") :]
             _logger.warning(
-                "Planner lint: step %s (%s) had malformed dependency token %r; "
-                "stripped 'dependency:' prefix → %r",
-                step_no, tool_name, value, stripped,
+                "Planner lint: step %s (%s) had malformed dependency token %r; stripped 'dependency:' prefix → %r",
+                step_no,
+                tool_name,
+                value,
+                stripped,
             )
             return stripped
         return value
@@ -69,6 +73,8 @@ def _filter_unparameterized_steps(
     plan: list[dict[str, Any]],
     all_tools: Iterable[Any] | None,
     ui_lang: str,
+    *,
+    allow_deferred_arguments: bool = False,
 ) -> tuple[list[dict[str, Any]], list[tuple[Any, str, list[str]]]]:
     """Drop plan steps whose tool requires fields but tool_input is empty.
 
@@ -106,8 +112,7 @@ def _filter_unparameterized_steps(
                             required.add(fname)
                     except Exception:
                         # Fallback: treat fields with no default as required.
-                        if getattr(finfo, "default", None) is None and \
-                                getattr(finfo, "default_factory", None) is None:
+                        if getattr(finfo, "default", None) is None and getattr(finfo, "default_factory", None) is None:
                             required.add(fname)
             else:
                 v1_fields = getattr(schema, "__fields__", None)  # pydantic v1
@@ -115,6 +120,9 @@ def _filter_unparameterized_steps(
                     for fname, finfo in v1_fields.items():
                         if getattr(finfo, "required", False):
                             required.add(fname)
+        if required and allow_deferred_arguments and (getattr(tool, "metadata", None) or {}).get("deferred_arguments"):
+            kept.append(step)
+            continue
         if required:
             dropped.append((step.get("step"), tname, sorted(required)))
             continue
@@ -126,21 +134,25 @@ async def plan_start_node(state: AgentState, config: RunnableConfig):
     """Show 'CB is designing pipeline' so UI updates before LLM runs."""
     history = list(state.get("history", []))
     ui_lang = _resolve_ui_lang(state)
-    history.append({
-        "role": "assistant",
-        "content": "📋 **Computational Biologist** 正在设计流程 …"
-        if ui_lang == "zh" else
-        "📋 **Computational Biologist** is designing the pipeline …",
-        "role_id": "computational_biologist",
-        "phase": "thinking",
-    })
+    history.append(
+        {
+            "role": "assistant",
+            "content": "📋 **Computational Biologist** 正在设计流程 …"
+            if ui_lang == "zh"
+            else "📋 **Computational Biologist** is designing the pipeline …",
+            "role_id": "computational_biologist",
+            "phase": "thinking",
+        }
+    )
     return {"history": history}
 
 
 async def plan_node(state: AgentState, config: RunnableConfig):
     """CB planning node: PI report -> pipeline (JSON list)."""
-    with _ensure_trace(session_id=state.get("session_id", "")), \
-            start_span("cb.plan", AgentSpanData(agent_name="CB", phase="planning")):
+    with (
+        _ensure_trace(session_id=state.get("session_id", "")),
+        start_span("cb.plan", AgentSpanData(agent_name="CB", phase="planning")),
+    ):
         return await _plan_node_impl(state, config)
 
 
@@ -160,7 +172,9 @@ async def _plan_node_impl(state: AgentState, config: RunnableConfig):
             pi_report = f"用户请求：{user_input}\n\n无需文献检索，直接进入工具执行。"
             pi_suggest_steps = pi_suggest_steps or "执行适当工具以完成用户请求。"
         else:
-            pi_report = f"User request: {user_input}\n\nNo literature research needed. Proceed directly with tool execution."
+            pi_report = (
+                f"User request: {user_input}\n\nNo literature research needed. Proceed directly with tool execution."
+            )
             pi_suggest_steps = pi_suggest_steps or "Execute the appropriate tool to fulfill the user's request."
 
     context_parts = [
@@ -187,6 +201,20 @@ async def _plan_node_impl(state: AgentState, config: RunnableConfig):
     if not available_tools_list and chains.get("workers"):
         available_tools_list = ", ".join(chains["workers"].keys())
 
+    if callable(chains.get("materialize_tool_arguments")):
+        deferred_names = [
+            tool.name for tool in chains.get("all_tools", [])
+            if (getattr(tool, "metadata", None) or {}).get("deferred_arguments")
+        ]
+        if deferred_names:
+            pi_suggest_steps += (
+                "\nDeferred execution tools: " + ", ".join(deferred_names) + ". "
+                "For these steps leave tool_input as an empty object and describe the "
+                "implementation or selection in task_description. The MLS generates "
+                "full typed arguments during execution after inspecting upstream evidence. "
+                "Do not put model source code or placeholder hashes in the plan. "
+                "Call artifact-writing tools only once per required output."
+            )
     cb_planner_inputs = {
         "pi_report": pi_report,
         "pi_suggest_steps": pi_suggest_steps,
@@ -258,12 +286,14 @@ async def _plan_node_impl(state: AgentState, config: RunnableConfig):
             continue
         _tool_input = _normalize_tool_input(p.get("tool_input") or p.get("input"))
         _tool_input = _sanitize_dependency_tokens(_tool_input, step_no=i + 1, tool_name=tname.strip())
-        normalized_plan.append({
-            "step": _normalize_step_number(p.get("step"), i + 1),
-            "task_description": p.get("task_description") or p.get("task") or "",
-            "tool_name": tname.strip(),
-            "tool_input": _tool_input,
-        })
+        normalized_plan.append(
+            {
+                "step": _normalize_step_number(p.get("step"), i + 1),
+                "task_description": p.get("task_description") or p.get("task") or "",
+                "tool_name": tname.strip(),
+                "tool_input": _tool_input,
+            }
+        )
     _logger.info(
         "CB plan normalization: kept=%d dropped_non_dict=%d dropped_no_tool=%d dropped_pi_search=%d available_tools=%s",
         len(normalized_plan),
@@ -279,39 +309,40 @@ async def _plan_node_impl(state: AgentState, config: RunnableConfig):
     # those will otherwise fail Pydantic validation at execute time. Keep
     # partially-parameterized steps so MLS debug can still recover them.
     normalized_plan, dropped_unparam = _filter_unparameterized_steps(
-        normalized_plan, chains.get("all_tools"), ui_lang
+        normalized_plan,
+        chains.get("all_tools"),
+        ui_lang,
+        allow_deferred_arguments=callable(chains.get("materialize_tool_arguments")),
     )
     if dropped_unparam:
         for step_no, tool_name, reqs in dropped_unparam:
             _logger.warning(
                 "Dropped plan step %s (%s): tool_input empty but requires %s",
-                step_no, tool_name, reqs,
+                step_no,
+                tool_name,
+                reqs,
             )
         if ui_lang == "zh":
-            drop_lines = [
-                f"  - 第 {sn} 步 `{tn}` 缺少必填参数：{', '.join(reqs)}"
-                for sn, tn, reqs in dropped_unparam
-            ]
+            drop_lines = [f"  - 第 {sn} 步 `{tn}` 缺少必填参数：{', '.join(reqs)}" for sn, tn, reqs in dropped_unparam]
             drop_msg = (
                 "⚠️ 已自动跳过以下计划步骤（参数为空但工具需要必填项）：\n"
                 + "\n".join(drop_lines)
                 + "\n建议重新生成 plan 或手动编辑。"
             )
         else:
-            drop_lines = [
-                f"  - Step {sn} `{tn}` requires: {', '.join(reqs)}"
-                for sn, tn, reqs in dropped_unparam
-            ]
+            drop_lines = [f"  - Step {sn} `{tn}` requires: {', '.join(reqs)}" for sn, tn, reqs in dropped_unparam]
             drop_msg = (
                 "⚠️ Auto-dropped plan steps (empty params but tool requires inputs):\n"
                 + "\n".join(drop_lines)
                 + "\nConsider rerunning the plan or editing manually."
             )
-        history.append({
-            "role": "assistant",
-            "content": drop_msg,
-            "role_id": "computational_biologist",
-        })
+        history.append(
+            {
+                "role": "assistant",
+                "content": drop_msg,
+                "role_id": "computational_biologist",
+            }
+        )
 
     if not normalized_plan:
         # Safety fallback: CB planner produced no usable steps (typically because
@@ -322,18 +353,20 @@ async def _plan_node_impl(state: AgentState, config: RunnableConfig):
             "⚠️ **规划失败**：模型未能生成可执行的工具计划（可能因为请求超时或输出格式异常）。"
             "请尝试：(1) 用更具体的描述重试；(2) 切换更稳定的模型；(3) 拆分为更小的子任务。"
             "**注意**：当前无法执行任何工具，下面没有真实结果。"
-            if ui_lang == "zh" else
-            "⚠️ **Planning failed**: the model did not produce an executable tool plan "
+            if ui_lang == "zh"
+            else "⚠️ **Planning failed**: the model did not produce an executable tool plan "
             "(possibly due to a request timeout or malformed output). Try: (1) rephrasing "
             "more specifically; (2) switching to a more stable model; (3) breaking the task "
             "into smaller subtasks. **Note**: no tools were executed; there are no real "
             "results to show."
         )
-        history.append({
-            "role": "assistant",
-            "content": failure_msg,
-            "role_id": "computational_biologist",
-        })
+        history.append(
+            {
+                "role": "assistant",
+                "content": failure_msg,
+                "role_id": "computational_biologist",
+            }
+        )
         return {
             "plan": [],
             "history": history,
@@ -343,10 +376,7 @@ async def _plan_node_impl(state: AgentState, config: RunnableConfig):
 
     # Intro streams first; step chips/rows reveal progressively in PlanEditor.
     if ui_lang == "zh":
-        plan_text = (
-            f"📋 **Computational Biologist** 已制定 {len(normalized_plan)} 步执行计划，"
-            "请确认或编辑后再执行："
-        )
+        plan_text = f"📋 **Computational Biologist** 已制定 {len(normalized_plan)} 步执行计划，请确认或编辑后再执行："
     else:
         plan_text = (
             f"📋 **Computational Biologist** has designed a {len(normalized_plan)}-step "
@@ -364,12 +394,14 @@ async def _plan_node_impl(state: AgentState, config: RunnableConfig):
 
     await _stream_text(plan_text, role_id="computational_biologist")
     history.append({"role": "assistant", "content": plan_text, "role_id": "computational_biologist"})
-    log_entries.append({
-        "role": "assistant",
-        "content": plan_text,
-        "role_id": "computational_biologist",
-        "timestamp": datetime.now().isoformat(),
-    })
+    log_entries.append(
+        {
+            "role": "assistant",
+            "content": plan_text,
+            "role_id": "computational_biologist",
+            "timestamp": datetime.now().isoformat(),
+        }
+    )
 
     return {
         "plan": normalized_plan,

@@ -112,9 +112,16 @@ async def research_search_node(state: AgentState, config: RunnableConfig):
     if search_idx < len(queries):
         sq = queries[search_idx]
         # Lighter fan-out for Expert UX: fewer sources, less timeline noise.
-        search_results_list, search_logged = await asyncio.to_thread(
-            _run_section_search, sq, None, "lite"
-        )
+        chains = config.get("configurable", {}).get("chains", {})
+        research_search_runner = chains.get("research_search_runner")
+        if research_search_runner is not None:
+            # Research harnesses may supply a restricted evidence provider.
+            # Never fall back to global search tools after an injected failure.
+            search_results_list, search_logged = await research_search_runner(sq)
+        else:
+            search_results_list, search_logged = await asyncio.to_thread(
+                _run_section_search, sq, None, "lite"
+            )
         current_search_results.extend(search_results_list)
 
         # Record in protein_ctx only — do NOT push into chat tool_executions

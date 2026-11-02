@@ -75,5 +75,5 @@ PyMOL runs locally; no network. Typical render is 5-30 seconds per structure. De
 ## References
 
 - `references/PYMOL_REFERENCE.md` — selection syntax, common commands, gotchas (copied verbatim from google-deepmind/science-skills).
-- `references/RECIPES.md` — 15+ copy-paste PyMOL recipes for advanced visualizations beyond what the two exposed tools cover. Useful when the user wants something custom — produce a one-off script via the lower-level `run_pymol_script` (in `src/tools/visualize/pymol/pymol_runner.py`) and run it from the agent's code-execution tool.
+- `references/RECIPES.md` — 15+ copy-paste PyMOL recipes for advanced visualizations beyond what the two exposed tools cover. Useful when the user wants something custom — produce a one-off script via the lower-level `run_pymol_script` (in `mcp_tools/tools/visualize/pymol/pymol_runner.py`) and run it from the agent's code-execution tool.
 - [PyMOL open-source homepage](https://github.com/schrodinger/pymol-open-source) / [PyMOL wiki](https://pymolwiki.org/)

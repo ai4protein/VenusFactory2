@@ -311,29 +311,29 @@ plt.savefig('analysis.png', dpi=300, bbox_inches='tight')
 
 ## Project Tools (VenusFactory2)
 
-Helper modules live in **`src/tools/visualize/matplotlib/`**. Run from project root (or with `PYTHONPATH` set):
+Helper modules live in **`mcp_tools/tools/visualize/matplotlib/`**. Run from project root (or with `PYTHONPATH` set):
 
 | Module | Purpose | Usage |
 |--------|---------|--------|
-| **plot_template.py** | Template for line, scatter, bar, histogram, heatmap, contour, box, violin, 3D; single or combined figure | `python -m src.tools.visualize.matplotlib.plot_template [--plot-type TYPE] [--style STYLE] [--output FILE]` |
-| **style_configurator.py** | Style presets (publication, presentation, web, dark, minimal), preview, save .mplstyle, interactive mode | `python -m src.tools.visualize.matplotlib.style_configurator --preset publication [--output FILE] [--preview]` |
+| **plot_template.py** | Template for line, scatter, bar, histogram, heatmap, contour, box, violin, 3D; single or combined figure | `python -m mcp_tools.tools.visualize.matplotlib.plot_template [--plot-type TYPE] [--style STYLE] [--output FILE]` |
+| **style_configurator.py** | Style presets (publication, presentation, web, dark, minimal), preview, save .mplstyle, interactive mode | `python -m mcp_tools.tools.visualize.matplotlib.style_configurator --preset publication [--output FILE] [--preview]` |
 
 **Examples:**
 ```bash
 # Single plot type
-python -m src.tools.visualize.matplotlib.plot_template --plot-type line --output line.png
+python -m mcp_tools.tools.visualize.matplotlib.plot_template --plot-type line --output line.png
 
 # All plot types in one figure
-python -m src.tools.visualize.matplotlib.plot_template --plot-type all --style seaborn-v0_8-whitegrid
+python -m mcp_tools.tools.visualize.matplotlib.plot_template --plot-type all --style seaborn-v0_8-whitegrid
 
 # List style presets and built-in styles
-python -m src.tools.visualize.matplotlib.style_configurator --list
+python -m mcp_tools.tools.visualize.matplotlib.style_configurator --list
 
 # Preview and save a preset
-python -m src.tools.visualize.matplotlib.style_configurator --preset publication --output my_style.mplstyle --preview
+python -m mcp_tools.tools.visualize.matplotlib.style_configurator --preset publication --output my_style.mplstyle --preview
 
 # Interactive style customization
-python -m src.tools.visualize.matplotlib.style_configurator --interactive
+python -m mcp_tools.tools.visualize.matplotlib.style_configurator --interactive
 ```
 
 **Import in code:** use `set_publication_style()` and plot builders from `plot_template`, or `STYLE_PRESETS` / `create_style_preview()` from `style_configurator`, by adding `src` to path and importing the modules.

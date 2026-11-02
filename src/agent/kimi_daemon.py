@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import os
 import signal
+import sys
 from pathlib import Path
 from typing import Optional
 
@@ -21,7 +22,7 @@ from logger import get_logger
 
 _logger = get_logger("agent.kimi_daemon")
 
-DEFAULT_KIMI_BIN = "/home/tanyang/.kimi-code/bin/kimi"
+DEFAULT_KIMI_BIN = str(Path.home() / ".kimi-code/bin/kimi")
 DEFAULT_PORT = 58627
 
 
@@ -75,16 +76,12 @@ class KimiDaemon:
                "--port", str(kimi_port()),
                "--foreground",
                "--log-level", os.environ.get("KIMI_LOG_LEVEL", "info")]
-        # When kimi shells out (Bash tool, scripts), the spawned shell uses
-        # PATH to resolve `python`/`pip`. On this host /opt/ADFRsuite/bin
-        # ships first and points at a broken Python 2.7, so `import Bio` /
-        # `from pymol import cmd` fail. Prepend our agent conda env so kimi
-        # picks up the working interpreter that already has BioPython and
-        # pymol-open-source installed. Override via KIMI_RUNTIME_PYTHON_BIN.
+        # Prefer the service interpreter; administrators can select a separate
+        # installed runtime with KIMI_RUNTIME_PYTHON_BIN.
         env = os.environ.copy()
         runtime_bin = os.environ.get(
             "KIMI_RUNTIME_PYTHON_BIN",
-            "/home/tanyang/miniconda3/envs/agent/bin",
+            str(Path(sys.executable).resolve().parent),
         )
         if runtime_bin and Path(runtime_bin).is_dir():
             env["PATH"] = runtime_bin + os.pathsep + env.get("PATH", "")

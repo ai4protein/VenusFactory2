@@ -1,0 +1,21 @@
+{
+  "mode": "science_expert",
+  "harness": "langgraph",
+  "model": {
+    "provider": "dmx",
+    "model": "glm-5.1",
+    "base_url": "https://www.dmxapi.cn/v1",
+    "protocol": "chat_completions",
+    "credential_env": "VENUS_RESEARCH_API_KEY",
+    "context_tokens": 131072
+  },
+  "budget": {
+    "wall_seconds": 900,
+    "request_seconds": 300,
+    "model_calls": 24,
+    "tool_calls": 12,
+    "output_tokens": 12288,
+    "temperature": 0.1,
+    "thinking": "enabled"
+  }
+}

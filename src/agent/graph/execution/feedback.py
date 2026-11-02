@@ -32,7 +32,7 @@ from agent.chat_agent_utils import (
 from agent.graph.execution.artifacts import schedule_upload
 from agent.graph.execution.context import ExecutionContext
 from agent.hooks import ToolResultInfo
-from web.utils.common_utils import to_project_relative_path
+from mcp_tools.common.common_utils import to_project_relative_path
 
 _logger = get_logger("agent.graph")
 

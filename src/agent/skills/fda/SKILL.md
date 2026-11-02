@@ -12,7 +12,7 @@ metadata:
 
 ## Overview
 
-**Hub tool:** `query_fda` — drug label search with adverse-event fallback (see `FdaDrugLabelSearchInput`). Broader openFDA categories (devices, foods, 510k, …) use `FDAQuery` via **`agent_generated_code`** and modules under `src/tools/search/deepsearch/fda/` (or legacy `references/`).
+**Hub tool:** `query_fda` — drug label search with adverse-event fallback (see `FdaDrugLabelSearchInput`). This tool does not cover every openFDA category. Use registered search/download tools for additional public evidence, then analyze downloaded files in the session sandbox.
 
 ## Project Tools (VenusFactory2)
 
@@ -23,8 +23,8 @@ metadata:
 ## Workflow
 
 1. Quick drug question → `query_fda`
-2. Devices / foods / recalls / 510k → load `references/devices.md` (etc.) + `agent_generated_code` with `FDAQuery`
-3. Set `OPENFDA_API_KEY` when available to raise rate limits
+2. Devices / foods / recalls / 510k → inspect the relevant reference, then search available tools; report unsupported structured queries rather than inventing a callable API.
+3. API credentials are managed by the server. Do not put credentials into analysis source or session files.
 
 ## When NOT to use
 
@@ -45,3 +45,6 @@ read_skill(skill_id="fda", relative_path="references/legacy_guide.md")
 ```
 
 Load legacy only after the hub workflow in this file is insufficient.
+
+### Session execution
+Use `write_session_file(path, content)` to write actual Python source and `run_session_python(path)` to execute it. Paths are relative to the server-assigned session workspace. Installed Python packages are available; repository source paths in this guide are host implementation references, not guest imports. Networking uses registered database/search/download tools; the analysis sandbox has no network access. Verify exit_code and actual output files.

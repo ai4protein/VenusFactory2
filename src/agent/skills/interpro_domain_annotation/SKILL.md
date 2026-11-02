@@ -12,7 +12,7 @@ metadata:
 
 ## Overview
 
-Retrieves InterPro entry metadata, UniProt-linked annotations, and protein lists. Prefer these hub tools over ad-hoc HTTP in `agent_generated_code`.
+Retrieves InterPro entry metadata, UniProt-linked annotations, and protein lists. Prefer these hub tools over ad-hoc HTTP in `write_session_file` then `run_session_python`.
 
 ## Project Tools (VenusFactory2)
 
@@ -35,3 +35,6 @@ Retrieves InterPro entry metadata, UniProt-linked annotations, and protein lists
 
 - Treating InterPro ids as UniProt accessions.
 - Editing conserved catalytic residues without reading annotation evidence.
+
+### Session execution
+Use `write_session_file(path, content)` to write actual Python source and `run_session_python(path)` to execute it. Paths are relative to the server-assigned session workspace. Installed Python packages are available; repository source paths in this guide are host implementation references, not guest imports. Networking uses registered database/search/download tools; the analysis sandbox has no network access. Verify exit_code and actual output files.

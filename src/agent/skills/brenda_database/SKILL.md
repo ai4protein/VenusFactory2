@@ -26,7 +26,7 @@ Agent exposes **download-only** tools that write JSON/CSV to disk. Configure `BR
 | **download_brenda_kinetic_data_by_ec_number** | `ec_number`, `out_path`, `format` | Kinetic export |
 | **download_brenda_pathway_report** | `pathway` (dict), `out_path` | Pathway report file |
 
-Returns rich JSON with `status` + `file_info` (not `{success, file_path}`). Tools live in `src/tools/database/tools_agent.py`.
+Returns rich JSON with `status` + `file_info` (not `{success, file_path}`). Tools live in `mcp_tools/tools/database/tools_agent.py`.
 
 ## Workflow
 

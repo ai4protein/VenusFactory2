@@ -46,6 +46,19 @@ class VerifyResult:
     failure_type: str = "unknown"
 
 
+def _trusted_result_check(ctx, raw_output):
+    validator = (getattr(getattr(ctx, "tool", None), "metadata", None) or {}).get("result_validator")
+    if validator is None:
+        return None
+    try:
+        validator(raw_output)
+    except Exception as exc:
+        reason = "Trusted tool result contract failed: " + type(exc).__name__
+        return VerifyResult(ok=False, raw_output=json.dumps({"status": "error", "error": reason}),
+                            failure_reason=reason, failure_type="result_contract")
+    return VerifyResult(ok=True)
+
+
 def _tool_self_reports_success(raw_output: Any) -> bool:
     """Return True when the tool's own payload looks substantively successful.
 
@@ -185,6 +198,10 @@ async def run_mls_post_check(
     non-empty content, skip the MLS LLM verifier entirely (no debug agent).
     Real failures still run the full verifier + retry/debug path.
     """
+    trusted = _trusted_result_check(ctx, raw_output)
+    if trusted is not None:
+        return trusted
+
     # Skip expensive MLS LLM round-trip when the tool already succeeded.
     if _should_skip_dual_verify(raw_output, ctx.tool_name):
         _logger.debug(
@@ -341,6 +358,10 @@ async def run_cb_post_check(
     Fast path: skip the CB LLM call when the tool already reports success with
     a non-empty artifact.
     """
+    trusted = _trusted_result_check(ctx, raw_output)
+    if trusted is not None:
+        return trusted
+
     if not ctx.chains.get("llm"):
         return VerifyResult(ok=True)
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import re
+from pathlib import Path
 
 from langchain_core.runnables import RunnableConfig
 
@@ -322,7 +323,7 @@ async def finalize_node(state: AgentState, config: RunnableConfig):
                 if not os.path.isabs(abs_p):
                     abs_p = abs_p.lstrip("./")
                     # try project root prefix
-                    pr = "/inspire/hdd/global_user/tanyang-253108120165/workspace/research/VenusFactory"
+                    pr = str(Path(__file__).resolve().parents[3])
                     cand = os.path.join(pr, abs_p)
                     if os.path.exists(cand):
                         abs_p = cand
@@ -473,6 +474,15 @@ async def finalize_node(state: AgentState, config: RunnableConfig):
         "数据与代码可用性 → 参考文献。"
         "不要写成 800–1500 词的短总结。保留图表嵌入与适合 HTML/PDF 导出的 Markdown。"
     )
+    evidence_mode = chains.get("report_policy") == "evidence_summary"
+    if evidence_mode:
+        length_directive = (
+            "\n\nResearch evidence report: at most 350 words. State completed operations, "
+            "actual artifacts and training-only feedback, failures and missing evidence. "
+            "Do not add background claims, organism identities, citations, or independent "
+            "validation not present in the execution record. Short mutable-site strings "
+            "must not be described as full proteins. A candidate is not a validated model."
+        )
     full_run_record = full_run_record + length_directive
 
     if history and (
@@ -483,6 +493,7 @@ async def finalize_node(state: AgentState, config: RunnableConfig):
     ):
         history.pop()
 
+    finalizer_succeeded = False
     try:
         finalizer_inputs = {
             "input": user_input,
@@ -500,14 +511,15 @@ async def finalize_node(state: AgentState, config: RunnableConfig):
         # Symptom: short word count AND missing manuscript section headers.
         # When detected, retry once via direct chain.invoke (no stream) which
         # is more resilient to one-shot LLM timeouts than token streaming.
-        summary = await _maybe_retry_truncated_summary(
-            summary,
-            chains.get("finalizer"),
-            finalizer_inputs,
-            tool_executions,
-            ui_lang,
-            short_mode=short_mode,
-        )
+        if not evidence_mode:
+            summary = await _maybe_retry_truncated_summary(
+                summary,
+                chains.get("finalizer"),
+                finalizer_inputs,
+                tool_executions,
+                ui_lang,
+                short_mode=short_mode,
+            )
         # Q1: deterministically force-embed any figures the SC LLM forgot.
         # We can't rely on the LLM to follow the "MANDATORY inline image"
         # rule (multiple runs proved it skips ≥50% of inventoried figures).
@@ -515,6 +527,7 @@ async def finalize_node(state: AgentState, config: RunnableConfig):
         # append a "## Figures (auto-embedded)" section at the end with
         # one image per missing figure and a short caption.
         summary = _force_embed_missing_figures(summary, figure_artifacts, ui_lang)
+        finalizer_succeeded = bool(summary and summary.strip())
         history.append({"role": "assistant", "content": summary, "role_id": "scientific_critic"})
     except Exception as e:
         _logger.warning("Finalizer failed: %s", e)
@@ -556,4 +569,4 @@ async def finalize_node(state: AgentState, config: RunnableConfig):
         "content": _ui_text(ui_lang, "iteration_prompt"),
         "role_id": "scientific_critic",
     })
-    return {"history": history, "status": "waiting_for_iteration", "waiting_for": "iteration"}
+    return {"history": history, "status": "waiting_for_iteration", "waiting_for": "iteration", "finalizer_succeeded": finalizer_succeeded}

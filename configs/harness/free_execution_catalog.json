@@ -1,0 +1,548 @@
+{
+  "models": [
+    {
+      "id": "dmx-u2-free",
+      "label": "Unisound U2 Flash · DMXAPI Free",
+      "binding": {
+        "provider": "dmx",
+        "model": "unisound-u2-flash",
+        "base_url": "https://www.dmxapi.cn/v1",
+        "protocol": "chat_completions",
+        "credential_env": "DMXAPI_API_KEY",
+        "context_tokens": 1000000
+      },
+      "inference_controls": {
+        "thinking": "disabled",
+        "temperature": 0.2
+      },
+      "pricing": {
+        "input_per_million": 0,
+        "output_per_million": 0
+      },
+      "enabled": true,
+      "max_output_tokens": 131072,
+      "protocols": [
+        "chat_completions"
+      ]
+    },
+    {
+      "id": "dmx-glm4-free",
+      "label": "GLM 4 Flash · DMXAPI Free",
+      "binding": {
+        "provider": "dmx",
+        "model": "glm-4-flash",
+        "base_url": "https://www.dmxapi.cn/v1",
+        "protocol": "chat_completions",
+        "credential_env": "DMXAPI_API_KEY",
+        "context_tokens": 128000
+      },
+      "inference_controls": {
+        "thinking": "disabled",
+        "temperature": 0.2
+      },
+      "pricing": {
+        "input_per_million": 0,
+        "output_per_million": 0
+      },
+      "enabled": true,
+      "max_output_tokens": 4096,
+      "protocols": [
+        "chat_completions"
+      ]
+    },
+    {
+      "id": "or-nvidia-nemotron-3-5-lightning-free",
+      "label": "NVIDIA: Nemotron 3.5 Lightning · OpenRouter Free",
+      "binding": {
+        "provider": "openrouter",
+        "model": "nvidia/nemotron-3.5-lightning:free",
+        "base_url": "https://openrouter.ai/api/v1",
+        "protocol": "chat_completions",
+        "credential_env": "OPENROUTER_API_KEY",
+        "context_tokens": 1000000
+      },
+      "inference_controls": {
+        "thinking": "disabled",
+        "temperature": 0.2
+      },
+      "pricing": {
+        "input_per_million": 0,
+        "output_per_million": 0
+      },
+      "enabled": true,
+      "max_output_tokens": 12288,
+      "protocols": [
+        "chat_completions",
+        "responses"
+      ]
+    },
+    {
+      "id": "or-recursive-flint-v1-0-free",
+      "label": "Recursive: Flint · OpenRouter Free",
+      "binding": {
+        "provider": "openrouter",
+        "model": "recursive/flint-v1.0:free",
+        "base_url": "https://openrouter.ai/api/v1",
+        "protocol": "chat_completions",
+        "credential_env": "OPENROUTER_API_KEY",
+        "context_tokens": 262144
+      },
+      "inference_controls": {
+        "thinking": "disabled",
+        "temperature": 0.2
+      },
+      "pricing": {
+        "input_per_million": 0,
+        "output_per_million": 0
+      },
+      "enabled": true,
+      "max_output_tokens": 12288,
+      "protocols": [
+        "chat_completions",
+        "responses"
+      ]
+    },
+    {
+      "id": "or-xingchen-agi-xing4-0-29b-a4b-free",
+      "label": "XingChen: Xing4.0 29B A4B · OpenRouter Free",
+      "binding": {
+        "provider": "openrouter",
+        "model": "xingchen-agi/xing4.0-29b-a4b:free",
+        "base_url": "https://openrouter.ai/api/v1",
+        "protocol": "chat_completions",
+        "credential_env": "OPENROUTER_API_KEY",
+        "context_tokens": 262144
+      },
+      "inference_controls": {
+        "thinking": "disabled",
+        "temperature": 0.2
+      },
+      "pricing": {
+        "input_per_million": 0,
+        "output_per_million": 0
+      },
+      "enabled": true,
+      "max_output_tokens": 12288,
+      "protocols": [
+        "chat_completions",
+        "responses"
+      ]
+    },
+    {
+      "id": "or-nvidia-nemotron-3-5-super-vl-free",
+      "label": "NVIDIA: Nemotron 3.5 Super VL · OpenRouter Free",
+      "binding": {
+        "provider": "openrouter",
+        "model": "nvidia/nemotron-3.5-super-vl:free",
+        "base_url": "https://openrouter.ai/api/v1",
+        "protocol": "chat_completions",
+        "credential_env": "OPENROUTER_API_KEY",
+        "context_tokens": 1000000
+      },
+      "inference_controls": {
+        "thinking": "disabled",
+        "temperature": 0.2
+      },
+      "pricing": {
+        "input_per_million": 0,
+        "output_per_million": 0
+      },
+      "enabled": true,
+      "max_output_tokens": 12288,
+      "protocols": [
+        "chat_completions",
+        "responses"
+      ]
+    },
+    {
+      "id": "or-dots-studio-dots-3-note-preview-free",
+      "label": "Dots Studio: Dots3-Note Preview · OpenRouter Free",
+      "binding": {
+        "provider": "openrouter",
+        "model": "dots-studio/dots-3-note-preview:free",
+        "base_url": "https://openrouter.ai/api/v1",
+        "protocol": "chat_completions",
+        "credential_env": "OPENROUTER_API_KEY",
+        "context_tokens": 512000
+      },
+      "inference_controls": {
+        "thinking": "disabled",
+        "temperature": 0.2
+      },
+      "pricing": {
+        "input_per_million": 0,
+        "output_per_million": 0
+      },
+      "enabled": true,
+      "max_output_tokens": 12288,
+      "protocols": [
+        "chat_completions",
+        "responses"
+      ]
+    },
+    {
+      "id": "or-liquid-lfm-2-5-2-6b-free",
+      "label": "LiquidAI: LFM2.5-2.6B · OpenRouter Free",
+      "binding": {
+        "provider": "openrouter",
+        "model": "liquid/lfm-2.5-2.6b:free",
+        "base_url": "https://openrouter.ai/api/v1",
+        "protocol": "chat_completions",
+        "credential_env": "OPENROUTER_API_KEY",
+        "context_tokens": 65536
+      },
+      "inference_controls": {
+        "thinking": "disabled",
+        "temperature": 0.2
+      },
+      "pricing": {
+        "input_per_million": 0,
+        "output_per_million": 0
+      },
+      "enabled": true,
+      "max_output_tokens": 12288,
+      "protocols": [
+        "chat_completions",
+        "responses"
+      ]
+    },
+    {
+      "id": "or-thinkingmachines-inkling-small-free",
+      "label": "Thinking Machines: Inkling Small · OpenRouter Free",
+      "binding": {
+        "provider": "openrouter",
+        "model": "thinkingmachines/inkling-small:free",
+        "base_url": "https://openrouter.ai/api/v1",
+        "protocol": "chat_completions",
+        "credential_env": "OPENROUTER_API_KEY",
+        "context_tokens": 1048576
+      },
+      "inference_controls": {
+        "thinking": "disabled",
+        "temperature": 0.2
+      },
+      "pricing": {
+        "input_per_million": 0,
+        "output_per_million": 0
+      },
+      "enabled": true,
+      "max_output_tokens": 12288,
+      "protocols": [
+        "chat_completions",
+        "responses"
+      ]
+    },
+    {
+      "id": "or-poolside-laguna-s-2-1-free",
+      "label": "Poolside: Laguna S 2.1 · OpenRouter Free",
+      "binding": {
+        "provider": "openrouter",
+        "model": "poolside/laguna-s-2.1:free",
+        "base_url": "https://openrouter.ai/api/v1",
+        "protocol": "chat_completions",
+        "credential_env": "OPENROUTER_API_KEY",
+        "context_tokens": 262144
+      },
+      "inference_controls": {
+        "thinking": "disabled",
+        "temperature": 0.2
+      },
+      "pricing": {
+        "input_per_million": 0,
+        "output_per_million": 0
+      },
+      "enabled": true,
+      "max_output_tokens": 12288,
+      "protocols": [
+        "chat_completions",
+        "responses"
+      ]
+    },
+    {
+      "id": "or-thinkingmachines-inkling-free",
+      "label": "Thinking Machines: Inkling · OpenRouter Free",
+      "binding": {
+        "provider": "openrouter",
+        "model": "thinkingmachines/inkling:free",
+        "base_url": "https://openrouter.ai/api/v1",
+        "protocol": "chat_completions",
+        "credential_env": "OPENROUTER_API_KEY",
+        "context_tokens": 1048576
+      },
+      "inference_controls": {
+        "thinking": "disabled",
+        "temperature": 0.2
+      },
+      "pricing": {
+        "input_per_million": 0,
+        "output_per_million": 0
+      },
+      "enabled": true,
+      "max_output_tokens": 12288,
+      "protocols": [
+        "chat_completions",
+        "responses"
+      ]
+    },
+    {
+      "id": "or-poolside-laguna-xs-2-1-free",
+      "label": "Poolside: Laguna XS 2.1 · OpenRouter Free",
+      "binding": {
+        "provider": "openrouter",
+        "model": "poolside/laguna-xs-2.1:free",
+        "base_url": "https://openrouter.ai/api/v1",
+        "protocol": "chat_completions",
+        "credential_env": "OPENROUTER_API_KEY",
+        "context_tokens": 262144
+      },
+      "inference_controls": {
+        "thinking": "disabled",
+        "temperature": 0.2
+      },
+      "pricing": {
+        "input_per_million": 0,
+        "output_per_million": 0
+      },
+      "enabled": true,
+      "max_output_tokens": 12288,
+      "protocols": [
+        "chat_completions",
+        "responses"
+      ]
+    },
+    {
+      "id": "or-cohere-north-mini-code-free",
+      "label": "Cohere: North Mini Code · OpenRouter Free",
+      "binding": {
+        "provider": "openrouter",
+        "model": "cohere/north-mini-code:free",
+        "base_url": "https://openrouter.ai/api/v1",
+        "protocol": "chat_completions",
+        "credential_env": "OPENROUTER_API_KEY",
+        "context_tokens": 256000
+      },
+      "inference_controls": {
+        "thinking": "disabled",
+        "temperature": 0.2
+      },
+      "pricing": {
+        "input_per_million": 0,
+        "output_per_million": 0
+      },
+      "enabled": true,
+      "max_output_tokens": 12288,
+      "protocols": [
+        "chat_completions",
+        "responses"
+      ]
+    },
+    {
+      "id": "or-nvidia-nemotron-3-ultra-550b-a55b-free",
+      "label": "NVIDIA: Nemotron 3 Ultra · OpenRouter Free",
+      "binding": {
+        "provider": "openrouter",
+        "model": "nvidia/nemotron-3-ultra-550b-a55b:free",
+        "base_url": "https://openrouter.ai/api/v1",
+        "protocol": "chat_completions",
+        "credential_env": "OPENROUTER_API_KEY",
+        "context_tokens": 1000000
+      },
+      "inference_controls": {
+        "thinking": "disabled",
+        "temperature": 0.2
+      },
+      "pricing": {
+        "input_per_million": 0,
+        "output_per_million": 0
+      },
+      "enabled": true,
+      "max_output_tokens": 12288,
+      "protocols": [
+        "chat_completions",
+        "responses"
+      ]
+    },
+    {
+      "id": "or-nvidia-nemotron-3-nano-omni-30b-a3b-reasoning-free",
+      "label": "NVIDIA: Nemotron 3 Nano Omni · OpenRouter Free",
+      "binding": {
+        "provider": "openrouter",
+        "model": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+        "base_url": "https://openrouter.ai/api/v1",
+        "protocol": "chat_completions",
+        "credential_env": "OPENROUTER_API_KEY",
+        "context_tokens": 256000
+      },
+      "inference_controls": {
+        "thinking": "disabled",
+        "temperature": 0.2
+      },
+      "pricing": {
+        "input_per_million": 0,
+        "output_per_million": 0
+      },
+      "enabled": true,
+      "max_output_tokens": 12288,
+      "protocols": [
+        "chat_completions",
+        "responses"
+      ]
+    },
+    {
+      "id": "or-google-gemma-4-26b-a4b-it-free",
+      "label": "Google: Gemma 4 26B A4B · OpenRouter Free",
+      "binding": {
+        "provider": "openrouter",
+        "model": "google/gemma-4-26b-a4b-it:free",
+        "base_url": "https://openrouter.ai/api/v1",
+        "protocol": "chat_completions",
+        "credential_env": "OPENROUTER_API_KEY",
+        "context_tokens": 262144
+      },
+      "inference_controls": {
+        "thinking": "disabled",
+        "temperature": 0.2
+      },
+      "pricing": {
+        "input_per_million": 0,
+        "output_per_million": 0
+      },
+      "enabled": true,
+      "max_output_tokens": 12288,
+      "protocols": [
+        "chat_completions",
+        "responses"
+      ]
+    },
+    {
+      "id": "or-google-gemma-4-31b-it-free",
+      "label": "Google: Gemma 4 31B · OpenRouter Free",
+      "binding": {
+        "provider": "openrouter",
+        "model": "google/gemma-4-31b-it:free",
+        "base_url": "https://openrouter.ai/api/v1",
+        "protocol": "chat_completions",
+        "credential_env": "OPENROUTER_API_KEY",
+        "context_tokens": 262144
+      },
+      "inference_controls": {
+        "thinking": "disabled",
+        "temperature": 0.2
+      },
+      "pricing": {
+        "input_per_million": 0,
+        "output_per_million": 0
+      },
+      "enabled": true,
+      "max_output_tokens": 12288,
+      "protocols": [
+        "chat_completions",
+        "responses"
+      ]
+    },
+    {
+      "id": "openai-official",
+      "label": "GPT-4o · OpenAI",
+      "binding": {
+        "provider": "openai",
+        "model": "gpt-4o",
+        "base_url": "https://api.openai.com/v1",
+        "credential_env": "OPENAI_API_KEY"
+      },
+      "inference_controls": {
+        "thinking": "disabled",
+        "temperature": 0.2
+      },
+      "pricing": null,
+      "enabled": true,
+      "max_output_tokens": 12288,
+      "protocols": [
+        "chat_completions"
+      ]
+    },
+    {
+      "id": "deepseek-official",
+      "label": "DeepSeek V4 Flash",
+      "binding": {
+        "provider": "deepseek",
+        "model": "deepseek-v4-flash",
+        "base_url": "https://api.deepseek.com/v1",
+        "credential_env": "DEEPSEEK_API_KEY"
+      },
+      "inference_controls": {
+        "thinking": "disabled",
+        "temperature": 0.2
+      },
+      "pricing": null,
+      "enabled": true,
+      "max_output_tokens": 12288,
+      "protocols": [
+        "chat_completions"
+      ]
+    },
+    {
+      "id": "google-official",
+      "label": "Gemini 2.5 Pro",
+      "binding": {
+        "provider": "google",
+        "model": "gemini-2.5-pro",
+        "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+        "credential_env": "GEMINI_API_KEY"
+      },
+      "inference_controls": {
+        "thinking": "disabled",
+        "temperature": 0.2
+      },
+      "pricing": null,
+      "enabled": true,
+      "max_output_tokens": 12288,
+      "protocols": [
+        "chat_completions"
+      ]
+    },
+    {
+      "id": "alibaba-official",
+      "label": "Qwen Plus",
+      "binding": {
+        "provider": "alibaba",
+        "model": "qwen-plus",
+        "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "credential_env": "DASHSCOPE_API_KEY"
+      },
+      "inference_controls": {
+        "thinking": "disabled",
+        "temperature": 0.2
+      },
+      "pricing": null,
+      "enabled": true,
+      "max_output_tokens": 12288,
+      "protocols": [
+        "chat_completions"
+      ]
+    }
+  ],
+  "defaults": {
+    "science_agent": {
+      "harness": "deepseek-harness",
+      "model_id": "dmx-u2-free"
+    },
+    "science_expert": {
+      "harness": "expert-deepseek-harness",
+      "model_id": "dmx-u2-free"
+    }
+  },
+  "harnesses": {
+    "science_agent": [
+      "kimi-code",
+      "deepseek-harness",
+      "codex",
+      "claude-code"
+    ],
+    "science_expert": [
+      "expert-kimi-code",
+      "expert-deepseek-harness",
+      "expert-codex",
+      "expert-claude-code"
+    ]
+  }
+}

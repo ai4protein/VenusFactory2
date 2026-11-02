@@ -406,7 +406,7 @@ def _enforce_skill_first_plan(
     if not skill_ids:
         return normalized_plan
 
-    code_tools = {"python_repl", "agent_generated_code"}
+    code_tools = {"run_session_python", "run_session_shell"}
     existing_steps = [p.get("step") for p in normalized_plan if isinstance(p.get("step"), int)]
     next_aux_step = (max(existing_steps) + 1) if existing_steps else 1
     enforced: list[dict[str, Any]] = []

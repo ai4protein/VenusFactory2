@@ -30,6 +30,7 @@ import os
 import shutil
 import signal
 import subprocess
+import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -169,7 +170,7 @@ def _pick_auto_spawn_mode() -> str:
         return "sandbox"
     if _bwrap_available():
         return "bwrap"
-    return "user"
+    raise SpawnError("An OS sandbox is required; host execution is unavailable")
 
 
 def resolve_spawn_mode() -> str:
@@ -186,28 +187,8 @@ def resolve_spawn_mode() -> str:
         _logger.warning("Unknown KIMI_ONLINE_SPAWN_MODE=%r; using auto", raw)
         mode = _pick_auto_spawn_mode()
 
-    if mode == "sandbox" and not _sandbox_available():
-        fallback = "bwrap" if _bwrap_available() else "user"
-        _logger.warning(
-            "KIMI_ONLINE_SPAWN_MODE=sandbox unavailable (no passwordless sudo); "
-            "falling back to %s",
-            fallback,
-        )
-        mode = fallback
-    if mode == "bwrap" and not _bwrap_available():
-        _logger.warning(
-            "KIMI_ONLINE_SPAWN_MODE=bwrap unavailable; falling back to user "
-            "(no OS isolation)"
-        )
-        mode = "user"
-
-    if mode == "user":
-        _logger.warning(
-            "kimi online spawn mode=user (no OS sandbox). "
-            "Prefer KIMI_ONLINE_SPAWN_MODE=bwrap or setup-online-mode.sh."
-        )
-    else:
-        _logger.info("kimi online spawn mode=%s", mode)
+    if mode == "user" or (mode == "sandbox" and not _sandbox_available()) or (mode == "bwrap" and not _bwrap_available()):
+        raise SpawnError("Configured sandbox is unavailable; host execution is refused")
     _resolved_spawn_mode = mode
     return mode
 
@@ -372,7 +353,7 @@ def _kimi_install_root(kimi_bin: str) -> Path:
 def _runtime_env_root() -> Optional[Path]:
     runtime_bin = os.environ.get(
         "KIMI_RUNTIME_PYTHON_BIN",
-        "/home/tanyang/miniconda3/envs/agent/bin",
+        str(Path(sys.executable).resolve().parent),
     )
     path = Path(runtime_bin).expanduser()
     if path.is_dir():
@@ -621,7 +602,7 @@ async def _wait_healthz(port: int, timeout: float = HEALTHZ_TIMEOUT_S) -> None:
 
 def _project_session_dir(session_id: str) -> str:
     """The host path we bind into /workspace inside the sandbox."""
-    root = Path(__file__).resolve().parent.parent.parent / "temp_outputs" / "web_v2" / "sessions"
+    root = Path(__file__).resolve().parent.parent.parent / "temp_outputs" / 'backend.web_v2' / "sessions"
     return str((root / session_id).resolve())
 
 
