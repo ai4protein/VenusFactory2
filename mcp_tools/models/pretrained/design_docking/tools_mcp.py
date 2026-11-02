@@ -1,0 +1,89 @@
+"""One explicit tool per upstream model, all using the shared runtime adapters."""
+from pathlib import Path
+import uuid
+from fastmcp import FastMCP
+from langchain_core.tools import StructuredTool
+from pydantic import BaseModel, ConfigDict, Field, create_model
+from mcp_tools.tools.runtime_tool_policy import assert_tool_call_allowed
+from mcp_tools.models.pretrained.design_docking.service import run, LigandParameters, AntibodyParameters, VinaParameters, BindCraftParameters, BoltzGenParameters, DiffDockParameters
+from utils.scoped_files import open_absolute, read_bytes, write_bytes
+
+mcp = FastMCP('VenusFactory Design and Docking')
+MODEL_TOOLS = {}
+
+def execute(model, structure_file, parameters, ligand_file=''):
+    name = MODEL_TOOLS[model]
+    assert_tool_call_allowed(name, {'parameters': parameters})
+    source = Path(structure_file)
+    with open_absolute(source, max_bytes=20*1024**2) as stream:
+        data = {'name': source.name, 'structure': stream.read().decode('utf-8')}
+    ligand = None
+    if ligand_file:
+        path = Path(ligand_file)
+        with open_absolute(path, max_bytes=20*1024**2) as stream:
+            ligand = {'name': path.name, 'structure': stream.read().decode('utf-8')}
+    class Inputs:
+        def owned(self, kind, identity, owner):
+            if kind != 'datasets' or identity != 'ligand' or ligand is None:
+                raise ValueError('Ligand input is missing')
+            return ligand
+    config = {'parameters': parameters}
+    if ligand is not None: config['ligand_dataset_id'] = 'ligand'
+    result = run(Inputs(), 'session', model, data, config)
+    # Place returned files next to the authorized input, preserving nested paths.
+    prefix = 'results/' + model + '_' + uuid.uuid4().hex
+    copied = []
+    for index, filename in enumerate(result.get('artifacts', [])):
+        artifact = Path(filename)
+        with open_absolute(artifact, max_bytes=100*1024**2) as stream:
+            content = stream.read()
+        relative = prefix + '/' + str(index) + '_' + artifact.name
+        write_bytes(source.parent, relative, content)
+        copied.append(str(source.parent / relative))
+    return {**result, 'artifacts': copied}
+
+def ligandmpnn_design(structure_file: str, parameters: LigandParameters, ligand_file: str = '') -> dict:
+    """Run ligandmpnn on an owned structure file through its configured runtime. Supply model-specific parameters; docking may also require ligand_file. Outputs include measured results and files. Heavy models are unavailable online. No arbitrary executable or checkpoint paths are accepted."""
+    return execute('ligandmpnn', structure_file, parameters.model_dump() if hasattr(parameters, 'model_dump') else parameters, ligand_file)
+
+MODEL_TOOLS['ligandmpnn'] = 'ligandmpnn_design'
+mcp.tool(name='ligandmpnn_design')(ligandmpnn_design)
+def antibmpnn_design(structure_file: str, parameters: AntibodyParameters, ligand_file: str = '') -> dict:
+    """Run antibmpnn on an owned structure file through its configured runtime. Supply model-specific parameters; docking may also require ligand_file. Outputs include measured results and files. Heavy models are unavailable online. No arbitrary executable or checkpoint paths are accepted."""
+    return execute('antibmpnn', structure_file, parameters.model_dump() if hasattr(parameters, 'model_dump') else parameters, ligand_file)
+
+MODEL_TOOLS['antibmpnn'] = 'antibmpnn_design'
+mcp.tool(name='antibmpnn_design')(antibmpnn_design)
+def vina_dock(structure_file: str, parameters: VinaParameters, ligand_file: str = '') -> dict:
+    """Run vina on an owned structure file through its configured runtime. Supply model-specific parameters; docking may also require ligand_file. Outputs include measured results and files. Heavy models are unavailable online. No arbitrary executable or checkpoint paths are accepted."""
+    return execute('vina', structure_file, parameters.model_dump() if hasattr(parameters, 'model_dump') else parameters, ligand_file)
+
+MODEL_TOOLS['vina'] = 'vina_dock'
+mcp.tool(name='vina_dock')(vina_dock)
+def bindcraft_design(structure_file: str, parameters: BindCraftParameters, ligand_file: str = '') -> dict:
+    """Run bindcraft on an owned structure file through its configured runtime. Supply model-specific parameters; docking may also require ligand_file. Outputs include measured results and files. Heavy models are unavailable online. No arbitrary executable or checkpoint paths are accepted."""
+    return execute('bindcraft', structure_file, parameters.model_dump() if hasattr(parameters, 'model_dump') else parameters, ligand_file)
+
+MODEL_TOOLS['bindcraft'] = 'bindcraft_design'
+mcp.tool(name='bindcraft_design')(bindcraft_design)
+def boltzgen_design(structure_file: str, parameters: BoltzGenParameters, ligand_file: str = '') -> dict:
+    """Run boltzgen on an owned structure file through its configured runtime. Supply model-specific parameters; docking may also require ligand_file. Outputs include measured results and files. Heavy models are unavailable online. No arbitrary executable or checkpoint paths are accepted."""
+    return execute('boltzgen', structure_file, parameters.model_dump() if hasattr(parameters, 'model_dump') else parameters, ligand_file)
+
+MODEL_TOOLS['boltzgen'] = 'boltzgen_design'
+mcp.tool(name='boltzgen_design')(boltzgen_design)
+def diffdock_dock(structure_file: str, parameters: DiffDockParameters, ligand_file: str = '') -> dict:
+    """Run diffdock on an owned structure file through its configured runtime. Supply model-specific parameters; docking may also require ligand_file. Outputs include measured results and files. Heavy models are unavailable online. No arbitrary executable or checkpoint paths are accepted."""
+    return execute('diffdock', structure_file, parameters.model_dump() if hasattr(parameters, 'model_dump') else parameters, ligand_file)
+
+MODEL_TOOLS['diffdock'] = 'diffdock_dock'
+mcp.tool(name='diffdock_dock')(diffdock_dock)
+
+EXTERNAL_TOOLS = [
+    StructuredTool.from_function(func=ligandmpnn_design, name='ligandmpnn_design', metadata={'tool_category': 'model_prediction', 'queue_resource': 'gpu', 'timeout_seconds': 3600}),
+    StructuredTool.from_function(func=antibmpnn_design, name='antibmpnn_design', metadata={'tool_category': 'model_prediction', 'queue_resource': 'gpu', 'timeout_seconds': 3600}),
+    StructuredTool.from_function(func=vina_dock, name='vina_dock', metadata={'tool_category': 'molecular_docking', 'queue_resource': 'cpu', 'timeout_seconds': 3600}),
+    StructuredTool.from_function(func=bindcraft_design, name='bindcraft_design', metadata={'tool_category': 'model_prediction', 'queue_resource': 'gpu', 'timeout_seconds': 3600}),
+    StructuredTool.from_function(func=boltzgen_design, name='boltzgen_design', metadata={'tool_category': 'model_prediction', 'queue_resource': 'gpu', 'timeout_seconds': 3600}),
+    StructuredTool.from_function(func=diffdock_dock, name='diffdock_dock', metadata={'tool_category': 'molecular_docking', 'queue_resource': 'gpu', 'timeout_seconds': 3600}),
+]

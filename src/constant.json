@@ -207,31 +207,31 @@
   "filter_tools": {
     "features_scripts": {
       "physchem": [
-        "src/tools/predict/features/calculate_physchem.py",
+        "mcp_tools/tools/predict/features/calculate_physchem.py",
         false
       ],
       "rsa": [
-        "src/tools/predict/features/calculate_rsa.py",
+        "mcp_tools/tools/predict/features/calculate_rsa.py",
         true
       ],
       "sasa": [
-        "src/tools/predict/features/calculate_sasa.py",
+        "mcp_tools/tools/predict/features/calculate_sasa.py",
         true
       ],
       "secondary-structure": [
-        "src/tools/predict/features/calculate_secondary_structure.py",
+        "mcp_tools/tools/predict/features/calculate_secondary_structure.py",
         true
       ],
       "all": [
-        "src/tools/predict/features/calculate_all_property.py",
+        "mcp_tools/tools/predict/features/calculate_all_property.py",
         false
       ]
     },
     "finetuned_scripts": {
-      "ankh": "src/tools/predict/finetuned/ankh.py",
-      "prott5": "src/tools/predict/finetuned/prott5.py",
-      "protbert": "src/tools/predict/finetuned/protbert.py",
-      "esm2": "src/tools/predict/finetuned/esm2.py"
+      "ankh": "mcp_tools/models/factory/prediction/ankh.py",
+      "prott5": "mcp_tools/models/factory/prediction/prott5.py",
+      "protbert": "mcp_tools/models/factory/prediction/protbert.py",
+      "esm2": "mcp_tools/models/factory/prediction/esm2.py"
     },
     "finetuned_tasks": [
       "DeepET_Topt",
@@ -290,7 +290,12 @@
       "ProSST-2048": "prosst",
       "ProtSSN": "protssn",
       "VenusPLM": "venusplm",
-      "VenusREM (foldseek-based)": "venusrem"
+      "VenusREM (foldseek-based)": "venusrem",
+      "ProSST-20": "prosst",
+      "ProSST-128": "prosst",
+      "ProSST-512": "prosst",
+      "ProSST-1024": "prosst",
+      "ProSST-4096": "prosst"
     },
     "dataset_mapping_zero_shot": [
       "Activity",

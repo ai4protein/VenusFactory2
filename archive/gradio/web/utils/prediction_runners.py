@@ -1,0 +1,189 @@
+"""Prediction runners for executing model predictions."""
+
+import os
+import sys
+import subprocess
+import time
+import pandas as pd
+from pathlib import Path
+from typing import Tuple
+
+from .constants import MODEL_MAPPING_ZERO_SHOT, PROTEIN_PROPERTIES_MAP_FUNCTION
+from .common_utils import get_project_root, get_save_path
+
+
+PROJECT_ROOT = get_project_root()
+
+
+def _subprocess_env() -> dict:
+    """Return os.environ with PYTHONPATH augmented so child scripts can resolve
+    both ``mcp_tools.tools.*`` and bare ``tools.*`` imports regardless of whether
+    the parent server was launched from project root or from ``src/``.
+    """
+    env = os.environ.copy()
+    existing = env.get("PYTHONPATH", "")
+    extras = [str(PROJECT_ROOT), str(PROJECT_ROOT / "src")]
+    env["PYTHONPATH"] = os.pathsep.join(
+        [p for p in extras if p] + ([existing] if existing else [])
+    )
+    return env
+
+
+def run_zero_shot_prediction(model_type: str, model_name: str, file_path: str) -> Tuple[str, pd.DataFrame]:
+    """Run zero-shot mutation prediction."""
+    try:
+        timestamp = str(int(time.time()))
+        sequence_dir = get_save_path("Zero_Shot", "Result")
+        output_csv = sequence_dir / f"{model_type}_{timestamp}.csv"
+        script_name = MODEL_MAPPING_ZERO_SHOT.get(model_name)
+        
+        if not script_name:
+            return f"Error: Model '{model_name}' has no script.", pd.DataFrame()
+
+        script_path = PROJECT_ROOT / 'mcp_tools/tools' / "mutation" / "models" / f"{script_name}.py"
+        if not script_path.exists():
+            return f"Script not found: {script_path}", pd.DataFrame()
+        
+        file_argument = "--pdb_file" if model_type == "structure" else "--fasta_file"
+        cmd = [
+            sys.executable, str(script_path),
+            file_argument, file_path, 
+            "--output_csv", str(output_csv)
+        ]
+        
+        subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=True,
+            encoding='utf-8',
+            errors='ignore',
+            env=_subprocess_env(),
+        )
+
+        if os.path.exists(output_csv):
+            df = pd.read_csv(output_csv)
+            os.remove(output_csv)
+            return "Prediction completed successfully!", df
+        
+        return "Prediction finished but no output file was created.", pd.DataFrame()
+        
+    except subprocess.CalledProcessError as e:
+        error_msg = e.stderr or e.stdout or "Unknown subprocess error"
+        return f"Prediction script failed: {error_msg}", pd.DataFrame()
+    except Exception as e:
+        return f"An unexpected error occurred: {e}", pd.DataFrame()
+
+
+def run_single_function_prediction(
+    dataset: str,
+    model: str,
+    fasta_file: str,
+    model_mapping: dict,
+    adapter_mapping: dict,
+    output_dir: Path
+) -> pd.DataFrame:
+    """Run prediction for a single dataset."""
+    try:
+        model_key = model_mapping.get(model)
+        if not model_key:
+            raise ValueError(f"Model key not found for {model}")
+        
+        adapter_key = adapter_mapping[model_key]
+        script_path = PROJECT_ROOT / 'mcp_tools/tools' / "predict" / "finetuned" / f"{model_key}.py"
+        from web.utils.common_utils import ensure_project_ckpt
+
+        adapter_path = ensure_project_ckpt(PROJECT_ROOT / "ckpt" / dataset / adapter_key)
+        output_file = output_dir / f"temp_{dataset}_{model}.csv"
+        
+        if not script_path.exists() or not adapter_path.exists():
+            raise FileNotFoundError(f"Required files not found: Script={script_path}, Adapter={adapter_path}")
+        
+        cmd = [
+            sys.executable, str(script_path),
+            "--fasta_file", str(Path(fasta_file)),
+            "--adapter_path", str(adapter_path),
+            "--output_csv", str(output_file)
+        ]
+        
+        subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=True,
+            encoding='utf-8',
+            errors='ignore',
+            env=_subprocess_env(),
+        )
+
+        if output_file.exists():
+            df = pd.read_csv(output_file)
+            df["Dataset"] = dataset
+            os.remove(output_file)
+            return df
+        else:
+            raise FileNotFoundError(f"Output file not created: {output_file}")
+            
+    except Exception as e:
+        error_detail = str(e)
+        return pd.DataFrame([{"Dataset": dataset, "header": "ERROR", "sequence": error_detail}])
+
+
+def run_protein_properties_prediction(task_type: str, file_path: str) -> Tuple[str, str]:
+    """Run protein properties prediction."""
+    try:
+        timestamp = str(int(time.time()))
+        properties_dir = get_save_path("Protein_Properties", "Result")
+        output_json = properties_dir / f"{task_type.replace(' ', '_').replace('(', '').replace(')', '')}_{timestamp}.json"
+        script_name = PROTEIN_PROPERTIES_MAP_FUNCTION.get(task_type)
+        if not script_name:
+           return "", f"Error: Task '{task_type}' is not allowed"
+       
+        script_path = PROJECT_ROOT / 'mcp_tools/tools' / "predict" / "features" / f"{script_name}.py"
+        if not script_path.exists():
+           return "", f"Script not found: {script_path}"
+
+        # Determine file argument based on file extension
+        file_argument = "--fasta_file" if file_path.lower().endswith((".fasta", ".fa")) else "--pdb_file"
+       
+        cmd_save = [
+           sys.executable, str(script_path),
+           file_argument, file_path,
+           "--chain_id", "A",
+           "--output_file", str(output_json)
+        ]
+       
+        # Run the command and capture output for debugging
+        result = subprocess.run(
+           cmd_save,
+           capture_output=True,
+           text=True,
+           encoding="utf-8",
+           errors="ignore",
+           env=_subprocess_env(),
+        )
+
+        # Check if the command failed
+        if result.returncode != 0:
+            error_msg = f"Script execution failed (return code: {result.returncode})"
+            if result.stderr:
+                error_msg += f"\nStderr: {result.stderr}"
+            if result.stdout:
+                error_msg += f"\nStdout: {result.stdout}"
+            return "", error_msg
+
+        # Check if output file was created
+        if os.path.exists(output_json):
+            return str(output_json), ""
+        else:
+            # Provide more detailed error information
+            error_msg = "JSON output file was not generated"
+            if result.stdout:
+                error_msg += f"\nScript output: {result.stdout}"
+            if result.stderr:
+                error_msg += f"\nScript errors: {result.stderr}"
+            return "", error_msg
+
+    except Exception as e:
+        return "", f"Error: {str(e)}"
+

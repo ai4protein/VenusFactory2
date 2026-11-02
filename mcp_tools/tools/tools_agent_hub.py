@@ -1,0 +1,543 @@
+"""
+Aggregate tools_agent: mutation, predict, search, train, file, skill.
+Hub for tools_agent submodules; only import and get_tools/FASTAPI_TOOLS/MCP_TOOLS, no tool implementation.
+Each series is a single list, then concatenated (no duplicate tool references).
+
+Usage: get_tools() -> all tools; get_pi_tools() -> search-only; FASTAPI_TOOLS/MCP_TOOLS -> filtered subsets.
+
+Tool inventory (all @tool from mutation, predict, search, train, file, skill):
+  MUTATION (2): zero_shot_mutation_sequence_prediction, zero_shot_mutation_structure_prediction
+  PREDICT (4): protein_property_prediction, protein_function_prediction, functional_residue_prediction, esmfold_structure_prediction
+  SEARCH (6): query_literature_by_keywords, query_dataset_by_keywords, query_web_by_keywords, query_fda_by_keywords, query_foldseek_search_by_pdb_file, query_sequence_from_pdb_file
+  DATABASE (32): by-ID (InterPro, UniProt, NCBI, RCSB, AlphaFold query/download) + BRENDA, ChEMBL, FDA, KEGG, STRING, ClinVar, UniProt search, NCBI BLAST
+  TRAIN (5): generate_training_config, train_protein_model, protein_model_predict, register_trained_model, list_trained_models
+  FILE (10): maxit_structure_convert, read_fasta, extract_uids_from_fasta, uid_file_to_chunks, unzip_archive, ungzip_file, pdb_chain_sequences, pdb_dir_to_fasta, check_pdb_apo, extract_uniprot_id_from_rcsb_metadata
+  SKILL (1–2): read_skill, python_repl (if langchain_experimental installed)
+"""
+from langchain.tools import BaseTool
+from mcp_tools.tools.database.tools_agent import (
+    # AlphaFold
+    download_alphafold_structure_by_uniprot_id_tool,
+    download_alphafold_metadata_by_uniprot_id_tool,
+    analyze_alphafold_plddt_by_metadata_file_tool,
+    analyze_alphafold_pae_by_pae_file_tool,
+    # BRENDA
+    download_brenda_km_values_by_ec_number_tool,
+    download_brenda_reactions_by_ec_number_tool,
+    download_brenda_enzymes_by_substrate_tool,
+    download_brenda_compare_organisms_by_ec_number_tool,
+    download_brenda_environmental_parameters_by_ec_number_tool,
+    download_brenda_kinetic_data_by_ec_number_tool,
+    download_brenda_pathway_report_tool,
+    # ChEMBL
+    download_chembl_molecule_by_id_tool,
+    download_chembl_similarity_by_smiles_tool,
+    download_chembl_substructure_by_smiles_tool,
+    download_chembl_drug_by_id_tool,
+    # FoldSeek
+    download_foldseek_results_by_pdb_file_tool,
+    # Clustal Omega (EBI MSA)
+    download_clustalo_msa_by_fasta_tool,
+    # Sequence similarity search (MMseqs2 + BLAST)
+    download_mmseqs2_homologs_by_sequence_tool,
+    download_blast_homologs_by_sequence_tool,
+    # OpenAlex (scholarly)
+    download_openalex_entries_by_query_tool,
+    download_openalex_entry_by_id_tool,
+    # arXiv (literature download)
+    download_arxiv_paper_by_id_tool,
+    # bioRxiv (per-DOI)
+    download_biorxiv_by_doi_tool,
+    # PyMOL visualization
+    render_protein_structure_tool,
+    superpose_two_structures_tool,
+    # InterPro
+    download_interpro_metadata_by_id_tool,
+    download_interpro_annotations_by_uniprot_id_tool,
+    download_interpro_proteins_by_id_tool,
+    download_interpro_uniprot_list_by_id_tool,
+    # KEGG
+    download_kegg_info_by_database_tool,
+    download_kegg_list_by_database_tool,
+    download_kegg_find_by_database_tool,
+    download_kegg_entry_by_id_tool,
+    download_kegg_conv_by_id_tool,
+    download_kegg_link_by_id_tool,
+    download_kegg_ddi_by_id_tool,
+    # NCBI
+    download_ncbi_sequence_tool,
+    download_ncbi_metadata_tool,
+    download_ncbi_blast_tool,
+    download_ncbi_clinvar_variants_tool,
+    download_ncbi_gene_by_id_tool,
+    download_ncbi_gene_by_symbol_tool,
+    download_ncbi_batch_lookup_by_symbols_tool,
+    translate_ncbi_cds_to_protein_tool,
+    search_ncbi_protein_by_gene_and_organism_tool,
+    download_pubmed_abstracts_by_pmids_tool,
+    # RCSB
+    download_rcsb_entry_metadata_by_pdb_id_tool,
+    download_rcsb_structure_by_pdb_id_tool,
+    download_rcsb_search_by_query_tool,
+    # STRING
+    download_string_map_ids_tool,
+    download_string_network_tool,
+    download_string_network_image_tool,
+    download_string_interaction_partners_tool,
+    download_string_enrichment_tool,
+    download_string_ppi_enrichment_tool,
+    download_string_homology_tool,
+    # Uniprot
+    download_uniprot_search_by_query_tool,
+    download_uniprot_retrieve_by_id_tool,
+    download_uniprot_mapping_tool,
+    download_uniprot_seq_by_id_tool,
+    download_uniprot_meta_by_id_tool,
+    download_uniprot_sparql_by_query_tool,
+    # HPA
+    download_hpa_protein_by_gene_tool,
+    download_hpa_subcellular_location_by_gene_tool,
+    download_hpa_tissue_expression_by_gene_tool,
+    download_hpa_single_cell_type_by_gene_tool,
+    download_hpa_blood_expression_by_gene_tool,
+)
+
+from mcp_tools.models.pretrained.mutation.tools_agent import zero_shot_mutation_sequence_prediction_tool, zero_shot_mutation_structure_prediction_tool
+from mcp_tools.tools.predict.tools_agent import (
+    calculate_physchem_from_sequence_tool,
+    calculate_physchem_from_fasta_tool,
+    calculate_rsa_from_pdb_tool,
+    calculate_sasa_from_pdb_tool,
+    calculate_ss_from_pdb_tool,
+    predict_protein_function_tool,
+    predict_residue_function_tool,
+    predict_structure_esmfold_tool,
+)
+from mcp_tools.tools.search.tools_agent import (
+    query_arxiv_tool,
+    query_biorxiv_tool,
+    query_duckduckgo_tool,
+    query_fda_tool,
+    query_github_tool,
+    query_hugging_face_tool,
+    query_pubmed_tool,
+    query_semantic_scholar_tool,
+    query_tavily_tool,
+    query_web_tool,
+    query_serpapi_tool,
+)
+from mcp_tools.models.factory.training.tools_agent import generate_training_config_tool, train_protein_model_tool, protein_model_predict_tool, register_trained_model_tool, list_trained_models_tool
+from mcp_tools.tools.file.tools_agent import (
+    maxit_structure_convert_tool,
+    read_fasta_tool,
+    extract_uids_from_fasta_tool,
+    uid_file_to_chunks_tool,
+    unzip_archive_tool,
+    ungzip_file_tool,
+    get_seq_from_pdb_chain_a_tool,
+    pdb_chain_sequences_tool,
+    pdb_dir_to_fasta_tool,
+    check_pdb_apo_tool,
+    extract_uniprot_id_from_rcsb_metadata_tool,
+)
+from mcp_tools.tools.skill.tools_agent import read_skill_tool
+
+try:
+    from mcp_tools.models.pretrained.design.tools_agent import proteinmpnn_sequence_design_from_structure_tool, proteinmpnn_sequence_scoring_from_structure_tool
+    _DENOVO_AVAILABLE = True
+except Exception:
+    _DENOVO_AVAILABLE = False
+
+# ---------------------------------------------------------------------------
+# Per-series lists (each tool appears in exactly one list)
+# ---------------------------------------------------------------------------
+
+MUTATION_TOOLS: list[BaseTool] = [
+    zero_shot_mutation_sequence_prediction_tool,
+    zero_shot_mutation_structure_prediction_tool,
+]
+
+from mcp_tools.models.pretrained.admet.tools_agent import predict_admet_tool
+
+PREDICT_TOOLS: list[BaseTool] = [
+    predict_admet_tool,
+    calculate_physchem_from_sequence_tool,
+    calculate_physchem_from_fasta_tool,
+    calculate_rsa_from_pdb_tool,
+    calculate_sasa_from_pdb_tool,
+    calculate_ss_from_pdb_tool,
+    predict_protein_function_tool,
+    predict_residue_function_tool,
+    predict_structure_esmfold_tool,
+]
+
+SEARCH_TOOLS: list[BaseTool] = [
+    query_arxiv_tool,
+    query_biorxiv_tool,
+    query_duckduckgo_tool,
+    query_fda_tool,
+    query_github_tool,
+    query_hugging_face_tool,
+    query_pubmed_tool,
+    query_semantic_scholar_tool,
+    query_tavily_tool,
+    query_web_tool,
+    query_serpapi_tool,
+]
+
+DATABASE_TOOLS: list[BaseTool] = [
+    # AlphaFold
+    download_alphafold_structure_by_uniprot_id_tool,
+    download_alphafold_metadata_by_uniprot_id_tool,
+    analyze_alphafold_plddt_by_metadata_file_tool,
+    analyze_alphafold_pae_by_pae_file_tool,
+    # BRENDA
+    download_brenda_km_values_by_ec_number_tool,
+    download_brenda_reactions_by_ec_number_tool,
+    download_brenda_enzymes_by_substrate_tool,
+    download_brenda_compare_organisms_by_ec_number_tool,
+    download_brenda_environmental_parameters_by_ec_number_tool,
+    download_brenda_kinetic_data_by_ec_number_tool,
+    download_brenda_pathway_report_tool,
+    # ChEMBL
+    download_chembl_molecule_by_id_tool,
+    download_chembl_similarity_by_smiles_tool,
+    download_chembl_substructure_by_smiles_tool,
+    download_chembl_drug_by_id_tool,
+    # FoldSeek
+    download_foldseek_results_by_pdb_file_tool,
+    # Clustal Omega (EBI MSA)
+    download_clustalo_msa_by_fasta_tool,
+    # Sequence similarity search (MMseqs2 + BLAST)
+    download_mmseqs2_homologs_by_sequence_tool,
+    download_blast_homologs_by_sequence_tool,
+    # OpenAlex (scholarly)
+    download_openalex_entries_by_query_tool,
+    download_openalex_entry_by_id_tool,
+    # arXiv (literature download)
+    download_arxiv_paper_by_id_tool,
+    # bioRxiv (per-DOI)
+    download_biorxiv_by_doi_tool,
+    # PyMOL visualization
+    render_protein_structure_tool,
+    superpose_two_structures_tool,
+    # InterPro
+    download_interpro_metadata_by_id_tool,
+    download_interpro_annotations_by_uniprot_id_tool,
+    download_interpro_proteins_by_id_tool,
+    download_interpro_uniprot_list_by_id_tool,
+    # KEGG
+    download_kegg_info_by_database_tool,
+    download_kegg_list_by_database_tool,
+    download_kegg_find_by_database_tool,
+    download_kegg_entry_by_id_tool,
+    download_kegg_conv_by_id_tool,
+    download_kegg_link_by_id_tool,
+    download_kegg_ddi_by_id_tool,
+    # NCBI
+    download_ncbi_sequence_tool,
+    download_ncbi_metadata_tool,
+    download_ncbi_blast_tool,
+    download_ncbi_clinvar_variants_tool,
+    download_ncbi_gene_by_id_tool,
+    download_ncbi_gene_by_symbol_tool,
+    download_ncbi_batch_lookup_by_symbols_tool,
+    translate_ncbi_cds_to_protein_tool,
+    search_ncbi_protein_by_gene_and_organism_tool,
+    download_pubmed_abstracts_by_pmids_tool,
+    # RCSB
+    download_rcsb_entry_metadata_by_pdb_id_tool,
+    download_rcsb_structure_by_pdb_id_tool,
+    download_rcsb_search_by_query_tool,
+    # STRING
+    download_string_map_ids_tool,
+    download_string_network_tool,
+    download_string_network_image_tool,
+    download_string_interaction_partners_tool,
+    download_string_enrichment_tool,
+    download_string_ppi_enrichment_tool,
+    download_string_homology_tool,
+    # Uniprot
+    download_uniprot_search_by_query_tool,
+    download_uniprot_retrieve_by_id_tool,
+    download_uniprot_mapping_tool,
+    download_uniprot_seq_by_id_tool,
+    download_uniprot_meta_by_id_tool,
+    download_uniprot_sparql_by_query_tool,
+    # HPA
+    download_hpa_protein_by_gene_tool,
+    download_hpa_subcellular_location_by_gene_tool,
+    download_hpa_tissue_expression_by_gene_tool,
+    download_hpa_single_cell_type_by_gene_tool,
+    download_hpa_blood_expression_by_gene_tool,
+]
+
+TRAIN_TOOLS: list[BaseTool] = [
+    generate_training_config_tool,
+    train_protein_model_tool,
+    protein_model_predict_tool,
+    register_trained_model_tool,
+    list_trained_models_tool,
+]
+
+FILE_TOOLS: list[BaseTool] = [
+    maxit_structure_convert_tool,
+    read_fasta_tool,
+    extract_uids_from_fasta_tool,
+    uid_file_to_chunks_tool,
+    unzip_archive_tool,
+    ungzip_file_tool,
+    pdb_chain_sequences_tool,
+    get_seq_from_pdb_chain_a_tool,
+    pdb_dir_to_fasta_tool,
+    check_pdb_apo_tool,
+    extract_uniprot_id_from_rcsb_metadata_tool,
+]
+
+# Code execution is bound to each session by the harness, never a host REPL.
+SKILL_TOOLS: list[BaseTool] = [read_skill_tool]
+
+# ---------------------------------------------------------------------------
+# Concatenated full list and subsets
+# ---------------------------------------------------------------------------
+
+DENOVO_TOOLS: list[BaseTool] = (
+    [
+        proteinmpnn_sequence_design_from_structure_tool,
+        proteinmpnn_sequence_scoring_from_structure_tool,
+    ]
+    if _DENOVO_AVAILABLE
+    else []
+)
+
+from mcp_tools.models.evolved.tools_agent import EVOLVED_MODEL_TOOLS
+from mcp_tools.tools.discovery.tools_agent import DISCOVERY_TOOLS
+from mcp_tools.models.pretrained.design_docking.tools_agent import EXTERNAL_TOOLS
+from mcp_tools.tools.research.tools_agent import PUBLIC_PROTEIN_TOOLS
+from mcp_tools.tools.discovery.research_capabilities import RESEARCH_CAPABILITY_TOOLS
+
+ALL_TOOLS: list[BaseTool] = (
+    MUTATION_TOOLS
+    + PREDICT_TOOLS
+    + SEARCH_TOOLS
+    + TRAIN_TOOLS
+    + FILE_TOOLS
+    + SKILL_TOOLS
+    + DATABASE_TOOLS
+    + DENOVO_TOOLS
+    + EVOLVED_MODEL_TOOLS
+    + DISCOVERY_TOOLS
+    + EXTERNAL_TOOLS
+    + RESEARCH_CAPABILITY_TOOLS
+    + PUBLIC_PROTEIN_TOOLS
+)
+
+# Apply live checks to existing references, including tools cached by a conversation.
+from mcp_tools.tools.capability_policy import guard_tool
+for _registered_tool in ALL_TOOLS:
+    guard_tool(_registered_tool)
+
+# PI can execute search tools + structural/sequence metadata lookups during
+# the research phase. The actual ``t.name`` values (from the @tool decorator)
+# do NOT carry the ``_tool`` suffix — make sure these match.
+PI_SEARCH_TOOL_NAMES = frozenset({
+    # Literature / web search
+    "query_arxiv",
+    "query_biorxiv",
+    "query_duckduckgo",
+    "query_fda",
+    "query_github",
+    "query_hugging_face",
+    "query_pubmed",
+    "query_semantic_scholar",
+    "query_tavily",
+    "query_web",
+    "query_serpapi",
+    "query_public_protein_service",
+    "query_ncbi",
+    "query_ncbi_blast",
+    "query_foldseek_remote",
+    "query_gget",
+    "query_opentargets",
+    "query_ensembl",
+    "query_europepmc",
+    "query_pubchem",
+    "query_interproscan",
+    # Structural / sequence / functional metadata lookups (read-only,
+    # cheap, complement literature when the literature search returns
+    # nothing — e.g. for a fresh PDB ID with no published paper yet)
+    "download_rcsb_entry_metadata_by_pdb_id",
+    "download_uniprot_meta_by_id",
+    "download_uniprot_search_by_query",
+    "download_alphafold_metadata_by_uniprot_id",
+    "download_interpro_annotations_by_uniprot_id",
+    "download_string_map_ids",
+    "download_hpa_protein_by_gene",
+})
+
+# FASTAPI: all except train_protein_model, protein_model_predict, query_dataset_by_keywords, query_web_by_keywords, query_foldseek_search_by_pdb_file, esmfold_structure_prediction
+FASTAPI_TOOL_NAMES = frozenset(t.name for t in ALL_TOOLS) - {
+    "train_protein_model",
+    "protein_model_predict",
+    "query_dataset_by_keywords",
+    "query_web_by_keywords",
+    "query_foldseek_search_by_pdb_file",
+    "esmfold_structure_prediction",
+}
+
+# Session coding tools are injected only with a server-owned workspace.
+MCP_TOOL_NAMES = frozenset(t.name for t in ALL_TOOLS)
+
+
+def get_tools() -> list[BaseTool]:
+    """Full list of tools for the chat agent (Planner/Worker)."""
+    from mcp_tools.tools.runtime_tool_policy import filter_tools
+    return filter_tools(ALL_TOOLS)[0]
+
+
+def get_pi_tools() -> list[BaseTool]:
+    """Tools that PI is allowed to use (search only: literature, dataset, web, foldseek). No download or other tools."""
+    return [t for t in get_tools() if t.name in PI_SEARCH_TOOL_NAMES]
+
+
+FASTAPI_TOOLS = tuple(t for t in ALL_TOOLS if t.name in FASTAPI_TOOL_NAMES)
+MCP_TOOLS = tuple(t for t in ALL_TOOLS if t.name in MCP_TOOL_NAMES)
+
+
+__all__ = [
+    "get_tools",
+    "get_pi_tools",
+    "PI_SEARCH_TOOL_NAMES",
+    "ALL_TOOLS",
+    "SKILL_TOOLS",
+    "DATABASE_TOOLS",
+    "MUTATION_TOOLS",
+    "PREDICT_TOOLS",
+    "SEARCH_TOOLS",
+    "TRAIN_TOOLS",
+    "FILE_TOOLS",
+    "FASTAPI_TOOLS",
+    "MCP_TOOLS",
+    "FASTAPI_TOOL_NAMES",
+    "MCP_TOOL_NAMES",
+    # AlphaFold
+    "download_alphafold_structure_by_uniprot_id_tool",
+    "download_alphafold_metadata_by_uniprot_id_tool",
+    "analyze_alphafold_plddt_by_metadata_file_tool",
+    "analyze_alphafold_pae_by_pae_file_tool",
+    # BRENDA
+    "download_brenda_km_values_by_ec_number_tool",
+    "download_brenda_reactions_by_ec_number_tool",
+    "download_brenda_enzymes_by_substrate_tool",
+    "download_brenda_compare_organisms_by_ec_number_tool",
+    "download_brenda_environmental_parameters_by_ec_number_tool",
+    "download_brenda_kinetic_data_by_ec_number_tool",
+    "download_brenda_pathway_report_tool",
+    # ChEMBL
+    "download_chembl_molecule_by_id_tool",
+    "download_chembl_similarity_by_smiles_tool",
+    "download_chembl_substructure_by_smiles_tool",
+    "download_chembl_drug_by_id_tool",
+    # FoldSeek
+    "download_foldseek_results_by_pdb_file_tool",
+    # Clustal Omega (EBI MSA)
+    "download_clustalo_msa_by_fasta_tool",
+    # Sequence similarity search (MMseqs2 + BLAST)
+    "download_mmseqs2_homologs_by_sequence_tool",
+    "download_blast_homologs_by_sequence_tool",
+    # OpenAlex (scholarly)
+    "download_openalex_entries_by_query_tool",
+    "download_openalex_entry_by_id_tool",
+    # arXiv (literature download)
+    "download_arxiv_paper_by_id_tool",
+    # bioRxiv (per-DOI)
+    "download_biorxiv_by_doi_tool",
+    # PyMOL visualization
+    "render_protein_structure_tool",
+    "superpose_two_structures_tool",
+    # InterPro
+    "download_interpro_metadata_by_id_tool",
+    "download_interpro_annotations_by_uniprot_id_tool",
+    "download_interpro_proteins_by_id_tool",
+    "download_interpro_uniprot_list_by_id_tool",
+    # KEGG
+    "download_kegg_info_by_database_tool",
+    "download_kegg_list_by_database_tool",
+    "download_kegg_find_by_database_tool",
+    "download_kegg_entry_by_id_tool",
+    "download_kegg_conv_by_id_tool",
+    "download_kegg_link_by_id_tool",
+    "download_kegg_ddi_by_id_tool",
+    # NCBI
+    "download_ncbi_sequence_tool",
+    "download_ncbi_metadata_tool",
+    "download_ncbi_blast_tool",
+    "download_ncbi_clinvar_variants_tool",
+    "download_ncbi_gene_by_id_tool",
+    "download_ncbi_gene_by_symbol_tool",
+    "download_ncbi_batch_lookup_by_symbols_tool",
+    "translate_ncbi_cds_to_protein_tool",
+    "search_ncbi_protein_by_gene_and_organism_tool",
+    "download_pubmed_abstracts_by_pmids_tool",
+    # RCSB
+    "download_rcsb_entry_metadata_by_pdb_id_tool",
+    "download_rcsb_structure_by_pdb_id_tool",
+    "download_rcsb_search_by_query_tool",
+    # STRING
+    "download_string_map_ids_tool",
+    "download_string_network_tool",
+    "download_string_network_image_tool",
+    "download_string_interaction_partners_tool",
+    "download_string_enrichment_tool",
+    "download_string_ppi_enrichment_tool",
+    "download_string_homology_tool",
+    # Uniprot
+    "download_uniprot_search_by_query_tool",
+    "download_uniprot_retrieve_by_id_tool",
+    "download_uniprot_mapping_tool",
+    "download_uniprot_seq_by_id_tool",
+    "download_uniprot_meta_by_id_tool",
+    "download_uniprot_sparql_by_query_tool",
+    # Mutation
+    "zero_shot_mutation_sequence_prediction_tool",
+    "zero_shot_mutation_structure_prediction_tool",
+    # Predict
+    "calculate_physchem_from_fasta_tool",
+    "calculate_rsa_from_pdb_tool",
+    "calculate_sasa_from_pdb_tool",
+    "calculate_ss_from_pdb_tool",
+    "predict_protein_function_tool",
+    "predict_residue_function_tool",
+    "predict_structure_esmfold_tool",
+    # Search
+    "query_arxiv_tool",
+    "query_biorxiv_tool",
+    "query_duckduckgo_tool",
+    "query_fda_tool",
+    "query_github_tool",
+    "query_hugging_face_tool",
+    "query_pubmed_tool",
+    "query_semantic_scholar_tool",
+    "query_tavily_tool",
+    "query_web_tool",
+    "query_serpapi_tool",
+    # Train
+    "generate_training_config_tool",
+    "train_protein_model_tool",
+    "protein_model_predict_tool",
+    "register_trained_model_tool",
+    "list_trained_models_tool",
+    # File
+    "maxit_structure_convert_tool",
+    "read_fasta_tool",
+    "extract_uids_from_fasta_tool",
+    "uid_file_to_chunks_tool",
+    "unzip_archive_tool",
+    "ungzip_file_tool",
+    "get_seq_from_pdb_chain_a_tool",
+    "pdb_chain_sequences_tool",
+    "pdb_dir_to_fasta_tool",
+    "check_pdb_apo_tool",
+    "extract_uniprot_id_from_rcsb_metadata_tool",
+    "read_skill_tool",
+]

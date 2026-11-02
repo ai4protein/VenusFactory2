@@ -1,4 +1,4 @@
-"""Shared download notices / progress helpers for ckpt & frpc hubs.
+"""Shared download notices / progress helpers for checkpoint downloads.
 
 Environment:
   VENUS_DOWNLOAD_QUIET=1          suppress user-facing notices (CI)

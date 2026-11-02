@@ -1,0 +1,28 @@
+{
+  "files": [
+    {
+      "original": "script/tools/esmfold.sh",
+      "archived": "archive/cli-examples/tools/esmfold.sh",
+      "sha256": "a41bcbf776a6ec20e295662965f467c88e6f1a5f9de835c84ad60027e91e128e",
+      "bytes": 186
+    },
+    {
+      "original": "script/tools/evolution/models/easy_mutation.sh",
+      "archived": "archive/cli-examples/tools/evolution/models/easy_mutation.sh",
+      "sha256": "659d92df1b597537598cc11611e46b5794593b6c932bf1a1914d5f1d8b02bcab",
+      "bytes": 313
+    },
+    {
+      "original": "script/tools/evolution/run_zero_shot_sequence.sh",
+      "archived": "archive/cli-examples/tools/evolution/run_zero_shot_sequence.sh",
+      "sha256": "c9742511a28d665606dfb1e48827aff62ba05c42af8cf78f16b1e42703853d07",
+      "bytes": 447
+    },
+    {
+      "original": "script/tools/evolution/run_zero_shot_structure.sh",
+      "archived": "archive/cli-examples/tools/evolution/run_zero_shot_structure.sh",
+      "sha256": "5283d82b9620d71d1fce87b7bd82304e2ca5b7d3037cc49a2c8884a27d504813",
+      "bytes": 474
+    }
+  ]
+}

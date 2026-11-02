@@ -1,0 +1,34 @@
+{
+  "1024.joblib": {
+    "bytes": 21040620,
+    "sha256": "a761adc0b83c4031a5b31a89eeb6275c7dba2ccec9f9f6cbfe181a0ab95c82d5"
+  },
+  "128.joblib": {
+    "bytes": 19205612,
+    "sha256": "951840db5917fe112d4d4a2b8fbfd1357deacf5c67e1c27bba8d0d31c386cb60"
+  },
+  "20.joblib": {
+    "bytes": 18984427,
+    "sha256": "f98a1d678c0a040e608d096806cc430d29f1ebb1e82f6405d6d6c4339491fc83"
+  },
+  "2048.joblib": {
+    "bytes": 23137772,
+    "sha256": "7e4a47885983b9f9adc1c3c8a9b549fd4b77a32685e1ffbad592ae6fccc5a20b"
+  },
+  "4096.joblib": {
+    "bytes": 27332076,
+    "sha256": "391ad839ef5019058486661547e34cea6e94234e3d52526659ee43bd1460d97c"
+  },
+  "512.joblib": {
+    "bytes": 19992044,
+    "sha256": "eacad4ba5aa1475a25fe156d81274cb93aaf737aa1a8fad2d2b08580ed2b719a"
+  },
+  "64.joblib": {
+    "bytes": 19074540,
+    "sha256": "571518ae435f1ec3bbd79a89cbfb9d75303008b431a90224e212724d34317cc2"
+  },
+  "AE.pt": {
+    "bytes": 23669861,
+    "sha256": "57cf97ace00c8e0413e3c2a1407d299d86d99ed22982202c1bc652f7f762b3a3"
+  }
+}

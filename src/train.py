@@ -2,11 +2,11 @@ import os
 import sys
 import json
 import wandb
-from tools.train.cli_utils.args import parse_args
-from tools.train.cli_utils.logger import setup_logging, print_model_parameters
-from tools.train.data.dataloader import prepare_dataloaders
-from tools.train.models.model_factory import create_models, lora_factory
-from tools.train.loop.trainer import Trainer
+from mcp_tools.models.factory.training.cli_utils.args import parse_args
+from mcp_tools.models.factory.training.cli_utils.logger import setup_logging, print_model_parameters
+from mcp_tools.models.factory.training.data.dataloader import prepare_dataloaders
+from mcp_tools.models.factory.training.models.model_factory import create_models, lora_factory
+from mcp_tools.models.factory.training.loop.trainer import Trainer
 
 def main():
     # Parse arguments

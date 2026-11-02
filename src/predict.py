@@ -11,8 +11,8 @@ import pandas as pd
 from pathlib import Path
 from tqdm import tqdm
 from transformers import logging
-from tools.train.models.inference_loader import load_inference_model
-from tools.train.models.pooling import MeanPooling, Attention1dPoolingHead, LightAttentionPoolingHead
+from mcp_tools.models.factory.training.models.inference_loader import load_inference_model
+from mcp_tools.models.factory.training.models.pooling import MeanPooling, Attention1dPoolingHead, LightAttentionPoolingHead
 
 # Ignore warning information
 logging.set_verbosity_error()
