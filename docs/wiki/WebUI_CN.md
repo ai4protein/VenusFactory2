@@ -1,69 +1,36 @@
-# WebUI 模块地图（v2）
+<!-- Generated compatibility view; edit docs/manual/zh/start.md -->
 
-[← Wiki 首页](./Home.md) · [English](./WebUI.md)
+# 从你的蛋白质问题开始
 
-当前主界面是 **FastAPI + React**（`python src/webui_v2.py`，默认 `:7861`）。  
-旧版 Gradio（`python src/webui.py`，`:7860`）仅作兼容，手册以 v2 为准。
+## 选择模式
 
-## 启动
+| 模式 | 提供什么 | 得到什么 |
+| --- | --- | --- |
+| Agent | 问题、文件或操作要求 | 调用已有工具得到回答、预测和分析文件 |
+| Scientist | 研究目标、数据、材料和预算 | 迭代开发的代码、模型、评估证据和交付文件 |
+| Researcher | 目标蛋白、研究重点和相关材料 | 整合文献、数据库与预测的长报告 |
 
-一键安装后通常已构建前端：
+在输入框旁选择模式。**Model** 选择用于对话的大语言模型，**Harness** 选择执行框架。蛋白质预测模型通过工具或模型广场使用。
 
-```bash
-source .venv/bin/activate
-python src/webui_v2.py --host 0.0.0.0 --port 7861
-```
+## 完成第一个任务
 
-仅在改过 `frontend/` 或缺少 `frontend/dist` 时：
+1. 打开 Chat，选择 Agent。粘贴序列、添加文件，或说明蛋白名称和物种。
+2. 说明要得到什么，例如：“计算这条序列的分子量和等电点，并保存为表格。”
+3. 发送后在对话中查看工具进展，从右上角文件面板打开结果。
+4. 在同一对话继续提问，可复用上下文和文件。保存会话链接，便于返回。
 
-```bash
-cd frontend && npm install && npm run build && cd ..
-```
+Enter 发送，Shift+Enter 换行。可以用上传按钮、拖拽或粘贴文件添加材料，发送前检查附件。
 
-Online：`python src/webui_v2.py --host 0.0.0.0 --port 7861 --online`
+## 找到需要的功能
 
-## 模块 ↔ 手册
+- **Chat**：[Agent](./Agent_CN.md)、[Scientist](./Scientist_CN.md)、[Researcher](./Researcher_CN.md) 各自保留历史记录。
+- **Model Plaza**：按功能浏览工具模型，直接预测，进入自定义训练、评估及排行榜。
+- **Workflows**：把工具与模型组合成可复用流程。
+- **Library**：浏览有权访问的文件；在线版与当前保留的对话关联。
+- **Settings**：语言、手册、线上额外额度；本地部署还提供 Administration 入口。
 
-| 侧栏 / 模块 | 路由前缀（示意） | 详细手册 |
-|:------------|:-----------------|:---------|
-| **Agent** | `/agent`, chat | [AgentManual_CN.md](../manual/AgentManual_CN.md) |
-| **Quick Tools** | `/quick-tools/*` | [QuickTools_CN.md](../manual/QuickTools_CN.md) |
-| **Advanced Tools** | `/advanced-tools/*` | [AdvancedToolsManual_CN.md](../manual/AdvancedToolsManual_CN.md) |
-| **Custom Model** · Training | `/custom-model/training` | [TrainingManual_ZH.md](../manual/TrainingManual_ZH.md) |
-| **Custom Model** · Evaluation | `/custom-model/evaluation` | [EvaluationManual_ZH.md](../manual/EvaluationManual_ZH.md) |
-| **Custom Model** · Predict | `/custom-model/predict` | [PredictionManual_ZH.md](../manual/PredictionManual_ZH.md) |
-| **Download** | `/download/*` | [DownloadManual_ZH.md](../manual/DownloadManual_ZH.md) |
-| **Manual** | `/manual/*` | 内嵌上述手册 |
-| **Workspace / Settings / Leaderboards / Report** | 对应页面 | Report → [ReportManual_CN.md](../manual/ReportManual_CN.md) |
+## 看教程或问 Agent
 
-### Quick Tools（6）
+在手册中选择主题，或点击**询问 Agent**，带着当前主题进入对话。可以修改问题后再发送。Agent 能检索同一份教程，并提供对应的手册链接。
 
-Directed Evolution · Sequence Design · Protein Discovery · Protein Function · Functional Residue · Physicochemical Property  
-
-### Advanced Tools
-
-与 Quick Tools 同类任务，提供更多模型 / 参数控制。
-
-### Chat — 双模式
-
-Agent 对话（`/agent`）在输入区上方切换 **Science Agent** / **Science Expert**（选择会保存在浏览器）。
-
-| 模式 | 引擎 | 说明 |
-|:-----|:-----|:-----|
-| **Science Agent** | kimi-code | 以工具调用为主的 agent 循环（MCP / bash）；可折叠 Thinking、内联工具卡片。上下文占用以只读指示显示；占用 ≥ ~90% 时由 Agent **自动压缩**（不提供 Plan/Compact/Fork 等输入区按钮）。走 kimi-code 守护进程（见下方配置）。Online 无模型选择器。**Local** 可通过 MCP 调用训练工具（`generate_training_config` / `train_protein_model` / `protein_model_predict` / `register_trained_model` / `list_trained_models`）；训练成功后自动注册到 `ckpt/user_trained/` 供跨会话复用。**Online** 硬禁用训练、VenusMine / FoldSeek 等高算力能力（API 返回 403，工具层直接拒绝）。 |
-| **Science Expert** | LangGraph（`graph`） | 多角色流水线 **PI → CB → MLS → SC**；先走 PI 澄清（含显式「跳过 Research」），再 CB 计划确认。计划确认后步骤默认自动执行；小报告默认自动推进。SC 输出 paper 级报告（约 5000–8000 词）。**Local** 可在模型选择器切换 LLM；**Online** 无模型选择器，使用平台固定后端模型。 |
-
-详见 [AgentManual_CN.md](../manual/AgentManual_CN.md)。
-
-## 配置
-
-- 模板：`.env.example` → `.env`
-- LLM 端点：`cp model-config.yaml.example model-config.yaml`，再设 `active: dmx|gpt|claude|…`
-- Agent / LLM Key：优先界面 **Settings**；也可写环境变量（见 `.env.example`）
-- Online：`WEBUI_V2_MODE=online`、`WEBUI_V2_SESSION_TOKEN_SECRET`、`WEBUI_V2_*_LIMIT`
-- Online 无 sudo 时 kimi-code：默认 `auto` 会走 `bwrap` 沙箱；也可显式 `KIMI_ONLINE_SPAWN_MODE=bwrap`
-- 跳过默认 kimi-code：`export KIMI_EXTERNAL=1`
-
-## 权重
-
-功能预测等任务用到的适配器见 [Checkpoints_CN.md](./Checkpoints_CN.md)。本地缺失时默认按需从 HF 拉取（`VENUS_CKPT_AUTO_DOWNLOAD=1`）。
+线上限制见[设置与额度](./Settings_CN.md)，文件操作见[Library](./Library_CN.md)。

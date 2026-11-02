@@ -1,62 +1,36 @@
-# 功能概览与架构
+<!-- Generated compatibility view; edit docs/manual/zh/start.md -->
 
-回到 [Wiki 首页](./Home.md) · [English](./Overview.md)
+# 从你的蛋白质问题开始
 
-## 核心能力
+## 选择模式
 
-| 任务 | 方案 | 量级耗时 |
-|:-----|:-----|:---------|
-| 突变效应 | ESM-2, ProSST, ProtSSN（零样本） | <1 分钟 |
-| 蛋白功能 | 30+ 微调适配器 | <30 秒 |
-| 定制训练 | 7 种 PEFT（LoRA, QLoRA 等） | 10–60 分钟 |
-| 数据下载 | AlphaFold, UniProt, RCSB, KEGG 等 | 实时 |
-| 文献 / 检索 | AI 辅助搜索与分析 | <2 分钟 |
+| 模式 | 提供什么 | 得到什么 |
+| --- | --- | --- |
+| Agent | 问题、文件或操作要求 | 调用已有工具得到回答、预测和分析文件 |
+| Scientist | 研究目标、数据、材料和预算 | 迭代开发的代码、模型、评估证据和交付文件 |
+| Researcher | 目标蛋白、研究重点和相关材料 | 整合文献、数据库与预测的长报告 |
 
-## 为什么用 VenusFactory2？
+在输入框旁选择模式。**Model** 选择用于对话的大语言模型，**Harness** 选择执行框架。蛋白质预测模型通过工具或模型广场使用。
 
-| Agent 优先 | 三种接口 | 从零到结果 |
-|:-----------|:---------|:-----------|
-| 自然语言 → 多步自动化；Web 对话可选 **Science Agent**（kimi-code）或 **Science Expert**（LangGraph） | Web / REST / CLI | 上传即可预测 |
-| 40+ 模型 + 11 数据库 | 同一能力，不同入口 | 也可分钟级微调 |
+## 完成第一个任务
 
-## 架构
+1. 打开 Chat，选择 Agent。粘贴序列、添加文件，或说明蛋白名称和物种。
+2. 说明要得到什么，例如：“计算这条序列的分子量和等电点，并保存为表格。”
+3. 发送后在对话中查看工具进展，从右上角文件面板打开结果。
+4. 在同一对话继续提问，可复用上下文和文件。保存会话链接，便于返回。
 
-```
-接口: Web UI | REST API | CLI
-        ↓
-   Agent 层 (LangGraph + LangChain)
-        ↓
-   应用: 训练 | 评估 | 预测 | 工具
-        ↓
-   核心工具（突变、数据库、搜索、设计等）
-        ↓
-   资源: 40+ 模型 | 30+ 数据集 | 11+ 数据库
-```
+Enter 发送，Shift+Enter 换行。可以用上传按钮、拖拽或粘贴文件添加材料，发送前检查附件。
 
-## 工具类别
+## 找到需要的功能
 
-| 类别 | 说明 | Agent | CLI |
-|:-----|:-----|:-----:|:---:|
-| 突变 | ESM-1v/2, ProSST, ProtSSN, MIF-ST | ✅ | ✅ |
-| 预测 | 30+ 微调模型 | ✅ | ✅ |
-| 数据库 | 11 个集成源 | ✅ | ✅ |
-| 搜索 | PubMed, FDA, 专利等 | ✅ | ✅ |
-| 训练 | LoRA / QLoRA / DoRA… | ✅ | ✅ |
-| 文件 | 格式转换 | ✅ | ✅ |
-| Denovo | 蛋白设计 | ✅ | ✅ |
-| 发现 | 新蛋白相关流程 | ✅ | ✅ |
-| 可视化 | 3D 查看 | ✅ | ✅ |
+- **Chat**：[Agent](./Agent_CN.md)、[Scientist](./Scientist_CN.md)、[Researcher](./Researcher_CN.md) 各自保留历史记录。
+- **Model Plaza**：按功能浏览工具模型，直接预测，进入自定义训练、评估及排行榜。
+- **Workflows**：把工具与模型组合成可复用流程。
+- **Library**：浏览有权访问的文件；在线版与当前保留的对话关联。
+- **Settings**：语言、手册、线上额外额度；本地部署还提供 Administration 入口。
 
-## 集成资源（摘要）
+## 看教程或问 Agent
 
-- **模型**：见 [Models_CN.md](./Models_CN.md)
-- **数据集**：见 [Datasets_CN.md](./Datasets_CN.md)
-- **权重**：见 [Checkpoints_CN.md](./Checkpoints_CN.md)
-- **数据库**：AlphaFold · RCSB · UniProt · NCBI · KEGG · STRING · BRENDA · ChEMBL · HPA · FDA · Foldseek
+在手册中选择主题，或点击**询问 Agent**，带着当前主题进入对话。可以修改问题后再发送。Agent 能检索同一份教程，并提供对应的手册链接。
 
-## 最新动态（摘录）
-
-- [2026-04-01] [venusfactory.bio](https://venusfactory.bio/)
-- [2026-03-27] 技术报告 [arXiv:2603.27303](https://arxiv.org/abs/2603.27303)
-- [2026-01-23] [VenusX (ICLR2026)](https://openreview.net/forum?id=zcmL592XRG)
-- [2025-04-19] [VenusREM](https://github.com/ai4protein/VenusREM) #1 ProteinGym / VenusMutHub
+线上限制见[设置与额度](./Settings_CN.md)，文件操作见[Library](./Library_CN.md)。

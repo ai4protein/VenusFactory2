@@ -1,0 +1,19 @@
+# Library and conversation files
+
+## Upload materials
+
+Use the composer upload icon, drag files onto the upload area, or paste files from the clipboard. Multiple files can support a Scientist goal or Researcher report. Plain text pasted into the message remains message text.
+
+Online uploads are limited to **10 MB per file**. Local mode has no platform upload-size cap. Accepted formats depend on the destination: tables and sequences for prediction/training, structures for structure tasks, and papers/notes for research materials.
+
+## Open the file panel
+
+Click the file icon at the upper right of Chat. Search by name and filter by type or date. Preview supported files, download individual results or use the available archive download action. A structure file opens the structure viewer; use its sequence selection and display controls to inspect residues. Unsupported formats can still be downloaded where permitted.
+
+## Browse Library
+
+Library is available in local mode. In online mode, it opens an empty page marked “Unavailable in online mode”. Use the Files panel within each conversation to view and download that conversation's materials and results.
+
+## Reuse data
+
+Select an existing accessible file where the input offers a Library picker, or download and re-upload it. Give Agent a filename and the intended use. Do not use host filesystem paths from another session; sandbox programs see only their assigned conversation directory.

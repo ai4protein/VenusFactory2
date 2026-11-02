@@ -1,0 +1,34 @@
+# 设置、模型与使用额度
+
+## 日常设置
+
+点击左下角 Settings 切换语言或打开手册。线上用户可以填写邮箱与额外额度 key，浏览器会保存这些信息。本地部署还显示 Administration 入口；线上管理页通过直接网址访问并要求管理员登录。
+
+## 对话额度
+
+线上默认**每个 IP 每天三个新对话**，Agent、Scientist、Researcher 共享。计算的是新建对话，不是已有对话中的每条消息。部署配置或额度 key 可改变实际额度，以当前页面显示的余额和重置时间为准。
+
+额度用尽后可等待提示的重置时间，或向 **tanyang.august@sjtu.edu.cn** 申请额外额度，说明姓名、单位、邮箱、联系方式和用途。获批后在 Settings 填写对应邮箱与 key。额度 key 不会解锁禁用工具或更大的线上训练骨干。
+
+## 对话模型与 Harness
+
+在线版只使用后台配置的免费模型与路由，包括开启的 DMXAPI 或 OpenRouter 选项。本地按已配置模型和密钥显示选择。Model、Harness 选择器展示支持的组合，密钥或适配器不可用会影响选项。
+
+更换 Harness 或对话模型不改变科学任务定义，所有 Harness 和三种 Chat 模式仍受相同工具权限约束。
+
+## Administration
+
+管理员管理密钥和模型路由、工具模型开关、额度、管理员账号及平台使用情况。使用统计可记录大模型 token、会话和工具作业。Token 表示使用量，不一定对应付费账单；部分供应商可能不返回完整用量。
+
+环境变量在 Administration 管理，不作为公共 Settings 的独立页面。不要把密钥或密码放进消息与共享文件。
+
+## 线上计算限制
+
+上传文件每个不超过 10 MB，自定义训练限定 ESM2-8M，本地 VenusMine 禁用，Scientist 受研究预算限制。禁用工具不能通过 Chat、模型表单或工作流绕过限制，详见[训练](manual:training)和[文件](manual:library)。
+
+
+## 配置官方模型 API
+
+本地部署可在「Administration → 环境变量」或项目根目录的 `.env` 中，填写提供方的 API Key 和模型 ID，随后统一重启后端及 worker。支持 OpenAI（ChatGPT）、Anthropic Claude、xAI Grok、智谱 GLM、MiniMax、DeepSeek、Gemini、Qwen 和 Moonshot。
+
+例如：`OPENAI_API_KEY` 配合 `OPENAI_MODEL`，或 `MINIMAX_API_KEY` 配合 `MINIMAX_MODEL`。`_MODELS` 可填写逗号分隔的多个模型 ID，`_BASE_URL` 可配置对应账户的 API 地址。仅填写 Key 不会自动启用模型或切换默认路由。新对话可以选择配置好的模型，已有对话保留原模型。线上仍只开放后台配置的免费路由；不兼容的 Harness 与模型组合不可选。

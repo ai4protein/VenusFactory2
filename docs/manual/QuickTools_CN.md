@@ -1,177 +1,42 @@
-# Quick Tools — 零配置快速分析
+<!-- Compatibility view; edit zh/models.md -->
 
-**Quick Tools** 是跑单次预测最快的方式：预选模型、默认参数、最少的开关。选工具、丢数据、点 **Start Prediction**。
+# 模型广场
 
-要完全掌控模型 / 数据集，去 **Advanced Tools**（同样的五大任务，加上更多选项）。
+## 按功能找模型
 
-## 工具一览
+打开 Model Plaza，按功能分类浏览，或搜索模型名、蛋白性质和任务。广场是统一目录，不再分 Quick/Advanced。它包含平台预测器，以及当前部署可用的已发布自定义模型或 Scientist 能力。
 
-| # | 工具 | 路由 | 输入 | 告诉你什么 |
-| :---: | :--- | :--- | :--- | :--- |
-| 1 | Directed Evolution | `/quick-tools/directed-evolution` | FASTA 或 PDB | 针对目标功能的最佳单点突变 |
-| 2 | Sequence Design | `/quick-tools/sequence-design` | PDB | 给定骨架的候选序列（ProteinMPNN） |
-| 3 | Protein Discovery | `/quick-tools/protein-discovery` | PDB | 通过 VenusMine 找结构 / 序列同源 |
-| 4 | Protein Function | `/quick-tools/protein-function` | FASTA | 蛋白级属性（溶解性、定位…） |
-| 5 | Functional Residue | `/quick-tools/functional-residue` | FASTA | 残基级活性 / 结合 / 保守 / motif |
-| 6 | Physicochemical Property | `/quick-tools/physicochemical-property` | FASTA 或 PDB | MW、pI、SASA、二级结构等 |
+功能可包括突变评分、蛋白或残基性质、序列设计、结构工具、小分子 ADMET 等。点击卡片查看输入与参数。是否可运行取决于工具开关、权重和依赖；目录中展示不代表每个部署都能运行。
 
----
+## 直接运行工具
 
-## 通用布局
+1. 打开与生物问题匹配的模型。
+2. 提供所需的序列、结构、表格或小分子输入。
+3. 检查可调整参数；链选择、采样等模型特有选项可在高级设置中查看。
+4. 提交一次后跟踪作业，检查输出文件，保存作业号便于追踪。
 
-所有 Quick Tools 页面布局一致：
+在线版会保留禁用模型的卡片，悬浮提示说明不可用原因。换用另一种 Chat 模式不能绕过管理员的工具开关。
 
-| 区域 | 内容 |
-| :--- | :--- |
-| **左栏 — 输入 + 配置** | 序列 / PDB 输入（粘贴 / 上传 / Workspace / 用示例）、任务下拉、可选的 **Enable AI analysis** 开关（启用后会出现 LLM Provider）、**Start Prediction** 按钮。 |
-| **右栏 — 结果面板** | 状态、原始结果表、可选的热图、可选的 AI Expert Analysis、**Download Results**。 |
+## 自定义模型和工作流
 
-**在线模式：** 序列输入受在线 FASTA 上限限制（默认粘贴 50 残基）。Protein Discovery 在在线模式下是**只读**的。
+通过训练、预测和评估入口使用自己的模型。完成训练不会自动公开私有模型，共享发布需满足审核和可见性设置。
 
----
+重复的多步分析可进入[工作流](./zh/workflows.md)，连接输入输出兼容的工具。也可以让 Agent 搜索合适模型并查看适用范围。
 
-## 1. Directed Evolution（定向进化）
+## 排行榜
 
-针对目标功能给所有单点突变打分。
+模型广场包含 VenusX 和 ProteinGym 入口或链接。解读排名前应比较任务与数据集，榜单排名不保证模型在你的蛋白或实验条件下同样有效。
 
-| 字段 | 说明 |
-| :--- | :--- |
-| **序列输入** | 粘贴 FASTA、上传 `.fasta` / `.fa` / `.pdb`、从 Workspace 选、或用示例。 |
-| **Select Protein Function** | 突变打分的目标功能（见下）。 |
-| **Enable AI analysis** | 可选；启用后多一个 AI Expert 总结标签。 |
+## 模型从哪里来
 
-**功能选项：**
+- **预训练方法**：ProSST、ProtSSN、ESM-1v、ProteinMPNN、LigandMPNN 使用上游方法和权重。
+- **平台训练模型**：例如 **DeepSol · ESM2-650M** 表示在特定数据集上训练的预测模型及其骨干；相同骨干在不同数据集上会产生不同模型。
+- **Scientist 模型**：RSI 开发的新模型或可复用能力。使用前查看适用范围、评估报告和审核状态；私有研究成果通过发布审核后才会公开。
 
-- **Activity** — 突变对催化或生物活性的影响。
-- **Binding** — 突变对蛋白结合配体或互作伙伴能力的影响。
-- **Expression** — 突变对宿主细胞中表达量的影响。
-- **Organismal Fitness** — 突变对整个生物体存活 / 生长能力的影响。
-- **Stability** — 突变对热力学或构象稳定性的影响。
+按功能和关键词寻找模型，按类型与来源理解模型的产生方式。需要帮助时，可以让 Agent 搜索当前可用工具并查询同一份手册。
 
-**输出：**
-- **Raw 表** — 按预测分排序的突变
-- **Prediction heatmap** — 二维矩阵：Y = 排序后的位置，X = 替换氨基酸；颜色越深 = 增益越强
-- **AI Expert Analysis**（启用时）— 自然语言解读
-- **Download Results**
+## 安装模型
 
----
+本地完整安装使用 `python3 install_full.py`；`--components external,factory,rsi,harnesses` 选择四类扩展。数据库/网络搜索和公开蛋白服务是内置能力。`--rsi-library` 可接入已有审核模型库。
 
-## 2. Sequence Design（序列设计）
-
-基于结构用 ProteinMPNN 生成候选序列，默认参数对生物用户友好。
-
-| 字段 | 说明 |
-| :--- | :--- |
-| **PDB 输入** | 上传 `.pdb`、从 Workspace 选、或用示例。 |
-| **Model Family** | Soluble（默认 — 大多数场景推荐）、Vanilla（膜蛋白）、CA（仅 Cα 粗粒度）。 |
-| **Designed Chains** | 可选，例如 `A` 或 `A,B`。留空 = 设计所有链。 |
-| **Fixed Residues** | 可选固定位点语法，例如 `A12,C13` 或 `A:12,13;B:5-8`。 |
-| **Number of sequences** | 4 / 8 / 16 / 32（在线模式受上限限制）。 |
-| **Design Diversity** | Low / Medium / High（映射到 ProteinMPNN 采样温度）。 |
-| **Enable AI analysis** | 可选。 |
-
-默认底层用 `v_48_020` + `backbone_noise=0.20`，适用于 AlphaFold 风格的骨架和常规重设计。
-
-**输出：**
-- **Table** — 生成的序列，含 header、长度、score
-- **Raw** — 完整 JSON
-- **AI Expert**（启用时）
-- **Download Result** — FASTA 文件
-
-需要更细的 ProteinMPNN 调参？去 **Advanced Tools → Sequence Design**。
-
----
-
-## 3. Protein Discovery（蛋白发现）
-
-一键 VenusMine 流水线，做结构同源搜索 + 聚类。
-
-| 字段 | 说明 |
-| :--- | :--- |
-| **PDB 输入** | 上传 `.pdb`、从 Workspace 选、或用示例。 |
-| **高级参数** | Quick 模式不暴露 — 使用后端默认值。 |
-
-点开始按钮等结果。输出与 Advanced 后端产物兼容（tree / labels / archive 下载字段）。
-
-**在线模式：** 整张表单只读。
-
-需要调参（protected region、MMseqs 线程 / 迭代、聚类相似度、e-value）请去 **Advanced Tools → Protein Discovery**。
-
----
-
-## 4. Protein Function（蛋白功能）
-
-从 FASTA 序列预测蛋白级属性。
-
-| 字段 | 说明 |
-| :--- | :--- |
-| **序列输入** | 粘贴 / 上传 FASTA、从 Workspace 选、或用示例。 |
-| **Select Task** | 要预测的属性（见下）。 |
-| **Enable AI analysis** | 可选。 |
-
-**任务选项：**
-
-- **Solubility** — 表达后是否可能可溶（对纯化关键）。
-- **Localization** — 在细胞中的最终位置（核 / 胞质 / 线粒体 / …）。
-- **Metal ion binding** — 是否能结合特定金属离子。
-- **Stability** — 对热或化学变性的内在稳定性。
-- **Sorting signal** — 是否含信号肽，将蛋白引导到特定细胞器 / 分泌途径。
-- **Optimum temperature** — 蛋白发挥最大功能活性所需的温度范围。
-
-**输出：**
-- **Raw 表** — 蛋白名、序列、预测类别、置信度（0–1）
-- **AI Expert Analysis**（启用时）
-- **Download Results**
-
-运行后状态提示： *"All predictions completed. Results were aggregated using soft voting."*
-
----
-
-## 5. Functional Residue（功能残基）
-
-沿序列预测残基级功能位点。
-
-| 字段 | 说明 |
-| :--- | :--- |
-| **序列输入** | 粘贴 / 上传 FASTA、从 Workspace 选、或用示例。 |
-| **Select Task** | 要预测的残基级位点类型（见下）。 |
-| **Enable AI analysis** | 可选。 |
-
-**任务选项：**
-
-- **Activity Site** — 负责催化 / 生物功能的关键残基。
-- **Binding Site** — 与配体、离子或其他分子结合的关键残基。
-- **Conserved Site** — 进化中高度保留的残基；通常对结构或功能关键。
-- **Motif** — 序列中形成特定结构 / 功能特征的短氨基酸模式。
-
-**输出：**
-- **Raw 表** — Position、Residue、Predicted Label (0/1)、Probability (0–1)
-- **Prediction heatmap** — 沿残基轴的一维概率分布带
-- **AI Expert Analysis**（启用时）
-- **Download Results**
-
----
-
-## 6. Physicochemical Property（理化性质）
-
-计算生物物理性质——部分仅需序列，部分仅需结构。
-
-| 性质 | 需要的输入 |
-| :--- | :--- |
-| **Physical and chemical properties** | FASTA — MW、pI、芳香性、不稳定指数、GRAVY、预测二级结构组成 |
-| **Relative solvent accessible surface area** | PDB — 每残基相对溶剂可及表面积 |
-| **SASA value** | PDB — 总 SASA（Å²） |
-| **Secondary structure** | PDB — 每残基 DSSP 编码（H、E…） |
-
-选择仅需 PDB 的任务、且上传了多链 `.pdb` 时，会多出一个 **PDB Chain** 选择器。仅 PDB 任务下粘贴文本框会被禁用。
-
-**输出：** 任务相关的表格；本模块**没有** AI Expert 标签。用 **Download Results** 导出。
-
----
-
-## 小贴士
-
-- **PDB-only 任务必须传 PDB。** 别把 FASTA 丢进 SASA / 二级结构任务，跑不出结果。
-- **传大文件前先用示例验证。** 用 example 按钮 sanity check。
-- **盯住状态胶囊。** 多数任务秒级返回，但 Directed Evolution 时间正比于 `序列长度 × 20`。
-- **AI 总结可选关掉。** 只要原始数字、想要更快出结果时可以不勾。
+`python3 initialize.py install` 默认只准备小型 Python 环境；`--dependencies platform --stages environment,frontend` 准备 Web 服务；`--tools proteinmpnn,ligandmpnn`、`--harnesses deepseek-harness,codex`、`--factory-preset demo` 分别只安装对应组件。`doctor` 搭配同样的组件参数检查安装。下载和环境放在独立忽略目录，保留管理员开关。

@@ -1,0 +1,482 @@
+{
+  "schema_status": "draft",
+  "purpose": "Design examples only; referenced adapter entrypoints have not been implemented. No credentials are embedded. Not a DSH-compatible manifest or a current VF runtime configuration.",
+  "plugin_manifests": [
+    {
+      "id": "model.dmx-glm",
+      "status": "design-only-not-implemented",
+      "package_version": "0.1.0-draft",
+      "api_version": "vf.harness/v1-draft",
+      "entrypoint": {
+        "transport": "python-worker",
+        "target": "adapters.model_dmx:bind"
+      },
+      "provides": [
+        "vf.model.binding@1"
+      ],
+      "requires": [],
+      "optional_requires": [],
+      "scope": "session",
+      "realm": "agent",
+      "config_schema": {
+        "type": "object"
+      },
+      "state_schema": "none-or-versioned",
+      "lifecycle": [
+        "prepare",
+        "activate",
+        "drain",
+        "dispose"
+      ],
+      "requested_capabilities": []
+    },
+    {
+      "id": "storage.local",
+      "status": "design-only-not-implemented",
+      "package_version": "0.1.0-draft",
+      "api_version": "vf.harness/v1-draft",
+      "entrypoint": {
+        "transport": "python-worker",
+        "target": "providers.storage:LocalStorage"
+      },
+      "provides": [
+        "vf.storage@1"
+      ],
+      "requires": [],
+      "optional_requires": [],
+      "scope": "session",
+      "realm": "agent",
+      "config_schema": {
+        "type": "object"
+      },
+      "state_schema": "none-or-versioned",
+      "lifecycle": [
+        "prepare",
+        "activate",
+        "drain",
+        "dispose"
+      ],
+      "requested_capabilities": []
+    },
+    {
+      "id": "trace.events",
+      "status": "design-only-not-implemented",
+      "package_version": "0.1.0-draft",
+      "api_version": "vf.harness/v1-draft",
+      "entrypoint": {
+        "transport": "python-worker",
+        "target": "providers.trace:EventTrace"
+      },
+      "provides": [
+        "vf.trace@1"
+      ],
+      "requires": [
+        "vf.storage@1"
+      ],
+      "optional_requires": [],
+      "scope": "session",
+      "realm": "agent",
+      "config_schema": {
+        "type": "object"
+      },
+      "state_schema": "none-or-versioned",
+      "lifecycle": [
+        "prepare",
+        "activate",
+        "drain",
+        "dispose"
+      ],
+      "requested_capabilities": []
+    },
+    {
+      "id": "artifact.contract",
+      "status": "design-only-not-implemented",
+      "package_version": "0.1.0-draft",
+      "api_version": "vf.harness/v1-draft",
+      "entrypoint": {
+        "transport": "python-worker",
+        "target": "providers.artifact:ContractWriter"
+      },
+      "provides": [
+        "vf.artifact@1"
+      ],
+      "requires": [
+        "vf.storage@1",
+        "vf.trace@1"
+      ],
+      "optional_requires": [],
+      "scope": "session",
+      "realm": "agent",
+      "config_schema": {
+        "type": "object"
+      },
+      "state_schema": "none-or-versioned",
+      "lifecycle": [
+        "prepare",
+        "activate",
+        "drain",
+        "dispose"
+      ],
+      "requested_capabilities": []
+    },
+    {
+      "id": "tools.fixture",
+      "status": "design-only-not-implemented",
+      "package_version": "0.1.0-draft",
+      "api_version": "vf.harness/v1-draft",
+      "entrypoint": {
+        "transport": "python-worker",
+        "target": "adapters.pilot_tools:FixtureMCP"
+      },
+      "provides": [
+        "vf.tools@1"
+      ],
+      "requires": [
+        "vf.artifact@1"
+      ],
+      "optional_requires": [],
+      "scope": "session",
+      "realm": "agent",
+      "config_schema": {
+        "type": "object"
+      },
+      "state_schema": "none-or-versioned",
+      "lifecycle": [
+        "prepare",
+        "activate",
+        "drain",
+        "dispose"
+      ],
+      "requested_capabilities": []
+    },
+    {
+      "id": "runtime.kimi",
+      "status": "design-only-not-implemented",
+      "package_version": "0.1.0-draft",
+      "api_version": "vf.harness/v1-draft",
+      "entrypoint": {
+        "transport": "python-worker",
+        "target": "adapters.kimi:KimiRuntime"
+      },
+      "provides": [
+        "vf.runtime@1",
+        "vf.agent.loop@1"
+      ],
+      "requires": [
+        "vf.model.binding@1",
+        "vf.tools@1",
+        "vf.trace@1"
+      ],
+      "optional_requires": [],
+      "scope": "session",
+      "realm": "agent",
+      "config_schema": {
+        "type": "object"
+      },
+      "state_schema": "none-or-versioned",
+      "lifecycle": [
+        "prepare",
+        "activate",
+        "drain",
+        "dispose"
+      ],
+      "requested_capabilities": []
+    },
+    {
+      "id": "improver.fixed",
+      "status": "design-only-not-implemented",
+      "package_version": "0.1.0-draft",
+      "api_version": "vf.harness/v1-draft",
+      "entrypoint": {
+        "transport": "python-worker",
+        "target": "providers.improver:FixedPolicy"
+      },
+      "provides": [
+        "vf.improver@1"
+      ],
+      "requires": [
+        "vf.runtime@1"
+      ],
+      "optional_requires": [],
+      "scope": "candidate",
+      "realm": "agent",
+      "config_schema": {
+        "type": "object"
+      },
+      "state_schema": "none-or-versioned",
+      "lifecycle": [
+        "prepare",
+        "activate",
+        "drain",
+        "dispose"
+      ],
+      "requested_capabilities": []
+    },
+    {
+      "id": "improver.recursive",
+      "status": "design-only-not-implemented",
+      "package_version": "0.1.0-draft",
+      "api_version": "vf.harness/v1-draft",
+      "entrypoint": {
+        "transport": "python-worker",
+        "target": "providers.improver:VersionedPolicy"
+      },
+      "provides": [
+        "vf.improver@1"
+      ],
+      "requires": [
+        "vf.runtime@1"
+      ],
+      "optional_requires": [],
+      "scope": "candidate",
+      "realm": "agent",
+      "config_schema": {
+        "type": "object"
+      },
+      "state_schema": "none-or-versioned",
+      "lifecycle": [
+        "prepare",
+        "activate",
+        "drain",
+        "dispose"
+      ],
+      "requested_capabilities": []
+    },
+    {
+      "id": "evaluation.fixture",
+      "status": "design-only-not-implemented",
+      "package_version": "0.1.0-draft",
+      "api_version": "vf.harness/v1-draft",
+      "entrypoint": {
+        "transport": "python-worker",
+        "target": "control.fixture:Evaluator"
+      },
+      "provides": [
+        "vf.evaluation@1"
+      ],
+      "requires": [],
+      "optional_requires": [],
+      "scope": "experiment",
+      "realm": "control",
+      "config_schema": {
+        "type": "object"
+      },
+      "state_schema": "none-or-versioned",
+      "lifecycle": [
+        "prepare",
+        "activate",
+        "drain",
+        "dispose"
+      ],
+      "requested_capabilities": []
+    },
+    {
+      "id": "budget.fixed",
+      "status": "design-only-not-implemented",
+      "package_version": "0.1.0-draft",
+      "api_version": "vf.harness/v1-draft",
+      "entrypoint": {
+        "transport": "python-worker",
+        "target": "control.budget:Budget"
+      },
+      "provides": [
+        "vf.budget@1"
+      ],
+      "requires": [],
+      "optional_requires": [],
+      "scope": "experiment",
+      "realm": "control",
+      "config_schema": {
+        "type": "object"
+      },
+      "state_schema": "none-or-versioned",
+      "lifecycle": [
+        "prepare",
+        "activate",
+        "drain",
+        "dispose"
+      ],
+      "requested_capabilities": []
+    }
+  ],
+  "profiles": [
+    {
+      "id": "vf-research-glm-frozen",
+      "status": "design-example-not-runnable",
+      "agent": {
+        "enabled": [
+          "model.dmx-glm",
+          "storage.local",
+          "trace.events",
+          "artifact.contract",
+          "tools.fixture",
+          "runtime.kimi"
+        ],
+        "bindings": {
+          "vf.model.binding@1": "model.dmx-glm",
+          "vf.storage@1": "storage.local",
+          "vf.trace@1": "trace.events",
+          "vf.artifact@1": "artifact.contract",
+          "vf.tools@1": "tools.fixture",
+          "vf.runtime@1": "runtime.kimi",
+          "vf.agent.loop@1": "runtime.kimi"
+        },
+        "configs": {
+          "model.dmx-glm": {
+            "provider": "dmx",
+            "base_url": "https://www.dmxapi.cn/v1",
+            "model": "glm-4-flash",
+            "credential_ref": "repo.CHAT_API_KEY"
+          },
+          "runtime.kimi": {
+            "expected_version": "0.19.2",
+            "required_capabilities": [
+              "session_start",
+              "events",
+              "cancel"
+            ],
+            "replace_boundary": "session"
+          }
+        }
+      },
+      "control": {
+        "enabled": [
+          "evaluation.fixture",
+          "budget.fixed"
+        ],
+        "bindings": {
+          "vf.evaluation@1": "evaluation.fixture",
+          "vf.budget@1": "budget.fixed"
+        },
+        "frozen_within_experiment": true,
+        "agent_can_write": false
+      },
+      "cross_realm_exports": {
+        "agent_to_control": [
+          "completed_artifact_snapshot",
+          "observable_events"
+        ],
+        "control_to_agent": [
+          "development_feedback_only"
+        ]
+      },
+      "evolution": {
+        "mode": "frozen",
+        "editable_roles": [],
+        "fixed_bindings": [
+          "vf.model.binding@1",
+          "vf.runtime@1"
+        ],
+        "fixed_control_profile": true
+      },
+      "lock_requirement": {
+        "package_and_config_hashes_required_before_execution": true,
+        "example_has_resolved_hashes": false,
+        "model_alias_is_verified_immutable": false
+      }
+    },
+    {
+      "id": "vf-research-glm-recursive",
+      "status": "design-example-not-runnable",
+      "agent": {
+        "enabled": [
+          "model.dmx-glm",
+          "storage.local",
+          "trace.events",
+          "artifact.contract",
+          "tools.fixture",
+          "runtime.kimi",
+          "improver.recursive"
+        ],
+        "bindings": {
+          "vf.model.binding@1": "model.dmx-glm",
+          "vf.storage@1": "storage.local",
+          "vf.trace@1": "trace.events",
+          "vf.artifact@1": "artifact.contract",
+          "vf.tools@1": "tools.fixture",
+          "vf.runtime@1": "runtime.kimi",
+          "vf.agent.loop@1": "runtime.kimi",
+          "vf.improver@1": "improver.recursive"
+        },
+        "configs": {
+          "model.dmx-glm": {
+            "provider": "dmx",
+            "base_url": "https://www.dmxapi.cn/v1",
+            "model": "glm-4-flash",
+            "credential_ref": "repo.CHAT_API_KEY"
+          },
+          "runtime.kimi": {
+            "expected_version": "0.19.2",
+            "required_capabilities": [
+              "session_start",
+              "events",
+              "cancel"
+            ],
+            "replace_boundary": "session"
+          }
+        }
+      },
+      "control": {
+        "enabled": [
+          "evaluation.fixture",
+          "budget.fixed"
+        ],
+        "bindings": {
+          "vf.evaluation@1": "evaluation.fixture",
+          "vf.budget@1": "budget.fixed"
+        },
+        "frozen_within_experiment": true,
+        "agent_can_write": false
+      },
+      "cross_realm_exports": {
+        "agent_to_control": [
+          "completed_artifact_snapshot",
+          "observable_events"
+        ],
+        "control_to_agent": [
+          "development_feedback_only"
+        ]
+      },
+      "evolution": {
+        "mode": "recursive",
+        "editable_roles": [
+          "domain_tool",
+          "skill",
+          "workflow",
+          "improver"
+        ],
+        "fixed_bindings": [
+          "vf.model.binding@1",
+          "vf.runtime@1"
+        ],
+        "fixed_control_profile": true
+      },
+      "lock_requirement": {
+        "package_and_config_hashes_required_before_execution": true,
+        "example_has_resolved_hashes": false,
+        "model_alias_is_verified_immutable": false
+      }
+    }
+  ],
+  "supported_mutation_examples": [
+    "enable_existing",
+    "disable_existing",
+    "replace_provider",
+    "configure",
+    "compose",
+    "generate_candidate_plugin",
+    "update_improver"
+  ],
+  "first_stage_activation_boundary": "session-or-candidate",
+  "runtime_contract": {
+    "operations": [
+      "start",
+      "events",
+      "cancel",
+      "close",
+      "capabilities"
+    ],
+    "kimi_internal_loop_replaceable": false,
+    "dsh_adapter_verified": false
+  }
+}

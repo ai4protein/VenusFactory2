@@ -1,90 +1,35 @@
-# Agent · CLI · API · 训练方法
+<!-- Generated compatibility view; edit docs/manual/zh/agent.md -->
 
-回到 [Wiki 首页](./Home.md) · [English](./Usage.md)
+# Agent：回答问题并执行分析
 
-## Agent-0.1
+## 怎样提问
 
-自然语言编排工具链（LangGraph + LangChain）。示例：
+说明蛋白标识符或序列、物种、目标性质，以及想要的结果。添加相关文件，例如：
 
-```
-您: "为 PDB:1ABC 设计耐热突变"
-→ 下载结构 → ESM-2 扫描 → 稳定性评分 → 排序报告
-```
+> 查询人类 TP53 的 UniProt 注释，整理结构域并附上来源。
 
-| 类别 | 能力 |
-|:-----|:-----|
-| 分析 | 突变 · 功能/稳定性 · 结构 |
-| 数据 | 多库检索 · 格式转换 · 批量 |
-| 规划 | 多步自动化 · 工具编排 |
-| 研究 | 文献 · 家族分析 · 报告 |
+> 读取我的 sequences.csv，计算序列理化性质并保存 CSV。序列列不明确时先问我。
 
-需要 LLM API Key。Science Expert 每次请求都会读取 [`model-config.yaml.example`](../../model-config.yaml.example)：
+Agent 可以搜索可用工具、检索网络、查询蛋白数据库和调用已开启的预测模型。对于“如何用自己的数据训练”等平台问题，它会检索平台手册，按当前功能回答。
 
-```bash
-cp model-config.yaml.example model-config.yaml
-# 把 `active` 改成 dmx / gpt / claude / gemini / deepseek / …
-# 对应 Key 写在 `.env` 或界面 Settings
-```
+## 选择 Model 和 Harness
 
-详细手册：[AgentManual_CN.md](../manual/AgentManual_CN.md)
+在输入框旁选择。可用选项由部署配置和密钥决定，在线版提供已配置的免费模型。Harness 可包括 Kimi Code、Codex、Claude Code、DeepSeek Harness，请选择当前可用的组合。Harness 名称不代表用于预测的蛋白模型。
 
-## CLI（示例）
+## 继续对话
 
-脚本多在 `script/tools/` 下：
+工具活动显示在对话中，运行中的会话在历史列表显示运行标记。任务提交后可以切换模式或会话，再从历史记录或会话链接返回。停止需要明确点击停止，切换页面不等于停止。
 
-```bash
-# 训练（路径以仓库实际文件为准）
-bash script/tools/train/train_plm_lora.sh \
-  --model facebook/esm2_t33_650M_UR50D \
-  --dataset DeepSol --batch_size 32
+常用对话可以置顶，悬浮查看时间。输入框附近的上下文用量圈显示使用情况；长对话可能被压缩，续聊时若发现关键约束缺失，可以补充说明。
 
-# 评估
-bash script/tools/evaluate/eval.sh \
-  --model_path ckpt/DeepSol/best_model \
-  --test_dataset DeepSol
-```
+## 代码和文件
 
-数据库下载等脚本见 `script/tools/database/`。
+自定义分析由 Agent 编写源文件，在会话沙箱中执行。程序只能看到该会话的工作目录；联网检索、下载通过已注册工具进行。点击文件图标打开结果，支持的结构文件可进入结构查看器。
 
-## REST API
+API 密钥不要粘贴到对话中，部署密钥在 Administration 中管理。
 
-```bash
-python src/api_server.py   # → http://localhost:5000/docs
-```
+## 调用 Scientist 产物
 
-```bash
-curl -X POST http://localhost:5000/api/mutation/predict \
-  -H "Content-Type: application/json" \
-  -d '{"sequence": "MKTAYIA...", "mutations": ["A23V", "K45R"]}'
-```
+按蛋白、性质或实验场景提出需求。Agent 会搜索注册目录，查看匹配模型的接口和适用范围，再执行调用。研究产物需通过独立审核并发布后，才能成为共享工具；当前部署还需开启该工具。
 
-具体路由以 `/docs` 为准（版本可能演进）。
-
-## Python 调用（示意）
-
-```python
-from src.tools.mutation import predict_mutation_effects
-from src.tools.predict import predict_protein_function
-
-results = predict_mutation_effects(
-    sequence="MKTAYIAKQR...",
-    mutations=["A5V", "K9R"],
-    model="esm2",
-)
-```
-
-导入路径以当前代码为准。
-
-## PEFT 训练方法对照
-
-| 方法 | 内存 | 速度 | 表现 | 适合 |
-|:-----|:----:|:----:|:----:|:-----|
-| LoRA | 低 | 快 | 良好 | 通用 |
-| QLoRA | 极低 | 慢 | 良好 | 显存紧张 |
-| DoRA | 低 | 中 | 更好 | LoRA 改进 |
-| AdaLoRA | 低 | 中 | 更好 | 自适应秩 |
-| SES-Adapter | 中 | 中 | 更好 | 选择性调优 |
-| IA3 | 极低 | 快 | 良好 | 轻量 |
-| Freeze | 低 | 快 | 良好 | 简单调优 |
-
-详见 [TrainingManual_ZH.md](../manual/TrainingManual_ZH.md)。
+开发新能力见 [Scientist](./Scientist_CN.md)，管理结果见 [Library](./Library_CN.md)。

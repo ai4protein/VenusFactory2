@@ -1,125 +1,125 @@
-<div align="right">
-  <a href="README.md">English</a> | <a href="README_CN.md">简体中文</a>
-</div>
+# VenusFactory2
 
-<p align="center">
-  <img src="img/banner_2503.png" width="70%" alt="VenusFactory2 Banner">
-</p>
+**Recursive Self-improvement AI Agents for Protein Engineering**
 
-<div align="center">
+[Web server](https://venusfactory.bio/) · [Tutorials](docs/wiki/Home.md) · [Installation](docs/installation.md) · [中文](README_CN.md)
 
-[![GitHub stars](https://img.shields.io/github/stars/AI4Protein/VenusFactory2?style=flat-square)](https://github.com/AI4Protein/VenusFactory2/stargazers)
-[![GitHub license](https://img.shields.io/github/license/AI4Protein/VenusFactory2?style=flat-square)](https://github.com/AI4Protein/VenusFactory2/blob/main/LICENSE)
-[![Wiki](https://img.shields.io/badge/Wiki-docs-brightgreen?style=flat-square)](docs/wiki/Home.md)
-[![Demo](https://img.shields.io/badge/Demo-Website-blue?style=flat-square)](https://venusfactory.bio/)
-[![arXiv](https://img.shields.io/badge/arXiv-2603.27303-b31b1b?style=flat-square)](https://arxiv.org/abs/2603.27303)
+VenusFactory2 brings protein research into a conversational workspace. Ask a
+question, upload experimental data, or start with a protein of interest to explore
+the literature, run predictions and develop models for your research.
 
-**Agent-driven protein engineering platform**  
-Web UI · REST API · CLI · 40+ models · 11+ databases
+- **Ask and analyse.** Find protein information, use scientific tools and interpret results.
+- **Develop from your data.** Turn a research goal and measurements into model code, tests and a research report.
+- **Investigate a protein.** Bring literature, database records and predictions together in a report with sources.
+- **Reuse the results.** Run models directly, combine tools in a workflow, or make reviewed Scientist models available to Agent.
 
-</div>
+![VenusFactory2 conversation workspace](docs/images/chat-workspace.jpg)
 
-<details>
-<summary>📨 WeChat / feedback</summary>
-<p align="center"><img src="img/wechat.png" width="50%" alt="WeChat"></p>
-</details>
+## Start with a question
 
----
+Click **New Chat**, choose a mode and describe what you want to learn. Agent is
+selected by default. You can paste a sequence or attach files, including structures,
+measurements and papers.
 
-## What is it?
+| Mode | Example request | What you get |
+| --- | --- | --- |
+| **Agent · Ask and analyse** | “Find homologues of this protein and explain its annotated domains.” | An answer supported by searches, tool results and downloadable files |
+| **Scientist · Develop and improve** | “Use my solubility measurements to develop and evaluate a predictor.” | A project with code, test and evaluation results, a report, and model artifacts when trained |
+| **Researcher · Investigate a protein** | “Investigate this enzyme, focusing on substrate specificity and engineering opportunities.” | A multi-section report combining literature, protein information and predictions |
 
-VenusFactory2 puts protein language models, biological databases, and an Agent orchestrator in one place: upload a sequence/structure to predict, drive multi-step analysis in natural language, or fine-tune your own models.
+To explore first, use Agent's suggested questions or open a **completed example**
+in Scientist or Researcher. Completed examples include results you can read and
+download without starting a new run. You can also ask Agent how to use the platform;
+it reads the same tutorials as the Manual.
 
-Try online: [venusfactory.bio](https://venusfactory.bio/)
+### How Scientist works
 
-<p align="center">
-  <img src="img/web_v2/train.png" width="90%" alt="VenusFactory2 Training Interface">
-</p>
+Scientist uses recursive self-improvement (RSI): it develops a solution, tests it,
+uses the feedback to revise the approach, and repeats within the research budget.
+A PI (research lead) coordinates the work:
 
-<p align="center">
-  <img src="img/web_v2/agent.png" width="90%" alt="VenusFactory2 Agent Interface">
-</p>
+**Goal and data → PI and plan → Develop and experiment ↔ Critique and revise → Review → Deliver**
 
----
+Follow the plan, intermediate files and progress in the conversation. The final
+project and report can be downloaded as a ZIP. A useful result may be a new analysis
+tool, a fitted machine-learning model or a method for your experimental setting.
+Models intended for the shared library undergo separate validation and independent
+review before Agent can discover and use them.
 
-## Quick Start
+## Choose models for your experiment
 
-| Prerequisite | Notes |
-|:-------------|:------|
-| Python | **≥3.12** (installer creates a 3.12 `.venv` by default) |
-| Node.js | **25.x** + npm (WebUI v2 build) |
-| Disk | Reserve several–15+ GB (PyTorch wheels dominate) |
-| GPU | Optional; NVIDIA → CUDA wheels, else CPU |
+**Model Plaza** groups models by biological function. Open a model to run a
+prediction, or use **Train**, **Evaluate** and **Predict** with your own dataset.
+**Workflow** lets you connect tools and follow the data through each step.
 
-Slow Hugging Face access: `export HF_ENDPOINT=https://hf-mirror.com`
+| Research task | Example tools and models |
+| --- | --- |
+| Find related proteins and annotate function | NCBI BLAST, Foldseek, InterProScan |
+| Rank mutations | VenusREM, ProSST, ProtSSN |
+| Design sequences | ProteinMPNN, LigandMPNN |
+| Predict protein properties | ProtSolM, VenusX, VenusVaccine and Factory-trained models |
+| Study small molecules | ADMET prediction and Vina docking |
+| Build a model for your experiment | Custom model training and reviewed Scientist models |
+
+![Model Plaza: models organised by research task](docs/images/model-plaza.jpg)
+
+The catalog brings together established tools, Factory-trained models and reviewed
+Scientist contributions. Available tools depend on the installation and administrator
+settings; the model page shows what can run.
+
+## Run locally
+
+Use Linux or WSL2 with Git and Python 3.10+ to run the installer; it prepares a
+Python 3.12 runtime for the platform. This setup installs the web platform,
+built-in search and protein services, and one agent backend:
 
 ```bash
-git clone --recurse-submodules https://github.com/AI4Protein/VenusFactory2.git && cd VenusFactory2
-# If you already cloned without submodules:
-#   git submodule update --init --recursive
-python scripts/setup_quickstart.py          # interactive one-click install
-# python scripts/setup_quickstart.py -y     # CI / non-interactive
-
-source .venv/bin/activate
-python src/webui_v2.py --host 0.0.0.0 --port 7861
-# → http://localhost:7861
+git clone --depth 1 https://github.com/ai4protein/VenusFactory2.git
+cd VenusFactory2
+python3 install_full.py --components harnesses --harnesses deepseek-harness
+.venv/bin/python scripts/serve.py --mode local --port 7861
 ```
 
-The installer detects older setups (`.venv` / frontend / weights) and can reuse or wipe them. Press Enter for the recommended path.
+Open **http://localhost:7861**. In **Settings → Administration**, configure a
+language-model API and enable the tools you need. Use DMXAPI or OpenRouter free
+models, or configure your own OpenAI, Claude, Grok, GLM, MiniMax and other provider
+APIs in local mode. See [API configuration](docs/model-providers.md). Web search
+can use Tavily or SerpAPI; public protein and literature databases are built in.
 
-**After launch**
+The installer detects the environment, prepares dependencies and shows download
+progress. Model packages and weights can be added later. For example:
 
-1. Open the UI → Quick Tools work without an LLM key  
-2. Agent / Science Expert LLM: copy the endpoint config, pick a provider, then set the key  
-   ```bash
-   cp model-config.yaml.example model-config.yaml
-   # set `active: dmx` | `gpt` | `claude` | `gemini` | `deepseek` | …
-   cp .env.example .env   # fill DMXAPI_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY / …
-   ```
-   The yaml is re-read on every page load and chat request — change `active`, `model`, or `base_url` and refresh. See [`model-config.yaml.example`](model-config.yaml.example).  
-3. Optional check: `python scripts/check_env.py`
-
----
-
-## Documentation
-
-Three layers — start at the top; dig only when needed:
-
-| Layer | Where |
-|:------|:------|
-| Map of all docs | **[docs/README.md](docs/README.md)** |
-| Install · catalogs · WebUI map · CLI/API | [docs/wiki/Home.md](docs/wiki/Home.md) |
-| Per-feature how-tos | [docs/manual/](docs/manual/) |
-| Agent skills (authors) | [src/agent/skills/AGENTS.md](src/agent/skills/AGENTS.md) · [docs/agent/SKILLS_INDEX.md](docs/agent/SKILLS_INDEX.md) · [docs/agent/CONTRIBUTING_SKILLS.md](docs/agent/CONTRIBUTING_SKILLS.md) |
-
-中文：[README_CN.md](README_CN.md) · [docs/README.md](docs/README.md)
-
----
-
-## Citation
-
-```bibtex
-@article{tan2026venusfactory2,
-  title={Self-evolving AI agents for protein discovery and directed evolution},
-  author={Tan, Yang and Zhang, Lingrong and Li, Mingchen and Yu, Yuanxi and Zhong, Bozitao and Zhou, Bingxin and Dong, Nanqing and Hong, Liang},
-  journal={arXiv preprint arXiv:2603.27303},
-  year={2026}
-}
-
-@inproceedings{tan2025venusfactory,
-  title={VenusFactory: An Integrated System for Protein Engineering with Data Retrieval and Language Model Fine-Tuning},
-  author={Tan, Yang and Liu, Chen and Gao, Jingyuan and Banghao, Wu and Li, Mingchen and Wang, Ruilin and Zhang, Lingrong and Yu, Huiqun and Fan, Guisheng and Hong, Liang and others},
-  booktitle={Proceedings of the 63rd Annual Meeting of the Association for Computational Linguistics (Volume 3: System Demonstrations)},
-  pages={230--241},
-  year={2025}
-}
+```bash
+python3 initialize.py install --tools proteinmpnn,ligandmpnn
 ```
 
----
+For a full installation, use `python3 install_full.py`. Some components require a
+GPU or a separate license. See the [installation guide](docs/installation.md) for
+hardware requirements, component selection and health checks, and the
+[service guide](docs/architecture/services.md) for online or multi-process deployment.
 
-## License & acknowledgement
+### Online or local?
 
-Released under the **VenusFactory Non-Commercial License**: free for academic / non-commercial use; commercial use needs written approval → **<hongl3lilang@sjtu.edu.cn>**. See [`LICENSE`](./LICENSE) / [`LICENSE_CN.md`](./LICENSE_CN.md).
+Use the web server to get started without installation. Run locally when you need
+your own datasets, a larger training model or additional compute-intensive tools.
+The two modes share the same interface.
 
-Maintained by [Liang's Lab](https://ins.sjtu.edu.cn/people/lhong/index.html), Shanghai Jiao Tong University.  
-[Website](https://venusfactory.bio/) · [YouTube](https://www.youtube.com/watch?v=MT6lPH5kgCc) · [Issues](https://github.com/AI4Protein/VenusFactory2/issues)
+| | Online | Local |
+| --- | --- | --- |
+| Conversations | Shared daily allowance across all three modes | Your own API and resource settings |
+| File uploads | Up to 10 MB per file | No platform file-size limit |
+| Custom model training | ESM2 8M | Installed models and available hardware |
+| Library | Unavailable | Browse uploaded and generated files |
+
+## Learn more
+
+- [Tutorials and examples](docs/wiki/Home.md): Chat, Model Plaza, Workflow and working with your data.
+- [Installation](docs/installation.md): add models, weights and agent backends as needed.
+- [Developer guide](docs/development.md): repository layout, model integration, services and checks.
+
+## License and citation
+
+VenusFactory2 is available for non-commercial use under the [project license](LICENSE).
+Individual tools and models retain their own licenses. Please use the
+[published citations](docs/CITATION.md) when referring to the platform and its methods.
+For questions, contact [tanyang.august@sjtu.edu.cn](mailto:tanyang.august@sjtu.edu.cn).

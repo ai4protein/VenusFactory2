@@ -1,0 +1,19 @@
+{
+  "captured": "2026-11-02",
+  "viewport": [
+    1280,
+    720
+  ],
+  "images": [
+    {
+      "file": "chat-workspace.jpg",
+      "sha256": "1356106ba07c74387e594e0299cbf481ff1486a0838db0186926c794f4035a68",
+      "bytes": 41884
+    },
+    {
+      "file": "model-plaza.jpg",
+      "sha256": "66ce605bb8947ac627286ebd992171f8c8afd4a9fd6323008dbc9426f0c7df29",
+      "bytes": 57765
+    }
+  ]
+}

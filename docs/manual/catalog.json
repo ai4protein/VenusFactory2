@@ -1,0 +1,236 @@
+{
+  "version": 1,
+  "updated": "2026-11-01",
+  "sections": [
+    {
+      "key": "start",
+      "title": {
+        "en": "Getting started",
+        "zh": "快速上手"
+      },
+      "summary": {
+        "en": "Choose a mode and complete your first task.",
+        "zh": "选择模式，完成第一个任务。"
+      },
+      "aliases": [],
+      "wiki": "Start",
+      "files": {
+        "en": "en/start.md",
+        "zh": "zh/start.md"
+      }
+    },
+    {
+      "key": "agent",
+      "title": {
+        "en": "Agent",
+        "zh": "Agent 对话"
+      },
+      "summary": {
+        "en": "Ask questions and use existing tools.",
+        "zh": "自由问答、检索和调用已有工具。"
+      },
+      "aliases": [],
+      "wiki": "Agent",
+      "files": {
+        "en": "en/agent.md",
+        "zh": "zh/agent.md"
+      }
+    },
+    {
+      "key": "scientist",
+      "title": {
+        "en": "Scientist",
+        "zh": "Scientist 研发"
+      },
+      "summary": {
+        "en": "Turn a goal and data into a tested capability.",
+        "zh": "围绕目标和数据研发、评估新能力。"
+      },
+      "aliases": [],
+      "wiki": "Scientist",
+      "files": {
+        "en": "en/scientist.md",
+        "zh": "zh/scientist.md"
+      }
+    },
+    {
+      "key": "researcher",
+      "title": {
+        "en": "Researcher",
+        "zh": "Researcher 报告"
+      },
+      "summary": {
+        "en": "Research a protein and assemble an evidence-based report.",
+        "zh": "调研目标蛋白，整合预测和证据。"
+      },
+      "aliases": [
+        "report"
+      ],
+      "wiki": "Researcher",
+      "files": {
+        "en": "en/researcher.md",
+        "zh": "zh/researcher.md"
+      }
+    },
+    {
+      "key": "models",
+      "title": {
+        "en": "Model Plaza",
+        "zh": "模型广场"
+      },
+      "summary": {
+        "en": "Find models by function and open their prediction forms.",
+        "zh": "按功能查找模型，直接进入预测。"
+      },
+      "aliases": [
+        "quick-tools",
+        "advanced-tools"
+      ],
+      "wiki": "Models",
+      "files": {
+        "en": "en/models.md",
+        "zh": "zh/models.md"
+      }
+    },
+    {
+      "key": "training",
+      "title": {
+        "en": "Train a model",
+        "zh": "模型训练"
+      },
+      "summary": {
+        "en": "Prepare labeled sequences and submit a training job.",
+        "zh": "准备带标签的序列，提交训练任务。"
+      },
+      "aliases": [],
+      "wiki": "Training",
+      "files": {
+        "en": "en/training.md",
+        "zh": "zh/training.md"
+      }
+    },
+    {
+      "key": "prediction",
+      "title": {
+        "en": "Predict",
+        "zh": "模型预测"
+      },
+      "summary": {
+        "en": "Run single-sequence and batch predictions.",
+        "zh": "对单条序列或批量样本进行预测。"
+      },
+      "aliases": [],
+      "wiki": "Prediction",
+      "files": {
+        "en": "en/prediction.md",
+        "zh": "zh/prediction.md"
+      }
+    },
+    {
+      "key": "evaluation",
+      "title": {
+        "en": "Evaluate",
+        "zh": "模型评估"
+      },
+      "summary": {
+        "en": "Evaluate checkpoints on independent labeled data.",
+        "zh": "用独立的带标签数据评估模型。"
+      },
+      "aliases": [],
+      "wiki": "Evaluation",
+      "files": {
+        "en": "en/evaluation.md",
+        "zh": "zh/evaluation.md"
+      }
+    },
+    {
+      "key": "workflows",
+      "title": {
+        "en": "Workflows",
+        "zh": "工作流"
+      },
+      "summary": {
+        "en": "Connect tools, save a workflow and run it again.",
+        "zh": "组合工具、保存流程并重复运行。"
+      },
+      "aliases": [],
+      "wiki": "Workflows",
+      "files": {
+        "en": "en/workflows.md",
+        "zh": "zh/workflows.md"
+      }
+    },
+    {
+      "key": "library",
+      "title": {
+        "en": "Library & files",
+        "zh": "Library 与文件"
+      },
+      "summary": {
+        "en": "Upload, preview and retrieve your research files.",
+        "zh": "上传、预览和查找研究文件。"
+      },
+      "aliases": [
+        "workspace"
+      ],
+      "wiki": "Library",
+      "files": {
+        "en": "en/library.md",
+        "zh": "zh/library.md"
+      }
+    },
+    {
+      "key": "data",
+      "title": {
+        "en": "Find data",
+        "zh": "数据检索"
+      },
+      "summary": {
+        "en": "Retrieve literature, sequences, structures and annotations.",
+        "zh": "检索文献、序列、结构和注释。"
+      },
+      "aliases": [
+        "download"
+      ],
+      "wiki": "Data",
+      "files": {
+        "en": "en/data.md",
+        "zh": "zh/data.md"
+      }
+    },
+    {
+      "key": "settings",
+      "title": {
+        "en": "Settings & access",
+        "zh": "设置与额度"
+      },
+      "summary": {
+        "en": "Choose models, understand limits and manage deployment.",
+        "zh": "选择模型、查看额度和管理部署。"
+      },
+      "aliases": [],
+      "wiki": "Settings",
+      "files": {
+        "en": "en/settings.md",
+        "zh": "zh/settings.md"
+      }
+    },
+    {
+      "key": "faq",
+      "title": {
+        "en": "Troubleshooting",
+        "zh": "常见问题"
+      },
+      "summary": {
+        "en": "Resolve missing results, disabled models and data issues.",
+        "zh": "排查结果、模型可用性和数据问题。"
+      },
+      "aliases": [],
+      "wiki": "FAQ",
+      "files": {
+        "en": "en/faq.md",
+        "zh": "zh/faq.md"
+      }
+    }
+  ]
+}

@@ -60,7 +60,7 @@ metadata:
 ## scientific-agent-skills (submodule)
 
 The full upstream library is already wired via git submodule
-`third_party/scientific-agent-skills` and the dual-root loader. Contributors
+`src/agent/skills/vendor/scientific-agent-skills` and the dual-root loader. Contributors
 normally **do not** copy packages into `src/agent/skills/`.
 
 | Topic | Rule |

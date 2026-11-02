@@ -1,161 +1,56 @@
-# Download — Batch Retrieval from Biological Databases
+<!-- Compatibility view; edit en/data.md -->
 
-The **Download** tab lets you pull sequences, structures, and metadata from major databases in bulk, instead of clicking through each web page. All six sources share the same workflow: choose **Single ID** or **From File**, click run, get an archive.
+# Retrieve data and evidence
 
-## Sources at a Glance
+## Ask in Chat
 
-| Source | Route | ID example | What you get |
-| :--- | :--- | :--- | :--- |
-| UniProt | `/download/uniprot` | `P00734` | Protein sequences (FASTA) |
-| NCBI | `/download/ncbi` | `NP_000517.1` | Protein sequences (FASTA) |
-| RCSB Structure | `/download/rcsb-structure` | `1a0j` | 3D structures (`.pdb` / `.cif`) |
-| AlphaFold | `/download/alphafold` | `P00734` | Predicted structures (`.pdb`) |
-| RCSB Metadata | `/download/rcsb-metadata` | `1a0j` | Per-entry JSON metadata |
-| InterPro | `/download/interpro` | `IPR000001` | Per-entry JSON metadata |
+Download is a tool capability, rather than a separate sidebar page. In Agent, identify the protein, organism and requested data. Ask for source accessions and saved files, for example:
 
----
+> Retrieve the reviewed UniProt sequence and available PDB structures for human lysozyme. Keep the accession IDs and save the sequence as FASTA.
 
-## Common Layout
+Registered tools can cover UniProt, NCBI, RCSB, AlphaFold DB, InterPro and other enabled services. Web and literature search uses configured providers such as Tavily or SerpAPI; you do not need to paste a search-provider key into Chat.
 
-Every download page uses the same form:
+## Choose a database
 
-| Field | Notes |
-| :--- | :--- |
-| **Download Method** | `Single ID` or `From File`. |
-| **ID input (Single)** | Type one ID — label / placeholder is source-specific. |
-| **File upload (From File)** | Drop a `.txt` (one ID per line) or pick from **Workspace**. Hit **Use Example** to load a sample list. A preview shows the first 20 entries. |
-| **Save Error File** | (Default on) Writes failures to `failed.txt` in the output directory. |
-| **Source-specific options** | See per-source notes below. |
+| What you need | Available queries |
+| --- | --- |
+| Target–disease links and drug candidates | **Open Targets**: search a gene, disease or drug name; inspect associations, tractability and mechanisms |
+| Gene IDs and cross-species context | **Ensembl**: resolve a symbol with its species, retrieve annotations, cross-references, orthologues and sequences |
+| Gene expression and enrichment | **gget**: Ensembl/UniProt information, sequences, PDB metadata, ARCHS4 expression, Bgee orthology, Open Targets and Enrichr |
+| Papers and abstracts | **Europe PMC**: abstracts, DOI/PMID, publication year, open-access and retraction metadata |
+| Compound information | **PubChem**: names, CID/SMILES, formula, mass and physicochemical descriptors |
 
-After the run, a status message and a result archive link appear. For structure sources you also get an inline 3D viewer.
+For example:
 
----
+> Resolve human BRCA2, summarize its Open Targets disease associations and drug candidates, and include source links.
 
-## 1. UniProt Sequences
+> Find the mouse orthologue of human BRCA2 and retrieve its protein sequence.
 
-| Field | Notes |
-| :--- | :--- |
-| **ID format** | UniProt accession (e.g. `P00734`). |
-| **Extra option** | **Merge FASTA** — combine all hits into a single multi-record FASTA. |
+> Find recent PET hydrolase papers in Europe PMC and compare the reported assays.
 
-**Output layout** (Single + no merge):
-```
-download/uniprot_sequences/
-├── P00734.fasta      # individual FASTA per ID
-└── merged.fasta      # only when merge enabled
-```
+> Retrieve caffeine from PubChem, including its SMILES and molecular properties.
 
----
+These database queries do not need a language-model or search-provider key of their own.
+They work in local and online modes when enabled in Administration. Agent and Scientist
+can discover them by task. Researcher uses the same Europe PMC tool for literature;
+when UniProt gives an unambiguous Ensembl gene mapping it also collects gene annotations,
+and for human proteins adds relevant Open Targets associations and drug candidates.
 
-## 2. NCBI Sequences
+Open Targets covers human therapeutic targets. Resolve names before comparing records;
+gene symbols can differ between species. Database associations do not establish causality,
+and PubChem descriptors are not ADMET or binding predictions. Results retain source links,
+retrieval time and release information where available. Use returned page/cursor information
+to continue a search. gget exposes selected public-query modules; large dataset downloads
+and paid AI modules are not part of this tool.
 
-| Field | Notes |
-| :--- | :--- |
-| **ID format** | RefSeq / GenBank protein accession (e.g. `NP_000517.1`, `XP_011541001.1`). |
-| **Extra option** | **Merge FASTA** — combine all hits into one file. |
+## Sequence and structure search
 
-Same on-disk layout as UniProt.
+NCBI BLAST searches sequence similarity. Remote Foldseek searches structural similarity. gget adapters provide supported gene/sequence and annotation queries. Supply the right identifier, species, sequence or structure; a protein name alone may be ambiguous.
 
----
+Remote services can return a job identifier while processing. Continue checking that identifier rather than repeatedly submitting the same search. Public server rate limits and outages are independent of platform availability.
 
-## 3. RCSB Structures
+## Keep provenance
 
-| Field | Notes |
-| :--- | :--- |
-| **ID format** | 4-character PDB code (e.g. `1a0j`). |
-| **File Type** | `pdb` or `cif` (mmCIF, recommended for large structures). |
+Keep database accessions, source links, retrieval context and relevant versions with downloaded files. Search snippets are not full papers, and a homology hit is not experimental confirmation of function. For a comprehensive synthesis, use [Researcher](./en/researcher.md).
 
-**Output layout:**
-```
-download/rcsb_structures/
-└── 1a0j.pdb          # or 1a0j.cif
-```
-
-The downloaded structure is rendered inline via Molstar so you can spot-check before downloading the archive.
-
----
-
-## 4. AlphaFold Structures
-
-| Field | Notes |
-| :--- | :--- |
-| **ID format** | UniProt accession (e.g. `P00734`). |
-| **Extra display** | Per-structure pLDDT and B-factor stats are shown next to the Molstar viewer. |
-
-**Output layout:**
-```
-download/alphafold_structures/
-└── P00734.pdb        # AlphaFold predicted structure
-```
-
----
-
-## 5. RCSB Metadata
-
-| Field | Notes |
-| :--- | :--- |
-| **ID format** | PDB code. |
-| **Returns** | Per-entry JSON: resolution, experimental method, publication info, chain composition, etc. |
-
-```
-download/rcsb_metadata/
-└── 1a0j.json
-```
-
----
-
-## 6. InterPro Metadata
-
-| Field | Notes |
-| :--- | :--- |
-| **ID format** | InterPro accession (e.g. `IPR000001`). |
-| **Returns** | Domain detail + list of UniProt IDs associated with this domain. |
-
-```
-download/interpro_domain/
-└── IPR000001/
-    ├── detail.json    # detailed protein information
-    ├── meta.json      # accession + protein count
-    └── uids.txt       # list of UniProt IDs in this domain
-```
-
----
-
-## Input File Formats
-
-**ID lists (UniProt / NCBI / RCSB / AlphaFold / InterPro):** one ID per line.
-
-```
-P00734
-P61823
-Q8WZ42
-```
-
-**InterPro batch from JSON** (legacy): a JSON array of objects with `metadata.accession`.
-
-```json
-[
-    {"metadata": {"accession": "IPR000001"}},
-    {"metadata": {"accession": "IPR000002"}}
-]
-```
-
----
-
-## Error Files
-
-When **Save Error File** is on, failed IDs are logged to `failed.txt` in the output directory:
-
-```
-P00734 - Download failed: 404 Not Found
-1a0j   - Connection timeout
-```
-
----
-
-## Tips
-
-- **Batch in chunks of 50–200.** Public APIs throttle aggressive parallel requests; the backend already paces calls but very large lists are still slower.
-- **Use `cif` for big structures.** PDB legacy format doesn't fit modern large assemblies; `cif` does.
-- **AlphaFold ≠ experimental.** Always check the pLDDT panel — low-confidence regions (orange/red) should not be over-interpreted.
-- **Merge FASTA** is only useful when you want a single file for downstream pipelines (e.g. MMseqs / BLAST). Keep merge **off** if you want per-ID outputs.
+The analysis sandbox has no network access. Agent uses registered download/search tools first, then reads the saved files for local analysis. Local VenusMine/Foldseek discovery is distinct from the remote Foldseek service and remains unavailable online.

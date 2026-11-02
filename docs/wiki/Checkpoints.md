@@ -1,57 +1,42 @@
-# Checkpoints
+<!-- Generated compatibility view; edit docs/manual/en/models.md -->
 
-Back to [Wiki home](./Home.md) · [中文](./Checkpoints_CN.md) · upstream notes [ckpt/README.md](../../ckpt/README.md)
+# Model Plaza
 
-Weights are hosted at [AI4Protein/VenusFactory2-ckpts](https://huggingface.co/AI4Protein/VenusFactory2-ckpts) and are **not** in git. Local cache defaults to `ckpt/`.
+## Find a model by function
 
-## One-click default
+Open Model Plaza and browse the functional categories or search by model name, protein property or task. There is one catalog, without Quick/Advanced tiers. Models include platform predictors and published custom or Scientist capabilities that the current deployment makes available.
 
-`scripts/setup_quickstart.py` downloads **`predict-core`** (~163 MB) in the recommended plan.
+The catalog can include mutation scoring, protein/residue properties, sequence design, structure-related tools and molecular ADMET. Open a card to see its inputs and parameters. Availability depends on enabled tools, weights and dependencies; an entry in the catalog is not a promise that it can run on every deployment.
 
-## Presets
+## Run a tool directly
 
-| Preset | Approx. size | Contents |
-|:-------|:-------------|:---------|
-| `demo` | ~0.4 MB | Tiny solubility demo |
-| `predict-core` | ~163 MB | **Recommended**: demo + per-task `ankh-large` |
-| `proteinmpnn` | ~64 MB | ProteinMPNN |
-| `predict-all` | ~405 MB | All finetuned task folders |
-| `all` | ~469 MB | Full hub snapshot |
+1. Open a model matching the biological question.
+2. Supply the required sequence, structure, table or small-molecule input.
+3. Review adjustable parameters. Use advanced settings when you need chain selection, sampling or another model-specific option.
+4. Submit once and follow the job. Inspect its result files and preserve the job number for follow-up.
 
-```bash
-python scripts/download_ckpts.py --list-presets
-python scripts/download_ckpts.py --preset predict-core
-python scripts/download_ckpts.py --preset proteinmpnn
-python scripts/download_ckpts.py --include 'DeepSol/**'
-```
+Disabled cards remain visible online. Their availability hint explains why they cannot be used. Choosing another Chat mode does not bypass an administrator's tool switch.
 
-## Common task folders (examples)
+## Custom models and workflows
 
-Adapters are stored per task (with backbones such as `ankh-large`, `esm2_t33_650M_UR50D`, …):
+Use the training, prediction and evaluation entries for your own models. A private model does not become public just because training finishes. Shared publication requires the applicable review and visibility settings.
 
-- DeepSol / DeepSoluE / ProtSolM — solubility
-- DeepLocBinary / DeepLocMulti — localization
-- Thermostability / DeepET_Topt — thermostability / Topt
-- MetalIonBinding / SortingSignal / DLKcat / EpHod
-- VenusVaccine_* — vaccine binary tasks
-- VenusX_Res_* — residue-level tasks (Motif / Act / Bind / Evo, …)
-- ProteinMPNN — sequence design
-- `demo/` — demo weights
+For repeated multi-step analyses, open [Workflows](./Workflows.md) and connect compatible tools. For conversational use, ask Agent to find a suitable model and inspect its scope.
 
-Full file list, sizes, and sha256: `ckpt/manifest.json` (after download or on HF).
+## Leaderboards
 
-## Environment variables
+Model Plaza includes VenusX and a ProteinGym entry/link. Compare evaluation task and dataset before interpreting rankings; leaderboard positions do not guarantee performance for your protein or assay.
 
-| Variable | Default | Meaning |
-|:---------|:--------|:--------|
-| `VENUS_CKPT_REPO_ID` | `AI4Protein/VenusFactory2-ckpts` | HF repo |
-| `VENUS_CKPT_DIR` | `ckpt` | Local root |
-| `VENUS_CKPT_REVISION` | `main` | Branch / tag |
-| `VENUS_CKPT_AUTO_DOWNLOAD` | `1` | Fetch missing weights |
-| `VENUS_DOWNLOAD_QUIET` | `0` | Suppress notices |
-| `HF_ENDPOINT` | (empty) | Mirror, e.g. `https://hf-mirror.com` |
+## Where models come from
 
-## Gradio frpc
+- **Pretrained methods**: ProSST, ProtSSN, ESM-1v, ProteinMPNN and LigandMPNN use upstream methods and checkpoints.
+- **Factory-trained models**: a name such as **DeepSol · ESM2-650M** identifies a dataset-specific predictor and its backbone. Different datasets can produce different models from the same backbone.
+- **Scientist models**: RSI develops a new model or reusable capability. Read its scope, evaluation report and review status before use. Private research results stay private until publication is approved.
 
-Only for `--share`: `python scripts/download_frpc.py --to-gradio-cache`  
-See [Installation.md](./Installation.md).
+Use function and search to find a model; use its type and source to understand how it was produced. Agent can search available tools and read the same manual when you need help.
+
+## Installing models
+
+For complete local setup use `python3 install_full.py`; `--components external,factory,rsi,harnesses` selects optional families. Database/web search and public protein services are built in. `--rsi-library` attaches an existing reviewed model library.
+
+`python3 initialize.py install` prepares a small Python environment. Add `--dependencies platform --stages environment,frontend` for the Web service; `--tools proteinmpnn,ligandmpnn`, `--harnesses deepseek-harness,codex`, or `--factory-preset demo` installs only that component. Use `doctor` with the same component flags to check it. Downloads and environments are separate from source.

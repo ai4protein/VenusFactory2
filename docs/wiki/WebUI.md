@@ -1,69 +1,36 @@
-# WebUI module map (v2)
+<!-- Generated compatibility view; edit docs/manual/en/start.md -->
 
-[← Wiki home](./Home.md) · [中文](./WebUI_CN.md)
+# Start with your protein question
 
-The primary UI is **FastAPI + React** (`python src/webui_v2.py`, default `:7861`).  
-Legacy Gradio (`python src/webui.py`, `:7860`) is compatibility-only; manuals describe v2.
+## Choose a mode
 
-## Launch
+| Mode | Give it | What you get |
+| --- | --- | --- |
+| Agent | A question, files or an operation | An answer, predictions or analysis files using existing tools |
+| Scientist | A research goal, data, materials and a budget | Iteratively developed code, models, evaluation evidence and a delivery package |
+| Researcher | A target protein, research focus and supporting materials | A long report integrating literature, databases and predictions |
 
-After one-click install the frontend is usually already built:
+Choose the mode beside the message box. **Model** selects the conversational language model; **Harness** selects its execution framework. Protein predictors are chosen through tools or Model Plaza.
 
-```bash
-source .venv/bin/activate
-python src/webui_v2.py --host 0.0.0.0 --port 7861
-```
+## Complete your first task
 
-Rebuild only if you changed `frontend/` or `frontend/dist` is missing:
+1. Open Chat and choose Agent. Paste a sequence, add a file, or identify a protein and species.
+2. Describe the result you want: for example, “Calculate the molecular weight and pI of this sequence and save a table.”
+3. Send the message. Follow the tool activity in the conversation and open the output in the upper-right file panel.
+4. Continue in the same conversation to reuse its context and files. Keep its session URL to return later.
 
-```bash
-cd frontend && npm install && npm run build && cd ..
-```
+Enter sends a message; Shift+Enter adds a line. The upload button, drag-and-drop and file paste attach materials. Review attachments before sending.
 
-Online: `python src/webui_v2.py --host 0.0.0.0 --port 7861 --online`
+## Find your way around
 
-## Modules ↔ manuals
+- **Chat**: [Agent](./Agent.md), [Scientist](./Scientist.md) and [Researcher](./Researcher.md) have separate histories.
+- **Model Plaza**: browse tools by function, use prediction forms, open custom training/evaluation and leaderboards.
+- **Workflows**: connect tools and models into a reusable process.
+- **Library**: browse files you can access. In online mode it follows your remaining conversations.
+- **Settings**: language, Manual and online credit entry; local deployments also provide an Administration entry.
 
-| Module | Route prefix (approx.) | How-to |
-|:-------|:-----------------------|:-------|
-| **Agent** | `/agent`, chat | [AgentManual_EN.md](../manual/AgentManual_EN.md) |
-| **Quick Tools** | `/quick-tools/*` | [QuickTools_EN.md](../manual/QuickTools_EN.md) |
-| **Advanced Tools** | `/advanced-tools/*` | [AdvancedToolsManual_EN.md](../manual/AdvancedToolsManual_EN.md) |
-| **Custom Model** · Training | `/custom-model/training` | [TrainingManual_EN.md](../manual/TrainingManual_EN.md) |
-| **Custom Model** · Evaluation | `/custom-model/evaluation` | [EvaluationManual_EN.md](../manual/EvaluationManual_EN.md) |
-| **Custom Model** · Predict | `/custom-model/predict` | [PredictionManual_EN.md](../manual/PredictionManual_EN.md) |
-| **Download** | `/download/*` | [DownloadManual_EN.md](../manual/DownloadManual_EN.md) |
-| **Manual** | `/manual/*` | In-app copies of the manuals |
-| **Workspace / Settings / Leaderboards / Report** | matching pages | Report → [ReportManual_EN.md](../manual/ReportManual_EN.md) |
+## Read a tutorial or ask Agent
 
-### Quick Tools (6)
+Read a topic in this Manual or use **Ask Agent** to prepare a question about it. You can edit the question before sending. Agent can search this same guide and link back to the relevant tutorial.
 
-Directed Evolution · Sequence Design · Protein Discovery · Protein Function · Functional Residue · Physicochemical Property  
-
-### Advanced Tools
-
-Same task families as Quick Tools with more model/parameter control.
-
-### Chat — dual modes
-
-Agent chat (`/agent`) uses a composer toggle (**Science Agent** / **Science Expert**; choice is stored in the browser).
-
-| Mode | Engine | Notes |
-|:-----|:-------|:------|
-| **Science Agent** | kimi-code | Tool-first agent loop (MCP / bash); collapsible thinking blocks and inline tool cards. Context usage is shown as a read-only pill; the agent auto-compacts when usage ≥ ~90% (no Plan/Compact/Fork composer buttons). Backed by the kimi-code daemon (see Configuration). Online hides the model picker. **Local:** MCP training tools (`generate_training_config` / `train_protein_model` / `protein_model_predict` / `register_trained_model` / `list_trained_models`); successful training auto-registers under `ckpt/user_trained/` for cross-session reuse. **Online:** hard-disables training and VenusMine / FoldSeek (API 403 + tool refusal). |
-| **Science Expert** | LangGraph (`graph`) | Multi-role pipeline **PI → CB → MLS → SC**; PI clarification first (with explicit Skip Research), then CB plan review. After plan confirm, steps default to auto-run; sub-reports default to auto-advance. SC writes a paper-level report (~5000–8000 words). **Local**: pick the LLM in the model selector. **Online**: no model selector — fixed backend model (client cannot change it). |
-
-Details: [AgentManual_EN.md](../manual/AgentManual_EN.md).
-
-## Configuration
-
-- Template: `.env.example` → `.env`
-- LLM endpoints: `cp model-config.yaml.example model-config.yaml`, then set `active: dmx|gpt|claude|…`
-- Agent / LLM keys: prefer UI **Settings**; env vars documented in `.env.example`
-- Online: `WEBUI_V2_MODE=online`, `WEBUI_V2_SESSION_TOKEN_SECRET`, `WEBUI_V2_*_LIMIT`
-- Online without sudo (kimi-code): default `auto` uses `bwrap` sandbox; or set `KIMI_ONLINE_SPAWN_MODE=bwrap`
-- Skip default kimi-code: `export KIMI_EXTERNAL=1`
-
-## Weights
-
-Adapters used by function/residue tools: [Checkpoints.md](./Checkpoints.md). Missing files auto-fetch when `VENUS_CKPT_AUTO_DOWNLOAD=1`.
+See [settings and access](./Settings.md) for online limits and [Library](./Library.md) for files.

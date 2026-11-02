@@ -1,91 +1,25 @@
-# Report — One-Click Comprehensive Protein Analysis
+<!-- Compatibility view; edit en/researcher.md -->
 
-The **Report** tab gives you a single document covering mutation, function, residue, and physicochemical analyses for one protein, with an AI-written narrative on top of the raw results.
+# Researcher: study a protein in depth
 
-## 1. When to Use It
+## Provide the target and focus
 
-- You're starting on a new protein and want a single overview without configuring multiple tools.
-- You need a sharable analysis (HTML + PDF) for collaborators.
-- You want mutation hotspots alongside functional context in one place.
+Choose Researcher in Chat. Supply a protein identifier and species, sequence or structure. Use the message field for additional research instructions: therapeutic relevance, enzyme engineering, binding partners, mutation interpretation or another focus. Add papers, tables, structures and notes through the composer upload button.
 
-For step-by-step, agent-driven analyses, use **Agent / Chat** instead.
+> Research human carbonic anhydrase II. Cover catalytic mechanism, structures, inhibitors, selectivity and engineering opportunities. Use my assay table as supporting context.
 
----
+## Choose analyses and start
 
-## 2. Layout
+Select an available free conversational model online. Choose analyses relevant to your inputs and submit. Sequence homology requires a sequence; structural similarity requires a structure. Tools and models that are unavailable in this deployment cannot be selected or invoked by Chat.
 
-The page has three columns:
+Researcher collects evidence across multiple topics and writes at least five specialist subsections. Relevant topics can include identity and function, sequences and evolution, structure and domains, interactions and pathways, properties and predictions, disease or application context, and research opportunities. Coverage depends on the input and available evidence.
 
-| Column | What it does |
-| :--- | :--- |
-| **Left — Input & Controls** | Choose input mode (Paste / Upload), pick chain or sequence, tick the analyses to run, click **Generate Report**. Shows progress %. |
-| **Center — AI Expert Analysis** | Renders the AI-generated narrative once the run finishes. Below it, links for **Download HTML** and **Download PDF**. |
-| **Right — Streaming Logs** | Live log lines from the backend pipeline. |
+## Follow the report
 
-A header status pill shows the current phase: *Ready / Processing Input / Generating Report*.
+Watch progress and intermediate results during generation. Long remote jobs may remain pending while public services process them. You can leave and return to the same research entry. Use the section navigation to move through a long report and the file panel to open source artifacts and downloads.
 
----
+## Interpret the evidence
 
-## 3. Inputs
+Check source links, accession IDs, analysis inputs, model names and caveats. Database annotations, literature claims, computational predictions and proposed experiments are different evidence types. Missing or failed analyses should remain identified as gaps, not converted into positive findings.
 
-| Input mode | How to use |
-| :--- | :--- |
-| **Paste** | Paste a sequence or FASTA into the textarea. |
-| **Upload** | Drop a `.fasta` / `.fa` / `.pdb` file, pick one from **Workspace**, or hit **Use Default Example** to load a sample FASTA. |
-
-After parsing:
-
-- A **chain / sequence selector** appears if the input contains multiple chains / records.
-- A short preview of the chosen sequence is shown.
-
-> **Online mode:** upload is restricted; use Paste with a sequence within the FASTA character limit.
-
----
-
-## 4. Selecting Analyses
-
-Tick at least one of the four analyses:
-
-| Icon | Analysis | Powered by |
-| :---: | :--- | :--- |
-| 🧬 | **Mutation** | Saturation mutagenesis scoring (ESM-2, ProSST, ProtSSN…) |
-| 🔬 | **Function** | Fine-tuned predictors (solubility, localization, stability, optimum T°, sorting signal, metal-ion binding) |
-| 🎯 | **Residue** | Activity / binding / conserved sites, motifs |
-| ⚗️ | **Properties** | Sequence-based physicochemical calculation (MW, pI, instability index, GRAVY, secondary-structure composition) |
-
-Ticking all four gives the most complete report.
-
----
-
-## 5. Run & Watch
-
-Click **Generate Report**. The page streams events:
-
-- **Progress** — bar + message (e.g., "Predicting solubility…", "Scoring mutations…")
-- **Logs** — appended to the right column
-- **Done** — renders the AI narrative in the center, enables HTML / PDF links
-
-If anything fails, an error block appears in the left column with a short reason; logs in the right column have the detail.
-
----
-
-## 6. What's Inside the Report
-
-| Section | Contents |
-| :--- | :--- |
-| **Comprehensive Summary** | Top-level brief: MW, theoretical pI, and a one-paragraph assessment. |
-| **Mutation Prediction Analysis** | Top beneficial mutations table (Rank / Position / Mutation / Score / Notes), secondary list, and key-site optimization suggestions. |
-| **Protein Function Analysis** | Per-task table: Property, Predicted Value, Confidence, Description — covering solubility, localization, metal ion binding, stability, sorting signal, optimum temperature. |
-| **Functional Residue** | Binding-site / functional-residue / motif predictions with sequence positions and probabilities. |
-| **Physical & Chemical Properties** | Biophysical characterization plus an instability-index-driven stability call. |
-| **Experimental Recommendations** | Synthesized advice for function / stability, technical considerations, and protocol suggestions. |
-| **Conclusion** | Final wrap-up of the protein's key characteristics and the most important optimization directions. |
-
----
-
-## 7. Tips
-
-- **Prefer PDB input when available.** Structure-aware analyses (e.g., structure-based mutation scoring) only kick in when a `.pdb` is provided.
-- **Cross-read sections.** Beneficial mutations near a **predicted binding site** are usually a better experimental target than mutations far from any functional residue.
-- **Save the downloads.** The HTML / PDF artifacts live in temporary backend storage; pull them locally before closing the browser.
-- **Long sequences are slow.** Mutation scoring time scales with sequence length × number of amino acid substitutions. Trim signal peptides / disordered tails if you only care about a specific domain.
+A report does not train or publish a new model by itself. Use [Scientist](./en/scientist.md) for that purpose, or [Agent](./en/agent.md) for a focused follow-up calculation.

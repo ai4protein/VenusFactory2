@@ -1,87 +1,35 @@
-# Agent · CLI · API · training methods
+<!-- Generated compatibility view; edit docs/manual/en/agent.md -->
 
-Back to [Wiki home](./Home.md) · [中文](./Usage_CN.md)
+# Agent: answer and act
 
-## Agent-0.1
+## Ask a useful question
 
-Natural-language orchestration (LangGraph + LangChain). Example:
+Include the protein identifier or sequence, species, the property of interest and the output you need. Add relevant files. For example:
 
-```
-You: "Design thermostable mutations for PDB:1ABC"
-→ Download structure → ESM-2 scan → Stability score → Ranked report
-```
+> Find UniProt annotations for human TP53, summarize its domains, and cite the records you use.
 
-| Category | Capabilities |
-|:---------|:-------------|
-| Analysis | Mutation · function/stability · structure |
-| Data | Multi-DB search · conversion · batch |
-| Planning | Multi-step automation · tool routing |
-| Research | Literature · family analysis · reports |
+> Read my sequences.csv, calculate sequence properties, and save a CSV. Ask me if the sequence column is ambiguous.
 
-Needs an LLM API key. Science Expert reads [`model-config.yaml.example`](../../model-config.yaml.example) on every request:
+Agent can search available tools, retrieve web evidence, query protein databases and run enabled prediction tools. For platform questions such as “How do I train with my data?”, it searches the platform Manual rather than assuming an older interface.
 
-```bash
-cp model-config.yaml.example model-config.yaml
-# set `active: dmx` | `gpt` | `claude` | `gemini` | `deepseek` | …
-# put the matching key in `.env` or UI Settings
-```
+## Choose Model and Harness
 
-Manual: [AgentManual_EN.md](../manual/AgentManual_EN.md)
+Use the selectors next to the composer. The available choices depend on deployment configuration and credentials. Online mode offers configured free models. Harnesses can include Kimi Code, Codex, Claude Code and DeepSeek Harness; choose an available combination. A harness name does not specify the protein model used for a prediction.
 
-## CLI (examples)
+## Follow a conversation
 
-Most scripts live under `script/tools/`:
+Tool activity appears within the conversation. Running sessions have an indicator in the history. You can switch modes or conversations while a submitted job continues. Return through the history or the session URL. Stop is an explicit action; changing the page is not a stop request.
 
-```bash
-bash script/tools/train/train_plm_lora.sh \
-  --model facebook/esm2_t33_650M_UR50D \
-  --dataset DeepSol --batch_size 32
+Pin frequently used conversations; hover over a history item to see its time. The context indicator near the composer shows context use. Long histories may be compacted: restate important constraints if they are missing from a continuation.
 
-bash script/tools/evaluate/eval.sh \
-  --model_path ckpt/DeepSol/best_model \
-  --test_dataset DeepSol
-```
+## Code and files
 
-Database helpers: `script/tools/database/`.
+For custom analysis, Agent writes source files and runs them in the session sandbox. Only that conversation's workspace is exposed to the program. Network searches and downloads use registered tools. Open outputs from the file icon; supported structures open in the structure viewer.
 
-## REST API
+Do not paste API keys into a conversation. Deployment credentials are managed in Administration.
 
-```bash
-python src/api_server.py   # → http://localhost:5000/docs
-```
+## Reuse Scientist work
 
-```bash
-curl -X POST http://localhost:5000/api/mutation/predict \
-  -H "Content-Type: application/json" \
-  -d '{"sequence": "MKTAYIA...", "mutations": ["A23V", "K45R"]}'
-```
+Ask for a tool by protein, property or experimental scenario. Agent searches the registered catalog and inspects a matching model's interface and scope before running it. A research output becomes a shared tool only after independent review and publication, and it must be enabled in the current deployment.
 
-Treat OpenAPI at `/docs` as source of truth (routes may evolve).
-
-## Python (illustrative)
-
-```python
-from src.tools.mutation import predict_mutation_effects
-
-results = predict_mutation_effects(
-    sequence="MKTAYIAKQR...",
-    mutations=["A5V", "K9R"],
-    model="esm2",
-)
-```
-
-Confirm import paths against the current codebase.
-
-## PEFT methods
-
-| Method | Memory | Speed | Quality | Best for |
-|:-------|:------:|:-----:|:-------:|:---------|
-| LoRA | Low | Fast | Good | General |
-| QLoRA | Very low | Slow | Good | Tight VRAM |
-| DoRA | Low | Medium | Better | Improved LoRA |
-| AdaLoRA | Low | Medium | Better | Adaptive rank |
-| SES-Adapter | Medium | Medium | Better | Selective tuning |
-| IA3 | Very low | Fast | Good | Lightweight |
-| Freeze | Low | Fast | Good | Simple tuning |
-
-See [TrainingManual_EN.md](../manual/TrainingManual_EN.md).
+See [Scientist](./Scientist.md) to develop a capability and [Library](./Library.md) to manage results.

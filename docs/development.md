@@ -1,0 +1,69 @@
+# Developer guide
+
+Start with the [user tutorials](wiki/Home.md) to understand the research workflows.
+Implementation and deployment details are organised below:
+
+- [Repository layout](architecture/repository-layout.md): source ownership, runtime assets and skills.
+- [Model integration](architecture/model-integration.md): pretrained methods, Factory-trained models and RSI artifacts.
+- [Services and operations](architecture/services.md): local/online deployment, API/MCP processes, worker pools and job recovery.
+- [Installation](installation.md): dependencies, optional components, model weights and health checks.
+
+## Maintain the tutorials
+
+The in-app Manual and Agent use the canonical tutorials in `docs/manual/en/` and
+`docs/manual/zh/`, indexed by `docs/manual/catalog.json`. Update both languages
+when behavior changes, then run this from the repository root:
+
+```bash
+python scripts/sync_platform_docs.py
+python scripts/sync_platform_docs.py --check
+```
+
+Wiki pages, legacy manual files and `docs/README.md` are generated views. Edit
+the source tutorials or generator instead of those views.
+
+## Maintainer checks
+
+From the repository root, use the installed platform Python environment:
+
+```bash
+python scripts/check_repository.py
+python scripts/check_layout.py
+python scripts/validate_skills.py
+python scripts/sync_platform_docs.py --check
+PYTHONPATH=src python -m pytest -q tests/test_model_family_boundaries.py tests/test_model_identity.py tests/test_managed_model_runtimes.py tests/test_tool_runtime.py
+```
+
+These are targeted layout, documentation and model-integration checks; they do
+not replace regression tests for the areas you change. See the
+[service guide](architecture/services.md) for API, MCP and worker startup, and
+the [directory guide](architecture/repository-layout.md) for source and runtime ownership.
+Current UI screenshots and capture details are listed in [images/README.md](images/README.md).
+
+## Before a commit
+
+Use Python 3.12 and Node 24. Keep credentials, runtime installations, session data,
+training weights and research evidence outside source control. Optional scientific
+skills stay in their Git submodule; do not copy the vendor checkout into Git.
+
+Run `python scripts/check_repository.py --staged` and `git diff --cached --check`
+against the proposed commit. The repository check detects private paths, large
+blobs and known credential patterns (including example ZIPs); it is a guardrail,
+not a complete secret scanner or security audit.
+
+For a release, use a clean source checkout without `.env` or model credentials:
+
+```bash
+PYTHON_DOTENV_DISABLED=1 PYTHONPATH=src python -m pytest -q
+cd frontend
+npm ci --no-audit --no-fund
+npm test
+npm run build
+```
+
+Run service/worker integration tests on Linux with bubblewrap available. Real GPU
+inference, public services and live model-provider probes are separate acceptance
+checks, not implied by offline regression. CI checks source boundaries, tutorial
+consistency and the frontend; full backend validation uses the installed platform
+environment. Refresh README screenshots when navigation changes, recording their
+capture details in `docs/images/manifest.json`.

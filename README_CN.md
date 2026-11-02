@@ -1,124 +1,112 @@
-<div align="right">
-  <a href="README.md">English</a> | <a href="README_CN.md">简体中文</a>
-</div>
+# VenusFactory2
 
-<p align="center">
-  <img src="img/banner_2503.png" width="70%" alt="VenusFactory2 Banner">
-</p>
+**Recursive Self-improvement AI Agents for Protein Engineering**
 
-<div align="center">
+[在线平台](https://venusfactory.bio/) · [使用教程](docs/wiki/Home.md) · [安装指南](docs/installation.zh-CN.md) · [English](README.md)
 
-[![GitHub stars](https://img.shields.io/github/stars/AI4Protein/VenusFactory2?style=flat-square)](https://github.com/AI4Protein/VenusFactory2/stargazers)
-[![GitHub license](https://img.shields.io/github/license/AI4Protein/VenusFactory2?style=flat-square)](https://github.com/AI4Protein/VenusFactory2/blob/main/LICENSE)
-[![Wiki](https://img.shields.io/badge/Wiki-docs-brightgreen?style=flat-square)](docs/wiki/Home.md)
-[![Demo](https://img.shields.io/badge/Demo-Website-blue?style=flat-square)](https://venusfactory.bio/)
-[![arXiv](https://img.shields.io/badge/arXiv-2603.27303-b31b1b?style=flat-square)](https://arxiv.org/abs/2603.27303)
+VenusFactory2 是面向蛋白质研究的对话式工作平台。从一个问题、一份实验数据或一个
+感兴趣的蛋白出发，检索文献、调用预测工具，并开发适合自己研究的模型。
 
-**Agent 驱动的蛋白质工程平台**  
-Web UI · REST API · CLI · 40+ 模型 · 11+ 数据库
+- **提问与分析**：查询蛋白信息、调用科学工具、理解预测结果。
+- **从数据开发模型**：围绕研究目标和实验测量，产出模型代码、测试结果与研究报告。
+- **全面研究一个蛋白**：整合文献、数据库信息和预测，生成带来源的专题报告。
+- **复用研究成果**：直接运行模型、组合工作流，或让 Agent 调用通过审核的 Scientist 新模型。
 
-</div>
+![VenusFactory2 对话工作区](docs/images/chat-workspace.jpg)
 
-<details>
-<summary>📨 微信群 / 反馈</summary>
-<p align="center"><img src="img/wechat.png" width="50%" alt="WeChat"></p>
-</details>
+## 从一个问题开始
 
----
+点击 **New Chat**，选择模式，描述你想解决的问题。默认进入 Agent；可以粘贴序列，
+也可以上传结构、实验测量、论文等材料。
 
-## 这是什么？
+| 模式 | 示例问题 | 可以获得什么 |
+| --- | --- | --- |
+| **Agent · 提问与分析** | “查找这个蛋白的同源序列，并解释它的结构域注释。” | 结合检索和工具结果的回答、预测结果及可下载文件 |
+| **Scientist · 开发与改进** | “根据我的溶解度测量，开发并评估一个预测模型。” | 包含代码、测试与评估结果、报告的项目，以及训练产出的模型文件 |
+| **Researcher · 蛋白专题研究** | “全面调研这个酶，重点关注底物特异性和改造方向。” | 整合文献、蛋白信息和预测的多章节报告 |
 
-VenusFactory2 把蛋白质语言模型、数据库与 Agent 编排放在同一平台：上传序列/结构即可预测，也可用自然语言驱动多步分析，或训练自己的微调模型。
+想先体验，可以使用 Agent 的推荐问题，或打开 Scientist、Researcher 的**已完成样例**。
+样例提供可直接阅读和下载的结果，无需重新运行。操作时遇到疑问，也可以直接问 Agent；
+它会查阅与 Manual 相同的使用教程。
 
-在线试用：[venusfactory.bio](https://venusfactory.bio/)
+### Scientist 怎样开展研究？
 
-<p align="center">
-  <img src="img/web_v2/train.png" width="90%" alt="VenusFactory2 训练界面">
-</p>
+Scientist 采用递归自我改进（RSI）：开发方案、执行测试，再根据反馈修改方法，
+在给定预算内反复迭代。PI（研究负责人）协调各个环节：
 
-<p align="center">
-  <img src="img/web_v2/agent.png" width="90%" alt="VenusFactory2 Agent 界面">
-</p>
+**目标与数据 → PI 与计划 → 开发和实验 ↔ 评议与修订 → 审核 → 交付**
 
----
+在对话中可以跟踪计划、阶段进展和中间文件，最终将项目与报告打包下载为 ZIP。
+研究成果可以是新的分析工具、训练好的机器学习模型，或适合特定实验场景的方法。
+需要进入公共模型库的成果，还会经过单独的验证和独立审核，再供 Agent 搜索与调用。
 
-## 快速开始
+## 为实验选择合适的模型
 
-| 前置 | 说明 |
-|:-----|:-----|
-| Python | **≥3.12**（一键安装默认创建 3.12 的 `.venv`） |
-| Node.js | **25.x** + npm（构建 WebUI v2） |
-| 磁盘 | 建议预留数 GB～十余 GB（含 PyTorch） |
-| GPU | 可选；有 NVIDIA 则装 CUDA 轮子，否则 CPU |
+**Model Plaza（模型广场）**按生物学功能分类。打开模型即可进行预测，也可以通过
+**Train、Evaluate、Predict** 使用自己的数据。**Workflow（工作流）**用于连接多个
+工具，并查看每一步的数据处理结果。
 
-国内 HF 较慢时可先：`export HF_ENDPOINT=https://hf-mirror.com`
+| 研究任务 | 工具与模型示例 |
+| --- | --- |
+| 查找相关蛋白、注释功能 | NCBI BLAST、Foldseek、InterProScan |
+| 筛选候选突变 | VenusREM、ProSST、ProtSSN |
+| 设计蛋白序列 | ProteinMPNN、LigandMPNN |
+| 预测蛋白性质 | ProtSolM、VenusX、VenusVaccine 与 Factory 训练模型 |
+| 分析小分子 | ADMET 预测、Vina 对接 |
+| 针对自己的实验建立模型 | 自定义模型训练、通过审核的 Scientist 模型 |
+
+![按研究任务分类的模型广场](docs/images/model-plaza.jpg)
+
+模型广场汇集已有工具、Factory 训练模型和经过审核的 Scientist 成果。
+可运行的工具取决于已安装组件和管理员设置，可以在模型页面查看。
+
+## 本地运行
+
+准备 Linux 或 WSL2、Git 和 Python 3.10+ 来运行安装器；安装器会为平台准备 Python 3.12
+运行环境。以下命令安装网页平台、自带的检索与蛋白服务，以及一个智能体执行后端：
 
 ```bash
-git clone --recurse-submodules https://github.com/AI4Protein/VenusFactory2.git && cd VenusFactory2
-# 若已普通 clone：git submodule update --init --recursive
-python scripts/setup_quickstart.py          # 交互一键安装（推荐）
-# python scripts/setup_quickstart.py -y     # CI / 无交互
-
-source .venv/bin/activate
-python src/webui_v2.py --host 0.0.0.0 --port 7861
-# → http://localhost:7861
+git clone --depth 1 https://github.com/ai4protein/VenusFactory2.git
+cd VenusFactory2
+python3 install_full.py --components harnesses --harnesses deepseek-harness
+.venv/bin/python scripts/serve.py --mode local --port 7861
 ```
 
-安装器会扫描旧环境（`.venv` / 前端 / 权重），可选复用或清理重装。一路回车即走推荐方案。
+打开 **http://localhost:7861**，在 **Settings → Administration** 中配置大模型 API，
+并启用需要的工具。支持 DMXAPI 和 OpenRouter 免费模型；本地还可以配置自己的
+OpenAI、Claude、Grok、GLM、MiniMax 等 API，见 [API 配置](docs/model-providers.md)。
+网络检索支持 Tavily 或 SerpAPI，公共蛋白与文献数据库查询为平台自带能力。
 
-**装完之后**
+安装程序会检测系统、准备环境并显示下载进度。模型软件与权重可以后续按需添加，例如：
 
-1. 打开网页 → Quick Tools 无需 LLM Key 即可试用  
-2. Agent / Science Expert 的 LLM：复制端点配置、选中提供商，再填 Key  
-   ```bash
-   cp model-config.yaml.example model-config.yaml
-   # 把 `active` 改成 dmx / gpt / claude / gemini / deepseek / …
-   cp .env.example .env   # 填写 DMXAPI_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY / …
-   ```
-   每次刷新页面或发消息都会重新读取该 yaml，改 `active`、`model`、`base_url` 立即生效。模板见 [`model-config.yaml.example`](model-config.yaml.example)。  
-3. 验证环境：`python scripts/check_env.py`
-
----
-
-## 文档
-
-分三层，从上往下看即可：
-
-| 层级 | 入口 |
-|:-----|:-----|
-| 文档总览 | **[docs/README.md](docs/README.md)** |
-| 安装 · 目录 · WebUI 地图 · CLI/API | [docs/wiki/Home.md](docs/wiki/Home.md) |
-| 各功能点操作手册 | [docs/manual/](docs/manual/) |
-| Agent Skills（作者指南） | [src/agent/skills/AGENTS.md](src/agent/skills/AGENTS.md) · [docs/agent/SKILLS_INDEX.md](docs/agent/SKILLS_INDEX.md) · [docs/agent/CONTRIBUTING_SKILLS.md](docs/agent/CONTRIBUTING_SKILLS.md) |
-
-English: [README.md](README.md) · [docs/README.md](docs/README.md)
-
----
-
-## 引用
-
-```bibtex
-@article{tan2026venusfactory2,
-  title={Self-evolving AI agents for protein discovery and directed evolution},
-  author={Tan, Yang and Zhang, Lingrong and Li, Mingchen and Yu, Yuanxi and Zhong, Bozitao and Zhou, Bingxin and Dong, Nanqing and Hong, Liang},
-  journal={arXiv preprint arXiv:2603.27303},
-  year={2026}
-}
-
-@inproceedings{tan2025venusfactory,
-  title={VenusFactory: An Integrated System for Protein Engineering with Data Retrieval and Language Model Fine-Tuning},
-  author={Tan, Yang and Liu, Chen and Gao, Jingyuan and Banghao, Wu and Li, Mingchen and Wang, Ruilin and Zhang, Lingrong and Yu, Huiqun and Fan, Guisheng and Hong, Liang and others},
-  booktitle={Proceedings of the 63rd Annual Meeting of the Association for Computational Linguistics (Volume 3: System Demonstrations)},
-  pages={230--241},
-  year={2025}
-}
+```bash
+python3 initialize.py install --tools proteinmpnn,ligandmpnn
 ```
 
----
+需要完整安装时，运行 `python3 install_full.py`；部分组件需要 GPU 或单独许可。
+硬件要求、组件选择和健康检查见[安装指南](docs/installation.zh-CN.md)，线上部署和
+多进程启动见[服务指南](docs/architecture/services.md)。
 
-## 协议与致谢
+### 在线使用，还是本地运行？
 
-采用 **VenusFactory 非商业许可**：学术/非商业免费；商用需邮件授权 → **<hongl3lilang@sjtu.edu.cn>**。详见 [`LICENSE`](./LICENSE) / [`LICENSE_CN.md`](./LICENSE_CN.md)。
+在线平台无需安装，适合直接体验。本地运行适合使用自己的数据集、更大的训练模型，
+或安装计算量较大的工具。两种模式使用相同的界面。
 
-由上海交通大学 [Liang's Lab](https://ins.sjtu.edu.cn/people/lhong/index.html) 维护。  
-[Website](https://venusfactory.bio/) · [YouTube](https://www.youtube.com/watch?v=MT6lPH5kgCc) · [Issues](https://github.com/AI4Protein/VenusFactory2/issues)
+| | 在线 | 本地 |
+| --- | --- | --- |
+| 对话 | 三种模式共享每日额度 | 使用自己的 API 与资源配置 |
+| 上传文件 | 每个文件最多 10 MB | 平台不设文件大小上限 |
+| 自定义模型训练 | ESM2 8M | 根据已安装模型和硬件选择 |
+| Library（文件库） | 不可用 | 浏览上传文件和计算产物 |
+
+## 继续了解
+
+- [使用教程与样例](docs/wiki/Home.md)：Chat、模型广场、工作流和自定义数据。
+- [安装指南](docs/installation.zh-CN.md)：按需添加模型、权重和智能体执行后端。
+- [开发者指南](docs/development.md)：目录规范、模型接入、服务启动与检查。
+
+## 许可与引用
+
+VenusFactory2 按[项目许可证](LICENSE_CN.md)提供非商业使用。各工具和模型保留各自的
+许可证。引用平台或相关方法时，请使用[已发表论文信息](docs/CITATION.md)。
+有问题可联系 [tanyang.august@sjtu.edu.cn](mailto:tanyang.august@sjtu.edu.cn)。

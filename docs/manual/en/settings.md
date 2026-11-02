@@ -1,0 +1,29 @@
+# Settings, models and access
+
+## Everyday settings
+
+Open Settings at the lower left to change language or open Manual. Online users can enter their email and an extra-credit key; the browser remembers that information. Local deployments also show an Administration entry. Online Administration is reached through its direct URL and requires administrator sign-in.
+
+## Conversation credits
+
+The online default is **three new conversations per IP per day**, shared by Agent, Scientist and Researcher. This counts new conversations, not each message in an existing conversation. Effective limits can change with deployment settings or an assigned credit key. The quota indicator and reset time shown by the running site take precedence over the default described here.
+
+When the limit is reached, wait until the displayed reset time or apply for extra credit at **tanyang.august@sjtu.edu.cn**. Include your name, institution, email, contact information and intended use. Enter an issued email/key pair in Settings. A key does not unlock disabled compute tools or larger online training models.
+
+## Conversational models and harnesses
+
+Online uses only the free models/routes configured by the operator, including enabled DMXAPI or OpenRouter options. Local choices follow locally configured models and credentials. Model and Harness selectors show supported combinations; unavailable credentials or adapters can limit choices.
+
+For a local API, open Administration → Environment and fill in the provider's API key and model ID, then restart the backend and workers. Supported providers include OpenAI (ChatGPT), Anthropic Claude, xAI Grok, Zhipu GLM, MiniMax, DeepSeek, Gemini, Qwen and Moonshot. For example, use `OPENAI_API_KEY` with `OPENAI_MODEL`, or `MINIMAX_API_KEY` with `MINIMAX_MODEL`. The corresponding `_MODELS` field accepts multiple comma-separated IDs. Choose IDs that your API account can access. New conversations can select them; existing conversations retain their selected model. An API key by itself does not enable a model. Online mode still shows only enabled free routes.
+
+Harnesses and models can change without changing your scientific task. Available tool permissions still apply to every harness and all three Chat modes.
+
+## Administration
+
+Administrators manage credentials and model routing, tool/model switches, credits, administrator accounts and platform usage. Usage views can record LLM token consumption, sessions and tool jobs. Token counts describe usage, not necessarily a monetary bill; some providers may omit usage details.
+
+Environment values are managed in Administration, not as a separate public Settings page. Do not put keys or passwords in messages or shared files.
+
+## Online compute limits
+
+Uploads are at most 10 MB per file; custom training is restricted to ESM2-8M; local VenusMine is disabled. Scientist has bounded research budgets. Disabled tools remain unavailable through Chat, model forms and workflows. See [training](manual:training) and [files](manual:library).
