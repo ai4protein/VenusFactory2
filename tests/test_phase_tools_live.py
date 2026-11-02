@@ -47,7 +47,7 @@ slow = pytest.mark.skipif(not SLOW, reason="set SLOW=1 to run multi-minute submi
 # ============================================================================
 
 def test_analyze_alphafold_plddt_real_metadata():
-    from src.tools.database.alphafold import analyze_alphafold_plddt_by_metadata_file
+    from mcp_tools.tools.database.alphafold import analyze_alphafold_plddt_by_metadata_file
 
     sample_path = _ART / "plddt_sample.json"
     # Realistic AlphaFold metadata fractions (P53 HUMAN — disordered N-term + structured DBD)
@@ -72,7 +72,7 @@ def test_analyze_alphafold_plddt_real_metadata():
 
 
 def test_analyze_alphafold_pae_real_matrix_two_domains():
-    from src.tools.database.alphafold import analyze_alphafold_pae_by_pae_file
+    from mcp_tools.tools.database.alphafold import analyze_alphafold_pae_by_pae_file
 
     # Synthetic 140-residue PAE matrix with two 70-residue domains (merge filter requires >50).
     n = 140
@@ -98,7 +98,7 @@ def test_analyze_alphafold_pae_real_matrix_two_domains():
 
 
 def test_analyze_alphafold_plddt_error_path():
-    from src.tools.database.alphafold import analyze_alphafold_plddt_by_metadata_file
+    from mcp_tools.tools.database.alphafold import analyze_alphafold_plddt_by_metadata_file
     r = json.loads(analyze_alphafold_plddt_by_metadata_file("/does/not/exist.json"))
     assert r["status"] == "error"
     assert r["error"]["type"] == "NotFound"
@@ -114,7 +114,7 @@ def _pymol_available() -> bool:
 
 @pytest.mark.skipif(not _pymol_available(), reason="pymol CLI not on PATH")
 def test_pymol_render_real_structure_ss_coloring():
-    from src.tools.visualize.pymol import render_protein_structure
+    from mcp_tools.tools.visualize.pymol import render_protein_structure
     pdb_path = _ART / "trp.pdb"
     if not pdb_path.exists():
         _generate_trp_pdb(pdb_path)
@@ -134,7 +134,7 @@ def test_pymol_render_real_structure_ss_coloring():
 
 @pytest.mark.skipif(not _pymol_available(), reason="pymol CLI not on PATH")
 def test_pymol_render_validation_errors():
-    from src.tools.visualize.pymol import render_protein_structure
+    from mcp_tools.tools.visualize.pymol import render_protein_structure
     # NotFound: bad pdb path
     r = json.loads(render_protein_structure("/nonexistent.pdb", str(_ART / "pymol_out")))
     assert r["status"] == "error" and r["error"]["type"] == "NotFound"
@@ -148,7 +148,7 @@ def test_pymol_render_validation_errors():
 
 @pytest.mark.skipif(not _pymol_available(), reason="pymol CLI not on PATH")
 def test_pymol_superpose_identical_structures_rmsd_zero():
-    from src.tools.visualize.pymol import superpose_two_structures
+    from mcp_tools.tools.visualize.pymol import superpose_two_structures
     pdb_path = _ART / "trp.pdb"
     if not pdb_path.exists():
         _generate_trp_pdb(pdb_path)
@@ -197,7 +197,7 @@ _TEST_EMAIL = os.environ.get("USER_EMAIL") or "noreply@anthropic.com"
 
 @slow
 def test_clustalo_msa_real_alignment():
-    from src.tools.database.clustalo import download_clustalo_msa_by_fasta
+    from mcp_tools.tools.database.clustalo import download_clustalo_msa_by_fasta
     in_path = _ART / "clustalo_input.fasta"
     in_path.write_text(
         ">human\nMVHLTPEEKSAVTALWGKVNVDEVGGEALGRLLVVYPWTQRFFESFGDLSTPDAVMGNPK\n"
@@ -230,7 +230,7 @@ def test_clustalo_msa_real_alignment():
 
 @slow
 def test_mmseqs2_real_homolog_search():
-    from src.tools.database.seq_search import download_mmseqs2_homologs_by_sequence
+    from mcp_tools.tools.database.seq_search import download_mmseqs2_homologs_by_sequence
     # Hemoglobin beta — has thousands of homologs
     seq = "MVHLTPEEKSAVTALWGKVNVDEVGGEALGRLLVVYPWTQRFFESFGDLSTPDAVMGNPKVKAHGKKVLGAFSDGLAHLDNLKGTFATLSELHCDKLHVDPENFRLLGNVLVCVLAHHFGKEFTPPVQAAYQKVVAGVANALAHKYH"
     out_dir = _ART / "mmseqs2_out"
@@ -251,7 +251,7 @@ def test_mmseqs2_real_homolog_search():
 
 @slow
 def test_ebi_blast_real_search():
-    from src.tools.database.seq_search import download_blast_homologs_by_sequence
+    from mcp_tools.tools.database.seq_search import download_blast_homologs_by_sequence
     seq = "MVHLTPEEKSAVTALWGKVNVDEVGGEALGRLLVVYPWTQRFFESFGDLSTPDAVMGNPKVKAHGKKVLGAFSDGLAHLDNLKGTFATLSELHCDKLHVDPENFRLLGNVLVCVLAHHFGKEFTPPVQAAYQKVVAGVANALAHKYH"
     out_dir = _ART / "blast_out"
     raw = download_blast_homologs_by_sequence(seq, str(out_dir), database="uniprotkb_swissprot", email=_TEST_EMAIL)
@@ -267,7 +267,7 @@ def test_ebi_blast_real_search():
 # ============================================================================
 
 def test_rcsb_search_real_text_query():
-    from src.tools.database.rcsb import download_rcsb_search_by_query
+    from mcp_tools.tools.database.rcsb import download_rcsb_search_by_query
     r = json.loads(download_rcsb_search_by_query(
         query={"type": "terminal", "service": "full_text", "parameters": {"value": "myoglobin"}},
         out_dir=str(_ART / "rcsb_out"),
@@ -286,7 +286,7 @@ def test_rcsb_search_real_text_query():
 
 
 def test_rcsb_search_count_only():
-    from src.tools.database.rcsb import download_rcsb_search_by_query
+    from mcp_tools.tools.database.rcsb import download_rcsb_search_by_query
     r = json.loads(download_rcsb_search_by_query(
         query={"type": "terminal", "service": "full_text", "parameters": {"value": "kinase"}},
         out_dir=str(_ART / "rcsb_out"), count_only=True,
@@ -296,7 +296,7 @@ def test_rcsb_search_count_only():
 
 
 def test_rcsb_search_sequence_service():
-    from src.tools.database.rcsb import download_rcsb_search_by_query
+    from mcp_tools.tools.database.rcsb import download_rcsb_search_by_query
     r = json.loads(download_rcsb_search_by_query(
         query={
             "type": "terminal", "service": "sequence",
@@ -317,7 +317,7 @@ def test_rcsb_search_sequence_service():
 # ============================================================================
 
 def test_uniprot_sparql_real_query():
-    from src.tools.database.uniprot import download_uniprot_sparql_by_query
+    from mcp_tools.tools.database.uniprot import download_uniprot_sparql_by_query
     q = """
     PREFIX up: <http://purl.uniprot.org/core/>
     SELECT ?p ?name
@@ -340,7 +340,7 @@ def test_uniprot_sparql_real_query():
 
 
 def test_uniprot_sparql_validation():
-    from src.tools.database.uniprot import download_uniprot_sparql_by_query
+    from mcp_tools.tools.database.uniprot import download_uniprot_sparql_by_query
     r = json.loads(download_uniprot_sparql_by_query("", str(_ART / "sparql_out")))
     assert r["status"] == "error" and r["error"]["type"] == "ValidationError"
 
@@ -350,7 +350,7 @@ def test_uniprot_sparql_validation():
 # ============================================================================
 
 def test_ncbi_cds_translate_real_hbb_mrna():
-    from src.tools.database.ncbi import translate_ncbi_cds_to_protein
+    from mcp_tools.tools.database.ncbi import translate_ncbi_cds_to_protein
     # NM_000518 = HBB mRNA, ~147 aa hemoglobin beta
     r = json.loads(translate_ncbi_cds_to_protein("NM_000518", str(_ART / "ncbi_out")))
     assert r["status"] == "success", r
@@ -369,14 +369,14 @@ def test_ncbi_cds_translate_real_hbb_mrna():
 
 def test_ncbi_cds_translate_target_length():
     """Verify target_length picks the closest translation when many are returned."""
-    from src.tools.database.ncbi import translate_ncbi_cds_to_protein
+    from mcp_tools.tools.database.ncbi import translate_ncbi_cds_to_protein
     r = json.loads(translate_ncbi_cds_to_protein("NM_000518", str(_ART / "ncbi_out"), target_length=147))
     bm = r["biological_metadata"]
     assert bm["selected_length"] == 147
 
 
 def test_ncbi_search_protein_by_gene_organism_real():
-    from src.tools.database.ncbi import search_ncbi_protein_by_gene_and_organism
+    from mcp_tools.tools.database.ncbi import search_ncbi_protein_by_gene_and_organism
     r = json.loads(search_ncbi_protein_by_gene_and_organism(
         "TP53", "Homo sapiens", str(_ART / "ncbi_out"), retmax=3,
     ))
@@ -398,7 +398,7 @@ def test_ncbi_search_protein_by_gene_organism_real():
 
 
 def test_ncbi_search_validation_errors():
-    from src.tools.database.ncbi import (
+    from mcp_tools.tools.database.ncbi import (
         translate_ncbi_cds_to_protein, search_ncbi_protein_by_gene_and_organism,
     )
     r = json.loads(translate_ncbi_cds_to_protein("", str(_ART / "ncbi_out")))
@@ -412,7 +412,7 @@ def test_ncbi_search_validation_errors():
 # ============================================================================
 
 def test_openalex_search_real_works_query():
-    from src.tools.database.openalex import download_openalex_entries_by_query
+    from mcp_tools.tools.database.openalex import download_openalex_entries_by_query
     r = json.loads(download_openalex_entries_by_query(
         "works", str(_ART / "openalex_out"),
         search="AlphaFold protein structure prediction",
@@ -433,7 +433,7 @@ def test_openalex_search_real_works_query():
 
 
 def test_openalex_entry_by_id_real():
-    from src.tools.database.openalex import download_openalex_entry_by_id
+    from mcp_tools.tools.database.openalex import download_openalex_entry_by_id
     # W3177828909 = "Highly accurate protein structure prediction with AlphaFold"
     r = json.loads(download_openalex_entry_by_id(
         "works", "W3177828909", str(_ART / "openalex_out"),
@@ -446,7 +446,7 @@ def test_openalex_entry_by_id_real():
 
 
 def test_openalex_validation_errors():
-    from src.tools.database.openalex import download_openalex_entries_by_query
+    from mcp_tools.tools.database.openalex import download_openalex_entries_by_query
     r = json.loads(download_openalex_entries_by_query("bogus_entity", str(_ART / "openalex_out")))
     assert r["status"] == "error" and r["error"]["type"] == "ValidationError"
 
@@ -456,7 +456,7 @@ def test_openalex_validation_errors():
 # ============================================================================
 
 def test_arxiv_download_real_pdf():
-    from src.tools.database.arxiv import download_arxiv_paper_by_id
+    from mcp_tools.tools.database.arxiv import download_arxiv_paper_by_id
     # 2007.07235 = ColabFold paper, small (~360 KB PDF)
     r = json.loads(download_arxiv_paper_by_id(
         "2007.07235", str(_ART / "arxiv_out"), format="pdf",
@@ -472,7 +472,7 @@ def test_arxiv_download_real_pdf():
 
 
 def test_arxiv_validation_and_not_found():
-    from src.tools.database.arxiv import download_arxiv_paper_by_id
+    from mcp_tools.tools.database.arxiv import download_arxiv_paper_by_id
     r = json.loads(download_arxiv_paper_by_id("2007.07235", str(_ART / "arxiv_out"), format="bogus"))
     assert r["status"] == "error" and r["error"]["type"] == "ValidationError"
     r2 = json.loads(download_arxiv_paper_by_id("9999.99999", str(_ART / "arxiv_out"), format="pdf"))
@@ -484,7 +484,7 @@ def test_arxiv_validation_and_not_found():
 # ============================================================================
 
 def test_pubmed_abstracts_real_alphafold_papers():
-    from src.tools.database.ncbi import download_pubmed_abstracts_by_pmids
+    from mcp_tools.tools.database.ncbi import download_pubmed_abstracts_by_pmids
     out_path = str(_ART / "pubmed_out" / "abstracts.json")
     # 3 real protein-science PMIDs: AlphaFold (Jumper 2021), AlphaFold DB (Varadi 2024),
     # ColabFold (Mirdita 2022)
@@ -506,7 +506,7 @@ def test_pubmed_abstracts_real_alphafold_papers():
 
 
 def test_pubmed_abstracts_validation():
-    from src.tools.database.ncbi import download_pubmed_abstracts_by_pmids
+    from mcp_tools.tools.database.ncbi import download_pubmed_abstracts_by_pmids
     r = json.loads(download_pubmed_abstracts_by_pmids([], str(_ART / "pubmed_out" / "v.json")))
     assert r["status"] == "error" and r["error"]["type"] == "ValidationError"
     # Too many
@@ -519,7 +519,7 @@ def test_pubmed_abstracts_validation():
 # ============================================================================
 
 def test_biorxiv_by_doi_real():
-    from src.tools.database.biorxiv import download_biorxiv_by_doi
+    from mcp_tools.tools.database.biorxiv import download_biorxiv_by_doi
     r = json.loads(download_biorxiv_by_doi(
         "10.1101/2023.05.16.541025", str(_ART / "biorxiv_out"),
     ))
@@ -535,7 +535,7 @@ def test_biorxiv_by_doi_real():
 
 def test_biorxiv_doi_url_normalization():
     """The tool should accept DOI URLs and strip the prefix."""
-    from src.tools.database.biorxiv import download_biorxiv_by_doi
+    from mcp_tools.tools.database.biorxiv import download_biorxiv_by_doi
     r = json.loads(download_biorxiv_by_doi(
         "https://doi.org/10.1101/2023.05.16.541025",
         str(_ART / "biorxiv_out"),
@@ -544,7 +544,7 @@ def test_biorxiv_doi_url_normalization():
 
 
 def test_biorxiv_validation_and_not_found():
-    from src.tools.database.biorxiv import download_biorxiv_by_doi
+    from mcp_tools.tools.database.biorxiv import download_biorxiv_by_doi
     r = json.loads(download_biorxiv_by_doi("", str(_ART / "biorxiv_out")))
     assert r["status"] == "error" and r["error"]["type"] == "ValidationError"
     r2 = json.loads(download_biorxiv_by_doi("any", str(_ART / "biorxiv_out"), server="not_a_server"))

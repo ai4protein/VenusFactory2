@@ -1,0 +1,35 @@
+{
+  "doi": "10.1093/bioinformatics/btaa578",
+  "published_logistic_parameters": {
+    "intercept": -62.7775,
+    "slope": 81.0581
+  },
+  "retrieved_utc": "2026-10-26T11:17:44.067759+00:00",
+  "schema": "published_swi_reference.v1",
+  "score_definition": "Arithmetic mean of the published amino-acid weights; probability is not a measured soluble mass percentage.",
+  "source_git_blob_sha1": "d83ef5906ffd03befb303f4985507bc92b3fee09",
+  "source_sha256": "6e9c0fdb18f65e20c885f5d59b7f5b2cebf557f8c471adb74713be1848e658f3",
+  "source_url": "https://github.com/Gardner-BinfLab/SoDoPE_paper_2020/blob/master/SWI/swi.py",
+  "weights": {
+    "A": 0.8356471476582918,
+    "C": 0.5208088354857734,
+    "D": 0.9079044671339564,
+    "E": 0.9876987431418378,
+    "F": 0.5849790194237692,
+    "G": 0.7997168496420723,
+    "H": 0.8947913996466419,
+    "I": 0.6784124413866582,
+    "K": 0.9267104557513497,
+    "L": 0.6554221515081433,
+    "M": 0.6296623675420369,
+    "N": 0.8597433107431216,
+    "P": 0.8235328714705341,
+    "Q": 0.789434648348208,
+    "R": 0.7712466317693457,
+    "S": 0.7440908318492778,
+    "T": 0.8096922697856334,
+    "V": 0.7357837119163659,
+    "W": 0.6374678690957594,
+    "Y": 0.6112801822947587
+  }
+}

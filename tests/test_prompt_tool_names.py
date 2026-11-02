@@ -24,7 +24,7 @@ TOOL_NAME_RE = re.compile(r'"tool_name"\s*:\s*"([^"]+)"')
 def _load_real_tool_names():
     """Return the set of real tool names, or None if the tools cannot be imported."""
     try:
-        from tools.tools_agent_hub import get_tools  # type: ignore
+        from mcp_tools.tools.tools_agent_hub import get_tools  # type: ignore
     except Exception as exc:  # pragma: no cover - depends on optional deps
         return None, f"tools.tools_agent_hub import failed: {exc!r}"
     try:

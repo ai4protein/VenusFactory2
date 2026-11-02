@@ -14,14 +14,14 @@ if str(SRC) not in sys.path:
 
 
 def test_expert_hub_has_read_skill():
-    from tools.tools_agent_hub import get_tools
+    from mcp_tools.tools.tools_agent_hub import get_tools
 
     names = {getattr(t, "name", None) for t in get_tools()}
     assert "read_skill" in names
 
 
 def test_mcp_skill_tools_match_expert_loader():
-    from tools.skill.tools_mcp import mcp_list_skills, mcp_read_skill
+    from mcp_tools.tools.skill.tools_mcp import mcp_list_skills, mcp_read_skill
     from agent.skills import list_skill_ids, get_skill_content
 
     listed = json.loads(mcp_list_skills())
@@ -42,8 +42,8 @@ def test_mcp_skill_tools_match_expert_loader():
 
 def test_read_skill_envelope_identical_across_adapters():
     """LangChain and MCP read_skill must share the same core envelope fields."""
-    from tools.skill.tools_agent import read_skill_tool
-    from tools.skill.tools_mcp import mcp_list_skills, mcp_read_skill
+    from mcp_tools.tools.skill.tools_agent import read_skill_tool
+    from mcp_tools.tools.skill.tools_mcp import mcp_list_skills, mcp_read_skill
     from agent.skills import build_list_skills_response, build_read_skill_response
 
     skill_id = "nature_figure"
@@ -68,7 +68,7 @@ def test_read_skill_envelope_identical_across_adapters():
 
 
 def test_resolve_engine_routes_chat_mode():
-    from web_v2.chat_api._shared import _resolve_chat_mode, _resolve_engine
+    from backend.web_v2.chat_api._shared import _resolve_chat_mode, _resolve_engine
 
     assert _resolve_engine(None, None, "science_agent") == "kimi-code"
     assert _resolve_engine(None, None, "science_expert") == "graph"
@@ -94,7 +94,7 @@ def test_kimi_project_skill_symlinks():
 
 
 def test_kimi_system_prompt_embeds_catalog_and_self_directed_policy():
-    from web_v2.chat_api._stream_kimi import _build_system_prompt
+    from backend.web_v2.chat_api._stream_kimi import _build_system_prompt
 
     prompt = _build_system_prompt("en")
     assert "mcp__venusfactory__read_skill" in prompt
@@ -131,7 +131,7 @@ def test_online_mcp_read_skill_trusted_when_allowlisted():
 
 
 def test_mcp_server_mounts_skill_mcp():
-    import mcp_server
+    import mcp_tools.mcp_server as mcp_server
 
     assert hasattr(mcp_server, "skill_mcp")
     assert mcp_server.skill_mcp is not None

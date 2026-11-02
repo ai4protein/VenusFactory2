@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from src.web_v2.analytics_store import AnalyticsStore, normalize_time_range
+from backend.web_v2.analytics_store import AnalyticsStore, normalize_time_range
 
 
 class AnalyticsStoreTests(unittest.TestCase):

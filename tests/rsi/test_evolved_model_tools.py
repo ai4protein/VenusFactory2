@@ -1,0 +1,232 @@
+"""Agent boundary tests use synthetic storage; no scientific model claims."""
+
+import json
+
+import pytest
+from fastmcp import Client
+from test_scientist_model_library import storage as model_storage  # noqa: F401
+
+from mcp_tools.models.evolved import service
+from mcp_tools.models.evolved.tools_agent import EVOLVED_MODEL_TOOLS, predict_with_evolved_model_tool
+from mcp_tools.models.evolved.tools_mcp import mcp
+
+
+@pytest.fixture
+def published(request, monkeypatch):
+    store, root, verified, calls = request.getfixturevalue("model_storage")
+    verified["origin"].update(stage="activity", paper={"title": "Synthetic fixture", "doi": "fixture"})
+    verified["packet"]["assessment"] = {"metrics": {"skill": 0.5}}
+    result = store.publish(root, "b" * 64)
+    monkeypatch.setattr(service, "configured_library", lambda: store)
+    monkeypatch.setattr(service, "assert_tool_allowed", lambda name: None)
+    seen = []
+
+    class Plugin:
+        def predict(self, model, rows, scope):
+            seen.extend(rows)
+            return [{"id": row["id"], "sequence": row["sequence"], "prediction": 0.25} for row in rows]
+
+    monkeypatch.setattr("agent.rsi.scientist_model_library.get_model_plugin", lambda name: Plugin())
+    return store, root, verified, result["entry_id"], seen
+
+
+def test_catalog_is_paginated_and_does_not_claim_current_verification(published):
+    store, root, verified, entry, seen = published
+    result = service.dispatch("list", query="Synthetic", stage="activity", limit=1)
+    assert result["success"] and result["matching_entries"] == 1
+    assert not result["models"][0]["verified_now"]
+    assert result["models"][0]["entry_id"] == entry
+    assert service.dispatch("list", stage="stability")["models"] == []
+    assert service.dispatch("list", offset=1)["models"] == []
+    assert not service.dispatch("list", limit=51)["success"]
+    assert not service.dispatch("list", limit=True)["success"]
+    assert str(root) not in json.dumps(result)
+
+
+def test_describe_returns_scope_without_sources_data_or_internal_paths(published):
+    store, root, verified, entry, seen = published
+    result = service.dispatch("describe", entry_id=entry)
+    assert result["success"] and result["verified_now"]
+    assert result["scope"] == verified["key"]["scope"]
+    assert result["validation_metrics"] == {"skill": 0.5}
+    assert result["input_fields"] == ["id", "sequence"]
+    assert result["input_contract"]["kind"] == "sequence"
+    serialized = json.dumps(result)
+    for private in ("source_code", "training_sequences", "goal_sha256", "origin_goal", str(root)):
+        assert private not in serialized
+
+
+@pytest.fixture(params=["generated_context.v1", "generated_context.v2", "generated_context.v3"])
+def context_published(request, monkeypatch):
+    from agent.rsi.context_interfaces import module_for
+
+    store, root, verified, _ = request.getfixturevalue("model_storage")
+    interface = request.param
+    columns = [
+        {"name": f"measured_{i}", "unit": "arbitrary_units", "minimum": 0, "maximum": 100}
+        for i in range(2 if interface.endswith("v1") else 19)
+    ]
+    scope = {
+        "protein": "synthetic_fixture",
+        "assay": "synthetic measured response",
+        "target": "response",
+        "unit": "arbitrary_units",
+        "context": {"source": "synthetic_test_only"},
+        "covariates": columns,
+        "grouping": {"level": "biological_replicate", "evidence_sha256": "a" * 64},
+    }
+    if not interface.endswith("v1"):
+        scope["interface_version"] = interface
+        scope["grouping"]["level"] = "deleted_gene"
+    verified["key"].update(plugin_id=interface, scope=scope)
+    verified["packet"]["model"].update(plugin_id=interface, scope=scope)
+    verified["packet"]["assessment"] = {"metrics": {"skill": 0.5}}
+    entry = store.publish(root, "b" * 64)["entry_id"]
+    seen = []
+
+    class Plugin:
+        def predict(self, model, rows, model_scope):
+            module_for(interface).validate_rows(rows, model_scope, labels=False)
+            seen.extend(rows)
+            return [{"id": row["id"], "prediction": sum(row["values"])} for row in rows]
+
+    monkeypatch.setattr(service, "configured_library", lambda: store)
+    monkeypatch.setattr(service, "assert_tool_allowed", lambda name: None)
+    monkeypatch.setattr("agent.rsi.scientist_model_library.get_model_plugin", lambda name: Plugin())
+    inputs = [
+        {"id": "query", "protein": scope["protein"], "group": "recorded_group", "values": list(range(len(columns)))}
+    ]
+    return entry, scope, inputs, seen
+
+
+def test_context_contract_matches_actual_prediction_inputs(context_published):
+    entry, scope, rows, seen = context_published
+    card = service.dispatch("describe", entry_id=entry)
+    assert card["success"] and card["input_fields"] == ["id", "protein", "group", "values"]
+    contract = card["input_contract"]
+    assert contract["kind"] == "measured_context" and not contract["target_required"]
+    assert contract["protein"] == scope["protein"]
+    assert contract["values"]["columns"] == scope["covariates"]
+    assert contract["group"]["level"] == scope["grouping"]["level"]
+    result = json.loads(
+        predict_with_evolved_model_tool.invoke(
+            {"entry_id": entry, "inputs": [{**rows[0], "target": 12345}], "scope": card["scope"]},
+            config={"configurable": {"thread_id": "context-chat"}},
+        )
+    )
+    assert result["success"] and result["receipt"]["session_id"] == "context-chat"
+    assert seen == rows
+    assert result["predictions"][0]["prediction"] == sum(rows[0]["values"])
+
+
+@pytest.mark.parametrize("invalid", ["sequence_only", "wrong_protein", "missing_value", "nonfinite", "out_of_range"])
+def test_context_contract_does_not_weaken_input_validation(context_published, invalid):
+    entry, scope, rows, seen = context_published
+    row = {**rows[0], "values": list(rows[0]["values"])}
+    if invalid == "sequence_only":
+        row = {"id": "query", "sequence": "AA"}
+    elif invalid == "wrong_protein":
+        row["protein"] = "another_protein"
+    elif invalid == "missing_value":
+        row["values"].pop()
+    elif invalid == "nonfinite":
+        row["values"][0] = float("nan")
+    else:
+        row["values"][0] = 101
+    result = service.dispatch("predict", entry_id=entry, inputs=[row], scope=scope)
+    assert not result["success"] and not seen
+
+
+@pytest.mark.asyncio
+async def test_mcp_context_description_and_inference(context_published):
+    entry, scope, rows, seen = context_published
+    async with Client(mcp) as client:
+        card = (await client.call_tool("describe_evolved_model", {"entry_id": entry})).data
+        assert card["input_fields"] == list(rows[0])
+        result = (
+            await client.call_tool(
+                "predict_with_evolved_model", {"entry_id": entry, "inputs": rows, "scope": card["scope"]}
+            )
+        ).data
+        assert result["success"] and result["session_binding"] == "mcp_transport_session"
+        assert seen == rows
+
+
+def test_predict_requires_exact_scope_and_strips_labels(published):
+    store, root, verified, entry, seen = published
+    rows = [{"id": "test", "sequence": "AA", "target": 12345}]
+    failed = service.dispatch("predict", entry_id=entry, inputs=rows, scope={})
+    assert not failed["success"] and not seen
+    result = service.dispatch("predict", entry_id=entry, inputs=rows, scope=verified["key"]["scope"])
+    assert result["success"] and result["session_binding"] == "tool_request"
+    assert result["receipt"]["session_id"].startswith("agent_tool_request_")
+    assert seen == [{"id": "test", "sequence": "AA"}]
+    assert not service.dispatch("predict", entry_id=entry, inputs=rows * 257, scope=verified["key"]["scope"])["success"]
+
+
+def test_retirement_or_invalid_evidence_blocks_actual_use(published, monkeypatch):
+    store, root, verified, entry, seen = published
+
+    def unavailable(*args, **kwargs):
+        raise ValueError("Internal evidence path /private/goal has changed")
+
+    monkeypatch.setattr(store, "resolve", unavailable)
+    result = service.dispatch(
+        "predict", entry_id=entry, inputs=[{"id": "x", "sequence": "AA"}], scope=verified["key"]["scope"]
+    )
+    assert not result["success"] and not seen
+    assert "/private" not in json.dumps(result)
+    assert not service.dispatch("describe", entry_id=entry)["success"]
+
+
+@pytest.mark.parametrize("action", ["list", "describe", "predict"])
+def test_online_mode_blocks_every_entry_before_library_access(monkeypatch, action):
+    def deny(name):
+        raise RuntimeError("Unavailable in online mode")
+
+    def no_access():
+        pytest.fail("Library must not be accessed in disabled mode")
+
+    monkeypatch.setattr(service, "assert_tool_allowed", deny)
+    monkeypatch.setattr(service, "configured_library", no_access)
+    assert service.dispatch(action)["error_code"] == "runtime_mode_disabled"
+
+
+def test_model_cannot_select_a_library_path(published):
+    assert not service.dispatch("list", library_root="/private/another_owner")["success"]
+    for tool in EVOLVED_MODEL_TOOLS:
+        fields = tool.tool_call_schema.model_json_schema()["properties"]
+        assert not {"config", "ctx", "session_id", "library_root", "path"} & fields.keys()
+
+
+def test_langchain_tool_receives_session_from_host_configuration(published):
+    store, root, verified, entry, seen = published
+    result = json.loads(
+        predict_with_evolved_model_tool.invoke(
+            {"entry_id": entry, "inputs": [{"id": "test", "sequence": "AA"}], "scope": verified["key"]["scope"]},
+            config={"configurable": {"thread_id": "host-chat-session"}},
+        )
+    )
+    assert result["success"]
+    assert result["receipt"]["session_id"] == "host-chat-session"
+    assert result["session_binding"] == "chat_session"
+
+
+@pytest.mark.asyncio
+async def test_mcp_discovers_and_calls_the_same_library_in_one_transport_session(published):
+    store, root, verified, entry, seen = published
+    async with Client(mcp) as client:
+        tools = await client.list_tools()
+        assert {t.name for t in tools} == set(service.TOOL_NAMES.values())
+        for tool in tools:
+            assert not {"ctx", "session_id", "library_root"} & tool.inputSchema["properties"].keys()
+        listing = (await client.call_tool("list_evolved_models", {})).data
+        assert listing["models"][0]["entry_id"] == entry
+        description = (await client.call_tool("describe_evolved_model", {"entry_id": entry})).data
+        arguments = {"entry_id": entry, "inputs": [{"id": "test", "sequence": "AA"}], "scope": description["scope"]}
+        first = (await client.call_tool("predict_with_evolved_model", arguments)).data
+        second = (await client.call_tool("predict_with_evolved_model", arguments)).data
+        assert first["success"] and second["success"]
+        assert first["receipt"]["session_id"] == second["receipt"]["session_id"]
+        assert first["receipt_id"] != second["receipt_id"]
+        assert first["session_binding"] == "mcp_transport_session"

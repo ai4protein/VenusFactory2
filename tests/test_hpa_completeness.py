@@ -22,7 +22,7 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(_PROJECT_ROOT))
 
-from src.tools.database.hpa.hpa_operations import (  # noqa: E402
+from mcp_tools.tools.database.hpa.hpa_operations import (  # noqa: E402
     download_hpa_tissue_expression_by_gene,
 )
 
@@ -69,7 +69,7 @@ def _run(entry):
     with tempfile.TemporaryDirectory() as tmp:
         out_path = str(Path(tmp) / "out.json")
         with patch(
-            "src.tools.database.hpa.hpa_operations.hpa_get_exact_entry",
+            'mcp_tools.tools.database.hpa.hpa_operations.hpa_get_exact_entry',
             return_value=entry,
         ):
             raw = download_hpa_tissue_expression_by_gene(

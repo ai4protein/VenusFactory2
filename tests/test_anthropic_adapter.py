@@ -201,5 +201,8 @@ def test_bind_tools_returns_copy_with_tools():
 
 def test_generate_raises_without_api_key():
     llm = ChatAnthropicLLM(api_key="", base_url="https://x", model_name="claude-3-7-sonnet-20250219")
+    # Other tests may configure the shared endpoint registry. This test covers
+    # request admission with no resolved credential, not registry resolution.
+    llm.api_key = ""
     with pytest.raises(ValueError, match="Anthropic API key"):
         llm._generate([HumanMessage(content="hi")])

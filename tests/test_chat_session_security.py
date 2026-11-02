@@ -3,7 +3,8 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from src.web_v2 import chat_api
+from fastapi import HTTPException
+from backend.web_v2.chat_api import _shared as chat_api
 
 
 class _FakeRequest:
@@ -20,12 +21,15 @@ class ChatSessionSecurityTests(unittest.TestCase):
     def setUp(self):
         self._mode_patcher = patch.object(chat_api, "_runtime_mode", return_value="online")
         self._mode_patcher.start()
+        self._visibility = patch('backend.web_v2.online_visibility.OnlineVisibility.is_hidden', return_value=False)
+        self._visibility.start()
 
     def tearDown(self):
+        self._visibility.stop()
         self._mode_patcher.stop()
 
     def test_issue_and_verify_token(self):
-        state = {}
+        state = {"session_id": "security-test"}
         req = _FakeRequest("10.0.0.1")
         token, _ = chat_api._issue_session_access_token(state, req)  # noqa: SLF001
         req_with_token = _FakeRequest("10.0.0.1")
@@ -33,22 +37,24 @@ class ChatSessionSecurityTests(unittest.TestCase):
         chat_api._assert_session_access(state, req_with_token)  # noqa: SLF001
 
     def test_reject_owner_mismatch(self):
-        state = {}
+        state = {"session_id": "security-test"}
         req = _FakeRequest("10.0.0.1")
         token, _ = chat_api._issue_session_access_token(state, req)  # noqa: SLF001
         req_other = _FakeRequest("10.0.0.2")
         req_other.headers["x-session-access-token"] = token
-        with self.assertRaises(Exception):
+        with self.assertRaises(HTTPException) as error:
             chat_api._assert_session_access(state, req_other)  # noqa: SLF001
+        self.assertEqual(error.exception.status_code, 403)
 
     def test_reject_invalid_token(self):
-        state = {}
+        state = {"session_id": "security-test"}
         req = _FakeRequest("10.0.0.1")
         chat_api._issue_session_access_token(state, req)  # noqa: SLF001
         req_with_invalid_token = _FakeRequest("10.0.0.1")
         req_with_invalid_token.headers["x-session-access-token"] = "invalid-token"
-        with self.assertRaises(Exception):
+        with self.assertRaises(HTTPException) as error:
             chat_api._assert_session_access(state, req_with_invalid_token)  # noqa: SLF001
+        self.assertEqual(error.exception.status_code, 403)
 
 
 if __name__ == "__main__":

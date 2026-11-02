@@ -242,20 +242,13 @@ class TestSessionStoreEdges(unittest.TestCase):
             # db is gone
             self.assertIsNone(backend.load(sid))
             self.assertNotIn(sid, backend.list_ids())
-            # mem still has the entry (cleanup_older_than is db-only)
+            # Another process may delete an expired conversation. A cached copy
+            # must not resurrect a record removed from the shared database.
             self.assertIn(sid, store._mem)
-            # store.get(sid) returns the in-memory copy (mem-first lookup)
             got = await store.get(sid)
-            self.assertIsNotNone(got)
-            self.assertEqual(got["session_id"], sid)
-            print(
-                f"\n[T7 NOTE] After backend.cleanup_older_than removed the db row, "
-                f"SessionStore.get() still returns the mem-cached state. "
-                f"list_ids reflects db-only sessions PLUS mem-only sessions matching owner."
-            )
-            # list_ids should still see it (mem fallback in SessionStore.list_ids)
-            ids = await store.list_ids("owner1")
-            self.assertIn(sid, ids)
+            self.assertIsNone(got)
+            self.assertNotIn(sid, store._mem)
+            self.assertNotIn(sid, await store.list_ids("owner1"))
 
     # ------------------------------------------------------------------ T8
     @_async

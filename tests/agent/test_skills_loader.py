@@ -68,7 +68,7 @@ def test_read_skill_relative_path_and_traversal():
 
 
 def test_read_skill_tool_json():
-    from tools.skill.tools_agent import read_skill_tool
+    from mcp_tools.tools.skill.tools_agent import read_skill_tool
 
     raw = read_skill_tool.invoke({"skill_id": "nature_figure", "relative_path": "manifest.yaml"})
     data = json.loads(raw)

@@ -31,7 +31,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 # does not blow this away.  We re-set it inside each test fixture too.
 os.environ.setdefault("OPENAI_API_KEY", "test-key-not-real")
 
-from tools.train import train_operations as to_mod  # noqa: E402
+from mcp_tools.models.factory.training import train_operations as to_mod  # noqa: E402
 from agent.sandbox import (  # noqa: E402
     Capability,
     PathGrant,
