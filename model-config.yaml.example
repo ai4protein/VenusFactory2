@@ -1,3 +1,5 @@
+# Web Agent / Scientist / Researcher: configure .env (docs/model-providers.md).
+# This file also supports legacy callers; model IDs below are examples.
 # VenusFactory LLM endpoints
 #
 # 1. cp model-config.yaml.example model-config.yaml
@@ -87,3 +89,20 @@ endpoints:
   #   api_compatible: openai
   #   api_key_env: CHAT_API_KEY
   #   # api_key: ${CHAT_API_KEY}
+
+
+  grok:
+    model: grok-4
+    label: Grok
+    provider: xai
+    base_url: https://api.x.ai/v1
+    api_compatible: openai
+    api_key_env: XAI_API_KEY
+
+  minimax:
+    model: MiniMax-M2.5
+    label: MiniMax
+    provider: minimax
+    base_url: https://api.minimax.io/v1
+    api_compatible: openai
+    api_key_env: MINIMAX_API_KEY

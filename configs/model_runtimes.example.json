@@ -1,0 +1,135 @@
+{
+  "vina": {
+    "enabled": false,
+    "executable": "runtime/local/model-runtimes/vina/bin/vina",
+    "cpus": 2,
+    "timeout_seconds": 1800
+  },
+  "ligandmpnn": {
+    "enabled": false,
+    "python": "runtime/local/model-runtimes/ligandmpnn-env/bin/python",
+    "root": "runtime/local/model-runtimes/LigandMPNN",
+    "weights": "runtime/local/model-runtimes/LigandMPNN/model_params/ligandmpnn_v_32_010_25.pt",
+    "timeout_seconds": 1800
+  },
+  "antibmpnn": {
+    "enabled": false,
+    "python": "runtime/local/model-runtimes/antibmpnn-env/bin/python",
+    "root": "runtime/local/model-runtimes/AntiBMPNN",
+    "weights": "runtime/local/model-runtimes/AntiBMPNN/antibmpnn_model_weights",
+    "timeout_seconds": 1800
+  },
+  "admet_ai": {
+    "enabled": false,
+    "python": "runtime/local/model-runtimes/admet-ai-env/bin/python",
+    "installation": "runtime/local/model-runtimes/admet-ai-env/installation.json",
+    "timeout_seconds": 300
+  },
+  "bindcraft": {
+    "enabled": false,
+    "python": "runtime/local/model-runtimes/bindcraft-env/bin/python",
+    "root": "runtime/local/model-runtimes/BindCraft",
+    "filters": "runtime/local/model-runtimes/BindCraft/settings_filters/default_filters.json",
+    "advanced": "runtime/local/model-runtimes/BindCraft/settings_advanced/default_4stage_multimer.json",
+    "cpus": 2,
+    "timeout_seconds": 3600,
+    "installation": "runtime/local/model-runtimes/bindcraft-env/installation.json"
+  },
+  "boltzgen": {
+    "enabled": false,
+    "executable": "runtime/local/model-runtimes/boltzgen-env/bin/boltzgen",
+    "cache": "runtime/local/model-runtimes/boltzgen-cache",
+    "cpus": 2,
+    "timeout_seconds": 3600,
+    "installation": "runtime/local/model-runtimes/boltzgen-env/installation.json"
+  },
+  "diffdock": {
+    "enabled": false,
+    "python": "runtime/local/model-runtimes/diffdock-env/bin/python",
+    "root": "runtime/local/model-runtimes/DiffDock",
+    "model_dir": "runtime/local/model-runtimes/DiffDock/workdir/v1.1/score_model",
+    "confidence_model_dir": "runtime/local/model-runtimes/DiffDock/workdir/v1.1/confidence_model",
+    "config": "runtime/local/model-runtimes/DiffDock/default_inference_args.yaml",
+    "confidence_ckpt": "best_model_epoch75.pt",
+    "cache": "runtime/local/model-runtimes/DiffDock/cache",
+    "cpus": 2,
+    "timeout_seconds": 3600,
+    "installation": "runtime/local/model-runtimes/diffdock-env/installation.json"
+  },
+  "prosst": {
+    "enabled": false,
+    "python": "runtime/local/model-runtimes/prosst/env/bin/python",
+    "model_id": "AI4Protein/ProSST-2048",
+    "cache": "runtime/local/model-runtimes/prosst/cache",
+    "timeout_seconds": 3600,
+    "variants": {
+      "20": {
+        "model_id": "AI4Protein/ProSST-20"
+      },
+      "128": {
+        "model_id": "AI4Protein/ProSST-128"
+      },
+      "512": {
+        "model_id": "AI4Protein/ProSST-512"
+      },
+      "1024": {
+        "model_id": "AI4Protein/ProSST-1024"
+      },
+      "2048": {
+        "model_id": "AI4Protein/ProSST-2048"
+      },
+      "4096": {
+        "model_id": "AI4Protein/ProSST-4096"
+      }
+    }
+  },
+  "esm1v": {
+    "enabled": false,
+    "python": "runtime/local/model-runtimes/esm1v/env/bin/python",
+    "model_id": "facebook/esm1v_t33_650M_UR90S_1",
+    "cache": "runtime/local/model-runtimes/esm1v/cache",
+    "timeout_seconds": 3600
+  },
+  "esmif1": {
+    "enabled": false,
+    "python": "runtime/local/model-runtimes/esmif1/env/bin/python",
+    "model_id": "esm_if1_gvp4_t16_142M_UR50",
+    "cache": "runtime/local/model-runtimes/esmif1/cache",
+    "timeout_seconds": 3600
+  },
+  "proteinmpnn": {
+    "enabled": false,
+    "python": "runtime/local/model-runtimes/proteinmpnn/env/bin/python",
+    "weights": "runtime/local/model-runtimes/proteinmpnn/weights",
+    "timeout_seconds": 1800
+  },
+  "protssn": {
+    "enabled": false,
+    "python": "runtime/local/model-runtimes/protssn/env/bin/python",
+    "model_id": "facebook/esm2_t33_650M_UR50D",
+    "weights": "runtime/local/model-runtimes/protssn/weights",
+    "cache": "runtime/local/model-runtimes/protssn/cache",
+    "use_ensemble": true,
+    "timeout_seconds": 7200
+  },
+  "finetuned": {
+    "enabled": false,
+    "python": "runtime/local/model-runtimes/finetuned/env/bin/python",
+    "timeout_seconds": 3600
+  },
+  "plm_checkpoint": {
+    "enabled": false,
+    "python": "runtime/local/model-runtimes/plm-checkpoint/env/bin/python",
+    "timeout_seconds": 3600
+  },
+  "s4pred": {
+    "enabled": false,
+    "python": "runtime/local/model-runtimes/s4pred-env/bin/python",
+    "root": "runtime/local/model-runtimes/S4PRED",
+    "installation": "runtime/local/model-runtimes/s4pred-env/installation.json"
+  },
+  "interproscan": {
+    "enabled": false,
+    "contact_email": ""
+  }
+}

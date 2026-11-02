@@ -1,0 +1,20 @@
+{
+  "torch_configs": {
+    "cu128": {
+      "torch_url": "https://download.pytorch.org/whl/cu128",
+      "torch_aug_url": "https://data.pyg.org/whl/torch-2.8.0+cu128.html"
+    },
+    "cpu": {
+      "torch_url": "https://download.pytorch.org/whl/cpu",
+      "torch_aug_url": "https://data.pyg.org/whl/torch-2.8.0+cpu.html"
+    }
+  },
+  "frpc_hf_fallback": {
+    "repo_id": "AI4Protein/VenusFactory2-ckpts",
+    "path_prefix": "assets/frpc",
+    "note": "Used when Gradio CDN is unreachable. Prefer: python scripts/download_frpc.py"
+  },
+  "pip_mirror": {
+    "index_url": "https://pypi.org/simple"
+  }
+}

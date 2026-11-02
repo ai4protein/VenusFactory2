@@ -1,0 +1,31 @@
+{
+  "schema_version": 2,
+  "factory_backbones": {
+    "ankh-large": "ElnaggarLab/ankh-large",
+    "esm2_t33_650M_UR50D": "facebook/esm2_t33_650M_UR50D",
+    "prot_bert": "RostLab/prot_bert",
+    "prot_t5_xl_uniref50": "RostLab/prot_t5_xl_uniref50"
+  },
+  "profiles": {
+    "minimal": [],
+    "standard": ["proteinmpnn", "ligandmpnn", "s4pred"],
+    "extended": ["proteinmpnn", "ligandmpnn", "antibmpnn", "s4pred", "prosst", "esm1v", "esmif1", "protssn", "admet_ai", "vina"],
+    "full": ["proteinmpnn", "ligandmpnn", "antibmpnn", "s4pred", "prosst", "esm1v", "esmif1", "protssn", "admet_ai", "vina", "boltzgen", "diffdock", "bindcraft", "signalp"]
+  },
+  "tools": {
+    "proteinmpnn": {"repository": "https://github.com/dauparas/ProteinMPNN.git", "revision": "main", "python": "3.12", "packages": ["numpy<2", "biopython", "tqdm"], "kind": "pretrained", "license": "MIT"},
+    "ligandmpnn": {"repository": "https://github.com/dauparas/LigandMPNN.git", "revision": "26ec57ac976ade5379920dbd43c7f97a91cf82de", "python": "3.11", "packages": ["numpy==1.23.5", "scipy==1.12.0", "prody==2.6.1", "biopython", "ml-collections==0.1.1", "dm-tree==0.1.8"], "kind": "pretrained", "license": "MIT"},
+    "antibmpnn": {"repository": "https://github.com/zeysun/AntiBMPNN.git", "revision": "7e6329ba3c317e7344c6b09add72dea2390af39a", "python": "3.11", "packages": ["numpy<2", "pandas", "peptides", "scikit-learn", "tqdm"], "kind": "pretrained", "license": "See upstream LICENSE"},
+    "s4pred": {"repository": "https://github.com/psipred/s4pred.git", "revision": "7f309dfc9a8155efdf30113fb4cb0affb40aeb7e", "python": "3.12", "packages": ["numpy", "biopython"], "kind": "pretrained", "license": "GPL-3.0"},
+    "prosst": {"repository": "https://github.com/ai4protein/ProSST.git", "revision": "main", "platform_environment": true, "kind": "pretrained", "license": "CC-BY-NC-ND-4.0"},
+    "esm1v": {"platform_environment": true, "kind": "pretrained", "license": "See facebook/esm1v model card"},
+    "esmif1": {"platform_environment": true, "kind": "pretrained", "license": "See facebookresearch/esm LICENSE"},
+    "protssn": {"platform_environment": true, "kind": "pretrained", "license": "See tyang816/ProtSSN model card"},
+    "admet_ai": {"python": "3.12", "packages": ["admet-ai==2.0.1"], "kind": "pretrained", "license": "MIT; check model/data licenses"},
+    "vina": {"kind": "pretrained", "license": "Apache-2.0", "release": "v1.2.7"},
+    "boltzgen": {"python": "3.12", "packages": ["boltzgen==0.3.2"], "gpu": true, "kind": "pretrained", "license": "MIT"},
+    "diffdock": {"repository": "https://github.com/gcorso/DiffDock.git", "revision": "85c49b60d3e0b0182a59ee43a34a6d7036981284", "python": "3.10", "gpu": true, "kind": "pretrained", "license": "MIT"},
+    "bindcraft": {"manual": "Install the licensed PyRosetta distribution and verify a bounded GPU run; see docs/model-runtimes.md. Existing installations are audited, never overwritten.", "kind": "pretrained", "license": "BindCraft MIT; PyRosetta separate license"},
+    "signalp": {"manual": "Obtain the SignalP 6 academic package and fast weights from DTU. No public-weight substitute is installed.", "kind": "pretrained", "license": "DTU terms"}
+  }
+}

@@ -1,0 +1,15 @@
+# Existing CRLF files remain valid; editors create new source with LF.
+# Do not normalize archived bytes or scientific audit capsules implicitly.
+* whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+archive/** -whitespace
+src/agent/harness/_legacy*/** -whitespace
+src/agent/rsi/_legacy*/** -whitespace
+mcp_tools/models/pretrained/mutation/models/** -whitespace
+
+# These legacy HTML/Markdown templates contain intentional literal trailing spaces.
+mcp_tools/common/common_utils.py whitespace=-blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+mcp_tools/common/file_handlers.py whitespace=-blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+mcp_tools/common/label_mappers.py whitespace=-blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+mcp_tools/common/llm_helpers.py whitespace=-blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+mcp_tools/common/report_fragments.py whitespace=-blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+mcp_tools/tools/discovery/workflow.py whitespace=-blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol

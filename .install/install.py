@@ -11,72 +11,13 @@ import tarfile
 VENV_PATH = ".venv"
 
 import json
-with open('./install_config.json', 'r', encoding='utf-8') as f:
+from pathlib import Path
+with open(Path(__file__).resolve().parents[1] / 'configs' / 'install.json', 'r', encoding='utf-8') as f:
     config = json.load(f)
 
 configs = config['torch_configs']
-FRPC_VERSIONS = config['frpc_versions']
 pip_mirror = config['pip_mirror']
 
-def download_frpc(system, arch_str, version="v0.3"):
-    """
-    Download the frpc executable for the corresponding system.
-
-    Prefer the shared helper (CDN → Hugging Face fallback). Keep a small
-    inline CDN attempt so this script still works if ``src/`` is unavailable.
-    """
-    # Preferred path: src/frpc_hub.py (CDN + HF assets/frpc fallback).
-    try:
-        repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-        src_dir = os.path.join(repo_root, "src")
-        if src_dir not in sys.path:
-            sys.path.insert(0, src_dir)
-        from frpc_hub import download_frpc as hub_download_frpc
-
-        path = hub_download_frpc(system=system, arch=arch_str, version=version, force=True)
-        print(f"✅ Download complete via frpc_hub: {path}")
-        return os.path.basename(path)
-    except Exception as hub_exc:
-        print(f"⚠️  frpc_hub download failed ({hub_exc}); trying CDN only...")
-
-    url_key = f"{system}_{arch_str}"
-    
-    if url_key not in FRPC_VERSIONS[version]:
-        print(f"❌ Unsupported system architecture: {system}_{arch_str}")
-        return None
-    
-    url = FRPC_VERSIONS[version][url_key]
-    
-    if system == "windows":
-        download_filename = f"frpc_{system}_{arch_str}_{version}.exe"
-        base_filename = f"frpc_{system}_{arch_str}_{version}"
-    else:
-        download_filename = f"frpc_{system}_{arch_str}_{version}"
-        base_filename = download_filename
-    
-    print(f"📥 Downloading frpc: {download_filename}")
-    print(f"   URL: {url}")
-    
-    try:
-        urllib.request.urlretrieve(url, download_filename)
-        print(f"✅ Download complete: {download_filename}")
-        
-        if system != "windows":
-            os.chmod(download_filename, 0o755)
-            print(f"✅ Executable permissions set")
-        if system == "windows":
-            if os.path.exists(base_filename):
-                os.remove(base_filename)
-            # Rename file
-            os.rename(download_filename, base_filename)
-            print(f"✅ Renamed to: {base_filename}")
-            return base_filename
-        
-        return download_filename
-    except Exception as e:
-        print(f"❌ Download failed: {e}")
-        print("   Tip: python scripts/download_frpc.py --to-gradio-cache")
-        return None
 
 
 def get_arch_str():
@@ -94,86 +35,7 @@ def get_arch_str():
     
     return arch_str
 
-def setup_frpc():
-    """
-    Copy frpc to the correct cache directory based on operating system
-    If not available locally, attempt to download
-    """
-    print("\n🔧 Setting up Gradio frpc...")
-    
-    system = platform.system().lower()
-    
-    arch_str = get_arch_str()
-    print(f"🔍 Architecture: {arch_str}")
 
-    frpc_file = None
-    version = "v0.3"
-    
-    for file in os.listdir('.'):
-        if file.startswith('frpc_') and system in file and arch_str in file:
-            frpc_file = file
-            if frpc_file.endswith(".exe"):
-                base_filename = frpc_file[:-4]
-                shutil.copy(frpc_file, base_filename)
-                frpc_file = base_filename
-            print(f"📦 Found local frpc file: {frpc_file}")
-            break
-    
-    # If not found locally, attempt to download
-    if not frpc_file:
-        print("📭 No local frpc file found, attempting download...")
-        frpc_file = download_frpc(system, arch_str, version)
-    
-    if not frpc_file:
-        print("⚠️  frpc setup failed, Gradio will download automatically when needed")
-        return
-    
-    # Determine target directory
-    cache_dir = get_frpc_cache_dir()
-    if not cache_dir:
-        print("❌ Unable to determine cache directory")
-        return
-    
-    os.makedirs(cache_dir, exist_ok=True)
-    
-    dest_file = os.path.join(cache_dir, frpc_file)
-    
-    try:
-        if os.path.exists(dest_file):
-            os.remove(dest_file)
-        
-        shutil.copy2(frpc_file, dest_file)
-        
-        if system != 'windows':
-            os.chmod(dest_file, 0o755)
-            print(f"✅ frpc copied to: {dest_file} (executable permissions set)")
-        else:
-            print(f"✅ frpc copied to: {dest_file}")
-            
-        if os.path.exists(dest_file):
-            file_size = os.path.getsize(dest_file)
-            print(f"📊 File size: {file_size} bytes")
-            
-    except Exception as e:
-        print(f"❌ Failed to copy frpc: {e}")
-        print("Gradio will download frpc automatically when needed")
-
-def get_frpc_cache_dir():
-    """
-    Get the frpc cache directory for the corresponding system
-    """
-    system = platform.system().lower()
-    
-    if system == 'windows':
-        path = os.path.join(os.environ.get('USERPROFILE', ''), '.cache', 'huggingface', 'gradio', 'frpc')
-        if not os.path.exists(path):
-            os.makedirs(path)
-        return path
-    else:
-        home = os.path.expanduser('~')
-        return os.path.join(home, '.cache', 'huggingface', 'gradio', 'frpc')
-    
-    return None
 
 def ensure_uv_installed():
     """
@@ -231,27 +93,11 @@ def main():
     parser.add_argument(
         "--skip-frpc",
         action="store_true",
-        help="Skip frpc setup"
-    )
-    parser.add_argument(
-        "--force-download",
-        action="store_true",
-        help="Force redownload frpc even if it exists locally"
+        help=argparse.SUPPRESS
     )
     args = parser.parse_args()
     install_type = _resolve_type(args.type)
     
-    if not args.skip_frpc:
-        if args.force_download:
-            print("🔄 Forcing frpc redownload...")
-            system = platform.system().lower()
-            arch_str = get_arch_str()
-            for file in os.listdir('.'):
-                if file.startswith(f"frpc_{system}_{arch_str}"):
-                    os.remove(file)
-                    print(f"🗑️  Deleted old file: {file}")
-        
-        setup_frpc()
     
     # Get current selected configuration
     current_config = configs[install_type]

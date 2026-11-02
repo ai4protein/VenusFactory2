@@ -35,11 +35,16 @@ frontend/dist/
 Thumbs.db
 
 # Project heavy artefacts (mount as volumes if needed)
-ckpt/
+ckpt/*
+!ckpt/README.md
+!ckpt/manifest.json
 temp_outputs/
 img/
 docker/
-docs/
+docs/*
+!docs/manual/
+!docs/wiki/
+!docs/README.md
 example/
 script_dev/
 tests/
@@ -47,10 +52,17 @@ Scripts_notebook.ipynb
 
 # Local secrets — provide via compose env_file instead
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 
-# frpc binaries (downloaded at runtime if needed)
+# Retired sources and machine-specific runtime state
+archive/
+runtime/
+.venvs/
+research_runs/
+configs/model_runtimes.json
+model-config.yaml
+# Historical FRPC binaries
 frpc_*
 
 # Logs
@@ -66,3 +78,19 @@ logs/
 /wheels/
 *.egg
 *.egg-info/
+
+# Deployment-only data and credentials
+configs/rsi/paper_steps.json
+configs/rsi/paper_step_definitions/
+configs/rsi/*_local.json
+.kimi-code/
+.claude/
+*.key
+*.pem
+
+configs/rsi/engineering_smoke.json
+configs/rsi/engineering_pilot_30.json
+configs/rsi/engineering_smoke_glm.json
+configs/rsi/engineering_pilot_30_glm.json
+configs/rsi/generated_models_glm47.json
+configs/rsi/generated_models_glm51.json

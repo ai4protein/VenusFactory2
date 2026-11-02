@@ -195,7 +195,6 @@ class InstallPlan:
         skip_ckpts: bool = False,
         skip_frontend: bool = False,
         force_frontend: bool = False,
-        with_frpc: bool = False,
         check_env: bool = False,
         hf_mirror: bool = False,
         port: int = 7861,
@@ -212,7 +211,6 @@ class InstallPlan:
         self.skip_ckpts = skip_ckpts
         self.skip_frontend = skip_frontend
         self.force_frontend = force_frontend
-        self.with_frpc = with_frpc
         self.check_env = check_env
         self.hf_mirror = hf_mirror
         self.port = port
@@ -526,7 +524,6 @@ def build_interactive_plan(base: InstallPlan) -> InstallPlan:
         preset="predict-core",
         skip_ckpts=False,
         skip_frontend=False,
-        with_frpc=False,
         check_env=True,
         port=base.port,
         dry_run=base.dry_run,
@@ -678,7 +675,6 @@ def plan_from_args(args: argparse.Namespace) -> InstallPlan:
         skip_ckpts=bool(args.skip_ckpts),
         skip_frontend=bool(args.skip_frontend),
         force_frontend=bool(args.force_frontend or args.clean_frontend),
-        with_frpc=bool(args.with_frpc),
         check_env=bool(args.check_env or args.yes),
         hf_mirror=bool(args.hf_mirror),
         port=args.port,
@@ -757,7 +753,6 @@ def install_deps(*, torch_type: str, env: str, dry_run: bool) -> int:
             env,
             "--type",
             resolved,
-            "--skip-frpc",
         ],
         dry_run=dry_run,
     )
@@ -785,12 +780,6 @@ def download_ckpts(python: str, preset: str, *, dry_run: bool) -> int:
     )
 
 
-def download_frpc(python: str, *, dry_run: bool) -> int:
-    _section(_t("Download Gradio frpc", "下载 Gradio frpc"))
-    return _run(
-        [python, str(_REPO_ROOT / "scripts" / "download_frpc.py"), "--to-gradio-cache"],
-        dry_run=dry_run,
-    )
 
 
 def run_check_env(python: str, *, dry_run: bool) -> int:
@@ -808,7 +797,7 @@ def print_next_steps(*, python: str, port: int, used_venv: bool) -> None:
             _print("  .\\.venv\\Scripts\\activate")
         else:
             _print("  source .venv/bin/activate")
-    _print(f"  {launch_python} src/webui_v2.py --host 0.0.0.0 --port {port}")
+    _print(f"  {launch_python} backend/webui_v2.py --host 0.0.0.0 --port {port}")
     _print()
     _print(f"{_t('Open', '浏览器打开')}: http://localhost:{port}")
     _print(
@@ -850,7 +839,6 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--skip-ckpts", action="store_true")
     p.add_argument("--skip-frontend", action="store_true")
     p.add_argument("--force-frontend", action="store_true")
-    p.add_argument("--with-frpc", action="store_true")
     p.add_argument("--check-env", action="store_true")
     p.add_argument("--strict-check", action="store_true", help="Fail if check_env fails.")
     p.add_argument("--hf-mirror", action="store_true", help="Set HF_ENDPOINT=hf-mirror.com")
@@ -872,7 +860,6 @@ def _should_prompt(args: argparse.Namespace) -> bool:
             args.skip_ckpts,
             args.skip_frontend,
             args.force_frontend,
-            args.with_frpc,
             args.check_env,
             args.hf_mirror,
             args.torch_type != "auto",
@@ -1035,8 +1022,6 @@ def execute_plan(plan: InstallPlan, *, strict_check: bool = False) -> int:
         _section(_t("Download checkpoints", "下载权重"))
         _print(_t("Skipped (on-demand download still enabled by default).", "已跳过（默认仍可按需自动下载）。"))
 
-    if plan.with_frpc:
-        download_frpc(python if Path(python).exists() else sys.executable, dry_run=plan.dry_run)
 
     if plan.check_env and Path(python).exists():
         code = run_check_env(python, dry_run=plan.dry_run)

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Spawn one isolated kimi-code session via systemd-run with DynamicUser.
 #
-# Called by fastapi (as `tanyang`) through sudo; see sudoers fragment in
+# Called by fastapi (as the configured service user) through sudo; see sudoers fragment in
 # scripts/install/setup-online-mode.sh. Args are strictly validated so
 # the NOPASSWD sudo rule has minimal blast radius.
 #
@@ -41,7 +41,7 @@ if [[ ! "$SDIR" =~ ^/[^[:space:]]+/temp_outputs/web_v2/sessions/${SID}$ ]]; then
 fi
 
 # ── Locate kimi binary ────────────────────────────────────────────────────
-KIMI_BIN="${KIMI_BIN:-/home/tanyang/.kimi-code/bin/kimi}"
+KIMI_BIN="${KIMI_BIN:-${HOME}/.kimi-code/bin/kimi}"
 if [[ ! -x "$KIMI_BIN" ]]; then
   KIMI_BIN="$(command -v kimi || true)"
 fi
@@ -68,7 +68,7 @@ chmod 2770 "$SDIR"
 # Copy is fine here (helper runs as root via sudo NOPASSWD) — provider
 # keys land in session_dir but it's 2770 owned by a per-session UID, so
 # other sessions can't read them.
-KIMI_CONFIG_SRC="${KIMI_CONFIG_DIR:-/home/tanyang/.kimi-code}"
+KIMI_CONFIG_SRC="${KIMI_CONFIG_DIR:-${HOME}/.kimi-code}"
 if [[ -d "$KIMI_CONFIG_SRC" ]]; then
   mkdir -p "$SDIR/.kimi-code/sessions"
   for item in config.toml mcp.json providers credentials.json auth.json; do

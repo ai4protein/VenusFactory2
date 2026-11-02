@@ -93,7 +93,6 @@ GROUPS: dict[str, list[tuple[str, tuple[str, ...], bool]]] = {
         ("tqdm", ("__version__",), False),
     ],
     "Web / API": [
-        ("gradio", ("__version__",), False),
         ("fastapi", ("__version__",), False),
         ("uvicorn", ("__version__",), False),
         ("starlette", ("__version__",), False),

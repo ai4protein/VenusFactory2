@@ -8,16 +8,16 @@
 # Idempotent — re-running just refreshes state. What it does:
 #
 #   1. Creates the `venus` group (if missing) and adds the project owner
-#      (tanyang) so fastapi can rwx session_dirs that DynamicUser writes.
+#      (the service account) so fastapi can rwx session_dirs that DynamicUser writes.
 #   2. Installs venus-spawn-kimi to /usr/local/libexec/.
-#   3. Installs a sudoers fragment letting tanyang run *only* the spawn
+#   3. Installs a sudoers fragment letting the service account run *only* the spawn
 #      helper and stop venus-kimi-*.scope units without password.
 #   4. Creates the project-local session root with the right group + perms.
 #   5. (Optional) installs the venusfactory.service systemd unit so the
 #      fastapi process autostarts on boot.
 #
 # Designed for the single-machine deployment where fastapi runs as the
-# `tanyang` user and frp tunnels port 7861 to the internet.
+# configured service user behind a reverse proxy.
 
 set -euo pipefail
 
@@ -26,8 +26,12 @@ if [[ $EUID -ne 0 ]]; then
   exit 1
 fi
 
-PROJECT_OWNER="${PROJECT_OWNER:-tanyang}"
-PROJECT_ROOT="${PROJECT_ROOT:-/home/${PROJECT_OWNER}/workspace/VenusFactory2}"
+PROJECT_OWNER="${PROJECT_OWNER:-${SUDO_USER:-}}"
+if [[ -z "$PROJECT_OWNER" || "$PROJECT_OWNER" == root ]]; then
+  echo "Set PROJECT_OWNER to the existing non-root service account" >&2
+  exit 2
+fi
+PROJECT_ROOT="${PROJECT_ROOT:-$(cd -- "$(dirname -- "$0")/../.." && pwd)}"
 SESSIONS_DIR="${PROJECT_ROOT}/temp_outputs/web_v2/sessions"
 HELPER_SRC="${PROJECT_ROOT}/scripts/install/venus-spawn-kimi"
 HELPER_DEST="/usr/local/libexec/venus-spawn-kimi"
@@ -112,10 +116,8 @@ echo "  - $SESSIONS_DIR ready (2770 venus)"
 
 echo "[5/5] systemd unit (optional)..."
 if [[ -f "$SYSTEMD_UNIT_SRC" ]]; then
-  install -m 0644 -o root -g root "$SYSTEMD_UNIT_SRC" "$SYSTEMD_UNIT_DEST"
-  systemctl daemon-reload
-  echo "  - installed $SYSTEMD_UNIT_DEST"
-  echo "  - enable + start with:  sudo systemctl enable --now venusfactory"
+  echo "  - service template: $SYSTEMD_UNIT_SRC"
+  echo "  - adjust User, WorkingDirectory and ExecStart before installing it"
 else
   echo "  - skipped (template not present at $SYSTEMD_UNIT_SRC)"
 fi
@@ -130,5 +132,5 @@ echo
 echo "Next steps:"
 echo "  1. ${PROJECT_OWNER} runs 'newgrp venus' (or re-logs) to pick up new group."
 echo "  2. Start fastapi in online mode:"
-echo "     WEBUI_V2_MODE=online MCP_HTTP_PORT=8088 python src/webui_v2.py --online --host 0.0.0.0 --port 7861"
+echo "     WEBUI_V2_MODE=online MCP_HTTP_PORT=8088 python backend/webui_v2.py --online --host 0.0.0.0 --port 7861"
 echo "  3. Or: sudo systemctl enable --now venusfactory (if you installed the unit)"

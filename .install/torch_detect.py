@@ -1,6 +1,6 @@
 """Detect a recommended torch install profile for VenusFactory2.
 
-Returns one of the keys in ``install_config.json`` → ``torch_configs``
+Returns one of the keys in ``configs/install.json`` → ``torch_configs``
 (currently ``cpu`` or ``cu128``).
 """
 from __future__ import annotations

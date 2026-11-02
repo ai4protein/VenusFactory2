@@ -26,6 +26,7 @@ services:
       - path: .env
         required: false
     volumes:
+      - ./runtime/online:/app/runtime/online
       - ./temp_outputs:/app/temp_outputs
       - ./ckpt:/app/ckpt
     restart: unless-stopped
@@ -53,6 +54,7 @@ services:
       - path: .env
         required: false
     volumes:
+      - ./runtime/online:/app/runtime/online
       - ./temp_outputs:/app/temp_outputs
       - ./ckpt:/app/ckpt
     restart: unless-stopped

@@ -10,7 +10,7 @@ Checks (VF2 tree — strict):
   - SKILL.md line count soft-cap (default 500)
 
 Checks (scientific-agent-skills submodule — loose):
-  - If ``third_party/scientific-agent-skills/skills`` exists, each package
+  - If ``src/agent/skills/vendor/scientific-agent-skills/skills`` exists, each package
     dir must contain SKILL.md. Frontmatter differences do not fail CI.
 
 Usage:
@@ -27,7 +27,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SKILLS_DIR = ROOT / "src" / "agent" / "skills"
-SAS_SKILLS_DIR = ROOT / "third_party" / "scientific-agent-skills" / "skills"
+SAS_SKILLS_DIR = ROOT / "src" / "agent" / "skills" / "vendor" / "scientific-agent-skills" / "skills"
 ALLOWED_TOP = {
     "name",
     "description",
@@ -156,7 +156,7 @@ def validate(strict: bool = False, check_refs: bool = False) -> int:
     for path in sorted(SKILLS_DIR.iterdir()):
         if not path.is_dir():
             continue
-        if path.name.startswith("_"):
+        if (path.name.startswith("_") or path.name == "vendor"):
             if (path / "SKILL.md").exists():
                 errors.append(f"{path.name}: shared dirs must not contain SKILL.md")
             continue
@@ -207,7 +207,7 @@ def validate(strict: bool = False, check_refs: bool = False) -> int:
     sas_count = 0
     if SAS_SKILLS_DIR.is_dir():
         for path in sorted(SAS_SKILLS_DIR.iterdir()):
-            if not path.is_dir() or path.name.startswith("_"):
+            if not path.is_dir() or (path.name.startswith("_") or path.name == "vendor"):
                 continue
             sas_count += 1
             if not (path / "SKILL.md").is_file():
@@ -215,7 +215,7 @@ def validate(strict: bool = False, check_refs: bool = False) -> int:
                     f"scientific/{path.name}: missing SKILL.md "
                     "(loose submodule check)"
                 )
-    elif (ROOT / "third_party" / "scientific-agent-skills").exists():
+    elif (ROOT / "src" / "agent" / "skills" / "vendor" / "scientific-agent-skills").exists():
         warnings.append(
             "scientific-agent-skills present but skills/ missing — "
             "run: git submodule update --init --recursive"

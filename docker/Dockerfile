@@ -1,15 +1,21 @@
 # syntax=docker/dockerfile:1.7
 
 # =============================================================================
-# Stage 1 — build the React frontend (Node 25 to match frontend/package.json)
+# Stage 1 — build the React frontend (Node 24 to match frontend/package.json)
 # =============================================================================
-FROM node:25-slim AS frontend
+FROM node:24-slim AS frontend
 
-WORKDIR /build
+RUN apt-get update && apt-get install -y --no-install-recommends python3 python-is-python3 \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /build/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 
 COPY frontend/ ./
+COPY scripts/sync_platform_docs.py /build/scripts/sync_platform_docs.py
+COPY docs/manual/ /build/docs/manual/
+COPY docs/wiki/ /build/docs/wiki/
+COPY docs/README.md /build/docs/README.md
 RUN npm run build
 
 
@@ -87,12 +93,18 @@ RUN uv pip install -r pyproject.toml
 
 # --- Application code ----------------------------------------------------
 COPY src/         ./src/
+COPY backend/     ./backend/
+COPY mcp_tools/   ./mcp_tools/
+COPY configs/     ./configs/
 COPY scripts/     ./scripts/
 COPY data/        ./data/
-COPY install_config.json .env.example ./
+COPY docs/manual/ ./docs/manual/
+COPY docs/wiki/   ./docs/wiki/
+COPY ckpt/README.md ckpt/manifest.json ./ckpt/
+COPY .env.example model-config.yaml.example ./
 
 # Built frontend assets from stage 1
-COPY --from=frontend /build/dist/ ./frontend/dist/
+COPY --from=frontend /build/frontend/dist/ ./frontend/dist/
 
 # Provide a default .env so the app starts even when no .env is mounted.
 # Mount a real .env via docker-compose env_file or `-v` to override.
@@ -103,4 +115,4 @@ EXPOSE 7861
 HEALTHCHECK --interval=30s --timeout=5s --start-period=180s --retries=3 \
     CMD curl -fsS "http://127.0.0.1:${WEBUI_V2_PORT}/health" || exit 1
 
-CMD ["python", "-u", "src/webui_v2.py", "--host", "0.0.0.0", "--port", "7861"]
+CMD ["python", "-u", "scripts/serve.py", "--mode", "online", "--host", "0.0.0.0", "--port", "7861"]

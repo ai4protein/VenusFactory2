@@ -1,0 +1,14 @@
+# Compatibility envelope for the supported Python 3.12 platform initializer.
+# Keep Torch/PyG ABI aligned; CPU or CUDA wheel selection happens separately.
+torch==2.8.0
+torchvision==0.23.0
+triton==3.4.0; sys_platform == 'linux'
+# MCP 2 renamed McpError; the platform's FastMCP integration uses MCP 1.
+fastmcp==3.4.0
+mcp==1.27.2
+transformers==4.48.1
+huggingface-hub==0.36.2
+tokenizers==0.21.4
+peft==0.21.2
+esm==3.2.3
+vplm==0.0.1

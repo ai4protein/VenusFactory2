@@ -59,8 +59,6 @@ pillow>=11.0.0
 fastapi==0.116.1
 uvicorn>=0.41.0
 starlette>=0.47.3
-gradio>=6.6.0,<7
-gradio-client>=2.1.0
 python-multipart>=0.0.20
 sse-starlette>=3.0.3
 websockets>=15.0.1
@@ -127,3 +125,8 @@ rich>=14.1.0
 typer>=0.17.3
 ipython>=9.5.0
 pathos>=0.3.5
+
+# Independent capability admission and report-material extraction
+jsonschema>=4.26,<5
+pypdf>=6.13,<7
+openpyxl>=3.1.5,<4
