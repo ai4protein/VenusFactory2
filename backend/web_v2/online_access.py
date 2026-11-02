@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 import hashlib
 import hmac
 import ipaddress
+import math
 import os
 from pathlib import Path
 import re
@@ -105,6 +106,8 @@ class AccessStore:
             c.executescript('''
             CREATE TABLE IF NOT EXISTS admissions(scope TEXT PRIMARY KEY, day TEXT NOT NULL, ip TEXT NOT NULL, visitor TEXT NOT NULL, grant_id TEXT, bucket TEXT NOT NULL, mode TEXT NOT NULL, created REAL NOT NULL);
             CREATE INDEX IF NOT EXISTS admissions_day ON admissions(day,ip,visitor,grant_id);
+            CREATE INDEX IF NOT EXISTS admissions_visitor_day ON admissions(visitor,day,bucket);
+            CREATE INDEX IF NOT EXISTS admissions_ip_created ON admissions(ip,created);
             CREATE TABLE IF NOT EXISTS grants(id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, key_hash TEXT NOT NULL, extra INTEGER NOT NULL, active INTEGER NOT NULL, expires REAL, name TEXT NOT NULL, institution TEXT NOT NULL, contact TEXT NOT NULL, note TEXT NOT NULL, created REAL NOT NULL);
             CREATE TABLE IF NOT EXISTS admins(id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, active INTEGER NOT NULL, created REAL NOT NULL);
             CREATE TABLE IF NOT EXISTS admin_sessions(token_hash TEXT PRIMARY KEY, admin_id TEXT NOT NULL, expires REAL NOT NULL);
@@ -152,9 +155,9 @@ class AccessStore:
 
     def _status(self, c, ip, visitor, grant, day, reset):
         base = self.limit()
-        ip_used = c.execute("SELECT COUNT(*) FROM admissions WHERE day=? AND ip=? AND bucket='base'", (day,ip)).fetchone()[0]
-        browser_used = c.execute("SELECT COUNT(*) FROM admissions WHERE day=? AND visitor=? AND bucket='base'", (day,visitor)).fetchone()[0]
-        base_used = max(ip_used, browser_used)
+        # The persistent visitor cookie owns the daily allowance. A shared NAT
+        # or reverse proxy must never merge different visitors' daily balances.
+        base_used = c.execute("SELECT COUNT(*) FROM admissions WHERE day=? AND visitor=? AND bucket='base'", (day,visitor)).fetchone()[0]
         extra_used = grant_used = 0
         if grant:
             grant_used = c.execute('SELECT COUNT(*) FROM admissions WHERE day=? AND grant_id=?', (day,grant['id'])).fetchone()[0]
@@ -165,12 +168,28 @@ class AccessStore:
         return dict(mode='online', enforced=True, limit=base+extra, used=base+extra-remaining,
                     remaining=remaining, base_limit=base, extra_limit=extra, resets_at=reset,
                     timezone=os.getenv('VENUS_QUOTA_TIMEZONE','Asia/Shanghai'), email=grant['email'] if grant else None,
-                    application_email=CONTACT, unit='new_conversation', base_remaining=max(0,base-base_used))
+                    application_email=CONTACT, unit='new_conversation', identity_scope='visitor', base_remaining=max(0,base-base_used))
 
     def status(self, ip, visitor, address='', key=''):
         day, reset = self.day()
         with self.connect() as c:
             return self._status(c,ip,visitor,self.grant(c,address,key),day,reset)
+
+    @staticmethod
+    def _check_network_rate(c, ip, now):
+        """A short burst guard, separate from every visitor's daily balance."""
+        maximum = max(1, int(os.getenv('VENUS_ONLINE_IP_STARTS_PER_MINUTE', '30')))
+        row = c.execute(
+            'SELECT created FROM admissions WHERE ip=? AND created>? ORDER BY created DESC LIMIT 1 OFFSET ?',
+            (ip, now - 60, maximum - 1),
+        ).fetchone()
+        if row:
+            retry = max(1, math.ceil(row['created'] + 60 - now))
+            raise HTTPException(429, {
+                'code': 'CHAT_START_RATE_LIMIT',
+                'message': f'Too many new conversations from this network. Try again in {retry} seconds.',
+                'retry_after': retry,
+            }, headers={'Retry-After': str(retry)})
 
     def admit(self, scope, mode, ip, visitor, address='', key=''):
         day, reset = self.day()
@@ -181,8 +200,10 @@ class AccessStore:
             status = self._status(c,ip,visitor,grant,day,reset)
             if status['remaining'] <= 0:
                 raise HTTPException(429, {'code':'CHAT_DAILY_LIMIT_REACHED','message':'Today’s new conversation allowance has been used. Continue an existing conversation or add an extra quota key.', 'quota':status})
+            now = time.time()
+            self._check_network_rate(c, ip, now)
             bucket = 'base' if status['base_remaining'] > 0 else 'extra'
-            c.execute('INSERT INTO admissions VALUES(?,?,?,?,?,?,?,?)',(scope,day,ip,visitor,grant['id'] if grant else None,bucket,mode,time.time()))
+            c.execute('INSERT INTO admissions VALUES(?,?,?,?,?,?,?,?)',(scope,day,ip,visitor,grant['id'] if grant else None,bucket,mode,now))
             return True
 
     def science_slot(self, scope, ip, visitor, address='', key=''):
@@ -192,7 +213,7 @@ class AccessStore:
             gid = grant['id'] if grant else ''
             existing = c.execute('SELECT * FROM science_slots WHERE scope=?',(scope,)).fetchone()
             if existing: return
-            if c.execute('SELECT 1 FROM science_slots WHERE ip=? OR visitor=? OR grant_id=?',(ip,visitor,gid)).fetchone():
+            if c.execute('SELECT 1 FROM science_slots WHERE visitor=? OR grant_id=?',(visitor,gid)).fetchone():
                 raise HTTPException(429, {'code':'SCIENCE_ALREADY_RUNNING','message':'One Scientist study can run at a time. Finish or cancel the current study first.'})
             # Includes at most an hour waiting in the queue and a 15-minute run.
             c.execute('INSERT INTO science_slots VALUES(?,?,?,?,?)',(scope,ip,visitor,gid or None,time.time()+4500))

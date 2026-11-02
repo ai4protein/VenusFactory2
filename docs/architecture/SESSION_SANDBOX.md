@@ -62,7 +62,7 @@ elapsed time, configured memory and temporary-directory cleanup result.
   administrator-enabled, queued MCP tools.
 - Output is capped at 2 MiB. Workspace/scratch storage and free memory/disk are
   monitored during execution. Storage checks are periodic safeguards, not a
-  filesystem quota. Upload limits, per-IP daily conversations and task budgets
+  filesystem quota. Upload limits, per-visitor daily conversations and per-IP burst limits and task budgets
   remain independent controls.
 
 ## Security boundary and remaining deployment work

@@ -8,7 +8,7 @@ Open Settings at the lower left to change language or open Manual. Online users 
 
 ## Conversation credits
 
-The online default is **three new conversations per IP per day**, shared by Agent, Scientist and Researcher. This counts new conversations, not each message in an existing conversation. Effective limits can change with deployment settings or an assigned credit key. The quota indicator and reset time shown by the running site take precedence over the default described here.
+The online default is **three new conversations per browser visitor per day**, shared by Agent, Scientist and Researcher. Visitors on the same laboratory or campus network have separate daily balances. A persistent browser cookie keeps your balance when you refresh or change networks. IP addresses support separate short-term abuse protection; they do not pool daily credits. This counts new conversations, not each message in an existing conversation. Effective limits can change with deployment settings or an assigned credit key. The quota indicator and reset time shown by the running site take precedence over the default described here.
 
 When the limit is reached, wait until the displayed reset time or apply for extra credit at **tanyang.august@sjtu.edu.cn**. Include your name, institution, email, contact information and intended use. Enter an issued email/key pair in Settings. A key does not unlock disabled compute tools or larger online training models.
 

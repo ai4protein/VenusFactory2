@@ -16,6 +16,7 @@ def store(tmp_path,monkeypatch):
     monkeypatch.setenv('VENUS_ACCESS_DB',str(tmp_path/'access.sqlite3'))
     monkeypatch.setenv('WEBUI_V2_ONLINE_DAILY_CHAT_LIMIT','3')
     monkeypatch.setenv('VENUS_QUOTA_TIMEZONE','Asia/Shanghai')
+    monkeypatch.setenv('VENUS_ONLINE_IP_STARTS_PER_MINUTE','30')
     return AccessStore()
 
 
@@ -54,10 +55,53 @@ def test_duplicate_admission_is_atomic(store):
     assert store.status('ip','browser')['used']==1
 
 
-def test_ip_and_browser_each_limit_evasion(store):
-    for i in range(3): store.admit(str(i),'agent','ip','browser')
-    for ip,browser in [('ip','cleared-cookies'),('another-ip','browser')]:
-        with pytest.raises(HTTPException):store.admit('new:'+ip,'agent',ip,browser)
+def test_visitors_have_independent_allowances_even_behind_shared_ip(store):
+    for visitor, ip in [('alice', 'lab-ip'), ('bob', 'lab-ip'), ('carol', 'other-ip')]:
+        assert store.status(ip, visitor)['remaining'] == 3
+        for mode in ['agent', 'scientist', 'researcher']:
+            assert store.admit(visitor + ':' + mode, mode, ip, visitor)
+        assert store.status(ip, visitor)['remaining'] == 0
+        with pytest.raises(HTTPException) as error:
+            store.admit(visitor + ':fourth', 'agent', ip, visitor)
+        assert error.value.detail['code'] == 'CHAT_DAILY_LIMIT_REACHED'
+    assert store.status('lab-ip', 'new-visitor')['remaining'] == 3
+
+
+def test_changing_ip_does_not_reset_the_same_visitor(store):
+    for i in range(3): store.admit(str(i), 'agent', 'ip', 'browser')
+    with pytest.raises(HTTPException):
+        store.admit('new', 'agent', 'another-ip', 'browser')
+
+
+def test_network_burst_guard_does_not_spend_daily_credit(store, monkeypatch):
+    from backend.web_v2 import online_access
+    monkeypatch.setenv('VENUS_ONLINE_IP_STARTS_PER_MINUTE', '4')
+    monkeypatch.setattr(online_access.time, 'time', lambda: 1000.0)
+    for i in range(4): store.admit(str(i), 'agent', 'lab-ip', 'visitor-' + str(i))
+    assert not store.admit('0', 'agent', 'lab-ip', 'visitor-0')
+    with pytest.raises(HTTPException) as error:
+        store.admit('fifth', 'agent', 'lab-ip', 'fresh')
+    assert error.value.detail['code'] == 'CHAT_START_RATE_LIMIT'
+    assert error.value.headers['Retry-After'] == '60'
+    assert store.status('lab-ip', 'fresh')['remaining'] == 3
+    assert store.admit('independent', 'agent', 'different-ip', 'another')
+    monkeypatch.setattr(online_access.time, 'time', lambda: 1060.0)
+    assert store.admit('fifth', 'agent', 'lab-ip', 'fresh')
+    assert store.status('lab-ip', 'fresh')['remaining'] == 2
+
+
+def test_network_burst_admission_is_atomic_across_visitors(store, monkeypatch):
+    from backend.web_v2 import online_access
+    monkeypatch.setenv('VENUS_ONLINE_IP_STARTS_PER_MINUTE', '5')
+    monkeypatch.setattr(online_access.time, 'time', lambda: 1000.0)
+    def submit(i):
+        try: return AccessStore(store.path).admit(str(i), 'agent', 'shared-ip', str(i))
+        except HTTPException as error:
+            assert error.detail['code'] == 'CHAT_START_RATE_LIMIT'
+            return False
+    with concurrent.futures.ThreadPoolExecutor(max_workers=16) as pool:
+        assert sum(pool.map(submit, range(30))) == 5
+    assert store.status('shared-ip', 'fresh')['remaining'] == 3
 
 
 def test_key_extra_shared_across_devices_and_revocation(store):
@@ -70,11 +114,11 @@ def test_key_extra_shared_across_devices_and_revocation(store):
     assert error.value.status_code==401
 
 
-def test_key_can_add_bonus_after_shared_ip_is_full(store):
+def test_key_allowance_is_not_spent_by_other_visitors_on_same_ip(store):
     who=actor(store);key=grant(store,who,2)
     for i in range(3):store.admit(str(i),'agent','institution-ip','anon')
-    assert store.status('institution-ip','person',key['email'],key['key'])['remaining']==2
-    for i in range(2):store.admit('bonus'+str(i),'scientist','institution-ip','person',key['email'],key['key'])
+    assert store.status('institution-ip','person',key['email'],key['key'])['remaining']==5
+    for i in range(5):store.admit('person'+str(i),'scientist','institution-ip','person',key['email'],key['key'])
     with pytest.raises(HTTPException):store.admit('too-many','agent','institution-ip','other',key['email'],key['key'])
 
 
@@ -147,13 +191,48 @@ def test_forwarded_headers_only_from_explicit_proxies(monkeypatch):
     assert client_ip(request('2001:db8::1234',''))=='2001:db8::/64'
 
 
-def test_scientist_one_active_per_ip_or_browser(store):
+def test_scientist_one_active_per_visitor_not_shared_ip(store):
     store.science_slot('one','ip','visitor')
     store.science_slot('one','ip','visitor')
-    with pytest.raises(HTTPException):store.science_slot('two','ip','other')
-    with pytest.raises(HTTPException):store.science_slot('two','other','visitor')
+    store.science_slot('other-study','ip','other')
+    with pytest.raises(HTTPException):store.science_slot('two','other-ip','visitor')
     store.release_science('one')
     store.science_slot('two','ip','visitor')
+
+
+def test_scientist_same_key_shares_active_slot_across_devices(store):
+    who=actor(store);key=grant(store,who)
+    store.science_slot('one','ip','visitor',key['email'],key['key'])
+    with pytest.raises(HTTPException):
+        store.science_slot('two','other-ip','other-visitor',key['email'],key['key'])
+
+
+def test_http_visitors_keep_balances_separate_across_proxy_and_modes(store, monkeypatch):
+    from fastapi import Request
+    from backend.web_v2 import online_access
+    monkeypatch.setattr(online_access, 'online', lambda: True)
+    monkeypatch.setenv('VENUS_TRUSTED_PROXIES', '127.0.0.1/32')
+    app=FastAPI();app.add_middleware(VisitorMiddleware);app.include_router(router)
+    @app.post('/api/admission/{mode}/{sid}')
+    def admission(mode: str, sid: str, request: Request):
+        online_access.admit(request, sid, mode)
+        return online_access.status(request)
+    clients=[TestClient(app,client=('127.0.0.1',1234)) for _ in range(2)]
+    headers={'X-Forwarded-For':'198.51.100.7'}
+    for i, client in enumerate(clients):
+        initial=client.get('/api/quota',headers=headers)
+        assert initial.json()['remaining']==3
+        assert initial.json()['identity_scope']=='visitor'
+        assert 'httponly' in initial.headers['set-cookie'].lower()
+        for j, mode in enumerate(['agent','scientist','researcher']):
+            result=client.post(f'/api/admission/{mode}/{i}-{j}',headers=headers)
+            assert result.status_code==200
+            assert result.json()['remaining']==2-j
+        assert client.post(f'/api/admission/agent/{i}-fourth',headers=headers).status_code==429
+    assert clients[0].cookies.get(online_access.COOKIE)!=clients[1].cookies.get(online_access.COOKIE)
+    restored=TestClient(app,client=('127.0.0.1',1234))
+    restored.cookies.update(clients[0].cookies)
+    assert restored.get('/api/quota',headers={'X-Forwarded-For':'203.0.113.9'}).json()['remaining']==0
 
 
 def test_real_mode_routes_share_admission_and_retries(tmp_path,store,monkeypatch,durable_chat_driver):
