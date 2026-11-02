@@ -172,7 +172,7 @@ Scientist project download. Do not rewrite prior experimental results.
 
 ## Retired interfaces and shared calculation code
 
-`archive/` preserves old notebooks, Gradio UI and FRPC utilities. Current services
+The ignored local `archive/` preserves old notebooks, Gradio UI and FRPC utilities; these are absent from source releases. Current services
 never import it. Shared path/data/report functions are in `mcp_tools/common/`;
 model implementations are in `mcp_tools/models/{pretrained,factory,evolved}/`; non-model services remain in `mcp_tools/tools/`.
 `mcp_tools/models/` starts model-specific environments on demand; it does not

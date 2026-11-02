@@ -33,8 +33,8 @@ Do not silently switch sandbox provider when its service is unavailable.
 
 Historical experiment configs are kept for reproducibility. A provider/model
 listed in a dated research profile is not necessarily enabled in online routing.
-Online admission continues to enforce its configured free-model catalog, shared
-daily quota, upload cap and compute policy independently of those research files.
+Online admission continues to enforce its configured free-model catalog, per-visitor
+daily quota shared across modes, upload cap and compute policy independently of those research files.
 
 Cleanup removes a setting only after its loader, examples and runtime callers have
 been checked. Generic upstream environment forwarding and historical evidence can

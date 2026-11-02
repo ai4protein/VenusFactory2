@@ -100,10 +100,10 @@ Starting the Web backend automatically ensures one independent MCP process for
 the configured port. A healthy process is reused across Web restarts.
 
 ```bash
-cd /home/tanyang/workspace/VenusFactory2
+cd VenusFactory2
 # Standalone foreground service; the default port is 8080.
 MCP_HTTP_PORT=8082 PYTHONPATH=src \
-  /home/tanyang/miniconda3/envs/venus/bin/python -m mcp_server
+  .venv/bin/python -m mcp_tools.mcp_server
 ```
 
 Do not run a second foreground instance on an already-used preview port. Health

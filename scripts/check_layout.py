@@ -11,7 +11,7 @@ OLD_MODULES = ('tools', 'src.tools', 'tool_runtime', 'web_v2', 'src.tool_runtime
 
 def check(root=ROOT):
     errors = []
-    for name in ('config', 'script', 'Scripts', 'epitope_miner', 'insulin_variants', 'src/tools', 'src/tool_runtime', 'src/web_v2', 'src/web', 'src/webui.py', 'src/frpc_hub.py', 'Scripts_notebook.ipynb', 'install_config.json', 'mcp_tools/runtimes', 'mcp_tools/tool_runtime', 'mcp_tools/tools/train', 'mcp_tools/tools/mutation', 'mcp_tools/tools/denovo', 'mcp_tools/tools/external', 'mcp_tools/tools/evolved', 'third_party/scientific-agent-skills', 'requirements-sandbox-cube.txt', 'requirements-sandbox-e2b.txt'):
+    for name in ('config', 'script', 'Scripts', 'epitope_miner', 'insulin_variants', 'src/tools', 'src/tool_runtime', 'src/web_v2', 'src/web', 'src/webui.py', 'src/frpc_hub.py', 'Scripts_notebook.ipynb', 'install_config.json', 'mcp_tools/runtimes', 'mcp_tools/tool_runtime', 'mcp_tools/tools/train', 'mcp_tools/tools/mutation', 'mcp_tools/tools/denovo', 'mcp_tools/tools/external', 'mcp_tools/tools/evolved', 'third_party', 'requirements-sandbox-cube.txt', 'requirements-sandbox-e2b.txt'):
         path = root / name
         if path.exists() or path.is_symlink():
             errors.append('Relocate duplicate, legacy or generated root content: ' + name)

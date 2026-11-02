@@ -37,7 +37,8 @@ automatically executes its scripts or enables a disabled computation tool.
 | **Chat integration** | `backend/web_v2/chat_api/`, `src/agent/harness/` | Harness routing, session boundary and mode policy; no second copy of skill content |
 
 New **VF2** skills go under `src/agent/skills/` — both adapters pick them up.
-Keep upstream source in `third_party/`; the registry provides the merged view.
+Keep upstream source in `src/agent/skills/vendor/scientific-agent-skills/`;
+the registry provides the merged view.
 Use `sas_biopython` to read the upstream package or `biopython` for the native
 tool-oriented guide. `scanpy` and `scikit-learn` are examples of upstream-only IDs.
 

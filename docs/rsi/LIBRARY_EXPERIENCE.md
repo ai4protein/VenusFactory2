@@ -68,7 +68,7 @@ IDs returned by `scientist_model_library.py list --verify`:
 ```json
 {
   "condition": "source",
-  "library_root": "/home/tanyang/workspace/VenusFactory2/research_runs/rsi/scientist_model_library_v1",
+  "library_root": "/absolute/path/to/owner/scientist_model_library",
   "entry_ids": ["REPLACE_WITH_A_VERIFIED_64_CHARACTER_ENTRY_ID"]
 }
 ```

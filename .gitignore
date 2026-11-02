@@ -248,3 +248,9 @@ tests/_phase_live_artifacts/
 /configs/rsi/engineering_pilot_30_glm.json
 /configs/rsi/generated_models_glm47.json
 /configs/rsi/generated_models_glm51.json
+
+# Local historical code and generated legacy examples are not release sources.
+/archive/
+/third_party/
+/docs/rsi/revision_backups/
+/example/database/foldseek/search/*.m8

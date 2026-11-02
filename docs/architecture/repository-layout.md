@@ -30,7 +30,7 @@ tests/                          Backend, MCP, runtime and agent tests
 docs/manual/                    Canonical bilingual platform manual
 docs/wiki/                      Generated manual pages and installation guides
 docs/images/                    Current UI screenshots with capture provenance
-archive/                        Historical Gradio, FRP and notebooks
+archive/                        Optional local history (ignored; absent from releases)
 runtime/local/                  Local sessions, queue, artifacts, installed models
 runtime/online/                 Online sessions, queue, artifacts and policy state
 research_runs/                  Research evidence and immutable historical runs
@@ -72,7 +72,7 @@ read-only; task directories, ownership databases and secret keys cannot.
 
 Optional Cube and E2B adapters are not the active bubblewrap provider. Install their
 dependency profiles only when an administrator has configured the corresponding
-local service. Gradio and FRP remain archived, outside active imports.
+local service. Gradio and FRP remain in the local ignored archive and Git history, outside release sources and active imports.
 
 Run `python scripts/check_layout.py` and `python scripts/validate_skills.py` after
 changing package ownership. Preserve public tool names and model IDs. Update CLI

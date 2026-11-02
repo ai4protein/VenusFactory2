@@ -29,5 +29,4 @@ The shell recipes locate the repository from their own path. Python module
 entry points use `mcp_tools.*` (or the existing `src.train/evaluate/predict` CLI).
 Keep reusable implementation in its owning package, not in a script.
 
-Removed CLI interfaces have historical examples in
-[`archive/cli-examples/`](../archive/cli-examples/README.md).
+Removed CLI interfaces remain available in Git history and the maintainer's ignored local `archive/cli-examples/`; they are not included in releases.

@@ -1,6 +1,6 @@
 # CLEAN enzyme annotation reproduction
 
-This plugin extends the research system from protein engineering to enzyme functional annotation. Its catalog entry declares an executable scope; it is not evidence that a run succeeded. All work is under the hl_gpu research checkout.
+This plugin extends the research system from protein engineering to enzyme functional annotation. Its catalog entry declares an executable scope; it is not evidence that a run succeeded. Run it in a dedicated research checkout.
 
 ## Source and admitted scope
 
@@ -33,7 +33,7 @@ The goal follows the existing Scientist protocol: discuss the admitted scope, re
 
 ## Reproduction commands
 
-From `/home/tanyang/workspace/VenusFactory2`, with the admitted research assets and isolated environment available:
+From the repository root, with the admitted research assets and isolated environment available:
 
 ```bash
 PYTHONPATH=src research_runs/rsi/envs/clean/bin/python \
