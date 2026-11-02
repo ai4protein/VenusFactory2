@@ -13,7 +13,7 @@ from .checks import doctor, factory_files, factory_health, failed
 from .common import InstallLock, Runner, atomic_json, inside, read_json
 from .runtimes import Runtimes
 from .system import Environment, choose_manager, frontend, probe
-from . import harnesses, progress, components, backbones as backbone_assets
+from . import harnesses, progress, components, skills, backbones as backbone_assets
 
 ROOT = Path(__file__).resolve().parents[2]
 STAGES = ("environment", "builtins", "frontend", "harnesses", "tools", "factory", "rsi", "skills")
@@ -232,8 +232,7 @@ def main(argv=None):
                                 env.pip(factory_python, 'huggingface-hub==0.36.2', 'PyYAML>=6,<7')
                             status = install_factory(root, factory_python, run, runtimes, preset, backbones)
                         else:
-                            run(["git", "submodule", "update", "--init", "--recursive", "--", "src/agent/skills/vendor/scientific-agent-skills"])
-                            status = {"status": "ready"}
+                            status = skills.install(root, run, manifest["skills"])
                         result["steps"][stage] = status
                     except Exception as error:
                         result["steps"][stage] = {"status": "failed", "message": str(error)}

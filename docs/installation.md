@@ -274,3 +274,6 @@ The initializer provisions files; `scripts/serve.py` owns runtime startup.
 - [LigandMPNN checkpoints](https://github.com/dauparas/LigandMPNN/blob/main/get_model_params.sh)
 - [S4PRED source and weight checksums](https://github.com/psipred/s4pred)
 - [Factory checkpoints](https://huggingface.co/AI4Protein/VenusFactory2-ckpts)
+
+
+Source release archives omit optional Git submodule contents. `python3 initialize.py install --stages skills` also works from an unpacked release: it installs the exact upstream revision pinned in `configs/bootstrap.json`, preserving its license. In a Git checkout the same command initializes the pinned submodule. Existing modified reference libraries are not overwritten.

@@ -171,3 +171,21 @@ def test_json_plan_stdout_is_machine_readable(tmp_path, monkeypatch, capsys):
     assert cli.main(['plan', '--harnesses', 'codex', '--json']) == 0
     result = json.loads(capsys.readouterr().out)
     assert result['stages'] == ['harnesses'] and result['tools'] == []
+
+
+@pytest.mark.parametrize('manager', ['uv', 'conda'])
+def test_platform_dependencies_use_valid_arguments_for_both_managers(tmp_path, monkeypatch, manager):
+    (tmp_path / 'pyproject.toml').write_text('[project]\ndependencies=["fastapi==0.116.1", "numpy>=2.1.2"]\n')
+    constraints = tmp_path / 'requirements/bootstrap-constraints.txt'
+    constraints.parent.mkdir(); constraints.write_text('fastapi==0.116.1\n')
+    folder = tmp_path / 'environment'; folder.mkdir()
+    commands = []
+    environment = system.Environment(tmp_path, lambda args: commands.append([str(x) for x in args]), manager=manager)
+    environment.command = [manager]
+    monkeypatch.setattr(environment, 'create', lambda *_: Path(sys.executable))
+    environment.platform(folder)
+    dependencies = next(args for args in commands if 'torch_geometric' in args)
+    assert 'fastapi==0.116.1' in dependencies and 'numpy>=2.1.2' in dependencies
+    assert str(constraints) in dependencies
+    assert '-r' not in dependencies and str(tmp_path / 'pyproject.toml') not in dependencies
+    assert json.loads((folder / '.venus-dependencies.json').read_text())['recipe'] == 3
