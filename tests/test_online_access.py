@@ -310,6 +310,7 @@ def test_scientist_server_budget_rejects_unbounded_specs(tmp_path,monkeypatch):
 
 def test_online_scientist_can_train_small_cpu_model_in_queue(tmp_path,monkeypatch):
     import asyncio, json, shutil
+    from pathlib import Path
     if not shutil.which('bwrap'):pytest.skip('Bubblewrap is required on the research host')
     from agent.harness.research_workspace import run_python
     monkeypatch.setenv('VENUS_SCIENTIST_ONLINE','1')
@@ -324,10 +325,10 @@ model=Ridge(alpha=.01).fit(x,y)
 assert abs(model.predict([[25]])[0]-51)<.1
 assert resource.getrlimit(resource.RLIMIT_AS)[0]==2*1024**3
 assert not os.path.exists('/dev/nvidia0')
-assert not os.path.exists('/home/tanyang/workspace/VenusFactory2/.env')
+assert not os.path.exists(HOST_ENV_PATH)
 assert not os.getenv('DMXAPI_API_KEY')
 print(json.dumps({'trained':True,'prediction':float(model.predict([[25]])[0]),'memory_gib':2}))
-''')
+'''.replace('HOST_ENV_PATH', repr(str(Path(__file__).resolve().parents[1] / '.env'))))
     result=asyncio.run(run_python(work,tmp_path/'control','train.py',120))
     assert result['exit_code']==0,result['stderr']
     assert json.loads(result['stdout'])['trained'] is True

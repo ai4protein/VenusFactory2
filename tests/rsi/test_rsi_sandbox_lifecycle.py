@@ -1,4 +1,5 @@
 import asyncio
+import os
 import sys
 from pathlib import Path
 
@@ -13,7 +14,7 @@ async def test_pid_namespace_stops_session_detached_child(tmp_path):
 
     if not shutil.which("bwrap"):
         pytest.skip("bubblewrap unavailable")
-    kimi = Path("/home/tanyang/.kimi-code/bin/kimi")
+    kimi = Path(os.environ.get("KIMI_CLI_PATH") or shutil.which("kimi") or Path.home() / ".kimi-code/bin/kimi")
     if not kimi.exists():
         pytest.skip("host integration fixture requires Kimi binary")
     work = tmp_path / "workspace"

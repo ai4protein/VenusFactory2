@@ -87,6 +87,8 @@ python3 initialize.py install --tools proteinmpnn,ligandmpnn
 硬件要求、组件选择和健康检查见[安装指南](docs/installation.zh-CN.md)，线上部署和
 多进程启动见[服务指南](docs/architecture/services.md)。
 
+PBS 集群部署见[online/local 启动指南](docs/deployment-pbs.md)：统一管理两种模式的服务，分别保存数据，并在作业退出时清理进程。
+
 ### 在线使用，还是本地运行？
 
 在线平台无需安装，适合直接体验。本地运行适合使用自己的数据集、更大的训练模型，

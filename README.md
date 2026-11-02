@@ -103,6 +103,8 @@ GPU or a separate license. See the [installation guide](docs/installation.md) fo
 hardware requirements, component selection and health checks, and the
 [service guide](docs/architecture/services.md) for online or multi-process deployment.
 
+For PBS clusters, see [online/local deployment](docs/deployment-pbs.md). The job supervises both services, keeps their data separate and cleans up its processes on exit.
+
 ### Online or local?
 
 Use the web server to get started without installation. Run locally when you need

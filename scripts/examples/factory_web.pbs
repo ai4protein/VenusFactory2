@@ -1,0 +1,14 @@
+#!/bin/bash
+#PBS -N factory_web
+#PBS -l select=1:ncpus=8:ngpus=1:mem=32gb
+#PBS -l walltime=168:00:00
+#PBS -j oe
+
+set -Eeuo pipefail
+umask 077
+REPOSITORY="${VENUS_REPOSITORY:-${PBS_O_WORKDIR:?Submit from the repository root}}"
+PYTHON="${VENUS_SERVICE_PYTHON:-python}"
+cd "$REPOSITORY"
+# Set the queue and resources for your cluster when submitting with qsub.
+# Add --frp-executable and --frp-config only if you use a private reverse tunnel.
+exec "$PYTHON" -u scripts/deploy_services.py --mode both

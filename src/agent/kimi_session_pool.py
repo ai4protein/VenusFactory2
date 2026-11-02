@@ -201,7 +201,7 @@ def _kimi_bin() -> str:
 def _seed_kimi_config(session_dir: str) -> None:
     """Copy host kimi auth/MCP config into the per-session HOME tree."""
     src_root = Path(
-        os.environ.get("KIMI_CONFIG_DIR") or (Path.home() / ".kimi-code")
+        os.environ.get("KIMI_CODE_HOME") or os.environ.get("KIMI_CONFIG_DIR") or (Path.home() / ".kimi-code")
     )
     dst_root = Path(session_dir) / ".kimi-code"
     if not src_root.is_dir():
