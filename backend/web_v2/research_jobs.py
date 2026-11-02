@@ -51,7 +51,7 @@ class ResearchJobs:
         return identity, row
 
     def start(self, owner, payload, *, admit=None):
-        from agent.rsi.storage import file_lock
+        from agent.rsi.engine.storage import file_lock
         request_id = payload.pop("request_id", None) or uuid.uuid4().hex
         payload=dict(payload)
         payload.pop('material_sources',None)  # Only owner-checked server snapshots can supply evidence.
@@ -159,7 +159,7 @@ class ResearchJobs:
         return {'success': True, 'id': identity}
 
     def resume(self, owner, identity, *, admit=None):
-        from agent.rsi.storage import file_lock
+        from agent.rsi.engine.storage import file_lock
         identity, _ = self.owned(owner, identity)
         folder = self.folder(identity)
         with file_lock(folder / '.resume.lock'):

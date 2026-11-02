@@ -17,11 +17,11 @@ from run_science_goal import GeneratedModelGoal, evidence, prepare, read
 from agent.harness import Profile
 from agent.harness.contracts import file_hash
 from agent.harness.host import write_json
-from agent.rsi.experience import ModelExperienceStore
-from agent.rsi.lineage_promotion import gain_error, new_evolution, validate_evolution
-from agent.rsi.model_plugins import get_model_plugin
-from agent.rsi.source_lineage import program_hash
-from agent.rsi.training_attempt_memory import POLICIES, POLICY
+from agent.rsi.engine.experience import ModelExperienceStore
+from agent.rsi.engine.lineage_promotion import gain_error, new_evolution, validate_evolution
+from agent.rsi.engine.model_plugins import get_model_plugin
+from agent.rsi.datasets.source_lineage import program_hash
+from agent.rsi.engine.training_attempt_memory import POLICIES, POLICY
 from agent.science_goal import GoalStore, run_goal
 
 
@@ -214,7 +214,7 @@ class EvolvingModelGoal(GeneratedModelGoal):
 
 
 async def main(args):
-    from agent.rsi.scientist_model_library import ScientistModelLibrary
+    from agent.rsi.engine.scientist_model_library import ScientistModelLibrary
 
     library_root = getattr(args, "model_library", None)
     publication_library = ScientistModelLibrary(library_root) if library_root is not None else None
@@ -254,7 +254,7 @@ async def main(args):
         if not key:
             raise ValueError("Goal credential unresolved")
         plugin = EvolvingModelGoal(store, key)
-        from agent.rsi.generation_publication import publisher
+        from agent.rsi.engine.generation_publication import publisher
 
         options = {"on_checkpoint": publisher(publication_library, store.root)} if publication_library else {}
         state = await run_goal(store, plugin.cycle, plugin.evaluate, **options)

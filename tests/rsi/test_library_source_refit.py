@@ -13,13 +13,13 @@ from test_training_attempt_memory import episode
 
 from agent.harness.contracts import file_hash
 from agent.rsi import training_attempt_memory as memory
-from agent.rsi.experience import LIMITATION
-from agent.rsi.library_source import REFIT_TOOL, resolve_library_source
-from agent.rsi.model_lifecycle import ModelLifecycle
-from agent.rsi.model_plugins import get_model_plugin
-from agent.rsi.protein_model import digest
-from agent.rsi.storage import atomic_json
-from agent.rsi.tool_contracts import validate_generated_result
+from agent.rsi.engine.experience import LIMITATION
+from agent.rsi.datasets.library_source import REFIT_TOOL, resolve_library_source
+from agent.rsi.engine.model_lifecycle import ModelLifecycle
+from agent.rsi.engine.model_plugins import get_model_plugin
+from agent.rsi.engine.protein_model import digest
+from agent.rsi.engine.storage import atomic_json
+from agent.rsi.engine.tool_contracts import validate_generated_result
 
 IDENTITY = "a" * 64
 
@@ -53,7 +53,7 @@ def bind(caps, packet):
 
 def setup(tmp_path, **kwargs):
     caps, work, config = setup_bundle(tmp_path)
-    shutil.copy2(ROOT / "src/agent/rsi/library_source.py", caps / "library_source.py")
+    shutil.copy2(ROOT / "src/agent/rsi/datasets/library_source.py", caps / "library_source.py")
     task = bind(caps, projection(**kwargs))
     return caps, work, config, task
 

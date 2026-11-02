@@ -7,7 +7,7 @@ from copy import deepcopy
 
 import pytest
 
-from agent.rsi.mutation_landscape_tasks import (
+from agent.rsi.datasets.mutation_landscape_tasks import (
     gfp_parents,
     gfp_records,
     make_record,

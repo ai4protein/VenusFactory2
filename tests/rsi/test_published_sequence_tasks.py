@@ -6,7 +6,7 @@ import zipfile
 
 import pytest
 
-from agent.rsi.published_sequence_tasks import (
+from agent.rsi.datasets.published_sequence_tasks import (
     ESOL_ENDPOINTS,
     audit_catalog,
     bound,

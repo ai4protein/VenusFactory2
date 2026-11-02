@@ -18,21 +18,23 @@ from pathlib import Path
 from run_generated_lifecycle import FILES, SYSTEM, policy_for, spec
 from run_protein_lifecycle import ROOT, audit_events, prepare_case
 
-from agent.rsi.live_model_gateway import ModelGateway
-from agent.rsi.model_gateway import GatewayPolicy
-from agent.rsi.model_lifecycle import ModelLifecycle
-from agent.rsi.model_plugins import get_model_plugin
-from agent.rsi.model_policy import read_model_configuration
-from agent.rsi.protein_model import digest, evaluate, fit_candidate
-from agent.rsi.runtime import build_task_message, run_task
-from agent.rsi.sandbox import SandboxKimi
-from agent.rsi.scientist_runtime import run_scientist
-from agent.rsi.storage import atomic_json, sha256_file
-from agent.rsi.versions import VersionStore
+from agent.rsi.engine.live_model_gateway import ModelGateway
+from agent.rsi.engine.model_gateway import GatewayPolicy
+from agent.rsi.engine.model_lifecycle import ModelLifecycle
+from agent.rsi.engine.model_plugins import get_model_plugin
+from agent.rsi.engine.model_policy import read_model_configuration
+from agent.rsi.engine.protein_model import digest, evaluate, fit_candidate
+from agent.rsi.engine.runtime import build_task_message, run_task
+from agent.rsi.engine.sandbox import SandboxKimi
+from agent.rsi.engine.scientist_runtime import run_scientist
+from agent.rsi.engine.storage import atomic_json, sha256_file
+from agent.rsi.engine.versions import VersionStore
 
 REQUEST_TOTAL_DEADLINE_S = 300
 CLIENT_READ_TIMEOUT_S = REQUEST_TOTAL_DEADLINE_S + 30
 
+
+from agent.rsi.layout import source_relative
 
 def make_bundle(
     folder,
@@ -61,9 +63,9 @@ def make_bundle(
         "generated_antibody.v1",
     }:
         raise ValueError("Unsupported generated model plugin")
-    from agent.rsi.context_feedback_dispatch import FIELD, policy_for
-    from agent.rsi.development_handoff import FIELD as HANDOFF_FIELD
-    from agent.rsi.development_handoff import POLICY as HANDOFF_POLICY
+    from agent.rsi.engine.context_feedback_dispatch import FIELD, policy_for
+    from agent.rsi.engine.development_handoff import FIELD as HANDOFF_FIELD
+    from agent.rsi.engine.development_handoff import POLICY as HANDOFF_POLICY
 
     feedback = policy_for({FIELD: training_baseline_feedback, "scope": scope}, plugin_id=plugin_id)
     if feedback != "none" and phase != "develop":
@@ -91,7 +93,7 @@ def make_bundle(
     if feedback == "group_baselines.v3":
         files.extend(["context_v3_controls.py", "context_v3_feedback.py"])
     for name in dict.fromkeys(files):
-        shutil.copy2(ROOT / "src/agent/rsi" / name, source / name)
+        shutil.copy2(ROOT / source_relative(name), source / name)
     task = {"phase": phase, "scope": scope, "inputs": {name: digest(rows) for name, rows in inputs.items()}}
     if phase == "develop":
         task[HANDOFF_FIELD] = HANDOFF_POLICY
@@ -100,13 +102,13 @@ def make_bundle(
     if feedback != "none":
         task[FIELD] = feedback
     if experience is not None:
-        from agent.rsi.experience import validate_projection
+        from agent.rsi.engine.experience import validate_projection
 
         validate_projection(experience)
         atomic_json(source / "experience.json", experience)
         task["experience_sha256"] = digest(experience)
     if library_experience is not None:
-        from agent.rsi.experience import validate_projection
+        from agent.rsi.engine.experience import validate_projection
 
         if phase != "develop":
             raise ValueError("Library experience is available only during development")
@@ -318,7 +320,7 @@ async def main(args):
     atomic_json(args.output / "protocol.json", protocol)
     paths = [
         Path(__file__),
-        *list((ROOT / "src/agent/rsi").glob("*.py")),
+        *list((ROOT / "src/agent/rsi").rglob("*.py")),
         ROOT / "src/agent/graph/finalize.py",
         ROOT / "src/agent/graph/state.py",
         ROOT / "src/agent/graph/planning/plan.py",

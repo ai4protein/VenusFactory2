@@ -6,8 +6,8 @@ from test_yeast_population_controls import example
 
 from agent.harness import Budget, ModelBinding, Profile
 from agent.rsi import yeast_population_evaluation as evaluation
-from agent.rsi.scientist_model_campaign import ALL_ALLOCATIONS, ModelCampaignStore
-from agent.rsi.storage import atomic_json, sha256_file
+from agent.rsi.campaigns.scientist_model_campaign import ALL_ALLOCATIONS, ModelCampaignStore
+from agent.rsi.engine.storage import atomic_json, sha256_file
 
 
 def test_terminal_campaign_with_no_model_completes_real_six_control_evaluation(tmp_path, monkeypatch):
@@ -98,7 +98,7 @@ def test_terminal_campaign_with_no_model_completes_real_six_control_evaluation(t
         {
             "final_controls": {
                 "methods": list(evaluation.METHODS),
-                "implementation": "src/agent/rsi/yeast_population_controls.py",
+                "implementation": "src/agent/rsi/engine/yeast_population_controls.py",
                 "sha256": sha256_file(Path(evaluation.yeast_population_controls.__file__)),
             },
             "allocation_count": 1,

@@ -6,8 +6,8 @@ import json
 import pytest
 from test_shared_history_projection import feedback
 
-from agent.rsi.protein_model import digest
-from agent.rsi.shared_model_display import LEGACY_POLICY, MAX_DISPLAY_CHARACTERS, POLICY, envelope
+from agent.rsi.engine.protein_model import digest
+from agent.rsi.engine.shared_model_display import LEGACY_POLICY, MAX_DISPLAY_CHARACTERS, POLICY, envelope
 
 
 def merged(common, specific):

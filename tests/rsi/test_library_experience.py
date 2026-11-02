@@ -15,8 +15,8 @@ from agent.harness import Budget, ModelBinding, Profile
 from agent.harness.contracts import digest, file_hash
 from agent.rsi import library_experience as transfer
 from agent.rsi import scientist_model_library
-from agent.rsi.storage import atomic_json
-from agent.rsi.tool_contracts import validate_generated_result
+from agent.rsi.engine.storage import atomic_json
+from agent.rsi.engine.tool_contracts import validate_generated_result
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts/rsi"))

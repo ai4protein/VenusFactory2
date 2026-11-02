@@ -286,8 +286,8 @@ def compact_entry(entry):
 
 async def complete(model_id, messages, output_tokens=3000):
     from agent.harness.free_catalog import free_routes
-    from agent.rsi.model_access import authorize_model
-    from agent.rsi.openrouter_policy import is_openrouter, enforce_free_request, verify_free_response
+    from agent.rsi.engine.model_access import authorize_model
+    from agent.rsi.engine.openrouter_policy import is_openrouter, enforce_free_request, verify_free_response
     from backend.web_v2.job_queue import resource_slot
     option, key = model_option(model_id)
     b = option.binding

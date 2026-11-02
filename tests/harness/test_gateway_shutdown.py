@@ -11,7 +11,7 @@ from agent.harness import Budget, ModelBinding, Profile, Task
 from agent.harness.events import audit_requests
 from agent.harness.gateway import EvidenceGateway
 from agent.harness.host import execute
-from agent.rsi.model_gateway import GatewayPolicy, ModelGateway
+from agent.rsi.engine.model_gateway import GatewayPolicy, ModelGateway
 
 
 class PendingUpstream:

@@ -10,9 +10,9 @@ import pytest
 from agent.rsi import generated_antibody as api
 from agent.rsi import model_tasks
 from agent.rsi import poisk_pair_encoder as encoder
-from agent.rsi.poisk_tasks import binding, prepare
-from agent.rsi.protein_model import digest
-from agent.rsi.storage import atomic_json, sha256_file
+from agent.rsi.datasets.poisk_tasks import binding, prepare
+from agent.rsi.engine.protein_model import digest
+from agent.rsi.engine.storage import atomic_json, sha256_file
 
 CODE = """def fit(features, targets, seed):
     x = [row[0] for row in features]
@@ -173,7 +173,7 @@ def test_source_target_cannot_be_replaced_with_a_new_bound_label(tmp_path):
 
 
 def test_encoder_matches_original_feasibility_representation(tmp_path):
-    from agent.rsi.poisk_training import encode
+    from agent.rsi.engine.poisk_training import encode
 
     task, parts = make_task(tmp_path)
     for row in parts["training"]:
@@ -185,7 +185,7 @@ def test_encoder_matches_original_feasibility_representation(tmp_path):
 
 
 def test_five_fixed_controls_keep_native_input_identity(tmp_path):
-    from agent.rsi.antibody_baselines import run_controls
+    from agent.rsi.engine.antibody_baselines import run_controls
 
     task, parts = make_task(tmp_path)
     report = run_controls(task)

@@ -8,7 +8,7 @@ import pytest
 
 from agent.rsi import shared_goal_history as history
 from agent.rsi import shared_history_selection as selection
-from agent.rsi.protein_model import digest
+from agent.rsi.engine.protein_model import digest
 
 
 def attempt(index, skills, *, code=None, status="tested_not_published"):
@@ -175,7 +175,7 @@ async def test_selective_goal_uses_real_training_feedback_across_episodes(tmp_pa
     assert all("1234567" not in c["prompt"] for c in calls)
     assert "Prior paired" not in calls[1]["prompt"]
     protocol = read(store.root / "protocol.json")
-    assert "src/agent/rsi/shared_history_selection.py" in protocol["implementation"]
+    assert "src/agent/rsi/engine/shared_history_selection.py" in protocol["implementation"]
     resumed = shared.SharedScientistGoal(GoalStore(store.root), None)
     assert resumed.training_history(state, [driver.by_id["synthetic_1"]]) == driver.training_history(
         state, [driver.by_id["synthetic_1"]]

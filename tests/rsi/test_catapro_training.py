@@ -3,8 +3,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from agent.rsi.catapro_case import file_sha
-from agent.rsi.catapro_training import STAGES, make_table, training_arguments, validate_fold_batches, verify_files
+from agent.rsi.cases.catapro_case import file_sha
+from agent.rsi.cases.catapro_training import STAGES, make_table, training_arguments, validate_fold_batches, verify_files
 
 
 def inputs():
@@ -117,14 +117,14 @@ def test_training_snapshot_runs_without_original_checkout(tmp_path):
     import sys
 
     sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rsi"))
-    from run_catapro_training import IMPLEMENTATION, ROOT
+    from scripts.rsi.cases.run_catapro_training import IMPLEMENTATION, ROOT
 
     for name in IMPLEMENTATION:
         target = tmp_path / name
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes((ROOT / name).read_bytes())
     result = subprocess.run(
-        [sys.executable, str(tmp_path / "scripts/rsi/run_catapro_training.py"), "--help"],
+        [sys.executable, str(tmp_path / "scripts/rsi/cases/run_catapro_training.py"), "--help"],
         cwd=tmp_path,
         env={**os.environ, "PYTHONPATH": str(tmp_path / "src")},
         capture_output=True,

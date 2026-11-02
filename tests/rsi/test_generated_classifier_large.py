@@ -5,7 +5,7 @@ import pytest
 
 from agent.rsi import generated_classifier as original
 from agent.rsi import generated_classifier_large as large
-from agent.rsi.model_plugins import get_model_plugin
+from agent.rsi.engine.model_plugins import get_model_plugin
 
 
 def scope(length=4):

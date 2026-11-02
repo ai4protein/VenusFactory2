@@ -53,20 +53,57 @@ set does not establish unbiased generalization, causal RSI benefit or statistica
 significance. Publication-grade claims still need sealed external evaluation,
 matched budgets, repeated independent tasks and suitable ablations.
 
-## Delivered files
+## A coherent project and selected releases
 
-- `model.zip`: runtime source, fitted state, training source, dependency versions,
-  interface/examples, documentation and checksums; raw evaluation data excluded.
-- `MODEL_CARD.md`: purpose, applicable proteins/properties/scenarios, limitations,
-  inference interface and training reproduction instructions.
-- `test-report.md` and `test-report.json`: validation lineage, host-recomputed
-  final test metrics, reference baseline, interface/boundary tests, independent
-  review, reproduction evidence and limitations.
+The workspace convention is `src/` for reusable code, `training/` for training
+reproduction, `artifacts/` for fitted state, `experiments/` for trials and
+ablations, `reports/` for results, and `data/` for inputs. Existing uploaded paths
+are preserved. The host owns `deliveries/`; the developer updates the project
+README instead of creating another deployable model for each attempt.
 
-These files appear in the conversation's Files/Library and use the existing
-authenticated preview and ZIP download routes. The goal API also exposes
-`research.development`, `research.deliveries` and `research.delivery_pending`.
-Completion checks revalidate delivery file hashes and registration identities.
+The `scientist.artifact.v1` contract applies to learned models and reusable
+methods/tools. The host verifies the saved independent Review receipt and source
+hashes before packaging. Models additionally require a measured development
+trajectory, fitted artifacts and training reproduction. Methods need interface,
+boundary and independent checks but do not invent weights or predictive scores.
+
+Each `artifact.zip` contains:
+
+```text
+README.md                      Use and reproduction commands
+capability.json                Identity, author, version, scope and review hash
+MODEL_CARD.md / METHOD_CARD.md  Intended use and limitations
+predict.py                     JSON entry point with input/output validation
+runtime/                       Selected code and fitted state, relative paths preserved
+interface.json                 Input/output schema
+examples/                      Example input and output
+tests/                         Runnable interface and boundary checks
+evaluation/                    Test report and independent review
+documentation/                 Approved supporting Markdown/RST, when supplied
+requirements.txt               Recorded dependency versions
+checksums.json                 SHA-256 of package members
+```
+
+Raw evaluation data, rejected implementations and temporary files are excluded.
+Files shows a README, card, test report and one ZIP per release. The UI shows
+selected releases first; experiment records and previous versions remain
+expandable. Project download expands the selected releases under `deliverables/`
+alongside the research report and evidence. Drafts export their working project;
+`include_working_files=true` explicitly includes working files for an admitted
+project as well. No historical workspace files are deleted by this selection.
+
+Keep a stable capability name and increment the version for a changed runtime.
+One topic, artifact kind and protein/property/scenario scope define a release
+family. Registration selects the last admitted version of that family for normal
+discovery. Earlier immutable IDs still work for recorded reproducible calls.
+Different topics or biological scopes remain separate; this is not automatic
+semantic deduplication of unrelated studies. Existing catalog entries without
+family metadata retain their previous visibility until explicitly re-registered.
+
+The goal API exposes `research.development`, the full `research.deliveries`,
+`research.selected_deliveries` and `research.delivery_pending`. Completion
+revalidates selected delivery hashes and registration identities. Legacy goals
+retain their original completion protocol.
 
 ## Scaling toward 10,000+ models
 

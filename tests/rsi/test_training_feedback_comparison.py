@@ -7,9 +7,9 @@ from test_context_feedback import prepare_goal
 
 from agent.harness.contracts import file_hash
 from agent.rsi import context_feedback as feedback
-from agent.rsi.campaign_evaluation import admit, load_study, paired_design
-from agent.rsi.model_coverage import PROGRAM_ENTRIES
-from agent.rsi.scientist_model_campaign import ALL_ALLOCATIONS, ModelCampaignStore
+from agent.rsi.engine.campaign_evaluation import admit, load_study, paired_design
+from agent.rsi.engine.model_coverage import PROGRAM_ENTRIES
+from agent.rsi.campaigns.scientist_model_campaign import ALL_ALLOCATIONS, ModelCampaignStore
 
 
 def design(tmp_path):

@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from agent.rsi.scientific_episode import artifact_written, episode_contract
+from agent.rsi.engine.scientific_episode import artifact_written, episode_contract
 
 
 def contract(capability, **updates):

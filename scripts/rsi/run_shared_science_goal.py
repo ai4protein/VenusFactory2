@@ -27,19 +27,19 @@ from agent.harness import Profile, Task
 from agent.harness.contracts import digest, file_hash
 from agent.harness.host import execute
 from agent.rsi import model_tasks, shared_library_experience
-from agent.rsi.context_feedback_dispatch import policy_for as feedback_policy
-from agent.rsi.model_access import authorize_profile
-from agent.rsi.model_lifecycle import ModelLifecycle
-from agent.rsi.model_plugins import get_model_plugin
-from agent.rsi.provider_access import access_wait
-from agent.rsi.shared_goal_history import POLICY as HISTORY_POLICY
-from agent.rsi.shared_goal_history import SUPPORTED_POLICIES
-from agent.rsi.shared_goal_history import make_prompt as make_shared_prompt
-from agent.rsi.shared_goal_history import project as project_shared_history
-from agent.rsi.shared_model_bundle import admit, prepare_bundle
-from agent.rsi.source_snapshot import research_implementation_paths
-from agent.rsi.storage import atomic_json, safe_child
-from agent.rsi.tool_contracts import validate_generated_result
+from agent.rsi.engine.context_feedback_dispatch import policy_for as feedback_policy
+from agent.rsi.engine.model_access import authorize_profile
+from agent.rsi.engine.model_lifecycle import ModelLifecycle
+from agent.rsi.engine.model_plugins import get_model_plugin
+from agent.rsi.engine.provider_access import access_wait
+from agent.rsi.engine.shared_goal_history import POLICY as HISTORY_POLICY
+from agent.rsi.engine.shared_goal_history import SUPPORTED_POLICIES
+from agent.rsi.engine.shared_goal_history import make_prompt as make_shared_prompt
+from agent.rsi.engine.shared_goal_history import project as project_shared_history
+from agent.rsi.engine.shared_model_bundle import admit, prepare_bundle
+from agent.rsi.engine.source_snapshot import research_implementation_paths
+from agent.rsi.engine.storage import atomic_json, safe_child
+from agent.rsi.engine.tool_contracts import validate_generated_result
 from agent.science_goal import GoalSpec, GoalStore, run_goal
 
 SCHEMA = "shared_scientist_goal.v1"
@@ -495,7 +495,7 @@ class SharedScientistGoal:
 
 async def main(args):
     if args.model_library is not None:
-        from agent.rsi.scientist_model_library import ScientistModelLibrary
+        from agent.rsi.engine.scientist_model_library import ScientistModelLibrary
 
         ScientistModelLibrary(args.model_library).goal(args.output)
     if args.action == "create":
@@ -549,7 +549,7 @@ async def main(args):
         and state["status"] in {"completed", "budget_exhausted"}
         and any("reuse_receipt" in row for row in state["progress"].get("targets", {}).values())
     ):
-        from agent.rsi.scientist_model_library import ScientistModelLibrary
+        from agent.rsi.engine.scientist_model_library import ScientistModelLibrary
 
         publication = ScientistModelLibrary(args.model_library).publish_goal(store.root)
         require(publication["all_published"], "Shared model publication did not pass")

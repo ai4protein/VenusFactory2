@@ -24,7 +24,7 @@ from run_science_goal import GeneratedModelGoal, prepare, read
 from agent.harness import Profile, builtin_registry
 from agent.harness.contracts import digest, file_hash
 from agent.harness.host import write_json
-from agent.rsi.model_plugins import get_model_plugin
+from agent.rsi.engine.model_plugins import get_model_plugin
 from agent.science_goal import GoalStore, run_goal
 
 CONDITIONS = ("science_goal", "persistent_agent_ablation", "scripted_agent_turns")
@@ -75,7 +75,7 @@ def implementation():
         ROOT / "src/agent/science_goal.py",
         ROOT / "src/agent/research_modes.py",
         *sorted((ROOT / "src/agent/harness").glob("*.py")),
-        *sorted((ROOT / "src/agent/rsi").glob("*.py")),
+        *sorted((ROOT / "src/agent/rsi").rglob("*.py")),
         *sorted((ROOT / "src/agent/graph").rglob("*.py")),
     ]
     return {str(p.relative_to(ROOT)): file_hash(p) for p in paths}

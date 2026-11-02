@@ -5,8 +5,8 @@ import json
 import pytest
 from test_shared_model_display import restored_inspection
 
-from agent.rsi.protein_model import digest
-from agent.rsi.shared_model_display import (
+from agent.rsi.engine.protein_model import digest
+from agent.rsi.engine.shared_model_display import (
     LEGACY_POLICY,
     MAX_DISPLAY_CHARACTERS,
     POLICY,

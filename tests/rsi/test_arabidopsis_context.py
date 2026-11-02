@@ -8,10 +8,10 @@ import numpy as np
 import pytest
 
 from agent.rsi import arabidopsis_context as source
-from agent.rsi.model_tasks import read_task
-from agent.rsi.reference_thermal_baselines import METHODS, predict, ratio_curve
-from agent.rsi.storage import atomic_json, sha256_file
-from agent.rsi.traditional_baselines import run_controls
+from agent.rsi.datasets.model_tasks import read_task
+from agent.rsi.engine.reference_thermal_baselines import METHODS, predict, ratio_curve
+from agent.rsi.engine.storage import atomic_json, sha256_file
+from agent.rsi.engine.traditional_baselines import run_controls
 
 
 @pytest.fixture

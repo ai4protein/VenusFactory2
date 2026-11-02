@@ -9,14 +9,14 @@ import pytest
 from test_generated_features import CODE, ROWS, SCOPE
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rsi"))
-import run_reap_goal_comparison as comparison
-from run_reap_generated_matrix import policy
+from scripts.rsi.cases import run_reap_goal_comparison as comparison
+from scripts.rsi.cases.run_reap_generated_matrix import policy
 
 from agent.harness import Budget, ModelBinding, Profile
 from agent.harness.contracts import file_hash
 from agent.harness.host import write_json
-from agent.rsi.model_lifecycle import ModelLifecycle
-from agent.rsi.model_plugins import get_model_plugin
+from agent.rsi.engine.model_lifecycle import ModelLifecycle
+from agent.rsi.engine.model_plugins import get_model_plugin
 from agent.science_goal import GoalSpec, GoalStore
 
 

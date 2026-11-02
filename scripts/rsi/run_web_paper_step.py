@@ -12,13 +12,13 @@ sys.path.insert(0, str(ROOT / "src"))
 from run_harness_probe import credential_from_toml, default_runtimes
 
 from agent.harness import Profile
-from agent.rsi.generated_step_library import GeneratedStepLibrary
-from agent.rsi.paper_step_catalog import task
-from agent.rsi.paper_step_goal import CRITERIA, PaperStepGoal, create_step_goal
-from agent.rsi.paper_step_sessions import read
-from agent.rsi.paper_step_transfer import CRITERIA as TRANSFER_CRITERIA
-from agent.rsi.paper_step_transfer import TransferredStepGoal, create_transfer_goal
-from agent.rsi.storage import atomic_json, sha256_file
+from agent.rsi.engine.generated_step_library import GeneratedStepLibrary
+from agent.rsi.engine.paper_step_catalog import task
+from agent.rsi.campaigns.paper_step_goal import CRITERIA, PaperStepGoal, create_step_goal
+from agent.rsi.engine.paper_step_sessions import read
+from agent.rsi.engine.paper_step_transfer import CRITERIA as TRANSFER_CRITERIA
+from agent.rsi.engine.paper_step_transfer import TransferredStepGoal, create_transfer_goal
+from agent.rsi.engine.storage import atomic_json, sha256_file
 from agent.science_goal import GoalSpec, GoalStore, run_goal
 
 

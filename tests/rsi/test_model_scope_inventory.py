@@ -3,8 +3,8 @@ from copy import deepcopy
 import pytest
 import test_scientist_model_library as fixtures
 
-from agent.rsi.model_scope_inventory import canonical_scope, inventory_libraries, summarize_catalogs
-from agent.rsi.storage import atomic_json
+from agent.rsi.engine.model_scope_inventory import canonical_scope, inventory_libraries, summarize_catalogs
+from agent.rsi.engine.storage import atomic_json
 
 storage = fixtures.storage
 
@@ -56,7 +56,7 @@ def test_distinct_biological_scope_adds_coverage(field, value):
 
 
 def test_scope_matches_existing_campaign_rule():
-    from agent.rsi.shared_model_campaign import task_scope
+    from agent.rsi.campaigns.shared_model_campaign import task_scope
 
     original = key()
     assert canonical_scope(original) == task_scope({"plugin_id": original["plugin_id"], "scope": original["scope"]})

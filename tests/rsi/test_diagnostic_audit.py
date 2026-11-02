@@ -2,8 +2,8 @@ import json
 
 import pytest
 
-from agent.rsi.diagnostic_audit import audit
-from agent.rsi.pilot import build_tasks
+from agent.rsi.engine.diagnostic_audit import audit
+from agent.rsi.campaigns.pilot import build_tasks
 
 
 def task(kind):

@@ -6,8 +6,8 @@ import numpy as np
 import pytest
 from test_context_integration import make_task, save
 
-from agent.rsi.context_baselines import METHODS, THERMAL_METHODS, thermal_predictions
-from agent.rsi.traditional_baselines import run_controls
+from agent.rsi.engine.context_baselines import METHODS, THERMAL_METHODS, thermal_predictions
+from agent.rsi.engine.traditional_baselines import run_controls
 
 
 def prediction_map(result):

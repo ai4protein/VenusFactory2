@@ -14,8 +14,8 @@ from agent.harness import Budget, ModelBinding, Profile
 from agent.harness.contracts import digest, file_hash
 from agent.rsi import library_experience
 from agent.rsi import shared_library_experience as shared
-from agent.rsi.code_sandbox import CandidateCodeError
-from agent.rsi.storage import atomic_json
+from agent.rsi.engine.code_sandbox import CandidateCodeError
+from agent.rsi.engine.storage import atomic_json
 from agent.science_goal import GoalSpec
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -196,8 +196,8 @@ async def test_real_mcp_development_and_reuse_bind_source_prompt_and_native_gate
     import test_shared_science_goal as executor_fixture
     from test_shared_model_publication import synthetic_native_seam
 
-    from agent.rsi.context_transfer import SOURCE_ADAPTATION
-    from agent.rsi.shared_model_publication import validate_shared_goal
+    from agent.rsi.engine.context_transfer import SOURCE_ADAPTATION
+    from agent.rsi.engine.shared_model_publication import validate_shared_goal
     from agent.science_goal import run_goal
 
     selection, tasks, donor, _ = fixture

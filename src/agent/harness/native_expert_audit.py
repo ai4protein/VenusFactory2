@@ -9,8 +9,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from agent.rsi.model_gateway import GatewayPolicy
-from agent.rsi.scientific_episode import artifact_written, completion_feedback, episode_contract
+from agent.rsi.engine.model_gateway import GatewayPolicy
+from agent.rsi.engine.scientific_episode import artifact_written, completion_feedback, episode_contract
 
 from .contracts import Profile, digest, file_hash
 from .events import audit_requests, audit_trace
@@ -103,9 +103,11 @@ def audit_native_expert(execution, workspace, capability, *, result=None):
         return historical_auditor(lock)(execution, workspace, capability, result=result)
     for name in ("native_expert_team.py", "events.py", "contracts.py"):
         require_equal(file_hash(base / name), lock["adapter_source"][name], "Expert audit source incompatible")
+    from agent.rsi.layout import source_relative
+
     for name in ("rsi/model_gateway.py", "rsi/scientific_episode.py"):
         require_equal(
-            file_hash(base.parent / name), lock["supporting_source"][name], "Expert audit source incompatible"
+            file_hash(base.parents[2] / source_relative(Path(name).name)), lock["supporting_source"][name], "Expert audit source incompatible"
         )
     if profile.model.protocol == "responses":
         for name in ("responses_gateway.py", "codex_adapter.py", "native_expert_audit.py"):

@@ -10,8 +10,8 @@ import test_shared_model_publication as shared_fixtures
 from agent.rsi import model_library_batch as batch
 from agent.rsi import model_tasks
 from agent.rsi import scientist_model_library as library_module
-from agent.rsi.scientist_model_library import ScientistModelLibrary
-from agent.rsi.storage import atomic_json, sha256_file
+from agent.rsi.engine.scientist_model_library import ScientistModelLibrary
+from agent.rsi.engine.storage import atomic_json, sha256_file
 
 completed = shared_fixtures.completed
 storage = single_fixtures.storage

@@ -12,8 +12,8 @@ from test_paper_step_tools import lifecycle as lifecycle
 
 from agent.harness import Budget, ModelBinding, Profile
 from agent.rsi import paper_step_goal as goal
-from agent.rsi.paper_step_sessions import prepare_phase, read
-from agent.rsi.storage import atomic_json
+from agent.rsi.engine.paper_step_sessions import prepare_phase, read
+from agent.rsi.engine.storage import atomic_json
 from agent.science_goal import GoalSpec, run_goal
 
 

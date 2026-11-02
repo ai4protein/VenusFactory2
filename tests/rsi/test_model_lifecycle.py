@@ -3,11 +3,11 @@ import json
 import pytest
 
 from agent.research_modes import get_research_mode
-from agent.rsi.model_lifecycle import ModelLifecycle
-from agent.rsi.model_plugins import get_model_plugin
-from agent.rsi.protein_model import PLUGIN_ID, digest, fit_candidate, predict, validate_rows
-from agent.rsi.runtime import safe_approval
-from agent.rsi.storage import atomic_json
+from agent.rsi.engine.model_lifecycle import ModelLifecycle
+from agent.rsi.engine.model_plugins import get_model_plugin
+from agent.rsi.engine.protein_model import PLUGIN_ID, digest, fit_candidate, predict, validate_rows
+from agent.rsi.engine.runtime import safe_approval
+from agent.rsi.engine.storage import atomic_json
 
 SCOPE = {"protein": "fixture", "assay": "assay1", "target": "activity", "unit": "AU", "sequence_length": 2}
 RECIPE = {"encoding": "onehot", "alphas": [0.001, 0.01]}

@@ -7,7 +7,7 @@ import pytest
 from agent.harness import Budget, ModelBinding, Profile
 from agent.harness.contracts import file_hash
 from agent.harness.host import write_json
-from agent.rsi.improver_replicates import freeze_batch_barrier, interleaved_schedule
+from agent.rsi.engine.improver_replicates import freeze_batch_barrier, interleaved_schedule
 from agent.science_goal import GoalSpec, GoalStore
 
 

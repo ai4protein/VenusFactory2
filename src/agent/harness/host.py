@@ -31,7 +31,7 @@ def write_json(path, value):
 
 
 async def execute(profile, task, runtimes, *, registry=None, credential=None):
-    from agent.rsi.model_gateway import GatewayPolicy
+    from agent.rsi.engine.model_gateway import GatewayPolicy
 
     from .gateway import EvidenceGateway
     from .native_expert_team import scientific_tool_exposure
@@ -67,6 +67,8 @@ async def execute(profile, task, runtimes, *, registry=None, credential=None):
         raise ValueError("Required model credential reference is unresolved")
     task.output.mkdir(parents=True, exist_ok=False)
     before = task.binding()
+    from agent.rsi.layout import source_relative
+
     lock = {
         "schema": 1,
         "profile": profile.public(),
@@ -76,7 +78,7 @@ async def execute(profile, task, runtimes, *, registry=None, credential=None):
         "transport": transport_name,
         "phase_deadline": "includes adapter startup; cleanup time reported in host_wall_seconds",
         "supporting_source": {
-            name: file_hash(Path(__file__).parent.parent / name)
+            name: file_hash(Path(__file__).resolve().parents[3] / source_relative(Path(name).name) if name.startswith("rsi/") else Path(__file__).parent.parent / name)
             for name in [
                 "rsi/model_gateway.py",
                 "rsi/live_model_gateway.py",

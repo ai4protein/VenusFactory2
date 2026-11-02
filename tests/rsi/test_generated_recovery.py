@@ -9,13 +9,13 @@ from pathlib import Path
 import pytest
 from fastmcp import Client
 
-from agent.rsi.code_sandbox import guard_source
-from agent.rsi.langgraph_tools import build_tools
-from agent.rsi.model_lifecycle import ModelLifecycle
-from agent.rsi.model_plugins import get_model_plugin
-from agent.rsi.protein_model import digest
-from agent.rsi.storage import atomic_json
-from agent.rsi.tool_contracts import validate_generated_result
+from agent.rsi.engine.code_sandbox import guard_source
+from agent.rsi.engine.langgraph_tools import build_tools
+from agent.rsi.engine.model_lifecycle import ModelLifecycle
+from agent.rsi.engine.model_plugins import get_model_plugin
+from agent.rsi.engine.protein_model import digest
+from agent.rsi.engine.storage import atomic_json
+from agent.rsi.engine.tool_contracts import validate_generated_result
 
 ROOT = Path(__file__).resolve().parents[2]
 SCOPE = {"protein": "repair_fixture", "assay": "synthetic", "target": "linear", "unit": "AU", "sequence_length": 2}
@@ -45,6 +45,8 @@ def predict(model,sequences):
 """
 
 
+from agent.rsi.layout import source_relative
+
 def setup_bundle(tmp_path, *, classifier=False, corrupt_worker=False):
     caps, work = tmp_path / "caps", tmp_path / "work"
     caps.mkdir()
@@ -60,7 +62,7 @@ def setup_bundle(tmp_path, *, classifier=False, corrupt_worker=False):
         "protein_model.py",
         "experience.py",
     ]:
-        shutil.copy2(ROOT / "src/agent/rsi" / name, caps / name)
+        shutil.copy2(ROOT / source_relative(name), caps / name)
     if corrupt_worker:
         (caps / "code_worker.py").write_text("this is invalid python !")
     scope = dict(SCOPE)

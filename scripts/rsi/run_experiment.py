@@ -19,13 +19,13 @@ from zoneinfo import ZoneInfo
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "src"))
-from agent.rsi.baseline import capture_baseline
-from agent.rsi.execution import execute_task
-from agent.rsi.model_policy import read_model_configuration
-from agent.rsi.pilot import build_tasks
-from agent.rsi.sandbox import bwrap_command
-from agent.rsi.storage import atomic_json, sha256_file
-from agent.rsi.versions import VersionStore
+from agent.rsi.engine.baseline import capture_baseline
+from agent.rsi.engine.execution import execute_task
+from agent.rsi.engine.model_policy import read_model_configuration
+from agent.rsi.campaigns.pilot import build_tasks
+from agent.rsi.engine.sandbox import bwrap_command
+from agent.rsi.engine.storage import atomic_json, sha256_file
+from agent.rsi.engine.versions import VersionStore
 
 SYSTEM_PROMPT = """You are the VenusFactory2 protein-engineering assistant running a bounded engineering pilot.
 Use only tools actually present in your catalog. The private venusfactory MCP provides
@@ -53,12 +53,12 @@ def setup(config: dict, output: Path) -> tuple[dict, Path, dict]:
         "thinking": "medium",
         "tool_policy": "pilot_mcp_and_workspace_files",
     }
-    baseline["evaluator_sha256"] = sha256_file(REPO / "src/agent/rsi/diagnostic_audit.py")
-    baseline["legacy_evaluator_sha256"] = sha256_file(REPO / "src/agent/rsi/pilot.py")
+    baseline["evaluator_sha256"] = sha256_file(REPO / "src/agent/rsi/engine/diagnostic_audit.py")
+    baseline["legacy_evaluator_sha256"] = sha256_file(REPO / "src/agent/rsi/campaigns/pilot.py")
     atomic_json(output / "baseline.json", baseline)
     source = output / "initial_capabilities"
     source.mkdir()
-    shutil.copyfile(REPO / "src/agent/rsi/pilot_tools.py", source / "pilot_tools.py")
+    shutil.copyfile(REPO / "src/agent/rsi/engine/pilot_tools.py", source / "pilot_tools.py")
     shutil.copyfile(REPO / "mcp_tools/tools/predict/features/calculate_physchem.py", source / "calculate_physchem.py")
     (source / "executor_prompt.md").write_text(SYSTEM_PROMPT)
     store = VersionStore(output / "version_store")

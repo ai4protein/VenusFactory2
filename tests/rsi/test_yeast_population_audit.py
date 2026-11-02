@@ -5,7 +5,7 @@ import zipfile
 
 import pytest
 
-from agent.rsi.yeast_population_audit import MEMBER, Q_FIELDS, audit_numeric
+from agent.rsi.engine.yeast_population_audit import MEMBER, Q_FIELDS, audit_numeric
 
 
 @pytest.fixture

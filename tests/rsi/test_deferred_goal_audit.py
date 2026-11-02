@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rsi"))
-from audit_reap_science_goal import audit_completed_goal
+from scripts.rsi.cases.audit_reap_science_goal import audit_completed_goal
 
 from agent.harness.contracts import digest
 from agent.harness.host import write_json

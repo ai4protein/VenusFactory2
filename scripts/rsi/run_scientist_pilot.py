@@ -17,11 +17,11 @@ from pathlib import Path
 from run_generated_lifecycle import policy_for
 from run_protein_lifecycle import ROOT, audit_events, prepare_case
 
-from agent.rsi.model_lifecycle import ModelLifecycle
-from agent.rsi.model_policy import read_model_configuration
-from agent.rsi.protein_model import digest
-from agent.rsi.scientist_runtime import run_scientist
-from agent.rsi.storage import atomic_json, sha256_file
+from agent.rsi.engine.model_lifecycle import ModelLifecycle
+from agent.rsi.engine.model_policy import read_model_configuration
+from agent.rsi.engine.protein_model import digest
+from agent.rsi.engine.scientist_runtime import run_scientist
+from agent.rsi.engine.storage import atomic_json, sha256_file
 
 
 async def main(args):
@@ -66,7 +66,7 @@ async def main(args):
     }
     atomic_json(args.output / "protocol.json", protocol)
     (args.output / "implementation.py").write_bytes(Path(__file__).read_bytes())
-    (args.output / "scientist_runtime.py").write_bytes((ROOT / "src/agent/rsi/scientist_runtime.py").read_bytes())
+    (args.output / "scientist_runtime.py").write_bytes((ROOT / "src/agent/rsi/engine/scientist_runtime.py").read_bytes())
     result = await run_scientist(
         workspace=workspace,
         capability=capability,

@@ -141,6 +141,18 @@ def test_material_inspection_is_not_capability_delivery(tmp_path,deliverable):
     assert not any(row['passed'] for row in result['criteria'].values())
 
 
+@pytest.mark.parametrize('deliverable,kind',[('model','method'),('tool','model')])
+def test_delivery_kind_must_match_the_planned_research(tmp_path,deliverable,kind):
+    store=create(tmp_path/'goal',profile(),'Extend the supplied paper using these measurements',dict(max_cycles=3,model_calls=36,tool_calls=36,wall_seconds=360))
+    proposed=plan();proposed['deliverable']=deliverable
+    accepted=parse_plan(json.dumps(proposed));accepted['steps'][0]['status']='completed'
+    state=store.read();state['progress'].update(plan=accepted,reviewed_episode=0,
+        capabilities=[{'id':'fixture'}],deliveries=[{'candidate_id':'fixture','kind':kind}])
+    result=AutonomousResearch(store,'fixture',{},tools=[]).evaluate(state)
+    assert result['delivery_pending']
+    assert not any(row['passed'] for row in result['criteria'].values())
+
+
 @pytest.mark.asyncio
 async def test_native_path_adapter_supports_existing_files_and_live_python_progress(tmp_path):
     import asyncio

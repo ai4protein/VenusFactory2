@@ -5,9 +5,9 @@ import json
 import numpy as np
 import pytest
 
-from agent.rsi.classifier_transfer import LOGISTIC_REFERENCE, refit_recipe, registered_source
-from agent.rsi.generated_classifier_large import fit_candidate, predict
-from agent.rsi.storage import sha256_file
+from agent.rsi.engine.classifier_transfer import LOGISTIC_REFERENCE, refit_recipe, registered_source
+from agent.rsi.engine.generated_classifier_large import fit_candidate, predict
+from agent.rsi.engine.storage import sha256_file
 
 
 @pytest.fixture

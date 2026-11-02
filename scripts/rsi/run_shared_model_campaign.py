@@ -14,9 +14,9 @@ from run_shared_science_goal import SharedScientistGoal, prepare
 from agent.harness import Profile
 from agent.harness.contracts import file_hash
 from agent.rsi import shared_campaign_experience
-from agent.rsi.model_access import authorize_profile
-from agent.rsi.shared_model_campaign import CRITERIA, SharedCampaignStore, bind_goal, read, require, run_campaign
-from agent.rsi.source_snapshot import research_implementation_paths
+from agent.rsi.engine.model_access import authorize_profile
+from agent.rsi.campaigns.shared_model_campaign import CRITERIA, SharedCampaignStore, bind_goal, read, require, run_campaign
+from agent.rsi.engine.source_snapshot import research_implementation_paths
 from agent.science_goal import GoalSpec, GoalStore, run_goal
 
 

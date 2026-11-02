@@ -7,8 +7,8 @@ from types import SimpleNamespace
 import pytest
 
 from agent.harness import Budget, ModelBinding, Profile
-from agent.rsi.reproduction_goal_contract import CASES, CRITERIA
-from agent.rsi.versions import VersionStore
+from agent.rsi.engine.reproduction_goal_contract import CASES, CRITERIA
+from agent.rsi.engine.versions import VersionStore
 from backend.web_v2.science_goals import (
     GeneratedModelDriver,
     ReproductionDriver,

@@ -79,9 +79,16 @@ async def test_measured_lineage_independent_review_delivery_and_agent_reuse(tmp_
     assert receipt['status']=='approved',receipt
     delivery=build_delivery(service.workspace,bundle,receipt)
     with zipfile.ZipFile(service.workspace/delivery['model_package']) as archive:
-        assert {'model/predict.py','model/weights.json','model/train.py','MODEL_CARD.md','test-report.json','checksums.json'}<=set(archive.namelist())
-        assert 'model/eval.json' not in archive.namelist()
-        assert json.loads(archive.read('test-report.json'))['final_test']['training_reproduced']
+        assert {'runtime/predict.py','runtime/weights.json','runtime/train.py','MODEL_CARD.md','evaluation/test-report.json','checksums.json','README.md','capability.json','predict.py','tests/test_interface.py'}<=set(archive.namelist())
+        assert not any(name.endswith('eval.json') for name in archive.namelist())
+        assert json.loads(archive.read('evaluation/test-report.json'))['final_test']['training_reproduced']
+        released=tmp_path/'released';archive.extractall(released)
+    import subprocess,sys
+    check=subprocess.run([sys.executable,'predict.py','examples/input.json'],cwd=released,capture_output=True,text=True)
+    assert check.returncode==0,check.stderr
+    assert json.loads(check.stdout)['value']==pytest.approx(4)
+    check=subprocess.run([sys.executable,'-m','unittest','discover','-s','tests','-v'],cwd=released,capture_output=True,text=True)
+    assert check.returncode==0,check.stderr
     library=tmp_path/'private_capabilities'
     entry=publish_proposals([bundle],'fixture',library)[0]
     output=await run_capability(entry['id'],{'x':2.5},library=library)

@@ -144,7 +144,7 @@ def test_queue_history_includes_training_and_parent_scoped_jobs(store):
 
 def test_live_gateway_records_actual_response_and_transport_failure(store,tmp_path):
     from agent.harness.gateway import EvidenceGateway
-    from agent.rsi.model_gateway import GatewayPolicy
+    from agent.rsi.engine.model_gateway import GatewayPolicy
     async def run():
         calls=0
         def upstream(request):

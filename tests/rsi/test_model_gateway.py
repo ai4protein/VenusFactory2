@@ -5,7 +5,7 @@ import time
 import httpx
 import pytest
 
-from agent.rsi.model_gateway import GatewayPolicy, ModelGateway
+from agent.rsi.engine.model_gateway import GatewayPolicy, ModelGateway
 
 
 def function(name):

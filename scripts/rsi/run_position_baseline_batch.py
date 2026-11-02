@@ -7,9 +7,9 @@ import json
 from pathlib import Path
 
 from agent.rsi import position_baselines
-from agent.rsi.model_tasks import bound_file, read_task
-from agent.rsi.research_project_catalog import build_catalog
-from agent.rsi.storage import atomic_json, sha256_file
+from agent.rsi.datasets.model_tasks import bound_file, read_task
+from agent.rsi.datasets.research_project_catalog import build_catalog
+from agent.rsi.engine.storage import atomic_json, sha256_file
 
 
 def run(manifest_path, project_id, output):

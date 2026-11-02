@@ -11,7 +11,7 @@ import time
 import httpx
 
 from agent.science_goal import GoalSpec, GoalStore, run_goal
-from agent.rsi.model_gateway import GatewayPolicy
+from agent.rsi.engine.model_gateway import GatewayPolicy
 from .contracts import Profile, file_hash
 from .events import audit_requests
 from .gateway import EvidenceGateway
@@ -23,6 +23,7 @@ from .research_workspace import ResearchWorkspace, publish_proposals, safe_file
 from .capability_review import REVIEW_PROMPT, review_proposal
 from .research_development import Development, model_goal, build_delivery, guide as development_guide
 from .research_topic import SCIENTIST_PURPOSE, topic_context
+from agent.rsi.artifacts.contract import SCHEMA as DELIVERY_SCHEMA, WORKSPACE_INSTRUCTIONS, selected_deliveries, has_delivery
 
 DRIVER='autonomous_research.v1'
 CRITERIA=('research_plan_executed','research_outputs_reviewed','capability_admission_resolved')
@@ -85,7 +86,7 @@ def parse_plan(text, previous=None, *, objective=''):
 def create(root, profile, objective, limits):
     if profile.harness not in NATIVE_EXPERT_HARNESSES:raise ValueError('Select a native Scientist harness')
     store=GoalStore.create(root,GoalSpec(objective,CRITERIA,**limits),profile)
-    write_json(store.root/'protocol.json',{'kind':DRIVER})
+    write_json(store.root/'protocol.json',{'kind':DRIVER,'delivery_schema':DELIVERY_SCHEMA})
     (store.root/'workspace').mkdir()
     return store
 
@@ -231,6 +232,7 @@ class AutonomousResearch:
                 instructions='You are the Machine Learning Specialist. Execute a small coherent group of unfinished steps of the supplied plan using scientific tools. Checkpoint useful results each iteration so the reviewer can approve completed steps before the next iteration; do not attempt a long plan in one uninterrupted execution. Search existing capabilities before reinventing work. Write code and reports with write_session_file; execute scripts with run_session_python. Use real datasets for scientific claims. For model-development goals, train on the supplied data, evaluate a held-out split, save the fitted weights and metrics, and build a reusable run(inputs) prediction program. Call get_research_review_requirements before developing a reusable candidate. Include an input/output contract, author, version, applicability and limitations; document data provenance and disjoint train/validation/test groups, fitted files, training reproduction and held-out metrics for models. Propose at most two candidates with review_spec, runtime files and private evidence files. Revise candidates using progress.publication_reviews issues even when research plan steps are complete. A proposed capability is not publicly available until independent Review approves it. Read supplied PDFs with read_session_file and inspect structures or tables before deciding the next experiment. Do not stop at a training script when a reusable model is requested. End by submit_research_checkpoint citing actual result artifacts and step IDs. If required input is missing, checkpoint a specific question instead of substituting a demo. Planning questions are advisory: inspect inputs and complete any useful unblocked work before requesting user input. Never invent missing data or replace the user sequence. Use relative paths for research tools and /workspace paths for scientific data tools.'
                 instructions+=' '+SCIENTIST_PURPOSE+' Follow context.research_topic for experimental-data, paper-extension and prospective-model projects. Create README.md early with the short research title, goal, current plan and input data. Update it after experiments with measured results, limitations and reproduction commands. Use enabled generate_training_config / train_protein_model / protein_model_predict for platform training when appropriate, with workspace files. Training is queued; do not implement a separate host subprocess or treat a configuration file as completed training. Online PLM training uses ESM2-8M. Custom algorithms run in the isolated Python workspace. Both paths require actual held-out evidence.'
                 instructions+=' For model goals, call get_research_strategy_guide. Execute a baseline and record it with evaluate_research_model(variant="baseline"); inspect the measured feedback, then revise the implementation, learning objective, representation or adaptation rule and evaluate a child using parent_experiment_id. Explain the hypothesis and use matched validation data. PLM training is optional. Use few-shot, semi-supervised, meta-learning, transfer or custom strategies when justified by the actual data; missing tasks/unlabeled examples cannot be fabricated. Implement genuine training/adaptation and relevant ablations, not merely a renamed estimator. Select on validation; reserve final test for Review. Put the selected experiment ID in review_spec.development_experiment_id. Source, fitted state, training reproduction, test evidence and a reusable inference interface are required. The host creates a private model delivery and test report after admission. Organize a reproducible project: a README explaining inputs and exact commands, dependency versions, source code, training/inference entry points, tests and a report citing actual results and unresolved limitations. Keep original relative paths so it runs after ZIP extraction. Do not claim algorithmic novelty, causal RSI benefit or statistical superiority without the required evidence.'
+                instructions+=' '+WORKSPACE_INSTRUCTIONS
                 instructions+=f' This iteration has at most {native.budget.tool_calls} tool calls. Respect the remaining-call feedback from mcp_tools.tools. When only two calls remain, submit_research_checkpoint immediately instead of starting another experiment. A useful partial checkpoint is expected; do not claim unfinished steps complete. Avoid re-reading guides already supplied in context.model_development.protocol.'
                 request={'session_id':self.store.root.name,'profile':native.public(),'runtimes':self.runtimes,'workspace':str(workspace),'control':str(folder),'messages':[],'text':json.dumps(context,ensure_ascii=False),'instructions':instructions,'base_url':relay.base_url,'token':relay.token,'budget':native.public()['budget'],'lang':'zh' if any('\u4e00'<=c<='\u9fff' for c in context['objective']) else 'en'}
                 phase('MLS')
@@ -282,13 +284,14 @@ class AutonomousResearch:
                         if receipt['status']=='approved' and audit_requests(folder/'model_requests.jsonl')['passed']:
                             try:
                                 delivery=None
-                                if candidate.get('development') and candidate['review_spec']['kind']=='model':
-                                    delivery=build_delivery(workspace,bundle,receipt)
+                                if candidate.get('development') or candidate['review_spec']['kind']=='tool':
+                                    delivery=build_delivery(workspace,bundle,receipt,goal_id=self.store.root.name)
                                 kwargs={'library':self.store.root/'private_capabilities'} if os.getenv('VENUS_SCIENTIST_ONLINE')=='1' else {}
                                 published=publish_proposals([bundle],self.store.root.name,**kwargs)
                                 progress['capabilities']=list({r['id']:r for r in [*progress.get('capabilities',[]),*published]}.values())
                                 if delivery:
-                                    progress['deliveries']=list({r['candidate_id']:r for r in [*progress.get('deliveries',[]),delivery]}.values())
+                                    progress['deliveries']=[r for r in progress.get('deliveries',[]) if r['candidate_id']!=delivery['candidate_id']]+[delivery]
+                                    progress['selected_deliveries']=selected_deliveries(progress['deliveries'])
                             except Exception as exc:
                                 row.update(status='needs_revision',issues=['Registration: '+str(exc)[:500]])
                         elif receipt['status']=='approved': row.update(status='needs_revision',issues=['Model response audit did not pass'])
@@ -302,10 +305,10 @@ class AutonomousResearch:
                 questions=(checkpoint or {}).get('needs_input',[])
                 progress.update(plan=plan,questions=questions,last_review=review,research_completed=ready and all(s['status']=='completed' for s in plan['steps']))
                 progress['development']=development.summary()
-                if plan.get('deliverable')=='model' and not progress.get('deliveries'):
+                if plan.get('deliverable')=='model' and not has_delivery(progress.get('deliveries',[]),'model'):
                     ready=False;progress['research_completed']=False
                     progress['delivery_pending']='A measured baseline, revised model, independent admission and model delivery are required'
-                elif plan.get('deliverable')=='tool' and not progress.get('capabilities'):
+                elif plan.get('deliverable')=='tool' and (not progress.get('capabilities') or not has_delivery(progress.get('deliveries',[]),'method')):
                     ready=False;progress['research_completed']=False
                     progress['delivery_pending']='The reusable tool needs independent review and a registered delivery'
                 else:progress.pop('delivery_pending',None)
@@ -321,7 +324,7 @@ class AutonomousResearch:
         finally:
             timeline.finish(result['status'])
             progress['development']=development.summary()
-            if model_goal(context['objective']) and not progress.get('deliveries'):
+            if model_goal(context['objective']) and not has_delivery(progress.get('deliveries',[]),'model'):
                 progress['delivery_pending']='Continue from measured generations; model review and delivery are not yet complete'
             write_json(folder/'events.json',events)
         calls=audit_requests(folder/'model_requests.jsonl') if (folder/'model_requests.jsonl').exists() else {'model_calls':0,'passed':False}
@@ -337,9 +340,12 @@ class AutonomousResearch:
         if not plan.get('steps') or not all(s.get('status')=='completed' for s in plan['steps']) or 'reviewed_episode' not in progress:return {'criteria':checks}
         if plan.get('deliverable')=='tool' and not progress.get('capabilities'):
             return {'criteria':checks,'delivery_pending':True}
-        if plan.get('deliverable')=='model' or model_goal(state['definition']['goal']['objective']):
-            if not progress.get('deliveries'):return {'criteria':checks,'delivery_pending':True}
-            for delivery in progress['deliveries']:
+        protocol=self.store.root/'protocol.json'
+        modern_delivery=protocol.exists() and json.loads(protocol.read_text()).get('delivery_schema')==DELIVERY_SCHEMA
+        if plan.get('deliverable')=='model' or model_goal(state['definition']['goal']['objective']) or (plan.get('deliverable')=='tool' and modern_delivery):
+            kind='method' if plan.get('deliverable')=='tool' and not model_goal(state['definition']['goal']['objective']) else 'model'
+            if not has_delivery(progress.get('deliveries',[]),kind):return {'criteria':checks,'delivery_pending':True}
+            for delivery in selected_deliveries(progress['deliveries']):
                 if delivery['candidate_id'] not in {c['id'] for c in progress.get('capabilities',[])}:return {'criteria':checks,'delivery_pending':True}
                 for artifact in delivery['artifacts']:
                     try:

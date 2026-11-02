@@ -12,7 +12,7 @@ from agent.harness.contracts import digest
 from agent.harness.empty_response_recovery import POLICY, eligible, response_shape
 from agent.harness.events import audit_requests
 from agent.harness.gateway import EvidenceGateway
-from agent.rsi.model_gateway import GatewayPolicy
+from agent.rsi.engine.model_gateway import GatewayPolicy
 
 
 def reply(content=None, reason="length", **extra):

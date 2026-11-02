@@ -24,11 +24,11 @@ from agent.harness import Profile, builtin_registry
 from agent.harness.catalog import ExecutionCatalog, resolve_credential
 from agent.harness.provider_config import online as provider_online
 from agent.harness.contracts import digest
-from agent.rsi.case_plugins import PLUGINS
-from agent.rsi.paper_campaign import SUITES, admitted_campaign, campaign_cases
-from agent.rsi.reproduction_goal_contract import CASES, CRITERIA, allocation
-from agent.rsi.storage import atomic_json, file_lock
-from agent.rsi.versions import VersionStore
+from agent.rsi.campaigns.case_plugins import PLUGINS
+from agent.rsi.campaigns.paper_campaign import SUITES, admitted_campaign, campaign_cases
+from agent.rsi.engine.reproduction_goal_contract import CASES, CRITERIA, allocation
+from agent.rsi.engine.storage import atomic_json, file_lock
+from agent.rsi.engine.versions import VersionStore
 from agent.science_goal import GoalStore
 from backend.web_v2.paper_step_goals import available_steps, public_step
 from backend.web_v2.paper_step_goals import drivers as paper_step_drivers
@@ -654,7 +654,7 @@ class ScienceGoalService:
             "parameters": meta["spec"]["parameters"],
             "activity": goal_activity(folder, state),
             "project": project_summary(folder, state),
-            "research": {**{k: state["progress"].get(k) for k in ["pending_interaction", "plan", "questions", "artifacts", "capabilities", "last_review", "inputs", "publication_reviews", "research_completed", "development", "deliveries", "delivery_pending"]}, "pending_updates": len(state.get("pending_research_updates", [])), "live": research_live(folder, state)} if meta["spec"]["driver"] == "autonomous_research.v1" else None,
+            "research": {**{k: state["progress"].get(k) for k in ["pending_interaction", "plan", "questions", "artifacts", "capabilities", "last_review", "inputs", "publication_reviews", "research_completed", "development", "deliveries", "selected_deliveries", "delivery_pending"]}, "pending_updates": len(state.get("pending_research_updates", [])), "live": research_live(folder, state)} if meta["spec"]["driver"] == "autonomous_research.v1" else None,
             "reproduction_recipes": public_reproduction_recipes(folder, state),
             "papers": public_paper_progress(folder, state),
             "code_step": public_step(folder, state),

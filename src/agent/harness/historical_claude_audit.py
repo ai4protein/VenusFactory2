@@ -4,6 +4,7 @@ import importlib
 from pathlib import Path
 
 from .contracts import file_hash
+from agent.rsi.layout import source_relative
 
 PINNED = {'__init__.py': 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
  'harness/__init__.py': '0127b45a0631cd125679fa0dee3b41e5d6538100a218eabc804fcc8e97339315',
@@ -49,7 +50,7 @@ def historical_claude_auditor(lock):
         if lock.get("adapter_source", {}).get(name) != PINNED["harness/" + name]:
             raise ValueError("Unrecognized pre-Claude Scientist source")
     for name in ["rsi/model_gateway.py", "rsi/scientific_episode.py"]:
-        if lock.get("supporting_source", {}).get(name) != PINNED[name] or file_hash(Path(__file__).parent.parent / name) != PINNED[name]:
+        if lock.get("supporting_source", {}).get(name) != PINNED[name] or file_hash(Path(__file__).resolve().parents[3] / source_relative(Path(name).name)) != PINNED[name]:
             raise ValueError("Historical pre-Claude support changed")
     root = Path(__file__).parent / "_legacy_pre_claude"
     if root.is_symlink() or not root.is_dir() or {p.relative_to(root).as_posix() for p in root.rglob("*.py")} != set(PINNED):

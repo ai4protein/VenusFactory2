@@ -56,7 +56,7 @@ async def test_failed_restricted_evidence_has_no_global_fallback(monkeypatch):
 def test_typed_mcp_arguments_remove_graph_context_fields():
     from langchain_core.tools import StructuredTool
 
-    from agent.rsi.scientist_runtime import argument_model
+    from agent.rsi.engine.scientist_runtime import argument_model
 
     tool = StructuredTool(
         name="inspect",

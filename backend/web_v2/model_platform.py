@@ -86,7 +86,7 @@ class Platform:
         self.records.protect(self.root)
         marker = self.root / '.job-index-v1'
         if not marker.exists():
-            from agent.rsi.storage import file_lock
+            from agent.rsi.engine.storage import file_lock
             with file_lock(self.root / '.jobs.lock'):
                 if not marker.exists():
                     for path in (self.root / 'jobs').glob('*.json'):
@@ -537,7 +537,7 @@ class Platform:
             from mcp_tools.tools.capability_policy import CapabilityStore
             CapabilityStore().assert_call('train_protein_model', {'plm_model':'classical'})
             self.validate_training(owner, payload)
-        from agent.rsi.storage import file_lock
+        from agent.rsi.engine.storage import file_lock
         with file_lock(self.root / '.jobs.lock'):
             job = {'id': uuid.uuid4().hex, 'owner': owner, 'kind': kind, 'payload': payload, 'status': 'queued', 'progress': 0,
                    'message': 'Queued', 'created': time.time(), 'steps': []}
@@ -908,7 +908,7 @@ class Platform:
         require(bool(files),'No output files')
         work=(self.root/'work'/identity).resolve()
         archive=work/'model-results.zip'
-        from agent.rsi.storage import file_lock
+        from agent.rsi.engine.storage import file_lock
         with file_lock(work/'.archive.lock'):
             temp=work/('archive-'+uuid.uuid4().hex+'.tmp')
             try:

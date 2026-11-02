@@ -7,9 +7,9 @@ from itertools import permutations
 import pytest
 
 from agent.rsi import matched_failure_closeout as module
-from agent.rsi.matched_history_analysis import ARMS
-from agent.rsi.protein_model import digest
-from agent.rsi.shared_sequence_evaluation import require_terminal
+from agent.rsi.engine.matched_history_analysis import ARMS
+from agent.rsi.engine.protein_model import digest
+from agent.rsi.engine.shared_sequence_evaluation import require_terminal
 
 
 def write(path, value):
@@ -312,7 +312,7 @@ def test_certificate_is_revalidated_after_creation(study_fixture, mutation):
 
 @pytest.mark.parametrize("encoding", [str, int])
 def test_current_live_process_cannot_pass_barrier_as_integer_ticks(encoding):
-    from agent.rsi.scientist_model_campaign import process_identity
+    from agent.rsi.campaigns.scientist_model_campaign import process_identity
 
     identity = process_identity()
     identity["start_ticks"] = encoding(identity["start_ticks"])

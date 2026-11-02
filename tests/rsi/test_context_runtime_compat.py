@@ -2,7 +2,7 @@ import hashlib
 
 import pytest
 
-from agent.rsi.context_runtime_compat import FILES, metadata_extension, verify_sources
+from agent.rsi.engine.context_runtime_compat import FILES, metadata_extension, verify_sources
 
 OLD = "GROUP_LEVELS = {'biological_replicate'}\ndef score(x):\n    return x + 1\n"
 NEW = "GROUP_LEVELS = {'biological_replicate', 'genetic_population'}\ndef score(x):\n    return x + 1\n"

@@ -6,7 +6,7 @@ from test_generated_assay import make_task
 
 from agent.rsi import generated_assay
 from agent.rsi import shared_assay_evaluation as evaluation
-from agent.rsi.storage import atomic_json, sha256_file
+from agent.rsi.engine.storage import atomic_json, sha256_file
 
 
 def predictions(rows):

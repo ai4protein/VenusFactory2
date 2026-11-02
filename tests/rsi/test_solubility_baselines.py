@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from agent.rsi.solubility_baselines import REFERENCE, WEIGHTS, predict_swi_control, swi
+from agent.rsi.engine.solubility_baselines import REFERENCE, WEIGHTS, predict_swi_control, swi
 
 
 def observations():

@@ -8,8 +8,8 @@ import pytest
 from test_reap_goal_comparison import candidate, goals
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rsi"))
-import audit_reap_goal_comparison as auditor
-from run_reap_goal_comparison import freeze_goal_barrier
+from scripts.rsi.cases import audit_reap_goal_comparison as auditor
+from scripts.rsi.cases.run_reap_goal_comparison import freeze_goal_barrier
 
 from agent.harness import Budget, ModelBinding, Profile
 from agent.harness.contracts import digest

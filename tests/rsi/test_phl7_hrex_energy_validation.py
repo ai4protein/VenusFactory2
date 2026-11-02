@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rsi"))
-from run_phl7_hrex_energy_validation import (
+from scripts.rsi.cases.run_phl7_hrex_energy_validation import (
     SCALED_TERMS,
     UNCHANGED_TERMS,
     build_index,
@@ -113,7 +113,7 @@ def test_optional_mass_column_in_ion_atoms_is_supported():
 
 
 def test_total_charge_includes_molecule_multiplicity():
-    from run_phl7_hrex_energy_validation import topology_charge
+    from scripts.rsi.cases.run_phl7_hrex_energy_validation import topology_charge
 
     assert topology_charge(TOP) == pytest.approx(0.2 - 0.834)
     assert topology_charge(TOP.replace("SOL 1\n", "SOL 2\n")) == pytest.approx(0.2 - 2 * 0.834)
@@ -122,8 +122,8 @@ def test_total_charge_includes_molecule_multiplicity():
 def test_charge_precision_diagnostic_preserves_other_parameters():
     import math
 
-    from run_phl7_hrex_energy_validation import restore_scaled_charge_precision
-    from run_phl7_hrex_preparation import parse_topology
+    from scripts.rsi.cases.run_phl7_hrex_energy_validation import restore_scaled_charge_precision
+    from scripts.rsi.cases.run_phl7_hrex_preparation import parse_topology
 
     all_hot, _ = mark_atoms(TOP, "all_hot")
     result = parse_topology(restore_scaled_charge_precision(all_hot, TOP, 0.5))
@@ -149,7 +149,7 @@ def test_untempered_explicit_pair_changes_only_coulomb_sr_and_potential_expectat
 
 
 def test_explicit_pair_oracle_uses_distance_and_rejects_nonzero_lj():
-    from run_phl7_hrex_energy_validation import explicit_pair_coulomb
+    from scripts.rsi.cases.run_phl7_hrex_energy_validation import explicit_pair_coulomb
 
     top = """[ moleculetype ]
 Protein_chain_A 3

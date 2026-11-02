@@ -9,12 +9,12 @@ from pathlib import Path
 
 from run_generated_lifecycle import ROOT, assess_and_reuse, policy_for
 
-from agent.rsi.landscape_cases import prepare_landscape
-from agent.rsi.model_lifecycle import ModelLifecycle
-from agent.rsi.model_plugins import get_model_plugin
-from agent.rsi.model_policy import read_model_configuration
-from agent.rsi.protein_model import digest
-from agent.rsi.storage import atomic_json, sha256_file
+from agent.rsi.engine.landscape_cases import prepare_landscape
+from agent.rsi.engine.model_lifecycle import ModelLifecycle
+from agent.rsi.engine.model_plugins import get_model_plugin
+from agent.rsi.engine.model_policy import read_model_configuration
+from agent.rsi.engine.protein_model import digest
+from agent.rsi.engine.storage import atomic_json, sha256_file
 
 
 async def main(args):

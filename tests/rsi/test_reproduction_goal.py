@@ -8,7 +8,7 @@ import pytest
 
 from agent.harness import Budget, ModelBinding, Profile
 from agent.harness.contracts import digest, file_hash
-from agent.rsi.reproduction_goal_contract import CRITERIA, allocation
+from agent.rsi.engine.reproduction_goal_contract import CRITERIA, allocation
 from agent.science_goal import GoalSpec, GoalStore, run_goal
 
 

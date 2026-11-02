@@ -9,12 +9,12 @@ from test_generated_features import CODE, ROWS, SCOPE
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rsi"))
 import run_science_goal as base
-from run_reap_science_goal import PLUGIN, ReapModelGoal, publish_completed_source
+from scripts.rsi.cases.run_reap_science_goal import PLUGIN, ReapModelGoal, publish_completed_source
 
 from agent.harness import Budget, ModelBinding, Profile
 from agent.harness.contracts import digest
 from agent.harness.host import write_json
-from agent.rsi.model_plugins import get_model_plugin
+from agent.rsi.engine.model_plugins import get_model_plugin
 from agent.science_goal import GoalSpec, GoalStore, run_goal
 
 
@@ -137,7 +137,7 @@ async def test_feature_goal_survives_failed_reuse_without_retraining(tmp_path, m
     assert not (store.root / "future_metrics.json").exists()
     packet = publish_completed_source(store, goal, state)
     assert publish_completed_source(store, goal, state) == packet
-    from agent.rsi.experience import ModelExperienceStore
+    from agent.rsi.engine.experience import ModelExperienceStore
 
     projection = ModelExperienceStore(store.root / "experience").project("source", [packet["experience_id"]])
     entry = projection["entries"][0]

@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rsi"))
-from audit_reap_generated import verify_code_origin
+from scripts.rsi.cases.audit_reap_generated import verify_code_origin
 
 
 def fixture(work):

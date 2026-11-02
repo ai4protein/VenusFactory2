@@ -15,7 +15,7 @@ from agent.harness import native_expert_team as team
 from agent.harness.contracts import digest
 from agent.harness.host import write_json
 from agent.harness.native_expert_audit import audit_native_expert
-from agent.rsi.scientific_episode import EpisodeContract
+from agent.rsi.engine.scientific_episode import EpisodeContract
 
 
 @pytest.mark.parametrize("decision", ["ready_for_host_validation", "needs_revision"])

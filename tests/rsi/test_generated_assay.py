@@ -8,10 +8,10 @@ import pytest
 
 from agent.rsi import generated_assay as api
 from agent.rsi import model_tasks
-from agent.rsi.assay_baselines import score_rows
-from agent.rsi.model_lifecycle import ModelLifecycle
-from agent.rsi.model_plugins import get_model_plugin
-from agent.rsi.storage import atomic_json, sha256_file
+from agent.rsi.engine.assay_baselines import score_rows
+from agent.rsi.engine.model_lifecycle import ModelLifecycle
+from agent.rsi.engine.model_plugins import get_model_plugin
+from agent.rsi.engine.storage import atomic_json, sha256_file
 
 CODE = """import numpy as np
 def fit(features, targets, seed):

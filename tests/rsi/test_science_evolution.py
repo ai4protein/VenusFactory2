@@ -13,9 +13,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rsi"))
 from run_science_evolution import EvolvingModelGoal
 from run_science_goal import GeneratedModelGoal
 
-from agent.rsi.generated_model import fit_candidate, predict
-from agent.rsi.model_lifecycle import ModelLifecycle
-from agent.rsi.storage import atomic_json
+from agent.rsi.engine.generated_model import fit_candidate, predict
+from agent.rsi.engine.model_lifecycle import ModelLifecycle
+from agent.rsi.engine.storage import atomic_json
 from backend.web_v2.science_goals import EvolvingModelDriver, ScienceGoalService, goal_activity
 
 

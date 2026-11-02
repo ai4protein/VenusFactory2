@@ -8,9 +8,9 @@ import pytest
 from fastmcp import Client
 from test_generated_recovery import GOOD, setup_bundle
 
-from agent.rsi.protein_model import digest
-from agent.rsi.storage import atomic_json
-from agent.rsi.tool_contracts import validate_generated_result
+from agent.rsi.engine.protein_model import digest
+from agent.rsi.engine.storage import atomic_json
+from agent.rsi.engine.tool_contracts import validate_generated_result
 
 LEDGER = ".model_development.json"
 

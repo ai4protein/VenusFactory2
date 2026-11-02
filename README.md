@@ -46,6 +46,11 @@ tool, a fitted machine-learning model or a method for your experimental setting.
 Models intended for the shared library undergo separate validation and independent
 review before Agent can discover and use them.
 
+Scientist delivers a selected model or method with a README, runnable interface,
+examples and a test report. Experiments and earlier versions stay in the research
+topic; they do not each become another default tool. See the
+[Scientist guide](docs/manual/en/scientist.md) for using and downloading results.
+
 ## Choose models for your experiment
 
 **Model Plaza** groups models by biological function. Open a model to run a

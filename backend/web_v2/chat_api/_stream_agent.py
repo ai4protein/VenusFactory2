@@ -18,7 +18,7 @@ from agent.harness.events import audit_requests, audit_trace
 from agent.harness.gateway import EvidenceGateway
 from agent.harness.host import write_json
 from agent.kimi_client import KimiEvent
-from agent.rsi.model_gateway import GatewayPolicy
+from agent.rsi.engine.model_gateway import GatewayPolicy
 from backend.web_v2.agent_execution import ROOT, admit, runtime_paths
 from backend.web_v2.agent_conversation import continuation_messages, record_tool_observation, completed_messages
 from backend.web_v2.agent_context import ContextPolicy, prepare_context, summarize_via_relay, turn_count, cancellable

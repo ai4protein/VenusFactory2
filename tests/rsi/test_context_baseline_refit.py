@@ -161,7 +161,7 @@ def test_cli_complete_coverage_and_stale_report(tmp_path):
         "totals": {"allocated": 1, "completed_control_fits": 4, "failed_control_fits": 0},
     }
     report_ref = save(root / "report.json", report)
-    cli = Path(__file__).resolve().parents[2] / "scripts/rsi/refit_context_baselines.py"
+    cli = Path(__file__).resolve().parents[2] / "scripts/rsi/evaluation/refit_context_baselines.py"
     spec = importlib.util.spec_from_file_location("context_refit_cli_test", cli)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -177,7 +177,7 @@ def test_cli_complete_coverage_and_stale_report(tmp_path):
 
 @pytest.mark.parametrize("change", ["valid", "wrong_digest", "source_override", "conflict"])
 def test_historical_implementation_archive_is_exact_and_code_only(tmp_path, change):
-    cli = Path(__file__).resolve().parents[2] / "scripts/rsi/refit_context_baselines.py"
+    cli = Path(__file__).resolve().parents[2] / "scripts/rsi/evaluation/refit_context_baselines.py"
     spec = importlib.util.spec_from_file_location("context_archive_cli_test", cli)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rsi"))
-import run_reap_goal_comparison as comparison
+from scripts.rsi.cases import run_reap_goal_comparison as comparison
 
 from agent.harness.contracts import file_hash
 from agent.harness.host import write_json

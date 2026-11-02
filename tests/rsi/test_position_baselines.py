@@ -9,7 +9,7 @@ import pytest
 from test_research_project_catalog import manifest as manifest
 from test_research_project_catalog import save, task_of
 
-from agent.rsi.position_baselines import IncompatibleAlignment, predict_control, run_controls
+from agent.rsi.engine.position_baselines import IncompatibleAlignment, predict_control, run_controls
 
 
 @pytest.mark.parametrize("degree", [1, 2])

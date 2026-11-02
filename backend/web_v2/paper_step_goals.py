@@ -4,13 +4,13 @@ import os
 import re
 from dataclasses import dataclass
 
-from agent.rsi.generated_step_library import GeneratedStepLibrary
-from agent.rsi.paper_step import digest
-from agent.rsi.paper_step_catalog import catalog, task
-from agent.rsi.paper_step_goal import CRITERIA as DEVELOPMENT_CRITERIA
-from agent.rsi.paper_step_sessions import read
-from agent.rsi.paper_step_transfer import CRITERIA as TRANSFER_CRITERIA
-from agent.rsi.storage import safe_child, sha256_file
+from agent.rsi.engine.generated_step_library import GeneratedStepLibrary
+from agent.rsi.engine.paper_step import digest
+from agent.rsi.engine.paper_step_catalog import catalog, task
+from agent.rsi.campaigns.paper_step_goal import CRITERIA as DEVELOPMENT_CRITERIA
+from agent.rsi.engine.paper_step_sessions import read
+from agent.rsi.engine.paper_step_transfer import CRITERIA as TRANSFER_CRITERIA
+from agent.rsi.engine.storage import safe_child, sha256_file
 
 
 @dataclass(frozen=True)

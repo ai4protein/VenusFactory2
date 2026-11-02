@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-PATH = Path(__file__).resolve().parents[2] / "scripts/rsi/wait_clean_training_evaluation.py"
+PATH = Path(__file__).resolve().parents[2] / "scripts/rsi/cases/wait_clean_training_evaluation.py"
 SPEC = importlib.util.spec_from_file_location("clean_evaluation_queue_fixture", PATH)
 queue = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(queue)

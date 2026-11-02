@@ -5,7 +5,7 @@ import pytest
 from scipy.stats import spearmanr
 from sklearn.metrics import log_loss, mean_absolute_error, mean_squared_error
 
-from agent.rsi.prediction_metrics import measure
+from agent.rsi.engine.prediction_metrics import measure
 
 
 def rows(values, prefix):

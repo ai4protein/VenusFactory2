@@ -11,11 +11,11 @@ from test_paper_step_tools import lifecycle as lifecycle
 
 from agent.harness import Budget, ModelBinding, Profile
 from agent.rsi import paper_step_goal as goals
-from agent.rsi.generated_step_library import GeneratedStepLibrary
-from agent.rsi.paper_step_sessions import phase_task, read
-from agent.rsi.research_tool_contract import validate_contract, validate_result
-from agent.rsi.research_tool_goal import create_research_tool_goal, research_tool_driver
-from agent.rsi.scientist_tool_context import verify_context
+from agent.rsi.engine.generated_step_library import GeneratedStepLibrary
+from agent.rsi.engine.paper_step_sessions import phase_task, read
+from agent.rsi.engine.research_tool_contract import validate_contract, validate_result
+from agent.rsi.campaigns.research_tool_goal import create_research_tool_goal, research_tool_driver
+from agent.rsi.engine.scientist_tool_context import verify_context
 from agent.science_goal import GoalSpec, run_goal
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -173,7 +173,7 @@ async def test_context_survives_real_validation_and_new_session_reuse(
 
 
 def test_hidden_acceptance_schema_cannot_be_bypassed_by_numerical_tolerance(tmp_path, lifecycle, contract):
-    from agent.rsi.research_tool_lifecycle import ResearchToolLifecycle
+    from agent.rsi.engine.research_tool_lifecycle import ResearchToolLifecycle
 
     definition = deepcopy(lifecycle.definition)
     definition["tolerance"] = {"atol": 0.001, "rtol": 0.0}

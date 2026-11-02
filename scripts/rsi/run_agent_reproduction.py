@@ -12,14 +12,14 @@ from pathlib import Path
 from run_protein_lifecycle import ROOT, audit_events
 from run_verified_case_review import review_case
 
-from agent.rsi.case_jobs import CaseJobBroker
-from agent.rsi.live_model_gateway import ModelGateway
-from agent.rsi.model_gateway import GatewayPolicy
-from agent.rsi.model_policy import read_model_configuration
-from agent.rsi.runtime import run_task
-from agent.rsi.sandbox import SandboxKimi
-from agent.rsi.storage import atomic_json, sha256_file
-from agent.rsi.versions import VersionStore
+from agent.rsi.campaigns.case_jobs import CaseJobBroker
+from agent.rsi.engine.live_model_gateway import ModelGateway
+from agent.rsi.engine.model_gateway import GatewayPolicy
+from agent.rsi.engine.model_policy import read_model_configuration
+from agent.rsi.engine.runtime import run_task
+from agent.rsi.engine.sandbox import SandboxKimi
+from agent.rsi.engine.storage import atomic_json, sha256_file
+from agent.rsi.engine.versions import VersionStore
 
 SYSTEM = "You are VenusFactory's scientific execution agent. Use only the declared reproduction MCP tools. Submit the requested pinned computational workflow within its stated budget and report actual job evidence. Queued is not completed. Controller-verified computational outputs do not establish experimental binding, PET degradation or full-paper replication. Never invent outputs or metrics. Do not ask for human intervention."
 
@@ -90,13 +90,13 @@ async def main(args):
     source.mkdir()
     # The existing runtime entry whitelist is retained; the immutable manifest
     # records this explicit entry-name adapter, not a generated-model operation.
-    shutil.copy2(ROOT / "src/agent/rsi/case_job_tools.py", source / "generated_tools.py")
+    shutil.copy2(ROOT / "src/agent/rsi/campaigns/case_job_tools.py", source / "generated_tools.py")
     atomic_json(
         source / "adapter.json",
         {
-            "source": "src/agent/rsi/case_job_tools.py",
+            "source": "src/agent/rsi/campaigns/case_job_tools.py",
             "entry_alias": "generated_tools.py",
-            "sha256": sha256_file(ROOT / "src/agent/rsi/case_job_tools.py"),
+            "sha256": sha256_file(ROOT / "src/agent/rsi/campaigns/case_job_tools.py"),
         },
     )
     versions = VersionStore(args.output / "bundles")
@@ -117,13 +117,13 @@ async def main(args):
         "implementation_sha256": {
             name: sha256_file(ROOT / name)
             for name in [
-                "src/agent/rsi/case_jobs.py",
-                "src/agent/rsi/case_job_tools.py",
-                "src/agent/rsi/case_plugins.py",
+                "src/agent/rsi/campaigns/case_jobs.py",
+                "src/agent/rsi/campaigns/case_job_tools.py",
+                "src/agent/rsi/campaigns/case_plugins.py",
                 "scripts/rsi/run_agent_reproduction.py",
                 "scripts/rsi/run_verified_case_review.py",
-                "src/agent/rsi/case_review_tools.py",
-                "src/agent/rsi/case_evidence.py",
+                "src/agent/rsi/engine/case_review_tools.py",
+                "src/agent/rsi/engine/case_evidence.py",
             ]
         },
     }

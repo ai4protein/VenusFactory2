@@ -6,6 +6,12 @@ and independently replay before any future scoring. Failures are never replaced.
 
 from __future__ import annotations
 
+import sys as _entry_sys
+from pathlib import Path as _EntryPath
+_entry_root = _EntryPath(__file__).resolve().parents[2]
+_entry_sys.path.insert(0, str(_entry_root))
+
+
 import argparse
 import asyncio
 import fcntl
@@ -16,17 +22,17 @@ import time
 from pathlib import Path
 from types import SimpleNamespace
 
-import audit_reap_improver_comparison as independent
+from scripts.rsi.cases import audit_reap_improver_comparison as independent
 import run_improver_revision as revision
-import run_reap_goal_comparison as goals
-import run_reap_improver_comparison as comparison
-from audit_reap_science_goal import audit as audit_goal
+from scripts.rsi.cases import run_reap_goal_comparison as goals
+from scripts.rsi.cases import run_reap_improver_comparison as comparison
+from scripts.rsi.cases.audit_reap_science_goal import audit as audit_goal
 from run_harness_probe import ROOT
 
 from agent.harness.contracts import digest, file_hash
 from agent.harness.host import write_json as _write_json
-from agent.rsi.improver_replicates import freeze_batch_barrier, interleaved_schedule
-from agent.rsi.source_snapshot import research_implementation_paths
+from agent.rsi.engine.improver_replicates import freeze_batch_barrier, interleaved_schedule
+from agent.rsi.engine.source_snapshot import research_implementation_paths
 
 read = revision.read
 
@@ -175,7 +181,7 @@ async def run(root, credential_toml):
                     proc = await asyncio.create_subprocess_exec(
                         sys.executable,
                         "-u",
-                        str(ROOT / "scripts/rsi/run_reap_improver_comparison.py"),
+                        str(ROOT / "scripts/rsi/cases/run_reap_improver_comparison.py"),
                         "worker",
                         "--output",
                         str(folder),

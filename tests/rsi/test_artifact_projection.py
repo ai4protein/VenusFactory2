@@ -1,6 +1,6 @@
 import pytest
 
-from agent.rsi.artifact_projection import project, successful_results
+from agent.rsi.engine.artifact_projection import project, successful_results
 
 
 def ref(call_id, path=None):

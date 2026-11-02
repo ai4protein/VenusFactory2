@@ -10,8 +10,8 @@ from test_paper_campaign import modules as campaign_modules
 from agent.harness import Budget, ModelBinding, Profile
 from agent.harness.contracts import file_hash
 from agent.harness.host import write_json
-from agent.rsi.paper_campaign import admitted_campaign, paper_case
-from agent.rsi.paper_capability_library import PaperCapabilityLibrary
+from agent.rsi.campaigns.paper_campaign import admitted_campaign, paper_case
+from agent.rsi.engine.paper_capability_library import PaperCapabilityLibrary
 from agent.science_goal import run_goal
 from backend.web_v2.science_goals import public_reproduction_recipes
 

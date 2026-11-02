@@ -5,7 +5,7 @@ import pytest
 
 
 def module():
-    path = Path(__file__).resolve().parents[2] / "scripts/rsi/run_alde_author_reproduction.py"
+    path = Path(__file__).resolve().parents[2] / "scripts/rsi/cases/run_alde_author_reproduction.py"
     spec = importlib.util.spec_from_file_location("alde_reproduction", path)
     result = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(result)
@@ -26,7 +26,7 @@ def test_trajectory_audit_preserves_but_reports_source_duplicates():
 def test_independent_curve_uses_all_observed_queries_and_rejects_bad_indices():
     import numpy as np
 
-    path = Path(__file__).resolve().parents[2] / "scripts/rsi/audit_alde_reproduction.py"
+    path = Path(__file__).resolve().parents[2] / "scripts/rsi/cases/audit_alde_reproduction.py"
     spec = importlib.util.spec_from_file_location("alde_audit", path)
     audit = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(audit)

@@ -13,8 +13,8 @@ from agent.harness.contracts import digest, file_hash
 from agent.rsi import model_tasks
 from agent.rsi import scientist_model_campaign as campaign
 from agent.rsi import training_attempt_memory as memory
-from agent.rsi.scientist_model_library import ScientistModelLibrary as RealLibrary
-from agent.rsi.storage import atomic_json
+from agent.rsi.engine.scientist_model_library import ScientistModelLibrary as RealLibrary
+from agent.rsi.engine.storage import atomic_json
 from agent.science_goal import GoalSpec, GoalStore
 
 
@@ -437,7 +437,7 @@ async def test_cli_missing_credential_leaves_allocation_and_budget_untouched(set
 async def test_paid_model_is_rejected_before_credentials_or_budget(setup, monkeypatch, action):
     from types import SimpleNamespace
 
-    from agent.rsi.model_access import ModelAccessDenied
+    from agent.rsi.engine.model_access import ModelAccessDenied
 
     create, base, *_ = setup
     base["profile"]["model"]["model"] = "glm-5.2"

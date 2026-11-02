@@ -17,11 +17,11 @@ from agent.harness import Profile
 from agent.harness.contracts import file_hash
 from agent.harness.registry import builtin_registry
 from agent.rsi import training_attempt_memory
-from agent.rsi.library_experience import select_for_campaign
-from agent.rsi.lineage_promotion import new_evolution
-from agent.rsi.model_access import authorize_profile
-from agent.rsi.model_coverage import PROGRAM_ENTRIES, SCIENTIFIC_SCOPES, counting_policy
-from agent.rsi.scientist_model_campaign import (
+from agent.rsi.engine.library_experience import select_for_campaign
+from agent.rsi.engine.lineage_promotion import new_evolution
+from agent.rsi.engine.model_access import authorize_profile
+from agent.rsi.engine.model_coverage import PROGRAM_ENTRIES, SCIENTIFIC_SCOPES, counting_policy
+from agent.rsi.campaigns.scientist_model_campaign import (
     ALL_ALLOCATIONS,
     COVERAGE_TARGET,
     ModelCampaignStore,
@@ -30,8 +30,8 @@ from agent.rsi.scientist_model_campaign import (
     process_live,
     run_campaign,
 )
-from agent.rsi.source_snapshot import research_implementation_paths
-from agent.rsi.storage import atomic_json
+from agent.rsi.engine.source_snapshot import research_implementation_paths
+from agent.rsi.engine.storage import atomic_json
 from agent.science_goal import GoalStore, run_goal
 
 
@@ -136,8 +136,8 @@ async def execute_allocation(allocation, root, credential_toml=None):
 
     options = {}
     if allocation["generations"] > 1:
-        from agent.rsi.generation_publication import publisher
-        from agent.rsi.scientist_model_library import ScientistModelLibrary
+        from agent.rsi.engine.generation_publication import publisher
+        from agent.rsi.engine.scientist_model_library import ScientistModelLibrary
 
         library = ScientistModelLibrary(campaign.read()["definition"]["library_root"])
         options["on_checkpoint"] = publisher(

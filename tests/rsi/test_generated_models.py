@@ -2,12 +2,12 @@ import json
 
 import pytest
 
-from agent.rsi.code_sandbox import CodeExecutionError, guard_source, run_code
-from agent.rsi.generated_model import evaluate, fit_candidate, predict
-from agent.rsi.model_lifecycle import ModelLifecycle
-from agent.rsi.model_plugins import get_model_plugin
-from agent.rsi.protein_model import digest
-from agent.rsi.storage import atomic_json
+from agent.rsi.engine.code_sandbox import CodeExecutionError, guard_source, run_code
+from agent.rsi.engine.generated_model import evaluate, fit_candidate, predict
+from agent.rsi.engine.model_lifecycle import ModelLifecycle
+from agent.rsi.engine.model_plugins import get_model_plugin
+from agent.rsi.engine.protein_model import digest
+from agent.rsi.engine.storage import atomic_json
 
 CODE = """import numpy as np
 AA='ACDEFGHIKLMNPQRSTVWY'

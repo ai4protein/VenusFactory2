@@ -13,7 +13,7 @@ from .host import write_json
 
 
 def task_message(task):
-    from agent.rsi.runtime import build_task_message
+    from agent.rsi.engine.runtime import build_task_message
 
     return build_task_message(task.instructions, task.prompt, interaction="chat" if task.phase == "chat" else "bounded")
 
@@ -23,9 +23,9 @@ class KimiAdapter:
         self.runtimes = runtimes
 
     async def run(self, ctx):
-        from agent.rsi.model_policy import read_model_configuration
-        from agent.rsi.runtime import run_task
-        from agent.rsi.sandbox import SandboxKimi
+        from agent.rsi.engine.model_policy import read_model_configuration
+        from agent.rsi.engine.runtime import run_task
+        from agent.rsi.engine.sandbox import SandboxKimi
 
         p, t = ctx.profile, ctx.task
         if t.mcp_entry not in {"pilot_tools.py", "protein_tools.py", "generated_tools.py", "web_tools.py"}:
@@ -108,7 +108,7 @@ class ScientistAdapter:
         self.runtimes = runtimes
 
     async def run(self, ctx):
-        from agent.rsi.scientist_runtime import run_scientist
+        from agent.rsi.engine.scientist_runtime import run_scientist
 
         p, t = ctx.profile, ctx.task
         if t.mcp_entry != "generated_tools.py" or t.phase not in {"develop", "reuse", "chat"}:
@@ -142,7 +142,7 @@ class LangGraphAdapter:
     async def run(self, ctx):
         if ctx.profile.mode == "science_expert":
             return await ScientistAdapter(self.runtimes).run(ctx)
-        from agent.rsi.adaptive_runtime import run_adaptive
+        from agent.rsi.engine.adaptive_runtime import run_adaptive
 
         p, t = ctx.profile, ctx.task
         if t.mcp_entry != "generated_tools.py":

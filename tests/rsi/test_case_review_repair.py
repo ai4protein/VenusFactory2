@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 from fastmcp import Client
 
-from agent.rsi.langgraph_tools import build_tools
+from agent.rsi.engine.langgraph_tools import build_tools
 
 ROOT = Path(__file__).resolve().parents[2]
 FACTS = {"job_status": "completed", "full_paper_reproduced": False, "wet_lab_validation": False}
@@ -19,7 +19,7 @@ def setup(tmp_path):
     cap, work = tmp_path / "cap", tmp_path / "work"
     cap.mkdir()
     work.mkdir()
-    shutil.copy2(ROOT / "src/agent/rsi/case_review_tools.py", cap / "generated_tools.py")
+    shutil.copy2(ROOT / "src/agent/rsi/engine/case_review_tools.py", cap / "generated_tools.py")
     (cap / "evidence.json").write_text(json.dumps({"job_id": "test", "facts": FACTS}))
     config = {
         "mcpServers": {

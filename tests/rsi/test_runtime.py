@@ -4,7 +4,7 @@ import json
 import pytest
 
 from agent.kimi_client import KimiEvent
-from agent.rsi.runtime import run_task, safe_approval
+from agent.rsi.engine.runtime import run_task, safe_approval
 
 
 class FakeClient:
@@ -251,7 +251,7 @@ async def test_pending_question_keeps_conversation_distinct_from_autonomous_epis
 
 
 def test_shared_prompt_retains_original_bounded_policy():
-    from agent.rsi.runtime import build_task_message
+    from agent.rsi.engine.runtime import build_task_message
 
     assert build_task_message("p", "q") == (
         "Research task instructions (execute in this turn):\np"

@@ -77,7 +77,7 @@ def test_metrics_preserve_minority_class_and_boolean_labels():
 
 
 def test_plugin_pins_full_cpu_allocation_and_isolated_environment(tmp_path):
-    from agent.rsi.case_plugins import invocation, list_case_plugins, resource_for
+    from agent.rsi.campaigns.case_plugins import invocation, list_case_plugins, resource_for
 
     def call(params):
         return invocation(
@@ -90,7 +90,7 @@ def test_plugin_pins_full_cpu_allocation_and_isolated_environment(tmp_path):
 
     argv = call({})
     assert argv[0].endswith("research_runs/rsi/envs/htfunclib/bin/python")
-    assert argv[2].endswith("scripts/rsi/run_htfunclib_case.py")
+    assert argv[2].endswith("scripts/rsi/cases/run_htfunclib_case.py")
     assert resource_for(case.CASE_ID, {}) == "cpu"
     catalog = next(x for x in list_case_plugins() if x["id"] == case.CASE_ID)
     assert catalog["parameters"]["additionalProperties"] is False
@@ -101,7 +101,7 @@ def test_plugin_pins_full_cpu_allocation_and_isolated_environment(tmp_path):
 
 @pytest.mark.parametrize("status", ["running", "admitted", "failed"])
 def test_incomplete_training_never_supports_claims(status):
-    from agent.rsi.case_evidence import canonical_claims
+    from agent.rsi.engine.case_evidence import canonical_claims
 
     with pytest.raises(ValueError, match="completed domain"):
         canonical_claims(case.CASE_ID, {"status": status})

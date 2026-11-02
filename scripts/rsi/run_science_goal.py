@@ -22,10 +22,10 @@ from agent.harness.host import execute, write_json
 from agent.rsi import context_feedback_dispatch as context_feedback
 from agent.rsi import library_experience, model_tasks
 from agent.rsi import training_attempt_memory as attempt_memory
-from agent.rsi.library_source import REFIT_TOOL
-from agent.rsi.model_lifecycle import ModelLifecycle
-from agent.rsi.model_plugins import get_model_plugin
-from agent.rsi.provider_access import access_wait
+from agent.rsi.datasets.library_source import REFIT_TOOL
+from agent.rsi.engine.model_lifecycle import ModelLifecycle
+from agent.rsi.engine.model_plugins import get_model_plugin
+from agent.rsi.engine.provider_access import access_wait
 from agent.science_goal import GoalSpec, GoalStore, run_goal
 
 
@@ -274,7 +274,7 @@ def prepare(args):
     )
     transfer = None
     if getattr(args, "experience_selection", None) is not None:
-        from agent.rsi.scientist_model_library import ScientistModelLibrary
+        from agent.rsi.engine.scientist_model_library import ScientistModelLibrary
 
         if task_definition is None:
             raise ValueError("Library transfer requires an admitted model task")
@@ -318,7 +318,7 @@ def prepare(args):
         ROOT / "scripts/rsi/run_generated_lifecycle.py",
         ROOT / "scripts/rsi/run_paired_generated.py",
         *sorted((ROOT / "src/agent/harness").glob("*.py")),
-        *sorted((ROOT / "src/agent/rsi").glob("*.py")),
+        *sorted((ROOT / "src/agent/rsi").rglob("*.py")),
         *sorted((ROOT / "src/agent/graph").rglob("*.py")),
     ]
     hashes = {str(p.relative_to(ROOT)): file_hash(p) for p in paths}
@@ -365,7 +365,7 @@ def prepare(args):
 
 
 async def main(args):
-    from agent.rsi.scientist_model_library import ScientistModelLibrary
+    from agent.rsi.engine.scientist_model_library import ScientistModelLibrary
 
     library_root = getattr(args, "model_library", None)
     publication_library = ScientistModelLibrary(library_root) if library_root is not None else None

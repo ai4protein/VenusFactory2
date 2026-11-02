@@ -8,9 +8,9 @@ import pytest
 from test_research_project_catalog import manifest as manifest
 from test_research_project_catalog import save, task_of
 
-from agent.rsi.model_coverage import resolve_scope, summarize_scopes
-from agent.rsi.research_batches import export_batch, project_batch
-from agent.rsi.research_project_catalog import build_catalog
+from agent.rsi.engine.model_coverage import resolve_scope, summarize_scopes
+from agent.rsi.datasets.research_batches import export_batch, project_batch
+from agent.rsi.datasets.research_project_catalog import build_catalog
 
 
 def parent(manifest, tmp_path):

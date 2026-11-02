@@ -15,9 +15,9 @@ from pathlib import Path
 from typing import Any, Optional
 
 from mcp_tools.common.common_utils import get_project_root, to_project_relative_path
-from agent.rsi.context import get_resources
+from agent.rsi.engine.context import get_resources
 from mcp_tools.models.identity import trained_metadata
-from agent.rsi.storage import atomic_json, file_lock
+from agent.rsi.engine.storage import atomic_json, file_lock
 
 _REGISTRY_ROOT_NAME = "user_trained"
 _INDEX_NAME = "registry.json"

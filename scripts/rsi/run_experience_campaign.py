@@ -18,14 +18,14 @@ from run_generated_lifecycle import SYSTEM, policy_for, spec
 from run_paired_generated import CLIENT_READ_TIMEOUT_S, REQUEST_TOTAL_DEADLINE_S, make_bundle, run_phase
 from run_protein_lifecycle import ROOT
 
-from agent.rsi.experience import ModelExperienceStore
-from agent.rsi.landscape_cases import prepare_landscape
-from agent.rsi.model_lifecycle import ModelLifecycle
-from agent.rsi.model_plugins import get_model_plugin
-from agent.rsi.model_policy import read_model_configuration
-from agent.rsi.protein_model import digest, evaluate, fit_candidate
-from agent.rsi.runtime import build_task_message
-from agent.rsi.storage import atomic_json, sha256_file
+from agent.rsi.engine.experience import ModelExperienceStore
+from agent.rsi.engine.landscape_cases import prepare_landscape
+from agent.rsi.engine.model_lifecycle import ModelLifecycle
+from agent.rsi.engine.model_plugins import get_model_plugin
+from agent.rsi.engine.model_policy import read_model_configuration
+from agent.rsi.engine.protein_model import digest, evaluate, fit_candidate
+from agent.rsi.engine.runtime import build_task_message
+from agent.rsi.engine.storage import atomic_json, sha256_file
 
 CONDITIONS = ["none", "summary", "source"]
 MODES = ["science_agent", "science_expert"]
@@ -184,7 +184,7 @@ async def main(args):
         ROOT / "scripts/rsi/run_paired_generated.py",
         ROOT / "scripts/rsi/run_generated_lifecycle.py",
         ROOT / "scripts/rsi/run_protein_lifecycle.py",
-        *sorted((ROOT / "src/agent/rsi").glob("*.py")),
+        *sorted((ROOT / "src/agent/rsi").rglob("*.py")),
         *sorted((ROOT / "src/agent/graph").rglob("*.py")),
     ]
     hashes = {}

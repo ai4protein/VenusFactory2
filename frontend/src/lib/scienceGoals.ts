@@ -1,3 +1,8 @@
+export interface ResearchDelivery {
+  candidate_id: string; family_id?: string; kind?: "model" | "method"; name?: string; version?: string;
+  model_package: string; package?: string; test_report: string; model_card: string; readme?: string;
+}
+
 import { shareRead } from "./readRequests";
 import { validateUploads } from "./uploadLimits";
 import { quotaError, QUOTA_CHANGED } from "./onlineQuota";
@@ -52,7 +57,8 @@ export type ScienceGoal = {
   parameters?: Record<string, string>;
   research?: {
     development?: ResearchDevelopment;
-    deliveries?: Array<{ candidate_id: string; model_package: string; test_report: string; model_card: string }>;
+    deliveries?: ResearchDelivery[];
+    selected_deliveries?: ResearchDelivery[];
     pending_interaction?: import("./interactions").UserInteraction | null;
     research_completed?: boolean;
     publication_reviews?: { id: string; name: string; status: string; summary: string; issues: string[] }[]; pending_updates?: number; inputs?: ResearchAttachment[]; live?: { phase?: { role: string; episode: number; updated_at: number }; checkpoint?: { summary: string; completed_steps: string[]; artifacts?: Array<{ path: string; sha256: string }> }; stages?: Array<{ role: string; episode: number; status: string; started_at: number; ended_at?: number }>; timeline?: Array<{ role: string; episode: number; tool: string; status: string; timestamp: number }>; tool?: { tool: string; status: string; progress?: { stdout_tail?: string; progress?: { step: number; total: number; metrics: Record<string, unknown> } } }; execution?: { queue?: { id:string; resource:string; status:string; position:number }; script: string; elapsed_seconds: number; stdout_tail: string; stderr_tail: string; progress?: { step: number; total: number; metrics: Record<string, unknown> } }; files?: Array<{ path: string; bytes: number }> }; plan?: { summary: string; steps: Array<{ id: string; title: string; acceptance: string; status: string }> }; questions?: string[]; artifacts?: Array<{ path: string; sha256: string }>; capabilities?: Array<{ id: string; name: string }>; last_review?: { summary: string } } | null;

@@ -113,14 +113,14 @@ async def main(args):
         ROOT / ("src/agent/" + n)
         for n in [
             "kimi_client.py",
-            "rsi/runtime.py",
-            "rsi/sandbox.py",
-            "rsi/scientist_runtime.py",
-            "rsi/adaptive_runtime.py",
-            "rsi/langgraph_tools.py",
-            "rsi/model_gateway.py",
-            "rsi/model_policy.py",
-        "rsi/tool_contracts.py",
+            "rsi/engine/runtime.py",
+            "rsi/engine/sandbox.py",
+            "rsi/engine/scientist_runtime.py",
+            "rsi/engine/adaptive_runtime.py",
+            "rsi/engine/langgraph_tools.py",
+            "rsi/engine/model_gateway.py",
+            "rsi/engine/model_policy.py",
+        "rsi/engine/tool_contracts.py",
         ]
     ]
     hashes = {str(p.relative_to(ROOT)): file_hash(p) for p in sources}

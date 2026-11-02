@@ -5,7 +5,7 @@ import pytest
 
 from agent.rsi import poisk_source as source
 from agent.rsi import poisk_training as training
-from agent.rsi.storage import atomic_json, sha256_file
+from agent.rsi.engine.storage import atomic_json, sha256_file
 
 
 @pytest.mark.parametrize(

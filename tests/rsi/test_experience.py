@@ -3,12 +3,12 @@ import json
 import pytest
 from test_generated_models import CODE, SCOPE, TRAIN, VALID
 
-from agent.rsi.experience import LIMITATION, ModelExperienceStore, validate_projection
-from agent.rsi.generated_model import fit_candidate
-from agent.rsi.model_lifecycle import ModelLifecycle
-from agent.rsi.model_plugins import get_model_plugin
-from agent.rsi.protein_model import digest
-from agent.rsi.storage import atomic_json
+from agent.rsi.engine.experience import LIMITATION, ModelExperienceStore, validate_projection
+from agent.rsi.engine.generated_model import fit_candidate
+from agent.rsi.engine.model_lifecycle import ModelLifecycle
+from agent.rsi.engine.model_plugins import get_model_plugin
+from agent.rsi.engine.protein_model import digest
+from agent.rsi.engine.storage import atomic_json
 
 
 @pytest.fixture

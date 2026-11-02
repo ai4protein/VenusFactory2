@@ -22,9 +22,9 @@ from run_protein_lifecycle import audit_events, prepare_case
 from agent.harness import Profile, Task, builtin_registry
 from agent.harness.contracts import digest, file_hash
 from agent.harness.host import execute, write_json
-from agent.rsi.experience import LIMITATION
-from agent.rsi.model_lifecycle import ModelLifecycle
-from agent.rsi.model_plugins import get_model_plugin
+from agent.rsi.engine.experience import LIMITATION
+from agent.rsi.engine.model_lifecycle import ModelLifecycle
+from agent.rsi.engine.model_plugins import get_model_plugin
 
 
 async def phase(folder, profile, phase_name, inputs, capability, prompt, *, cold_start=False):
@@ -81,7 +81,7 @@ async def main(args):
         ROOT / "scripts/rsi/run_protein_lifecycle.py",
         ROOT / "scripts/rsi/run_paired_generated.py",
         *sorted((ROOT / "src/agent/harness").glob("*.py")),
-        *sorted((ROOT / "src/agent/rsi").glob("*.py")),
+        *sorted((ROOT / "src/agent/rsi").rglob("*.py")),
         *sorted((ROOT / "src/agent/graph").rglob("*.py")),
     ]
     hashes = {str(p.relative_to(ROOT)): file_hash(p) for p in paths}

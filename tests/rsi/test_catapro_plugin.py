@@ -10,13 +10,13 @@ import numpy as np
 import pytest
 
 from agent.rsi import catapro_evidence as evidence
-from agent.rsi.case_evidence import canonical_claims
-from agent.rsi.case_plugins import invocation, list_case_plugins, resource_for
-from agent.rsi.catapro_case import file_sha
-from agent.rsi.reproduction_goal_contract import allocation
+from agent.rsi.engine.case_evidence import canonical_claims
+from agent.rsi.campaigns.case_plugins import invocation, list_case_plugins, resource_for
+from agent.rsi.cases.catapro_case import file_sha
+from agent.rsi.engine.reproduction_goal_contract import allocation
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rsi"))
-from run_catapro_case import gpu_lease
+from scripts.rsi.cases.run_catapro_case import gpu_lease
 
 
 def call(root, parameters):

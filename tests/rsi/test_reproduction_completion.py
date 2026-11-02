@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from agent.rsi.reproduction_tool_contracts import validate_reproduction_result
-from agent.rsi.scientific_episode import completion_feedback, episode_contract, successful_tools
+from agent.rsi.engine.reproduction_tool_contracts import validate_reproduction_result
+from agent.rsi.engine.scientific_episode import completion_feedback, episode_contract, successful_tools
 
 
 def write(root, name, value):
@@ -143,7 +143,7 @@ async def test_registered_lookup_is_verified_as_data_not_fabricated_file(tmp_pat
 
 
 def test_review_contract_preserves_negative_feedback_but_rejects_false_acceptance(tmp_path):
-    from agent.rsi.case_evidence import validate_review
+    from agent.rsi.engine.case_evidence import validate_review
 
     facts = {"full_paper_reproduced": False, "replicas": 8}
     evidence = {"job_id": "fixture", "plugin": "phl7.hrex_validation.v1", "report_sha256": "pinned", "facts": facts}

@@ -9,9 +9,9 @@ from test_scientist_model_library import numerical as current_numerical  # noqa:
 from agent.harness.contracts import digest, file_hash
 from agent.rsi import model_runtime_migration as migration
 from agent.rsi import scientist_model_library as library
-from agent.rsi.model_lifecycle import ModelLifecycle
-from agent.rsi.storage import atomic_json
-from agent.rsi.versions import VersionStore
+from agent.rsi.engine.model_lifecycle import ModelLifecycle
+from agent.rsi.engine.storage import atomic_json
+from agent.rsi.engine.versions import VersionStore
 
 
 @pytest.fixture

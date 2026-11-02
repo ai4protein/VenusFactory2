@@ -10,6 +10,7 @@ import importlib
 from pathlib import Path
 
 from .contracts import file_hash
+from agent.rsi.layout import source_relative
 
 PINNED_SOURCES = {
     "__init__.py": "6672043a6f8d56a39853beaadb260264e368a43a706122b72c55f9f80a01cd33",
@@ -55,7 +56,7 @@ def historical_auditor(lock):
         expected = PINNED_SOURCES[name]
         if lock.get("supporting_source", {}).get(name) != expected:
             raise ValueError("Unrecognized historical supporting source")
-        if file_hash(Path(__file__).parent.parent / name) != expected:
+        if file_hash(Path(__file__).resolve().parents[3] / source_relative(Path(name).name)) != expected:
             raise ValueError("Historical import support changed")
     root = Path(__file__).parent / "_legacy_native_v2"
     if root.is_symlink() or not root.is_dir():

@@ -53,9 +53,9 @@ def test_invalid_probabilities_or_constant_outputs_fail_host_assessment(monkeypa
 
 @pytest.mark.asyncio
 async def test_native_episode_contract_and_training_rows_are_admitted(tmp_path):
-    from agent.rsi.generated_classifier import validate_rows
-    from agent.rsi.scientific_episode import episode_contract
-    from agent.rsi.tool_contracts import validate_generated_result
+    from agent.rsi.engine.generated_classifier import validate_rows
+    from agent.rsi.engine.scientific_episode import episode_contract
+    from agent.rsi.engine.tool_contracts import validate_generated_result
 
     task = probe.prepare_task(tmp_path / "fixture")
     rows, scope = probe.synthetic_case()

@@ -5,7 +5,7 @@ import pytest
 from test_context_v2 import make_task, save
 
 from agent.rsi import shared_context_evaluation as evaluation
-from agent.rsi.protein_model import digest
+from agent.rsi.engine.protein_model import digest
 
 
 def prediction_rows(rows):

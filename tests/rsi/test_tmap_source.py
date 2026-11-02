@@ -9,8 +9,8 @@ import pytest
 
 from agent.rsi import tmap_source as source
 from agent.rsi import tmap_tasks as tasks
-from agent.rsi.model_tasks import load_task
-from agent.rsi.storage import sha256_file
+from agent.rsi.datasets.model_tasks import load_task
+from agent.rsi.engine.storage import sha256_file
 
 
 def binding(path):

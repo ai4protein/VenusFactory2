@@ -15,9 +15,9 @@ from run_protein_lifecycle import audit_events
 from agent.harness import Profile, Task
 from agent.harness.contracts import digest, file_hash
 from agent.harness.host import execute, write_json
-from agent.rsi.case_evidence import render_evidence_report, validate_review
-from agent.rsi.reproduction_recovery import RESOURCES, RecoveryLedger, equal, load_source, phase_evidence, read
-from agent.rsi.source_snapshot import research_implementation_paths
+from agent.rsi.engine.case_evidence import render_evidence_report, validate_review
+from agent.rsi.engine.reproduction_recovery import RESOURCES, RecoveryLedger, equal, load_source, phase_evidence, read
+from agent.rsi.engine.source_snapshot import research_implementation_paths
 
 
 async def main(args, *, credential=None, continuation=None, ceiling=None, goal_context=""):
@@ -84,12 +84,12 @@ async def main(args, *, credential=None, continuation=None, ceiling=None, goal_c
     versions, version, cap = bundle(
         output / "review_capability",
         [
-            ("src/agent/rsi/case_review_tools.py", "generated_tools.py"),
-            ("src/agent/rsi/case_evidence.py", "agent/rsi/case_evidence.py"),
-            ("src/agent/rsi/protein_model.py", "agent/rsi/protein_model.py"),
-            ("src/agent/rsi/mcba_evidence.py", "agent/rsi/mcba_evidence.py"),
-            ("src/agent/rsi/rfantibody_evidence.py", "agent/rsi/rfantibody_evidence.py"),
-            ("src/agent/rsi/storage.py", "agent/rsi/storage.py"),
+            ("src/agent/rsi/engine/case_review_tools.py", "generated_tools.py"),
+            ("src/agent/rsi/engine/case_evidence.py", "agent/rsi/engine/case_evidence.py"),
+            ("src/agent/rsi/engine/protein_model.py", "agent/rsi/engine/protein_model.py"),
+            ("src/agent/rsi/cases/mcba_evidence.py", "agent/rsi/cases/mcba_evidence.py"),
+            ("src/agent/rsi/cases/rfantibody_evidence.py", "agent/rsi/cases/rfantibody_evidence.py"),
+            ("src/agent/rsi/engine/storage.py", "agent/rsi/engine/storage.py"),
         ],
         {"plugin": source["job"]["plugin_id"], "source_report_sha256": source_sha},
         {

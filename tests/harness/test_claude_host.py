@@ -11,7 +11,7 @@ from agent.harness import Budget, ModelBinding, Profile, Task
 from agent.harness import claude_adapter as adapter
 from agent.harness.host import RuntimeContext
 from agent.harness.messages_bridge import MessagesBridge
-from agent.rsi.model_gateway import GatewayPolicy
+from agent.rsi.engine.model_gateway import GatewayPolicy
 
 
 def response():

@@ -12,14 +12,14 @@ from test_generated_context import CODE, ROWS, SCOPE
 from agent.harness import Profile
 from agent.rsi import generated_context as api
 from agent.rsi import model_tasks
-from agent.rsi.experience import ModelExperienceStore
-from agent.rsi.library_experience import IneligibleDonor, snapshot
-from agent.rsi.model_lifecycle import ModelLifecycle
-from agent.rsi.protein_model import digest
-from agent.rsi.research_project_catalog import SCHEMA, build_catalog
-from agent.rsi.scientist_model_library import _model
-from agent.rsi.storage import atomic_json, sha256_file
-from agent.rsi.tool_contracts import validate_generated_result
+from agent.rsi.engine.experience import ModelExperienceStore
+from agent.rsi.engine.library_experience import IneligibleDonor, snapshot
+from agent.rsi.engine.model_lifecycle import ModelLifecycle
+from agent.rsi.engine.protein_model import digest
+from agent.rsi.datasets.research_project_catalog import SCHEMA, build_catalog
+from agent.rsi.engine.scientist_model_library import _model
+from agent.rsi.engine.storage import atomic_json, sha256_file
+from agent.rsi.engine.tool_contracts import validate_generated_result
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts/rsi"))

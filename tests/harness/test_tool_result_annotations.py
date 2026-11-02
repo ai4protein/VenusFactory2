@@ -82,7 +82,7 @@ def test_partial_annotation_metadata_is_rejected(tmp_path, field):
 @pytest.mark.asyncio
 async def test_kimi_runtime_writes_canonical_result_and_original_notice(tmp_path):
     from agent.kimi_client import KimiEvent
-    from agent.rsi.runtime import run_task
+    from agent.rsi.engine.runtime import run_task
 
     payload = '{"models": ["fixture_model"]}'
     raw = payload + KIMI_REPEAT_NOTICE

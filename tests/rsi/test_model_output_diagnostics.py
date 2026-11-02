@@ -4,7 +4,7 @@ import json
 import time
 from types import SimpleNamespace
 
-from agent.rsi.scientist_runtime import ModelAudit
+from agent.rsi.engine.scientist_runtime import ModelAudit
 
 
 def test_output_shape_reports_truncation_and_invalid_arguments_without_content(tmp_path):

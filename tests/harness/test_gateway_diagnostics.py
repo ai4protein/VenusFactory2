@@ -6,7 +6,7 @@ import httpx
 import pytest
 
 from agent.harness.gateway import EvidenceGateway
-from agent.rsi.model_gateway import GatewayPolicy, ModelGateway, classify_upstream_error
+from agent.rsi.engine.model_gateway import GatewayPolicy, ModelGateway, classify_upstream_error
 
 
 def test_untrusted_error_fields_never_enter_logs():

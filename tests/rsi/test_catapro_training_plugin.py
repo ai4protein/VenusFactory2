@@ -11,11 +11,11 @@ from pathlib import Path
 import pytest
 
 from agent.rsi import catapro_training_evidence as evidence
-from agent.rsi.case_evidence import canonical_claims, render_evidence_report
-from agent.rsi.case_plugins import invocation, resource_for
-from agent.rsi.catapro_case import file_sha
-from agent.rsi.catapro_training import PARAMETERS, STAGES, gpu_lease, stop_training_process
-from agent.rsi.reproduction_goal_contract import allocation
+from agent.rsi.engine.case_evidence import canonical_claims, render_evidence_report
+from agent.rsi.campaigns.case_plugins import invocation, resource_for
+from agent.rsi.cases.catapro_case import file_sha
+from agent.rsi.cases.catapro_training import PARAMETERS, STAGES, gpu_lease, stop_training_process
+from agent.rsi.engine.reproduction_goal_contract import allocation
 
 
 def call(root, params):
@@ -273,7 +273,7 @@ def test_training_cancellation_reaps_stubborn_parent_and_descendant(tmp_path):
 
 def test_wrapper_runs_controller_in_its_own_process_for_broker_cleanup(tmp_path, monkeypatch):
     sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rsi"))
-    import run_catapro_training_plugin as plugin
+    from scripts.rsi.cases import run_catapro_training_plugin as plugin
 
     calls = []
 
@@ -313,7 +313,7 @@ def test_broker_cancels_real_training_controller_and_worker_group(tmp_path, monk
         + repr(str(repo / "src"))
         + ")\n"
         + "entry=runpy.run_path("
-        + repr(str(repo / "scripts/rsi/run_catapro_training.py"))
+        + repr(str(repo / "scripts/rsi/cases/run_catapro_training.py"))
         + ")\n"
         + 'run=entry["run"]\nrun.__globals__["__file__"]='
         + repr(str(worker))

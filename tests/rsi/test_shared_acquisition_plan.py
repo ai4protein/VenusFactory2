@@ -8,7 +8,7 @@ import pytest
 import test_research_project_catalog as fixtures
 
 from agent.rsi import shared_acquisition_plan as planner
-from agent.rsi.research_project_catalog import build_catalog
+from agent.rsi.datasets.research_project_catalog import build_catalog
 
 manifest = fixtures.manifest
 

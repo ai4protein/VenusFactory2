@@ -14,14 +14,14 @@ import shutil
 from pathlib import Path
 
 from agent.research_modes import get_research_mode
-from agent.rsi.model_lifecycle import ModelLifecycle
-from agent.rsi.model_plugins import get_model_plugin
-from agent.rsi.model_policy import read_model_configuration
-from agent.rsi.protein_model import PLUGIN_ID, digest, evaluate, fit_candidate, validate_rows
-from agent.rsi.runtime import run_task
-from agent.rsi.sandbox import SandboxKimi
-from agent.rsi.storage import atomic_json, sha256_file
-from agent.rsi.versions import VersionStore
+from agent.rsi.engine.model_lifecycle import ModelLifecycle
+from agent.rsi.engine.model_plugins import get_model_plugin
+from agent.rsi.engine.model_policy import read_model_configuration
+from agent.rsi.engine.protein_model import PLUGIN_ID, digest, evaluate, fit_candidate, validate_rows
+from agent.rsi.engine.runtime import run_task
+from agent.rsi.engine.sandbox import SandboxKimi
+from agent.rsi.engine.storage import atomic_json, sha256_file
+from agent.rsi.engine.versions import VersionStore
 
 ROOT = Path(__file__).resolve().parents[2]
 TOOL_SETS = {
@@ -40,6 +40,8 @@ PROMPTS = {
     "reuse": "This is a fresh protein prediction task. Inspect its scope, discover any compatible validated protein models, and reuse a suitable discovered model to predict every input. Do not train a new model. Use the MCP tool to save predictions.json and report its path and row count.",
 }
 
+
+from agent.rsi.layout import source_relative
 
 def source_asset(cache: Path, repository: str, name: str):
     root = cache / repository
@@ -199,7 +201,7 @@ async def phase_run(root, phase, inputs, scope, config, identity, lifecycle=None
     source = run / "bundle_source"
     source.mkdir()
     for name in spec.get("files", ("protein_tools.py", "protein_model.py")):
-        shutil.copy2(ROOT / "src/agent/rsi" / name, source / name)
+        shutil.copy2(ROOT / source_relative(name), source / name)
     if phase == "reuse":
         packet = lifecycle.export(model_id, source / "registered")
         task["capability_sha256"] = digest(packet)
@@ -304,10 +306,10 @@ async def main(args):
             str(f.relative_to(ROOT)): sha256_file(f)
             for f in [
                 Path(__file__),
-                ROOT / "src/agent/rsi/model_lifecycle.py",
-                ROOT / "src/agent/rsi/runtime.py",
-                ROOT / "src/agent/rsi/sandbox.py",
-                ROOT / "src/agent/rsi/protein_tools.py",
+                ROOT / "src/agent/rsi/engine/model_lifecycle.py",
+                ROOT / "src/agent/rsi/engine/runtime.py",
+                ROOT / "src/agent/rsi/engine/sandbox.py",
+                ROOT / "src/agent/rsi/engine/protein_tools.py",
             ]
         },
     }

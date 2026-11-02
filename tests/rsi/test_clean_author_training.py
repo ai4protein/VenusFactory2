@@ -2,7 +2,7 @@
 import pytest
 import torch
 
-from agent.rsi.clean_author_training import cached_embeddings, verify_trace
+from agent.rsi.cases.clean_author_training import cached_embeddings, verify_trace
 
 
 def test_cache_returns_fresh_tensors_and_preserves_uncached_load(tmp_path):

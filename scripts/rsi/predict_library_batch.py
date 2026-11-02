@@ -7,8 +7,8 @@ import argparse
 import json
 from pathlib import Path
 
-from agent.rsi.scientist_model_library import ScientistModelLibrary
-from agent.rsi.storage import atomic_json
+from agent.rsi.engine.scientist_model_library import ScientistModelLibrary
+from agent.rsi.engine.storage import atomic_json
 
 
 def main():

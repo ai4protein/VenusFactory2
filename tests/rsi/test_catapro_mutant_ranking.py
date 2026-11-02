@@ -3,7 +3,7 @@
 import numpy as np
 import pytest
 
-from agent.rsi.catapro_ranking import ranking_metrics, reaction_groups, summarize_groups
+from agent.rsi.cases.catapro_ranking import ranking_metrics, reaction_groups, summarize_groups
 
 
 def test_perfect_and_reversed_selection():

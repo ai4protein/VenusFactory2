@@ -10,7 +10,7 @@ from test_science_goal import assessment, create, outcome
 from test_shared_model_program import task_pair
 
 from agent.harness import Budget, ModelBinding, Profile
-from agent.rsi.storage import atomic_json
+from agent.rsi.engine.storage import atomic_json
 from agent.science_goal import GoalSpec, run_goal
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rsi"))

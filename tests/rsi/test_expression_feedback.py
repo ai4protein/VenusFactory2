@@ -14,11 +14,11 @@ from test_yeast_population_controls import example
 from agent.rsi import context_feedback as legacy
 from agent.rsi import context_feedback_profiles as feedback
 from agent.rsi import expression_baselines, generated_context
-from agent.rsi.campaign_evaluation import paired_design
-from agent.rsi.protein_model import digest
-from agent.rsi.storage import atomic_json, sha256_file
-from agent.rsi.tool_contracts import validate_generated_result
-from agent.rsi.yeast_population_controls import controls, verify_metrics
+from agent.rsi.engine.campaign_evaluation import paired_design
+from agent.rsi.engine.protein_model import digest
+from agent.rsi.engine.storage import atomic_json, sha256_file
+from agent.rsi.engine.tool_contracts import validate_generated_result
+from agent.rsi.engine.yeast_population_controls import controls, verify_metrics
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rsi"))
 from run_paired_generated import make_bundle

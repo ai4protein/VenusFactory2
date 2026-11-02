@@ -21,10 +21,10 @@ from agent.rsi import generated_context as api
 from agent.rsi import library_experience as transfer
 from agent.rsi import model_tasks
 from agent.rsi import scientist_model_campaign as campaign
-from agent.rsi.library_source import REFIT_TOOL
-from agent.rsi.model_lifecycle import ModelLifecycle
-from agent.rsi.storage import atomic_json
-from agent.rsi.tool_contracts import validate_generated_result
+from agent.rsi.datasets.library_source import REFIT_TOOL
+from agent.rsi.engine.model_lifecycle import ModelLifecycle
+from agent.rsi.engine.storage import atomic_json
+from agent.rsi.engine.tool_contracts import validate_generated_result
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts/rsi"))

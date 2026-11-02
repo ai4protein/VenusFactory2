@@ -6,10 +6,10 @@ from pathlib import Path
 
 import pytest
 
-from agent.rsi.designed_protein_tasks import VERSION, mutation_site, prepare, select_records, site_assignments
-from agent.rsi.model_tasks import load_task
-from agent.rsi.published_sequence_tasks import bound
-from agent.rsi.storage import atomic_json
+from agent.rsi.datasets.designed_protein_tasks import VERSION, mutation_site, prepare, select_records, site_assignments
+from agent.rsi.datasets.model_tasks import load_task
+from agent.rsi.datasets.published_sequence_tasks import bound
+from agent.rsi.engine.storage import atomic_json
 
 
 @pytest.fixture

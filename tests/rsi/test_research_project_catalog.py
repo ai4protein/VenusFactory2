@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from agent.rsi.research_project_catalog import SCHEMA, build_catalog, campaign_plan
-from agent.rsi.storage import atomic_json, sha256_file
-from agent.rsi.traditional_baselines import run_controls
+from agent.rsi.datasets.research_project_catalog import SCHEMA, build_catalog, campaign_plan
+from agent.rsi.engine.storage import atomic_json, sha256_file
+from agent.rsi.engine.traditional_baselines import run_controls
 
 
 def bound(path):

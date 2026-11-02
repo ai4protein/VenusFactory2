@@ -3,7 +3,7 @@ import hashlib
 import numpy as np
 import pytest
 
-from agent.rsi.rfantibody_publication import read_metadata, summarize_quivers, target_aligned_ca_rmsd
+from agent.rsi.cases.rfantibody_publication import read_metadata, summarize_quivers, target_aligned_ca_rmsd
 
 COMMIT = "3e5a5bb1cb98befde9fc049ae3ff58cabb491f67"
 BASE = np.array([[0.0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]])

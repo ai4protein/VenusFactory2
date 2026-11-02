@@ -16,9 +16,9 @@ from agent.harness import Budget, ModelBinding, Profile
 from agent.harness.contracts import digest, file_hash
 from agent.rsi import campaign_evaluation as evaluation
 from agent.rsi import training_attempt_memory as memory
-from agent.rsi.generated_model import fit_candidate
-from agent.rsi.scientist_model_campaign import ALL_ALLOCATIONS, ModelCampaignStore
-from agent.rsi.storage import atomic_json
+from agent.rsi.engine.generated_model import fit_candidate
+from agent.rsi.campaigns.scientist_model_campaign import ALL_ALLOCATIONS, ModelCampaignStore
+from agent.rsi.engine.storage import atomic_json
 
 task = campaign_fixtures.task
 

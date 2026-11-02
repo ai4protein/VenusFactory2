@@ -58,7 +58,7 @@ does not demonstrate cross-protein generalization.
 From the research repository, using its existing `venus` Python environment:
 
 ```sh
-PYTHONPATH=src python scripts/rsi/prepare_mutation_landscape_tasks.py \
+PYTHONPATH=src python scripts/rsi/data_preparation/prepare_mutation_landscape_tasks.py \
   --sources research_runs/rsi/20261023_mutation_landscape_sources_v1 \
   --output research_runs/rsi/NEW_mutation_tasks
 

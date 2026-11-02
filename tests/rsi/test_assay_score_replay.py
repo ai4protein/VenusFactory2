@@ -5,7 +5,7 @@ from test_generated_assay import make_task
 from test_shared_assay_evaluation import predictions
 
 from agent.rsi import assay_score_replay, shared_assay_evaluation
-from agent.rsi.protein_model import digest
+from agent.rsi.engine.protein_model import digest
 
 
 def test_independent_replay_covers_scientist_and_controls(tmp_path):

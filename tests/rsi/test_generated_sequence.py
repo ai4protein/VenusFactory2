@@ -9,13 +9,13 @@ import pytest
 from fastmcp import Client
 
 from agent.rsi import generated_sequence as api
-from agent.rsi.experience import ModelExperienceStore, validate_projection
-from agent.rsi.model_lifecycle import ModelLifecycle
-from agent.rsi.model_plugins import get_model_plugin
-from agent.rsi.model_tasks import inference_inputs
-from agent.rsi.protein_model import digest
-from agent.rsi.storage import atomic_json
-from agent.rsi.tool_contracts import validate_generated_result
+from agent.rsi.engine.experience import ModelExperienceStore, validate_projection
+from agent.rsi.engine.model_lifecycle import ModelLifecycle
+from agent.rsi.engine.model_plugins import get_model_plugin
+from agent.rsi.datasets.model_tasks import inference_inputs
+from agent.rsi.engine.protein_model import digest
+from agent.rsi.engine.storage import atomic_json
+from agent.rsi.engine.tool_contracts import validate_generated_result
 
 ROOT = Path(__file__).resolve().parents[2]
 SCOPE = {

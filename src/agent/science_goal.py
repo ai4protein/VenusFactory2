@@ -17,7 +17,7 @@ from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 from agent.harness.contracts import Profile, digest, file_hash
-from agent.rsi.storage import atomic_json, file_lock
+from agent.rsi.engine.storage import atomic_json, file_lock
 
 
 @dataclass(frozen=True)

@@ -3,9 +3,9 @@ from pathlib import Path
 
 import pytest
 
-from agent.rsi.case_jobs import CaseJobBroker
-from agent.rsi.case_plugins import invocation, list_case_plugins
-from agent.rsi.rfantibody_benchmark import (
+from agent.rsi.campaigns.case_jobs import CaseJobBroker
+from agent.rsi.campaigns.case_plugins import invocation, list_case_plugins
+from agent.rsi.cases.rfantibody_benchmark import (
     CONDITIONS,
     SCALE,
     STAGES,
@@ -13,8 +13,8 @@ from agent.rsi.rfantibody_benchmark import (
     canonical_benchmark,
     verify_author_source,
 )
-from agent.rsi.rfantibody_evidence import COMMIT
-from agent.rsi.storage import atomic_json, sha256_file
+from agent.rsi.cases.rfantibody_evidence import COMMIT
+from agent.rsi.engine.storage import atomic_json, sha256_file
 
 
 def report():
@@ -170,7 +170,7 @@ def test_frozen_repository_resource_alias_does_not_change_stage_recipes(tmp_path
 
 
 def test_complete_benchmark_has_explicit_long_deadline_without_expanding_legacy_jobs():
-    from agent.rsi.case_plugins import antibody_allocation, maximum_case_job_seconds
+    from agent.rsi.campaigns.case_plugins import antibody_allocation, maximum_case_job_seconds
 
     assert maximum_case_job_seconds("rfantibody.benchmark.v1") == 604800
     assert maximum_case_job_seconds("rfantibody.targets.v1") == 86400

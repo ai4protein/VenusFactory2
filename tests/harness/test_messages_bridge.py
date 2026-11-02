@@ -7,7 +7,7 @@ import pytest
 
 from agent.harness.events import audit_requests
 from agent.harness.messages_bridge import MessagesBridge, chat_to_message, message_sse, messages_to_chat
-from agent.rsi.model_gateway import GatewayPolicy
+from agent.rsi.engine.model_gateway import GatewayPolicy
 
 MODEL = "unisound-u2-flash"
 TOOL = "mcp__venusfactory__protein_probe"

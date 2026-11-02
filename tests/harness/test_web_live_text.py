@@ -11,7 +11,7 @@ from agent.harness.gateway import EvidenceGateway
 from agent.harness.live_text import PublicTextStream
 from agent.harness.messages_bridge import MessagesBridge
 from agent.harness.responses_gateway import ResponsesGateway
-from agent.rsi.model_gateway import GatewayPolicy
+from agent.rsi.engine.model_gateway import GatewayPolicy
 
 
 def chunk(content=None, *, end=False, tools=None, reasoning=None):

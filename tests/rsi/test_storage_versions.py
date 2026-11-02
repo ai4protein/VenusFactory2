@@ -2,8 +2,8 @@ import json
 
 import pytest
 
-from agent.rsi.storage import atomic_json, safe_child
-from agent.rsi.versions import VersionStore
+from agent.rsi.engine.storage import atomic_json, safe_child
+from agent.rsi.engine.versions import VersionStore
 
 
 def test_reject_and_stale_accept_leave_incumbent_unchanged(tmp_path):

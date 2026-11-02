@@ -16,9 +16,9 @@ from test_paper_step_tools import simulated_session
 from agent.harness import Profile
 from agent.rsi import paper_step_goal as goal
 from agent.rsi import paper_step_transfer as transfer
-from agent.rsi.generated_step_library import GeneratedStepLibrary, validate_completed_step
-from agent.rsi.paper_step_sessions import read
-from agent.rsi.storage import atomic_json, sha256_file
+from agent.rsi.engine.generated_step_library import GeneratedStepLibrary, validate_completed_step
+from agent.rsi.engine.paper_step_sessions import read
+from agent.rsi.engine.storage import atomic_json, sha256_file
 from agent.science_goal import GoalSpec, run_goal
 
 
@@ -171,7 +171,7 @@ def test_changed_origin_cannot_be_resolved_or_silently_repaired(donor, change):
     elif change == "reference":
         Path(next(iter(donor.driver.definition["references"]))).write_text("changed")
     elif change == "archive":
-        (root / "implementation/src/agent/rsi/paper_step.py").write_text("changed")
+        (root / "implementation/src/agent/rsi/engine/paper_step.py").write_text("changed")
     elif change == "missing_admission":
         p = root / "host_private/admission.json"
         p.chmod(0o644)

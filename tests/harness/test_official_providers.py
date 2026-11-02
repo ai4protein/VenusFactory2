@@ -10,7 +10,7 @@ import pytest
 from agent.harness import provider_config as pc
 from agent.harness.catalog import ExecutionCatalog, resolve_credential
 from agent.harness.contracts import Profile
-from agent.rsi.model_access import ModelAccessDenied, authorize_model
+from agent.rsi.engine.model_access import ModelAccessDenied, authorize_model
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -120,7 +120,7 @@ def test_workspace_header_only_reaches_anthropic(monkeypatch):
 @pytest.mark.parametrize('stream', [False, True])
 def test_gateway_real_http_contract_with_mock_provider(monkeypatch, tmp_path, prefix, stream):
     from agent.harness.gateway import EvidenceGateway
-    from agent.rsi.model_gateway import GatewayPolicy
+    from agent.rsi.engine.model_gateway import GatewayPolicy
     row = configure(monkeypatch, prefix)
     b = row['binding']
     seen = []
@@ -209,7 +209,7 @@ def test_official_alias_can_resolve_to_its_dated_snapshot_only(monkeypatch):
 
 def test_native_claude_bridge_roundtrips_official_tool_call(monkeypatch, tmp_path):
     from agent.harness.messages_bridge import MessagesBridge
-    from agent.rsi.model_gateway import GatewayPolicy
+    from agent.rsi.engine.model_gateway import GatewayPolicy
     configure(monkeypatch, 'ANTHROPIC', 'claude-test')
     name = 'mcp__venusfactory__search_tools'
     def upstream(request):

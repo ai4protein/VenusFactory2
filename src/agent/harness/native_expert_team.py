@@ -14,7 +14,7 @@ from dataclasses import replace
 
 import httpx
 
-from agent.rsi.scientific_episode import artifact_written, completion_feedback, episode_contract
+from agent.rsi.engine.scientific_episode import artifact_written, completion_feedback, episode_contract
 
 from .contracts import Task, digest, file_hash
 from .events import audit_trace

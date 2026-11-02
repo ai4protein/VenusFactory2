@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-spec = importlib.util.spec_from_file_location("audit_case_sources", Path(__file__).resolve().parents[2] / "scripts/rsi/audit_case_sources.py")
+spec = importlib.util.spec_from_file_location("audit_case_sources", Path(__file__).resolve().parents[2] / "scripts/rsi/evaluation/audit_case_sources.py")
 audit = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(audit)
 

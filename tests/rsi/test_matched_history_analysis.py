@@ -5,8 +5,8 @@ from itertools import permutations
 
 import pytest
 
-from agent.rsi.matched_history_analysis import ARMS, interval, summarize, validate_design
-from agent.rsi.protein_model import digest
+from agent.rsi.engine.matched_history_analysis import ARMS, interval, summarize, validate_design
+from agent.rsi.engine.protein_model import digest
 
 
 def fixture():

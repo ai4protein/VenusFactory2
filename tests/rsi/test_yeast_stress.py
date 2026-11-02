@@ -6,10 +6,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from agent.rsi.paper_step import PaperStepLifecycle, compare, validated_source
-from agent.rsi.paper_step_catalog import catalog
-from agent.rsi.storage import sha256_file
-from agent.rsi.yeast_stress import HEADERS, admit_task, parse_sheet, read_supplement, reference
+from agent.rsi.engine.paper_step import PaperStepLifecycle, compare, validated_source
+from agent.rsi.engine.paper_step_catalog import catalog
+from agent.rsi.engine.storage import sha256_file
+from agent.rsi.datasets.yeast_stress import HEADERS, admit_task, parse_sheet, read_supplement, reference
 
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE_PATH = ROOT / 'configs/rsi/paper_step_examples/yeast_abundance_contrasts.py'
@@ -145,7 +145,7 @@ def test_catalog_add_preserves_existing_and_rejects_replacement(tmp_path):
 
 def test_export_freezes_reference_paths_and_all_prespecified_cases(tmp_path, monkeypatch):
     from agent.rsi import yeast_stress
-    from agent.rsi.paper_step import validate_definition
+    from agent.rsi.engine.paper_step import validate_definition
 
     proteins = parse_sheet([HEADERS, sheet_row()])
     monkeypatch.setattr(yeast_stress, 'read_supplement', lambda path: proteins)

@@ -11,9 +11,9 @@ from test_generated_models import CODE, SCOPE, TRAIN, VALID
 
 from agent.harness import Budget, ModelBinding, Profile
 from agent.rsi import model_tasks as tasks
-from agent.rsi.generated_model import fit_candidate, predict
-from agent.rsi.model_lifecycle import ModelLifecycle
-from agent.rsi.storage import atomic_json, sha256_file
+from agent.rsi.engine.generated_model import fit_candidate, predict
+from agent.rsi.engine.model_lifecycle import ModelLifecycle
+from agent.rsi.engine.storage import atomic_json, sha256_file
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rsi"))
 from run_science_evolution import EvolvingModelGoal

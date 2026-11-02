@@ -34,6 +34,8 @@ Model research requires a measured baseline and a revised experiment on matched 
 
 ## Receive and reuse the results
 
-The project includes a README, source and configuration, fitted artifacts where applicable, data/split provenance, experiment results, reproduction commands, limitations and a report. Model deliveries include a prediction interface, model card and test report. Use **Download project (.zip)** to obtain the project in its original directory structure.
+**Research outputs** shows the selected models or methods with their README, usage card, test report and download. Each release includes runnable code, a JSON interface, example input/output, interface tests and recorded dependencies. Learned models also include their fitted state and training code. Raw evaluation datasets stay in the research workspace.
+
+Use **Download project (.zip)** for the selected releases and research report. Each release has its own README with use and reproduction commands. A draft without a reviewed release downloads the working project. Experiments, ablations and previous versions remain in the topic; expand their records when you need the details. Revisions of the same purpose appear as versions of one capability instead of filling the tool list with every trial.
 
 Research completion and public-tool admission are separate. Code execution or Critic agreement alone does not publish a model. Independent checks review interfaces, scope, reproducibility and evaluation evidence. Rejected candidates remain available for revision. Only reviewed, published and enabled capabilities can be discovered and called by [Agent](manual:agent), Model Plaza or workflows.

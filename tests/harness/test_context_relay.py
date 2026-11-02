@@ -9,7 +9,7 @@ from agent.harness.contracts import ModelBinding, Profile, Budget
 from agent.harness.gateway import EvidenceGateway
 from agent.harness.messages_bridge import MessagesBridge
 from agent.harness.responses_gateway import ResponsesGateway, ResponsesPolicy
-from agent.rsi.model_gateway import GatewayPolicy
+from agent.rsi.engine.model_gateway import GatewayPolicy
 from backend.web_v2.agent_context import summarize_via_relay
 
 

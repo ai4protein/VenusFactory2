@@ -19,7 +19,7 @@ regexes = ['''monkeypatch\.setenv\('PRIVATE_TEST_KEY',''']
 [[rules.allowlists]]
 description = "Published dataset SHA-256 digests, not credentials"
 condition = "AND"
-paths = ['''(^|/)scripts/rsi/prepare_mutation_landscape_tasks\.py$''']
+paths = ['''(^|/)scripts/rsi/data_preparation/prepare_mutation_landscape_tasks\.py$''']
 regexTarget = "line"
 regexes = ['''^\s*"gfp_api_[^"]+\.(?:tsv|ipynb|txt)": "[a-f0-9]{64}",?\s*$''']
 [[rules.allowlists]]

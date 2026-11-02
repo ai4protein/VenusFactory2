@@ -3,7 +3,7 @@ import copy
 import numpy as np
 import pytest
 
-from agent.rsi.y3k_source import FEATURES, parse_condition, protein_index, strain_index
+from agent.rsi.datasets.y3k_source import FEATURES, parse_condition, protein_index, strain_index
 
 
 @pytest.fixture

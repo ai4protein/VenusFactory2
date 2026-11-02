@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-spec = importlib.util.spec_from_file_location("reap_extrapolation", Path(__file__).resolve().parents[2] / "scripts/rsi/run_reap_extrapolation.py")
+spec = importlib.util.spec_from_file_location("reap_extrapolation", Path(__file__).resolve().parents[2] / "scripts/rsi/cases/run_reap_extrapolation.py")
 module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 

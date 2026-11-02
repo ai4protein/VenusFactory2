@@ -22,11 +22,11 @@ from run_protein_lifecycle import audit_events
 from agent.harness import Profile, Task
 from agent.harness.contracts import digest, file_hash
 from agent.harness.host import execute, write_json
-from agent.rsi.case_evidence import canonical_claims, render_evidence_report, validate_review
-from agent.rsi.case_jobs import CaseJobBroker
-from agent.rsi.case_plugins import PLUGINS, antibody_allocation, invocation, maximum_case_job_seconds
-from agent.rsi.source_snapshot import research_implementation_paths
-from agent.rsi.versions import VersionStore
+from agent.rsi.engine.case_evidence import canonical_claims, render_evidence_report, validate_review
+from agent.rsi.campaigns.case_jobs import CaseJobBroker
+from agent.rsi.campaigns.case_plugins import PLUGINS, antibody_allocation, invocation, maximum_case_job_seconds
+from agent.rsi.engine.source_snapshot import research_implementation_paths
+from agent.rsi.engine.versions import VersionStore
 
 
 def read(path):
@@ -146,7 +146,7 @@ async def main(args, *, profile=None, credential=None, goal_context="", register
     workspace.mkdir()
     versions, version, cap = bundle(
         output / "launch_capability",
-        [("src/agent/rsi/case_job_tools.py", "generated_tools.py")],
+        [("src/agent/rsi/campaigns/case_job_tools.py", "generated_tools.py")],
         {"plugin": args.plugin},
         episode={
             "context_tool": "inspect_registered_reproduction" if registered_recipe else "discover_reproduction_plugins",
@@ -242,12 +242,12 @@ async def main(args, *, profile=None, credential=None, goal_context="", register
                 rv, vid, rcap = bundle(
                     output / "review_capability",
                     [
-                        ("src/agent/rsi/case_review_tools.py", "generated_tools.py"),
-                        ("src/agent/rsi/case_evidence.py", "agent/rsi/case_evidence.py"),
-                        ("src/agent/rsi/protein_model.py", "agent/rsi/protein_model.py"),
-                        ("src/agent/rsi/mcba_evidence.py", "agent/rsi/mcba_evidence.py"),
-                        ("src/agent/rsi/rfantibody_evidence.py", "agent/rsi/rfantibody_evidence.py"),
-                        ("src/agent/rsi/storage.py", "agent/rsi/storage.py"),
+                        ("src/agent/rsi/engine/case_review_tools.py", "generated_tools.py"),
+                        ("src/agent/rsi/engine/case_evidence.py", "agent/rsi/engine/case_evidence.py"),
+                        ("src/agent/rsi/engine/protein_model.py", "agent/rsi/engine/protein_model.py"),
+                        ("src/agent/rsi/cases/mcba_evidence.py", "agent/rsi/cases/mcba_evidence.py"),
+                        ("src/agent/rsi/cases/rfantibody_evidence.py", "agent/rsi/cases/rfantibody_evidence.py"),
+                        ("src/agent/rsi/engine/storage.py", "agent/rsi/engine/storage.py"),
                     ],
                     {"plugin": args.plugin, "source_report_sha256": source_sha},
                     {"job_id": jid, "plugin": args.plugin, "report_sha256": source_sha, "facts": facts},

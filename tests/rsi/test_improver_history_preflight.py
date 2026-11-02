@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rsi"))
-import audit_improver_revision as audit
+from scripts.rsi.evaluation import audit_improver_revision as audit
 import run_improver_revision as revision
 from test_reap_goal_comparison import candidate
 from test_reap_science_goal import setup_goal
@@ -95,7 +95,7 @@ async def test_revision_preflight_precedes_credentials_and_execute(tmp_path, mon
     protocol = revision.prepare(
         SimpleNamespace(output=output, profile=profile_path, parent_policy=None, history_goal=[root])
     )
-    assert {"scripts/rsi/audit_improver_revision.py", "scripts/rsi/audit_reap_generated.py"} <= protocol[
+    assert {"scripts/rsi/evaluation/audit_improver_revision.py", "scripts/rsi/cases/audit_reap_generated.py"} <= protocol[
         "implementation"
     ].keys()
     calls = []

@@ -4,10 +4,10 @@ from run_reproduction_goal import read, safe_file, verify_run
 
 from agent.harness.contracts import file_hash
 from agent.harness.host import write_json
-from agent.rsi.paper_campaign import admitted_campaign
-from agent.rsi.paper_capability_library import PaperCapabilityLibrary
-from agent.rsi.storage import safe_child
-from agent.rsi.versions import VersionStore
+from agent.rsi.campaigns.paper_campaign import admitted_campaign
+from agent.rsi.engine.paper_capability_library import PaperCapabilityLibrary
+from agent.rsi.engine.storage import safe_child
+from agent.rsi.engine.versions import VersionStore
 from agent.science_goal import GoalStore
 
 

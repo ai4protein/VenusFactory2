@@ -15,8 +15,8 @@ from run_science_evolution import EvolvingModelGoal
 from run_science_goal import GeneratedModelGoal
 from test_science_evolution import lineage as lineage
 
-from agent.rsi.lineage_promotion import gain_error, new_evolution, validate_evolution
-from agent.rsi.source_lineage import program_hash
+from agent.rsi.engine.lineage_promotion import gain_error, new_evolution, validate_evolution
+from agent.rsi.datasets.source_lineage import program_hash
 
 BEFORE = 0.14655056844396863
 AFTER = 0.14655056844396874
@@ -129,7 +129,7 @@ def test_library_independently_enforces_new_promotion_guard(tmp_path, monkeypatc
 
     from agent.rsi import generation_publication as generation
     from agent.rsi import scientist_model_library as library
-    from agent.rsi.storage import atomic_json
+    from agent.rsi.engine.storage import atomic_json
 
     # Real numerical fixture; native expert execution remains explicitly mocked.
     (tmp_path / "numeric").mkdir()

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from agent.rsi.sandbox import SandboxKimi, bwrap_command
+from agent.rsi.engine.sandbox import SandboxKimi, bwrap_command
 
 
 @pytest.mark.asyncio

@@ -7,13 +7,13 @@ from pathlib import Path
 import openpyxl
 import pytest
 
-from agent.rsi.model_tasks import read_task
-from agent.rsi.mutation_landscape_tasks import make_record, write_mutation_task
-from agent.rsi.published_sequence_tasks import audit_catalog, bound
+from agent.rsi.datasets.model_tasks import read_task
+from agent.rsi.datasets.mutation_landscape_tasks import make_record, write_mutation_task
+from agent.rsi.datasets.published_sequence_tasks import audit_catalog, bound
 
 ROOT = Path(__file__).resolve().parents[2]
 spec = importlib.util.spec_from_file_location(
-    "prepare_mutation_landscapes", ROOT / "scripts/rsi/prepare_mutation_landscape_tasks.py"
+    "prepare_mutation_landscapes", ROOT / "scripts/rsi/data_preparation/prepare_mutation_landscape_tasks.py"
 )
 prep = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(prep)

@@ -10,16 +10,16 @@ from test_improver_policy import history, revised
 from test_reap_science_goal import setup_goal
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rsi"))
-import run_reap_goal_comparison as goals
-import run_reap_improver_comparison as paired
-from run_reap_improver_goal import PolicyReapGoal, policy_action
-from run_reap_science_goal import ReapModelGoal
+from scripts.rsi.cases import run_reap_goal_comparison as goals
+from scripts.rsi.cases import run_reap_improver_comparison as paired
+from scripts.rsi.cases.run_reap_improver_goal import PolicyReapGoal, policy_action
+from scripts.rsi.cases.run_reap_science_goal import ReapModelGoal
 
 from agent.harness import Budget, ModelBinding, Profile
 from agent.harness.contracts import digest, file_hash
 from agent.harness.events import audit_requests, audit_trace
 from agent.harness.host import write_json
-from agent.rsi.improver_policy import BASE_POLICY, candidate, identity, revision_packet
+from agent.rsi.engine.improver_policy import BASE_POLICY, candidate, identity, revision_packet
 from agent.science_goal import GoalSpec, GoalStore
 
 CAP = {"model_calls": 8, "tool_calls": 4, "wall_seconds": 420}

@@ -22,7 +22,7 @@ The native suite implements training mean, standardized ridge (alpha 1), random 
 
 ## Preparation and execution
 
-Use `scripts/rsi/prepare_poisk_tasks.py` with `--source`, `--feasibility` and a fresh `--output` directory. Preparation binds source observations, original task declarations, grouping evidence and the frozen encoder. It preserves original partitions, creates no model calls and registers no models. `scripts/rsi/run_shared_science_goal.py` consumes the resulting `tasks.json` through the existing lifecycle; shared admission must succeed first.
+Use `scripts/rsi/data_preparation/prepare_poisk_tasks.py` with `--source`, `--feasibility` and a fresh `--output` directory. Preparation binds source observations, original task declarations, grouping evidence and the frozen encoder. It preserves original partitions, creates no model calls and registers no models. `scripts/rsi/run_shared_science_goal.py` consumes the resulting `tasks.json` through the existing lifecycle; shared admission must succeed first.
 
 The four small real cohorts are valid individual exploratory tasks but do not meet the stricter large-catalog row and group floors. Do not relax those floors to increase the model count. Scale requires additional source-supported cohorts and adequate independent groups.
 

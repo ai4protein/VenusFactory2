@@ -12,15 +12,15 @@ from test_scientist_model_campaign import checkpoint
 from agent.harness import Budget, ModelBinding, Profile
 from agent.harness.contracts import digest, file_hash
 from agent.rsi import scientist_model_campaign as campaign
-from agent.rsi.model_coverage import (
+from agent.rsi.engine.model_coverage import (
     PROGRAM_ENTRIES,
     SCIENTIFIC_SCOPES,
     counting_policy,
     resolve_scope,
     summarize_scopes,
 )
-from agent.rsi.research_project_catalog import build_catalog, campaign_plan
-from agent.rsi.scientist_model_library import ScientistModelLibrary
+from agent.rsi.datasets.research_project_catalog import build_catalog, campaign_plan
+from agent.rsi.engine.scientist_model_library import ScientistModelLibrary
 
 
 def export(manifest, tmp_path, name="manifest"):

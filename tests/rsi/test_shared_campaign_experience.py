@@ -16,9 +16,9 @@ from agent.harness import Profile
 from agent.harness.contracts import digest
 from agent.rsi import shared_campaign_experience as memory
 from agent.rsi import shared_library_experience
-from agent.rsi.context_transfer import POLICY as OVERLAP_POLICY
-from agent.rsi.context_transfer import SOURCE_ADAPTATION
-from agent.rsi.storage import atomic_json
+from agent.rsi.engine.context_transfer import POLICY as OVERLAP_POLICY
+from agent.rsi.engine.context_transfer import SOURCE_ADAPTATION
+from agent.rsi.engine.storage import atomic_json
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts/rsi"))

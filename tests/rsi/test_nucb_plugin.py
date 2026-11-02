@@ -6,9 +6,9 @@ from pathlib import Path
 import pytest
 
 from agent.rsi import nucb_reproduction as n
-from agent.rsi.case_evidence import canonical_claims
-from agent.rsi.case_plugins import invocation, list_case_plugins, resource_for
-from agent.rsi.paper_campaign import campaign_cases, paper_case
+from agent.rsi.engine.case_evidence import canonical_claims
+from agent.rsi.campaigns.case_plugins import invocation, list_case_plugins, resource_for
+from agent.rsi.campaigns.paper_campaign import campaign_cases, paper_case
 
 
 def report():
@@ -111,7 +111,7 @@ def test_artifacts_reject_traversal_symlinks_and_changed_bytes(tmp_path):
 
 
 def test_native_validator_is_required_at_broker_boundary(monkeypatch, tmp_path):
-    from agent.rsi.case_jobs import verify_job_report
+    from agent.rsi.campaigns.case_jobs import verify_job_report
 
     calls = []
 
@@ -141,7 +141,7 @@ def test_direct_runner_rejects_parent_escape_before_creating_output(tmp_path, mo
     import importlib.util
 
     root = Path(__file__).resolve().parents[2]
-    spec = importlib.util.spec_from_file_location("nucb_runner_fixture", root / "scripts/rsi/run_nucb_case.py")
+    spec = importlib.util.spec_from_file_location("nucb_runner_fixture", root / "scripts/rsi/cases/run_nucb_case.py")
     runner = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(runner)
     monkeypatch.setattr(runner, "ROOT", tmp_path)

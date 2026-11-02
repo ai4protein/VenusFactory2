@@ -9,11 +9,11 @@ from pathlib import Path
 import pytest
 
 from agent.rsi import clean_training_plugin as c
-from agent.rsi.case_evidence import canonical_claims, render_evidence_report
-from agent.rsi.case_jobs import verify_job_report
-from agent.rsi.case_plugins import invocation, list_case_plugins, maximum_case_job_seconds, resource_for
-from agent.rsi.paper_campaign import campaign_cases, paper_case
-from agent.rsi.reproduction_goal_contract import allocation
+from agent.rsi.engine.case_evidence import canonical_claims, render_evidence_report
+from agent.rsi.campaigns.case_jobs import verify_job_report
+from agent.rsi.campaigns.case_plugins import invocation, list_case_plugins, maximum_case_job_seconds, resource_for
+from agent.rsi.campaigns.paper_campaign import campaign_cases, paper_case
+from agent.rsi.engine.reproduction_goal_contract import allocation
 
 
 def report():

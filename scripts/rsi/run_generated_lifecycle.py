@@ -9,13 +9,13 @@ from pathlib import Path
 
 from run_protein_lifecycle import ROOT, phase_run, prepare_case
 
-from agent.rsi.model_lifecycle import ModelLifecycle
-from agent.rsi.model_plugins import get_model_plugin
-from agent.rsi.model_policy import read_model_configuration
-from agent.rsi.protein_model import digest
-from agent.rsi.protein_model import evaluate as fixed_evaluate
-from agent.rsi.protein_model import fit_candidate as fixed_fit
-from agent.rsi.storage import atomic_json, sha256_file
+from agent.rsi.engine.model_lifecycle import ModelLifecycle
+from agent.rsi.engine.model_plugins import get_model_plugin
+from agent.rsi.engine.model_policy import read_model_configuration
+from agent.rsi.engine.protein_model import digest
+from agent.rsi.engine.protein_model import evaluate as fixed_evaluate
+from agent.rsi.engine.protein_model import fit_candidate as fixed_fit
+from agent.rsi.engine.storage import atomic_json, sha256_file
 
 FILES = [
     "generated_tools.py",
@@ -41,6 +41,8 @@ PROMPTS = {
     "reuse": "Inspect the new task, discover a compatible validated generated-code model, and use it to save every prediction. Do not train or modify the model. Report the artifact and row count.",
 }
 
+
+from agent.rsi.layout import source_relative
 
 def spec(phase):
     tools = {"inspect_model_code_task", "discover_generated_models"}
@@ -147,11 +149,11 @@ async def main(args):
     paths = [
         Path(__file__),
         ROOT / "scripts/rsi/run_protein_lifecycle.py",
-        *[ROOT / "src/agent/rsi" / name for name in FILES],
-        ROOT / "src/agent/rsi/model_lifecycle.py",
-        ROOT / "src/agent/rsi/model_plugins.py",
-        ROOT / "src/agent/rsi/runtime.py",
-        ROOT / "src/agent/rsi/sandbox.py",
+        *[ROOT / source_relative(name) for name in FILES],
+        ROOT / "src/agent/rsi/engine/model_lifecycle.py",
+        ROOT / "src/agent/rsi/engine/model_plugins.py",
+        ROOT / "src/agent/rsi/engine/runtime.py",
+        ROOT / "src/agent/rsi/engine/sandbox.py",
     ]
     for path in paths:
         dest = implementation / path.relative_to(ROOT)

@@ -15,7 +15,7 @@ import run_reproduction_goal as goal_runner
 
 from agent.harness import Budget, ModelBinding, Profile
 from agent.harness.contracts import file_hash
-from agent.rsi.source_snapshot import research_implementation_paths
+from agent.rsi.engine.source_snapshot import research_implementation_paths
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -42,7 +42,7 @@ def test_snapshot_imports_scientist_without_original_checkout(tmp_path):
         "from pathlib import Path; import agent.prompts; "
         "assert Path(agent.prompts.__file__).resolve().is_relative_to(Path.cwd()); "
         "assert agent.prompts.PLANNER_SYSTEM_PROMPT_TEMPLATE; "
-        "from agent.rsi.model_access import authorize_model, POLICY_PATH; "
+        "from agent.rsi.engine.model_access import authorize_model, POLICY_PATH; "
         "assert POLICY_PATH.resolve().is_relative_to(Path.cwd()); "
         "assert authorize_model(model='glm-4-flash', base_url='https://www.dmxapi.cn/v1', "
         "protocol='chat_completions', output_tokens=4096)"

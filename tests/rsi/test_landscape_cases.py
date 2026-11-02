@@ -1,6 +1,6 @@
 import pytest
 
-from agent.rsi.landscape_cases import partition
+from agent.rsi.engine.landscape_cases import partition
 
 
 def fixture_rows():

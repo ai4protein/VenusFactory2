@@ -44,7 +44,7 @@ def test_incomplete_or_overclaimed_epinnet_rejected(claim):
 
 
 def test_epinnet_plugin_rejects_test_tuning_or_partial_scope(tmp_path):
-    from agent.rsi.case_plugins import invocation, list_case_plugins, resource_for
+    from agent.rsi.campaigns.case_plugins import invocation, list_case_plugins, resource_for
 
     def call(parameters):
         return invocation(

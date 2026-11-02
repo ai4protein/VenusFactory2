@@ -1,13 +1,13 @@
 import pytest
 
-from agent.rsi.rfantibody_targets import (
+from agent.rsi.cases.rfantibody_targets import (
     exact_ca_subset,
     pdb_residues,
     resolve_cif_hotspots,
     validate_target_input,
     write_observed_chain,
 )
-from agent.rsi.storage import sha256_file
+from agent.rsi.engine.storage import sha256_file
 
 
 def pdb(rows):

@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-scripts = Path(__file__).resolve().parents[2] / "scripts/rsi"
+scripts = Path(__file__).resolve().parents[2] / "scripts/rsi/cases"
 sys.path.insert(0, str(scripts))
 spec = importlib.util.spec_from_file_location("htfunclib_generated", scripts / "run_htfunclib_generated.py")
 campaign = importlib.util.module_from_spec(spec)

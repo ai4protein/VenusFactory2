@@ -11,8 +11,8 @@ import pytest
 from test_web_science_goals import api_client as api_client
 
 from agent.harness import Budget, ModelBinding, Profile
-from agent.rsi.paper_step_catalog import catalog
-from agent.rsi.storage import atomic_json, sha256_file
+from agent.rsi.engine.paper_step_catalog import catalog
+from agent.rsi.engine.storage import atomic_json, sha256_file
 from agent.science_goal import GoalStore
 from backend.web_v2.paper_step_goals import PaperStepDriver, public_step
 from backend.web_v2.science_goals import ROOT, GoalConflict, ScienceGoalService
@@ -85,7 +85,7 @@ sys.path.insert(0,{str(ROOT / "scripts/rsi")!r})
 sys.path.insert(0,{str(ROOT / "tests/rsi")!r})
 import run_web_paper_step as entry
 from agent.rsi import paper_step_goal
-from agent.rsi.paper_step_sessions import read
+from agent.rsi.engine.paper_step_sessions import read
 from test_paper_step_tools import simulated_session
 entry.ROOT=Path({str(root)!r})
 async def execute(folder,profile,runtimes,credential):

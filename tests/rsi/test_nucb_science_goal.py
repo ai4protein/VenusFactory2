@@ -9,12 +9,12 @@ from test_generated_classifier import CODE, ROWS, SCOPE
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rsi"))
 import run_science_goal as base
-from run_nucb_science_goal import PLUGIN, NucbModelGoal
+from scripts.rsi.cases.run_nucb_science_goal import PLUGIN, NucbModelGoal
 
 from agent.harness import Budget, ModelBinding, Profile
 from agent.harness.contracts import digest
 from agent.harness.host import write_json
-from agent.rsi.model_plugins import get_model_plugin
+from agent.rsi.engine.model_plugins import get_model_plugin
 from agent.science_goal import GoalSpec, GoalStore, run_goal
 
 

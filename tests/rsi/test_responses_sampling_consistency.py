@@ -7,7 +7,7 @@ import pytest
 
 from agent.harness import Budget, ModelBinding, Profile
 from agent.rsi import generated_step_library, paper_step_goal, scientist_model_library
-from agent.rsi.storage import atomic_json
+from agent.rsi.engine.storage import atomic_json
 
 
 def profiles():

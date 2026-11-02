@@ -10,8 +10,8 @@ from agent.harness.contracts import ModelBinding, Profile
 from agent.harness.gateway import EvidenceGateway
 from agent.harness.responses_gateway import ResponsesGateway, ResponsesPolicy
 from agent.rsi import model_access
-from agent.rsi.live_model_gateway import ModelGateway
-from agent.rsi.model_gateway import GatewayPolicy
+from agent.rsi.engine.live_model_gateway import ModelGateway
+from agent.rsi.engine.model_gateway import GatewayPolicy
 
 
 @pytest.fixture

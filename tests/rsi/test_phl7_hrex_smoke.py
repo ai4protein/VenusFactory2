@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rsi"))
-from run_phl7_hrex_smoke import EXCHANGE, STEPS, allocation_plan, exchange_steps, parse_series, short_mdp
+from scripts.rsi.cases.run_phl7_hrex_smoke import EXCHANGE, STEPS, allocation_plan, exchange_steps, parse_series, short_mdp
 
 
 def test_short_protocol_changes_only_declared_duration_output_and_seed_fields():

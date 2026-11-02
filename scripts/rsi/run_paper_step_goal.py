@@ -12,8 +12,8 @@ sys.path.insert(0, str(ROOT / "src"))
 from run_harness_probe import credential_from_toml, default_runtimes
 
 from agent.harness import Profile
-from agent.rsi.paper_step_goal import CRITERIA, PaperStepGoal, create_step_goal
-from agent.rsi.paper_step_sessions import read
+from agent.rsi.campaigns.paper_step_goal import CRITERIA, PaperStepGoal, create_step_goal
+from agent.rsi.engine.paper_step_sessions import read
 from agent.science_goal import GoalSpec, GoalStore, run_goal
 
 

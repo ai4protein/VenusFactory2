@@ -14,8 +14,8 @@ from agent.harness import Budget, ModelBinding, Profile
 from agent.harness.contracts import file_hash
 from agent.rsi import context_interfaces, model_tasks
 from agent.rsi import library_program_screen as screening
-from agent.rsi.code_sandbox import CandidateCodeError
-from agent.rsi.storage import atomic_json
+from agent.rsi.engine.code_sandbox import CandidateCodeError
+from agent.rsi.engine.storage import atomic_json
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rsi"))
 from run_science_goal import GeneratedModelGoal, prepare

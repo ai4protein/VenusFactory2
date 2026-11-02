@@ -13,7 +13,6 @@ from pathlib import Path
 import re
 import time
 import uuid
-import zipfile
 
 from .contracts import digest, file_hash
 from .host import write_json
@@ -40,7 +39,8 @@ def model_goal(objective):
 
 
 def guide():
-    return {'strategies':STRATEGIES, 'plm_training_required':False,
+    from agent.rsi.artifacts.contract import guide as artifact_guide
+    return {'artifact_contract':artifact_guide(), 'strategies':STRATEGIES, 'plm_training_required':False,
         'workflow':['Inspect real data and define leakage-resistant splits',
             'Implement and train a baseline; evaluate_research_model(variant="baseline")',
             'Use returned validation feedback to revise code/learning strategy; evaluate a child with parent_experiment_id',
@@ -200,34 +200,5 @@ class Development:
         return {'selected_experiment_id':identity,'generations':list(reversed(chain)),'claim':'Measured development trajectory; biological novelty and superiority are not inferred from the strategy name.'}
 
 
-def build_delivery(workspace, bundle, receipt):
-    """Create a private downloadable package only after independent admission."""
-    from .capability_review import admitted
-    bundle=Path(bundle);manifest=json.loads((bundle/'manifest.json').read_text());admitted(bundle,manifest)
-    spec=manifest['review_spec'];development=manifest.get('development')
-    require(spec['kind']=='model' and development,'A reviewed model development record is required')
-    evaluation=receipt['automatic']['evaluation'];identity=manifest['id'];prefix='deliveries/'+identity[:16]
-    report={'candidate_id':identity,'review_status':receipt['status'],'validation_trajectory':development,
-        'final_test':evaluation,'interface_tests':receipt['automatic']['interface_cases'],
-        'independent_tests':receipt['automatic']['independent_cases'],'independent_review':receipt['independent'],
-        'dependencies':receipt['automatic']['dependency_versions'],'evidence_limit':'Host recomputation of developer-supplied splits, not a blinded external benchmark; data semantics and novelty require scientific review.'}
-    report_text='# Model test report\n\n'+manifest['name']+'\n\n'
-    report_text+='## Validation trajectory\n\n| Generation | Strategy | Role | Score |\n|---|---|---|---|\n'
-    for i,row in enumerate(development['generations']):report_text+=f"| {i} | {row['strategy']} | {row['variant']} | {row['validation']['score']:.6g} |\n"
-    report_text+='\nSelected experiment: `'+development['selected_experiment_id']+'`. A baseline can be retained when revisions do not justify replacement.\n'
-    report_text+='\n## Independent final test\n\n'+json.dumps(evaluation,indent=2,ensure_ascii=False)+'\n\n## Review\n\n'+receipt['independent']['summary']+'\n\n## Limitations\n\n'+report['evidence_limit']+'\n'
-    card='# '+manifest['name']+'\n\n'+manifest['description']+'\n\n## Scope and limitations\n\n'+json.dumps(spec['scope'],indent=2,ensure_ascii=False)+'\n\n## Prediction interface\n\nImport `run(inputs)` from `'+manifest['source']+'`.\n\n```json\n'+json.dumps(manifest['tests'][0],indent=2)+'\n```\n\n## Reproduce training\n\nUse `'+spec['reproduction_script']+'` with the private evaluation/training evidence in the research workspace. Raw datasets are excluded from this package.\n'
-    outputs={'test-report.json':json.dumps(report,indent=2,ensure_ascii=False).encode(),'test-report.md':report_text.encode(),'MODEL_CARD.md':card.encode(),
-        'interface.json':json.dumps({'input_schema':spec['input_schema'],'output_schema':spec['output_schema'],'examples':manifest['tests']},indent=2).encode(),
-        'requirements.txt':('\n'.join(k+'=='+v for k,v in receipt['automatic']['dependency_versions'].items())+'\n').encode()}
-    import io
-    package=io.BytesIO();checksums={}
-    with zipfile.ZipFile(package,'w',zipfile.ZIP_DEFLATED) as archive:
-        for name in [*manifest['files'],spec['reproduction_script']]:
-            data=read_bytes(bundle,name);archive.writestr('model/'+name,data);checksums['model/'+name]=hashlib.sha256(data).hexdigest()
-        for name,data in outputs.items():archive.writestr(name,data);checksums[name]=hashlib.sha256(data).hexdigest()
-        archive.writestr('checksums.json',json.dumps(checksums,indent=2))
-    for name,data in outputs.items():write_bytes(workspace,prefix+'/'+name,data)
-    write_bytes(workspace,prefix+'/model.zip',package.getvalue())
-    return {'candidate_id':identity,'model_package':prefix+'/model.zip','test_report':prefix+'/test-report.md','model_card':prefix+'/MODEL_CARD.md',
-        'artifacts':[{'path':prefix+'/'+name,'sha256':hashlib.sha256(data).hexdigest()} for name,data in {**outputs,'model.zip':package.getvalue()}.items()]}
+# Public import retained for saved clients and existing development integrations.
+from agent.rsi.artifacts.package import build_delivery

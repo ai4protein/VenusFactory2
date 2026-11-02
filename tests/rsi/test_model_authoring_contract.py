@@ -8,9 +8,9 @@ from fastmcp import Client
 from test_generated_recovery import GOOD, setup_bundle
 from test_protein_references import wrappers
 
-from agent.rsi.code_sandbox import guard_source
-from agent.rsi.protein_references import audit_source_references, reference_catalog
-from agent.rsi.tool_contracts import validate_generated_result
+from agent.rsi.engine.code_sandbox import guard_source
+from agent.rsi.engine.protein_references import audit_source_references, reference_catalog
+from agent.rsi.engine.tool_contracts import validate_generated_result
 
 
 def reference_source(problem=None):

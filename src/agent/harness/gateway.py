@@ -14,7 +14,7 @@ import httpx
 from aiohttp import web
 from .provider_config import request_headers
 
-from agent.rsi.live_model_gateway import ModelGateway
+from agent.rsi.engine.live_model_gateway import ModelGateway
 from .live_text import PublicTextStream
 
 

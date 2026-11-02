@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rsi"))
 from run_improver_revision import project_development_history, revision_prompt
 
 from agent.harness.host import write_json
-from agent.rsi.improver_policy import (
+from agent.rsi.engine.improver_policy import (
     BASE_POLICY,
     candidate,
     revision_packet,
@@ -119,8 +119,8 @@ async def test_actual_isolated_mcp_revision_preserves_single_attempt(tmp_path):
     from fastmcp import Client
     from fastmcp.client.transports import StdioTransport
 
-    import agent.rsi.improver_policy as policy_module
-    from agent.rsi.langgraph_tools import mcp_command
+    import agent.rsi.engine.improver_policy as policy_module
+    from agent.rsi.engine.langgraph_tools import mcp_command
 
     bundle = tmp_path / "bundle"
     bundle.mkdir()
@@ -169,8 +169,8 @@ async def test_invalid_proposal_cannot_be_retried_by_restarting_tool_process(tmp
     from fastmcp import Client
     from fastmcp.client.transports import StdioTransport
 
-    import agent.rsi.improver_policy as policy_module
-    from agent.rsi.langgraph_tools import mcp_command
+    import agent.rsi.engine.improver_policy as policy_module
+    from agent.rsi.engine.langgraph_tools import mcp_command
 
     bundle = tmp_path / "bundle"
     bundle.mkdir()
@@ -208,13 +208,13 @@ async def test_invalid_proposal_cannot_be_retried_by_restarting_tool_process(tmp
 @pytest.mark.asyncio
 async def test_frozen_improver_instruction_reaches_model_development(tmp_path, monkeypatch):
     import run_science_goal as base
-    from run_reap_improver_goal import PolicyReapGoal
-    from run_reap_science_goal import PLUGIN, ReapModelGoal
+    from scripts.rsi.cases.run_reap_improver_goal import PolicyReapGoal
+    from scripts.rsi.cases.run_reap_science_goal import PLUGIN, ReapModelGoal
     from test_generated_features import CODE, ROWS
 
     from agent.harness.contracts import digest, file_hash
-    from agent.rsi.improver_policy import identity
-    from agent.rsi.model_plugins import get_model_plugin
+    from agent.rsi.engine.improver_policy import identity
+    from agent.rsi.engine.model_plugins import get_model_plugin
     from agent.science_goal import run_goal
 
     store = setup_goal(tmp_path)
@@ -275,7 +275,7 @@ def test_history_survives_runtime_upgrade_only_with_verified_archive(tmp_path, m
 
     import run_improver_revision as revision
 
-    import agent.rsi.generated_features as feature_module
+    import agent.rsi.engine.generated_features as feature_module
 
     store = setup_goal(tmp_path)
     cycle, lc, mid = model_candidate(store.root, 0, 1000.0)

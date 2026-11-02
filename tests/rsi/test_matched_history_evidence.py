@@ -7,8 +7,8 @@ import numpy as np
 import pytest
 
 from agent.rsi import matched_history_evidence as module
-from agent.rsi.prediction_metrics import regression_scores
-from agent.rsi.shared_sequence_evaluation import score_predictions
+from agent.rsi.engine.prediction_metrics import regression_scores
+from agent.rsi.engine.shared_sequence_evaluation import score_predictions
 
 
 def write(path, value):

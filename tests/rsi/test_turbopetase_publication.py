@@ -6,7 +6,7 @@ import openpyxl
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rsi"))
-from audit_turbopetase_publication import extract_triplicates, parse_rankings
+from scripts.rsi.cases.audit_turbopetase_publication import extract_triplicates, parse_rankings
 
 
 def test_triplicates_preserve_conditions_and_do_not_silently_impute_missing_data():

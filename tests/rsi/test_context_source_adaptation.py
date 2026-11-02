@@ -13,11 +13,11 @@ from test_generated_context import CODE
 
 from agent.harness.contracts import digest, file_hash
 from agent.rsi import context_interfaces, context_transfer, library_experience, model_tasks
-from agent.rsi.campaign_evaluation import paired_design
-from agent.rsi.library_source import REFIT_TOOL
-from agent.rsi.model_lifecycle import ModelLifecycle
-from agent.rsi.storage import atomic_json
-from agent.rsi.tool_contracts import validate_generated_result
+from agent.rsi.engine.campaign_evaluation import paired_design
+from agent.rsi.datasets.library_source import REFIT_TOOL
+from agent.rsi.engine.model_lifecycle import ModelLifecycle
+from agent.rsi.engine.storage import atomic_json
+from agent.rsi.engine.tool_contracts import validate_generated_result
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rsi"))
 from run_paired_generated import make_bundle

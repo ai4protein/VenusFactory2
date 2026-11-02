@@ -8,14 +8,20 @@ This is retrospective adaptive selection, not evidence of algorithmic novelty.
 
 from __future__ import annotations
 
+import sys as _entry_sys
+from pathlib import Path as _EntryPath
+_entry_root = _EntryPath(__file__).resolve().parents[2]
+_entry_sys.path.insert(0, str(_entry_root))
+
+
 import argparse
 import asyncio
 from pathlib import Path
 
 from run_generated_lifecycle import SYSTEM
 from run_harness_probe import ROOT
-from run_htfunclib_generated import PROMPT as GFP_PROMPT
-from run_nucb_science_goal import NucbModelGoal, goal_development_prompt
+from scripts.rsi.cases.run_htfunclib_generated import PROMPT as GFP_PROMPT
+from scripts.rsi.cases.run_nucb_science_goal import NucbModelGoal, goal_development_prompt
 from run_science_evolution import EvolvingModelGoal
 from run_science_goal import GeneratedModelGoal, read
 
@@ -23,11 +29,11 @@ from agent.harness import Profile
 from agent.harness.catalog import resolve_credential
 from agent.harness.contracts import digest, file_hash
 from agent.harness.host import write_json
-from agent.rsi.htfunclib_model_case import prepare_htfunclib_model_case
-from agent.rsi.lineage_promotion import new_evolution
-from agent.rsi.model_plugins import get_model_plugin
-from agent.rsi.nucb_case import prepare_nucb_case
-from agent.rsi.source_snapshot import research_implementation_paths
+from agent.rsi.cases.htfunclib_model_case import prepare_htfunclib_model_case
+from agent.rsi.engine.lineage_promotion import new_evolution
+from agent.rsi.engine.model_plugins import get_model_plugin
+from agent.rsi.cases.nucb_case import prepare_nucb_case
+from agent.rsi.engine.source_snapshot import research_implementation_paths
 from agent.science_goal import GoalSpec, GoalStore, goal_cycle_prompt, run_goal
 
 PLUGINS = {"nucb": "generated_classifier.v1", "gfp": "generated_classifier.large.v1"}

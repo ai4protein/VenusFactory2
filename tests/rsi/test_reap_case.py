@@ -4,7 +4,7 @@ from copy import deepcopy
 
 import pytest
 
-from agent.rsi.reap_case import (
+from agent.rsi.cases.reap_case import (
     apply_mutations,
     join_campaign,
     mutation_key,

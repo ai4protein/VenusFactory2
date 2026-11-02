@@ -10,10 +10,10 @@ from test_generated_antibody import CODE, make_task
 
 from agent.rsi import generated_antibody as api
 from agent.rsi import model_tasks
-from agent.rsi.model_lifecycle import ModelLifecycle
-from agent.rsi.model_plugins import get_model_plugin
-from agent.rsi.storage import atomic_json
-from agent.rsi.tool_contracts import validate_generated_result
+from agent.rsi.engine.model_lifecycle import ModelLifecycle
+from agent.rsi.engine.model_plugins import get_model_plugin
+from agent.rsi.engine.storage import atomic_json
+from agent.rsi.engine.tool_contracts import validate_generated_result
 
 
 def client_for(work, cap):
@@ -105,7 +105,7 @@ async def test_native_development_and_reuse_roundtrip(tmp_path):
         == "reused"
     )
 
-    from agent.rsi.scientist_model_library import _model
+    from agent.rsi.engine.scientist_model_library import _model
 
     receipt = controller._state()["events"][-1]
     atomic_json(reuse.parent / "reuse_receipt.json", receipt)
@@ -222,7 +222,7 @@ async def test_antibody_goal_reaches_harness_with_training_only_bundle(tmp_path,
     from test_model_tasks import prepared
 
     from agent.harness import Profile
-    from agent.rsi.protein_model import digest
+    from agent.rsi.engine.protein_model import digest
 
     definition, data = make_task(tmp_path / "data")
     store, driver = prepared(tmp_path, definition)
@@ -257,8 +257,8 @@ async def test_antibody_goal_reaches_harness_with_training_only_bundle(tmp_path,
 def test_antibody_catalog_admission_uses_observed_scope_and_group_counts(tmp_path):
     from pathlib import Path
 
-    from agent.rsi.research_project_catalog import inspect_candidate
-    from agent.rsi.storage import sha256_file
+    from agent.rsi.datasets.research_project_catalog import inspect_candidate
+    from agent.rsi.engine.storage import sha256_file
 
     task, parts = make_task(tmp_path / "data")
     groups_path = tmp_path / "catalog_groups.json"
@@ -293,8 +293,8 @@ def test_antibody_catalog_admission_uses_observed_scope_and_group_counts(tmp_pat
 def test_shared_paired_tasks_reject_cross_task_leakage_even_with_renamed_groups(tmp_path):
     from pathlib import Path
 
-    from agent.rsi.shared_model_bundle import admit
-    from agent.rsi.storage import sha256_file
+    from agent.rsi.engine.shared_model_bundle import admit
+    from agent.rsi.engine.storage import sha256_file
 
     tasks = [make_task(tmp_path / "egfr", "P00533")[0], make_task(tmp_path / "erbb2", "P04626")[0]]
     task = tasks[1]
@@ -325,8 +325,8 @@ def test_shared_paired_tasks_reject_cross_task_leakage_even_with_renamed_groups(
 def test_full_catalog_admits_native_paired_antibody_scopes(tmp_path):
     from pathlib import Path
 
-    from agent.rsi.poisk_tasks import binding
-    from agent.rsi.research_project_catalog import build_catalog
+    from agent.rsi.datasets.poisk_tasks import binding
+    from agent.rsi.datasets.research_project_catalog import build_catalog
 
     tasks = [make_task(tmp_path / "egfr", "P00533")[0], make_task(tmp_path / "erbb2", "P04626")[0]]
     candidates = []

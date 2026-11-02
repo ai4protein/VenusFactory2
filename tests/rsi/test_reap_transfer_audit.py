@@ -5,11 +5,11 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rsi"))
-from audit_reap_transfer import audit, verify_barrier
-from run_reap_transfer_campaign import freeze_development_barrier
+from scripts.rsi.cases.audit_reap_transfer import audit, verify_barrier
+from scripts.rsi.cases.run_reap_transfer_campaign import freeze_development_barrier
 
 from agent.harness.contracts import file_hash
-from agent.rsi.reap_experience import design
+from agent.rsi.cases.reap_experience import design
 
 
 def fixture(root):

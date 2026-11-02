@@ -11,12 +11,12 @@ from test_nucb_goal_comparison import candidate
 from test_nucb_science_goal import setup_goal
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rsi"))
-import audit_nucb_goal_comparison as audit
-import run_nucb_goal_comparison as runner
-from audit_nucb_science_goal import compare_metrics, independent_metrics
+from scripts.rsi.cases import audit_nucb_goal_comparison as audit
+from scripts.rsi.cases import run_nucb_goal_comparison as runner
+from scripts.rsi.cases.audit_nucb_science_goal import compare_metrics, independent_metrics
 
 from agent.harness.contracts import digest
-from agent.rsi.model_plugins import get_model_plugin
+from agent.rsi.engine.model_plugins import get_model_plugin
 
 
 @pytest.fixture(scope="module")

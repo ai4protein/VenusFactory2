@@ -5,7 +5,7 @@ import json
 import pytest
 
 from agent.harness import Budget, ModelBinding, Profile
-from agent.rsi.provider_access import access_wait
+from agent.rsi.engine.provider_access import access_wait
 from agent.science_goal import GoalSpec, GoalStore, run_goal
 
 

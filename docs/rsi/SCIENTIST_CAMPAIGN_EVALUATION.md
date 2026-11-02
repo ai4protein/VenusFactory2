@@ -81,9 +81,9 @@ The comparison file is a JSON list, for example:
 ```
 
 ```sh
-python scripts/rsi/evaluate_scientist_campaign.py admit --campaign CAMPAIGN --pairs pairs.json --output STUDY
-python scripts/rsi/evaluate_scientist_campaign.py evaluate --study STUDY --output SCORES
-python scripts/rsi/evaluate_scientist_campaign.py audit --study STUDY --evaluation SCORES --output AUDIT
+python scripts/rsi/evaluation/evaluate_scientist_campaign.py admit --campaign CAMPAIGN --pairs pairs.json --output STUDY
+python scripts/rsi/evaluation/evaluate_scientist_campaign.py evaluate --study STUDY --output SCORES
+python scripts/rsi/evaluation/evaluate_scientist_campaign.py audit --study STUDY --evaluation SCORES --output AUDIT
 ```
 
 `--allocation-id` can select newly queued allocations when admitting a study.

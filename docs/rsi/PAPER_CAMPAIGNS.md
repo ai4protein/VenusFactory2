@@ -9,7 +9,7 @@ performance improvement.
 
 ## Available scopes
 
-The executable catalog is `src/agent/rsi/paper_campaign.py`. It currently covers
+The executable catalog is `src/agent/rsi/campaigns/paper_campaign.py`. It currently covers
 eight publications and fourteen admitted allocations:
 
 | Publication / domain | Executable scope | Explicit omissions |

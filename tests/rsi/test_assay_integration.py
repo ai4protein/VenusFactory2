@@ -10,10 +10,10 @@ from test_generated_assay import CODE, make_task
 
 from agent.rsi import generated_assay as api
 from agent.rsi import model_tasks
-from agent.rsi.model_lifecycle import ModelLifecycle
-from agent.rsi.model_plugins import get_model_plugin
-from agent.rsi.storage import atomic_json
-from agent.rsi.tool_contracts import validate_generated_result
+from agent.rsi.engine.model_lifecycle import ModelLifecycle
+from agent.rsi.engine.model_plugins import get_model_plugin
+from agent.rsi.engine.storage import atomic_json
+from agent.rsi.engine.tool_contracts import validate_generated_result
 
 
 def client_for(work, cap):
@@ -104,7 +104,7 @@ async def test_native_development_and_reuse_roundtrip(tmp_path):
         == "reused"
     )
 
-    from agent.rsi.scientist_model_library import _model
+    from agent.rsi.engine.scientist_model_library import _model
 
     receipt = controller._state()["events"][-1]
     atomic_json(reuse.parent / "reuse_receipt.json", receipt)
@@ -156,7 +156,7 @@ def test_agent_describes_full_assay_inputs_and_uses_plugin(tmp_path):
 def assay_pair(root):
     from pathlib import Path
 
-    from agent.rsi.storage import sha256_file
+    from agent.rsi.engine.storage import sha256_file
 
     tasks = []
     for index in range(2):
@@ -176,8 +176,8 @@ def assay_pair(root):
 def test_shared_assay_rejects_cross_task_dependencies_despite_renamed_groups(tmp_path):
     from pathlib import Path
 
-    from agent.rsi.shared_model_bundle import admit
-    from agent.rsi.storage import sha256_file
+    from agent.rsi.engine.shared_model_bundle import admit
+    from agent.rsi.engine.storage import sha256_file
 
     tasks = assay_pair(tmp_path)
     parts = model_tasks.load_task(tasks[1])
@@ -271,7 +271,7 @@ async def test_assay_goal_reaches_harness_with_training_only_bundle(tmp_path, mo
     from test_model_tasks import prepared
 
     from agent.harness import Profile
-    from agent.rsi.protein_model import digest
+    from agent.rsi.engine.protein_model import digest
 
     definition, data = make_task(tmp_path / "data")
     store, driver = prepared(tmp_path, definition)
@@ -304,8 +304,8 @@ async def test_assay_goal_reaches_harness_with_training_only_bundle(tmp_path, mo
 def test_assay_catalog_admission_uses_observed_scope_and_group_counts(tmp_path):
     from pathlib import Path
 
-    from agent.rsi.research_project_catalog import inspect_candidate
-    from agent.rsi.storage import sha256_file
+    from agent.rsi.datasets.research_project_catalog import inspect_candidate
+    from agent.rsi.engine.storage import sha256_file
 
     task, parts = make_task(tmp_path / "data")
     groups_path = tmp_path / "catalog_groups.json"

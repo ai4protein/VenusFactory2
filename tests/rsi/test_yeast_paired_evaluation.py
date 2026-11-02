@@ -6,7 +6,7 @@ import pytest
 from test_yeast_population_controls import example
 
 from agent.rsi import context_feedback_profiles as feedback
-from agent.rsi.yeast_population_evaluation import verify_selected_tasks
+from agent.rsi.engine.yeast_population_evaluation import verify_selected_tasks
 
 
 def design():

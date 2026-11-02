@@ -11,9 +11,9 @@ from agent.harness import Budget, ModelBinding, Profile
 from agent.harness.contracts import digest, file_hash
 from agent.rsi import generation_publication as generation
 from agent.rsi import scientist_model_library as library
-from agent.rsi.experience import ModelExperienceStore
-from agent.rsi.source_lineage import program_hash
-from agent.rsi.storage import atomic_json
+from agent.rsi.engine.experience import ModelExperienceStore
+from agent.rsi.datasets.source_lineage import program_hash
+from agent.rsi.engine.storage import atomic_json
 from agent.science_goal import GoalSpec, GoalStore, run_goal
 
 numerical = library_tests.numerical
@@ -275,7 +275,7 @@ async def test_failed_publication_stops_next_cycle_and_resume_keeps_progress(tmp
 def test_campaign_counts_partial_generation_and_evaluates_its_own_packet(numerical, tmp_path, monkeypatch):
     from agent.rsi import campaign_evaluation as evaluation
     from agent.rsi import model_tasks
-    from agent.rsi.scientist_model_campaign import ModelCampaignStore
+    from agent.rsi.campaigns.scientist_model_campaign import ModelCampaignStore
 
     root, state, record, catalog, _ = numerical_checkpoint(numerical, tmp_path, monkeypatch)
     data = {p: generation.read(root / "data" / (p + ".json")) for p in model_tasks.PHASES}

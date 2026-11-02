@@ -11,8 +11,8 @@ import pytest
 from agent.rsi import generated_assay, model_tasks
 from agent.rsi import sabio_assay_encoder as encoder
 from agent.rsi import sabio_assay_tasks as tasks
-from agent.rsi.shared_model_bundle import admit
-from agent.rsi.storage import atomic_json
+from agent.rsi.engine.shared_model_bundle import admit
+from agent.rsi.engine.storage import atomic_json
 
 
 def observation(index=0, prop="Km"):

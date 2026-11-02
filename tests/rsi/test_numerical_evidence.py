@@ -12,12 +12,12 @@ from test_generated_features import ROWS as FEATURE_ROWS
 from test_generated_features import SCOPE as FEATURE_SCOPE
 from test_model_lifecycle import RECIPE, SCOPE, data
 
-from agent.rsi.code_sandbox import capture_code_runs, run_code
-from agent.rsi.model_lifecycle import ModelLifecycle
-from agent.rsi.model_plugins import get_model_plugin
-from agent.rsi.numerical_evidence import archive_assessment, verify_assessment
-from agent.rsi.protein_model import digest
-from agent.rsi.storage import atomic_json
+from agent.rsi.engine.code_sandbox import capture_code_runs, run_code
+from agent.rsi.engine.model_lifecycle import ModelLifecycle
+from agent.rsi.engine.model_plugins import get_model_plugin
+from agent.rsi.engine.numerical_evidence import archive_assessment, verify_assessment
+from agent.rsi.engine.protein_model import digest
+from agent.rsi.engine.storage import atomic_json
 
 SEQUENCE_CODE = """import numpy as np
 AA = "ACDEFGHIKLMNPQRSTVWY"
@@ -197,7 +197,7 @@ def test_isolated_execution_capture_does_not_leak_into_later_calls():
 
 
 def test_corrupted_witness_cannot_enter_policy_revision_history(tmp_path):
-    import audit_improver_revision as auditor
+    from scripts.rsi.evaluation import audit_improver_revision as auditor
     import run_improver_revision as producer
     from test_improver_history_preflight import donor
 

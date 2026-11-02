@@ -15,10 +15,10 @@ from test_shared_model_program import CODE, task_pair
 
 from agent.rsi import context_transfer, library_experience
 from agent.rsi import scientist_model_library as library
-from agent.rsi.model_origin_view import origin_view
-from agent.rsi.protein_model import digest
-from agent.rsi.shared_model_publication import validate_shared_goal
-from agent.rsi.storage import atomic_json, sha256_file
+from agent.rsi.engine.model_origin_view import origin_view
+from agent.rsi.engine.protein_model import digest
+from agent.rsi.engine.shared_model_publication import validate_shared_goal
+from agent.rsi.engine.storage import atomic_json, sha256_file
 from agent.science_goal import run_goal
 
 
@@ -279,7 +279,7 @@ async def test_compact_inspection_and_scientific_receipts_must_remain_complete(c
 
 @pytest.mark.asyncio
 async def test_legacy_shared_history_retains_its_original_publication_semantics(tmp_path, monkeypatch):
-    from agent.rsi.shared_goal_history import LEGACY_POLICY
+    from agent.rsi.engine.shared_goal_history import LEGACY_POLICY
 
     store, _, state = await run_bound_goal(tmp_path, monkeypatch, history_policy=LEGACY_POLICY)
     assert state["status"] == "completed"

@@ -7,7 +7,7 @@ import pytest
 from agent.harness.catalog import ExecutionCatalog, free_model
 from agent.harness.contracts import Budget, ModelBinding, Profile
 from agent.harness.prepared_mcp import check_entry
-from agent.rsi.openrouter_policy import enforce_free_responses_request, verify_free_responses_response
+from agent.rsi.engine.openrouter_policy import enforce_free_responses_request, verify_free_responses_response
 
 
 def test_missing_key_visible_free_key_selectable_and_paid_key_not_enough(tmp_path, monkeypatch):

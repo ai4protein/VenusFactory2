@@ -4,9 +4,9 @@ from pathlib import Path
 import pytest
 
 from agent.rsi import execution
-from agent.rsi.model_policy import ModelBindingError, read_model_configuration
-from agent.rsi.pilot import build_tasks
-from agent.rsi.versions import VersionStore
+from agent.rsi.engine.model_policy import ModelBindingError, read_model_configuration
+from agent.rsi.campaigns.pilot import build_tasks
+from agent.rsi.engine.versions import VersionStore
 
 
 def prepare(tmp_path):
@@ -150,7 +150,7 @@ async def test_rewritten_input_rejected_even_with_correct_artifact(tmp_path, mon
 
 @pytest.mark.asyncio
 async def test_model_rechecked_at_sandbox_start(tmp_path, monkeypatch):
-    from agent.rsi.sandbox import SandboxKimi
+    from agent.rsi.engine.sandbox import SandboxKimi
 
     capdir, _, config, baseline = prepare(tmp_path)
     path = Path(config["kimi_config"])

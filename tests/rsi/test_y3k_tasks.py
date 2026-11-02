@@ -8,9 +8,9 @@ import pytest
 
 from agent.rsi import model_tasks
 from agent.rsi import y3k_tasks as api
-from agent.rsi.storage import atomic_json, sha256_file
-from agent.rsi.y3k_source import FEATURES, PAPER, SHEETS, UNIT
-from agent.rsi.y3k_source import SCHEMA as SOURCE_SCHEMA
+from agent.rsi.engine.storage import atomic_json, sha256_file
+from agent.rsi.datasets.y3k_source import FEATURES, PAPER, SHEETS, UNIT
+from agent.rsi.datasets.y3k_source import SCHEMA as SOURCE_SCHEMA
 
 
 def read(path):

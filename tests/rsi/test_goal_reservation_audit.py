@@ -8,9 +8,9 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rsi"))
-from audit_goal_reservations import retained_timeout_reservation
-from audit_nucb_goal_comparison import verify_revision_receipts
-from audit_reap_goal_comparison import turn_accounting
+from scripts.rsi.evaluation.audit_goal_reservations import retained_timeout_reservation
+from scripts.rsi.cases.audit_nucb_goal_comparison import verify_revision_receipts
+from scripts.rsi.cases.audit_reap_goal_comparison import turn_accounting
 
 from agent.harness import Budget, ModelBinding, Profile
 from agent.harness.contracts import digest

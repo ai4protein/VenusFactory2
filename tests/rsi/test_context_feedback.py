@@ -15,11 +15,11 @@ from test_generated_context import CODE, ROWS, SCOPE
 from agent.harness import Budget, ModelBinding, Profile
 from agent.rsi import context_feedback as feedback
 from agent.rsi import generated_context as api
-from agent.rsi.context_controls import score_rows
-from agent.rsi.protein_model import digest
-from agent.rsi.scientist_model_campaign import admit_allocations, bind_goal
-from agent.rsi.storage import atomic_json, sha256_file
-from agent.rsi.tool_contracts import validate_generated_result
+from agent.rsi.engine.context_controls import score_rows
+from agent.rsi.engine.protein_model import digest
+from agent.rsi.campaigns.scientist_model_campaign import admit_allocations, bind_goal
+from agent.rsi.engine.storage import atomic_json, sha256_file
+from agent.rsi.engine.tool_contracts import validate_generated_result
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts/rsi"))

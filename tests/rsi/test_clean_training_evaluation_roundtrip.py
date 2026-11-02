@@ -67,7 +67,7 @@ def artifacts(tmp_path, monkeypatch):
         {"models": list(e.SCHEDULES), "cohorts": e.COHORTS, "sequence_records": 6, "prediction_records": 12},
     )
     implementation = {}
-    runner = Path(e.__file__).resolve().parents[3] / "scripts/rsi/run_clean_training_evaluation.py"
+    runner = Path(e.__file__).resolve().parents[4] / "scripts/rsi/cases/run_clean_training_evaluation.py"
     for path in (Path(e.__file__), Path(inputs.__file__), Path(annotation.__file__), runner):
         shutil.copy2(path, output / path.name)
         implementation[path.name] = inputs.sha(path)

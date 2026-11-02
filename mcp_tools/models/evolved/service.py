@@ -7,7 +7,7 @@ import os
 import uuid
 from pathlib import Path
 
-from agent.rsi.scientist_model_library import ScientistModelLibrary, _require
+from agent.rsi.engine.scientist_model_library import ScientistModelLibrary, _require
 from mcp_tools.tools.runtime_tool_policy import assert_tool_allowed
 
 TOOL_NAMES = {
@@ -80,11 +80,11 @@ def list_models(library, query="", stage="", limit=10, offset=0):
 def describe_model(library, entry_id):
     verified = library.resolve(entry_id)
     key = verified["key"]
-    from agent.rsi.context_interfaces import PLUGINS
+    from agent.rsi.engine.context_interfaces import PLUGINS
 
     contextual = key["plugin_id"] in PLUGINS
     if key["plugin_id"] == "generated_antibody.v1":
-        from agent.rsi.generated_antibody import INPUT_FIELDS
+        from agent.rsi.engine.generated_antibody import INPUT_FIELDS
 
         fields = list(INPUT_FIELDS)
         contract = {
@@ -102,7 +102,7 @@ def describe_model(library, entry_id):
             },
         }
     elif key["plugin_id"] == "generated_assay.v1":
-        from agent.rsi.generated_assay import INPUT_FIELDS
+        from agent.rsi.engine.generated_assay import INPUT_FIELDS
 
         fields = list(INPUT_FIELDS)
         contract = {

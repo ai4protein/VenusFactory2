@@ -4,7 +4,7 @@ from dataclasses import replace
 
 import pytest
 
-from agent.rsi.case_workflow import CaseStage, CaseWorkflow
+from agent.rsi.campaigns.case_workflow import CaseStage, CaseWorkflow
 
 
 def make_stage(tmp_path, code):

@@ -17,9 +17,9 @@ from fastmcp import Client
 from fastmcp.client.transports import StdioTransport
 from run_experiment import preflight, setup
 
-from agent.rsi.pilot import build_tasks, evaluate
-from agent.rsi.sandbox import bwrap_command
-from agent.rsi.storage import atomic_json
+from agent.rsi.campaigns.pilot import build_tasks, evaluate
+from agent.rsi.engine.sandbox import bwrap_command
+from agent.rsi.engine.storage import atomic_json
 
 
 async def run(config, output, capability_dir):

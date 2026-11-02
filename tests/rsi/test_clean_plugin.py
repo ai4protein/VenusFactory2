@@ -6,10 +6,10 @@ import json
 import pytest
 
 from agent.rsi import clean_annotation as c
-from agent.rsi.case_evidence import canonical_claims
-from agent.rsi.case_jobs import verify_job_report
-from agent.rsi.case_plugins import invocation, list_case_plugins, resource_for
-from agent.rsi.paper_campaign import campaign_cases, paper_case
+from agent.rsi.engine.case_evidence import canonical_claims
+from agent.rsi.campaigns.case_jobs import verify_job_report
+from agent.rsi.campaigns.case_plugins import invocation, list_case_plugins, resource_for
+from agent.rsi.campaigns.paper_campaign import campaign_cases, paper_case
 
 
 def report():
@@ -140,7 +140,7 @@ def test_runner_rejects_escape_before_making_directory(tmp_path, monkeypatch):
         monkeypatch.setenv(name, os.environ.get(name, ""))
 
     root = Path(__file__).resolve().parents[2]
-    spec = importlib.util.spec_from_file_location("clean_runner_fixture", root / "scripts/rsi/run_clean_annotation.py")
+    spec = importlib.util.spec_from_file_location("clean_runner_fixture", root / "scripts/rsi/cases/run_clean_annotation.py")
     runner = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(runner)
     monkeypatch.setattr(runner, "ROOT", tmp_path)

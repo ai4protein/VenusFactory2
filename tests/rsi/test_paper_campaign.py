@@ -8,8 +8,8 @@ from types import SimpleNamespace
 import pytest
 
 from agent.harness import Budget, ModelBinding, Profile
-from agent.rsi.paper_campaign import PAPERS, SCOPES, SUITES, campaign_cases, paper_case, validate_campaign
-from agent.rsi.reproduction_goal_contract import CRITERIA, allocation
+from agent.rsi.campaigns.paper_campaign import PAPERS, SCOPES, SUITES, campaign_cases, paper_case, validate_campaign
+from agent.rsi.engine.reproduction_goal_contract import CRITERIA, allocation
 from agent.science_goal import GoalSpec, GoalStore, run_goal
 from backend.web_v2.science_goals import PaperCampaignDriver, driver_limits, public_paper_progress, public_reproduction_recipes
 

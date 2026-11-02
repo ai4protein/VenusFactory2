@@ -8,11 +8,11 @@ import pytest
 from test_yeast_population_controls import example
 
 from agent.rsi import yeast_population_evaluation as evaluation
-from agent.rsi.prediction_metrics import measure_context
-from agent.rsi.protein_model import digest
-from agent.rsi.scientist_model_campaign import ALL_ALLOCATIONS, ModelCampaignStore
-from agent.rsi.storage import atomic_json, sha256_file
-from agent.rsi.yeast_population_controls import controls
+from agent.rsi.engine.prediction_metrics import measure_context
+from agent.rsi.engine.protein_model import digest
+from agent.rsi.campaigns.scientist_model_campaign import ALL_ALLOCATIONS, ModelCampaignStore
+from agent.rsi.engine.storage import atomic_json, sha256_file
+from agent.rsi.engine.yeast_population_controls import controls
 
 
 def terminal_state():
@@ -158,7 +158,7 @@ def test_predeclared_control_binding_is_enforced(tmp_path, monkeypatch, attack):
     protocol = {
         "final_controls": {
             "methods": list(evaluation.METHODS),
-            "implementation": "src/agent/rsi/yeast_population_controls.py",
+            "implementation": "src/agent/rsi/engine/yeast_population_controls.py",
             "sha256": sha256_file(Path(evaluation.yeast_population_controls.__file__)),
         }
     }

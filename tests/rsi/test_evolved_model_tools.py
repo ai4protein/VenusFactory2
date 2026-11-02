@@ -26,7 +26,7 @@ def published(request, monkeypatch):
             seen.extend(rows)
             return [{"id": row["id"], "sequence": row["sequence"], "prediction": 0.25} for row in rows]
 
-    monkeypatch.setattr("agent.rsi.scientist_model_library.get_model_plugin", lambda name: Plugin())
+    monkeypatch.setattr("agent.rsi.engine.scientist_model_library.get_model_plugin", lambda name: Plugin())
     return store, root, verified, result["entry_id"], seen
 
 
@@ -58,7 +58,7 @@ def test_describe_returns_scope_without_sources_data_or_internal_paths(published
 
 @pytest.fixture(params=["generated_context.v1", "generated_context.v2", "generated_context.v3"])
 def context_published(request, monkeypatch):
-    from agent.rsi.context_interfaces import module_for
+    from agent.rsi.engine.context_interfaces import module_for
 
     store, root, verified, _ = request.getfixturevalue("model_storage")
     interface = request.param
@@ -92,7 +92,7 @@ def context_published(request, monkeypatch):
 
     monkeypatch.setattr(service, "configured_library", lambda: store)
     monkeypatch.setattr(service, "assert_tool_allowed", lambda name: None)
-    monkeypatch.setattr("agent.rsi.scientist_model_library.get_model_plugin", lambda name: Plugin())
+    monkeypatch.setattr("agent.rsi.engine.scientist_model_library.get_model_plugin", lambda name: Plugin())
     inputs = [
         {"id": "query", "protein": scope["protein"], "group": "recorded_group", "values": list(range(len(columns)))}
     ]

@@ -6,14 +6,20 @@ repetitions share retrospective cohorts; they are not biological replicates.
 
 from __future__ import annotations
 
+import sys as _entry_sys
+from pathlib import Path as _EntryPath
+_entry_root = _EntryPath(__file__).resolve().parents[2]
+_entry_sys.path.insert(0, str(_entry_root))
+
+
 import argparse
 import asyncio
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 
-import run_reap_goal_comparison as common
-from audit_science_evolution import audit
+from scripts.rsi.cases import run_reap_goal_comparison as common
+from scripts.rsi.evaluation.audit_science_evolution import audit
 from run_classifier_evolution import (
     HISTORY_POLICIES,
     EvolvingClassifierGoal,

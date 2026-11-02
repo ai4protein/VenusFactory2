@@ -8,10 +8,10 @@ from types import SimpleNamespace
 import pytest
 
 from agent.harness.contracts import digest, file_hash
-from agent.rsi.versions import VersionStore
+from agent.rsi.engine.versions import VersionStore
 
 spec = importlib.util.spec_from_file_location(
-    "nucb_auditor", Path(__file__).resolve().parents[2] / "scripts/rsi/audit_nucb_generated.py"
+    "nucb_auditor", Path(__file__).resolve().parents[2] / "scripts/rsi/cases/audit_nucb_generated.py"
 )
 auditor = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(auditor)

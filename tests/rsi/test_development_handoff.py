@@ -11,10 +11,10 @@ from fastmcp import Client
 from test_generated_context import CODE
 from test_yeast_population_controls import example
 
-from agent.rsi.development_handoff import FIELD, POLICY, description, receipt_fields
-from agent.rsi.protein_model import digest
-from agent.rsi.storage import atomic_json
-from agent.rsi.tool_contracts import validate_generated_result
+from agent.rsi.engine.development_handoff import FIELD, POLICY, description, receipt_fields
+from agent.rsi.engine.protein_model import digest
+from agent.rsi.engine.storage import atomic_json
+from agent.rsi.engine.tool_contracts import validate_generated_result
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rsi"))
 from run_paired_generated import make_bundle

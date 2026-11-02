@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-SOURCE = Path(__file__).resolve().parents[2] / "scripts/rsi/evaluate_protpredict_pilot.py"
+SOURCE = Path(__file__).resolve().parents[2] / "scripts/rsi/evaluation/evaluate_protpredict_pilot.py"
 spec = importlib.util.spec_from_file_location("protpredict_evaluation_controller", SOURCE)
 evaluator = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(evaluator)

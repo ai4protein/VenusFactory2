@@ -9,7 +9,7 @@ from agent.harness import Budget, ModelBinding, Profile, Task, builtin_registry
 from agent.harness.events import audit_requests, audit_trace, normalize_dsh
 from agent.harness.gateway import EvidenceGateway, inspect_response
 from agent.research_modes import get_research_mode
-from agent.rsi.model_gateway import GatewayPolicy
+from agent.rsi.engine.model_gateway import GatewayPolicy
 
 
 def model():

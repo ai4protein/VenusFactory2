@@ -6,7 +6,7 @@ from pathlib import Path
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rsi"))
-from nucb_reproduction_checks import compare_tables
+from scripts.rsi.cases.nucb_reproduction_checks import compare_tables
 
 
 def tables(tmp_path):
@@ -78,7 +78,7 @@ def test_author_dna_tuple_serialization_matches_json_without_relaxing_identity(t
 
 
 def test_published_label_aliases_preserve_every_evaluation_row():
-    from run_nucb_cnn_reproduction import normalize_activity_labels
+    from scripts.rsi.cases.run_nucb_cnn_reproduction import normalize_activity_labels
 
     frame = pd.DataFrame({"activity_level": ["non-functional", "activity > 0", "activity > WT", "activity > A73R"]})
     normalized = normalize_activity_labels(frame)
@@ -94,7 +94,7 @@ def test_published_label_aliases_preserve_every_evaluation_row():
 
 def test_unknown_or_missing_activity_cannot_be_silently_dropped():
     import pytest
-    from run_nucb_cnn_reproduction import normalize_activity_labels
+    from scripts.rsi.cases.run_nucb_cnn_reproduction import normalize_activity_labels
 
     for value in ["unknown", None]:
         with pytest.raises(ValueError, match="Unknown or missing"):
@@ -102,7 +102,7 @@ def test_unknown_or_missing_activity_cannot_be_silently_dropped():
 
 
 def test_bootstrap_order_uses_identity_only_and_preserves_reconstructed_values():
-    from run_nucb_analysis_reproduction import align_bootstrap_row_order
+    from scripts.rsi.cases.run_nucb_analysis_reproduction import align_bootstrap_row_order
 
     data = pd.DataFrame({"generation": ["g1", "g1", "g2"], "sequence": ["B", "A", "A"], "value": [2.0, 1.0, 3.0]})
     reference = pd.DataFrame(
@@ -124,7 +124,7 @@ def test_bootstrap_order_uses_identity_only_and_preserves_reconstructed_values()
 
 def test_bootstrap_order_rejects_missing_replaced_or_duplicate_identities():
     import pytest
-    from run_nucb_analysis_reproduction import align_bootstrap_row_order
+    from scripts.rsi.cases.run_nucb_analysis_reproduction import align_bootstrap_row_order
 
     data = pd.DataFrame({"generation": ["g1", "g2"], "sequence": ["A", "A"], "value": [1.0, 2.0]})
     for reference in [data.iloc[:1], data.assign(sequence=["B", "A"]), pd.concat([data, data.iloc[:1]])]:

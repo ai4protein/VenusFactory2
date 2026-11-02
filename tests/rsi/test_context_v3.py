@@ -10,8 +10,8 @@ from test_context_v2 import make_task, save
 from agent.rsi import context_feedback_dispatch as feedback
 from agent.rsi import generated_context_v2, model_tasks
 from agent.rsi import generated_context_v3 as api
-from agent.rsi.context_baselines import run_controls
-from agent.rsi.model_plugins import get_model_plugin
+from agent.rsi.engine.context_baselines import run_controls
+from agent.rsi.engine.model_plugins import get_model_plugin
 
 
 @pytest.fixture
@@ -101,7 +101,7 @@ async def test_scientist_goal_uses_condition_bundle(contextual, tmp_path, monkey
 
 
 def test_shared_final_scorer_accepts_condition_tasks_with_missing_model(contextual):
-    from agent.rsi.shared_context_evaluation import evaluate_task
+    from agent.rsi.engine.shared_context_evaluation import evaluate_task
 
     task, _, _ = contextual
     result = evaluate_task(task, None)

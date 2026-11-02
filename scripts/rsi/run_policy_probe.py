@@ -20,11 +20,11 @@ import httpx
 from run_experiment import REPO, preflight, setup
 
 sys.path.insert(0, str(REPO / "src"))
-from agent.rsi.execution import execute_task
-from agent.rsi.model_policy import read_model_configuration
-from agent.rsi.pilot import build_tasks
-from agent.rsi.storage import atomic_json, sha256_file
-from agent.rsi.versions import VersionStore
+from agent.rsi.engine.execution import execute_task
+from agent.rsi.engine.model_policy import read_model_configuration
+from agent.rsi.campaigns.pilot import build_tasks
+from agent.rsi.engine.storage import atomic_json, sha256_file
+from agent.rsi.engine.versions import VersionStore
 
 
 def shape(value):

@@ -4,7 +4,7 @@ import sys
 
 import pytest
 
-from agent.rsi.storage import case_gpu_lock
+from agent.rsi.engine.storage import case_gpu_lock
 
 
 def test_inherited_lock_is_not_reacquired_or_released(tmp_path, monkeypatch):

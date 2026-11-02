@@ -62,7 +62,7 @@ print(json.dumps({'root':str(registry_root()),'config':str(resolved),'model':(ro
 
 
 def test_research_roots_cannot_escape_workspace(tmp_path, monkeypatch):
-    from agent.rsi.context import get_resources
+    from agent.rsi.engine.context import get_resources
 
     get_resources.cache_clear()
     monkeypatch.setenv("VENUS_RSI_WORKSPACE", str(tmp_path))
@@ -76,7 +76,7 @@ def test_research_roots_cannot_escape_workspace(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize("malformed", [[], {}, {"models": "bad"}, {"models": [{}]}])
 def test_malformed_registry_never_discards_history(tmp_path, monkeypatch, malformed):
-    from agent.rsi.context import get_resources
+    from agent.rsi.engine.context import get_resources
     from mcp_tools.models.factory.training.model_registry import index_path, list_trained_models
 
     get_resources.cache_clear()
@@ -94,7 +94,7 @@ def test_malformed_registry_never_discards_history(tmp_path, monkeypatch, malfor
 
 
 def test_agent_writable_registry_cannot_forge_publication(tmp_path, monkeypatch):
-    from agent.rsi.context import get_resources
+    from agent.rsi.engine.context import get_resources
     from mcp_tools.models.factory.training.model_registry import index_path, list_trained_models, resolve_registered_config_path
 
     get_resources.cache_clear()

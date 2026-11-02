@@ -4,9 +4,9 @@ from copy import deepcopy
 
 import pytest
 
-from agent.rsi.case_evidence import canonical_claims, validate_review
-from agent.rsi.protein_model import digest
-from agent.rsi.rfantibody_evidence import COMMIT, PRESETS, validate_target_report, verify_target_artifacts
+from agent.rsi.engine.case_evidence import canonical_claims, validate_review
+from agent.rsi.engine.protein_model import digest
+from agent.rsi.cases.rfantibody_evidence import COMMIT, PRESETS, validate_target_report, verify_target_artifacts
 
 
 def fixture(root):

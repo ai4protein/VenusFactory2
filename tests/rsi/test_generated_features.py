@@ -11,11 +11,11 @@ import pytest
 from fastmcp import Client
 
 from agent.rsi import generated_features as api
-from agent.rsi.model_lifecycle import ModelLifecycle
-from agent.rsi.model_plugins import get_model_plugin
-from agent.rsi.protein_model import digest
-from agent.rsi.storage import atomic_json
-from agent.rsi.tool_contracts import validate_generated_result
+from agent.rsi.engine.model_lifecycle import ModelLifecycle
+from agent.rsi.engine.model_plugins import get_model_plugin
+from agent.rsi.engine.protein_model import digest
+from agent.rsi.engine.storage import atomic_json
+from agent.rsi.engine.tool_contracts import validate_generated_result
 
 ROOT = Path(__file__).resolve().parents[2]
 AA = "ACDEFGHIKLMNPQRSTVWY"
@@ -46,6 +46,8 @@ def predict(model, features):
 """
 
 
+from agent.rsi.layout import source_relative
+
 def lifecycle(root):
     p = get_model_plugin(api.PLUGIN_ID)
     return ModelLifecycle(
@@ -70,7 +72,7 @@ def test_real_feature_acceptance_reuse_and_changed_encoder(tmp_path):
     atomic_json(tmp_path / "candidate.json", model)
     mid = lc.submit(tmp_path / "candidate.json", session_id="develop", mode="science_agent")
     assert lc.assess(mid, training=ROWS[:60], validation=ROWS[60:80])["passed"]
-    from agent.rsi.experience import ModelExperienceStore
+    from agent.rsi.engine.experience import ModelExperienceStore
 
     store = ModelExperienceStore(tmp_path / "experience")
     entry = store.publish(lc, mid, summary="Verified feature model fixture")
@@ -128,7 +130,7 @@ async def test_real_mcp_development_and_reuse(tmp_path):
         "protein_model.py",
         "experience.py",
     ]:
-        shutil.copy2(ROOT / "src/agent/rsi" / name, caps / name)
+        shutil.copy2(ROOT / source_relative(name), caps / name)
     task = {
         "phase": "develop",
         "plugin_id": api.PLUGIN_ID,

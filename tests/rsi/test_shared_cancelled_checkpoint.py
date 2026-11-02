@@ -6,9 +6,9 @@ import pytest
 import test_shared_science_goal as fixture
 from test_shared_model_publication import synthetic_native_seam
 
-from agent.rsi.protein_model import digest
-from agent.rsi.scientist_model_library import ScientistModelLibrary, validate_model_goal
-from agent.rsi.storage import atomic_json
+from agent.rsi.engine.protein_model import digest
+from agent.rsi.engine.scientist_model_library import ScientistModelLibrary, validate_model_goal
+from agent.rsi.engine.storage import atomic_json
 from agent.science_goal import run_goal
 
 

@@ -7,6 +7,12 @@ No policy promotion occurs here: matched offspring tests are still required.
 
 from __future__ import annotations
 
+import sys as _entry_sys
+from pathlib import Path as _EntryPath
+_entry_root = _EntryPath(__file__).resolve().parents[2]
+_entry_sys.path.insert(0, str(_entry_root))
+
+
 import argparse
 import ast
 import asyncio
@@ -15,14 +21,14 @@ import hashlib
 import json
 from pathlib import Path
 
-from audit_improver_revision import context as audit_revision_context
+from scripts.rsi.evaluation.audit_improver_revision import context as audit_revision_context
 from run_harness_probe import ROOT, credential_from_toml, default_runtimes
 from run_protein_lifecycle import audit_events
 
 from agent.harness import Profile, Task, builtin_registry
 from agent.harness.contracts import digest, file_hash
 from agent.harness.host import execute, write_json
-from agent.rsi.improver_policy import (
+from agent.rsi.engine.improver_policy import (
     BASE_POLICY,
     METRICS,
     candidate,
@@ -31,15 +37,19 @@ from agent.rsi.improver_policy import (
     validate_candidate,
     validate_packet,
 )
-from agent.rsi.model_plugins import get_model_plugin
-from agent.rsi.numerical_evidence import verify_assessment
-from agent.rsi.storage import safe_child
-from agent.rsi.versions import VersionStore
+from agent.rsi.engine.model_plugins import get_model_plugin
+from agent.rsi.engine.numerical_evidence import verify_assessment
+from agent.rsi.engine.storage import safe_child
+from agent.rsi.engine.versions import VersionStore
 from agent.science_goal import GoalStore
 
 SYSTEM = "Revise the model-code improver policy using only the supplied development evidence. You can propose policy text through the declared tools, but cannot change evaluation, tool access, budgets or dataset partitions. Submit one candidate and report its untested status. A changed policy is not evidence of better offspring or recursive improvement."
 TOOLS = frozenset({"inspect_improver_context", "submit_improver_policy"})
 
+
+from agent.rsi.layout import source_relative
+
+from agent.rsi.layout import recorded_relative
 
 def read(path):
     return json.loads(Path(path).read_text())
@@ -47,7 +57,7 @@ def read(path):
 
 def historical_plugin_hash(snapshot, hashes):
     """Interpret the published fingerprint manifests without executing code."""
-    source_name = "src/agent/rsi/generated_features.py"
+    source_name = recorded_relative(hashes, "generated_features.py")
     if source_name not in hashes:
         raise ValueError("Historical plugin snapshot is incomplete")
     for name, sha in hashes.items():
@@ -66,7 +76,7 @@ def historical_plugin_hash(snapshot, hashes):
     allowed = [legacy, legacy + ["protein_references.py"], legacy + ["protein_references.py", "numeric_runtime.py"]]
     if len(manifests) != 1 or manifests[0] not in allowed:
         raise ValueError("Historical fingerprint manifest is unsupported")
-    required = ["src/agent/rsi/" + name for name in manifests[0]]
+    required = [recorded_relative(hashes, name) for name in manifests[0]]
     if not all(name in hashes for name in required):
         raise ValueError("Historical plugin snapshot is incomplete")
     return hashlib.sha256(b"".join((snapshot / name).read_bytes() for name in required)).hexdigest()
@@ -193,7 +203,7 @@ def prepare(args):
     source = args.output / "bundle_source"
     source.mkdir()
     for original, target in [("improver_policy.py", "improver_policy.py"), ("improver_tools.py", "generated_tools.py")]:
-        (source / target).write_bytes((ROOT / "src/agent/rsi" / original).read_bytes())
+        (source / target).write_bytes((ROOT / source_relative(original)).read_bytes())
     write_json(source / "revision_context.json", packet)
     versions = VersionStore(args.output / "bundles")
     manifest = versions.snapshot(
@@ -203,10 +213,10 @@ def prepare(args):
         Path(__file__),
         ROOT / "scripts/rsi/run_harness_probe.py",
         ROOT / "scripts/rsi/run_protein_lifecycle.py",
-        ROOT / "scripts/rsi/audit_improver_revision.py",
-        ROOT / "scripts/rsi/audit_reap_generated.py",
+        ROOT / "scripts/rsi/evaluation/audit_improver_revision.py",
+        ROOT / "scripts/rsi/cases/audit_reap_generated.py",
         *sorted((ROOT / "src/agent/harness").glob("*.py")),
-        *sorted((ROOT / "src/agent/rsi").glob("*.py")),
+        *sorted((ROOT / "src/agent/rsi").rglob("*.py")),
         ROOT / "src/agent/kimi_client.py",
     ]
     hashes = {str(p.relative_to(ROOT)): file_hash(p) for p in paths}

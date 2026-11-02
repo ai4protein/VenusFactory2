@@ -245,8 +245,8 @@ def validate_tool_result(task, name, data):
     if task.phase == "chat" and task.mcp_entry == "web_tools.py":
         return
 
-    from agent.rsi.reproduction_tool_contracts import SUPPORTED, validate_reproduction_result
-    from agent.rsi.tool_contracts import validate_generated_result
+    from agent.rsi.engine.reproduction_tool_contracts import SUPPORTED, validate_reproduction_result
+    from agent.rsi.engine.tool_contracts import validate_generated_result
 
     if name in SUPPORTED:
         validate_reproduction_result(name, data, workspace=task.workspace, capability=task.capability)

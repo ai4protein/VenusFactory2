@@ -7,10 +7,10 @@ from types import SimpleNamespace
 import pytest
 
 from agent.graph.execution import verify
-from agent.rsi.experience import LIMITATION
-from agent.rsi.langgraph_tools import build_tools
-from agent.rsi.protein_model import digest
-from agent.rsi.tool_contracts import validate_generated_result
+from agent.rsi.engine.experience import LIMITATION
+from agent.rsi.engine.langgraph_tools import build_tools
+from agent.rsi.engine.protein_model import digest
+from agent.rsi.engine.tool_contracts import validate_generated_result
 
 
 @pytest.fixture

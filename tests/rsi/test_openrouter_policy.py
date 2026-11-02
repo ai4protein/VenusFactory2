@@ -9,9 +9,9 @@ import pytest
 
 from agent.harness.gateway import EvidenceGateway
 from agent.rsi import model_access
-from agent.rsi.live_model_gateway import ModelGateway
-from agent.rsi.model_gateway import GatewayPolicy
-from agent.rsi.openrouter_policy import (
+from agent.rsi.engine.live_model_gateway import ModelGateway
+from agent.rsi.engine.model_gateway import GatewayPolicy
+from agent.rsi.engine.openrouter_policy import (
     BASE_URL,
     FREE_ROUTER,
     PROVIDER,

@@ -21,7 +21,7 @@ from run_harness_probe import credential_from_toml, default_runtimes
 from agent.harness import Budget, ModelBinding, Profile, Task, builtin_registry
 from agent.harness.contracts import digest, file_hash
 from agent.harness.host import execute, write_json
-from agent.rsi.code_sandbox import guard_source, run_code
+from agent.rsi.engine.code_sandbox import guard_source, run_code
 
 PROMPT = (
     "This is a synthetic code-delivery compatibility check, not a biological discovery task. "
@@ -67,7 +67,7 @@ def prepare_task(folder):
     work, capability = folder / "workspace", folder / "capability"
     work.mkdir(parents=True)
     capability.mkdir()
-    source_root = Path(__file__).resolve().parents[2] / "src/agent/rsi"
+    source_root = Path(__file__).resolve().parents[2] / "src/agent/rsi/engine"
     for source in sorted(source_root.glob("*.py")):
         shutil.copy2(source, capability / source.name)
     write_json(work / "training.json", rows)

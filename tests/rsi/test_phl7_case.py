@@ -4,9 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from agent.rsi.case_evidence import canonical_claims, render_evidence_report
-from agent.rsi.case_plugins import invocation, list_case_plugins, resource_for
-from agent.rsi.phl7_case import (
+from agent.rsi.engine.case_evidence import canonical_claims, render_evidence_report
+from agent.rsi.campaigns.case_plugins import invocation, list_case_plugins, resource_for
+from agent.rsi.cases.phl7_case import (
     ANALYSES,
     ARCHIVE_SHA256,
     TOLERANCES,
@@ -17,7 +17,7 @@ from agent.rsi.phl7_case import (
     read_table,
     verify_artifacts,
 )
-from agent.rsi.storage import sha256_file
+from agent.rsi.engine.storage import sha256_file
 
 GRID = """#! FIELDS D1 D2 fes_cv1_cv2 dfes_cv1_cv2_D1 dfes_cv1_cv2_D2
 #! SET min_D1 0
@@ -145,7 +145,7 @@ def test_independent_auditor_uses_archive_and_rejects_tampering(tmp_path, monkey
     import importlib.util
     import zipfile
 
-    script = Path(__file__).resolve().parents[2] / "scripts/rsi/audit_phl7_case.py"
+    script = Path(__file__).resolve().parents[2] / "scripts/rsi/cases/audit_phl7_case.py"
     spec = importlib.util.spec_from_file_location("independent_phl7_audit", script)
     auditor = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(auditor)

@@ -12,10 +12,10 @@ sys.path.insert(0, str(ROOT / "src"))
 from run_harness_probe import credential_from_toml, default_runtimes
 
 from agent.harness import Profile
-from agent.rsi.generated_step_library import GeneratedStepLibrary
-from agent.rsi.model_access import authorize_profile
-from agent.rsi.paper_step_sessions import read
-from agent.rsi.research_tool_goal import create_research_tool_goal, research_tool_driver
+from agent.rsi.engine.generated_step_library import GeneratedStepLibrary
+from agent.rsi.engine.model_access import authorize_profile
+from agent.rsi.engine.paper_step_sessions import read
+from agent.rsi.campaigns.research_tool_goal import create_research_tool_goal, research_tool_driver
 from agent.science_goal import GoalStore, run_goal
 
 

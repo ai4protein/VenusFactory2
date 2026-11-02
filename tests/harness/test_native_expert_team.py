@@ -9,7 +9,7 @@ import pytest
 from agent.harness import Budget, ModelBinding, Profile, Task, builtin_registry
 from agent.harness import native_expert_team as team
 from agent.harness.host import RuntimeContext
-from agent.rsi.model_gateway import GatewayPolicy
+from agent.rsi.engine.model_gateway import GatewayPolicy
 
 
 @pytest.fixture

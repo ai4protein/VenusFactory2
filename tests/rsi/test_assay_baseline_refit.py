@@ -11,7 +11,7 @@ from test_sabio_assay_tasks import synthetic_sources
 
 from agent.rsi import assay_baseline_refit as refit
 from agent.rsi import assay_baselines, sabio_assay_tasks, sabio_domain_controls, shared_assay_evaluation
-from agent.rsi.storage import atomic_json, sha256_file
+from agent.rsi.engine.storage import atomic_json, sha256_file
 
 
 def enrich(controls, rows):
@@ -148,7 +148,7 @@ def test_intervals_preserve_missing_ranges_and_reject_nonfinite():
 
 
 def test_cli_binds_report_and_refits_all_allocations(tmp_path):
-    script = Path(__file__).resolve().parents[2] / "scripts/rsi/refit_assay_baselines.py"
+    script = Path(__file__).resolve().parents[2] / "scripts/rsi/evaluation/refit_assay_baselines.py"
     spec = importlib.util.spec_from_file_location("refit_cli_test", script)
     cli = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(cli)

@@ -15,12 +15,12 @@ from fastmcp.client.transports import StdioTransport
 from agent.harness import Budget, ModelBinding, Profile
 from agent.harness import native_expert_team as team
 from agent.harness.host import RuntimeContext
-from agent.rsi.langgraph_tools import mcp_command
-from agent.rsi.paper_step import PaperStepLifecycle, digest
-from agent.rsi.paper_step_sessions import accept_development, accept_reuse, phase_task, prepare_phase
-from agent.rsi.paper_step_tool_service import TOOLS, PaperStepTools, source_hash
-from agent.rsi.reproduction_tool_contracts import validate_reproduction_result
-from agent.rsi.storage import atomic_json, sha256_file
+from agent.rsi.engine.langgraph_tools import mcp_command
+from agent.rsi.engine.paper_step import PaperStepLifecycle, digest
+from agent.rsi.engine.paper_step_sessions import accept_development, accept_reuse, phase_task, prepare_phase
+from agent.rsi.engine.paper_step_tool_service import TOOLS, PaperStepTools, source_hash
+from agent.rsi.engine.reproduction_tool_contracts import validate_reproduction_result
+from agent.rsi.engine.storage import atomic_json, sha256_file
 
 CODE = "def reproduce(inputs):\n    return {'sum': sum(inputs)}\n"
 

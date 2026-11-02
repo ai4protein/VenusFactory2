@@ -4,10 +4,10 @@ import json
 import pytest
 
 from agent.rsi import yeast_population_tasks as source
-from agent.rsi.context_baselines import run_controls
-from agent.rsi.model_tasks import read_task
-from agent.rsi.research_project_catalog import build_catalog
-from agent.rsi.yeast_population import DOI, target_protocol
+from agent.rsi.engine.context_baselines import run_controls
+from agent.rsi.datasets.model_tasks import read_task
+from agent.rsi.datasets.research_project_catalog import build_catalog
+from agent.rsi.datasets.yeast_population import DOI, target_protocol
 
 
 @pytest.fixture

@@ -7,7 +7,7 @@ import json
 import pytest
 
 from agent.rsi import shared_goal_history as history
-from agent.rsi.protein_model import digest
+from agent.rsi.engine.protein_model import digest
 
 
 def feedback():

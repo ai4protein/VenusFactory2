@@ -10,9 +10,9 @@ from test_mcba_plugin import complete_report
 from agent.harness import ModelBinding, Profile
 from agent.harness.contracts import digest, file_hash
 from agent.harness.events import audit_requests, audit_trace
-from agent.rsi.case_evidence import canonical_claims
-from agent.rsi.reproduction_recovery import RecoveryLedger, load_source, read
-from agent.rsi.versions import VersionStore
+from agent.rsi.engine.case_evidence import canonical_claims
+from agent.rsi.engine.reproduction_recovery import RecoveryLedger, load_source, read
+from agent.rsi.engine.versions import VersionStore
 
 
 def save(path, value):
@@ -76,7 +76,7 @@ def phase(run, name, profile, job, calls=4):
 @pytest.fixture
 def source(tmp_path):
     run = tmp_path / "run"
-    entry = "scripts/rsi/run_mcba_case.py"
+    entry = "scripts/rsi/cases/run_mcba_case.py"
     impl = run / "implementation" / entry
     impl.parent.mkdir(parents=True)
     impl.write_text("# original source")
@@ -146,7 +146,7 @@ def test_invalid_source_cannot_be_recovered(source, mutation):
         report["status"] = "running"
         save(path, report)
     elif mutation == "entry":
-        (source / "implementation/scripts/rsi/run_mcba_case.py").write_text("changed")
+        (source / "implementation/scripts/rsi/cases/run_mcba_case.py").write_text("changed")
     else:
         path = source / "launch/model_requests.jsonl"
         rows = [json.loads(s) for s in path.read_text().splitlines()]

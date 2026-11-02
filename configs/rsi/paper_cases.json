@@ -894,7 +894,7 @@
         "manifest": "research_runs/rsi/case_assets/alde_landscapes/source_manifest.json"
       },
       "protocol": {
-        "adapter": "agent.rsi.landscape_cases",
+        "adapter": "agent.rsi.engine.landscape_cases",
         "training_rows": 256,
         "acceptance_rows": 512,
         "later_rows": 1024,
@@ -920,7 +920,7 @@
         "manifest": "research_runs/rsi/case_assets/alde_landscapes/source_manifest.json"
       },
       "protocol": {
-        "adapter": "agent.rsi.landscape_cases",
+        "adapter": "agent.rsi.engine.landscape_cases",
         "training_rows": 256,
         "acceptance_rows": 512,
         "later_rows": 1024,

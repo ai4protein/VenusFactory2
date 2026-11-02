@@ -19,7 +19,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[2]
 _VF_SKILLS_DIR = Path(__file__).resolve().parent / "skills"
 _SAS_SKILLS_DIR = _REPO_ROOT / "src" / "agent" / "skills" / "vendor" / "scientific-agent-skills" / "skills"
 # Back-compat alias used by older callers/tests.
-from agent.rsi.context import get_resources as _get_research_resources
+from agent.rsi.engine.context import get_resources as _get_research_resources
 _research_resources = _get_research_resources()
 if _research_resources is not None:
     _VF_SKILLS_DIR = _research_resources.skills

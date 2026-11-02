@@ -6,7 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from agent.rsi.case_plugins import invocation, list_case_plugins
+from agent.rsi.campaigns.case_plugins import invocation, list_case_plugins
 
 ROOT = Path(__file__).resolve().parents[2]
 if __name__ == "__main__":

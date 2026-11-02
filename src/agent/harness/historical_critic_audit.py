@@ -4,6 +4,7 @@ import importlib
 from pathlib import Path
 
 from .contracts import file_hash
+from agent.rsi.layout import source_relative
 
 PINNED = {
     "__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
@@ -49,7 +50,7 @@ def historical_critic_auditor(lock):
     for name in ["rsi/model_gateway.py", "rsi/scientific_episode.py"]:
         if (
             lock.get("supporting_source", {}).get(name) != PINNED[name]
-            or file_hash(Path(__file__).parent.parent / name) != PINNED[name]
+            or file_hash(Path(__file__).resolve().parents[3] / source_relative(Path(name).name)) != PINNED[name]
         ):
             raise ValueError("Historical critic support changed")
     root = Path(__file__).parent / "_legacy_pre_critic_repair"

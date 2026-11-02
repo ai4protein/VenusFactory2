@@ -8,14 +8,14 @@ from pathlib import Path
 import pytest
 from test_generated_features import CODE, SCOPE
 
-from agent.rsi.experience import LIMITATION
-from agent.rsi.protein_model import digest
-from agent.rsi.reap_experience import design, load_library, project_for_target, transfer_prompt
-from agent.rsi.storage import sha256_file
+from agent.rsi.engine.experience import LIMITATION
+from agent.rsi.engine.protein_model import digest
+from agent.rsi.cases.reap_experience import design, load_library, project_for_target, transfer_prompt
+from agent.rsi.engine.storage import sha256_file
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rsi"))
-from run_reap_generated_matrix import development_prompt
-from run_reap_transfer_campaign import analysis_rows, freeze_development_barrier, paired_contrasts
+from scripts.rsi.cases.run_reap_generated_matrix import development_prompt
+from scripts.rsi.cases.run_reap_transfer_campaign import analysis_rows, freeze_development_barrier, paired_contrasts
 
 
 def library(tmp_path):

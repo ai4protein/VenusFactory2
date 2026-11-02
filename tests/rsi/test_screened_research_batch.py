@@ -12,11 +12,11 @@ from agent.harness import Budget, ModelBinding, Profile
 from agent.harness.contracts import file_hash
 from agent.rsi import library_program_screen, model_tasks
 from agent.rsi import screened_research_batch as batch
-from agent.rsi.code_sandbox import CandidateCodeError
-from agent.rsi.model_coverage import resolve_scope
-from agent.rsi.research_project_catalog import SCHEMA, build_catalog
-from agent.rsi.scientist_model_campaign import ALL_ALLOCATIONS, ModelCampaignStore
-from agent.rsi.storage import atomic_json
+from agent.rsi.engine.code_sandbox import CandidateCodeError
+from agent.rsi.engine.model_coverage import resolve_scope
+from agent.rsi.datasets.research_project_catalog import SCHEMA, build_catalog
+from agent.rsi.campaigns.scientist_model_campaign import ALL_ALLOCATIONS, ModelCampaignStore
+from agent.rsi.engine.storage import atomic_json
 
 
 @pytest.fixture
@@ -119,7 +119,7 @@ def test_real_screen_creates_admissible_campaign_with_exact_scope_binding(fixtur
     for ref in receipt["outputs"].values():
         model_tasks.bound_file(ref)
     root = Path(__file__).resolve().parents[2]
-    impl = "src/agent/rsi/screened_research_batch.py"
+    impl = "src/agent/rsi/datasets/screened_research_batch.py"
     store = ModelCampaignStore.create(
         tmp_path / "campaign",
         objective="Synthetic Scientist batch integration",

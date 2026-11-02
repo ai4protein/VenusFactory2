@@ -10,9 +10,9 @@ from pathlib import Path
 import pytest
 
 from agent.rsi import case_jobs
-from agent.rsi.case_evidence import canonical_claims, render_evidence_report, validate_review
-from agent.rsi.case_plugins import invocation, list_case_plugins, resource_for
-from agent.rsi.mcba_evidence import COMMIT, TASK_IDS, summarize_campaign
+from agent.rsi.engine.case_evidence import canonical_claims, render_evidence_report, validate_review
+from agent.rsi.campaigns.case_plugins import invocation, list_case_plugins, resource_for
+from agent.rsi.cases.mcba_evidence import COMMIT, TASK_IDS, summarize_campaign
 
 
 def complete_report():

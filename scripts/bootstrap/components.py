@@ -62,7 +62,7 @@ def rsi_health(root, python, library=None):
     from mcp_tools.common.installation import scientist_library_root
     library = (root / Path(library).expanduser()).absolute() if library is not None else scientist_library_root(root)
     try:
-        capture([python, '-c', 'import sys; sys.path.insert(0,sys.argv[1]); from mcp_tools.models.evolved.service import configured_library; from agent.rsi.scientist_model_library import ScientistModelLibrary', root / 'src'], cwd=root, timeout=90)
+        capture([python, '-c', 'import sys; sys.path.insert(0,sys.argv[1]); from mcp_tools.models.evolved.service import configured_library; from agent.rsi.engine.scientist_model_library import ScientistModelLibrary', root / 'src'], cwd=root, timeout=90)
         healthy = library.is_dir()
     except Exception:
         healthy = False

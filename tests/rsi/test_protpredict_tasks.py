@@ -8,9 +8,9 @@ import pytest
 
 from agent.rsi import model_tasks
 from agent.rsi import protpredict_tasks as api
-from agent.rsi.protpredict_source import FEATURES, PAPER_DOI
-from agent.rsi.protpredict_source import SCHEMA as SOURCE_SCHEMA
-from agent.rsi.storage import atomic_json, sha256_file
+from agent.rsi.datasets.protpredict_source import FEATURES, PAPER_DOI
+from agent.rsi.datasets.protpredict_source import SCHEMA as SOURCE_SCHEMA
+from agent.rsi.engine.storage import atomic_json, sha256_file
 
 
 def read(path):

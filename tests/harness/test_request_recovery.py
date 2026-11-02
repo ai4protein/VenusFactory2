@@ -12,7 +12,7 @@ from agent.harness.contracts import digest
 from agent.harness.events import audit_requests
 from agent.harness.gateway import EvidenceGateway
 from agent.harness.request_recovery import POLICY, REJECTION_SHA256
-from agent.rsi.model_gateway import GatewayPolicy
+from agent.rsi.engine.model_gateway import GatewayPolicy
 
 ERROR = b'{"error":{"message":"The request is invalid: the request was rejected by an internal MaaS component. Please check the request body, required fields, and request format.","type":"invalid_request_error","param":"","code":"400001"}}'
 OK = {

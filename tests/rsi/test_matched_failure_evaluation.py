@@ -4,9 +4,9 @@ from copy import deepcopy
 import pytest
 
 from agent.rsi import matched_failure_evaluation as module
-from agent.rsi.matched_history_evidence import Evidence
-from agent.rsi.matched_history_operations import duration_totals, resource_accounting
-from agent.rsi.protein_model import digest
+from agent.rsi.engine.matched_history_evidence import Evidence
+from agent.rsi.campaigns.matched_history_operations import duration_totals, resource_accounting
+from agent.rsi.engine.protein_model import digest
 
 
 def test_unknown_failure_reservation_is_not_physical_usage():

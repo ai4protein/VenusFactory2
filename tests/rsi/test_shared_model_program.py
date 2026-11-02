@@ -12,13 +12,13 @@ from test_context_integration import make_bundle, make_task
 from test_generated_context import CODE
 
 from agent.rsi import model_tasks
-from agent.rsi.model_lifecycle import ModelLifecycle
-from agent.rsi.protein_model import digest
-from agent.rsi.scientific_episode import artifact_written, episode_contract
-from agent.rsi.shared_model_bundle import admit, prepare_bundle
-from agent.rsi.shared_model_contracts import _state
-from agent.rsi.storage import atomic_json, sha256_file
-from agent.rsi.tool_contracts import validate_generated_result
+from agent.rsi.engine.model_lifecycle import ModelLifecycle
+from agent.rsi.engine.protein_model import digest
+from agent.rsi.engine.scientific_episode import artifact_written, episode_contract
+from agent.rsi.engine.shared_model_bundle import admit, prepare_bundle
+from agent.rsi.engine.shared_model_contracts import _state
+from agent.rsi.engine.storage import atomic_json, sha256_file
+from agent.rsi.engine.tool_contracts import validate_generated_result
 
 
 def read(path):
@@ -136,7 +136,7 @@ async def test_shared_real_mcp_independent_acceptance_and_fresh_reuse(tmp_path, 
         if plugin in {"generated_context.v2", "generated_context.v3"}:
             task["scope"]["interface_version"] = plugin
         if plugin == "generated_context.v3":
-            from agent.rsi.storage import sha256_file
+            from agent.rsi.engine.storage import sha256_file
 
             group = task["scope"]["grouping"]
             reference = next(item for item in task["references"] if item["sha256"] == group["evidence_sha256"])

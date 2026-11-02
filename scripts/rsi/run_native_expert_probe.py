@@ -14,7 +14,7 @@ from agent.harness import Budget, ModelBinding, Profile, Task, builtin_registry
 from agent.harness.contracts import file_hash
 from agent.harness.host import execute, write_json
 from agent.harness.native_expert_team import NATIVE_EXPERT_HARNESSES, POLICY
-from agent.rsi.source_snapshot import research_implementation_paths
+from agent.rsi.engine.source_snapshot import research_implementation_paths
 
 TOOL = '''from fastmcp import FastMCP
 from pathlib import Path

@@ -12,11 +12,11 @@ from test_mcba_plugin import complete_report
 from agent.harness import Budget, ModelBinding, Profile
 from agent.harness.contracts import digest, file_hash
 from agent.harness.events import audit_requests, audit_trace
-from agent.rsi.case_evidence import canonical_claims
-from agent.rsi.reproduction_goal_contract import CRITERIA, allocation
-from agent.rsi.reproduction_recovery import RecoveryLedger, load_source
-from agent.rsi.scientific_episode import episode_contract
-from agent.rsi.versions import VersionStore
+from agent.rsi.engine.case_evidence import canonical_claims
+from agent.rsi.engine.reproduction_goal_contract import CRITERIA, allocation
+from agent.rsi.engine.reproduction_recovery import RecoveryLedger, load_source
+from agent.rsi.engine.scientific_episode import episode_contract
+from agent.rsi.engine.versions import VersionStore
 from agent.science_goal import GoalSpec, GoalStore, run_goal
 
 
@@ -86,7 +86,7 @@ def runtime(path, profile, tools, capability, *, outputs=None, args=None, failed
 
 def source_run(output, profile, recipe=None):
     declaration = allocation("mcba_all_tasks")
-    entry = "scripts/rsi/run_mcba_case.py"
+    entry = "scripts/rsi/cases/run_mcba_case.py"
     save(output / "implementation" / entry, {"synthetic": True})
     protocol = {
         "profile": profile.public(),
@@ -390,8 +390,8 @@ async def test_recovered_paper_publishes_and_imported_goal_still_requires_fresh_
     s = system
     campaign_module = importlib.import_module("run_paper_campaign")
     library_module = importlib.import_module("paper_library")
-    from agent.rsi.paper_campaign import campaign_cases
-    from agent.rsi.paper_capability_library import PaperCapabilityLibrary
+    from agent.rsi.campaigns.paper_campaign import campaign_cases
+    from agent.rsi.engine.paper_capability_library import PaperCapabilityLibrary
 
     papers = campaign_cases(cases=["mcba_all_tasks"])
     admission = {"kind": "paper_campaign.v1", "papers": papers, "review_continuation": s.continuation.POLICY}

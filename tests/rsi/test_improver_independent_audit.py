@@ -8,15 +8,15 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rsi"))
-import audit_improver_revision as revision_audit
-import audit_reap_improver_comparison as audit
-import run_reap_improver_comparison as runner
+from scripts.rsi.evaluation import audit_improver_revision as revision_audit
+from scripts.rsi.cases import audit_reap_improver_comparison as audit
+from scripts.rsi.cases import run_reap_improver_comparison as runner
 from test_improver_policy import history, revised
 
 from agent.harness import Budget, ModelBinding, Profile
 from agent.harness.contracts import digest, file_hash
 from agent.harness.host import write_json
-from agent.rsi.improver_policy import BASE_POLICY, candidate, identity, revision_packet
+from agent.rsi.engine.improver_policy import BASE_POLICY, candidate, identity, revision_packet
 
 
 @pytest.fixture

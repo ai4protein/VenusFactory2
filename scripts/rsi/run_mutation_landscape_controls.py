@@ -16,9 +16,9 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 
 from agent.rsi import generated_sequence as api  # noqa: E402
-from agent.rsi.code_sandbox import capture_code_runs  # noqa: E402
-from agent.rsi.model_tasks import inference_inputs, read_task  # noqa: E402
-from agent.rsi.published_sequence_tasks import _write, audit_catalog, bound  # noqa: E402
+from agent.rsi.engine.code_sandbox import capture_code_runs  # noqa: E402
+from agent.rsi.datasets.model_tasks import inference_inputs, read_task  # noqa: E402
+from agent.rsi.datasets.published_sequence_tasks import _write, audit_catalog, bound  # noqa: E402
 
 SOURCE = """import numpy as np
 DEGREE = 1

@@ -20,6 +20,8 @@
 .research-evolution td>small{display:block;margin-top:5px;color:#727c89;font-size:11px}
 .research-evolution td>strong{font-variant-numeric:tabular-nums;font-weight:500}
 .research-evolution summary{cursor:pointer;line-height:1.6}
+.research-evolution>details{margin-top:12px}
+.research-evolution>details>summary{color:#657080;padding:6px 0}
 .research-evolution details p{margin:8px 0;font-size:12px;line-height:1.6}
 .research-variant{color:#687585;font-size:11px;margin-right:5px}
 .research-evolution details button,.research-model-deliveries button{border:0;background:transparent;padding:6px 8px;color:#365c85;font-size:12px}

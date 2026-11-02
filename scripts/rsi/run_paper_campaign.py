@@ -20,11 +20,11 @@ from run_reproduction_goal import ReproductionGoal, read
 
 from agent.harness import Profile
 from agent.harness.host import write_json
-from agent.rsi.case_plugins import invocation
-from agent.rsi.paper_campaign import SCOPES, SUITES, admitted_campaign, campaign_cases
-from agent.rsi.paper_capability_library import PaperCapabilityLibrary
-from agent.rsi.reproduction_goal_contract import CRITERIA
-from agent.rsi.source_snapshot import research_implementation_paths
+from agent.rsi.campaigns.case_plugins import invocation
+from agent.rsi.campaigns.paper_campaign import SCOPES, SUITES, admitted_campaign, campaign_cases
+from agent.rsi.engine.paper_capability_library import PaperCapabilityLibrary
+from agent.rsi.engine.reproduction_goal_contract import CRITERIA
+from agent.rsi.engine.source_snapshot import research_implementation_paths
 from agent.science_goal import GoalSpec, GoalStore, run_goal
 
 

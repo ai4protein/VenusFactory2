@@ -2,7 +2,7 @@ import copy
 
 import pytest
 
-from agent.rsi.yeast_population_controls import controls, verify_metrics
+from agent.rsi.engine.yeast_population_controls import controls, verify_metrics
 
 
 def example():

@@ -2,7 +2,7 @@ import math
 
 import pytest
 
-from agent.rsi.rfantibody_alignment import compare_alignment_rows
+from agent.rsi.cases.rfantibody_alignment import compare_alignment_rows
 
 
 def row(name, backbone, pae, rmsd):

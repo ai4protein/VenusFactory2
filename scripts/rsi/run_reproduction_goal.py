@@ -31,13 +31,13 @@ from run_protein_lifecycle import audit_events
 from agent.harness import Profile
 from agent.harness.contracts import digest, file_hash
 from agent.harness.host import write_json
-from agent.rsi.case_evidence import canonical_claims, validate_review
-from agent.rsi.case_jobs import verify_job_report
-from agent.rsi.case_plugins import PLUGINS, invocation
-from agent.rsi.provider_access import access_wait
-from agent.rsi.reproduction_goal_contract import CASES, CRITERIA, allocation
-from agent.rsi.source_snapshot import research_implementation_paths
-from agent.rsi.versions import VersionStore
+from agent.rsi.engine.case_evidence import canonical_claims, validate_review
+from agent.rsi.campaigns.case_jobs import verify_job_report
+from agent.rsi.campaigns.case_plugins import PLUGINS, invocation
+from agent.rsi.engine.provider_access import access_wait
+from agent.rsi.engine.reproduction_goal_contract import CASES, CRITERIA, allocation
+from agent.rsi.engine.source_snapshot import research_implementation_paths
+from agent.rsi.engine.versions import VersionStore
 from agent.science_goal import GoalSpec, GoalStore, run_goal
 
 
@@ -146,7 +146,7 @@ class ReproductionGoal:
             if self.declaration != allocation(self.protocol["case"]):
                 raise ValueError("Goal allocation changed")
         else:
-            from agent.rsi.paper_campaign import admitted_campaign
+            from agent.rsi.campaigns.paper_campaign import admitted_campaign
 
             papers = admitted_campaign(self.protocol, store.read())
             self.paper = next((p for p in papers if p["case"] == case), None)

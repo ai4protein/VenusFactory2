@@ -10,11 +10,11 @@ from test_generated_context import CODE
 from agent.rsi import context_feedback_dispatch as feedback
 from agent.rsi import context_interfaces, generated_context, model_tasks
 from agent.rsi import generated_context_v2 as api
-from agent.rsi.context_baselines import run_controls
-from agent.rsi.model_plugins import get_model_plugin
-from agent.rsi.prediction_metrics import measure_context
-from agent.rsi.research_project_catalog import build_catalog
-from agent.rsi.storage import atomic_json, sha256_file
+from agent.rsi.engine.context_baselines import run_controls
+from agent.rsi.engine.model_plugins import get_model_plugin
+from agent.rsi.engine.prediction_metrics import measure_context
+from agent.rsi.datasets.research_project_catalog import build_catalog
+from agent.rsi.engine.storage import atomic_json, sha256_file
 
 
 def scope(columns=19):

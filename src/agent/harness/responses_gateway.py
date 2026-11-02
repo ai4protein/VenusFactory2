@@ -18,7 +18,7 @@ import httpx
 from aiohttp import web
 from .provider_config import request_headers, matches_snapshot
 
-from agent.rsi.live_model_gateway import ModelGateway
+from agent.rsi.engine.live_model_gateway import ModelGateway
 
 from .contracts import digest
 

@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from agent.rsi.paper_step import PaperStepLifecycle, compare, digest, validated_source
-from agent.rsi.storage import sha256_file
+from agent.rsi.engine.paper_step import PaperStepLifecycle, compare, digest, validated_source
+from agent.rsi.engine.storage import sha256_file
 
 SOURCE = "def reproduce(inputs):\n    return {'sum': sum(inputs)}\n"
 
@@ -130,7 +130,7 @@ def test_wrong_computation_not_registered(tmp_path):
 
 
 def test_hidden_host_file_is_not_mounted_and_failed_execution_cannot_restart(tmp_path):
-    from agent.rsi.code_sandbox import CandidateCodeError
+    from agent.rsi.engine.code_sandbox import CandidateCodeError
 
     d = definition(tmp_path)
     secret = tmp_path / "private_reference_values.txt"

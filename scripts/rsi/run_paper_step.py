@@ -12,7 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
-from agent.rsi.paper_step import PaperStepLifecycle
+from agent.rsi.engine.paper_step import PaperStepLifecycle
 
 
 def main():

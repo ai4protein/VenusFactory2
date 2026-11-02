@@ -17,10 +17,10 @@ from pathlib import Path
 
 from run_experiment import REPO, preflight, setup
 
-from agent.rsi.execution import execute_task
-from agent.rsi.pilot import build_tasks
-from agent.rsi.storage import atomic_json, sha256_file
-from agent.rsi.versions import VersionStore
+from agent.rsi.engine.execution import execute_task
+from agent.rsi.campaigns.pilot import build_tasks
+from agent.rsi.engine.storage import atomic_json, sha256_file
+from agent.rsi.engine.versions import VersionStore
 
 CONTRACT_POLICY = """Result delivery procedure (human-authored engineering control):
 Before each scientific tool call, preserve the exact task input, sequence, sample IDs and units.
@@ -193,7 +193,7 @@ def main():
     config.update(suite="glm_repeated_diagnostic", concurrency=2, claim_scope="72 synthetic diagnostic runs")
     baseline, capdir, parent = setup(config, output)
     assert baseline["model"]["model"] == "glm-4-flash"
-    baseline["diagnostic_audit_sha256"] = sha256_file(REPO / "src/agent/rsi/diagnostic_audit.py")
+    baseline["diagnostic_audit_sha256"] = sha256_file(REPO / "src/agent/rsi/engine/diagnostic_audit.py")
     atomic_json(output / "baseline.json", baseline)
     print(f"RUN_DIR={output}", flush=True)
     try:

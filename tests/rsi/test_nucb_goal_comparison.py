@@ -10,15 +10,15 @@ from test_generated_classifier import CODE, ROWS, SCOPE
 from test_nucb_science_goal import setup_goal
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rsi"))
-import run_nucb_goal_comparison as comparison
+from scripts.rsi.cases import run_nucb_goal_comparison as comparison
 import run_science_goal as base
-from run_nucb_generated_matrix import policy
-from run_nucb_science_goal import PLUGIN, NucbModelGoal
+from scripts.rsi.cases.run_nucb_generated_matrix import policy
+from scripts.rsi.cases.run_nucb_science_goal import PLUGIN, NucbModelGoal
 
 from agent.harness import Budget, ModelBinding, Profile
 from agent.harness.host import write_json
-from agent.rsi.model_lifecycle import ModelLifecycle
-from agent.rsi.model_plugins import get_model_plugin
+from agent.rsi.engine.model_lifecycle import ModelLifecycle
+from agent.rsi.engine.model_plugins import get_model_plugin
 from agent.science_goal import GoalSpec, GoalStore, run_goal
 
 BAD_CODE = "def fit(sequences, targets, seed):\n    return {}\ndef predict(model, sequences):\n    return [[1.0, 0.0] for s in sequences]\n"

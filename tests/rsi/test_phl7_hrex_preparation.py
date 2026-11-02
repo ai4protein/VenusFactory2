@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rsi"))
-from run_phl7_hrex_preparation import molecular_atoms, parse_topology, verify_scaling
+from scripts.rsi.cases.run_phl7_hrex_preparation import molecular_atoms, parse_topology, verify_scaling
 
 SOURCE = """*** published force-field attribution ***
 [ defaults ]
@@ -65,7 +65,7 @@ def test_preprocessor_and_unrecognized_preamble_are_not_ignored():
 def test_accidental_restart_does_not_overwrite_historical_report(tmp_path, monkeypatch):
     from types import SimpleNamespace
 
-    import run_phl7_hrex_preparation as module
+    from scripts.rsi.cases import run_phl7_hrex_preparation as module
 
     output = tmp_path / "completed"
     output.mkdir()

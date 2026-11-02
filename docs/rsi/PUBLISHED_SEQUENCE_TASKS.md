@@ -68,7 +68,7 @@ capabilities are exposed to the model-development episode.
 Rebuild with the admitted source versions into a new directory:
 
 ```bash
-PYTHONPATH=src python scripts/rsi/prepare_published_sequence_tasks.py \
+PYTHONPATH=src python scripts/rsi/data_preparation/prepare_published_sequence_tasks.py \
   --sources /absolute/path/to/source-cache \
   --output /absolute/path/to/new-task-catalog
 ```

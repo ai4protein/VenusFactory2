@@ -15,8 +15,8 @@ def main():
     # The supplemental controller lives outside the already frozen experiment.
     # All campaign, publication and numerical imports resolve inside its snapshot.
     sys.path.insert(0, str(args.pilot.absolute() / "repository/src"))
-    controller = Path(__file__).resolve().parents[2] / "src/agent/rsi/yeast_population_evaluation.py"
-    spec = importlib.util.spec_from_file_location("agent.rsi.yeast_population_evaluation", controller)
+    controller = Path(__file__).resolve().parents[2] / "src/agent/rsi/engine/yeast_population_evaluation.py"
+    spec = importlib.util.spec_from_file_location("agent.rsi.engine.yeast_population_evaluation", controller)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     result = module.evaluate(args.pilot, args.output)

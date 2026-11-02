@@ -37,7 +37,7 @@ From the repository root, with the admitted research assets and isolated environ
 
 ```bash
 PYTHONPATH=src research_runs/rsi/envs/clean/bin/python \
-  scripts/rsi/run_clean_annotation.py \
+  scripts/rsi/cases/run_clean_annotation.py \
   --output research_runs/rsi/clean_unique_new_run
 ```
 
@@ -123,7 +123,7 @@ For a new direct research execution, use a unique output directory:
 ```bash
 PYTHONHASHSEED=1234 OMP_NUM_THREADS=4 MKL_NUM_THREADS=4 OPENBLAS_NUM_THREADS=1 \
 research_runs/rsi/envs/clean/bin/python \
-  scripts/rsi/run_clean_training_plugin.py \
+  scripts/rsi/cases/run_clean_training_plugin.py \
   --output research_runs/rsi/clean_training_unique_new_run
 ```
 

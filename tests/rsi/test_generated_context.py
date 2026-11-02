@@ -6,11 +6,11 @@ import numpy as np
 import pytest
 
 from agent.rsi import generated_context as api
-from agent.rsi.model_lifecycle import ModelLifecycle
-from agent.rsi.model_plugins import get_model_plugin
-from agent.rsi.numerical_evidence import archive_assessment
-from agent.rsi.protein_model import digest
-from agent.rsi.storage import atomic_json
+from agent.rsi.engine.model_lifecycle import ModelLifecycle
+from agent.rsi.engine.model_plugins import get_model_plugin
+from agent.rsi.engine.numerical_evidence import archive_assessment
+from agent.rsi.engine.protein_model import digest
+from agent.rsi.engine.storage import atomic_json
 
 SCOPE = {
     "protein": "Synthetic plant protein",

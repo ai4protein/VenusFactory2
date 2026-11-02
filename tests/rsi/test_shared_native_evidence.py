@@ -12,15 +12,15 @@ from test_shared_model_program import CODE, client_for, make_task, prepare
 
 from agent.harness.events import audit_trace
 from agent.kimi_client import KimiEvent
-from agent.rsi.protein_model import digest
-from agent.rsi.runtime import run_task
-from agent.rsi.shared_goal_history import project
-from agent.rsi.shared_model_contracts import resolve_shared_result
-from agent.rsi.shared_model_display import LEGACY_POLICY, MAX_DISPLAY_CHARACTERS
-from agent.rsi.shared_model_display import POLICY as DISPLAY_POLICY
-from agent.rsi.shared_model_publication import _operation_receipts
-from agent.rsi.storage import atomic_json
-from agent.rsi.tool_contracts import validate_generated_result
+from agent.rsi.engine.protein_model import digest
+from agent.rsi.engine.runtime import run_task
+from agent.rsi.engine.shared_goal_history import project
+from agent.rsi.engine.shared_model_contracts import resolve_shared_result
+from agent.rsi.engine.shared_model_display import LEGACY_POLICY, MAX_DISPLAY_CHARACTERS
+from agent.rsi.engine.shared_model_display import POLICY as DISPLAY_POLICY
+from agent.rsi.engine.shared_model_publication import _operation_receipts
+from agent.rsi.engine.storage import atomic_json
+from agent.rsi.engine.tool_contracts import validate_generated_result
 
 
 @pytest.mark.asyncio

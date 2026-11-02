@@ -1,6 +1,6 @@
 import pytest
 
-from agent.rsi.case_evidence import canonical_claims, render_evidence_report, validate_review
+from agent.rsi.engine.case_evidence import canonical_claims, render_evidence_report, validate_review
 
 
 def example():
@@ -51,7 +51,7 @@ def test_unverified_job_cannot_supply_verified_claims():
 def test_alde_claims_keep_reused_computation_and_seed_scope_explicit():
     from copy import deepcopy
 
-    from agent.rsi.case_evidence import canonical_claims, render_evidence_report
+    from agent.rsi.engine.case_evidence import canonical_claims, render_evidence_report
 
     def summary(p, c):
         return {

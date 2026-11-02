@@ -6,7 +6,7 @@ import sqlite3
 import numpy as np
 import pytest
 
-from agent.rsi.catapro_case import FeatureCache, dataset_rows, log_targets, normalize_protein, numpy_forward
+from agent.rsi.cases.catapro_case import FeatureCache, dataset_rows, log_targets, normalize_protein, numpy_forward
 
 
 def test_units_follow_released_output_headers():

@@ -8,15 +8,15 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rsi"))
 import run_science_goal as base
-from audit_science_evolution import audit
+from scripts.rsi.evaluation.audit_science_evolution import audit
 from run_classifier_evolution import EvolvingClassifierGoal, score_terminal_campaign
 from test_generated_classifier import CODE, ROWS, SCOPE
 from test_nucb_science_goal import setup_goal
 
 from agent.harness.contracts import digest
 from agent.harness.host import write_json
-from agent.rsi.model_plugins import get_model_plugin
-from agent.rsi.source_lineage import program_hash
+from agent.rsi.engine.model_plugins import get_model_plugin
+from agent.rsi.datasets.source_lineage import program_hash
 from agent.science_goal import run_goal
 from backend.web_v2.science_goals import EvolvingModelDriver, ScienceGoalService
 

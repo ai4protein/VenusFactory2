@@ -11,14 +11,14 @@ from pathlib import Path
 import pytest
 from fastmcp import Client
 
-from agent.rsi.code_sandbox import guard_source
-from agent.rsi.langgraph_tools import build_tools
-from agent.rsi.model_lifecycle import ModelLifecycle
-from agent.rsi.model_plugins import get_model_plugin
-from agent.rsi.protein_model import digest
-from agent.rsi.protein_references import audit_source_references, reference_catalog
-from agent.rsi.storage import atomic_json
-from agent.rsi.tool_contracts import validate_generated_result
+from agent.rsi.engine.code_sandbox import guard_source
+from agent.rsi.engine.langgraph_tools import build_tools
+from agent.rsi.engine.model_lifecycle import ModelLifecycle
+from agent.rsi.engine.model_plugins import get_model_plugin
+from agent.rsi.engine.protein_model import digest
+from agent.rsi.engine.protein_references import audit_source_references, reference_catalog
+from agent.rsi.engine.storage import atomic_json
+from agent.rsi.engine.tool_contracts import validate_generated_result
 
 ROOT = Path(__file__).resolve().parents[2]
 AA = "ACDEFGHIKLMNPQRSTVWY"
@@ -31,6 +31,8 @@ SCOPE = {
     "sequence_length": 2,
 }
 
+
+from agent.rsi.layout import source_relative
 
 def source(order=AA, *, reference=REF, mapping=False, mutation=None):
     catalog = reference_catalog()
@@ -146,7 +148,7 @@ def bundle(tmp_path, phase, rows, packet=None):
     cap.mkdir(parents=True)
     work.mkdir()
     for name in FILES:
-        shutil.copy2(ROOT / "src/agent/rsi" / name, cap / name)
+        shutil.copy2(ROOT / source_relative(name), cap / name)
     name = "training.json" if phase == "develop" else "inputs.json"
     task = {"phase": phase, "scope": SCOPE, "plugin_id": "generated_python.v1", "inputs": {name: digest(rows)}}
     if packet is not None:

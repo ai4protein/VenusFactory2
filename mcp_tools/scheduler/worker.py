@@ -32,7 +32,7 @@ async def execute(spec):
         os.environ['VENUS_RSI_WORKSPACE'] = str(workspace)
         os.environ['VENUS_RSI_REGISTRY_ROOT'] = str(workspace / 'registry')
         os.environ['VENUS_RSI_SKILLS_ROOT'] = str(workspace / 'skills')
-        from agent.rsi.context import get_resources
+        from agent.rsi.engine.context import get_resources
         get_resources.cache_clear()
     if spec['route']=='public_service':
         from mcp_tools.tools.research.services import run_service

@@ -14,8 +14,8 @@ from test_generated_context import CODE, ROWS, SCOPE
 from agent.harness.contracts import digest
 from agent.rsi import campaign_evaluation as evaluation
 from agent.rsi import generated_context, model_tasks
-from agent.rsi.context_baselines import run_controls
-from agent.rsi.prediction_metrics import measure_context
+from agent.rsi.engine.context_baselines import run_controls
+from agent.rsi.engine.prediction_metrics import measure_context
 
 
 @pytest.fixture

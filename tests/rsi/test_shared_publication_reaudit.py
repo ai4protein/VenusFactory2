@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-_path = Path(__file__).resolve().parents[2] / 'scripts/rsi/audit_shared_publications.py'
+_path = Path(__file__).resolve().parents[2] / 'scripts/rsi/evaluation/audit_shared_publications.py'
 _spec = importlib.util.spec_from_file_location('publication_reaudit', _path)
 audit = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(audit)

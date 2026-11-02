@@ -11,15 +11,17 @@ from pathlib import Path
 
 from run_protein_lifecycle import ROOT, audit_events
 
-from agent.rsi.case_evidence import canonical_claims, render_evidence_report, validate_review
-from agent.rsi.live_model_gateway import ModelGateway
-from agent.rsi.model_gateway import GatewayPolicy
-from agent.rsi.model_policy import read_model_configuration
-from agent.rsi.runtime import run_task
-from agent.rsi.sandbox import SandboxKimi
-from agent.rsi.storage import atomic_json, sha256_file
-from agent.rsi.versions import VersionStore
+from agent.rsi.engine.case_evidence import canonical_claims, render_evidence_report, validate_review
+from agent.rsi.engine.live_model_gateway import ModelGateway
+from agent.rsi.engine.model_gateway import GatewayPolicy
+from agent.rsi.engine.model_policy import read_model_configuration
+from agent.rsi.engine.runtime import run_task
+from agent.rsi.engine.sandbox import SandboxKimi
+from agent.rsi.engine.storage import atomic_json, sha256_file
+from agent.rsi.engine.versions import VersionStore
 
+
+from agent.rsi.layout import source_relative
 
 async def review_case(*, source_report, plugin, job_id, output, config):
     output.mkdir(parents=True, exist_ok=False)
@@ -29,12 +31,12 @@ async def review_case(*, source_report, plugin, job_id, output, config):
     source_sha = sha256_file(source_report)
     expected = canonical_claims(plugin, json.loads(source_report.read_text()))
     source = output / "bundle_source"
-    (source / "agent/rsi").mkdir(parents=True)
+    (source / "agent/rsi/engine").mkdir(parents=True)
     for name in ["case_evidence.py", "protein_model.py"]:
-        shutil.copy2(ROOT / "src/agent/rsi" / name, source / "agent/rsi" / name)
-    for path in [source / "agent/__init__.py", source / "agent/rsi/__init__.py"]:
+        shutil.copy2(ROOT / source_relative(name), source / "agent/rsi/engine" / name)
+    for path in [source / "agent/__init__.py", source / "agent/rsi/__init__.py", source / "agent/rsi/engine/__init__.py"]:
         path.write_text("")
-    shutil.copy2(ROOT / "src/agent/rsi/case_review_tools.py", source / "generated_tools.py")
+    shutil.copy2(ROOT / "src/agent/rsi/engine/case_review_tools.py", source / "generated_tools.py")
     atomic_json(
         source / "evidence.json",
         {

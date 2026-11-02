@@ -5,8 +5,8 @@ import argparse
 import json
 from pathlib import Path
 
-from agent.rsi.shared_acquisition_plan import plan_acquisition
-from agent.rsi.storage import atomic_json, sha256_file
+from agent.rsi.campaigns.shared_acquisition_plan import plan_acquisition
+from agent.rsi.engine.storage import atomic_json, sha256_file
 
 
 def reference(path):

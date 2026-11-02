@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-path = Path(__file__).resolve().parents[2] / "scripts/rsi/audit_htfunclib_case.py"
+path = Path(__file__).resolve().parents[2] / "scripts/rsi/cases/audit_htfunclib_case.py"
 spec = importlib.util.spec_from_file_location("htfunclib_native_audit", path)
 audit = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(audit)

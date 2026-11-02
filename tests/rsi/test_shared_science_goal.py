@@ -11,10 +11,10 @@ import pytest
 from test_shared_model_program import CODE, client_for, task_pair
 
 from agent.harness import Budget, ModelBinding, Profile
-from agent.rsi.protein_model import digest
-from agent.rsi.scientist_model_library import validate_model_goal
-from agent.rsi.storage import atomic_json, sha256_file
-from agent.rsi.tool_contracts import validate_generated_result
+from agent.rsi.engine.protein_model import digest
+from agent.rsi.engine.scientist_model_library import validate_model_goal
+from agent.rsi.engine.storage import atomic_json, sha256_file
+from agent.rsi.engine.tool_contracts import validate_generated_result
 from agent.science_goal import GoalSpec, GoalStore, run_goal
 
 ROOT = Path(__file__).resolve().parents[2]

@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/rsi"))
-from fetch_pmc_assets import resolve_asset, verified_bytes
+from scripts.rsi.data_preparation.fetch_pmc_assets import resolve_asset, verified_bytes
 
 
 def test_pmc_url_and_checksum_binding():

@@ -10,7 +10,7 @@ from sklearn.linear_model import Ridge
 
 def script(name):
     spec = importlib.util.spec_from_file_location(
-        name, Path(__file__).resolve().parents[2] / "scripts/rsi" / (name + ".py")
+        name, Path(__file__).resolve().parents[2] / "scripts/rsi/cases" / (name + ".py")
     )
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

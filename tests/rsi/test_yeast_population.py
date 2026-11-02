@@ -7,7 +7,7 @@ import openpyxl
 import pytest
 
 from agent.rsi import yeast_population as population
-from agent.rsi.storage import sha256_file
+from agent.rsi.engine.storage import sha256_file
 
 
 def samples():

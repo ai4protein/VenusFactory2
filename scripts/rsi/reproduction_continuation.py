@@ -4,11 +4,17 @@ This does not restart a job, alter its failed episode, or turn an operator
 recovery into autonomous success. Legacy protocols do not opt in implicitly.
 """
 
+import sys as _entry_sys
+from pathlib import Path as _EntryPath
+_entry_root = _EntryPath(__file__).resolve().parents[2]
+_entry_sys.path.insert(0, str(_entry_root))
+
+
 from copy import deepcopy
 from pathlib import Path
 from types import SimpleNamespace
 
-from audit_reproduction_recovery import verify_recovery
+from scripts.rsi.evaluation.audit_reproduction_recovery import verify_recovery
 from resume_harness_reproduction import main as recover_review
 from run_harness_probe import ROOT
 from run_harness_reproduction import submission_receipt_matches
@@ -16,9 +22,9 @@ from run_protein_lifecycle import audit_events
 
 from agent.harness.contracts import digest, file_hash
 from agent.harness.host import write_json
-from agent.rsi.case_jobs import verify_job_report
-from agent.rsi.reproduction_recovery import RESOURCES, RecoveryLedger, equal, load_source, read
-from agent.rsi.storage import safe_child
+from agent.rsi.campaigns.case_jobs import verify_job_report
+from agent.rsi.engine.reproduction_recovery import RESOURCES, RecoveryLedger, equal, load_source, read
+from agent.rsi.engine.storage import safe_child
 
 POLICY = "verified_completed_job.v1"
 

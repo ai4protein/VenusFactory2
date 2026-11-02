@@ -12,9 +12,9 @@ from test_shared_model_publication import synthetic_native_seam
 
 from agent.harness import Budget, ModelBinding, Profile
 from agent.rsi import shared_model_campaign as campaign
-from agent.rsi.scientist_model_library import ScientistModelLibrary
-from agent.rsi.source_snapshot import research_implementation_paths
-from agent.rsi.storage import atomic_json, sha256_file
+from agent.rsi.engine.scientist_model_library import ScientistModelLibrary
+from agent.rsi.engine.source_snapshot import research_implementation_paths
+from agent.rsi.engine.storage import atomic_json, sha256_file
 from agent.science_goal import GoalSpec, GoalStore, run_goal
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -57,7 +57,7 @@ def batch(root, index, *, reject=False):
 
 
 def create(root, batches, *, target=10000, resources=None, full_source=False, excluded=(), required=()):
-    paths = research_implementation_paths(ROOT) if full_source else [ROOT / "src/agent/rsi/shared_model_campaign.py"]
+    paths = research_implementation_paths(ROOT) if full_source else [ROOT / "src/agent/rsi/campaigns/shared_model_campaign.py"]
     implementation = {p.relative_to(ROOT).as_posix(): sha256_file(p) for p in paths}
     limits = {key: sum(row["goal_budget"][key] for row in batches) for key in campaign.RESOURCES}
     return campaign.SharedCampaignStore.create(

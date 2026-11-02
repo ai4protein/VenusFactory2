@@ -9,7 +9,7 @@ from test_sabio_assay_tasks import synthetic_sources
 
 from agent.rsi import model_tasks, sabio_assay_tasks
 from agent.rsi import sabio_domain_controls as domain
-from agent.rsi.assay_baselines import run_controls
+from agent.rsi.engine.assay_baselines import run_controls
 
 
 def test_family_median_weights_components_and_uses_hierarchy():

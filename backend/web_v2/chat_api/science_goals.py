@@ -191,7 +191,7 @@ async def control_goal(
 
 
 @router.get("/sessions/{session_id}/science-goals/{goal_id}/project")
-async def download_project(session_id: str, goal_id: str, request: Request, format: Literal["zip", "report"] = "zip"):
+async def download_project(session_id: str, goal_id: str, request: Request, format: Literal["zip", "report"] = "zip", include_working_files: bool = False):
     await access(session_id, request)
     from agent.science_goal import GoalStore
     from backend.web_v2.research_delivery import export_project, report
@@ -205,7 +205,7 @@ async def download_project(session_id: str, goal_id: str, request: Request, form
         headers = {"Cache-Control": "no-store", "Content-Disposition": f'attachment; filename="research-{goal_id}.{ "zip" if format == "zip" else "md" }"'}
         if format == "report":
             return Response(report(state), media_type="text/markdown", headers=headers)
-        archive = await asyncio.to_thread(export_project, folder, state)
+        archive = await asyncio.to_thread(export_project, folder, state, include_working_files=include_working_files)
         return StreamingResponse(chunks(archive), media_type="application/zip", headers=headers)
     except FileNotFoundError as exc:
         raise HTTPException(404, "Research project not found") from exc

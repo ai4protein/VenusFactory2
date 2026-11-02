@@ -5,7 +5,7 @@ import pytest
 
 from agent.graph.execution.prepare import materialize_deferred_input
 from agent.graph.planning.plan import _filter_unparameterized_steps
-from agent.rsi.langgraph_tools import build_tools
+from agent.rsi.engine.langgraph_tools import build_tools
 
 
 @pytest.mark.asyncio

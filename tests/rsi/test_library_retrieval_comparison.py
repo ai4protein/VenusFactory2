@@ -7,7 +7,7 @@ from test_campaign_evaluation import campaign as campaign  # noqa: F401
 from test_scientist_model_campaign import task as task  # noqa: F401
 
 from agent.rsi import campaign_evaluation as evaluation
-from agent.rsi.scientist_model_campaign import ALL_ALLOCATIONS, ModelCampaignStore
+from agent.rsi.campaigns.scientist_model_campaign import ALL_ALLOCATIONS, ModelCampaignStore
 
 
 def three_arms(campaign):

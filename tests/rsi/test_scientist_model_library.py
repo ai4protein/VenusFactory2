@@ -11,10 +11,10 @@ from agent.harness import Budget, ModelBinding, Profile
 from agent.harness.contracts import digest, file_hash
 from agent.rsi import model_tasks
 from agent.rsi import scientist_model_library as library
-from agent.rsi.generated_model import fit_candidate, predict
-from agent.rsi.model_lifecycle import ModelLifecycle
-from agent.rsi.model_plugins import get_model_plugin
-from agent.rsi.storage import atomic_json
+from agent.rsi.engine.generated_model import fit_candidate, predict
+from agent.rsi.engine.model_lifecycle import ModelLifecycle
+from agent.rsi.engine.model_plugins import get_model_plugin
+from agent.rsi.engine.storage import atomic_json
 from agent.science_goal import GoalSpec, GoalStore
 
 

@@ -5,10 +5,10 @@ from pathlib import Path
 
 import pytest
 
-from agent.rsi.case_evidence import canonical_claims, render_evidence_report
-from agent.rsi.case_plugins import invocation, list_case_plugins, resource_for
-from agent.rsi.phl7_case import ARCHIVE_SHA256
-from agent.rsi.phl7_hrex import PLUGIN_ID, STAGES, canonical_hrex
+from agent.rsi.engine.case_evidence import canonical_claims, render_evidence_report
+from agent.rsi.campaigns.case_plugins import invocation, list_case_plugins, resource_for
+from agent.rsi.cases.phl7_case import ARCHIVE_SHA256
+from agent.rsi.cases.phl7_hrex import PLUGIN_ID, STAGES, canonical_hrex
 
 
 def report():
@@ -96,8 +96,8 @@ def test_unsupported_or_incomplete_evidence_is_rejected(mutation):
 def test_runtime_manifest_rejects_unverified_or_changed_dependencies(tmp_path, mutation):
     import json
 
-    from agent.rsi.phl7_hrex import runtime_configuration
-    from agent.rsi.storage import sha256_file
+    from agent.rsi.cases.phl7_hrex import runtime_configuration
+    from agent.rsi.engine.storage import sha256_file
 
     config_path = tmp_path / "research_runs/rsi/runtime_configs/phl7_hrex/cpu.json"
     config_path.parent.mkdir(parents=True)
@@ -145,11 +145,11 @@ def test_failed_dynamics_preserves_known_progress_or_uncertainty(tmp_path, monke
 
     scripts = Path(__file__).resolve().parents[2] / "scripts/rsi"
     monkeypatch.syspath_prepend(str(scripts))
-    spec = importlib.util.spec_from_file_location("pipeline_failure_test", scripts / "run_phl7_hrex_case.py")
+    spec = importlib.util.spec_from_file_location("pipeline_failure_test", scripts / "cases/run_phl7_hrex_case.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     monkeypatch.setattr(module, "ROOT", tmp_path)
-    source = tmp_path / "src/agent/rsi/phl7_hrex.py"
+    source = tmp_path / "src/agent/rsi/cases/phl7_hrex.py"
     source.parent.mkdir(parents=True)
     source.write_text("# isolated source fixture")
     build = tmp_path / "build"

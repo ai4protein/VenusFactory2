@@ -5,12 +5,12 @@ import numpy as np
 import pytest
 
 from agent.rsi import generated_classifier as classifier
-from agent.rsi.experience import ModelExperienceStore
-from agent.rsi.model_lifecycle import ModelLifecycle
-from agent.rsi.model_plugins import get_model_plugin
-from agent.rsi.nucb_case import reconstruct_sequence, temporal_partition
-from agent.rsi.protein_model import digest
-from agent.rsi.storage import atomic_json
+from agent.rsi.engine.experience import ModelExperienceStore
+from agent.rsi.engine.model_lifecycle import ModelLifecycle
+from agent.rsi.engine.model_plugins import get_model_plugin
+from agent.rsi.cases.nucb_case import reconstruct_sequence, temporal_partition
+from agent.rsi.engine.protein_model import digest
+from agent.rsi.engine.storage import atomic_json
 
 SCOPE = {
     "protein": "fixture",
@@ -118,7 +118,7 @@ def test_historical_training_does_not_use_later_duplicate_labels():
 
 
 def test_probability_artifact_contract_rejects_plausible_class_with_bad_distribution(tmp_path):
-    from agent.rsi.tool_contracts import validate_generated_result
+    from agent.rsi.engine.tool_contracts import validate_generated_result
 
     work, caps = tmp_path / "work", tmp_path / "caps"
     work.mkdir()

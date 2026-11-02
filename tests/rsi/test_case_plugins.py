@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from agent.rsi.case_plugins import invocation
+from agent.rsi.campaigns.case_plugins import invocation
 
 
 def call(tmp_path, plugin, parameters, output=None):
@@ -54,7 +54,7 @@ def test_multitarget_case_requires_explicit_registered_antigen(tmp_path):
 
 
 def test_alde_cpu_recipes_separate_existing_evidence_from_new_computation(tmp_path):
-    from agent.rsi.case_plugins import resource_for
+    from agent.rsi.campaigns.case_plugins import resource_for
 
     argv = call(
         tmp_path, "alde.onehot_dnn.v1", {"operation": "reproduce", "seeds": 70, "acquisitions": ["GREEDY", "UCB", "TS"]}

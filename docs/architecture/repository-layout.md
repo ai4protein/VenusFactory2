@@ -20,6 +20,10 @@ mcp_tools/                      Shared scientific capability service
 src/agent/                      Agent, Scientist, Researcher orchestration
   harness/                      Harness adapters and session sandbox adapters
   rsi/                          Research lifecycle, evaluation and admission
+    engine/                     Reusable execution and evaluation primitives
+    artifacts/                  Model/method contract and selected releases
+    datasets/, cases/            Data adapters and paper-specific reproductions
+    campaigns/                  Multi-topic study orchestration
   skills/                       Native SKILL.md packages
     vendor/scientific-agent-skills/  Intact optional upstream Git submodule
 configs/                        Runtime, queue, install and research configuration
@@ -65,6 +69,13 @@ a new installation. Administrator availability and quotas are persisted per mode
 Dated work logs and machine-specific profiles are archived locally under ignored
 `archive/research-notes/`. Experiment evidence is preserved under `research_runs/`.
 Only reusable protocols and credential-free templates belong in source control.
+
+RSI experiment history is distinct from a deployable capability. A topic keeps
+trial code and metrics in its workspace; the host packages the selected,
+independently approved result. Later versions of the same topic and scope replace
+the default discovery entry while retaining immutable earlier versions. See
+[Scientist delivery](../scientist-model-development.md) and
+[RSI source ownership](../../src/agent/rsi/README.md).
 
 Do not merge local and online state. Do not move a Python venv after installation:
 its entry-point shebangs can contain absolute paths. Installations can be shared

@@ -13,7 +13,9 @@ SCIENTIST_PURPOSE = (
 
 
 def topic_context():
+    from agent.rsi.artifacts.contract import guide
     return {
+        'artifact_contract': guide(),
         'workflow': 'Scientist / RSI',
         'entry': 'One natural-language topic; optional wet-lab tables, sequences, structures, papers or notes.',
         'materials': {
