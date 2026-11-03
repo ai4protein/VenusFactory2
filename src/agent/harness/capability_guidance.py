@@ -1,5 +1,7 @@
 """Shared discovery guidance for conversational harnesses."""
 
+from .capability_boundary import CAPABILITY_BOUNDARY
+
 
 def discovery_instructions(tool_names):
     names = set(tool_names)
@@ -18,7 +20,7 @@ def discovery_instructions(tool_names):
     ) if manual else ''
     search = registered("search_research_tools")
     if not search:
-        return help_text
+        return CAPABILITY_BOUNDARY + '\n\n' + help_text
     describe = registered("describe_evolved_model")
     predict = registered("predict_with_evolved_model")
     text = (
@@ -59,7 +61,7 @@ def discovery_instructions(tool_names):
         'query_europepmc': 'Europe PMC literature abstracts, DOI/PMID and retraction metadata',
         'query_pubchem': 'compound names, CID/SMILES and physicochemical descriptors',
         'query_gget': 'gget gene annotation, sequence, tissue expression, orthology, target associations and gene-set enrichment',
-        'query_public_protein_service': 'InterPro/Pfam, QuickGO, STRING, Reactome, AlphaFold DB and PDBe annotations',
+        'query_public_protein_service': 'InterPro/Pfam, QuickGO, STRING, Reactome, AlphaFold DB existing structures and PDBe annotations',
     }
     available = [registered(name) + ' for ' + detail for name, detail in public.items() if registered(name)]
     if available:
@@ -71,4 +73,4 @@ def discovery_instructions(tool_names):
                  "theoretical pI, GRAVY and composition. It is a local CPU calculation with no input file required. "
                  "Do not run structure prediction or download a protein merely to create a FASTA input. "
                  "Keep progress updates concise; if a required input is missing, ask for it instead of repeating speculative tool plans. ")
-    return help_text + text
+    return CAPABILITY_BOUNDARY + '\n\n' + help_text + text

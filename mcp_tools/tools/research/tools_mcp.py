@@ -8,7 +8,7 @@ mcp=FastMCP('Venus_Public_Protein_Services')
 
 @mcp.tool(name='query_public_protein_service')
 async def query_public_protein_service(service: ServiceName, accession: str='', sequence: str='', structure_pdb: str='', structure_chain: str='') -> dict:
-    """Run free remote NCBI BLAST or Foldseek, or query InterPro/Pfam, QuickGO, STRING, KEGG, Reactome, AlphaFold DB and PDBe/PDB. Returns evidence, actual status and a remote job URL. BLAST sends a sequence to NCBI; Foldseek sends a protein structure. Use an exact UniProt ID for annotations. Pending jobs are not completed analyses. No local GPU computation."""
+    """Query public protein databases or submit remote NCBI BLAST/Foldseek searches; AlphaFold DB retrieves existing structures, not new predictions. Services include InterPro/Pfam, QuickGO, STRING, KEGG, Reactome and PDBe/PDB. Returns evidence, actual status and a remote job URL. BLAST sends a sequence to NCBI; Foldseek sends a protein structure. Use an exact UniProt ID for annotations. Pending jobs are not completed analyses. No local GPU computation."""
     return await public_analysis(service,accession,sequence,structure_pdb,structure_chain)
 
 

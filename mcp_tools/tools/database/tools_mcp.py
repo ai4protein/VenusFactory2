@@ -118,7 +118,7 @@ def mcp_download_alphafold_structure(
     version: str = "v6",
     fragment: int = 1,
 ) -> str:
-    """Download AlphaFold 3D structure by UniProt ID."""
+    """Retrieve existing AlphaFold DB structure records by UniProt ID; this does not run AlphaFold inference."""
     result = download_alphafold_structure_by_uniprot_id(
         uniprot_id, out_dir, format=format, version=version, fragment=fragment
     )
@@ -127,14 +127,14 @@ def mcp_download_alphafold_structure(
 
 @mcp.tool(name="download_alphafold_metadata")
 def mcp_download_alphafold_metadata(uniprot_id: str, out_dir: str) -> str:
-    """Download AlphaFold metadata by UniProt ID."""
+    """Retrieve existing AlphaFold DB confidence/metadata records; this does not run AlphaFold inference."""
     result = download_alphafold_metadata_by_uniprot_id(uniprot_id, out_dir)
     return result
 
 
 @mcp.tool(name="analyze_alphafold_plddt")
 def mcp_analyze_alphafold_plddt(metadata_path: str) -> str:
-    """Analyze pLDDT fractions from a local AlphaFold metadata JSON file."""
+    """Analyze pLDDT confidence from a supplied AlphaFold metadata JSON; this does not run AlphaFold inference."""
     return analyze_alphafold_plddt_by_metadata_file(metadata_path)
 
 
@@ -144,7 +144,7 @@ def mcp_analyze_alphafold_pae(
     distance_cutoff: float = 7.0,
     min_domain_size: int = 40,
 ) -> str:
-    """Detect global domain boundaries from a local AlphaFold PAE JSON file."""
+    """Analyze a supplied AlphaFold PAE matrix for domain boundaries; this does not run AlphaFold inference."""
     return analyze_alphafold_pae_by_pae_file(pae_path, distance_cutoff=distance_cutoff, min_domain_size=min_domain_size)
 
 
@@ -315,7 +315,7 @@ def mcp_download_mmseqs2_homologs(
     poll_interval: float = 10.0,
     timeout_secs: int = 15 * 60,
 ) -> str:
-    """ColabFold MMseqs2 homologue search by protein sequence (submit + poll + download + parse)."""
+    """Query the external ColabFold service for sequence homologues; this adapter does not execute local MMseqs2. Submits, polls and downloads parsed results."""
     return download_mmseqs2_homologs_by_sequence(
         sequence_or_fasta_path, out_dir,
         include_mgnify=include_mgnify, poll_interval=poll_interval, timeout_secs=timeout_secs,

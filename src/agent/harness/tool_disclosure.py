@@ -6,13 +6,14 @@ calls must still pass the host's normal policy, argument and queue checks.
 from __future__ import annotations
 
 import re
+from .capability_boundary import CAPABILITY_BOUNDARY
 
 
 SEARCH = 'search_tools'
 DESCRIBE = 'describe_tool'
 CALL = 'call_tool'
 CONTROLS = frozenset({SEARCH, DESCRIBE, CALL})
-GUIDANCE = (
+GUIDANCE = CAPABILITY_BOUNDARY + '\n\n' + (
     'Tools use progressive disclosure. Answer ordinary questions directly. '
     'When a tool is needed, use search_tools with concise English keywords or a tool name. '
     'It returns only names and short descriptions, with pagination. Read describe_tool for the selected '

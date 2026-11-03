@@ -47,6 +47,16 @@ NCBI BLAST searches sequence similarity. Remote Foldseek searches structural sim
 
 Remote services can return a job identifier while processing. Continue checking that identifier rather than repeatedly submitting the same search. Public server rate limits and outages are independent of platform availability.
 
+## Platform capability boundaries
+
+Use the current tool/model catalog to check what is enabled in this deployment. Database retrieval, remote searches, model inference and training are different operations.
+
+- **AlphaFold DB** retrieves existing predicted structures and confidence records. VenusFactory does not expose an AlphaFold inference engine for new structure prediction.
+- **ColabFold sequence search**, when enabled, queries an external public service. It is not a local MMseqs2 installation or an arbitrary MMseqs2 command interface.
+- **NCBI BLAST and remote Foldseek** submit searches to their respective public servers. Availability and completion depend on those servers.
+- **Structure-conditioned mutation scoring** evaluates mutations using an input structure. It does not generate that structure. pLDDT/PAE analysis interprets existing confidence values.
+- A model is usable only when its adapter is configured and enabled. A mention in a paper, tutorial or previous answer does not establish availability.
+
 ## Keep provenance
 
 Keep database accessions, source links, retrieval context and relevant versions with downloaded files. Search snippets are not full papers, and a homology hit is not experimental confirmation of function. For a comprehensive synthesis, use [Researcher](manual:researcher).

@@ -117,7 +117,7 @@ def download_mmseqs2_homologs_by_sequence(
     poll_interval: float = 10.0,
     timeout_secs: int = 15 * 60,
 ) -> str:
-    """Run MMseqs2 (ColabFold) homologue search. Returns rich JSON envelope.
+    """Query the external ColabFold service for sequence homologues; this adapter does not execute local MMseqs2. Returns a rich JSON envelope.
 
     `sequence_or_fasta_path` may be a raw amino-acid sequence or a path to a
     FASTA file (first record is used).

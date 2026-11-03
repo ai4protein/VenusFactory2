@@ -38,7 +38,7 @@ class PublicProteinInput(BaseModel):
 
 @tool('query_public_protein_service',args_schema=PublicProteinInput)
 def query_public_protein_service_tool(service: str, accession: str='', sequence: str='', structure_pdb: str='', structure_chain: str='') -> dict:
-    """Run a bounded free public protein analysis: NCBI BLAST, remote Foldseek, InterPro/Pfam, QuickGO, STRING, KEGG, Reactome, AlphaFold DB, or PDBe/PDB. BLAST submits one protein sequence; Foldseek submits one protein structure. Returns actual status, evidence, and remote job URL. Remote similarity is not functional validation. No local GPU training or VenusMine execution. Jobs can take several minutes; pending means still processing, not complete."""
+    """Query public protein databases or submit remote NCBI BLAST/Foldseek searches; AlphaFold DB retrieves existing structures, not new predictions. Services include InterPro/Pfam, QuickGO, STRING, KEGG, Reactome and PDBe/PDB. BLAST submits one protein sequence; Foldseek submits one protein structure. Returns actual status, evidence, and remote job URL. Remote similarity is not functional validation. No local GPU training or VenusMine execution. Jobs can take several minutes; pending means still processing, not complete."""
     return asyncio.run(public_analysis(service,accession,sequence,structure_pdb,structure_chain))
 
 

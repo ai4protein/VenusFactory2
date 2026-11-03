@@ -106,7 +106,7 @@ def download_alphafold_structure_by_uniprot_id_tool(
     version: str = "v6",
     fragment: int = 1
 ) -> str:
-    """Download AlphaFold structure by UniProt ID. Returns JSON: {success, file_path} where file_path is the path to the downloaded structure file."""
+    """Retrieve existing AlphaFold DB structure records by UniProt ID; this does not run AlphaFold inference. Returns JSON: {success, file_path} where file_path is the path to the downloaded structure file."""
     try:
         return download_alphafold_structure_by_uniprot_id(uniprot_id, out_dir, format=format, version=version, fragment=fragment)
     except Exception as e:
@@ -121,7 +121,7 @@ def download_alphafold_metadata_by_uniprot_id_tool(
     uniprot_id: str,
     out_dir: str
 ) -> str:
-    """Download AlphaFold metadata by UniProt ID. Returns JSON: {success, file_path} where file_path is the path to the downloaded metadata file."""
+    """Retrieve existing AlphaFold DB confidence/metadata records; this does not run AlphaFold inference. Returns JSON: {success, file_path} where file_path is the path to the downloaded metadata file."""
     try:
         return download_alphafold_metadata_by_uniprot_id(uniprot_id, out_dir)
     except Exception as e:
@@ -132,7 +132,7 @@ class AlphaFoldAnalyzePlddtInput(BaseModel):
 
 @tool("analyze_alphafold_plddt_by_metadata_file", args_schema=AlphaFoldAnalyzePlddtInput)
 def analyze_alphafold_plddt_by_metadata_file_tool(metadata_path: str) -> str:
-    """Analyze AlphaFold pLDDT confidence fractions from a local metadata JSON. Returns rich JSON: {status, content, biological_metadata {uniprot_id, global_plddt, fractions, conclusion}}."""
+    """Analyze pLDDT confidence from a supplied AlphaFold metadata JSON; this does not run AlphaFold inference. Returns rich JSON: {status, content, biological_metadata {uniprot_id, global_plddt, fractions, conclusion}}."""
     try:
         return analyze_alphafold_plddt_by_metadata_file(metadata_path)
     except Exception as e:
@@ -145,7 +145,7 @@ class AlphaFoldAnalyzePaeInput(BaseModel):
 
 @tool("analyze_alphafold_pae_by_pae_file", args_schema=AlphaFoldAnalyzePaeInput)
 def analyze_alphafold_pae_by_pae_file_tool(pae_path: str, distance_cutoff: float = 7.0, min_domain_size: int = 40) -> str:
-    """Analyze an AlphaFold PAE matrix and detect global domain boundaries. Returns rich JSON: {status, content, biological_metadata {matrix_shape, mean_pae, domains[], conclusion}}."""
+    """Analyze a supplied AlphaFold PAE matrix for domain boundaries; this does not run AlphaFold inference. Returns rich JSON: {status, content, biological_metadata {matrix_shape, mean_pae, domains[], conclusion}}."""
     try:
         return analyze_alphafold_pae_by_pae_file(pae_path, distance_cutoff=distance_cutoff, min_domain_size=min_domain_size)
     except Exception as e:
@@ -390,7 +390,7 @@ def download_mmseqs2_homologs_by_sequence_tool(
     poll_interval: float = 10.0,
     timeout_secs: int = 15 * 60,
 ) -> str:
-    """Submit a protein sequence to ColabFold MMseqs2 and download parsed homologue hits as JSON. Returns rich JSON envelope; preview is a top-10 markdown table."""
+    """Query the external ColabFold service for sequence homologues; this adapter does not execute local MMseqs2. Returns rich JSON envelope; preview is a top-10 markdown table."""
     try:
         return download_mmseqs2_homologs_by_sequence(
             sequence_or_fasta_path, out_dir,

@@ -106,10 +106,9 @@ You have access to TWO namespaces of tools. They are NOT interchangeable.
    `EnterPlanMode`. These come from kimi itself and are always available.
 
 2. **VenusFactory MCP tools** — prefixed `mcp__venusfactory__...`.
-   These wrap protein-specific operations (mutation prediction, structure
-   download, ESMFold, ProteinMPNN, sequence/structure DB queries, BLAST,
-   ClustalO MSA, KEGG/BRENDA/ChEMBL, PubMed/arXiv search, etc.) **and**
-   VenusFactory skill packages.
+   These expose scientific operations and skills from the current catalog.
+   Inspect each interface; do not infer a local executable from a database
+   or remote-service adapter.
 
 **Hard rule**: Only call tools that appear verbatim in your tool catalog.
 Do NOT prefix kimi built-ins with `mcp__venusfactory__`. Do NOT invent

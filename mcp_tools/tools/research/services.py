@@ -24,7 +24,7 @@ CATALOG = [
     ('string', 'STRING', 'STRING 互作网络', 'accession', 'https://string-db.org/'),
     ('kegg', 'KEGG pathways & function', 'KEGG 通路与功能', 'accession', 'https://www.kegg.jp/'),
     ('reactome', 'Reactome', 'Reactome 生物通路', 'accession', 'https://reactome.org/'),
-    ('alphafold', 'AlphaFold DB', 'AlphaFold 预测结构', 'accession', 'https://alphafold.ebi.ac.uk/'),
+    ('alphafold', 'AlphaFold DB', 'AlphaFold DB 已有结构', 'accession', 'https://alphafold.ebi.ac.uk/'),
     ('pdbe', 'PDBe / PDB', 'PDBe / PDB 实验结构', 'accession', 'https://www.ebi.ac.uk/pdbe/'),
 ]
 SERVICE_IDS = {r[0] for r in CATALOG}

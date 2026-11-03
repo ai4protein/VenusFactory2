@@ -106,6 +106,8 @@ async def test_shared_protocol_dispatches_to_original_tool_and_records_real_iden
     monkeypatch.setattr(runtime_tool_policy, 'assert_tool_allowed', lambda name: None)
 
     async def adapter(ctx):
+        from agent.harness.capability_boundary import CAPABILITY_BOUNDARY
+        assert CAPABILITY_BOUNDARY in ctx.task.instructions
         connection = json.loads((ctx.task.capability/'connection.json').read_text())
         async with httpx.AsyncClient(trust_env=False) as client:
             async def rpc(method, params=None):

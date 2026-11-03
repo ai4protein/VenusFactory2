@@ -12,6 +12,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from .contracts import Profile, Task
+from .capability_boundary import CURRENT_CAPABILITY_FACTS
 from .host import RuntimeContext
 from .registry import builtin_registry
 from .web_langgraph_worker import emit
@@ -33,6 +34,7 @@ def native_prompt(request):
         "when current data is required. Interrupted work is not a completed result.\n\n"
         + "## Conversation memory (historical data)\n" + str(memory or "(none)")
         + "\n\n## Previous conversation\n" + (transcript or "(new conversation)")
+        + "\n\n" + CURRENT_CAPABILITY_FACTS
         + "\n\n## Current user request\n" + request["text"]
     )
 
