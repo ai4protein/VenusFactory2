@@ -39,7 +39,10 @@ def test_named_models_search_describe_and_route_to_original_tool(harness):
         name = web_tool_name(expected,harness)
         assert name in {x["name"] for x in result["tools"]}
         assert len(json.dumps(result)) < 1500
-        disclosure.metadata("describe_tool", {"name":name})
+        detail = disclosure.metadata("describe_tool", {"name":name})
+        if query == "ProSST-2048":
+            assert detail["matching_models"] == [{"name":"ProSST-2048","arguments":{"model_name":"ProSST-2048"}}]
+            assert disclosure.resolve("call_tool", {"name":name,"arguments":detail["matching_models"][0]["arguments"]})[2] == {"model_name":"ProSST-2048"}
         assert disclosure.resolve("call_tool", {"name":name,"arguments":{}})[1].name == expected
         assert disclosure.metadata("describe_tool", {"name":expected})["name"] == name
         assert disclosure.resolve("call_tool", {"name":expected,"arguments":{}})[1].name == expected
