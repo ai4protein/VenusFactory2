@@ -24,7 +24,6 @@
 .allowance-metrics strong { font-size:26px; font-weight:600; }.allowance-metrics span { color:#64748b; font-size:13px; }
 .allowance-modes { display:flex; flex-wrap:wrap; gap:12px; }.allowance-modes>div { flex:1; min-width:180px; display:flex; gap:8px; flex-direction:column; padding:14px; background:#f8fafc; }
 .allowance-reset { min-height:44px; padding:12px 20px!important; font-weight:600; }
-.allowance-feedback { border:1px solid #e5e7eb; padding:18px; margin:12px 0; }.allowance-feedback header { display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; }
 
 @media(max-width:760px) { .allowance-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); } .admin-allowances .access-admin-top { flex-wrap:wrap; } }
 @media(max-width:420px) { .allowance-metrics { grid-template-columns:1fr 1fr; gap:8px; } .allowance-metrics>div { padding:12px; } }

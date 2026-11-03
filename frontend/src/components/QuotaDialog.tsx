@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLang } from '../lib/i18n';
 import { fetchQuota, QUOTA_EVENT, savedQuota, saveQuota, type Quota } from '../lib/onlineQuota';
+import { allowanceEmailLink } from '../lib/allowanceEmail';
 import './access.css';
 
 export function QuotaDialog() {
@@ -31,15 +32,16 @@ export function QuotaDialog() {
       saveQuota(value); setQuota(body); setNotice(t('Saved on this browser. Your allowance is ready.', '已在此浏览器保存，额度已生效。'));
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
-  async function request(event: React.FormEvent) {
-    event.preventDefault(); setBusy(true); setError(''); setNotice('');
-    try {
-      const response = await fetch('/api/quota/feedback', { method:'POST', headers:{'Content-Type':'application/json','X-Venus-Access':'1'},
-        body:JSON.stringify({name,institution,email,contact,feedback:purpose,conversations:amount,predictions}) });
-      const body = await response.json();
-      if (!response.ok) throw new Error(typeof body.detail === 'string' ? body.detail : t('Could not submit feedback', '反馈提交失败'));
-      setNotice(t('Feedback submitted. We will review your request and contact you by email.', '反馈已提交，我们会审核申请并通过邮箱联系你。'));
-    } catch(e) { setError((e as Error).message); } finally { setBusy(false); }
+  function request(event: React.FormEvent) {
+    event.preventDefault(); setError(''); setNotice('');
+    if (![name, institution, email, contact, purpose].every(value => value.trim())) {
+      setError(t('Please complete your details and describe a bug or suggestion.', '请填写完整信息和 Bug 或建议。'));
+      return;
+    }
+    window.location.href = allowanceEmailLink({
+      name, institution, email, contact, feedback: purpose, conversations: amount, predictions,
+    });
+    setNotice(t('Complete and send the request in your email app.', '请在邮件客户端中确认并发送申请。'));
   }
   return <dialog ref={ref} className="access-dialog" aria-labelledby="quota-dialog-title" onCancel={() => setOpen(false)} onClose={() => setOpen(false)} onClick={e => { if (e.target === ref.current) setOpen(false); }}>
     <div className="access-dialog-inner">
@@ -64,7 +66,7 @@ export function QuotaDialog() {
         <label>{t('Extra model predictions per day', '申请额外每日模型推理数')}<input type="number" min={0} max={10000} required value={predictions} onChange={e => setPredictions(Number(e.target.value))}/></label></div>
         <p className="access-hint">{t('More specific, useful feedback can improve your chances of approval and the allowance awarded.', '更多具体、有价值的 Bug 或建议，有助于提高额度申请的获批机会和数额。')}</p>
         <label>{t('Bugs or suggestions', 'Bug 或改进建议')}<textarea required maxLength={5000} rows={5} value={purpose} onChange={e => setPurpose(e.target.value)}/></label>
-        <button className="access-primary" disabled={busy}>{busy ? t('Submitting…','提交中…') : t('Submit feedback & request','提交反馈并申请额度')}</button><p className="access-hint">tanyang.august@sjtu.edu.cn</p>
+        <button className="access-primary" disabled={busy}>{t('Request by email','通过邮件申请')}</button><p className="access-hint">tanyang.august@sjtu.edu.cn</p>
       </form>}
       {error && <p role="alert" className="access-error">{error}</p>}{notice && <p role="status" className="access-notice">{notice}</p>}
     </div>

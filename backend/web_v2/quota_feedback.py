@@ -1,7 +1,5 @@
-"""Feedback requests, durable grant bindings and non-destructive quota resets."""
-import json
+"""Durable grant bindings, usage statistics and non-destructive quota resets."""
 import time
-import secrets
 
 def initialize(c):
     c.executescript("""
@@ -9,11 +7,9 @@ def initialize(c):
     CREATE TABLE IF NOT EXISTS visitor_grants(visitor TEXT PRIMARY KEY, grant_id TEXT NOT NULL, key_hash TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS quota_reset(id INTEGER PRIMARY KEY CHECK(id=1), since REAL NOT NULL);
     CREATE TABLE IF NOT EXISTS visitor_days(visitor TEXT NOT NULL, day TEXT NOT NULL, first_seen REAL NOT NULL, last_seen REAL NOT NULL, visits INTEGER NOT NULL, PRIMARY KEY(visitor,day));
-    CREATE TABLE IF NOT EXISTS quota_feedback(id TEXT PRIMARY KEY, visitor TEXT NOT NULL, created REAL NOT NULL, payload TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS compute_grants(scope TEXT NOT NULL, resource TEXT NOT NULL, grant_id TEXT NOT NULL, PRIMARY KEY(scope,resource));
     CREATE INDEX IF NOT EXISTS compute_grants_by_key ON compute_grants(grant_id,resource);
     CREATE INDEX IF NOT EXISTS visitor_last_seen ON visitor_days(last_seen);
-    CREATE INDEX IF NOT EXISTS feedback_created ON quota_feedback(created);
     """)
 
 def since(c):
@@ -41,20 +37,6 @@ def visit(store, visitor, *, document=True):
         c.execute("""INSERT INTO visitor_days VALUES(?,?,?,?,?)
             ON CONFLICT(visitor,day) DO UPDATE SET last_seen=excluded.last_seen,
                 visits=visits+excluded.visits""", (visitor,day,now,now,int(document)))
-
-def feedback(store, visitor, payload):
-    from backend.web_v2.online_access import email
-    payload=dict(payload);payload['email']=email(payload['email'])
-    if not payload['feedback'].strip(): raise ValueError("Please describe a bug or suggestion")
-    store.throttle(['feedback:'+visitor],5,86400)
-    identity=secrets.token_hex(16)
-    with store.connect(True) as c:
-        c.execute("INSERT INTO quota_feedback VALUES(?,?,?,?)",(identity,visitor,time.time(),json.dumps(payload)))
-    return {'id':identity}
-
-def requests(store):
-    with store.connect() as c:
-        return [{'id':r['id'],'created':r['created'],**json.loads(r['payload'])} for r in c.execute("SELECT * FROM quota_feedback ORDER BY created DESC LIMIT 200")]
 
 def reset(store, actor):
     with store.connect(True) as c:

@@ -225,10 +225,12 @@ admitted conversations are recovered through their quota records even if the IP,
 browser version or UI cache changes. Clearing that cookie removes the browser's proof
 of ownership. Local deployment remains unrestricted.
 
-Extra allowance (Feedback) records bug reports and suggestions with separate daily chat
-and prediction requests. Administrators review requests under Allowance keys, set both
-amounts and deliver the generated key to the applicant. Submission does not award
-credits automatically. Activated prediction grants apply across Chat, Model Plaza and
+Extra allowance (Feedback) opens a prefilled email to tanyang.august@sjtu.edu.cn
+with bug reports or suggestions and separate daily chat and prediction requests.
+The applicant sends it from their email app; the platform does not collect feedback
+requests in its database or administration interface. Administrators review the email,
+set both amounts under Quota keys and return the generated key to the applicant.
+Sending a request does not award credits automatically. Activated prediction grants apply across Chat, Model Plaza and
 Workflow and share their daily allowance across devices. Rotation, expiry and revocation
 invalidate the old binding.
 

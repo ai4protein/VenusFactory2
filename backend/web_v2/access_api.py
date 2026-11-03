@@ -239,26 +239,6 @@ async def admin_save_env(payload: UpdateEnvRequest,user=Depends(admin)):
     return result
 
 
-class FeedbackRequest(BaseModel):
-    model_config=ConfigDict(extra='forbid', str_strip_whitespace=True)
-    email: str=Field(min_length=3,max_length=254)
-    name: str=Field(min_length=1,max_length=100)
-    institution: str=Field(min_length=1,max_length=200)
-    contact: str=Field(min_length=1,max_length=200)
-    feedback: str=Field(min_length=1,max_length=5000)
-    conversations: StrictInt=Field(default=0,ge=0,le=10000)
-    predictions: StrictInt=Field(default=0,ge=0,le=10000)
-
-
-@router.post('/quota/feedback',dependencies=[Depends(private)])
-async def submit_feedback(payload: FeedbackRequest, request: Request):
-    from backend.web_v2.quota_feedback import feedback
-    ip,visitor,*_=identities(request)
-    store=AccessStore()
-    await call(store.throttle,['feedback-ip:'+ip],30,3600)
-    return await call(feedback,store,visitor,payload.model_dump())
-
-
 @router.post('/quota/disconnect',dependencies=[Depends(private)])
 async def disconnect_grant(request: Request):
     from backend.web_v2.quota_feedback import unbind
@@ -268,10 +248,10 @@ async def disconnect_grant(request: Request):
 
 @router.get('/admin/allowances')
 async def allowance_overview(user=Depends(admin)):
-    from backend.web_v2.quota_feedback import overview, requests
+    from backend.web_v2.quota_feedback import overview
     from backend.web_v2.compute_access import ComputeStore
     store=ComputeStore()
-    return {'overview':await call(overview,store),'requests':await call(requests,store)}
+    return {'overview':await call(overview,store)}
 
 
 class ResetAllowances(BaseModel):

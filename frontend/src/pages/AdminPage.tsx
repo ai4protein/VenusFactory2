@@ -67,7 +67,7 @@ export function AdminPage() {
     {tab === 'usage' && <><AdminAllowances api={api}/><AdminUsage api={api}/></>}
     {tab === 'environment' && <SettingsPage admin/>}
     {tab === 'grants' && <>
-      <AdminAllowances api={api} onReview={request => { const existing = grants.find(g => g.email === request.email); setGrantForm({...emptyGrant(), ...(existing ? {id:existing.id, active:Boolean(existing.active), expires:existing.expires} : {}), email:request.email,name:request.name,institution:request.institution,contact:request.contact,note:request.feedback.slice(0,2000),extra:request.conversations,extra_predictions:request.predictions}); setIssued(undefined); }}/>
+      <AdminAllowances api={api}/>
       <div className="access-admin-top"><input aria-label={t('Search quota keys', '搜索额度 key')} value={query} onChange={e => setQuery(e.target.value)} placeholder={t('Search email, name or institution', '搜索邮箱、姓名或单位')}/><button className="access-primary" onClick={() => { setGrantForm(emptyGrant()); setIssued(undefined); }}>{t('Create key', '生成 key')}</button></div>
       {grantForm && <section className="access-editor"><h2>{grantForm.id ? t('Edit allowance', '修改额度') : t('Create allowance', '创建额度')}</h2><form onSubmit={e => { e.preventDefault(); void act(async () => { const { id, ...payload } = grantForm; const result = await api<{ email: string; key: string | null }>('/grants' + (id ? '/' + id : ''), id ? 'PUT' : 'POST', payload); if (result.key) setIssued({ email: result.email, key: result.key }); setGrantForm(undefined); await refresh(); }); }}>
         <label>{t('Email', '邮箱')}<input type="email" required value={grantForm.email} onChange={e => setGrantForm({ ...grantForm, email: e.target.value })}/></label>

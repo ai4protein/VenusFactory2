@@ -80,7 +80,7 @@ def test_prediction_grant_shared_across_devices_and_revoked_on_rotation(stores):
     assert compute.status('b')['prediction']['limit']==20
     assert access.grants()[0]['extra_predictions']==10
 
-def test_html_establishes_cookie_and_feedback_and_reset_require_validation(stores):
+def test_html_establishes_cookie_feedback_is_email_only_and_reset_requires_validation(stores):
     from backend.web_v2.access_api import router
     access,compute=stores
     app=FastAPI();app.add_middleware(VisitorMiddleware);app.include_router(router)
@@ -95,13 +95,13 @@ def test_html_establishes_cookie_and_feedback_and_reset_require_validation(store
         assert history.headers['cache-control'] == 'private, no-store'
         assert 'cookie' in history.headers['vary'].lower()
         payload=dict(email='person@example.org',name='A',institution='Lab',contact='email',feedback='Prediction upload needs clearer units',conversations=5,predictions=40)
-        response=client.post('/api/quota/feedback',json=payload,headers={'X-Venus-Access':'1'})
-        assert response.status_code==200
-        assert feedback.requests(access)[0]['predictions']==40
-        assert client.post('/api/quota/feedback',json={**payload,'feedback':' '},headers={'X-Venus-Access':'1'}).status_code==422
+        assert client.post('/api/quota/feedback',json=payload,headers={'X-Venus-Access':'1'}).status_code==404
+        with access.connect() as c:
+            assert not c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='quota_feedback'").fetchone()
         assert client.post('/api/admin/allowances/reset',json={'confirm':'RESET'},headers={'X-Venus-Access':'1'}).status_code==401
         access.bootstrap('admin@example.org','fixture-password-123')
         assert client.post('/api/admin/login',json={'email':'admin@example.org','password':'fixture-password-123'},headers={'X-Venus-Access':'1'}).status_code==200
+        assert set(client.get('/api/admin/allowances').json()) == {'overview'}
         assert client.post('/api/admin/allowances/reset',json={'confirm':'WRONG'},headers={'X-Venus-Access':'1'}).status_code==422
         assert client.post('/api/admin/allowances/reset',json={'confirm':'RESET'},headers={'X-Venus-Access':'1'}).status_code==200
 
