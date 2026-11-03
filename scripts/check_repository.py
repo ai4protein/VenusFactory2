@@ -41,7 +41,8 @@ def private_path(name: str) -> bool:
         or name.startswith(('archive/research-notes/', 'configs/rsi/paper_step_definitions/', 'frontend/dist/'))
         or name.startswith('ckpt/') and name not in {'ckpt/README.md', 'ckpt/manifest.json'}
         or path.name.startswith('.env') and path.name != '.env.example'
-        or path.suffix in {'.key', '.pem', '.sqlite3', '.db', '.pyc'}
+        or path.suffix in {'.key', '.pem', '.sqlite', '.sqlite3', '.db', '.pyc'}
+        or re.search(r'\.(?:db|sqlite3?)-(?:wal|shm|journal)$', path.name)
     )
 
 

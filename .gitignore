@@ -60,6 +60,18 @@ cover/
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
+# SQLite state and sidecars may contain conversations and credentials.
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite-journal
+*.sqlite3-wal
+*.sqlite3-shm
+*.sqlite3-journal
 
 # Flask stuff:
 instance/
