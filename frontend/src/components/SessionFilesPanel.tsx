@@ -4,6 +4,7 @@ import { FilePreviewModal, type PreviewableFile } from "./FilePreviewModal";
 import "./SessionFilesPanel.css";
 import { MolstarViewer } from "./MolstarViewer";
 import { isStructureFile, matchSessionFile, structureExtension, structurePathFromLink, type StructureRequest } from "../lib/structurePreview";
+import { shareRead } from "../lib/readRequests";
 
 interface SessionFile { key: string; name: string; rel: string; scope: string; size: number; mtime: number; ext: string }
 interface Props { sessionId: string; authHeaders?: Record<string, string>; liveRefresh?: boolean; pollMs?: number; quota?: ReactNode; actions?: ReactNode }
@@ -65,9 +66,11 @@ export function SessionFilesPanel({ sessionId, authHeaders, liveRefresh = false,
     const epoch = generation.current;
     setLoading(true);
     try {
-      const r = await fetch(root, { headers: JSON.parse(headers), cache: "no-store" });
-      if (!r.ok) throw new Error();
-      const j = await r.json();
+      const j = await shareRead(`session-files:${root}:${headers}`, async () => {
+        const r = await fetch(root, { headers: JSON.parse(headers), cache: "no-store" });
+        if (!r.ok) throw new Error();
+        return r.json();
+      });
       const rows: SessionFile[] = j.files || [];
       if (epoch === generation.current) {
         setFiles(rows); setTruncated(!!j.truncated); setError("");
@@ -119,14 +122,17 @@ export function SessionFilesPanel({ sessionId, authHeaders, liveRefresh = false,
     generation.current += 1;
     setFiles([]); setSelected(new Set()); setError(""); setOpening(""); setDownloading(false); setLoading(false);
     setQuery(""); setKind(""); setDate(""); setOrder("newest"); setSelecting(false);
-    closePreview(); void refresh();
+    closePreview();
     return () => { generation.current += 1; if (blob.current) URL.revokeObjectURL(blob.current); };
   }, [refresh]);
   useEffect(() => {
-    if (!liveRefresh || !sessionId) return;
+    if (open && sessionId) void refresh();
+  }, [open, sessionId, refresh]);
+  useEffect(() => {
+    if (!open || !liveRefresh || !sessionId) return;
     const timer = window.setInterval(() => void refresh(), pollMs);
     return () => clearInterval(timer);
-  }, [liveRefresh, sessionId, pollMs, refresh]);
+  }, [open, liveRefresh, sessionId, pollMs, refresh]);
   useEffect(() => {
     if (!open || preview) return;
     const key = (e: KeyboardEvent) => {
@@ -206,7 +212,7 @@ export function SessionFilesPanel({ sessionId, authHeaders, liveRefresh = false,
 
   return <>
     <div className="chat-file-actions">{quota}{actions}
-      <button ref={trigger} className="session-files-toggle" type="button" onClick={() => { if (structure) { closePreview(); setWide(false); } else { setOpen(!open); if (!open) void refresh(); } }} aria-expanded={open} aria-controls={panelId} aria-label={zh ? "研究文件" : "Research files"} title={zh ? "文件" : "Files"}><FileIcon name="folder"/></button>
+      <button ref={trigger} className="session-files-toggle" type="button" onClick={() => { if (structure) { closePreview(); setWide(false); } else setOpen(!open); }} aria-expanded={open} aria-controls={panelId} aria-label={zh ? "研究文件" : "Research files"} title={zh ? "文件" : "Files"}><FileIcon name="folder"/></button>
     </div>
     {open && <aside ref={panel} id={panelId} style={{ "--structure-width": `${structureWidth}px` } as CSSProperties} className={`session-files-sidebar${structure ? " is-structure" : ""}${wide && structure ? " is-wide" : ""}`} aria-labelledby={`${panelId}-title`}>
       {structure ? <>

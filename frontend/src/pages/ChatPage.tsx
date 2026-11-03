@@ -26,6 +26,8 @@ import { ContextUsageRing } from "../components/ContextUsageRing";
 import { isRunActive } from "../lib/runProgress";
 import { RunSpinner } from "../components/RunSpinner";
 import { activeSessionStorageKey, sessionsForMode, sessionCandidates } from "../lib/chatSessions";
+import { SessionPreviewCache } from "../lib/sessionPreviewCache";
+import { PageLoading } from "../components/PageLoading";
 import { isFreeResearchModel } from "../lib/researchUi";
 import { ScienceGoalPanel } from "../components/ScienceGoalPanel";
 import { ChatTimeline } from "../components/ChatTimeline";
@@ -578,6 +580,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   const routeInitialized = useRef(false);
   const [sessionId, setSessionId] = useState<string>("");
   const sessionLoad = useRef({ target: "", revision: 0, pending: false });
+  const sessionPreviews = useRef(new SessionPreviewCache<ChatSnapshot>());
   const sessionCreation = useRef<Promise<string> | null>(null);
   useLayoutEffect(() => {
     if (!sessionLoad.current.pending && sessionLoad.current.target !== sessionId) {
@@ -642,6 +645,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   const abortRef = useRef<AbortController | null>(null);
   const agentWorking = !researcherMode && chatMode === "science_agent" && (running || isRunActive(snapshot?.status));
   function detachStream() {
+    sessionPreviews.current.remember(snapshotRef.current);
     const controller = abortRef.current;
     abortRef.current = null;
     controller?.abort();
@@ -1131,6 +1135,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     setError("");
     try {
       await deleteChatSession(targetId);
+      sessionPreviews.current.forget(targetId);
       forgetOwnedSession(targetId);
       if (deletingActive) {
         rememberActiveSession(activeModeRef.current, "");
@@ -1274,8 +1279,10 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       if (sid !== sessionLoad.current.target) detachStream();
       sessionLoad.current = { target: sid, revision: sessionLoad.current.revision + 1, pending: true };
       setSessionId(sid);
-      setSnapshot(null);
-      snapshotRef.current = null;
+      const cached = sessionPreviews.current.peek(sid);
+      const preview = cached && (cached.chat_mode === "science_expert" ? "science_expert" : "science_agent") === requestedMode ? cached : null;
+      setSnapshot(preview);
+      snapshotRef.current = preview;
       if (opts?.updateUrl !== false) syncSessionUrl(sid, requestedMode);
     } else if (sessionLoad.current.pending || sessionLoad.current.target !== sid) return;
     const requestedSessionRevision = sessionLoad.current.revision;
@@ -1283,6 +1290,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     try {
       const s = sanitizeLoadedSnapshot(await getChatSession(sid));
       if (!isCurrentRequest()) return;
+      sessionPreviews.current.remember(s);
       const savedMode = s.chat_mode === "science_expert" ? "science_expert" : "science_agent";
       if (syncComposer && savedMode !== requestedMode) {
         sessionLoad.current.pending = false;
@@ -1327,6 +1335,10 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     } catch (err) {
       if (!isCurrentRequest()) return;
       const msg = err instanceof Error ? err.message : "";
+      // A preview cannot stand in for a failed authenticated refresh.
+      sessionPreviews.current.forget(sid);
+      setSnapshot(null);
+      snapshotRef.current = null;
       if (msg.includes("404") || msg.includes("not found") || msg.includes("Not Found")) {
         forgetOwnedSession(sid);
         if (sid === sessionId && routeSessionId !== sid) {
@@ -2557,7 +2569,8 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
               ensureSession={ensureGoalSession} onRunning={setGoalRunning}
               onGoalStatus={(sid, status) => setGoalStatuses(previous => previous[sid] === status ? previous : { ...previous, [sid]: status })}
               onChanged={async (sid) => { if (visibleModeRef.current !== "researcher" && activeModeRef.current === "science_expert" && sid === scientistSessionId) void refreshCurrentSession(sid, { syncComposer: false }); await fetchSessions(); }} />
-            {!researcherMode && chatMode === "science_agent" && <ChatTimeline
+            {!researcherMode && chatMode === "science_agent" && sessionLoad.current.pending && sessionId && !snapshot && !pendingTurn && <PageLoading/>}
+            {!researcherMode && chatMode === "science_agent" && (!sessionId || snapshot || pendingTurn) && <ChatTimeline
               running={running}
               items={visibleHistory}
               streamingIndex={streamingIdx}
