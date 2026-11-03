@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import re
 import json
+import copy
 from mcp_tools.tools.discovery.matching import query_groups, relevance
 from .capability_boundary import CAPABILITY_BOUNDARY
 
@@ -57,6 +58,7 @@ class ToolDisclosure:
         self.inspected = set()
         self._index = {}
         self._model_matches = {}
+        self._model_selectors = {}
 
     @property
     def names(self):
@@ -140,16 +142,24 @@ class ToolDisclosure:
             if not self._available(name):
                 raise DisclosureError('Tool unavailable. Search for an enabled tool.')
             tool = self.mapping[name]
-            result = {'name': name, 'description': tool.description, 'inputSchema': self.schema(tool)}
+            result = {'name': name, 'description': tool.description,
+                      'inputSchema': copy.deepcopy(self.schema(tool))}
             from mcp_tools.tools.capability_policy import canonical
             from mcp_tools.tools.discovery.platform_models import platform_models
+            live_models = {card['entry_id']: card for _,_,card in platform_models('', [getattr(tool, 'name', name)])}
             wanted = self._model_matches.get(canonical(getattr(tool, 'name', name)), [])
+            # Follow-up turns may describe a remembered tool without searching again.
+            # Its current catalog must still identify explicit model selectors.
+            if not wanted:
+                wanted = list(live_models.values())
+            total_models = len(wanted)
+            wanted = wanted[:20]
             # Refresh each chosen model against administrator/runtime switches.
             options = []
             for candidate in wanted:
-                live = [card for _,_,card in platform_models(candidate['name'], [tool.name]) if card['entry_id'] == candidate['entry_id']]
+                live = live_models.get(candidate['entry_id'])
                 if not live: continue
-                selection = live[0]['selection']
+                selection = live['selection']
                 properties = result['inputSchema'].get('properties', {})
                 preset = {}
                 for field, keys in {'model': ('model_name', 'model'), 'dataset': ('dataset_name', 'dataset'), 'task': ('task',)}.items():
@@ -160,6 +170,19 @@ class ToolDisclosure:
                             break
                 options.append({'name': candidate['name'], 'arguments': preset})
             if options:
+                result['description'] = brief_description(tool.description, 600)
+                model_keys = {key for row in options for key in row['arguments'] if key in {'model_name','model'}}
+                properties = result['inputSchema'].get('properties', {})
+                self._model_selectors[name] = model_keys
+                for key in model_keys:
+                    properties[key].pop('default', None)
+                    properties[key]['description'] = 'Explicit model selector. Use the requested model from matching_models; there is no implicit model choice.'
+                    required = result['inputSchema'].setdefault('required', [])
+                    if key not in required: required.append(key)
+                result['scientific_inputs'] = [key for key in result['inputSchema'].get('required', []) if key not in model_keys]
+                result['model_count'] = total_models
+                if total_models > len(options):
+                    result['more_models'] = 'Search by the requested model name to narrow the catalog.'
                 result['matching_models'] = options
                 result['selection_rule'] = 'For the requested model, use its explicit arguments instead of generic defaults; ask for required scientific inputs only.'
             self.inspected.add(name)
@@ -179,4 +202,7 @@ class ToolDisclosure:
             raise DisclosureError('Use search_tools, describe_tool, then call_tool.')
         if not self._available(name):
             raise DisclosureError('Tool unavailable. Search for an enabled tool.')
+        for key in self._model_selectors.get(name, ()):
+            if not arguments.get(key):
+                raise DisclosureError('Specify the requested model explicitly using matching_models from describe_tool; do not use a generic default.')
         return name, self.mapping[name], arguments

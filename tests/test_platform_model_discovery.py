@@ -7,7 +7,7 @@ from mcp_tools.tools.discovery import service
 from mcp_tools.tools.runtime_tool_policy import is_tool_allowed
 from mcp_tools.tools import runtime_tool_policy as policy
 from mcp_tools.tools.capability_policy import CapabilityStore, selector
-from agent.harness.tool_disclosure import ToolDisclosure
+from agent.harness.tool_disclosure import ToolDisclosure, DisclosureError
 from agent.harness.web_native_worker import web_tool_name
 
 
@@ -43,9 +43,10 @@ def test_named_models_search_describe_and_route_to_original_tool(harness):
         if query == "ProSST-2048":
             assert detail["matching_models"] == [{"name":"ProSST-2048","arguments":{"model_name":"ProSST-2048"}}]
             assert disclosure.resolve("call_tool", {"name":name,"arguments":detail["matching_models"][0]["arguments"]})[2] == {"model_name":"ProSST-2048"}
-        assert disclosure.resolve("call_tool", {"name":name,"arguments":{}})[1].name == expected
+        call_args = {"model_name":"ProSST-2048"} if query == "ProSST-2048" else {}
+        assert disclosure.resolve("call_tool", {"name":name,"arguments":call_args})[1].name == expected
         assert disclosure.metadata("describe_tool", {"name":expected})["name"] == name
-        assert disclosure.resolve("call_tool", {"name":expected,"arguments":{}})[1].name == expected
+        assert disclosure.resolve("call_tool", {"name":expected,"arguments":call_args})[1].name == expected
 
 
 def test_online_inventory_matches_plaza_and_honors_live_variant_switch():
@@ -84,3 +85,17 @@ def test_skill_discovery_is_bounded_and_prompt_does_not_grow(monkeypatch):
     assert len(json.dumps(result)) < 2000
     assert len(skills.get_skills_catalog_for_agent()) < 500
     assert skills.build_list_skills_response(limit=100)["success"] is False
+
+def test_followup_description_preserves_live_models_without_prior_search():
+    tool = tools()[0]
+    tool.parameters["properties"]["model_name"].update(default="ESM-IF1", description="Default: ESM-IF1")
+    d = ToolDisclosure({tool.name:tool}, schema=lambda t:t.parameters, allowed=lambda t:True)
+    detail = d.metadata("describe_tool", {"name":tool.name})
+    assert any(m["arguments"] == {"model_name":"ProSST-2048"} for m in detail["matching_models"])
+    assert "default" not in detail["inputSchema"]["properties"]["model_name"]
+    assert "model_name" in detail["inputSchema"]["required"]
+    assert tool.parameters["properties"]["model_name"]["default"] == "ESM-IF1"
+    assert "Parameters:" not in detail["description"]
+    with pytest.raises(DisclosureError, match="explicitly"):
+        d.resolve("call_tool", {"name":tool.name, "arguments":{"pdb_file":"test.pdb"}})
+    assert d.resolve("call_tool", {"name":tool.name, "arguments":{"pdb_file":"test.pdb","model_name":"ProSST-2048"}})[2]["model_name"] == "ProSST-2048"
