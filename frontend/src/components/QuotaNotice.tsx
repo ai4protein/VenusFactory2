@@ -32,7 +32,7 @@ export function QuotaNotice({ quota, lang }: { quota: Quota | null; lang: string
     <div className="chat-quota-notice">
       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
       <span className="chat-quota-notice-text" role="status" aria-live="polite" aria-atomic="true" title={current.timezone}>{quotaRetryLabel(current, lang)}</span>
-      <button type="button" className="chat-quota-extra" onClick={() => openQuota()}>{zh ? '额外额度' : 'Extra allowance'}</button>
+      <button type="button" className="chat-quota-extra" onClick={() => openQuota()}>{zh ? '额外额度（反馈）' : 'Extra allowance (Feedback)'}</button>
       <button type="button" className="chat-quota-dismiss" aria-label={zh ? '关闭额度提示' : 'Dismiss quota notice'} onClick={() => setDismissed(identity)}>×</button>
     </div>
   </div>;

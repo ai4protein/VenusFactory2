@@ -79,6 +79,8 @@ class AccessStore:
             CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY, at REAL NOT NULL, actor TEXT NOT NULL, action TEXT NOT NULL, target TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS science_slots(scope TEXT PRIMARY KEY, ip TEXT NOT NULL, visitor TEXT NOT NULL, grant_id TEXT, expires REAL NOT NULL);
             ''')
+        from backend.web_v2.quota_feedback import initialize
+        with self.connect() as c: initialize(c)
         self.path.chmod(0o600)
 
     @contextmanager
@@ -117,14 +119,16 @@ class AccessStore:
         return row
 
     def _status(self, c, ip, visitor, grant, day, reset):
+        from backend.web_v2.quota_feedback import since
+        cutoff = since(c)
         base = self.limit()
         # The persistent visitor cookie owns the daily allowance. A shared NAT
         # or reverse proxy must never merge different visitors' daily balances.
-        base_used = c.execute("SELECT COUNT(*) FROM admissions WHERE day=? AND visitor=? AND bucket='base'", (day,visitor)).fetchone()[0]
+        base_used = c.execute("SELECT COUNT(*) FROM admissions WHERE day=? AND visitor=? AND bucket='base' AND created>?", (day,visitor,cutoff)).fetchone()[0]
         extra_used = grant_used = 0
         if grant:
-            grant_used = c.execute('SELECT COUNT(*) FROM admissions WHERE day=? AND grant_id=?', (day,grant['id'])).fetchone()[0]
-            extra_used = c.execute("SELECT COUNT(*) FROM admissions WHERE day=? AND grant_id=? AND bucket='extra'", (day,grant['id'])).fetchone()[0]
+            grant_used = c.execute('SELECT COUNT(*) FROM admissions WHERE day=? AND grant_id=? AND created>?', (day,grant['id'],cutoff)).fetchone()[0]
+            extra_used = c.execute("SELECT COUNT(*) FROM admissions WHERE day=? AND grant_id=? AND bucket='extra' AND created>?", (day,grant['id'],cutoff)).fetchone()[0]
         extra = grant['extra'] if grant else 0
         remaining = max(0,base-base_used) + max(0,extra-extra_used)
         if grant: remaining = min(remaining, max(0,base+extra-grant_used))
@@ -133,10 +137,19 @@ class AccessStore:
                     timezone=os.getenv('VENUS_QUOTA_TIMEZONE','Asia/Shanghai'), email=grant['email'] if grant else None,
                     application_email=CONTACT, unit='new_conversation', identity_scope='visitor', base_remaining=max(0,base-base_used))
 
+    def owned_chat_ids(self, visitor):
+        with self.connect() as c:
+            return {row[0][5:] for row in c.execute(
+                "SELECT scope FROM admissions WHERE visitor=? AND scope LIKE 'chat:%'", (visitor,))}
+
     def status(self, ip, visitor, address='', key=''):
         day, reset = self.day()
         with self.connect() as c:
-            return self._status(c,ip,visitor,self.grant(c,address,key),day,reset)
+            return self._status(c,ip,visitor,self.visitor_grant(c,visitor,address,key),day,reset)
+
+    def visitor_grant(self, c, visitor, address='', key=''):
+        from backend.web_v2.quota_feedback import bound_grant
+        return self.grant(c,address,key) if address or key else bound_grant(c,visitor)
 
     @staticmethod
     def _check_network_rate(c, ip, now):
@@ -159,7 +172,7 @@ class AccessStore:
         with self.connect(True) as c:
             # Access to the conversation itself is checked by each HTTP adapter.
             if c.execute('SELECT 1 FROM admissions WHERE scope=?',(scope,)).fetchone(): return False
-            grant = self.grant(c,address,key)
+            grant = self.visitor_grant(c,visitor,address,key)
             status = self._status(c,ip,visitor,grant,day,reset)
             if status['remaining'] <= 0:
                 raise HTTPException(429, {'code':'CHAT_DAILY_LIMIT_REACHED','message':'Today’s new conversation allowance has been used. Continue an existing conversation or add an extra quota key.', 'quota':status})
@@ -172,7 +185,7 @@ class AccessStore:
     def science_slot(self, scope, ip, visitor, address='', key=''):
         with self.connect(True) as c:
             c.execute('DELETE FROM science_slots WHERE expires<?',(time.time(),))
-            grant = self.grant(c,address,key)
+            grant = self.visitor_grant(c,visitor,address,key)
             gid = grant['id'] if grant else ''
             existing = c.execute('SELECT * FROM science_slots WHERE scope=?',(scope,)).fetchone()
             if existing: return
@@ -264,7 +277,9 @@ class AccessStore:
         day,_ = self.day()
         with self.connect() as c:
             rows = c.execute('SELECT id,email,extra,active,expires,name,institution,contact,note,created FROM grants WHERE instr(lower(email||name||institution),?)>0 ORDER BY created DESC LIMIT 500',(query.lower(),)).fetchall()
-            return [{**dict(r),'used_today':c.execute('SELECT COUNT(*) FROM admissions WHERE day=? AND grant_id=?',(day,r['id'])).fetchone()[0]} for r in rows]
+            from backend.web_v2.quota_feedback import since
+            return [{**dict(r),'extra_predictions':(c.execute('SELECT extra_predictions FROM grant_compute WHERE grant_id=?',(r['id'],)).fetchone() or [0])[0],
+                     'used_today':c.execute('SELECT COUNT(*) FROM admissions WHERE day=? AND grant_id=? AND created>?',(day,r['id'],since(c))).fetchone()[0]} for r in rows]
 
     def save_grant(self, actor, data, ident=None, rotate=False):
         address = email(data['email']); extra = data['extra']
@@ -277,6 +292,10 @@ class AccessStore:
             values = (address,fingerprint(key) if key else row['key_hash'],extra,int(data['active']),data.get('expires'),data.get('name',''),data.get('institution',''),data.get('contact',''),data.get('note',''))
             if row: c.execute('UPDATE grants SET email=?,key_hash=?,extra=?,active=?,expires=?,name=?,institution=?,contact=?,note=? WHERE id=?',(*values,ident))
             else: c.execute('INSERT INTO grants VALUES(?,?,?,?,?,?,?,?,?,?,?)',(ident,*values,time.time()))
+            predictions = data.get('extra_predictions', 0)
+            if type(predictions) is not int or not 0 <= predictions <= 10000:
+                raise ValueError('Extra predictions must be 0-10000')
+            c.execute('INSERT OR REPLACE INTO grant_compute VALUES(?,?)',(ident,predictions))
             self.log(c,actor['email'],'grant.rotate' if rotate else 'grant.save',ident)
             return {'id':ident,'key':key,'email':address}
 
@@ -319,8 +338,12 @@ class VisitorMiddleware:
     """Pure ASGI: attach identity without buffering event streams."""
     def __init__(self, app): self.app=app
     async def __call__(self, scope, receive, send):
-        if scope['type']!='http' or not scope['path'].startswith('/api/'):
+        if scope['type'] != 'http':
             return await self.app(scope,receive,send)
+        document = scope.get('method') == 'GET' and b'text/html' in dict(scope.get('headers',[])).get(b'accept',b'')
+        if not scope['path'].startswith('/api/') and not document:
+            return await self.app(scope,receive,send)
+        # Establish identity before concurrent browser API requests.
         from starlette.requests import Request
         from starlette.responses import Response
         request=Request(scope)
@@ -334,9 +357,18 @@ class VisitorMiddleware:
         fresh=not re.fullmatch('[a-f0-9]{64}',value)
         if fresh: value=secrets.token_hex(32)
         scope.setdefault('state',{})['quota_visitor']=value
+        if document or scope['path'] == '/api/runtime-config':
+            from backend.web_v2.quota_feedback import visit
+            from starlette.concurrency import run_in_threadpool
+            await run_in_threadpool(lambda: visit(AccessStore(),fingerprint(value),document=document))
         async def wrapped(message):
             if message['type']=='http.response.start':
                 headers=list(message.get('headers',[]))
+                if scope['path'].startswith('/api/chat/sessions') or (document and fresh):
+                    # Cookie-authorized history must never enter a shared cache.
+                    headers=[(k,v) for k,v in headers if k.lower()!=b'cache-control']
+                    headers.append((b'cache-control',b'private, no-store'))
+                    headers.append((b'vary',b'Cookie'))
                 if fresh:
                     response=Response()
                     response.set_cookie(COOKIE,value,max_age=365*86400,httponly=True,samesite='lax',secure=secure_request(request),path='/')

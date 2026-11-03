@@ -96,7 +96,7 @@ export function AppSidebar({ collapsed, toggle, mode, historyRef, onNavigate }: 
         <LangNavLink to="/manual/index" className="sidebar-settings-item" onClick={navigateFromSettings}>
           <Icon name="manual"/><span>{label("Manual", "使用手册")}</span>
         </LangNavLink>
-        {mode === "online" && <button type="button" className="sidebar-settings-item" onClick={() => { navigateFromSettings(); openQuota(); }}><Icon name="chat"/><span>{label("Extra allowance", "额外额度")}</span></button>}
+        {mode === "online" && <button type="button" className="sidebar-settings-item" onClick={() => { navigateFromSettings(); openQuota(); }}><Icon name="chat"/><span>{label("Extra allowance (Feedback)", "额外额度（反馈）")}</span></button>}
         {mode === "local" && <>
           <LangNavLink to="/admin" className="sidebar-settings-item" onClick={navigateFromSettings}><Icon name="settings"/><span>{label("Administration", "管理后台")}</span></LangNavLink>
         </>}

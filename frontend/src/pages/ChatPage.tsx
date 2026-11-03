@@ -995,7 +995,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     const revision = sessionHistoryRevision.current;
     const data = await listChatSessions();
     const allServer = (data.sessions || []).filter(hasSessionContent);
-    const list = localMode ? allServer : filterOwnedSessions(allServer);
+    const list = allServer; // Server-side visitor ownership is authoritative.
     // Preserve locally derived titles when the API omits them (older server
     // process, or race before the first message is persisted).
     let merged: SessionMeta[] = [];
@@ -1036,7 +1036,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   }
 
   function writeOwnedSessionIds(ids: string[]) {
-    localStorage.setItem(SESSION_OWNED_KEY, JSON.stringify(Array.from(new Set(ids.filter(Boolean)))));
+    try { localStorage.setItem(SESSION_OWNED_KEY, JSON.stringify(Array.from(new Set(ids.filter(Boolean))))); } catch { /* Server owns the session list. */ }
   }
 
   function rememberOwnedSession(nextSessionId: string) {
@@ -1046,14 +1046,6 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
 
   function forgetOwnedSession(targetSessionId: string) {
     writeOwnedSessionIds(readOwnedSessionIds().filter((item) => item !== targetSessionId));
-  }
-
-  function filterOwnedSessions(list: SessionMeta[]) {
-    const owned = new Set(readOwnedSessionIds());
-    if (sessionId) {
-      owned.add(sessionId);
-    }
-    return list.filter((item) => owned.has(item.session_id));
   }
 
   async function refreshChatQuota(): Promise<ChatQuota | null> {
@@ -1085,7 +1077,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   }
 
   function rememberActiveSession(mode: ChatMode, sid: string) {
-    sessionStorage.setItem(activeSessionStorageKey(mode), sid);
+    try { sessionStorage.setItem(activeSessionStorageKey(mode), sid); } catch { /* URL restores the session. */ }
     if (mode === "science_expert") setScientistSessionId(sid);
   }
 
@@ -1177,7 +1169,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     }
     try {
       const [quota, data] = await Promise.all([quotaRequest, sessionsRequest]);
-      if (data) { list = (data.sessions || []).filter(hasSessionContent); if (quota?.mode !== "local") list = filterOwnedSessions(list); setSessions(list); }
+      if (data) { list = (data.sessions || []).filter(hasSessionContent); setSessions(list); }
     } catch {
       // keep cached list if server refresh fails
     }

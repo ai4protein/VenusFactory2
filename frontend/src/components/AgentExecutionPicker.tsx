@@ -40,7 +40,7 @@ export function AgentExecutionPicker({ value, onChange, onReadyChange, locked, b
       items={[...(locked && value?.harness === "langgraph" ? [{ value: "langgraph", label: "LangGraph" }] : []),
         ...(options?.harnesses || []).map(h => ({ value: h.id, label: h.label, disabled: !h.ready, hint: zh ? "未配置" : "Not configured" }))]}
       onChange={next => onChange({ harness: next, model_id: preferredModel(options?.combinations || [], next, value?.model_id, options?.shared_default_model) })}/>
-    {value && <ComposerSelect label={zh ? "模型" : "Model"} ariaLabel="Agent LLM" value={value.model_id}
+    {value && <ComposerSelect label={zh ? "模型" : "Model"} ariaLabel="Agent LLM" value={value.model_id} helpText={zh ? "根据API反馈速度不一可能需要耐心等待" : "API response times vary. Please allow some time for a response."}
       disabled={locked || busy || !options} disabledHint={locked ? (zh ? "在新对话中更换" : "Start a new chat to change") : undefined}
       placeholder={zh ? "暂无可用模型" : "No models available"}
       items={executionModelItems(options?.models || [], options?.combinations || [], harness, zh, online)}

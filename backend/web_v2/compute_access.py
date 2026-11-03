@@ -54,11 +54,21 @@ class ComputeStore(AccessStore):
         return positive_setting(key, default)
 
     def _status(self, c, visitor, day, reset):
+        from backend.web_v2.quota_feedback import since, bound_grant
+        cutoff = since(c)
+        grant = bound_grant(c, visitor)
         values = {}
         for resource in LIMITS:
-            used = c.execute('SELECT COALESCE(SUM(units),0) FROM compute_admissions WHERE visitor=? AND day=? AND resource=?',
-                             (visitor, day, resource)).fetchone()[0]
+            used = c.execute('SELECT COALESCE(SUM(units),0) FROM compute_admissions WHERE visitor=? AND day=? AND resource=? AND created>?',
+                             (visitor, day, resource, cutoff)).fetchone()[0]
             limit = self.limit(resource)
+            if resource == 'prediction' and grant:
+                limit += grant['extra_predictions']
+                shared = c.execute("""SELECT COALESCE(SUM(a.units),0) FROM compute_admissions a
+                    JOIN compute_grants g ON g.scope=a.scope AND g.resource=a.resource
+                    WHERE g.grant_id=? AND a.day=? AND a.resource=? AND a.created>?""",
+                    (grant['id'],day,resource,cutoff)).fetchone()[0]
+                used = max(used, shared)
             values[resource] = dict(limit=limit, used=used, remaining=max(0, limit-used))
         return dict(enforced=True, mode='online', **values, resets_at=reset,
                     timezone=os.getenv('VENUS_QUOTA_TIMEZONE', 'Asia/Shanghai'))
@@ -101,6 +111,10 @@ class ComputeStore(AccessStore):
                 raise HTTPException(429, {'code':'COMPUTE_START_RATE_LIMIT', 'message':f'Too many computations from this network. Try again in {retry} seconds.', 'retry_after':retry}, headers={'Retry-After':str(retry)})
             c.executemany('INSERT INTO compute_admissions VALUES(?,?,?,?,?,?,?)',
                           [(scope, key, day, actor['visitor'], actor['ip'], units, now) for key, units in demands.items()])
+            from backend.web_v2.quota_feedback import bound_grant
+            grant = bound_grant(c, actor['visitor'])
+            if grant:
+                c.executemany('INSERT INTO compute_grants VALUES(?,?,?)',[(scope,k,grant['id']) for k in demands])
             return True
 
     def release(self, scope):
@@ -108,6 +122,7 @@ class ComputeStore(AccessStore):
         # job does not grant more daily executions.
         with self.connect(True) as c:
             c.execute('DELETE FROM compute_admissions WHERE scope=?', (scope,))
+            c.execute('DELETE FROM compute_grants WHERE scope=?', (scope,))
 
 
 def allowance(owner=None):

@@ -91,7 +91,19 @@ def _build_owner_fingerprint(request: Request) -> str:
 def _session_owner_key_for_request(request: Request) -> str:
     if _runtime_mode() != "online":
         return "local"
-    return _build_owner_fingerprint(request)
+    return _visitor_owner_key(request) or _build_owner_fingerprint(request)
+
+
+def _visitor_owner_key(request):
+    from backend.web_v2.online_access import COOKIE, fingerprint
+    value = getattr(getattr(request, "state", None), "quota_visitor", "") or getattr(request, "cookies", {}).get(COOKIE, "")
+    return "visitor:" + fingerprint(value) if len(value) == 64 and all(ch in "0123456789abcdef" for ch in value) else ""
+
+
+def _historical_session_ids(request):
+    from backend.web_v2.online_access import AccessStore
+    owner = _visitor_owner_key(request)
+    return AccessStore().owned_chat_ids(owner.removeprefix("visitor:")) if owner else set()
 
 
 # ── Session access tokens (HMAC) ───────────────────────────────────────────
@@ -124,7 +136,8 @@ async def get_visible_session_ids(request: Request) -> set[str]:
     if _runtime_mode() != "online":
         sids = await _session_store.list_ids(None)
         return set(sids)
-    sids = await _session_store.list_ids(owner_key)
+    summaries = await _session_store.list_summaries(owner_key, extra_session_ids=await asyncio.to_thread(_historical_session_ids, request))
+    sids = [row["session_id"] for row in summaries]
     from backend.web_v2.online_visibility import OnlineVisibility
     return set(sids) - OnlineVisibility().hidden_ids("chat")
 
@@ -429,8 +442,14 @@ def _assert_session_access(state: dict[str, Any], request: Request) -> None:
     from backend.web_v2.online_visibility import OnlineVisibility
     if OnlineVisibility().is_hidden("chat", state["session_id"]):
         raise HTTPException(404, "Conversation not found")
-    expected_owner = _session_owner_key_for_request(request)
     actual_owner = str(state.get("owner_key", ""))
+    visitor_owner = _visitor_owner_key(request)
+    if visitor_owner:
+        if actual_owner == visitor_owner:
+            return
+        if not actual_owner.startswith("visitor:") and state["session_id"] in _historical_session_ids(request):
+            return
+    expected_owner = _build_owner_fingerprint(request)
     if actual_owner != expected_owner:
         raise HTTPException(
             status_code=403,

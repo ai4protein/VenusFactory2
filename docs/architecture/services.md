@@ -216,3 +216,25 @@ never import it. Shared path/data/report functions are in `mcp_tools/common/`;
 model implementations are in `mcp_tools/models/{pretrained,factory,evolved}/`; non-model services remain in `mcp_tools/tools/`.
 `mcp_tools/models/` starts model-specific environments on demand; it does not
 create a permanently running server for each model. See `docs/model-runtimes.md`.
+
+
+## Visitor recovery and feedback allowances
+
+Online conversation ownership uses the persistent HttpOnly visitor cookie. Existing
+admitted conversations are recovered through their quota records even if the IP,
+browser version or UI cache changes. Clearing that cookie removes the browser's proof
+of ownership. Local deployment remains unrestricted.
+
+Extra allowance (Feedback) records bug reports and suggestions with separate daily chat
+and prediction requests. Administrators review requests under Allowance keys, set both
+amounts and deliver the generated key to the applicant. Submission does not award
+credits automatically. Activated prediction grants apply across Chat, Model Plaza and
+Workflow and share their daily allowance across devices. Rotation, expiry and revocation
+invalidate the old binding.
+
+Administration shows browser visitor counts, recent visits, each mode's starts, LLM/tool
+calls, reported tokens and quota usage. Visitors are browser identities, not verified
+people; visit recording begins with this release. Reset all allowances restores the
+current deployment's daily chat, prediction and Workflow allowances after confirmation.
+It preserves historical admissions, conversation ownership, idempotency, running tasks,
+grant keys and IP burst protection, and writes an administrator audit event.

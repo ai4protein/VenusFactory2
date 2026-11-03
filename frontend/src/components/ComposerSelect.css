@@ -14,7 +14,7 @@
 .chat-page .research-execution-controls .agent-execution-controls,
 .chat-page .research-execution-controls .scientist-execution-controls { gap:4px; }
 .chat-page .research-execution-controls .scientist-execution-controls::after { display:none; }
-.chat-page .agent-execution-controls > :last-child:not(.composer-picker) { margin-left:auto; }
+.chat-page .agent-execution-controls > :last-child:not(.composer-picker):not(.composer-picker-wrap) { margin-left:auto; }
 .composer-picker-menu { position:fixed; z-index:1300; display:flex; flex-direction:column; box-sizing:border-box;
   padding:6px; border:1px solid #e3e5e8; border-radius:8px; background:#fff;
   color:#363d46; box-shadow:0 8px 30px #17212b18,0 2px 6px #17212b08; overflow:hidden; }
@@ -27,5 +27,11 @@
 .composer-picker-option.is-active { background:#f1f3f5; }
 .composer-picker-option[aria-disabled="true"] { color:#a4a8af; cursor:default; }
 .composer-picker-option svg { flex:none; width:16px; height:16px; fill:none; stroke:#5d7567; stroke-width:1.7; }
-@container (max-width:600px) { .chat-page .research-execution-controls .composer-picker { max-width:50%; } }
+@container (max-width:600px) { .chat-page .research-execution-controls .composer-picker-wrap { max-width:50%; } .chat-page .research-execution-controls .composer-picker { max-width:100%; } }
 @media (prefers-reduced-motion:reduce) { .chat-page .research-execution-controls .composer-picker { transition:none; } }
+
+.composer-picker-wrap { display:inline-flex; position:relative; min-width:0; }
+.composer-picker-wrap.has-help { padding-right:18px; }
+.chat-page .composer-picker-help { position:absolute; top:1px; right:0; display:grid; place-items:center; width:15px; height:15px; min-width:15px; min-height:15px; padding:0; box-sizing:border-box; border:1px solid #9ca3af; border-radius:50%; color:#64748b; background:transparent; font-size:10px; line-height:1; cursor:help; }
+.composer-picker-help:hover { color:#111827; border-color:#64748b; }
+.composer-picker-help:focus-visible { outline:2px solid #64748b; outline-offset:2px; }

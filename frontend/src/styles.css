@@ -5398,7 +5398,7 @@ button:disabled {
   color: #b26a00;
 }
 
-.composer-row button:not(.composer-mode-btn):not(.model-key-chip):not(.composer-icon-btn):not(.file-upload-icon-btn) {
+.composer-row button:not(.composer-mode-btn):not(.model-key-chip):not(.composer-icon-btn):not(.file-upload-icon-btn):not(.composer-picker-help) {
   min-height: 36px;
   padding: 8px 14px;
   min-width: 80px;

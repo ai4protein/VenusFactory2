@@ -172,7 +172,7 @@ export function ScienceGoalPanel({ noticeTarget, online, toolbarTarget, composer
           placeholder={say("Loading…", "加载中…")}
           items={(catalog?.execution?.harnesses || []).map(h => ({ value: h.id, label: harnessNames[h.id] || h.id, disabled: !choices.some(c => c.harness === h.id && c.ready), hint: say("Not configured", "未配置") }))}
           onChange={harness => setExecution({ harness, model_id: preferredModel(choices, harness, execution.model_id, catalog?.execution?.default.model_id) })}/>
-        <ComposerSelect label={say("Model", "模型")} ariaLabel="Scientist model" value={execution.model_id} disabled={pending || busy || active || !catalog}
+        <ComposerSelect label={say("Model", "模型")} ariaLabel="Scientist model" helpText={say("API response times vary. Please allow some time for a response.", "根据API反馈速度不一可能需要耐心等待")} value={execution.model_id} disabled={pending || busy || active || !catalog}
           placeholder={say("No models available", "暂无可用模型")}
           items={executionModelItems(catalog?.execution?.models || [], choices, execution.harness, zh, online)}
           onChange={model_id => setExecution({ ...execution, model_id })}/>

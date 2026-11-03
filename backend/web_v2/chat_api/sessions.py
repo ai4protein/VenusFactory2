@@ -22,6 +22,7 @@ from backend.web_v2.chat_api._shared import (
     _extract_client_ip,
     _get_session_or_404,
     _issue_session_access_token,
+    _historical_session_ids,
     _record_access_event,
     _runtime_mode,
     _session_owner_key_for_request,
@@ -83,7 +84,7 @@ async def list_sessions(request: Request):
     used_summaries = False
     if list_summaries is not None:
         try:
-            summaries = await list_summaries(owner_key)
+            summaries = await list_summaries(owner_key, extra_session_ids=await asyncio.to_thread(_historical_session_ids, request)) if owner_key is not None else await list_summaries(None)
             data = [
                 {
                     "session_id": s["session_id"],

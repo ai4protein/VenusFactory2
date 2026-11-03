@@ -319,7 +319,7 @@ class SqliteBackend:
         ).fetchone()
         return row[0] if row else None
 
-    def list_summaries(self, owner_key: Optional[str] = None) -> list[dict]:
+    def list_summaries(self, owner_key: Optional[str] = None, *, extra_session_ids=()) -> list[dict]:
         """Lightweight summary listing. Parses minimal fields from data JSON
         without rebuilding any runtime state. Sorted newest-first.
         """
@@ -332,8 +332,9 @@ class SqliteBackend:
         else:
             rows = conn.execute(
                 "SELECT session_id, owner_key, created_at, last_accessed, data "
-                "FROM sessions WHERE owner_key = ? ORDER BY last_accessed DESC",
-                (owner_key,),
+                "FROM sessions WHERE owner_key = ? OR session_id IN "
+                "(SELECT value FROM json_each(?)) ORDER BY last_accessed DESC",
+                (owner_key, json.dumps(list(extra_session_ids))),
             ).fetchall()
         summaries: list[dict] = []
         for sid, owner, created, accessed, data_json in rows:
@@ -478,13 +479,13 @@ class SessionStore:
             return owner or None
         return await asyncio.to_thread(self._backend.peek_owner, session_id)
 
-    async def list_summaries(self, owner_key: Optional[str] = None) -> list[dict]:
+    async def list_summaries(self, owner_key: Optional[str] = None, *, extra_session_ids=()) -> list[dict]:
         """Return lightweight per-session summaries (no runtime rebuild).
 
         Includes mem-only sessions that have not been persisted yet so callers
         see them in the listing immediately after create().
         """
-        db_summaries = await asyncio.to_thread(self._backend.list_summaries, owner_key)
+        db_summaries = await asyncio.to_thread(self._backend.list_summaries, owner_key, extra_session_ids=extra_session_ids)
         by_id = {s["session_id"]: s for s in db_summaries}
         async with self._lock:
             mem_snapshot = list(self._mem.items())

@@ -1,7 +1,7 @@
 export const QUOTA_EVENT = 'vf:quota-dialog';
 export const QUOTA_CHANGED = 'vf:quota-changed';
 const STORAGE = 'vf_online_quota_v1';
-export type Quota = { mode: string; enforced: boolean; limit: number | null; used: number; remaining: number | null; extra_limit?: number; email?: string | null; resets_at?: string; timezone?: string };
+export type Quota = { compute?: { prediction: { remaining: number; limit: number } }; mode: string; enforced: boolean; limit: number | null; used: number; remaining: number | null; extra_limit?: number; email?: string | null; resets_at?: string; timezone?: string };
 export function savedQuota(): { email: string; key: string } {
   try { const value = JSON.parse(localStorage.getItem(STORAGE) || '{}'); return { email: typeof value.email === 'string' ? value.email : '', key: typeof value.key === 'string' ? value.key : '' }; }
   catch { return { email: '', key: '' }; }

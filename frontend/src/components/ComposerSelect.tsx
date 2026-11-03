@@ -3,9 +3,9 @@ import { createPortal } from "react-dom";
 import { matchPickerItem, nextPickerItem, pickerPlacement, type PickerItem } from "../lib/pickerNavigation";
 import "./ComposerSelect.css";
 
-export function ComposerSelect({ label, ariaLabel = label, value, items, placeholder, disabled = false, disabledHint, onChange }: {
+export function ComposerSelect({ label, ariaLabel = label, value, items, placeholder, disabled = false, disabledHint, helpText, onChange }: {
   label: string; ariaLabel?: string; value: string; items: PickerItem[]; placeholder: string;
-  disabled?: boolean; disabledHint?: string; onChange: (value: string) => void;
+  disabled?: boolean; disabledHint?: string; helpText?: string; onChange: (value: string) => void;
 }) {
   const id = useId();
   const trigger = useRef<HTMLButtonElement>(null);
@@ -68,6 +68,7 @@ export function ComposerSelect({ label, ariaLabel = label, value, items, placeho
   useEffect(() => { if (open) menu.current?.querySelector(`[data-index="${active}"]`)?.scrollIntoView({ block: "nearest" }); }, [open, active]);
 
   return <>
+    <span className={helpText ? "composer-picker-wrap has-help" : "composer-picker-wrap"}>
     <button ref={trigger} type="button" className="composer-picker" role="combobox" aria-label={ariaLabel}
       aria-expanded={open} aria-haspopup="listbox" aria-controls={open ? id : undefined}
       aria-activedescendant={open && active >= 0 ? `${id}-${active}` : undefined} disabled={unavailable}
@@ -76,6 +77,8 @@ export function ComposerSelect({ label, ariaLabel = label, value, items, placeho
       <span>{selected?.label || placeholder}</span>
       <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m5 6 3 3 3-3"/></svg>
     </button>
+    {helpText && <button type="button" className="composer-picker-help" aria-label={helpText} title={helpText}>?</button>}
+    </span>
     {open && createPortal(<div ref={menu} className="composer-picker-menu" style={placement}>
       <div className="composer-picker-heading">{label}</div>
       <div id={id} role="listbox" aria-label={ariaLabel} className="composer-picker-options">

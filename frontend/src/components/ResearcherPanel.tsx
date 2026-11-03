@@ -22,7 +22,7 @@ type Material = { id: string; name: string; bytes: number; url?: string; extract
 type Protein = { id?: string; pdb_id?: string; structure_chain?: string; accession: string; name: string; organism: string; length?: number; reviewed?: boolean };
 type Scope = { id: string; label: string; label_zh: string; available: boolean; default: boolean; remote?: boolean };
 type Chapter = { id: string; title: string; status: string; length: number; draft?: string; source_ids: string[] };
-type Options = { chapters?: { id: string; label: string; label_zh: string }[]; minimum_chapters?: number; web_search?: { provider: string; tavily_configured: boolean }; models: { id: string; label: string; provider: string; ready: boolean; free: boolean }[]; default_model: string; analyses: Scope[] };
+type Options = { online?: boolean; chapters?: { id: string; label: string; label_zh: string }[]; minimum_chapters?: number; web_search?: { provider: string; tavily_configured: boolean }; models: { id: string; label: string; provider: string; ready: boolean; free: boolean }[]; default_model: string; analyses: Scope[] };
 type Source = { id: string; title: string; url: string; text: string; kind: string; evidence_level: string; year?: string };
 type RemoteService = { id: string; label: string; label_zh: string; status: string; url: string; count?: number; job_id?: string; summary?: string; data?: unknown };
 type Report = { materials?: Material[]; resumable?: boolean; stop_reason?: string; predictions?: Prediction[]; activity?: { id: number; at: number; kind: string; key: string; status: string; label: string; job_number?: string }[]; remote_services?: RemoteService[]; chapters?: Chapter[]; phase?: string; minimum_met?: boolean; completed_chapters?: number; id: string; title: string; created: number; job_number: string; status: string; model_id?: string; partial?: boolean; report?: string; message?: string; focus?: string; sources?: Source[]; sections?: { id: string; title: string; data?: unknown; text?: string }[]; steps?: { id: string; status: string; message: string }[]; queries?: string[]; plan?: { id: string; label: string }[]; queue?: { position: number; cancel_requested: boolean } };
@@ -294,7 +294,7 @@ export const ResearcherPanel = forwardRef<ResearcherPanelHandle, {
   const label = protein ? `${proteinLabel(protein)} · ${protein.organism}` : sequences[chain] ? `${fileName} · ${sequences[chain].length} aa` : '';
   const visibleMatches = matches.length ? matches : protein ? [protein] : [];
   return <>
-    {toolbarTarget && createPortal(<ComposerSelect label={tr('Model', '模型')} ariaLabel={tr('Research model', '研究模型')} value={job?.model_id || model}
+    {toolbarTarget && createPortal(<ComposerSelect label={tr('Model', '模型')} ariaLabel={tr('Research model', '研究模型')} helpText={tr('API response times vary. Please allow some time for a response.', '根据API反馈速度不一可能需要耐心等待')} value={job?.model_id || model}
       disabled={busy || !!job || !visibleModels.length} onChange={setModel}
       placeholder={!options ? tr('Loading…', '加载中…') : tr('No models available', '暂无可用模型')}
       items={visibleModels.map(m => ({ value: m.id, label: modelName(m) }))}/>, toolbarTarget)}

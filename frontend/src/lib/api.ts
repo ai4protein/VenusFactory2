@@ -263,7 +263,8 @@ function loadTokenMap(): ChatSessionTokenMap {
 }
 
 function saveTokenMap(map: ChatSessionTokenMap) {
-  localStorage.setItem(CHAT_SESSION_TOKEN_MAP_KEY, JSON.stringify(map));
+  try { localStorage.setItem(CHAT_SESSION_TOKEN_MAP_KEY, JSON.stringify(map)); }
+  catch { try { sessionStorage.setItem(CHAT_SESSION_TOKEN_MAP_KEY, JSON.stringify(map)); } catch { /* Visitor cookie permits server recovery. */ } }
 }
 
 function persistSessionToken(sessionId: string, token: string, expiresAt: string) {
