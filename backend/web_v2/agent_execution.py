@@ -68,6 +68,7 @@ def options():
         "harnesses": harnesses,
         "combinations": combinations,
         "shared_default_model": cat.default_model,
+        "readiness": public["readiness"],
     }
 
 

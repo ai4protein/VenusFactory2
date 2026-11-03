@@ -341,12 +341,16 @@ async def _stream_agent(state, text, attachment_paths, *, retry=False, interacti
         ]
         state["status"] = outcome if outcome in {"completed", "stopped", "waiting_for_input"} else "error"
         state["agent_last_outcome"] = outcome
+        if outcome not in {"completed", "stopped", "waiting_for_input"}:
+            from agent.harness.failure_summary import public_failure
+            state["error"] = public_failure(control / "model_requests.jsonl", outcome)["message"]
         write_json(
             control / "run.json",
             {"status": outcome, "binding_sha256": binding["sha256"], "requests": request_audit, "events": event_audit},
         )
         await _session_store.save(sid)
     if outcome not in {"completed", "stopped", "waiting_for_input"}:
-        yield f"event: error\ndata: {_to_json({'message': 'Agent turn did not complete: ' + outcome, 'code': outcome})}\n\n"
+        from agent.harness.failure_summary import public_failure
+        yield f"event: error\ndata: {_to_json(public_failure(control / 'model_requests.jsonl', outcome))}\n\n"
     yield f"event: state\ndata: {_to_json(_snapshot(state))}\n\n"
     yield "event: done\ndata: {}\n\n"

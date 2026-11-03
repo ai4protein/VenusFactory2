@@ -33,8 +33,16 @@ class KimiAdapter:
         cfg = t.output / "runtime-private.toml"
         # The child receives only a short-lived local gateway token, never the upstream key.
         q = json.dumps
+        loop_control = ""
+        if t.phase == "chat" and t.mcp_entry == "web_tools.py":
+            loop_control = (
+                "[loop_control]\nmax_retries_per_step = 1\n"
+                + "max_steps_per_turn = " + str(p.budget.model_calls) + "\n"
+            )
         cfg.write_text(
-            'default_model = "research"\n[models.research]\nprovider = "research"\n'
+            'default_model = "research"\n'
+            + loop_control
+            + '[models.research]\nprovider = "research"\n'
             + "model = "
             + q(p.model.model)
             + "\nmax_context_size = "

@@ -164,7 +164,9 @@ class ClaudeAdapter:
             entry=task.mcp_entry,
             timeout_s=min(180, p.budget.wall_seconds),
         )
-        state = ClaudeEvents(task.tools, p.budget.tool_calls, lambda name, data: validate_tool_result(task, name, data))
+        web_tools = task.phase == 'chat' and task.mcp_entry == 'web_tools.py'
+        validator = None if web_tools else lambda name, data: validate_tool_result(task, name, data)
+        state = ClaudeEvents(task.tools, p.budget.tool_calls, validator)
         result = {
             "status": "running",
             "engine": "claude-code",
@@ -199,9 +201,15 @@ class ClaudeAdapter:
                         limit=8_000_000,
                         start_new_session=True,
                     )
-                    process.stdin.write(task_message(task).encode())
-                    await process.stdin.drain()
-                    process.stdin.close()
+                    try:
+                        process.stdin.write(task_message(task).encode())
+                        await process.stdin.drain()
+                    except (BrokenPipeError, ConnectionResetError):
+                        # An early CLI exit can close stdin before drain. Still
+                        # consume stdout and record its actual terminal status.
+                        pass
+                    finally:
+                        process.stdin.close()
                     while line := await process.stdout.readline():
                         raw.write(line)
                         raw.flush()

@@ -411,6 +411,7 @@ class ResponsesGateway(ModelGateway):
         if request_recovery != "none":
             raise ValueError("Responses recovery requires its own declared and tested policy")
         self.on_text = on_text
+        self._rate_limited = False
         super().__init__(**kwargs)
 
     async def handle(self, request):
@@ -432,6 +433,9 @@ class ResponsesGateway(ModelGateway):
         except (ValueError, KeyError, TypeError, AttributeError):
             self.record({"event": "policy_rejected"})
             return web.json_response({"error": "request policy rejected"}, status=400)
+        if self._rate_limited:
+            self.record({"event": "upstream_retry_suppressed", "status": 429})
+            return web.json_response({"error": "upstream_http_429"}, status=400)
         if self.calls >= self.policy.max_calls:
             self.record({"event": "budget_rejected"})
             return web.json_response({"error": "model call budget exhausted"}, status=429)
@@ -454,7 +458,9 @@ class ResponsesGateway(ModelGateway):
                 status = response.status_code
                 if status != 200:
                     await self.record_upstream_rejection(response, call)
-                    return web.json_response({"error": "upstream_http_" + str(status)}, status=status)
+                    client_status = 400 if status == 429 and self.on_text is not None else status
+                    self._rate_limited = client_status != status
+                    return web.json_response({"error": "upstream_http_" + str(status)}, status=client_status)
                 raw = bytearray()
                 preview = PublicTextStream(self.on_text, call, protocol="responses") if self.on_text is not None else None
                 async for chunk in response.aiter_bytes():

@@ -200,7 +200,7 @@
         "output_per_million": 0
       },
       "enabled": true,
-      "max_output_tokens": 12288,
+      "max_output_tokens": 8192,
       "protocols": [
         "chat_completions",
         "responses"
@@ -251,7 +251,7 @@
         "input_per_million": 0,
         "output_per_million": 0
       },
-      "enabled": true,
+      "enabled": false,
       "max_output_tokens": 12288,
       "protocols": [
         "chat_completions",
@@ -303,7 +303,7 @@
         "input_per_million": 0,
         "output_per_million": 0
       },
-      "enabled": true,
+      "enabled": false,
       "max_output_tokens": 12288,
       "protocols": [
         "chat_completions",

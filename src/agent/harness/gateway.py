@@ -54,6 +54,7 @@ class EvidenceGateway(ModelGateway):
         if request_recovery not in {"none", POLICY, EMPTY_POLICY}:
             raise ValueError("Unknown request recovery policy")
         self.on_text = on_text
+        self._rate_limited = False
         self.request_recovery = request_recovery
         super().__init__(**kwargs)
 
@@ -72,15 +73,25 @@ class EvidenceGateway(ModelGateway):
             if not isinstance(incoming, dict) or type(incoming.get("stream", False)) is not bool:
                 raise ValueError("Invalid streaming request")
             client_stream = incoming.get("stream", False)
+            # DeepSeek Harness attaches local plugin inventory to its OpenAI
+            # request. It is not an inference parameter and must not leave the host.
+            local_fields = [key for key in ('dsh_plugin_packages',) if key in incoming]
+            for key in local_fields:
+                incoming.pop(key)
             if self.on_text is not None:
                 incoming = {**incoming, "stream": True}
             payload, metadata = self.policy.apply(incoming)
+            if local_fields:
+                metadata['local_only_fields'] = local_fields
             from .scientist_policy import request_policy_witness
 
             metadata.update(request_policy_witness(payload))
         except (ValueError, KeyError, TypeError):
             self.record({"event": "policy_rejected"})
             return web.json_response({"error": "request policy rejected"}, status=400)
+        if self._rate_limited:
+            self.record({"event": "upstream_retry_suppressed", "status": 429})
+            return web.json_response({"error": "upstream_http_429"}, status=400)
         from urllib.parse import urlsplit
         from backend.web_v2.job_queue import resource_slot
         provider=(urlsplit(self.upstream_url).hostname or 'provider').lower()
@@ -134,7 +145,12 @@ class EvidenceGateway(ModelGateway):
                                 evidence = await self.record_upstream_rejection(response, call)
                                 retry = self.request_recovery == POLICY and attempt == 1 and matches_rejection(evidence)
                                 if not retry:
-                                    return web.json_response({"error": "upstream_http_" + str(status)}, status=status)
+                                    # Native SDKs retry 429 several times. A live turn
+                                    # cannot resolve a provider quota; stop that retry
+                                    # loop while retaining the real status in evidence.
+                                    client_status = 400 if status == 429 and self.on_text is not None else status
+                                    self._rate_limited = client_status != status
+                                    return web.json_response({"error": "upstream_http_" + str(status)}, status=client_status)
                             else:
                                 raw = bytearray()
                                 preview = PublicTextStream(self.on_text, call) if self.on_text is not None else None
@@ -167,6 +183,7 @@ class EvidenceGateway(ModelGateway):
                     self.record({"event": "transport_error", "call": call, "error_type": error_type})
                     raise
                 except (httpx.HTTPError, ValueError, OSError, TimeoutError) as exc:
+                    completed = False
                     error_type = type(exc).__name__
                     self.record({"event": "transport_error", "call": call, "error_type": error_type})
                     return web.json_response({"error": "incomplete upstream response"}, status=502)

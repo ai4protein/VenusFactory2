@@ -213,6 +213,10 @@ def chat_to_message(raw, *, model, allowed_tools, max_tokens, upstream_url=None)
     data = _object(json.loads(raw))
     choices = data.get("choices")
     aliases = _RESPONSE_MODEL_ALIASES.get((upstream_url, model), frozenset())
+    from agent.rsi.engine.openrouter_policy import is_openrouter
+    if upstream_url and is_openrouter(upstream_url) and model.endswith(':free'):
+        # Same exact alias rule as the preceding zero-cost provider verification.
+        aliases = aliases | {model.removesuffix(':free')}
     response_model = data.get("model")
     if (
         data.get("error")
@@ -349,6 +353,9 @@ class MessagesBridge(EvidenceGateway):
         except (ValueError, KeyError, TypeError):
             self.record({"event": "policy_rejected"})
             return self.error("invalid_request_error", "Request policy rejected", 400)
+        if self._rate_limited:
+            self.record({"event": "upstream_retry_suppressed", "status": 429})
+            return self.error("api_error", "upstream_http_429", 400)
         if self.calls >= self.policy.max_calls:
             self.record({"event": "budget_rejected"})
             return self.error("rate_limit_error", "Model call budget exhausted", 429)
@@ -369,7 +376,9 @@ class MessagesBridge(EvidenceGateway):
                 status = response.status_code
                 if status != 200:
                     await self.record_upstream_rejection(response, call)
-                    return self.error("api_error", "upstream_http_" + str(status), status)
+                    client_status = 400 if status == 429 and self.on_text is not None else status
+                    self._rate_limited = client_status != status
+                    return self.error("api_error", "upstream_http_" + str(status), client_status)
                 raw = bytearray()
                 preview = PublicTextStream(self.on_text, call) if self.on_text is not None else None
                 async for chunk in response.aiter_bytes():
@@ -382,6 +391,10 @@ class MessagesBridge(EvidenceGateway):
                     inspect_response(bytes(raw), True)
                 chat_raw = preview.completion() if preview is not None else bytes(raw)
                 provider = self.verify_provider_response(bytes(raw), preview is not None)
+                from .tool_response_names import normalize
+                chat_raw, aliases = normalize(chat_raw, False, payload.get('tools', []))
+                if aliases:
+                    self.record({'event': 'tool_name_normalized', 'call': call, 'aliases': aliases})
                 message, usage = chat_to_message(
                     chat_raw,
                     model=self.policy.model,

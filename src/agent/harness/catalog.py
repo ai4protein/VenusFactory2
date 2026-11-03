@@ -25,6 +25,7 @@ class ModelOption:
     credential_toml: Path | None = None
     inference_controls: dict | None = None
     max_output_tokens: int | None = None
+    protocols: tuple[str, ...] | None = None
 
     def public(self):
         return {
@@ -92,7 +93,14 @@ class ExecutionCatalog:
                         raise ValueError("Only explicit inference controls belong in a model option")
                     replace(default_profile.budget, **controls)
                     controls = dict(controls)
-                self.models[mid] = ModelOption(mid, str(row["label"]), ModelBinding(**row["binding"]), bridge, controls)
+                ceiling = row.get('max_output_tokens')
+                if ceiling is not None and (type(ceiling) is not int or ceiling < 1):
+                    raise ValueError('Invalid model output limit')
+                protocols = row.get('protocols')
+                if protocols is not None and (not isinstance(protocols, list) or not protocols or any(p not in {'chat_completions', 'responses'} for p in protocols)):
+                    raise ValueError('Invalid model protocols')
+                self.models[mid] = ModelOption(mid, str(row["label"]), ModelBinding(**row["binding"]), bridge, controls,
+                                               ceiling, tuple(protocols) if protocols is not None else None)
         if include_configured:
             # Official endpoints are opt-in by model ID, never enabled by an
             # unrelated pre-existing API key or an example catalog placeholder.
@@ -145,6 +153,8 @@ class ExecutionCatalog:
         if selection["harness"] in {"codex", "expert-codex"} and binding.provider in {"openrouter", "openai"}:
             binding = replace(binding, protocol="responses")
             budget = replace(budget, thinking=None, reasoning_effort=None)
+        if model.protocols is not None and binding.protocol not in model.protocols:
+            raise ValueError('Selected harness requires a protocol not enabled for this model')
         return replace(self.default_profile, harness=selection["harness"], model=binding, budget=budget), model
 
     def public(self, runtimes):

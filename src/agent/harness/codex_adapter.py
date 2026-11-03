@@ -97,12 +97,15 @@ class CodexEvents:
                     if data is None:
                         parts = result.get("content", [])
                         text = "\n".join(part.get("text", "") for part in parts if part.get("type") == "text")
-                        data = json.loads(text)
-                    if not isinstance(data, dict):
-                        raise ValueError("MCP result must be a structured mapping")
+                        if self.validator:
+                            data = json.loads(text)
+                    else:
+                        text = json.dumps(data, ensure_ascii=False, allow_nan=False)
                     if self.validator:
+                        if not isinstance(data, dict):
+                            raise ValueError("MCP result must be a structured mapping")
                         self.validator(name, data)
-                    text = json.dumps(data, ensure_ascii=False, allow_nan=False)
+                        text = json.dumps(data, ensure_ascii=False, allow_nan=False)
                 self.finished.add(identity)
                 self.tool_errors += int(failed)
                 return [{"kind": "tool_result", "tool_call_id": identity, "is_error": failed, "output": text}]
@@ -267,7 +270,8 @@ class CodexAdapter:
         def validator(name, data):
             validate_tool_result(task, name, data)
 
-        state = CodexEvents(task.tools, ctx.profile.budget.tool_calls, validator)
+        web_tools = task.phase == 'chat' and task.mcp_entry == 'web_tools.py'
+        state = CodexEvents(task.tools, ctx.profile.budget.tool_calls, None if web_tools else validator)
         result = {
             "status": "running",
             "engine": "codex",
