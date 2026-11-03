@@ -87,6 +87,12 @@ validate the browser Origin (scheme, host and port); job identity cookies use
 Secure on HTTPS, including TLS terminated by a trusted proxy. Direct command-line
 clients can omit Origin; authentication and ownership checks still apply.
 
+For a TLS-terminating tunnel that does not forward the protocol, set
+`WEBUI_V2_PUBLIC_ORIGIN=https://your-public-domain` and preserve the public Host.
+Only that exact host and port use the configured HTTPS scheme; local HTTP access
+continues to work. This setting does not trust forwarded client IPs or allow
+foreign browser origins. Restart the API after changing deployment settings.
+
 The current single-host task store is SQLite WAL with process-safe claims and
 leases. `--api-workers` adds API processes, not GPU replicas. This is not yet a
 distributed PostgreSQL/Redis cluster; do not share SQLite across network hosts.
