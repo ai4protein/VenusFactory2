@@ -86,7 +86,7 @@ def zero_shot_mutation_structure_prediction_tool(
     backend: Optional[str] = None,
     out_dir: Optional[str] = None,
 ) -> str:
-    """Predict beneficial mutations from PDB structure (zero-shot). Returns status JSON with data/file_info or error."""
+    """Score and rank amino-acid substitutions from a protein PDB using the explicitly selected zero-shot model. Scores prioritize candidates for experiments; they are not measured activity or guaranteed improvements. Returns scores and output files."""
     try:
         actual_path = structure_file
         if structure_file.strip().startswith("{") and structure_file.strip().endswith("}"):

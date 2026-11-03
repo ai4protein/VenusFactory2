@@ -170,7 +170,7 @@ class ToolDisclosure:
                             break
                 options.append({'name': candidate['name'], 'arguments': preset})
             if options:
-                result['description'] = brief_description(tool.description, 600)
+                result['description'] = re.split(r'\n\s*\n|\n\s*(?:Args|Arguments|Parameters|Returns)\s*:', str(tool.description), maxsplit=1)[0].strip()[:600]
                 model_keys = {key for row in options for key in row['arguments'] if key in {'model_name','model'}}
                 properties = result['inputSchema'].get('properties', {})
                 self._model_selectors[name] = model_keys
