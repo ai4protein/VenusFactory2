@@ -6,6 +6,7 @@ import { JobDetails } from './JobDetails';
 import { JobNumber } from './JobNumber';
 import { QueueState, type QueueStatus } from './QueueState';
 import './JobHistory.css';
+import { JOBS_CHANGED, mergeJobUpdate, jobPollDelay, type JobUpdate } from '../lib/jobUpdates';
 
 const statuses: Record<string, [string, string]> = { active: ['In progress', '进行中'], queued: ['Queued', '排队中'], running: ['Running', '运行中'], completed: ['Completed', '已完成'], failed: ['Failed', '失败'], interrupted: ['Interrupted', '已中断'], cancelled: ['Cancelled', '已取消'] };
 const kinds: Record<string, [string, string]> = { train: ['Training', '训练'], training: ['Training', '训练'], predict: ['Prediction', '预测'], evaluation: ['Evaluation', '评估'], workflow: ['Workflow', '工作流'] };
@@ -18,6 +19,21 @@ export function JobHistory({ customTask, defer = false, presentation = 'inline' 
   const [error, setError] = useState(''), [loading, setLoading] = useState(false), [pending, setPending] = useState<string[]>([]), [revision, setRevision] = useState(0);
 
   const dialog = useRef<HTMLDialogElement>(null), trigger = useRef<HTMLButtonElement>(null);
+  const polling = useRef<AbortController>();
+  useEffect(() => {
+    const refresh = () => { if (!document.hidden) { polling.current?.abort(); setRevision(v => v + 1); } };
+    const changed = (event: Event) => {
+      const update = (event as CustomEvent<JobUpdate>).detail;
+      if (update.source !== (customTask ? 'custom' : 'platform')) return;
+      polling.current?.abort();
+      setPage(current => mergeJobUpdate(current, update.job));
+      setRevision(v => v + 1);
+    };
+    window.addEventListener(JOBS_CHANGED, changed);
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => { window.removeEventListener(JOBS_CHANGED, changed); window.removeEventListener('focus', refresh); document.removeEventListener('visibilitychange', refresh); };
+  }, [customTask]);
   useEffect(() => {
     if (presentation !== 'dialog') return;
     if (open && !dialog.current?.open) dialog.current?.showModal();
@@ -27,13 +43,16 @@ export function JobHistory({ customTask, defer = false, presentation = 'inline' 
   useEffect(() => {
     if (defer && !open) return;
     const controller = new AbortController(); let timer: ReturnType<typeof setTimeout>;
+    polling.current = controller;
     async function poll() {
+      let delay = 5000;
       try {
         const next = await client.list({ query, status, kind, offset }, controller.signal);
         if (controller.signal.aborted) return;
         setPage(next); setError(''); setLoading(false);
+        delay = jobPollDelay(open, next.active > 0, document.hidden);
       } catch (e) { if (!controller.signal.aborted) { setError((e as Error).message); setLoading(false); } }
-      if (!controller.signal.aborted) timer = setTimeout(poll, open ? 4000 : 12000);
+      if (!controller.signal.aborted) timer = setTimeout(poll, delay);
     }
     setLoading(true); timer = setTimeout(poll, query ? 250 : 0);
     return () => { controller.abort(); clearTimeout(timer); };
@@ -50,6 +69,8 @@ export function JobHistory({ customTask, defer = false, presentation = 'inline' 
     finally { setPending(ids => ids.filter(id => id !== job.id)); }
   }
   function changed(next: JobSummary) {
+    setPage(current => mergeJobUpdate(current, next));
+    if (page?.items.find(item => item.id === next.id)?.status !== next.status) { polling.current?.abort(); setRevision(v => v + 1); }
     if (next.id !== selected) { setSelected(next.id); setOffset(0); setStatus(''); setQuery(''); setRevision(v => v + 1); }
   }
   const content = <>

@@ -1,3 +1,4 @@
+import { notifyJobs } from './jobUpdates';
 import { validateUploads } from "./uploadLimits";
 import { ensureJobSession } from './jobSession';
 import { computeQuotaError, COMPUTE_QUOTA_CHANGED } from './computeQuota';
@@ -221,6 +222,7 @@ export async function startTrainingStream(
     { args },
     ({ event, data }) => {
       const payload = parseEventData(data);
+      if (['start', 'done', 'error'].includes(event)) notifyJobs('custom');
       if(event === 'start')activeJobs.training=String(payload.run_id);
       if(event === 'queue')onEvent({type:'queue',data:payload as QueueStatus});
       if (event === "start") onEvent({ type: "start", data: payload as Extract<StreamEventPayload, { type: "start" }>["data"] });
@@ -246,6 +248,7 @@ export async function startEvaluationStream(
     { args },
     ({ event, data }) => {
       const payload = parseEventData(data);
+      if (['start', 'done', 'error'].includes(event)) notifyJobs('custom');
       if(event === 'start')activeJobs.evaluation=String(payload.run_id);
       if(event === 'queue')onEvent({type:'queue',data:payload as QueueStatus});
       if (event === "start") onEvent({ type: "start", data: payload as Extract<StreamEventPayload, { type: "start" }>["data"] });
@@ -269,6 +272,7 @@ export async function startPredictStream(
     { args },
     ({ event, data }) => {
       const payload = parseEventData(data);
+      if (['start', 'done', 'error'].includes(event)) notifyJobs('custom');
       if(event === 'start')activeJobs.predict=String(payload.run_id);
       if(event === 'queue')onEvent({type:'queue',data:payload as QueueStatus});
       if (event === "start") onEvent({ type: "start", data: payload as Extract<StreamEventPayload, { type: "start" }>["data"] });
@@ -288,6 +292,7 @@ export function buildArtifactDownloadUrl(path: string) {
 export async function watchCustomJob(id:string,onEvent:(event:StreamEventPayload)=>void,signal?:AbortSignal){
   await ensureJobSession('custom');
   await streamSSEFromPost('/api/custom-model/jobs/'+encodeURIComponent(id)+'/stream',{},({event,data})=>{
+    if (['start','done','error'].includes(event)) notifyJobs('custom');
     if(['start','queue','progress','log','training_metrics','test_results','error','done'].includes(event))onEvent({type:event,data:parseEventData(data)} as StreamEventPayload);
   },signal);
 }

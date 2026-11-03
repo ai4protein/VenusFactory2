@@ -48,6 +48,12 @@ class JobRecords:
         with self.queue.connection() as c:
             return [dict(r) for r in c.execute('SELECT identity,kind,title,number,created FROM job_records WHERE source=? AND owner=? ORDER BY created DESC,serial DESC', (source, owner))]
 
+    def metadata(self, source, identity, owner):
+        with self.queue.connection() as c:
+            row = c.execute('SELECT number,title FROM job_records WHERE source=? AND identity=? AND owner=?',
+                            (source, identity, owner)).fetchone()
+        return {'job_number': row['number'], 'title': row['title']} if row and row['number'] else None
+
     def protect(self, path):
         with self.queue.connection(True) as c:
             c.execute('INSERT OR IGNORE INTO job_private_roots VALUES(?)', (str(Path(path).resolve()),))

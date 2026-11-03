@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import { useLang } from '../lib/i18n';
 import { Dataset, Job, platform, post, uploadDataset } from '../lib/modelPlatform';
 import { resultRows, tableCsv, type TableResult } from '../lib/biologicalInputs';
+import { notifyJobs } from '../lib/jobUpdates';
 
 export function ModelGlyph({ kind = 'function', size = 25 }: { kind?: string; size?: number }) {
   return <svg width={size} height={size} viewBox="0 0 32 32" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
@@ -40,16 +41,16 @@ export function JobProgress({ initial, onChange, inputColumns }: { initial: Job;
   const callback = useRef(onChange); callback.current = onChange;
   const { lang } = useLang(); const zh = lang === 'zh';
   useEffect(() => {
-    let alive = true, timer: ReturnType<typeof setTimeout>;
+    let alive = true, timer: ReturnType<typeof setTimeout>, lastStatus = initial.status;
     setError('');
     async function poll() {
-      try { const next = await platform<Job>('/jobs/' + job.id); if (!alive) return; setJob(next); callback.current?.(next); setError(''); if (['queued', 'running'].includes(next.status)) timer = setTimeout(poll, 1300); }
+      try { const next = await platform<Job>('/jobs/' + job.id); if (!alive) return; setJob(next); callback.current?.(next); if (next.status !== lastStatus) { lastStatus = next.status; notifyJobs('platform', next); } setError(''); if (['queued', 'running'].includes(next.status)) timer = setTimeout(poll, 1000); }
       catch (e) { if (alive) { setError((e as Error).message); timer = setTimeout(poll, 4000); } }
     }
     void poll(); return () => { alive = false; clearTimeout(timer); };
   }, [job.id]);
   return <section className="mp-job" aria-live="polite"><div className="mp-section-heading"><strong>{job.status === 'completed' ? (zh ? '已完成' : 'Completed') : job.status === 'cancelled' || job.status === 'failed' || job.status === 'interrupted' ? (zh ? '未完成' : 'Run stopped') : job.status === 'queued' ? (zh ? '排队中' : 'Queued') : (zh ? '正在运行' : 'Running')}</strong><span>{job.progress}%</span></div>
-    <JobNumber number={job.job_number}/><QueueState queue={job.queue}/><progress max="100" value={job.progress} aria-label={zh ? '运行进度' : 'Run progress'}/>{job.message && job.status !== 'queued' && !['Running','Completed','Cancelled'].includes(job.message) && <p className={job.status === 'failed' ? 'mp-error' : 'mp-muted'}>{job.message}</p>}
+    <JobNumber number={job.job_number}/>{['queued','running'].includes(job.status) && <QueueState queue={job.queue}/>}<progress max="100" value={job.progress} aria-label={zh ? '运行进度' : 'Run progress'}/>{job.message && job.status !== 'queued' && !['Running','Completed','Cancelled'].includes(job.message) && <p className={job.status === 'failed' ? 'mp-error' : 'mp-muted'}>{job.message}</p>}
     <div className="mp-job-controls">{['queued','running'].includes(job.status) && <button className="mp-button" disabled={changing||Boolean(job.queue?.cancel_requested)} onClick={()=>void control('cancel')}>{zh?'取消任务':'Cancel task'}</button>}{['failed','interrupted','cancelled'].includes(job.status) && <button className="mp-button" disabled={changing} onClick={()=>void control('retry')}>{zh?'重试':'Retry'}</button>}</div>
     {error && <p role="alert" className="mp-error">{error}</p>}
     {job.result?.model?.metrics && <div className="mp-metrics">{Object.entries(job.result.model.metrics).map(([k,v]) => <div key={k}><span>{k}</span><strong>{v.toFixed(4)}</strong></div>)}</div>}

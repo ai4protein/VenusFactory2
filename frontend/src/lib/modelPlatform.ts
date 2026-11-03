@@ -15,12 +15,14 @@ export type ComponentCatalog = { items: ModelCard[]; total: number; categories: 
 export type Catalog = { items: ModelCard[]; total: number; registered: number; categories: Record<string, number>; unavailable_sources: string[]; unavailable_tools?: string[] };
 import { COMPUTE_QUOTA_CHANGED, computeQuotaError } from './computeQuota';
 import { ensureJobSession } from './jobSession';
+import { notifyJobs } from './jobUpdates';
 export async function platform<T>(path: string, options?: RequestInit): Promise<T> {
   const request = async (): Promise<T> => {
   const res = await fetch('/api/model-platform' + path, { credentials: 'same-origin', ...options, headers: { ...(options?.method === 'POST' ? { 'Idempotency-Key': crypto.randomUUID() } : {}), ...(options?.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), ...options?.headers } });
   const data = await res.json();
   if (!res.ok) throw new Error(computeQuotaError(data) || (typeof data.detail === 'string' ? data.detail : data.detail?.message || 'Please check your input and try again.'));
   if (options?.method === 'POST' && (path === '/predict' || path === '/workflows/run' || path.endsWith('/retry'))) window.dispatchEvent(new Event(COMPUTE_QUOTA_CHANGED));
+  if (options?.method === 'POST' && (path === '/predict' || path === '/train' || path === '/workflows/run' || /\/jobs\/[^/]+\/(cancel|retry)$/.test(path))) notifyJobs('platform', data);
   return data as T;
   };
   // The first read also establishes the workspace cookie. Other callers wait

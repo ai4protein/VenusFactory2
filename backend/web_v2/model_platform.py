@@ -503,7 +503,7 @@ class Platform:
             return self.records.resolve('platform', identity, owner)
         return identity
 
-    def job(self, owner, identity):
+    def job(self, owner, identity, *, metadata=None):
         identity = self.resolve_job(owner, identity)
         job = self.owned('jobs', identity, owner)
         if job.get('queue_id'):
@@ -515,13 +515,18 @@ class Platform:
                     write(self.path('jobs',identity),{k:v for k,v in job.items() if k!='queue'})
                 elif schedule['status']=='queued':job['message']=schedule['message']
                 elif schedule['status']=='completed' and job['status']!='completed':
-                    job.update(status='interrupted',message='Worker ended without results. Retry to continue.')
+                    # The worker may finish between the file read and queue read.
+                    job = self.owned('jobs', identity, owner)
+                    job['queue'] = schedule
+                    if job['status'] in {'queued', 'running'}:
+                        job.update(status='interrupted',message='Worker ended without results. Retry to continue.')
         elif job['status'] in {'queued', 'running'} and time.time() - job['created'] > 10:
             try: os.kill(job.get('pid', 0) or -999999, 0)
             except ProcessLookupError:
                 job.update(status='interrupted', message='Run interrupted. Retry to continue.')
                 write(self.path('jobs', identity), job)
-        public = {**{k: v for k, v in job.items() if k not in {'owner', 'payload', 'pid', 'queue_id'}}, **self.register_job(job)}
+        metadata = metadata or self.records.metadata('platform', identity, owner) or self.register_job(job)
+        public = {**{k: v for k, v in job.items() if k not in {'owner', 'payload', 'pid', 'queue_id'}}, **metadata}
         if job['kind'] == 'workflow':
             payload = job['payload']
             public['workflow'] = {'id': payload.get('workflow_id'), 'name': payload.get('name') or 'Workflow', 'graph': payload['graph']}
@@ -608,7 +613,7 @@ class Platform:
         return 'gpu' if any(self.model(owner, identity)['adapter'] in gpu for identity in ids) else 'cpu'
 
     def jobs(self, owner):
-        return [self.job(owner, item['identity']) for item in self.records.entries('platform', owner)
+        return [self.job(owner, item['identity'], metadata={'job_number': item['number'], 'title': item['title']}) for item in self.records.entries('platform', owner)
                 if self.path('jobs', item['identity']).is_file()]
 
     def job_page(self, owner, **filters):
