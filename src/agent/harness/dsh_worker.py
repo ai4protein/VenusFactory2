@@ -15,7 +15,7 @@ def main():
     from deepseek_harness import DeepSeekHarness
 
     request = json.load(sys.stdin)
-    root = Path("/runtime_home")
+    root = Path("/evidence")
     # Minimal composition owns its loop. Remove native shell tools instead of wrapping another loop.
     patch = [
         {"id": name, "disabled": True}
@@ -52,7 +52,7 @@ def main():
     result = {"status": "runtime_error", "session_id": sid, "tool_calls": 0}
     try:
         with DeepSeekHarness(
-            dsh_home=str(root / "dsh"),
+            dsh_home="/runtime_home/dsh",
             profile="sdk-minimal",
             patches=(str(patch_path),),
             cwd="/workspace",

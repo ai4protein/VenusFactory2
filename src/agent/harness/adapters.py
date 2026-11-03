@@ -209,6 +209,10 @@ def dsh_command(ctx, controls):
         "/capabilities",
         "--bind",
         str(controls),
+        "/evidence",
+        # SDK boot generates hundreds of package shims. Keep these disposable
+        # files off shared storage; only events and diagnostics are persisted.
+        "--tmpfs",
         "/runtime_home",
         "--chdir",
         "/workspace",

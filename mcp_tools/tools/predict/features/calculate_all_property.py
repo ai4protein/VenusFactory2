@@ -17,7 +17,6 @@ from mcp_tools.tools.predict.features.calculate_physchem import calculate_physch
 from mcp_tools.tools.predict.features.calculate_sasa import calculate_sasa_from_pdb
 from mcp_tools.tools.predict.features.calculate_rsa import calculate_rsa_from_pdb
 from mcp_tools.tools.predict.features.calculate_secondary_structure import calculate_ss_from_pdb
-from mcp_tools.models.factory.training.cli_utils.data_utils import extract_seq_from_pdb
 
 def calculate_all_properties(input_file: str, file_type: str = 'auto', chain_id: str = 'A') -> Dict[str, Any]:
     """
@@ -61,6 +60,8 @@ def calculate_all_properties(input_file: str, file_type: str = 'auto', chain_id:
                 print(f"✓ Calculated physicochemical properties for sequence '{physchem['sequence_id']}'")
             
         elif file_type == 'pdb':
+            from mcp_tools.models.factory.training.cli_utils.data_utils import extract_seq_from_pdb
+
             # Create temporary FASTA file for physicochemical calculation
             with tempfile.NamedTemporaryFile(mode='w', suffix='.fasta', delete=False) as tmp_fasta:
                 sequence = extract_seq_from_pdb(input_file, chain=chain_id)

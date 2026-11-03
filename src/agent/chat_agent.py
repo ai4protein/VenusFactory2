@@ -49,13 +49,22 @@ from agent.tracing import LLMSpanData, start_span
 from config import get_config
 from logger import get_logger
 from mcp_tools.tools.runtime_tool_policy import filter_tools as _filter_agent_tools_for_runtime_mode
-from mcp_tools.tools.tools_agent_hub import get_pi_tools, get_tools
 from mcp_tools.common.common_utils import get_web_v2_area_dir
 
 load_dotenv()
 
 _logger = get_logger("agent.chat")
 _cfg = get_config()
+
+
+def get_tools():
+    from mcp_tools.tools.tools_agent_hub import get_tools as load
+    return load()
+
+
+def get_pi_tools():
+    from mcp_tools.tools.tools_agent_hub import get_pi_tools as load
+    return load()
 
 # Models that support Anthropic-style explicit prompt caching via cache_control blocks.
 # Extend this set as more cache-capable official models are added.
@@ -1208,6 +1217,11 @@ def ensure_runtime_state(state: dict[str, Any]) -> dict[str, Any]:
     Called after loading state from disk. Preserves all persisted fields,
     only fills in runtime-only fields.
     """
+    # Native turns restore their own model and toolbox in a separate worker.
+    # Rebuilding the legacy role graph here loads the entire scientific stack
+    # a second time, including during a read-only conversation refresh.
+    if state.get("agent_execution"):
+        return state
     if state.get("llm") is None:
         api_key = state.get("default_llm_api_key", "") or ""
         base_url = state.get("default_llm_base_url", "") or ""
