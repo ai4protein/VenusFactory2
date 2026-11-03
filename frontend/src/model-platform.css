@@ -70,3 +70,5 @@ body:has(.vf2-layout){background:#fff}
 .mp-model-lineage {display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px 20px;margin:18px 0 24px;padding:14px 0;border-block:1px solid #e7e9ec;font-size:13px;}
 .mp-model-lineage dt {color:#737b84;margin-bottom:4px;}
 .mp-model-lineage dd {margin:0;color:#242b33;overflow-wrap:anywhere;}
+
+.mp-card-skeleton{min-height:190px;padding:24px;display:flex;flex-direction:column;gap:18px;pointer-events:none}.mp-card-skeleton span{display:block;height:14px;width:85%;border-radius:3px;background:#f1f3f5}.mp-card-skeleton span:first-child{width:65%;height:20px}.mp-card-skeleton span:last-child{margin-top:auto;width:45%}

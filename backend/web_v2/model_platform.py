@@ -20,6 +20,7 @@ import threading
 import time
 import uuid
 from pathlib import Path
+from mcp_tools.models.catalog_snapshot import catalog_snapshot
 
 PROJECT = Path(__file__).resolve().parents[2]
 AA = 'ACDEFGHIKLMNPQRSTVWY'
@@ -207,6 +208,7 @@ class Platform:
             raise ValueError(card['name'] + ' is available in local mode')
         return card
 
+    @catalog_snapshot
     def official(self):
         cfg = read(PROJECT / 'src/constant.json')
         ui = cfg['web_ui']
@@ -250,6 +252,7 @@ class Platform:
         from backend.web_v2.external_models import cards as external_cards
         return [self.availability(c) for c in cards + external_cards()]
 
+    @catalog_snapshot
     def shared(self, refresh=False):
         if self._cache is not None and not refresh and time.monotonic() - self._cache_time < 30:
             return self._cache
@@ -286,8 +289,9 @@ class Platform:
         self._cache, self._cache_time = (cards, issues), time.monotonic()
         return self._cache
 
+    @catalog_snapshot
     def catalog(self, owner, query='', category='', source='', mine=False, offset=0, limit=24, mode='advanced'):
-        shared, issues = self.shared()
+        shared, issues = ([], []) if mine else self.shared()
         cards = [] if mine else [self.availability(c) for c in shared]
         for p in (self.root / 'models').glob('*.json'):
             m = read(p)
@@ -302,10 +306,11 @@ class Platform:
         found = prioritize_platform_models(found)
         return {'items': found[offset:offset+limit], 'total': len(found), 'registered': registered, 'categories': counts, 'unavailable_sources': issues}
 
+    @catalog_snapshot
     def plaza_catalog(self, owner, query='', category='', source='', mine=False, kind='', offset=0, limit=24, model_type=''):
         from backend.web_v2.workflow_tools import catalog
         base = self.catalog(owner, mine=mine, limit=100000)
-        tools, unavailable = ([], []) if mine else catalog()
+        tools, unavailable = ([], []) if mine else catalog(detail=False)
         cards = [{**m, 'node_kind': 'tool' if m['adapter'] == 'capability' else 'model'} for m in base['items']] + tools
         words = query.casefold().split()
         matching = [m for m in cards if (not source or m['source'] == source)
@@ -315,7 +320,7 @@ class Platform:
         counts = {c: sum(m['category'] == c for m in matching) for c in [*CATEGORIES, 'processing', 'search']}
         found = [m for m in matching if not category or m['category'] == category]
         found = prioritize_platform_models(found)
-        return {'items': found[offset:offset+limit], 'total': len(found), 'registered': len(cards),
+        return {'items': [{k: v for k, v in card.items() if k not in {'parameter_schema', 'contract'}} for card in found[offset:offset+limit]], 'total': len(found), 'registered': len(cards),
                 'categories': counts, 'unavailable_sources': base['unavailable_sources'] if not mine else [],
                 'unavailable_tools': unavailable}
 
@@ -354,6 +359,7 @@ class Platform:
         write(self.path('models', identity), m)
         return self.model_card(m, owner)
 
+    @catalog_snapshot
     def workflow_components(self, owner, query='', category='', source='', kind='', offset=0, limit=24):
         from backend.web_v2.workflow_tools import catalog
         base = self.catalog(owner, limit=100000)

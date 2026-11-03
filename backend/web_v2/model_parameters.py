@@ -6,7 +6,7 @@ import math
 
 @lru_cache(maxsize=8)
 def request_model(adapter):
-    from backend.web_v2 import advanced_tools_api as api
+    from backend.web_v2 import model_contracts as api
     return {'design': api.SequenceDesignBody, 'discovery': api.ProteinDiscoveryBody,
             'evolution': api.DirectedEvolutionBody, 'structure-evolution': api.DirectedEvolutionBody}.get(adapter)
 
@@ -28,7 +28,7 @@ def parameter_schema(adapter):
         if key in properties:
             properties[key]['default']=field.get_default(call_default_factory=True)
     if adapter=='design':
-        from backend.web_v2.advanced_tools_api import _proteinmpnn_model_options
+        from backend.web_v2.model_contracts import _proteinmpnn_model_options
         checkpoints=_proteinmpnn_model_options()
         properties['model_family']['enum']=['soluble','vanilla','ca']
         properties['model_name']['enum']=sorted(set(v for options in checkpoints.values() for v in options))

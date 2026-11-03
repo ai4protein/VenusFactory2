@@ -12,22 +12,25 @@ const fieldNames: Record<string, [string, string]> = {
   include_nonstandard: ['Include nonstandard residues', '包含非标准残基'], chain_id: ['Chain', '链'], structure_chain: ['Protein chain (optional)', '蛋白质链（可选）'],
 };
 
-export function RegisteredToolDrawer({ tool, onClose }: { tool: ModelCard; onClose: () => void }) {
+export function RegisteredToolDrawer({ tool: summary, onClose }: { tool: ModelCard; onClose: () => void }) {
   const { lang } = useLang(); const zh = lang === 'zh';
+  const [tool, setTool] = useState(summary), [ready, setReady] = useState(false);
   const [datasets, setDatasets] = useState<Dataset[]>([]), [dataset, setDataset] = useState('');
   const [parameters, setParameters] = useState<Record<string, unknown>>({}), [sequence, setSequence] = useState('sequence');
   const [job, setJob] = useState<Job>(), [error, setError] = useState(''), [busy, setBusy] = useState(false);
   const fields = (tool.contract?.properties || {}) as Record<string, FieldSchema>;
   const required = (tool.contract?.required || []) as string[];
-  const active = busy || Boolean(job && ['queued', 'running'].includes(job.status));
+  const active = !ready || busy || Boolean(job && ['queued', 'running'].includes(job.status));
   useEffect(() => {
     let alive = true;
+    void platform<ModelCard>('/workflow-components/' + encodeURIComponent(summary.id)).then(value => { if (alive) { setTool(value); setReady(true); } }).catch(e => { if (alive) setError(e.message); });
     void platform<Dataset[]>('/datasets').then(d => { if (alive) setDatasets(d); }).catch(e => { if (alive) setError(e.message); });
     const key = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', key);
     return () => { alive = false; document.removeEventListener('keydown', key); };
   }, [tool.id]);
   async function run() {
+    if (!ready || tool.available === false) return;
     setBusy(true); setError('');
     try {
       const graph: Graph = {
@@ -46,6 +49,7 @@ export function RegisteredToolDrawer({ tool, onClose }: { tool: ModelCard; onClo
       <header><span className="mp-eyebrow">{categoryNames[tool.category]?.[zh ? 1 : 0]}</span><button autoFocus className="mp-close" aria-label={zh ? '关闭' : 'Close'} onClick={onClose}>×</button></header>
       <span className={'mp-model-mark large ' + tool.category}><ModelGlyph kind={tool.category} size={32}/></span>
       <h2 id="tool-detail-title">{tool.name}</h2><p className="mp-muted">{tool.description.replace(/\.+$/, '.')}</p>
+      {!ready && !error && <p role="status">{zh ? '正在加载…' : 'Loading…'}</p>}
       {tool.available === false ? <p role="status">{unavailableLabel(tool,zh)}</p> : <form onSubmit={e => { e.preventDefault(); void run(); }}>
         {!tool.standalone && <><h3>{zh ? '输入数据' : 'Input data'}</h3>
           <label className="mp-field">{zh ? '数据集' : 'Dataset'}<select required disabled={active} value={dataset} onChange={e => setDataset(e.target.value)}>

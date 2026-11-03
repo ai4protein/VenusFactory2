@@ -2,8 +2,11 @@
 
 Model Plaza and Workflows use the same typed parameters and queued execution.
 The catalog includes LigandMPNN, AntiBMPNN, BindCraft, BoltzGen, AutoDock Vina
-and DiffDock. These computationally expensive runtimes are local-only; online
-cards are visible but disabled. Missing installations are marked Not configured.
+and DiffDock. LigandMPNN, AntiBMPNN, AutoDock Vina and DiffDock are enabled in
+both online and local mode when installed and enabled by the administrator. They
+use the same resource queues and input limits through Model Plaza, Workflow and
+Chat. BindCraft and BoltzGen remain local-only, with visible but disabled online
+cards. Missing installations are marked Not configured.
 
 Set `VENUS_MODEL_RUNTIMES_CONFIG` to an administrator-owned JSON file, or use
 `configs/model_runtimes.json`. This is server configuration, never browser input.
@@ -205,7 +208,7 @@ the runtime adapter is not a second scheduler or a generated-code sandbox.
 Both tools use the existing shared MCP service and administrator tool controls.
 They appear in Model Plaza and Workflows, and can be discovered by Agent,
 Scientist and Researcher. They are available in both local and online mode when
-configured; BindCraft, BoltzGen and DiffDock remain local-only.
+configured; BindCraft and BoltzGen remain local-only.
 
 | Tool | MCP name | Input | Output | Scheduling |
 | --- | --- | --- | --- | --- |

@@ -15,11 +15,20 @@ export type ComponentCatalog = { items: ModelCard[]; total: number; categories: 
 export type Catalog = { items: ModelCard[]; total: number; registered: number; categories: Record<string, number>; unavailable_sources: string[]; unavailable_tools?: string[] };
 import { ensureJobSession } from './jobSession';
 export async function platform<T>(path: string, options?: RequestInit): Promise<T> {
-  await ensureJobSession('platform');
+  const request = async (): Promise<T> => {
   const res = await fetch('/api/model-platform' + path, { credentials: 'same-origin', ...options, headers: { ...(options?.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), ...options?.headers } });
   const data = await res.json();
   if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Please check your input and try again.');
   return data as T;
+  };
+  // The first read also establishes the workspace cookie. Other callers wait
+  // on the same bootstrap, so parallel loads cannot create different owners.
+  let initial: T | undefined;
+  let initialized = false;
+  await ensureJobSession('platform', path.startsWith('/catalog?') && (!options?.method || options.method === 'GET')
+    ? async () => { initial = await request(); initialized = true; }
+    : undefined);
+  return initialized ? initial as T : request();
 }
 export const post = <T>(path: string, value: unknown) => platform<T>(path, { method: 'POST', body: JSON.stringify(value) });
 export async function uploadDataset(file: File) {

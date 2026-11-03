@@ -9,7 +9,7 @@ import './JobHistory.css';
 const statuses: Record<string, [string, string]> = { active: ['In progress', '进行中'], queued: ['Queued', '排队中'], running: ['Running', '运行中'], completed: ['Completed', '已完成'], failed: ['Failed', '失败'], interrupted: ['Interrupted', '已中断'], cancelled: ['Cancelled', '已取消'] };
 const kinds: Record<string, [string, string]> = { train: ['Training', '训练'], training: ['Training', '训练'], predict: ['Prediction', '预测'], evaluation: ['Evaluation', '评估'], workflow: ['Workflow', '工作流'] };
 
-export function JobHistory({ customTask }: { customTask?: string }) {
+export function JobHistory({ customTask, defer = false }: { customTask?: string; defer?: boolean }) {
   const { lang } = useLang(); const zh = lang === 'zh'; const tr = (pair: [string, string]) => pair[zh ? 1 : 0];
   const client = useMemo(() => jobClient(customTask), [customTask]);
   const [page, setPage] = useState<JobPage>(), [open, setOpen] = useState(false), [selected, setSelected] = useState('');
@@ -17,6 +17,7 @@ export function JobHistory({ customTask }: { customTask?: string }) {
   const [error, setError] = useState(''), [loading, setLoading] = useState(false), [pending, setPending] = useState<string[]>([]), [revision, setRevision] = useState(0);
 
   useEffect(() => {
+    if (defer && !open) return;
     const controller = new AbortController(); let timer: ReturnType<typeof setTimeout>;
     async function poll() {
       try {
@@ -28,7 +29,7 @@ export function JobHistory({ customTask }: { customTask?: string }) {
     }
     setLoading(true); timer = setTimeout(poll, query ? 250 : 0);
     return () => { controller.abort(); clearTimeout(timer); };
-  }, [client, query, status, kind, offset, revision, open]);
+  }, [client, query, status, kind, offset, revision, open, defer]);
 
   async function action(job: JobSummary, operation: 'cancel' | 'retry') {
     if (pending.includes(job.id)) return;

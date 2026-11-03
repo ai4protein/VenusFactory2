@@ -30,6 +30,12 @@ def load_runtime_settings(*, root=None, env=None):
     environment = os.environ if env is None else env
     path = repository_path(environment.get('VENUS_MODEL_RUNTIMES_CONFIG') or
                            'configs/model_runtimes.json', root=base)
+    from copy import deepcopy
+    from mcp_tools.models.catalog_snapshot import cached
+    return deepcopy(cached(('runtime_settings', str(base), str(path)), lambda: _read_runtime_settings(path, base)))
+
+
+def _read_runtime_settings(path, base):
     if not path.is_file():
         return {}
     data = json.loads(path.read_text(encoding='utf-8'))

@@ -29,7 +29,7 @@ def test_typed_models_are_disabled_until_configured(tmp_path,monkeypatch):
     assert all(not c['available'] and c['disabled_reason']=='not_configured' for c in cards)
     assert all(parameter_schema(c['adapter'])['properties'] for c in cards)
     monkeypatch.setenv('WEBUI_V2_MODE','online')
-    assert all(Platform.availability(c)['disabled_reason']==('not_configured' if c['id']=='external:admet_ai' else 'local_only') for c in cards)
+    assert all(Platform.availability(c)['disabled_reason']==('local_only' if c['id'] in {'external:bindcraft','external:boltzgen'} else 'not_configured') for c in cards)
 
 
 def test_catalog_does_not_override_missing_runtime_or_online_policy(tmp_path,monkeypatch):
@@ -38,8 +38,8 @@ def test_catalog_does_not_override_missing_runtime_or_online_policy(tmp_path,mon
     assert platform.model('owner','external:vina')['available']
     assert not platform.model('owner','external:ligandmpnn')['available']
     monkeypatch.setenv('WEBUI_V2_MODE','online')
-    assert not platform.model('owner','external:vina')['available']
-    with pytest.raises(ValueError):platform.start('owner','predict',{'model_id':'external:vina','dataset_id':'missing','config':{}},launch=False)
+    assert platform.model('owner','external:vina')['available']
+    with pytest.raises((ValueError, FileNotFoundError)):platform.start('owner','predict',{'model_id':'external:vina','dataset_id':'missing','config':{}},launch=False)
 
 
 def test_parameters_reject_paths_nan_and_unbounded_counts():

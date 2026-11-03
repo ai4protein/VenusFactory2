@@ -1,12 +1,12 @@
 import { unavailableLabel } from '../lib/capabilityAvailability';
 import { JobHistory } from '../components/JobHistory';
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useLang } from '../lib/i18n';
 import { Catalog, ModelCard, plazaCategories, categoryNames, platform, sourceNames, modelTypeNames } from '../lib/modelPlatform';
 import { ModelGlyph } from '../components/ModelPlatformShared';
-import { RegisteredToolDrawer } from '../components/RegisteredToolDrawer';
-import { ModelPredictionDrawer as ModelDrawer } from '../components/ModelPredictionDrawer';
+const RegisteredToolDrawer = lazy(() => import('../components/RegisteredToolDrawer').then(m => ({ default: m.RegisteredToolDrawer })));
+const ModelDrawer = lazy(() => import('../components/ModelPredictionDrawer').then(m => ({ default: m.ModelPredictionDrawer })));
 import '../model-platform.css';
 import { modelWorkspaceRoute } from '../lib/modelPlazaNavigation';
 
@@ -19,7 +19,7 @@ export function ModelPlazaPage() {
   function showView(own: boolean) { setParams(own ? { view: 'mine' } : {}); setQuery(''); setCategory(''); setSource(''); setKind(''); setPage(0); }
   useEffect(() => { if (params.has('mode')) { const next = new URLSearchParams(params); next.delete('mode'); setParams(next, { replace: true }); } }, [params, setParams]);
   useEffect(() => { setPage(0); }, [query, category, source, mine, kind]);
-  useEffect(() => { const id = params.get('model'); if (!id) return; let alive = true; void platform<ModelCard>('/models/' + encodeURIComponent(id)).then(m => { if (alive) setSelected(m); }).catch(e => { if (alive) setError(e.message); }); return () => { alive = false; }; }, [params.get('model')]);
+  useEffect(() => { const id = params.get('model'); if (!id) return; let alive = true; void platform<ModelCard>((id.startsWith('tool:') ? '/workflow-components/' : '/models/') + encodeURIComponent(id)).then(m => { if (alive) setSelected(m); }).catch(e => { if (alive) setError(e.message); }); return () => { alive = false; }; }, [params.get('model')]);
   function closeModel() { setSelected(undefined); if (params.has('model')) { const next = new URLSearchParams(params); next.delete('model'); setParams(next, { replace: true }); } }
   useEffect(() => {
     let alive = true; setLoading(true);
@@ -30,7 +30,7 @@ export function ModelPlazaPage() {
   const [notice,setNotice] = useState('');
   function chooseModel(m:ModelCard) { if(m.available===false){setNotice(unavailableLabel(m,zh));return;} setNotice(''); if(m.category==='foundation')navigate(`/${lang}${modelWorkspaceRoute(m)}`);else setSelected(m); }
   return <div className="mp-page mp-explore-page">
-    <JobHistory/>
+    <JobHistory defer={!catalog && loading}/>
     {notice && <div className="mp-cap-notice" role="status">{notice}<button aria-label={zh?"关闭提示":"Dismiss notice"} onClick={()=>setNotice('')}>×</button></div>}
     <div className="mp-topline"><div className="mp-tabs"><button aria-pressed={!mine} className={!mine ? 'active' : ''} onClick={() => showView(false)}>{zh ? '工具与模型' : 'Tools & models'}</button><button aria-pressed={mine} className={mine ? 'active' : ''} onClick={() => showView(true)}>{zh ? '我的模型' : 'My models'}</button></div><Link className="mp-text-link" to={`/${lang}/workflows`}><ModelGlyph kind="workflow" size={17}/>{zh ? '工作流画布' : 'Workflow studio'} ↗</Link></div>
     <div className="mp-mobile-filters">
@@ -43,7 +43,7 @@ export function ModelPlazaPage() {
       {!mine && <div className="mp-task-shortcuts" aria-label={zh ? '常用预测性质' : 'Common properties'}>{[['Solubility','Solubility','溶解度'],['Stability','Stability','稳定性'],['Kcat','Enzyme kinetics','酶催化动力学'],['Protein descriptors','Protein properties','理化性质']].map(([value,en,cn]) => <button key={value} type="button" aria-pressed={query === value} onClick={() => { setCategory(''); setSource(''); setKind(''); setQuery(query === value ? '' : value); }}>{zh ? cn : en}</button>)}</div>}
       {error && <p role="alert" className="mp-error">{error} <button onClick={() => setRevision(r => r + 1)}>{zh ? '重试' : 'Retry'}</button></p>}
       {!!((catalog?.unavailable_sources.length || 0) + (catalog?.unavailable_tools?.length || 0)) && <p className="mp-error">{zh ? '部分来源暂时无法加载' : 'Some sources could not be loaded'} · <button onClick={() => setRevision(r => r + 1)}>{zh ? '重试' : 'Retry'}</button></p>}
-      <div className="mp-grid" aria-busy={loading}>{catalog?.items.map(m => <article className={`mp-card${m.available === false ? " is-unavailable" : ""}`} key={m.id} title={m.available===false ? unavailableLabel(m,zh) : undefined} draggable={m.workflow && m.available !== false} onDragStart={e => { e.dataTransfer.setData('application/venus-model', m.id); e.dataTransfer.effectAllowed = 'copy'; }}>
+      <div className="mp-grid" aria-busy={loading}>{loading && !catalog && Array.from({length: 6}, (_, i) => <div key={i} className="mp-card mp-card-skeleton" aria-hidden="true"><span/><span/><span/></div>)}{catalog?.items.map(m => <article className={`mp-card${m.available === false ? " is-unavailable" : ""}`} key={m.id} title={m.available===false ? unavailableLabel(m,zh) : undefined} draggable={m.workflow && m.available !== false} onDragStart={e => { e.dataTransfer.setData('application/venus-model', m.id); e.dataTransfer.effectAllowed = 'copy'; }}>
         <button className="mp-card-main" aria-disabled={m.available === false} onClick={() => chooseModel(m)}><div className="mp-card-heading"><span className={'mp-model-mark compact ' + m.category}><ModelGlyph kind={m.category} size={20}/></span><div className="mp-card-title"><h2>{m.name}</h2><span className="mp-source">{sourceNames[m.source]?.[zh ? 1 : 0] || m.source}</span></div></div><p>{m.description.replace(/\.+$/, '.')}</p><div className="mp-tags"><span>{categoryNames[m.category]?.[zh ? 1 : 0]}</span><span>{modelTypeNames[m.model_type || (m.node_kind === 'tool' ? 'tool' : '')]?.[zh ? 1 : 0] || (zh ? '模型' : 'Model')}</span><span>{m.visibility === 'private' ? (zh ? '仅自己' : 'Private') : m.standalone ? (zh ? '文本检索' : 'Text query') : m.input_format ? m.input_format : m.input_kind === 'structure' ? (m.input_accept || '.pdb').replace('.','').toUpperCase() : (zh ? '序列 / 表格' : 'Sequence / table')}</span></div></button>
         <div className="mp-card-bottom"><button aria-disabled={m.available === false} onClick={() => chooseModel(m)}>{m.available === false ? unavailableLabel(m,zh) : m.category === 'foundation' ? (zh ? '微调模型' : 'Fine-tune model') : m.node_kind === 'tool' ? (zh ? '使用工具' : 'Use tool') : (zh ? '使用模型' : 'Use model')} <span>↗</span></button>{m.workflow && <button disabled={m.available === false} title={zh ? '加入工作流' : 'Add to workflow'} aria-label={(zh ? '加入工作流：' : 'Add to workflow: ') + m.name} onClick={() => navigate(`/${lang}/workflows?model=${encodeURIComponent(m.id)}`)}><ModelGlyph kind="workflow" size={17}/></button>}</div>
       </article>)}</div>
@@ -51,6 +51,6 @@ export function ModelPlazaPage() {
       {!loading && catalog?.total === 0 && <div className="mp-empty"><ModelGlyph size={36}/><h2>{mine ? (zh ? '从你的数据开始' : 'Start with your data') : (zh ? '没有匹配的工具或模型' : 'No matching tools or models')}</h2><p>{mine ? (zh ? '训练第一个模型，自用或分享。' : 'Train your first model. Keep it private or share it.') : (zh ? '试试其他名称或分类。' : 'Try another name or category.')}</p>{mine && <Link className="mp-button primary" to={`/${lang}/models/new`}>{zh ? '创建模型' : 'Create a model'}</Link>}</div>}
       {(catalog?.total || 0) > 24 && <div className="mp-pagination"><button disabled={page === 0} onClick={() => setPage(p => p - 1)}>← {zh ? '上一页' : 'Previous'}</button><span>{page + 1} / {Math.ceil((catalog?.total || 0) / 24)}</span><button disabled={(page + 1) * 24 >= (catalog?.total || 0)} onClick={() => setPage(p => p + 1)}>{zh ? '下一页' : 'Next'} →</button></div>}
       </section></div>
-    {selected && (selected.adapter === 'registered-tool' ? <RegisteredToolDrawer key={selected.id} tool={selected} onClose={closeModel}/> : <ModelDrawer key={selected.id} model={selected} onClose={closeModel} onUpdate={() => setRevision(r => r + 1)}/>)}
+    {selected && <Suspense fallback={<div className="mp-overlay"><section className="mp-drawer" role="dialog" aria-modal="true" aria-label={selected.name}><header><h2>{selected.name}</h2><button className="mp-close" aria-label={zh ? "关闭" : "Close"} onClick={closeModel}>×</button></header><p role="status">{zh ? "正在加载…" : "Loading…"}</p></section></div>}>{(selected.adapter === 'registered-tool' ? <RegisteredToolDrawer key={selected.id} tool={selected} onClose={closeModel}/> : <ModelDrawer key={selected.id} model={selected} onClose={closeModel} onUpdate={() => setRevision(r => r + 1)}/>)}</Suspense>}
   </div>;
 }

@@ -186,7 +186,7 @@ def availability(key):
     from mcp_tools.tools.capability_policy import model_disabled
     if model_disabled({'id':'external:'+key,'adapter':'external:'+key}):return False,'admin_disabled'
     from mcp_tools.tools.runtime_tool_policy import is_online_mode
-    if is_online_mode() and key!='admet_ai':return False,'local_only'
+    if is_online_mode() and key in {'bindcraft','boltzgen'}:return False,'local_only'
     try:runtime(key)
     except (ValueError,OSError,json.JSONDecodeError):return False,'not_configured'
     return True,None

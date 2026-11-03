@@ -38,15 +38,17 @@ def registered(name):
     return tool
 
 
-def card(name):
-    tool = registered(name)
+def card(name, *, detail=True):
     spec = SPECS[name]
-    schema = tool.args_schema.model_json_schema()
-    if name in {'query_ncbi_blast', 'query_foldseek_remote', 'query_interproscan', 'predict_s4pred'}:
-        keep = {'structure_chain'} if name == 'query_foldseek_remote' else set()
-        schema['properties'] = {k: v for k, v in schema.get('properties', {}).items() if k in keep}
-    schema['properties'] = {k: v for k, v in schema.get('properties', {}).items() if k not in MANAGED}
-    schema['required'] = [k for k in schema.get('required', []) if k in schema['properties']]
+    schema = None
+    if detail:
+        tool = registered(name)
+        schema = tool.args_schema.model_json_schema()
+        if name in {'query_ncbi_blast', 'query_foldseek_remote', 'query_interproscan', 'predict_s4pred'}:
+            keep = {'structure_chain'} if name == 'query_foldseek_remote' else set()
+            schema['properties'] = {k: v for k, v in schema.get('properties', {}).items() if k in keep}
+        schema['properties'] = {k: v for k, v in schema.get('properties', {}).items() if k not in MANAGED}
+        schema['required'] = [k for k in schema.get('required', []) if k in schema['properties']]
     from mcp_tools.tools.runtime_tool_policy import is_tool_allowed
     reason=None
     if name=='predict_s4pred':
@@ -60,17 +62,17 @@ def card(name):
             configuration()
         except ValueError: reason='not_configured'
     from mcp_tools.tools.capability_policy import mode
-    return {'available':is_tool_allowed(name) and reason is None,'disabled_reason':reason or (None if is_tool_allowed(name) else 'admin_disabled'),'runtime_mode':mode(),'id': 'tool:' + name, 'name': spec[1], 'description': {'predict_s4pred':'Secondary structure from a protein sequence', 'query_interproscan':'Protein families, domains and functional sites', 'query_ncbi_blast': 'Sequence similarity search · NCBI public API · SwissProt', 'query_foldseek_remote': 'Structure similarity search · Foldseek public API · PDB and AlphaFold SwissProt'}.get(name, tool.description.split('. Returns')[0] + '.'),
+    return {'available':is_tool_allowed(name) and reason is None,'disabled_reason':reason or (None if is_tool_allowed(name) else 'admin_disabled'),'runtime_mode':mode(),'id': 'tool:' + name, 'name': spec[1], 'description': {'predict_s4pred':'Secondary structure from a protein sequence', 'query_interproscan':'Protein families, domains and functional sites', 'query_ncbi_blast': 'Sequence similarity search · NCBI public API · SwissProt', 'query_foldseek_remote': 'Structure similarity search · Foldseek public API · PDB and AlphaFold SwissProt'}.get(name, spec[1]),
             'category': spec[2], 'source': 'platform', 'visibility': 'public', 'adapter': 'registered-tool',
             'workflow': True, 'node_kind': 'tool', 'input_kind': spec[3], 'output_kind': 'table',
-            'standalone': spec[4] is None, 'contract': schema}
+            'standalone': spec[4] is None, **({'contract': schema} if detail else {})}
 
 
-def catalog():
+def catalog(*, detail=True):
     rows, unavailable = [], []
     for name in SPECS:
         try:
-            rows.append(card(name))
+            rows.append(card(name, detail=detail))
         except (ImportError, AttributeError, ValueError):
             unavailable.append(name)
     return rows, unavailable

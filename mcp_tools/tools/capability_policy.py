@@ -150,11 +150,15 @@ class CapabilityStore:
         with self.connect() as c:
             return workspace_switch_rows(c.execute('SELECT * FROM switches'))
 
+    def catalog_rows(self):
+        from mcp_tools.models.catalog_snapshot import cached
+        return cached(('capabilities', str(self.path)), self.rows)
+
     def enabled(self, key):
         return bool(self.rows().get(key, {}).get('enabled', True))
 
     def tool_enabled(self, name):
-        name=canonical(name); rows=self.rows()
+        name=canonical(name); rows=self.catalog_rows()
         if not rows.get('tool:'+name,{}).get('enabled',True): return False
         # Single-model tools disappear with their model. Multi-model tools stay
         # discoverable and validate the selected variant at invocation time.
@@ -215,7 +219,7 @@ def matches(spec, name, args):
 
 
 def model_disabled(card):
-    rows = CapabilityStore().rows()
+    rows = CapabilityStore().catalog_rows()
     if not rows.get('model:'+card['id'],{}).get('enabled',True): return True
     return any(not rows.get('tool:'+canonical(t),{}).get('enabled',True) for t in model_tools(card))
 

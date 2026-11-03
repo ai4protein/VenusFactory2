@@ -43,10 +43,15 @@ def test_discovery_options_and_display_names(tmp_path):
     assert venusx['name'].startswith('VenusX_') and venusx['name'].endswith(' · ESM2-650M')
 
 
-def test_checkpoints_follow_installed_model_family(monkeypatch):
-    from backend.web_v2 import advanced_tools_api as api
+def test_checkpoints_follow_installed_model_family(tmp_path,monkeypatch):
+    import json
     choices={'soluble':['v_48_020'],'vanilla':['v_48_010','v_48_020'],'ca':['v_48_002']}
-    monkeypatch.setattr(api,'_proteinmpnn_model_options',lambda:choices)
+    for family, checkpoints in choices.items():
+        folder=tmp_path/'weights'/(family+'_model_weights');folder.mkdir(parents=True)
+        for checkpoint in checkpoints:(folder/(checkpoint+'.pt')).write_bytes(b'fixture')
+    config=tmp_path/'runtime.json'
+    config.write_text(json.dumps({'proteinmpnn':{'weights':str(tmp_path/'weights')}}))
+    monkeypatch.setenv('VENUS_MODEL_RUNTIMES_CONFIG',str(config))
     assert parameter_schema('design')['properties']['model_name']['choices_by']['options']==choices
     with pytest.raises(ValueError,match='supported ca'):validated_parameters('design',{'parameters':{'model_family':'ca','model_name':'v_48_020'}})
     assert validated_parameters('design',{'parameters':{'model_family':'ca','model_name':'v_48_002'}})['ca_only']

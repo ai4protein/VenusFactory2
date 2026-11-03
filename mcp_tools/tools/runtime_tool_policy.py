@@ -15,7 +15,7 @@ from mcp_tools.tools.tool_surface import RETIRED_CODE_TOOLS, CODE_MIGRATION_MESS
 
 # Agent / MCP tool names disabled when WEBUI_V2_MODE=online.
 ONLINE_DISABLED_TOOL_NAMES: frozenset[str] = frozenset({
-    "ligandmpnn_design", "antibmpnn_design", "vina_dock", "bindcraft_design", "boltzgen_design", "diffdock_dock",
+    "bindcraft_design", "boltzgen_design",
     # Training + custom model reuse via agent/MCP
     "register_trained_model",
     "list_trained_models",
