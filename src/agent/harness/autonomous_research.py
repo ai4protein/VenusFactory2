@@ -23,6 +23,7 @@ from .research_workspace import ResearchWorkspace, publish_proposals, safe_file
 from .capability_review import REVIEW_PROMPT, review_proposal
 from .research_development import Development, model_goal, build_delivery, guide as development_guide
 from .research_topic import SCIENTIST_PURPOSE, topic_context
+from .tool_disclosure import ToolDisclosure, CONTROLS, GUIDANCE
 from agent.rsi.artifacts.contract import SCHEMA as DELIVERY_SCHEMA, WORKSPACE_INSTRUCTIONS, selected_deliveries, has_delivery
 
 DRIVER='autonomous_research.v1'
@@ -184,7 +185,12 @@ class AutonomousResearch:
             available = get_tools()
         else: available = self.extra_tools
         scientific = [t for t in filter_tools(available)[0] if t.name not in UNSAFE_TOOLS]
-        context['available_tools'] = [{'name':t.name,'description':t.description[:240]} for t in scientific]
+        tool_index = ToolDisclosure({t.name: t for t in scientific}, schema=lambda t: {}, allowed=lambda t: True)
+        preview = tool_index.metadata('search_tools', {'query': context['objective'][:200], 'limit': 12})
+        if not preview['tools']:
+            preview = tool_index.metadata('search_tools', {'limit': 12})
+        context['available_tools'] = {'count': len(scientific), 'preview': preview['tools'],
+                                      'discovery': GUIDANCE}
         context['resources'] = {'online':os.getenv('VENUS_SCIENTIST_ONLINE')=='1', 'budget':state['definition']['goal'],
             'training':'Use enabled training MCP for platform PLMs; online only ESM2-8M. Isolated Python supports custom statistical and learning algorithms.'}
         development=Development(self.store.root/'development')
@@ -222,8 +228,8 @@ class AutonomousResearch:
                 context['planning_questions']=plan['needs_input']
                 service=ResearchWorkspace(workspace,folder/'tools',plan,development_root=self.store.root/'development')
                 from .interactions import INTERACTION_NAMES
-                tools=scientific+service.tools();names={t.name for t in tools} | INTERACTION_NAMES
-                context['tools']=[{'name':t.name,'description':t.description[:400]} for t in tools]
+                tools=scientific+service.tools();names=CONTROLS | INTERACTION_NAMES | {'submit_research_checkpoint'}
+                context['tools'] = sorted(names)
                 if profile.model.protocol=='responses':policy.allowed={'mcp__venusfactory__'+n for n in names}
                 else:policy.scientific_tools=frozenset(names)
                 remaining=profile.budget.model_calls-relay.calls

@@ -16,6 +16,7 @@ from .host import RuntimeContext
 from .registry import builtin_registry
 from .web_langgraph_worker import emit
 from .session_boundary import UNSAFE_TOOLS, SECURITY_INSTRUCTIONS, bind_arguments, public_value, session_tools
+from .tool_disclosure import ToolDisclosure, DisclosureError, SEARCH, DESCRIBE, GUIDANCE
 
 
 def native_prompt(request):
@@ -53,6 +54,15 @@ def prepare_tool_arguments(name, tool, arguments, workspace, host_paths):
         return dict(arguments)
     from agent.graph.helpers.tool_io import _normalize_output_paths, _sanitize_tool_invoke_input
     args = _sanitize_tool_invoke_input(name, tool, bind_arguments(name, arguments, workspace), str(workspace), {})
+    # A new scientific tool may not yet appear in the legacy write-prefix list.
+    # Never let omitted output arguments fall back to a shared platform folder.
+    output_keys = ('out_dir', 'output_dir', 'out_path', 'output_file')
+    if not any(args.get(key) for key in output_keys):
+        fields = mcp_input_schema(tool).get('properties', {})
+        for key in output_keys:
+            if key in fields:
+                args[key] = None
+                break
     return _normalize_output_paths(name, tool, args, str(workspace))
 
 
@@ -96,7 +106,18 @@ async def run(request, *, tools=None, event_sink=None):
     mapping = {web_tool_name(t.name, request["profile"]["harness"]): t for t in tools}
     if len(mapping) != len(tools):
         raise ValueError("Duplicate scientific tool identity")
-    send({"kind": "catalog", "tools": ["mcp__venusfactory__" + name for name in mapping]})
+    def available(tool):
+        if tool.name in INTERACTION_NAMES:
+            return True
+        try:
+            assert_tool_allowed(tool.name)
+            return True
+        except Exception:
+            return False
+
+    disclosure = ToolDisclosure(mapping, schema=mcp_input_schema, allowed=available,
+                                direct=INTERACTION_NAMES | {'submit_research_checkpoint'})
+    send({"kind": "catalog", "tools": ["mcp__venusfactory__" + name for name in sorted(disclosure.names)]})
     if request.get("handshake"):
         import sys
 
@@ -141,25 +162,23 @@ async def run(request, *, tools=None, event_sink=None):
             elif method == "ping":
                 result = {}
             elif method == "tools/list":
-                result = {
-                    "tools": [
-                        {
-                            "name": exposed_name,
-                            "description": t.description,
-                            "inputSchema": mcp_input_schema(t),
-                        }
-                        for exposed_name, t in mapping.items()
-                    ]
-                }
+                result = {"tools": disclosure.surface()}
             elif method == "tools/call":
                 name = params["name"]
-                if name not in mapping or calls >= profile.budget.tool_calls:
+                if name not in disclosure.names or calls >= profile.budget.tool_calls:
                     raise ValueError("Tool unavailable")
                 if interaction is not None:
                     raise ValueError("Waiting for the user's response; no further actions are allowed")
                 calls += 1
                 call_id = str(calls)
-                tool = mapping[name]
+                arguments = params.get('arguments', {})
+                if name in {SEARCH, DESCRIBE}:
+                    value = public_value(disclosure.metadata(name, arguments), workspace)
+                    from backend.web_v2.usage_store import Observation
+                    Observation('tool', name).finish()
+                    return web.json_response({'jsonrpc': '2.0', 'id': body['id'], 'result': {
+                        'content': [{'type': 'text', 'text': json.dumps(value, ensure_ascii=False)}], 'isError': False}})
+                name, tool, arguments = disclosure.resolve(name, arguments)
                 canonical_name = tool.name
                 if event_sink:
                     send({"kind": "research_tool_status", "status": "running", "tool": name, "call_id": call_id})
@@ -169,7 +188,7 @@ async def run(request, *, tools=None, event_sink=None):
                     async with workspace_call:
                         if interaction is not None:
                             raise ValueError("A user interaction is already pending")
-                        value = await tool.ainvoke(params.get("arguments", {}))
+                        value = await tool.ainvoke(arguments)
                     if event_sink:
                         send({"kind": "research_tool_status", "status": "completed", "tool": name, "call_id": call_id})
                     return web.json_response({"jsonrpc": "2.0", "id": body["id"], "result": {
@@ -185,8 +204,8 @@ async def run(request, *, tools=None, event_sink=None):
                     check_workspace(workspace)
                     if canonical_name not in INTERACTION_NAMES:
                         assert_tool_allowed(canonical_name)
-                    args = (params.get("arguments", {}) if canonical_name in INTERACTION_NAMES else
-                            prepare_tool_arguments(canonical_name, tool, params.get("arguments", {}), workspace, host_paths))
+                    args = (arguments if canonical_name in INTERACTION_NAMES else
+                            prepare_tool_arguments(canonical_name, tool, arguments, workspace, host_paths))
                     from mcp_tools.scheduler.catalog import classify, native_tools
                     registered = native_tools()
                     if canonical_name in registered and classify(canonical_name, tool.metadata)["execution"] == "queued":
@@ -235,10 +254,10 @@ async def run(request, *, tools=None, event_sink=None):
             if event_sink and method == "tools/call":
                 send({"kind": "research_tool_status", "status": "failed", "tool": params.get("name", ""), "call_id": locals().get("call_id"), "error_type": type(exc).__name__})
             message=type(exc).__name__
-            failed_tool=mapping.get(params.get('name')) if method=='tools/call' else None
+            failed_tool=locals().get('tool') if method=='tools/call' else None
             # Give model developers actionable contract failures without exposing
             # arbitrary plugin tracebacks, host paths or credentials.
-            if isinstance(exc, ValueError) and ((getattr(failed_tool,'metadata',None) or {}).get('workspace_relative_paths') or params.get('name') in INTERACTION_NAMES):
+            if isinstance(exc, DisclosureError) or isinstance(exc, ValueError) and ((getattr(failed_tool,'metadata',None) or {}).get('workspace_relative_paths') or params.get('name') in INTERACTION_NAMES):
                 message+=': '+public_value(str(exc),workspace)[:600]
             return web.json_response(
                 {"jsonrpc": "2.0", "id": body.get("id"), "error": {"code": -32603, "message": message}}
@@ -264,11 +283,9 @@ async def run(request, *, tools=None, event_sink=None):
     )
     if request.get("instructions"):
         instructions = request["instructions"] + "\n" + ("Respond in Chinese." if request.get("lang") == "zh" else "Respond in English.")
-    from .capability_guidance import discovery_instructions
-
-    instructions += "\n\n" + INTERACTION_GUIDANCE + "\n\n" + SECURITY_INSTRUCTIONS + "\n\n" + discovery_instructions(mapping)
+    instructions += "\n\n" + INTERACTION_GUIDANCE + "\n\n" + SECURITY_INSTRUCTIONS + "\n\n" + GUIDANCE
     task = Task(
-        workspace, capability, output, public_value(native_prompt(request), workspace), instructions, frozenset(mapping), "web_tools.py", "chat"
+        workspace, capability, output, public_value(native_prompt(request), workspace), instructions, frozenset(disclosure.names), "web_tools.py", "chat"
     )
     adapter, _ = builtin_registry().resolve(profile, request["runtimes"])
     ctx = RuntimeContext(
@@ -312,7 +329,7 @@ async def run(request, *, tools=None, event_sink=None):
         event_audit = None
         if request.get("audit_required"):
             from .events import audit_trace
-            event_audit = audit_trace(trace, mapping, profile.budget.tool_calls)
+            event_audit = audit_trace(trace, disclosure.names, profile.budget.tool_calls)
             if not event_audit["passed"]:
                 raise ValueError("Scientific tool trace did not pass validation")
         text = result.get("final_text") or result.get("text") or result.get("final_message") or ""

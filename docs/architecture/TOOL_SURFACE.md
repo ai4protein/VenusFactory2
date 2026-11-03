@@ -13,6 +13,20 @@ Agent / Scientist / Researcher
 
 会话代码只挂载服务器分配的目录。MCP 参数不能覆盖会话、挂载、后端或控制目录。沙箱无网络、无宿主凭据；执行有 CPU、内存、超时和输出限制，无宿主执行回退。搜索与下载使用已注册的联网工具。
 
+## 渐进式工具披露
+
+Web Agent 与 Scientist 的原生 Harness 共用一个发现入口，不将整份科学工具说明和参数写入每次模型请求：
+
+1. `search_tools(query, limit, offset)` 只返回工具名称和简短用途。默认 12 项，最多 20 项，每项说明最多 180 字符；支持分页，不返回参数或长文档。
+2. `describe_tool(name)` 按需读取一个工具的完整说明和输入参数。
+3. `call_tool(name, arguments)` 调用本轮已经查看过接口的工具。底层继续使用原工具的权限检查、参数验证、会话绑定、队列和执行预算。
+
+Kimi Code、DeepSeek Harness、Codex、Claude Code 使用同一协议。`ask_user`、`request_confirmation` 直接保留；Scientist 还直接保留 `submit_research_checkpoint`，方便保存进度。PI 和规划角色只收到少量相关名称与用途，不再重复注入完整目录。
+
+禁用的工具不进入搜索结果，查看和执行时再次检查权限。包装后的调用仍按原始科学工具名称记录执行状态与用量。Scientist 注册模型通过模型注册表继续二级搜索和按需加载，不把大量模型逐项展开为顶层工具。
+
+实现位于 `src/agent/harness/tool_disclosure.py`。回归测试覆盖一万项模拟目录的固定初始接口、分页、禁用后拒绝执行、四种 Harness 的共享调用协议，以及真实会话沙箱的目录隔离。
+
 ## 接口归并
 
 | 能力 | 当前公开接口 | 处理 |

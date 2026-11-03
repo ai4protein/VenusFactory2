@@ -36,8 +36,15 @@ async def test_mcp_mount_is_implicit_and_bound_to_each_session(tmp_path,monkeypa
                     nonlocal counter
                     counter+=1
                     return await client.post(connection['url'],headers={'Authorization':'Bearer '+(token or connection['token'])},json={'jsonrpc':'2.0','id':counter,'method':method,'params':params or {}})
+                inspected=set()
+                async def invoke(name,arguments):
+                    if name not in inspected:
+                        description=(await rpc('tools/call',{'name':'describe_tool','arguments':{'name':name}})).json()
+                        assert 'error' not in description,description
+                        inspected.add(name)
+                    return await rpc('tools/call',{'name':'call_tool','arguments':{'name':name,'arguments':arguments}})
                 async def call(name,arguments):
-                    response=await rpc('tools/call',{'name':name,'arguments':arguments})
+                    response=await invoke(name,arguments)
                     response.raise_for_status()
                     body=response.json()
                     assert 'error' not in body,body
@@ -49,7 +56,12 @@ async def test_mcp_mount_is_implicit_and_bound_to_each_session(tmp_path,monkeypa
                 assert initialized['result']['capabilities']['tools']=={}
                 assert (await rpc('tools/list',token=connections[peer]['token'])).status_code==401
                 advertised=(await rpc('tools/list')).json()['result']['tools']
-                assert set(verbs)<={tool['name'] for tool in advertised}
+                assert {'search_tools','describe_tool','call_tool'}<={tool['name'] for tool in advertised}
+                assert not set(verbs)&{tool['name'] for tool in advertised}
+                for name in verbs:
+                    found=(await rpc('tools/call',{'name':'search_tools','arguments':{'query':name}})).json()
+                    rows=json.loads(found['result']['content'][0]['text'])['tools']
+                    assert rows[0]['name']==name and set(rows[0])=={'name','description'}
                 assert not {'agent_generated_code','python_repl','write_research_file','run_research_python'} & {tool['name'] for tool in advertised}
                 for tool in advertised:
                     assert tool['inputSchema']['additionalProperties'] is False
@@ -63,7 +75,7 @@ async def test_mcp_mount_is_implicit_and_bound_to_each_session(tmp_path,monkeypa
                 await asyncio.wait_for(inputs_ready.wait(),10)
                 assert (sessions[peer]/'input.txt').exists()
                 for field,value in [('workspace',str(sessions[peer])),('session_id',peer),('mounts',['/']),('backend','user'),('control','/tmp')]:
-                    body=(await rpc('tools/call',{'name':verbs[1],'arguments':{'path':'verify.py',field:value}})).json()
+                    body=(await invoke(verbs[1],{'path':'verify.py',field:value})).json()
                     assert body['error']['message'].startswith('ValueError:'),body
                     assert 'session workspace is assigned by the server' in body['error']['message']
                     assert not (sessions[identity]/'result.json').exists()
@@ -72,7 +84,7 @@ async def test_mcp_mount_is_implicit_and_bound_to_each_session(tmp_path,monkeypa
                 saved=json.loads((await call(verbs[2],{'path':'result.json'}))['text'])
                 assert saved=={'cwd':'/workspace','identity':identity,'peer_visible':False}
                 for path in ['../'+peer+'/input.txt',str(sessions[peer]/'input.txt')]:
-                    denied=(await rpc('tools/call',{'name':verbs[2],'arguments':{'path':path}})).json()
+                    denied=(await invoke(verbs[2],{'path':path})).json()
                     assert 'error' in denied
                 if mode=='agent':
                     shell=await call('run_session_shell',{'command':'pwd','timeout_seconds':10})
