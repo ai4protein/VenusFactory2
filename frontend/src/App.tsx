@@ -1,5 +1,6 @@
 import { pageLoaders } from "./lib/pageLoaders";
 import { PageLoading } from "./components/PageLoading";
+import { initializeGoogleAnalytics, type AnalyticsRuntimeConfig } from "./lib/googleAnalytics";
 const OnlineLibraryPage = lazy(() => pageLoaders.OnlineLibraryPage().then(m => ({ default: m.OnlineLibraryPage })));
 const AdminPage = lazy(() => pageLoaders.AdminPage().then(m => ({ default: m.AdminPage })));
 import { QuotaDialog } from "./components/QuotaDialog";
@@ -150,9 +151,10 @@ function LocalizedApp() {
           setRuntimeMode("online");
           return;
         }
-        const data = (await res.json()) as { mode?: string };
+        const data = (await res.json()) as AnalyticsRuntimeConfig;
         if (!alive) return;
         setRuntimeMode(data.mode === "local" ? "local" : "online");
+        initializeGoogleAnalytics(data);
       } catch {
         if (!alive) return;
         // Fail closed when mode cannot be determined.

@@ -28,6 +28,27 @@ Do not move historical experiment data or checkpoints during a code refactor.
 `src/agent/harness/_legacy_*` contains hash-verified historical audit capsules.
 Their bytes remain unchanged; they are not the current service implementation.
 
+## Optional online website analytics
+
+Set `WEBUI_V2_GA_MEASUREMENT_ID` in `.env` to the Google Analytics 4 web
+stream measurement ID (`G-...`). The same setting appears in **Administration
+> Environment**. This is a public identifier, not an API secret. Leave it empty
+to disable Google Analytics. Restart the API and reload the browser after changes;
+the shared frontend does not need rebuilding when the ID changes.
+
+Only online mode exposes the ID and loads Google's asynchronous tag. Local mode
+does not load it, even when both services share the same `.env`. Missing or
+invalid IDs disable tracking without affecting the app. An unavailable or blocked
+Google script does not prevent the interface from working.
+
+The tag is initialized once per document, including React remounts and language
+changes. SPA page views use Google's **Enhanced measurement > Page views > Page
+changes based on browser history events** setting; keep it enabled in the GA web
+stream. The app does not also send manual `page_view` events. See
+[Google's SPA setup](https://developers.google.com/analytics/devguides/collection/ga4/single-page-applications).
+The Google tag collects website usage according to that stream's settings.
+This integration adds no custom chat-content, uploaded-file or model-result events.
+
 ## Build and start
 
 Use Linux for worker queues and Bubblewrap isolation. Activate the installed

@@ -347,7 +347,8 @@ async def health_check():
 
 @app.get("/api/runtime-config")
 async def runtime_config():
-    return {"mode": WEBUI_V2_MODE}
+    from backend.web_v2.web_analytics import public_analytics_config
+    return {"mode": WEBUI_V2_MODE, **public_analytics_config(WEBUI_V2_MODE)}
 
 
 _INLINE_MEDIA_TYPES: dict[str, str] = {

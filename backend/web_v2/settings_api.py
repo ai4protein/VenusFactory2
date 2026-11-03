@@ -193,6 +193,13 @@ def write_env_entries(payload):
                 setting_value(entry.key, entry.value)
             except ValueError as exc:
                 raise HTTPException(status_code=400, detail=str(exc)) from None
+    from backend.web_v2.web_analytics import GA_MEASUREMENT_ID_ENV, validate_measurement_id
+    for entry in clean_entries:
+        if entry.key == GA_MEASUREMENT_ID_ENV:
+            try:
+                entry.value = validate_measurement_id(entry.value)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from None
     updates = {e.key: e.value for e in clean_entries}
     from agent.harness.provider_config import configuration_keys, configured_models
     if set(updates).intersection(configuration_keys()):
