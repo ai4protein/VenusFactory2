@@ -1,3 +1,4 @@
+import { publicationEmail } from '../lib/publicationEmail';
 import { submissionHistoryRow, type HistoryActivityCallback } from "../lib/optimisticHistory";
 import { ScientistWelcome } from "./ScientistWelcome";
 import { InteractionCard } from "./InteractionCard";
@@ -134,7 +135,7 @@ export function ScienceGoalPanel({ noticeTarget, online, toolbarTarget, composer
       const created = await createGoal(sid, spec, id); applyGoals(sid, [created, ...goals.filter(goal => goal.id !== created.id)]); callbacks.current.onGoalStatus(sid, created.status); sessionStorage.removeItem(key); if (currentSession.current === sid) { setObjective(""); setAttachments([]); } await update(sid);
     } catch (e) { setError((e as Error).message); } finally { callbacks.current.onHistoryActivity(activityKey, null); startLock.current = false; setPending(false); }
   }
-  async function control(id: string, action: "pause" | "resume" | "cancel" | "publish") {
+  async function control(id: string, action: "pause" | "resume" | "cancel") {
     setPending(true); setError("");
     try { await controlGoal(sessionId, id, action); await update(sessionId); }
     catch (e) { setError((e as Error).message); } finally { setPending(false); }
@@ -208,7 +209,7 @@ export function ScienceGoalPanel({ noticeTarget, online, toolbarTarget, composer
         {g.status === "active" && <button type="button" disabled={pending} onClick={() => void control(g.id, "pause")}>{say("Pause", "暂停")}</button>}
         {["paused", "interrupted"].includes(g.status) && <button type="button" disabled={pending || g.worker_alive} onClick={() => void control(g.id, "resume")}>{say("Resume", "继续")}</button>}
         {unfinished.has(g.status) && <button type="button" disabled={pending} onClick={() => void control(g.id, "cancel")}>{say("End research", "结束研究")}</button>}
-        {g.code_step?.registered && !g.code_step.published && g.status === "completed" && <button type="button" disabled={pending} onClick={() => void control(g.id, "publish")}>{say("Add to library", "加入能力库")}</button>}
+        {g.status === "completed" && (!!g.research?.capabilities?.length || g.code_step?.registered) && <a href={publicationEmail(g.objective || "Scientist model", g.id)}>{say("Request publication by email", "邮件申请上架")}</a>}
       </div>
     </article>)}
 

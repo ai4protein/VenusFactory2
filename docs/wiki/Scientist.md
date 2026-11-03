@@ -41,3 +41,10 @@ Model research requires a measured baseline and a revised experiment on matched 
 Use **Download project (.zip)** for the selected releases and research report. Each release has its own README with use and reproduction commands. A draft without a reviewed release downloads the working project. Experiments, ablations and previous versions remain in the topic; expand their records when you need the details. Revisions of the same purpose appear as versions of one capability instead of filling the tool list with every trial.
 
 Research completion and public-tool admission are separate. Code execution or Critic agreement alone does not publish a model. Independent checks review interfaces, scope, reproducibility and evaluation evidence. Rejected candidates remain available for revision. Only reviewed, published and enabled capabilities can be discovered and called by [Agent](./Agent.md), Model Plaza or workflows.
+
+
+## Share a model with the platform
+
+Scientist outputs remain private in both local and online modes, even after independent Review passes. Download your project and test report for your own use. To request publication, choose **Request publication by email** and include your name, author email, scope, code/weights, test report and permission to share the data and model. Send the email to **tanyang.august@sjtu.edu.cn**. There is no in-app submission queue.
+
+The platform operator selects and publishes reviewed models. Published entries display the author email and become discoverable by Agent, Model Plaza and Workflow when enabled. Research completion, technical review and operator publication are three separate decisions.

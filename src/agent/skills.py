@@ -331,19 +331,10 @@ def get_skills_metadata_string() -> str:
 
 @functools.lru_cache(maxsize=1)
 def get_skills_catalog_for_agent() -> str:
-    """Compact catalog for Science Agent system prompt (self-directed loading)."""
-    vf = _format_skills_metadata_string(sources=["venusfactory"], max_desc=220)
-    sas = _format_skills_metadata_string(sources=["scientific"], max_desc=80)
-    if sas.startswith("(No skills"):
-        return vf
-    return (
-        "## VenusFactory2 skills (prefer for tool execution)\n"
-        f"{vf}\n\n"
-        "## Scientific-agent-skills reference library "
-        "(call `read_skill` / `list_skills` for details; "
-        "name collisions use `sas_<id>`)\n"
-        f"{sas}"
-    )
+    """Discover skills on demand instead of embedding the reference library."""
+    return ("Skills are reference workflows, not proof that a tool is executable. "
+            "Search list_skills(query=task, limit=10), then read_skill(skill_id) for the selected guide. "
+            "Use relative_path only for a needed reference. Check live tool availability separately.")
 
 
 def get_skill_content(skill_id: str, relative_path: Optional[str] = None) -> Optional[str]:
@@ -404,13 +395,24 @@ def build_read_skill_response(
     }
 
 
-def build_list_skills_response() -> Dict[str, Any]:
-    """Shared JSON envelope for listing skills (Agent MCP list_skills)."""
-    return {
-        "success": True,
-        "skills": get_skills_metadata_string(),
-        "available_ids": list_skill_ids(),
-    }
+def build_list_skills_response(query: str = "", limit: int = 10, offset: int = 0) -> Dict[str, Any]:
+    """Bounded bilingual skill index; file contents are read only on selection."""
+    from mcp_tools.tools.discovery.matching import query_groups, relevance
+    if not isinstance(query, str) or len(query) > 200 or type(limit) is not int or not 1 <= limit <= 30 or type(offset) is not int or offset < 0:
+        return {"success": False, "error": "Use query up to 200 characters, limit 1–30 and a nonnegative offset."}
+    groups = query_groups(query)
+    found = []
+    for item in get_skills_metadata():
+        name = item["skill_id"]
+        description = str(item.get("description", ""))
+        score = relevance(groups, name, name + " " + description)
+        if score is not None:
+            found.append((score, name, {"skill_id": name, "description": description[:180], "source": item.get("source", "venusfactory")}))
+    found.sort(key=lambda row: (-row[0], row[1]))
+    page = [row[2] for row in found[offset:offset+limit]]
+    return {"success": True, "items": page, "skills": "\n".join(row["skill_id"] + ": " + row["description"] for row in page),
+            "available_ids": [row["skill_id"] for row in page], "total": len(found),
+            "next_offset": offset + limit if offset + limit < len(found) else None}
 
 
 def invalidate_skills_cache() -> None:

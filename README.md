@@ -11,7 +11,7 @@ the literature, run predictions and develop models for your research.
 - **Ask and analyse.** Find protein information, use scientific tools and interpret results.
 - **Develop from your data.** Turn a research goal and measurements into model code, tests and a research report.
 - **Investigate a protein.** Bring literature, database records and predictions together in a report with sources.
-- **Reuse the results.** Run models directly, combine tools in a workflow, or make reviewed Scientist models available to Agent.
+- **Reuse the results.** Run models directly, combine tools in a workflow, or request publication of a reviewed Scientist model.
 
 ![VenusFactory2 conversation workspace](docs/images/chat-workspace.jpg)
 
@@ -43,8 +43,10 @@ A PI (research lead) coordinates the work:
 Follow the plan, intermediate files and progress in the conversation. The final
 project and report can be downloaded as a ZIP. A useful result may be a new analysis
 tool, a fitted machine-learning model or a method for your experimental setting.
-Models intended for the shared library undergo separate validation and independent
-review before Agent can discover and use them.
+Scientist outputs stay private. To share a model, email its project and test report to
+[tanyang.august@sjtu.edu.cn](mailto:tanyang.august@sjtu.edu.cn). The platform operator
+selects reviewed models for publication; each published entry displays the author email.
+See [operator publication](docs/development/model-publication.md) for local registration.
 
 Scientist delivers a selected model or method with a README, runnable interface,
 examples and a test report. Experiments and earlier versions stay in the research

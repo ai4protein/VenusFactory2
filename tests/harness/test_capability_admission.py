@@ -104,7 +104,7 @@ async def test_admission_revision_continues_even_after_research_steps_complete(t
         async def __aexit__(self,*args):pass
     monkeypatch.setattr(ar,'EvidenceGateway',Relay)
     monkeypatch.setattr(ar,'audit_requests',lambda p:{'passed':True,'model_calls':5})
-    monkeypatch.setattr(ar,'publish_proposals',lambda proposals,goal_id:publish_proposals(proposals,goal_id,tmp_path/'library'))
+    monkeypatch.setattr(ar,'publish_proposals',lambda proposals,goal_id,**kw:publish_proposals(proposals,goal_id,kw['library']))
     profile=Profile.from_dict({'mode':'science_expert','harness':'expert-deepseek-harness','model':{'provider':'dmx','model':'glm-4-flash','base_url':'https://www.dmxapi.cn/v1'},'budget':{'model_calls':12,'tool_calls':12,'wall_seconds':120,'output_tokens':4096,'thinking':'disabled'}})
     store=ar.create(tmp_path/'goal',profile,'Develop a reusable length calculation tool',dict(max_cycles=3,model_calls=36,tool_calls=36,wall_seconds=360))
     attempts=[];reviews=[]

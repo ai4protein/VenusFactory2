@@ -26,8 +26,9 @@ def test_mcp_skill_tools_match_expert_loader():
 
     listed = json.loads(mcp_list_skills())
     assert listed["success"] is True
-    assert "nature_figure" in listed["available_ids"]
-    assert set(listed["available_ids"]) == set(list_skill_ids())
+    assert len(listed["available_ids"]) <= 10
+    assert listed["total"] == len(list_skill_ids())
+    assert "nature_figure" in json.loads(mcp_list_skills(query="nature_figure"))["available_ids"]
 
     payload = json.loads(mcp_read_skill("nature_figure"))
     assert payload["success"] is True
@@ -93,18 +94,12 @@ def test_kimi_project_skill_symlinks():
     assert (dest / "zero_shot_mutation_workflow" / "SKILL.md").is_file()
 
 
-def test_kimi_system_prompt_embeds_catalog_and_self_directed_policy():
+def test_kimi_system_prompt_discovers_skills_on_demand():
     from backend.web_v2.chat_api._stream_kimi import _build_system_prompt
-
     prompt = _build_system_prompt("en")
-    assert "mcp__venusfactory__read_skill" in prompt
-    assert "mcp__venusfactory__list_skills" in prompt
-    assert "you decide" in prompt.lower() or "Self-directed" in prompt
-    assert "no** mandatory skill-first" in prompt.lower() or "no mandatory skill-first" in prompt.lower()
-    # Catalog is inlined so Agent can see skills without an extra tool call
-    assert "nature_figure" in prompt
-    assert "zero_shot_mutation_workflow" in prompt
-    assert "skill_id:" in prompt
+    assert "list_skills(query=task" in prompt and "read_skill(skill_id)" in prompt
+    assert "Skills are reference workflows" in prompt
+    assert "nature_figure" not in prompt
 
 
 def test_online_skill_builtin_still_denied():

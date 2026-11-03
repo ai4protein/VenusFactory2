@@ -19,7 +19,7 @@ Disabled cards remain visible online. Their availability hint explains why they 
 
 ## Custom models and workflows
 
-Use the training, prediction and evaluation entries for your own models. A private model does not become public just because training finishes. Shared publication requires the applicable review and visibility settings.
+Use the training, prediction and evaluation entries for your own models. A private model does not become public just because training finishes. Public release requires operator approval after an email application; the model records the author email.
 
 For repeated multi-step analyses, open [Workflows](./en/workflows.md) and connect compatible tools. For conversational use, ask Agent to find a suitable model and inspect its scope.
 

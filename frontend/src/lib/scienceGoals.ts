@@ -90,7 +90,7 @@ const root = (sid: string) => `/sessions/${encodeURIComponent(sid)}/science-goal
 export const goalCatalog = () => shareRead("goal-catalog", () => request<GoalCatalog>("/science-goals/catalog?view=composer"));
 export const listGoals = (sid: string) => shareRead("goals:" + sid + JSON.stringify(getChatSessionAuthHeaders(sid)), () => request<{ goals: ScienceGoal[] }>(root(sid), sid));
 export const createGoal = (sid: string, spec: GoalSpec, request_id: string) => request<ScienceGoal>(root(sid), sid, { ...spec, request_id });
-export const controlGoal = (sid: string, id: string, action: "pause" | "resume" | "cancel" | "publish") => request<ScienceGoal>(`${root(sid)}/${id}/${action}`, sid, {});
+export const controlGoal = (sid: string, id: string, action: "pause" | "resume" | "cancel") => request<ScienceGoal>(`${root(sid)}/${id}/${action}`, sid, {});
 
 export const generatedSteps = (sid: string, caseId: string) => request<{ entries: GeneratedStepEntry[] }>(`${root(sid)}/generated-steps?case=${encodeURIComponent(caseId)}`, sid);
 

@@ -25,8 +25,8 @@ def discovery_instructions(tool_names):
     predict = registered("predict_with_evolved_model")
     text = (
         "Capability discovery: when asked what tools or protein models are available, or to find a tool/model "
-        "for a task, call " + search + " before answering. Use kind='models', query='' for the Scientist "
-        "model inventory, kind='tools' for native tools, or kind='all' for a task search. "
+        "for a task, call " + search + " before answering. Use kind='models', query='' for the Model Plaza "
+        "inventory of enabled platform and curator-published models, kind='tools' for native tools, or kind='all' for a task search. "
         "Search by protein identifier or property; use stage and pagination to narrow large catalogs. "
         "Report returned counts and representative matches without claiming a page is the complete catalog. "
         "If a search returns no matches, broaden the query or inspect the empty-query overview before claiming no capability exists. "

@@ -56,3 +56,10 @@ def read_skill_tool(skill_id: str, relative_path: Optional[str] = None) -> str:
 def get_python_repl_tool():
     """Compatibility import: host REPLs are retired; execution is session-bound."""
     return None
+
+
+@tool("list_skills")
+def list_skills_tool(query: str = "", limit: int = 10, offset: int = 0) -> str:
+    """Search reference skills by name or task. Returns short descriptions and pagination; read_skill loads a selected guide."""
+    from agent.skills import build_list_skills_response
+    return json.dumps(build_list_skills_response(query, limit, offset), ensure_ascii=False)

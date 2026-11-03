@@ -13,7 +13,7 @@ def search_research_tools_tool(
     query: str = "", kind: Literal["all", "tools", "models"] = "all",
     stage: str = "", limit: int = 10, offset: int = 0,
 ) -> str:
-    """Discover available scientific tools and published Scientist-created protein models. Use kind='models' when asked which protein models exist; use an empty query for an overview, or search by protein ID, property or task in English/Chinese. Results are ranked and paginated. For a model, call its returned describe tool before predict_with_evolved_model; these are protein predictors, not chat LLM choices. Native tool results give their registered names and arguments."""
+    """Discover available scientific tools and platform and curator-published protein models. Use kind='models' when asked which protein models exist; use an empty query for an overview, or search by protein ID, property or task in English/Chinese. Results are ranked and paginated. For a platform model, inspect the returned tool schema and apply its selection hints; for a reviewed Scientist model, use its describe and predict tools; these are protein predictors, not chat LLM choices. Native tool results give their registered names and arguments."""
     return json.dumps(search(query, kind, stage, limit, offset), ensure_ascii=False)
 
 

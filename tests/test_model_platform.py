@@ -32,18 +32,19 @@ class ModelPlatformTests(unittest.TestCase):
         self.assertEqual(result['status'], 'completed', result)
         return result['result']['model']
 
-    def test_train_private_publish_and_revoke(self):
+    def test_train_private_email_publication_and_revoke(self):
         m = self.train()
         self.assertEqual(m['split']['kind'], 'group')
         self.assertLess(m['metrics']['MAE'], 3)
         self.assertEqual(m['visibility'], 'private')
         with self.assertRaises(FileNotFoundError): self.p.model(self.other, m['id'])
         with self.assertRaises(FileNotFoundError): self.p.visibility(self.other, m['id'][5:], 'public')
-        self.p.visibility(self.owner, m['id'][5:], 'public')
-        self.assertFalse(self.p.model(self.other, m['id'])['owned'])
-        self.assertIn(m['id'], [x['id'] for x in self.p.catalog(self.other, query='Test activity')['items']])
-        d = self.p.upload(self.other, 'new.csv', b'x\n100\n101')
-        output = self.p.predict(self.other, m['id'], self.p.owned('datasets', d['id'], self.other))
+        with self.assertRaisesRegex(ValueError, 'operator'):
+            self.p.visibility(self.owner, m['id'][5:], 'public')
+        with self.assertRaises(FileNotFoundError): self.p.model(self.other, m['id'])
+        self.assertNotIn(m['id'], [x['id'] for x in self.p.catalog(self.other, query='Test activity')['items']])
+        d = self.p.upload(self.owner, 'new.csv', b'x\n100\n101')
+        output = self.p.predict(self.owner, m['id'], self.p.owned('datasets', d['id'], self.owner))
         self.assertEqual(len(output['rows']), 2)
         self.assertLess(abs(output['rows'][0]['target_prediction'] - 203), 4)
         self.p.visibility(self.owner, m['id'][5:], 'private')

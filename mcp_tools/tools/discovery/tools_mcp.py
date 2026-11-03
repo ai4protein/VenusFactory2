@@ -17,8 +17,8 @@ def register_discovery_tools(server):
         query: str = "", kind: Literal["all", "tools", "models"] = "all",
         stage: str = "", limit: int = 10, offset: int = 0,
     ) -> dict:
-        """Search scientific tools and published Scientist-created protein models by protein ID, property or task (English/Chinese). For model inventory use kind='models', query=''. Results include bounded pages and current counts. Describe a model entry before calling predict_with_evolved_model with its exact inputs and scope. Protein models are scientific tools, separate from the chat LLM selector."""
-        mounted = await server.list_tools() if kind != "models" else []
+        """Search scientific tools and platform and curator-published protein models by protein ID, property or task (English/Chinese). For model inventory use kind='models', query=''. Results include bounded pages and current counts. For platform models, inspect the returned tool schema and selection hints; for Scientist models, use their describe and predict tools with the exact scope. Protein models are scientific tools, separate from the chat LLM selector."""
+        mounted = await server.list_tools()
         catalog = [
             {"name": t.name, "description": t.description, "parameters": t.parameters}
             for t in mounted
@@ -27,7 +27,7 @@ def register_discovery_tools(server):
 
     @server.tool(name="search_generated_capabilities")
     def search_generated_capabilities(query: str = "", limit: int = 10) -> dict:
-        """Search reusable programs published by autonomous Scientist goals."""
+        """Search operator-published Scientist programs with scope, author email and version."""
         from mcp_tools.tools.runtime_tool_policy import assert_tool_allowed
         from agent.harness.research_workspace import search_capabilities
         assert_tool_allowed("search_generated_capabilities")

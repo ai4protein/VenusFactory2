@@ -19,17 +19,25 @@ def database(library):
         with con: yield con
     finally: con.close()
 
-def register(library, manifest, receipt, goal_id, visibility='public'):
+def register(library, manifest, receipt, goal_id, *, publication=None):
     from agent.rsi.artifacts.contract import family_id
+    if publication is not None:
+        from .curated_publication import validate_publication
+        validate_publication(publication, manifest, receipt, goal_id)
+    visibility = 'public' if publication is not None else 'private'
     spec = manifest['review_spec']
     family = family_id(goal_id, spec['kind'], spec['scope'])
     card = {k: manifest[k] for k in ['id', 'name', 'description', 'validation']}
     card.update(family_id=family, author=spec['author'], version=spec['version'], kind=spec['kind'], scope=spec['scope'], review_status='approved', visibility=visibility, origin_goal=goal_id)
+    if publication is not None:
+        card.update(author_email=publication['author_email'], publication=publication)
     search = ' '.join([card['name'], card['description'], spec['author'], *[x for values in spec['scope'].values() for x in values]]).casefold()
     with database(library) as con:
         con.execute('INSERT OR IGNORE INTO capabilities VALUES (?,?,?,?,?,?,?,?)', (manifest['id'], goal_id, manifest['name'], spec['version'], search, json.dumps(card, ensure_ascii=False), receipt['receipt_sha256'], time.time()))
         row = con.execute('SELECT id FROM capabilities WHERE creator=? AND name=? AND version=?', (goal_id, manifest['name'], spec['version'])).fetchone()
         if not row or row[0] != manifest['id']: raise ValueError('Publish a new version instead of replacing an existing one')
+        if publication is not None:
+            con.execute('UPDATE capabilities SET card=?,receipt_hash=? WHERE id=?', (json.dumps(card,ensure_ascii=False),receipt['receipt_sha256'],manifest['id']))
         con.execute('INSERT OR IGNORE INTO capability_families VALUES (?,?)', (manifest['id'], family))
         con.execute('INSERT INTO capability_heads VALUES (?,?) ON CONFLICT(family) DO UPDATE SET id=excluded.id', (family, manifest['id']))
     return card
@@ -48,5 +56,6 @@ def cards(library):
     with database(library) as con: return [json.loads(row[0]) for row in con.execute('SELECT card FROM capabilities WHERE '+CURRENT+' ORDER BY created DESC,id')]
 
 def require_registered(library, identity, receipt_hash):
-    with database(library) as con: row = con.execute('SELECT receipt_hash FROM capabilities WHERE id=?', (identity,)).fetchone()
+    with database(library) as con: row = con.execute('SELECT receipt_hash,card FROM capabilities WHERE id=?', (identity,)).fetchone()
     if not row or row[0] != receipt_hash: raise ValueError('Capability is not admitted to this registry')
+    return json.loads(row[1])

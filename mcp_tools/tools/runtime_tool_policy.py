@@ -23,9 +23,6 @@ ONLINE_DISABLED_TOOL_NAMES: frozenset[str] = frozenset({
     "describe_evolved_model",
     "predict_with_evolved_model",
     "agent_generated_code",
-    "search_generated_capabilities",
-    "describe_generated_capability",
-    "run_generated_capability",
     # VenusMine / FoldSeek discovery (heavy local compute + large DB)
     # Agent hub name + MCP short name both listed.
     "download_foldseek_results_by_pdb_file",
@@ -59,7 +56,7 @@ def is_local_mode() -> bool:
 def is_tool_allowed(tool_name: str) -> bool:
     from mcp_tools.tools.capability_policy import CapabilityStore, canonical
     name = canonical((tool_name or "").strip())
-    if name in RETIRED_CODE_TOOLS: return False
+    if name in RETIRED_CODE_TOOLS or name == 'register_trained_model': return False
     if not CapabilityStore().tool_enabled(name): return False
     if not is_online_mode(): return True
     if not name:
@@ -78,6 +75,8 @@ def is_tool_allowed(tool_name: str) -> bool:
 def online_disabled_reason(tool_name: str = "", *, feature: str = "") -> str:
     """JSON-friendly error message for online-mode denials."""
     if tool_name in RETIRED_CODE_TOOLS: return CODE_MIGRATION_MESSAGE
+    if tool_name == 'register_trained_model':
+        return 'Public model registration is an operator action. Keep research outputs private and request publication by email.'
     label = (tool_name or feature or "this capability").strip()
     return (
         f"Unavailable in online mode: {label}. "

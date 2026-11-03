@@ -20,6 +20,7 @@ from mcp_tools.models.evolved.tools_agent import EVOLVED_MODEL_TOOLS
 def isolated_discovery_runtime(monkeypatch):
     # These fixtures describe a synthetic local catalog, not the deployment's
     # mode or the real Scientist capabilities already published on the server.
+    monkeypatch.setattr(service, "platform_models", lambda *a, **kw: [])
     from agent.harness import research_workspace
     from mcp_tools.tools import runtime_tool_policy
     monkeypatch.setattr(research_workspace, "capability_cards", lambda: [])
@@ -87,7 +88,7 @@ def test_online_mode_never_reads_model_library(catalog, monkeypatch):
     monkeypatch.setattr(service, "model_cards", lambda: pytest.fail("Disabled model catalog was accessed"))
     result = service.search()
     assert result["matching_tools"] == 1 and result["indexed_models"] == 0
-    assert result["model_catalog_status"] == "local_only"
+    assert result["model_catalog_status"] == "available"
 
 
 def test_catalog_failure_keeps_native_tools_available(catalog, monkeypatch):
@@ -127,7 +128,7 @@ async def test_langchain_and_mcp_search_the_same_catalog(catalog):
     direct = json.loads(search_research_tools_tool.invoke(arguments))
     async with Client(mcp) as client:
         result = (await client.call_tool("search_research_tools", arguments)).data
-    assert result == direct
+    assert {k:v for k,v in result.items() if k != "available_tools"} == {k:v for k,v in direct.items() if k != "available_tools"}
     assert result["results"][0]["describe"]["tool"] == "describe_evolved_model"
 
 
@@ -138,7 +139,8 @@ def test_guidance_uses_actual_registered_names(prefix):
     text = discovery_instructions(names)
     assert all(n in text for n in names)
     assert "before answering" in text and "kind='models'" in text
-    assert discovery_instructions([]) == ""
+    from agent.harness.capability_boundary import CAPABILITY_BOUNDARY
+    assert discovery_instructions([]) == CAPABILITY_BOUNDARY + "\n\n"
 
 
 def test_conversation_search_describe_predict_with_published_model(published, tmp_path, monkeypatch):

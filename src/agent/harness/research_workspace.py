@@ -105,7 +105,7 @@ class ResearchWorkspace:
 
     @guard_operation('propose_research_capability')
     async def propose_research_capability(self, name: str, description: str, source: str, files: list[str], test_inputs: list[dict], review_spec: dict | None = None) -> dict:
-        """Propose reusable code after implementing run(inputs: dict) -> JSON in the source module. Include any weights in files. The host replays test_inputs in fresh isolated processes; scientific accuracy must be evaluated separately. Research Critic and separate public admission Review are required. Call get_research_review_requirements first. Supply review_spec and private evidence files; only runtime files become public."""
+        """Propose reusable code after implementing run(inputs: dict) -> JSON in the source module. Include any weights in files. The host replays test_inputs in fresh isolated processes; scientific accuracy must be evaluated separately. Research Critic and independent technical Review are required. Call get_research_review_requirements first. Runtime files and evidence remain private to this goal. Public release additionally requires operator selection with an author email; users apply by email."""
         if not name.strip() or not description.strip() or not 1<=len(test_inputs)<=8 or len(files)>20:
             raise ValueError('Provide a name, scope, files and 1..8 test inputs')
         if len(self.proposals)>=2: raise ValueError('Submit at most two candidates per iteration')
@@ -216,14 +216,22 @@ async def invoke_bundle(bundle, manifest, inputs, control, *, runner=run_python,
     if result['exit_code']!=0:raise ValueError('Capability execution failed: '+result['stderr'][-2000:])
     value=json.loads(read_bytes(work,'capability_result.json',max_bytes=2000000));json.dumps(value,allow_nan=False);return value
 
-def publish_proposals(proposals, goal_id, library=LIBRARY):
+def publish_proposals(proposals, goal_id, library=None, *, publication=None):
     from .capability_review import admitted
     from .capability_catalog import register
-    library=Path(library);library.mkdir(parents=True,exist_ok=True);published=[]
+    if library is None:
+        raise ValueError('Choose the private research library; public publication requires operator selection')
+    library=Path(library)
+    if library.resolve() == LIBRARY.resolve() and publication is None:
+        raise ValueError('The platform registry requires operator selection')
+    library.mkdir(parents=True,exist_ok=True);published=[]
     for bundle in proposals:
         bundle=Path(bundle);manifest=json.loads((bundle/'manifest.json').read_text());ident=manifest['id']
         if digest({k:v for k,v in manifest.items() if k!='id'})!=ident:raise ValueError('Capability manifest changed')
         receipt=admitted(bundle,manifest)
+        if publication is not None:
+            from .curated_publication import validate_publication
+            validate_publication(publication,manifest,receipt,goal_id)
         dest=library/ident
         if not dest.exists():
             stage=library/('staging_'+uuid.uuid4().hex);stage.mkdir()
@@ -234,19 +242,23 @@ def publish_proposals(proposals, goal_id, library=LIBRARY):
             write_json(stage/'manifest.json',manifest);write_json(stage/'admission.json',receipt)
             write_json(stage/'origin.json',{'goal_id':goal_id,'kind':'autonomous_research'})
             stage.rename(dest)
-        published.append(register(library,manifest,receipt,goal_id,visibility='private' if library.name=='private_capabilities' else 'public'))
+        for name,sha in manifest['files'].items():
+            if file_hash(safe_file(dest,name)) != sha: raise ValueError('Stored capability runtime changed')
+        if publication is not None: write_json(dest/'publication.json',publication)
+        published.append(register(library,manifest,receipt,goal_id,publication=publication))
     return published
 
 def capability_cards(library=LIBRARY):
     from .capability_catalog import cards
-    return cards(library)
+    rows = cards(library)
+    return [c for c in rows if c.get('visibility') == 'public' and c.get('publication',{}).get('policy') == 'operator_selected.v1'] if Path(library).resolve() == LIBRARY.resolve() else rows
 
 def search_capabilities(query='', limit=10, library=LIBRARY, offset=0):
     from .capability_catalog import search
     from mcp_tools.tools.capability_policy import CapabilityStore
     from .capability_catalog import cards
     settings=CapabilityStore()
-    values=[c for c in cards(library) if settings.enabled('model:capability:'+c['id']) and all(w in json.dumps(c,ensure_ascii=False).casefold() for w in query.casefold().split())]
+    values=[c for c in capability_cards(library) if settings.enabled('model:capability:'+c['id']) and all(w in json.dumps(c,ensure_ascii=False).casefold() for w in query.casefold().split())]
     return {'total':len(values),'items':values[max(0,int(offset)):max(0,int(offset))+max(1,min(int(limit),50))]}
 
 def admitted_manifest(capability_id, library):
@@ -255,7 +267,12 @@ def admitted_manifest(capability_id, library):
     if not re.fullmatch('[a-f0-9]{64}',capability_id):raise ValueError('Invalid capability ID')
     bundle=Path(library)/capability_id;manifest=json.loads(safe_file(bundle,'manifest.json').read_text())
     if digest({k:v for k,v in manifest.items() if k!='id'})!=capability_id:raise ValueError('Capability manifest changed')
-    receipt=admitted(bundle,manifest);require_registered(library,capability_id,receipt['receipt_sha256'])
+    receipt=admitted(bundle,manifest);card=require_registered(library,capability_id,receipt['receipt_sha256'])
+    if Path(library).resolve() == LIBRARY.resolve():
+        from .curated_publication import validate_publication
+        if card.get('visibility') != 'public': raise ValueError('Capability has not been published by the operator')
+        decision=validate_publication(card.get('publication'),manifest,receipt,card['origin_goal'])
+        if json.loads(safe_file(bundle,'publication.json').read_text()) != decision: raise ValueError('Publication record changed')
     for name,sha in manifest['files'].items():
         if file_hash(safe_file(bundle,name))!=sha:raise ValueError('Capability source changed')
     return bundle,manifest,receipt
@@ -263,9 +280,11 @@ def admitted_manifest(capability_id, library):
 def describe_capability(capability_id, library=LIBRARY):
     _,manifest,receipt=admitted_manifest(capability_id,library)
     spec=manifest['review_spec']
+    from .capability_catalog import require_registered
+    card=require_registered(library,capability_id,receipt['receipt_sha256'])
     return {**{k:manifest[k] for k in ['id','name','description','tests','validation']},
             **{k:spec[k] for k in ['kind','author','version','scope','input_schema','output_schema','dependencies']},
-            'review_status':'approved','review':receipt}
+            'review_status':'approved','review':receipt,**{k:card[k] for k in ('author_email','visibility','publication') if k in card}}
 
 @guard_operation('run_generated_capability')
 async def run_capability(capability_id, inputs, *, library=LIBRARY):

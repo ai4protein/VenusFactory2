@@ -1,3 +1,4 @@
+import { publicationEmail } from '../lib/publicationEmail';
 import { ComputeAllowance } from './ComputeAllowance';
 import { unavailableLabel } from '../lib/capabilityAvailability';
 import { ModelExtraInputs } from './ModelExtraInputs';
@@ -57,11 +58,6 @@ export function ModelPredictionDrawer({ model, onClose, onUpdate }: { model: Mod
       setJob(await post<Job>('/predict', { model_id: model.id, dataset_id: id, config: { sequence_column: paste ? (detail.sequence_column || 'sequence') : sequence, columns, parameters: molecular && paste ? {...parameters,smiles_column:'smiles'} : parameters, ...extraInputs } }));
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
-  async function publish() {
-    setBusy(true);
-    try { setDetail(await platform<ModelCard>('/models/' + encodeURIComponent(model.id) + '/visibility', { method: 'PATCH', body: JSON.stringify({ visibility: detail.visibility === 'public' ? 'private' : 'public' }) })); onUpdate(); }
-    catch (e) { setError((e as Error).message); } finally { setBusy(false); }
-  }
   const extraValid=(detail.extra_inputs || []).every(i=>!i.required || !!extraInputs[i.key]);
   const valid = extraValid && (paste ? parsed.length > 0 : !!selectedData && missing.length === 0 && (!needsSequence || !!sequence));
   return <div className="mp-overlay" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
@@ -97,7 +93,8 @@ export function ModelPredictionDrawer({ model, onClose, onUpdate }: { model: Mod
       {error && <p className="mp-error" role="alert">{error}</p>}
       {job && <JobProgress initial={job} onChange={setJob} inputColumns={inputColumns}/>}
       {(detail.contract || detail.metrics) && <details className="mp-details"><summary>{zh ? '模型信息与验证结果' : 'Model details & validation'}</summary>{detail.metrics && <div className="mp-metrics">{Object.entries(detail.metrics).map(([k,v]) => <div key={k}><span>{k}</span><strong>{v.toFixed(4)}</strong></div>)}</div>}{detail.contract && <pre className="mp-contract">{JSON.stringify(detail.contract, null, 2)}</pre>}</details>}
-      {detail.owned && <div className="mp-visibility"><span>{detail.visibility === 'public' ? (zh ? '已发布到广场' : 'Published in the plaza') : (zh ? '仅自己可见' : 'Private model')}</span><button disabled={busy || active} onClick={() => void publish()}>{detail.visibility === 'public' ? (zh ? '设为私有' : 'Make private') : (zh ? '发布模型' : 'Publish model')}</button></div>}
+      {detail.author_email && <p className="mp-muted">{zh ? '作者邮箱' : 'Author email'}: <a href={'mailto:' + encodeURIComponent(detail.author_email)}>{detail.author_email}</a></p>}
+      {detail.owned && <div className="mp-visibility"><span>{detail.visibility === 'public' ? (zh ? '已上架' : 'Published') : (zh ? '私有模型' : 'Private model')}</span><a href={publicationEmail(detail.name, detail.id)}>{zh ? '邮件申请上架' : 'Request publication by email'}</a></div>}
     </section>
   </div>;
 }

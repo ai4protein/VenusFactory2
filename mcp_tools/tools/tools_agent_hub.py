@@ -140,7 +140,7 @@ from mcp_tools.tools.file.tools_agent import (
     check_pdb_apo_tool,
     extract_uniprot_id_from_rcsb_metadata_tool,
 )
-from mcp_tools.tools.skill.tools_agent import read_skill_tool
+from mcp_tools.tools.skill.tools_agent import read_skill_tool, list_skills_tool
 
 try:
     from mcp_tools.models.pretrained.design.tools_agent import proteinmpnn_sequence_design_from_structure_tool, proteinmpnn_sequence_scoring_from_structure_tool
@@ -295,7 +295,7 @@ FILE_TOOLS: list[BaseTool] = [
 ]
 
 # Code execution is bound to each session by the harness, never a host REPL.
-SKILL_TOOLS: list[BaseTool] = [read_skill_tool]
+SKILL_TOOLS: list[BaseTool] = [read_skill_tool, list_skills_tool]
 
 # ---------------------------------------------------------------------------
 # Concatenated full list and subsets

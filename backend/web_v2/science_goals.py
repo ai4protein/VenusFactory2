@@ -853,14 +853,7 @@ class ScienceGoalService:
                 self.admission(self.frozen_profile(folder), self.frozen_credential_path(folder))
                 self.spawn(folder, self.drivers[meta["spec"]["driver"]], "resume")
             elif action == "publish":
-                if state["status"] != "completed" or meta["spec"]["driver"] not in {
-                    "paper_step.v1",
-                    "paper_step_transfer.v1",
-                }:
-                    raise GoalConflict("Only a completed computation goal can publish its verified code")
-                if self.live(folder):
-                    raise GoalConflict("Wait for the current worker before retrying publication")
-                self.spawn(folder, self.drivers[meta["spec"]["driver"]], "publish")
+                raise GoalConflict("Request platform publication by email; only the platform operator can publish reviewed models")
             elif action == "cancel":
                 if state["status"] not in {"completed", "budget_exhausted", "cancelled"}:
 

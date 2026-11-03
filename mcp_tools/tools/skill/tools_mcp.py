@@ -37,9 +37,9 @@ def mcp_read_skill(skill_id: str, relative_path: Optional[str] = None) -> str:
 
 
 @mcp.tool(name="list_skills")
-def mcp_list_skills() -> str:
+def mcp_list_skills(query: str = "", limit: int = 10, offset: int = 0) -> str:
     """Discover platform and scientific-agent-skills in one catalog.
 
     Prefer this before ``read_skill`` when you are unsure which skill_id to load.
     """
-    return json.dumps(build_list_skills_response(), ensure_ascii=False)
+    return json.dumps(build_list_skills_response(query, limit, offset), ensure_ascii=False)
