@@ -74,6 +74,10 @@ async def run(request, *, tools=None, model=None):
         from backend.web_v2.usage_store import Observation
         observation = Observation('tool', tool.name)
         try:
+            from backend.web_v2.compute_access import inline_prediction
+            from mcp_tools.scheduler.catalog import classify
+            import os
+            inline_prediction(os.getenv('VENUS_QUEUE_OWNER') or 'chat:'+str(request.get('session_id')), tool.name, classify(tool.name, tool.metadata)['category'])
             result = await handler(call.override(tool_call={**tool_call, "args": args}))
             content = public_value(result.content, request["workspace"])
             result = result.model_copy(update={"content":content})

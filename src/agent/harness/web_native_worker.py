@@ -223,6 +223,8 @@ async def run(request, *, tools=None, event_sink=None):
                     else:
                         from backend.web_v2.usage_store import Observation
                         observation = Observation('tool', canonical_name)
+                        from backend.web_v2.compute_access import inline_prediction
+                        inline_prediction(os.getenv('VENUS_QUEUE_OWNER') or 'chat:'+str(request.get('session_id')), canonical_name, classify(canonical_name, tool.metadata)['category'])
                         value = await tool.ainvoke(args, config={"configurable": {"session_id": request.get("session_id")}})
                 value = public_value(value, workspace)
                 failed, _ = _tool_output_indicates_failure(value)

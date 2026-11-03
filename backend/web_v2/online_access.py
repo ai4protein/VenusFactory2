@@ -374,4 +374,15 @@ class VisitorMiddleware:
                     headers.extend((k,v) for k,v in response.raw_headers if k==b'set-cookie')
                 message['headers']=headers
             await send(message)
-        await self.app(scope,receive,wrapped)
+        from backend.web_v2.compute_access import actor_context, request_key_context, inline_request_context
+        actor_token = actor_context.set(identities(request)[:2])
+        key = request.headers.get('idempotency-key', '')
+        request_key = 'http:'+request.method+':'+scope['path']+':'+key if re.fullmatch(r'[A-Za-z0-9_.:-]{1,128}', key) else None
+        key_token = request_key_context.set(request_key)
+        inline_token = inline_request_context.set({})
+        try:
+            await self.app(scope,receive,wrapped)
+        finally:
+            inline_request_context.reset(inline_token)
+            request_key_context.reset(key_token)
+            actor_context.reset(actor_token)

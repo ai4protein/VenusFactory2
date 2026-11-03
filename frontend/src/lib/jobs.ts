@@ -1,4 +1,5 @@
 import { ensureJobSession } from './jobSession';
+import { computeQuotaError, COMPUTE_QUOTA_CHANGED } from './computeQuota';
 import { platform, type Job } from './modelPlatform';
 import type { QueueStatus } from '../components/QueueState';
 
@@ -18,7 +19,8 @@ export function jobClient(customTask?: string) {
     await ensureJobSession('custom');
     const response = await fetch('/api/custom-model' + path, { credentials: 'same-origin', ...options });
     const value = await response.json();
-    if (!response.ok) throw new Error(typeof value.detail === 'string' ? value.detail : 'Could not load jobs');
+    if (!response.ok) throw new Error(computeQuotaError(value) || (typeof value.detail === 'string' ? value.detail : value.detail?.message || 'Could not load jobs'));
+    if (options?.method === 'POST' && path.endsWith('/retry')) window.dispatchEvent(new Event(COMPUTE_QUOTA_CHANGED));
     return value as T;
   }
   return {

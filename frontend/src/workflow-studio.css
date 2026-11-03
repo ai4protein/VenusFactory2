@@ -55,7 +55,7 @@
 .mp-studio .mp-studio-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .mp-studio .mp-studio-controls>select{width:190px;padding:9px 10px;font-size:12px}
 .wf-path{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 24px;border-top:1px solid #edf0f3;border-bottom:1px solid #e3e6eb;background:white;color:#75808e;font-size:12px;flex-shrink:0}
-.wf-path>div:last-child{margin-left:auto}
+.wf-path-steps{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.wf-path>.job-history-trigger{margin-left:auto}
 .wf-switch-confirm{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap;padding:14px 24px;border-bottom:1px solid #e3e6eb;background:#f8f9fb}
 .wf-switch-confirm strong{font-size:13px;font-weight:500;margin-right:auto}
 .wf-connection-actions{position:absolute;top:12px;left:12px;z-index:4;display:flex;gap:6px}

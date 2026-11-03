@@ -1,5 +1,6 @@
 import { validateUploads } from "./uploadLimits";
 import { ensureJobSession } from './jobSession';
+import { computeQuotaError, COMPUTE_QUOTA_CHANGED } from './computeQuota';
 import type { QueueStatus } from '../components/QueueState';
 import { streamSSEFromPost } from "./sse";
 
@@ -74,9 +75,10 @@ async function requestJSON<T>(url: string, init?: RequestInit): Promise<T> {
   if (!res.ok) {
     const text = await res.text();
     let message = text;
-    try { const body = JSON.parse(text); message = typeof body.detail === "string" ? body.detail : body.message || text; } catch { /* Plain text response. */ }
+    try { const body = JSON.parse(text); message = computeQuotaError(body) || (typeof body.detail === "string" ? body.detail : body.detail?.message || body.message || text); } catch { /* Plain text response. */ }
     throw new Error(message || `Request failed (${res.status})`);
   }
+  if (init?.method === 'POST' && /\/(predict|evaluation)\/start$/.test(url)) window.dispatchEvent(new Event(COMPUTE_QUOTA_CHANGED));
   return (await res.json()) as T;
 }
 

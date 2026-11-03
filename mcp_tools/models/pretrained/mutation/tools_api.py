@@ -4,6 +4,7 @@ from mcp_tools.tools.capability_policy import guard_operation
 
 from typing import Optional
 
+from backend.web_v2.compute_access import metered_prediction
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
@@ -30,6 +31,7 @@ class ZeroShotStructureBody(BaseModel):
 
 @router.post("/zero-shot/sequence")
 @guard_operation('zero_shot_mutation_sequence_prediction')
+@metered_prediction
 def api_zero_shot_mutation_sequence(body: ZeroShotSequenceBody):
     """Zero-shot mutation prediction from sequence. Returns status JSON."""
     if not body.sequence and not body.fasta_file:
@@ -46,6 +48,7 @@ def api_zero_shot_mutation_sequence(body: ZeroShotSequenceBody):
 
 @router.post("/zero-shot/structure")
 @guard_operation('zero_shot_mutation_structure_prediction')
+@metered_prediction
 def api_zero_shot_mutation_structure(body: ZeroShotStructureBody):
     """Zero-shot mutation prediction from PDB structure. Returns status JSON."""
     result = zero_shot_mutation_structure_prediction(

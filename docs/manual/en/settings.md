@@ -26,4 +26,6 @@ Environment values are managed in Administration, not as a separate public Setti
 
 ## Online compute limits
 
+The default daily compute allowance is **5 workflow starts** and **20 model inference jobs** per browser visitor. Model Plaza, Workflow and Chat share the inference balance. A workflow reserves allowance for all its model steps before starting. A conversation credit key changes conversation credits, not these compute limits. Local mode has no daily compute allowance. Operators can set `WEBUI_V2_ONLINE_DAILY_WORKFLOW_LIMIT` and `WEBUI_V2_ONLINE_DAILY_PREDICTION_LIMIT` in Administration → Environment and restart the services.
+
 Uploads are at most 10 MB per file; custom training is restricted to ESM2-8M; local VenusMine is disabled. Scientist has bounded research budgets. Disabled tools remain unavailable through Chat, model forms and workflows. See [training](manual:training) and [files](manual:library).

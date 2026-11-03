@@ -7,6 +7,7 @@ from mcp_tools.tools.capability_policy import guard_operation
 import json
 from typing import Optional
 
+from backend.web_v2.compute_access import metered_prediction
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
@@ -177,6 +178,7 @@ def api_calculate_all_properties(body: CalculateAllPropertiesBody):
 # ---------- Finetuned ----------
 @router.post("/finetuned/protein-function")
 @guard_operation('predict_protein_function')
+@metered_prediction
 def api_predict_protein_function(body: PredictProteinFunctionBody):
     """Run finetuned protein function prediction (e.g. Solubility, Optimal Temperature). Returns status JSON."""
     try:
@@ -196,6 +198,7 @@ def api_predict_protein_function(body: PredictProteinFunctionBody):
 
 @router.post("/finetuned/residue-function")
 @guard_operation('predict_residue_function')
+@metered_prediction
 def api_predict_residue_function(body: PredictResidueFunctionBody):
     """Run finetuned residue prediction (Activity Site, Binding Site, etc.). Returns status JSON."""
     try:
@@ -216,6 +219,7 @@ def api_predict_residue_function(body: PredictResidueFunctionBody):
 # ---------- Structure ----------
 @router.post("/structure/esmfold")
 @guard_operation('predict_structure_esmfold')
+@metered_prediction
 def api_predict_structure_esmfold(body: PredictStructureEsmfoldBody):
     """Predict protein structure with ESMFold (local). Returns status JSON with file_info (PDB path)."""
     try:

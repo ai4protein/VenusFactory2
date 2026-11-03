@@ -46,5 +46,12 @@ def test_new_tools_obey_online_and_admin_policy(tmp_path, monkeypatch):
     monkeypatch.setenv('WEBUI_V2_MODE','online')
     from mcp_tools.tools import runtime_tool_policy
     monkeypatch.setattr(runtime_tool_policy,'is_online_mode',lambda:True)
-    for name in NAMES.values():
-        with pytest.raises(Exception): assert_tool_call_allowed(name, {})
+    from backend.web_v2 import runtime_paths
+    monkeypatch.setattr(runtime_paths, 'runtime_root', lambda *args: tmp_path)
+    for model,name in NAMES.items():
+        if model in {'bindcraft','boltzgen'}:
+            with pytest.raises(Exception): assert_tool_call_allowed(name, {})
+        else:
+            assert_tool_call_allowed(name, {})
+    CapabilityStore().set('tool:'+NAMES['vina'], False, 0, {}, 'test-admin')
+    with pytest.raises(Exception): assert_tool_call_allowed(NAMES['vina'], {})

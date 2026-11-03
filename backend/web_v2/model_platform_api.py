@@ -29,6 +29,12 @@ def session(who=Depends(owner)):
     return {'ready': True}
 
 
+@router.get('/allowance')
+def compute_allowance(who=Depends(owner)):
+    from backend.web_v2.compute_access import allowance
+    return allowance(who)
+
+
 @router.get('/catalog')
 async def plaza_catalog(query: str = Query('', max_length=200), category: str = '', source: str = '', mine: bool = False,
                         kind: str = Query('', pattern='^(|model|tool)$'), offset: int = Query(0, ge=0),

@@ -54,11 +54,15 @@ def test_ownership_and_queued_cancellation(q):
     assert not q.list('other')
 
 def test_waiting_job_starts_automatically_and_wait_does_not_consume_runtime(q,tmp_path):
-    first,p1=launch([sys.executable,'-c','import time;time.sleep(1)'],owner='a',kind='test',resource='gpu',queue=q)
+    first,p1=launch([sys.executable,'-c','import time;time.sleep(30)'],owner='a',kind='test',resource='gpu',queue=q)
     wait(q,first,{'running'})
     output=tmp_path/'ran'
-    second,p2=launch([sys.executable,'-c',f'from pathlib import Path;Path({str(output)!r}).write_text("done")'],owner='b',kind='test',resource='gpu',timeout=.5,queue=q)
+    second,p2=launch([sys.executable,'-c',f'from pathlib import Path;Path({str(output)!r}).write_text("done")'],owner='b',kind='test',resource='gpu',timeout=3,queue=q)
+    # Hold the resource longer than the runtime budget. Leave sufficient time
+    # for a Python child to import its queue bootstrap on shared filesystems.
+    time.sleep(3.5)
     assert q.public(second)['status']=='queued'
+    q.cancel(first)
     assert wait(q,second,{'completed','failed'})['status']=='completed'
     assert output.read_text()=='done';p1.wait(3);p2.wait(3)
 

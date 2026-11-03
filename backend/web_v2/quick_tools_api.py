@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
+from backend.web_v2.compute_access import metered_prediction
 from fastapi import Request, APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
@@ -661,6 +662,7 @@ def _parse_fixed_residues_text(text: str) -> dict[str, list[int]]:
 
 @router.post("/run/sequence-design")
 @guard_operation('proteinmpnn_sequence_design_from_structure')
+@metered_prediction
 async def run_quick_tool_sequence_design(body: SequenceDesignRunBody):
     input_path = _resolve_upload_input(body.structure_file)
     if not input_path.lower().endswith(".pdb"):
@@ -739,6 +741,7 @@ async def run_quick_tool_protein_discovery(body: ProteinDiscoveryRunBody):
 
 
 @router.post("/run/mutation")
+@metered_prediction
 async def run_quick_tool_mutation(body: MutationRunBody):
     # Run local scripts directly (legacy quick-tool behavior) to avoid requiring an external Gradio service.
     model_type = "sequence"
@@ -870,6 +873,7 @@ class ProteinFunctionRunBody(BaseModel):
 
 
 @router.post("/run/protein-function")
+@metered_prediction
 async def run_quick_tool_protein_function(body: ProteinFunctionRunBody):
     fasta_path = _resolve_upload_input(body.fasta_file)
     _enforce_online_fasta_limit_for_path(fasta_path, source="Protein Function FASTA")
@@ -903,6 +907,7 @@ class ResidueFunctionRunBody(BaseModel):
 
 
 @router.post("/run/residue-function")
+@metered_prediction
 async def run_quick_tool_residue_function(body: ResidueFunctionRunBody):
     fasta_path = _resolve_upload_input(body.fasta_file)
     _enforce_online_fasta_limit_for_path(fasta_path, source="Functional Residue FASTA")
@@ -976,6 +981,7 @@ async def run_quick_tool_properties(body: PropertiesRunBody):
 
 
 @router.post("/run/mutation/stream")
+@metered_prediction
 async def run_quick_tool_mutation_stream(body: MutationRunBody):
     async def event_stream():
         start = time.perf_counter()
@@ -998,6 +1004,7 @@ async def run_quick_tool_mutation_stream(body: MutationRunBody):
 
 
 @router.post("/run/sequence-design/stream")
+@metered_prediction
 async def run_quick_tool_sequence_design_stream(body: SequenceDesignRunBody):
     async def event_stream():
         start = time.perf_counter()
@@ -1051,6 +1058,7 @@ async def run_quick_tool_protein_discovery_stream(body: ProteinDiscoveryRunBody)
 
 
 @router.post("/run/protein-function/stream")
+@metered_prediction
 async def run_quick_tool_protein_function_stream(body: ProteinFunctionRunBody):
     async def event_stream():
         start = time.perf_counter()
@@ -1084,6 +1092,7 @@ async def run_quick_tool_protein_function_stream(body: ProteinFunctionRunBody):
 
 
 @router.post("/run/residue-function/stream")
+@metered_prediction
 async def run_quick_tool_residue_function_stream(body: ResidueFunctionRunBody):
     async def event_stream():
         start = time.perf_counter()

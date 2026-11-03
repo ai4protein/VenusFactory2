@@ -34,3 +34,8 @@
 本地部署可在「Administration → 环境变量」或项目根目录的 `.env` 中，填写提供方的 API Key 和模型 ID，随后统一重启后端及 worker。支持 OpenAI（ChatGPT）、Anthropic Claude、xAI Grok、智谱 GLM、MiniMax、DeepSeek、Gemini、Qwen 和 Moonshot。
 
 例如：`OPENAI_API_KEY` 配合 `OPENAI_MODEL`，或 `MINIMAX_API_KEY` 配合 `MINIMAX_MODEL`。`_MODELS` 可填写逗号分隔的多个模型 ID，`_BASE_URL` 可配置对应账户的 API 地址。仅填写 Key 不会自动启用模型或切换默认路由。新对话可以选择配置好的模型，已有对话保留原模型。线上仍只开放后台配置的免费路由；不兼容的 Harness 与模型组合不可选。
+
+
+## 每日计算额度
+
+线上默认每位浏览器访客每天可启动 **5 次工作流**、提交 **20 次模型推理**。模型广场、Workflow 和 Chat 共享推理额度；工作流开始前会预留其中所有模型步骤的额度。对话额度 key 增加的是对话次数，不改变计算额度。本地模式不设每日计算额度。管理员可在管理后台的环境配置中设置 `WEBUI_V2_ONLINE_DAILY_WORKFLOW_LIMIT` 和 `WEBUI_V2_ONLINE_DAILY_PREDICTION_LIMIT`，重启服务后生效。

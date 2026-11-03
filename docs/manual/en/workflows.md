@@ -2,11 +2,11 @@
 
 ## When to use a workflow
 
-Use Workflows when the steps and data flow are already clear and you expect to repeat them. Use Agent for exploratory questions and Scientist when the method itself needs research or development.
+Use Workflow when the steps and data flow are already clear and you expect to repeat them. Use Agent for exploratory questions and Scientist when the method itself needs research or development.
 
 ## Create and connect steps
 
-1. Open Workflows, name the workflow and choose tools/models from the categorized catalog.
+1. Open Workflow, name the workflow and choose tools/models from the categorized catalog.
 2. Add the input files or data required by the first step.
 3. Drag cards into place and connect compatible outputs to later inputs. The connection selects the data source; visual position alone does not create a dependency.
 4. Open each card to set its model-specific parameters and required inputs. Remove unwanted cards with their delete control.
@@ -31,3 +31,12 @@ An Input data card selects one uploaded dataset: CSV/TSV/JSON contains one sampl
 Connections pass actual upstream output. Steps run in dependency order, regardless of where cards are placed. A prediction step has separate data and trained-model inputs. A single input can have only one source; choosing another replaces that connection. Cycles, incompatible file kinds and invalid ports are rejected. Known columns are checked before submission; generated columns are checked again before the next step executes.
 
 During execution, completed edges turn green and active edges animate. Select a step in the execution trace to inspect its input/output preview, record counts, elapsed time and processing log. Registered tools report record progress; model adapters without internal progress show their running state until completion. If a step fails, later steps are not executed. Saved job traces remain available after refresh.
+
+
+## My jobs and daily allowance
+
+Open **My jobs** beside the workflow steps to view your submissions. Search by name or job number, filter by type/status, and open a job to inspect its results. The panel keeps the workflow canvas in place. Your browser workspace shows only your jobs.
+
+Online visitors can start **5 workflows per day** and share **20 model inference jobs per day** across Model Plaza, Workflow and all Chat modes. Each model prediction step in a workflow uses one inference allowance; the whole workflow is checked before it enters the queue. Database searches and basic physicochemical calculations do not use model inference allowance. Retry starts a new execution; refreshing or viewing a result does not consume allowance.
+
+The counters show the remaining allowance and a rejected submission gives its reset time. Visitors sharing an IP have separate daily balances; IP burst protection is separate. Local deployments have no daily allowance limit.

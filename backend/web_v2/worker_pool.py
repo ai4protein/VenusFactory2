@@ -97,7 +97,8 @@ def submit_command(command, *, owner, kind, resource, env, cwd, stdout, pass_fds
     log_path=str(Path(stdout.name).resolve()) if stdout is not None else None
     spec={'command':[str(x) for x in command],'cwd':str(cwd),'timeout':float(timeout),
           'environment':public,'credential_refs':refs,'leases':leases,'log':log_path}
-    identity,created=q.enqueue(owner,kind,resource,spec,namespace,metadata=metadata,priority=priority,
+    from .compute_access import enqueue
+    identity,created=enqueue(q,owner,kind,resource,spec,namespace,metadata=metadata,priority=priority,
                               session_key=session_key,request_key=request_key,request_hash=request_hash)
     if created:
         command_file=q.files(identity)/'command.json'

@@ -13,12 +13,14 @@ export type FlowEvent = {seq: number; step_id: string; status: string; time: num
 export type Job = { job_number: string; title: string; created: number; queue?: { id:string; resource:string; status:string; position:number; cancel_requested:boolean }; id: string; kind: string; status: string; progress: number; message: string; steps: FlowStep[]; events?: FlowEvent[]; workflow?: Workflow; result?: { metadata?: ADMETMetadata; artifacts_download?: string; model?: ModelCard; models?: ModelCard[]; preview: Record<string, unknown>[]; rows: number; download: string } };
 export type ComponentCatalog = { items: ModelCard[]; total: number; categories: Record<string, number>; kinds: Record<string, number>; unavailable_sources: string[]; unavailable_tools: string[] };
 export type Catalog = { items: ModelCard[]; total: number; registered: number; categories: Record<string, number>; unavailable_sources: string[]; unavailable_tools?: string[] };
+import { COMPUTE_QUOTA_CHANGED, computeQuotaError } from './computeQuota';
 import { ensureJobSession } from './jobSession';
 export async function platform<T>(path: string, options?: RequestInit): Promise<T> {
   const request = async (): Promise<T> => {
-  const res = await fetch('/api/model-platform' + path, { credentials: 'same-origin', ...options, headers: { ...(options?.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), ...options?.headers } });
+  const res = await fetch('/api/model-platform' + path, { credentials: 'same-origin', ...options, headers: { ...(options?.method === 'POST' ? { 'Idempotency-Key': crypto.randomUUID() } : {}), ...(options?.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), ...options?.headers } });
   const data = await res.json();
-  if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Please check your input and try again.');
+  if (!res.ok) throw new Error(computeQuotaError(data) || (typeof data.detail === 'string' ? data.detail : data.detail?.message || 'Please check your input and try again.'));
+  if (options?.method === 'POST' && (path === '/predict' || path === '/workflows/run' || path.endsWith('/retry'))) window.dispatchEvent(new Event(COMPUTE_QUOTA_CHANGED));
   return data as T;
   };
   // The first read also establishes the workspace cookie. Other callers wait

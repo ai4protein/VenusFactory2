@@ -1,3 +1,4 @@
+import { ComputeAllowance } from './ComputeAllowance';
 import { unavailableLabel } from '../lib/capabilityAvailability';
 import { ModelExtraInputs } from './ModelExtraInputs';
 import { ModelParameters } from "./ModelParameters";
@@ -68,6 +69,7 @@ export function ModelPredictionDrawer({ model, onClose, onUpdate }: { model: Mod
       <header><span className="mp-eyebrow">{sourceNames[model.source]?.[zh ? 1 : 0]}</span><button autoFocus className="mp-close" aria-label={zh ? '关闭' : 'Close'} onClick={onClose}>×</button></header>
       <div className="mp-detail-heading"><ModelGlyph kind={model.category} size={24}/><h2 id="model-detail-title">{model.name}</h2></div>
       <p className="mp-muted">{model.description}</p>
+      <ComputeAllowance only="prediction"/>
       {detail.model_type && <dl className="mp-model-lineage">
         <div><dt>{zh ? '模型类型' : 'Model type'}</dt><dd>{modelTypeNames[detail.model_type]?.[zh ? 1 : 0]}</dd></div>
         {detail.backbone?.name && <div><dt>{zh ? '基础模型' : 'Backbone'}</dt><dd>{detail.backbone.name}</dd></div>}

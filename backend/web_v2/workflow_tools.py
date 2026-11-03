@@ -39,6 +39,8 @@ def registered(name):
 
 
 def card(name, *, detail=True):
+    if name not in SPECS:
+        raise ValueError('Unknown workflow tool')
     spec = SPECS[name]
     schema = None
     if detail:

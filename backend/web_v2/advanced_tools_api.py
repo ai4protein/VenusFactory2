@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
+from backend.web_v2.compute_access import metered_prediction
 from fastapi import Request, APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
@@ -774,6 +775,7 @@ async def advanced_ai_summary(body: AdvancedAiSummaryBody):
 
 
 @router.post("/directed-evolution/run")
+@metered_prediction
 async def run_directed_evolution(body: DirectedEvolutionBody):
     if body.input_mode not in {"sequence", "structure"}:
         raise HTTPException(status_code=400, detail="input_mode must be 'sequence' or 'structure'.")
@@ -823,6 +825,7 @@ async def run_directed_evolution(body: DirectedEvolutionBody):
 
 @router.post("/protein-function/run")
 @guard_operation('predict_protein_function')
+@metered_prediction
 async def run_protein_function(body: ProteinFunctionBody):
     fasta_file = _ensure_fasta_path(body.file_path, body.sequence)
     if _online_fasta_limit_enabled():
@@ -860,6 +863,7 @@ async def run_protein_function(body: ProteinFunctionBody):
 
 @router.post("/functional-residue/run")
 @guard_operation('predict_residue_function')
+@metered_prediction
 async def run_functional_residue(body: FunctionalResidueBody):
     fasta_file = _ensure_fasta_path(body.file_path, body.sequence)
     if _online_fasta_limit_enabled():
@@ -897,6 +901,7 @@ async def run_functional_residue(body: FunctionalResidueBody):
 
 @router.post("/sequence-design/run")
 @guard_operation('proteinmpnn_sequence_design_from_structure')
+@metered_prediction
 async def run_sequence_design(body: SequenceDesignBody):
     safe_pdb_file = _resolve_upload_file(body.structure_file)
     if not safe_pdb_file.lower().endswith(".pdb"):
@@ -1073,6 +1078,7 @@ async def run_protein_discovery(body: ProteinDiscoveryBody):
 
 
 @router.post("/directed-evolution/run/stream")
+@metered_prediction
 async def run_directed_evolution_stream(body: DirectedEvolutionBody):
     async def event_stream():
         start = time.perf_counter()
@@ -1095,6 +1101,7 @@ async def run_directed_evolution_stream(body: DirectedEvolutionBody):
 
 
 @router.post("/protein-function/run/stream")
+@metered_prediction
 async def run_protein_function_stream(body: ProteinFunctionBody):
     async def event_stream():
         start = time.perf_counter()
@@ -1189,6 +1196,7 @@ async def run_protein_function_stream(body: ProteinFunctionBody):
 
 
 @router.post("/functional-residue/run/stream")
+@metered_prediction
 async def run_functional_residue_stream(body: FunctionalResidueBody):
     async def event_stream():
         start = time.perf_counter()
@@ -1282,6 +1290,7 @@ async def run_functional_residue_stream(body: FunctionalResidueBody):
 
 
 @router.post("/sequence-design/run/stream")
+@metered_prediction
 async def run_sequence_design_stream(body: SequenceDesignBody):
     async def event_stream():
         start = time.perf_counter()

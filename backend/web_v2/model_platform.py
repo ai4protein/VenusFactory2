@@ -544,11 +544,18 @@ class Platform:
             CapabilityStore().assert_call('train_protein_model', {'plm_model':'classical'})
             self.validate_training(owner, payload)
         from agent.rsi.engine.storage import file_lock
+        from backend.web_v2.compute_access import request_key_context
+        admission_key = request_key_context.get()
+        admission_hash = hashlib.sha256(json.dumps({'kind': kind, 'payload': payload}, sort_keys=True).encode()).hexdigest()
         with file_lock(self.root / '.jobs.lock'):
+            if launch and admission_key:
+                previous = self.queue.request(owner, admission_key, admission_hash)
+                if previous:
+                    original = self.queue.get(previous['id'], owner)
+                    return self.job(owner, original['metadata']['platform_job_id'])
             job = {'id': uuid.uuid4().hex, 'owner': owner, 'kind': kind, 'payload': payload, 'status': 'queued', 'progress': 0,
                    'message': 'Queued', 'created': time.time(), 'steps': []}
             write(self.path('jobs', job['id']), job)
-            self.register_job(job)
             if launch:
                 env = dict(os.environ, PYTHONPATH=str(PROJECT / 'src'), VENUS_MODEL_PLATFORM_ROOT=str(self.root),
                            OMP_NUM_THREADS='2', OPENBLAS_NUM_THREADS='2', MKL_NUM_THREADS='2')
@@ -556,14 +563,40 @@ class Platform:
                 work.mkdir(parents=True, mode=0o700)
                 env['TEMP_OUTPUTS_DIR'] = str(work)
                 from backend.web_v2.job_queue import launch
-                with (work / 'worker.log').open('ab') as log:
-                    queue_id, proc = launch([sys.executable, '-m', 'backend.web_v2.model_platform_worker', job['id']], owner=owner,
-                        kind='platform:'+kind, resource=self.resource_for(owner,kind,payload), env=env,cwd=PROJECT,stdout=log,
-                        timeout=int(os.getenv('VENUS_QUEUE_MODEL_TIMEOUT','3600')), priority=10 if kind=='predict' else 0,
-                        metadata={'platform_job_id':job['id']}, queue=self.queue)
+                try:
+                    with (work / 'worker.log').open('ab') as log:
+                        queue_id, proc = launch([sys.executable, '-m', 'backend.web_v2.model_platform_worker', job['id']], owner=owner,
+                            kind='platform:'+kind, resource=self.resource_for(owner,kind,payload), env=env,cwd=PROJECT,stdout=log,
+                            timeout=int(os.getenv('VENUS_QUEUE_MODEL_TIMEOUT','3600')), priority=10 if kind=='predict' else 0,
+                            metadata={'platform_job_id':job['id'], 'compute_demands':self.compute_demands(owner,kind,payload)}, queue=self.queue,
+                            request_key=admission_key, request_hash=admission_hash if admission_key else None)
+                except Exception:
+                    self.path('jobs', job['id']).unlink(missing_ok=True)
+                    raise
                 job.update(pid=proc.pid,queue_id=queue_id)
                 write(self.path('jobs',job['id']),job)
+            self.register_job(job)
         return self.job(owner, job['id'])
+
+    def compute_demands(self, owner, kind, payload):
+        from mcp_tools.scheduler.catalog import classify
+        from backend.web_v2.compute_access import prediction_tool
+        def prediction(identity):
+            model = self.workflow_component(owner, identity) if identity.startswith('tool:') else self.model(owner, identity)
+            if model.get('adapter') == 'registered-tool':
+                from mcp_tools.scheduler.catalog import native_tools
+                name = identity.removeprefix('tool:')
+                tool = native_tools().get(name)
+                return int(prediction_tool(name, classify(name, getattr(tool, 'metadata', None))['category']))
+            return int(model.get('adapter', '').startswith('external:') or
+                       (model.get('adapter') != 'descriptors' and model.get('model_type') != 'tool'))
+        if kind == 'predict':
+            return {'prediction': prediction(payload['model_id'])}
+        if kind == 'workflow':
+            count = sum(1 if n['kind'] == 'predict' else prediction(n['model_id'])
+                        for n in payload['graph']['nodes'] if n['kind'] in {'model','tool','predict'})
+            return {'workflow': 1, 'prediction': count}
+        return {}
 
     def resource_for(self, owner, kind, payload):
         if kind=='workflow': return 'api:orchestration'

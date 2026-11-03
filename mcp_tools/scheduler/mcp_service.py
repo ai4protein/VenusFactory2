@@ -4,6 +4,7 @@ from contextlib import AsyncExitStack, asynccontextmanager
 import hashlib
 import os
 import secrets
+from fastapi import HTTPException
 
 from fastmcp import FastMCP
 from fastmcp.server.dependencies import get_http_headers
@@ -27,6 +28,10 @@ async def operation(fn, *args, **kwargs):
         return await asyncio.to_thread(fn, *args, **kwargs)
     except FileNotFoundError:
         return {'error': {'code': 404, 'message': 'Task not found'}}
+    except HTTPException as exc:
+        detail = exc.detail
+        message = detail.get('message', 'Computation is unavailable') if isinstance(detail, dict) else str(detail)
+        return {'error': {'code': exc.status_code, 'message': message, 'detail': detail}}
     except ValueError as exc:
         full = 'queue is full' in str(exc).lower()
         return {'error': {'code': 429 if full else 422, 'message': 'Task queue is full' if full else 'Invalid tool arguments'}}
