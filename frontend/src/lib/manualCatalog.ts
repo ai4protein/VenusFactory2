@@ -11,6 +11,16 @@ export function langToManual(lang: Lang): ManualLanguage { return lang === 'zh' 
 export function getManualSection(key?: string) {
   return MANUAL_SECTIONS.find(item => item.key === key || item.aliases.includes(key || '')) ?? null;
 }
+
+/** Recover old links that accumulated valid chapter names during navigation. */
+export function canonicalManualPath(pathname: string, lang: Lang): string | null {
+  const base = `/${lang}/manual`;
+  if (pathname !== base && !pathname.startsWith(`${base}/`)) return null;
+  const parts = pathname.slice(base.length).split('/').filter(Boolean);
+  const sections = parts.map(part => part === 'index' ? 'index' : getManualSection(part)?.key);
+  if (sections.some(section => !section)) return null;
+  return `${base}/${sections.at(-1) ?? 'index'}`;
+}
 export function manualQuestion(key: string | null, lang: Lang): string {
   const section = key ? getManualSection(key) : null;
   if (!section) return '';

@@ -1,10 +1,11 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { Navigate, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useMemo } from "react";
 import "./manual-guide.css";
 import { MANUAL_SECTIONS, langToManual, type ManualLanguage } from "../../lib/manualContent";
 import { PageFooter } from "../../components/PageFooter";
 import { useLang } from "../../lib/i18n";
 import { useDocumentMeta } from "../../lib/useDocumentMeta";
+import { canonicalManualPath } from "../../lib/manualCatalog";
 
 export type ManualLayoutContext = {
   language: ManualLanguage;
@@ -25,6 +26,7 @@ const STRINGS = {
 
 export function ManualLayout() {
   const { lang, t: translate } = useLang();
+  const location = useLocation();
   const t = translate(STRINGS);
   useDocumentMeta({ title: `${t.title} — VenusFactory2`, description: t.subtitle });
   const language = langToManual(lang);
@@ -40,6 +42,11 @@ export function ManualLayout() {
     [t, lang]
   );
 
+  const canonicalPath = canonicalManualPath(location.pathname, lang);
+  if (canonicalPath && canonicalPath !== location.pathname) {
+    return <Navigate to={`${canonicalPath}${location.search}${location.hash}`} replace />;
+  }
+
   return (
     <div className="manual-v2-page">
       <header className="chat-header manual-v2-header">
@@ -53,7 +60,8 @@ export function ManualLayout() {
         {tabs.map((tab) => (
           <NavLink
             key={tab.path}
-            to={tab.path}
+            to={`/${lang}/manual/${tab.path}`}
+            end
             className={({ isActive }) => `manual-v2-switch-item ${isActive ? "active" : ""}`}
           >
             {tab.label}

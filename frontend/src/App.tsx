@@ -238,10 +238,11 @@ function LocalizedApp() {
             element={<AdvancedFunctionalResiduePage workspaceEnabled={workspaceEnabled} />}
           />
           <Route path="download/*" element={<LangNavigate to="/agent/chat" replace />} />
-          <Route path="manual" element={<LangNavigate to="/manual/index" replace />} />
-          <Route path="manual/*" element={<ManualLayout />}>
+          <Route path="manual" element={<ManualLayout />}>
+            <Route index element={<LangNavigate to="/manual/index" replace />} />
             <Route path="index" element={<ManualIndexPage />} />
             <Route path=":section" element={<ManualDocPage />} />
+            <Route path="*" element={<ManualDocPage />} />
           </Route>
           <Route
             path="/custom-model/training"
