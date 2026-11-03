@@ -8,7 +8,7 @@ mcp=FastMCP('Venus_Public_Protein_Services')
 
 @mcp.tool(name='query_public_protein_service')
 async def query_public_protein_service(service: ServiceName, accession: str='', sequence: str='', structure_pdb: str='', structure_chain: str='') -> dict:
-    """Run free remote NCBI BLAST or Foldseek, or query InterPro/Pfam, QuickGO, STRING, Reactome, AlphaFold DB and PDBe/PDB. Returns evidence, actual status and a remote job URL. BLAST sends a sequence to NCBI; Foldseek sends a protein structure. Use an exact UniProt ID for annotations. Pending jobs are not completed analyses. No local GPU computation."""
+    """Run free remote NCBI BLAST or Foldseek, or query InterPro/Pfam, QuickGO, STRING, KEGG, Reactome, AlphaFold DB and PDBe/PDB. Returns evidence, actual status and a remote job URL. BLAST sends a sequence to NCBI; Foldseek sends a protein structure. Use an exact UniProt ID for annotations. Pending jobs are not completed analyses. No local GPU computation."""
     return await public_analysis(service,accession,sequence,structure_pdb,structure_chain)
 
 
@@ -77,3 +77,12 @@ async def query_europepmc(query: str, limit: int=6, cursor: str='*') -> dict:
 async def query_pubchem(query: str, namespace: PubChemNamespace='name', limit: int=5) -> dict:
     """Look up compound properties by name, numeric CID or SMILES via PubChem: formula, mass, SMILES, InChIKey, XLogP, TPSA and H-bond descriptors. Bounded records and source links. Database descriptors are not ADMET or binding predictions."""
     return await pubchem_query(query=query, namespace=namespace, limit=limit)
+
+
+from mcp_tools.tools.database.kegg.query import Operation as KeggOperation, Database as KeggDatabase, kegg_query
+
+
+@mcp.tool(name='query_kegg')
+async def query_kegg(operation: KeggOperation='search', query: str='', identifier: str='', database: KeggDatabase='genes', limit: int=10) -> dict:
+    """Search KEGG genes/pathways/orthology, get one entry, convert a UniProt accession to genes, or link an entry to a database. Bounded evidence with source links."""
+    return await kegg_query(operation=operation, query=query, identifier=identifier, database=database, limit=limit)

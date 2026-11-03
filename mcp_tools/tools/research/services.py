@@ -22,6 +22,7 @@ CATALOG = [
     ('interpro', 'InterPro / Pfam', 'InterPro / Pfam 结构域', 'accession', 'https://www.ebi.ac.uk/interpro/'),
     ('quickgo', 'QuickGO', 'QuickGO 功能注释', 'accession', 'https://www.ebi.ac.uk/QuickGO/'),
     ('string', 'STRING', 'STRING 互作网络', 'accession', 'https://string-db.org/'),
+    ('kegg', 'KEGG pathways & function', 'KEGG 通路与功能', 'accession', 'https://www.kegg.jp/'),
     ('reactome', 'Reactome', 'Reactome 生物通路', 'accession', 'https://reactome.org/'),
     ('alphafold', 'AlphaFold DB', 'AlphaFold 预测结构', 'accession', 'https://alphafold.ebi.ac.uk/'),
     ('pdbe', 'PDBe / PDB', 'PDBe / PDB 实验结构', 'accession', 'https://www.ebi.ac.uk/pdbe/'),
@@ -29,7 +30,7 @@ CATALOG = [
 SERVICE_IDS = {r[0] for r in CATALOG}
 HOSTS = {'blast.ncbi.nlm.nih.gov', 'search.foldseek.com', 'www.ebi.ac.uk', 'reactome.org', 'string-db.org',
          'alphafold.ebi.ac.uk', 'files.rcsb.org', 'rest.uniprot.org', 'eutils.ncbi.nlm.nih.gov',
-         'api.platform.opentargets.org', 'rest.ensembl.org', 'pubchem.ncbi.nlm.nih.gov'}
+         'api.platform.opentargets.org', 'rest.ensembl.org', 'pubchem.ncbi.nlm.nih.gov', 'data.rcsb.org', 'rest.kegg.jp'}
 ACCESSION = re.compile(r'(?:[OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9](?:[A-Z][A-Z0-9]{2}[0-9]){1,2})(?:-\d+)?')
 
 
@@ -124,7 +125,7 @@ async def get_json(url, params=None):
 
 
 def digest_input(service, context):
-    relevant={k:context.get(k,'') for k in ('accession','sequence','structure_pdb','structure_chain')}
+    relevant={k:context.get(k,'') for k in ('accession','sequence','structure_pdb','structure_chain','pdb_id','source_chain')}
     return hashlib.sha256(json.dumps([service,relevant],sort_keys=True).encode()).hexdigest()
 
 
@@ -186,7 +187,11 @@ async def blast(context, row, emit):
 async def choose_structure(context):
     if context.get('structure_pdb'):
         pdb,seq,chain=structure_chain(context['structure_pdb'],context.get('structure_chain',''))
-        return pdb,{'origin':'uploaded_structure','chain':chain,'sequence_length':len(seq)}
+        origin = {'origin': 'experimental_structure' if context.get('pdb_id') else 'uploaded_structure',
+                  'chain': chain, 'sequence_length': len(seq)}
+        if context.get('pdb_id'):
+            origin.update(pdb_id=context['pdb_id'], source_chain=context.get('source_chain', chain))
+        return pdb, origin
     accession=context.get('accession','')
     if not accession:raise NotApplicable('Upload a PDB structure or choose a UniProt entry')
     # Fetch exactly mapped experimental chain, never a random chain of a complex.
@@ -259,6 +264,11 @@ async def annotation(service,context,row):
     accession=context.get('accession','')
     if not ACCESSION.fullmatch(accession):raise NotApplicable('A matched UniProt accession is required')
     row['evidence_level']='database_annotation'
+    if service=='kegg':
+        from mcp_tools.tools.database.kegg.query import protein_annotations
+        data = await protein_annotations(context)
+        if data['genes']: row['url'] = data['genes'][0]['url']
+        return data
     if service=='interpro':
         url='https://www.ebi.ac.uk/interpro/api/entry/interpro/protein/uniprot/'+accession+'/'
         obj=await get_json(url,{'page_size':25}) or {};rows=obj.get('results',[])[:25]
@@ -298,6 +308,7 @@ async def run_service(service, context, update=lambda _:None, cache_dir=None):
     if service == 'blast': assert_tool_call_allowed('query_ncbi_blast')
     if service == 'foldseek_remote': assert_tool_call_allowed('query_foldseek_remote')
     if service == 'interproscan': assert_tool_call_allowed('query_interproscan')
+    if service == 'kegg': assert_tool_call_allowed('query_kegg')
     if service == 's4pred': assert_tool_call_allowed('predict_s4pred')
     if service not in SERVICE_IDS:raise ServiceError('Unknown public protein service')
     spec=next(r for r in CATALOG if r[0]==service);key=digest_input(service,context)

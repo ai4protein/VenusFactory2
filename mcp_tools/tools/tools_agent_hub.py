@@ -362,6 +362,7 @@ PI_SEARCH_TOOL_NAMES = frozenset({
     "query_ensembl",
     "query_europepmc",
     "query_pubchem",
+    "query_kegg",
     "query_interproscan",
     # Structural / sequence / functional metadata lookups (read-only,
     # cheap, complement literature when the literature search returns

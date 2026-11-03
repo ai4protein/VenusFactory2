@@ -5,7 +5,7 @@ from langchain.tools import tool
 import asyncio
 from .services import run_service, get_json, ACCESSION, sequence as clean_sequence, structure_chain as clean_structure
 
-ServiceName = Literal['blast','foldseek_remote','interproscan','s4pred','interpro','quickgo','string','reactome','alphafold','pdbe']
+ServiceName = Literal['blast','foldseek_remote','interproscan','s4pred','interpro','quickgo','string','kegg','reactome','alphafold','pdbe']
 
 
 async def prepare_context(service, accession='', sequence='', structure_pdb='', structure_chain=''):
@@ -38,7 +38,7 @@ class PublicProteinInput(BaseModel):
 
 @tool('query_public_protein_service',args_schema=PublicProteinInput)
 def query_public_protein_service_tool(service: str, accession: str='', sequence: str='', structure_pdb: str='', structure_chain: str='') -> dict:
-    """Run a bounded free public protein analysis: NCBI BLAST, remote Foldseek, InterPro/Pfam, QuickGO, STRING, Reactome, AlphaFold DB, or PDBe/PDB. BLAST submits one protein sequence; Foldseek submits one protein structure. Returns actual status, evidence, and remote job URL. Remote similarity is not functional validation. No local GPU training or VenusMine execution. Jobs can take several minutes; pending means still processing, not complete."""
+    """Run a bounded free public protein analysis: NCBI BLAST, remote Foldseek, InterPro/Pfam, QuickGO, STRING, KEGG, Reactome, AlphaFold DB, or PDBe/PDB. BLAST submits one protein sequence; Foldseek submits one protein structure. Returns actual status, evidence, and remote job URL. Remote similarity is not functional validation. No local GPU training or VenusMine execution. Jobs can take several minutes; pending means still processing, not complete."""
     return asyncio.run(public_analysis(service,accession,sequence,structure_pdb,structure_chain))
 
 
@@ -118,7 +118,10 @@ query_europepmc_tool = shared_tool('query_europepmc', EuropePMCInput, europepmc_
     'Search Europe PMC literature and retrieve actual abstracts, DOI/PMID/PMCID, publication year, open-access and retraction metadata. Search with EXT_ID:<PMID> AND SRC:MED for a known paper. Use next_cursor to page. Abstracts are not full text; distinguish preprints and retracted work. No API key required.')
 query_pubchem_tool = shared_tool('query_pubchem', PubChemInput, pubchem_query,
     'Look up one compound by name, PubChem CID or SMILES to retrieve formula, molecular weight, stereochemical/connectivity SMILES, InChIKey, XLogP, TPSA and hydrogen-bond descriptors. Returns compound source links. These database properties are not ADMET predictions or binding measurements.')
-KNOWLEDGE_TOOLS = [query_opentargets_tool, query_ensembl_tool, query_europepmc_tool, query_pubchem_tool]
+from mcp_tools.tools.database.kegg.query import KeggInput, kegg_query
+query_kegg_tool = shared_tool('query_kegg', KeggInput, kegg_query,
+    'Search KEGG genes, pathways, orthology and compounds; retrieve a resolved entry, map a UniProt accession to genes, or link an entry to a selected database. Returns bounded annotations and sources.')
+KNOWLEDGE_TOOLS = [query_kegg_tool, query_opentargets_tool, query_ensembl_tool, query_europepmc_tool, query_pubchem_tool]
 for _tool in KNOWLEDGE_TOOLS:
     _tool.metadata = {'tool_category': 'web_search' if _tool.name == 'query_europepmc' else 'protein_database',
                       'queue_resource': 'api:' + _tool.name.removeprefix('query_'), 'timeout_seconds': 90}

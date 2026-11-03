@@ -21,3 +21,9 @@ Watch progress and intermediate results during generation. Long remote jobs may 
 Check source links, accession IDs, analysis inputs, model names and caveats. Database annotations, literature claims, computational predictions and proposed experiments are different evidence types. Missing or failed analyses should remain identified as gaps, not converted into positive findings.
 
 A report does not train or publish a new model by itself. Use [Scientist](manual:scientist) for that purpose, or [Agent](manual:agent) for a focused follow-up calculation.
+
+## PDB structures and KEGG pathways
+
+Enter a PDB ID such as `4HHB`, or `4HHB:A` for a specific chain. Choose the protein chain from the results; Researcher retrieves its coordinates automatically. Sequence calculations use observed residues of that chain, which can differ from the full UniProt reference protein.
+
+Select **KEGG pathways & function** to retrieve mapped genes, pathways, orthology and modules. KEGG requires an explicit UniProt mapping; an unmapped sequence is not assigned pathways by name alone. Reports retain identifiers and source links. Agent and Scientist can also discover the `query_kegg` tool for search, entry lookup, UniProt conversion and linked annotations.

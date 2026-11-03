@@ -152,9 +152,9 @@ async def run_long_report(payload, update, *, service_cache=None, checkpoint=Non
             chapter.update(status='searching', started=time.time()); publish()
             relevant = {
                 'identity_evolution': {'blast', 'interpro'},
-                'function_pathways': {'interpro', 'quickgo', 'reactome'},
+                'function_pathways': {'interpro', 'quickgo', 'reactome', 'kegg'},
                 'structure_binding': {'foldseek_remote', 'pdbe', 'alphafold', 'interpro'},
-                'interactions_regulation': {'string', 'reactome', 'quickgo'},
+                'interactions_regulation': {'string', 'reactome', 'quickgo', 'kegg'},
                 'variants_modifications': {'interpro', 'quickgo'},
                 'biophysics_production': {'alphafold', 'interpro'},
                 'engineering_design': {'blast', 'foldseek_remote', 'interpro'},
@@ -162,6 +162,8 @@ async def run_long_report(payload, update, *, service_cache=None, checkpoint=Non
             }[identity]
             core = [s for s in base_sources if s.get('kind') in {'database', 'calculation', 'structure'}]
             remote = [s for s in base_sources if s.get('kind') == 'public_service' and s.get('service') in relevant]
+            if identity in {'function_pathways', 'interactions_regulation'}:
+                remote.sort(key=lambda s: s.get('service') != 'kegg')
             predictions = [s for s in base_sources if s.get('kind') == 'prediction']
             from backend.web_v2.research_materials import chapter_materials
             materials=chapter_materials(base_sources,index,terms)

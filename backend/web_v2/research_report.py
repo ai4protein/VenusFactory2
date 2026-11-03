@@ -155,6 +155,10 @@ async def resolve_protein(query):
     query = query.strip()
     if not 1 <= len(query) <= 180:
         raise ValueError('Enter a protein name, organism or UniProt accession')
+    from mcp_tools.tools.database.rcsb.research_target import pdb_query, resolve_pdb
+    target = pdb_query(query)
+    if target:
+        return await resolve_pdb(*target)
     # Quoted text protects the public query service from accidental query-language operators.
     term = 'accession:' + query if ACCESSION.fullmatch(query) else ' AND '.join('"' + w + '"' for w in re.findall(r'[\w.-]+', query)[:16])
     obj = await get_json('https://rest.uniprot.org/uniprotkb/search', {'query': term, 'format': 'json', 'size': 8})
@@ -366,9 +370,31 @@ async def run_research(payload, update, *, synthesize=True, model_call=None, ser
             state['partial'] = True
             step(key, 'unavailable', 'Source temporarily unavailable')
     entry, sequence = None, payload.get('sequence', '')
+    accession = payload.get('accession', '')
+    structure_pdb, structure_chain = payload.get('structure_pdb', ''), payload.get('structure_chain', '')
+    source_chain = structure_chain
     protein = payload.get('protein', '')
     step('identity', 'running')
-    if payload.get('accession'):
+    if payload.get('pdb_id'):
+        from mcp_tools.tools.database.rcsb.research_target import load_pdb_target
+        target = await load_pdb_target(payload['pdb_id'], structure_chain)
+        card = target['protein']; state['protein'] = card
+        sequence, structure_pdb, structure_chain = target['sequence'], target['structure_pdb'], target['structure_chain']
+        source_chain, accession = target['source_chain'], card['accession']
+        protein = card['name'] + ' (' + card['organism'] + ')'
+        add([{'title': 'PDB · ' + card['pdb_id'] + ' · chain ' + source_chain, 'url': card['url'],
+              'kind': 'database', 'evidence_level': 'experimental_structure_metadata',
+              'text': json.dumps({**card, 'interpretation': target['interpretation']}, ensure_ascii=False)}])
+        if accession:
+            try:
+                entry = await get_json('https://rest.uniprot.org/uniprotkb/' + accession + '.json')
+                add([{'title': 'UniProt reference · ' + accession, 'url': 'https://www.uniprot.org/uniprotkb/' + accession,
+                      'kind': 'database', 'evidence_level': 'reference_protein_annotation',
+                      'text': json.dumps({'annotation_scope': target['interpretation'], 'entry': compact_entry(entry)}, ensure_ascii=False)}])
+            except Exception:
+                state['partial'] = True
+        step('identity', 'completed', card['pdb_id'] + ' · chain ' + source_chain)
+    elif payload.get('accession'):
         try:
             entry = await get_json('https://rest.uniprot.org/uniprotkb/' + payload['accession'] + '.json')
             card = protein_card(entry)
@@ -449,8 +475,9 @@ async def run_research(payload, update, *, synthesize=True, model_call=None, ser
         else:
             step('properties', 'empty', 'A canonical amino-acid sequence is required')
     remote_ids = [key for key in scopes if key in public_services.SERVICE_IDS]
-    context = {'sequence': sequence, 'accession': payload.get('accession', ''), 'entry': entry or {},
-               'structure_pdb': payload.get('structure_pdb', ''), 'structure_chain': payload.get('structure_chain', '')}
+    context = {'sequence': sequence, 'accession': accession, 'entry': entry or {},
+               'structure_pdb': structure_pdb, 'structure_chain': structure_chain,
+               'pdb_id': payload.get('pdb_id', ''), 'source_chain': source_chain}
     slots = asyncio.Semaphore(4)
     state['remote_services'] = [{**o, 'status': 'queued'} for o in public_services.options() if o['id'] in remote_ids]
     def service_update(row):
@@ -458,11 +485,20 @@ async def run_research(payload, update, *, synthesize=True, model_call=None, ser
         publish()
     async def public_analysis(key):
         async with slots:
-            if os.getenv('VENUS_QUEUE_JOB_ID') and os.getenv('VENUS_MCP_QUEUE_WORKER') != '1':
-                from mcp_tools.scheduler.client import report_service
-                row = await report_service(key, context, service_update, cache_dir=service_cache)
-            else:
-                row = await public_services.run_service(key, context, service_update, cache_dir=service_cache)
+            try:
+                if os.getenv('VENUS_QUEUE_JOB_ID') and os.getenv('VENUS_MCP_QUEUE_WORKER') != '1':
+                    from mcp_tools.scheduler.client import report_service
+                    row = await report_service(key, context, service_update, cache_dir=service_cache)
+                else:
+                    row = await public_services.run_service(key, context, service_update, cache_dir=service_cache)
+            except Exception:
+                # A queue/transport failure must not discard other collected evidence.
+                # CancelledError remains uncaught so stopping the report still works.
+                row = next(x for x in state['remote_services'] if x['id'] == key)
+                row = {**row, 'status': 'unavailable', 'summary': 'This analysis could not be completed; other evidence is retained.'}
+                service_update(row)
+                state['partial'] = True
+                return
             evidence = public_services.source(row)
             if evidence: add([evidence])
             if row['status'] in {'pending', 'unavailable'}: state['partial'] = True

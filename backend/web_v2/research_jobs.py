@@ -75,6 +75,14 @@ class ResearchJobs:
         model_option(payload['model_id'])  # credential readiness and free route before admission
         if payload.get('accession') and not ACCESSION.fullmatch(payload['accession']):
             raise ValueError('Choose a UniProt entry')
+        if payload.get('pdb_id'):
+            from mcp_tools.tools.database.rcsb.research_target import pdb_identifier
+            payload['pdb_id'] = pdb_identifier(payload['pdb_id'])
+            if any(payload.get(k) for k in ('accession', 'sequence', 'structure_pdb')):
+                raise ValueError('Choose either a PDB entry, UniProt entry or uploaded sequence/structure')
+            import re
+            if not re.fullmatch(r'[A-Za-z0-9]{0,16}', payload.get('structure_chain', '')):
+                raise ValueError('Choose a valid PDB chain')
         if payload.get('sequence'):
             payload['sequence'] = clean_sequence(payload['sequence'])
         if payload.get('structure_pdb'):
@@ -85,7 +93,7 @@ class ResearchJobs:
             if payload.get('accession'):
                 raise ValueError('Choose either a UniProt entry or an uploaded structure')
             payload.update(structure_pdb=pdb, structure_chain=chain, sequence=seq)
-        if not payload.get('accession') and not payload.get('sequence'):
+        if not payload.get('pdb_id') and not payload.get('accession') and not payload.get('sequence'):
             raise ValueError('Choose a protein or supply a sequence')
 
     def _start(self, owner, payload, identity, submitted, *, admit=None):
@@ -94,7 +102,7 @@ class ResearchJobs:
         if admit: admit(identity)
         row = {'id': identity, 'owner': owner, 'created': time.time(), 'payload': payload,
                'submitted_payload': submitted,
-               'title': (payload.get('protein') or payload.get('accession') or 'Sequence research')[:160]}
+               'title': (payload.get('protein') or payload.get('accession') or payload.get('pdb_id') or 'Sequence research')[:160]}
         folder = self.folder(identity)
         write(folder/'request.json', row)
         info = self.records.register('report', identity, owner, 'research', row['title'], row['created'])

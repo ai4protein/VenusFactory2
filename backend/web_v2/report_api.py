@@ -24,10 +24,11 @@ class ResearchRequest(BaseModel):
     request_id: str | None = Field(default=None, pattern=r"^[a-zA-Z0-9_-]{8,80}$")
     model_id: str = Field(max_length=80)
     protein: str = Field(default='', max_length=180)
+    pdb_id: str = Field(default='', max_length=12)
     accession: str = Field(default='', max_length=20)
     sequence: str = Field(default='', max_length=10000)
     structure_pdb: str = Field(default='')
-    structure_chain: str = Field(default='', max_length=1)
+    structure_chain: str = Field(default='', max_length=16, pattern=r'^[A-Za-z0-9]*$')
     focus: str = Field(default='', max_length=3000)
     analyses: list[str] = Field(min_length=1, max_length=32)
     lang: Literal['en', 'zh'] = 'en'
@@ -61,7 +62,7 @@ async def resolve(query: str = Query(min_length=1, max_length=180), who=Depends(
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from None
     except Exception:
-        raise HTTPException(502, 'UniProt is temporarily unavailable. Try an accession or upload a sequence.') from None
+        raise HTTPException(502, 'Protein lookup is temporarily unavailable. Try again or upload a sequence.') from None
 
 
 @router.post('/parse-input')

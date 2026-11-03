@@ -19,13 +19,15 @@ import { ResearchReportReader } from './ResearchReportReader';
 import { ResearchActivity, PredictionResults, type Prediction } from './ResearchActivity';
 
 type Material = { id: string; name: string; bytes: number; url?: string; extraction: { format: string; truncated: boolean } };
-type Protein = { accession: string; name: string; organism: string; length?: number; reviewed?: boolean };
+type Protein = { id?: string; pdb_id?: string; structure_chain?: string; accession: string; name: string; organism: string; length?: number; reviewed?: boolean };
 type Scope = { id: string; label: string; label_zh: string; available: boolean; default: boolean; remote?: boolean };
 type Chapter = { id: string; title: string; status: string; length: number; draft?: string; source_ids: string[] };
 type Options = { chapters?: { id: string; label: string; label_zh: string }[]; minimum_chapters?: number; web_search?: { provider: string; tavily_configured: boolean }; models: { id: string; label: string; provider: string; ready: boolean; free: boolean }[]; default_model: string; analyses: Scope[] };
 type Source = { id: string; title: string; url: string; text: string; kind: string; evidence_level: string; year?: string };
 type RemoteService = { id: string; label: string; label_zh: string; status: string; url: string; count?: number; job_id?: string; summary?: string; data?: unknown };
 type Report = { materials?: Material[]; resumable?: boolean; stop_reason?: string; predictions?: Prediction[]; activity?: { id: number; at: number; kind: string; key: string; status: string; label: string; job_number?: string }[]; remote_services?: RemoteService[]; chapters?: Chapter[]; phase?: string; minimum_met?: boolean; completed_chapters?: number; id: string; title: string; created: number; job_number: string; status: string; model_id?: string; partial?: boolean; report?: string; message?: string; focus?: string; sources?: Source[]; sections?: { id: string; title: string; data?: unknown; text?: string }[]; steps?: { id: string; status: string; message: string }[]; queries?: string[]; plan?: { id: string; label: string }[]; queue?: { position: number; cancel_requested: boolean } };
+const proteinId = (protein?: Protein) => protein?.id || protein?.accession || '';
+const proteinLabel = (protein: Protein) => protein.pdb_id ? `${protein.pdb_id} · ${protein.structure_chain}${protein.accession ? ' · ' + protein.accession : ''}` : protein.accession;
 const pending = (r?: Report) => Boolean(r && ['queued', 'running'].includes(r.status));
 
 function PublicEvidence({ service, zh }: { service: RemoteService; zh: boolean }) {
@@ -37,13 +39,13 @@ function PublicEvidence({ service, zh }: { service: RemoteService; zh: boolean }
     blast: ['Protein', 'Identity (%)', 'Query coverage (%)', 'E-value'],
     foldseek_remote: ['Structure / database', 'Identity (%)', 'E-value', 'Score'],
     interpro: ['Domain / family', 'Identifier', 'Type'], quickgo: ['GO term', 'Evidence', 'Reference'],
-    string: ['Partner', 'Combined score', 'Experimental score'], reactome: ['Pathway', 'Identifier'],
+    string: ['Partner', 'Combined score', 'Experimental score'], reactome: ['Pathway', 'Identifier'], kegg: ['Pathway', 'Identifier', 'Genes'],
     alphafold: ['Predicted model', 'Mean pLDDT', 'Version'], pdbe: ['PDB / chain', 'Coverage', 'Resolution (Å)'],
   };
   const chinese: Record<string, string[]> = {
     blast: ['蛋白', '一致性 (%)', '查询覆盖率 (%)', 'E-value'], foldseek_remote: ['结构 / 数据库', '一致性 (%)', 'E-value', '得分'],
     interpro: ['结构域 / 家族', '编号', '类型'], quickgo: ['GO 注释', '证据代码', '参考来源'],
-    string: ['关联蛋白', '综合得分', '实验得分'], reactome: ['通路', '编号'],
+    string: ['关联蛋白', '综合得分', '实验得分'], reactome: ['通路', '编号'], kegg: ['通路', '编号', '基因'],
     alphafold: ['预测模型', '平均 pLDDT', '版本'], pdbe: ['PDB / 链', '覆盖率', '分辨率 (Å)'],
   };
   const cells = (row: Record<string, unknown>): unknown[] => {
@@ -54,6 +56,7 @@ function PublicEvidence({ service, zh }: { service: RemoteService; zh: boolean }
       case 'interpro': return [meta.name, meta.accession, meta.type];
       case 'quickgo': return [row.goName || row.goId, row.goEvidence || row.evidenceCode, row.reference];
       case 'string': return [row.preferredName_B, row.score, row.escore];
+      case 'kegg': return [row.name, row.id, (row.genes as string[] || []).join(', ')];
       case 'reactome': return [row.displayName, row.stId];
       case 'alphafold': return [row.modelEntityId, row.globalMetricValue, row.latestVersion];
       case 'pdbe': return [`${text(row.pdb_id)} / ${text(row.chain_id)}`, row.coverage, row.resolution];
@@ -249,7 +252,7 @@ export const ResearcherPanel = forwardRef<ResearcherPanelHandle, {
     showActivity();
     const revision = ++viewRevision.current;
     try {
-      const r = await request<Report>('/jobs', { method: 'POST', body: reportPayload({ model_id: model, accession: protein?.accession || '', protein: protein?.name || chain, sequence: protein ? '' : sequences[chain], structure_pdb: protein ? '' : structurePdb, structure_chain: !protein && structurePdb ? chain : '', focus, analyses: scopes, lang, material_ids: materials.map(m => m.id) }) });
+      const r = await request<Report>('/jobs', { method: 'POST', body: reportPayload({ model_id: model, accession: protein?.pdb_id ? '' : protein?.accession || '', pdb_id: protein?.pdb_id || '', protein: protein?.name || chain, sequence: protein ? '' : sequences[chain], structure_pdb: protein ? '' : structurePdb, structure_chain: protein?.pdb_id ? protein.structure_chain || '' : !protein && structurePdb ? chain : '', focus, analyses: scopes, lang, material_ids: materials.map(m => m.id) }) });
       historyRevision.current++; showActivity(r.id);
       setHistory(rows => [r, ...rows.filter(row => row.id !== r.id)]);
       if (revision === viewRevision.current) { selection.current.select(r.id); setJob(r); setView('report'); sessionStorage.setItem('venus.researcher.job', r.id); callbacks.current.onJobChange?.(r.id, true); }
@@ -288,7 +291,8 @@ export const ResearcherPanel = forwardRef<ResearcherPanelHandle, {
     finally { setBusy(false); }
   }
   const visibleModels = options?.models.filter(m => m.ready && (!options.online || m.free)) || [];
-  const label = protein ? `${protein.accession} · ${protein.organism}` : sequences[chain] ? `${fileName} · ${sequences[chain].length} aa` : '';
+  const label = protein ? `${proteinLabel(protein)} · ${protein.organism}` : sequences[chain] ? `${fileName} · ${sequences[chain].length} aa` : '';
+  const visibleMatches = matches.length ? matches : protein ? [protein] : [];
   return <>
     {toolbarTarget && createPortal(<ComposerSelect label={tr('Model', '模型')} ariaLabel={tr('Research model', '研究模型')} value={job?.model_id || model}
       disabled={busy || !!job || !visibleModels.length} onChange={setModel}
@@ -299,10 +303,10 @@ export const ResearcherPanel = forwardRef<ResearcherPanelHandle, {
     {footerTarget && createPortal(<span className="rr-footer">{job ? `${job.job_number} · ${status(job.status)}${job.status === 'queued' ? ' · ' + tr('Position ', '队列位置 ') + (job.queue?.position ?? '—') : ''}` : label || tr('Choose a protein to get started.', '先选择要研究的蛋白。')}</span>, footerTarget)}
     <div className="rr-panel">
       {loadingJob ? <p role="status">{tr('Loading research…', '正在恢复研究…')}</p> : !job && selection.current.id ? <button type="button" onClick={() => void selectJob(selection.current.id, true)}>{tr('Reload research', '重新加载研究')}</button> : !job ? <div className="rr-start"><div className="rr-intro"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="10" r="6"/><path d="m15 15 6 6M7 10h6M10 7v6"/></svg><h1>{tr('Understand your protein', '全面了解你的蛋白')}</h1><p>{tr('An in-depth report, researched and written by specialist agents.', '专题智能体协作检索与撰写，生成深入、全面的蛋白研究报告。')}</p></div>
-        <form className="rr-search" onSubmit={e => { e.preventDefault(); void search(); }}><label htmlFor="rr-query">{tr('Protein name + organism, or UniProt ID', '蛋白名称与物种，或 UniProt ID')}</label><div><input id="rr-query" placeholder={tr('e.g. P00520 or ABL1 mouse', '例如 P00520，或 ABL1 mouse')} value={query} maxLength={180} disabled={busy} onChange={e => { lookupRevision.current++; setQuery(e.target.value); setProtein(undefined); setMatches([]); setSearched(false); }}/><button disabled={busy || !query.trim()}>{tr('Find protein', '查找蛋白')}</button></div></form>
+        <form className="rr-search" onSubmit={e => { e.preventDefault(); void search(); }}><label htmlFor="rr-query">{tr('Protein name, UniProt ID or PDB ID', '蛋白名称、UniProt ID 或 PDB ID')}</label><div><input id="rr-query" placeholder={tr('e.g. P00520, 4HHB or ABL1 mouse', '例如 P00520、4HHB 或 ABL1 mouse')} value={query} maxLength={180} disabled={busy} onChange={e => { lookupRevision.current++; setQuery(e.target.value); setProtein(undefined); setMatches([]); setSearched(false); }}/><button disabled={busy || !query.trim()}>{tr('Find protein', '查找蛋白')}</button></div></form>
         {!label && <CompletedExamples mode="researcher" lang={lang}/>}
-        {!!matches.length && <div className="rr-matches" aria-label={tr('Matching proteins', '匹配的蛋白')}>{matches.map(m => <button key={m.accession} aria-pressed={protein?.accession === m.accession} onClick={() => { setProtein(m); setSequences({}); setStructurePdb(''); }}><span><strong>{m.name}</strong><small>{m.accession} · {m.organism} · {m.length} aa{m.reviewed ? ' · Swiss-Prot' : ''}</small></span><b>{protein?.accession === m.accession ? '✓' : '＋'}</b></button>)}</div>}
-        {searched && !matches.length && <p>{tr('No match found. Try a UniProt ID or upload a sequence.', '没有找到匹配。请尝试 UniProt ID，或上传序列。')}</p>}
+        {!!visibleMatches.length && <div className="rr-matches" aria-label={tr('Matching proteins', '匹配的蛋白')}>{visibleMatches.map(m => <button key={proteinId(m)} aria-pressed={proteinId(protein) === proteinId(m)} onClick={() => { setProtein(m); setSequences({}); setStructurePdb(''); }}><span><strong>{m.name}</strong><small>{proteinLabel(m)} · {m.organism} · {m.length} aa{m.reviewed ? ' · Swiss-Prot' : ''}</small></span><b>{proteinId(protein) === proteinId(m) ? '✓' : '＋'}</b></button>)}</div>}
+        {searched && !matches.length && <p>{tr('No match found. Try a UniProt or PDB ID, or upload a sequence.', '没有找到匹配。请尝试 UniProt 或 PDB ID，或上传序列。')}</p>}
         {!!Object.keys(sequences).length && <div className="rr-sequence"><label>{fileName}<select aria-label={tr('Protein sequence or chain', '蛋白序列或链')} value={chain} onChange={e => setChain(e.target.value)}>{Object.entries(sequences).map(([id, seq]) => <option key={id} value={id}>{id} · {seq.length} aa</option>)}</select></label><button aria-label={tr('Remove sequence', '移除序列')} onClick={() => { setSequences({}); setStructurePdb(''); setChain(''); }}>×</button></div>}
         <div className="rr-input-links"><button disabled={busy} onClick={() => input.current?.click()}>{tr('Upload FASTA / PDB', '上传 FASTA / PDB')}</button><span>·</span><button onClick={() => setPasteOpen(!pasteOpen)} aria-expanded={pasteOpen}>{tr('Paste a sequence', '粘贴序列')}</button></div>
         {pasteOpen && <div className="rr-paste"><textarea aria-label={tr('Protein sequence', '蛋白序列')} value={paste} maxLength={30000} onChange={e => setPaste(e.target.value)} rows={4} placeholder={'>protein\nMKTAYIAKQRQISFVKSHFSRQLEERLGLIEVQANL'}/><button disabled={busy || !paste.trim()} onClick={() => void parseInput()}>{tr('Use sequence', '使用序列')}</button></div>}

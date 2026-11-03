@@ -17,7 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .services import ServiceError, request
 
-KNOWLEDGE_TOOL_NAMES = ('query_opentargets', 'query_ensembl', 'query_europepmc', 'query_pubchem')
+KNOWLEDGE_TOOL_NAMES = ('query_kegg', 'query_opentargets', 'query_ensembl', 'query_europepmc', 'query_pubchem')
 OT_URL = 'https://api.platform.opentargets.org/api/v4/graphql'
 ENSEMBL_URL = 'https://rest.ensembl.org/'
 EUROPEPMC_URL = 'https://www.ebi.ac.uk/europepmc/webservices/rest/search'

@@ -56,14 +56,14 @@ def classify(name, metadata=None):
         category = 'sequence_analysis'
     elif name.startswith(('calculate_physchem','translate_ncbi','read_fasta')):
         category = 'sequence_analysis'
-    elif name in {'query_ncbi','query_gget','query_opentargets','query_ensembl','query_pubchem'} or name.startswith(('download_','query_sequence_','query_uniprot','search_ncbi','search_uniprot')):
+    elif name in {'query_ncbi','query_gget','query_opentargets','query_ensembl','query_pubchem','query_kegg'} or name.startswith(('download_','query_sequence_','query_uniprot','search_ncbi','search_uniprot')):
         category = 'protein_database'
     else:
         category = 'workspace'
     if category not in CATEGORIES:
         raise ValueError('Unknown tool category: '+str(category))
     en, zh, resource, timeout = CATEGORIES[category]
-    if name in {'query_gget','query_opentargets','query_ensembl','query_europepmc','query_pubchem'}:resource='api:'+name.removeprefix('query_')
+    if name in {'query_gget','query_opentargets','query_ensembl','query_europepmc','query_pubchem','query_kegg'}:resource='api:'+name.removeprefix('query_')
     if name in {'query_ncbi','query_ncbi_blast'} or name.startswith(('download_ncbi','search_ncbi')):resource='api:ncbi'
     if name in {'generate_training_config'}:resource='cpu'
     return {'category': category, 'category_label': en, 'category_label_zh': zh,
