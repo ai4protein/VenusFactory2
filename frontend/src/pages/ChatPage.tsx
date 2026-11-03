@@ -1336,9 +1336,12 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       if (!isCurrentRequest()) return;
       const msg = err instanceof Error ? err.message : "";
       // A preview cannot stand in for a failed authenticated refresh.
-      sessionPreviews.current.forget(sid);
-      setSnapshot(null);
-      snapshotRef.current = null;
+      // A transient background poll must not blank the already loaded chat.
+      if (navigation || /403|404|authentication|forbidden|not found|expired|denied/i.test(msg)) {
+        sessionPreviews.current.forget(sid);
+        setSnapshot(null);
+        snapshotRef.current = null;
+      }
       if (msg.includes("404") || msg.includes("not found") || msg.includes("Not Found")) {
         forgetOwnedSession(sid);
         if (sid === sessionId && routeSessionId !== sid) {
