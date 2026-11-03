@@ -7,7 +7,6 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta
 import hashlib
 import hmac
-import ipaddress
 import math
 import os
 from pathlib import Path
@@ -18,6 +17,7 @@ import time
 from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException
+from backend.web_v2.http_security import client_ip, secure_request
 
 COOKIE = 'vf_online_visitor'
 ADMIN_COOKIE = 'vf_admin_session'
@@ -57,43 +57,6 @@ def password_matches(password, encoded):
         return hmac.compare_digest(actual.hex(), expected)
     except (ValueError, TypeError):
         return False
-
-
-def client_ip(request):
-    # A proxy must overwrite/append XFF and be explicitly trusted. Never trust
-    # a client-supplied leftmost address. Uvicorn must use --no-proxy-headers.
-    peer = request.client.host if request.client else 'unknown'
-    networks = []
-    for value in os.getenv('VENUS_TRUSTED_PROXIES', '').split(','):
-        try: networks.append(ipaddress.ip_network(value.strip()))
-        except ValueError: pass
-    def trusted(value):
-        try: return any(ipaddress.ip_address(value) in n for n in networks)
-        except ValueError: return False
-    if trusted(peer):
-        chain = [x.strip() for x in request.headers.get('x-forwarded-for', '').split(',') if x.strip()] + [peer]
-        for value in reversed(chain):
-            try: ipaddress.ip_address(value)
-            except ValueError: return peer
-            if not trusted(value):
-                peer = value
-                break
-    try:
-        address = ipaddress.ip_address(peer)
-        # Group IPv6 privacy addresses by /64.
-        return str(ipaddress.ip_network(str(address) + '/64', strict=False)) if address.version == 6 else str(address)
-    except ValueError: return peer
-
-
-def secure_request(request):
-    if request.url.scheme == 'https': return True
-    peer = request.client.host if request.client else ''
-    if request.headers.get('x-forwarded-proto', '').strip().lower() != 'https': return False
-    for value in os.getenv('VENUS_TRUSTED_PROXIES', '').split(','):
-        try:
-            if ipaddress.ip_address(peer) in ipaddress.ip_network(value.strip()): return True
-        except ValueError: pass
-    return False
 
 
 class AccessStore:
@@ -361,6 +324,12 @@ class VisitorMiddleware:
         from starlette.requests import Request
         from starlette.responses import Response
         request=Request(scope)
+        from backend.web_v2.http_security import require_same_origin
+        try:
+            require_same_origin(request)
+        except HTTPException as exc:
+            from starlette.responses import JSONResponse
+            return await JSONResponse({'detail': exc.detail}, status_code=exc.status_code)(scope, receive, send)
         value=request.cookies.get(COOKIE,'')
         fresh=not re.fullmatch('[a-f0-9]{64}',value)
         if fresh: value=secrets.token_hex(32)
