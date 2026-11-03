@@ -5,9 +5,11 @@ supervisor inherits credentials at startup. A namespace isolates runtime modes
 and configuration generations while all pools share the same resource limits.
 """
 from __future__ import annotations
+from contextlib import contextmanager
 import fcntl
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import signal
@@ -58,24 +60,34 @@ class QueuedProcess:
     def terminate(self):self.queue.cancel(self.identity)
 
 
-def ensure_pool(q, namespace, env):
+@contextmanager
+def pool_guard(q, namespace):
     folder=q.root/'pools'/namespace;folder.mkdir(parents=True,exist_ok=True,mode=0o700)
     with (folder/'start.lock').open('a') as guard:
         fcntl.flock(guard,fcntl.LOCK_EX)
-        record=folder/'supervisor.json'
-        if record.exists():
-            try:
-                r=json.loads(record.read_text())
-                if process_token(r['pid'])==r['token']:return
-            except (ValueError,KeyError):pass
-        boot=dict(env,VENUS_JOB_QUEUE_ROOT=str(q.root),PYTHONPATH=str(PROJECT)+os.pathsep+str(PROJECT/'src')+os.pathsep+env.get('PYTHONPATH',''))
-        for key in ('VENUS_QUEUE_JOB_ID','VENUS_QUEUE_OWNER','VENUS_QUEUE_LEASE_TOKEN'):boot.pop(key,None)
-        with (folder/'supervisor.log').open('ab') as log:
-            proc=subprocess.Popen([sys.executable,'-u','-m','backend.web_v2.worker_pool','supervise',namespace],env=boot,cwd=PROJECT,
-                                  stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
-        token=process_token(proc.pid)
-        if not token:raise RuntimeError('Worker supervisor did not start')
-        temp=record.with_suffix('.tmp');temp.write_text(json.dumps({'pid':proc.pid,'token':token}));os.replace(temp,record)
+        yield folder
+
+
+def _ensure_pool_locked(q, namespace, env, folder):
+    record=folder/'supervisor.json'
+    if record.exists():
+        try:
+            r=json.loads(record.read_text())
+            if process_token(r['pid'])==r['token']:return
+        except (ValueError,KeyError):pass
+    boot=dict(env,VENUS_JOB_QUEUE_ROOT=str(q.root),PYTHONPATH=str(PROJECT)+os.pathsep+str(PROJECT/'src')+os.pathsep+env.get('PYTHONPATH',''))
+    for key in ('VENUS_QUEUE_JOB_ID','VENUS_QUEUE_OWNER','VENUS_QUEUE_LEASE_TOKEN'):boot.pop(key,None)
+    with (folder/'supervisor.log').open('ab') as log:
+        proc=subprocess.Popen([sys.executable,'-u','-m','backend.web_v2.worker_pool','supervise',namespace],env=boot,cwd=PROJECT,
+                              stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
+    token=process_token(proc.pid)
+    if not token:raise RuntimeError('Worker supervisor did not start')
+    temp=record.with_suffix('.tmp');temp.write_text(json.dumps({'pid':proc.pid,'token':token}));os.replace(temp,record)
+
+
+def ensure_pool(q, namespace, env):
+    with pool_guard(q, namespace) as folder:
+        _ensure_pool_locked(q, namespace, env, folder)
 
 
 def submit_command(command, *, owner, kind, resource, env, cwd, stdout, pass_fds, timeout, priority, metadata, queue,
@@ -98,16 +110,19 @@ def submit_command(command, *, owner, kind, resource, env, cwd, stdout, pass_fds
     spec={'command':[str(x) for x in command],'cwd':str(cwd),'timeout':float(timeout),
           'environment':public,'credential_refs':refs,'leases':leases,'log':log_path}
     from .compute_access import enqueue
-    identity,created=enqueue(q,owner,kind,resource,spec,namespace,metadata=metadata,priority=priority,
-                              session_key=session_key,request_key=request_key,request_hash=request_hash)
-    if created:
-        command_file=q.files(identity)/'command.json'
-        command_file.write_text(json.dumps({**spec,'pass_fds':[]}));command_file.chmod(0o600)
-    try:
-        if os.getenv('VENUS_WORKER_AUTOSTART','1')=='1':ensure_pool(q,namespace,baseline)
-    except BaseException:
-        if created:q.finish(identity,'failed','Worker pool could not start')
-        raise
+    # Admission and pool retirement share a lock: a newly queued task must not
+    # arrive between the supervisor's empty-queue check and its shutdown.
+    with pool_guard(q, namespace) as folder:
+        identity,created=enqueue(q,owner,kind,resource,spec,namespace,metadata=metadata,priority=priority,
+                                  session_key=session_key,request_key=request_key,request_hash=request_hash)
+        if created:
+            command_file=q.files(identity)/'command.json'
+            command_file.write_text(json.dumps({**spec,'pass_fds':[]}));command_file.chmod(0o600)
+        try:
+            if os.getenv('VENUS_WORKER_AUTOSTART','1')=='1':_ensure_pool_locked(q,namespace,baseline,folder)
+        except BaseException:
+            if created:q.finish(identity,'failed','Worker pool could not start')
+            raise
     return identity,QueuedProcess(q,identity)
 
 
@@ -204,10 +219,47 @@ def child(identity, lease):
 
 def work(namespace,family):
     q=JobQueue()
-    while True:
+    stopping=False
+    def stop(*_):
+        nonlocal stopping
+        stopping=True
+    signal.signal(signal.SIGTERM,stop);signal.signal(signal.SIGINT,stop)
+    while not stopping:
         row=q.claim_next(namespace,family)
         if row:execute(q,row)
         else:time.sleep(.2)
+
+
+def stop_workers(workers):
+    for proc in workers.values():
+        if proc.poll() is None:proc.terminate()
+    deadline=time.monotonic()+5
+    for proc in workers.values():
+        try:proc.wait(timeout=max(.01,deadline-time.monotonic()))
+        except subprocess.TimeoutExpired:proc.kill();proc.wait()
+    workers.clear()
+
+
+def idle_timeout():
+    if os.getenv('VENUS_WORKER_AUTOSTART','1')!='1':return 0.
+    try:value=float(os.getenv('VENUS_WORKER_IDLE_TIMEOUT','60'))
+    except ValueError:return 60.
+    return max(1.,value) if math.isfinite(value) and value>0 else 60.
+
+
+def retire_idle_pool(q, namespace, workers, supervisor_guard=None):
+    with pool_guard(q, namespace) as folder:
+        with q.connection() as c:
+            pending=c.execute("SELECT COUNT(*) FROM jobs WHERE namespace=? AND status IN ('queued','running')",(namespace,)).fetchone()[0]
+        if pending:return False
+        stop_workers(workers)
+        record=folder/'supervisor.json'
+        try:
+            if json.loads(record.read_text())['pid']==os.getpid():record.unlink()
+        except (FileNotFoundError,ValueError,KeyError):pass
+        if supervisor_guard is not None:
+            fcntl.flock(supervisor_guard,fcntl.LOCK_UN)
+        return True
 
 
 def supervise(namespace):
@@ -233,13 +285,10 @@ def supervise(namespace):
                     q._recover(c)
                     pending=c.execute("SELECT COUNT(*) FROM jobs WHERE namespace=? AND status IN ('queued','running')",(namespace,)).fetchone()[0]
                 if pending:idle_since=time.monotonic()
+                elif (timeout:=idle_timeout()) and time.monotonic()-idle_since>=timeout and retire_idle_pool(q,namespace,workers,guard):break
                 time.sleep(.5)
         finally:
-            for proc in workers.values():
-                if proc.poll() is None:proc.terminate()
-            for proc in workers.values():
-                try:proc.wait(timeout=5)
-                except subprocess.TimeoutExpired:proc.kill();proc.wait()
+            stop_workers(workers)
             with q.connection(True) as c:q._recover(c)
 
 

@@ -62,7 +62,10 @@ command. It starts fixed research/CPU/GPU/network pools for queued configuration
 namespaces. It does not create a waiting process for every queued job. Each
 worker supervises one task subprocess at a time. Worker supervisors survive the
 launcher; manage them through your service manager and drain running tasks before
-stopping a deployment.
+stopping a deployment. Automatically started pools exit after 60 seconds with no
+queued or running work. The next submission starts a fresh pool. Admission and
+retirement share a process lock, so a task cannot arrive unnoticed during exit.
+Pools with `VENUS_WORKER_AUTOSTART=0` remain running for service management.
 
 Run online separately, with its own runtime directory and MCP port:
 
@@ -77,6 +80,12 @@ training and disabled expensive tools. Explicit legacy path overrides in `.env`
 are respected: check effective paths with `--check` and never point two modes at
 the same session/queue/database directories. Reverse-proxy only the API; keep MCP
 private. Set trusted proxy configuration explicitly when deploying publicly.
+
+Set `VENUS_TRUSTED_PROXIES` to the actual proxy addresses or CIDRs, preserve the
+public `Host`, and have the proxy overwrite forwarded headers. API mutations
+validate the browser Origin (scheme, host and port); job identity cookies use
+Secure on HTTPS, including TLS terminated by a trusted proxy. Direct command-line
+clients can omit Origin; authentication and ownership checks still apply.
 
 The current single-host task store is SQLite WAL with process-safe claims and
 leases. `--api-workers` adds API processes, not GPU replicas. This is not yet a
@@ -115,6 +124,7 @@ run outside the request process. Long orchestration waits do not hold a GPU slot
 | `VENUS_WORKERS_CPU` | 2 | CPU worker processes per pool |
 | `VENUS_WORKERS_GPU` | 1 | GPU worker processes per pool |
 | `VENUS_WORKERS_API` | 4 | Network/coordinator workers per pool |
+| `VENUS_WORKER_IDLE_TIMEOUT` | 60 | Idle seconds before an automatically started pool exits |
 | `VENUS_QUEUE_RESEARCH_SLOTS` | 2 | Research concurrency in the shared queue |
 | `VENUS_QUEUE_CPU_SLOTS` | 2 | CPU concurrency |
 | `VENUS_QUEUE_GPU_SLOTS` | 1 | GPU concurrency |
@@ -159,7 +169,9 @@ local transport/configuration problem; inspect that before blaming data sources.
 
 ```bash
 python scripts/check_layout.py
+python scripts/check_repository.py
 python scripts/sync_platform_docs.py --check
+PYTHONPATH=src python -m pytest -q tests/test_http_security.py tests/test_worker_lifecycle.py tests/test_repository_state_exclusions.py
 PYTHONPATH=src python -m pytest -q tests/test_research_project_delivery.py tests/test_external_mcp_dispatch.py tests/test_tool_runtime.py tests/test_durable_tasks.py
 cd frontend
 npm run build
