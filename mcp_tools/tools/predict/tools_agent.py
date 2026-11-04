@@ -34,7 +34,7 @@ class CalculatePhyschemSequenceInput(BaseModel):
 
 @tool("calculate_physchem_from_sequence", args_schema=CalculatePhyschemSequenceInput)
 def calculate_physchem_from_sequence_tool(sequence: str, output_file: Optional[str] = None, out_dir: Optional[str] = None) -> str:
-    """Calculate length, molecular weight (Da), theoretical pI, GRAVY and composition directly from a pasted protein sequence. Local CPU only; no FASTA file, structure prediction, GPU or network is required. Prefer this tool when the user supplies a sequence in chat."""
+    """Calculate protein sequence physicochemical properties: length, molecular weight (Da), isoelectric point (pI), GRAVY and composition. Local CPU only; no FASTA file, structure prediction, GPU or network is required. Prefer this tool when the user supplies a sequence in chat."""
     return calculate_physchem_from_sequence(sequence, output_file=output_file, out_dir=out_dir)
 
 

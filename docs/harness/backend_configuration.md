@@ -17,6 +17,42 @@ Web 的 Agent 和 Scientist 共用 `configs/harness/free_execution_catalog.json`
 
 `configs/rsi/model_access.json` 的 schema 2 指向上述模型目录，实现页面可选项与真实请求的统一授权。OpenRouter 仍要求明确的 `:free` 模型及零费用响应记录，不进行付费回退。
 
+## Progressive tool discovery
+
+Local and online chat use the same native harness dispatcher and discovery protocol.
+Deployment policy filters visibility and checks permission again before execution; it
+does not select a different conversation implementation. Existing online quotas,
+session isolation and resource limits still apply.
+
+1. The initial prompt contains only enabled category names and brief summaries:
+   biology databases, web/literature, computational tools, Factory-trained models,
+   RSI methods, model development, session files/code, and manuals/skills.
+2. `search_tools(category="compute", query="ProSST-2048")` returns a bounded page
+   of capability names and short descriptions. Omit both category and query to
+   inspect categories. Broad cross-category searches return category choices.
+   Exact queries that resolve to one category remain supported for older clients.
+   If only part of a long query matches, the best summary matches are labeled as
+   partial. A topic with no direct match in guides or model registries returns
+   their search entry points, without claiming any content was read.
+3. `describe_tool(name)` loads the selected input contract and matching model
+   selectors; `call_tool(name, arguments)` executes it through normal admission,
+   quota and queue checks. A provider that emits a discovered MCP name directly
+   is routed back through this broker; it still requires prior inspection and
+   current permission. Other namespaces remain rejected.
+4. For guidance, search the `guides` category, then find a relevant manual section
+   or skill. Only `read_skill(skill_id)` loads that skill's contents.
+
+Tool search indexes names and short summaries, not full schemas or skill bodies.
+Plugins should provide a meaningful first sentence and may set
+`metadata.discovery_category` to one of these IDs:
+`databases`, `literature`, `compute`, `factory_models`, `rsi`, `training`,
+`files`, `guides`. Otherwise the shared scheduler taxonomy and model provenance
+determine the category. Platform model aliases come from the same enabled registry
+used by Model Plaza; model variants are checked again before execution.
+
+No tool or model becomes public merely by appearing in a skill or an RSI result.
+Scientist artifacts continue to require the platform's publication review.
+
 ## Harness 与模型兼容性
 
 安装了 Harness、配置了 Key，并不代表所有组合均已通过在线验证。选择接口的 `readiness` 标记的是静态准入；实际工具调用还取决于供应商当前端点、工具调用能力及限流状态。

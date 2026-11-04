@@ -69,11 +69,13 @@ def test_unmounted_models_are_not_offered():
     assert not service.search("LigandMPNN",kind="models",tool_catalog=[])["results"]
 
 
-def test_short_description_does_not_limit_search_index():
-    tool=SimpleNamespace(name="unfamiliar_tool", description="Generic title.\n\nSupports specialized kidney assay.")
-    d=ToolDisclosure({tool.name:tool},schema=lambda t:{"properties":{"method":{"enum":["rare_model"]}}},allowed=lambda t:True)
+def test_discovery_index_uses_only_name_and_summary():
+    tool = SimpleNamespace(name="unfamiliar_tool", description="Generic title.\n\nSupports specialized kidney assay.", metadata={"discovery_category": "compute"})
+    d = ToolDisclosure({tool.name: tool}, schema=lambda t: {"properties": {"method": {"enum": ["rare_model"]}}}, allowed=lambda t: True)
     for query in ("kidney", "rare_model"):
-        assert d.metadata("search_tools",{"query":query})["tools"] == [{"name":tool.name,"description":"Generic title."}]
+        assert d.metadata("search_tools", {"category": "compute", "query": query})["tools"] == []
+    assert d.metadata("search_tools", {"category": "compute", "query": "unfamiliar_tool"})["tools"] == [
+        {"name": tool.name, "description": "Generic title."}]
 
 
 def test_skill_discovery_is_bounded_and_prompt_does_not_grow(monkeypatch):

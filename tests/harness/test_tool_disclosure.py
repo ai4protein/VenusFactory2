@@ -140,9 +140,94 @@ def test_overview_stays_bounded_and_tracks_enabled_tools():
     enabled = {'protein_model_0'}
     c = catalog(10000, enabled)
     overview = c.overview()
-    assert sum(g['count'] for g in overview['categories']) == 1
+    assert sum(g['tool_count'] for g in overview['categories']) == 1
     assert len(json.dumps(overview)) < 1500
     assert 'inputSchema' not in json.dumps(overview)
     enabled.clear()
     assert c.overview()['categories'] == []
-    assert c.metadata('search_tools', {})['overview']['categories'] == []
+    assert c.metadata('search_tools', {})['categories'] == []
+
+def grouped_catalog(enabled=None, schema=None):
+    descriptions = {
+        'query_uniprot': 'Find protein records.\n\nArgs:\nsecret_schema_word',
+        'predict_custom_model': 'Predict protein properties.',
+        'calculate_protein': 'Calculate protein properties.',
+        'search_generated_capabilities': 'Find protein research methods.',
+        'list_skills': 'Find scientific workflow guides.\n\nprivate_skill_body',
+    }
+    categories = ['databases', 'factory_models', 'compute', 'rsi', 'guides']
+    tools = {name: SimpleNamespace(name=name, description=desc, metadata={'discovery_category': cat})
+             for (name, desc), cat in zip(descriptions.items(), categories)}
+    return ToolDisclosure(tools, schema=schema or (lambda t: {'type': 'object', 'properties': {}}),
+                          allowed=lambda t: enabled is None or t.name in enabled)
+
+
+def test_initial_overview_contains_categories_only_and_broad_search_narrows():
+    c = grouped_catalog()
+    for args in ({}, {'query': 'protein'}):
+        result = c.metadata('search_tools', args)
+        assert result['level'] == 'categories' and result['tools'] == []
+        encoded = json.dumps(result)
+        assert not any(name in encoded for name in c.mapping)
+        assert 'secret_schema_word' not in encoded and 'private_skill_body' not in encoded
+    assert len(json.dumps(catalog(10000).overview())) < 1500
+
+
+def test_category_filter_and_short_search_never_read_schemas():
+    def must_not_read(tool):
+        raise AssertionError('Schema read before selecting a capability')
+    c = grouped_catalog(schema=must_not_read)
+    result = c.metadata('search_tools', {'category': 'databases', 'query': 'protein'})
+    assert result['level'] == 'capabilities' and result['category'] == 'databases'
+    assert result['tools'] == [{'name': 'query_uniprot', 'description': 'Find protein records.'}]
+    assert c.metadata('search_tools', {'category': 'databases', 'query': 'secret_schema_word'})['tools'] == []
+    fallback = c.metadata('search_tools', {'category': 'guides', 'query': 'private_skill_body'})
+    assert fallback['match_mode'] == 'category_navigation'
+    assert 'private_skill_body' not in json.dumps(fallback)
+    assert c.metadata('search_tools', {'category': 'guides'})['tools'][0]['name'] == 'list_skills'
+
+
+@pytest.mark.parametrize('args', [{'category': []}, {'category': None}, {'category': 'invalid'}, {'category': True}])
+def test_category_validation(args):
+    with pytest.raises(DisclosureError):
+        grouped_catalog().metadata('search_tools', args)
+
+
+def test_same_discovery_flow_for_local_and_online_with_live_permissions(monkeypatch):
+    enabled = {'query_uniprot', 'calculate_protein'}
+    results = []
+    for mode in ('local', 'online'):
+        monkeypatch.setenv('WEBUI_V2_MODE', mode)
+        c = grouped_catalog(enabled)
+        results.append((c.overview(), c.metadata('search_tools', {'category': 'compute'})))
+        c.metadata('describe_tool', {'name': 'calculate_protein'})
+        enabled.remove('calculate_protein')
+        assert c.metadata('search_tools', {'category': 'compute'})['tools'] == []
+        with pytest.raises(DisclosureError, match='unavailable'):
+            c.resolve('call_tool', {'name': 'calculate_protein', 'arguments': {}})
+        enabled.add('calculate_protein')
+    assert results[0] == results[1]
+
+
+def test_requested_platform_model_alias_remains_searchable_in_category(monkeypatch):
+    from mcp_tools.tools.discovery import platform_models as registry
+    c = ToolDisclosure({'zero_shot_mutation_structure_prediction': SimpleNamespace(
+        name='zero_shot_mutation_structure_prediction', description='Score sequence mutations.')},
+        schema=lambda t: {}, allowed=lambda t: True)
+    monkeypatch.setattr(registry, 'platform_models', lambda query, names: [
+        (10, 'prosst', {'name': 'ProSST-2048', 'tools': ['zero_shot_mutation_structure_prediction']})])
+    result = c.metadata('search_tools', {'category': 'compute', 'query': 'ProSST-2048'})
+    assert result['tools'][0]['name'] == 'zero_shot_mutation_structure_prediction'
+    assert 'ProSST-2048' in result['tools'][0]['description']
+    assert c.metadata('search_tools', {'category': 'databases', 'query': 'ProSST-2048'})['tools'] == []
+
+@pytest.mark.parametrize("query", ["molecular weight isoelectric point protein sequence", "physicochemical properties"])
+def test_physchem_is_discoverable_from_its_brief_description(query):
+    import ast
+    from pathlib import Path
+    source = Path(__file__).resolve().parents[2] / "mcp_tools/tools/predict/tools_agent.py"
+    func = next(n for n in ast.parse(source.read_text()).body
+                if getattr(n, "name", "") == "calculate_physchem_from_sequence_tool")
+    tool = SimpleNamespace(name="calculate_physchem_from_sequence", description=ast.get_docstring(func))
+    c = ToolDisclosure({tool.name: tool}, schema=lambda t: {}, allowed=lambda t: True)
+    assert c.metadata("search_tools", {"category": "compute", "query": query})["tools"][0]["name"] == tool.name

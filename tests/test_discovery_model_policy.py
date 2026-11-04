@@ -45,10 +45,12 @@ def test_online_policy_keeps_scoring_remote_search_but_not_local_discovery(monke
     assert len(wanted) == 7 and all(c['available'] for c in wanted)
     assert not next(c for c in cards if c['name'] == 'VenusMine')['available']
     assert not next(c for c in cards if c['name'] == 'ProSST-2048 · Backbone')['available']
-    for name in ('bindcraft', 'boltzgen', 'diffdock'):
+    for name in ('bindcraft', 'boltzgen'):
         card = next(c for c in cards if c['adapter'] == 'external:' + name)
         assert not card['available'] and card['disabled_reason'] == 'local_only'
         assert not policy.is_tool_allowed(name + ('_dock' if name == 'diffdock' else '_design'))
+    diffdock = next(c for c in cards if c['adapter'] == 'external:diffdock')
+    assert diffdock.get('disabled_reason') != 'local_only' and policy.is_tool_allowed('diffdock_dock')
     for name in ('query_ncbi_blast','query_foldseek_remote'):
         card = workflow_tools.card(name)
         assert card['category'] == 'discovery' and card['available']
