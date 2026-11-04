@@ -26,6 +26,7 @@ class ModelOption:
     inference_controls: dict | None = None
     max_output_tokens: int | None = None
     protocols: tuple[str, ...] | None = None
+    listed_by_default: bool = True
 
     def public(self):
         return {
@@ -56,7 +57,7 @@ def resolve_credential(model, credential_toml=None):
 
 
 class ExecutionCatalog:
-    def __init__(self, root, default_profile, *, path=None, legacy_credential=None, registry=None, free_only=False, include_configured=False):
+    def __init__(self, root, default_profile, *, path=None, legacy_credential=None, registry=None, free_only=False, include_configured=False, include_unlisted=False):
         self.free_only = free_only
         self.hide_nonfree = include_configured and free_only
         self.registry = registry or builtin_registry()
@@ -74,8 +75,6 @@ class ExecutionCatalog:
             if self.enabled_harnesses is not None and (not isinstance(self.enabled_harnesses, list) or not self.enabled_harnesses or any(h not in known for h in self.enabled_harnesses) or len(set(self.enabled_harnesses)) != len(self.enabled_harnesses)):
                 raise ValueError("Invalid configured harnesses")
             for row in data["models"]:
-                if row.get("enabled", True) is not True:
-                    continue
                 if set(row) - {"id", "label", "binding", "credential_toml", "inference_controls", "enabled", "pricing", "max_output_tokens", "protocols"}:
                     raise ValueError("Unknown model catalog field")
                 mid = row["id"]
@@ -100,7 +99,7 @@ class ExecutionCatalog:
                 if protocols is not None and (not isinstance(protocols, list) or not protocols or any(p not in {'chat_completions', 'responses'} for p in protocols)):
                     raise ValueError('Invalid model protocols')
                 self.models[mid] = ModelOption(mid, str(row["label"]), ModelBinding(**row["binding"]), bridge, controls,
-                                               ceiling, tuple(protocols) if protocols is not None else None)
+                                               ceiling, tuple(protocols) if protocols is not None else None, row.get("enabled", True) is True)
         if include_configured:
             # Official endpoints are opt-in by model ID, never enabled by an
             # unrelated pre-existing API key or an example catalog placeholder.
@@ -135,6 +134,16 @@ class ExecutionCatalog:
             self.default_model = configured_default["model_id"]
             self.default_profile = replace(default_profile, harness=configured_default["harness"], model=self.models[self.default_model].binding)
 
+        if not include_unlisted:
+            from .llm_policy import listed
+            from mcp_tools.tools.capability_policy import CapabilityStore
+            saved = CapabilityStore().rows()
+            self.models = {mid: m for mid, m in self.models.items()
+                           if listed(m.binding.model, m.binding.base_url, m.listed_by_default, rows=saved)}
+            if self.default_model not in self.models:
+                # Never silently fall back from an unpublished free model to a paid API.
+                self.default_model = next((m.id for m in self.models.values() if free_model(m.binding)), "")
+
     def select(self, selection=None):
         selection = selection or {"harness": self.default_profile.harness, "model_id": self.default_model}
         if set(selection) != {"harness", "model_id"} or selection["model_id"] not in self.models:
@@ -142,6 +151,8 @@ class ExecutionCatalog:
         if self.enabled_harnesses is not None and selection["harness"] not in self.enabled_harnesses:
             raise ValueError("Executor is disabled in the host configuration")
         model = self.models[selection["model_id"]]
+        from .llm_policy import assert_listed
+        assert_listed(model.binding.model, model.binding.base_url, model.listed_by_default)
         if selection["harness"] not in {s.id for s in self.registry.specs()}:
             raise ValueError("Unknown executor")
         budget = replace(self.default_profile.budget, **(model.inference_controls or {}))

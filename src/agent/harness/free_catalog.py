@@ -10,13 +10,17 @@ DEFAULT_PATH = Path(__file__).resolve().parents[3] / 'configs/harness/free_execu
 def catalog_path():
     return Path(os.environ.get('VENUS_EXECUTION_CATALOG') or DEFAULT_PATH)
 
-def free_routes(path=None):
+def free_routes(path=None, *, include_unlisted=False):
     raw = Path(path or catalog_path()).read_bytes()
     data = json.loads(raw)
     routes = []
     identities = set()
+    from .llm_policy import listed
+    from mcp_tools.tools.capability_policy import CapabilityStore
+    saved = CapabilityStore().rows()
     for row in data['models']:
-        if row.get('enabled', True) is not True:
+        binding = row['binding']
+        if not include_unlisted and not listed(binding['model'], binding['base_url'], row.get('enabled', True) is True, rows=saved):
             continue
         price = row.get('pricing')
         if price is None:

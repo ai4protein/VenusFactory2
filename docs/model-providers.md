@@ -1,6 +1,6 @@
 # Configure conversational model APIs
 
-For a local deployment, fill in a provider's API key and exact model ID in the repository's `.env`, or in **Administration → Environment**. Restart the backend and workers together, then start a new conversation and choose that model. Existing conversations keep their original model binding.
+For a local deployment, fill in a provider's API key and exact model ID in the repository's `.env`, or in **Administration → Environment → LLMs**. Expand the provider card to edit its API key, model IDs, endpoint and limits. Restart the backend and workers together, then start a new conversation and choose that model. Existing conversations keep their original model binding.
 
 ```dotenv
 OPENAI_API_KEY=your-api-key
@@ -42,3 +42,13 @@ Online mode continues to use only the enabled zero-price routes in `configs/harn
 `model-config.yaml` remains available for legacy callers; new Web conversations use the shared execution catalog and these environment settings.
 
 Official references: [OpenAI API](https://developers.openai.com/api/reference/overview), [Claude compatibility](https://platform.claude.com/docs/en/cli-sdks-libraries/libraries/openai-sdk), [xAI API](https://docs.x.ai/developers/rest-api-reference/inference), [GLM compatibility](https://docs.bigmodel.cn/cn/guide/develop/openai/introduction), [MiniMax compatibility](https://platform.minimax.io/docs/api-reference/text-openai-api).
+
+## Publish or unpublish an LLM
+
+**Administration → Environment → LLMs → LLM availability** lists registered routes and explicitly configured official models. Switch each LLM on or off for the current deployment. Local and online switches are stored separately and take effect without a restart. Entering new API configuration still requires restarting the backend and workers.
+
+The **Free** badge comes from the zero-input/zero-output prices in the server execution catalog, even when a model is unpublished. It is not inferred from a model name or an API key. Online publication requires a configured credential and a free route; an official paid API cannot be enabled online through this switch.
+
+Agent, Scientist and Researcher share these controls. Unpublished LLMs disappear from new selections. Existing conversations and running relays recheck publication before subsequent model requests; already submitted provider requests are not cancelled. No paid fallback is selected automatically.
+
+Administration loads this list on entry or manual refresh; there is no timer polling. Publication changes are revision checked and audited without recording credentials.

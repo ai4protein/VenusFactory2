@@ -464,6 +464,8 @@ class ScienceGoalService:
         from agent.harness.provider_config import online
         if online() and not free_model(profile.model):
             raise ValueError("Select a free model")
+        from agent.harness.llm_policy import assert_listed
+        assert_listed(profile.model.model, profile.model.base_url)
         resolve_credential(profile.model, credential_path)
         check = builtin_registry().preflight(profile, self.runtime_paths())
         if not check["ready"]:

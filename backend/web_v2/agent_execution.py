@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 WEB_HARNESSES = {"kimi-code", "langgraph", "deepseek-harness", "codex", "claude-code"}
 
 
-def catalog():
+def catalog(*, for_admin=False):
     profile = Profile.from_dict(json.loads((ROOT / "configs/harness/free_science_goal.json").read_text()))
     profile = replace(
         profile,
@@ -25,7 +25,7 @@ def catalog():
         budget=replace(profile.budget, thinking="disabled", output_tokens=4096),
     )
     path = Path(os.environ.get("VENUS_EXECUTION_CATALOG") or ROOT / "configs/harness/free_execution_catalog.json")
-    return ExecutionCatalog(ROOT, profile, path=path, free_only=online(), include_configured=True)
+    return ExecutionCatalog(ROOT, profile, path=path, free_only=online() and not for_admin, include_configured=True, include_unlisted=for_admin)
 
 
 def runtime_paths():
@@ -82,6 +82,8 @@ def admit(state, selection=None):
         if selection is not None and selection != saved["selection"]:
             raise ValueError("Start a new conversation to change its execution profile")
         profile = Profile.from_dict(saved["profile"])
+        from agent.harness.llm_policy import assert_listed
+        assert_listed(profile.model.model, profile.model.base_url)
         if profile.harness not in WEB_HARNESSES or profile.mode != "science_agent":
             raise ValueError("Unsupported stored Agent profile")
         if online() and not free_model(profile.model):

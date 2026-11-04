@@ -53,3 +53,21 @@
 .prefs-empty h2 { font-size:17px; color:#34383f; }
 @media(max-width:1050px) { .prefs-navigation { align-items:stretch; flex-direction:column; gap:12px; } .prefs-page .prefs-navigation input { width:100%; } }
 @media(max-width:600px) { .prefs-header { padding-top:0; } .prefs-header h1 { font-size:22px; } .prefs-navigation nav { display:grid; grid-template-columns:repeat(2,1fr); } .prefs-row { grid-template-columns:1fr; gap:10px; } .prefs-savebar { flex-wrap:wrap; } .prefs-savebar>div:first-child { flex-basis:100%; } .prefs-savebar>div:first-child:empty { display:none; } .prefs-intro { margin-bottom:20px; } }
+
+.prefs-llms { margin-bottom:28px; }
+.prefs-llms-heading { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:12px; }
+.prefs-llms-heading h3 { margin:0; font-size:14px; font-weight:600; }
+.prefs-llms-heading p { margin:5px 0 0; font-size:12px; color:#717680; }
+.prefs-llms-list { max-height:400px; overflow:auto; border:1px solid #e5e7eb; border-radius:6px; }
+.prefs-llm-row { display:grid; grid-template-columns:minmax(0,1fr) auto 38px; align-items:center; gap:16px; padding:13px 14px; border-bottom:1px solid #eef0f2; }
+.prefs-llm-row:last-child { border-bottom:0; }
+.prefs-llm-name { min-width:0; }
+.prefs-llm-name strong { display:block; overflow-wrap:anywhere; font-size:13px; font-weight:500; }
+.prefs-llm-name small { display:block; margin-top:4px; color:#858991; font-size:11px; }
+.prefs-llm-badges { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:8px; font-size:11px; color:#717680; }
+.prefs-free { background:#eef7f1; color:#37734d; padding:3px 7px; border-radius:4px; font-weight:500; }
+.prefs-provider-state { display:flex; align-items:center; gap:14px; }
+.prefs-provider-state small { font-size:11px; color:#5b7567; font-weight:400; }
+.prefs-disclosure summary strong { font-weight:500; }
+.prefs-llms .prefs-error { color:#a04141; font-size:13px; }
+@media(max-width:600px) { .prefs-llm-row { gap:10px; grid-template-columns:minmax(0,1fr) 78px 34px; } .prefs-llm-badges { gap:4px; } }

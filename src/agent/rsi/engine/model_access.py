@@ -19,6 +19,11 @@ class ModelAccessDenied(ValueError):
 
 
 def authorize_model(*, model, base_url, protocol, output_tokens):
+    from agent.harness.llm_policy import assert_listed
+    try:
+        assert_listed(model, base_url)
+    except (ValueError, TypeError, AttributeError) as exc:
+        raise ModelAccessDenied(str(exc)) from None
     from agent.harness.provider_config import authorize_local
     try:
         configured = authorize_local(model, base_url, protocol, output_tokens)

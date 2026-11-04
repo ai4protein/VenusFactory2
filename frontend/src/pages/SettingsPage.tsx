@@ -2,11 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useLang } from "../lib/i18n";
 import { useDocumentMeta } from "../lib/useDocumentMeta";
 import "../settings.css";
+import { AdminLLMs } from "../components/AdminLLMs";
+import { LLM_PROVIDERS, llmProvider, llmSettingLabel } from "../lib/llmSettings";
 
 const STRINGS = {
   en: {
     title: "Environment variables", subtitle: "Model connections and runtime configuration.", search: "Search settings…",
-    models: "AI models", searchGroup: "Web search", limits: "Usage limits", advanced: "Advanced",
+    models: "LLMs", searchGroup: "Web search", limits: "Usage limits", advanced: "Advanced",
     providers: "Model providers", responses: "Response preferences", searchServices: "Search services",
     limitsGroup: "Task and conversation limits", advancedGroup: "System settings",
     modelHint: "API connections used by Agent, Scientist and Researcher.",
@@ -24,7 +26,7 @@ const STRINGS = {
   },
   zh: {
     title: "环境变量", subtitle: "模型连接与运行配置。", search: "搜索设置…",
-    models: "AI 模型", searchGroup: "网络检索", limits: "使用限额", advanced: "高级设置",
+    models: "LLMs", searchGroup: "网络检索", limits: "使用限额", advanced: "高级设置",
     providers: "模型服务", responses: "回答偏好", searchServices: "检索服务",
     limitsGroup: "任务与对话限额", advancedGroup: "系统设置",
     modelHint: "Agent、Scientist 和 Researcher 使用的 API 连接。",
@@ -116,7 +118,7 @@ export function isSecretSetting(key: string) {
 }
 function groupFor(key: string): Group {
   if (key.startsWith("WEBUI_V2_AGENT_")) return "limits";
-  if (key.startsWith("CHAT_") || ["DMXAPI_API_KEY", "OPENROUTER_API_KEY"].includes(key)) return "models";
+  if (key.startsWith("CHAT_") || llmProvider(key) || key === "VENUS_EXECUTION_CATALOG") return "models";
   if (SEARCH_KEYS.has(key)) return "search";
   if (key.endsWith("_LIMIT") || ["SEARCH_MAX_RESULTS", "MAX_STEP_RETRIES", "TOOL_EXECUTION_TIMEOUT"].includes(key)) return "limits";
   return "advanced";
@@ -135,6 +137,7 @@ export function SettingsPage({ readonly = false, admin = false }: { readonly?: b
   const [entries, setEntries] = useState<EnvEntry[]>([]);
   const [original, setOriginal] = useState<EnvEntry[]>([]);
   const [revision, setRevision] = useState("");
+  const [llmRevision, setLlmRevision] = useState(0);
   const [visibility, setVisibility] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(!readonly);
   const [saving, setSaving] = useState(false);
@@ -150,6 +153,8 @@ export function SettingsPage({ readonly = false, admin = false }: { readonly?: b
     { id: "limits", label: t.limits, hint: t.limitsHint }, { id: "advanced", label: t.advanced, hint: t.advancedHint }
   ];
   function label(key: string) {
+    const providerLabel = llmSettingLabel(key, zh);
+    if (providerLabel) return providerLabel;
     if (LABELS[key]) return LABELS[key][zh ? 1 : 0];
     const retention = key.match(/^TEMP_OUTPUTS_(.+)_TTL_DAYS$/);
     if (retention) {
@@ -164,7 +169,7 @@ export function SettingsPage({ readonly = false, admin = false }: { readonly?: b
       const response = await fetch(admin ? "/api/admin/env" : "/api/settings/env", {cache:"no-store", credentials:"same-origin"});
       if (!response.ok) throw new Error(t.loadError);
       const data = await response.json();
-      setEntries(data.entries || []); setOriginal(data.entries || []); setRevision(data.revision || ""); setVisibility({});
+      setEntries(data.entries || []); setOriginal(data.entries || []); setRevision(data.revision || ""); setVisibility({}); setLlmRevision(v => v + 1);
     } catch { setError(t.loadError); }
     finally { setLoading(false); }
   }
@@ -185,16 +190,16 @@ export function SettingsPage({ readonly = false, admin = false }: { readonly?: b
       const response = await fetch(admin ? "/api/admin/env" : "/api/settings/env", { method: "POST", credentials:"same-origin", headers: { "Content-Type": "application/json", ...(admin ? {"X-Venus-Access":"1"} : {}) }, body: JSON.stringify({ entries: changed, revision }) });
       if (!response.ok) throw new Error(response.status === 409 ? t.conflict : t.saveError);
       const data = await response.json();
-      const savedEntries = entries.map(e => admin && isSecretSetting(e.key) && e.value ? {...e,value:"••••••••"} : e); setEntries(savedEntries); setOriginal(savedEntries); setRevision(data.revision || ""); setVisibility({}); setMessage(t.saved);
+      const savedEntries = entries.map(e => admin && isSecretSetting(e.key) && e.value ? {...e,value:"••••••••"} : e); setEntries(savedEntries); setOriginal(savedEntries); setRevision(data.revision || ""); setVisibility({}); setLlmRevision(v => v + 1); setMessage(t.saved);
     } catch (err) { setError(err instanceof Error ? err.message : t.saveError); }
     finally { setSaving(false); }
   }
   const search = query.trim().toLowerCase();
-  const visible = entries.filter(e => search ? `${e.key} ${label(e.key)} ${e.section || ""}`.toLowerCase().includes(search) : groupFor(e.key) === active);
+  const visible = entries.filter(e => search ? `${e.key} ${label(e.key)} ${llmProvider(e.key)?.[1] || ""} ${e.section || ""}`.toLowerCase().includes(search) : groupFor(e.key) === active);
   const sections = new Map<string, EnvEntry[]>();
   visible.forEach(entry => {
     const group = groupFor(entry.key);
-    const section = group === "models" ? (isSecretSetting(entry.key) ? t.providers : t.responses) : group === "search" ? t.searchServices : group === "limits" ? (entry.key.startsWith("WEBUI_V2_AGENT_") ? (zh ? "Agent 上下文" : "Agent context") : t.limitsGroup) : (SECTION_LABELS[entry.section || ""]?.[zh ? 1 : 0] || entry.section || t.advancedGroup);
+    const section = group === "models" ? (llmProvider(entry.key)?.[1] || t.responses) : group === "search" ? t.searchServices : group === "limits" ? (entry.key.startsWith("WEBUI_V2_AGENT_") ? (zh ? "Agent 上下文" : "Agent context") : t.limitsGroup) : (SECTION_LABELS[entry.section || ""]?.[zh ? 1 : 0] || entry.section || t.advancedGroup);
     sections.set(section, [...(sections.get(section) || []), entry]);
   });
   function row(entry: EnvEntry) {
@@ -240,9 +245,10 @@ export function SettingsPage({ readonly = false, admin = false }: { readonly?: b
       <div className="prefs-body" aria-busy={loading}>
         <div className="prefs-intro"><h2>{search ? t.results : groups.find(g => g.id === active)?.label}</h2>
           {!search && <p>{groups.find(g => g.id === active)?.hint}</p>}</div>
+        {admin && !loading && (active === "models" || search) && <AdminLLMs refreshKey={llmRevision} query={search}/>}
         {loading ? <p className="prefs-empty" role="status">{t.loading}</p> : !visible.length ? <div className="prefs-empty"><p>{error || t.noMatch}</p>{search && <button className="prefs-button" onClick={() => setQuery("")}>{t.clear}</button>}</div> :
-          Array.from(sections, ([section, rows]) => !search && active === "advanced" ? <details className="prefs-section prefs-disclosure" key={section}>
-            <summary>{section}<span aria-hidden="true">＋</span></summary><div>{rows.map(row)}</div></details> :
+          Array.from(sections).sort(([a], [b]) => { const rank = (name: string) => { const i = LLM_PROVIDERS.findIndex(p => p[1] === name); return i < 0 ? 99 : i; }; return rank(a) - rank(b); }).map(([section, rows]) => !search && (active === "advanced" || active === "models") ? <details className="prefs-section prefs-disclosure" key={section}>
+            <summary><strong>{section}</strong><div className="prefs-provider-state">{rows.some(e => isSecretSetting(e.key) && !!e.value) && <small>{t.configured}</small>}<span aria-hidden="true">＋</span></div></summary><div>{rows.map(row)}</div></details> :
             <section className="prefs-section" key={section}><h3>{section}</h3>{rows.map(row)}</section>)}
       </div>
       <footer className="prefs-savebar"><div aria-live="polite">{error ? <span className="prefs-error" role="alert">{error}</span> : message || (dirty ? `${changed.length} ${!zh && changed.length === 1 ? "unsaved change" : t.changes}` : "")}</div>

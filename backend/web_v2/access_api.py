@@ -212,8 +212,34 @@ async def change_capability(payload: CapabilityChange,user=Depends(admin)):
     return {'ok':True,'revision':revision,'mode':data['mode']}
 
 
+@router.get('/admin/llms')
+async def llms(user=Depends(admin)):
+    from backend.web_v2.llm_admin import inventory
+    return await call(inventory)
+
+
+@router.put('/admin/llms')
+async def change_llm(payload: CapabilityChange, user=Depends(admin)):
+    from backend.web_v2.llm_admin import publish
+    try:
+        revision = await run_in_threadpool(publish, payload.key, payload.enabled, payload.revision, user['email'])
+    except LookupError:
+        raise HTTPException(404, 'LLM not found') from None
+    except PermissionError as exc:
+        raise HTTPException(422, str(exc)) from None
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from None
+    store = AccessStore()
+    with store.connect(True) as c:
+        store.log(c, user['email'], 'llm.publish' if payload.enabled else 'llm.unpublish', payload.key)
+    return {'ok': True, 'revision': revision}
+
+
 def secret_env_key(key):
-    return any(part in key.upper() for part in ('KEY','TOKEN','SECRET','PASSWORD','CREDENTIAL'))
+    key = key.upper()
+    if key.endswith(('_TOKENS', '_TOKEN_TTL_HOURS', '_TOKEN_PRICE_JSON')):
+        return False
+    return any(part in key for part in ('KEY','TOKEN','SECRET','PASSWORD','CREDENTIAL'))
 
 
 @router.get('/admin/env')
