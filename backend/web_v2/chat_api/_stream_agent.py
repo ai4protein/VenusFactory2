@@ -135,9 +135,13 @@ async def _stream_agent(state, text, attachment_paths, *, retry=False, interacti
     preview_call = None
     reader = None
     preparing_context = True
+    preview_text_seen = set()
 
     async def preview_text(call, text):
         if not preparing_context:
+            if call not in preview_text_seen and not text.strip():
+                return
+            preview_text_seen.add(call)
             await queue.put(("preview", {"kind": "text", "text": text, "call": call}))
 
     async def read_worker(proc):
@@ -175,6 +179,9 @@ async def _stream_agent(state, text, attachment_paths, *, retry=False, interacti
                 lambda: _is_cancelled(sid),
             )
             preparing_context = False
+            if gateway_type is EvidenceGateway:
+                from agent.harness.chat_tool_budget import ChatToolBudget
+                relay.chat_tool_budget = ChatToolBudget(profile.budget.tool_calls)
             state["agent_context"] = context_info
             # Persist the exact retry input once preparation succeeds. Keep the
             # original working history untouched until an answer completes.

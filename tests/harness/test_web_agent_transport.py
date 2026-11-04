@@ -46,10 +46,11 @@ def test_web_native_lifecycle(tmp_path, monkeypatch, durable_chat_driver):
                 assert not body.get("tools")
             else:
                 assert len(body["tools"]) > 20  # Actual repository science toolbox.
-            if body["messages"][-1]["content"] == "cancel this turn":
+            current_user = body["messages"][-1]["content"].split("\n\nCurrent user request:\n", 1)[-1]
+            if current_user == "cancel this turn":
                 waiting.set()
                 await release.wait()
-            if body["messages"][-1]["content"] == "leave this turn":
+            if current_user == "leave this turn":
                 departed.set()
                 await finish_departed.wait()
             chunk = {

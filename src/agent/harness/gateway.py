@@ -47,12 +47,14 @@ def inspect_response(raw, streaming):
 class EvidenceGateway(ModelGateway):
     supports_free_response_evidence = True
 
-    def __init__(self, *, request_recovery="none", on_text=None, **kwargs):
+    def __init__(self, *, request_recovery="none", on_text=None, tool_budget=None, **kwargs):
         from .empty_response_recovery import POLICY as EMPTY_POLICY
         from .request_recovery import POLICY
 
         if request_recovery not in {"none", POLICY, EMPTY_POLICY}:
             raise ValueError("Unknown request recovery policy")
+        from .chat_tool_budget import ChatToolBudget
+        self.chat_tool_budget = ChatToolBudget(tool_budget) if tool_budget is not None else None
         self.on_text = on_text
         self._rate_limited = False
         self.request_recovery = request_recovery
@@ -80,7 +82,12 @@ class EvidenceGateway(ModelGateway):
                 incoming.pop(key)
             if self.on_text is not None:
                 incoming = {**incoming, "stream": True}
+            budget_info = {}
+            if self.chat_tool_budget is not None:
+                incoming, budget_info = self.chat_tool_budget.prepare(
+                    incoming, final_call=self.calls >= self.policy.max_calls - 1)
             payload, metadata = self.policy.apply(incoming)
+            metadata.update(budget_info)
             if local_fields:
                 metadata['local_only_fields'] = local_fields
             from .scientist_policy import request_policy_witness
@@ -174,6 +181,9 @@ class EvidenceGateway(ModelGateway):
                                     delivered, aliases = normalize(delivered, client_stream, payload.get('tools', []))
                                     if aliases:
                                         self.record({'event':'tool_name_normalized','call':call,'aliases':aliases})
+                                    if self.chat_tool_budget is not None:
+                                        delivered, budget_info = self.chat_tool_budget.deliver(delivered, client_stream)
+                                        self.record({'event': 'chat_tool_budget', 'call': call, **budget_info})
                                     return web.Response(
                                         body=delivered,
                                         content_type="text/event-stream" if client_stream else "application/json",

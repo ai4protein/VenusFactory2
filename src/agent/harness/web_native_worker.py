@@ -288,6 +288,7 @@ async def run(request, *, tools=None, event_sink=None):
     if request.get("instructions"):
         instructions = request["instructions"] + "\n" + ("Respond in Chinese." if request.get("lang") == "zh" else "Respond in English.")
     instructions += "\n\n" + INTERACTION_GUIDANCE + "\n\n" + SECURITY_INSTRUCTIONS + "\n\n" + GUIDANCE
+    instructions += '\n\nCurrent enabled capability overview (examples; not exhaustive):\n' + json.dumps(disclosure.overview(), ensure_ascii=False)
     task = Task(
         workspace, capability, output, public_value(native_prompt(request), workspace), instructions, frozenset(disclosure.names), "web_tools.py", "chat"
     )

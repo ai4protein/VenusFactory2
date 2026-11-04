@@ -135,3 +135,14 @@ async def test_shared_protocol_dispatches_to_original_tool_and_records_real_iden
     assert calls == ['ACDE']
     assert any(e.get('tool')=='protein_length' and e.get('status')=='completed' for e in events)
     assert any(e.get('kind')=='completed' for e in events)
+
+def test_overview_stays_bounded_and_tracks_enabled_tools():
+    enabled = {'protein_model_0'}
+    c = catalog(10000, enabled)
+    overview = c.overview()
+    assert sum(g['count'] for g in overview['categories']) == 1
+    assert len(json.dumps(overview)) < 1500
+    assert 'inputSchema' not in json.dumps(overview)
+    enabled.clear()
+    assert c.overview()['categories'] == []
+    assert c.metadata('search_tools', {})['overview']['categories'] == []
