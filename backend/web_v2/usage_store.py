@@ -8,6 +8,8 @@ from pathlib import Path
 import sqlite3
 import time
 import uuid
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 LOG = logging.getLogger(__name__)
 MODES = {'agent', 'scientist', 'researcher', 'tools'}
@@ -18,12 +20,12 @@ def normalize_usage(usage):
     def number(*names):
         for name in names:
             value = usage.get(name)
-            if type(value) is int and value >= 0: return value
+            if type(value) is int and 0 <= value <= 2**63-1: return value
         return None
     inp = number('prompt_tokens', 'input_tokens')
     out = number('completion_tokens', 'output_tokens')
     total = number('total_tokens')
-    if total is None and inp is not None and out is not None: total = inp + out
+    if total is None and inp is not None and out is not None and inp + out <= 2**63-1: total = inp + out
     return inp, out, total
 
 
@@ -124,7 +126,9 @@ class UsageStore:
                 SUM(CASE WHEN kind='model' THEN output_tokens END) AS output_tokens,
                 SUM(CASE WHEN kind='model' THEN total_tokens END) AS total_tokens,
                 SUM(kind='model' AND total_tokens IS NOT NULL) AS reported_calls,
-                SUM(kind='model' AND total_tokens IS NULL) AS unreported_calls
+                SUM(kind='model' AND total_tokens IS NULL AND status!='running') AS unreported_calls,
+                SUM(kind='model' AND total_tokens IS NULL AND status='running') AS pending_calls,
+                MAX(CASE WHEN kind='model' AND total_tokens IS NOT NULL THEN updated END) AS last_reported_at
                 FROM usage_events WHERE {where}''', args).fetchone())
             models = [dict(r) for r in c.execute(f'''SELECT name,provider,harness,COUNT(*) AS calls,
                 SUM(status='failed') AS failed,COUNT(total_tokens) AS reported_calls,
@@ -134,13 +138,15 @@ class UsageStore:
             tools = [dict(r) for r in c.execute(f'''SELECT name,COUNT(*) AS calls,SUM(status='failed') AS failed,
                 AVG(latency_ms) AS latency_ms FROM usage_events WHERE {where} AND kind='tool'
                 GROUP BY name ORDER BY calls DESC LIMIT 100''',args)]
-            daily = [dict(r) for r in c.execute(f'''SELECT date(created,'unixepoch') AS day,
+            zone = ZoneInfo(os.getenv('VENUS_QUOTA_TIMEZONE', 'Asia/Shanghai'))
+            c.create_function('usage_day', 1, lambda stamp: datetime.fromtimestamp(stamp, zone).date().isoformat())
+            daily = [dict(r) for r in c.execute(f'''SELECT usage_day(created) AS day,
                 SUM(kind='model') AS model_calls,SUM(kind='tool') AS tool_calls,
                 SUM(CASE WHEN kind='model' THEN total_tokens END) AS total_tokens
                 FROM usage_events WHERE {where} GROUP BY day ORDER BY day''',args)]
             since = c.execute('SELECT MIN(created) FROM usage_events').fetchone()[0]
         return {'summary':summary,'models':models,'tools':tools,'daily':daily,'recording_since':since,
-                'deployment':os.getenv('WEBUI_V2_MODE','local'),'at':time.time()}
+                'deployment':os.getenv('WEBUI_V2_MODE','local'),'timezone':str(zone),'at':time.time()}
 
     def events(self, days=7, mode='', session_id='', kind='', offset=0, limit=25):
         self.reconcile()

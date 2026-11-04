@@ -132,6 +132,7 @@ class EvidenceGateway(ModelGateway):
                 retry = False
                 shape = None
                 provider_evidence = None
+                raw = bytearray()
                 try:
                     async with asyncio.timeout(max(0, deadline - time.monotonic())):
                         async with self.client.stream(
@@ -188,6 +189,9 @@ class EvidenceGateway(ModelGateway):
                     self.record({"event": "transport_error", "call": call, "error_type": error_type})
                     return web.json_response({"error": "incomplete upstream response"}, status=502)
                 finally:
+                    if not usage and raw:
+                        from .provider_usage import reported_usage
+                        usage = reported_usage(bytes(raw), bool(payload.get("stream")))
                     self.record(
                         {
                             "event": "response",

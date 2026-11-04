@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useLang } from '../lib/i18n';
 import './admin-usage.css';
 
-type Counters = { model_calls: number; tool_calls: number; input_tokens: number | null; output_tokens: number | null; total_tokens: number | null; unreported_calls: number; reported_calls: number; failed: number };
+type Counters = { model_calls: number; tool_calls: number; input_tokens: number | null; output_tokens: number | null; total_tokens: number | null; unreported_calls: number; pending_calls: number; last_reported_at: number | null; reported_calls: number; failed: number };
 type Group = { name: string; provider?: string; harness?: string; calls: number; failed: number; reported_calls?: number; total_tokens?: number | null; latency_ms: number | null };
 type Overview = { deployment: string; at: number; recording_since: number | null; summary: Counters; models: Group[]; tools: Group[] };
 type Session = { session_id: string; title: string; mode: string; status: string; messages: number | null; runs: number; updated: number; model_calls?: number; tool_calls?: number; total_tokens?: number | null };
@@ -11,7 +11,7 @@ type Job = { id: string; kind: string; resource: string; status: string; created
 type Page<T> = { items: T[]; total: number; active?: number; offset: number; limit: number };
 type Api = <T>(path: string, method?: string, body?: unknown) => Promise<T>;
 
-export function AdminUsage({ api }: { api: Api }) {
+export function AdminUsage({ api, refreshKey = 0, onRefresh }: { api: Api; refreshKey?: number; onRefresh?: () => void }) {
   const { lang } = useLang(); const zh = lang === 'zh'; const t = (en: string, cn: string) => zh ? cn : en;
   const [days,setDays]=useState(7), [mode,setMode]=useState(''), [session,setSession]=useState('');
   const [tab,setTab]=useState('overview'), [page,setPage]=useState(0), [refresh,setRefresh]=useState(0);
@@ -29,8 +29,7 @@ export function AdminUsage({ api }: { api: Api }) {
       tab==='jobs' ? api<Page<Job>>('/usage/jobs?'+query+`&offset=${offset}`) : Promise.resolve(undefined),
     ]).then(([o,s,e,j])=>{ if(alive){setOverview(o);setSessions(s);setEvents(e);setJobs(j);} }).catch(e=>{if(alive)setError(e.message);}).finally(()=>{if(alive)setLoading(false);});
     return ()=>{alive=false;};
-  },[api,days,mode,session,tab,page,refresh]);
-  useEffect(()=>{const id=window.setInterval(()=>{if(document.visibilityState==='visible')setRefresh(n=>n+1);},30000);return()=>clearInterval(id);},[]);
+  },[api,days,mode,session,tab,page,refresh,refreshKey]);
   const number=(n: number | null | undefined)=> n==null ? '—' : n.toLocaleString(zh?'zh-CN':'en-US');
   const time=(n: number)=>new Date(n*1000).toLocaleString(zh?'zh-CN':'en-GB');
   const duration=(n: number | null)=>n==null?'—':`${(n/1000).toFixed(1)} s`;
@@ -40,12 +39,12 @@ export function AdminUsage({ api }: { api: Api }) {
   const pagerTotal=tab==='sessions'?sessions?.total:tab==='jobs'?jobs?.total:events?.total;
   const groups=(rows:Group[],models:boolean)=><div className="access-admin-table"><table><thead><tr><th>{models?t('Model','模型'):t('Tool','工具')}</th><th>{t('Calls','调用次数')}</th><th>{t('Failures','失败')}</th>{models&&<th>Tokens</th>}<th>{t('Avg. duration','平均耗时')}</th></tr></thead><tbody>{rows.map((r,i)=><tr key={`${r.name}-${i}`}><td>{r.name}{models&&<small>{[r.provider,r.harness].filter(Boolean).join(' · ')}</small>}</td><td>{number(r.calls)}</td><td>{number(r.failed)}</td>{models&&<td>{number(r.total_tokens)}<small>{r.reported_calls}/{r.calls} {t('reported','已上报')}</small></td>}<td>{duration(r.latency_ms)}</td></tr>)}</tbody></table>{!rows.length&&<p className="access-admin-empty">{t('No records in this period','此时间范围内暂无记录')}</p>}</div>;
   return <section className="admin-usage" aria-label={t('Platform usage','平台用量')} aria-busy={loading}>
-    <div className="usage-filters"><label>{t('Period','时间范围')}<select value={days} onChange={e=>{setDays(Number(e.target.value));setPage(0);}}>{[1,7,30,90].map(n=><option key={n} value={n}>{zh?`最近 ${n} 天`:`Last ${n} ${n===1?'day':'days'}`}</option>)}</select></label><label>{t('Mode','模式')}<select value={mode} onChange={e=>{setMode(e.target.value);setPage(0);}}><option value="">{t('All modes','所有模式')}</option>{['agent','scientist','researcher','tools'].map(m=><option key={m} value={m}>{m==='tools'?t('Other tools','其他工具'):m[0].toUpperCase()+m.slice(1)}</option>)}</select></label><button disabled={loading} onClick={()=>setRefresh(n=>n+1)}>{loading?t('Updating…','更新中…'):t('Refresh','刷新')}</button><span className="usage-updated">{overview?(overview.deployment==='online'?'Online':'Local'):''}{overview&&` · ${t('Updated','更新于')} ${time(overview.at)}`}</span></div>
+    <div className="usage-filters"><label>{t('Period','时间范围')}<select value={days} onChange={e=>{setDays(Number(e.target.value));setPage(0);}}>{[1,7,30,90].map(n=><option key={n} value={n}>{zh?`最近 ${n} 天`:`Last ${n} ${n===1?'day':'days'}`}</option>)}</select></label><label>{t('Mode','模式')}<select value={mode} onChange={e=>{setMode(e.target.value);setPage(0);}}><option value="">{t('All modes','所有模式')}</option>{['agent','scientist','researcher','tools'].map(m=><option key={m} value={m}>{m==='tools'?t('Other tools','其他工具'):m[0].toUpperCase()+m.slice(1)}</option>)}</select></label><button disabled={loading} onClick={()=>onRefresh ? onRefresh() : setRefresh(n=>n+1)}>{loading?t('Updating…','更新中…'):t('Refresh','刷新')}</button><span className="usage-updated">{overview?(overview.deployment==='online'?'Online':'Local'):''}{overview&&` · ${t('Updated','更新于')} ${time(overview.at)}`}</span></div>
     {session&&<div className="usage-session-filter"><span>{t('Conversation','会话')} <code>{session}</code></span><button onClick={()=>{setSession('');setPage(0);}} aria-label={t('Clear conversation filter','清除会话筛选')}>×</button></div>}
     {error&&<p role="alert" className="access-error">{error}</p>}
     {overview&&<><div className="usage-cards">
-      <article><span>{t('Reported tokens','已上报 Token')}</span><strong>{number(overview.summary.total_tokens)}</strong><small>{t('Input','输入')} {number(overview.summary.input_tokens)} · {t('Output','输出')} {number(overview.summary.output_tokens)}</small></article>
-      <article><span>{t('Model requests','模型请求')}</span><strong>{number(overview.summary.model_calls||0)}</strong><small>{number(overview.summary.unreported_calls||0)} {t('without token counts','次未上报 Token')}</small></article>
+      <article><span>{t('Reported tokens','已上报 Token')}</span><strong>{number(overview.summary.total_tokens)}</strong><small>{t('Input','输入')} {number(overview.summary.input_tokens)} · {t('Output','输出')} {number(overview.summary.output_tokens)}</small>{overview.summary.last_reported_at&&<small>{t('Last reported','最后上报')} {time(overview.summary.last_reported_at)}</small>}</article>
+      <article><span>{t('Model requests','模型请求')}</span><strong>{number(overview.summary.model_calls||0)}</strong><small>{number(overview.summary.pending_calls||0)} {t('awaiting usage','次等待上报')} · {number(overview.summary.unreported_calls||0)} {t('without token counts','次未提供 Token')}</small></article>
       <article><span>{t('Conversations','会话')}</span><strong>{number(sessions?.total)}</strong><small>{number(sessions?.active||0)} {t('active','个运行中')}</small></article>
       <article><span>{t('Tool calls','工具调用')}</span><strong>{number(overview.summary.tool_calls||0)}</strong><small>{number(overview.summary.failed||0)} {t('failed requests / calls','次请求／调用失败')}</small></article>
     </div><p className="usage-note">{overview.recording_since ? t('Usage recording since ','用量记录始于 ')+time(overview.recording_since) : t('Usage will appear after the next model request or tool call.','下一次模型请求或工具调用后开始显示用量。')} · {t('— means not reported. Provider totals are used without adding cache or reasoning breakdowns again.','— 表示未上报。采用供应商总量，不重复累加缓存或推理明细。')}</p></>}

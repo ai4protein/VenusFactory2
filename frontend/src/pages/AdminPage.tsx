@@ -30,6 +30,8 @@ export function AdminPage() {
   const tab = adminTabs.includes(requestedTab) ? requestedTab : 'usage';
   const setTab = (next: AdminTab) => setSearchParams({ tab: next }, { replace: true });
   const backToChat = <Link className="access-admin-back" to={`/${lang}/agent/chat`}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m12 5-7 7 7 7M5 12h14"/></svg><span>{t('Back to chat', '返回对话')}</span></Link>;
+  const [usageRevision, setUsageRevision] = useState(0);
+  const refreshUsage = () => setUsageRevision(n => n + 1);
   const [me, setMe] = useState<Admin>(), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [error, setError] = useState('');
   const [address, setAddress] = useState(''), [password, setPassword] = useState('');
   const [grants, setGrants] = useState<Grant[]>([]), [admins, setAdmins] = useState<Admin[]>([]);
@@ -64,10 +66,10 @@ export function AdminPage() {
     {issued && <div className="access-key" role="status"><strong>{t('New key', '新额度 key')} · {issued.email}</strong><code>{issued.key}</code><div className="access-actions"><button onClick={() => { void navigator.clipboard.writeText(issued.key).catch(() => setError(t('Select the key to copy it.', '请选择上方 key 手动复制。'))); }}>{t('Copy', '复制')}</button><button onClick={() => setIssued(undefined)}>{t('Done', '完成')}</button><span>{t('Copy now; it will not be shown again.', '请复制保存，关闭后不再显示。')}</span></div></div>}
     {confirm && <section className="access-editor"><p>{confirm.kind === 'grant' ? t('Revoke this key?', '停用并撤销此 key？') : t('Delete this administrator?', '删除此管理员？')} <strong>{confirm.email}</strong></p><div className="access-actions"><button className="access-danger" disabled={busy} onClick={() => void act(async () => { await api(`/${confirm.kind === 'grant' ? 'grants' : 'admins'}/${confirm.id}`, 'DELETE'); setConfirm(undefined); await refresh(); })}>{t('Confirm', '确认')}</button><button onClick={() => setConfirm(undefined)}>{t('Cancel', '取消')}</button></div></section>}
     {tab === 'capabilities' && <AdminCapabilities api={api}/>}
-    {tab === 'usage' && <><AdminAllowances api={api}/><AdminUsage api={api}/></>}
+    {tab === 'usage' && <><AdminAllowances api={api} refreshKey={usageRevision} onRefresh={refreshUsage}/><AdminUsage api={api} refreshKey={usageRevision} onRefresh={refreshUsage}/></>}
     {tab === 'environment' && <SettingsPage admin/>}
     {tab === 'grants' && <>
-      <AdminAllowances api={api}/>
+      <AdminAllowances api={api} refreshKey={usageRevision} onRefresh={refreshUsage}/>
       <div className="access-admin-top"><input aria-label={t('Search quota keys', '搜索额度 key')} value={query} onChange={e => setQuery(e.target.value)} placeholder={t('Search email, name or institution', '搜索邮箱、姓名或单位')}/><button className="access-primary" onClick={() => { setGrantForm(emptyGrant()); setIssued(undefined); }}>{t('Create key', '生成 key')}</button></div>
       {grantForm && <section className="access-editor"><h2>{grantForm.id ? t('Edit allowance', '修改额度') : t('Create allowance', '创建额度')}</h2><form onSubmit={e => { e.preventDefault(); void act(async () => { const { id, ...payload } = grantForm; const result = await api<{ email: string; key: string | null }>('/grants' + (id ? '/' + id : ''), id ? 'PUT' : 'POST', payload); if (result.key) setIssued({ email: result.email, key: result.key }); setGrantForm(undefined); await refresh(); }); }}>
         <label>{t('Email', '邮箱')}<input type="email" required value={grantForm.email} onChange={e => setGrantForm({ ...grantForm, email: e.target.value })}/></label>

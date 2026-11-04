@@ -445,6 +445,7 @@ class ResponsesGateway(ModelGateway):
             {"event": "request", "call": call, "total_deadline_s": self.timeout_s, "transport": "web_responses_live_text_v1" if self.on_text is not None else TRANSPORT, **metadata}
         )
         status, completed, error_type, evidence = None, False, None, {}
+        raw = bytearray()
         try:
             async with (
                 asyncio.timeout(self.timeout_s),
@@ -494,6 +495,11 @@ class ResponsesGateway(ModelGateway):
             self.record({"event": "transport_error", "call": call, "error_type": error_type})
             return web.json_response({"error": "incomplete upstream response"}, status=502)
         finally:
+            if not evidence.get("usage") and raw:
+                from .provider_usage import reported_usage
+                usage = reported_usage(bytes(raw), bool(payload.get("stream")), responses=True)
+                if usage:
+                    evidence["usage"] = usage
             self.record(
                 {
                     "event": "response",
