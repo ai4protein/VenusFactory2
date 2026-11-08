@@ -137,6 +137,8 @@ class ToolDisclosure:
         query, limit, offset = arguments.get('query', ''), arguments.get('limit', 8), arguments.get('offset', 0)
         if not isinstance(query, str) or len(query) > 200 or type(limit) is not int or not 1 <= limit <= 20 or type(offset) is not int or offset < 0:
             raise DisclosureError('Use query up to 200 characters, limit 1-20, and nonnegative offset.')
+        # Search hints belong to this query; inspected interfaces remain turn-scoped.
+        self._model_matches.clear()
         self._navigation_queries.clear()
         try:
             category = category_id(arguments.get('category', ''))

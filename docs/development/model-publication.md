@@ -54,6 +54,8 @@ result supplies the next description call, then the selected reader receives the
 original topic as suggested arguments. Model listing uses the shared bilingual
 matcher, so a phrase such as "Scientist model <entry ID>" still finds the record.
 The first discovery response contains no model input schemas or full catalog.
+Reader topics and model suggestions are scoped to the latest search. A new search
+clears earlier hints; it does not remove the requirement to inspect a tool before use.
 
 
 Agent discovery and Model Plaza share a short-lived metadata snapshot. Its

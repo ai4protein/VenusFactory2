@@ -175,3 +175,23 @@ def test_described_model_choices_are_bounded_and_refresh_live_availability(monke
         "name": "Variant 26", "arguments": {"model_name": "Variant 26"}
     }]
     assert second["model_count"] == 1
+
+
+@pytest.mark.parametrize("next_search", [
+    {"category": "compute"},
+    {"category": "compute", "query": "zero_shot_mutation_structure_prediction"},
+])
+def test_new_search_discards_previous_model_choice_hint(next_search):
+    tool = tools()[0]
+    disclosure = ToolDisclosure(
+        {tool.name: tool}, schema=lambda t: t.parameters, allowed=lambda _: True
+    )
+    disclosure.metadata("search_tools", {"query": "ProSST-2048"})
+    first = disclosure.metadata("describe_tool", {"name": tool.name})
+    assert first["matching_models"] == [{
+        "name": "ProSST-2048", "arguments": {"model_name": "ProSST-2048"}
+    }]
+    disclosure.metadata("search_tools", next_search)
+    second = disclosure.metadata("describe_tool", {"name": tool.name})
+    choices = {row["arguments"]["model_name"] for row in second["matching_models"]}
+    assert {"ProSST-2048", "ProSST-128", "ESM-IF1"} <= choices
