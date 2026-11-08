@@ -56,12 +56,12 @@ def source(order=AA, *, reference=REF, mapping=False, mutation=None):
     )
 
 
-def test_frozen_reference_values_match_the_pinned_primary_package():
-    import Bio
+def test_frozen_reference_values_match_the_pinned_primary_source():
     from Bio.Data import IUPACData
     from Bio.SeqUtils import ProtParamData
 
-    assert Bio.__version__ == "1.87"
+    # The extraction release is provenance, not a runtime version restriction.
+    # Verify the complete source bytes and values even after a package upgrade.
     catalog = reference_catalog()
     assert catalog["catalog_sha256"] == "d29135c8d338f850b4cdab6292e4e16608ebfeab17eb999a5279da395905daa3"
     for key, module, symbol in [
