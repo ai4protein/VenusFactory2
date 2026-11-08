@@ -54,6 +54,9 @@ Researcher keeps job ownership and recovery in `backend/web_v2/research_jobs.py`
 The long-form coordinator schedules retrieval and specialist writers; document
 acceptance and rendering belong to `research_documents.py`. API views and ZIP
 exports use that document layer, which does not call models or launch jobs.
+Completed-chapter counts and delivery status are derived from current review
+receipts for both views. Rechecking a report preserves its saved drafts, evidence,
+request budget and queue lifecycle; it never rewrites the historical checkpoint.
 Source-review receipts and revision feedback belong to `research_source_review.py`;
 author and editor modules consume those receipts without owning the reviewer.
 

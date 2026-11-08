@@ -14,7 +14,7 @@ from mcp_tools.tools.runtime_tool_policy import is_online_mode
 from mcp_tools.tools.search import web_provider
 from mcp_tools.tools.research import services as public_services
 from backend.web_v2 import research_predictions
-from .research_documents import cite_report
+from .research_documents import MINIMUM_CHAPTERS, cite_report
 
 SCOPES = [
     ('identity', 'Protein identity', '蛋白身份', False),
@@ -78,7 +78,7 @@ def model_options():
     default = default or next((r['id'] for r in rows if r['ready']), '')
     from backend.web_v2.research_longform import chapter_options
     return {'models': rows, 'default_model': default, 'analyses': analysis_options(), 'online': is_online_mode(),
-            'prediction_panel': research_predictions.options(), 'public_services': public_services.options(), 'chapters': chapter_options(), 'minimum_chapters': 5,
+            'prediction_panel': research_predictions.options(), 'public_services': public_services.options(), 'chapters': chapter_options(), 'minimum_chapters': MINIMUM_CHAPTERS,
             'web_search': web_provider.search_options(os.getenv('VENUS_REPORT_SEARCH_PROVIDER', 'auto'))}
 
 

@@ -18,7 +18,7 @@ from agent.harness.model_availability import ModelServiceUnavailable
 
 # Document helpers remain importable here for existing report scripts.
 from .research_documents import (
-    text_size, chapter_body, normalize_source_citations, contains_long_sequence, chapter_document,
+    MINIMUM_CHAPTERS, text_size, chapter_body, normalize_source_citations, contains_long_sequence, chapter_document,
     chapter_ready, remember_chapter, chapter_text, audit_chapter, assemble,
 )
 
@@ -32,7 +32,6 @@ CHAPTERS = [
     ('engineering_design', 'Protein engineering & design', '蛋白工程与设计', 'Published engineering studies, mutagenesis, directed evolution, DMS and validated sequence-function relationships; compare measured changes, baselines, experimental conditions and tradeoffs; distinguish proposed from demonstrated interventions.', 'engineering directed evolution mutagenesis design'),
     ('datasets_applications', 'Datasets, applications & reproducibility', '数据集、应用与可复现性', 'Public sequence, structure, activity and DMS datasets, models and source code, licenses and access conditions, applications, assay comparability, evidence gaps and reproducible next analyses. Do not invent downloadable data or licensing.', 'dataset benchmark application reproducibility'),
 ]
-MINIMUM_CHAPTERS = 5
 MAX_MODEL_CALLS = 48
 HARD_MODEL_CALL_LIMIT = 96
 LEGACY_MODEL_CALL_LIMIT = 18

@@ -132,23 +132,12 @@ class ResearchJobs:
             status = 'failed'
         if status == 'completed' and state.get('minimum_met') is False:
             status = 'incomplete'
-        if state.get('review') and state.get('review_status', 'completed') == 'completed':
-            from .research_documents import editor_audit, review_ready
-            lang = row['payload'].get('lang', 'en')
-            state['review_audit'] = editor_audit(state['review'], [source['id'] for source in state.get('sources', [])], lang)
-            if not review_ready(state, lang):
-                state.update(review_status='partial', partial=True)
-        if state.get("evidence_review_required"):
-            from .research_documents import chapter_ready
-            for chapter in state.get("chapters", []):
-                if chapter.get("status") == "completed" and not chapter_ready(chapter, state.get("sources", [])):
-                    chapter["status"] = "partial"
-                    state["partial"] = True
-            if status == "completed" and (state.get("partial") or state.get("phase") == "incomplete"):
-                status = "incomplete"
+        from .research_documents import assemble, report_view
+        lang = row['payload'].get('lang', 'en')
+        state = report_view({**state, 'status': status}, lang)
+        status = state['status']
         if state.get('chapters') and state.get('report'):
-            from .research_documents import assemble
-            state['report'] = assemble(state, row['payload'].get('lang', 'en'))
+            state['report'] = assemble(state, lang)
         from backend.web_v2.research_longform import report_model_call_limit
         unfinished = any(c.get('status') != 'completed' for c in state.get('chapters', []))
         retry_sections = status == 'completed' and (

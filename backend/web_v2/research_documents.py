@@ -5,10 +5,14 @@ saved report never starts retrieval, model calls or background work.
 """
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import re
 import time
+
+
+MINIMUM_CHAPTERS = 5
 
 
 def text_size(text, lang):
@@ -147,6 +151,51 @@ def cite_report(text, sources):
     text = re.sub(r'https?://[^\s<>]+', '', text)
     known = {r['id']: r for r in sources}
     return re.sub(r'\[(S\d+)\]', lambda m: f"[{m[1]}]({known[m[1]]['url']})" if m[1] in known and known[m[1]].get('url') else ('[' + m[1] + ']' if m[1] in known else '[source unavailable]'), text)
+
+
+def report_view(state, lang):
+    """Reconcile a saved document without altering its checkpoint or lifecycle.
+
+    Stored completion counts are observations from the previous execution. The
+    owner API and dossier must count only chapters accepted by the current rules.
+    A queue failure, cancellation or running state is never promoted to success.
+    """
+    value = copy.deepcopy(state)
+    sources = value.get("sources", [])
+    chapters = value.get("chapters")
+    demoted = False
+    if chapters is not None:
+        completed = 0
+        for chapter in chapters:
+            if value.get("evidence_review_required"):
+                chapter["evidence_review_required"] = value["evidence_review_required"]
+            accepted = chapter_ready(chapter, sources)
+            completed += accepted
+            if chapter.get("status") == "completed" and not accepted:
+                chapter["status"] = "partial"
+                demoted = True
+        # A synthesis may have used a chapter whose receipt is no longer valid,
+        # even if the chapter's prose and its saved signature have not changed.
+        if demoted and value.get("review"):
+            value["review_status"] = "partial"
+        minimum = value.get("minimum_chapters", MINIMUM_CHAPTERS)
+        minimum = max(MINIMUM_CHAPTERS, minimum) if type(minimum) is int else MINIMUM_CHAPTERS
+        value.update(completed_chapters=completed, minimum_chapters=minimum,
+                     minimum_met=completed >= minimum)
+        requires_editor = value.get("workflow") == "specialist_research_v2" or bool(value.get("evidence_review_required"))
+        value["partial"] = bool(value.get("partial") or value.get("collection_partial")
+                                or completed != len(chapters) or not value["minimum_met"]
+                                or (requires_editor and not review_ready(value, lang)))
+    if value.get("review"):
+        value["review_audit"] = editor_audit(value["review"], [source["id"] for source in sources], lang)
+        if value.get("review_status", "completed") == "completed" and not review_ready(value, lang):
+            value.update(review_status="partial", partial=True)
+    if value.get("partial") or value.get("minimum_met") is False:
+        if value.get("status") == "completed":
+            value["status"] = "incomplete"
+        if value.get("phase") == "completed":
+            value["phase"] = "incomplete"
+    return value
 
 
 def assemble(state, lang):

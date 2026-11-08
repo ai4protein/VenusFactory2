@@ -12,6 +12,9 @@ def build_dossier(report, inputs=None):
     """Return a seekable archive. Never follow paths or fetch URLs in evidence."""
     if not report.get("report"):
         raise ValueError("The report is not ready yet")
+    from .research_documents import report_view
+    lang = inputs.get("lang", "en") if inputs else "en"
+    report = report_view(report, lang)
     target = tempfile.SpooledTemporaryFile(max_size=2 * 1024 * 1024, mode="w+b")
     files = []
     total = 0
@@ -31,7 +34,6 @@ def build_dossier(report, inputs=None):
                 add(name, json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False))
 
             from .research_documents import assemble
-            lang = inputs.get("lang", "en") if inputs else "en"
             body = assemble(report, lang) if report.get("workflow") == "specialist_research_v2" else report["report"]
             add("report.md", body)
             from .research_documents import editor_audit, review_ready
