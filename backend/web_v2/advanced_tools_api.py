@@ -40,12 +40,8 @@ from mcp_tools.common.common_utils import (
 from mcp_tools.common.constants import LLM_MODELS
 from mcp_tools.common.file_handlers import validate_and_normalize_fasta_content
 from mcp_tools.common.llm_helpers import LLMConfig, call_llm_api, get_api_key, get_chat_base_url
-try:
-    from mcp_tools.models.pretrained.design.proteinmpnn.protein_mpnn_run import proteinmpnn_run
-    from mcp_tools.models.pretrained.design.proteinmpnn.protein_mpnn_utils import parse_PDB
-except ModuleNotFoundError:
-    from mcp_tools.models.pretrained.design.proteinmpnn.protein_mpnn_run import proteinmpnn_run
-    from mcp_tools.models.pretrained.design.proteinmpnn.protein_mpnn_utils import parse_PDB
+from mcp_tools.models.pretrained.design.proteinmpnn.protein_mpnn_run import proteinmpnn_run
+from mcp_tools.models.pretrained.design.proteinmpnn.protein_mpnn_utils import parse_PDB
 
 
 router = APIRouter(prefix="/api/advanced-tools", tags=["advanced-tools-v2"])

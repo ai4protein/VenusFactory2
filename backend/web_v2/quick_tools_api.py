@@ -35,36 +35,19 @@ from mcp_tools.common.file_handlers import validate_and_normalize_fasta_content
 from mcp_tools.common.prediction_runners import run_zero_shot_prediction
 from mcp_tools.common.data_processors import prepare_top_residue_heatmap_data
 from mcp_tools.common.visualization import generate_plotly_heatmap
-try:
-    from backend.web_v2.advanced_tools_api import (
-        ProteinDiscoveryBody as AdvancedProteinDiscoveryBody,
-        run_protein_discovery as run_advanced_protein_discovery,
-    )
-except ModuleNotFoundError:
-    from backend.web_v2.advanced_tools_api import (
-        ProteinDiscoveryBody as AdvancedProteinDiscoveryBody,
-        run_protein_discovery as run_advanced_protein_discovery,
-    )
-try:
-    from mcp_tools.models.pretrained.mutation.models.mutation_operations import zero_shot_mutation_sequence_prediction, zero_shot_mutation_structure_prediction, DEFAULT_BACKEND
-    from mcp_tools.models.factory.prediction.fintuned_operations import predict_protein_function, predict_residue_function
-    from mcp_tools.tools.predict.features.features_operations import (
-        calculate_physchem_from_fasta,
-        calculate_rsa_from_pdb,
-        calculate_sasa_from_pdb,
-        calculate_ss_from_pdb,
-    )
-    from mcp_tools.models.pretrained.design.proteinmpnn.protein_mpnn_function import proteinmpnn_design
-except ModuleNotFoundError:
-    from mcp_tools.models.pretrained.mutation.models.mutation_operations import zero_shot_mutation_sequence_prediction, zero_shot_mutation_structure_prediction, DEFAULT_BACKEND
-    from mcp_tools.models.factory.prediction.fintuned_operations import predict_protein_function, predict_residue_function
-    from mcp_tools.tools.predict.features.features_operations import (
-        calculate_physchem_from_fasta,
-        calculate_rsa_from_pdb,
-        calculate_sasa_from_pdb,
-        calculate_ss_from_pdb,
-    )
-    from mcp_tools.models.pretrained.design.proteinmpnn.protein_mpnn_function import proteinmpnn_design
+from backend.web_v2.advanced_tools_api import (
+    ProteinDiscoveryBody as AdvancedProteinDiscoveryBody,
+    run_protein_discovery as run_advanced_protein_discovery,
+)
+from mcp_tools.models.pretrained.mutation.models.mutation_operations import zero_shot_mutation_sequence_prediction, zero_shot_mutation_structure_prediction, DEFAULT_BACKEND
+from mcp_tools.models.factory.prediction.fintuned_operations import predict_protein_function, predict_residue_function
+from mcp_tools.tools.predict.features.features_operations import (
+    calculate_physchem_from_fasta,
+    calculate_rsa_from_pdb,
+    calculate_sasa_from_pdb,
+    calculate_ss_from_pdb,
+)
+from mcp_tools.models.pretrained.design.proteinmpnn.protein_mpnn_function import proteinmpnn_design
 
 
 router = APIRouter(prefix="/api/quick-tools", tags=["quick-tools-v2"])

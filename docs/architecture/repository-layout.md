@@ -50,6 +50,11 @@ Scientific capabilities are served through MCP; model packages own implementatio
 and runtime adapters. Agent code plans work and calls tools; it does not contain
 another copy of model inference code.
 
+Prediction result plots belong to `mcp_tools/common/visualization.py`; API
+workflows import those functions instead of maintaining their own renderers.
+Legacy Quick and Advanced routes use canonical package imports. Compatibility
+belongs at the route boundary, not in repeated import fallbacks.
+
 Chat streaming separates transport from display state. `frontend/src/lib/sse.ts`
 owns event IDs and reconnects; `chatStreamState.ts` owns snapshot reconciliation
 and message transitions. `useChatStream.ts` manages that state and the disposable
