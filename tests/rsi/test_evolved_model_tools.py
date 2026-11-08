@@ -48,7 +48,8 @@ def test_catalog_is_paginated_and_does_not_claim_current_verification(published)
 def test_describe_returns_scope_without_sources_data_or_internal_paths(published):
     store, root, verified, entry, seen = published
     result = service.dispatch("describe", entry_id=entry)
-    assert result["success"] and result["verified_now"]
+    assert result["success"] and not result["verified_now"]
+    assert result["validation_metrics_status"] == "recorded"
     assert result["scope"] == verified["key"]["scope"]
     assert result["validation_metrics"] == {"skill": 0.5}
     assert result["input_fields"] == ["id", "sequence"]
@@ -180,7 +181,9 @@ def test_retirement_or_invalid_evidence_blocks_actual_use(published, monkeypatch
     )
     assert not result["success"] and not seen
     assert "/private" not in json.dumps(result)
-    assert not service.dispatch("describe", entry_id=entry)["success"]
+    recorded = service.dispatch("describe", entry_id=entry)
+    assert recorded["success"] and not recorded["verified_now"]
+    assert recorded["validation_metrics_status"] == "recorded"
 
 
 @pytest.mark.parametrize("action", ["list", "describe", "predict"])
@@ -262,4 +265,59 @@ def test_warm_metadata_does_not_bypass_current_policy_or_evidence(published, mon
     assert service.dispatch("list")["matching_entries"] == 0
     from agent.rsi.engine.storage import atomic_json
     atomic_json(root / "goal.json", {"changed_after_discovery": True})
+    assert not service.dispatch("describe", entry_id=entry)["success"]
+
+
+def test_inspection_keeps_full_validation_out_of_metadata_reads(published, monkeypatch):
+    store, root, verified, entry, seen = published
+    def no_execution(*args, **kwargs):
+        pytest.fail("Reading model details must not replay native research or numerical experiments")
+    monkeypatch.setattr(store, "resolve", no_execution)
+    monkeypatch.setattr("agent.rsi.engine.scientist_model_library.validate_model_goal", no_execution)
+    description = service.dispatch("describe", entry_id=entry)
+    assert description["success"] and not description["verified_now"] and not seen
+    assert description["scope"] == verified["key"]["scope"]
+    assert description["validation_metrics_status"] == "recorded"
+
+
+def test_inspection_checks_live_runtime_after_discovery(published, monkeypatch):
+    store, root, verified, entry, _ = published
+    assert service.dispatch("list")["matching_entries"] == 1
+    monkeypatch.setattr(service, "runtime_implementation", lambda _: "0" * 64)
+    assert not service.dispatch("describe", entry_id=entry)["success"]
+
+
+@pytest.mark.parametrize("attack", ["packet", "entry", "index", "origin", "goal", "protocol", "symlink"])
+def test_inspection_rejects_changed_publication_bindings(published, attack):
+    from agent.rsi.engine.storage import atomic_json
+    store, root, verified, entry, _ = published
+    if attack in {"goal", "protocol"}:
+        path = root / (attack + ".json")
+    else:
+        pattern = {"packet": "packets/*.json", "entry": "entries/*.json",
+                   "index": "index/*.json", "origin": "origins/*/*.json",
+                   "symlink": "packets/*.json"}[attack]
+        path = next(store.root.glob(pattern))
+    path.chmod(0o644)
+    if attack == "symlink":
+        saved = path.with_suffix(".fixture")
+        path.rename(saved)
+        path.symlink_to(saved)
+    else:
+        atomic_json(path, {"changed": True})
+    assert not service.dispatch("describe", entry_id=entry)["success"]
+
+
+def test_inspection_rebinds_after_reading_publication(published, monkeypatch):
+    from agent.rsi.engine import scientist_model_library as library
+    from agent.rsi.engine.storage import atomic_json
+    store, root, verified, entry, _ = published
+    model_key = library.model_key
+    def change_index(model, policy):
+        key = model_key(model, policy)
+        index = next((store.root / "index").glob("*.json"))
+        index.chmod(0o644)
+        atomic_json(index, {"entry_id": "0" * 64})
+        return key
+    monkeypatch.setattr(library, "model_key", change_index)
     assert not service.dispatch("describe", entry_id=entry)["success"]

@@ -16,7 +16,7 @@ def list_evolved_models_tool(query: str = "", stage: str = "", limit: int = 10, 
 
 @tool("describe_evolved_model")
 def describe_evolved_model_tool(entry_id: str) -> str:
-    """Revalidate a published Scientist model and read its exact scope, validation metrics and required inputs. Local only."""
+    """Read a registered Scientist model's exact scope, required inputs and recorded validation metrics. Prediction revalidates current evidence. Local only."""
     return json.dumps(dispatch("describe", entry_id=entry_id), ensure_ascii=False)
 
 

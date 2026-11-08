@@ -57,6 +57,15 @@ def discovery_card(card):
     }
 
 
+def runtime_implementation(plugin_id):
+    from agent.rsi.engine.model_plugins import get_model_plugin
+
+    try:
+        return get_model_plugin(plugin_id).source_sha256
+    except (ValueError, KeyError, FileNotFoundError):
+        return None
+
+
 def catalog_cards(library):
     """Public publication metadata, shared by listing and capability search."""
     from .catalog import recorded_metadata
@@ -64,15 +73,11 @@ def catalog_cards(library):
     catalog = recorded_metadata(library)
     cards = []
     implementations = {}
-    from agent.rsi.engine.model_plugins import get_model_plugin
     for item in catalog["models"]:
         origin = item["origin"]
         plugin_id = item["key"]["plugin_id"]
         if plugin_id not in implementations:
-            try:
-                implementations[plugin_id] = get_model_plugin(plugin_id).source_sha256
-            except (ValueError, KeyError, FileNotFoundError):
-                implementations[plugin_id] = None
+            implementations[plugin_id] = runtime_implementation(plugin_id)
         compatible = bool(implementations[plugin_id]) and item["plugin_sha256"] == implementations[plugin_id]
         cards.append({**public_card(item["entry_id"], item["key"], origin, verified_now=False),
                       "runtime_compatible": compatible})
@@ -104,14 +109,19 @@ def list_models(library, query="", stage="", limit=10, offset=0):
         "matching_entries": len(cards),
         "indexed_entries": catalog["indexed_entries"],
         "next_offset": offset + limit if offset + limit < len(cards) else None,
-        "availability": "Recorded publications; describe and predict revalidate current evidence.",
+        "availability": "Recorded publications; prediction revalidates current evidence.",
         "counting_rule": catalog["counting_rule"],
     }
 
 
 def describe_model(library, entry_id):
-    verified = library.resolve(entry_id)
-    key = verified["key"]
+    publication = library.inspect_publication(entry_id)
+    key = publication["key"]
+    implementation = runtime_implementation(key["plugin_id"])
+    _require(
+        bool(implementation) and publication["packet"]["assessment"].get("plugin_sha256") == implementation,
+        "Published model runtime needs revalidation",
+    )
     from agent.rsi.engine.context_interfaces import PLUGINS
 
     contextual = key["plugin_id"] in PLUGINS
@@ -171,8 +181,9 @@ def describe_model(library, entry_id):
         fields = ["id", "sequence", "features"] if featured else ["id", "sequence"]
         contract = {"kind": "sequence_with_features" if featured else "sequence"}
     return {
-        **public_card(entry_id, key, verified["origin"], verified_now=True),
-        "validation_metrics": verified["packet"]["assessment"]["metrics"],
+        **public_card(entry_id, key, publication["origin"], verified_now=False),
+        "validation_metrics_status": "recorded",
+        "validation_metrics": publication["packet"]["assessment"]["metrics"],
         "input_fields": fields,
         "input_contract": {"schema": "evolved_model_inputs.v1", "target_required": False, **contract},
         "maximum_prediction_rows": 256,

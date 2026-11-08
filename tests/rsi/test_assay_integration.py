@@ -132,11 +132,11 @@ def test_agent_describes_full_assay_inputs_and_uses_plugin(tmp_path):
     model = plugin.fit(parts["training"], task["scope"], {"source_code": CODE, "seed": 19})
 
     class Library:
-        def resolve(self, entry_id):
+        def inspect_publication(self, entry_id):
             return {
                 "key": {"plugin_id": api.PLUGIN_ID, "scope": task["scope"]},
                 "origin": {"stage": "kinetics", "paper": task["paper"]},
-                "packet": {"assessment": {"metrics": {"fixture": True}}},
+                "packet": {"assessment": {"metrics": {"fixture": True}, "plugin_sha256": plugin.source_sha256}},
             }
 
         def predict(self, entry_id, inputs, scope, session_id):

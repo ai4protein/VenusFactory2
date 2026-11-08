@@ -42,7 +42,12 @@ operator selection and independent admission remain separate requirements.
 
 Agent discovery returns short model names and descriptions. The
 `describe_evolved_model` tool loads the exact applicability scope, input columns
-and validation metrics only after a model is selected.
+and recorded validation metrics only after a model is selected. Description checks
+the publication hashes, index, goal anchors and runtime interface without running
+the research again. It reports `verified_now: false`; the metrics are the recorded
+assessment, not a new validation. Actual prediction still resolves and verifies
+native execution, numerical evidence and reuse receipts before calling the model.
+No metadata response or cache grants execution approval.
 
 
 Agent discovery and Model Plaza share a short-lived metadata snapshot. Its

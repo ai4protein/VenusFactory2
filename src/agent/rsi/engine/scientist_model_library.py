@@ -563,6 +563,25 @@ class ScientistModelLibrary:
         )
         return {**verified, "entry_id": entry_id, "key_id": key_id, "origin_goal": str(folder)}
 
+    def inspect_publication(self, entry_id):
+        """Read a bound publication without executing or replaying its model.
+
+        This checks the immutable registry objects and their frozen goal anchors,
+        not current numerical or native-execution evidence. Inference still
+        requires resolve(); no successful inspection is cached as verification.
+        """
+        entry, _, origin, _ = self._binding(entry_id)
+        packet = self._object("packets", entry["packet_id"])
+        _require(model_key(packet["model"], None) == entry["key"], "Published model scope changed")
+        _require(packet["model_id"] == origin["model_id"], "Published model identity changed")
+        publication = {
+            "key": entry["key"],
+            "packet": packet,
+            "origin": {k: v for k, v in origin.items() if k not in {"goal", "key_id", "packet_id"}},
+        }
+        # Rebind after reading so retirement or a changed index cannot race inspection.
+        return self._bind_verified(entry_id, self._binding(entry_id), publication)
+
     def resolve(self, entry_id, *, replay_training=False):
         binding = self._binding(entry_id)
         _, _, origin, folder = binding

@@ -9,13 +9,13 @@ mcp = FastMCP("Venus_Evolved_Models")
 
 @mcp.tool(name="list_evolved_models")
 def list_evolved_models(query: str = "", stage: str = "", limit: int = 10, offset: int = 0) -> dict:
-    """Search recorded Scientist models. Current evidence is checked by describe and predict. Local only."""
+    """Search recorded Scientist models. Read a selected model's input contract with describe. Local only."""
     return dispatch("list", query=query, stage=stage, limit=limit, offset=offset)
 
 
 @mcp.tool(name="describe_evolved_model")
 def describe_evolved_model(entry_id: str) -> dict:
-    """Revalidate a Scientist model and return its applicability scope, validation metrics and input fields. Local only."""
+    """Read a registered Scientist model's exact scope, input fields and recorded validation metrics. Prediction revalidates current evidence. Local only."""
     return dispatch("describe", entry_id=entry_id)
 
 
