@@ -177,7 +177,8 @@ def test_json_plan_stdout_is_machine_readable(tmp_path, monkeypatch, capsys):
 def test_platform_dependencies_use_valid_arguments_for_both_managers(tmp_path, monkeypatch, manager):
     (tmp_path / 'pyproject.toml').write_text('[project]\ndependencies=["fastapi==0.116.1", "numpy>=2.1.2"]\n')
     constraints = tmp_path / 'requirements/bootstrap-constraints.txt'
-    constraints.parent.mkdir(); constraints.write_text('fastapi==0.116.1\n')
+    constraints.parent.mkdir(); constraints.write_text('fastapi==0.116.1\ntorch==2.8.0\ntorchvision==0.23.0\n')
+    atomic_json(tmp_path / 'configs/install.json', {'torch_configs': {'cpu': {'torch_aug_url': 'https://data.pyg.org/whl/torch-2.8.0+cpu.html'}}, 'pip_mirror': {'index_url': 'https://pypi.org/simple'}})
     security = constraints.with_name('service-security.txt')
     security.write_text('fastapi==0.116.1\n')
     folder = tmp_path / 'environment'; folder.mkdir()
@@ -191,13 +192,18 @@ def test_platform_dependencies_use_valid_arguments_for_both_managers(tmp_path, m
     assert str(constraints) in dependencies and str(security) in dependencies
     assert dependencies.count('--constraint') == 2
     assert '-r' not in dependencies and str(tmp_path / 'pyproject.toml') not in dependencies
-    assert json.loads((folder / '.venus-dependencies.json').read_text())['recipe'] == 4
+    assert json.loads((folder / '.venus-dependencies.json').read_text())['recipe'] == 5
+    for command in commands:
+        if 'install' in command:
+            assert command.count('--constraint') == 2
+    assert 'torch==2.8.0' in commands[0] and 'torchvision==0.23.0' in commands[0]
 
 def test_changed_service_constraints_invalidate_dependency_receipt(tmp_path, monkeypatch):
     (tmp_path / "pyproject.toml").write_text('[project]\ndependencies=["fastapi>=0.162.0"]\n')
     requirements = tmp_path / "requirements"
     requirements.mkdir()
-    (requirements / "bootstrap-constraints.txt").write_text("torch==2.8.0\n")
+    (requirements / "bootstrap-constraints.txt").write_text("torch==2.8.0\ntorchvision==0.23.0\n")
+    atomic_json(tmp_path / "configs/install.json", {"torch_configs": {"cpu": {"torch_aug_url": "https://data.pyg.org/whl/torch-2.8.0+cpu.html"}}, "pip_mirror": {"index_url": "https://pypi.org/simple"}})
     security = requirements / "service-security.txt"
     security.write_text("fastapi==0.162.0\n")
     folder = tmp_path / "environment"

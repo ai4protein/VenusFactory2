@@ -11,6 +11,7 @@ from pathlib import Path
 
 from .assets import download, fetch_json
 from .common import atomic_json, capture, digest, inside, read_json
+from .dependency_policy import platform_policy
 
 
 def executable(name):
@@ -146,16 +147,16 @@ class Environment:
             if not python.is_file():
                 raise ValueError(f"Existing environment has no Python: {python}")
             return python
+        config, constraints, torch_packages = platform_policy(self.root, self.torch_type)
         python = self.create(folder, "3.12")
-        constraints = [self.root / "requirements" / name for name in
-                       ("bootstrap-constraints.txt", "service-security.txt")]
         signature = {"pyproject": digest(self.root / "pyproject.toml"), "torch_type": self.torch_type,
-                     "constraints": digest(constraints[0]), "service_security": digest(constraints[1]), "recipe": 4}
+                     "constraints": digest(constraints[0]), "service_security": digest(constraints[1]),
+                     "wheel_policy": digest(self.root / "configs/install.json"), "recipe": 5}
         receipt = folder / ".venus-dependencies.json"
         if read_json(receipt) != signature:
-            self.pip(python, "torch==2.8.0", "torchvision==0.23.0", torch=True)
-            links = f"https://data.pyg.org/whl/torch-2.8.0+{self.torch_type}.html"
-            self.pip(python, "pyg_lib", "torch_scatter", "torch_sparse", "torch_cluster", "torch_spline_conv", links=links)
+            self.pip(python, *torch_packages, torch=True, constraints=constraints)
+            links = config["torch_aug_url"]
+            self.pip(python, "pyg_lib", "torch_scatter", "torch_sparse", "torch_cluster", "torch_spline_conv", links=links, constraints=constraints)
             # Read metadata with the newly created Python 3.12, even when the
             # bootstrap itself runs on Python 3.10. pip cannot consume TOML via -r.
             dependencies = json.loads(capture([

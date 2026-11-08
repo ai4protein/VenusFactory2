@@ -9,6 +9,10 @@ The compatibility venv/current-environment installers now share one implementati
 and apply both constraints at every installation step. Torchvision is pinned with
 Torch, the PyG wheel index is checked against that ABI, and dependency/import checks
 must pass before success. Commands use argument arrays instead of shell strings.
+The main initializer and compatibility commands now read the same Torch/torchvision
+pins and validate the matching PyG wheel index before creating an environment.
+All three installation stages apply both constraints files; changing the wheel
+policy invalidates the installation receipt.
 Automatic cu128 selection requires a known driver advertising CUDA 12.8 or newer;
 unknown or older drivers select CPU, as in the supported initializer.
 
@@ -27,7 +31,9 @@ and validates skill routing descriptions strictly. An uninstalled optional skill
 library is a valid minimal installation; an incomplete populated library still
 fails strict validation.
 
-## Verified scope
+## Initial service and frontend verification
+
+These regression counts precede the Torch compatibility update below.
 
 | Check | Result |
 | --- | --- |
@@ -58,21 +64,50 @@ optimization, and an ESM LoRA forward/backward pass using PEFT 0.21.2,
 Transformers 4.48.1 and Torch 2.8.0. macOS validation covers dependency resolution;
 a macOS device and GPU inference were not used in these checks.
 
+## Torch compatibility update
+
+The platform installation pair is now Torch 2.10.0 and torchvision 0.25.0, with
+the matching PyG 2.10 wheel index and Triton 3.6.0. ESM and Transformers retain
+their existing compatibility constraints. Independently installed external model
+runtimes keep their own versions.
+
+An isolated Python 3.12 CPU environment passed dependency consistency checks and:
+
+- Loaded the real ESM2 8M checkpoint and reproduced embeddings within a maximum
+  absolute difference of 1.44e-6 from the Torch 2.8 environment.
+- Completed a LoRA update through the platform training head, then saved and
+  reloaded the adapter and head with identical predictions.
+- Generated a 141-residue design for the A chain of the bundled 4HHB structure
+  using real ProteinMPNN weights, with finite score and probability outputs.
+- Executed scatter, neighbor-search, sparse-matrix and graph-convolution operations
+  using the matching compiled PyG extensions.
+
+These are software compatibility checks, not new scientific models. The CUDA 12.8
+wheel metadata includes the required Linux/Python 3.12 extensions; GPU execution
+and macOS device testing have not been performed in this update.
+
+The updated resolution covers 263 packages on Linux and 224 on macOS.
+Each profile reports 38 OSV records, down from 45.
+Torch contributes two remaining records and Transformers 36. Aliases can describe
+the same vulnerability, so this reduction is not a count of GitHub alerts closed.
+
 ## Remaining model-runtime advisories
 
 | Package | Current constraint | Upgrade dependency |
 | --- | --- | --- |
 | Transformers | 4.48.1 | ESM 3.2.3 requires Transformers below 4.48.2 |
-| Torch | 2.8.0 | The initializer aligns Torch, torchvision and compiled PyG wheels; these must move together |
+| Torch | 2.10.0 | Later patched releases require replacing or rebuilding the remaining compiled PyG extensions |
 
 These advisories remain open. Even ESM 3.4.2 requires Transformers below 5 and
 Torch below 2.12, while the reviewed fix targets include Transformers 5.10 and
 Torch 2.13. A compatible migration therefore needs separate ESM/model environments
 or a validated upstream update, followed by checkpoint and inference tests.
 
-The checkpoint-loader advisory also affects `weights_only=True`; that flag alone
-does not resolve it. See the
-[PyTorch advisory](https://github.com/pytorch/pytorch/security/advisories/GHSA-63cw-57p8-fm3p),
+Torch 2.10 fixes the checkpoint-loader vulnerability that also affected
+weights_only=True. This does not make arbitrary model code safe or resolve the
+remaining Torch advisories. See the
+[PyTorch loader advisory](https://github.com/pytorch/pytorch/security/advisories/GHSA-63cw-57p8-fm3p),
+[remaining TorchScript advisory](https://github.com/advisories/GHSA-rrmf-rvhw-rf47),
 [ESM release metadata](https://pypi.org/pypi/esm/3.4.2/json) and
 [Transformers advisory](https://github.com/advisories/GHSA-xrqw-3rrv-vx5w).
 

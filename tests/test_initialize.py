@@ -196,7 +196,8 @@ def test_uv_and_conda_create_only_requested_environment(tmp_path):
 def test_failed_dependency_install_is_not_marked_ready(tmp_path):
     (tmp_path / "pyproject.toml").write_text("[project]\nname='sample'\n")
     (tmp_path / "requirements").mkdir()
-    (tmp_path / "requirements/bootstrap-constraints.txt").write_text("torch==2.8.0\n")
+    (tmp_path / "requirements/bootstrap-constraints.txt").write_text("torch==2.8.0\ntorchvision==0.23.0\n")
+    atomic_json(tmp_path / "configs/install.json", {"torch_configs": {"cpu": {"torch_aug_url": "https://data.pyg.org/whl/torch-2.8.0+cpu.html"}}, "pip_mirror": {"index_url": "https://pypi.org/simple"}})
     (tmp_path / "requirements/service-security.txt").write_text("fastapi==0.162.0\n")
     calls = []
     def fail(args, **kw):
@@ -259,3 +260,18 @@ def test_tar_with_npz_members_is_not_misclassified_as_zip(tmp_path):
     assets.extract(archive, tmp_path / "params")
     assert (tmp_path / "params/params_model_1.npz").read_bytes() == payload
     assert not (tmp_path / "params/alphafold").exists()
+
+
+def test_platform_policy_mismatch_stops_before_environment_creation(tmp_path, monkeypatch):
+    (tmp_path / "requirements").mkdir()
+    (tmp_path / "requirements/bootstrap-constraints.txt").write_text("torch==2.10.0\ntorchvision==0.25.0\n")
+    (tmp_path / "requirements/service-security.txt").write_text("fastapi==0.162.0\n")
+    atomic_json(tmp_path / "configs/install.json", {
+        "torch_configs": {"cpu": {"torch_aug_url": "https://data.pyg.org/whl/torch-2.8.0+cpu.html"}},
+        "pip_mirror": {"index_url": "https://pypi.org/simple"},
+    })
+    environment = Environment(tmp_path, lambda *_: pytest.fail("must not install"))
+    monkeypatch.setattr(environment, "create", lambda *_: pytest.fail("must not create an environment"))
+    with pytest.raises(ValueError, match="Torch ABI"):
+        environment.platform(tmp_path / "env")
+    assert not (tmp_path / "env").exists()

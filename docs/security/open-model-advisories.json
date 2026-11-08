@@ -3,17 +3,10 @@
   "entries": [
     {
       "name": "torch",
-      "version": "2.8.0",
+      "version": "2.10.0",
       "ids": [
-        "GHSA-63cw-57p8-fm3p",
-        "GHSA-qfhq-4f3w-5fph",
         "GHSA-rrmf-rvhw-rf47",
-        "GHSA-vgrw-7cvw-pwgx",
-        "PYSEC-2025-203",
-        "PYSEC-2025-204",
-        "PYSEC-2025-206",
-        "PYSEC-2026-139",
-        "PYSEC-2026-2286"
+        "PYSEC-2026-139"
       ],
       "profiles": [
         "linux",
@@ -21,7 +14,7 @@
       ],
       "reviewed": "2026-11-08",
       "review_by": "2026-12-08",
-      "reason": "Torch, torchvision and compiled PyG ABI must migrate together and pass actual model inference.",
+      "reason": "Torch 2.10/PyG CPU checkpoint and training checks pass; later releases omit required compiled extensions. A separate runtime migration is needed for Torch 2.13.",
       "evidence": "docs/security/dependency-review-2026-11-08.md"
     },
     {

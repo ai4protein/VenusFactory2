@@ -3,13 +3,13 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
-import json
 import os
 from pathlib import Path
-import re
 import shutil
 import subprocess
 import sys
+
+from .dependency_policy import platform_policy as policy
 
 ROOT = Path(__file__).resolve().parents[2]
 UV_VERSION = "0.11.6"
@@ -20,33 +20,6 @@ PYG_PACKAGES = ("torch_geometric", "pyg_lib", "torch_scatter", "torch_sparse",
 def run(command: list[str], label: str) -> None:
     print(label, flush=True)
     subprocess.run(command, cwd=ROOT, check=True)
-
-
-def policy(root: Path, profile: str) -> tuple[dict, list[str], list[str]]:
-    """Validate constraints and the compiled wheel ABI before installing anything."""
-    config = json.loads((root / "configs/install.json").read_text(encoding="utf-8"))
-    constraints = [root / "requirements" / name for name in
-                   ("bootstrap-constraints.txt", "service-security.txt")]
-    pins: dict[str, str] = {}
-    for path in constraints:
-        if not path.is_file() or not path.read_text(encoding="utf-8").strip():
-            raise ValueError(f"Missing dependency policy: {path.name}")
-        for line in path.read_text(encoding="utf-8").splitlines():
-            match = re.fullmatch(r"(torch|torchvision)==([0-9]+(?:\.[0-9]+)+)", line.strip())
-            if match:
-                name, version = match.groups()
-                if name in pins and pins[name] != version:
-                    raise ValueError(f"Conflicting dependency policy for {name}")
-                pins[name] = version
-    if set(pins) != {"torch", "torchvision"}:
-        raise ValueError("The platform policy must pin Torch and torchvision")
-    selected = dict(config["torch_configs"][profile])
-    expected = f"https://data.pyg.org/whl/torch-{pins['torch']}+{profile}.html"
-    if selected["torch_aug_url"] != expected:
-        raise ValueError("The configured PyG wheel index does not match the pinned Torch ABI")
-    selected["index_url"] = config["pip_mirror"]["index_url"]
-    arguments = [value for path in constraints for value in ("--constraint", str(path))]
-    return selected, arguments, [f"{name}=={pins[name]}" for name in ("torch", "torchvision")]
 
 
 def resolve_profile(requested: str) -> tuple[str, str]:
@@ -79,7 +52,8 @@ def main(argv: list[str] | None = None, *, environment: str = "venv") -> int:
         if environment == "system" and sys.version_info < (3, 12):
             raise ValueError("The current environment requires Python 3.12 or newer; use --env venv")
         profile, reason = resolve_profile(args.type)
-        config, constraints, torch_packages = policy(ROOT, profile)
+        config, constraint_files, torch_packages = policy(ROOT, profile)
+        constraints = [value for path in constraint_files for value in ('--constraint', str(path))]
         print(f"Torch profile: {profile} ({reason})", flush=True)
         uv = ensure_uv(config["index_url"])
         if environment == "venv":

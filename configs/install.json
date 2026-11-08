@@ -2,11 +2,11 @@
   "torch_configs": {
     "cu128": {
       "torch_url": "https://download.pytorch.org/whl/cu128",
-      "torch_aug_url": "https://data.pyg.org/whl/torch-2.8.0+cu128.html"
+      "torch_aug_url": "https://data.pyg.org/whl/torch-2.10.0+cu128.html"
     },
     "cpu": {
       "torch_url": "https://download.pytorch.org/whl/cpu",
-      "torch_aug_url": "https://data.pyg.org/whl/torch-2.8.0+cpu.html"
+      "torch_aug_url": "https://data.pyg.org/whl/torch-2.10.0+cpu.html"
     }
   },
   "frpc_hf_fallback": {

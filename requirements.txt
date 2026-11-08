@@ -1,11 +1,11 @@
 # VenusFactory direct dependencies (mirror of [project.dependencies] in pyproject.toml).
 #
 # Install torch/torchvision and the PyG suite separately (see README), e.g.:
-#   pip install torch==2.8.0 torchvision --index-url https://download.pytorch.org/whl/cu128
+#   pip install torch==2.10.0 torchvision==0.25.0 --index-url https://download.pytorch.org/whl/cu128
 #   pip install torch_geometric pyg_lib torch_scatter torch_sparse torch_cluster torch_spline_conv \
-#       -f https://data.pyg.org/whl/torch-2.8.0+cu128.html
+#       -f https://data.pyg.org/whl/torch-2.10.0+cu128.html
 #
-# Then: pip install -r requirements.txt
+# Then: pip install -r requirements.txt -c requirements/bootstrap-constraints.txt -c requirements/service-security.txt
 
 # --- Core ML / training -----------------------------------------------------
 transformers==4.48.1

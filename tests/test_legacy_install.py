@@ -43,7 +43,7 @@ def test_all_installations_are_constrained_and_checked(installation, environment
         assert str(root / "requirements/service-security.txt") in call
         assert ("--system" in call) == (environment == "system")
         assert "--prerelease=allow" not in call
-    assert "torch==2.8.0" in installs[0] and "torchvision==0.23.0" in installs[0]
+    assert "torch==2.10.0" in installs[0] and "torchvision==0.25.0" in installs[0]
     assert "--only-binary" in installs[1]
     assert str(root / "pyproject.toml") in installs[2]
     assert calls[-2][1:3] == ["pip", "check"]
@@ -62,7 +62,7 @@ def test_missing_policy_stops_before_package_manager(installation, filename):
 def test_mismatched_pyg_abi_stops_before_install(installation):
     root, calls = installation
     path = root / "requirements/bootstrap-constraints.txt"
-    path.write_text(path.read_text().replace("torch==2.8.0", "torch==2.9.0"))
+    path.write_text(path.read_text().replace("torch==2.10.0", "torch==2.9.0"))
     assert installer.main(["--type", "cpu"]) == 1
     assert calls == []
 
@@ -71,7 +71,7 @@ def test_install_failure_is_not_reported_as_success(installation, monkeypatch, c
     root, calls = installation
     def fail(command, **kwargs):
         calls.append(command)
-        if "torch==2.8.0" in command:
+        if "torch==2.10.0" in command:
             raise subprocess.CalledProcessError(17, command)
     monkeypatch.setattr(installer.subprocess, "run", fail)
     assert installer.main(["--type", "cpu"]) == 17
