@@ -79,6 +79,22 @@ toward the training-attempt budget. Focused repair receives the current source's
 diagnostics, while completed generations still require actual fitting, validation
 and independent Review.
 
+## Failed attempts and measured replacements
+
+A failed fit retains its source, logs and host-owned receipt under a stable attempt
+ID. Scientist can revise the same file or implement a replacement in a new file.
+A replacement resolves that attempt's execution blocker only after successful
+fitting and fresh-process validation on the same frozen data, prediction field,
+experiment role and parent lineage. An older model, a different dataset or an
+ablation of another branch does not resolve it.
+
+The host records the link between failed and replacement attempts and verifies
+the receipts, frozen evaluation and runtime files. The Critic receives this link;
+the failed attempt remains available as negative evidence. Resolving an execution
+blocker does not approve the model: the selected candidate still needs independent
+Review, reproduction and a delivery package. Historical attempts without the
+required binding remain unchanged.
+
 ## Reusable reference controls
 
 Call `get_research_baseline` without a reference ID to list four fixed controls:

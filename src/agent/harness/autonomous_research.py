@@ -390,7 +390,7 @@ class AutonomousResearch:
                     else:
                         continuation['model_development'].pop('prepared_dataset', None)
                     continuation['execution_receipts'] = service.receipts[-6:]
-                    repair = repair_source_context(workspace, feedback_state(events, workspace, progress.get('execution_feedback')))
+                    repair = repair_source_context(workspace, feedback_state(events, workspace, progress.get('execution_feedback'), development=development))
                     if repair is not None:continuation['model_development']['repair_source'] = repair
                     else:continuation['model_development'].pop('repair_source', None)
                     focus = selected_tools(continuation, tools)
@@ -430,7 +430,9 @@ class AutonomousResearch:
                     if p.suffix in {'.json','.txt','.md','.csv','.py'} and p.stat().st_size<=40000:preview['content']=p.read_text(errors='replace')
                     previews.append(preview)
                 context['artifact_previews']=previews
-                context['execution']['failures']=iteration_feedback(events,workspace,progress.get('execution_feedback'))
+                current_feedback=feedback_state(events,workspace,progress.get('execution_feedback'),development=development)
+                context['execution']['failures']=current_feedback['errors']
+                context['execution']['superseded_attempts']=current_feedback.get('superseded', [])
                 step_checks=checkpoint_steps(plan,checkpoint,workspace=workspace,receipts=service.receipts,
                     experiments=development.records(),progress=progress)
                 context['execution']['step_checks']=step_checks
@@ -524,7 +526,7 @@ class AutonomousResearch:
             progress['development']=development.summary()
             if service is not None and service.latest_submission:
                 progress['review_submission']=service.latest_submission
-            progress['execution_feedback']={'iteration':index+1, **feedback_state(events,workspace,progress.get('execution_feedback'))}
+            progress['execution_feedback']={'iteration':index+1, **feedback_state(events,workspace,progress.get('execution_feedback'),development=development)}
             if model_goal(context['objective']) and not has_delivery(progress.get('deliveries',[]),'model'):
                 progress['delivery_pending']='Continue from measured generations; model review and delivery are not yet complete'
             write_json(folder/'events.json',events)

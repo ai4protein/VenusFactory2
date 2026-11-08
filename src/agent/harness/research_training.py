@@ -15,6 +15,8 @@ from .research_algorithm_checks import algorithm_diagnostics, checked_algorithm_
 from utils.scoped_files import read_bytes, write_bytes
 
 from .research_model_state import RUNTIME_SUFFIX, training_script, read_fitted_state
+from .research_attempt_resolution import VERSION as ATTEMPT_PROTOCOL, TrainingAttemptError
+from .research_execution_feedback import _key as feedback_key
 
 
 async def fit_model(workspace, development, runner, *, name, source_file, evaluation_file,
@@ -67,7 +69,10 @@ async def fit_model(workspace, development, runner, *, name, source_file, evalua
               "training.json": json.dumps(training, sort_keys=True, allow_nan=False).encode()}
     for path, content in inputs.items():
         write_bytes(work, path, content)
-    record = {"id": identity, "status": "running", "created": time.time(), "seed": seed,
+    record = {"id": identity, "attempt_protocol": ATTEMPT_PROTOCOL,
+              "feedback_key": feedback_key("train_research_model", {
+                  "source_file": source_file, "parent_experiment_id": parent_experiment_id, "variant": variant}),
+              "variant": variant, "prediction_key": prediction_key, "status": "running", "created": time.time(), "seed": seed,
               "algorithm_sha256": hashlib.sha256(code.encode()).hexdigest(),
               "source_snapshot": "algorithm.py", "stage": "preflight", "evaluation_sha256": data_hash,
               "training_sha256": digest(training), "training_rows": len(training["train"]),
@@ -134,4 +139,6 @@ async def fit_model(workspace, development, runner, *, name, source_file, evalua
                       error=bounded_message(str(exc), work, 1600))
         record["receipt_sha256"] = digest(record)
         write_json(folder/"receipt.json", record)
+        if isinstance(exc, Exception):
+            raise TrainingAttemptError(identity, bounded_message(str(exc), work, 1000)) from exc
         raise

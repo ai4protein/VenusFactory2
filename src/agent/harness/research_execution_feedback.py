@@ -57,7 +57,7 @@ def _source_path(value):
         return None
     return value
 
-def feedback_state(events, workspace, previous=None):
+def feedback_state(events, workspace, previous=None, *, development=None):
     failures={}
     pending=(previous or {}).get("pending")
     if isinstance(pending,list):
@@ -90,14 +90,24 @@ def feedback_state(events, workspace, previous=None):
                 "error":_failure_message(semantic or event.get("output") or "Tool failed",workspace)}
             if source is not None:
                 failures[key]["source_file"]=source
+                from .research_attempt_resolution import attempt_id
+                identity = attempt_id(event.get("output"))
+                if identity:
+                    failures[key]["training_attempt_id"] = identity
     pending=list(failures.values())[-5:]
-    return {"errors":[{"tool":row["tool"],"error":row["error"]} for row in pending],"pending":pending}
+    result = {"errors":[{"tool":row["tool"],"error":row["error"]} for row in pending],"pending":pending}
+    if (previous or {}).get("superseded"):
+        result["superseded"] = list(previous["superseded"])
+    if development is not None and any(row.get("training_attempt_id") for row in pending):
+        from .research_attempt_resolution import resolve_attempts
+        result = resolve_attempts(result, development)
+    return result
 
 def execution_feedback(events, workspace):
     return feedback_state(events,workspace)["errors"]
 
-def iteration_feedback(events, workspace, previous):
-    return feedback_state(events,workspace,previous)["errors"]
+def iteration_feedback(events, workspace, previous, *, development=None):
+    return feedback_state(events,workspace,previous,development=development)["errors"]
 
 
 def repair_source_context(workspace, feedback):
