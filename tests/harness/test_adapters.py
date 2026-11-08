@@ -40,13 +40,13 @@ def test_unsupported_combinations_are_explicit_not_fallback(tmp_path):
     exe = tmp_path / "runtime"
     exe.touch()
     registry = builtin_registry()
-    p = Profile("science_agent", "codex", model())
-    result = registry.preflight(p, {"codex_bin": str(exe)})
+    p = Profile("science_agent", "kimi-code", replace(model(), protocol="responses"))
+    result = registry.preflight(p, {"kimi_bin": str(exe)})
     assert not result["ready"]
     assert "model_protocol_incompatible" in result["reasons"]
     assert "adapter_not_implemented" not in result["reasons"]
     with pytest.raises(ValueError, match="rejected"):
-        registry.resolve(p, {"codex_bin": str(exe)})
+        registry.resolve(p, {"kimi_bin": str(exe)})
     assert (
         "mode_not_implemented_for_harness"
         in registry.preflight(replace(p, mode="science_expert", harness="deepseek-harness"), {"dsh_bin": str(exe)})[

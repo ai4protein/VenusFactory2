@@ -49,6 +49,12 @@ class HarnessRegistry:
             profile.budget.temperature is None or profile.budget.reasoning_effort is not None
         ):
             reasons.append("chat_controls_incompatible")
+        if profile.harness in {"codex", "expert-codex"} and profile.model.protocol == "chat_completions":
+            from .responses_bridge import validate_profile
+            try:
+                validate_profile(profile)
+            except ValueError:
+                reasons.append("codex_bridge_controls_incompatible")
         if profile.harness in {"claude-code", "expert-claude-code"}:
             from .claude_policy import validate_profile
 
@@ -142,7 +148,7 @@ def builtin_registry():
             "codex",
             "agent.harness.codex_adapter:CodexAdapter",
             ("science_agent",),
-            ("responses",),
+            ("responses", "chat_completions"),
             controls,
             "codex_bin",
         )
@@ -152,7 +158,7 @@ def builtin_registry():
             "expert-codex",
             "agent.harness.native_expert_team:NativeExpertTeamAdapter",
             ("science_expert",),
-            ("responses",),
+            ("responses", "chat_completions"),
             controls,
             "codex_bin",
         )

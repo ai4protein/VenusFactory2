@@ -55,6 +55,10 @@ async def execute(profile, task, runtimes, *, registry=None, credential=None):
             thinking=profile.budget.thinking,
         )
         gateway_type, transport_name = EvidenceGateway, "buffered_complete_response_v1"
+    if profile.harness in {"codex", "expert-codex"} and profile.model.protocol == "chat_completions":
+        from .responses_bridge import ResponsesChatBridge, TRANSPORT, validate_profile
+        validate_profile(profile)
+        gateway_type, transport_name = ResponsesChatBridge, TRANSPORT
     if profile.harness in {"claude-code", "expert-claude-code"}:
         from .claude_adapter import validate_profile
         from .messages_bridge import MessagesBridge

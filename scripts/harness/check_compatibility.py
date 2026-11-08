@@ -25,6 +25,7 @@ async def probe(cat, runtimes, harness, model_id, folder):
     from agent.harness.interactions import INTERACTION_NAMES
     from agent.harness.messages_bridge import MessagesBridge
     from agent.harness.responses_gateway import ResponsesGateway, ResponsesPolicy
+    from agent.harness.responses_bridge import ResponsesChatBridge
     from agent.harness.tool_disclosure import CONTROLS
     from agent.harness.web_native_worker import run
     from agent.rsi.engine.model_gateway import GatewayPolicy
@@ -59,7 +60,8 @@ async def probe(cat, runtimes, harness, model_id, folder):
             max_calls=profile.budget.model_calls, max_tokens=profile.budget.output_tokens,
             temperature=profile.budget.temperature, thinking=profile.budget.thinking,
         )
-        gateway = MessagesBridge if harness == "claude-code" else EvidenceGateway
+        gateway = (MessagesBridge if harness == "claude-code" else
+                   ResponsesChatBridge if harness == "codex" else EvidenceGateway)
 
     async def on_text(call, text):
         if text:

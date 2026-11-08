@@ -132,7 +132,11 @@ class CodexEvents:
 
 def configuration(ctx):
     p, task = ctx.profile, ctx.task
-    ResponsesPolicy.from_profile(p, task.tools)
+    if p.model.protocol == "responses":
+        ResponsesPolicy.from_profile(p, task.tools)
+    else:
+        from .responses_bridge import validate_profile
+        validate_profile(p)
     q = json.dumps
     lines = [
         f"model = {q(p.model.model)}",

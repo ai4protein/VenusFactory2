@@ -170,6 +170,9 @@ def audit_native_expert(execution, workspace, capability, *, result=None):
     else:
         _, fixed = policy.apply({"model": profile.model.model, "messages": []})
         sampling_keys = ("model", "temperature", "max_tokens")
+    if profile.harness == "expert-codex" and profile.model.protocol == "chat_completions":
+        from .responses_bridge import TRANSPORT
+        require_equal(lock["transport"], TRANSPORT, "Codex bridge transport changed")
     allowed = {"mcp__venusfactory__" + name for name in binding["tools"]}
     for request in requests.values():
         for key in sampling_keys:

@@ -62,9 +62,11 @@ Scientist artifacts continue to require the platform's publication review.
 | Kimi Code | Chat Completions | DMX、OpenRouter |
 | DeepSeek Harness | Chat Completions | DMX、OpenRouter |
 | Claude Code | Messages 转 Chat Completions | DMX、OpenRouter |
-| Codex | Responses | 声明支持 Responses 的 OpenRouter 模型 |
+| Codex | Responses；可显式转换为 Chat Completions | DMX、OpenRouter；取决于模型声明的协议 |
 
-DMX 的 GLM 4 Flash、U2 Flash 当前仅声明 Chat Completions，不能与 Codex 配对。适配器不会为绕过限制偷偷更换模型。`protocols` 控制允许的协议，`max_output_tokens` 会约束实际请求输出上限。
+Codex 原生客户端仍使用 Responses。对于 Chat Completions 路由，平台网关转换文本、MCP 工具声明及调用历史；供应商、模型和免费授权保持原配置。只有完整且通过校验的工具调用才能执行，角色请求和原生客户端请求共用预算。网关记录供应商返回的 token 用量。
+
+这个转换层支持文本与 MCP 工具结果，不接受图片、服务端历史引用、加密压缩项或结构化输出格式；这些能力需要对应协议的单独验证。原生 Responses 路由继续直接使用 Responses 网关。`protocols` 控制允许的协议，`max_output_tokens` 会约束实际请求输出上限。
 
 工具搜索首先只返回简短名称与描述，读取接口后才可调用。普通 Web 工具允许返回 Markdown、纯文本、JSON 或多个文本块；科学实验的专用结果凭据仍保留严格校验。Claude 的 OpenRouter 适配只接受同一模型省略 `:free` 的返回名，费用和工具权限检查保持独立。
 
@@ -77,6 +79,7 @@ Web 遇到供应商 429 后终止本轮自动重试；内部网关向原生 SDK 
 ```bash
 python -m pytest -q tests/harness/test_native_compatibility.py \
   tests/harness/test_web_live_text.py tests/harness/test_messages_bridge.py \
+  tests/harness/test_responses_bridge.py \
   tests/harness/test_codex_adapter.py tests/harness/test_claude_events.py \
   tests/harness/test_claude_host.py tests/harness/test_responses_gateway.py \
   tests/harness/test_configured_free_routes.py tests/harness/test_user_interactions.py
@@ -87,7 +90,7 @@ python -m pytest -q tests/harness/test_native_compatibility.py \
 ```bash
 python scripts/harness/check_compatibility.py --output research_runs/compatibility/preflight
 python scripts/harness/check_compatibility.py --models dmx-glm4-free \
-  --harnesses kimi-code deepseek-harness claude-code --execute \
+  --harnesses kimi-code deepseek-harness codex claude-code --execute \
   --output research_runs/compatibility/glm-live
 ```
 
@@ -101,4 +104,4 @@ Scientist 的默认入口为 `autonomous_research.v1`。提交研究目标和运
 
 前端轮询显示专家报告、计划状态、当前工具、程序输出和中间文件。训练脚本可输出 JSON 行 `{"event":"progress","step":5,"total":20,"metrics":{"loss":0.3}}`；常见 `Epoch 5/20` 日志也会显示进度条。没有真实计数时只显示日志和耗时。
 
-可复用程序提供 `run(inputs: dict)` 并通过隔离重放检查，审查通过后注册到 `research_runs/rsi/research_capabilities`。Agent 可通过统一搜索、`describe_generated_capability` 和 `run_generated_capability` 使用它们。执行重放验证与科学预测准确率分别记录；准确率需要相应的数据划分和实验产物。
+可复用程序提供 `run(inputs: dict)` 并通过隔离重放与独立审查。研究产物先保存在所属会话；公开发布还需平台审核和选择，并记录作者邮箱。进入平台注册表后，Agent 通过统一搜索、`describe_generated_capability` 和 `run_generated_capability` 调用。执行重放验证与科学预测准确率分别记录；准确率需要相应的数据划分和实验产物。

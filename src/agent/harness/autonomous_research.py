@@ -310,6 +310,9 @@ class AutonomousResearch:
         if profile.model.protocol=='responses':
             from .responses_gateway import ResponsesGateway, ResponsesPolicy
             gateway=ResponsesGateway;policy=ScientistResponsesPolicy.from_profile(profile,[])
+        elif profile.harness=='expert-codex':
+            from .responses_bridge import ResponsesChatBridge
+            gateway=ResponsesChatBridge
         elif profile.harness=='expert-claude-code':
             from .messages_bridge import MessagesBridge
             gateway=MessagesBridge

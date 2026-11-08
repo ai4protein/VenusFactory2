@@ -127,6 +127,9 @@ async def _stream_agent(state, text, attachment_paths, *, retry=False, interacti
 
         gateway_type = ResponsesGateway
         policy = ResponsesPolicy.from_profile(profile, [])
+    elif profile.harness == "codex":
+        from agent.harness.responses_bridge import ResponsesChatBridge
+        gateway_type = ResponsesChatBridge
     elif profile.harness == "claude-code":
         from agent.harness.messages_bridge import MessagesBridge
 

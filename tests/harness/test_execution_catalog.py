@@ -46,7 +46,11 @@ def test_catalog_rejects_incompatible_combinations_and_hides_secret_references(t
     assert combos["langgraph", "a"]["ready"]
     assert "credential_unavailable" in combos["langgraph", "b"]["reasons"]
     assert "adapter_not_implemented" not in combos["codex", "a"]["reasons"]
-    assert "model_protocol_incompatible" in combos["codex", "a"]["reasons"]
+    assert not combos["codex", "a"]["ready"]
+    assert "runtime_missing" in combos["codex", "a"]["reasons"]
+    with_runtime = catalog.public({"python_bin": sys.executable, "codex_bin": sys.executable})
+    codex = next(x for x in with_runtime["combinations"] if x["harness"] == "codex" and x["model_id"] == "a")
+    assert codex["ready"]
     assert "mode_not_implemented_for_harness" in combos["role-graph", "a"]["reasons"]
     serialized = json.dumps(public)
     assert "secret-a" not in serialized and "TEST_MODEL_A_KEY" not in serialized

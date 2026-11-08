@@ -327,6 +327,8 @@ def message_sse(message):
 
 class MessagesBridge(EvidenceGateway):
     supports_free_response_evidence = True
+    native_route = "/v1/messages"
+    transport_name = TRANSPORT
 
     def __init__(self, *, request_recovery="none", **kwargs):
         if request_recovery != "none":
@@ -341,10 +343,10 @@ class MessagesBridge(EvidenceGateway):
         key = request.headers.get("x-api-key", "")
         if not (secrets.compare_digest(auth, "Bearer " + self.token) or secrets.compare_digest(key, self.token)):
             return self.error("authentication_error", "Invalid relay credential", 401)
-        if request.path != "/v1/messages" or request.method != "POST":
+        if request.path != self.native_route or request.method != "POST":
             return self.error("invalid_request_error", "Unsupported relay route", 404)
         try:
-            payload, native = messages_to_chat(await request.json(), self.policy)
+            payload, native = self.translate_request(await request.json())
             if self.on_text is not None:
                 payload["stream"] = True
             payload, metadata = self.policy.apply(payload)
@@ -362,7 +364,7 @@ class MessagesBridge(EvidenceGateway):
             return self.error("invalid_request_error", "Model call budget exhausted", 400)
         self.calls += 1
         call, started = self.calls, time.monotonic()
-        self.record({"event": "request", "call": call, "transport": TRANSPORT, **metadata, **native})
+        self.record({"event": "request", "call": call, "transport": self.transport_name, **metadata, **native})
         status, usage, completed, error_type, evidence = None, None, False, None, {}
         raw = bytearray()
         try:
@@ -399,18 +401,7 @@ class MessagesBridge(EvidenceGateway):
                 chat_raw, aliases = normalize(chat_raw, False, payload.get('tools', []))
                 if aliases:
                     self.record({'event': 'tool_name_normalized', 'call': call, 'aliases': aliases})
-                message, usage = chat_to_message(
-                    chat_raw,
-                    model=self.policy.model,
-                    allowed_tools=set(metadata["tools_sent"]),
-                    max_tokens=self.policy.max_tokens,
-                    upstream_url=self.upstream_url,
-                )
-                body = (
-                    message_sse(message)
-                    if native["native_stream"]
-                    else json.dumps(message, ensure_ascii=False, allow_nan=False).encode()
-                )
+                body, usage = self.translate_response(chat_raw, metadata, native)
                 evidence = {
                     "response_sha256": hashlib.sha256(raw).hexdigest(),
                     "translated_response_sha256": hashlib.sha256(body).hexdigest(),
@@ -446,6 +437,18 @@ class MessagesBridge(EvidenceGateway):
                     "wall_seconds": round(time.monotonic() - started, 3),
                 }
             )
+
+    def translate_request(self, body):
+        return messages_to_chat(body, self.policy)
+
+    def translate_response(self, chat_raw, metadata, native):
+        message, usage = chat_to_message(
+            chat_raw, model=self.policy.model, allowed_tools=set(metadata["tools_sent"]),
+            max_tokens=self.policy.max_tokens, upstream_url=self.upstream_url,
+        )
+        body = (message_sse(message) if native["native_stream"]
+                else json.dumps(message, ensure_ascii=False, allow_nan=False).encode())
+        return body, usage
 
     @staticmethod
     def error(kind, message, status):
