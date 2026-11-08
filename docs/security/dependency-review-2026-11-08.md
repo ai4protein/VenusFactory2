@@ -5,6 +5,13 @@
 The platform initializer now applies both the model compatibility constraints and
 the service security constraints. Its installation receipt includes both files,
 so changing either triggers dependency verification and installation again.
+The compatibility venv/current-environment installers now share one implementation
+and apply both constraints at every installation step. Torchvision is pinned with
+Torch, the PyG wheel index is checked against that ABI, and dependency/import checks
+must pass before success. Commands use argument arrays instead of shell strings.
+Automatic cu128 selection requires a known driver advertising CUDA 12.8 or newer;
+unknown or older drivers select CPU, as in the supported initializer.
+
 Linux and macOS declarations use patched minimum versions for the Web/MCP,
 agent, document-processing and scientific utility packages. The macOS PEFT pin
 also matches the existing platform compatibility constraint.

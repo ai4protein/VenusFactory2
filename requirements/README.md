@@ -21,9 +21,10 @@ this layout change does not claim that the API can run from a minimal web-only
 requirements file. Dependency removal requires import and execution verification.
 
 `bootstrap-constraints.txt` is the compatibility envelope used by `initialize.py`
+and the compatibility `install.py` entry points
 for the platform environment (Torch/PyG, MCP/FastMCP, Transformers). It does not
-apply to independently versioned third-party environments. The initializer also applies
-`service-security.txt` and rechecks dependencies when either constraints file changes. See
+apply to independently versioned third-party environments. All platform dependency installers also apply
+`service-security.txt`; the initializer rechecks dependencies when either constraints file changes. See
 [installation](../docs/installation.md).
 
 CI resolves both platform profiles and audits them against OSV. See the

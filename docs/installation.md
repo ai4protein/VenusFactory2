@@ -4,6 +4,13 @@
 `configs/bootstrap.json` describes tool sources, versions, dependencies and profiles.
 Factory artifacts are indexed separately in `ckpt/manifest.json`.
 
+The compatibility entry points `python install.py` and `python install.py --env system`
+also apply both the model compatibility and service security constraints. The first
+uses the repository's .venv; the second changes the explicitly selected current
+Python environment and requires Python 3.12 or newer. Both check dependency
+consistency and imports before reporting success. They install Python dependencies
+only; use the initializer below for tools, weights and frontend setup.
+
 ## One-command full installation
 
 ```bash

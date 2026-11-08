@@ -62,8 +62,23 @@ def test_detect_modern_nvidia(monkeypatch):
 
     monkeypatch.setattr(torch_detect.platform, "system", lambda: "Linux")
     monkeypatch.setattr(torch_detect.shutil, "which", lambda _n: "/usr/bin/nvidia-smi")
-    monkeypatch.setattr(torch_detect, "_nvidia_cuda_version", lambda: 12.4)
+    monkeypatch.setattr(torch_detect, "_nvidia_cuda_version", lambda: 12.8)
     monkeypatch.setattr(torch_detect.subprocess, "run", lambda *a, **k: Proc())
     kind, reason = torch_detect.detect_install_type()
     assert kind == "cu128"
     assert "NVIDIA" in reason
+
+
+def test_detect_uncertain_or_older_cuda_prefers_cpu(monkeypatch):
+    class Proc:
+        returncode = 0
+        stdout = "GPU 0: NVIDIA GPU\\n"
+
+    monkeypatch.setattr(torch_detect.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(torch_detect.shutil, "which", lambda _: "/usr/bin/nvidia-smi")
+    monkeypatch.setattr(torch_detect.subprocess, "run", lambda *a, **k: Proc())
+    for version in (None, 12.0, 12.4, 12.7):
+        monkeypatch.setattr(torch_detect, "_nvidia_cuda_version", lambda: version)
+        kind, reason = torch_detect.detect_install_type()
+        assert kind == "cpu"
+        assert "12.8" in reason

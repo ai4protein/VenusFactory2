@@ -68,14 +68,14 @@ def detect_install_type() -> tuple[str, str]:
     if not has_gpu:
         return "cpu", "No NVIDIA GPU detected → CPU wheels"
 
-    # cu128 wheels need a relatively new driver. Older stacks → prefer CPU
-    # (or manual CUDA 11.8 recipe in the wiki) to avoid a broken runtime.
-    if cuda_ver is not None and cuda_ver < 12.0:
+    # Match the supported initializer: unknown/older drivers use CPU by default.
+    # An explicit cu128 override remains available to an informed operator.
+    if cuda_ver is None or cuda_ver < 12.8:
+        detail = "unknown" if cuda_ver is None else str(cuda_ver)
         return (
             "cpu",
-            f"NVIDIA GPU found but driver CUDA {cuda_ver} < 12.0 → CPU "
-            f"(override with --torch-type cu128 if you know it works; "
-            f"see docs/wiki/Installation.md for CUDA 11.8 manual install). GPU={gpu_label}",
+            f"NVIDIA GPU found but driver CUDA is {detail}; cu128 requires "
+            f"CUDA 12.8 or newer for automatic selection. GPU={gpu_label}",
         )
 
     detail = gpu_label
