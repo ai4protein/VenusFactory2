@@ -166,3 +166,34 @@ def test_old_recovered_failures_are_not_reported_as_current_failures(tmp_path):
         {'event': 'response', 'status': 200, 'completed': True},
     ]))
     assert public_failure(path)['code'] == 'runtime_error'
+
+
+def test_completed_empty_provider_response_has_a_specific_public_hint(tmp_path):
+    from agent.harness.failure_summary import public_failure
+    path = tmp_path / "requests.jsonl"
+    path.write_text(json.dumps({
+        "event": "response", "status": 200, "completed": True,
+        "response_completion": {"streaming": True, "done": True, "malformed": False,
+            "provider_error": False, "content_present": False, "tools_present": False,
+            "finish_reasons": ["stop"]},
+        "body": "private-provider-body"
+    }))
+    result = public_failure(path)
+    assert result["code"] == "model_response_empty"
+    assert "no answer" in result["message"]
+    assert "private-provider-body" not in json.dumps(result)
+
+
+@pytest.mark.parametrize("change", [
+    {"content_present": True}, {"tools_present": True},
+    {"finish_reasons": ["content_filter"]}, {"done": False}, {"malformed": True},
+])
+def test_real_output_or_ambiguous_completion_does_not_become_an_empty_answer(tmp_path, change):
+    from agent.harness.failure_summary import public_failure
+    shape = {"streaming": True, "done": True, "malformed": False,
+        "provider_error": False, "content_present": False, "tools_present": False,
+        "finish_reasons": ["stop"], **change}
+    path = tmp_path / "requests.jsonl"
+    path.write_text(json.dumps({"event": "response", "status": 200, "completed": True,
+        "response_completion": shape}))
+    assert public_failure(path)["code"] == "runtime_error"

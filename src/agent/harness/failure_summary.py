@@ -15,6 +15,15 @@ def public_failure(path, fallback="runtime_error"):
     for row in reversed(rows):
         if row.get("event") == "response":
             if row.get("completed"):
+                shape = row.get("response_completion")
+                if (
+                    row.get("status") == 200 and isinstance(shape, dict)
+                    and shape.get("malformed") is False and shape.get("provider_error") is False
+                    and shape.get("content_present") is False and shape.get("tools_present") is False
+                    and shape.get("finish_reasons") in (["stop"], ["length"])
+                    and (shape.get("streaming") is False or shape.get("done") is True)
+                ):
+                    code = "model_response_empty"
                 break
             status = row.get("status")
             if status == 429:
@@ -38,6 +47,7 @@ def public_failure(path, fallback="runtime_error"):
         "model_access_401": "Model provider authentication failed (401).",
         "model_access_403": "Model provider access denied (403).",
         "model_response_invalid": "Model returned an incomplete response. Please retry.",
+        "model_response_empty": "The model returned no answer. Please retry or choose another model.",
         "model_protocol_incompatible": "Model request is incompatible with the selected harness.",
     }
     return {"code": code, "message": messages.get(code, "Agent turn did not complete: " + fallback)}
