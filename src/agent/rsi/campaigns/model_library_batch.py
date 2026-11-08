@@ -10,63 +10,25 @@ import copy
 import time
 import uuid
 
-from agent.harness.contracts import digest, file_hash
+from agent.harness.contracts import digest
 from agent.research_modes import get_research_mode
 
 from agent.rsi import model_tasks
 from agent.rsi.engine.model_plugins import get_model_plugin
-from agent.rsi.engine.scientist_model_library import _read, _require
-from agent.rsi.engine.shared_model_publication import SCHEMA, validate_shared_goal
-from agent.rsi.engine.storage import file_lock, safe_child
+from agent.rsi.engine.scientist_model_library import _require
+from agent.rsi.engine.storage import file_lock
 
 MAX_BATCH_REQUESTS = 256
 
 
-def _binding(library, entry_id):
-    entry = library._object("entries", entry_id)
-    key_id = digest(entry["key"])
-    _require(_read(safe_child(library.root, f"index/{key_id}.json")) == {"entry_id": entry_id}, "Model index changed")
-    origin = library._object("origins/" + key_id, entry["canonical_origin"])
-    folder = library.goal(safe_child(library.owner, origin["goal"]))
-    return entry, key_id, origin, folder
-
-
-def _bind_verified(library, entry_id, binding, verified):
-    entry, key_id, origin, folder = binding
-    _require(
-        verified["origin"] == {k: v for k, v in origin.items() if k not in {"goal", "key_id", "packet_id"}},
-        "Model origin changed",
-    )
-    _require(
-        verified["key"] == entry["key"]
-        and origin["key_id"] == key_id
-        and digest(verified["packet"]) == entry["packet_id"] == origin["packet_id"],
-        "Model binding changed",
-    )
-    _require(library._object("packets", entry["packet_id"]) == verified["packet"], "Published model changed")
-    _require(
-        file_hash(folder / "goal.json") == origin["goal_sha256"]
-        and file_hash(folder / "protocol.json") == origin["protocol_sha256"],
-        "Goal changed during batch inference",
-    )
-    return {**verified, "entry_id": entry_id, "key_id": key_id, "origin_goal": str(folder)}
-
-
 def _resolve_all(library, entry_ids):
-    shared, resolved = {}, {}
-    for entry_id in dict.fromkeys(entry_ids):
-        binding = _binding(library, entry_id)
-        _, _, origin, folder = binding
-        if "runtime_migration" in origin or _read(folder / "protocol.json").get("schema") != SCHEMA:
-            resolved[entry_id] = library.resolve(entry_id)
-            continue
-        if folder not in shared:
-            rows = validate_shared_goal(folder, replay_training=False)
-            shared[folder] = {row["origin"]["model_id"]: row for row in rows}
-            _require(len(shared[folder]) == len(rows), "Repeated shared model identity")
-        _require(origin["model_id"] in shared[folder], "Model is not a qualified shared output")
-        resolved[entry_id] = _bind_verified(library, entry_id, binding, shared[folder][origin["model_id"]])
-    return resolved, len(shared)
+    resolved = library.resolve_many(entry_ids)
+    shared_goals = {
+        value["origin_goal"]
+        for value in resolved.values()
+        if value["origin"].get("evidence_kind") == "native_scientist_shared_program_model"
+    }
+    return resolved, len(shared_goals)
 
 
 def predict_many(library, requests):
@@ -124,7 +86,7 @@ def predict_many(library, requests):
     # have passed. Recheck registry bindings while holding the writer lock.
     with file_lock(library.root / ".library.lock"):
         for entry_id, value in verified.items():
-            _bind_verified(library, entry_id, _binding(library, entry_id), value)
+            library._bind_verified(entry_id, library._binding(entry_id), value)
         for result in results:
             result["receipt_id"] = library._immutable("usage", result["receipt"])
         batch = {

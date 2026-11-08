@@ -11,6 +11,7 @@ from agent.rsi import model_library_batch as batch
 from agent.rsi import model_tasks
 from agent.rsi import scientist_model_library as library_module
 from agent.rsi.engine.scientist_model_library import ScientistModelLibrary
+from agent.rsi.engine import shared_model_publication
 from agent.rsi.engine.storage import atomic_json, sha256_file
 
 completed = shared_fixtures.completed
@@ -44,22 +45,27 @@ async def test_batch_matches_individual_inference_and_verifies_shared_goal_twice
     prior = sha256_file(store.root / "goal.json")
     expected = [library.predict(**r)["predictions"] for r in requests]
     calls = []
-    original = batch.validate_shared_goal
+    original = shared_model_publication.validate_shared_goal
 
     def counted(folder, **kwargs):
-        calls.append(folder)
+        calls.append((folder, kwargs["replay_training"]))
         return original(folder, **kwargs)
 
-    monkeypatch.setattr(batch, "validate_shared_goal", counted)
+    monkeypatch.setattr(shared_model_publication, "validate_shared_goal", counted)
     result = library.predict_many(requests)
     assert [r["predictions"] for r in result["results"]] == expected
-    assert len(calls) == 2 and len(set(calls)) == 1
+    assert calls == [(store.root, False), (store.root, False)]
     assert result["batch_receipt"]["verified_shared_goals"] == 1
     assert not result["batch_receipt"]["persistent_validation_cache"]
     assert len({r["receipt"]["session_id"] for r in result["results"]}) == len(requests)
     assert len({r["receipt_id"] for r in result["results"]}) == len(requests)
     assert library._object("usage_batches", result["batch_receipt_id"]) == result["batch_receipt"]
     assert all(library._object("usage", r["receipt_id"]) == r["receipt"] for r in result["results"])
+    assert sha256_file(store.root / "goal.json") == prior
+    entries = [r["entry_id"] for r in requests]
+    verified = library.resolve_many(entries + entries, replay_training=True)
+    assert set(verified) == set(entries)
+    assert calls == [(store.root, False), (store.root, False), (store.root, True)]
     assert sha256_file(store.root / "goal.json") == prior
 
 

@@ -533,18 +533,16 @@ class ScientistModelLibrary:
             report_id = self._immutable("publication_attempts", report)
         return {**report, "report_id": report_id}
 
-    def resolve(self, entry_id, *, replay_training=False):
+    def _binding(self, entry_id):
         entry = self._object("entries", entry_id)
         key_id = digest(entry["key"])
         _require(_read(safe_child(self.root, f"index/{key_id}.json")) == {"entry_id": entry_id}, "Model index changed")
         origin = self._object("origins/" + key_id, entry["canonical_origin"])
         folder = self.goal(safe_child(self.owner, origin["goal"]))
-        if "runtime_migration" in origin:
-            from .model_runtime_migration import verify_migration
+        return entry, key_id, origin, folder
 
-            verified = verify_migration(self, folder, origin["runtime_migration"], replay_training=replay_training)
-        else:
-            verified = validate_model_goal(folder, origin["model_id"], replay_training=replay_training)
+    def _bind_verified(self, entry_id, binding, verified):
+        entry, key_id, origin, folder = binding
         _require(
             verified["origin"] == {k: v for k, v in origin.items() if k not in {"goal", "key_id", "packet_id"}},
             "Model origin changed",
@@ -556,7 +554,49 @@ class ScientistModelLibrary:
             "Model binding changed",
         )
         _require(self._object("packets", entry["packet_id"]) == verified["packet"], "Published model changed")
+        _require(
+            file_hash(folder / "goal.json") == origin["goal_sha256"]
+            and file_hash(folder / "protocol.json") == origin["protocol_sha256"],
+            "Goal changed during model verification",
+        )
         return {**verified, "entry_id": entry_id, "key_id": key_id, "origin_goal": str(folder)}
+
+    def resolve(self, entry_id, *, replay_training=False):
+        binding = self._binding(entry_id)
+        _, _, origin, folder = binding
+        if "runtime_migration" in origin:
+            from .model_runtime_migration import verify_migration
+
+            verified = verify_migration(self, folder, origin["runtime_migration"], replay_training=replay_training)
+        else:
+            verified = validate_model_goal(folder, origin["model_id"], replay_training=replay_training)
+        return self._bind_verified(entry_id, self._binding(entry_id), verified)
+
+    def resolve_many(self, entry_ids, *, replay_training=False):
+        """Verify a bounded set, sharing terminal goal audits only within this call."""
+        from .shared_model_publication import SCHEMA, validate_shared_goal
+
+        _require(isinstance(entry_ids, list) and 1 <= len(entry_ids) <= 256, "Declare 1..256 model identities")
+        _require(type(replay_training) is bool, "Training replay must be a boolean")
+        identities = list(dict.fromkeys(_identity(value) for value in entry_ids))
+        bindings = {entry_id: self._binding(entry_id) for entry_id in identities}
+        shared, resolved = {}, {}
+        for entry_id, binding in bindings.items():
+            _, _, origin, folder = binding
+            if "runtime_migration" in origin or _read(folder / "protocol.json").get("schema") != SCHEMA:
+                value = self.resolve(entry_id, replay_training=replay_training)
+            else:
+                if folder not in shared:
+                    rows = validate_shared_goal(folder, replay_training=replay_training)
+                    shared[folder] = {row["origin"]["model_id"]: row for row in rows}
+                    _require(len(shared[folder]) == len(rows), "Repeated shared model identity")
+                _require(origin["model_id"] in shared[folder], "Model is not a qualified shared output")
+                value = shared[folder][origin["model_id"]]
+            resolved[entry_id] = self._bind_verified(entry_id, binding, value)
+        # A different target must not change an earlier target's registry binding.
+        for entry_id, value in resolved.items():
+            self._bind_verified(entry_id, self._binding(entry_id), value)
+        return resolved
 
     def catalog(self, *, verify=False):
         entries = []
