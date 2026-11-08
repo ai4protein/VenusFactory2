@@ -24,11 +24,17 @@
     "react-router-dom": "^7.18.5"
   },
   "devDependencies": {
-    "@types/dompurify": "^3.2.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^5.2.0",
     "typescript": "^5.6.3",
     "vite": "^7.3.7"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "@scarf/scarf": false
+  },
+  "scarfSettings": {
+    "enabled": false
   }
 }

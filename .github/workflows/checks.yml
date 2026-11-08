@@ -11,15 +11,15 @@ jobs:
   backend-boundaries:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.12'
       - name: Install service test dependencies
         run: >-
           python -m pip install -c requirements/service-security.txt
           "pytest>=8,<10" "pytest-asyncio>=1" "fastapi>=0.162.0"
-          "httpx>=0.28.1" "python-dotenv>=1.1.1" "PyYAML>=6.0.2"
+          "httpx>=0.28.1" "httpx2>=2.16.0" "python-dotenv>=1.1.1" "PyYAML>=6.0.2"
       - name: Test browser identities and worker lifecycle
         env:
           PYTHONPATH: src
@@ -27,15 +27,16 @@ jobs:
           TRANSFORMERS_OFFLINE: '1'
         run: >-
           python -m pytest -q tests/test_http_security.py tests/test_worker_lifecycle.py
-          tests/test_repository_state_exclusions.py
+          tests/test_repository_state_exclusions.py tests/test_incremental_install.py
+          tests/test_initialize.py tests/test_skill_validation.py
   source-and-frontend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.12'
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
           cache: npm
@@ -45,11 +46,12 @@ jobs:
           python scripts/check_repository.py
           python scripts/check_release.py
           python scripts/check_layout.py
-          python scripts/validate_skills.py
+          python scripts/validate_skills.py --strict
           python scripts/sync_platform_docs.py --check
       - name: Test and build the frontend
         working-directory: frontend
         run: |
           npm ci --no-audit --no-fund
+          npm audit --audit-level=moderate
           npm test
           npm run build
