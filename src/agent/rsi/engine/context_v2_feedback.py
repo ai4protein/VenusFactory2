@@ -7,7 +7,7 @@ import math
 from pathlib import Path
 
 try:
-    from agent.rsi import context_v2_controls, generated_context_v2, reference_thermal_baselines
+    from . import context_v2_controls, generated_context_v2, reference_thermal_baselines
     from .protein_model import digest
 except ImportError:  # Frozen standalone MCP capability.
     import context_v2_controls

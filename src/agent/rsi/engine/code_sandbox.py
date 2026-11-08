@@ -20,7 +20,7 @@ from contextvars import ContextVar
 from pathlib import Path
 
 try:
-    from agent.rsi.engine.protein_references import require_reference_parity
+    from .protein_references import require_reference_parity
 except ImportError:  # Read-only standalone capability bundle.
     from protein_references import require_reference_parity
 

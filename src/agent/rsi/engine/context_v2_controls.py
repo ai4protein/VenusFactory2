@@ -18,7 +18,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVR
 
 try:
-    from agent.rsi import reference_thermal_baselines as reference_thermal
+    from . import reference_thermal_baselines as reference_thermal
     from .generated_context_v2 import validate_rows
 except ImportError:
     import reference_thermal_baselines as reference_thermal
