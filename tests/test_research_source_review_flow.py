@@ -73,7 +73,7 @@ async def test_complete_report_resume_and_dossier():
 async def test_source_failure_triggers_author_revision_and_independent_recheck(where):
     model=FixtureModel(bad_chapter=where=="chapter",bad_editor=where=="editor")
     state=await run(model)
-    assert state["phase"]=="completed" and len(model.calls)==13
+    assert state["phase"]=="completed" and len(model.calls)==(14 if where=="chapter" else 13)
     assert "A signal peptide is removed." not in state["report"]
     assert any("unsupported" in a["response"] for a in state["source_review"]["attempts"])
     with build_dossier({**state,"id":"fixture","status":"completed"}) as handle,zipfile.ZipFile(handle) as bundle:

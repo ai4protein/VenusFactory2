@@ -54,6 +54,7 @@ jobs:
           tests/harness/test_messages_bridge.py tests/harness/test_responses_gateway.py
           tests/harness/test_codex_adapter.py tests/harness/test_web_live_text.py
           tests/harness/test_execution_catalog.py tests/harness/test_adapters.py
+          tests/test_research_review_recovery.py
 
   source-and-frontend:
     runs-on: ubuntu-latest
