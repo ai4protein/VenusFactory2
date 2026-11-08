@@ -23,7 +23,7 @@ ENSEMBL_URL = 'https://rest.ensembl.org/'
 EUROPEPMC_URL = 'https://www.ebi.ac.uk/europepmc/webservices/rest/search'
 PUBCHEM_URL = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/'
 OTOperation = Literal['search', 'target', 'disease', 'drug']
-OTResource = Literal['overview', 'diseases', 'drugs', 'tractability']
+OTResource = Literal['overview', 'diseases', 'drugs', 'tractability', 'expression', 'genetic_constraint']
 OTEntity = Literal['all', 'target', 'disease', 'drug']
 EnsemblOperation = Literal['symbol', 'lookup', 'xrefs', 'homology', 'sequence']
 SequenceType = Literal['protein', 'cdna', 'cds', 'genomic']
@@ -54,7 +54,7 @@ class OpenTargetsInput(QueryInput):
                 raise ValueError('Use a resolved identifier without query or entity filters')
             if self.operation != 'target' and self.resource != 'overview':
                 raise ValueError('Resource selection applies only to a target')
-            if self.page and (self.operation == 'drug' or self.operation == 'target' and self.resource in {'overview', 'tractability'}):
+            if self.page and (self.operation == 'drug' or self.operation == 'target' and self.resource in {'overview', 'tractability', 'genetic_constraint'}):
                 raise ValueError('This resource is not paginated')
         return self
 
@@ -162,6 +162,11 @@ async def opentargets_query(**kwargs):
             fields = 'id approvedSymbol approvedName biotype'
             if arg.resource in {'overview', 'tractability'}:
                 fields += ' tractability{label modality value}'
+            elif arg.resource == 'genetic_constraint':
+                fields += ' geneticConstraint{constraintType exp obs oe oeLower oeUpper score}'
+            elif arg.resource == 'expression':
+                declaration += ',$page:Pagination'
+                fields += ' baselineExpression(page:$page){count rows{targetId targetFromSourceId datatypeId datasourceId unit tissueBiosampleFromSource celltypeBiosampleFromSource min q1 median q3 max qualityControls distribution_score specificity_score}}'
             elif arg.resource == 'diseases':
                 declaration += ',$page:Pagination'
                 fields += ' associatedDiseases(page:$page){count rows{score disease{id name description}}}'
@@ -190,8 +195,10 @@ async def opentargets_query(**kwargs):
         return result('Open Targets', [], sources, **extra)
     if arg.operation == 'search':
         rows, total = record['hits'][:arg.limit], record['total']
-    elif arg.operation == 'target' and arg.resource in {'diseases', 'drugs'} or arg.operation == 'disease':
-        field = 'associatedTargets' if arg.operation == 'disease' else 'associatedDiseases' if arg.resource == 'diseases' else 'drugAndClinicalCandidates'
+    elif arg.operation == 'target' and arg.resource in {'diseases', 'drugs', 'expression'} or arg.operation == 'disease':
+        field = 'associatedTargets' if arg.operation == 'disease' else {
+            'diseases': 'associatedDiseases', 'drugs': 'drugAndClinicalCandidates',
+            'expression': 'baselineExpression'}[arg.resource]
         group = record[field]
         start = arg.page * arg.limit if field == 'drugAndClinicalCandidates' else 0
         rows, total = group['rows'][start:start + arg.limit], group['count']

@@ -1,0 +1,143 @@
+import copy
+import json
+import pytest
+from backend.web_v2.research_evidence_passages import selected_passages, resolve_passage, source_digest
+from backend.web_v2 import research_source_review as sr
+
+SOURCE = {"id":"S1","kind":"database","title":"Reference annotation",
+          "text":json.dumps({"features":[{"type":"Initiator methionine","description":"Removed",
+                                         "location":{"start":1,"end":1}}],"sequence_length":147}),
+          "url":"https://example.org/entry"}
+DOCUMENT = {"id":"identity","title":"Identity","text":"The initiator methionine is removed. [S1]"}
+
+
+def assessment(request, *, verdict="supported"):
+    result=[]
+    for unit in request["units"]:
+        source=next((s for s in request["sources"] if s["id"] in unit["citations"]),None)
+        passage=source["passages"][0] if source and source["passages"] else None
+        result.append({"unit_id":unit["id"],"classification":"factual","verdict":verdict,
+                       "issues":[] if verdict=="supported" else [{"claim":unit["text"],"reason":"The annotation does not establish this claim."}],
+                       "evidence":[{"source_id":source["id"],"passage_id":passage["id"],"quote":passage["text"]}]
+                       if passage else []})
+    return json.dumps({"assessments":result})
+
+
+def state():
+    return {"sources":[copy.deepcopy(SOURCE)],"model_calls":0,"model_call_limit":18}
+
+
+def test_json_and_plain_anchors_match_original_saved_evidence():
+    source={**SOURCE,"text":json.dumps({"filler":"background "*900,
+                                      "features":[{"type":"Initiator methionine","description":"Removed"}]})}
+    selected=selected_passages(source,"signal peptide cleavage maturation",600)
+    assert any("Initiator methionine" in p["text"] for p in selected["passages"])
+    for passage in selected["passages"]:
+        assert resolve_passage(source,passage["location"])==passage["text"]
+    plain={**SOURCE,"text":"Original annotation. "*400}
+    for passage in selected_passages(plain,"annotation",300)["passages"]:
+        assert resolve_passage(plain,passage["location"])==passage["text"]
+
+
+def test_short_table_heading_and_long_paragraph_claims_are_not_dropped():
+    doc={**DOCUMENT,"text":"## A strong experimental claim\n\n|Value|Result|\n|---|---|\n|Class|1 [S1]|\n\n"+
+         "A factual assertion. "*500+"[S1]"}
+    units=sr.units(doc,[SOURCE])
+    assert "A strong experimental claim" in units[0]["text"]
+    assert "|Class|1" in units[0]["text"]
+    assert len(units)>2 and all(unit["citations"]==["S1"] for unit in units)
+
+@pytest.mark.parametrize("mutation",["missing","duplicate","unknown_unit","wrong_quote","wrong_source","wrong_passage","empty_evidence",
+                                    "unsupported_without_issue","supported_with_issue","unmarked_proposal","bad_issue","extra_field"])
+def test_incomplete_or_unanchored_verdicts_are_rejected(mutation):
+    request=sr.packet(sr.units(DOCUMENT,[SOURCE]),[SOURCE])
+    response=json.loads(assessment(request));row=response["assessments"][0]
+    if mutation=="missing":response["assessments"]=[]
+    elif mutation=="duplicate":response["assessments"].append(copy.deepcopy(row))
+    elif mutation=="unknown_unit":row["unit_id"]="unknown"
+    elif mutation=="wrong_quote":row["evidence"][0]["quote"]="Signal peptide removed"
+    elif mutation=="wrong_source":row["evidence"][0]["source_id"]="S9"
+    elif mutation=="wrong_passage":row["evidence"][0]["passage_id"]="fabricated"
+    elif mutation=="empty_evidence":row["evidence"]=[]
+    elif mutation=="unsupported_without_issue":row["verdict"]="unsupported"
+    elif mutation=="supported_with_issue":row["issues"]=[{"claim":"methionine","reason":"Unresolved"}]
+    elif mutation=="unmarked_proposal":row.update(classification="proposal",evidence=[])
+    elif mutation=="bad_issue":row.update(verdict="uncertain",issues=[{"claim":"not present","reason":"Missing evidence"}])
+    else:row["authority"]="trust me"
+    with pytest.raises((ValueError,KeyError,TypeError)):
+        sr.validate_assessments(json.dumps(response),request,[SOURCE])
+
+
+def test_fabricated_packet_cannot_replace_original_evidence():
+    request=sr.packet(sr.units(DOCUMENT,[SOURCE]),[SOURCE])
+    request["sources"][0]["passages"][0]["text"]="Invented signal peptide cleavage."
+    with pytest.raises(ValueError,match="original source"):
+        sr.validate_assessments(assessment(request),request,[SOURCE])
+
+
+def test_explicit_proposals_need_no_fake_measurement_citations():
+    document={**DOCUMENT,"text":"We propose testing whether expression conditions alter the yield."}
+    request=sr.packet(sr.units(document,[]),[])
+    response={"assessments":[{"unit_id":request["units"][0]["id"],"classification":"proposal",
+                             "verdict":"supported","issues":[],"evidence":[]}]}
+    assert sr.validate_assessments(json.dumps(response),request,[])[0]["passed"]
+
+
+@pytest.mark.asyncio
+async def test_review_cache_invalidated_by_source_or_draft_changes():
+    current=state();calls=[]
+    async def complete(model,messages,tokens):
+        current["model_calls"]+=1;calls.append(messages)
+        assert len(messages)==2 and "independently review" in messages[0]["content"]
+        return assessment(json.loads(messages[1]["content"])),False
+    receipts=await sr.review_documents(current,{"model_id":"fixture"},[DOCUMENT],complete,lambda:None)
+    assert sr.document_ready(DOCUMENT,current["sources"],receipts["identity"])
+    await sr.review_documents(current,{"model_id":"fixture"},[DOCUMENT],complete,lambda:None)
+    assert len(calls)==1
+    changed={**DOCUMENT,"text":DOCUMENT["text"]+" Additional assertion."}
+    assert not sr.document_ready(changed,current["sources"],receipts["identity"])
+    current["sources"][0]["query_arguments"]={"organism":"different"}
+    assert not sr.document_ready(DOCUMENT,current["sources"],receipts["identity"])
+    await sr.review_documents(current,{"model_id":"fixture"},[DOCUMENT],complete,lambda:None)
+    assert len(calls)==2
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure",["truncated","missing","unsupported","budget"])
+async def test_failed_review_retained_and_never_complete(failure):
+    current=state()
+    if failure=="budget":current["model_calls"]=current["model_call_limit"]
+    async def complete(model,messages,tokens):
+        current["model_calls"]+=1;request=json.loads(messages[1]["content"])
+        return ('{"assessments":[]}' if failure=="missing" else
+                assessment(request,verdict="unsupported" if failure=="unsupported" else "supported"),failure=="truncated")
+    receipts=await sr.review_documents(current,{"model_id":"fixture"},[DOCUMENT],complete,lambda:None)
+    assert not sr.document_ready(DOCUMENT,current["sources"],receipts["identity"])
+    if failure!="budget":
+        attempt=current["source_review"]["attempts"][0]
+        assert attempt["response"] and attempt["request"]["sources"]
+    assert current["model_calls"]<=current["model_call_limit"]
+
+
+@pytest.mark.asyncio
+async def test_source_changes_mid_response_do_not_validate_packet():
+    current=state()
+    async def complete(model,messages,tokens):
+        current["model_calls"]+=1;request=json.loads(messages[1]["content"])
+        current["sources"][0]["text"]="A different annotation."
+        return assessment(request),False
+    result=await sr.review_documents(current,{"model_id":"fixture"},[DOCUMENT],complete,lambda:None)
+    assert result["identity"]["status"]=="partial"
+
+def test_progress_events_do_not_duplicate_audit_prompts_or_old_drafts(monkeypatch):
+    import backend.web_v2.task_progress as progress
+    class Queue:
+        frames=[]
+        def append_frame(self,*args):self.frames.append(args)
+    monkeypatch.setenv("VENUS_QUEUE_JOB_ID","test-job")
+    monkeypatch.setenv("VENUS_QUEUE_LEASE_TOKEN","test-lease")
+    monkeypatch.setattr(progress,"JobQueue",Queue)
+    progress.publish_progress({"chapters":[{"id":"x","status":"reviewing","draft":"PRIVATE_DRAFT",
+                                          "draft_history":[{"draft":"PRIVATE_OLD"}]}],
+                               "source_review":{"attempts":[{"request":"PRIVATE_PACKET"}]}})
+    assert len(Queue.frames)==1
+    assert "reviewing" in Queue.frames[0][1] and "PRIVATE" not in Queue.frames[0][1]

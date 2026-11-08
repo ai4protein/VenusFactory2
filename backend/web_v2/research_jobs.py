@@ -75,6 +75,8 @@ class ResearchJobs:
         model_option(payload['model_id'])  # credential readiness and free route before admission
         if payload.get('accession') and not ACCESSION.fullmatch(payload['accession']):
             raise ValueError('Choose a UniProt entry')
+        if payload.get('accession') and payload.get('sequence'):
+            raise ValueError('Choose one protein entry or one uploaded sequence/structure')
         if payload.get('pdb_id'):
             from mcp_tools.tools.database.rcsb.research_target import pdb_identifier
             payload['pdb_id'] = pdb_identifier(payload['pdb_id'])
@@ -120,7 +122,7 @@ class ResearchJobs:
         write(folder/'request.json', row)
         return self.get(owner, identity)
 
-    def get(self, owner, identity):
+    def get(self, owner, identity, *, include_evidence=False):
         identity, row = self.owned(owner, identity)
         folder = self.folder(identity)
         state = json.loads((folder/'state.json').read_text()) if (folder/'state.json').exists() else {}
@@ -130,14 +132,38 @@ class ResearchJobs:
             status = 'failed'
         if status == 'completed' and state.get('minimum_met') is False:
             status = 'incomplete'
+        if state.get('review') and state.get('review_status', 'completed') == 'completed':
+            from backend.web_v2.research_editor import editor_audit, review_ready
+            lang = row['payload'].get('lang', 'en')
+            state['review_audit'] = editor_audit(state['review'], [source['id'] for source in state.get('sources', [])], lang)
+            if not review_ready(state, lang):
+                state.update(review_status='partial', partial=True)
+        if state.get("evidence_review_required"):
+            from .research_longform import chapter_ready
+            for chapter in state.get("chapters", []):
+                if chapter.get("status") == "completed" and not chapter_ready(chapter, state.get("sources", [])):
+                    chapter["status"] = "partial"
+                    state["partial"] = True
+            if status == "completed" and (state.get("partial") or state.get("phase") == "incomplete"):
+                status = "incomplete"
         if state.get('chapters') and state.get('report'):
             from backend.web_v2.research_longform import assemble
             state['report'] = assemble(state, row['payload'].get('lang', 'en'))
         from backend.web_v2.research_longform import MAX_MODEL_CALLS
-        resumable = status in {'failed', 'interrupted', 'incomplete'} and int(state.get('model_calls', 0)) < MAX_MODEL_CALLS and int(row.get('resume_count', 0)) < 2
-        reason = ''
+        unfinished = any(c.get('status') != 'completed' for c in state.get('chapters', []))
+        retry_sections = status == 'completed' and (
+            unfinished or state.get('review_status') in {'partial', 'unavailable'})
+        resumable = (status in {'failed', 'interrupted', 'incomplete'} or retry_sections) and int(state.get('model_calls', 0)) < MAX_MODEL_CALLS and int(row.get('resume_count', 0)) < 2
+        reason = state.get('stop_reason', '') if retry_sections else ''
         if status in {'failed', 'interrupted', 'incomplete'}:
             reason = state.get('stop_reason') or ('timeout' if 'limit' in queue.get('message', '').lower() else 'interrupted' if status == 'interrupted' else 'incomplete' if status == 'incomplete' else 'unavailable')
+        if not include_evidence:
+            review = state.pop("source_review", None)
+            state.pop("source_review_history", None)
+            if review:
+                state["source_review_summary"] = {k: review.get(k) for k in ("policy", "status", "pending", "documents")}
+            for chapter in state.get("chapters", []):
+                chapter.pop("draft_history", None)
         return {**state, 'resumable': resumable, 'stop_reason': reason, 'id': identity, 'title': row['title'], 'created': row['created'], 'status': status,
                 'job_number': self.records.register('report', identity, owner, 'research', row['title'], row['created'])['job_number'],
                 'queue': queue, 'model_id': row['payload']['model_id'], 'analyses': row['payload']['analyses'],
@@ -177,6 +203,24 @@ class ResearchJobs:
             if not current['resumable']: raise ValueError('This research cannot resume within its run budget')
             self.validate(dict(row['payload']))  # same free route and current online policy
             if admit: admit(identity)
+            # Keep the exact previous state before a new writer changes drafts.
+            previous = folder / 'state.json'
+            if previous.is_file():
+                raw = previous.read_bytes()
+                snapshots = folder / 'attempts'
+                snapshots.mkdir(exist_ok=True, mode=0o700)
+                name = f"before_resume_{int(row.get('resume_count', 0))+1}_{hashlib.sha256(raw).hexdigest()}.json"
+                destination = snapshots / name
+                try:
+                    fd = os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+                except FileExistsError:
+                    if destination.is_symlink() or destination.read_bytes() != raw:
+                        raise ValueError('Research checkpoint snapshot changed')
+                else:
+                    with os.fdopen(fd, 'wb') as stream:
+                        stream.write(raw)
+                        stream.flush()
+                        os.fsync(stream.fileno())
             env = dict(os.environ, VENUS_REPORT_ROOT=str(self.root))
             qid, _ = launch([sys.executable, '-u', '-m', 'backend.web_v2.research_jobs', identity], owner=owner,
                             kind='protein-research', resource='research', timeout=2400, env=env,
@@ -207,7 +251,8 @@ def worker(identity):
     try:
         from backend.web_v2.research_longform import run_long_report
         checkpoint = json.loads((folder/'state.json').read_text()) if (folder/'state.json').exists() else None
-        asyncio.run(asyncio.wait_for(run_long_report(row['payload'], update, service_cache=folder/'remote', checkpoint=checkpoint), timeout=2300))
+        asyncio.run(asyncio.wait_for(run_long_report(row['payload'], update, service_cache=folder/'remote', checkpoint=checkpoint,
+                                                   input_store=folder/'input_snapshots'), timeout=2300))
     except Exception as exc:
         existing = json.loads((folder/'state.json').read_text()) if (folder/'state.json').exists() else {}
         update({**existing, 'status': 'failed', 'stop_reason': 'timeout' if isinstance(exc, TimeoutError) else 'unavailable', 'message': 'Research stopped before completion'})

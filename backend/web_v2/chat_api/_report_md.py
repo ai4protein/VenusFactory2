@@ -15,7 +15,7 @@ import re
 from datetime import datetime
 from typing import Any
 
-from agent.chat_graph import _format_clarification_answers
+from agent.graph.helpers.plan_helpers import _format_clarification_answers
 from mcp_tools.common.common_utils import redact_path_text
 
 from backend.web_v2.chat_api._shared import _infer_chat_mode, _is_zh_text

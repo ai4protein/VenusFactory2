@@ -1,7 +1,7 @@
 """Shared public-service tool for Agent and Scientist."""
 from typing import Literal
 from pydantic import BaseModel, Field
-from langchain.tools import tool
+from langchain_core.tools import tool
 import asyncio
 from .services import run_service, get_json, ACCESSION, sequence as clean_sequence, structure_chain as clean_structure
 
@@ -111,7 +111,7 @@ from .knowledge_queries import (
     opentargets_query, ensembl_query, europepmc_query, pubchem_query,
 )
 query_opentargets_tool = shared_tool('query_opentargets', OpenTargetsInput, opentargets_query,
-    'Query Open Targets for human target-disease associations, drug candidates, tractability and drug mechanisms. Search a gene symbol, disease or drug name first to resolve current IDs; inspect target resource diseases/drugs/tractability, disease-associated targets or drug details. Returns source links, API/data release and bounded pages. Association scores are not causal or experimental validation.')
+    'Query Open Targets for human target-disease associations, drug candidates, tractability and drug mechanisms. Search a gene symbol, disease or drug name first to resolve current IDs; inspect target resource diseases/drugs/expression/genetic_constraint/tractability, disease-associated targets or drug details. Returns source links, API/data release and bounded pages. Association scores are not causal or experimental validation.')
 query_ensembl_tool = shared_tool('query_ensembl', EnsemblInput, ensembl_query,
     'Resolve gene symbols to Ensembl IDs with explicit species, retrieve gene/transcript/protein annotations, cross-references, orthologues and protein/cDNA/CDS/genomic sequences. Use symbol first, then the returned stable ID; target_species narrows orthologues. No local genome database or gget installation needed.')
 query_europepmc_tool = shared_tool('query_europepmc', EuropePMCInput, europepmc_query,

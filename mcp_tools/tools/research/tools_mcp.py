@@ -57,7 +57,7 @@ from .knowledge_queries import (
 
 @mcp.tool(name='query_opentargets')
 async def query_opentargets(operation: OTOperation='search', query: str='', identifier: str='', entity: OTEntity='all', resource: OTResource='overview', limit: int=10, page: int=0) -> dict:
-    """Open Targets: search gene/disease/drug names to resolve current IDs, then query target overview, diseases, drugs or tractability; disease-associated targets; or drug mechanisms. Human targets only. Bounded pages and release/source metadata. Associations do not prove causation."""
+    """Open Targets: search gene/disease/drug names to resolve current IDs, then query target overview, diseases, drugs, expression, genetic constraint or tractability; disease-associated targets; or drug mechanisms. Human targets only. Bounded pages and release/source metadata. Associations do not prove causation."""
     return await opentargets_query(operation=operation, query=query, identifier=identifier, entity=entity, resource=resource, limit=limit, page=page)
 
 

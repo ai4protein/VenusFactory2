@@ -180,7 +180,7 @@ def mapped_entry(taxon=9606, gene='ENSG00000139618.19'):
 
 def test_researcher_does_not_invent_cross_species_or_ambiguous_target_mappings():
     from backend.web_v2.research_report import knowledge_plan
-    assert len(knowledge_plan(mapped_entry(), ['function'])) == 3
+    assert len(knowledge_plan(mapped_entry(), ['function'])) == 4
     assert len(knowledge_plan(mapped_entry(10090, 'ENSMUSG00000041147'), ['function'])) == 1
     assert knowledge_plan({}, ['function']) == []
     entry = mapped_entry()

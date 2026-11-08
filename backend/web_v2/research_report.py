@@ -208,8 +208,13 @@ def knowledge_plan(entry, scopes):
         return []
     planned = [('ensembl', 'query_ensembl', {'operation': 'lookup', 'identifier': gene, 'species': species})]
     if organism.get('taxonId') == 9606 and re.fullmatch(r'ENSG[0-9]{11}', gene) and set(scopes) & {'function', 'variants', 'interactions', 'engineering'}:
+        resources = ['diseases', 'drugs']
+        if set(scopes) & {'function', 'interactions'}: resources.append('expression')
+        if 'variants' in scopes: resources.append('genetic_constraint')
+        if 'engineering' in scopes: resources.append('tractability')
         planned += [('opentargets_' + resource, 'query_opentargets',
-                     {'operation': 'target', 'identifier': gene, 'resource': resource, 'limit': 5}) for resource in ['diseases', 'drugs']]
+                     {'operation': 'target', 'identifier': gene, 'resource': resource, 'limit': 5})
+                    for resource in resources]
     return planned
 
 
@@ -316,6 +321,9 @@ async def complete(model_id, messages, output_tokens=3000):
                 async with client.stream('POST', b.base_url.rstrip('/') + '/chat/completions', json=payload,
                                          headers=request_headers(b.base_url, key)) as response:
                     if response.status_code != 200:
+                        from agent.harness.model_availability import ModelServiceUnavailable, model_service_failure
+                        if model_service_failure(response.status_code):
+                            raise ModelServiceUnavailable(response.status_code)
                         raise ValueError('Model returned HTTP ' + str(response.status_code))
                     raw = bytearray()
                     async for chunk in response.aiter_bytes():
@@ -341,8 +349,13 @@ def cite_report(text, sources):
     return re.sub(r'\[(S\d+)\]', lambda m: f"[{m[1]}]({known[m[1]]['url']})" if m[1] in known and known[m[1]].get('url') else ('[' + m[1] + ']' if m[1] in known else '[source unavailable]'), text)
 
 
-async def run_research(payload, update, *, synthesize=True, model_call=None, service_cache=None):
+async def run_research(payload, update, *, synthesize=True, model_call=None, service_cache=None,
+                       input_store=None, input_snapshot=None):
     """At most two model calls, three literature and two web queries per report."""
+    targets = (bool(payload.get('pdb_id')), bool(payload.get('accession')),
+               bool(payload.get('sequence') or payload.get('structure_pdb')))
+    if sum(targets) > 1:
+        raise ValueError('Choose one protein entry or one uploaded sequence/structure')
     scopes = validate_scopes(payload['analyses'])
     model_call = model_call or complete
     sources, sections, steps = [], [], []
@@ -358,7 +371,7 @@ async def run_research(payload, update, *, synthesize=True, model_call=None, ser
     def add(rows):
         for row in rows:
             if len(sources) < 48 and (not row.get('url') or row['url'] not in {s.get('url') for s in sources}):
-                sources.append({**row, 'id': 'S' + str(len(sources)+1), 'retrieved': datetime.now(timezone.utc).isoformat()})
+                sources.append({**row, 'id': 'S' + str(len(sources)+1), 'retrieved': row.get('retrieved') or datetime.now(timezone.utc).isoformat()})
         publish()
     async def collect(key, fn):
         step(key, 'running')
@@ -375,42 +388,73 @@ async def run_research(payload, update, *, synthesize=True, model_call=None, ser
     source_chain = structure_chain
     protein = payload.get('protein', '')
     step('identity', 'running')
-    if payload.get('pdb_id'):
-        from mcp_tools.tools.database.rcsb.research_target import load_pdb_target
-        target = await load_pdb_target(payload['pdb_id'], structure_chain)
-        card = target['protein']; state['protein'] = card
-        sequence, structure_pdb, structure_chain = target['sequence'], target['structure_pdb'], target['structure_chain']
-        source_chain, accession = target['source_chain'], card['accession']
-        protein = card['name'] + ' (' + card['organism'] + ')'
-        add([{'title': 'PDB · ' + card['pdb_id'] + ' · chain ' + source_chain, 'url': card['url'],
-              'kind': 'database', 'evidence_level': 'experimental_structure_metadata',
-              'text': json.dumps({**card, 'interpretation': target['interpretation']}, ensure_ascii=False)}])
-        if accession:
-            try:
-                entry = await get_json('https://rest.uniprot.org/uniprotkb/' + accession + '.json')
-                add([{'title': 'UniProt reference · ' + accession, 'url': 'https://www.uniprot.org/uniprotkb/' + accession,
-                      'kind': 'database', 'evidence_level': 'reference_protein_annotation',
-                      'text': json.dumps({'annotation_scope': target['interpretation'], 'entry': compact_entry(entry)}, ensure_ascii=False)}])
-            except Exception:
-                state['partial'] = True
-        step('identity', 'completed', card['pdb_id'] + ' · chain ' + source_chain)
-    elif payload.get('accession'):
-        try:
-            entry = await get_json('https://rest.uniprot.org/uniprotkb/' + payload['accession'] + '.json')
-            card = protein_card(entry)
-            protein = card['name'] + ' (' + card['organism'] + ')'
-            sequence = clean_sequence(entry['sequence']['value'])
-            state['protein'] = card
-            selected = compact_entry(entry)
-            add([{'title': 'UniProt · ' + card['accession'] + ' · ' + card['name'], 'url': 'https://www.uniprot.org/uniprotkb/' + card['accession'],
-                  'kind': 'database', 'evidence_level': 'database_annotation', 'text': json.dumps(selected, ensure_ascii=False)}])
-            step('identity', 'completed', protein)
-        except Exception:
-            step('identity', 'unavailable', 'UniProt entry could not be retrieved')
-            state['partial'] = True
+    restored = None
+    if input_snapshot is not None:
+        if input_store is None:
+            raise ValueError('Saved research inputs are unavailable')
+        from backend.web_v2.research_input_snapshot import load_inputs
+        restored = load_inputs(input_store, input_snapshot)
+    if restored is not None:
+        entry, sequence = restored.get('entry'), restored['sequence']
+        structure_pdb = restored.get('structure_pdb', '')
+        structure_chain, source_chain = restored.get('structure_chain', ''), restored.get('source_chain', '')
+        accession = restored.get('accession', '')
+        state['protein'] = restored['protein']
+        state['partial'] = bool(restored.get('identity_partial'))
+        protein = restored.get('protein_label') or protein
+        add(restored.get('sources', []))
+        state['input_snapshot'] = dict(input_snapshot)
+        step('identity', 'completed', protein)
     else:
-        state['protein'] = {'name': protein or 'Uploaded sequence', 'length': len(sequence)}
-        step('identity', 'completed', 'User-provided sequence; identity not inferred')
+        if payload.get('pdb_id'):
+            from mcp_tools.tools.database.rcsb.research_target import load_pdb_target
+            target = await load_pdb_target(payload['pdb_id'], structure_chain)
+            card = target['protein']; state['protein'] = card
+            sequence, structure_pdb, structure_chain = target['sequence'], target['structure_pdb'], target['structure_chain']
+            source_chain, accession = target['source_chain'], card['accession']
+            protein = card['name'] + ' (' + card['organism'] + ')'
+            add([{'title': 'PDB · ' + card['pdb_id'] + ' · chain ' + source_chain, 'url': card['url'],
+                  'kind': 'database', 'evidence_level': 'experimental_structure_metadata',
+                  'text': json.dumps({**card, 'interpretation': target['interpretation']}, ensure_ascii=False)}])
+            if accession:
+                try:
+                    entry = await get_json('https://rest.uniprot.org/uniprotkb/' + accession + '.json')
+                    add([{'title': 'UniProt reference · ' + accession, 'url': 'https://www.uniprot.org/uniprotkb/' + accession,
+                          'kind': 'database', 'evidence_level': 'reference_protein_annotation',
+                          'text': json.dumps({'annotation_scope': target['interpretation'], 'entry': compact_entry(entry)}, ensure_ascii=False)}])
+                except Exception:
+                    state['partial'] = True
+            step('identity', 'completed', card['pdb_id'] + ' · chain ' + source_chain)
+        elif payload.get('accession'):
+            try:
+                entry = await get_json('https://rest.uniprot.org/uniprotkb/' + payload['accession'] + '.json')
+                card = protein_card(entry)
+                protein = card['name'] + ' (' + card['organism'] + ')'
+                sequence = clean_sequence(entry['sequence']['value'])
+                state['protein'] = card
+                selected = compact_entry(entry)
+                add([{'title': 'UniProt · ' + card['accession'] + ' · ' + card['name'], 'url': 'https://www.uniprot.org/uniprotkb/' + card['accession'],
+                      'kind': 'database', 'evidence_level': 'database_annotation', 'text': json.dumps(selected, ensure_ascii=False)}])
+                step('identity', 'completed', protein)
+            except Exception:
+                step('identity', 'unavailable', 'UniProt entry could not be retrieved')
+                state['partial'] = True
+        else:
+            state['protein'] = {'name': protein or 'Uploaded sequence', 'length': len(sequence)}
+            step('identity', 'completed', 'User-provided sequence; identity not inferred')
+        if input_store is not None and (sequence or structure_pdb) and any(
+                item['id'] == 'identity' and item['status'] == 'completed' for item in steps):
+            from backend.web_v2.research_input_snapshot import save_inputs
+            state['input_snapshot'] = save_inputs(input_store, {
+                'origin': 'pdb' if payload.get('pdb_id') else 'uniprot' if payload.get('accession') else 'upload',
+                'recorded_at': datetime.now(timezone.utc).isoformat(),
+                'sequence': sequence, 'structure_pdb': structure_pdb,
+                'structure_chain': structure_chain, 'source_chain': source_chain,
+                'accession': accession, 'pdb_id': payload.get('pdb_id', ''),
+                'entry': entry, 'protein': state.get('protein', {}),
+                'identity_partial': bool(state['partial']),
+                'protein_label': protein, 'sources': list(sources)})
+            publish()
     protein = protein or payload.get('accession') or 'unidentified protein'
     if payload.get('material_sources'):
         step('materials','running')
@@ -457,6 +501,7 @@ async def run_research(payload, update, *, synthesize=True, model_call=None, ser
                 url = source['url'] + ('#' + args['resource'] if 'resource' in args else '')
                 return [{'title': value['provider'] + ' · ' + args.get('identifier', '') + ' · ' + args.get('resource', args.get('operation', '')),
                          'url': url, 'kind': 'database', 'evidence_level': 'database_annotation',
+                         'query_tool': tool_name, 'query_arguments': dict(args),
                          'text': json.dumps(value, ensure_ascii=False)}]
             await collect(key, collect_knowledge)
     if 'properties' in scopes:

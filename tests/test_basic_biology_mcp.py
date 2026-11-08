@@ -133,10 +133,11 @@ def test_online_discovery_includes_remote_tools_but_denies_local_foldseek():
         assert set(b.BASIC_PUBLIC_TOOL_NAMES) <= PI_SEARCH_TOOL_NAMES
         assert not is_tool_allowed('download_foldseek_results_by_pdb_file')
         assert not is_tool_allowed('fake_foldseek_remote')
-        for key in ('query_gget', 'query_ncbi', 'query_foldseek_remote'):
+        for key in b.BASIC_PUBLIC_TOOL_NAMES:
             assert key in json.dumps(search(key, kind='tools'))
         text = discovery_instructions(['mcp__venusfactory__'+n for n in names])
-        assert all('mcp__venusfactory__'+n in text for n in b.BASIC_PUBLIC_TOOL_NAMES)
+        # Availability comes from live discovery rather than an exhaustive prompt.
+        assert 'mcp__venusfactory__search_research_tools' in text
 
 
 @pytest.mark.asyncio

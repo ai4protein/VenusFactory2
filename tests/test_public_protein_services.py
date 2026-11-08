@@ -184,3 +184,16 @@ class PublicProteinTests(unittest.IsolatedAsyncioTestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+def test_foldseek_brief_response_preserves_alignment_for_venusrem():
+    async def exercise():
+        hit={"target":"1abc_A","qAln":"ACDE","dbAln":"ACDF","qStartPos":1,"qEndPos":4,"tCa":0,"tSeq":0}
+        payload={"results":[{"db":"pdb100","alignments":[[hit]]}]}
+        fake=AsyncMock(side_effect=[{"status":"COMPLETE"},payload])
+        with patch.object(s,"get_json",new=fake):
+            result=await s.foldseek({"include_alignments":True},{"job_id":"existing-ticket"},lambda:None)
+        assert fake.call_args.args[1]=={"format":"brief"}
+        assert result["hits"][0]["qAln"]=="ACDE"
+        assert result["hits"][0]["dbAln"]=="ACDF"
+        assert "tCa" not in result["hits"][0]
+    asyncio.run(exercise())

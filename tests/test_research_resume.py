@@ -56,3 +56,47 @@ def test_resume_preserves_activity_ids_and_does_not_repeat_saved_transitions():
     assert events[0] == old[0]
     assert [e['id'] for e in events] == [501, 502]
     assert len(journal.observe({'phase': 'chapters', 'chapters': [{'id': 'identity', 'status': 'completed'}]})) == 2
+
+def test_partial_completed_report_can_resume_and_keeps_previous_draft(tmp_path, monkeypatch):
+    jobs, identity = fixture(tmp_path, "completed", calls=12)
+    folder = jobs.folder(identity)
+    write(folder / "state.json", {
+        "model_calls": 12, "report": "Retained draft", "minimum_met": True, "partial": True,
+        "stop_reason": "model_service",
+        "sources": [], "chapters": [
+            {"id": "one", "title": "One", "status": "completed", "draft": "Done", "source_ids": []},
+            {"id": "two", "title": "Two", "status": "partial", "draft": "Unfinished", "source_ids": []},
+        ]})
+    previous = (folder / "state.json").read_bytes()
+    current = jobs.get("alice", identity)
+    assert current["resumable"] and current["stop_reason"] == "model_service"
+    monkeypatch.setattr(jobs, "validate", lambda payload: None)
+    calls = []
+    def launch(command, **kwargs):
+        calls.append(command)
+        return jobs.queue.submit(kwargs["owner"], kwargs["kind"], kwargs["resource"]), None
+    monkeypatch.setattr("backend.web_v2.research_jobs.launch", launch)
+    resumed = jobs.resume("alice", identity)
+    assert resumed["status"] == "queued" and resumed["model_calls"] == 12
+    snapshots = list((folder / "attempts").glob("*.json"))
+    assert len(snapshots) == 1 and snapshots[0].read_bytes() == previous
+    assert (folder / "state.json").read_bytes() == previous
+    jobs.resume("alice", identity)
+    assert len(calls) == 1 and len(list((folder / "attempts").glob("*.json"))) == 1
+
+
+@pytest.mark.parametrize("status,calls,resumes", [
+    ("completed", 18, 0), ("completed", 12, 2), ("cancelled", 12, 0),
+])
+def test_partial_report_cannot_bypass_existing_resume_or_model_limits(tmp_path, status, calls, resumes):
+    jobs, identity = fixture(tmp_path, status, calls)
+    row = jobs.read(identity); row["resume_count"] = resumes
+    write(jobs.folder(identity) / "request.json", row)
+    write(jobs.folder(identity) / "state.json", {
+        "model_calls": calls, "minimum_met": True, "report": "Draft", "partial": True,
+        "chapters": [{"id": "one", "title": "One", "status": "partial", "draft": "Text", "source_ids": []}],
+        "sources": []})
+    assert not jobs.get("alice", identity)["resumable"]
+    with pytest.raises(ValueError):
+        jobs.resume("alice", identity)
+    assert not (jobs.folder(identity) / "attempts").exists()

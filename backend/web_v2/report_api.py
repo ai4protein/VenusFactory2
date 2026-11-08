@@ -141,17 +141,33 @@ async def cancel(identity: str, who=Depends(owner)):
 
 
 @router.get('/jobs/{identity}/download')
-async def download(identity: str, format: Literal['md', 'html', 'json'] = 'md', who=Depends(owner)):
-    result = await call(ResearchJobs().get, who, identity)
+async def download(identity: str, format: Literal['md', 'html', 'json', 'zip'] = 'md', who=Depends(owner)):
+    from functools import partial
+    result = await call(partial(ResearchJobs().get, include_evidence=format in {'zip', 'json'}), who, identity)
     if not result.get('report'):
         raise HTTPException(409, 'The report is not ready yet')
+    if format == 'zip':
+        from backend.web_v2.research_dossier import build_dossier, archive_chunks
+        from starlette.background import BackgroundTask
+        service = ResearchJobs()
+        _, row = await call(service.owned, who, result['id'])
+        inputs = row['payload']
+        if result.get('input_snapshot'):
+            from backend.web_v2.research_input_snapshot import load_inputs
+            snapshot = await call(load_inputs, service.folder(result['id'])/'input_snapshots', result['input_snapshot'])
+            inputs = {**inputs, **snapshot}
+        handle = await call(build_dossier, result, inputs)
+        return StreamingResponse(archive_chunks(handle), media_type='application/zip',
+            background=BackgroundTask(handle.close),
+            headers={'Content-Disposition': f'attachment; filename="{result["job_number"]}.zip"',
+                     'Cache-Control': 'private, no-store'})
     if format == 'json':
         content = json.dumps(result, ensure_ascii=False, indent=2)
         mime = 'application/json'
     elif format == 'html':
-        # Escape content; the file is self-contained and prints cleanly to PDF.
-        import markdown
-        rendered = markdown.markdown(html.escape(result['report']), extensions=['tables', 'fenced_code'])
+        # Allowlisted HTML keeps the download self-contained and printable.
+        from backend.web_v2.report_rendering import render_report_markdown
+        rendered = render_report_markdown(result['report'])
         content = '<!doctype html><meta charset="utf-8"><title>' + html.escape(result['title']) + '</title><style>body{font:16px/1.7 system-ui;max-width:900px;margin:48px auto;padding:24px;color:#222}pre{white-space:pre-wrap;overflow-wrap:anywhere}table{border-collapse:collapse;font-size:14px}td,th{border:1px solid #ddd;padding:10px}a{color:#365777}@media print{body{margin:0}}</style>' + rendered
         mime = 'text/html'
     else:

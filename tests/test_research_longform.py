@@ -1,3 +1,4 @@
+from research_source_review_fixture import with_source_review
 import asyncio
 from contextlib import asynccontextmanager
 import json
@@ -20,6 +21,7 @@ class LongReportTests(unittest.IsolatedAsyncioTestCase):
         calls, active, maximum = [], 0, 0
         async def collect(payload, update, **kwargs):
             value = evidence(); update(value); return value
+        @with_source_review
         async def complete(model, messages, tokens):
             nonlocal active, maximum
             active += 1; maximum = max(maximum, active)
@@ -33,7 +35,7 @@ class LongReportTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(result['chapters']), 8)
         self.assertEqual(result['completed_chapters'], 8)
         self.assertTrue(result['minimum_met'])
-        self.assertEqual(result['model_calls'], 9)
+        self.assertEqual(result['model_calls'], 12)
         self.assertEqual(len({m[0]['content'] for m in calls[:8]}), 8)
         self.assertLessEqual(maximum, 2)
         for i in range(1, 9): self.assertIn(f'## {i}.', result['report'])
@@ -41,6 +43,7 @@ class LongReportTests(unittest.IsolatedAsyncioTestCase):
     async def test_fewer_than_five_complete_is_not_success(self):
         async def collect(payload, update, **kwargs):
             value = evidence(); update(value); return value
+        @with_source_review
         async def complete(model, messages, tokens):
             if any(spec[3] in messages[0]['content'] for spec in lf.CHAPTERS[:4]):
                 raise ValueError('Unavailable')
@@ -57,7 +60,9 @@ class LongReportTests(unittest.IsolatedAsyncioTestCase):
             value = evidence(); update(value); return value
         with patch.object(r, 'run_research', side_effect=collect), patch.object(r, 'complete', new=AsyncMock(return_value=('Short [S1]', False))):
             result = await lf.run_long_report({'model_id': 'free', 'analyses': ['properties']}, lambda x: None)
-        self.assertEqual(result['model_calls'], 17)
+        self.assertEqual(result['model_calls'], 16)
+        self.assertEqual(result['review_status'], 'unavailable')
+        self.assertEqual(result.get('review_attempts', []), [])
         self.assertLessEqual(result['model_calls'], lf.MAX_MODEL_CALLS)
         self.assertTrue(all(c['attempts'] == 2 for c in result['chapters']))
         self.assertFalse(result['minimum_met'])
@@ -81,6 +86,7 @@ class LongReportTests(unittest.IsolatedAsyncioTestCase):
     async def test_revision_failure_keeps_the_first_draft(self):
         async def collect(payload, update, **kwargs):
             value = evidence(); update(value); return value
+        @with_source_review
         async def complete(model, messages, tokens):
             if len(messages) > 2:
                 raise ValueError('Temporary provider failure')
@@ -89,22 +95,26 @@ class LongReportTests(unittest.IsolatedAsyncioTestCase):
             result = await lf.run_long_report({'model_id': 'free', 'analyses': ['properties']}, lambda x: None)
         self.assertTrue(all(c['status'] == 'partial' and c['draft'] == 'Retained first draft [S1]' for c in result['chapters']))
         self.assertFalse(result['minimum_met'])
-        self.assertIn('Retained first draft', result['report'])
+        self.assertNotIn('Retained first draft', result['report'])
+        self.assertIn('awaiting revision', result['report'])
 
     async def test_resume_reuses_collected_evidence_and_completed_chapters(self):
         checkpoint = evidence() | {'workflow': 'specialist_research_v2', 'phase': 'chapters', 'model_calls': 6,
             'partial': False, 'chapters': []}
         for i, (identity, title, *_) in enumerate(lf.CHAPTERS):
             checkpoint['chapters'].append({'id': identity, 'title': title, 'status': 'completed' if i < 3 else 'pending',
-                'draft': 'Already verified chapter' if i < 3 else '', 'source_ids': ['S1'], 'attempts': 1, 'length': 500})
+                'draft': ('Previously written chapter. ' + 'protein evidence ' * 230 + '[S1]') if i < 3 else '', 'source_ids': ['S1'], 'attempts': 1, 'length': 500})
         collect = AsyncMock(side_effect=AssertionError('must not recollect'))
-        complete = AsyncMock(return_value=('protein evidence ' * 230 + '[S1]', False))
+        @with_source_review
+        async def resumed_complete(*args):
+            return ('protein evidence ' * 230 + '[S1]', False)
+        complete = AsyncMock(side_effect=resumed_complete)
         with patch.object(r, 'run_research', collect), patch.object(r, 'complete', complete):
             result = await lf.run_long_report({'model_id': 'free', 'analyses': ['properties']}, lambda x: None, checkpoint=checkpoint)
         collect.assert_not_called()
-        self.assertEqual(complete.await_count, 6)  # five unfinished chapters and one editor
-        self.assertEqual(result['model_calls'], 12)
-        self.assertTrue(all(c['draft'] == 'Already verified chapter' for c in result['chapters'][:3]))
+        self.assertEqual(complete.await_count, 9)  # five writers, three bounded source reviews and one editor
+        self.assertEqual(result['model_calls'], 15)
+        self.assertTrue(all(c['draft'] == ('Previously written chapter. ' + 'protein evidence ' * 230 + '[S1]') for c in result['chapters'][:3]))
         self.assertEqual(result['completed_chapters'], 8)
         self.assertEqual(checkpoint['model_calls'], 6)  # no mutation of the saved checkpoint
 
@@ -128,7 +138,10 @@ class LongReportTests(unittest.IsolatedAsyncioTestCase):
         state['sources'].append({'id': 'S9', 'title': 'Other chapter source', 'url': 'https://example.org/other', 'evidence_level': 'abstract'})
         state['chapters'] = [{'title': 'Chapter', 'source_ids': ['S1'], 'draft': 'Evidence [S1]. Unsupported [S9].', 'status': 'partial'}]
         text = lf.assemble(state, 'en')
-        self.assertIn('Unsupported [source unavailable]', text)
+        self.assertNotIn('Unsupported', text)
+        self.assertIn('awaiting revision', text)
+        preserved = r.cite_report(state['chapters'][0]['draft'], [state['sources'][0]])
+        self.assertIn('Unsupported [source unavailable]', preserved)
         self.assertNotIn('Unsupported [S9](https://example.org/other)', text)
 
 

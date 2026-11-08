@@ -1,3 +1,4 @@
+from research_source_review_fixture import with_source_review
 import io
 import json
 from pathlib import Path
@@ -49,6 +50,7 @@ async def test_materials_reach_specialists_and_cited_report_without_entering_web
     async def collect(payload,update,**kwargs):
         return {'sources':[source],'protein':{'name':'fixture'},'steps':[],'sections':[],'remote_services':[]}
     observed=[]
+    @with_source_review
     async def complete(model,messages,*args):
         bundle=json.loads(messages[-1]['content'])
         if 'chapter' in bundle:

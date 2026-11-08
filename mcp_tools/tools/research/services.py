@@ -249,7 +249,7 @@ async def foldseek(context,row,emit):
     for _ in range(context.get('poll_attempts',36)):
         status=await get_json('https://search.foldseek.com/api/ticket/'+row['job_id'])
         if (status or {}).get('status')=='COMPLETE':
-            result=await get_json('https://search.foldseek.com/api/result/'+row['job_id']+'/0',{} if context.get('include_alignments') else {'format':'brief'})
+            result=await get_json('https://search.foldseek.com/api/result/'+row['job_id']+'/0',{'format':'brief'})
             if not isinstance(result,dict) or 'results' not in result:raise ServiceError('Foldseek returned an incomplete result')
             hits=foldseek_hits(result or {}, bool(context.get("include_alignments")))
             return {'hits':hits,'count':len(hits),'retention':'Up to 20 hits per database; see server link for all hits. seqId is percent identity.','mode':'3diaa','query_structure':row.get('query_structure'),
