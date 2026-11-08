@@ -1,4 +1,4 @@
-"""Content-free evidence for unsuccessful provider responses."""
+"""Content-free completion evidence for provider responses."""
 from __future__ import annotations
 import hashlib
 import json

@@ -77,3 +77,42 @@ def test_valid_python_path_and_shell_are_preserved():
     from agent.harness.session_sandbox import validate_execution
     validate_execution("python", "src/analyze.PY", 30)
     validate_execution("shell", "cat data.csv", 30)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("streaming", [False, True])
+async def test_successful_http_response_retains_completion_metadata_without_content(tmp_path, streaming):
+    content = "Private prompt-derived answer"
+    usage = {"prompt_tokens": 12, "completion_tokens": 5, "total_tokens": 17}
+    if streaming:
+        raw = frame({"model": "test", "choices": [{"index": 0, "delta": {"content": content},
+                     "finish_reason": None}]})
+        raw += frame({"model": "test", "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}],
+                      "usage": usage}) + b"data: [DONE]\n\n"
+    else:
+        raw = json.dumps({"model": "test", "choices": [{"index": 0,
+            "message": {"role": "assistant", "content": content}, "finish_reason": "stop"}],
+            "usage": usage}).encode()
+    log = tmp_path / "requests.jsonl"
+    async with EvidenceGateway(
+        policy=GatewayPolicy(model="test", mode="science_agent", scientific_tools=set()),
+        upstream_url="https://provider.example/v1", api_key="private-key", output=log,
+        transport=httpx.MockTransport(lambda request: httpx.Response(200, content=raw)),
+    ) as relay:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                relay.base_url + "/chat/completions",
+                headers={"Authorization": "Bearer " + relay.token},
+                json={"model": "test", "messages": [{"role": "user", "content": "private-prompt"}],
+                      "stream": streaming},
+            )
+    assert response.status_code == 200 and content.encode() in response.content
+    records = [json.loads(line) for line in log.read_text().splitlines()]
+    result = records[-1]
+    evidence = result["response_completion"]
+    assert result["completed"] and result["usage"] == usage
+    assert evidence["finish_reasons"] == ["stop"]
+    assert evidence["done"] is streaming
+    assert evidence["content_present"] and not evidence["tools_present"]
+    assert evidence["response_bytes"] == len(raw) and len(evidence["response_sha256"]) == 64
+    assert not any(value in log.read_text() for value in [content, "private-key", "private-prompt", relay.token])

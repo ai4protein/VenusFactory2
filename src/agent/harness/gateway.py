@@ -14,6 +14,7 @@ import httpx
 from aiohttp import web
 from .sse_terminal import StreamTerminal
 from .provider_config import request_headers
+from .provider_response_diagnostics import response_evidence
 
 from agent.rsi.engine.live_model_gateway import ModelGateway
 from .live_text import PublicTextStream
@@ -214,7 +215,6 @@ class EvidenceGateway(ModelGateway):
                 except (httpx.HTTPError, ValueError, OSError, TimeoutError) as exc:
                     completed = False
                     error_type = type(exc).__name__
-                    from .provider_response_diagnostics import response_evidence
                     self.record({"event": "transport_error", "call": call, "error_type": error_type,
                                  "validation_stage": validation_stage,
                                  **response_evidence(bytes(raw), bool(payload.get("stream")))})
@@ -231,6 +231,7 @@ class EvidenceGateway(ModelGateway):
                             "completed": completed,
                             "error_type": error_type,
                             "usage": usage,
+                            **({"response_completion": response_evidence(bytes(raw), bool(payload.get("stream")))} if raw else {}),
                             **({"provider_evidence": provider_evidence} if provider_evidence is not None else {}),
                             **(
                                 {"response_sha256": shape["response_sha256"], "response_shape_sha256": digest(shape)}
