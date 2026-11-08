@@ -194,12 +194,14 @@ class Platform:
 
     @catalog_snapshot
     def shared(self, refresh=False):
-        if self._cache is not None and not refresh and time.monotonic() - self._cache_time < 30:
+        from mcp_tools.tools.runtime_tool_policy import is_local_mode
+        local = is_local_mode()
+        if self._cache is not None and getattr(self, "_cache_local", None) == local and not refresh and time.monotonic() - self._cache_time < 30:
             return self._cache
         cards, issues = self.official(), []
         try:
             from mcp_tools.models.evolved.service import configured_library, catalog_cards
-            records, _ = catalog_cards(configured_library())
+            records = catalog_cards(configured_library())[0] if local else []
             for c in records:
                 scope = c['scope']
                 context = scope.get('context', scope.get('assay', c['stage']))
@@ -227,7 +229,7 @@ class Platform:
                                    **{k:m[k] for k in ('model_type','runtime_id','backbone','training_dataset','training_method','provenance','artifact','version') if k in m}})
         except Exception:
             issues.append('checkpoints')
-        self._cache, self._cache_time = (cards, issues), time.monotonic()
+        self._cache, self._cache_time, self._cache_local = (cards, issues), time.monotonic(), local
         return self._cache
 
     @catalog_snapshot

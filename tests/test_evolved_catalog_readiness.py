@@ -42,3 +42,40 @@ def test_known_stale_card_does_not_replay_full_evidence_on_detail(tmp_path, monk
     detail = p.model("owner", card["id"], detail=True)
     assert not detail["available"]
     assert detail["contract"]["verified_now"] is False
+
+
+def test_online_plaza_never_loads_unselected_local_research_models(tmp_path, monkeypatch):
+    from agent.harness import research_workspace
+    from mcp_tools.tools import runtime_tool_policy
+    from mcp_tools.models.factory.training import model_registry
+
+    platform = Platform(tmp_path)
+    monkeypatch.setattr(platform, "official", lambda: [])
+    monkeypatch.setattr(model_registry, "list_trained_models", lambda: {"models": []})
+    curated = {"id": "reviewed", "name": "Reviewed model", "description": "Selected publication",
+               "author_email": "author@example.org"}
+    monkeypatch.setattr(research_workspace, "capability_cards", lambda: [curated])
+    local = [True]
+    monkeypatch.setattr(runtime_tool_policy, "is_local_mode", lambda: local[0])
+    reads = []
+
+    def load():
+        reads.append(1)
+        assert local[0], "Online catalogs must not read the private local library"
+        return object()
+
+    monkeypatch.setattr(service, "configured_library", load)
+    monkeypatch.setattr(service, "catalog_cards", lambda _: ([{
+        "entry_id": "private", "scope": {"protein": "unpublished", "target": "activity"},
+        "interface": "fixture.v1", "stage": "activity", "runtime_compatible": True,
+    }], {}))
+    assert {c["id"] for c in platform.shared()[0]} == {"scientist:private", "capability:reviewed"}
+    local[0] = False
+    online, issues = platform.shared()
+    assert not issues and [c["id"] for c in online] == ["capability:reviewed"]
+    assert online[0]["author_email"] == "author@example.org"
+    with pytest.raises(FileNotFoundError):
+        platform.model("visitor", "scientist:private")
+    assert len(reads) == 1
+    local[0] = True
+    assert len(platform.shared()[0]) == 2 and len(reads) == 2
