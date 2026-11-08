@@ -326,7 +326,7 @@ class AutonomousResearch:
         def phase(role):
             timeline.phase(role)
         try:
-            async with gateway(policy=policy,upstream_url=profile.model.base_url,api_key=self.credential,output=folder/'model_requests.jsonl',timeout_s=profile.budget.request_seconds) as relay:
+            async with gateway(policy=policy,upstream_url=profile.model.base_url,api_key=self.credential,output=folder/'model_requests.jsonl',timeout_s=profile.budget.request_seconds,stop_on_rate_limit=True) as relay:
                 phase('PI')
                 context['PI']=await self.structured('PI',context,profile,relay,folder,lambda value:value)
                 phase('CB')

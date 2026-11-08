@@ -378,7 +378,7 @@ class MessagesBridge(EvidenceGateway):
                 status = response.status_code
                 if status != 200:
                     await self.record_upstream_rejection(response, call)
-                    client_status = 400 if status == 429 and self.on_text is not None else status
+                    client_status = 400 if status == 429 and (self.on_text is not None or self.stop_on_rate_limit) else status
                     self._rate_limited = client_status != status
                     return self.error("api_error", "upstream_http_" + str(status), client_status)
                 preview = PublicTextStream(self.on_text, call) if self.on_text is not None else None

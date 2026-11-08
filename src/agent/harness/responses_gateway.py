@@ -417,10 +417,11 @@ from .live_text import PublicTextStream
 class ResponsesGateway(ModelGateway):
     supports_free_response_evidence = True
 
-    def __init__(self, *, request_recovery="none", on_text=None, **kwargs):
+    def __init__(self, *, request_recovery="none", on_text=None, stop_on_rate_limit=False, **kwargs):
         if request_recovery != "none":
             raise ValueError("Responses recovery requires its own declared and tested policy")
         self.on_text = on_text
+        self.stop_on_rate_limit = stop_on_rate_limit
         self._rate_limited = False
         super().__init__(**kwargs)
 
@@ -470,7 +471,7 @@ class ResponsesGateway(ModelGateway):
                 status = response.status_code
                 if status != 200:
                     await self.record_upstream_rejection(response, call)
-                    client_status = 400 if status == 429 and self.on_text is not None else status
+                    client_status = 400 if status == 429 and (self.on_text is not None or self.stop_on_rate_limit) else status
                     self._rate_limited = client_status != status
                     return web.json_response({"error": "upstream_http_" + str(status)}, status=client_status)
                 raw = bytearray()

@@ -78,6 +78,7 @@ async def test_next_scientist_iteration_reuses_host_verified_preparation(tmp_pat
         token = "fixture"
 
         def __init__(self, **kwargs):
+            assert kwargs["stop_on_rate_limit"] is True
             Path(kwargs["output"]).touch()
 
         async def __aenter__(self):

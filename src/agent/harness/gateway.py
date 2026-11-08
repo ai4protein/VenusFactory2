@@ -50,7 +50,7 @@ def inspect_response(raw, streaming):
 class EvidenceGateway(ModelGateway):
     supports_free_response_evidence = True
 
-    def __init__(self, *, request_recovery="none", on_text=None, tool_budget=None, **kwargs):
+    def __init__(self, *, request_recovery="none", on_text=None, tool_budget=None, stop_on_rate_limit=False, **kwargs):
         from .empty_response_recovery import POLICY as EMPTY_POLICY
         from .request_recovery import POLICY
 
@@ -59,6 +59,7 @@ class EvidenceGateway(ModelGateway):
         from .chat_tool_budget import ChatToolBudget
         self.chat_tool_budget = ChatToolBudget(tool_budget) if tool_budget is not None else None
         self.on_text = on_text
+        self.stop_on_rate_limit = stop_on_rate_limit
         self._rate_limited = False
         self.request_recovery = request_recovery
         super().__init__(**kwargs)
@@ -163,10 +164,10 @@ class EvidenceGateway(ModelGateway):
                                 evidence = await self.record_upstream_rejection(response, call)
                                 retry = self.request_recovery == POLICY and attempt == 1 and matches_rejection(evidence)
                                 if not retry:
-                                    # Native SDKs retry 429 several times. A live turn
-                                    # cannot resolve a provider quota; stop that retry
-                                    # loop while retaining the real status in evidence.
-                                    client_status = 400 if status == 429 and self.on_text is not None else status
+                                    # Stop native SDK quota retries in interactive and
+                                    # autonomous research runs; retain the real upstream
+                                    # status in evidence for an explicit later resume.
+                                    client_status = 400 if status == 429 and (self.on_text is not None or self.stop_on_rate_limit) else status
                                     self._rate_limited = client_status != status
                                     return web.json_response({"error": "upstream_http_" + str(status)}, status=client_status)
                             else:
