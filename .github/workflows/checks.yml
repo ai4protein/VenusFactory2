@@ -30,6 +30,31 @@ jobs:
           tests/test_repository_state_exclusions.py tests/test_incremental_install.py
           tests/test_initialize.py tests/test_skill_validation.py tests/test_hub_progress.py
           tests/test_dependency_audit.py
+  harness-protocols:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+      - name: Install protocol test dependencies
+        run: >-
+          python -m pip install -c requirements/service-security.txt
+          "pytest>=8,<10" "pytest-asyncio>=1" "httpx>=0.28.1"
+          "aiohttp>=3.14.5" "python-dotenv>=1.1.1"
+      - name: Verify native protocols, tool boundaries and usage
+        env:
+          PYTHONPATH: src
+          PYTHON_DOTENV_DISABLED: '1'
+          HF_HUB_OFFLINE: '1'
+          TRANSFORMERS_OFFLINE: '1'
+        run: >-
+          python -m pytest -q tests/harness/test_responses_bridge.py
+          tests/harness/test_messages_bridge.py tests/harness/test_responses_gateway.py
+          tests/harness/test_codex_adapter.py tests/harness/test_web_live_text.py
+          tests/harness/test_execution_catalog.py tests/harness/test_adapters.py
+
   source-and-frontend:
     runs-on: ubuntu-latest
     steps:
