@@ -30,11 +30,11 @@ def build_dossier(report, inputs=None):
             def data(name, value):
                 add(name, json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False))
 
-            from backend.web_v2.research_longform import assemble
+            from .research_documents import assemble
             lang = inputs.get("lang", "en") if inputs else "en"
             body = assemble(report, lang) if report.get("workflow") == "specialist_research_v2" else report["report"]
             add("report.md", body)
-            from .research_editor import editor_audit, review_ready
+            from .research_documents import editor_audit, review_ready
             if report.get("review") and not review_ready(report, lang):
                 add("drafts/editor.md", report["review"])
                 data("drafts/editor-audit.json", editor_audit(report["review"], [s["id"] for s in report.get("sources", [])], lang))
@@ -55,7 +55,7 @@ def build_dossier(report, inputs=None):
                 "status", "partial", "completed_chapters", "minimum_met", "analyses",
                 "model_calls", "model_call_limit", "queries", "literature_queries", "input_snapshot", "evidence_review_required")}
             data("overview.json", metadata)
-            from backend.web_v2.research_longform import chapter_ready, chapter_text
+            from .research_documents import chapter_ready, chapter_text
             index = []
             for i, chapter in enumerate(report.get("chapters", []), 1):
                 name = f"chapters/{i:02d}.md"

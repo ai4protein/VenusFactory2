@@ -233,6 +233,24 @@ def document_receipt(document, sources, cached):
             "unresolved": [row["unit_id"] for row in current if not row.get("passed")]}
 
 
+def feedback(state, document):
+    cached = state.get("source_review", {}).get("units", {})
+    bad = []
+    for unit in units(document, state.get("sources", [])):
+        row = cached.get(unit["id"], {})
+        if row.get("input_sha256") == unit["input_sha256"] and not row.get("passed", True):
+            bad.append((unit, row))
+    return bad
+
+
+def revision_input(state, document):
+    bad = feedback(state, document)
+    request = packet([unit for unit, _ in bad], state.get("sources", []))
+    request["issues"] = [{"unit_id": row["unit_id"], "issues": row["issues"]} for _, row in bad]
+    request["draft"] = document["text"]
+    return request
+
+
 async def review_documents(state, payload, documents, model_call, publish):
     """Audit fresh units only; all calls share the report's existing call budget."""
     review = state.setdefault("source_review", {"policy": VERSION, "units": {}, "attempts": []})

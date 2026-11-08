@@ -6,9 +6,13 @@ import hashlib
 import json
 import re
 
+from .research_documents import (
+    citation_coverage, editor_audit, chapter_signature, review_ready, incomplete_review,
+)
+
 
 def editorial_input(state, payload):
-    from .research_longform import chapter_ready
+    from .research_documents import chapter_ready
     chapters = [
         {"title": c["title"], "status": c["status"], "audit": c.get("audit", {}),
          "allowed_source_ids": c["source_ids"],
@@ -37,63 +41,6 @@ def editorial_input(state, payload):
     }
 
 
-
-def citation_coverage(text):
-    tick = chr(96)
-    prose = re.sub(tick * 3 + r"[\s\S]*?" + tick * 3 + r"|~~~[\s\S]*?~~~", "", text)
-    prose = re.sub(tick + r"[^" + tick + r"\n]*" + tick, "", prose)
-    checked = []
-    for block in re.split(r"\n\s*\n", prose):
-        lines = [line.strip() for line in block.splitlines() if line.strip()]
-        lines = [line for line in lines if not line.startswith("#")
-                 and not re.fullmatch(r"\*\*[^*]+\*\*", line)]
-        body = " ".join(lines)
-        if not body:
-            continue
-        table = any(line.startswith("|") for line in lines)
-        words = len(re.findall(r"\b[\w-]+\b", body))
-        cjk = len(re.findall(r"[\u3400-\u9fff]", body))
-        if words < (16 if table else 35) and cjk < (25 if table else 80):
-            continue
-        checked.append(bool(re.search(r"\[S\d+\]", body)))
-    cited = sum(checked)
-    coverage = cited / len(checked) if checked else 1.0
-    return {"citation_blocks": len(checked), "cited_blocks": cited,
-            "uncited_block_indices": [index + 1 for index, ok in enumerate(checked) if not ok],
-            "citation_coverage": round(coverage, 3), "citation_coverage_ok": coverage >= 0.75}
-
-
-def editor_audit(text, source_ids, lang):
-    from .research_longform import audit_chapter
-    return {**audit_chapter(text, source_ids, lang), **citation_coverage(text)}
-
-
-def chapter_signature(state):
-    return hashlib.sha256(json.dumps([
-        {key: chapter.get(key) for key in ("id", "title", "draft", "source_ids")}
-        for chapter in state.get("chapters", [])
-    ], sort_keys=True, ensure_ascii=False).encode()).hexdigest()
-
-
-def review_ready(state, lang):
-    if state.get("review_status", "completed") != "completed" or not state.get("review"):
-        return False
-    sources = state.get("sources", [])
-    audit = editor_audit(state["review"], [s["id"] for s in sources], lang)
-    if state.get("evidence_review_required"):
-        from .research_source_review import document_ready
-        document = {"id": "editor", "title": "Integrated assessment", "text": state["review"]}
-        if (not document_ready(document, sources, state.get("review_source_review"))
-                or state.get("review_chapters_sha256") != chapter_signature(state)):
-            return False
-    return not incomplete_review(audit, state.get("review_truncated", False), bool(sources))
-
-def incomplete_review(audit, truncated, has_sources):
-    return bool(truncated or audit["long_sequence"] or audit["unknown_citations"]
-                or not audit["substantial"] or (has_sources and not audit["has_citations"])
-                or not audit.get("citation_coverage_ok", True))
-
-
 def remember_review(state, draft, audit, *, truncated=False, input_sha256=None, legacy=False, raw_draft=None):
     history = state.setdefault("review_attempts", [])
     entry = {"draft": draft, "audit": audit, "truncated": bool(truncated),
@@ -110,7 +57,7 @@ def remember_review(state, draft, audit, *, truncated=False, input_sha256=None, 
 
 
 async def write_editor_review(state, payload, model_call, publish):
-    from .research_longform import normalize_source_citations
+    from .research_documents import normalize_source_citations
     lang = payload.get("lang", "en")
     sources = state.get("sources", [])
     source_ids = [s["id"] for s in sources]
@@ -149,7 +96,7 @@ async def write_editor_review(state, payload, model_call, publish):
             return
         request = list(messages)
         if state.get("evidence_review_required") and draft:
-            from .research_source_repair import feedback, revision_input
+            from .research_source_review import feedback, revision_input
             document = {"id": "editor", "title": "Integrated assessment", "text": draft}
             if feedback(state, document):
                 evidence_feedback = revision_input(state, document)

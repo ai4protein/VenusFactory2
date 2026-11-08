@@ -1,0 +1,173 @@
+"""Report document validation and rendering, independent of execution and storage.
+
+Writers, owner views and dossier exports share these acceptance rules. Reading a
+saved report never starts retrieval, model calls or background work.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+import time
+
+
+def text_size(text, lang):
+    return len(re.findall(r'[\u3400-\u9fff]', text)) if lang == 'zh' else len(re.findall(r'\b[\w-]+\b', text))
+
+
+def chapter_body(text):
+    # The coordinator owns section numbering; child agents own their subsection content.
+    return re.sub(r'^#{1,2}\s+', '### ', text.strip(), flags=re.M)
+
+
+def normalize_source_citations(text, sources):
+    """Normalize explicit source references; never infer citations for prose."""
+    titles = {s["id"]: str(s.get("title", "")).strip().casefold()
+              for s in sources if re.fullmatch(r"S\d+", str(s.get("id", "")))}
+    def named(match):
+        title, identity = match.group(1).strip(), match.group(2)
+        return "[" + identity + "]" if titles.get(identity) == title.casefold() else match.group(0)
+    def group(match):
+        return " ".join("[" + identity + "]" for identity in re.findall(r"S\d+", match.group(1)))
+    # Code samples remain verbatim; an example marker is not prose evidence.
+    parts = re.split(r"(```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`)", text)
+    for index in range(0, len(parts), 2):
+        body = re.sub(r"\(([^()\n]{1,300})[,;]\s*(S\d+)\s*\)", named, parts[index])
+        body = re.sub(r"\((S\d+(?:\s*[,;]\s*S\d+)*)\)", group, body)
+        parts[index] = re.sub(r"(?<!!)\[(S\d+(?:\s*[,;]\s*S\d+)+)\](?!\()", group, body)
+    return "".join(parts)
+
+
+def contains_long_sequence(text):
+    # Sequences are delivered from verified input snapshots, not generated prose.
+    if re.search(r"\b[ACDEFGHIKLMNPQRSTVWY]{60,}\b", text):
+        return True
+    residues = "Ala|Arg|Asn|Asp|Cys|Gln|Glu|Gly|His|Ile|Leu|Lys|Met|Phe|Pro|Ser|Thr|Trp|Tyr|Val"
+    return bool(re.search(r"\b(?:" + residues + r")(?:[-\s]+(?:" + residues + r")){29,}\b", text, re.I))
+
+
+def chapter_document(chapter):
+    return {"id": chapter["id"], "title": chapter["title"], "text": chapter.get("draft", "")}
+
+
+def chapter_ready(chapter, sources=None):
+    if chapter.get("status") != "completed" or not chapter.get("draft") or contains_long_sequence(chapter["draft"]):
+        return False
+    if chapter.get("evidence_review_required"):
+        from .research_source_review import document_ready
+        return sources is not None and document_ready(chapter_document(chapter), sources, chapter.get("source_review"))
+    return True
+
+
+def remember_chapter(chapter, draft, audit, truncated=False):
+    history = chapter.setdefault("draft_history", [])
+    if not history or history[-1]["draft"] != draft:
+        history.append({"draft": draft, "audit": audit, "truncated": bool(truncated),
+                        "attempt": chapter.get("attempts", 0), "recorded": time.time()})
+
+
+def chapter_text(chapter, lang, sources=None):
+    if chapter_ready(chapter, sources):
+        return chapter_body(chapter['draft'])
+    if chapter.get('status') == 'reviewing':
+        return '正在核对来源。' if lang == 'zh' else 'Checking sources.'
+    if chapter.get('status') in {'partial', 'unavailable', 'completed'}:
+        return '本章待修订。' if lang == 'zh' else 'This chapter is awaiting revision.'
+    return '正在研究。' if lang == 'zh' else 'Research in progress.'
+
+
+def audit_chapter(text, source_ids, lang):
+    prose = re.sub(r"```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`", "", text)
+    cited = set(re.findall(r'\[(S\d+)\]', prose))
+    unknown = sorted(cited - set(source_ids))
+    return {'length': text_size(text, lang), 'unknown_citations': unknown, 'cited_sources': sorted(cited & set(source_ids)),
+            'substantial': text_size(text, lang) >= (900 if lang == 'zh' else 400), 'has_citations': bool(cited & set(source_ids)),
+            'long_sequence': contains_long_sequence(text)}
+
+
+def citation_coverage(text):
+    tick = chr(96)
+    prose = re.sub(tick * 3 + r"[\s\S]*?" + tick * 3 + r"|~~~[\s\S]*?~~~", "", text)
+    prose = re.sub(tick + r"[^" + tick + r"\n]*" + tick, "", prose)
+    checked = []
+    for block in re.split(r"\n\s*\n", prose):
+        lines = [line.strip() for line in block.splitlines() if line.strip()]
+        lines = [line for line in lines if not line.startswith("#")
+                 and not re.fullmatch(r"\*\*[^*]+\*\*", line)]
+        body = " ".join(lines)
+        if not body:
+            continue
+        table = any(line.startswith("|") for line in lines)
+        words = len(re.findall(r"\b[\w-]+\b", body))
+        cjk = len(re.findall(r"[\u3400-\u9fff]", body))
+        if words < (16 if table else 35) and cjk < (25 if table else 80):
+            continue
+        checked.append(bool(re.search(r"\[S\d+\]", body)))
+    cited = sum(checked)
+    coverage = cited / len(checked) if checked else 1.0
+    return {"citation_blocks": len(checked), "cited_blocks": cited,
+            "uncited_block_indices": [index + 1 for index, ok in enumerate(checked) if not ok],
+            "citation_coverage": round(coverage, 3), "citation_coverage_ok": coverage >= 0.75}
+
+
+def editor_audit(text, source_ids, lang):
+    return {**audit_chapter(text, source_ids, lang), **citation_coverage(text)}
+
+
+def chapter_signature(state):
+    return hashlib.sha256(json.dumps([
+        {key: chapter.get(key) for key in ("id", "title", "draft", "source_ids")}
+        for chapter in state.get("chapters", [])
+    ], sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+
+
+def review_ready(state, lang):
+    if state.get("review_status", "completed") != "completed" or not state.get("review"):
+        return False
+    sources = state.get("sources", [])
+    audit = editor_audit(state["review"], [s["id"] for s in sources], lang)
+    if state.get("evidence_review_required"):
+        from .research_source_review import document_ready
+        document = {"id": "editor", "title": "Integrated assessment", "text": state["review"]}
+        if (not document_ready(document, sources, state.get("review_source_review"))
+                or state.get("review_chapters_sha256") != chapter_signature(state)):
+            return False
+    return not incomplete_review(audit, state.get("review_truncated", False), bool(sources))
+
+
+def incomplete_review(audit, truncated, has_sources):
+    return bool(truncated or audit["long_sequence"] or audit["unknown_citations"]
+                or not audit["substantial"] or (has_sources and not audit["has_citations"])
+                or not audit.get("citation_coverage_ok", True))
+
+
+def cite_report(text, sources):
+    # Only fetched source IDs become links. Arbitrary links/images from a model are removed.
+    text = re.sub(r'!?\[([^\]]*)\]\([^)]*\)', r'\1', text)
+    text = re.sub(r'https?://[^\s<>]+', '', text)
+    known = {r['id']: r for r in sources}
+    return re.sub(r'\[(S\d+)\]', lambda m: f"[{m[1]}]({known[m[1]]['url']})" if m[1] in known and known[m[1]].get('url') else ('[' + m[1] + ']' if m[1] in known else '[source unavailable]'), text)
+
+
+def assemble(state, lang):
+    from . import research_predictions
+    from mcp_tools.tools.research import services as public_services
+
+    zh = lang == 'zh'
+    title = state.get('protein', {}).get('name', 'Protein research')
+    parts = ['# ' + title, state.get('overview', ''), '## ' + ('目录' if zh else 'Contents')]
+    parts.extend(f"{i}. {c['title']}" for i, c in enumerate(state['chapters'], 1))
+    for i, chapter in enumerate(state['chapters'], 1):
+        parts += [f"## {i}. {chapter['title']}"]
+        if chapter_ready(chapter, state.get("sources", [])):
+            allowed = [s for s in state['sources'] if s['id'] in chapter['source_ids']]
+            parts.append(cite_report(chapter_body(chapter['draft']), allowed))
+        else:
+            parts.append(chapter_text(chapter, lang, state.get("sources", [])))
+    if review_ready(state, lang):
+        parts += ['## ' + ('综合评述与研究建议' if zh else 'Integrated assessment & research priorities'), cite_report(state['review'], state['sources'])]
+    parts.append(research_predictions.report_appendix(state.get('predictions', []), lang))
+    parts.append(public_services.report_appendix(state.get('remote_services', []), lang))
+    parts += ['## ' + ('来源' if zh else 'Sources')]
+    parts += [f"- [{s['id']} · {s['title']}]({s['url']}) · {s['evidence_level']}" for s in state['sources'] if s.get('url')]
+    return '\n\n'.join(x for x in parts if x)

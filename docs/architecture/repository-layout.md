@@ -50,6 +50,13 @@ Scientific capabilities are served through MCP; model packages own implementatio
 and runtime adapters. Agent code plans work and calls tools; it does not contain
 another copy of model inference code.
 
+Researcher keeps job ownership and recovery in `backend/web_v2/research_jobs.py`.
+The long-form coordinator schedules retrieval and specialist writers; document
+acceptance and rendering belong to `research_documents.py`. API views and ZIP
+exports use that document layer, which does not call models or launch jobs.
+Source-review receipts and revision feedback belong to `research_source_review.py`;
+author and editor modules consume those receipts without owning the reviewer.
+
 Model origin is separate from scientific function. For example, ProteinMPNN and
 LigandMPNN are both pretrained methods; DeepSol · ESM2-650M is a factory-trained
 task model; a reviewed Scientist solubility predictor is an RSI artifact. All use

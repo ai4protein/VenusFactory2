@@ -14,6 +14,7 @@ from mcp_tools.tools.runtime_tool_policy import is_online_mode
 from mcp_tools.tools.search import web_provider
 from mcp_tools.tools.research import services as public_services
 from backend.web_v2 import research_predictions
+from .research_documents import cite_report
 
 SCOPES = [
     ('identity', 'Protein identity', '蛋白身份', False),
@@ -339,14 +340,6 @@ async def complete(model_id, messages, output_tokens=3000):
         if not isinstance(text, str) or not text.strip() or choice.get('finish_reason') not in {'stop', 'length'}:
             raise ValueError('Model did not return a complete answer')
         return text, choice['finish_reason'] == 'length'
-
-
-def cite_report(text, sources):
-    # Only fetched source IDs become links. Arbitrary links/images from a model are removed.
-    text = re.sub(r'!?\[([^\]]*)\]\([^)]*\)', r'\1', text)
-    text = re.sub(r'https?://[^\s<>]+', '', text)
-    known = {r['id']: r for r in sources}
-    return re.sub(r'\[(S\d+)\]', lambda m: f"[{m[1]}]({known[m[1]]['url']})" if m[1] in known and known[m[1]].get('url') else ('[' + m[1] + ']' if m[1] in known else '[source unavailable]'), text)
 
 
 async def run_research(payload, update, *, synthesize=True, model_call=None, service_cache=None,

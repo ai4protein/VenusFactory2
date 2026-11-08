@@ -16,6 +16,12 @@ from urllib.parse import urlsplit
 from backend.web_v2 import research_report as research
 from agent.harness.model_availability import ModelServiceUnavailable
 
+# Document helpers remain importable here for existing report scripts.
+from .research_documents import (
+    text_size, chapter_body, normalize_source_citations, contains_long_sequence, chapter_document,
+    chapter_ready, remember_chapter, chapter_text, audit_chapter, assemble,
+)
+
 CHAPTERS = [
     ('identity_evolution', 'Identity, sequence & evolution', '身份、序列与进化', 'Protein and gene identifiers, organism, isoforms, mature-chain numbering, sequence composition, domains, homologs, orthologs, family evolution and conservation.', 'sequence evolution ortholog isoform'),
     ('function_pathways', 'Function, catalysis & pathways', '功能、催化与通路', 'Molecular function, reaction and substrate specificity, cofactors, enzyme mechanism, kinetics with assay conditions, cellular role, localization, expression and pathways.', 'function catalysis substrate pathway'),
@@ -88,10 +94,6 @@ def chapter_database_sources(sources, chapter_id):
     return common[:2] + focused[:2] + common[2:4]
 
 
-def text_size(text, lang):
-    return len(re.findall(r'[\u3400-\u9fff]', text)) if lang == 'zh' else len(re.findall(r'\b[\w-]+\b', text))
-
-
 def source_context(sources, limit=14):
     from .research_evidence import evidence_excerpt
     rows = []
@@ -101,78 +103,6 @@ def source_context(sources, limit=14):
         row = {k: v for k, v in source.items() if k in {"id", "title", "url", "kind", "evidence_level", "year", "extraction", "sha256", "query_tool", "query_arguments"}}
         rows.append({**row, "text": text, "excerpted": excerpted})
     return rows
-
-
-def chapter_body(text):
-    # The coordinator owns section numbering; child agents own their subsection content.
-    return re.sub(r'^#{1,2}\s+', '### ', text.strip(), flags=re.M)
-
-
-
-def normalize_source_citations(text, sources):
-    """Normalize explicit source references; never infer citations for prose."""
-    titles = {s["id"]: str(s.get("title", "")).strip().casefold()
-              for s in sources if re.fullmatch(r"S\d+", str(s.get("id", "")))}
-    def named(match):
-        title, identity = match.group(1).strip(), match.group(2)
-        return "[" + identity + "]" if titles.get(identity) == title.casefold() else match.group(0)
-    def group(match):
-        return " ".join("[" + identity + "]" for identity in re.findall(r"S\d+", match.group(1)))
-    # Code samples remain verbatim; an example marker is not prose evidence.
-    parts = re.split(r"(```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`)", text)
-    for index in range(0, len(parts), 2):
-        body = re.sub(r"\(([^()\n]{1,300})[,;]\s*(S\d+)\s*\)", named, parts[index])
-        body = re.sub(r"\((S\d+(?:\s*[,;]\s*S\d+)*)\)", group, body)
-        parts[index] = re.sub(r"(?<!!)\[(S\d+(?:\s*[,;]\s*S\d+)+)\](?!\()", group, body)
-    return "".join(parts)
-
-
-def contains_long_sequence(text):
-    # Sequences are delivered from verified input snapshots, not generated prose.
-    if re.search(r"\b[ACDEFGHIKLMNPQRSTVWY]{60,}\b", text):
-        return True
-    residues = "Ala|Arg|Asn|Asp|Cys|Gln|Glu|Gly|His|Ile|Leu|Lys|Met|Phe|Pro|Ser|Thr|Trp|Tyr|Val"
-    return bool(re.search(r"\b(?:" + residues + r")(?:[-\s]+(?:" + residues + r")){29,}\b", text, re.I))
-
-
-def chapter_document(chapter):
-    return {"id": chapter["id"], "title": chapter["title"], "text": chapter.get("draft", "")}
-
-
-def chapter_ready(chapter, sources=None):
-    if chapter.get("status") != "completed" or not chapter.get("draft") or contains_long_sequence(chapter["draft"]):
-        return False
-    if chapter.get("evidence_review_required"):
-        from .research_source_review import document_ready
-        return sources is not None and document_ready(chapter_document(chapter), sources, chapter.get("source_review"))
-    return True
-
-
-def remember_chapter(chapter, draft, audit, truncated=False):
-    history = chapter.setdefault("draft_history", [])
-    if not history or history[-1]["draft"] != draft:
-        history.append({"draft": draft, "audit": audit, "truncated": bool(truncated),
-                        "attempt": chapter.get("attempts", 0), "recorded": time.time()})
-
-
-
-def chapter_text(chapter, lang, sources=None):
-    if chapter_ready(chapter, sources):
-        return chapter_body(chapter['draft'])
-    if chapter.get('status') == 'reviewing':
-        return '正在核对来源。' if lang == 'zh' else 'Checking sources.'
-    if chapter.get('status') in {'partial', 'unavailable', 'completed'}:
-        return '本章待修订。' if lang == 'zh' else 'This chapter is awaiting revision.'
-    return '正在研究。' if lang == 'zh' else 'Research in progress.'
-
-
-def audit_chapter(text, source_ids, lang):
-    prose = re.sub(r"```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`", "", text)
-    cited = set(re.findall(r'\[(S\d+)\]', prose))
-    unknown = sorted(cited - set(source_ids))
-    return {'length': text_size(text, lang), 'unknown_citations': unknown, 'cited_sources': sorted(cited & set(source_ids)),
-            'substantial': text_size(text, lang) >= (900 if lang == 'zh' else 400), 'has_citations': bool(cited & set(source_ids)),
-            'long_sequence': contains_long_sequence(text)}
 
 
 async def structure_evidence(entry):
@@ -188,28 +118,6 @@ async def structure_evidence(entry):
         except Exception:
             continue
     return rows
-
-
-def assemble(state, lang):
-    zh = lang == 'zh'
-    title = state.get('protein', {}).get('name', 'Protein research')
-    parts = ['# ' + title, state.get('overview', ''), '## ' + ('目录' if zh else 'Contents')]
-    parts.extend(f"{i}. {c['title']}" for i, c in enumerate(state['chapters'], 1))
-    for i, chapter in enumerate(state['chapters'], 1):
-        parts += [f"## {i}. {chapter['title']}"]
-        if chapter_ready(chapter, state.get("sources", [])):
-            allowed = [s for s in state['sources'] if s['id'] in chapter['source_ids']]
-            parts.append(research.cite_report(chapter_body(chapter['draft']), allowed))
-        else:
-            parts.append(chapter_text(chapter, lang, state.get("sources", [])))
-    from .research_editor import review_ready
-    if review_ready(state, lang):
-        parts += ['## ' + ('综合评述与研究建议' if zh else 'Integrated assessment & research priorities'), research.cite_report(state['review'], state['sources'])]
-    parts.append(research.research_predictions.report_appendix(state.get('predictions', []), lang))
-    parts.append(research.public_services.report_appendix(state.get('remote_services', []), lang))
-    parts += ['## ' + ('来源' if zh else 'Sources')]
-    parts += [f"- [{s['id']} · {s['title']}]({s['url']}) · {s['evidence_level']}" for s in state['sources'] if s.get('url')]
-    return '\n\n'.join(x for x in parts if x)
 
 
 async def run_long_report(payload, update, *, service_cache=None, checkpoint=None, input_store=None):
@@ -390,7 +298,7 @@ async def run_long_report(payload, update, *, service_cache=None, checkpoint=Non
         await review_editor(state, payload, model_call, publish)
     else:
         state["review_status"] = "partial" if state.get("review") else "unavailable"
-    from .research_editor import review_ready
+    from .research_documents import review_ready
     state['partial'] |= not review_ready(state, lang)
     state['overview'] = ''
     state['phase'] = 'incomplete' if state['partial'] else 'completed'

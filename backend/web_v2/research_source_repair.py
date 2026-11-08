@@ -3,29 +3,11 @@ from __future__ import annotations
 
 import hashlib
 import json
-from .research_source_review import packet, units, review_documents, document_ready
-
-
-def feedback(state, document):
-    cached = state.get("source_review", {}).get("units", {})
-    bad = []
-    for unit in units(document, state.get("sources", [])):
-        row = cached.get(unit["id"], {})
-        if row.get("input_sha256") == unit["input_sha256"] and not row.get("passed", True):
-            bad.append((unit, row))
-    return bad
-
-
-def revision_input(state, document):
-    bad = feedback(state, document)
-    request = packet([unit for unit, _ in bad], state.get("sources", []))
-    request["issues"] = [{"unit_id": row["unit_id"], "issues": row["issues"]} for _, row in bad]
-    request["draft"] = document["text"]
-    return request
+from .research_source_review import feedback, revision_input, review_documents, document_ready
 
 
 async def repair_chapters(state, payload, chapters, model_call, publish):
-    from .research_longform import chapter_document, audit_chapter, remember_chapter, normalize_source_citations
+    from .research_documents import chapter_document, audit_chapter, remember_chapter, normalize_source_citations
     for chapter in chapters:
         document = chapter_document(chapter)
         if not feedback(state, document) or state.get("execution_blocker"):
@@ -67,7 +49,8 @@ async def repair_chapters(state, payload, chapters, model_call, publish):
 
 
 async def review_editor(state, payload, model_call, publish):
-    from .research_editor import write_editor_review, editor_audit, incomplete_review, review_ready, editorial_input
+    from .research_editor import write_editor_review, editorial_input
+    from .research_documents import editor_audit, incomplete_review, review_ready
     lang = payload.get("lang", "en")
     signature = hashlib.sha256(json.dumps(editorial_input(state, payload), sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     if review_ready(state, lang) and state.get("review_input_sha256") == signature:
