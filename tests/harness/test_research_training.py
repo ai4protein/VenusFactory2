@@ -158,3 +158,50 @@ def test_training_tool_is_discoverable_with_an_explicit_interface(tmp_path):
 def test_unsupported_algorithm_interfaces_are_rejected(source):
     with pytest.raises(ValueError):
         validate_algorithm(source)
+
+
+@pytest.mark.asyncio
+async def test_failed_preflight_keeps_source_and_diagnostics_without_starting_worker(tmp_path):
+    service = await service_at(tmp_path)
+    broken = "pipeline=[('a',object())('b',object())]\ndef fit(training,seed):\n return pipeline\ndef predict(m,i):\n return {'value':0}\n"
+    await service.write_research_file("algorithm.py", broken)
+    executions = []
+
+    async def forbidden(*args, **kwargs):
+        executions.append(args)
+        raise AssertionError("Static rejection must not acquire a sandbox")
+
+    service.runner = forbidden
+    with pytest.raises(ValueError, match="fit does not read"):
+        await service.train_research_model("broken", "algorithm.py", "evaluation.json", "Fixture")
+    paths = list((service.development.root/"training").glob("*/receipt.json"))
+    assert len(paths) == 1 and not executions
+    receipt = json.loads(paths[0].read_text())
+    assert receipt["status"] == "failed" and receipt["stage"] == "preflight"
+    assert receipt["source_check"]["valid"] is False and receipt["source_snapshot"] == "algorithm.py"
+    assert "fit does not read" in receipt["error"]
+    assert "execution" not in receipt and "experiment_id" not in receipt
+    assert (paths[0].parent/"algorithm.py").read_text() == broken
+    training = json.loads((paths[0].parent/"workspace/training.json").read_text())
+    assert "validation" not in training and "test" not in training
+    assert receipt["validation_and_test_mounted"] is False
+    await service.write_research_file("algorithm.py", LINEAR)
+    assert (paths[0].parent/"algorithm.py").read_text() == broken
+    assert not service.development.records()
+
+
+@pytest.mark.asyncio
+async def test_preflight_failures_count_toward_training_attempt_budget(tmp_path):
+    service = await service_at(tmp_path)
+    await service.write_research_file("algorithm.py", "def fit(training,seed):return {}")
+    training = service.development.root/"training"
+    for i in range(63):
+        folder = training/str(i)
+        folder.mkdir(parents=True)
+        (folder/"receipt.json").write_text('{"status":"failed","stage":"preflight"}')
+    with pytest.raises(ValueError, match="source check failed"):
+        await service.train_research_model("broken", "algorithm.py", "evaluation.json", "Fixture")
+    assert len(list(training.glob("*/receipt.json"))) == 64
+    with pytest.raises(ValueError, match="Training attempt budget reached"):
+        await service.train_research_model("broken", "algorithm.py", "evaluation.json", "Fixture")
+    assert len(list(training.glob("*/receipt.json"))) == 64

@@ -30,6 +30,9 @@ def test_current_source_is_disclosed_only_for_its_unresolved_failure(tmp_path, w
     assert context["sha256"]==hashlib.sha256(SOURCE.encode()).hexdigest()
     assert "PRIVATE_UNRELATED_CONTENT" not in json.dumps(context)
     assert not context["redacted"]
+    assert context["source_check"]["valid"] is False
+    assert context["source_check"]["source_sha256"] == context["sha256"]
+    assert any(item["code"] == "unfinished_entrypoint" for item in context["source_check"]["issues"])
     resolved=feedback_state(failure(failed=False),tmp_path,state)
     assert repair_source_context(tmp_path,resolved) is None
     assert repair_source_context(tmp_path,{"errors":state["errors"]}) is None

@@ -105,6 +105,7 @@ def repair_source_context(workspace, feedback):
     from hashlib import sha256
     from utils.scoped_files import read_bytes
     from .session_boundary import public_value
+    from .research_algorithm_checks import algorithm_diagnostics
     pending=(feedback or {}).get("pending")
     if not isinstance(pending,list):
         return None
@@ -120,8 +121,9 @@ def repair_source_context(workspace, feedback):
         except (OSError,ValueError,UnicodeError):
             continue
         code=public_value(original,workspace)
+        checks=algorithm_diagnostics(original)
         return {"path":path,"sha256":sha256(raw).hexdigest(),"code":code,
-                "redacted":code!=original,"error":_failure_message(row.get("error","Fitting failed"),workspace),
+                "redacted":code!=original,"source_check":public_value(checks,workspace),"error":_failure_message(row.get("error","Fitting failed"),workspace),
                 "instruction":"This is the current saved source for an unresolved fitting action. "
                     "Repair its complete implementation using the observed error and model interface, save it, and fit again. "
                     "For sequence-regression encoding errors, get_research_baseline(reference, output_file) can save a verified comparison implementation in a new file. "

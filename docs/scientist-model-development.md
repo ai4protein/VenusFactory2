@@ -59,7 +59,14 @@ transformations on the training partition and retain them with the model.
 
 The platform persists fitted state, records dependencies and runs predictions in
 isolated processes. Failed fits return the final exception and applicable input
-contract; full execution logs remain in the training receipts.
+contract; full execution logs remain in the training receipts. Before a worker is
+started, Python compilation and interface checks collect diagnostics with line
+numbers without importing or executing the submitted module. Rejected sources
+retain a host-owned source snapshot and a failed preflight receipt. Editing the
+workspace file does not overwrite that evidence, and rejected attempts count
+toward the training-attempt budget. Focused repair receives the current source's
+diagnostics, while completed generations still require actual fitting, validation
+and independent Review.
 
 ## Reusable reference controls
 

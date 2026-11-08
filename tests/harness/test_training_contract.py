@@ -1,4 +1,6 @@
 """Reject accidental data-as-code and unfinished model bodies before worker allocation."""
+import json
+
 import pytest
 
 from agent.harness.research_training import validate_algorithm
@@ -108,4 +110,8 @@ async def test_fixed_demo_is_rejected_before_allocating_a_training_process(tmp_p
     with pytest.raises(ValueError, match="fit does not read"):
         await service.train_research_model("Demo", "demo.py", prepared["evaluation_file"], "Contract test")
     assert not service.development.records()
-    assert not list(service.development.root.glob("training/*/receipt.json"))
+    attempts = list(service.development.root.glob("training/*/receipt.json"))
+    assert len(attempts) == 1
+    receipt = json.loads(attempts[0].read_text())
+    assert receipt["status"] == "failed" and receipt["stage"] == "preflight"
+    assert "execution" not in receipt and "experiment_id" not in receipt
