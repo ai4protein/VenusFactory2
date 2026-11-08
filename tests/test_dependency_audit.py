@@ -164,3 +164,21 @@ def test_strict_mode_fails_on_recorded_risks_and_ci_warns(tmp_path, monkeypatch,
     assert "::warning" in capsys.readouterr().out
     assert ID in summary.read_text()
     assert audit.main([*args, "--strict"]) == 1
+
+
+@pytest.mark.parametrize("profile", ["cube", "e2b"])
+def test_optional_clients_do_not_inherit_platform_risk_allowance(tmp_path, monkeypatch, profile):
+    pins = tmp_path / "resolved.txt"
+    pins.write_text("torch==2.8.0")
+    output = tmp_path / "result.json"
+    monkeypatch.setattr(audit, "query", lambda _: {("torch", "2.8.0"): {ID}})
+    monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+    args = [str(pins), "--profile", profile, "--strict", "--baseline",
+            str(inventory(tmp_path, [baseline()])), "--output", str(output)]
+    assert audit.main(args) == 1
+    report = json.loads(output.read_text())
+    assert report["new_count"] == 1
+    assert "sandbox-client" in report["scope"]
+    monkeypatch.setattr(audit, "query", lambda _: {("torch", "2.8.0"): set()})
+    assert audit.main(args) == 0
+    assert json.loads(output.read_text())["status"] == "clear"

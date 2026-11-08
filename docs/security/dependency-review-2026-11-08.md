@@ -101,7 +101,12 @@ uv pip compile requirements.txt -c requirements/bootstrap-constraints.txt \
 python scripts/audit_dependencies.py /tmp/venus-resolved.txt --profile linux --strict
 ```
 
-The scope is the resolved platform environment. Independently installed external
+Optional CubeSandbox and E2B client manifests apply the service constraints even
+when installed directly. Their resolved Linux dependencies are audited separately
+in strict mode; platform model-risk entries cannot exempt these clients. The
+initial scans covered 11 CubeSandbox and 27 E2B packages with no findings.
+
+The scope is the resolved platform environment and these optional clients. Independently installed external
 model runtimes still require their own audit and inference validation. GHSA and
 PYSEC identifiers may describe the same issue; the number of OSV records is not
 the number of GitHub Dependabot alerts.

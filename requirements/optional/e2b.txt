@@ -1,2 +1,3 @@
+-c ../service-security.txt
 # Optional: only for a configured local E2B Embed service; does not install a VM host.
 e2b==2.46.0

@@ -1,1 +1,2 @@
+-c ../service-security.txt
 cubesandbox==0.7.3

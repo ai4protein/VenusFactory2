@@ -157,7 +157,7 @@ def classify(findings: dict, baseline: list[dict], profile: str, today: date) ->
     overdue = sum(row["state"] == "review_overdue" for row in rows)
     return {
         "profile": profile, "checked_at": datetime.now(timezone.utc).isoformat(),
-        "scope": "Resolved platform dependencies; excludes independent third-party model environments",
+        "scope": ("Resolved optional sandbox-client dependencies" if profile in {"cube", "e2b"} else "Resolved platform dependencies") + "; excludes independent third-party model environments",
         "package_count": len(findings), "advisory_record_count": len(rows),
         "new_count": new, "overdue_count": overdue,
         "status": "action_required" if new or overdue else "known_open" if rows else "clear",
@@ -181,7 +181,7 @@ def render(report: dict) -> str:
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("resolved", type=Path)
-    parser.add_argument("--profile", choices=("linux", "macos"), required=True)
+    parser.add_argument("--profile", choices=("linux", "macos", "cube", "e2b"), required=True)
     parser.add_argument("--baseline", type=Path, default=BASELINE)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--strict", action="store_true", help="Fail on all open advisories, including recorded legacy model risks")

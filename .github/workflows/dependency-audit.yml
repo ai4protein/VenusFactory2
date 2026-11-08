@@ -32,11 +32,21 @@ jobs:
       matrix:
         include:
           - profile: linux
+            audit_flags: ""
             requirements: requirements.txt
             platform: x86_64-unknown-linux-gnu
           - profile: macos
+            audit_flags: ""
             requirements: requirements/macos.txt
             platform: aarch64-apple-darwin
+          - profile: cube
+            requirements: requirements/optional/cube.txt
+            platform: x86_64-unknown-linux-gnu
+            audit_flags: "--strict"
+          - profile: e2b
+            requirements: requirements/optional/e2b.txt
+            platform: x86_64-unknown-linux-gnu
+            audit_flags: "--strict"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
@@ -53,7 +63,7 @@ jobs:
       - name: Audit every resolved package
         run: >-
           python scripts/audit_dependencies.py "$RUNNER_TEMP/resolved.txt"
-          --profile '${{ matrix.profile }}' --output "$RUNNER_TEMP/dependency-audit.json"
+          --profile '${{ matrix.profile }}' ${{ matrix.audit_flags }} --output "$RUNNER_TEMP/dependency-audit.json"
       - name: Record machine-readable audit
         if: always()
         run: |
