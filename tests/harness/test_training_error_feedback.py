@@ -44,6 +44,7 @@ def predict(model, inputs):
     message = str(caught.value)
     assert "All arrays must be of the same length" in message
     assert "training['train']" in message
+    assert "At broken.py:5:" in message and "return pd.DataFrame(training)" in message
     assert "benign execution warning" not in message and "Traceback" not in message
     assert len(message) < 850
     receipts = list(service.development.root.glob("training/*/receipt.json"))
@@ -65,3 +66,40 @@ def test_class_methods_report_missing_module_entrypoints_without_running_code():
 """
     with pytest.raises(ValueError, match="module-level functions, not class methods"):
         validate_algorithm(source)
+
+
+
+def test_training_trace_maps_original_line_and_ignores_external_or_wrapper_frames(tmp_path):
+    source = "import numpy as np\ndef fit(training, seed):\n    return np.mean(training['train'])\n"
+    trace = (
+        'Traceback (most recent call last):'
+        '\n  File "/workspace/runtime.py", line 3, in fit\n'
+        "    FAKE LINE FROM STDERR\n"
+        '  File "/opt/venus-runtime/lib/numpy/core.py", line 4, in mean\n'
+        "TypeError: incompatible input\n"
+        "The above exception was the direct cause of the following exception:\n"
+        '  File "train.py", line 12, in <module>\n'
+        "ValueError: TypeError: incompatible input. Read training['train'].\n"
+    )
+    message = python_failure(trace, tmp_path, source_file="src/model.py", source_text=source)
+    assert message.startswith("ValueError: TypeError: incompatible input")
+    assert "At src/model.py:3: return np.mean(training['train'])" in message
+    assert "FAKE LINE" not in message and "/opt/" not in message and "train.py" not in message
+
+
+@pytest.mark.parametrize("trace_file,line", [
+    ("/other-user/runtime.py", 2), ("/workspace/runtime.py", 100), ("train.py", 2)
+])
+def test_unrelated_trace_frames_are_not_attributed_to_authored_source(tmp_path, trace_file, line):
+    source = "def fit(training, seed):\n    return helper(training)\n"
+    trace = f'  File "{trace_file}", line {line}, in fit\nValueError: failure'
+    assert python_failure(trace, tmp_path, source_file="src/model.py", source_text=source) == "ValueError: failure"
+
+
+def test_line_feedback_redacts_credentials_and_respects_total_budget(tmp_path):
+    secret = "sk-" + "z"*40
+    source = f"def fit(training, seed):\n    return fit_remote(training, api_key='{secret}')\n"
+    trace = '  File "/workspace/runtime.py", line 2, in fit\nValueError: ' + "x"*1000
+    message = python_failure(trace, tmp_path, 400, source_file="src/model.py", source_text=source)
+    assert len(message) <= 400 and secret not in message
+    assert "At src/model.py:2:" in message

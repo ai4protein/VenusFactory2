@@ -121,8 +121,9 @@ async def test_invalid_training_inputs_never_start_a_process(tmp_path, damage):
 @pytest.mark.parametrize("mutation", ["bad_state","nonfinite","tamper"])
 async def test_failed_fit_keeps_evidence_and_cannot_become_a_generation(tmp_path, mutation):
     service=await service_at(tmp_path)
-    bad={"bad_state":"return []","nonfinite":"return {'x':float('nan')}",
-         "tamper":"Path('training.json').write_text('{}'); return {'mean':0}"}[mutation]
+    bad={"bad_state":"return [row['target'] for row in training['train']]",
+         "nonfinite":"return {'x':sum(row['target'] for row in training['train'])*float('nan')}",
+         "tamper":"Path('training.json').write_text('{}'); return {'mean':sum(row['target'] for row in training['train'])}"}[mutation]
     source="from pathlib import Path\ndef fit(training,seed):\n    "+bad+"\ndef predict(model,inputs):\n    return {'value':0}\n"
     await service.write_research_file("algorithm.py",source)
     with pytest.raises(ValueError):

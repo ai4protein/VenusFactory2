@@ -22,7 +22,7 @@ def model_interface(task, columns):
             "samples": "training['train'] is a list; each row contains an inputs dict and target.",
             "features": "Encode inputs into features. Numeric estimators cannot fit raw dictionaries or amino-acid strings.",
             "preprocessing": "Learn transformations from training rows only; retain fitted transformers with the learner.",
-            "returns": "Fitted estimator or parameter dict containing the model and any fitted transformers.",
+            "returns": "Parameters learned from the supplied training rows: a fitted estimator or dict with fitted transformers; not fixed demo values.",
         },
         "predict": {
             "signature": "predict(model, inputs)",

@@ -52,6 +52,13 @@ def validate_algorithm(source):
             body.pop(0)
         require(body and not all(_unimplemented(statement) for statement in body),
                 f"{name} is an unfinished placeholder. Implement its calculations before training.")
+    fit = functions["fit"]
+    training_name = (fit.args.posonlyargs + fit.args.args)[0].arg
+    require(any(isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load) and node.id == training_name
+                for statement in fit.body for node in ast.walk(statement)),
+            "fit does not read its training argument. Fit parameters from the supplied training['train'] rows "
+            "and return the fitted model; fixed demo values or a seed alone are not training. "
+            "Existing pretrained or fixed-rule baselines use evaluate_research_model.")
     require("run" not in functions, "The host supplies run(inputs); implement fit and predict")
     require(not any(isinstance(n, ast.Name) and n.id.startswith("_vf_") for n in ast.walk(tree)),
             "Names starting _vf_ are reserved for the prediction interface")
@@ -112,7 +119,8 @@ async def fit_model(workspace, development, runner, *, name, source_file, evalua
         execution = await runner(work, folder/"execution", "train.py", 120, **kwargs)
         record["execution"] = execution
         require(execution["exit_code"] == 0, "Training failed: "+python_failure(
-                execution.get("stderr_tail") or execution.get("stderr") or "inspect the training log", work, 800))
+                execution.get("stderr_tail") or execution.get("stderr") or "inspect the training log", work, 800,
+                source_file=source_file, source_text=code))
         require(all(read_bytes(work, path) == content for path, content in inputs.items()),
                 "Training modified its source or input data")
         state_metadata, state_files, state_hash = read_fitted_state(work)
