@@ -230,23 +230,13 @@ def _generate_ss8(pdb_dir: str, num_workers: int = 4) -> pd.DataFrame:
 
 
 def _generate_esm3(pdb_dir: str, device: str = "cuda:0") -> pd.DataFrame:
-    import torch
-    from mcp_tools.models.factory.training.data.get_esm3_structure_seq import get_esm3_structure_seq, ESM3_structure_encoder_v0
+    from mcp_tools.models.factory.training.data.esm3_runtime import encode_structures
 
-    encoder = ESM3_structure_encoder_v0(device)
     pdb_files = _list_pdb_paths(pdb_dir)
     if not pdb_files:
         raise FileNotFoundError(f"No PDB files found in {pdb_dir}")
-    results = []
-    for f in pdb_files:
-        r = get_esm3_structure_seq(f, encoder, device)
-        r["name"] = os.path.basename(f).split(".")[0]
-        results.append(r)
-    df = pd.DataFrame(results)[["name", "esm3_structure_seq"]]
-    del encoder
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
-    return df
+    return pd.DataFrame(encode_structures(pdb_files, device))[["name", "esm3_structure_seq"]]
+
 
 
 def generate_structure_data(

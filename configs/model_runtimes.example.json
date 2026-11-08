@@ -195,5 +195,12 @@
     "cache": "runtime/local/model-runtimes/mol1/cache",
     "installation": "runtime/local/model-runtimes/mol1/installation.json",
     "timeout_seconds": 3600
+  },
+  "esm3": {
+    "enabled": false,
+    "python": "runtime/local/model-runtimes/esm3/env/bin/python",
+    "weights": "runtime/local/model-runtimes/esm3/weights/esm3_structure_encoder_v0.pth",
+    "installation": "runtime/local/model-runtimes/esm3/installation.json",
+    "timeout_seconds": 1800
   }
 }

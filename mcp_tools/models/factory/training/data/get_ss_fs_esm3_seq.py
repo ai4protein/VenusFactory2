@@ -1,32 +1,16 @@
 import os
 import json
 import argparse
-import torch
 import pandas as pd
 from tqdm import tqdm
-from esm.models.vqvae import StructureTokenEncoder
-from get_esm3_structure_seq import get_esm3_structure_seq
-from get_foldseek_structure_seq import get_foldseek_structure_seq
-from get_secondary_structure_seq import get_secondary_structure_seq
-from get_prosst_str_token import get_prosst_token
+from mcp_tools.models.factory.training.data.esm3_runtime import encode_structures
+from mcp_tools.models.factory.training.data.get_foldseek_structure_seq import get_foldseek_structure_seq
+from mcp_tools.models.factory.training.data.get_secondary_structure_seq import get_secondary_structure_seq
+from mcp_tools.models.factory.training.data.get_prosst_str_token import convert_predict_results
 
 # ignore the warning
 import warnings
 warnings.filterwarnings("ignore")
-
-def ESM3_structure_encoder_v0(device: torch.device | str = "cpu"):
-    model = (
-        StructureTokenEncoder(
-            d_model=1024, n_heads=1, v_heads=128, n_layers=2, d_out=128, n_codes=4096
-        )
-        .to(device)
-        .eval()
-    )
-    state_dict = torch.load(
-        "./mcp_tools/models/factory/training/data/weight/esm3_structure_encoder_v0.pth", map_location=device
-    )
-    model.load_state_dict(state_dict)
-    return model
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -38,22 +22,19 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     device = "cuda:0"
-    esm3_encoder = ESM3_structure_encoder_v0(device)
     
     if args.pdb_dir is not None:
         dir_name = os.path.basename(args.pdb_dir)
         pdb_files = sorted([p for p in os.listdir(args.pdb_dir) if p.endswith('.pdb')])
-        ss_results, esm3_results = [], []
+        ss_results, esm3_inputs = [], []
         for pdb_file in tqdm(pdb_files):
             ss_result, error = get_secondary_structure_seq(os.path.join(args.pdb_dir, pdb_file))
             if error is not None:
                 print(error)
                 continue
             ss_results.append(ss_result)
-            esm3_result = get_esm3_structure_seq(os.path.join(args.pdb_dir, pdb_file), esm3_encoder, device)
-            esm3_results.append(esm3_result)
-            # clear cuda cache
-            torch.cuda.empty_cache()
+            esm3_inputs.append(os.path.join(args.pdb_dir, pdb_file))
+        esm3_results = encode_structures(esm3_inputs, device)
         ss_csv = os.path.join(args.out_dir, f"{dir_name}_ss.csv")
         esm3_csv = os.path.join(args.out_dir, f"{dir_name}_esm3.csv")
         fs_csv = os.path.join(args.out_dir, f"{dir_name}_fs.csv")
@@ -67,13 +48,11 @@ if __name__ == "__main__":
         fs_results = get_foldseek_structure_seq(args.pdb_dir)
         pd.DataFrame(fs_results).to_csv(fs_csv, index=False)
 
-        prosst_tokens = []
         from mcp_tools.models.pretrained.prosst.structure.get_sst_seq import SSTPredictor
         processor = SSTPredictor(structure_vocab_size=2048)
-        for pdb_file in tqdm(pdb_files, desc='ProSST'):
-            result, error = get_prosst_token(os.path.join(args.pdb_dir, pdb_file), processor, 2048)
-            if error is None:
-                prosst_tokens.append(result)
+        prosst_tokens = convert_predict_results(
+            processor.predict_from_pdb([os.path.join(args.pdb_dir, p) for p in pdb_files]), 2048,
+        )
         prosst_df = pd.DataFrame(prosst_tokens)
         for col in prosst_df.columns:
             if col != 'name' and col != 'aa_seq' and prosst_df[col].dtype == object:

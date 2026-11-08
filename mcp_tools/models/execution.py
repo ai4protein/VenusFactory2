@@ -27,7 +27,7 @@ def profile(key, settings=None):
     cfg = dict(settings.get(key, {}))
     if cfg.get('enabled') is False:
         raise ValueError(f'{key} runtime is disabled')
-    if key in {'rfd4_proteina', 'rfantibody', 'esmfold2', 'alphafold2', 'protenix', 'mol1'} or (key == 'esmfold' and cfg.get('installation')):
+    if key in {'esm3', 'rfd4_proteina', 'rfantibody', 'esmfold2', 'alphafold2', 'protenix', 'mol1'} or (key == 'esmfold' and cfg.get('installation')):
         receipt_path = cfg.get('installation')
         receipt = {}
         if receipt_path:

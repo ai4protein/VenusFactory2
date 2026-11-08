@@ -1,0 +1,17 @@
+# Isolated ESM3 structure-token runtime; never install into the platform environment.
+# ESM upstream still requires Transformers 4. Audit this profile separately.
+esm==3.4.2
+torch==2.11.0
+transformers==4.57.6
+tokenizers==0.22.2
+huggingface-hub==0.36.2
+biopython>=1.88
+biotite>=1.4.0
+numpy>=2.1.2
+pandas>=2.2.3
+requests>=2.33.0
+urllib3>=2.8.0
+pillow>=13.0.0
+filelock>=4.2.7
+fsspec>=2026.6.0
+tqdm>=4.67.1

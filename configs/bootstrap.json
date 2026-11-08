@@ -46,7 +46,8 @@
       "esmfold",
       "alphafold2",
       "protenix",
-      "mol1"
+      "mol1",
+      "esm3"
     ]
   },
   "tools": {
@@ -339,6 +340,13 @@
       "checkpoint_sha256": "d5b83a86884aa6870565b1a249e8f13c232dfc6dfa311089ab0c7868212b6bd6",
       "recommended_gpu": true,
       "cpu_supported": true
+    },
+    "esm3": {
+      "python": "3.12",
+      "installer": "esm3",
+      "kind": "pretrained",
+      "license": "EvolutionaryScale ESM terms; supply an authorized structure-encoder checkpoint",
+      "requirements": "requirements/optional/esm3.txt"
     }
   },
   "skills": {

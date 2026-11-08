@@ -63,6 +63,9 @@ class Runtimes:
             return {"status": "manual", "message": spec["manual"]}
         if spec.get("gpu") and not self.gpu:
             return {"status": "blocked", "message": "This optional runtime requires an NVIDIA GPU"}
+        if spec.get("installer") == "esm3":
+            from .esm3_runtime import install
+            return install(self, name)
         if spec.get("installer") == "structure":
             from .structure_runtimes import install
             return install(self, name)

@@ -67,6 +67,12 @@ def tool_health(root, name, python, hashes=False):
         checks = [base / "AE.pt", base / "2048.joblib"]
     missing += [str(p.relative_to(root)) if p.is_relative_to(root) else p.name for p in checks if not p.is_file() or not p.stat().st_size]
     receipt = read_json(root / config["installation"], {}) if config.get("installation") and (root / config["installation"]).is_file() else {}
+    if name == "esm3":
+        for field in ("python", "weights", "installation"):
+            if not config.get(field) and field not in missing:
+                missing.append(field)
+        if receipt.get("runtime") != "esm3" or receipt.get("verified") is not True:
+            missing.append("inference_verification")
     for path in receipt.get("required_files", []):
         asset = root / path
         if not asset.is_file() or not asset.stat().st_size:
@@ -81,6 +87,7 @@ def tool_health(root, name, python, hashes=False):
                "s4pred": "torch,Bio", "proteinmpnn": "torch,numpy", "prosst": "torch,transformers,torch_geometric",
                "esm1v": "torch,transformers", "esmif1": "torch,torch_geometric", "protssn": "torch,transformers,torch_geometric",
                "admet_ai": "admet_ai", "bindcraft": "jax,colabdesign,pyrosetta", "diffdock": "torch,esm,torch_geometric,rdkit",
+               "esm3": "torch,esm.models.vqvae,esm.utils.structure.protein_chain",
                "esmfold": "torch,transformers,biotite", "esmfold2": "torch,esm.models.esmfold2",
                "mol1": "torch,mol", "protenix": "torch,protenix", "alphafold2": "jax,haiku,openmm",
                "rfd4_proteina": "torch,rfproteina", "rfantibody": "torch,rfantibody"}
