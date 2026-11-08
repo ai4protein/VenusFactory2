@@ -149,11 +149,11 @@ class ResearchJobs:
         if state.get('chapters') and state.get('report'):
             from backend.web_v2.research_longform import assemble
             state['report'] = assemble(state, row['payload'].get('lang', 'en'))
-        from backend.web_v2.research_longform import MAX_MODEL_CALLS
+        from backend.web_v2.research_longform import report_model_call_limit
         unfinished = any(c.get('status') != 'completed' for c in state.get('chapters', []))
         retry_sections = status == 'completed' and (
             unfinished or state.get('review_status') in {'partial', 'unavailable'})
-        resumable = (status in {'failed', 'interrupted', 'incomplete'} or retry_sections) and int(state.get('model_calls', 0)) < MAX_MODEL_CALLS and int(row.get('resume_count', 0)) < 2
+        resumable = (status in {'failed', 'interrupted', 'incomplete'} or retry_sections) and int(state.get('model_calls', 0)) < report_model_call_limit(state) and int(row.get('resume_count', 0)) < 2
         reason = state.get('stop_reason', '') if retry_sections else ''
         if status in {'failed', 'interrupted', 'incomplete'}:
             reason = state.get('stop_reason') or ('timeout' if 'limit' in queue.get('message', '').lower() else 'interrupted' if status == 'interrupted' else 'incomplete' if status == 'incomplete' else 'unavailable')

@@ -8,6 +8,7 @@ import asyncio
 import copy
 from datetime import datetime, timezone
 import json
+import os
 import re
 import time
 from urllib.parse import urlsplit
@@ -26,7 +27,24 @@ CHAPTERS = [
     ('datasets_applications', 'Datasets, applications & reproducibility', '数据集、应用与可复现性', 'Public sequence, structure, activity and DMS datasets, models and source code, licenses and access conditions, applications, assay comparability, evidence gaps and reproducible next analyses. Do not invent downloadable data or licensing.', 'dataset benchmark application reproducibility'),
 ]
 MINIMUM_CHAPTERS = 5
-MAX_MODEL_CALLS = 18
+MAX_MODEL_CALLS = 48
+HARD_MODEL_CALL_LIMIT = 96
+LEGACY_MODEL_CALL_LIMIT = 18
+
+
+def report_model_call_limit(checkpoint=None):
+    try:
+        configured = int(os.getenv("VENUS_REPORT_MODEL_CALL_LIMIT", str(MAX_MODEL_CALLS)))
+    except ValueError:
+        configured = MAX_MODEL_CALLS
+    configured = max(1, min(configured, HARD_MODEL_CALL_LIMIT))
+    if checkpoint is None:
+        return configured
+    saved = checkpoint.get("model_call_limit", LEGACY_MODEL_CALL_LIMIT)
+    if type(saved) is not int or saved < 1:
+        saved = LEGACY_MODEL_CALL_LIMIT
+    # A deployment change may lower a ceiling, never add requests to an old run.
+    return min(saved, configured)
 
 
 def chapter_options():
@@ -197,7 +215,7 @@ def assemble(state, lang):
 async def run_long_report(payload, update, *, service_cache=None, checkpoint=None, input_store=None):
     lang = payload.get('lang', 'en')
     state = {'workflow': 'specialist_research_v2', 'phase': 'collecting', 'chapters': [], 'sources': [], 'steps': [], 'report': '',
-             'model_calls': 0, 'model_call_limit': MAX_MODEL_CALLS, 'minimum_chapters': MINIMUM_CHAPTERS, 'partial': False}
+             'model_calls': 0, 'model_call_limit': report_model_call_limit(), 'minimum_chapters': MINIMUM_CHAPTERS, 'partial': False}
     for identity, en, zh, _, _ in CHAPTERS:
         state['chapters'].append({'id': identity, 'title': zh if lang == 'zh' else en, 'status': 'pending', 'source_ids': [],
                                   'model_id': payload['model_id'], 'attempts': 0, 'draft': '', 'length': 0})
@@ -205,7 +223,7 @@ async def run_long_report(payload, update, *, service_cache=None, checkpoint=Non
         state = copy.deepcopy(checkpoint)
         if state.get('phase') in {'chapters', 'reviewing', 'completed', 'incomplete'}: state['collection_complete'] = True
         state.pop('status', None); state.pop('message', None); state.pop('stop_reason', None)
-        state['model_call_limit'] = MAX_MODEL_CALLS
+        state['model_call_limit'] = report_model_call_limit(checkpoint)
         # Legacy checkpoints cannot distinguish collection and writer failures.
         state.setdefault('collection_partial', bool(state.get('partial')))
     from .research_source_review import VERSION, document_ready, review_documents
@@ -224,7 +242,7 @@ async def run_long_report(payload, update, *, service_cache=None, checkpoint=Non
         nonlocal service_error
         if service_error is not None:
             raise service_error
-        if state['model_calls'] >= MAX_MODEL_CALLS:
+        if state['model_calls'] >= state['model_call_limit']:
             raise ValueError('Report model-call limit reached')
         state['model_calls'] += 1
         if attempt is not None:

@@ -60,6 +60,7 @@ const LABELS: Record<string, [string, string]> = {
   WEBUI_V2_AGENT_COMPACT_PERCENT: ["Compress at usage (%)", "自动压缩阈值（%）"],
   WEBUI_V2_AGENT_SUMMARY_TOKENS: ["Memory summary budget (tokens)", "历史摘要预算（token）"],
   WEBUI_V2_AGENT_MAX_TURNS: ["Maximum turns per conversation", "每段对话最多轮数"],
+  VENUS_REPORT_MODEL_CALL_LIMIT: ["Model requests per report", "每份报告模型请求上限"],
   WEBUI_V2_ONLINE_DAILY_CHAT_LIMIT: ["Daily new conversations per visitor", "每位访客每日新对话次数"],
   VENUS_ONLINE_IP_STARTS_PER_MINUTE: ["New conversations per IP per minute", "每个 IP 每分钟新对话上限"],
   VENUS_QUOTA_TIMEZONE: ["Daily credit reset timezone", "每日额度重置时区"],

@@ -100,3 +100,12 @@ def test_partial_report_cannot_bypass_existing_resume_or_model_limits(tmp_path, 
     with pytest.raises(ValueError):
         jobs.resume("alice", identity)
     assert not (jobs.folder(identity) / "attempts").exists()
+
+
+@pytest.mark.parametrize("saved,configured,calls,resumable", [(4,"48",4,False),(48,"8",8,False),(48,"48",19,True)])
+def test_resume_api_uses_checkpoint_and_current_server_ceiling(tmp_path,monkeypatch,saved,configured,calls,resumable):
+    jobs,identity=fixture(tmp_path,status="interrupted",calls=calls)
+    state_path=jobs.folder(identity)/"state.json"
+    state=json.loads(state_path.read_text());state["model_call_limit"]=saved;write(state_path,state)
+    monkeypatch.setenv("VENUS_REPORT_MODEL_CALL_LIMIT",configured)
+    assert jobs.get("alice",identity)["resumable"] is resumable

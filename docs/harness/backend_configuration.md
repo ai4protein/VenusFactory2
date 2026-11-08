@@ -105,3 +105,11 @@ Scientist 的默认入口为 `autonomous_research.v1`。提交研究目标和运
 前端轮询显示专家报告、计划状态、当前工具、程序输出和中间文件。训练脚本可输出 JSON 行 `{"event":"progress","step":5,"total":20,"metrics":{"loss":0.3}}`；常见 `Epoch 5/20` 日志也会显示进度条。没有真实计数时只显示日志和耗时。
 
 可复用程序提供 `run(inputs: dict)` 并通过隔离重放与独立审查。研究产物先保存在所属会话；公开发布还需平台审核和选择，并记录作者邮箱。进入平台注册表后，Agent 通过统一搜索、`describe_generated_capability` 和 `run_generated_capability` 调用。执行重放验证与科学预测准确率分别记录；准确率需要相应的数据划分和实验产物。
+
+## Researcher 报告预算与恢复
+
+Researcher 为八个专题分别检索和撰写，随后逐段核对原始来源，再修订和综合。审阅每批最多八段；超时或格式不完整的批次拆小重试，最多两轮，并继续处理其他章节。每段独立通过同一套证据校验后才缓存；缺失或不合格的段落继续审阅，不拆掉段内的错误论断来换取通过。未核对的内容保持未完成，作者修订后仍须重新审阅。
+
+Administration 的 Environment 中可设置 VENUS_REPORT_MODEL_CALL_LIMIT：新报告默认最多 48 次模型请求，范围为 1–96，包含专题撰写、来源审阅、修订及综合。原有报告保持创建时的限额；降低后台设置也会限制恢复执行，调高设置不会给旧报告增加预算。供应商限流或不可用时停止当前执行，不自动改用付费模型。
+
+Source-review policy v2 invalidates earlier review receipts while preserving them in checkpoint history. It additionally checks that explicitly measured values occur in the quoted evidence. These structural checks do not establish scientific entailment; a model review can still misinterpret a source.
