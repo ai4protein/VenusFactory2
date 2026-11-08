@@ -39,7 +39,13 @@ def specification(role, protocol):
         schema["required"].remove("deliverable")
         from .research_plan_evidence import VERIFICATION_KINDS
         schema["properties"]["steps"]["items"]["properties"]["verification"] = {"enum": list(VERIFICATION_KINDS)}
-        schema["properties"]["steps"]["items"]["properties"]["approach"] = dict(text)
+        schema["properties"]["steps"]["items"]["properties"]["approach"] = {
+            **text, "description": (
+                "Concrete implementation method. For model training or revision, name the feature representation, "
+                "learning procedure, comparison and scientific rationale. Revise this method from measured feedback "
+                "while preserving the acceptance criteria."
+            ),
+        }
     function = {"name": name, "description": "Return this phase's structured output. No action is executed.",
                 "parameters": schema}
     if protocol == "chat_completions":
