@@ -51,6 +51,13 @@ The command runs as PID 1 in its private PID namespace. Stdin is `/dev/null`,
 stdout/stderr are pipes, and inherited descriptors are closed. The host drains
 bounded logs outside the mount. Python binaries and libraries are read-only;
 environment metadata and root-level configuration are not mounted.
+For virtual environments, the sandbox mounts the base interpreter's standard
+library and shared libraries, then overlays the active environment's packages.
+The environment roots and pyvenv.cfg remain outside the guest. A system Python
+without a site-packages directory uses private, read-only mount points; no
+directory is created in the host installation. Native harnesses and MCP
+preloading use the same Python runtime layout. The MCP preloader receives a
+minimal supervisor environment and selected system certificate/resolver files.
 
 File reads, previews and ZIP downloads use directory-anchored `O_NOFOLLOW`
 descriptors, not a validate-then-reopen pathname. Writes use anchored temporary

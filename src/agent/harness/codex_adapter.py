@@ -193,6 +193,8 @@ def sandbox_command(ctx, home):
     ]
     from .system_mounts import system_mounts
     command += system_mounts()
+    from agent.harness.python_runtime_mounts import python_runtime_mounts
+    command += python_runtime_mounts(paths["python_root"])
     command += [
         "--proc",
         "/proc",
@@ -204,9 +206,6 @@ def sandbox_command(ctx, home):
         "/home",
         "--dir",
         "/opt",
-        "--ro-bind",
-        paths["python_root"],
-        "/opt/venus-runtime",
         "--ro-bind",
         str(binary.parent.parent),
         "/opt/codex",

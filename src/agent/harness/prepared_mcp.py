@@ -275,9 +275,10 @@ def sandbox_command(*, workspace, capability, python_root, ipc_root, control_dir
         "--cap-drop",
         "ALL",
     ]
-    for path in ("/usr", "/bin", "/lib", "/lib64", "/etc"):
-        if Path(path).exists():
-            command += ["--ro-bind", path, path]
+    from .system_mounts import system_mounts
+    from .python_runtime_mounts import python_runtime_mounts
+    command += system_mounts()
+    command += python_runtime_mounts(python_root)
     command += [
         "--proc",
         "/proc",
@@ -287,9 +288,6 @@ def sandbox_command(*, workspace, capability, python_root, ipc_root, control_dir
         "/tmp",
         "--tmpfs",
         "/home",
-        "--ro-bind",
-        str(Path(python_root).resolve()),
-        "/opt/venus-runtime",
         "--ro-bind",
         str(Path(capability).resolve()),
         "/capabilities",
@@ -362,6 +360,7 @@ class PreparedMcp:
                 stdout=self.log,
                 stderr=asyncio.subprocess.STDOUT,
                 start_new_session=True,
+                env={"PATH": "/usr/bin:/bin", "LANG": "C.UTF-8"},
             )
             write_json(
                 self.control_dir / "launch.json",

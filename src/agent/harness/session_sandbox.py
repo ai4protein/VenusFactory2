@@ -71,13 +71,10 @@ def command(workspace, kind, payload, timeout, *, scratch, memory):
         if Path(p).exists(): cmd += ['--ro-bind',p,p]
     cmd += ['--proc','/proc','--dev','/dev','--bind',str(scratch),'/tmp','--dir','/home','--dir','/opt',
             '--dir','/opt/venus-runtime/bin']
-    # Mount code and shared libraries, never the environment's configuration/metadata.
-    for name in ['lib','lib64']:
-        p = Path(sys.prefix)/name
-        if p.exists(): cmd += ['--ro-bind',str(p),'/opt/venus-runtime/'+name]
-    executable = str(Path(sys.executable).resolve())
-    for name in ['python','python3',f'python{sys.version_info.major}.{sys.version_info.minor}']:
-        cmd += ['--ro-bind',executable,'/opt/venus-runtime/bin/'+name]
+    from .python_runtime_mounts import runtime_mounts
+    cmd += runtime_mounts(prefix=sys.prefix, base_prefix=sys.base_prefix,
+                          executable=sys.executable,
+                          version=f'{sys.version_info.major}.{sys.version_info.minor}')
     cmd += ['--bind',str(Path(workspace).resolve()),'/workspace',
             '--ro-bind',str(Path(__file__).with_name('session_command_worker.py')),'/runner.py',
             '--ro-bind',str(Path(__file__).with_name('session_seccomp.py')),'/sandbox_seccomp.py',

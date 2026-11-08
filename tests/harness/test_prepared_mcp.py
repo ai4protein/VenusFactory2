@@ -85,11 +85,24 @@ def test_invalid_load_budget_rejected(tmp_path, timeout):
 
 
 @pytest.mark.asyncio
-async def test_prepared_worker_retains_real_mcp_handshake_and_tool_result(tmp_path):
+async def test_prepared_worker_retains_real_mcp_handshake_and_tool_result(tmp_path, monkeypatch):
     from mcp import ClientSession, StdioServerParameters
     from mcp.client.stdio import stdio_client
 
-    worker = fixture(tmp_path)
+    monkeypatch.setenv("PRIVATE_MCP_TEST_KEY", "private_prepared_canary")
+    guard = """import os
+from pathlib import Path
+assert 'PRIVATE_MCP_TEST_KEY' not in os.environ
+assert not Path('/etc/passwd').exists()
+assert not Path('/opt/venus-runtime/pyvenv.cfg').exists()
+assert not Path('/opt/venus-runtime/conda-meta').exists()
+assert not Path('/opt/venus-runtime/.env').exists()
+for entry in Path('/proc').glob('[0-9]*/environ'):
+    try: content = entry.read_bytes()
+    except OSError: continue
+    assert b'private_prepared_canary' not in content
+"""
+    worker = fixture(tmp_path, guard + VALID)
     try:
         ready = await worker.start()
         assert ready["stage"] == "capability_loaded" and ready["native_handshake_completed"] is False

@@ -190,6 +190,8 @@ def dsh_command(ctx, controls):
     ]
     from agent.harness.system_mounts import system_mounts
     cmd += system_mounts()
+    from agent.harness.python_runtime_mounts import python_runtime_mounts
+    cmd += python_runtime_mounts(runtimes["python_root"])
     cmd += [
         "--proc",
         "/proc",
@@ -201,9 +203,6 @@ def dsh_command(ctx, controls):
         "/home",
         "--dir",
         "/opt",
-        "--ro-bind",
-        runtimes["python_root"],
-        "/opt/venus-runtime",
         "--ro-bind",
         runtimes["dsh_site"],
         "/opt/dsh-site",

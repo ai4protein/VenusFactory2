@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -8,7 +9,7 @@ def test_sdk_boot_is_ephemeral_but_evidence_and_session_are_persisted(tmp_path):
     controls = tmp_path / 'control'
     workspace = tmp_path / 'session'
     ctx = SimpleNamespace(task=SimpleNamespace(workspace=workspace, capability=tmp_path / 'caps'),
-                          runtimes={'python_root': '/runtime/python', 'dsh_site': '/runtime/sdk'})
+                          runtimes={'python_root': sys.prefix, 'dsh_site': '/runtime/sdk'})
     command = dsh_command(ctx, controls)
     pairs = list(zip(command, command[1:]))
     assert ('--tmpfs', '/runtime_home') in pairs

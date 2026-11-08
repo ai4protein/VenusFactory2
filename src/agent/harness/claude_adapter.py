@@ -38,6 +38,8 @@ def sandbox_command(ctx, home, prepared):
     ]
     from agent.harness.system_mounts import system_mounts
     command += system_mounts()
+    from agent.harness.python_runtime_mounts import python_runtime_mounts
+    command += python_runtime_mounts(ctx.runtimes["python_root"])
     command += [
         "--proc",
         "/proc",
@@ -50,9 +52,6 @@ def sandbox_command(ctx, home, prepared):
         "--ro-bind",
         str(Path(ctx.runtimes["claude_bin"]).resolve()),
         "/opt/claude",
-        "--ro-bind",
-        str(Path(ctx.runtimes["python_root"]).resolve()),
-        "/opt/venus-runtime",
         "--bind",
         str(task.workspace),
         "/workspace",

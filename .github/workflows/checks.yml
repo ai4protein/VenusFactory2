@@ -30,6 +30,12 @@ jobs:
           tests/test_repository_state_exclusions.py tests/test_incremental_install.py
           tests/test_initialize.py tests/test_skill_validation.py tests/test_hub_progress.py
           tests/test_dependency_audit.py tests/test_legacy_install.py tests/test_torch_detect.py
+      - name: Verify isolated virtualenv mount layout
+        env:
+          PYTHONPATH: src
+          PYTHON_DOTENV_DISABLED: '1'
+        run: >-
+          python -m pytest -q tests/harness/test_session_virtualenv.py -k 'not actual'
   harness-protocols:
     runs-on: ubuntu-latest
     timeout-minutes: 5
