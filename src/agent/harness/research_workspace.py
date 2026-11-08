@@ -85,8 +85,9 @@ class ResearchWorkspace:
         from backend.web_v2.research_files import list_files
         return {'files':[{'path':row['rel'],'bytes':row['size']} for row in list_files({'workspace':self.workspace},limit=500)['files']]}
 
-    async def read_research_file(self, path: str, offset_bytes: int=0, max_bytes: int=20000) -> dict:
-        """Preview text, CSV or molecular text in bounded UTF-8 windows; continue with next_offset_bytes. Analyze full tables with isolated Python. PDFs return up to 30 pages."""
+    async def read_research_file(self, path: str, offset_bytes: int=0, max_bytes: int=20000, view: Literal["auto", "text"]="auto") -> dict:
+        """Preview a file. CSV/TSV defaults to columns and three sample rows; analyze full tables with isolated Python. Use view='text' for a targeted raw window. Text windows return next_offset_bytes; PDFs return up to 30 pages."""
+        if view not in ("auto", "text"): raise ValueError("view must be auto or text")
         p=Path(path)
         if p.suffix.lower()=='.pdf':
             if offset_bytes: raise ValueError('Byte offsets apply to text files only')
@@ -98,8 +99,8 @@ class ResearchWorkspace:
                 from PyPDF2 import PdfReader
             reader=PdfReader(io.BytesIO(data))
             return {'path':path,'pages':len(reader.pages),'text':'\n'.join(page.extract_text() or '' for page in reader.pages[:30])[:200000],'sha256':hashlib.sha256(data).hexdigest()}
-        from .workspace_preview import text_window
-        return text_window(self.workspace,path,offset_bytes=offset_bytes,max_bytes=max_bytes)
+        from .workspace_preview import file_preview
+        return file_preview(self.workspace,path,offset_bytes=offset_bytes,max_bytes=max_bytes,view=view)
 
     async def write_research_file(self, path: str, content: str) -> dict:
         """Create or revise Python code, a report, or a small data file in this workspace."""
