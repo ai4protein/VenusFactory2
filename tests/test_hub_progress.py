@@ -35,6 +35,8 @@ def test_estimate_download_bytes_from_manifest():
 def test_ensure_announces_missing(tmp_path, monkeypatch):
     monkeypatch.setenv("VENUS_CKPT_DIR", str(tmp_path))
     monkeypatch.setenv("VENUS_CKPT_AUTO_DOWNLOAD", "1")
+    monkeypatch.delenv("HF_HUB_OFFLINE", raising=False)
+    monkeypatch.delenv("TRANSFORMERS_OFFLINE", raising=False)
     monkeypatch.delenv("VENUS_DOWNLOAD_QUIET", raising=False)
 
     def fake_download(rel, *, force=False):

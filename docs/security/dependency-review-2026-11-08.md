@@ -28,12 +28,19 @@ fails strict validation.
 | Resolved Linux environment, both constraints | 260 packages; findings in Torch and Transformers |
 | Resolved Apple Silicon macOS environment, both constraints | 224 packages; findings in Torch and Transformers |
 | Frontend npm audit, production and development dependencies | 0 known vulnerabilities, 326 dependency entries |
+| Backend coverage, segmented run and correction reruns | 5,474 passed; 16 skipped |
 | Installer regression | 69 passed |
 | CI boundary, skill and installation regression | 113 passed |
 | Frontend tests | 114 passed |
 | Frontend type check and production build | Passed |
 | Source credentials/paths, repository layout and documentation | Passed |
 | Strict skill validation, including reference paths | 36 skills; 0 errors and 0 warnings |
+
+The broad backend run was completed in segments after an execution time limit.
+Two environment-sensitive assertions were corrected and their modules retested:
+the reference check now validates frozen source bytes across Biopython upgrades,
+and the simulated download test explicitly controls its offline flags. Reference
+tables retain their recorded extraction version and source hashes.
 
 The Python inventory counts affected package/version pairs rather than individual
 advisories; GHSA and PYSEC identifiers can describe the same vulnerability.
