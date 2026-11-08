@@ -135,7 +135,9 @@ class Environment:
         if links:
             command += ["--find-links", links, "--only-binary", ":all:"]
         if constraints:
-            command += ["--constraint", constraints]
+            files = [constraints] if isinstance(constraints, (str, Path)) else constraints
+            for constraint in files:
+                command += ["--constraint", constraint]
         self.run(command)
 
     def platform(self, folder, reuse=False):
@@ -145,14 +147,15 @@ class Environment:
                 raise ValueError(f"Existing environment has no Python: {python}")
             return python
         python = self.create(folder, "3.12")
+        constraints = [self.root / "requirements" / name for name in
+                       ("bootstrap-constraints.txt", "service-security.txt")]
         signature = {"pyproject": digest(self.root / "pyproject.toml"), "torch_type": self.torch_type,
-                     "constraints": digest(self.root / "requirements/bootstrap-constraints.txt"), "recipe": 3}
+                     "constraints": digest(constraints[0]), "service_security": digest(constraints[1]), "recipe": 4}
         receipt = folder / ".venus-dependencies.json"
         if read_json(receipt) != signature:
             self.pip(python, "torch==2.8.0", "torchvision==0.23.0", torch=True)
             links = f"https://data.pyg.org/whl/torch-2.8.0+{self.torch_type}.html"
             self.pip(python, "pyg_lib", "torch_scatter", "torch_sparse", "torch_cluster", "torch_spline_conv", links=links)
-            constraint = self.root / "requirements/bootstrap-constraints.txt"
             # Read metadata with the newly created Python 3.12, even when the
             # bootstrap itself runs on Python 3.10. pip cannot consume TOML via -r.
             dependencies = json.loads(capture([
@@ -163,7 +166,7 @@ class Environment:
             ]))
             if not isinstance(dependencies, list) or not all(isinstance(item, str) and item for item in dependencies):
                 raise ValueError("Invalid project dependency metadata")
-            self.pip(python, "torch_geometric", *dependencies, constraints=constraint)
+            self.pip(python, "torch_geometric", *dependencies, constraints=constraints)
             self.run([python, "-m", "pip", "check"])
             self.run([python, "-c", "import fastapi,uvicorn,fastmcp,torch,transformers,torch_geometric,peft"])
             atomic_json(receipt, signature)

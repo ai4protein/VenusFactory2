@@ -4,6 +4,7 @@
 | --- | --- |
 | `../pyproject.toml`, `../requirements.txt` | Existing platform environment; GPU wheels are selected by `install.py` |
 | `macos.txt` | macOS dependency profile; Linux sandbox and GPU support differ |
+| `service-security.txt` | Validated service versions, applied by the initializer together with the model compatibility constraints |
 | `optional/cube.txt` | Optional CubeSandbox SDK; requires a separately configured local service |
 | `optional/e2b.txt` | Optional E2B SDK; requires the configured local E2B infrastructure |
 
@@ -21,5 +22,6 @@ requirements file. Dependency removal requires import and execution verification
 
 `bootstrap-constraints.txt` is the compatibility envelope used by `initialize.py`
 for the platform environment (Torch/PyG, MCP/FastMCP, Transformers). It does not
-apply to independently versioned third-party environments. See
+apply to independently versioned third-party environments. The initializer also applies
+`service-security.txt` and rechecks dependencies when either constraints file changes. See
 [installation](../docs/installation.md).

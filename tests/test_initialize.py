@@ -197,6 +197,7 @@ def test_failed_dependency_install_is_not_marked_ready(tmp_path):
     (tmp_path / "pyproject.toml").write_text("[project]\nname='sample'\n")
     (tmp_path / "requirements").mkdir()
     (tmp_path / "requirements/bootstrap-constraints.txt").write_text("torch==2.8.0\n")
+    (tmp_path / "requirements/service-security.txt").write_text("fastapi==0.162.0\n")
     calls = []
     def fail(args, **kw):
         calls.append(args)

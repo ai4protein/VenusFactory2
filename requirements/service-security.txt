@@ -2,6 +2,8 @@
 Authlib==1.9.2
 GitPython==3.2.1
 PyJWT==2.15.1
+accelerate==1.15.0
+biopython==1.88
 aiohttp==3.14.5
 anyio==4.16.0
 brotli==1.2.1

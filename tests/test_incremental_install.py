@@ -178,6 +178,8 @@ def test_platform_dependencies_use_valid_arguments_for_both_managers(tmp_path, m
     (tmp_path / 'pyproject.toml').write_text('[project]\ndependencies=["fastapi==0.116.1", "numpy>=2.1.2"]\n')
     constraints = tmp_path / 'requirements/bootstrap-constraints.txt'
     constraints.parent.mkdir(); constraints.write_text('fastapi==0.116.1\n')
+    security = constraints.with_name('service-security.txt')
+    security.write_text('fastapi==0.116.1\n')
     folder = tmp_path / 'environment'; folder.mkdir()
     commands = []
     environment = system.Environment(tmp_path, lambda args: commands.append([str(x) for x in args]), manager=manager)
@@ -186,6 +188,30 @@ def test_platform_dependencies_use_valid_arguments_for_both_managers(tmp_path, m
     environment.platform(folder)
     dependencies = next(args for args in commands if 'torch_geometric' in args)
     assert 'fastapi==0.116.1' in dependencies and 'numpy>=2.1.2' in dependencies
-    assert str(constraints) in dependencies
+    assert str(constraints) in dependencies and str(security) in dependencies
+    assert dependencies.count('--constraint') == 2
     assert '-r' not in dependencies and str(tmp_path / 'pyproject.toml') not in dependencies
-    assert json.loads((folder / '.venus-dependencies.json').read_text())['recipe'] == 3
+    assert json.loads((folder / '.venus-dependencies.json').read_text())['recipe'] == 4
+
+def test_changed_service_constraints_invalidate_dependency_receipt(tmp_path, monkeypatch):
+    (tmp_path / "pyproject.toml").write_text('[project]\ndependencies=["fastapi>=0.162.0"]\n')
+    requirements = tmp_path / "requirements"
+    requirements.mkdir()
+    (requirements / "bootstrap-constraints.txt").write_text("torch==2.8.0\n")
+    security = requirements / "service-security.txt"
+    security.write_text("fastapi==0.162.0\n")
+    folder = tmp_path / "environment"
+    folder.mkdir()
+    commands = []
+    environment = system.Environment(tmp_path, lambda args: commands.append(list(args)))
+    environment.command = ["uv"]
+    monkeypatch.setattr(environment, "create", lambda *_: Path(sys.executable))
+    environment.platform(folder)
+    first = len(commands)
+    environment.platform(folder)
+    assert len(commands) == first
+    security.write_text("fastapi==0.162.0\nstarlette==1.10.0\n")
+    environment.platform(folder)
+    assert len(commands) > first
+    command = next(args for args in commands[first:] if "torch_geometric" in args)
+    assert str(security) in list(map(str, command))
