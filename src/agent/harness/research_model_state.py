@@ -155,6 +155,13 @@ spec.loader.exec_module(module)
 training=json.loads((base/"training.json").read_text())
 try:
     state=module.fit(training,__VF_SEED__)
+except FileNotFoundError as exc:
+    raise ValueError(
+        f"FileNotFoundError: {str(exc)[:240]}. "
+        "Fitting runs in a fresh training workspace; original session files are not mounted. "
+        "Use the supplied training['train'] sample list, row['inputs'] and row['target'], "
+        "instead of reopening the uploaded CSV. Keep validation and test data outside fitting."
+    ) from exc
 except (TypeError, ValueError, KeyError, IndexError) as exc:
     raise ValueError(
         f"{type(exc).__name__}: {str(exc)[:240]}. "

@@ -103,3 +103,36 @@ def test_line_feedback_redacts_credentials_and_respects_total_budget(tmp_path):
     message = python_failure(trace, tmp_path, 400, source_file="src/model.py", source_text=source)
     assert len(message) <= 400 and secret not in message
     assert "At src/model.py:2:" in message
+
+
+@pytest.mark.asyncio
+async def test_fit_cannot_reopen_session_csv_and_gets_training_only_guidance(tmp_path):
+    service = ResearchWorkspace(tmp_path / "work", tmp_path / "control", {"steps": []},
+                                development_root=tmp_path / "development")
+    table = "id,group,x,target\n" + "".join(f"{i},g{i},{i},{2*i+1}\n" for i in range(60))
+    await service.write_research_file("measurements.csv", table)
+    prepared = await service.prepare_research_dataset(
+        "measurements.csv", "target", ["x"], "group", "Synthetic software fixture", "Independent fixture groups")
+    code = """def fit(training, seed):
+    rows = training["train"]
+    with open("measurements.csv") as source:
+        return {"mean": len(source.read()) / len(rows)}
+def predict(model, inputs):
+    return {"value": model["mean"]}
+"""
+    await service.write_research_file("reopen.py", code)
+    with pytest.raises(ValueError) as caught:
+        await service.train_research_model(
+            "Fixture", "reopen.py", prepared["evaluation_file"], "Validate isolated fitting only")
+    message = str(caught.value)
+    assert "FileNotFoundError" in message and "measurements.csv" in message
+    assert "original session files are not mounted" in message
+    assert "training['train']" in message and "row['inputs']" in message
+    assert "At reopen.py:3:" in message and len(message) < 850
+    assert (service.workspace / "measurements.csv").read_text() == table
+    receipts = list(service.development.root.glob("training/*/receipt.json"))
+    assert len(receipts) == 1
+    receipt = json.loads(receipts[0].read_text())
+    assert receipt["status"] == "failed"
+    assert "Traceback" in (receipt["execution"].get("stderr") or receipt["execution"].get("stderr_tail", ""))
+    assert not service.development.records()

@@ -47,11 +47,12 @@ async def test_genuine_missing_input_is_preserved_in_plan_and_checkpoint(tmp_pat
     assert service.checkpoint["needs_input"] == [question]
 
 @pytest.mark.asyncio
-async def test_existing_bounded_plan_repair_corrects_placeholder_without_answering_for_user(tmp_path):
+@pytest.mark.parametrize("invalid_question", [PLACEHOLDERS[1], "evaluation_file"])
+async def test_existing_bounded_plan_repair_corrects_invalid_question_without_answering_for_user(tmp_path, invalid_question):
     seen = []
     async def consult(role, context):
         seen.append(context)
-        return json.dumps(plan([PLACEHOLDERS[1]] if len(seen) == 1 else []))
+        return json.dumps(plan([invalid_question] if len(seen) == 1 else []))
     profile = Profile.from_dict({
         "mode": "science_expert", "harness": "expert-deepseek-harness",
         "model": {"provider": "dmx", "model": "glm-4-flash", "base_url": "https://www.dmxapi.cn/v1"},
@@ -63,5 +64,48 @@ async def test_existing_bounded_plan_repair_corrects_placeholder_without_answeri
     assert result["needs_input"] == []
     assert len(seen) == 2
     assert "concrete" in seen[1]["format_repair"]["validation_error"]
-    assert seen[1]["format_repair"]["previous_response"] == json.dumps(plan([PLACEHOLDERS[1]]))
+    assert seen[1]["format_repair"]["previous_response"] == json.dumps(plan([invalid_question]))
     assert result["steps"][0]["status"] == "pending"
+
+
+INTERNAL_FIELDS = [
+    "evaluation_file", "Evaluation File", " source_file ", "parent_experiment_id",
+    "prediction_key", "review_spec", "reproduction_script", "fitted_files",
+    chr(96) + "evaluation_file" + chr(96),
+    '"evaluation_file"?',
+]
+
+
+@pytest.mark.parametrize("question", INTERNAL_FIELDS)
+def test_protocol_field_is_not_a_missing_user_input(question):
+    with pytest.raises(ValueError, match="concrete"):
+        parse_plan(json.dumps(plan([question])))
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("question", INTERNAL_FIELDS)
+async def test_internal_field_cannot_save_a_checkpoint_that_pauses_work(tmp_path, question):
+    service = ResearchWorkspace(tmp_path / "workspace", tmp_path / "control", parse_plan(json.dumps(plan([]))))
+    await service.submit_research_checkpoint("Work in progress", [], [], [])
+    previous = (service.control / "checkpoint.json").read_bytes()
+    with pytest.raises(ValueError, match="concrete"):
+        await service.submit_research_checkpoint("Fitting needs code repair", [], [], [question])
+    assert service.checkpoint["needs_input"] == []
+    assert (service.control / "checkpoint.json").read_bytes() == previous
+
+
+def test_missing_internal_evaluation_reference_explains_how_to_recover():
+    with pytest.raises(ValueError) as caught:
+        parse_plan(json.dumps(plan(["evaluation_file"])))
+    assert "prepare_research_dataset" in str(caught.value)
+    assert "prepared_dataset" in str(caught.value)
+
+
+@pytest.mark.parametrize("question", [
+    "Can you provide independent experimental measurements for evaluation_file?",
+    "Which mutation assay should be used to evaluate the model?",
+    "Please upload the missing source_file named measurements.csv.",
+    "请提供独立实验数据作为评估集。",
+])
+def test_concrete_user_data_questions_can_mention_protocol_fields(question):
+    assert parse_plan(json.dumps(plan([question])))["needs_input"] == [question]
