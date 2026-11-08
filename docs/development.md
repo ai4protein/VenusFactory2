@@ -40,6 +40,37 @@ not replace regression tests for the areas you change. See the
 the [directory guide](architecture/repository-layout.md) for source and runtime ownership.
 Current UI screenshots and capture details are listed in [images/README.md](images/README.md).
 
+## Development checkpoints
+
+Complete one coherent behavior change, then review its implementation before
+starting another feature or preparing a commit. Also stop for this review when a
+fix introduces a second path for the same behavior, another compatibility
+exception, or a dependency across package boundaries.
+
+1. Trace the affected user action through API, worker, MCP and model code. Keep
+   each policy and state transition in one owning module; callers use its public
+   interface.
+2. Inspect the diff and existing implementations. Consolidate repeated validation,
+   configuration and lifecycle logic. Remove a replaced path only after checking
+   callers, saved jobs, CLI entry points and tests.
+3. Keep compatibility at an explicit boundary. New code imports the owning package;
+   modules in the same RSI engine use relative imports. Preserve standalone bundle
+   execution, stable tool names and frozen research evidence. Do not relax source
+   hashes or numerical verification to make historical results pass.
+4. Run the maintainer checks above and focused behavioral tests. Changes to a
+   bundled runtime also need a standalone execution check; changes to research
+   validation need replay and rejection checks.
+5. Update the existing architecture or user documentation when behavior changes.
+   Keep machine-specific profiles, experiments and verification logs in the ignored
+   runtime or research directories. Commit refactoring separately from unrelated
+   features.
+
+Review the affected subsystem as a whole after several feature batches: identify
+cycles, duplicated state, obsolete adapters and oversized modules with unrelated
+responsibilities. Refactor around those responsibilities, rather than moving files
+only to make directories look smaller. Record concrete unresolved issues with an
+owner and next verification step; do not create a parallel checklist for every fix.
+
 ## Before a commit
 
 Use Python 3.12 and Node 24. Keep credentials, runtime installations, session data,

@@ -19,7 +19,9 @@ generated models and research outputs never belong in this source package.
 New imports use the owning package, such as
 `agent.rsi.engine.model_gateway`. `_compat.py` lazily maps previous flat Python
 import names to the same modules for older callers. It does not duplicate code or
-eagerly load model libraries. Frozen historical source snapshots are not rewritten.
+eagerly load model libraries. Modules within the same engine use relative imports;
+do not route their internal dependencies through the legacy alias layer. Frozen
+historical source snapshots are not rewritten.
 
 Engine modules that build isolated execution bundles remain together: their
 relative source dependencies are part of the runtime contract. Moving an engine
