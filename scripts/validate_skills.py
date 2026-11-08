@@ -215,10 +215,10 @@ def validate(strict: bool = False, check_refs: bool = False) -> int:
                     f"scientific/{path.name}: missing SKILL.md "
                     "(loose submodule check)"
                 )
-    elif (ROOT / "src" / "agent" / "skills" / "vendor" / "scientific-agent-skills").exists():
+    elif SAS_SKILLS_DIR.parent.is_dir() and any(SAS_SKILLS_DIR.parent.iterdir()):
         warnings.append(
-            "scientific-agent-skills present but skills/ missing — "
-            "run: git submodule update --init --recursive"
+            "scientific-agent-skills installation is incomplete (skills/ missing) — "
+            "run: python3 initialize.py install --stages skills"
         )
 
     # Loader smoke (optional if import path works)

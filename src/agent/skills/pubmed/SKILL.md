@@ -1,6 +1,6 @@
 ---
 name: pubmed
-description: PubMed — NCBI's biomedical literature database (>35M citations). Keyword search inline, or batch-fetch full title + structured abstract + authors + DOI for a known list of PMIDs. Use for medical / biological literature lookup, citation resolution, or building an abstract corpus for downstream NLP. Honors NCBI_API_KEY env var.
+description: Use for biomedical literature searches, PMID citation resolution and structured abstracts in PubMed. Prefer biorxiv for unpublished preprints and openalex for citation networks.
 license: Unknown
 metadata:
   version: "1.0"

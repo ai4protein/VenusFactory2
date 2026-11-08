@@ -1,6 +1,6 @@
 ---
 name: biorxiv
-description: bioRxiv & medRxiv — biology / medicine preprint servers. Search by keyword + date window, fetch a specific preprint's full metadata (with all version history + abstract + JATS XML link) by DOI. Use for cutting-edge biology/medicine work that hasn't gone through peer review yet, or to find the original preprint version of a paper you only have the DOI for.
+description: "Use for biology and medicine preprints: search bioRxiv or medRxiv and retrieve DOI metadata and version history. Prefer pubmed for peer-reviewed biomedical literature."
 license: Unknown (bioRxiv content licensed by individual authors)
 metadata:
   version: "1.0"

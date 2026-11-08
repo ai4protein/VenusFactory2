@@ -1,6 +1,6 @@
 ---
 name: ncbi_gene
-description: Query NCBI Gene via E-utilities/Datasets API. Search by symbol/ID, retrieve gene info (RefSeqs, GO, locations, phenotypes), batch lookups, for gene annotation and functional analysis.
+description: Use for NCBI Gene lookup by symbol or ID, RefSeq accessions, gene annotations and batch queries. Prefer ncbi_clinvar for variant clinical significance and uniprot for protein annotations.
 license: Unknown
 metadata:
   version: "1.0"

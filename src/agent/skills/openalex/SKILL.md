@@ -1,6 +1,6 @@
 ---
 name: openalex
-description: OpenAlex — free, comprehensive scholarly graph (works, authors, sources/journals, institutions, topics, concepts, funders). Search papers by keyword/filter/sort, fetch a single entity by ID, look up author profiles, institutions, citation networks. Use whenever the user asks about papers, citation counts, author publications, institution outputs, or research topics. Lower-friction alternative to Semantic Scholar / Web of Science / Scopus.
+description: Use for scholarly works, authors, institutions and citation networks in OpenAlex. Prefer pubmed for biomedical abstracts and biorxiv for preprint version histories.
 license: CC0 (OpenAlex data) / Apache-2.0 (adapted from google-deepmind/science-skills)
 metadata:
   version: "1.0"

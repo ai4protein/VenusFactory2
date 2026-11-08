@@ -1,6 +1,6 @@
 ---
 name: ncbi_clinvar
-description: Query NCBI ClinVar for variant clinical significance. Search by gene/condition/CLNSIG, interpret pathogenicity, use E-utilities or FTP; annotate VCFs. Use project tools in mcp_tools.tools.database.ncbi.
+description: Use for querying NCBI ClinVar variant classifications, review status and supporting evidence by gene or condition. Prefer ncbi_gene for gene annotations; not for diagnosing a patient.
 license: Unknown
 metadata:
   version: "1.0"
