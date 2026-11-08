@@ -64,8 +64,15 @@ async def test_agent_sees_only_schema_then_training_rows(tmp_path,suffix):
     assert store.original_bytes(item["path"])==original
     assert all(marker not in workspace_text(work) for marker in hidden_markers(data))
     assert all(marker not in json.dumps(result) for marker in hidden_markers(data))
-    table=list(csv.DictReader(io.StringIO((work/item["path"]).read_text()),delimiter="\t" if suffix==".tsv" else ","))
+    access=result["training_data"]
+    assert access["file"]==item["path"] and access["scope"]=="training_only"
+    assert access["format"]==suffix[1:] and access["target_column"]=="target"
+    assert access["input_columns"]==["sequence"]
+    assert result["evaluation_access"]=="host_reference"
+    assert access["file"]!=result["evaluation_file"]
+    table=list(csv.DictReader(io.StringIO((work/access["file"]).read_text()),delimiter=access["delimiter"]))
     assert {r["id"] for r in table}=={r["id"] for r in data["splits"]["train"]}
+    assert len(table)==access["rows"]==len(data["splits"]["train"])
     assert result["passed"]
 
 
@@ -104,6 +111,8 @@ async def test_metadata_resume_verifies_private_snapshot_and_training_view(tmp_p
     resumed=prepared_dataset_context(work,tmp_path/"episodes",data_store=store)
     assert resumed["evaluation_sha256"]==result["evaluation_sha256"]
     assert resumed["columns"]["target_column"]=="target"
+    assert resumed["training_data"]==result["training_data"]
+    assert resumed["evaluation_access"]=="host_reference"
     assert "9100000013" not in json.dumps(resumed)
     handle=json.loads((work/result["evaluation_file"]).read_text())
     (store.root/"evaluations"/(handle["id"]+".json")).write_text("{}")
@@ -340,3 +349,26 @@ def test_changed_stream_cannot_commit_a_private_table_or_expose_rows(tmp_path):
     assert not (store.root/"tables"/("f"*64)).exists()
     assert not (work/"inputs/data.csv").exists()
     assert not store.entries
+
+
+@pytest.mark.parametrize("suffix", [".csv", ".tsv"])
+@pytest.mark.asyncio
+async def test_advertised_training_table_is_readable_in_analysis_sandbox(tmp_path, suffix):
+    from agent.harness.research_workspace import run_python
+
+    work, store, service, item, _ = setup_table(tmp_path, suffix)
+    prepared = await prepare(service, item)
+    access = prepared["training_data"]
+    script = ("import csv, json\n"
+              + "access = " + repr(access) + "\n"
+              + "with open(access['file'], newline='') as f:\n"
+              + "    rows = list(csv.DictReader(f, delimiter=access['delimiter']))\n"
+              + "print(json.dumps({'rows': len(rows), 'ids': [r['id'] for r in rows]}))\n")
+    await service.write_research_file("inspect_training.py", script)
+    result = await run_python(work, tmp_path / "analysis", "inspect_training.py", 30)
+    assert result["exit_code"] == 0, result
+    measured = json.loads(result["stdout"])
+    private = json.loads(store.load_evaluation(prepared["evaluation_file"]))
+    assert measured["rows"] == access["rows"]
+    assert set(measured["ids"]) == {r["id"] for r in private["splits"]["train"]}
+    assert all(marker not in result["stdout"] for marker in hidden_markers(private))

@@ -34,6 +34,24 @@ def model_interface(task, columns):
     }
 
 
+def protected_data_access(data):
+    """Describe the training view separately from the opaque evaluation handle."""
+    preparation = data["preparation"]
+    source = preparation["source_file"]
+    tabular = source.lower().endswith((".tsv", ".tab"))
+    return {
+        "training_data": {
+            "file": source, "format": "tsv" if tabular else "csv",
+            "delimiter": "\t" if tabular else ",", "scope": "training_only",
+            "rows": len(data["splits"]["train"]),
+            "target_column": preparation["target_column"],
+            "input_columns": preparation["input_columns"],
+        },
+        "evaluation_access": "host_reference",
+        "data_usage": "Read training_data.file as a table for analysis. Pass evaluation_file to training/review tools; it is an opaque reference, not sample data.",
+    }
+
+
 def prepare_dataset(workspace, *, data_file, target_column, input_columns, group_column,
                     provenance, grouping, id_column="", task="regression", seed=0,
                     validation_fraction=0.15, test_fraction=0.15, output_file="", data_store=None):
@@ -99,4 +117,6 @@ def prepare_dataset(workspace, *, data_file, target_column, input_columns, group
                   input_columns=input_columns,input_type="Original table strings; convert numerical features in fit/predict.",
                   model_interface=model_interface(task,input_columns),
                   next_step="Write a complete fit(training, seed) and predict(model, inputs) module, then call train_research_model with this evaluation_file and variant=baseline.")
+    if data_store:
+        result.update(protected_data_access(data))
     return result

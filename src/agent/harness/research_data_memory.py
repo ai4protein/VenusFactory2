@@ -7,7 +7,7 @@ from pathlib import Path
 
 from utils.scoped_files import read_bytes
 from .research_development import evaluation_digest
-from .research_dataset import model_interface
+from .research_dataset import model_interface, protected_data_access
 
 
 def prepared_dataset_context(workspace, episodes, *, data_store=None):
@@ -50,6 +50,7 @@ def prepared_dataset_context(workspace, episodes, *, data_store=None):
                     "evaluation_sha256": result["evaluation_sha256"],
                     "task": data["task"], "columns": columns, "splits": splits,
                     "model_interface": model_interface(data["task"], preparation["input_columns"]),
+                    **(protected_data_access(data) if data_store else {}),
                     "input_type": "Original table strings; convert numerical features in fit/predict.",
                     "next_step": "Reuse this evaluation_file. Write the complete .py algorithm and train a baseline.",
                 }
