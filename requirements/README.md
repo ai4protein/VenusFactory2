@@ -25,3 +25,7 @@ for the platform environment (Torch/PyG, MCP/FastMCP, Transformers). It does not
 apply to independently versioned third-party environments. The initializer also applies
 `service-security.txt` and rechecks dependencies when either constraints file changes. See
 [installation](../docs/installation.md).
+
+CI resolves both platform profiles and audits them against OSV. See the
+[security review](../docs/security/dependency-review-2026-11-08.md#continuous-audit)
+for the exact open model-runtime advisories and the strict audit command.

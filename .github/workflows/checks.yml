@@ -29,6 +29,7 @@ jobs:
           python -m pytest -q tests/test_http_security.py tests/test_worker_lifecycle.py
           tests/test_repository_state_exclusions.py tests/test_incremental_install.py
           tests/test_initialize.py tests/test_skill_validation.py tests/test_hub_progress.py
+          tests/test_dependency_audit.py
   source-and-frontend:
     runs-on: ubuntu-latest
     steps:

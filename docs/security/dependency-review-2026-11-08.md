@@ -69,6 +69,36 @@ does not resolve it. See the
 [ESM release metadata](https://pypi.org/pypi/esm/3.4.2/json) and
 [Transformers advisory](https://github.com/advisories/GHSA-xrqw-3rrv-vx5w).
 
+## Continuous audit
+
+The Python dependency audit workflow resolves Linux and Apple Silicon macOS profiles
+with both constraints files, then queries OSV for every resolved package. It runs
+when dependency declarations change, weekly, and on manual dispatch. Resolution
+does not install GPU libraries or download model weights.
+
+The audit prints every finding, including the remaining model-runtime risks.
+`open-model-advisories.json` records the reviewed package, exact version,
+advisory identifier, affected profile, migration reason and review deadline.
+Only these specific records can remain non-blocking until 8 December 2026.
+A new advisory, different vulnerable version, overdue review, incomplete response
+or unavailable audit service fails the check. These entries do not dismiss
+GitHub alerts or indicate that the underlying vulnerabilities are fixed.
+
+For a strict check that also fails on the recorded risks:
+
+```sh
+uv pip compile requirements.txt -c requirements/bootstrap-constraints.txt \
+  -c requirements/service-security.txt --python-version 3.12 \
+  --python-platform x86_64-unknown-linux-gnu --no-header --no-annotate \
+  -o /tmp/venus-resolved.txt
+python scripts/audit_dependencies.py /tmp/venus-resolved.txt --profile linux --strict
+```
+
+The scope is the resolved platform environment. Independently installed external
+model runtimes still require their own audit and inference validation. GHSA and
+PYSEC identifiers may describe the same issue; the number of OSV records is not
+the number of GitHub Dependabot alerts.
+
 ## Rollout
 
 This revision updates source, installation metadata and CI. Running services keep
