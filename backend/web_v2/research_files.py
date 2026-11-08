@@ -74,16 +74,26 @@ def resolve_inputs(base, identities):
         record = json.loads((folder / '.metadata.json').read_text())
         path = safe_path(folder, record['name'])
         validate_upload_size(path.stat().st_size)
-        if hashlib.sha256(read_bytes(folder, record['name'])).hexdigest() != record['sha256']:
+        digest = hashlib.sha256()
+        with open_file(folder, record['name']) as stream:
+            for block in chunks(stream):
+                digest.update(block)
+        if digest.hexdigest() != record['sha256']:
             raise ValueError('Attachment changed')
         result.append((path, record))
     return result
 
 
-def stage_inputs(base, workspace, identities):
+def stage_inputs(base, workspace, identities, *, data_store=None):
     result = []
     for source, record in resolve_inputs(base, identities):
         relative = 'inputs/' + record['id'] + '/' + record['name']
+        if data_store is not None:
+            from agent.harness.research_data_store import TABLE_SUFFIXES
+            if Path(relative).suffix.lower() in TABLE_SUFFIXES:
+                data_store.ingest_file(relative, source.parent, source.name, record['sha256'])
+                result.append({**record,'path':relative})
+                continue
         destination = Path(workspace) / relative
         if destination.parent.exists() and destination.parent.is_symlink():
             raise ValueError('Invalid input directory')
@@ -92,10 +102,14 @@ def stage_inputs(base, workspace, identities):
         destination.parent.mkdir(parents=True, exist_ok=True)
         if destination.exists():
             checked = safe_path(workspace, relative)
-            if hashlib.sha256(read_bytes(workspace, relative)).hexdigest() != record['sha256']:
+            digest = hashlib.sha256()
+            with open_file(workspace, relative) as stream:
+                for block in chunks(stream):
+                    digest.update(block)
+            if digest.hexdigest() != record['sha256']:
                 raise ValueError('Input file changed')
         else:
-            copy_file(source.parent, source.name, workspace, relative)
+            copy_file(source.parent, source.name, workspace, relative, max_bytes=source.stat().st_size)
         result.append({**record, 'path': relative})
     return result
 

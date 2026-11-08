@@ -57,7 +57,8 @@ async def test_python_has_no_host_credentials_or_network(tmp_path,monkeypatch):
     assert json.loads((work/'result.json').read_text())=={'isolated':True}
 
 @pytest.mark.asyncio
-async def test_goal_executes_reviews_and_revises_until_evidence_passes(tmp_path,monkeypatch):
+@pytest.mark.parametrize("catalog_kind", ["empty", "categories"])
+async def test_goal_executes_reviews_and_revises_until_evidence_passes(tmp_path,monkeypatch,catalog_kind):
     import agent.harness.autonomous_research as module
     class Relay:
         calls=0;base_url='http://unused';token='fixture'
@@ -70,6 +71,9 @@ async def test_goal_executes_reviews_and_revises_until_evidence_passes(tmp_path,
     roles=[];attempts=[]
     async def consult(role,context):
         roles.append(role)
+        if catalog_kind == "categories":
+            assert {row["id"] for row in context["available_tools"]["categories"]} == {"compute", "databases"}
+            assert context["available_tools"]["preview"] == []
         if role=='PI':return 'Preserve the supplied peptide sequences.'
         if role=='CB':
             proposed=plan();proposed['needs_input']=['Do you prefer a CSV or JSON report?']
@@ -82,7 +86,10 @@ async def test_goal_executes_reviews_and_revises_until_evidence_passes(tmp_path,
         assert result['exit_code']==0
         await service.submit_research_checkpoint('Calculated lengths',['compute'],['result.json'],[])
         events.extend([{'kind':'tool_call_start'},{'kind':'completed','text':'Ran calculate.py and wrote result.json','event_audit':{'passed':True}}])
-    runner=AutonomousResearch(store,'fixture',{},consult=consult,executor=executor,tools=[])
+    catalog = [] if catalog_kind == "empty" else [
+        SimpleNamespace(name="read_record", description="Look up a record.", metadata={"discovery_category":"databases"}),
+        SimpleNamespace(name="compute_feature", description="Compute a feature.", metadata={"discovery_category":"compute"})]
+    runner=AutonomousResearch(store,'fixture',{},consult=consult,executor=executor,tools=catalog)
     state=await runner.run()
     assert state['status']=='completed',state
     assert len(state['cycles'])==2 and roles==['PI','CB','SC']*2

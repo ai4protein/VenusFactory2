@@ -15,7 +15,9 @@ from mcp_tools.models.evolved.tools_mcp import mcp
 def published(request, monkeypatch):
     store, root, verified, calls = request.getfixturevalue("model_storage")
     verified["origin"].update(stage="activity", paper={"title": "Synthetic fixture", "doi": "fixture"})
-    verified["packet"]["assessment"] = {"metrics": {"skill": 0.5}}
+    from agent.rsi.engine.model_plugins import get_model_plugin
+    verified["packet"]["assessment"] = {"metrics": {"skill": 0.5},
+                                          "plugin_sha256": get_model_plugin(verified["key"]["plugin_id"]).source_sha256}
     result = store.publish(root, "b" * 64)
     monkeypatch.setattr(service, "configured_library", lambda: store)
     monkeypatch.setattr(service, "assert_tool_allowed", lambda name: None)
@@ -80,7 +82,9 @@ def context_published(request, monkeypatch):
         scope["grouping"]["level"] = "deleted_gene"
     verified["key"].update(plugin_id=interface, scope=scope)
     verified["packet"]["model"].update(plugin_id=interface, scope=scope)
-    verified["packet"]["assessment"] = {"metrics": {"skill": 0.5}}
+    from agent.rsi.engine.model_plugins import get_model_plugin
+    verified["packet"]["assessment"] = {"metrics": {"skill": 0.5},
+                                          "plugin_sha256": get_model_plugin(verified["key"]["plugin_id"]).source_sha256}
     entry = store.publish(root, "b" * 64)["entry_id"]
     seen = []
 

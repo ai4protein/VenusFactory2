@@ -9,6 +9,7 @@ import os
 import secrets
 import shutil
 from pathlib import Path
+from dataclasses import replace
 from types import SimpleNamespace
 
 from .contracts import Profile, Task
@@ -42,8 +43,17 @@ def native_prompt(request):
 def mcp_input_schema(tool):
     """Session bindings belong to the server, never to a tool-call argument."""
     schema = tool.get_input_schema().model_json_schema()
-    if (getattr(tool, "metadata", None) or {}).get("workspace_relative_paths"):
+    metadata = getattr(tool, "metadata", None) or {}
+    if metadata.get("workspace_relative_paths"):
         schema["additionalProperties"] = False
+    steps = metadata.get("plan_step_ids")
+    field = schema.get("properties", {}).get("completed_steps")
+    if isinstance(steps, list) and isinstance(field, dict):
+        field["description"] = "Exact IDs of completed plan steps; never include titles or descriptions. Use [] for a partial checkpoint."
+        if steps:
+            field.setdefault("items", {})["enum"] = list(steps)
+        else:
+            field["maxItems"] = 0
     return schema
 
 
@@ -51,9 +61,25 @@ def prepare_tool_arguments(name, tool, arguments, workspace, host_paths):
     # Research workspace tools own their relative-path validation. Legacy
     # scientific tools still receive their normal host-path normalization.
     if (getattr(tool, "metadata", None) or {}).get("workspace_relative_paths"):
-        if not isinstance(arguments, dict) or set(arguments) - set(mcp_input_schema(tool).get("properties", {})):
-            raise ValueError("Use the declared tool arguments; the session workspace is assigned by the server")
-        return dict(arguments)
+        fields = mcp_input_schema(tool).get("properties", {})
+        if not isinstance(arguments, dict):
+            raise ValueError("Use a JSON object with the declared tool arguments")
+        extra = set(arguments) - set(fields)
+        if extra:
+            # Report names, never caller-supplied values or source code. A read
+            # receipt's byte counts are not write arguments or a permission issue.
+            import re
+            names = sorted(key if isinstance(key, str) and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,63}", key)
+                           else "<invalid field name>" for key in extra)
+            message = ("Use the declared tool arguments. Unexpected fields: " +
+                       ", ".join(names[:12]) + ". Allowed fields: " +
+                       ", ".join(sorted(fields)[:32]) +
+                       ". Remove the extra fields and retry; output metadata is not input.")
+            if extra & {"workspace", "workspace_root", "session_id", "session_dir", "root", "cwd", "mounts", "mount", "backend", "control"}:
+                message += " The session workspace is assigned by the server."
+            raise ValueError(message)
+        from .session_boundary import relative_workspace_arguments
+        return relative_workspace_arguments(arguments)
     from agent.graph.helpers.tool_io import _normalize_output_paths, _sanitize_tool_invoke_input
     args = _sanitize_tool_invoke_input(name, tool, bind_arguments(name, arguments, workspace), str(workspace), {})
     # A new scientific tool may not yet appear in the legacy write-prefix list.
@@ -117,8 +143,12 @@ async def run(request, *, tools=None, event_sink=None):
         except Exception:
             return False
 
+    from mcp_tools.tools.tool_surface import WORKSPACE_PRIMITIVES
+    from .research_focus import admitted_tools
+    focus = admitted_tools(request, mapping)
     disclosure = ToolDisclosure(mapping, schema=mcp_input_schema, allowed=available,
-                                direct=INTERACTION_NAMES | {'submit_research_checkpoint'})
+                                direct=WORKSPACE_PRIMITIVES | INTERACTION_NAMES | {'submit_research_checkpoint'} | focus,
+                                detailed=focus)
     send({"kind": "catalog", "tools": ["mcp__venusfactory__" + name for name in sorted(disclosure.names)]})
     if request.get("handshake"):
         import sys
@@ -134,7 +164,24 @@ async def run(request, *, tools=None, event_sink=None):
     output = control / "run"
     output.mkdir(mode=0o700)
     token = secrets.token_urlsafe(32)
-    calls = 0
+    calls = executions = lookups = 0
+    checkpoint_saved = False
+    checkpoint_calls = 0
+    is_research = 'submit_research_checkpoint' in mapping
+    lookup_limit = min(48, 2 * profile.budget.tool_calls) if is_research else 0
+    # Read-only discovery has its own finite allowance; it cannot consume the
+    # research execution allowance or increase actual compute/inference quotas.
+    checkpoint_limit = 2 if is_research else 0
+    allowances = request.get("research_allowances", {})
+    if not isinstance(allowances, dict) or any(
+        key not in {"discovery", "checkpoint"} or type(value) is not int or value < 0
+        for key, value in allowances.items()
+    ):
+        raise ValueError("Invalid remaining research allowances")
+    lookup_limit = min(lookup_limit, allowances.get("discovery", lookup_limit))
+    checkpoint_limit = min(checkpoint_limit, allowances.get("checkpoint", checkpoint_limit))
+    transport_limit = profile.budget.tool_calls + lookup_limit + checkpoint_limit
+    runtime_profile = replace(profile, budget=replace(profile.budget, tool_calls=transport_limit))
     workspace_call = asyncio.Lock()
 
     def host_paths(value):
@@ -146,14 +193,29 @@ async def run(request, *, tools=None, event_sink=None):
             return {k: host_paths(v) for k, v in value.items()}
         return value
 
+    def with_budget_feedback(result):
+        if is_research:
+            remaining = max(0, profile.budget.tool_calls - executions)
+            if checkpoint_saved:
+                note = 'Checkpoint saved. End this iteration with a short summary; do not call further tools.'
+            else:
+                note = (f'Execution budget: {remaining} tool calls remain; '
+                        f'{max(0, lookup_limit - lookups)} read-only discovery calls remain. '
+                        + ('Save submit_research_checkpoint now with actual artifacts and only completed steps.'
+                           if remaining <= 2 else 'Save a checkpoint when the current step is ready.')
+                        + f' Checkpoint saves have a separate allowance: {max(0, checkpoint_limit - checkpoint_calls)} remain.')
+            result['content'].append({'type': 'text', 'text': note})
+        return result
+
     async def rpc(http):
-        nonlocal calls
+        nonlocal calls, executions, lookups, checkpoint_saved, checkpoint_calls
         if not secrets.compare_digest(http.headers.get("Authorization", ""), "Bearer " + token):
             raise web.HTTPUnauthorized()
         body = await http.json()
         method, params = body.get("method"), body.get("params", {})
         observation = None
         queued_tool = False
+        accepted_call = False
         try:
             if method == "initialize":
                 result = {
@@ -167,21 +229,53 @@ async def run(request, *, tools=None, event_sink=None):
                 result = {"tools": disclosure.surface()}
             elif method == "tools/call":
                 name = params["name"]
-                if name not in disclosure.names or calls >= profile.budget.tool_calls:
+                if name not in disclosure.names:
                     raise ValueError("Tool unavailable")
+                accepted_call = True
+                if calls >= transport_limit:
+                    raise DisclosureError("Tool transport budget reached. Finish this iteration.")
+                if checkpoint_saved:
+                    raise DisclosureError("Checkpoint saved; finish this iteration without further calls.")
+                metadata_call = is_research and name in {SEARCH, DESCRIBE}
+                if metadata_call and lookups >= lookup_limit:
+                    raise DisclosureError("Discovery budget reached. Use inspected interfaces or save a checkpoint.")
                 if interaction is not None:
                     raise ValueError("Waiting for the user's response; no further actions are allowed")
                 calls += 1
                 call_id = str(calls)
                 arguments = params.get('arguments', {})
                 if name in {SEARCH, DESCRIBE}:
+                    if not metadata_call and executions >= profile.budget.tool_calls:
+                        raise DisclosureError("Execution budget reached.")
+                    if metadata_call: lookups += 1
+                    else: executions += 1
+                    send({"kind": "tool_usage", "tool_calls": executions,
+                          "discovery_calls": lookups, "transport_calls": calls})
                     value = public_value(disclosure.metadata(name, arguments), workspace)
                     from backend.web_v2.usage_store import Observation
                     Observation('tool', name).finish()
-                    return web.json_response({'jsonrpc': '2.0', 'id': body['id'], 'result': {
-                        'content': [{'type': 'text', 'text': json.dumps(value, ensure_ascii=False)}], 'isError': False}})
-                name, tool, arguments = disclosure.resolve(name, arguments)
+                    return web.json_response({'jsonrpc': '2.0', 'id': body['id'], 'result': with_budget_feedback({
+                        'content': [{'type': 'text', 'text': json.dumps(value, ensure_ascii=False)}], 'isError': False})})
+                try:
+                    name, tool, arguments = disclosure.resolve(name, arguments)
+                except DisclosureError:
+                    # Rejected discovery attempts did not execute a tool. They
+                    # still consume the finite transport allowance.
+                    send({"kind": "tool_usage", "tool_calls": executions,
+                          "discovery_calls": lookups, "transport_calls": calls})
+                    raise
                 canonical_name = tool.name
+                if is_research and canonical_name == 'submit_research_checkpoint':
+                    if checkpoint_calls >= checkpoint_limit:
+                        raise DisclosureError("Checkpoint allowance reached; finish this iteration.")
+                    checkpoint_calls += 1
+                else:
+                    if executions >= profile.budget.tool_calls:
+                        raise DisclosureError("Execution budget reached. Save a research checkpoint or finish this iteration." if is_research else "Execution budget reached.")
+                    executions += 1
+                send({"kind": "tool_usage", "tool_calls": executions,
+                      "discovery_calls": lookups, "checkpoint_calls": checkpoint_calls,
+                      "transport_calls": calls})
                 if event_sink:
                     send({"kind": "research_tool_status", "status": "running", "tool": name, "call_id": call_id})
                 if canonical_name in INTERACTION_NAMES:
@@ -228,6 +322,8 @@ async def run(request, *, tools=None, event_sink=None):
                         value = await tool.ainvoke(args, config={"configurable": {"session_id": request.get("session_id")}})
                 value = public_value(value, workspace)
                 failed, _ = _tool_output_indicates_failure(value)
+                if canonical_name == 'submit_research_checkpoint' and not failed:
+                    checkpoint_saved = True
                 if observation: observation.finish(failed=failed)
                 if event_sink:
                     send({"kind": "research_tool_status", "status": "failed" if failed else "completed", "tool": name, "call_id": call_id, "result": str(value)[:3000]})
@@ -242,11 +338,7 @@ async def run(request, *, tools=None, event_sink=None):
                     ],
                     "isError": failed,
                 }
-                if 'submit_research_checkpoint' in mapping:
-                    remaining_calls=max(0,profile.budget.tool_calls-calls)
-                    result['content'].append({'type':'text','text':
-                        f'Execution budget: {remaining_calls} tool calls remain in this iteration. '
-                        + ('Save submit_research_checkpoint now with actual artifacts and only completed steps; leave unfinished work for the next iteration.' if remaining_calls<=2 else 'Reserve a final tool call for submit_research_checkpoint; continue unfinished work in the next iteration.')})
+                result = with_budget_feedback(result)
             else:
                 raise ValueError("Unknown MCP method")
             return web.json_response({"jsonrpc": "2.0", "id": body["id"], "result": result})
@@ -261,8 +353,15 @@ async def run(request, *, tools=None, event_sink=None):
             failed_tool=locals().get('tool') if method=='tools/call' else None
             # Give model developers actionable contract failures without exposing
             # arbitrary plugin tracebacks, host paths or credentials.
-            if isinstance(exc, DisclosureError) or isinstance(exc, ValueError) and ((getattr(failed_tool,'metadata',None) or {}).get('workspace_relative_paths') or params.get('name') in INTERACTION_NAMES):
-                message+=': '+public_value(str(exc),workspace)[:600]
+            if isinstance(exc, DisclosureError) or isinstance(exc, (ValueError, FileNotFoundError)) and ((getattr(failed_tool,'metadata',None) or {}).get('workspace_relative_paths') or params.get('name') in INTERACTION_NAMES):
+                from .tool_diagnostics import contract_error
+                message = contract_error(exc, workspace)
+            if accepted_call:
+                # Tool execution errors belong in the result so the harness can
+                # show feedback to the model and continue within the same budget.
+                result = with_budget_feedback({
+                    "content": [{"type": "text", "text": message}], "isError": True})
+                return web.json_response({"jsonrpc": "2.0", "id": body.get("id"), "result": result})
             return web.json_response(
                 {"jsonrpc": "2.0", "id": body.get("id"), "error": {"code": -32603, "message": message}}
             )
@@ -287,6 +386,10 @@ async def run(request, *, tools=None, event_sink=None):
     )
     if request.get("instructions"):
         instructions = request["instructions"] + "\n" + ("Respond in Chinese." if request.get("lang") == "zh" else "Respond in English.")
+    instructions += ("\n\nComplete the requested deliverables, including files. When a filename is specified, "
+                     "pass it in the tool output argument; otherwise create it with a session file tool. "
+                     "Before reporting completion, check the tool receipt or file content. Link the actual saved file; "
+                     "do not claim a differently named output satisfies the requested filename.")
     instructions += "\n\n" + INTERACTION_GUIDANCE + "\n\n" + SECURITY_INSTRUCTIONS + "\n\n" + GUIDANCE
     instructions += '\n\nCurrent enabled capability categories:\n' + json.dumps(
         [{key: row[key] for key in ('id', 'name', 'description')}
@@ -294,9 +397,9 @@ async def run(request, *, tools=None, event_sink=None):
     task = Task(
         workspace, capability, output, public_value(native_prompt(request), workspace), instructions, frozenset(disclosure.names), "web_tools.py", "chat"
     )
-    adapter, _ = builtin_registry().resolve(profile, request["runtimes"])
+    adapter, _ = builtin_registry().resolve(runtime_profile, request["runtimes"])
     ctx = RuntimeContext(
-        profile, task, SimpleNamespace(base_url=request["base_url"], token=request["token"]), request["runtimes"]
+        runtime_profile, task, SimpleNamespace(base_url=request["base_url"], token=request["token"]), request["runtimes"]
     )
     observed = 0
     trace = output / ("control/events.jsonl" if profile.harness == "deepseek-harness" else "events.jsonl")
@@ -336,7 +439,7 @@ async def run(request, *, tools=None, event_sink=None):
         event_audit = None
         if request.get("audit_required"):
             from .events import audit_trace
-            event_audit = audit_trace(trace, disclosure.names, profile.budget.tool_calls)
+            event_audit = audit_trace(trace, disclosure.names, transport_limit)
             if not event_audit["passed"]:
                 raise ValueError("Scientific tool trace did not pass validation")
         text = result.get("final_text") or result.get("text") or result.get("final_message") or ""
@@ -347,7 +450,7 @@ async def run(request, *, tools=None, event_sink=None):
             {"role": "user", "content": request["text"]},
             {"role": "assistant", "content": text},
         ]
-        send({"kind": "completed", "messages": messages, "text": text, "tool_calls": calls, "event_audit": event_audit})
+        send({"kind": "completed", "messages": messages, "text": text, "tool_calls": executions, "discovery_calls": lookups, "checkpoint_calls": checkpoint_calls, "event_audit": event_audit})
     finally:
         pending.cancel()
         with contextlib.suppress(asyncio.CancelledError):

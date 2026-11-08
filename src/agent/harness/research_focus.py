@@ -1,0 +1,57 @@
+"""Expose the few tools relevant to the current Scientist development stage."""
+from __future__ import annotations
+from .research_workspace import RESEARCH_TOOLS
+
+def selected_tools(context, tools):
+    if context.get("plan",{}).get("deliverable")!="model":
+        return []
+    stage=context.get("model_development",{}).get("next_action",{}).get("stage","evaluate_baseline")
+    if stage=="evaluate_baseline":
+        dataset = context.get("model_development", {}).get("prepared_dataset")
+        wanted = ("get_research_baseline", "train_research_model") if dataset else (
+            "prepare_research_dataset", "get_research_baseline", "train_research_model")
+    elif stage=="evaluate_revision":
+        wanted=("train_research_model","evaluate_research_model")
+    elif stage in {"submit_for_review","revise_submission"}:
+        wanted=("get_research_review_requirements","propose_research_capability","train_research_model")
+    else:
+        wanted=()
+    available={tool.name for tool in tools}
+    return [name for name in wanted if name in available]
+
+def admitted_tools(request, mapping):
+    names=request.get("research_focus",[])
+    if not isinstance(names,list) or len(names)>3 or any(not isinstance(n,str) or n not in RESEARCH_TOOLS for n in names):
+        raise ValueError("Invalid research tool focus")
+    if "submit_research_checkpoint" not in mapping:
+        return set()
+    return {name for name in names if name in mapping}
+
+def instructions(context, tool_calls):
+    return (
+        "You are the Machine Learning Specialist. Execute the next unfinished research step using the supplied real materials. "
+        "Use context.model_development.next_action and the selected tool interfaces. Other enabled capabilities remain searchable. "
+        "When model_development.repair_source is present, repair that saved implementation from its actual failure before refitting. "
+        "Reuse model_development.prepared_dataset when present: its source and splits were hash-verified. "
+        "Otherwise inspect table headers before choosing columns. Preserve observed targets and biological groups. "
+        "For a tabular model, prepare_research_dataset makes reproducible splits; write a complete fit(training, seed) and "
+        "predict(model, inputs) module, then call train_research_model. Defining functions is not fitting a model. "
+        "Use host validation feedback to implement and measure a child generation on the same split. Keep failed trials as evidence. "
+        "Existing fitted runtimes can use evaluate_research_model; platform PLMs can use enabled queued training tools "
+        "(online ESM2-8M only). Choose statistical, neural, few-shot, semi-supervised or meta-learning methods when data justify them. "
+        "The analysis sandbox has no network or pretrained-weight cache. Do not download weights inside a fit; "
+        "use enabled platform training/embedding tools when a pretrained model is needed. "
+        "Use the plan approach for method choices; revise failed choices while preserving scientific acceptance criteria. "
+        "Write code/files with write_session_file and run exploratory analysis with run_session_python. "
+        "Use relative workspace paths; scientific data tools use /workspace. Read PDFs/tables/structures as needed. "
+        "Keep one project and stable capability name; revisions are experiments, not extra public models. "
+        "Keep source in src/, trials in experiments/ and reports in reports/. Preserve uploads and relative paths. "
+        "Keep README.md and the research report current with actual results, provenance, commands and limitations. "
+        "When a measured candidate is ready, inspect get_research_review_requirements and submit independent Review. "
+        "A reviewed delivery stays private; public release requires operator selection and an author email. "
+        "Ask for genuinely missing scientific inputs; do not substitute demos or invented data. "
+        "Resolve observed execution/step-check errors. Checkpoint useful partial work with actual artifact paths and plan IDs. "
+        "A checkpoint is not proof of training, novelty or superiority. "
+        f"This iteration allows {tool_calls} execution calls; discovery has a separate bounded allowance. "
+        "When two calls remain, checkpoint immediately."
+    )

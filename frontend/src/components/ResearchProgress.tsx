@@ -8,6 +8,15 @@ export function ResearchProgress({ goal: g, lang }: { goal: ScienceGoal; lang: s
   const live = g.research?.live, steps = g.research?.plan?.steps || [];
   const { complete, total, reviewing } = planProgress(steps, live?.checkpoint);
   const running = isRunActive(g.status), role = live?.phase?.role;
+  const blocker = !running && g.research?.execution_blocker;
+  const blockerText = blocker ? ({
+    quota: say("The selected model quota is exhausted. Continue when access is restored.", "所选大模型额度已用完，可在服务恢复后继续。"),
+    authentication: say("Check the selected model credentials before continuing.", "请检查所选大模型的密钥配置，再继续研究。"),
+    access: say("The selected model denied access. Continue when access is restored.", "所选大模型暂时无法访问，可在服务恢复后继续。"),
+    rate_limit: say("The selected model is rate-limited. Try continuing later.", "所选大模型暂时限流，请稍后继续。"),
+    configuration: say("Check the selected model route before continuing.", "请检查所选大模型的路由配置，再继续研究。"),
+  } as Record<string, string>)[blocker.code] || say("The selected model is unavailable.", "所选大模型暂不可用。") : "";
+
   const files = (live?.files || []).filter(f => !f.path.includes("__pycache__/") && !f.path.endsWith(".pyc")), metrics = live?.execution?.progress?.metrics || {};
   return <>
     <div className="research-now" role="status">
@@ -15,6 +24,7 @@ export function ResearchProgress({ goal: g, lang }: { goal: ScienceGoal; lang: s
       {total > 0 && <span>{complete} / {total} {say("steps complete", "项已完成")}</span>}</div>
       {running && <div className="research-stage-row">{Object.entries(roles).map(([id, names]) => <span key={id} className={id === role ? "is-current" : ""} aria-current={id === role ? "step" : undefined}>{id} · {names[zh ? 1 : 0]}</span>)}</div>}
       {running && live?.tool && role === "MLS" && <p className="research-current-tool">{live.tool.tool.replace(/_/g, " ")}</p>}
+      {blocker && <p className="goal-note">{blockerText}</p>}
       {total > 0 && <progress aria-label={say("Completed plan steps", "已完成计划项")} value={complete} max={total}/>}
     </div>
     {total > 0 && <details className="research-plan" open><summary>{say("Research plan", "研究计划")}</summary><ol>{steps.map(s => <li key={s.id} className={s.status === "completed" ? "is-complete" : reviewing.has(s.id) ? "is-reviewing" : ""}><span aria-hidden="true">{s.status === "completed" ? "✓" : reviewing.has(s.id) ? "◷" : "○"}</span><div><strong>{s.title}</strong>{reviewing.has(s.id) && <small className="plan-review-label">{say("Awaiting review", "待审核")}</small>}<p>{s.acceptance}</p></div></li>)}</ol></details>}

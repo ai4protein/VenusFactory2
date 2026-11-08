@@ -102,16 +102,14 @@ def critic_decision(text):
         raise ValueError("Nonfinite scientific critic value")
 
     value = json.loads(content, object_pairs_hook=unique_object, parse_constant=reject_constant)
-    if (
-        not isinstance(value, dict)
-        or set(value) != {"decision", "summary", "issues"}
-        or value["decision"] not in {"ready_for_host_validation", "needs_revision"}
-        or not isinstance(value["summary"], str)
-        or not value["summary"].strip()
-        or not isinstance(value["issues"], list)
-        or any(not isinstance(x, str) for x in value["issues"])
-    ):
-        raise ValueError("Malformed scientific critic decision")
+    if not isinstance(value, dict) or set(value) != {"decision", "summary", "issues"}:
+        raise ValueError("Malformed scientific critic decision: require exactly decision, summary and issues fields")
+    if not isinstance(value["decision"], str) or value["decision"] not in {"ready_for_host_validation", "needs_revision"}:
+        raise ValueError("Malformed scientific critic decision: decision must be the string ready_for_host_validation or needs_revision")
+    if not isinstance(value["summary"], str) or not value["summary"].strip():
+        raise ValueError("Malformed scientific critic decision: summary must be a nonempty string")
+    if not isinstance(value["issues"], list) or any(not isinstance(item, str) for item in value["issues"]):
+        raise ValueError("Malformed scientific critic decision: issues must be a list of strings")
     return value
 
 

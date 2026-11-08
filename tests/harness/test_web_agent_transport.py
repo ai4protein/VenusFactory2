@@ -258,7 +258,8 @@ def test_stop_process_reaps_descendant(tmp_path, ignore_term):
         child_code = (
             "import os,signal,sys,time; "
             + ("signal.signal(signal.SIGTERM, signal.SIG_IGN); " if ignore_term else "")
-            + "open(sys.argv[1], 'w').write(str(os.getpid())); time.sleep(120)"
+            + "from pathlib import Path; p=Path(sys.argv[1]); pending=p.with_suffix('.pending'); "
+            + "pending.write_text(str(os.getpid())); os.replace(pending,p); time.sleep(120)"
         )
         code = (
             "import subprocess,sys,time; subprocess.Popen([sys.executable,'-c',"

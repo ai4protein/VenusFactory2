@@ -42,10 +42,21 @@ def catalog_cards(library):
 
     catalog = library.catalog()
     cards = []
+    implementations = {}
+    from agent.rsi.engine.model_plugins import get_model_plugin
     for item in catalog["entries"]:
         entry = library._object("entries", item["entry_id"])
         origin = library._object("origins/" + digest(item["key"]), entry["canonical_origin"])
-        cards.append(public_card(item["entry_id"], item["key"], origin, verified_now=False))
+        plugin_id = item["key"]["plugin_id"]
+        if plugin_id not in implementations:
+            try:
+                implementations[plugin_id] = get_model_plugin(plugin_id).source_sha256
+            except (ValueError, KeyError, FileNotFoundError):
+                implementations[plugin_id] = None
+        packet = library._object("packets", entry["packet_id"])
+        compatible = bool(implementations[plugin_id]) and packet["assessment"].get("plugin_sha256") == implementations[plugin_id]
+        cards.append({**public_card(item["entry_id"], item["key"], origin, verified_now=False),
+                      "runtime_compatible": compatible})
     return cards, catalog
 
 
@@ -61,6 +72,7 @@ def list_models(library, query="", stage="", limit=10, offset=0):
     from mcp_tools.tools.capability_policy import CapabilityStore
     switches = CapabilityStore()
     for card in published:
+        if not card.get("runtime_compatible", True): continue
         if not switches.enabled('model:scientist:' + card['entry_id']): continue
         if stage and card["stage"] != stage:
             continue

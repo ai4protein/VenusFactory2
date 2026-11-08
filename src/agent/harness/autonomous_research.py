@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import copy
 from dataclasses import replace
+from contextlib import nullcontext
 import json
 import os
 from pathlib import Path
@@ -11,27 +12,57 @@ import time
 import httpx
 
 from agent.science_goal import GoalSpec, GoalStore, run_goal
-from agent.rsi.engine.model_gateway import GatewayPolicy
-from .contracts import Profile, file_hash
+from .scientist_gateway_policy import ScientistGatewayPolicy, ScientistResponsesPolicy
+from .contracts import Profile, file_hash, digest
 from .events import audit_requests
+from .research_execution_feedback import execution_feedback, iteration_feedback, feedback_state, repair_source_context
 from .gateway import EvidenceGateway
 from .host import write_json
 from .native_expert_team import NATIVE_EXPERT_HARNESSES, critic_decision, role_content
 from .research_updates import apply_revisions
+from .research_plan_evidence import VERIFICATION_KINDS, checkpoint_steps
+from .research_focus import selected_tools, instructions as execution_instructions
+from .research_questions import validate_input_questions
 from .research_workspace import ResearchWorkspace, publish_proposals, safe_file
 
 from .capability_review import REVIEW_PROMPT, review_proposal
-from .research_development import Development, model_goal, build_delivery, guide as development_guide
+from .research_development import Development, model_goal, build_delivery
 from .research_topic import SCIENTIST_PURPOSE, topic_context
 from .tool_disclosure import ToolDisclosure, CONTROLS, GUIDANCE
-from agent.rsi.artifacts.contract import SCHEMA as DELIVERY_SCHEMA, WORKSPACE_INSTRUCTIONS, selected_deliveries, has_delivery
+from agent.rsi.artifacts.contract import SCHEMA as DELIVERY_SCHEMA, selected_deliveries, has_delivery
+
+def development_next_action(summary, progress):
+    """Expose only the next missing model-development stage."""
+    revisions = [r for r in progress.get('publication_reviews', []) if r.get('status') != 'approved']
+    if revisions:
+        return {'stage':'revise_submission', 'tool':'propose_research_capability',
+                'proposal_file':progress.get('review_submission',{}).get('proposal_file'),
+                'issues':[str(issue)[:500] for row in revisions[-2:] for issue in row.get('issues', [])[:3]],
+                'instruction':'Edit the saved proposal file to fix the reported issues, preserving its unchanged author, scope and interface fields. Resubmit with proposal_file. Submission remains subject to automatic verification and independent Review.'}
+    if has_delivery(progress.get('deliveries', []), 'model'):
+        return {'stage':'finish_research', 'instruction':'Use the reviewed delivery evidence to finish the report and checkpoint the remaining plan steps.'}
+    generations = summary.get('generations', [])
+    candidates = [row['id'] for row in generations if row.get('variant') == 'candidate' and row.get('parent')]
+    if candidates:
+        return {'stage':'submit_for_review', 'tool':'propose_research_capability',
+                'eligible_experiment_ids':candidates[-8:],
+                'instruction':'Evaluation records an experiment; it does not submit independent review. Select using matched validation evidence. Inspect experiments/<id>.json for the measured source and runtime file list; reuse them unchanged or evaluate a changed runtime first. Inspect the proposal interface and review requirements, then call propose_research_capability with review_spec.development_experiment_id. Do this even if all scientific plan steps are marked complete.'}
+    baselines = [row['id'] for row in generations if row.get('variant') == 'baseline']
+    if baselines:
+        return {'stage':'evaluate_revision', 'tool':'train_research_model',
+                'eligible_parent_ids':baselines[-8:], 'evaluation_tool':'evaluate_research_model',
+                'instruction':'Inspect the baseline validation diagnostics. If predictions are constant or match the training reference, check feature variation and learned parameters on training data. Implement and fit a justified revision, then evaluate variant=candidate with the measured baseline parent_experiment_id and identical data splits. A constant baseline may be retained when its purpose and measured limitations are explicit.'}
+    return {'stage':'evaluate_baseline', 'tool':'train_research_model', 'dataset_tool':'prepare_research_dataset',
+            'evaluation_tool':'evaluate_research_model',
+            'instruction':'Reuse the verified prepared dataset, or inspect headers and prepare_research_dataset by biological groups. For sequence regression, get_research_baseline(reference, output_file) can save a runnable reference with verified feature encoding; preserve that reference provenance. Alternatively write your own fit(training, seed) and predict(model, inputs). Call train_research_model with variant=baseline to fit and measure it. Already-fitted custom runtimes can use evaluate_research_model.'}
+
 
 DRIVER='autonomous_research.v1'
 CRITERIA=('research_plan_executed','research_outputs_reviewed','capability_admission_resolved')
 ROLES={
  'REVIEW':REVIEW_PROMPT,
  'PI':'You are the Principal Investigator. Interpret the user research objective, existing results and user updates. Establish scientific scope and the next useful experiment. Preserve the actual target protein, property and research question. Do not substitute a demo case or invent data. Return a concise public research direction, not private reasoning.',
- 'CB':'You are the Computational Biologist. Produce an executable research plan for the objective, using available tools and isolated Python coding. Return one JSON object: {"summary":"...","steps":[{"id":"step1","title":"...","acceptance":"measurable result"}],"needs_input":["specific missing user information"]}. Prefer 3..6 concrete computational steps that fit the available budget (maximum 24). Planning is prospective: never claim a script was run or results exist before tool execution. Do not invent or substitute a sequence, measurement, target or acceptance result. Preserve all existing step IDs and their acceptance criteria; add steps when needed. Do not mark steps completed. Seek public data or reusable capabilities where appropriate. Ask only for information that blocks every useful next step and cannot be obtained from the supplied materials or public sources. Optional preferences (preferred variant, model type, interpretability) must not stop research: choose and record a reasonable assumption. Read progress.user_updates and revision_history before asking; never repeat a question already answered. Do not invent missing measurements. Missing labels are a data acquisition question: use public measured data when available; never substitute synthetic/proxy labels, stability, activity or folding scores for measured solubility. First inspect the actual data before setting sample-count or metric requirements. Existing examples are optional resources, never substitute the target.',
+ 'CB':'You are the Computational Biologist. Produce an executable research plan for the objective, using available tools and isolated Python coding. Return one JSON object: {"summary":"...","steps":[{"id":"step1","title":"...","acceptance":"measurable result"}],"needs_input":[]}. Put needs_input only at the plan top level, never inside individual steps. Prefer 3..6 concrete computational steps that fit the available budget (maximum 24). Planning is prospective: never claim a script was run or results exist before tool execution. Do not invent or substitute a sequence, measurement, target or acceptance result. Preserve all existing step IDs and scientific acceptance criteria; add steps when needed. Acceptance specifies the measured endpoint, data and evaluation evidence, not an optional algorithm or library. Put the chosen implementation method in the optional approach field. You may revise the approach of an unfinished step using experimental feedback, while keeping the target, observed data, split, comparison and acceptance requirements unchanged. Never revise a verified completed step. Do not mark steps completed. Seek public data or reusable capabilities where appropriate. Ask only for information that blocks every useful next step and cannot be obtained from the supplied materials or public sources. Optional preferences (preferred variant, model type, interpretability) must not stop research: choose and record a reasonable assumption. Read progress.user_updates and revision_history before asking; never repeat a question already answered. Do not invent missing measurements. Missing labels are a data acquisition question: use public measured data when available; never substitute synthetic/proxy labels, stability, activity or folding scores for measured solubility. First inspect the actual data before setting sample-count or metric requirements. Existing examples are optional resources, never substitute the target.',
  'SC':'You are the Scientific Critic. Treat the original user objective and supplied sequences as authoritative; reject invented or substituted inputs even if the plan says otherwise. Review the original objective, plan, actual tool receipts, Python exit codes, artifact previews and submitted checkpoint. Require actual executed work for empirical claims. A script or proposed experiment alone is not experimental evidence. Do not accept placeholder/synthetic data as measured biological evidence. Assess the completed step IDs claimed in the checkpoint, not all future unfinished work. Valid data inspection, training or evaluation milestones may be accepted while delivery remains pending. For a claimed final reusable-model delivery, require its proposal receipt and runtime artifacts; a training script alone is insufficient. Check that completed step IDs satisfy their acceptance criteria; missing work requires revision. Your research review does not grant public admission; a separate independent Review checks reusable candidates. Return only JSON with decision ("ready_for_host_validation" or "needs_revision"), summary (nonempty string), and issues (list of strings).',
 }
 
@@ -53,12 +84,22 @@ def parse_plan(text, previous=None, *, objective=''):
         if len(plans)!=1:raise ValueError('Return one complete research plan JSON object')
         value=plans[0]
     if not isinstance(value,dict) or set(value)-{'summary','steps','needs_input','deliverable'} or not {'summary','steps','needs_input'}<=set(value) or not isinstance(value['summary'],str) or not isinstance(value['steps'],list) or not 1<=len(value['steps'])<=24 or not isinstance(value['needs_input'],list) or any(not isinstance(x,str) for x in value['needs_input']):raise ValueError('Invalid research plan')
+    validate_input_questions(value['needs_input'])
     if 'deliverable' in value and value['deliverable'] not in {'analysis','tool','model'}:raise ValueError('Invalid research deliverable')
     ids=set()
-    for row in value['steps']:
+    for index, row in enumerate(value['steps']):
         required={'id','title','acceptance'}
-        if not isinstance(row,dict) or not required<=set(row) or set(row)-required-{'status','evidence'} or any(not isinstance(row[k],str) or not row[k].strip() or len(row[k])>2000 for k in required) or row['id'] in ids:
+        if isinstance(row,dict) and set(row)-required-{'status','evidence','verification','approach'}:
+            extra=', '.join(sorted(set(row)-required-{'status','evidence','verification','approach'}))[:200]
+            raise ValueError(f'Step {index+1} has unsupported fields: {extra}. '
+                'Each step contains id, title, acceptance and optional verification and approach fields. Put needs_input at the plan top level, not inside steps. '
+                'Do not supply completion status or evidence; the host owns those fields.')
+        if not isinstance(row,dict) or not required<=set(row) or set(row)-required-{'status','evidence','verification','approach'} or any(not isinstance(row[k],str) or not row[k].strip() or len(row[k])>2000 for k in required) or row['id'] in ids:
             raise ValueError('Each research step requires unique id, title and acceptance strings; status and evidence are managed by the host')
+        if 'approach' in row and (not isinstance(row['approach'],str) or not row['approach'].strip() or len(row['approach'])>2000):
+            raise ValueError('A research approach must be a concise method description')
+        if row.get('verification','artifact') not in VERIFICATION_KINDS:
+            raise ValueError('Unsupported plan verification kind')
         # A planner may echo its input, including checkpoint metadata. Never
         # trust that metadata: restore only previously verified host state.
         ids.add(row['id']);row['status']='pending';row['evidence']=[]
@@ -75,6 +116,11 @@ def parse_plan(text, previous=None, *, objective=''):
     for row in value['steps']:
         if row['id'] in old:
             row['title']=old[row['id']]['title'];row['acceptance']=old[row['id']]['acceptance'];row['status']=old[row['id']]['status'];row['evidence']=old[row['id']].get('evidence',[])
+            if old[row['id']].get('status')=='completed' or 'approach' not in row:
+                if 'approach' in old[row['id']]:row['approach']=old[row['id']]['approach']
+                else:row.pop('approach',None)
+            if 'verification' in old[row['id']]:row['verification']=old[row['id']]['verification']
+            elif 'verification' in row:row.update(status='pending',evidence=[])
     # A compact user goal may omit the word "model"; the planner can infer the
     # deliverable from the materials. Once established, replanning cannot turn
     # model/tool development into an analysis-only completion.
@@ -84,6 +130,15 @@ def parse_plan(text, previous=None, *, objective=''):
     else:value.setdefault('deliverable','analysis')
     return value
 
+def method_changes(previous, current, episode):
+    old={row['id']:row for row in (previous or {}).get('steps',[])}
+    return [{'episode':episode,'step_id':row['id'],'previous':old[row['id']].get('approach',''),
+             'approach':row['approach'],'acceptance':row['acceptance']}
+            for row in current.get('steps',[]) if row['id'] in old and row.get('approach')
+            and old[row['id']].get('status')!='completed'
+            and row['approach']!=old[row['id']].get('approach','')]
+
+
 def create(root, profile, objective, limits):
     if profile.harness not in NATIVE_EXPERT_HARNESSES:raise ValueError('Select a native Scientist harness')
     store=GoalStore.create(root,GoalSpec(objective,CRITERIA,**limits),profile)
@@ -91,8 +146,9 @@ def create(root, profile, objective, limits):
     (store.root/'workspace').mkdir()
     return store
 
-def verified_checkpoint(workspace, checkpoint, receipts):
-    if not checkpoint or not checkpoint['completed_steps'] or not receipts:return False
+def verified_checkpoint(workspace, checkpoint, receipts, *, require_completed_steps=True):
+    if not checkpoint or not receipts:return False
+    if require_completed_steps and not checkpoint['completed_steps']:return False
     for row in checkpoint['artifacts']:
         if file_hash(safe_file(workspace,row['path']))!=row['sha256']:return False
     return bool(checkpoint['artifacts'])
@@ -104,8 +160,14 @@ class AutonomousResearch:
 
     async def consult(self, role, context, profile, relay, folder):
         if self.consult_override:return await self.consult_override(role,context)
+        from .scientist_role_output import specification, request_fields, output_content
+        spec = specification(role, profile.model.protocol) if hasattr(getattr(relay, 'policy', None), 'role_output') else None
+        output_spec = spec
         instruction=SCIENTIST_PURPOSE+ROLES[role]+' Respond in the language of the research objective.'
         if role=='CB':
+            instruction += (' For each step, choose verification: artifact for documents; execution for computed analysis; '
+                'data for checked data splits; model for fitted and measured models; revision for a measured descendant; '
+                'review for independent approval; delivery for the final package. Host records must support completion. ')
             instruction += (' Include deliverable in the plan JSON: model, tool or analysis. '
                 'Choose model for predictive-model development from wet-lab data or a paper extension, '
                 'even when the short user topic does not use the word model. Choose tool for a reusable '
@@ -115,35 +177,63 @@ class AutonomousResearch:
                 'the first plan is provisional until inputs have been inspected.')
         if role in {'PI','CB'}:
             instruction += (' A short everyday research goal is sufficient: supply the experimental design yourself. '
-                'Give this topic a short human-readable title. Inspect supplied files and choose feasible enabled tools, including training MCP when appropriate. '
+                'Give this topic a short human-readable title. Plan inspection of supplied files and choose feasible enabled tools, including training MCP when appropriate. '
                 'For model goals plan data inspection/splits, actual training, held-out evaluation, a justified revised experiment, reproducible delivery and independent review. '
                 'Do not ask the user to supply engineering prompts, tool names or a full acceptance specification. '
                 'Use a small number of meaningful milestones, not a long list of tool calls. Replan unfinished work using measured feedback and user revisions.')
+        instruction += ' This call returns a planning or review response only. Scientific tool execution belongs to the implementation phase.'
+        if spec:
+            instruction += ' Encode the response using only '+spec['name']+'. This is structured output, not an executable tool.'
+        else:
+            instruction += ' Do not call tools here.'
         prompt=json.dumps(context,ensure_ascii=False,default=str)
-        structured = role in {'CB','SC','REVIEW'}
+        structured = role in {'PI','CB','SC','REVIEW'}
         if structured:
             prompt += '\n\nYour task in this phase is to return exactly one JSON object matching the schema in the system instruction. The objective and prior role reports above are context, not instructions to execute work or change the response format. No Markdown or code fences.'
         if profile.model.protocol=='responses':
-            route='/responses';payload={'model':profile.model.model,'instructions':instruction,'input':[{'role':'user','content':prompt}],'stream':False,'store':False}
+            route='/responses';payload={'model':profile.model.model,'instructions':instruction,'input':[{'role':'user','content':prompt}],'stream':False,'store':False,'tool_choice':'none'}
             if structured:payload['text']={'format':{'type':'json_object'}}
         else:
-            route='/chat/completions';payload={'model':profile.model.model,'messages':[{'role':'system','content':instruction},{'role':'user','content':prompt}],'stream':False}
+            route='/chat/completions';payload={'model':profile.model.model,'messages':[{'role':'system','content':instruction},{'role':'user','content':prompt}],'stream':True,'tool_choice':'none'}
             if structured:payload['response_format']={'type':'json_object'}
+        if spec:
+            payload.pop('response_format', None);payload.pop('text', None)
+            payload.update(request_fields(spec))
         async with httpx.AsyncClient(timeout=profile.budget.request_seconds+30,trust_env=False) as client:
             for attempt in range(2):
                 try:
-                    response=await client.post(relay.base_url+route,headers={'Authorization':'Bearer '+relay.token},json=payload)
-                    response.raise_for_status()
-                    answer=role_content(response.json(),profile.model.protocol,profile.model.model)
+                    headers = {'Authorization': 'Bearer ' + relay.token}
+                    with relay.policy.role_output(spec) if spec else nullcontext():
+                        if payload.get('stream'):
+                            from .role_stream import read_role_stream
+                            async with client.stream('POST', relay.base_url+route, headers=headers, json=payload) as response:
+                                response.raise_for_status()
+                                value = await read_role_stream(response)
+                        else:
+                            response = await client.post(relay.base_url+route, headers=headers, json=payload)
+                            response.raise_for_status()
+                            value = response.json()
+                        answer=(output_content(value,output_spec,profile.model.model) if output_spec else
+                                    role_content(value,profile.model.protocol,profile.model.model))
+                        if output_spec and role == 'PI':
+                            answer = json.loads(answer)['direction']
                     break
                 except (httpx.HTTPStatusError,httpx.TransportError) as exc:
                     # Some free routes have no endpoint supporting native JSON
                     # mode. Retry the same model without that optional transport
                     # hint; structured() still enforces the complete host schema.
-                    format_retry=isinstance(exc,httpx.HTTPStatusError) and exc.response.status_code in {400,404,422} and 'response_format' in payload
+                    format_retry=isinstance(exc,httpx.HTTPStatusError) and exc.response.status_code in {400,404,422} and (spec is not None or 'response_format' in payload)
                     transient=not isinstance(exc,httpx.HTTPStatusError) or exc.response.status_code in {429,500,502,503,504}
                     if attempt or not (transient or format_retry) or relay.calls>=profile.budget.model_calls-3:raise
-                    if format_retry:payload.pop('response_format')
+                    if format_retry:
+                        payload.pop('response_format', None)
+                        if spec:
+                            instruction = instruction.replace(' Encode the response using only '+spec['name']+'. This is structured output, not an executable tool.', ' Return exactly one JSON object; do not call tools.')
+                            if profile.model.protocol=='responses':payload['instructions']=instruction
+                            else:payload['messages'][0]['content']=instruction
+                            for key in ('tools','parallel_tool_calls'):payload.pop(key,None)
+                            payload['tool_choice']='none'
+                            spec=None
                     await asyncio.sleep(.5)
         return answer
 
@@ -151,14 +241,18 @@ class AutonomousResearch:
         """One bounded format repair within the existing model-call budget."""
         current=context
         for attempt in range(2):
-            raw=await self.consult(role,current,profile,relay,folder)
+            from .scientist_role_output import RoleOutputError
+            problem=None
+            try:raw=await self.consult(role,current,profile,relay,folder)
+            except RoleOutputError as exc:raw=exc.raw;problem=exc
             self.activity(folder,role,raw)
-            try:return validator(raw)
-            except (ValueError,KeyError,TypeError) as exc:
-                if attempt or relay.calls>=profile.budget.model_calls-3:raise
-                current={**context,'format_repair':{'previous_response':raw[:12000],
-                    'validation_error':str(exc)[:400],
-                    'instruction':'Reformat the same research content as one valid JSON object with the required fields. Do not invent results, change the objective or execute any tools.'}}
+            if problem is None:
+                try:return validator(raw)
+                except (ValueError,KeyError,TypeError) as exc:problem=exc
+            if attempt or relay.calls>=profile.budget.model_calls-3:raise problem
+            current={**context,'format_repair':{'previous_response':raw[:12000],
+                'validation_error':str(problem)[:400],
+                'instruction':'Reformat the same research content as one valid JSON object with the required fields. Do not invent results, change the objective or execute any tools.'}}
         raise AssertionError('Bounded structured request')
 
     def activity(self, folder, role, text):
@@ -168,15 +262,21 @@ class AutonomousResearch:
 
     def record_development_progress(self, event, development):
         """Expose host-measured generations without waiting for an episode to end."""
-        if event.get('status')=='completed' and str(event.get('tool','')).rsplit('__',1)[-1]=='evaluate_research_model':
+        if event.get('status')=='completed' and str(event.get('tool','')).rsplit('__',1)[-1] in {'evaluate_research_model','train_research_model'}:
             summary=development.summary()
             self.store.mutate(lambda state:state['progress'].update(development=summary))
 
     async def episode(self, index, profile, state, context_prompt):
         started=time.monotonic();folder=self.store.root/'episodes'/f'cycle_{index:03d}';folder.mkdir(parents=True,exist_ok=True)
         state=apply_revisions(self.store)
-        workspace=self.store.root/'workspace';progress=copy.deepcopy(state['progress']);events=[];relay=None;tools=[]
+        workspace=self.store.root/'workspace';progress=copy.deepcopy(state['progress']);events=[];relay=None;tools=[];service=None
+        from .research_data_store import store_for_goal
+        data_store=store_for_goal(self.store.root)
+        if data_store is not None:
+            data_store.protect_inputs(progress.get('inputs',[]),prior_agent_execution=bool(state.get('cycles')))
         context={'objective':state['definition']['goal']['objective'],'progress':progress,'previous_episodes':[{k:r.get(k) for k in ['summary','status']} for r in state['cycles'][-4:]],'workspace_files':[str(p.relative_to(workspace)) for p in workspace.rglob('*') if p.is_file()][:200]}
+        from .research_input_index import input_descriptions
+        context['supplied_materials'] = input_descriptions(workspace, progress.get('inputs', []),source_reader=data_store.input_bytes if data_store else None)
         context['research_topic']=topic_context()
         from mcp_tools.tools.runtime_tool_policy import filter_tools
         from .session_boundary import UNSAFE_TOOLS
@@ -187,19 +287,29 @@ class AutonomousResearch:
         scientific = [t for t in filter_tools(available)[0] if t.name not in UNSAFE_TOOLS]
         tool_index = ToolDisclosure({t.name: t for t in scientific}, schema=lambda t: {}, allowed=lambda t: True)
         preview = tool_index.metadata('search_tools', {'query': context['objective'][:200], 'limit': 12})
-        if not preview['tools']:
+        if not preview.get('tools') and not preview.get('categories'):
             preview = tool_index.metadata('search_tools', {'limit': 12})
-        context['available_tools'] = {'count': len(scientific), 'preview': preview['tools'],
+        context['available_tools'] = {'count': len(scientific), 'preview': preview.get('tools', []),
+                                      'categories': preview.get('categories', []),
                                       'discovery': GUIDANCE}
         context['resources'] = {'online':os.getenv('VENUS_SCIENTIST_ONLINE')=='1', 'budget':state['definition']['goal'],
             'training':'Use enabled training MCP for platform PLMs; online only ESM2-8M. Isolated Python supports custom statistical and learning algorithms.'}
-        development=Development(self.store.root/'development')
-        context['model_development']={'protocol':development_guide(),'prior_generations':development.summary()}
-        policy=GatewayPolicy(model=profile.model.model,mode='science_agent',scientific_tools=set(),max_calls=profile.budget.model_calls,temperature=profile.budget.temperature,max_tokens=profile.budget.output_tokens,thinking=profile.budget.thinking)
+        development=Development(self.store.root/'development',data_store=data_store)
+        context['model_development']={'prior_generations':development.summary(),
+            'guidance_tool':'get_research_strategy_guide',
+            'workflow':'Prepare checked data, fit a baseline, measure a justified revision, then submit independent Review.',
+            'evidence_scope':'Host-owned datasets expose training rows only. The host computes validation feedback; final tests are reserved for independent Review. This does not establish prospective or out-of-domain validation.'}
+        from .research_data_memory import prepared_dataset_context
+        prepared = prepared_dataset_context(workspace, self.store.root/'episodes',data_store=data_store)
+        if prepared is not None:
+            context['model_development']['prepared_dataset'] = prepared
+        if model_goal(context['objective']) or progress.get('plan',{}).get('deliverable')=='model':
+            context['model_development']['next_action']=development_next_action(development.summary(),progress)
+        policy=ScientistGatewayPolicy(model=profile.model.model,mode='science_agent',scientific_tools=set(),max_calls=profile.budget.model_calls,temperature=profile.budget.temperature,max_tokens=profile.budget.output_tokens,thinking=profile.budget.thinking)
         gateway=EvidenceGateway
         if profile.model.protocol=='responses':
             from .responses_gateway import ResponsesGateway, ResponsesPolicy
-            gateway=ResponsesGateway;policy=ResponsesPolicy.from_profile(profile,[])
+            gateway=ResponsesGateway;policy=ScientistResponsesPolicy.from_profile(profile,[])
         elif profile.harness=='expert-claude-code':
             from .messages_bridge import MessagesBridge
             gateway=MessagesBridge
@@ -218,35 +328,85 @@ class AutonomousResearch:
         try:
             async with gateway(policy=policy,upstream_url=profile.model.base_url,api_key=self.credential,output=folder/'model_requests.jsonl',timeout_s=profile.budget.request_seconds) as relay:
                 phase('PI')
-                context['PI']=await self.consult('PI',context,profile,relay,folder);self.activity(folder,'PI',context['PI'])
+                context['PI']=await self.structured('PI',context,profile,relay,folder,lambda value:value)
                 phase('CB')
                 plan=await self.structured('CB',context,profile,relay,folder,lambda raw:parse_plan(raw,progress.get('plan'),objective=context['objective']))
+                changes = method_changes(progress.get('plan'), plan, index)
                 context['plan']=plan;progress['plan']=plan
                 write_json(folder/'plan.json',plan)
-                self.store.mutate(lambda s:s['progress'].update(plan=plan))
+                if changes:
+                    progress.setdefault('method_revisions', []).extend(changes)
+                    context['progress']['method_revisions'] = progress['method_revisions']
+                self.store.mutate(lambda s:s['progress'].update(plan=plan, method_revisions=progress.get('method_revisions', [])))
                 ensure_project_readme(workspace, context['objective'], plan)
                 context['planning_questions']=plan['needs_input']
-                service=ResearchWorkspace(workspace,folder/'tools',plan,development_root=self.store.root/'development')
+                if plan.get('deliverable')=='model' and data_store is None:
+                    data_store=store_for_goal(self.store.root,force=True)
+                    data_store.protect_inputs(progress.get('inputs',[]),prior_agent_execution=bool(state.get('cycles')))
+                    development.data_store=data_store
+                service=ResearchWorkspace(workspace,folder/'tools',plan,development_root=self.store.root/'development',data_store=data_store)
                 from .interactions import INTERACTION_NAMES
-                tools=scientific+service.tools();names=CONTROLS | INTERACTION_NAMES | {'submit_research_checkpoint'}
+                from mcp_tools.tools.tool_surface import WORKSPACE_PRIMITIVES
+                tools=scientific+service.tools()
+                if plan.get('deliverable')=='model':
+                    context['model_development']['next_action']=development_next_action(development.summary(),progress)
+                    repair = repair_source_context(workspace, progress.get('execution_feedback'))
+                    if repair is not None:context['model_development']['repair_source'] = repair
+                focus=selected_tools(context,tools)
+                context['model_development']['selected_tools']=focus
+                names=CONTROLS | WORKSPACE_PRIMITIVES | INTERACTION_NAMES | {'submit_research_checkpoint'} | set(focus)
                 context['tools'] = sorted(names)
                 if profile.model.protocol=='responses':policy.allowed={'mcp__venusfactory__'+n for n in names}
                 else:policy.scientific_tools=frozenset(names)
                 remaining=profile.budget.model_calls-relay.calls
                 if remaining<4:raise ValueError('No budget left for execution and review')
                 native=replace(profile,mode='science_agent',harness=NATIVE_EXPERT_HARNESSES[profile.harness],budget=replace(profile.budget,model_calls=remaining-3,wall_seconds=max(1,profile.budget.wall_seconds-(time.monotonic()-started))))
-                instructions='You are the Machine Learning Specialist. Execute a small coherent group of unfinished steps of the supplied plan using scientific tools. Checkpoint useful results each iteration so the reviewer can approve completed steps before the next iteration; do not attempt a long plan in one uninterrupted execution. Search existing capabilities before reinventing work. Write code and reports with write_session_file; execute scripts with run_session_python. Use real datasets for scientific claims. For model-development goals, train on the supplied data, evaluate a held-out split, save the fitted weights and metrics, and build a reusable run(inputs) prediction program. Call get_research_review_requirements before developing a reusable candidate. Include an input/output contract, author, version, applicability and limitations; document data provenance and disjoint train/validation/test groups, fitted files, training reproduction and held-out metrics for models. Propose at most two candidates with review_spec, runtime files and private evidence files. Revise candidates using progress.publication_reviews issues even when research plan steps are complete. All outputs remain private to this research. Independent Review validates the deliverable; it never authorizes platform publication. Public release requires separate operator selection and an author email, requested by email. Read supplied PDFs with read_session_file and inspect structures or tables before deciding the next experiment. Do not stop at a training script when a reusable model is requested. End by submit_research_checkpoint citing actual result artifacts and step IDs. If required input is missing, checkpoint a specific question instead of substituting a demo. Planning questions are advisory: inspect inputs and complete any useful unblocked work before requesting user input. Never invent missing data or replace the user sequence. Use relative paths for research tools and /workspace paths for scientific data tools.'
-                instructions+=' '+SCIENTIST_PURPOSE+' Follow context.research_topic for experimental-data, paper-extension and prospective-model projects. Create README.md early with the short research title, goal, current plan and input data. Update it after experiments with measured results, limitations and reproduction commands. Use enabled generate_training_config / train_protein_model / protein_model_predict for platform training when appropriate, with workspace files. Training is queued; do not implement a separate host subprocess or treat a configuration file as completed training. Online PLM training uses ESM2-8M. Custom algorithms run in the isolated Python workspace. Both paths require actual held-out evidence.'
-                instructions+=' For model goals, call get_research_strategy_guide. Execute a baseline and record it with evaluate_research_model(variant="baseline"); inspect the measured feedback, then revise the implementation, learning objective, representation or adaptation rule and evaluate a child using parent_experiment_id. Explain the hypothesis and use matched validation data. PLM training is optional. Use few-shot, semi-supervised, meta-learning, transfer or custom strategies when justified by the actual data; missing tasks/unlabeled examples cannot be fabricated. Implement genuine training/adaptation and relevant ablations, not merely a renamed estimator. Select on validation; reserve final test for Review. Put the selected experiment ID in review_spec.development_experiment_id. Source, fitted state, training reproduction, test evidence and a reusable inference interface are required. The host creates a private model delivery and test report after admission. Organize a reproducible project: a README explaining inputs and exact commands, dependency versions, source code, training/inference entry points, tests and a report citing actual results and unresolved limitations. Keep original relative paths so it runs after ZIP extraction. Do not claim algorithmic novelty, causal RSI benefit or statistical superiority without the required evidence.'
-                instructions+=' '+WORKSPACE_INSTRUCTIONS
-                instructions+=f' This iteration has at most {native.budget.tool_calls} tool calls. Respect the remaining-call feedback from mcp_tools.tools. When only two calls remain, submit_research_checkpoint immediately instead of starting another experiment. A useful partial checkpoint is expected; do not claim unfinished steps complete. Avoid re-reading guides already supplied in context.model_development.protocol.'
-                request={'session_id':self.store.root.name,'profile':native.public(),'runtimes':self.runtimes,'workspace':str(workspace),'control':str(folder),'messages':[],'text':json.dumps(context,ensure_ascii=False),'instructions':instructions,'base_url':relay.base_url,'token':relay.token,'budget':native.public()['budget'],'lang':'zh' if any('\u4e00'<=c<='\u9fff' for c in context['objective']) else 'en'}
+                instructions=execution_instructions(context,native.budget.tool_calls)
+                request={'session_id':self.store.root.name,'profile':native.public(),'runtimes':self.runtimes,'research_focus':focus,'workspace':str(workspace),'control':str(folder),'messages':[],'text':json.dumps(context,ensure_ascii=False),'instructions':instructions,'base_url':relay.base_url,'token':relay.token,'budget':native.public()['budget'],'lang':'zh' if any('\u4e00'<=c<='\u9fff' for c in context['objective']) else 'en'}
                 phase('MLS')
                 if self.executor_override:await self.executor_override(request,service,events)
                 else:
                     from .web_native_worker import run
                     request['audit_required']=True
                     await run(request,tools=tools,event_sink=event_sink)
+                from .execution_followup import execution_followup, execution_usage
+                followup = execution_followup(
+                    request, native, events, checkpoint=service.checkpoint,
+                    remaining_calls=profile.budget.model_calls-relay.calls-3,
+                    remaining_seconds=max(0,profile.budget.wall_seconds-(time.monotonic()-started)))
+                if followup is not None:
+                    retry_folder=folder/'execution_retry';retry_folder.mkdir()
+                    followup['control']=str(retry_folder)
+                    continuation = json.loads(followup['text'])
+                    current_development = development.summary()
+                    continuation['model_development']['prior_generations'] = current_development
+                    continuation['model_development']['next_action'] = development_next_action(current_development, progress)
+                    prepared = prepared_dataset_context(workspace, self.store.root/'episodes',data_store=data_store)
+                    if prepared is not None:
+                        continuation['model_development']['prepared_dataset'] = prepared
+                    else:
+                        continuation['model_development'].pop('prepared_dataset', None)
+                    continuation['execution_receipts'] = service.receipts[-6:]
+                    repair = repair_source_context(workspace, feedback_state(events, workspace, progress.get('execution_feedback')))
+                    if repair is not None:continuation['model_development']['repair_source'] = repair
+                    else:continuation['model_development'].pop('repair_source', None)
+                    focus = selected_tools(continuation, tools)
+                    continuation['model_development']['selected_tools'] = focus
+                    names = CONTROLS | WORKSPACE_PRIMITIVES | INTERACTION_NAMES | {'submit_research_checkpoint'} | set(focus)
+                    continuation['tools'] = sorted(names)
+                    if profile.model.protocol == 'responses':
+                        policy.allowed = {'mcp__venusfactory__'+name for name in names}
+                    else:
+                        policy.scientific_tools = frozenset(names)
+                    followup.update(text=json.dumps(continuation,ensure_ascii=False), research_focus=focus,
+                                    instructions=execution_instructions(continuation,followup['budget']['tool_calls']))
+                    write_json(retry_folder/'reason.json', {'reason':'native_return_without_checkpoint',
+                        'maximum_retries':1, 'used':execution_usage(events),
+                        'remaining_execution_calls':followup['budget']['tool_calls']})
+                    if self.executor_override:
+                        await self.executor_override(followup,service,events)
+                    else:
+                        await run(followup,tools=tools,event_sink=event_sink)
                 awaiting=next((e for e in events if e.get('kind')=='interaction'),None)
                 if awaiting:
                     from .interactions import Interaction
@@ -255,7 +415,7 @@ class AutonomousResearch:
                     progress.pop('reviewed_episode',None)
                     self.activity(folder,'MLS',json.dumps(gate,ensure_ascii=False))
                     raise AwaitUser()
-                execution=next((e for e in events if e.get('kind')=='completed'),None)
+                execution=next((e for e in reversed(events) if e.get('kind')=='completed'),None)
                 if not execution:raise ValueError('Native executor did not complete')
                 if not (execution.get('event_audit') or {}).get('passed'):raise ValueError('Scientific execution evidence was not validated')
                 self.activity(folder,'MLS',execution['text'])
@@ -267,15 +427,44 @@ class AutonomousResearch:
                     if p.suffix in {'.json','.txt','.md','.csv','.py'} and p.stat().st_size<=40000:preview['content']=p.read_text(errors='replace')
                     previews.append(preview)
                 context['artifact_previews']=previews
+                context['execution']['failures']=iteration_feedback(events,workspace,progress.get('execution_feedback'))
+                step_checks=checkpoint_steps(plan,checkpoint,workspace=workspace,receipts=service.receipts,
+                    experiments=development.records(),progress=progress)
+                context['execution']['step_checks']=step_checks
+                progress['step_checks']=step_checks
                 phase('SC')
                 review=await self.structured('SC',context,profile,relay,folder,critic_decision)
                 write_json(folder/'review.json',review)
-                ready=review['decision']=='ready_for_host_validation' and verified_checkpoint(workspace,checkpoint,service.receipts) and audit_requests(folder/'model_requests.jsonl')['passed']
+                checkpoint_valid=verified_checkpoint(workspace,checkpoint,service.receipts,require_completed_steps=False)
+                request_valid=audit_requests(folder/'model_requests.jsonl')['passed']
+                host_issues=[row['error'] for row in context['execution']['failures']]
+                if not checkpoint_valid:host_issues.append('Submit a checkpoint with unchanged artifacts and execution receipts.')
+                if not request_valid:host_issues.append('Model request evidence did not pass verification.')
+                reviewable=not host_issues
+                critic_ready=review['decision']=='ready_for_host_validation'
+                step_issues=[f"Step {row['id']}: {issue}" for row in step_checks for issue in row['issues']]
+                host_issues.extend(step_issues)
+                host_review={'passed':not host_issues,'execution_passed':reviewable,'issues':host_issues,
+                             'steps':step_checks,'model_decision':review['decision']}
+                write_json(folder/'host_review.json',host_review)
+                progress['host_review']=host_review
+                if host_issues:
+                    review={'decision':'needs_revision','summary':'Execution needs revision: '+host_issues[0].strip().splitlines()[-1][:700],
+                            'issues':host_issues}
+                    self.activity(folder,'SC',json.dumps({'source':'automatic_checks',**review},ensure_ascii=False))
+                accepted_steps={row['id'] for row in step_checks if row['passed']}
+                ready=critic_ready and reviewable and bool(accepted_steps)
                 if ready:
                     accepted_plan=copy.deepcopy(plan)
                     for step in accepted_plan['steps']:
-                        if step['id'] in checkpoint['completed_steps']:
+                        if step['id'] in accepted_steps:
                             step.update(status='completed',evidence=checkpoint['artifacts'])
+                    plan=accepted_plan
+                    progress['artifacts']=checkpoint['artifacts']
+                    progress['reviewed_episode']=index
+                # Independent candidate review must not wait for the Critic to
+                # claim that the review itself has already finished.
+                if reviewable:
                     reviews={r['name']:r for r in progress.get('publication_reviews',[])}
                     for bundle in service.proposals:
                         phase('REVIEW')
@@ -287,6 +476,9 @@ class AutonomousResearch:
                         row={'id':candidate['id'],'name':candidate['name'],'status':receipt['status'],'issues':receipt['issues'],
                              'summary':(receipt.get('independent') or {}).get('summary',''),
                              'receipt':str((bundle/'admission.json').relative_to(self.store.root)),'sha256':file_hash(bundle/'admission.json')}
+                        if (bundle/'submission.json').is_file():
+                            row['proposal_file']=json.loads((bundle/'submission.json').read_text()).get('proposal_file')
+                        row['review_stage']='independent' if receipt.get('independent') is not None else 'automatic'
                         if receipt['status']=='approved' and audit_requests(folder/'model_requests.jsonl')['passed']:
                             try:
                                 delivery=None
@@ -305,9 +497,6 @@ class AutonomousResearch:
                         progress['publication_reviews']=list(reviews.values())
                         self.activity(folder,'REVIEW',json.dumps(row,ensure_ascii=False))
                         self.store.mutate(lambda s:s['progress'].update(publication_reviews=progress['publication_reviews']))
-                    plan=accepted_plan
-                    progress['artifacts']=checkpoint['artifacts']
-                    progress['reviewed_episode']=index
                 questions=(checkpoint or {}).get('needs_input',[])
                 progress.update(plan=plan,questions=questions,last_review=review,research_completed=ready and all(s['status']=='completed' for s in plan['steps']))
                 progress['development']=development.summary()
@@ -330,6 +519,9 @@ class AutonomousResearch:
         finally:
             timeline.finish(result['status'])
             progress['development']=development.summary()
+            if service is not None and service.latest_submission:
+                progress['review_submission']=service.latest_submission
+            progress['execution_feedback']={'iteration':index+1, **feedback_state(events,workspace,progress.get('execution_feedback'))}
             if model_goal(context['objective']) and not has_delivery(progress.get('deliveries',[]),'model'):
                 progress['delivery_pending']='Continue from measured generations; model review and delivery are not yet complete'
             write_json(folder/'events.json',events)
@@ -337,7 +529,18 @@ class AutonomousResearch:
         if result['status']=='completed' and not calls['passed']:
             result.update(status='failed',summary='Model response audit did not complete')
             progress.pop('reviewed_episode',None)
-        result['usage']={'model_calls':calls['model_calls'],'tool_calls':sum(e.get('kind')=='tool_call_start' for e in events),'wall_seconds':time.monotonic()-started}
+        from .model_availability import model_service_blocker
+        blocker=model_service_blocker(folder/'model_requests.jsonl')
+        if blocker and result['status']!='completed':
+            progress['execution_blocker']=blocker
+            result.update(execution_blocker=blocker,summary=blocker['message'])
+            write_json(folder/'model_service.json',blocker)
+        elif not blocker:
+            progress.pop('execution_blocker',None)
+        from .execution_followup import execution_usage
+        result['usage']={'model_calls':calls['model_calls'],
+            'tool_calls':execution_usage(events)['tool_calls'],
+            'wall_seconds':time.monotonic()-started}
         return result
 
     def evaluate(self,state):

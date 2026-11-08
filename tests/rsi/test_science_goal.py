@@ -240,3 +240,63 @@ async def test_scientific_cycle_deadline_must_be_finite_and_explicit(tmp_path, v
     store = create(tmp_path)
     with pytest.raises(ValueError, match="scientific cycle"):
         await run_goal(store, None, None, cycle_wall_seconds=value)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("limits,expected", [
+    ({"max_cycles": 1}, "budget_exhausted"),
+    ({"max_cycles": 4, "model_calls": 1}, "budget_exhausted"),
+    ({"max_cycles": 4, "tool_calls": 1}, "budget_exhausted"),
+    ({"max_cycles": 4}, "waiting_for_input"),
+])
+async def test_user_question_cannot_mask_an_exhausted_goal(tmp_path, limits, expected):
+    store = create(tmp_path, **limits)
+
+    async def cycle(*args):
+        return {
+            **outcome("Partial results retained"),
+            "needs_input": True,
+            "progress": {"questions": ["Supply additional measurements"], "artifact": "partial.json"},
+        }
+
+    state = await run_goal(store, cycle, lambda s: assessment(store, s))
+    assert state["status"] == expected
+    assert state["progress"]["questions"] == ["Supply additional measurements"]
+    assert len(state["cycles"]) == 1
+    assert state["usage"]["model_calls"] == 1
+
+@pytest.mark.asyncio
+async def test_model_service_suspension_saves_budget_and_resumes_without_repeating(tmp_path):
+    store = create(tmp_path, max_cycles=4)
+    seen = []
+    async def cycle(index, *args):
+        seen.append(index)
+        if index == 0:
+            blocker = {"source": "model_gateway", "code": "quota", "http_status": 403}
+            return {**outcome("Model quota exhausted"), "status": "failed",
+                    "execution_blocker": blocker, "progress": {"execution_blocker": blocker}}
+        (store.root / "accepted.json").write_text("{}")
+        (store.root / "reused.json").write_text("{}")
+        return {**outcome(), "progress": {}}
+    first = await run_goal(store, cycle, lambda s: assessment(store, s))
+    assert first["status"] == "interrupted" and seen == [0]
+    assert first["usage"]["model_calls"] == 1
+    saved = (store.root / "cycle_000.json").read_bytes()
+    store.resume()
+    final = await run_goal(store, cycle, lambda s: assessment(store, s))
+    assert final["status"] == "completed" and seen == [0, 1]
+    assert final["usage"]["model_calls"] == 2
+    assert (store.root / "cycle_000.json").read_bytes() == saved
+    assert final["progress"] == {}
+
+
+@pytest.mark.asyncio
+async def test_model_service_interruption_cannot_extend_an_exhausted_budget(tmp_path):
+    store = create(tmp_path, max_cycles=1)
+    async def cycle(*args):
+        return {**outcome(), "status": "failed",
+                "execution_blocker": {"source": "model_gateway", "code": "quota", "http_status": 403}}
+    final = await run_goal(store, cycle, lambda s: assessment(store, s))
+    assert final["status"] == "budget_exhausted"
+    with pytest.raises(ValueError):
+        store.resume()

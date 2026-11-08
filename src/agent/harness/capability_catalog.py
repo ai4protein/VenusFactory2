@@ -42,15 +42,38 @@ def register(library, manifest, receipt, goal_id, *, publication=None):
         con.execute('INSERT INTO capability_heads VALUES (?,?) ON CONFLICT(family) DO UPDATE SET id=excluded.id', (family, manifest['id']))
     return card
 
-def search(library, query='', limit=10, offset=0):
-    terms = str(query).casefold().split()[:20]
-    conditions = ' AND '.join('search_text LIKE ? ESCAPE \'\\\'' for _ in terms) or '1=1'
+def search(library, query='', limit=10, offset=0, *, public_only=False, excluded=()):
+    if not isinstance(query, str) or len(query) > 200:
+        raise ValueError('Use a search query of at most 200 characters')
+    if type(limit) is not int or not 1 <= limit <= 50 or type(offset) is not int or offset < 0:
+        raise ValueError('Use limit 1-50 and a nonnegative offset')
+    terms = query.casefold().split()
+    conditions = ' AND '.join("search_text LIKE ? ESCAPE '\\'" for _ in terms) or '1=1'
     conditions = '(' + conditions + ') AND ' + CURRENT
     values = ['%'+word.replace('\\','\\\\').replace('%','\\%').replace('_','\\_')+'%' for word in terms]
+    if public_only:
+        conditions += " AND json_extract(card,'$.visibility')='public' AND json_extract(card,'$.publication.policy')='operator_selected.v1'"
+    if excluded:
+        conditions += ' AND id NOT IN (SELECT value FROM json_each(?))'
+        values.append(json.dumps(list(excluded)))
     with database(library) as con:
         total = con.execute('SELECT COUNT(*) FROM capabilities WHERE '+conditions, values).fetchone()[0]
-        rows = con.execute('SELECT card FROM capabilities WHERE '+conditions+' ORDER BY created DESC,id LIMIT ? OFFSET ?', [*values, max(1,min(int(limit),50)), max(0,int(offset))]).fetchall()
-    return {'total': total, 'items': [json.loads(row[0]) for row in rows]}
+        rows = con.execute('SELECT card FROM capabilities WHERE '+conditions+' ORDER BY created DESC,id LIMIT ? OFFSET ?', [*values,limit,offset]).fetchall()
+    items = [json.loads(row[0]) for row in rows]
+    return {'total':total,'items':items,'next_offset':offset+len(items) if offset+len(items)<total else None}
+
+
+def discovery_card(card):
+    result = {key:card[key] for key in ('id','family_id','kind','author','author_email','version','review_status') if key in card}
+    result.update(name=card['name'][:120],description=card['description'][:240])
+    scope = card.get('scope') or {}
+    result['scope'] = {key:[value[:80] for value in scope.get(key,[])[:3]]
+                       for key in ('proteins','properties','scenarios')}
+    if any(len(scope.get(key,[]))>3 or any(len(value)>80 for value in scope.get(key,[]))
+           for key in result['scope']):
+        result['scope_truncated'] = True
+    return result
+
 
 def cards(library):
     with database(library) as con: return [json.loads(row[0]) for row in con.execute('SELECT card FROM capabilities WHERE '+CURRENT+' ORDER BY created DESC,id')]

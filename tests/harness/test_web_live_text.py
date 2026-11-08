@@ -154,3 +154,51 @@ async def test_messages_preview_still_requires_the_complete_provider_stream(tmp_
             result = await client.post(gateway.base_url + "/messages", json=request(), headers={"Authorization": "Bearer " + gateway.token})
     assert seen == ["partial"] and result.status_code == 502
     assert not audit_requests(log)["passed"]
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("protocol",["chat","messages","responses"])
+async def test_complete_protocol_frame_does_not_wait_for_http_eof(tmp_path,protocol):
+    seen=[]
+    async def observe(call,text):
+        seen.append(text)
+    if protocol=="responses":
+        from test_responses_gateway import events,stream,policy
+        raw=stream(events()); config=policy()
+        gateway_type,route=ResponsesGateway,"/responses"
+        body={"model":"fixture-model","input":"fixture","stream":True}
+    elif protocol=="messages":
+        from test_messages_bridge import policy,request
+        raw=sse(chunk("complete",end=True))+b"data: [DONE]\n\n"
+        config,body=policy(),request()
+        gateway_type,route=MessagesBridge,"/messages"
+    else:
+        raw=sse(chunk("complete",end=True))+b"data: [DONE]\n\n"
+        config=GatewayPolicy(model="unisound-u2-flash",mode="science_agent",scientific_tools=set())
+        body={"model":"unisound-u2-flash","messages":[{"role":"user","content":"fixture"}],"stream":True}
+        gateway_type,route=EvidenceGateway,"/chat/completions"
+    class CompletedButOpen(httpx.AsyncByteStream):
+        async def __aiter__(self):
+            # Includes chunk boundaries inside the terminal marker.
+            for offset in range(0,len(raw),13):
+                yield raw[offset:offset+13]
+            raise httpx.RemoteProtocolError("provider never closes the HTTP body after its terminal event")
+    async def upstream(request):
+        return httpx.Response(200,stream=CompletedButOpen())
+    log=tmp_path/"requests.jsonl"
+    async with gateway_type(policy=config,upstream_url="https://fixture.invalid/v1",api_key="test",
+                            output=log,transport=httpx.MockTransport(upstream),on_text=observe) as gateway:
+        async with httpx.AsyncClient(trust_env=False) as client:
+            result=await client.post(gateway.base_url+route,json=body,headers={"Authorization":"Bearer "+gateway.token})
+    assert result.status_code==200,result.text
+    assert seen and audit_requests(log)["passed"]
+
+
+def test_stream_terminal_requires_a_complete_protocol_frame():
+    from agent.harness.sse_terminal import StreamTerminal
+    parser=StreamTerminal()
+    assert not parser.feed(b': data: [DONE]\n\n')
+    assert not parser.feed(b'data: {"content":"[DONE]"}\n\n')
+    assert not parser.feed(b'data: [DO')
+    assert not parser.feed(b'NE]\r\n')
+    assert parser.feed(b'\r\n')
+    assert not StreamTerminal().feed(b'data: [DONE]\ndata: other\n\n')

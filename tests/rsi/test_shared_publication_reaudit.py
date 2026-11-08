@@ -59,3 +59,31 @@ def test_shared_programs_do_not_multiply_algorithm_count_or_duplicate_scopes():
     assert report['verified_scope_count'] == 2 and report['distinct_verified_programs'] == 1
     with pytest.raises(ValueError, match='Repeated scientific scope'):
         audit.summary([good, good], 2)
+
+
+@pytest.mark.parametrize('layout', ['flat', 'packaged'])
+def test_frozen_runtime_layouts_are_imported_without_rewriting(tmp_path, monkeypatch, layout):
+    from types import SimpleNamespace
+    base=tmp_path/'src/agent/rsi'
+    source=base/('campaigns' if layout=='packaged' else '')/'shared_model_campaign.py'
+    source.parent.mkdir(parents=True);source.write_text('# frozen source')
+    original=source.read_bytes()
+    module=SimpleNamespace(__file__=str(source))
+    imported=[]
+    def load(name):
+        imported.append(name)
+        return module
+    monkeypatch.setattr(audit.importlib,'import_module',load)
+    assert audit.runtime_module(tmp_path,'campaigns','shared_model_campaign') is module
+    assert imported == ['agent.rsi.'+('campaigns.' if layout=='packaged' else '')+'shared_model_campaign']
+    assert source.read_bytes()==original
+
+
+def test_ambient_runtime_cannot_impersonate_frozen_source(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    source=tmp_path/'frozen/src/agent/rsi/shared_model_campaign.py'
+    source.parent.mkdir(parents=True);source.touch()
+    foreign=tmp_path/'current/src/agent/rsi/shared_model_campaign.py'
+    monkeypatch.setattr(audit.importlib,'import_module',lambda _:SimpleNamespace(__file__=str(foreign)))
+    with pytest.raises(ValueError,match='different runtime'):
+        audit.runtime_module(tmp_path/'frozen','campaigns','shared_model_campaign')

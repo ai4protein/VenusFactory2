@@ -12,7 +12,7 @@ from pathlib import Path
 PROJECT = Path(__file__).resolve().parents[2]
 PATH_FIELDS = frozenset({
     'python', 'executable', 'root', 'weights', 'packing_weights', 'installation',
-    'filters', 'advanced', 'model_dir', 'confidence_model_dir', 'config', 'cache', 'structure_weights',
+    'filters', 'advanced', 'model_dir', 'confidence_model_dir', 'config', 'cache', 'structure_weights', 'ccd', 'data_dir', 'bio_bin',
 })
 
 

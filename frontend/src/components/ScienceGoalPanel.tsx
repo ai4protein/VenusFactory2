@@ -201,7 +201,7 @@ export function ScienceGoalPanel({ noticeTarget, online, toolbarTarget, composer
         </div>
 
       </section>}
-      {!g.research?.last_review && !!g.cycles?.length && g.cycles[g.cycles.length - 1].status === "failed" && <p className="goal-note">{g.cycles[g.cycles.length - 1].summary}</p>}
+      {!g.research?.execution_blocker && !g.research?.last_review && !!g.cycles?.length && g.cycles[g.cycles.length - 1].status === "failed" && <p className="goal-note">{g.cycles[g.cycles.length - 1].summary}</p>}
       {g.research?.last_review && <details className="research-review-summary"><summary>{say("Latest review", "最近一次审阅")}</summary><p>{g.research.last_review.summary}</p></details>}
       {!!g.research?.capabilities?.length && <div className="goal-capabilities"><h4>{say("Reusable capabilities", "可复用能力")}</h4>{g.research.capabilities.map(c => <p key={c.id}>{c.name}</p>)}</div>}
       {g.driver === "autonomous_research.v1" && unfinished.has(g.status) && <>{!g.research?.pending_interaction && !!g.research?.questions?.length && <ul className="research-questions">{g.research.questions.map((q, i) => <li key={i}>{q}</li>)}</ul>}{g.research?.pending_interaction ? <InteractionCard key={g.research.pending_interaction.id} interaction={g.research.pending_interaction} sessionId={sessionId} disabled={pending || g.worker_alive} onSubmit={response => answerInteraction(g.id, response)}/> : <ResearchRevision goal={g} sessionId={sessionId} onSaved={() => update(sessionId)}/>}</>}

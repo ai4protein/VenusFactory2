@@ -176,6 +176,7 @@ class Platform:
             if card.get('disabled_reason')=='admin_disabled':
                 from mcp_tools.tools.capability_policy import CapabilityDisabled, unavailable_message
                 raise CapabilityDisabled(unavailable_message())
+            if card.get('disabled_reason')=='needs_revalidation':raise ValueError(card['name']+' needs operator revalidation')
             if card.get('disabled_reason')=='runtime_disabled':raise ValueError(card['name']+' runtime is disabled')
             if card.get('disabled_reason')=='not_configured':raise ValueError(card['name']+' runtime is not configured')
             raise ValueError(card['name'] + ' is available in local mode')
@@ -205,7 +206,8 @@ class Platform:
                 description = ' · '.join(str(context[k]) for k in ('organism', 'application', 'perturbation') if context.get(k)) if isinstance(context, dict) else str(context)
                 cards.append({'id': 'scientist:' + c['entry_id'], 'name': str(scope.get('protein', 'Protein')) + ' · ' + str(scope.get('target', c['interface'])),
                               'category': 'function', 'source': 'scientist', 'visibility': 'public', 'description': description or str(c['interface']),
-                              'adapter': 'scientist', 'workflow': True, 'input_kind': 'table', 'scope': scope, 'interface': c['interface']})
+                              'adapter': 'scientist', 'workflow': True, 'input_kind': 'table', 'scope': scope, 'interface': c['interface'],
+                              'validation_status': 'recorded' if c.get('runtime_compatible', True) else 'needs_revalidation'})
         except Exception:
             issues.append('scientist')
         try:
@@ -285,7 +287,13 @@ class Platform:
             raise FileNotFoundError('Model not found')
         if detail and m['adapter'] == 'scientist':
             from mcp_tools.models.evolved.service import describe_model, configured_library
-            m['contract'] = describe_model(configured_library(), identity.split(':', 1)[1])
+            m['contract'] = {'verified_now': False, 'input_fields': [],
+                             'availability': 'This model needs operator revalidation.'}
+            if m.get('validation_status') != 'needs_revalidation':
+                try:
+                    m['contract'] = describe_model(configured_library(), identity.split(':', 1)[1])
+                except (ValueError, FileNotFoundError, KeyError):
+                    m['validation_status'] = 'needs_revalidation'
         if detail and m['adapter'] == 'capability':
             from agent.harness.research_workspace import describe_capability
             m['contract'] = describe_capability(identity.split(':', 1)[1])

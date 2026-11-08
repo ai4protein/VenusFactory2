@@ -13,12 +13,24 @@ import sys
 import time
 import re
 import uuid
+from typing import Annotated, Literal
+from pydantic import Field
 
 from .contracts import digest, file_hash
 from .host import write_json
+from .research_questions import validate_input_questions
 from utils.scoped_files import open_file, read_bytes, write_bytes, copy_file, parts
 
+ExperimentVariant = Annotated[
+    Literal["auto", "baseline", "candidate", "ablation"],
+    Field(description=(
+        "auto starts a baseline without a parent; with parent_experiment_id, "
+        "it evaluates a candidate revision. Use ablation for a controlled removal."
+    )),
+]
+
 LIBRARY = Path(__file__).resolve().parents[3] / 'research_runs/rsi/research_capabilities'
+RESEARCH_TOOLS = ('get_research_strategy_guide', 'get_research_baseline', 'prepare_research_dataset', 'validate_research_evaluation', 'train_research_model', 'evaluate_research_model', 'restore_research_evaluation', 'get_research_review_requirements', 'propose_research_capability', 'submit_research_checkpoint')
 
 def safe_file(root, name, *, exists=True):
     parts(name)
@@ -54,12 +66,13 @@ async def run_python(workspace, control, script, timeout=120, *, on_progress=Non
         return await _run_python(workspace,control,script,timeout,on_progress=on_progress)
 
 class ResearchWorkspace:
-    def __init__(self, workspace, control, plan, *, runner=run_python, development_root=None):
+    def __init__(self, workspace, control, plan, *, runner=run_python, development_root=None, data_store=None):
         self.workspace=Path(workspace);self.control=Path(control);self.plan=plan;self.runner=runner
         self.workspace.mkdir(parents=True,exist_ok=True);self.control.mkdir(parents=True,exist_ok=True)
-        self.receipts=[];self.checkpoint=None;self.proposals=[]
+        self.receipts=[];self.checkpoint=None;self.proposals=[];self.latest_submission=None
         from .research_development import Development
-        self.development=Development(development_root or self.control/'development')
+        self.data_store=data_store
+        self.development=Development(development_root or self.control/'development',data_store=data_store)
 
     def record(self, tool, args, result):
         row={'tool':tool,'arguments_sha256':digest(args),'result':result}
@@ -72,10 +85,11 @@ class ResearchWorkspace:
         from backend.web_v2.research_files import list_files
         return {'files':[{'path':row['rel'],'bytes':row['size']} for row in list_files({'workspace':self.workspace},limit=500)['files']]}
 
-    async def read_research_file(self, path: str) -> dict:
-        """Read text, CSV, molecular structure text or up to 30 pages from a PDF."""
+    async def read_research_file(self, path: str, offset_bytes: int=0, max_bytes: int=20000) -> dict:
+        """Preview text, CSV or molecular text in bounded UTF-8 windows; continue with next_offset_bytes. Analyze full tables with isolated Python. PDFs return up to 30 pages."""
         p=Path(path)
         if p.suffix.lower()=='.pdf':
+            if offset_bytes: raise ValueError('Byte offsets apply to text files only')
             import io
             data=read_bytes(self.workspace,path,max_bytes=20*1024**2)
             try:
@@ -84,8 +98,8 @@ class ResearchWorkspace:
                 from PyPDF2 import PdfReader
             reader=PdfReader(io.BytesIO(data))
             return {'path':path,'pages':len(reader.pages),'text':'\n'.join(page.extract_text() or '' for page in reader.pages[:30])[:200000],'sha256':hashlib.sha256(data).hexdigest()}
-        data=read_bytes(self.workspace,path,max_bytes=200000)
-        return {'path':path,'text':data.decode(),'sha256':hashlib.sha256(data).hexdigest()}
+        from .workspace_preview import text_window
+        return text_window(self.workspace,path,offset_bytes=offset_bytes,max_bytes=max_bytes)
 
     async def write_research_file(self, path: str, content: str) -> dict:
         """Create or revise Python code, a report, or a small data file in this workspace."""
@@ -95,17 +109,38 @@ class ResearchWorkspace:
 
     @guard_operation('run_research_python')
     async def run_research_python(self, path: str, timeout_seconds: int=120) -> dict:
-        """Execute saved Python in an isolated, memory-bounded single process without networking or subprocesses. Scientific Python packages are available. Use n_jobs=1; model training needing subprocesses uses queued MCP tools. Save relative outputs; inspect exit_code."""
+        """Execute a saved .py script, not a data file, in an isolated, memory-bounded single process without networking or subprocesses. Scientific Python packages are available. Use n_jobs=1; model training needing subprocesses uses queued MCP tools. Save relative outputs; inspect exit_code."""
+        from .session_sandbox import validate_execution
+        validate_execution('python', path, timeout_seconds)
         source_hash=workspace_hash(self.workspace,path)
         kwargs={'on_progress':lambda value:write_json(self.control/'execution.json',progress_view(value))} if self.runner is run_python else {}
         result=await self.runner(self.workspace,self.control/'python',path,timeout_seconds,**kwargs)
         if result['script_sha256'] != source_hash:raise ValueError('Script changed during execution')
         result['submitted_source_sha256']=source_hash
-        return self.record('run_research_python',{'path':path,'timeout':timeout_seconds},result)
+        self.record('run_research_python',{'path':path,'timeout':timeout_seconds},result)
+        from .execution_outcome import execution_error
+        from .tool_diagnostics import bounded_message
+        error=execution_error(result)
+        if error:raise ValueError(bounded_message(error,self.workspace,1200))
+        return result
 
     @guard_operation('propose_research_capability')
-    async def propose_research_capability(self, name: str, description: str, source: str, files: list[str], test_inputs: list[dict], review_spec: dict | None = None) -> dict:
-        """Propose reusable code after implementing run(inputs: dict) -> JSON in the source module. Include any weights in files. The host replays test_inputs in fresh isolated processes; scientific accuracy must be evaluated separately. Research Critic and independent technical Review are required. Call get_research_review_requirements first. Runtime files and evidence remain private to this goal. Public release additionally requires operator selection with an author email; users apply by email."""
+    async def propose_research_capability(self, name: str='', description: str='', source: str='', files: list[str] | None=None, test_inputs: list[dict] | None=None, review_spec: dict | None=None, proposal_file: str='') -> dict:
+        """Submit a private candidate for independent Review. Prefer proposal_file: a workspace JSON with name, description, source, files, test_inputs and review_spec. Edit and resubmit that file after revision; unchanged metadata are preserved. Inline fields remain supported and save review/proposal.json. Read get_research_review_requirements first. Submission does not grant public release."""
+        from .review_submission import ReviewSubmission
+        submission=ReviewSubmission(self.workspace,self.control,
+            dict(name=name,description=description,source=source,files=files,test_inputs=test_inputs,review_spec=review_spec),proposal_file)
+        self.latest_submission=submission.record('preparing')
+        try:
+            result=await self._propose_research_capability(**submission.payload)
+        except (ValueError,TypeError,OSError) as exc:
+            self.latest_submission=submission.record('invalid',error=exc)
+            raise ValueError(str(exc)+'; revise '+submission.path+' and resubmit using proposal_file') from exc
+        self.latest_submission=submission.record('submitted',candidate_id=result['id'])
+        write_json(self.proposals[-1]/'submission.json',self.latest_submission)
+        return {**result,'proposal_file':submission.path,'submission_status':'awaiting_review'}
+
+    async def _propose_research_capability(self, name, description, source, files, test_inputs, review_spec):
         if not name.strip() or not description.strip() or not 1<=len(test_inputs)<=8 or len(files)>20:
             raise ValueError('Provide a name, scope, files and 1..8 test inputs')
         if len(self.proposals)>=2: raise ValueError('Submit at most two candidates per iteration')
@@ -122,9 +157,12 @@ class ResearchWorkspace:
             validate_spec(review_spec)
             evidence=review_spec['evidence_files']
             if set(evidence)&set(paths): raise ValueError('Keep private evidence separate from runtime files')
-            for name in evidence:
-                if Path(name).name in {'manifest.json','admission.json','origin.json'}: raise ValueError('Reserved evidence filename')
-                copy_file(self.workspace,name,bundle,name)
+            for evidence_name in evidence:
+                if Path(evidence_name).name in {'manifest.json','admission.json','origin.json'}: raise ValueError('Reserved evidence filename')
+                if self.data_store and evidence_name == review_spec.get('evaluation_file'):
+                    write_bytes(bundle,evidence_name,self.data_store.load_evaluation(evidence_name))
+                else:
+                    copy_file(self.workspace,evidence_name,bundle,evidence_name)
             manifest.update(review_spec=review_spec,evidence_files={p:file_hash(bundle/p) for p in evidence})
             experiment_id=review_spec.get('development_experiment_id')
             if self.plan.get('deliverable')=='model' and not experiment_id:
@@ -146,9 +184,18 @@ class ResearchWorkspace:
         return self.record('propose_research_capability',{'source':source,'tests':test_inputs},{'id':manifest['id'],'name':name,'validation':manifest['validation']})
 
     async def submit_research_checkpoint(self, summary: str, completed_steps: list[str], artifacts: list[str], needs_input: list[str]) -> dict:
-        """Checkpoint actual work for the Scientific Critic. Cite existing result files, and only step IDs from the current plan. Use needs_input for specific missing user data. This does not itself complete the goal."""
+        """Checkpoint actual work for the Scientific Critic. Cite existing result files, and only step IDs from the current plan. Use needs_input only for specific missing user data. Use an empty list for unfinished work or an iteration budget limit; the goal loop continues automatically. This does not itself complete the goal."""
+        validate_input_questions(needs_input)
         ids={s['id'] for s in self.plan['steps']}
-        if not summary.strip() or not set(completed_steps)<=ids or (completed_steps and not artifacts):raise ValueError('Cite current plan steps and actual artifacts')
+        if not summary.strip():
+            raise ValueError('Provide a brief summary of actual work before checkpointing')
+        if not set(completed_steps)<=ids:
+            raise ValueError('completed_steps accepts exact step IDs only, without titles or descriptions. '
+                             'Current step IDs: '+json.dumps(sorted(ids))+
+                             '. Put explanations in summary; do not mark unfinished steps complete.')
+        if completed_steps and not artifacts:
+            raise ValueError('Completed steps require existing artifact filenames. '
+                             'Use completed_steps=[] for a partial checkpoint without completed work.')
         saved=[]
         for name in artifacts:
             data=read_bytes(self.workspace,name);saved.append({'path':name,'sha256':hashlib.sha256(data).hexdigest(),'bytes':len(data)})
@@ -164,11 +211,70 @@ class ResearchWorkspace:
     async def get_research_strategy_guide(self) -> dict:
         """Get model-development strategies, evidence requirements and measured prior generations. Supports custom algorithms, few-shot, semi-supervised and meta-learning; PLM training is optional."""
         from .research_development import guide
-        return {**guide(),'development':self.development.summary()}
+        return {**guide(),'development':self.development.summary(),
+                'reference_baselines':{'tool':'get_research_baseline','task':'regression',
+                    'scope':'Fixed canonical-sequence composition controls; inspect scope before choosing.'}}
+
+    async def get_research_baseline(self, reference: str='', sequence_column: str='sequence', output_field: str='value', output_file: str='') -> dict:
+        """List classic sequence-regression controls. Select a reference ID and output_file to save runnable fit/predict code with verified sequence encoding; omit output_file to read the source. Existing different files are never overwritten. Fit it with train_research_model, then develop a measured revision. Preserve its platform-reference provenance."""
+        from .research_reference_baselines import reference_baseline
+        from .research_development import immutable_copy
+        result=reference_baseline(reference,sequence_column,output_field)
+        if output_file:
+            if not reference or not isinstance(output_file,str) or not output_file.endswith('.py'):
+                raise ValueError('Select a reference ID and a relative .py output_file')
+            safe_file(self.workspace,output_file,exists=False)
+            immutable_copy(self.workspace,output_file,result['source'].encode())
+            result={key:value for key,value in result.items() if key!='source'}
+            result.update(source_file=output_file,
+                next_step='Call train_research_model with this source_file, the prepared evaluation_file and variant=baseline. '
+                'Then develop and measure a candidate using its parent_experiment_id; preserve the reference provenance.')
+        return self.record('get_research_baseline',{'reference':reference,'sequence_column':sequence_column,
+            'output_field':output_field,'output_file':output_file},result)
+
+    async def restore_research_evaluation(self, experiment_id: str, output_file: str='') -> dict:
+        """Export the measured generation's frozen evaluation to a new session file for final Review. Never overwrite different existing data. Use the returned path in review_spec.evaluation_file and evidence_files; keep targets and splits unchanged."""
+        result=self.development.export_evaluation(self.workspace,experiment_id,output_file)
+        return self.record('restore_research_evaluation',{'experiment_id':experiment_id,'output_file':output_file},result)
+
+    @guard_operation('validate_research_evaluation')
+    async def validate_research_evaluation(self, evaluation_file: str, strategy: str='supervised') -> dict:
+        """Check a dataset evaluation JSON before training: split sizes, finite targets and disjoint IDs, groups and exact inputs. Returns counts and file hashes, never labels or sequences. Use get_research_review_requirements for the format."""
+        from .research_development import inspect_evaluation
+        result=inspect_evaluation(self.workspace,evaluation_file,strategy,data_store=self.data_store)
+        return self.record('validate_research_evaluation',
+                           {'evaluation_file':evaluation_file,'strategy':strategy},result)
+
+    @guard_operation('prepare_research_dataset')
+    async def prepare_research_dataset(self, data_file: str, target_column: str, input_columns: list[str],
+            group_column: str, provenance: str, grouping: str, id_column: str='', task: str='regression',
+            seed: int=0, validation_fraction: float=0.15, test_fraction: float=0.15, output_file: str='') -> dict:
+        """Build checked, reproducible train/validation/test JSON from a CSV/TSV. Select real measured targets and useful input columns; exclude the target from inputs. Select a biologically justified group column so related observations stay together. IDs may be generated from source rows when id_column is empty. Original strings and labels are preserved, group splits are deterministic, and no samples are invented or silently discarded. Returns the evaluation_file, hashes and split counts; no held-out labels."""
+        from .research_dataset import prepare_dataset
+        result=prepare_dataset(self.workspace, data_file=data_file,target_column=target_column,
+            input_columns=input_columns,group_column=group_column,provenance=provenance,grouping=grouping,
+            id_column=id_column,task=task,seed=seed,validation_fraction=validation_fraction,
+            test_fraction=test_fraction,output_file=output_file,data_store=self.data_store)
+        return self.record('prepare_research_dataset',{'source_file':data_file,'source_sha256':result['table_sha256']},result)
+
+    @guard_operation('train_research_model')
+    async def train_research_model(self, name: str,
+            source_file: Annotated[str, Field(description="Workspace-relative .py file containing complete fit(training, seed) and predict(model, inputs) implementations. This is model code, not the dataset.")],
+            evaluation_file: Annotated[str, Field(description="Dataset JSON path returned by prepare_research_dataset. For a revision, use an empty string to reuse the parent experiment's frozen splits.")],
+            hypothesis: str, strategy: str='supervised', parent_experiment_id: str='',
+            variant: ExperimentVariant = "auto", prediction_key: str='value', seed: int=0) -> dict:
+        """Fit and validate agent-written model code in the session sandbox. fit(training, seed): rows=training["train"]; each row has an inputs dict and a target. Encode input fields into features before calling a numeric estimator; use the SAME feature transformation in fit and predict. Raw dictionaries or amino-acid strings are not numeric feature vectors. Fit transformations on training rows only and retain them with the learner. Return a parameter dict (arrays/estimators allowed) or fitted estimator. predict(model, inputs) receives ONE inputs dict, not a batch, and returns {"value": scalar}; use prediction_key instead of value if specified. Regression requires a finite number; classification a scalar label. The host saves fitted state and evaluates held-out data in isolation. Without a parent, evaluation_file creates a baseline. For a revision, cite parent_experiment_id and set evaluation_file="" to reuse frozen splits. Returns measured metrics, fitted files and reproduction entrypoint. Independent Review follows training."""
+        from .research_training import fit_model
+        args=dict(name=name,source_file=source_file,evaluation_file=evaluation_file,hypothesis=hypothesis,
+                  strategy=strategy,parent_experiment_id=parent_experiment_id,variant=variant,
+                  prediction_key=prediction_key,seed=seed)
+        progress=(lambda value:write_json(self.control/'execution.json',progress_view(value))) if self.runner is run_python else None
+        result=await fit_model(self.workspace,self.development,self.runner,on_progress=progress,**args)
+        return self.record('train_research_model',args,result)
 
     @guard_operation('evaluate_research_model')
-    async def evaluate_research_model(self, name: str, source: str, files: list[str], evaluation_file: str, prediction_key: str, hypothesis: str, strategy: str='custom', parent_experiment_id: str='', variant: str='candidate') -> dict:
-        """Snapshot a fitted run(inputs) model, replay validation predictions in isolated processes and score on the host. First use variant=baseline; revised candidates cite parent_experiment_id and identical data/splits. Never use final test scores to choose a generation. Call get_research_strategy_guide for the protocol."""
+    async def evaluate_research_model(self, name: str, source: str, files: list[str], evaluation_file: str, prediction_key: str, hypothesis: str, strategy: str='custom', parent_experiment_id: str='', variant: ExperimentVariant = "auto") -> dict:
+        """Snapshot a fitted run(inputs) model, replay validation predictions in isolated processes and score on the host. Without a parent, variant=auto starts a baseline and requires an evaluation_file; revised candidates cite parent_experiment_id and set evaluation_file="" to reuse its frozen data/splits. Never use final test scores to choose a generation. Call get_research_strategy_guide for the protocol."""
         args=dict(name=name,source=source,files=files,evaluation_file=evaluation_file,prediction_key=prediction_key,hypothesis=hypothesis,strategy=strategy,parent_experiment_id=parent_experiment_id,variant=variant)
         result=await self.development.evaluate(self.workspace,self.runner,**args)
         return self.record('evaluate_research_model',args,result)
@@ -186,7 +292,7 @@ class ResearchWorkspace:
         from langchain_core.tools import StructuredTool
         from mcp_tools.tools.runtime_tool_policy import is_tool_allowed
         from mcp_tools.tools.capability_policy import guard_tool
-        return self.workspace_tools() + [guard_tool(StructuredTool.from_function(coroutine=getattr(self,name),name=name,metadata={"workspace_relative_paths": True})) for name in ['get_research_strategy_guide','evaluate_research_model','get_research_review_requirements','propose_research_capability','submit_research_checkpoint'] if is_tool_allowed(name)]
+        return self.workspace_tools() + [guard_tool(StructuredTool.from_function(coroutine=getattr(self,name),name=name,metadata={"workspace_relative_paths": True, "discovery_category": "training", **({"plan_step_ids": [step["id"] for step in self.plan["steps"]]} if name == "submit_research_checkpoint" else {})})) for name in RESEARCH_TOOLS if is_tool_allowed(name)]
 
 def log_tail(path, limit=10000):
     with Path(path).open('rb') as f:
@@ -211,7 +317,7 @@ async def invoke_bundle(bundle, manifest, inputs, control, *, runner=run_python,
         if file_hash(p)!=sha:raise ValueError('Registered program changed')
         target=work/name;target.parent.mkdir(parents=True,exist_ok=True);shutil.copyfile(p,target)
     write_json(work/'capability_input.json',inputs)
-    (work/'capability_runner.py').write_text('import importlib.util,json\nspec=importlib.util.spec_from_file_location("candidate",'+repr(manifest['source'])+')\nm=importlib.util.module_from_spec(spec)\nspec.loader.exec_module(m)\ninputs=json.load(open("capability_input.json"))\nresult='+('[m.run(row) for row in inputs]' if batch else 'm.run(inputs)')+'\nwith open("capability_result.json","w") as f: json.dump(result,f,allow_nan=False)\n')
+    (work/'capability_runner.py').write_text('import importlib.util,json,sys\nspec=importlib.util.spec_from_file_location("candidate",'+repr(manifest['source'])+')\nm=importlib.util.module_from_spec(spec)\nsys.modules[spec.name]=m\nspec.loader.exec_module(m)\ninputs=json.load(open("capability_input.json"))\nresult='+('[m.run(row) for row in inputs]' if batch else 'm.run(inputs)')+'\nwith open("capability_result.json","w") as f: json.dump(result,f,allow_nan=False)\n')
     result=await runner(work,control/'runs','capability_runner.py',120)
     if result['exit_code']!=0:raise ValueError('Capability execution failed: '+result['stderr'][-2000:])
     value=json.loads(read_bytes(work,'capability_result.json',max_bytes=2000000));json.dumps(value,allow_nan=False);return value
@@ -254,12 +360,16 @@ def capability_cards(library=LIBRARY):
     return [c for c in rows if c.get('visibility') == 'public' and c.get('publication',{}).get('policy') == 'operator_selected.v1'] if Path(library).resolve() == LIBRARY.resolve() else rows
 
 def search_capabilities(query='', limit=10, library=LIBRARY, offset=0):
-    from .capability_catalog import search
+    from .capability_catalog import search, discovery_card
     from mcp_tools.tools.capability_policy import CapabilityStore
-    from .capability_catalog import cards
-    settings=CapabilityStore()
-    values=[c for c in capability_cards(library) if settings.enabled('model:capability:'+c['id']) and all(w in json.dumps(c,ensure_ascii=False).casefold() for w in query.casefold().split())]
-    return {'total':len(values),'items':values[max(0,int(offset)):max(0,int(offset))+max(1,min(int(limit),50))]}
+    rows = CapabilityStore().rows()
+    prefix = 'model:capability:'
+    disabled = [key[len(prefix):] for key,row in rows.items() if key.startswith(prefix) and not row['enabled']]
+    page = search(library,query,limit,offset,public_only=Path(library).resolve()==LIBRARY.resolve(),excluded=disabled)
+    page['items'] = [discovery_card(card) for card in page['items']]
+    page['next_step'] = 'Describe a selected ID for its complete scope, interface and review evidence before running it.'
+    return page
+
 
 def admitted_manifest(capability_id, library):
     from .capability_review import admitted

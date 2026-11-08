@@ -28,6 +28,8 @@ Paper-based work can reproduce a defined part of a study, address a limitation o
 
 Enter submits; Shift+Enter adds a line. A topic retains its own context when you switch modes. If it asks for essential missing information, reply in the same topic. A budget limit is a checkpoint, not evidence that research has finished.
 
+If the selected model rejects requests because of quota, credentials or rate limits, the topic stops issuing new research rounds and saves its progress. Once the service is available again, continue the same topic within its remaining budget. Previous results and consumed budget are retained.
+
 ## Develop and evaluate models
 
 Scientist can implement statistical models, custom neural models, few-shot adaptation, semi-supervised learning, meta-learning or other justified methods. It may use enabled training MCP tools or develop a custom model in the session sandbox. PLM training is not required; online PLM training is restricted to ESM2-8M and all work follows deployment budgets and tool availability.
@@ -37,6 +39,8 @@ Model research requires a measured baseline and a revised experiment on matched 
 ## Receive and reuse the results
 
 **Research outputs** shows the selected models or methods with their README, usage card, test report and download. Each release includes runnable code, a JSON interface, example input/output, interface tests and recorded dependencies. Learned models also include their fitted state and training code. Raw evaluation datasets stay in the research workspace.
+
+The included test command replays both developer examples and independently reviewed cases. It checks declared outputs, invalid inputs and any reviewed prediction bounds and repeatability requirements. Rebuilding an unchanged release produces the same package; changed release contents are saved separately so earlier downloads remain available.
 
 Use **Download project (.zip)** for the selected releases and research report. Each release has its own README with use and reproduction commands. A draft without a reviewed release downloads the working project. Experiments, ablations and previous versions remain in the topic; expand their records when you need the details. Revisions of the same purpose appear as versions of one capability instead of filling the tool list with every trial.
 

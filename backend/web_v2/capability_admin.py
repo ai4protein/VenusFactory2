@@ -17,7 +17,8 @@ async def inventory():
         rows.append({'key':'tool:'+name,'name':name,'kind':'tool','category':info['category'],
                      'description':tool.description or '', 'available':is_tool_allowed(name),
                      'selector':{},'category_label':info['category_label'],'category_label_zh':info['category_label_zh']})
-    for name in ['get_research_strategy_guide','evaluate_research_model','get_research_review_requirements','propose_research_capability','submit_research_checkpoint']:
+    from agent.harness.research_workspace import RESEARCH_TOOLS
+    for name in RESEARCH_TOOLS:
         rows.append({'key':'tool:'+name,'name':name,'kind':'tool','category':'workspace', 'description':name.replace('_',' '),
                      'available':is_tool_allowed(name),'selector':{},'category_label':'Scientist workspace','category_label_zh':'Scientist 研究工作区'})
     for name in ['list_session_files','read_session_file','write_session_file','run_session_python','run_session_shell']:

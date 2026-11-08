@@ -367,7 +367,17 @@ async def run_goal(
                 if outcome.get("progress") is not None:
                     s["progress"] = outcome["progress"]
                 if s["status"] == "active" and outcome.get("needs_input") and not s.get("pending_research_updates"):
-                    s["status"] = "waiting_for_input"
+                    exhausted = len(s["cycles"]) >= spec.max_cycles or any(
+                        s["usage"][key] >= getattr(spec, key) for key in reserve
+                    )
+                    s["status"] = "budget_exhausted" if exhausted else "waiting_for_input"
+                blocker = outcome.get("execution_blocker")
+                if s["status"] == "active" and isinstance(blocker, dict) and blocker.get("source") == "model_gateway":
+                    exhausted = len(s["cycles"]) >= spec.max_cycles or any(
+                        s["usage"][key] >= getattr(spec, key) for key in reserve)
+                    s["status"] = "budget_exhausted" if exhausted else "interrupted"
+                    s["events"].append({"event": "model_service_unavailable", "index": index,
+                                        "code": blocker["code"], "http_status": blocker["http_status"]})
                 if stop_on_uncheckpointed_failure and uncheckpointed_failure and s["status"] == "active":
                     # A missing executor checkpoint cannot support later publication.
                     # Preserve its reservation and stop before spending on more cycles.

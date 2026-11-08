@@ -23,6 +23,8 @@ def availability(card):
     from mcp_tools.tools.capability_policy import model_disabled, mode
     if model_disabled(card):
         return {**card,'available':False,'disabled_reason':'admin_disabled','runtime_mode':mode()}
+    if card.get('validation_status') == 'needs_revalidation':
+        return {**card, 'available': False, 'disabled_reason': 'needs_revalidation'}
     if card['adapter'].startswith('external:'):
         from mcp_tools.models.pretrained.design_docking.service import availability
         ready,reason=availability(card['adapter'].split(':',1)[1])

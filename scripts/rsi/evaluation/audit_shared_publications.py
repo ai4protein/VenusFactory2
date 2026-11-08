@@ -15,6 +15,7 @@ _entry_sys.path[:0] = [str(_entry_root), str(_entry_root / 'src'), str(_entry_ro
 
 import argparse
 import hashlib
+import importlib
 import json
 import os
 from pathlib import Path
@@ -95,12 +96,29 @@ def summary(records, expected):
     }
 
 
+def runtime_module(repository, area, name):
+    """Load the original package layout without rewriting frozen source."""
+    repository = Path(repository).resolve()
+    base = repository / 'src/agent/rsi'
+    if (base / area / (name + '.py')).is_file():
+        qualified = 'agent.rsi.' + area + '.' + name
+    elif (base / (name + '.py')).is_file():
+        qualified = 'agent.rsi.' + name
+    else:
+        raise ValueError('Frozen runtime module is missing: ' + name)
+    module = importlib.import_module(qualified)
+    if not Path(module.__file__).resolve().is_relative_to(repository / 'src'):
+        raise ValueError('Auditor imported a different runtime; use a fresh process')
+    return module
+
+
 def load_campaign(campaign):
     initial = read(campaign / "campaign.json")
     repository = Path(initial["definition"]["repository"]).resolve()
     sys.path.insert(0, str(repository / "src"))
-    from agent.rsi.campaigns.shared_model_campaign import SharedCampaignStore, TERMINAL
-    from agent.rsi.engine.scientist_model_library import ScientistModelLibrary
+    campaign_runtime = runtime_module(repository, 'campaigns', 'shared_model_campaign')
+    SharedCampaignStore, TERMINAL = campaign_runtime.SharedCampaignStore, campaign_runtime.TERMINAL
+    ScientistModelLibrary = runtime_module(repository, 'engine', 'scientist_model_library').ScientistModelLibrary
     store = SharedCampaignStore(campaign)
     state = store.read()
     if state["owner"] is not None or state["inflight"] is not None or any(b["status"] not in TERMINAL for b in state["batches"].values()):
@@ -139,8 +157,11 @@ def batch_binding(store, state, spec, library, name):
 
 def audit_batch(store, state, spec, library, name):
     from agent.harness.contracts import digest as native_digest
-    from agent.rsi.campaigns.shared_model_campaign import bind_goal, task_scope, shared_campaign_experience
-    from agent.rsi.engine.shared_model_publication import validate_shared_goal
+    repository = Path(state['definition']['repository'])
+    campaign_runtime = runtime_module(repository, 'campaigns', 'shared_model_campaign')
+    bind_goal, task_scope = campaign_runtime.bind_goal, campaign_runtime.task_scope
+    shared_campaign_experience = campaign_runtime.shared_campaign_experience
+    validate_shared_goal = runtime_module(repository, 'engine', 'shared_model_publication').validate_shared_goal
     reports = [a["publication"] for a in state["batches"][name]["attempts"] if a.get("publication")]
     if not reports:
         return {"status": "no_publication", "verified": [], "original_status": state["batches"][name]["status"]}

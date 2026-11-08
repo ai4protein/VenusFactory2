@@ -1,9 +1,13 @@
 # Scientist: model development and recursive improvement
 
-Scientist uses a goal-driven PI → planning → implementation → Critic → revision
-loop. A separate admission Review controls registration. Model-development goals
-now additionally require a measured development trajectory and a model delivery;
-neither a training script nor a favorable research Critic can satisfy that gate.
+Scientist develops models from a research goal, supplied data and a resource
+budget through PI → planning → implementation → Critic → revision. A delivery
+contains fitted models, reproducible code, measured evaluation and a research
+report. Registration follows a separate admission Review.
+
+The PI derives a research direction from the goal and available materials. Plan
+steps keep their scientific acceptance criteria while their approach can change
+in response to experiments. Completed steps retain their verified evidence.
 
 ## Algorithm freedom
 
@@ -21,18 +25,90 @@ labeled/held-out records. Review must inspect the actual implementation, meaning
 baselines, support/query design, ablations and uncertainty. These checks do not
 prove that user-supplied grouping labels encode true protein homology.
 
+## Inspecting inputs and saving progress
+
+The shared file reader previews large text, sequence and table files in bounded
+UTF-8 windows. Use the returned next_offset_bytes to continue reading, or analyze
+the full dataset with isolated Python. A preview includes the full file size and
+marks truncation; its slice hash is distinct from a whole-file hash.
+
+Save useful partial results with submit_research_checkpoint. It is exposed
+directly and also accepts the common call_tool route. When an audited executor
+stops before saving a checkpoint, one bounded continuation can use the remaining
+model-call, tool-call and time budget. It receives the verified dataset metadata,
+measured generations and current execution feedback. Tool calls written as prose
+remain text; only actual tool invocations create execution receipts.
+
+## Generated model interface
+
+The source module exposes two functions:
+
+- `fit(training, seed)` receives a dictionary. Its `training["train"]` value is
+  a list of observations, each containing an `inputs` dictionary and a `target`.
+  Return a fitted estimator or a dictionary containing learned parameters and
+  fitted preprocessing objects.
+- `predict(model, inputs)` receives one input dictionary and returns an output
+  dictionary such as `{"value": 1.2}`. The output key follows `prediction_key`;
+  regression values must be finite numbers and classification outputs scalar labels.
+
+These entrypoints are module-level functions; helper classes can implement the
+underlying algorithm. Table features retain their original string representation.
+Encode sequence and categorical features, convert numeric strings where needed,
+and use the same transformation during fitting and prediction. Fit learned
+transformations on the training partition and retain them with the model.
+
+The platform persists fitted state, records dependencies and runs predictions in
+isolated processes. Failed fits return the final exception and applicable input
+contract; full execution logs remain in the training receipts.
+
+## Reusable reference controls
+
+Call `get_research_baseline` without a reference ID to list four fixed controls:
+training mean, amino-acid-composition ridge regression, random forest and support-vector
+regression. Select an ID to obtain its complete `fit`/`predict` source, source hashes
+and interface. Add `output_file="src/reference.py"` to save the selected source
+directly in the research workspace; different existing contents are never overwritten.
+Set `sequence_column` to the actual input field and `output_field` to the evaluation's
+prediction key. Reading or saving a reference does not fit or register a model.
+
+These adapters reuse the repository's classical controls: canonical amino-acid composition
+and log sequence length, with target scaling learned from training data. They do not
+represent assay covariates or mutation positions. They apply to regression datasets with
+canonical protein sequences; other tasks need an appropriate custom baseline.
+
+Save and fit a selected reference as `variant="baseline"`. Use the same frozen splits
+to develop and measure a justified candidate. Keep the reference identity and code provenance
+in the report; a supplied reference is not a Scientist-created method. The implementation
+role remains free to build other representations and algorithms.
+
 ## Experiment protocol
 
 1. Inspect data, provenance, assay conditions and available compute. Define fixed
    train/validation/test groups before optimizing a model.
-2. Fit a baseline; save a module implementing `run(inputs)` and its fitted state.
-   Call `evaluate_research_model` with `variant="baseline"`.
+2. For an uploaded table, call `prepare_research_dataset` with its measured
+   target, feature columns and biological grouping. Write the model module
+   described below, then call `train_research_model` to fit and evaluate a
+   baseline. An existing fitted runtime implementing `run(inputs)` can enter
+   through `evaluate_research_model` with `variant="baseline"`.
 3. Use its validation feedback to revise a hypothesis, representation, algorithm
    or fitted model. Evaluate the child with `parent_experiment_id`.
+   Set `evaluation_file=""` to reuse the parent's frozen evaluation table. If an
+   explicit table is supplied, its inputs, targets and splits must match the
+   parent. Training-time transformations may change; evaluation targets may not.
 4. Repeat matched experiments and relevant ablations/seeds within the budget.
    Negative results are retained; superior accuracy is not mandatory for delivery.
-5. Freeze the selected generation and provide its ID as
-   `review_spec.development_experiment_id` in `propose_research_capability`.
+5. Freeze the selected generation. Save `review/proposal.json` with the
+   candidate name, description, source, runtime files, interface examples and
+   `review_spec`. Set `review_spec.development_experiment_id` to the selected
+   measured generation and submit with
+   `propose_research_capability(proposal_file="review/proposal.json")`.
+   Export the selected experiment's evaluation with `restore_research_evaluation(experiment_id, output_file)` and use the returned
+   path in `review_spec.evaluation_file` and the evidence list. Exporting creates
+   a new file and never overwrites different existing contents. The optional
+   metric claim may be omitted; the host computes the reported score.
+   After a revision request, edit the same draft and resubmit. Each attempt and
+   admission receipt is retained separately; unchanged attribution and interface
+   fields do not need to be re-entered. Inline submission remains supported.
 6. Independent admission replays interfaces and final test predictions, recomputes
    metrics, reruns training without the test split, and checks scientific scope.
 7. Approved models receive a private delivery under `workspace/deliveries/` and
@@ -41,7 +117,9 @@ prove that user-supplied grouping labels encode true protein homology.
 
 The host snapshots runtime source and fitted artifacts outside the writable
 session workspace, scores predictions itself and persists immutable receipts.
-Lineages require identical evaluation records. Renaming a model, editing only
+Identical evaluation tables share one immutable, content-addressed snapshot
+within a study. Lineages require identical evaluation records. Older receipts
+without a snapshot remain unchanged and require the original matching table. Renaming a model, editing only
 comments, forging a displayed receipt or changing validation labels cannot pass
 as a measured improvement. The public workspace copy is informational only.
 
@@ -52,6 +130,38 @@ benchmark: the report explicitly discloses this. Repeated use of a supplied test
 set does not establish unbiased generalization, causal RSI benefit or statistical
 significance. Publication-grade claims still need sealed external evaluation,
 matched budgets, repeated independent tasks and suitable ablations.
+
+## Measurement access during autonomous model development
+
+New model topics keep uploaded measurement tables in host-owned storage outside
+the Agent workspace. Original uploads are copied and hashed in bounded chunks;
+local uploads retain their existing size policy, while online uploads retain the
+10 MiB limit. Dataset preparation accepts a documented CSV/TSV cohort up to
+20 MiB and 21,024 rows. Larger originals remain stored privately.
+Planning receives column names and inferred types. Preparing
+a CSV/TSV table fixes the group split and exposes only its training rows; the
+workspace evaluation file is an opaque reference resolved by the host.
+
+Training, revisions, restored evaluations and independent reproduction use the
+same frozen split. Generated code receives training observations, while the host
+scores validation predictions. Independent Review additionally measures the final
+test and receives aggregate evidence. Raw evaluation labels are excluded from
+review prompts, runtime mounts and release archives. The original upload remains
+available to its owner.
+
+Changing the split, supplying an unregistered evaluation JSON or reusing an
+Agent-visible legacy evaluation cannot acquire this isolation status. Existing
+research records remain unchanged. Tables already exposed in an earlier run need
+a fresh topic; retrospective masking cannot erase the previous model context.
+Measurement tables in formats other than CSV/TSV remain protected and require
+conversion before dataset preparation. A small JSON document containing only recognized
+source metadata, such as a dataset title, source URL and license, remains readable;
+measurement records and evaluation partitions stay protected.
+
+The isolation tests exercise actual sandbox reads, initial and later uploads,
+fitting, revision, restoration, independent reproduction, ZIP delivery and private
+capability reuse. These are software tests. Public-data evaluation still requires
+appropriate biological grouping and independent studies to support generalization.
 
 ## A coherent project and selected releases
 

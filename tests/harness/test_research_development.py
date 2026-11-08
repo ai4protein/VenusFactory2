@@ -53,7 +53,9 @@ def review_spec(identity):
 
 
 async def independent(context):
-    assert {'learning_strategy','evolution_evidence'}<=set(context['required_checks'])
+    assert {'learning_strategy','evolution_evidence','prediction_behavior'}<=set(context['required_checks'])
+    assert context['host_evidence']['development']['generations'][0]['validation']['diagnostics']['constant_predictions']
+    assert context['host_evidence']['evaluation']['diagnostics']['split']=='test'
     assert context['host_evidence']['development']['generations'][0]['variant']=='baseline'
     return {'decision':'approve','summary':'Synthetic software fixture only; host replay and training reproducibility checked. No biological or novelty claim.',
         'checks':{k:{'passed':True,'reason':'Controlled fixture with explicit nonbiological scope'} for k in context['required_checks']},'issues':[],
@@ -82,6 +84,11 @@ async def test_measured_lineage_independent_review_delivery_and_agent_reuse(tmp_
         assert {'runtime/predict.py','runtime/weights.json','runtime/train.py','MODEL_CARD.md','evaluation/test-report.json','checksums.json','README.md','capability.json','predict.py','tests/test_interface.py'}<=set(archive.namelist())
         assert not any(name.endswith('eval.json') for name in archive.namelist())
         assert json.loads(archive.read('evaluation/test-report.json'))['final_test']['training_reproduced']
+        report=json.loads(archive.read('evaluation/test-report.json'))
+        assert report['final_test']['diagnostics']['split']=='test'
+        assert report['validation_trajectory']['generations'][0]['validation']['diagnostics']['constant_predictions']
+        report_text=archive.read('evaluation/test-report.md').decode()
+        assert 'Prediction behavior' in report_text and 'Varies across queries' in report_text and 'Constant' in report_text
         released=tmp_path/'released';archive.extractall(released)
     import subprocess,sys
     check=subprocess.run([sys.executable,'predict.py','examples/input.json'],cwd=released,capture_output=True,text=True)
@@ -107,8 +114,14 @@ async def test_changed_runtime_data_or_fake_metrics_cannot_replace_host_receipt(
     await service.write_research_file('eval.json',json.dumps(modified))
     with pytest.raises(ValueError,match='identical data'):
         await service.evaluate_research_model('bad split','predict.py',['weights.json'],'eval.json','value','Change evaluation','custom',candidate['id'])
-    with pytest.raises(ValueError,match='differs'):
+    with pytest.raises(ValueError,match='differs') as rejected:
         service.development.selected(candidate['id'],{'source':'predict.py','files':{}},data())
+    # Rejection must identify the recoverable runtime contract, not just an
+    # opaque hash mismatch that the next iteration cannot resolve.
+    message=str(rejected.value)
+    assert 'predict.py' in message and 'weights.json' in message
+    assert 'experiments/'+candidate['id']+'.json' in message
+    assert candidate['files']['weights.json'] not in message
 
 
 @pytest.mark.asyncio
@@ -225,7 +238,13 @@ def test_replanning_remaining_work_preserves_completed_requirements():
 
 
 @pytest.mark.asyncio
-async def test_model_goal_cannot_complete_with_only_a_script_and_friendly_critic(tmp_path,monkeypatch):
+@pytest.mark.parametrize('objective', [
+    'Develop a new protein prediction model',
+    'Reproduce the supplied peptide-regression project. Independently verify the model and deliver runnable artifacts with a test report.',
+    '复现论文中的溶解度模型，交付权重和测试报告',
+    'Fit\na small peptide regressor from the supplied measurements',
+])
+async def test_model_goal_cannot_complete_with_only_a_script_and_friendly_critic(tmp_path,monkeypatch,objective):
     from agent.harness import autonomous_research as ar, Profile
     class Relay:
         calls=0;base_url='unused';token='fixture'
@@ -235,7 +254,7 @@ async def test_model_goal_cannot_complete_with_only_a_script_and_friendly_critic
     monkeypatch.setattr(ar,'EvidenceGateway',Relay)
     monkeypatch.setattr(ar,'audit_requests',lambda p:{'passed':True,'model_calls':4})
     profile=Profile.from_dict({'mode':'science_expert','harness':'expert-deepseek-harness','model':{'provider':'dmx','model':'glm-4-flash','base_url':'https://www.dmxapi.cn/v1'},'budget':{'model_calls':12,'tool_calls':12,'wall_seconds':120,'output_tokens':4096,'thinking':'disabled'}})
-    store=ar.create(tmp_path/'goal',profile,'Develop a new protein prediction model',dict(max_cycles=1,model_calls=12,tool_calls=12,wall_seconds=120))
+    store=ar.create(tmp_path/'goal',profile,objective,dict(max_cycles=1,model_calls=12,tool_calls=12,wall_seconds=120))
     async def consult(role,context):
         if role=='PI':return 'Model development'
         if role=='CB':return json.dumps({'summary':'Train a model','steps':[{'id':'fit','title':'Train','acceptance':'Deliver a fitted predictor'}],'needs_input':[]})
@@ -259,7 +278,12 @@ async def test_role_transport_retries_once_without_hiding_auth_failures(tmp_path
     original=httpx.AsyncClient;calls=[]
     def handler(request):
         status=statuses[len(calls)];calls.append(status)
-        return httpx.Response(status,json={'choices':[{'finish_reason':'stop','message':{'content':'Direction checked'}}]})
+        assert json.loads(request.content)['stream'] is True
+        if status != 200:
+            return httpx.Response(status, json={'error': 'fixture transport failure'})
+        chunk = {'choices': [{'index': 0, 'delta': {'content': 'Direction checked'}, 'finish_reason': 'stop'}]}
+        return httpx.Response(200, text='data: '+json.dumps(chunk)+'\n\ndata: [DONE]\n\n',
+                              headers={'content-type':'text/event-stream'})
     monkeypatch.setattr(ar.httpx,'AsyncClient',lambda **kw:original(transport=httpx.MockTransport(handler),**kw))
     profile=Profile.from_dict({'mode':'science_expert','harness':'expert-deepseek-harness','model':{'provider':'dmx','model':'glm-4-flash','base_url':'https://www.dmxapi.cn/v1'},'budget':{'model_calls':12,'tool_calls':12,'wall_seconds':120,'output_tokens':4096,'thinking':'disabled'}})
     runner=ar.AutonomousResearch(None,'fixture',{})
@@ -292,7 +316,10 @@ async def test_free_json_mode_fallback_keeps_strict_plan_validation(tmp_path,mon
     def handler(request):
         payloads.append(json.loads(request.content))
         if len(payloads)==1:return httpx.Response(404,json={'error':'No JSON-mode endpoint'})
-        return httpx.Response(200,json={'choices':[{'finish_reason':'stop','message':{'content':'{"steps":[]}'}}]})
+        assert payloads[-1]['stream'] is True
+        chunk = {'choices': [{'index': 0, 'delta': {'content': '{"steps":[]}'}, 'finish_reason': 'stop'}]}
+        return httpx.Response(200, text='data: '+json.dumps(chunk)+'\n\ndata: [DONE]\n\n',
+                              headers={'content-type':'text/event-stream'})
     monkeypatch.setattr(ar.httpx,'AsyncClient',lambda **kw:original(transport=httpx.MockTransport(handler),**kw))
     profile=Profile.from_dict({'mode':'science_expert','harness':'expert-deepseek-harness','model':{'provider':'dmx','model':'glm-4-flash','base_url':'https://www.dmxapi.cn/v1'},'budget':{'model_calls':12,'tool_calls':12,'wall_seconds':120,'output_tokens':4096,'thinking':'disabled'}})
     raw=await ar.AutonomousResearch(None,'fixture',{}).consult('CB',{},profile,SimpleNamespace(base_url='http://fixture',token='fixture',calls=0),tmp_path)
@@ -300,3 +327,27 @@ async def test_free_json_mode_fallback_keeps_strict_plan_validation(tmp_path,mon
     assert 'response_format' not in payloads[1]
     assert payloads[0]['model']==payloads[1]['model']
     with pytest.raises(ValueError,match='Invalid research plan'):ar.parse_plan(raw)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("fault", ["missing", "rejected"])
+async def test_independent_admission_must_address_prediction_behavior(tmp_path, fault):
+    service, baseline, candidate = await measured(tmp_path)
+    await service.write_research_file("README.md", "Synthetic quadratic fixture with a constant baseline and measured revision.")
+    await service.propose_research_capability(
+        "Fixture learner", "Small-data regression fixture", "predict.py", ["weights.json"],
+        [{"x":1.5}], review_spec(candidate["id"]))
+
+    async def reviewer(context):
+        result = await independent(context)
+        if fault == "missing":
+            result["checks"].pop("prediction_behavior")
+        else:
+            result["checks"]["prediction_behavior"] = {
+                "passed":False, "reason":"Prediction behavior does not support the declared use"}
+        return result
+
+    receipt = await review_proposal(service.proposals[0], reviewer=reviewer,
+                                    control=tmp_path/"review", runner=run_python)
+    assert receipt["status"] == "needs_revision"
+    assert receipt["issues"]

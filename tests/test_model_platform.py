@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from backend.web_v2.model_platform import Platform, read
 from backend.web_v2 import model_platform_api as api
+from backend.web_v2.job_access import cookie_name
 
 
 class ModelPlatformTests(unittest.TestCase):
@@ -97,7 +98,7 @@ class ModelPlatformTests(unittest.TestCase):
             with TestClient(app) as a, TestClient(app) as b:
                 self.assertEqual(a.get('/api/model-platform/session').status_code,200)
                 self.assertEqual(b.get('/api/model-platform/session').status_code,200)
-                self.assertNotEqual(a.cookies.get(api.COOKIE),b.cookies.get(api.COOKIE))
+                self.assertNotEqual(a.cookies.get(cookie_name('platform')),b.cookies.get(cookie_name('platform')))
                 response=a.post('/api/model-platform/datasets',files={'file':('input.csv',b'x,y\n1,2')})
                 self.assertEqual(response.status_code,200,response.text)
                 self.assertEqual(len(b.get('/api/model-platform/datasets').json()),0)

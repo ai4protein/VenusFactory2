@@ -86,7 +86,7 @@ def test_scientist_uses_research_queue_and_retains_lease_while_waiting(tmp_path,
         def frozen_profile(self,folder):return __import__('types').SimpleNamespace(harness='expert-kimi-code')
         def environment(self,profile):return dict(__import__('os').environ)
     folder=tmp_path/'session'/'goal';folder.mkdir(parents=True)
-    (folder.parent/'goal.json').write_text(json.dumps({'online_owner': 'test-research-owner'}))
+    (folder.parent/'goal.json').write_text(json.dumps({'online_owner': 'test-research-owner', 'session_id': 'research-conversation'}))
     try:
         service=Service();ScienceGoalService.spawn(service,folder,Driver(),'run')
         ticket=json.loads((folder/'queue.json').read_text())['id']
@@ -97,6 +97,7 @@ def test_scientist_uses_research_queue_and_retains_lease_while_waiting(tmp_path,
         with (folder/'.worker.lock').open('a') as f:
             fcntl.flock(f,fcntl.LOCK_EX|fcntl.LOCK_NB)
         assert q.get(ticket)['pid'] is None
-        assert q.get(ticket)['session_key']=='chat:'+folder.parent.name
+        assert q.get(ticket)['session_key']=='chat:research-conversation'
+        assert q.get(ticket)['metadata']['session_id']=='research-conversation'
         q.cancel(ticket);terminal(q,ticket);service.children[str(folder)].wait(5)
     finally:q.cancel(holder);worker.wait(5)

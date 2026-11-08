@@ -204,6 +204,7 @@ def api_client(service, monkeypatch, tmp_path):
     monkeypatch.setattr(api, "_runtime_mode", lambda: "local")
     monkeypatch.setattr(shared, "_runtime_mode", lambda: "online")
     monkeypatch.setattr(shared, "_session_owner_key_for_request", lambda req: "owner")
+    monkeypatch.setattr(shared, "_build_owner_fingerprint", lambda req: "owner")
     for module in [api, sessions, messages]:
         monkeypatch.setattr(module, "_get_session_or_404", get)
     monkeypatch.setattr(api, "_session_store", Store())

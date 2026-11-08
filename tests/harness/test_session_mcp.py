@@ -57,11 +57,11 @@ async def test_mcp_mount_is_implicit_and_bound_to_each_session(tmp_path,monkeypa
                 assert (await rpc('tools/list',token=connections[peer]['token'])).status_code==401
                 advertised=(await rpc('tools/list')).json()['result']['tools']
                 assert {'search_tools','describe_tool','call_tool'}<={tool['name'] for tool in advertised}
-                assert not set(verbs)&{tool['name'] for tool in advertised}
+                assert set(verbs)<={tool['name'] for tool in advertised}
                 for name in verbs:
-                    found=(await rpc('tools/call',{'name':'search_tools','arguments':{'query':name}})).json()
-                    rows=json.loads(found['result']['content'][0]['text'])['tools']
-                    assert rows[0]['name']==name and set(rows[0])=={'name','description'}
+                    described=(await rpc('tools/call',{'name':'describe_tool','arguments':{'name':name}})).json()
+                    entry=json.loads(described['result']['content'][0]['text'])
+                    assert entry['name']==name and entry['call_via']==name
                 assert not {'agent_generated_code','python_repl','write_research_file','run_research_python'} & {tool['name'] for tool in advertised}
                 for tool in advertised:
                     assert tool['inputSchema']['additionalProperties'] is False
@@ -76,8 +76,9 @@ async def test_mcp_mount_is_implicit_and_bound_to_each_session(tmp_path,monkeypa
                 assert (sessions[peer]/'input.txt').exists()
                 for field,value in [('workspace',str(sessions[peer])),('session_id',peer),('mounts',['/']),('backend','user'),('control','/tmp')]:
                     body=(await invoke(verbs[1],{'path':'verify.py',field:value})).json()
-                    assert body['error']['message'].startswith('ValueError:'),body
-                    assert 'session workspace is assigned by the server' in body['error']['message']
+                    assert body['result']['isError'] is True,body
+                    assert body['result']['content'][0]['text'].startswith('ValueError:'),body
+                    assert 'session workspace is assigned by the server' in body['result']['content'][0]['text']
                     assert not (sessions[identity]/'result.json').exists()
                 result=await call(verbs[1],{'path':'verify.py','timeout_seconds':10})
                 assert result['backend']=='bwrap' and result['exit_code']==0,result
@@ -85,7 +86,7 @@ async def test_mcp_mount_is_implicit_and_bound_to_each_session(tmp_path,monkeypa
                 assert saved=={'cwd':'/workspace','identity':identity,'peer_visible':False}
                 for path in ['../'+peer+'/input.txt',str(sessions[peer]/'input.txt')]:
                     denied=(await invoke(verbs[2],{'path':path})).json()
-                    assert 'error' in denied
+                    assert denied['result']['isError'] is True
                 if mode=='agent':
                     shell=await call('run_session_shell',{'command':'pwd','timeout_seconds':10})
                     assert shell['exit_code']==0 and shell['stdout'].strip()=='/workspace'

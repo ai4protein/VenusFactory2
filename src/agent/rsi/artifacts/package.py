@@ -48,7 +48,7 @@ if __name__ == '__main__':
     print(json.dumps(run(inputs), ensure_ascii=False, allow_nan=False))
 '''
 
-TESTS = '''"""Replay the declared interface and boundary cases."""
+TESTS = '''"""Replay the declared and independent review interface and boundary cases."""
 from pathlib import Path
 import json
 import math
@@ -70,14 +70,40 @@ def equal(actual, expected):
     return type(actual) is type(expected) and actual == expected
 
 class InterfaceTests(unittest.TestCase):
-    def test_examples_and_boundaries(self):
-        for case in json.loads((ROOT / 'tests/cases.json').read_text()):
-            with self.subTest(inputs=case['inputs']):
+    def check_cases(self, filename):
+        contract = json.loads((ROOT / 'capability.json').read_text())
+        interface = json.loads((ROOT / 'interface.json').read_text())
+        cases = json.loads((ROOT / 'tests' / filename).read_text())
+        self.assertTrue(cases, 'The saved review cases are missing')
+        for case in cases:
+            with self.subTest(cases=filename, inputs=case['inputs']):
+                self.assertEqual(sum(['expected' in case, 'invariants' in case,
+                                      case.get('reject') is True]), 1)
                 if case.get('reject'):
                     with self.assertRaises((ValidationError, ValueError, TypeError)):
                         run(case['inputs'])
-                else:
-                    self.assertTrue(equal(run(case['inputs']), case['expected']))
+                    continue
+                actual = run(case['inputs'])
+                if 'expected' in case:
+                    self.assertTrue(equal(actual, case['expected']))
+                    continue
+                invariant = case['invariants']
+                self.assertEqual(contract['kind'], 'model')
+                self.assertIs(invariant.get('finite_prediction'), True)
+                value = actual[interface['prediction_key']]
+                self.assertIn(type(value), (int, float))
+                self.assertTrue(math.isfinite(value))
+                if 'min' in invariant:
+                    self.assertGreaterEqual(value, invariant['min'])
+                if 'max' in invariant:
+                    self.assertLessEqual(value, invariant['max'])
+                self.assertTrue(equal(actual, run(case['inputs'])), 'Predictions changed on replay')
+
+    def test_examples_and_boundaries(self):
+        self.check_cases('cases.json')
+
+    def test_independent_review(self):
+        self.check_cases('independent-cases.json')
 
 if __name__ == '__main__':
     unittest.main()
@@ -101,9 +127,18 @@ def build_delivery(workspace, bundle, receipt, *, goal_id=''):
         raise ValueError('A reviewed model development record is required')
     identity = manifest['id']
     kind = 'model' if is_model else 'method'
-    prefix = f'deliveries/{kind}-{identity[:16]}'
     family = family_id(goal_id or identity, spec['kind'], spec['scope'])
     automatic = receipt['automatic']
+    review_cases = receipt['independent'].get('tests')
+    review_checks = automatic.get('independent_cases')
+    from agent.harness.contracts import digest
+    if (not isinstance(review_cases, list) or len(review_cases) < 2 or
+            not isinstance(review_checks, list) or len(review_checks) != len(review_cases) or
+            any(not isinstance(case, dict) or not isinstance(check, dict) or
+                check.get('passed') is not True or
+                check.get('input_sha256') != digest(case.get('inputs'))
+                for case, check in zip(review_cases, review_checks))):
+        raise ValueError('Independent review cases do not match the saved execution evidence')
     evaluation = automatic.get('evaluation')
     dependencies = dict(automatic['dependency_versions'])
     dependencies['jsonschema'] = importlib.metadata.version('jsonschema')
@@ -133,9 +168,15 @@ def build_delivery(workspace, bundle, receipt, *, goal_id=''):
         card += '## ' + field.capitalize() + '\n\n' + ''.join('- ' + value + '\n' for value in spec['scope'][field]) + '\n'
     report_text = '# ' + ('Model' if is_model else 'Method') + ' test report\n\n' + manifest['name'] + '\n\n'
     if development:
-        report_text += '## Validation trajectory\n\n| Generation | Strategy | Role | Score |\n|---|---|---|---|\n'
+        report_text += '## Validation trajectory\n\n| Generation | Strategy | Role | Score | Prediction behavior |\n|---|---|---|---|---|\n'
         for index, row in enumerate(development['generations']):
-            report_text += f"| {index} | {row['strategy']} | {row['variant']} | {row['validation']['score']:.6g} |\n"
+            diagnostics = row['validation'].get('diagnostics')
+            behavior = 'Not recorded'
+            if diagnostics:
+                behavior = 'Constant' if diagnostics['constant_predictions'] else 'Varies across queries'
+                if diagnostics['matches_training_reference']:
+                    behavior += '; matches training reference'
+            report_text += f"| {index} | {row['strategy']} | {row['variant']} | {row['validation']['score']:.6g} | {behavior} |\n"
         report_text += '\nSelected experiment: `' + development['selected_experiment_id'] + '`.\n'
     if evaluation:
         report_text += '\n## Final test\n\n```json\n' + json.dumps(evaluation, indent=2, ensure_ascii=False) + '\n```\n'
@@ -156,8 +197,9 @@ def build_delivery(workspace, bundle, receipt, *, goal_id=''):
     readme += 'Only the selected release is included. Intermediate runs and rejected candidates remain in the research record.\n'
     outputs = {
         'README.md': readme.encode(), 'capability.json': encode(contract), card_name: card.encode(),
-        'interface.json': encode({k: spec[k] for k in ('input_schema', 'output_schema')}),
+        'interface.json': encode({k: spec[k] for k in ('input_schema', 'output_schema', 'prediction_key') if k in spec}),
         'predict.py': RUNNER.encode(), 'tests/test_interface.py': TESTS.encode(), 'tests/cases.json': encode(spec['cases']),
+        'tests/independent-cases.json': encode(review_cases),
         'examples/input.json': encode(example['inputs']), 'examples/output.json': encode(example['expected']),
         'evaluation/test-report.json': encode(report), 'evaluation/test-report.md': report_text.encode(),
         'requirements.txt': ('\n'.join(k + '==' + v for k, v in sorted(dependencies.items())) + '\n').encode(),
@@ -167,16 +209,34 @@ def build_delivery(workspace, bundle, receipt, *, goal_id=''):
     package = io.BytesIO()
     with zipfile.ZipFile(package, 'w', zipfile.ZIP_DEFLATED) as archive:
         for name, data in sorted({**runtime, **outputs, 'checksums.json': encode(checksums)}.items()):
-            archive.writestr(name, data)
+            member = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+            member.create_system = 3
+            member.external_attr = 0o100644 << 16
+            archive.writestr(member, data, compress_type=zipfile.ZIP_DEFLATED, compresslevel=9)
+    archive_bytes = package.getvalue()
+    archive_sha256 = hashlib.sha256(archive_bytes).hexdigest()
+    prefix = f'deliveries/{kind}-{identity[:16]}-{archive_sha256[:16]}'
     # Files exposes an uncluttered summary and one runnable release ZIP.
     visible = {'README.md': outputs['README.md'], card_name: outputs[card_name],
                'capability.json': outputs['capability.json'], 'test-report.md': outputs['evaluation/test-report.md'],
-               'test-report.json': outputs['evaluation/test-report.json'], 'artifact.zip': package.getvalue()}
+               'test-report.json': outputs['evaluation/test-report.json'], 'artifact.zip': archive_bytes}
+    missing = {}
     for name, data in visible.items():
-        write_bytes(workspace, prefix + '/' + name, data)
+        path = prefix + '/' + name
+        try:
+            saved = read_bytes(workspace, path, max_bytes=max(len(data), 1))
+        except FileNotFoundError:
+            missing[path] = data
+            continue
+        except ValueError as exc:
+            raise ValueError('Reviewed release file changed: ' + path) from exc
+        if saved != data:
+            raise ValueError('Reviewed release file changed: ' + path)
+    for path, data in missing.items():
+        write_bytes(workspace, path, data)
     return {'schema': SCHEMA, 'candidate_id': identity, 'family_id': family, 'kind': kind,
             'name': manifest['name'], 'version': spec['version'], 'package': prefix + '/artifact.zip',
             'model_package': prefix + '/artifact.zip', 'test_report': prefix + '/test-report.md',
             'model_card': prefix + '/' + card_name, 'readme': prefix + '/README.md',
-            'manifest': prefix + '/capability.json',
+            'manifest': prefix + '/capability.json', 'package_sha256': archive_sha256,
             'artifacts': [{'path': prefix + '/' + name, 'sha256': hashlib.sha256(data).hexdigest()} for name, data in visible.items()]}

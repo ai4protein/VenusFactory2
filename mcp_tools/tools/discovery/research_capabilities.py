@@ -1,11 +1,11 @@
 """Agent access to programs created by autonomous Scientist goals."""
 import json
-from langchain.tools import tool
+from langchain_core.tools import tool
 from mcp_tools.tools.runtime_tool_policy import assert_tool_allowed
 
 @tool('search_generated_capabilities')
 def search_generated_capabilities(query: str='', limit: int=10, offset: int=0) -> str:
-    """Search operator-published Scientist models and computations. Results include an ID, scope, author email, version and review status; private research is excluded. Page with offset. Describe a match to inspect its input/output contract and limitations, then run it by ID."""
+    """Search operator-published Scientist models and computations. Results include an ID, compact scope summary, author email, version and review status; private research is excluded. Page with offset. Describe a match for its full input/output contract, limitations and review evidence, then run it by ID."""
     assert_tool_allowed('search_generated_capabilities')
     from agent.harness.research_workspace import search_capabilities
     return json.dumps(search_capabilities(query,limit,offset=offset),ensure_ascii=False)

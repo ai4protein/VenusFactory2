@@ -656,7 +656,7 @@ class ScienceGoalService:
             "parameters": meta["spec"]["parameters"],
             "activity": goal_activity(folder, state),
             "project": project_summary(folder, state),
-            "research": {**{k: state["progress"].get(k) for k in ["pending_interaction", "plan", "questions", "artifacts", "capabilities", "last_review", "inputs", "publication_reviews", "research_completed", "development", "deliveries", "selected_deliveries", "delivery_pending"]}, "pending_updates": len(state.get("pending_research_updates", [])), "live": research_live(folder, state)} if meta["spec"]["driver"] == "autonomous_research.v1" else None,
+            "research": {**{k: state["progress"].get(k) for k in ["pending_interaction", "plan", "questions", "artifacts", "capabilities", "last_review", "inputs", "publication_reviews", "research_completed", "development", "deliveries", "selected_deliveries", "delivery_pending", "execution_blocker"]}, "pending_updates": len(state.get("pending_research_updates", [])), "live": research_live(folder, state)} if meta["spec"]["driver"] == "autonomous_research.v1" else None,
             "reproduction_recipes": public_reproduction_recipes(folder, state),
             "papers": public_paper_progress(folder, state),
             "code_step": public_step(folder, state),
@@ -740,8 +740,8 @@ class ScienceGoalService:
             queue_id, proc = launch(driver.run_command(self, folder, action),owner=meta.get("online_owner") or str(folder.parent.name),
                 kind='scientist',resource='research',cwd=self.root,env=self.environment(self.frozen_profile(folder)),
                 stdout=log,pass_fds=(lease.fileno(),),timeout=SCIENCE_LIMITS['wall_seconds'] if limited else int(os.getenv('VENUS_QUEUE_RESEARCH_TIMEOUT','2419200')),
-                session_key='chat:'+folder.parent.name,
-                metadata={'goal_id':folder.name, 'goal_folder':str(folder), 'session_id':folder.parent.name, 'mode':'scientist', 'harness':self.frozen_profile(folder).harness, **({'quota_scope':'chat:'+folder.parent.name} if limited else {})})
+                session_key='chat:'+meta['session_id'],
+                metadata={'goal_id':folder.name, 'goal_folder':str(folder), 'session_id':meta['session_id'], 'mode':'scientist', 'harness':self.frozen_profile(folder).harness, **({'quota_scope':'chat:'+meta['session_id']} if limited else {})})
             atomic_json(folder/'queue.json',{'id':queue_id})
         self.children[str(folder)] = proc
         identity = process_identity(proc.pid) if not getattr(proc, 'identity', None) else None
@@ -822,7 +822,8 @@ class ScienceGoalService:
                 if digest(self.frozen_profile(folder).public()) != meta["profile_sha256"]:
                     raise ValueError("Prepared execution profile differs from selected profile")
                 if attachments:
-                    inputs = stage_inputs(base, folder / "workspace", attachments)
+                    from agent.harness.research_data_store import store_for_goal
+                    inputs = stage_inputs(base, folder / "workspace", attachments,data_store=store_for_goal(folder))
                     GoalStore(folder).mutate(lambda s: s["progress"].update(inputs=inputs))
                 self.spawn(folder, driver, "run")
             except Exception as exc:
@@ -877,7 +878,8 @@ class ScienceGoalService:
             state = self.reconcile(folder)
             if meta["spec"]["driver"] != "autonomous_research.v1" or state["status"] not in NONTERMINAL:
                 raise GoalConflict("This research has ended")
-            inputs = stage_inputs(folder.parent, folder / "workspace", attachments or [])
+            from agent.harness.research_data_store import store_for_goal
+            inputs = stage_inputs(folder.parent, folder / "workspace", attachments or [],data_store=store_for_goal(folder))
             queue_revision(GoalStore(folder), text, plan, inputs, interaction)
             if not self.live(folder) and state["status"] in {"waiting_for_input", "paused", "interrupted"}:
                 self.admission(self.frozen_profile(folder), self.frozen_credential_path(folder))

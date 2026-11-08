@@ -191,16 +191,18 @@ def test_authenticated_product_development_transfer_and_publication(api_client, 
     assert len(state["history"]) == 2
 
 
-def test_publication_can_retry_without_repeating_computation(service):
+def test_user_publication_request_is_denied_without_repeating_computation(service):
     started = service.create("owner", request(), "publication-retry-01")
     complete(service, "owner", started["id"])
     folder, _ = service.paths("owner", started["id"])
     before = GoalStore(folder).read()
     (folder / "step_publication.json").unlink()
     assert not service.public("owner", started["id"])["code_step"]["published"]
-    service.control("owner", started["id"], "publish")
-    final = complete(service, "owner", started["id"])
-    assert final["code_step"]["published"] and GoalStore(folder).read() == before
+    with pytest.raises(GoalConflict, match="platform operator"):
+        service.control("owner", started["id"], "publish")
+    final = service.public("owner", started["id"])
+    assert not final["code_step"]["published"]
+    assert GoalStore(folder).read() == before
     assert len(list((folder.parent / ".generated_steps/generated_entries").glob("*.json"))) == 1
 
 

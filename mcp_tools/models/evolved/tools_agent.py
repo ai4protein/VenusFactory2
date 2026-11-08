@@ -2,7 +2,7 @@
 
 import json
 
-from langchain.tools import tool
+from langchain_core.tools import tool
 from langchain_core.runnables import RunnableConfig
 
 from mcp_tools.models.evolved.service import dispatch

@@ -26,12 +26,12 @@ def register_discovery_tools(server):
         return search(query, kind, stage, limit, offset, tool_catalog=catalog)
 
     @server.tool(name="search_generated_capabilities")
-    def search_generated_capabilities(query: str = "", limit: int = 10) -> dict:
-        """Search operator-published Scientist programs with scope, author email and version."""
+    def search_generated_capabilities(query: str = "", limit: int = 10, offset: int = 0) -> dict:
+        """Search operator-published Scientist programs by protein, property or scenario. Returns compact pages with scope summaries, author email and version; use offset to continue. Describe a selected ID for its full interface and review evidence. Private research is excluded."""
         from mcp_tools.tools.runtime_tool_policy import assert_tool_allowed
         from agent.harness.research_workspace import search_capabilities
         assert_tool_allowed("search_generated_capabilities")
-        return search_capabilities(query, limit)
+        return search_capabilities(query, limit, offset=offset)
 
     @server.tool(name="describe_generated_capability")
     def describe_generated_capability(capability_id: str) -> dict:
