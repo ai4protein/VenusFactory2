@@ -36,6 +36,26 @@ def public_card(entry_id, key, origin, *, verified_now):
     }
 
 
+def discovery_card(card):
+    """Bounded discovery metadata; exact inputs and evidence live in describe."""
+    scope = card["scope"]
+    protein = str(scope.get("protein", "Protein model"))[:80]
+    target = str(scope.get("target", "prediction")).replace("_", " ")[:100]
+    assay = str(scope.get("assay", "")).replace("_", " ")[:120]
+    return {
+        "entry_id": card["entry_id"],
+        "name": f"{protein} · {target}"[:160],
+        "description": f"Predict {target}. {assay}".strip()[:240],
+        "stage": card["stage"],
+        "interface": card["interface"],
+        "protein": protein,
+        "target": target,
+        "verified_now": False,
+        "describe": {"tool": "describe_evolved_model", "arguments": {"entry_id": card["entry_id"]}},
+        "predict_tool": "predict_with_evolved_model",
+    }
+
+
 def catalog_cards(library):
     """Public publication metadata, shared by listing and capability search."""
     from agent.harness.contracts import digest
@@ -80,7 +100,7 @@ def list_models(library, query="", stage="", limit=10, offset=0):
             continue
         cards.append(card)
     return {
-        "models": cards[offset : offset + limit],
+        "models": [discovery_card(card) for card in cards[offset : offset + limit]],
         "matching_entries": len(cards),
         "indexed_entries": catalog["indexed_entries"],
         "next_offset": offset + limit if offset + limit < len(cards) else None,

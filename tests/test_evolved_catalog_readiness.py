@@ -22,6 +22,9 @@ def test_evolved_search_excludes_incompatible_publications(monkeypatch):
     monkeypatch.setattr(CapabilityStore,"enabled",lambda *args:True)
     cards=[{"entry_id":"old","stage":"test","runtime_compatible":False},
            {"entry_id":"current","stage":"test","runtime_compatible":True}]
+    for card in cards:
+        card.update(scope={"protein":"fixture","target":"activity","assay":"measurement"},
+                    interface="generated_python.v1", verified_now=False)
     monkeypatch.setattr(service,"catalog_cards",lambda _: (cards,{"indexed_entries":2,"counting_rule":"fixture"}))
     result=service.list_models(object())
     assert [x["entry_id"] for x in result["models"]]==["current"]

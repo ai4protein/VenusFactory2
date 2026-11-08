@@ -234,3 +234,21 @@ async def test_mcp_discovers_and_calls_the_same_library_in_one_transport_session
         assert first["receipt"]["session_id"] == second["receipt"]["session_id"]
         assert first["receipt_id"] != second["receipt_id"]
         assert first["session_binding"] == "mcp_transport_session"
+
+
+def test_context_discovery_is_compact_and_details_remain_on_demand(context_published):
+    entry, scope, _, _ = context_published
+    query = scope["covariates"][-1]["name"]
+    result = service.dispatch("list", query=query)
+    assert result["success"] and result["matching_entries"] == 1
+    card = result["models"][0]
+    assert card["entry_id"] == entry
+    assert card["name"] and card["description"]
+    assert card["describe"] == {"tool": "describe_evolved_model", "arguments": {"entry_id": entry}}
+    assert not card["verified_now"]
+    assert not {"scope", "covariates", "paper", "input_contract"} & card.keys()
+    assert scope["grouping"]["evidence_sha256"] not in json.dumps(card)
+    assert len(json.dumps(card)) < 1200
+    full = service.dispatch("describe", entry_id=entry)
+    assert full["scope"] == scope
+    assert full["input_contract"]["values"]["columns"] == scope["covariates"]

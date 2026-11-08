@@ -107,7 +107,14 @@ def search(query="", kind="all", stage="", limit=10, offset=0, *, tool_catalog=N
                 model_status = "unavailable"
     from mcp_tools.tools.capability_policy import CapabilityStore
     settings = CapabilityStore()
-    cards = [c for c in cards if settings.enabled('model:scientist:' + c['entry_id']) and is_tool_allowed('predict_with_evolved_model')]
+    cards = [
+        card for card in cards
+        if card.get("runtime_compatible", True)
+        and settings.enabled("model:scientist:" + card["entry_id"])
+        and is_tool_allowed("predict_with_evolved_model")
+    ]
+    if cards:
+        from mcp_tools.models.evolved.service import discovery_card
     for card in cards:
         if stage and card["stage"] != stage:
             continue
@@ -119,18 +126,7 @@ def search(query="", kind="all", stage="", limit=10, offset=0, *, tool_catalog=N
         model_results.append((score, card["entry_id"], {
             "kind": "scientist_model",
             "model_family": "rsi",
-            "name": title,
-            "entry_id": card["entry_id"],
-            "stage": card["stage"],
-            "interface": card["interface"],
-            "protein": scope.get("protein"),
-            "assay": scope.get("assay"),
-            "target": scope.get("target"),
-            "unit": scope.get("unit"),
-            "paper": card.get("paper"),
-            "verified_now": False,
-            "describe": {"tool": "describe_evolved_model", "arguments": {"entry_id": card["entry_id"]}},
-            "predict_tool": "predict_with_evolved_model",
+            **discovery_card(card),
         }))
 
     if kind != "tools" and not stage:

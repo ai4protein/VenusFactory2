@@ -16,3 +16,30 @@ WEBUI_V2_MODE=local python scripts/publish_research_model.py path/to/reviewed-ca
 The command requires valid independent admission and unchanged source files. It stores a separate publication decision bound to the candidate and review hashes, preserving the original research manifest. The published author email is visible in discovery and Model Plaza. No publication command is exposed as an MCP tool. Use Admin's model switch to disable a released model.
 
 Existing uncurated autonomous entries are retained on disk but excluded from the public capability catalog until selected and published with this command. Earlier paper-reproduction campaign libraries remain local-only; they are not imported into the online curated catalog.
+
+## Revalidate a local research library
+
+Operator audits can verify up to 256 registered entry IDs together with the current
+runtime. Put the IDs in a JSON array, then run:
+
+```bash
+PYTHON_DOTENV_DISABLED=1 PYTHONPATH=src python scripts/rsi/scientist_model_library.py \
+  --library path/to/model_library verify \
+  --entry-ids entry_ids.json --output verification.json
+```
+
+This command replays training and checks the registered model, native research
+history, validation evidence and reuse receipts. Models from one shared goal reuse
+that goal's audit within the call; single-model and batch inference use the same
+registry binding checks. No validation cache survives the request.
+
+A failed verification creates no success report, and an existing report is never
+overwritten. Reports describe verified historical models, not newly developed
+models or scored future labels. The frozen-campaign audit in
+`scripts/rsi/evaluation/audit_shared_publications.py` remains available for
+reproducing the original environment's checks. Neither audit grants public access;
+operator selection and independent admission remain separate requirements.
+
+Agent discovery returns short model names and descriptions. The
+`describe_evolved_model` tool loads the exact applicability scope, input columns
+and validation metrics only after a model is selected.
