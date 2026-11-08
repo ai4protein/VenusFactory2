@@ -1,0 +1,71 @@
+version: 2
+updates:
+  - package-ecosystem: pip
+    directories:
+      - /
+      - /requirements
+      - /requirements/optional
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      model-runtime-security:
+        applies-to: security-updates
+        patterns:
+          - torch*
+          - torchvision
+          - triton
+          - transformers
+          - tokenizers
+          - huggingface*
+          - esm
+          - peft
+          - accelerate
+      service-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+        exclude-patterns:
+          - torch*
+          - torchvision
+          - triton
+          - transformers
+          - tokenizers
+          - huggingface*
+          - esm
+          - peft
+          - accelerate
+      service-patches:
+        applies-to: version-updates
+        update-types:
+          - patch
+        patterns:
+          - "*"
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      frontend-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+      frontend-patches:
+        applies-to: version-updates
+        update-types:
+          - patch
+        patterns:
+          - "*"
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    groups:
+      actions:
+        patterns:
+          - "*"

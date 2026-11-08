@@ -60,3 +60,13 @@ jobs:
           if [ -f "$RUNNER_TEMP/dependency-audit.json" ]; then
             cat "$RUNNER_TEMP/dependency-audit.json"
           fi
+      - name: Keep resolved inventory and audit evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dependency-audit-${{ matrix.profile }}
+          path: |
+            ${{ runner.temp }}/resolved.txt
+            ${{ runner.temp }}/dependency-audit.json
+          retention-days: 14
+          if-no-files-found: warn

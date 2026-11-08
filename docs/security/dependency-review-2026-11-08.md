@@ -106,3 +106,16 @@ their existing Python environments until a separately verified environment rollo
 Their older dependency audit is recorded in
 [deployment validation](deployment-validation.md). Recheck each optional external
 model runtime independently when installing or upgrading it.
+
+## GitHub maintenance
+
+Dependabot checks the Python manifests, frontend lockfile and GitHub Actions weekly.
+Security updates for the scientific runtime are grouped separately from service
+updates so Torch, Transformers and ESM compatibility is reviewed together. Other
+patch updates are grouped to reduce review overhead. Major updates still require
+compatibility checks; no update is automatically merged or deployed. No advisory
+is ignored or dismissed by this configuration.
+
+Each Python audit run retains its exact resolved inventory and JSON findings as a
+GitHub Actions artifact for 14 days. The existing audit gate continues to fail on
+new or overdue findings and reports known open model risks explicitly.
