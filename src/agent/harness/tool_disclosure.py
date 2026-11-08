@@ -6,7 +6,6 @@ calls must still pass the host's normal policy, argument and queue checks.
 from __future__ import annotations
 
 import re
-import copy
 from mcp_tools.tools.discovery.matching import query_groups, relevance
 from .capability_boundary import CAPABILITY_BOUNDARY
 
@@ -284,51 +283,20 @@ class ToolDisclosure:
             result = {'name': name, 'description': tool.description,
                       'call_via': name if name in self.direct else 'call_tool',
                       'next_step': ('This tool is directly exposed; call it by name with its arguments.' if name in self.direct else 'Use call_tool(name, arguments). This capability is not a directly exposed native function.'),
-                      'inputSchema': copy.deepcopy(self.schema(tool))}
+                      'inputSchema': self.schema(tool)}
             query_field = result['inputSchema'].get('properties', {}).get('query', {})
             if name in self._navigation_queries and query_field.get('type') == 'string':
                 result['suggested_arguments'] = {'query': self._navigation_queries[name]}
             from mcp_tools.tools.capability_policy import canonical
-            from mcp_tools.tools.discovery.platform_models import platform_models
-            live_models = {card['entry_id']: card for _,_,card in platform_models('', [getattr(tool, 'name', name)])}
-            wanted = self._model_matches.get(canonical(getattr(tool, 'name', name)), [])
-            # Follow-up turns may describe a remembered tool without searching again.
-            # Its current catalog must still identify explicit model selectors.
-            if not wanted:
-                wanted = list(live_models.values())
-            total_models = len(wanted)
-            wanted = wanted[:20]
-            # Refresh each chosen model against administrator/runtime switches.
-            options = []
-            for candidate in wanted:
-                live = live_models.get(candidate['entry_id'])
-                if not live: continue
-                selection = live['selection']
-                properties = result['inputSchema'].get('properties', {})
-                preset = {}
-                for field, keys in {'model': ('model_name', 'model'), 'dataset': ('dataset_name', 'dataset'), 'task': ('task',)}.items():
-                    if field not in selection: continue
-                    for key in keys:
-                        if key in properties and (not properties[key].get('enum') or selection[field] in properties[key]['enum']):
-                            preset[key] = selection[field]
-                            break
-                options.append({'name': candidate['name'], 'arguments': preset})
-            if options:
+            from mcp_tools.tools.discovery.platform_models import describe_model_choices
+            tool_name = getattr(tool, 'name', name)
+            model_details, selectors = describe_model_choices(
+                tool_name, result['inputSchema'], self._model_matches.get(canonical(tool_name), [])
+            )
+            result.update(model_details)
+            if model_details.get('matching_models'):
                 result['description'] = re.split(r'\n\s*\n|\n\s*(?:Args|Arguments|Parameters|Returns)\s*:', str(tool.description), maxsplit=1)[0].strip()[:600]
-                model_keys = {key for row in options for key in row['arguments'] if key in {'model_name','model'}}
-                properties = result['inputSchema'].get('properties', {})
-                self._model_selectors[name] = model_keys
-                for key in model_keys:
-                    properties[key].pop('default', None)
-                    properties[key]['description'] = 'Explicit model selector. Use the requested model from matching_models; there is no implicit model choice.'
-                    required = result['inputSchema'].setdefault('required', [])
-                    if key not in required: required.append(key)
-                result['scientific_inputs'] = [key for key in result['inputSchema'].get('required', []) if key not in model_keys]
-                result['model_count'] = total_models
-                if total_models > len(options):
-                    result['more_models'] = 'Search by the requested model name to narrow the catalog.'
-                result['matching_models'] = options
-                result['selection_rule'] = 'For the requested model, use its explicit arguments instead of generic defaults; ask for required scientific inputs only.'
+                self._model_selectors[name] = selectors
             self.inspected.add(name)
             return result
         raise DisclosureError('Unknown discovery operation.')

@@ -60,6 +60,13 @@ request budget and queue lifecycle; it never rewrites the historical checkpoint.
 Source-review receipts and revision feedback belong to `research_source_review.py`;
 author and editor modules consume those receipts without owning the reviewer.
 
+Tool discovery separates session navigation from model metadata. Harness adapters
+use the shared discovery broker to track which tool was inspected during a turn.
+The MCP discovery package owns catalog lookup and the mapping of model, dataset
+and task choices to a selected tool's declared input fields. Search returns names
+and summaries; only description loads that interface. Availability is refreshed
+at description and enforced again by the invocation path.
+
 Model origin is separate from scientific function. For example, ProteinMPNN and
 LigandMPNN are both pretrained methods; DeepSol · ESM2-650M is a factory-trained
 task model; a reviewed Scientist solubility predictor is an RSI artifact. All use

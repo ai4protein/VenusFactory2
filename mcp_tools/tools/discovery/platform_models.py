@@ -1,4 +1,6 @@
 """Search platform models without loading model weights or input schemas into prompts."""
+from copy import deepcopy
+
 from mcp_tools.models.platform_catalog import official_cards
 from mcp_tools.tools.capability_policy import canonical, model_tools
 from mcp_tools.tools.runtime_tool_policy import is_tool_allowed
@@ -34,3 +36,70 @@ def platform_models(query="", names=None):
             "tools": tools, "selection": selection,
         }))
     return results
+
+
+def describe_model_choices(tool_name, input_schema, requested=()):
+    """Bind current catalog choices to one selected tool's declared interface.
+
+    Only description calls use this function. Search does not load schemas, and
+    these selector hints never replace invocation-time permission checks.
+    """
+    result = {"inputSchema": deepcopy(input_schema)}
+    live_models = {
+        card["entry_id"]: card for _, _, card in platform_models("", [tool_name])
+    }
+    wanted = requested or list(live_models.values())
+    properties = result["inputSchema"].get("properties", {})
+    options = []
+    selector_fields = {
+        "model": ("model_name", "model"),
+        "dataset": ("dataset_name", "dataset"),
+        "task": ("task",),
+    }
+    for candidate in wanted[:20]:
+        live = live_models.get(candidate["entry_id"])
+        if not live:
+            continue
+        selection = live["selection"]
+        preset = {}
+        for field, keys in selector_fields.items():
+            if field not in selection:
+                continue
+            for key in keys:
+                if key in properties and (
+                    not properties[key].get("enum")
+                    or selection[field] in properties[key]["enum"]
+                ):
+                    preset[key] = selection[field]
+                    break
+        options.append({"name": candidate["name"], "arguments": preset})
+    if not options:
+        return result, set()
+
+    model_keys = {
+        key for option in options for key in option["arguments"]
+        if key in {"model_name", "model"}
+    }
+    for key in model_keys:
+        properties[key].pop("default", None)
+        properties[key]["description"] = (
+            "Explicit model selector. Use the requested model from matching_models; "
+            "there is no implicit model choice."
+        )
+        required = result["inputSchema"].setdefault("required", [])
+        if key not in required:
+            required.append(key)
+    result.update(
+        scientific_inputs=[
+            key for key in result["inputSchema"].get("required", []) if key not in model_keys
+        ],
+        model_count=len(wanted),
+        matching_models=options,
+        selection_rule=(
+            "For the requested model, use its explicit arguments instead of generic defaults; "
+            "ask for required scientific inputs only."
+        ),
+    )
+    if len(wanted) > len(options):
+        result["more_models"] = "Search by the requested model name to narrow the catalog."
+    return result, model_keys

@@ -101,3 +101,77 @@ def test_followup_description_preserves_live_models_without_prior_search():
     with pytest.raises(DisclosureError, match="explicitly"):
         d.resolve("call_tool", {"name":tool.name, "arguments":{"pdb_file":"test.pdb"}})
     assert d.resolve("call_tool", {"name":tool.name, "arguments":{"pdb_file":"test.pdb","model_name":"ProSST-2048"}})[2]["model_name"] == "ProSST-2048"
+
+
+@pytest.mark.parametrize("model_field,dataset_field", [
+    ("model_name", "dataset_name"), ("model", "dataset"),
+])
+def test_model_choices_follow_declared_fields_without_changing_original_schema(
+    monkeypatch, model_field, dataset_field
+):
+    from mcp_tools.tools.discovery import platform_models as registry
+
+    name = "predict_custom_model"
+    schema = {
+        "type": "object",
+        "properties": {
+            model_field: {"type": "string", "enum": ["ESM2-8M"], "default": "legacy-default"},
+            dataset_field: {"type": "string", "enum": ["solubility"]},
+            "task": {"type": "string", "enum": ["regression"]},
+            "sequence": {"type": "string"},
+        },
+        "required": ["sequence"],
+    }
+    original = json.loads(json.dumps(schema))
+    card = {
+        "entry_id": "fixture-solubility",
+        "name": "Solubility · ESM2-8M",
+        "selection": {
+            "model": "ESM2-8M", "dataset": "solubility", "task": "regression",
+            "repository": "metadata-is-not-an-input",
+        },
+    }
+    monkeypatch.setattr(registry, "platform_models", lambda query, names: [(1, card["entry_id"], card)])
+    tool = SimpleNamespace(name=name, description="Predict solubility.")
+    disclosure = ToolDisclosure({name: tool}, schema=lambda _: schema, allowed=lambda _: True)
+
+    detail = disclosure.metadata("describe_tool", {"name": name})
+    arguments = detail["matching_models"][0]["arguments"]
+    assert arguments == {
+        model_field: "ESM2-8M", dataset_field: "solubility", "task": "regression"
+    }
+    assert detail["scientific_inputs"] == ["sequence"]
+    assert set(detail["inputSchema"]["required"]) == {"sequence", model_field}
+    assert "default" not in detail["inputSchema"]["properties"][model_field]
+    assert schema == original
+    with pytest.raises(DisclosureError, match="explicitly"):
+        disclosure.resolve("call_tool", {"name": name, "arguments": {"sequence": "ACDE"}})
+    assert disclosure.resolve("call_tool", {
+        "name": name, "arguments": {**arguments, "sequence": "ACDE"}
+    })[2]["sequence"] == "ACDE"
+
+
+def test_described_model_choices_are_bounded_and_refresh_live_availability(monkeypatch):
+    from mcp_tools.tools.discovery import platform_models as registry
+
+    name = "zero_shot_mutation_structure_prediction"
+    live = [{
+        "entry_id": "model-" + str(i), "name": "Variant " + str(i),
+        "selection": {"model": "Variant " + str(i)},
+    } for i in range(27)]
+    monkeypatch.setattr(registry, "platform_models", lambda query, names: [
+        (1, card["entry_id"], card) for card in live
+    ])
+    tool = SimpleNamespace(name=name, description="Score mutations.")
+    disclosure = ToolDisclosure({name: tool}, schema=lambda _: {
+        "type": "object", "properties": {"model_name": {"type": "string"}}
+    }, allowed=lambda _: True)
+    first = disclosure.metadata("describe_tool", {"name": name})
+    assert first["model_count"] == 27 and len(first["matching_models"]) == 20
+    assert first["more_models"]
+    live[:] = live[-1:]
+    second = disclosure.metadata("describe_tool", {"name": name})
+    assert second["matching_models"] == [{
+        "name": "Variant 26", "arguments": {"model_name": "Variant 26"}
+    }]
+    assert second["model_count"] == 1
