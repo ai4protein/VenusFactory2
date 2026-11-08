@@ -195,3 +195,27 @@ def test_progress_events_do_not_duplicate_audit_prompts_or_old_drafts(monkeypatc
                                "source_review":{"attempts":[{"request":"PRIVATE_PACKET"}]}})
     assert len(Queue.frames)==1
     assert "reviewing" in Queue.frames[0][1] and "PRIVATE" not in Queue.frames[0][1]
+
+def test_independent_reviewer_cannot_accept_a_wrong_concentration_unit():
+    source = {**SOURCE, "text": json.dumps({"constant": 2.9, "unit": "mM"})}
+    document = {**DOCUMENT, "text": "The measured constant is 2.9 nM. [S1]"}
+    request = sr.packet(sr.units(document, [source]), [source])
+    with pytest.raises(ValueError, match="measured value and unit"):
+        sr.validate_assessments(assessment(request), request, [source])
+
+
+@pytest.mark.asyncio
+async def test_quantity_policy_upgrade_invalidates_old_receipts(monkeypatch):
+    current = state()
+
+    async def complete(model, messages, tokens):
+        current["model_calls"] += 1
+        return assessment(json.loads(messages[1]["content"])), False
+
+    with monkeypatch.context() as old_policy:
+        old_policy.setattr(sr, "VERSION", "source_review.v2")
+        receipts = await sr.review_documents(
+            current, {"model_id": "fixture"}, [DOCUMENT], complete, lambda: None
+        )
+        assert sr.document_ready(DOCUMENT, current["sources"], receipts["identity"])
+    assert not sr.document_ready(DOCUMENT, current["sources"], receipts["identity"])

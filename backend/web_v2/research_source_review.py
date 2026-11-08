@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from collections import deque
-from decimal import Decimal
 import json
 import re
 import time
@@ -10,8 +9,9 @@ import time
 import httpx
 
 from .research_evidence_passages import digest, source_digest, selected_passages, resolve_passage, chunks
+from .research_measurements import measured_values_anchored
 
-VERSION = "source_review.v2"
+VERSION = "source_review.v2.1"
 MAX_PACKET_CHARS = 28000
 MAX_UNITS = 8
 MAX_RECOVERY_ROUNDS = 2
@@ -112,21 +112,6 @@ def explicit_proposal(text):
     return bool(re.search(r"\b(?:we propose|we recommend|proposed|recommended|future experiments?|test whether|could be tested|should be tested)\b|建议|拟开展|可检验|下一步",text,re.I))
 
 
-_MEASURED_NUMBER = re.compile(
-    r"(?<![A-Za-z0-9_])([+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\s*"
-    r"(?:Å|angstroms?\b|°\s*C\b|degrees? Celsius\b|%|kDa\b|Da\b|nM\b|[uµμ]M\b|mM\b|"
-    r"amino[- ]acids?\b|residues?\b)"
-)
-_NUMBER = re.compile(r"(?<![\w.])[+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?")
-
-
-def measured_values_anchored(text, evidence):
-    """Reject explicit measured values missing even numerically from quoted evidence."""
-    measured = {Decimal(value) for value in _MEASURED_NUMBER.findall(text)}
-    quoted = {Decimal(value) for item in evidence for value in _NUMBER.findall(item["quote"])}
-    return measured <= quoted
-
-
 def validate_assessments(response, request, sources):
     """Validate coverage and source anchors independently of the model verdict."""
     rows = parse_response(response)
@@ -176,7 +161,7 @@ def validate_assessments(response, request, sources):
             if row["classification"] == "factual" and not evidence:
                 raise ValueError("Factual assertions require original-source evidence")
             if row["classification"] == "factual" and not measured_values_anchored(unit["text"], evidence):
-                raise ValueError("Quoted evidence does not contain the claimed measured value; preserve source values and units")
+                raise ValueError("Quoted evidence does not contain the claimed measured value and unit; preserve source values and units")
             if row["classification"] == "proposal" and not explicit_proposal(unit["text"]):
                 raise ValueError("Uncited proposals must be explicitly proposed")
         elif not row["issues"]:

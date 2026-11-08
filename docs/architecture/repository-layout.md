@@ -67,6 +67,9 @@ receipts for both views. Rechecking a report preserves its saved drafts, evidenc
 request budget and queue lifecycle; it never rewrites the historical checkpoint.
 Source-review receipts and revision feedback belong to `research_source_review.py`;
 author and editor modules consume those receipts without owning the reviewer.
+Explicit measurement checks belong to `research_measurements.py`; values retain
+their dimensions and unit conversions. Changes to acceptance policy invalidate
+older receipts while preserving their original review evidence.
 Chapter evidence selection and writer context belong to `research_chapter_context.py`.
 Specialists receive topic-selected source excerpts under one serialized context
 budget, with citation identities, query scope and material extraction limits.
