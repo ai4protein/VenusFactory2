@@ -16,6 +16,7 @@ import time
 
 import httpx
 from aiohttp import web
+from .sse_terminal import StreamTerminal
 from .provider_config import request_headers, matches_snapshot
 
 from agent.rsi.engine.live_model_gateway import ModelGateway
@@ -136,7 +137,8 @@ class ResponsesPolicy:
             result["tools"] = kept
         else:
             result.pop("tools", None)
-            result.pop("tool_choice", None)
+            if choice != "none":
+                result.pop("tool_choice", None)
             result.pop("parallel_tool_calls", None)
         if self.temperature is None:
             result.pop("temperature", None)
@@ -178,7 +180,7 @@ class ResponsesPolicy:
         return result, metadata
 
 
-def _usage(value, max_output_tokens):
+def _usage(value, max_output_tokens, *, allow_reasoning_detail_mismatch=False):
     if value is None:
         return None
     if not isinstance(value, dict):
@@ -196,13 +198,21 @@ def _usage(value, max_output_tokens):
         if detail is not None:
             if not isinstance(detail, dict) or type(detail.get(field)) is not int or detail[field] < 0:
                 raise ValueError("Malformed token detail")
-            if detail[field] > out["input_tokens" if key.startswith("input") else "output_tokens"]:
-                raise ValueError("Token detail exceeds its total")
+            parent = out["input_tokens" if key.startswith("input") else "output_tokens"]
+            if detail[field] > parent:
+                if not (allow_reasoning_detail_mismatch and field == "reasoning_tokens" and detail[field] <= max_output_tokens):
+                    raise ValueError("Token detail exceeds its total")
+                # Retain the provider's inconsistent counters; do not fabricate
+                # a corrected total or mistake accounting metadata for tool output.
+                out.setdefault("anomalies", []).append({
+                    "field": field, "reported": detail[field], "parent_total": parent,
+                    "code": "detail_exceeds_total",
+                })
             out[key] = {field: detail[field]}
     return out
 
 
-def _completed(response, *, model, allowed_tools, max_output_tokens):
+def _completed(response, *, model, allowed_tools, max_output_tokens, allow_reasoning_detail_mismatch=False):
     if (
         not isinstance(response, dict)
         or response.get("status") != "completed"
@@ -259,7 +269,7 @@ def _completed(response, *, model, allowed_tools, max_output_tokens):
             raise ValueError("Unsupported provider tool or output type")
     if not meaningful:
         raise ValueError("Response contains no answer or function call")
-    return _usage(response.get("usage"), max_output_tokens)
+    return _usage(response.get("usage"), max_output_tokens, allow_reasoning_detail_mismatch=allow_reasoning_detail_mismatch)
 
 
 def _sse(raw):
@@ -281,8 +291,8 @@ def _sse(raw):
         yield obj
 
 
-def inspect_responses(raw, streaming, *, model, allowed_tools, max_output_tokens):
-    options = {"model": model, "allowed_tools": allowed_tools, "max_output_tokens": max_output_tokens}
+def inspect_responses(raw, streaming, *, model, allowed_tools, max_output_tokens, allow_reasoning_detail_mismatch=False):
+    options = {"model": model, "allowed_tools": allowed_tools, "max_output_tokens": max_output_tokens, "allow_reasoning_detail_mismatch": allow_reasoning_detail_mismatch}
     if not streaming:
         response = json.loads(raw)
         return {"usage": _completed(response, **options), "response_id_sha256": digest(response["id"])}
@@ -377,7 +387,7 @@ def inspect_responses(raw, streaming, *, model, allowed_tools, max_output_tokens
             else:
                 field = "arguments" if is_arguments else "refusal" if "refusal" in kind else "text"
                 value = event.get(field)
-                if not isinstance(value, str) or deltas.get(key, "") != value:
+                if not isinstance(value, str) or (key in deltas and deltas[key] != value):
                     raise ValueError("Output deltas disagree with completed content")
                 table[key] = value
         elif kind not in auxiliary:
@@ -437,8 +447,9 @@ class ResponsesGateway(ModelGateway):
             self.record({"event": "upstream_retry_suppressed", "status": 429})
             return web.json_response({"error": "upstream_http_429"}, status=400)
         if self.calls >= self.policy.max_calls:
-            self.record({"event": "budget_rejected"})
-            return web.json_response({"error": "model call budget exhausted"}, status=429)
+            self.record({"event": "budget_rejected", "code": "model_call_budget_exhausted"})
+            return web.json_response({"error": {"message": "model call budget exhausted",
+                "type": "budget_exhausted", "code": "model_call_budget_exhausted"}}, status=400)
         self.calls += 1
         call, started = self.calls, time.monotonic()
         self.record(
@@ -464,12 +475,15 @@ class ResponsesGateway(ModelGateway):
                     return web.json_response({"error": "upstream_http_" + str(status)}, status=client_status)
                 raw = bytearray()
                 preview = PublicTextStream(self.on_text, call, protocol="responses") if self.on_text is not None else None
+                terminal = StreamTerminal('responses') if payload.get('stream') else None
                 async for chunk in response.aiter_bytes():
                     raw.extend(chunk)
                     if len(raw) > 16_000_000:
                         raise ValueError("Provider response exceeds byte budget")
                     if preview is not None:
                         await preview.feed(chunk)
+                    if terminal is not None and terminal.feed(chunk):
+                        break
                 provider_evidence = self.verify_provider_response(bytes(raw), payload.get("stream", False))
                 evidence = inspect_responses(
                     bytes(raw),
@@ -477,6 +491,8 @@ class ResponsesGateway(ModelGateway):
                     model=self.policy.model,
                     allowed_tools=set(metadata["tools_sent"]),
                     max_output_tokens=self.policy.max_output_tokens,
+                    allow_reasoning_detail_mismatch=bool(provider_evidence and
+                        provider_evidence.get("policy") == "openrouter_free_text.v1"),
                 )
                 if provider_evidence is not None:
                     evidence["provider_evidence"] = provider_evidence

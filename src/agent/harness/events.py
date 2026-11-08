@@ -47,6 +47,20 @@ def valid_tool_result_annotations(row):
     return set(expected) == fields and expected == {key: row[key] for key in fields}
 
 
+def normalize_tool_arguments(arguments):
+    """Observe malformed input without executing, rewriting or aborting the harness."""
+    try:
+        value = json.loads(arguments) if isinstance(arguments, str) else arguments
+        if not isinstance(value, dict):
+            return {"args": None, "arguments_error": {"code": "object_required"}}
+        return {"args": value}
+    except (ValueError, RecursionError) as exc:
+        error = {"code": "invalid_json"}
+        if isinstance(exc, json.JSONDecodeError):
+            error.update(line=exc.lineno, column=exc.colno, offset=exc.pos)
+        return {"args": None, "arguments_error": error}
+
+
 def normalize_dsh(event):
     data = event.get("data", {})
     if event.get("type") == "tool/call":
@@ -56,7 +70,7 @@ def normalize_dsh(event):
                 "kind": "tool_call_start",
                 "tool_call_id": data["callId"],
                 "tool_name": data["name"],
-                "args": json.loads(arguments) if isinstance(arguments, str) else arguments,
+                **normalize_tool_arguments(arguments),
             }
         ]
     if event.get("type") == "tool/result":
@@ -92,6 +106,9 @@ def audit_trace(path, allowed_tools, limit):
             problems.append("undeclared_tool")
         if row["kind"] == "tool_result" and cid not in starts:
             problems.append("result_before_call")
+    for cid, start in starts.items():
+        if start.get("arguments_error") and cid in ends and ends[cid].get("is_error") is not True:
+            problems.append("invalid_arguments_not_rejected")
     if starts.keys() != ends.keys():
         problems.append("unpaired_tool_calls")
     if len(starts) > limit:

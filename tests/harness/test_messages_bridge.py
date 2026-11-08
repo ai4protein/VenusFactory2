@@ -221,7 +221,7 @@ def test_gateway_enforces_real_request_count_and_no_key_leak(tmp_path):
                 assert (await client.post(url, json=invalid, headers=headers)).status_code == 400
                 result = await client.post(url, json=request(), headers=headers)
                 assert result.status_code == 200 and b"tool_use" in result.content
-                assert (await client.post(url, json=request(), headers=headers)).status_code == 429
+                assert (await client.post(url, json=request(), headers=headers)).status_code == 400
                 assert gateway.calls == 1 and len(seen) == 1
         text = output.read_text()
         assert "fixture-upstream-secret" not in text and "Measure ACDEFGHIKC" not in text

@@ -72,6 +72,7 @@ class KimiAdapter:
             relay=ctx.relay,
             startup_timeout_s=startup_limit,
             mcp_startup_timeout_s=startup_limit,
+            mcp_tool_timeout_s=p.budget.wall_seconds,
             prepare_mcp=True,
         )
         stage = "server_startup"

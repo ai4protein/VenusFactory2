@@ -321,6 +321,14 @@ async def _stream_agent(state, text, attachment_paths, *, retry=False, interacti
         request_audit = audit_requests(control / "model_requests.jsonl")
         event_audit = audit_trace(control / "events.jsonl", tools, profile.budget.tool_calls)
         passed = request_audit["passed"] and event_audit["passed"]
+        recovery = None
+        if outcome == "completed" and event_audit["passed"] and not request_audit["passed"]:
+            from backend.web_v2.agent_recovery import completed_turn_recovery, canonical_recovered_history
+            recovery = completed_turn_recovery(control / "model_requests.jsonl", profile.budget.model_calls)
+            if recovery["accepted"]:
+                passed = True
+                state["history"] = canonical_recovered_history(
+                    state.get("history", []), turn_id, completed["text"])
         if outcome == "completed" and not passed:
             outcome = "protocol_failed"
         if outcome == "completed":
@@ -353,7 +361,8 @@ async def _stream_agent(state, text, attachment_paths, *, retry=False, interacti
             state["error"] = public_failure(control / "model_requests.jsonl", outcome)["message"]
         write_json(
             control / "run.json",
-            {"status": outcome, "binding_sha256": binding["sha256"], "requests": request_audit, "events": event_audit},
+            {"status": outcome, "binding_sha256": binding["sha256"], "requests": request_audit, "events": event_audit,
+             **({"conversation_recovery": recovery} if recovery is not None else {})},
         )
         await _session_store.save(sid)
     if outcome not in {"completed", "stopped", "waiting_for_input"}:

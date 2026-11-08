@@ -86,7 +86,7 @@ async def test_one_recovery_is_charged_and_not_called_uninterrupted(tmp_path):
         ({"policy": "empty_length_once_v1"}, 400, 1),
         ({"always_bad": True}, 400, 2),
         ({"bad": b'{"error":"invalid credential"}'}, 400, 1),
-        ({"limit": 1}, 429, 1),
+        ({"limit": 1}, 400, 1),
         ({"timeout": 0.05}, 502, 1),
     ],
 )
@@ -158,7 +158,7 @@ async def test_concurrent_requests_share_physical_attempt_budget(tmp_path):
                 )
 
             results = await asyncio.gather(call(), call())
-    assert sorted(r.status_code for r in results) == [200, 429]
+    assert sorted(r.status_code for r in results) == [200, 400]
     assert len(calls) == 3 and audit_requests(log)["model_calls"] == 3
     assert not audit_requests(log)["passed"]
 

@@ -74,7 +74,7 @@ async def execute(profile, task, runtimes, *, registry=None, credential=None):
         "profile": profile.public(),
         "preflight": preflight,
         "task": before,
-        "adapter_source": {p.name: file_hash(p) for p in sorted(Path(__file__).parent.glob("*.py"))},
+        "adapter_source": {p.name: file_hash(p) for p in sorted([*Path(__file__).parent.glob("*.py"), *Path(__file__).parent.glob("*.mjs")])},
         "transport": transport_name,
         "phase_deadline": "includes adapter startup; cleanup time reported in host_wall_seconds",
         "supporting_source": {

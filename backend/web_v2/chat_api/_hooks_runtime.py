@@ -10,8 +10,7 @@ import os
 import secrets
 from pathlib import Path
 
-from agent.chat_agent import ensure_runtime_state
-from agent.chat_graph import create_agent_graph
+from backend.web_v2.chat_runtime import ensure_runtime_state
 from agent.session_store import SessionStore, SqliteBackend
 from config import get_config
 from logger import get_logger
@@ -67,6 +66,7 @@ def _get_compiled_graph():
     StateGraph.compile() is expensive; the resulting graph is stateless and
     safe to share across requests, so we build it once and reuse it.
     """
+    from agent.chat_graph import create_agent_graph
     return create_agent_graph()
 
 

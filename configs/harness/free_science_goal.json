@@ -14,7 +14,7 @@
     "request_seconds": 300,
     "model_calls": 24,
     "tool_calls": 12,
-    "output_tokens": 4096,
+    "output_tokens": 12288,
     "temperature": 0.2,
     "thinking": "disabled"
   }

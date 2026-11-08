@@ -62,11 +62,11 @@ async def test_expert_chat_and_native_messages_share_physical_budget(tmp_path):
             denied = await client.post(
                 gateway.base_url + "/messages", json=native, headers={"x-api-key": gateway.token}
             )
-            assert denied.status_code == 429
+            assert denied.status_code == 400
             denied = await client.post(
                 gateway.base_url + "/chat/completions", json=chat, headers={"Authorization": "Bearer " + gateway.token}
             )
-            assert denied.status_code == 429
+            assert denied.status_code == 400
             assert gateway.calls == len(observed) == 2
     events = [json.loads(line) for line in (tmp_path / "requests.jsonl").read_text().splitlines()]
     assert sorted(row["call"] for row in events if row["event"] == "request") == [1, 2]

@@ -53,6 +53,28 @@ def session_path(root, value):
     return str(path)
 
 
+def relative_workspace_arguments(arguments):
+    """Accept virtual /workspace paths without expanding access to host paths."""
+    from utils.scoped_files import parts
+
+    def relative(value):
+        if isinstance(value, str) and value:
+            if value.startswith('/workspace/'):
+                value = value[len('/workspace/'):]
+            parts(value)
+        return value
+
+    # Only declared file arguments. Never rewrite source code, text, tool inputs,
+    # shell commands or prediction data merely because they contain a path.
+    result = dict(arguments)
+    for key in ('path', 'source', 'evaluation_file', 'proposal_file', 'output_file'):
+        if key in result:
+            result[key] = relative(result[key])
+    if isinstance(result.get('files'), list):
+        result['files'] = [relative(value) for value in result['files']]
+    return result
+
+
 def bind_arguments(name, arguments, workspace):
     """Validate before legacy normalizers can silently rewrite an unsafe path."""
     if name in UNSAFE_TOOLS: raise ValueError('Use the isolated session coding tools')
@@ -77,7 +99,18 @@ def public_value(value, workspace):
     if isinstance(value, list): return [public_value(v, workspace) for v in value]
     if isinstance(value, tuple): return [public_value(v, workspace) for v in value]
     if isinstance(value, str):
-        value = value.replace(str(Path(workspace).resolve()), '/workspace')
+        root = Path(workspace).resolve()
+        value = value.replace(str(root), '/workspace')
+        # Legacy scientific tools return project-relative file receipts. They
+        # name the same owned files as absolute receipts and must remain usable.
+        project = Path(__file__).resolve().parents[3]
+        try:
+            relative_root = root.relative_to(project).as_posix()
+        except ValueError:
+            relative_root = ''
+        if relative_root:
+            value = re.sub(r'(?<![A-Za-z0-9_/])' + re.escape(relative_root) + r'(?=/|$|[^A-Za-z0-9_.-])',
+                           '/workspace', value)
         return _SECRET.sub('[redacted]', _HOST_PATH.sub('[server path]', value))
     return value
 

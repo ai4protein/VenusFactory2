@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 
 from .messages_bridge import PREFIX, _object, _text
 
@@ -38,6 +39,19 @@ class ClaudeEvents:
             return []
         if self.session_id is None or event.get("session_id") != self.session_id:
             raise ValueError("Native session identity mismatch")
+        if kind == "tool_progress":
+            # Claude emits heartbeats during long MCP calls. Their parent is the
+            # existing call, not a delegated agent or a new executable action.
+            parent = event.get("parent_tool_use_id")
+            cid = parent if event.get("heartbeat") is True else event.get("tool_use_id")
+            elapsed = event.get("elapsed_time_seconds")
+            if (cid not in self.started or cid in self.finished
+                    or event.get("tool_name") != self.started[cid]
+                    or (parent is not None and event.get("heartbeat") is not True)
+                    or type(elapsed) not in (int, float)
+                    or not math.isfinite(elapsed) or elapsed < 0):
+                raise ValueError("Invalid native tool progress")
+            return []
         if event.get("parent_tool_use_id") is not None:
             raise ValueError("Nested native execution has no admitted contract")
         if kind == "stream_event":

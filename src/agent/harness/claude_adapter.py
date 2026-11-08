@@ -100,7 +100,8 @@ def sandbox_command(ctx, home, prepared):
         "MCP_DISCOVERY_CACHE": "0",
         "MCP_CONNECTION_NONBLOCKING": "0",
         "MCP_CONNECT_TIMEOUT_MS": "120000",
-        "MCP_TIMEOUT": str(int(p.budget.wall_seconds * 1000)),
+        "MCP_TIMEOUT": str(int(min(120, p.budget.wall_seconds) * 1000)),
+        "MCP_TOOL_TIMEOUT": str(int(p.budget.wall_seconds * 1000)),
     }
     for name, value in env.items():
         command += ["--setenv", name, value]

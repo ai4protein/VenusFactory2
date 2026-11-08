@@ -194,7 +194,7 @@ async def test_normal_answers_refusals_partial_text_and_tool_calls_are_not_repla
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "options,status,count", [({"always_empty": True}, 200, 2), ({"limit": 1}, 429, 1), ({"timeout": 0.05}, 502, 1)]
+    "options,status,count", [({"always_empty": True}, 200, 2), ({"limit": 1}, 400, 1), ({"timeout": 0.05}, 502, 1)]
 )
 async def test_repeated_empty_result_and_budget_deadline_are_not_hidden(tmp_path, options, status, count):
     response, bodies, log = await fixture(tmp_path, **options)
@@ -317,6 +317,6 @@ async def test_concurrent_logical_requests_share_the_physical_budget(tmp_path):
                 )
 
             responses = await asyncio.gather(call(), call())
-    assert sorted(response.status_code for response in responses) == [200, 429]
+    assert sorted(response.status_code for response in responses) == [200, 400]
     assert len(calls) == audit_requests(log)["model_calls"] == 3
     assert not audit_requests(log)["passed"]

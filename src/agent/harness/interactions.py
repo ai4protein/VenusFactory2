@@ -113,6 +113,9 @@ INTERACTION_GUIDANCE = (
     "(options optional; text answers supported). For a concrete plan or action requiring the user's decision, "
     "call request_confirmation. These are the platform equivalents of AskUserQuestion, request_user_input "
     "and plan confirmation; do not use terminal prompts or harness-native interactive commands. "
+    "An explicit user request already authorizes its ordinary analysis and saving outputs in this session. "
+    "Do not pause to ask whether to do that same requested work, or to approve each research iteration. "
+    "Ask only for a genuinely missing decision or additional authorization, such as destructive or external actions. "
     "The platform checkpoints and pauses this turn. Do not perform the pending action until an explicit answer "
     "is supplied in a resumed turn. Do not ask again for answers already in context. Confirmation never enables "
     "disabled tools or changes sandbox/access/resource policy. Never ask users to paste credentials."
@@ -137,7 +140,7 @@ def interaction_tools(on_request):
     return [StructuredTool.from_function(coroutine=ask_user, name="ask_user", args_schema=AskInput,
                description="Pause for user input: single/multiple choice or free text. Questions must be concise and necessary."),
             StructuredTool.from_function(coroutine=request_confirmation, name="request_confirmation", args_schema=ConfirmInput,
-               description="Pause for an explicit approve/reject/revise decision on a concrete action or plan. Does not grant system permissions.")]
+               description="Pause for necessary additional authorization or a missing decision. Do not ask again to perform requested analysis or save its session outputs. Does not grant system permissions.")]
 
 
 def response_display(pending, response, lang="en"):

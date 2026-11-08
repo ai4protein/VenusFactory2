@@ -5,7 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response
 
-from agent.chat_agent import initialize_session_state
+from backend.web_v2.chat_runtime import initialize_session_state
 
 from backend.web_v2.chat_api._hooks_runtime import (
     _SESSION_CANCEL_FLAGS,

@@ -16,6 +16,13 @@ if SRC_DIR not in sys.path:
     sys.path.insert(0, SRC_DIR)
 
 
+@pytest.fixture(autouse=True)
+def isolate_cached_configuration(monkeypatch):
+    """Do not retain one test's environment-derived mode or provider settings."""
+    import config
+    monkeypatch.setattr(config, "_config", None)
+
+
 @pytest.fixture
 def durable_chat_driver(monkeypatch, tmp_path):
     """Drive real admission/events with a deterministic worker in the test loop.

@@ -19,6 +19,8 @@ GUIDANCE = CAPABILITY_BOUNDARY + '\n\n' + (
     'Discover progressively: categories first; then search_tools(category=ID, query=task_or_model) '
     'for names and brief descriptions; then describe_tool(name) only for a selected capability. '
     'call_tool uses that declared interface. Use matching_models arguments for a specifically requested model. '
+    'search_tools, describe_tool and call_tool are already exposed; call these navigation functions directly. '
+    'Available session file operations are also directly exposed; invoke them by name to read, write and run code. '
     'The initial category overview contains no individual models or skills. Summarize it for general '
     'capability questions in a few sentences; avoid tool counts or an exhaustive category list. '
     'A specific task normally needs one targeted search. '
@@ -51,13 +53,16 @@ def _schema(properties, required=()):
 
 
 class ToolDisclosure:
-    def __init__(self, mapping, *, schema, allowed, direct=()):
+    def __init__(self, mapping, *, schema, allowed, direct=(), detailed=()):
         if CONTROLS & mapping.keys():
             raise ValueError('Tool name conflicts with discovery transport')
         self.mapping = mapping
         self.schema = schema
         self.allowed = allowed
         self.direct = set(direct) & mapping.keys()
+        self.detailed = set(detailed)
+        if len(self.detailed) > 3 or not self.detailed <= self.direct:
+            raise ValueError("Detailed disclosure requires at most three admitted direct tools")
         self.inspected = set()
         self._model_matches = {}
         self._model_selectors = {}
@@ -91,6 +96,13 @@ class ToolDisclosure:
         return CONTROLS | self.direct
 
     def _name(self, name):
+        # Harnesses sometimes repeat our MCP transport namespace inside the
+        # discovery arguments. Normalize only this server, then apply the same
+        # catalog, disclosure and enablement checks.
+        for prefix in ('functions.mcp__venusfactory__', 'mcp__venusfactory__'):
+            if name.startswith(prefix):
+                name = name[len(prefix):]
+                break
         if name in self.mapping:
             return name
         from mcp_tools.tools.capability_policy import canonical
@@ -105,15 +117,16 @@ class ToolDisclosure:
         name = {'type': 'string', 'description': 'Exact name returned by search_tools.'}
         result = [
             {'name': SEARCH, 'description': 'List categories, or search one category for enabled capability names and brief descriptions.',
-             'inputSchema': _schema({'category': {'type': 'string', 'default': '', 'description': 'Category ID from the initial overview; omit to list categories.'}, 'query': {'type': 'string', 'default': '', 'maxLength': 200},
+             'inputSchema': _schema({'category': {'type': 'string', 'default': '', 'description': 'Category ID from the initial overview; omit to list categories.',
+                 'enum': ['', *[row['id'] for row in self.overview()['categories']]]}, 'query': {'type': 'string', 'default': '', 'maxLength': 200},
                                     'limit': {'type': 'integer', 'default': 8, 'minimum': 1, 'maximum': 20},
                                     'offset': {'type': 'integer', 'default': 0, 'minimum': 0}})},
             {'name': DESCRIBE, 'description': 'Read one tool’s full input contract before calling it.',
              'inputSchema': _schema({'name': name}, ['name'])},
-            {'name': CALL, 'description': 'Execute ONLY after describe_tool(name) in this turn. Supply arguments from its inputSchema. Uses normal session permissions and queue.',
+            {'name': CALL, 'description': 'Execute after describe_tool(name), or use an already exposed direct tool. Supply its inputSchema arguments. Uses normal session permissions and queue.',
              'inputSchema': _schema({'name': name, 'arguments': {'type': 'object', 'additionalProperties': True}}, ['name', 'arguments'])},
         ]
-        result += [{'name': name, 'description': brief_description(self.mapping[name].description),
+        result += [{'name': name, 'description': (self.mapping[name].description if name in self.detailed else brief_description(self.mapping[name].description)),
                     'inputSchema': self.schema(self.mapping[name])} for name in sorted(self.direct) if self._available(name)]
         return result
 
@@ -129,11 +142,35 @@ class ToolDisclosure:
         except ValueError as exc:
             raise DisclosureError(str(exc)) from exc
         if category and category not in CATEGORIES:
-            raise DisclosureError('Choose a category ID from search_tools().')
+            if query.strip():
+                # Keep the query useful even if a model guessed a category name.
+                # Normal search still enforces visibility and progressive disclosure.
+                result = self.search({key:value for key,value in arguments.items() if key != 'category'})
+                result['requested_category'] = category
+                return result
+            # A misspelled/guessed facet is a navigation mistake, not a failed
+            # scientific operation. Return only the current allowed categories
+            # so smaller models can recover without repeating the same call.
+            result = self.overview()
+            result['selection_error'] = 'Unknown category.'
+            result['next_step'] = 'Use an exact category ID from categories below, or omit category and search by query.'
+            return result
         if not query.strip() and not category:
             return self.overview()
         candidates = [n for n in self.mapping if n not in self.direct and self._available(n)
                       and (not category or category in self._categories(n))]
+        # If the caller already knows an exact name but selected a wrong facet,
+        # return its category only; never disclose a disabled tool or its schema.
+        if category and query.strip():
+            exact = self._name(query.strip())
+            if exact not in self.direct and self._available(exact) and exact not in candidates:
+                result = self.overview([exact])
+                result['selection_error'] = 'This named capability belongs to another category.'
+                result['next_step'] = 'Select its category below, or inspect the known name with describe_tool(name).'
+                return result
+        known_name = self._name(query.strip())
+        if known_name in self.mapping:
+            query = known_name
         groups = query_groups(query)
         from mcp_tools.tools.discovery.platform_models import platform_models
         from mcp_tools.tools.capability_policy import canonical, ADAPTER_TOOLS
@@ -181,7 +218,26 @@ class ToolDisclosure:
             categories = {c for _, _, n, _ in matches for c in self._categories(n)}
             if len(categories) != 1:
                 result = self.overview([n for _, _, n, _ in matches] if matches else None)
-                result['next_step'] = 'Choose one of these categories and search by the task or model name.'
+                # A category-only response must not look like an empty tool
+                # search: small models interpreted tools=[] as unavailability.
+                result.pop('tools', None)
+                result['query'] = query
+                result['matched_capabilities'] = len(matches)
+                result['match_status'] = 'matches_found' if matches else 'no_direct_match'
+                result['summary'] = (
+                    f'Found {len(matches)} enabled capabilities matching {query!r}. '
+                    'Their names and interfaces have not been loaded yet.'
+                    if matches else
+                    'No direct name or summary match. Browse a relevant category; '
+                    'this does not establish that the requested capability is unavailable.')
+                result['suggested_searches'] = [
+                    {'category': row['id'], 'query': query}
+                    for row in result['categories'][:6]]
+                result['next_step'] = (
+                    'Call search_tools with a suggested category and the SAME query '
+                    'to load matching names before answering availability.'
+                    if matches else
+                    'Choose a relevant category and broaden the query.')
                 return result
             category = next(iter(categories))
         page = matches[offset:offset+limit]
@@ -204,12 +260,16 @@ class ToolDisclosure:
             if set(arguments) != {'name'} or not isinstance(arguments['name'], str):
                 raise DisclosureError('describe_tool requires one tool name.')
             name = self._name(arguments['name'])
+            if name in CONTROLS:
+                exposed = next(tool for tool in self.surface() if tool['name'] == name)
+                return {**exposed, 'call_via':name,
+                        'next_step':'This navigation tool is already exposed. Call it directly with these arguments.'}
             if not self._available(name):
                 raise DisclosureError('Tool unavailable. Search for an enabled tool.')
             tool = self.mapping[name]
             result = {'name': name, 'description': tool.description,
-                      'call_via': 'call_tool',
-                      'next_step': 'Use call_tool(name, arguments). This capability is not a directly exposed native function.',
+                      'call_via': name if name in self.direct else 'call_tool',
+                      'next_step': ('This tool is directly exposed; call it by name with its arguments.' if name in self.direct else 'Use call_tool(name, arguments). This capability is not a directly exposed native function.'),
                       'inputSchema': copy.deepcopy(self.schema(tool))}
             from mcp_tools.tools.capability_policy import canonical
             from mcp_tools.tools.discovery.platform_models import platform_models
@@ -263,7 +323,9 @@ class ToolDisclosure:
             if not isinstance(arguments, dict) or set(arguments) != {'name', 'arguments'} or not isinstance(arguments['name'], str) or not isinstance(arguments['arguments'], dict):
                 raise DisclosureError('call_tool requires a name and an arguments object.')
             name, arguments = self._name(arguments['name']), arguments['arguments']
-            if name not in self.inspected:
+            if not self._available(name):
+                raise DisclosureError('Tool unavailable. Search for an enabled tool; do not guess its name.')
+            if name not in self.inspected and name not in self.direct:
                 raise DisclosureError('Read describe_tool for this tool before calling it.')
         else:
             raise DisclosureError('Use search_tools, describe_tool, then call_tool.')

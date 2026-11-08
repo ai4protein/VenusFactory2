@@ -4,7 +4,6 @@ Multi-agent roles and avatars: img/agent_role/{role_id}.png.
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 
-from langchain_classic.prompts import ChatPromptTemplate
 from langchain_core.messages import SystemMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 

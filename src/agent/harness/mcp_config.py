@@ -88,7 +88,10 @@ def codex_mcp_configuration(server, wall_seconds):
     return "\n".join(lines) + "\n"
 
 
-def deepseek_mcp_plugin(server):
+def deepseek_mcp_plugin(server, wall_seconds=60):
+    if (isinstance(wall_seconds, bool) or not isinstance(wall_seconds, (int, float))
+            or not math.isfinite(wall_seconds) or wall_seconds <= 0):
+        raise ValueError("Invalid scientific tool timeout")
     return {
         "id": server["name"],
         "name": "@deepseek-ai/dsh-mcp-client",
@@ -99,6 +102,7 @@ def deepseek_mcp_plugin(server):
             "args": list(server["args"]),
             "env": dict(server["env"]),
             "failOnStartupError": True,
+            "toolCallTimeoutMs": max(1, math.ceil(wall_seconds * 1000)),
         },
     }
 

@@ -12,6 +12,7 @@ import time
 
 import httpx
 from aiohttp import web
+from .sse_terminal import StreamTerminal
 from .provider_config import request_headers
 
 from agent.rsi.engine.live_model_gateway import ModelGateway
@@ -21,7 +22,7 @@ from .live_text import PublicTextStream
 def inspect_response(raw, streaming):
     if not streaming:
         obj = json.loads(raw)
-        if obj.get("error") or not obj.get("choices") or not all(c.get("finish_reason") for c in obj["choices"]):
+        if obj.get("error") or not obj.get("choices") or not all(c.get("finish_reason") and c.get("finish_reason") != "error" for c in obj["choices"]):
             raise ValueError("Incomplete provider response")
         return obj.get("usage")
     done, finished, usage = False, set(), None
@@ -37,6 +38,8 @@ def inspect_response(raw, streaming):
                 raise ValueError("Provider stream error")
             usage = obj.get("usage") or usage
             for choice in obj.get("choices", []):
+                if choice.get("finish_reason") == "error":
+                    raise ValueError("Provider stream terminated with an error")
                 if choice.get("finish_reason"):
                     finished.add(choice.get("index", 0))
     if not done or not finished:
@@ -110,8 +113,14 @@ class EvidenceGateway(ModelGateway):
                     self.record({"event": "request_deadline_exhausted", "logical_call": logical_call})
                     return web.json_response({"error": "logical request deadline exhausted"}, status=502)
                 if self.calls >= self.policy.max_calls:
-                    self.record({"event": "budget_rejected"})
-                    return web.json_response({"error": "model call budget exhausted"}, status=429)
+                    self.record({"event": "budget_rejected", "code": "model_call_budget_exhausted"})
+                    # This is a fixed run budget, not a temporary provider limit.
+                    # A retry cannot replenish it; native SDKs must stop immediately.
+                    return web.json_response(
+                        {"error": {"message": "model call budget exhausted",
+                                   "type": "budget_exhausted", "code": "model_call_budget_exhausted"}},
+                        status=400,
+                    )
                 self.calls += 1
                 call, started = self.calls, time.monotonic()
                 logical_call = logical_call or call
@@ -140,6 +149,7 @@ class EvidenceGateway(ModelGateway):
                 shape = None
                 provider_evidence = None
                 raw = bytearray()
+                validation_stage = "transport"
                 try:
                     async with asyncio.timeout(max(0, deadline - time.monotonic())):
                         async with self.client.stream(
@@ -162,13 +172,18 @@ class EvidenceGateway(ModelGateway):
                             else:
                                 raw = bytearray()
                                 preview = PublicTextStream(self.on_text, call) if self.on_text is not None else None
+                                terminal = StreamTerminal('chat') if payload.get('stream') else None
                                 async for chunk in response.aiter_bytes():
                                     raw.extend(chunk)
                                     if len(raw) > 16_000_000:
                                         raise ValueError("Provider response exceeds byte budget")
                                     if preview is not None:
                                         await preview.feed(chunk)
+                                    if terminal is not None and terminal.feed(chunk):
+                                        break
+                                validation_stage = "response_completion"
                                 usage = inspect_response(bytes(raw), bool(payload.get("stream")))
+                                validation_stage = "free_pricing"
                                 provider_evidence = self.verify_provider_response(bytes(raw), bool(payload.get("stream")))
                                 completed = True
                                 if self.request_recovery == EMPTY_POLICY:
@@ -178,10 +193,12 @@ class EvidenceGateway(ModelGateway):
                                 if not retry:
                                     from .tool_response_names import normalize
                                     delivered = preview.completion() if preview is not None and not client_stream else bytes(raw)
+                                    validation_stage = "tool_interface"
                                     delivered, aliases = normalize(delivered, client_stream, payload.get('tools', []))
                                     if aliases:
                                         self.record({'event':'tool_name_normalized','call':call,'aliases':aliases})
                                     if self.chat_tool_budget is not None:
+                                        validation_stage = "tool_budget"
                                         delivered, budget_info = self.chat_tool_budget.deliver(delivered, client_stream)
                                         self.record({'event': 'chat_tool_budget', 'call': call, **budget_info})
                                     return web.Response(
@@ -196,7 +213,10 @@ class EvidenceGateway(ModelGateway):
                 except (httpx.HTTPError, ValueError, OSError, TimeoutError) as exc:
                     completed = False
                     error_type = type(exc).__name__
-                    self.record({"event": "transport_error", "call": call, "error_type": error_type})
+                    from .provider_response_diagnostics import response_evidence
+                    self.record({"event": "transport_error", "call": call, "error_type": error_type,
+                                 "validation_stage": validation_stage,
+                                 **response_evidence(bytes(raw), bool(payload.get("stream")))})
                     return web.json_response({"error": "incomplete upstream response"}, status=502)
                 finally:
                     if not usage and raw:

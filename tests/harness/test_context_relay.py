@@ -46,5 +46,5 @@ def test_same_model_relay_and_shared_call_budget(tmp_path,harness):
             assert first==second and relay.calls==2
             with pytest.raises(httpx.HTTPStatusError) as error:
                 await summarize_via_relay(relay,profile,'Third request',2000)
-            assert error.value.response.status_code==429 and len(bodies)==2
+            assert error.value.response.status_code==400 and len(bodies)==2
     asyncio.run(scenario())

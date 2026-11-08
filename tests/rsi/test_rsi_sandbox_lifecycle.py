@@ -78,3 +78,42 @@ async def test_spawn_failure_removes_private_credential_copy(tmp_path, monkeypat
     assert not (sandbox.control_dir / "private_home/.kimi-code/config.toml").exists()
     assert config.exists()
     assert sandbox.log.closed
+
+
+@pytest.mark.asyncio
+async def test_native_kimi_keeps_admitted_output_and_mcp_timeouts(tmp_path, monkeypatch):
+    import json
+    import tomllib
+
+    config = tmp_path / "source.toml"
+    config.write_text('default_model = "research"\n[models.research]\nmax_output_size = 12288\n')
+    sandbox = SandboxKimi(
+        workspace=tmp_path / "work", control_dir=tmp_path / "control",
+        capability_dir=tmp_path / "capabilities", kimi_bin=tmp_path / "kimi",
+        config_path=config, python_root=Path(sys.prefix),
+        mcp_startup_timeout_s=30, mcp_tool_timeout_s=210,
+    )
+
+    async def inspect_spawn(*args, **kwargs):
+        private = sandbox.control_dir / "private_home/.kimi-code"
+        assert tomllib.loads((private / "config.toml").read_text())["models"]["research"]["max_output_size"] == 12288
+        server = json.loads((private / "mcp.json").read_text())["mcpServers"]["venusfactory"]
+        assert server["startupTimeoutMs"] == 30000
+        assert server["toolTimeoutMs"] == 210000
+        raise OSError("inspected without launching")
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", inspect_spawn)
+    with pytest.raises(OSError, match="inspected"):
+        await sandbox.start()
+    assert not (sandbox.control_dir / "private_home/.kimi-code/config.toml").exists()
+
+
+@pytest.mark.parametrize("timeout", [True, 0, -1, float("inf"), float("nan"), "120"])
+def test_kimi_rejects_invalid_mcp_timeouts(tmp_path, timeout):
+    with pytest.raises(ValueError, match="MCP tool timeout"):
+        SandboxKimi(
+            workspace=tmp_path, control_dir=tmp_path / "control",
+            capability_dir=tmp_path, kimi_bin=tmp_path / "kimi",
+            config_path=tmp_path / "config", python_root=Path(sys.prefix),
+            mcp_tool_timeout_s=timeout,
+        )

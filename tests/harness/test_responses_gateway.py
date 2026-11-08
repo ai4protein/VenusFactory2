@@ -280,7 +280,7 @@ async def test_real_http_relay_keeps_wire_bytes_and_counts_physical_requests(tmp
             result = await client.post(relay.base_url + "/responses", **args)
             assert result.status_code == 200 and result.content == raw
             assert audit_requests(log)["passed"]
-            assert (await client.post(relay.base_url + "/responses", **args)).status_code == 429
+            assert (await client.post(relay.base_url + "/responses", **args)).status_code == 400
             assert (await client.post(relay.base_url + "/chat/completions", **args)).status_code == 404
             assert (await client.post(relay.base_url + "/responses", json=args["json"])).status_code == 401
     assert len(seen) == 1
@@ -392,3 +392,77 @@ async def test_shutdown_waits_for_cancelled_request_evidence(tmp_path):
         assert log.read_bytes() == before and not audit_requests(log)["passed"]
         pending.cancel()
         await asyncio.gather(pending, return_exceptions=True)
+
+
+@pytest.mark.parametrize("tool", [False, True])
+def test_atomic_done_without_deltas_requires_complete_terminal_evidence(tool):
+    rows = [row for row in events(tool) if not row["type"].endswith(".delta")]
+    rows = [{**row, "sequence_number": i} for i, row in enumerate(rows)]
+    assert inspect(stream(rows), True)["usage"]["output_tokens"] == 5
+
+    # A partial delta must agree even when a complete done event follows it.
+    partial = {
+        "type": "response.function_call_arguments.delta" if tool else "response.output_text.delta",
+        "item_id": "item1", "output_index": 0, "delta": "partial",
+    }
+    if not tool:
+        partial["content_index"] = 0
+    changed = copy.deepcopy(rows)
+    changed.insert(2, partial)
+    changed = [{**row, "sequence_number": i} for i, row in enumerate(changed)]
+    with pytest.raises(ValueError, match="deltas disagree"):
+        inspect(stream(changed), True)
+
+    for missing_type in ("response.output_item.done",
+                         "response.function_call_arguments.done" if tool else "response.output_text.done",
+                         "response.completed"):
+        changed = [row for row in rows if row["type"] != missing_type]
+        changed = [{**row, "sequence_number": i} for i, row in enumerate(changed)]
+        with pytest.raises(ValueError):
+            inspect(stream(changed), True)
+
+    changed = copy.deepcopy(rows)
+    field = "arguments" if tool else "text"
+    done_type = "response.function_call_arguments.done" if tool else "response.output_text.done"
+    next(row for row in changed if row["type"] == done_type)[field] = "{}" if tool else "changed"
+    with pytest.raises(ValueError):
+        inspect(stream(changed), True)
+
+
+def test_reasoning_accounting_anomaly_is_explicit_and_preserves_provider_counts():
+    value = response(True)
+    value["usage"] = {
+        "input_tokens": 6270, "output_tokens": 79, "total_tokens": 6349,
+        "output_tokens_details": {"reasoning_tokens": 80},
+    }
+    raw = json.dumps(value).encode()
+    with pytest.raises(ValueError, match="detail exceeds"):
+        inspect(raw, False)
+    usage = inspect_responses(
+        raw, False, model="fixture-model", allowed_tools={NAME}, max_output_tokens=100,
+        allow_reasoning_detail_mismatch=True,
+    )["usage"]
+    assert usage["input_tokens"] == 6270 and usage["output_tokens"] == 79
+    assert usage["total_tokens"] == 6349
+    assert usage["output_tokens_details"]["reasoning_tokens"] == 80
+    assert usage["anomalies"] == [{
+        "field": "reasoning_tokens", "reported": 80, "parent_total": 79,
+        "code": "detail_exceeds_total",
+    }]
+
+    for change in (
+        {"output_tokens_details": {"reasoning_tokens": 101}},
+        {"output_tokens_details": {"reasoning_tokens": -1}},
+        {"output_tokens_details": {"reasoning_tokens": True}},
+        {"input_tokens_details": {"cached_tokens": 6271}},
+        {"total_tokens": 6350},
+        {"output_tokens": 101, "total_tokens": 6371},
+    ):
+        changed = copy.deepcopy(value)
+        changed["usage"].update(change)
+        with pytest.raises(ValueError):
+            inspect_responses(
+                json.dumps(changed).encode(), False, model="fixture-model",
+                allowed_tools={NAME}, max_output_tokens=100,
+                allow_reasoning_detail_mismatch=True,
+            )

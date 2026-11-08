@@ -88,7 +88,7 @@
         "context_tokens": 262144
       },
       "inference_controls": {
-        "thinking": "disabled",
+        "thinking": "enabled",
         "temperature": 0.2
       },
       "pricing": {
@@ -192,7 +192,7 @@
         "context_tokens": 65536
       },
       "inference_controls": {
-        "thinking": "disabled",
+        "thinking": "enabled",
         "temperature": 0.2
       },
       "pricing": {
@@ -225,7 +225,7 @@
         "input_per_million": 0,
         "output_per_million": 0
       },
-      "enabled": true,
+      "enabled": false,
       "max_output_tokens": 12288,
       "protocols": [
         "chat_completions",
@@ -277,7 +277,7 @@
         "input_per_million": 0,
         "output_per_million": 0
       },
-      "enabled": true,
+      "enabled": false,
       "max_output_tokens": 12288,
       "protocols": [
         "chat_completions",
@@ -524,11 +524,11 @@
   "defaults": {
     "science_agent": {
       "harness": "deepseek-harness",
-      "model_id": "dmx-u2-free"
+      "model_id": "dmx-glm4-free"
     },
     "science_expert": {
       "harness": "expert-deepseek-harness",
-      "model_id": "dmx-u2-free"
+      "model_id": "dmx-glm4-free"
     }
   },
   "harnesses": {

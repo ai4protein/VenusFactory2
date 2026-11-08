@@ -119,7 +119,7 @@ async def test_shared_protocol_dispatches_to_original_tool_and_records_real_iden
             assert len(listing) == 5 and 'protein_length' not in {r['name'] for r in listing}
             assert len(json.dumps(listing)) < 6000
             assert 'error' in await call('protein_length', {'sequence':'ACDE'})
-            assert 'error' in await call('call_tool', {'name':'protein_length','arguments':{'sequence':'ACDE'}})
+            assert (await call('call_tool', {'name':'protein_length','arguments':{'sequence':'ACDE'}}))['result']['isError'] is True
             found = json.loads((await call('search_tools', {'query':'protein_length'}))['result']['content'][0]['text'])
             assert found['tools'][0] == {'name':'protein_length','description':'Calculate sequence length.'}
             described = json.loads((await call('describe_tool', {'name':'protein_length'}))['result']['content'][0]['text'])
@@ -166,7 +166,7 @@ def test_initial_overview_contains_categories_only_and_broad_search_narrows():
     c = grouped_catalog()
     for args in ({}, {'query': 'protein'}):
         result = c.metadata('search_tools', args)
-        assert result['level'] == 'categories' and result['tools'] == []
+        assert result['level'] == 'categories' and not result.get('tools')
         encoded = json.dumps(result)
         assert not any(name in encoded for name in c.mapping)
         assert 'secret_schema_word' not in encoded and 'private_skill_body' not in encoded
@@ -187,7 +187,7 @@ def test_category_filter_and_short_search_never_read_schemas():
     assert c.metadata('search_tools', {'category': 'guides'})['tools'][0]['name'] == 'list_skills'
 
 
-@pytest.mark.parametrize('args', [{'category': []}, {'category': None}, {'category': 'invalid'}, {'category': True}])
+@pytest.mark.parametrize('args', [{'category': []}, {'category': None}, {'category': True}])
 def test_category_validation(args):
     with pytest.raises(DisclosureError):
         grouped_catalog().metadata('search_tools', args)
@@ -231,3 +231,106 @@ def test_physchem_is_discoverable_from_its_brief_description(query):
     tool = SimpleNamespace(name="calculate_physchem_from_sequence", description=ast.get_docstring(func))
     c = ToolDisclosure({tool.name: tool}, schema=lambda t: {}, allowed=lambda t: True)
     assert c.metadata("search_tools", {"category": "compute", "query": query})["tools"][0]["name"] == tool.name
+
+def test_guessed_category_returns_only_allowed_navigation_and_can_recover():
+    c = grouped_catalog({'query_uniprot'})
+    result = c.metadata('search_tools', {'category': 'sequence_analysis'})
+    assert result['level'] == 'categories' and result['selection_error']
+    assert result['tools'] == [] and not c.inspected
+    assert [row['id'] for row in result['categories']] == ['databases']
+    assert 'calculate_protein' not in json.dumps(result)
+    assert c.metadata('search_tools', {'category':'databases','query':'protein'})['tools']
+    category = c.surface()[0]['inputSchema']['properties']['category']
+    assert category['enum'] == ['', 'databases']
+
+
+def test_directly_exposed_checkpoint_can_use_either_dispatch_path_and_still_be_revoked():
+    name = "submit_research_checkpoint"
+    tool = SimpleNamespace(name=name, description="Save the current research result.")
+    enabled = {name}
+    c = ToolDisclosure({name:tool}, schema=lambda _:{"type":"object"},
+                       allowed=lambda t:t.name in enabled, direct={name})
+    assert name in {row["name"] for row in c.surface()}
+    arguments = {"summary":"Measured a baseline"}
+    assert c.resolve(name, arguments)[1:] == (tool, arguments)
+    assert c.resolve("call_tool", {"name":name, "arguments":arguments})[1:] == (tool, arguments)
+    assert c.metadata("describe_tool", {"name":name})["call_via"] == name
+    enabled.clear()
+    for method, args in [(name,arguments), ("call_tool",{"name":name,"arguments":arguments})]:
+        with pytest.raises(DisclosureError, match="unavailable"):
+            c.resolve(method,args)
+
+@pytest.mark.parametrize("prefix",["mcp__venusfactory__","functions.mcp__venusfactory__"])
+def test_harness_namespace_in_discovery_arguments_preserves_policy(prefix):
+    enabled={"protein_model_0"}
+    c=catalog(1,enabled)
+    name=prefix+"protein_model_0"
+    with pytest.raises(DisclosureError,match="describe_tool"):
+        c.resolve("call_tool",{"name":name,"arguments":{}})
+    assert c.metadata("describe_tool",{"name":name})["name"]=="protein_model_0"
+    assert c.resolve("call_tool",{"name":name,"arguments":{}})[0]=="protein_model_0"
+    assert c.metadata("search_tools",{"query":name})["tools"][0]["name"]=="protein_model_0"
+    with pytest.raises(DisclosureError,match="unavailable"):
+        c.metadata("describe_tool",{"name":"mcp__other_server__protein_model_0"})
+    enabled.clear()
+    with pytest.raises(DisclosureError,match="unavailable"):
+        c.resolve("call_tool",{"name":name,"arguments":{}})
+
+def test_cross_category_search_reports_matches_without_empty_tool_list():
+    tools = {name: SimpleNamespace(name=name, description="ProSST-2048 capability.",
+             metadata={"discovery_category": category})
+             for name, category in (("score_variant", "compute"), ("fit_model", "training"))}
+    enabled = set(tools)
+    def no_schema(tool):
+        raise AssertionError("Category lookup must not load a schema")
+    c = ToolDisclosure(tools, schema=no_schema, allowed=lambda tool: tool.name in enabled)
+    result = c.metadata("search_tools", {"query": "ProSST-2048"})
+    assert result["level"] == "categories" and "tools" not in result
+    assert result["match_status"] == "matches_found"
+    assert result["matched_capabilities"] == 2
+    assert "Found 2 enabled capabilities" in result["summary"]
+    assert not any(name in json.dumps(result) for name in tools)
+    assert not c.inspected
+    for args in result["suggested_searches"]:
+        assert args["query"] == "ProSST-2048"
+        page = c.metadata("search_tools", args)
+        assert len(page["tools"]) == 1
+    enabled.clear()
+    missing = c.metadata("search_tools", {"query": "ProSST-2048"})
+    assert missing["match_status"] == "no_direct_match"
+    assert missing["matched_capabilities"] == 0 and not missing["suggested_searches"]
+    assert "not establish" in missing["summary"]
+
+def test_unavailable_uninspected_names_do_not_suggest_an_impossible_describe_call():
+    c = catalog(2, set())
+    for name in ("protein_model_0", "guessed_name"):
+        with pytest.raises(DisclosureError, match="unavailable") as error:
+            c.resolve("call_tool", {"name":name, "arguments":{}})
+        assert "Read describe_tool" not in str(error.value)
+
+
+def test_unknown_category_with_named_query_recovers_without_expanding_schema():
+    c = catalog(2, {'protein_model_0'})
+    result = c.metadata('search_tools', {'category':'sequence_analysis','query':'protein_model_0'})
+    assert result['level'] == 'capabilities'
+    assert [row['name'] for row in result['tools']] == ['protein_model_0']
+    assert result['requested_category'] == 'sequence_analysis'
+    assert all(set(row) == {'name','description'} for row in result['tools'])
+    assert not c.inspected
+    with pytest.raises(DisclosureError, match='describe_tool'):
+        c.resolve('call_tool', {'name':'protein_model_0','arguments':{'sequence':'AC'}})
+    hidden = c.metadata('search_tools', {'category':'sequence_analysis','query':'protein_model_1'})
+    assert not hidden.get('tools') and not c.inspected
+
+
+@pytest.mark.parametrize('name',['search_tools','describe_tool','call_tool'])
+@pytest.mark.parametrize('prefix',['','mcp__venusfactory__','functions.mcp__venusfactory__'])
+def test_navigation_tools_can_describe_their_already_exposed_contract(name,prefix):
+    c=catalog()
+    result=c.metadata('describe_tool',{'name':prefix+name})
+    public=next(tool for tool in c.surface() if tool['name']==name)
+    assert result['name']==name and result['inputSchema']==public['inputSchema']
+    assert result['call_via']==name
+    assert not c.inspected
+    with pytest.raises(DisclosureError,match='describe_tool'):
+        c.resolve('call_tool',{'name':'protein_model_0','arguments':{'sequence':'AC'}})

@@ -189,7 +189,10 @@ async def test_buffered_sse_complete_before_downstream_disconnect_and_budget(tmp
                 assert response.status_code == 200
                 # Exit without consuming its body, as an SDK may do after a finish event.
             assert audit_requests(log)["passed"]
-            assert (await client.post(url, headers=h, json=payload)).status_code == 429
+            rejected = await client.post(url, headers=h, json=payload)
+            assert rejected.status_code == 400
+            assert rejected.json()["error"]["code"] == "model_call_budget_exhausted"
+            assert gateway.calls == 1
     assert len(seen) == 1
     assert "private-prompt" not in log.read_text() and "upstream-secret" not in log.read_text()
     assert not audit_requests(log)["passed"]  # budget overrun remains a failed protocol
@@ -206,3 +209,42 @@ def test_same_harness_supports_both_modes_without_changing_model_or_budget(tmp_p
     assert left["adapter"] == right["adapter"]
     assert left["profile"]["model"] == right["profile"]["model"]
     assert left["profile"]["budget"] == right["profile"]["budget"]
+
+
+@pytest.mark.parametrize("arguments", ['{"code":"unterminated', "[]", "null", "[", None])
+def test_bad_dsh_arguments_are_observed_and_require_a_tool_error(tmp_path, arguments):
+    event = {"type": "tool/call", "data": {
+        "callId": "bad-input", "name": "mcp__venusfactory__fit", "arguments": arguments,
+    }}
+    original = json.loads(json.dumps(event))
+    start = normalize_dsh(event)[0]
+    assert event == original
+    assert start["args"] is None and start["arguments_error"]
+    path = tmp_path / "events.jsonl"
+    for is_error in (True, False):
+        result = {"kind": "tool_result", "tool_call_id": "bad-input",
+                  "is_error": is_error, "output": "Argument validation"}
+        path.write_text("\n".join(json.dumps(row) for row in (start, result)))
+        audit = audit_trace(path, {"fit"}, 1)
+        assert audit["passed"] is is_error
+        assert audit["tool_calls"] == 1 and audit["tool_errors"] == int(is_error)
+    path.write_text(json.dumps(start))
+    assert "unpaired_tool_calls" in audit_trace(path, {"fit"}, 1)["problems"]
+
+
+def test_recovery_after_bad_arguments_does_not_hide_budget_or_identity(tmp_path):
+    rows = normalize_dsh({"type": "tool/call", "data": {
+        "callId": "bad", "name": "mcp__venusfactory__fit", "arguments": '{"seed":',
+    }})
+    rows.append({"kind": "tool_result", "tool_call_id": "bad",
+                 "is_error": True, "output": "Invalid JSON"})
+    rows += normalize_dsh({"type": "tool/call", "data": {
+        "callId": "retry", "name": "mcp__venusfactory__fit", "arguments": '{"seed":1}',
+    }})
+    rows.append({"kind": "tool_result", "tool_call_id": "retry",
+                 "is_error": False, "output": "Fitted"})
+    path = tmp_path / "events.jsonl"
+    path.write_text("\n".join(json.dumps(row) for row in rows))
+    assert audit_trace(path, {"fit"}, 2)["passed"]
+    assert "tool_budget_exceeded" in audit_trace(path, {"fit"}, 1)["problems"]
+    assert "undeclared_tool" in audit_trace(path, {"other"}, 2)["problems"]

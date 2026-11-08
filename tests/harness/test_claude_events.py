@@ -153,3 +153,28 @@ def test_native_terminal_failure_does_not_count_as_success():
     event["permission_denials"] = [{"tool_name": "Bash"}]
     state.consume(event)
     assert state.failed and not state.completed
+
+def heartbeat():
+    return {"type": "tool_progress", "session_id": "s1", "tool_use_id": "c1-heartbeat-0",
+            "tool_name": TOOL, "parent_tool_use_id": "c1", "heartbeat": True, "elapsed_time_seconds": 30}
+
+
+def test_long_tool_heartbeat_does_not_start_or_finish_another_call():
+    state = ClaudeEvents({"protein_probe"}, 1)
+    state.consume(init()); state.consume(call())
+    assert state.consume(heartbeat()) == []
+    assert len(state.started) == 1 and not state.finished
+    state.consume(result()); state.consume(terminal())
+    assert state.completed and state.tool_errors == 0
+
+
+@pytest.mark.parametrize("change", [
+    {"session_id": "other"}, {"parent_tool_use_id": "unknown"},
+    {"tool_name": "mcp__venusfactory__unregistered"}, {"heartbeat": False},
+    {"elapsed_time_seconds": -1}, {"elapsed_time_seconds": float("nan")},
+])
+def test_unbound_tool_progress_is_rejected(change):
+    state = ClaudeEvents({"protein_probe"}, 1)
+    state.consume(init()); state.consume(call())
+    with pytest.raises(ValueError):
+        state.consume({**heartbeat(), **change})

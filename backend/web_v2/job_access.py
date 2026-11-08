@@ -1,6 +1,7 @@
 """Shared browser identity and private-file checks for job HTTP adapters."""
 from contextvars import ContextVar
 import hashlib
+import os
 import re
 import secrets
 from fastapi import HTTPException, Request, Response
@@ -11,13 +12,24 @@ COOKIES = {'platform': 'vf_model_workspace', 'custom': 'vf_custom_jobs', 'report
 request_context = ContextVar('job_request', default=None)
 
 
+def cookie_name(source):
+    # Cookies do not distinguish localhost ports. Keep the established online
+    # cookie and isolate a local instance opened in the same browser.
+    mode = os.getenv("WEBUI_V2_MODE", "").strip().lower()
+    if not mode:
+        from config import get_config
+        mode = "online" if get_config().server.is_online else "local"
+    suffix = "_local" if mode == "local" else ""
+    return COOKIES[source] + suffix
+
+
 def browser_owner(request, response, source, session=None):
     require_same_origin(request)
     cache = getattr(request.state, 'job_owners', {})
     if source in cache:
         return cache[source]
-    cookie = COOKIES[source]
-    old = request.cookies.get(cookie, '')
+    cookie = cookie_name(source)
+    old = request.cookies.get(cookie) or request.cookies.get(COOKIES[source], '')
     if session:
         token, owner = session(old)
     else:
@@ -25,7 +37,7 @@ def browser_owner(request, response, source, session=None):
         owner = hashlib.sha256(token.encode()).hexdigest()
     # Preserve existing identities while making them available to result routes.
     response.set_cookie(cookie, token, httponly=True, secure=secure_request(request), samesite='strict', max_age=365*86400, path='/api')
-    response.delete_cookie(cookie, path='/api/model-platform' if source == 'platform' else '/api/custom-model')
+    response.delete_cookie(COOKIES[source], path='/api/model-platform' if source == 'platform' else '/api/custom-model')
     response.headers['Cache-Control'] = 'private, no-store'
     response.headers['Vary'] = 'Cookie'
     cache[source] = owner
@@ -36,7 +48,7 @@ def browser_owner(request, response, source, session=None):
 def request_owners(request):
     owners = dict(getattr(request.state, 'job_owners', {}))
     for source, cookie in COOKIES.items():
-        token = request.cookies.get(cookie, '')
+        token = request.cookies.get(cookie_name(source)) or request.cookies.get(cookie, '')
         if source not in owners and re.fullmatch('[a-f0-9]{64}', token):
             owners[source] = hashlib.sha256(token.encode()).hexdigest()
     return owners

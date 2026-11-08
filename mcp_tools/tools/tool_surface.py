@@ -10,6 +10,9 @@ WORKSPACE_ALIASES = {
     'run_research_python': 'run_session_python',
 }
 
+# A small stable execution surface; scientific catalogs remain discoverable.
+WORKSPACE_PRIMITIVES = frozenset(WORKSPACE_ALIASES.values())
+
 CODE_MIGRATION_MESSAGE = (
     'Write the Python source with write_session_file(path, content), then call '
     'run_session_python(path, timeout_seconds). The server assigns the session workspace.'

@@ -54,6 +54,32 @@ class Limits:
         )
 
 
+def cgroup_headroom(folder, limit, used):
+    """Available cgroup memory, excluding reclaimable clean file cache.
+
+    memory.current/usage_in_bytes include reclaimable page cache. Counting that
+    as resident application memory can permanently starve every sandbox after
+    downloading weights. Clean file-backed pages on either LRU can be reclaimed by the kernel.
+    Dirty pages, tmpfs, unevictable memory and anonymous RSS remain charged.
+    Missing/malformed statistics retain the conservative raw-usage calculation.
+    """
+    ceiling, usage = int(limit), max(0, int(used))
+    reclaimable = 0
+    try:
+        stats = {key: max(0, int(value)) for key, value in
+                 (line.split() for line in (folder / 'memory.stat').read_text().splitlines())}
+        prefix = 'total_' if 'total_inactive_file' in stats else ''
+        file_lru = stats.get(prefix + 'inactive_file', 0) + stats.get(prefix + 'active_file', 0)
+        cache = stats.get(prefix + 'cache', stats.get('file', 0))
+        shared = stats.get(prefix + 'shmem', 0)
+        dirty = stats.get(prefix + 'dirty', stats.get('file_dirty', 0))
+        writeback = stats.get(prefix + 'writeback', stats.get('file_writeback', 0))
+        reclaimable = max(0, min(file_lru, max(0, cache - shared)) - dirty - writeback)
+    except (OSError, ValueError):
+        pass
+    return max(0, ceiling - usage + min(usage, reclaimable))
+
+
 def memory_headroom():
     """Minimum of host available memory and the process's actual cgroup budget."""
     values = []
@@ -75,7 +101,7 @@ def memory_headroom():
             limit,used=folder/names[0],folder/names[1]
             if limit.exists() and used.exists():
                 raw=limit.read_text().strip()
-                if raw!='max':values.append(max(0,int(raw)-int(used.read_text())))
+                if raw!='max':values.append(cgroup_headroom(folder,raw,used.read_text()))
     if not values:raise RuntimeError('Memory accounting unavailable')
     return min(values)
 

@@ -22,7 +22,8 @@ def main():
         for name in ["persistent-bash", "persistent-pwsh", "terminal-bash", "terminal-pwsh"]
     ]
     server = scientific_server(entry=request["entry"], tools=request["tools"], clean_pythonpath=True)
-    patch.append({"insert": [deepseek_mcp_plugin(server)]})
+    patch.append({"insert": [deepseek_mcp_plugin(server, request["timeout"]),
+        {"id": "venus-tool-arguments", "name": "/runner/dsh_argument_guard.mjs"}]})
     patch_path = root / "composition.patch.yml"
     patch_path.write_text(json.dumps(patch, indent=2))
     (root / "events.jsonl").touch(exist_ok=False)

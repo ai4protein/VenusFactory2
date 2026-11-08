@@ -118,6 +118,7 @@ def test_workflow_component_http_contract_and_private_visibility(setup,monkeypat
 
 
 def test_http_training_workflow_completes_in_separate_worker(tmp_path,monkeypatch):
+    monkeypatch.setenv('WEBUI_V2_MODE','local')
     p=Platform(tmp_path);monkeypatch.setattr(api,'service',p)
     app=FastAPI();app.include_router(api.router)
     with TestClient(app) as client:

@@ -315,7 +315,12 @@ def test_online_scientist_can_train_small_cpu_model_in_queue(tmp_path,monkeypatc
     from agent.harness.research_workspace import run_python
     monkeypatch.setenv('VENUS_SCIENTIST_ONLINE','1')
     monkeypatch.setenv('VENUS_JOB_QUEUE_ROOT',str(tmp_path/'queue'))
+    monkeypatch.setenv('VENUS_SANDBOX_CONTROL_ROOT',str(tmp_path/'sandbox-control'))
     monkeypatch.delenv('VENUS_QUEUE_JOB_ID',raising=False)
+    from agent.harness.sandbox_resources import Limits, memory_headroom
+    limits = Limits.load()
+    if memory_headroom() < limits.memory + limits.reserve_free:
+        pytest.skip('Host/cgroup memory budget cannot safely admit the integration sandbox')
     work=tmp_path/'workspace';work.mkdir()
     (work/'train.py').write_text('''import os,resource,json
 import numpy as np

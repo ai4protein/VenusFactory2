@@ -135,6 +135,7 @@ class SandboxKimi:
         relay=None,
         startup_timeout_s: float = 35,
         mcp_startup_timeout_s: float | None = None,
+        mcp_tool_timeout_s: float | None = None,
         prepare_mcp: bool = False,
     ):
         if type(prepare_mcp) is not bool:
@@ -161,6 +162,13 @@ class SandboxKimi:
             or not 0.001 <= mcp_startup_timeout_s <= 2147483.647
         ):
             raise ValueError("Invalid native MCP startup timeout")
+        if mcp_tool_timeout_s is not None and (
+            type(mcp_tool_timeout_s) not in (int, float)
+            or not math.isfinite(mcp_tool_timeout_s)
+            or not 0.001 <= mcp_tool_timeout_s <= 2147483.647
+        ):
+            raise ValueError("Invalid native MCP tool timeout")
+        self.mcp_tool_timeout_s = mcp_tool_timeout_s
         self.mcp_startup_timeout_s = mcp_startup_timeout_s
         self.startup_timeout_s = startup_timeout_s
         self.relay = relay
@@ -183,7 +191,6 @@ class SandboxKimi:
                 config_text = self.config_path.read_text()
             else:
                 config_text, _ = read_model_configuration(self.config_path, expected=self.expected_model)
-            config_text = re.sub(r"(?m)^(max_output_size\s*=\s*)[0-9]+", r"\g<1>4096", config_text)
             if self.relay is not None:
                 import tomllib
 
@@ -222,6 +229,8 @@ class SandboxKimi:
                 mcp["mcpServers"]["venusfactory"] = self.prepared_mcp.connection()
             if self.mcp_startup_timeout_s is not None:
                 mcp["mcpServers"]["venusfactory"]["startupTimeoutMs"] = max(1, int(self.mcp_startup_timeout_s * 1000))
+            if self.mcp_tool_timeout_s is not None:
+                mcp["mcpServers"]["venusfactory"]["toolTimeoutMs"] = max(1, int(self.mcp_tool_timeout_s * 1000))
             (config_root / "mcp.json").write_text(json.dumps(mcp))
             self.log = (self.control_dir / "server.log").open("wb")
             self.startup_stage = "server_startup"

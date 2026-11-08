@@ -38,20 +38,30 @@ def check_workspace(workspace):
     for folder, dirs, files in os.walk(root, followlinks=False):
         for name in dirs + files:
             p = Path(folder)/name
-            if p.is_symlink(): raise ValueError('Linked files are unavailable in session execution')
-            if not p.is_dir() and not p.is_file(): raise ValueError('Only regular session files are supported')
-            if p.is_file() and p.stat().st_nlink != 1: raise ValueError('Hard-linked files are unavailable in session execution')
+            try:
+                info = p.lstat()
+            except FileNotFoundError:
+                # Atomic saves and temporary files can disappear after os.walk.
+                # Never follow a replacement link or reuse metadata from another stat.
+                continue
+            if stat.S_ISLNK(info.st_mode): raise ValueError('Linked files are unavailable in session execution')
+            regular = stat.S_ISREG(info.st_mode)
+            if not regular and not stat.S_ISDIR(info.st_mode): raise ValueError('Only regular session files are supported')
+            if regular and info.st_nlink != 1: raise ValueError('Hard-linked files are unavailable in session execution')
             count += 1
             if count > 10000: raise ValueError('Session file limit reached')
-        for name in files:
-            total += (Path(folder)/name).stat().st_size
-            if total > limit: raise ValueError('Session storage limit reached')
+            if regular:
+                total += info.st_size
+                if total > limit: raise ValueError('Session storage limit reached')
 
 
 def validate_execution(kind, payload, timeout):
     if kind not in {'python', 'shell'}: raise ValueError('Unsupported session execution')
     if type(timeout) is not int or not 1 <= timeout <= 300: raise ValueError('Timeout must be 1..300 seconds')
     if not isinstance(payload,str) or not payload or len(payload.encode()) > 200000: raise ValueError('Invalid command')
+    if kind == 'python' and Path(payload).suffix.lower() != '.py':
+        raise ValueError('Pass a saved .py script to run_session_python. Read data with read_session_file, or write a Python script that loads the data file.')
+
 
 
 def command(workspace, kind, payload, timeout, *, scratch, memory):
@@ -75,7 +85,8 @@ def command(workspace, kind, payload, timeout, *, scratch, memory):
             '--chdir','/workspace','--clearenv']
     env = {'HOME':'/tmp','PATH':'/opt/venus-runtime/bin:/usr/bin:/bin','LANG':'C.UTF-8',
            'OPENBLAS_NUM_THREADS':'1','OMP_NUM_THREADS':'1','MKL_NUM_THREADS':'1','PYTHONDONTWRITEBYTECODE':'1',
-           'VENUS_SANDBOX_MEMORY_BYTES':str(memory),'XDG_CACHE_HOME':'/tmp/cache'}
+           'VENUS_SANDBOX_MEMORY_BYTES':str(memory),'XDG_CACHE_HOME':'/tmp/cache',
+           'HF_HUB_OFFLINE':'1','TRANSFORMERS_OFFLINE':'1','HF_DATASETS_OFFLINE':'1'}
     if os.getenv('VENUS_SCIENTIST_ONLINE') == '1' or os.getenv('WEBUI_V2_MODE') == 'online': env['VENUS_SCIENTIST_ONLINE']='1'
     for k,v in env.items(): cmd += ['--setenv',k,v]
     return cmd+['--','/opt/venus-runtime/bin/python','-I','-u','/runner.py',kind,str(timeout),payload]

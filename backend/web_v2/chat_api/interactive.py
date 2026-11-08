@@ -3,7 +3,7 @@ import asyncio
 
 from fastapi import APIRouter, HTTPException, Request
 
-from agent.chat_graph import _format_clarification_answers
+from agent.graph.helpers.plan_helpers import _format_clarification_answers
 from logger import get_logger
 
 from backend.web_v2.chat_api._hooks_runtime import (

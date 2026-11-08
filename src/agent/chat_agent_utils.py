@@ -8,9 +8,8 @@ import re
 from datetime import datetime
 from typing import Any
 
-from langchain_classic.schema import HumanMessage
+from langchain_core.messages import HumanMessage
 
-from agent.prompts import MLS_SELF_CHECK_TEMPLATE
 from config import get_config
 from logger import get_logger
 from mcp_tools.common.common_utils import (
@@ -443,6 +442,7 @@ def _mls_debug_step(llm, step_num: int, task_desc: str, tool_name: str, merged_t
         f"Step {step_num} failed during tool execution.\n\n"
         f"**Task:** {task_desc}\n**Tool:** {tool_name}\n**Current input:** {json.dumps(merged_tool_input, ensure_ascii=False)}\n**Error:** {error_str}"
     )
+    from agent.prompts import MLS_SELF_CHECK_TEMPLATE
     prompt = f"{context}\n\n{MLS_SELF_CHECK_TEMPLATE}"
     try:
         response = llm.invoke([HumanMessage(content=prompt)])

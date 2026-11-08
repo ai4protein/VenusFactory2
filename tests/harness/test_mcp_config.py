@@ -159,3 +159,16 @@ def test_cli_exports_without_credentials_or_overwriting_existing_files(tmp_path)
     second = subprocess.run(command, capture_output=True, text=True)
     assert second.returncode != 0
     assert {p.name: p.read_bytes() for p in target.iterdir()} == previous
+
+@pytest.mark.parametrize("seconds", [0.25, 120, 900])
+def test_deepseek_tool_timeout_matches_admitted_turn(seconds):
+    server = scientific_server(entry="web_tools.py", tools=["call_tool"])
+    config = deepseek_mcp_plugin(server, seconds)["config"]
+    assert config["toolCallTimeoutMs"] == int(seconds * 1000)
+
+
+@pytest.mark.parametrize("seconds", [0, -1, True, float("nan"), float("inf"), "900"])
+def test_deepseek_rejects_unbounded_or_invalid_timeout(seconds):
+    server = scientific_server(entry="web_tools.py", tools=["call_tool"])
+    with pytest.raises(ValueError):
+        deepseek_mcp_plugin(server, seconds)

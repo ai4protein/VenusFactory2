@@ -16,6 +16,7 @@ import time
 
 import httpx
 from aiohttp import web
+from .sse_terminal import StreamTerminal
 from .provider_config import request_headers, matches_snapshot, local_route
 
 from .contracts import digest
@@ -357,12 +358,13 @@ class MessagesBridge(EvidenceGateway):
             self.record({"event": "upstream_retry_suppressed", "status": 429})
             return self.error("api_error", "upstream_http_429", 400)
         if self.calls >= self.policy.max_calls:
-            self.record({"event": "budget_rejected"})
-            return self.error("rate_limit_error", "Model call budget exhausted", 429)
+            self.record({"event": "budget_rejected", "code": "model_call_budget_exhausted"})
+            return self.error("invalid_request_error", "Model call budget exhausted", 400)
         self.calls += 1
         call, started = self.calls, time.monotonic()
         self.record({"event": "request", "call": call, "transport": TRANSPORT, **metadata, **native})
         status, usage, completed, error_type, evidence = None, None, False, None, {}
+        raw = bytearray()
         try:
             async with (
                 asyncio.timeout(self.timeout_s),
@@ -379,14 +381,16 @@ class MessagesBridge(EvidenceGateway):
                     client_status = 400 if status == 429 and self.on_text is not None else status
                     self._rate_limited = client_status != status
                     return self.error("api_error", "upstream_http_" + str(status), client_status)
-                raw = bytearray()
                 preview = PublicTextStream(self.on_text, call) if self.on_text is not None else None
+                terminal = StreamTerminal('chat') if payload.get('stream') else None
                 async for chunk in response.aiter_bytes():
                     raw.extend(chunk)
                     if len(raw) > 16_000_000:
                         raise ValueError("Provider response exceeds byte budget")
                     if preview is not None:
                         await preview.feed(chunk)
+                    if terminal is not None and terminal.feed(chunk):
+                        break
                 if preview is not None:
                     inspect_response(bytes(raw), True)
                 chat_raw = preview.completion() if preview is not None else bytes(raw)
@@ -435,6 +439,7 @@ class MessagesBridge(EvidenceGateway):
                     "call": call,
                     "status": status,
                     "completed": completed,
+                    "received_bytes": len(raw),
                     "error_type": error_type,
                     "usage": usage,
                     **evidence,

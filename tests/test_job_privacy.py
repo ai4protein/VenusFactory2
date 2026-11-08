@@ -1,4 +1,6 @@
 import hashlib
+import os
+from backend.web_v2.job_access import cookie_name
 import json
 import sys
 import time
@@ -52,7 +54,7 @@ def platform_app(tmp_path, monkeypatch):
 
 def make_prediction(client, service):
     client.get('/api/model-platform/session')
-    owner = hashlib.sha256(client.cookies.get('vf_model_workspace').encode()).hexdigest()
+    owner = hashlib.sha256(client.cookies.get(cookie_name('platform')).encode()).hexdigest()
     data = client.post('/api/model-platform/datasets', files={'file':('input.fa',b'>sample\nACDEFGHIKLMN')}).json()
     model = next(m for m in service.official() if m['adapter']=='descriptors')
     job = service.start(owner, 'predict', {'dataset_id': data['id'], 'model_id': model['id']}, launch=False)
@@ -99,14 +101,18 @@ def test_legacy_cookie_migration_preserves_jobs(platform_app):
         client.cookies.set('vf_model_workspace',token,domain='testserver.local',path='/api/model-platform')
         response=client.get('/api/model-platform/job-history')
         assert response.status_code==200
-        assert client.cookies.get('vf_model_workspace')==token
-        assert [c.path for c in client.cookies.jar if c.name=='vf_model_workspace']==['/api']
+        from backend.web_v2.job_access import cookie_name
+        assert client.cookies.get(cookie_name('platform'))==token
+        assert [c.path for c in client.cookies.jar if c.name==cookie_name('platform')]==['/api']
         assert service.session(token)[1]==owner
 
 
-def test_custom_first_request_stream_cookie_and_artifact_privacy(tmp_path,monkeypatch):
+@pytest.mark.parametrize("mode", ["local", "online"])
+def test_custom_first_request_stream_cookie_and_artifact_privacy(tmp_path,monkeypatch,mode):
     from backend.web_v2 import custom_model_api as api
     from backend.web_v2.job_access import guard_artifact
+    monkeypatch.setenv('WEBUI_V2_MODE',mode)
+    monkeypatch.setenv('TEMP_OUTPUTS_DIR',str(tmp_path/'files'))
     monkeypatch.setenv('VENUS_JOB_QUEUE_ROOT',str(tmp_path/'queue'))
     monkeypatch.setattr(api,'_require_training_model',lambda args:None)
     monkeypatch.setattr(api,'_normalize_training_args',lambda args,_:args)
@@ -122,7 +128,7 @@ def test_custom_first_request_stream_cookie_and_artifact_privacy(tmp_path,monkey
         # No bootstrap GET: streaming responses must retain both cookie headers.
         response=alice.post('/api/custom-model/training/start',json={'args':{'output_dir':str(tmp_path/'training'),'num_epochs':1}})
         assert response.status_code==200 and 'private training log' in response.text
-        assert alice.cookies.get('vf_custom_jobs')
+        assert alice.cookies.get(cookie_name('custom'))
         job=alice.get('/api/custom-model/job-history').json()['items'][0]
         number=job['job_number'];identity=job['id']
         assert alice.get('/api/custom-model/jobs/'+number).json()['id']==identity
@@ -142,6 +148,7 @@ def test_custom_first_request_stream_cookie_and_artifact_privacy(tmp_path,monkey
 
 def test_custom_model_lists_do_not_reveal_other_job_outputs(tmp_path,monkeypatch):
     from backend.web_v2 import custom_model_api as api
+    monkeypatch.setenv('WEBUI_V2_MODE','local')
     monkeypatch.setenv('VENUS_JOB_QUEUE_ROOT',str(tmp_path/'queue'))
     monkeypatch.setattr(api,'_ALLOWED_FILE_ROOTS',[tmp_path])
     folder=tmp_path/'models';folder.mkdir()
@@ -190,7 +197,40 @@ def test_custom_meta_does_not_replace_identity_during_first_page_load(tmp_path,m
         response=client.get('/api/custom-model/meta')
         assert 'set-cookie' not in response.headers
         assert client.get('/api/custom-model/session').status_code==200
-        cookie=client.cookies.get('vf_custom_jobs')
+        cookie=client.cookies.get(cookie_name('custom'))
         assert cookie
         client.get('/api/custom-model/meta')
-        assert client.cookies.get('vf_custom_jobs')==cookie
+        assert client.cookies.get(cookie_name('custom'))==cookie
+
+def test_same_host_local_and_online_keep_their_workspaces(tmp_path,monkeypatch):
+    from fastapi import Response
+    from backend.web_v2.model_platform import Platform
+    from backend.web_v2.job_access import browser_owner,request_owners
+    local=Platform(tmp_path/"local")
+    online=Platform(tmp_path/"online")
+    app=FastAPI()
+    @app.get("/api/identity")
+    def identity(request:Request,response:Response):
+        service=local if os.environ["WEBUI_V2_MODE"]=="local" else online
+        owner=browser_owner(request,response,"platform",service.session)
+        return {"owner":owner,"file_owner":request_owners(request)["platform"]}
+    with TestClient(app) as client:
+        monkeypatch.setenv("WEBUI_V2_MODE","local")
+        local_owner=client.get("/api/identity").json()["owner"]
+        monkeypatch.setenv("WEBUI_V2_MODE","online")
+        online_owner=client.get("/api/identity").json()["owner"]
+        assert local_owner!=online_owner
+        monkeypatch.setenv("WEBUI_V2_MODE","local")
+        assert client.get("/api/identity").json()=={"owner":local_owner,"file_owner":local_owner}
+        monkeypatch.setenv("WEBUI_V2_MODE","online")
+        assert client.get("/api/identity").json()=={"owner":online_owner,"file_owner":online_owner}
+        assert client.cookies.get("vf_model_workspace_local")!=client.cookies.get("vf_model_workspace")
+
+
+def test_cookie_namespace_uses_config_when_mode_env_is_absent(monkeypatch):
+    from types import SimpleNamespace
+    import config
+    monkeypatch.delenv("WEBUI_V2_MODE", raising=False)
+    monkeypatch.setattr(config, "get_config", lambda: SimpleNamespace(
+        server=SimpleNamespace(is_online=True)))
+    assert cookie_name("platform") == "vf_model_workspace"

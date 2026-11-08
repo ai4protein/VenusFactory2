@@ -3,10 +3,6 @@ import asyncio
 
 from fastapi import APIRouter, HTTPException, Request
 
-from agent.chat_agent import (
-    update_llm_model,
-    update_llm_openai_style_config,
-)
 from agent.model_config import apply_to_llm, get_expert_model_id, load_model_config
 from backend.web_v2.agent_context import ContextPolicy, ContextLimit, check_admission
 from backend.web_v2.agent_execution import admit as admit_agent
