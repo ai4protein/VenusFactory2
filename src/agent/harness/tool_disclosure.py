@@ -66,6 +66,7 @@ class ToolDisclosure:
         self.inspected = set()
         self._model_matches = {}
         self._model_selectors = {}
+        self._navigation_queries = {}
 
 
     def _categories(self, name):
@@ -137,6 +138,7 @@ class ToolDisclosure:
         query, limit, offset = arguments.get('query', ''), arguments.get('limit', 8), arguments.get('offset', 0)
         if not isinstance(query, str) or len(query) > 200 or type(limit) is not int or not 1 <= limit <= 20 or type(offset) is not int or offset < 0:
             raise DisclosureError('Use query up to 200 characters, limit 1-20, and nonnegative offset.')
+        self._navigation_queries.clear()
         try:
             category = category_id(arguments.get('category', ''))
         except ValueError as exc:
@@ -241,7 +243,7 @@ class ToolDisclosure:
                 return result
             category = next(iter(categories))
         page = matches[offset:offset+limit]
-        return {'level': 'capabilities', 'category': category, 'match_mode': match_mode,
+        result = {'level': 'capabilities', 'category': category, 'match_mode': match_mode,
                 'tools': [{'name': name, 'description': desc} for _, _, name, desc in page],
                 'total': len(matches),
                 'next_offset': offset+len(page) if offset+len(page) < len(matches) else None,
@@ -250,6 +252,18 @@ class ToolDisclosure:
                               if match_mode == 'category_navigation' else
                               'Inspect a relevant capability with describe_tool(name) before calling it. '
                               'If no match, broaden the query or choose another category.')}
+
+        if match_mode == 'category_navigation' and page:
+            # A reader is a pointer to records, never evidence that a model is
+            # absent. Keep its query until the selected schema is disclosed.
+            self._navigation_queries.update({name: query for _, _, name, _ in page})
+            result.update(
+                records_searched=False,
+                next_action={'name': DESCRIBE, 'arguments': {'name': page[0][2]}},
+                next_step='Call next_action, then call_tool with the selected reader and its declared arguments. '
+                          'No model, database or guide records have been searched; repeating search_tools repeats only this index.',
+            )
+        return result
 
     def metadata(self, method, arguments):
         if not isinstance(arguments, dict):
@@ -271,6 +285,9 @@ class ToolDisclosure:
                       'call_via': name if name in self.direct else 'call_tool',
                       'next_step': ('This tool is directly exposed; call it by name with its arguments.' if name in self.direct else 'Use call_tool(name, arguments). This capability is not a directly exposed native function.'),
                       'inputSchema': copy.deepcopy(self.schema(tool))}
+            query_field = result['inputSchema'].get('properties', {}).get('query', {})
+            if name in self._navigation_queries and query_field.get('type') == 'string':
+                result['suggested_arguments'] = {'query': self._navigation_queries[name]}
             from mcp_tools.tools.capability_policy import canonical
             from mcp_tools.tools.discovery.platform_models import platform_models
             live_models = {card['entry_id']: card for _,_,card in platform_models('', [getattr(tool, 'name', name)])}

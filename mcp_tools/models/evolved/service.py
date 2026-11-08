@@ -93,6 +93,8 @@ def list_models(library, query="", stage="", limit=10, offset=0):
         "Invalid catalog filter",
     )
     cards = []
+    from mcp_tools.tools.discovery.matching import query_groups, relevance
+    groups = query_groups(query)
     published, catalog = catalog_cards(library)
     from mcp_tools.tools.capability_policy import CapabilityStore
     switches = CapabilityStore()
@@ -101,7 +103,7 @@ def list_models(library, query="", stage="", limit=10, offset=0):
         if not switches.enabled('model:scientist:' + card['entry_id']): continue
         if stage and card["stage"] != stage:
             continue
-        if query.casefold() not in json.dumps(card, ensure_ascii=False).casefold():
+        if relevance(groups, card["entry_id"], json.dumps(card, ensure_ascii=False)) is None:
             continue
         cards.append(card)
     return {

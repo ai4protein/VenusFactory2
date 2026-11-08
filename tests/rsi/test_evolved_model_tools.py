@@ -321,3 +321,12 @@ def test_inspection_rebinds_after_reading_publication(published, monkeypatch):
         return key
     monkeypatch.setattr(library, "model_key", change_index)
     assert not service.dispatch("describe", entry_id=entry)["success"]
+
+
+def test_registered_model_search_uses_shared_topic_matching(published):
+    store, root, verified, entry, _ = published
+    for query in (entry, "model " + entry, "Scientist model " + entry[:16]):
+        result = service.dispatch("list", query=query)
+        assert result["success"] and result["matching_entries"] == 1
+        assert result["models"][0]["entry_id"] == entry
+    assert service.dispatch("list", query="unregistered-protein")["matching_entries"] == 0

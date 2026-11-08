@@ -49,6 +49,12 @@ assessment, not a new validation. Actual prediction still resolves and verifies
 native execution, numerical evidence and reuse receipts before calling the model.
 No metadata response or cache grants execution approval.
 
+Category search identifies a reader before querying model records. A navigation
+result supplies the next description call, then the selected reader receives the
+original topic as suggested arguments. Model listing uses the shared bilingual
+matcher, so a phrase such as "Scientist model <entry ID>" still finds the record.
+The first discovery response contains no model input schemas or full catalog.
+
 
 Agent discovery and Model Plaza share a short-lived metadata snapshot. Its
 15-second lifetime starts after reading completes, and concurrent requests share
