@@ -50,6 +50,14 @@ Scientific capabilities are served through MCP; model packages own implementatio
 and runtime adapters. Agent code plans work and calls tools; it does not contain
 another copy of model inference code.
 
+Chat streaming separates transport from display state. `frontend/src/lib/sse.ts`
+owns event IDs and reconnects; `chatStreamState.ts` owns snapshot reconciliation
+and message transitions. `useChatStream.ts` manages that state and the disposable
+frame queue; `ChatPage.tsx` owns navigation and user actions. A new session, run or
+user turn cannot inherit the previous streamed answer. Waiting and terminal
+snapshots are authoritative, and leaving the view discards queued animation work
+without cancelling the backend job.
+
 Researcher keeps job ownership and recovery in `backend/web_v2/research_jobs.py`.
 The long-form coordinator schedules retrieval and specialist writers; document
 acceptance and rendering belong to `research_documents.py`. API views and ZIP

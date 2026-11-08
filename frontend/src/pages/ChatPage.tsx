@@ -1,3 +1,5 @@
+import { useChatStream } from "../lib/useChatStream";
+import { sanitizeChatSnapshot } from "../lib/chatStreamState";
 import { mergeHistoryActivity, submissionHistoryRow, type HistoryActivity } from "../lib/optimisticHistory";
 import { NewChatStart } from "../components/NewChatStart";
 import { ChatModeIcon } from "../components/ChatModeIcon";
@@ -587,7 +589,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       sessionLoad.current = { target: sessionId, revision: sessionLoad.current.revision + 1, pending: false };
     }
   }, [sessionId]);
-  const [snapshot, setSnapshot] = useState<ChatSnapshot | null>(null);
+  const { snapshot, streamingIdx, setSnapshot, stopStream, discardStream, updateStream } = useChatStream();
   const [pendingTurn, setPendingTurn] = useState<PendingChatTurn | null>(null);
   const [sessions, setSessions] = useState<SessionMeta[]>([]);
   const [historyActivity, setHistoryActivity] = useState<Record<string, HistoryActivity>>({});
@@ -608,7 +610,6 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   const [scientistDraftRevision, setScientistDraftRevision] = useState(0);
   const [goalStatuses, setGoalStatuses] = useState<Record<string, string>>({});
   const [runStatus, setRunStatus] = useState<RunStatus>("stopped");
-  const [streamingIdx, setStreamingIdx] = useState(-1);
   const [error, setError, dismissError] = useDismissibleError();
   const [noticeTarget, setNoticeTarget] = useState<HTMLDivElement | null>(null);
   const [selectedModel, setSelectedModel] = useState<string>("");
@@ -650,17 +651,13 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     abortRef.current = null;
     controller?.abort();
     runningRef.current = false;
-    tokenQueueRef.current = [];
+    discardStream();
     setPendingTurn(null);
-    setRunning(false); setStartingTurn(false); setStreamingIdx(-1);
+    setRunning(false); setStartingTurn(false); stopStream();
   }
 
   const snapshotRef = useRef<ChatSnapshot | null>(null);
   const runningRef = useRef(false);
-  /** Expert token pump: apply SSE tokens across animation frames so a
-   * buffered burst still paints as progressive streaming. */
-  const tokenQueueRef = useRef<Array<{ content: string; role_id?: string }>>([]);
-  const tokenPumpScheduledRef = useRef(false);
   const timelineRef = useRef<HTMLDivElement | null>(null);
   const chatLayoutRef = useRef<HTMLDivElement | null>(null);
   useLayoutEffect(() => {
@@ -730,10 +727,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     routeInitialized.current = true;
     handledRoute.current = key;
     if (runningRef.current && (routeSessionId !== sessionLoad.current.target || routeMode !== activeModeRef.current)) {
-      abortRef.current?.abort();
-      abortRef.current = null;
-      runningRef.current = false;
-      setRunning(false);
+      detachStream();
     }
     if (freshDraftId && !routeSessionId) {
       if (routeMode !== "researcher") {
@@ -913,7 +907,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       // clear a zombie "running" flag so the UI can rejoin the checkpoint.
       if (ev.persisted) {
         setRunning(false);
-        setStreamingIdx(-1);
+        stopStream();
         setRunStatus("stopped");
         abortRef.current = null;
       }
@@ -1116,7 +1110,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     }
     setError("");
     setRunStatus("stopped");
-    setStreamingIdx(-1);
+    stopStream();
     setModelSwitchNotice("");
     closeOnNarrow();
   }
@@ -1227,33 +1221,6 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     });
   }
 
-  function sanitizeLoadedSnapshot(s: ChatSnapshot): ChatSnapshot {
-    const status = String(s.status || "").toLowerCase();
-    const hist = Array.isArray(s.history) ? s.history : [];
-    const isPlaceholder = (h: (typeof hist)[number]) =>
-      h.kind === "thinking" ||
-      h.phase === "thinking" ||
-      /preparing clarification|准备澄清/i.test(h.content || "");
-    // Waiting checkpoints must not keep a live Thinking pulse from a prior
-    // mount — that made "leave and come back" look permanently stuck.
-    if (status.startsWith("waiting_")) {
-      return { ...s, history: hist.filter((h) => !isPlaceholder(h)) };
-    }
-    // Terminal / idle: drop orphaned preparing bubbles left by a cancelled SSE.
-    if (
-      status === "stopped" ||
-      status === "completed" ||
-      status === "error" ||
-      status === "planning_failed" ||
-      status === "execution_failed" ||
-      !status
-    ) {
-      const cleaned = hist.filter((h) => !isPlaceholder(h));
-      return cleaned.length === hist.length ? s : { ...s, history: cleaned };
-    }
-    return s;
-  }
-
   async function refreshCurrentSession(
     targetId?: string,
     opts?: { localMode?: boolean; syncComposer?: boolean; mode?: ChatMode; updateUrl?: boolean }
@@ -1280,7 +1247,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     const requestedSessionRevision = sessionLoad.current.revision;
     const isCurrentRequest = () => activeModeRef.current === requestedMode && sessionLoad.current.revision === requestedSessionRevision && sessionLoad.current.target === sid;
     try {
-      const s = sanitizeLoadedSnapshot(await getChatSession(sid));
+      const s = sanitizeChatSnapshot(await getChatSession(sid));
       if (!isCurrentRequest()) return;
       sessionPreviews.current.remember(s);
       const savedMode = s.chat_mode === "science_expert" ? "science_expert" : "science_agent";
@@ -1290,7 +1257,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         return;
       }
       setSnapshot(s);
-      setStreamingIdx(-1);
+      stopStream();
       setSessionId(sid);
       if (syncComposer) setModelSwitchNotice("");
       rememberActiveSession(requestedMode, sid);
@@ -1363,233 +1330,32 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       if (ownsView() && !controller.signal.aborted) setError(error instanceof Error ? error.message : t.errStreamMsg);
     } finally {
       if (ownsView()) {
-        abortRef.current = null; runningRef.current = false; setRunning(false); setStreamingIdx(-1);
+        abortRef.current = null; runningRef.current = false; setRunning(false); stopStream();
         await refreshCurrentSession(saved.session_id, { syncComposer: false });
       }
       await fetchSessions();
     }
   }
 
-  function appendTokenToSnapshot(content: string, roleId?: string) {
-    if (!content) return;
-    setSnapshot((prev) => {
-      if (!prev) return prev;
-      const history = [...prev.history];
-      const last = history[history.length - 1];
-      if (last && last.role === "assistant" && last.kind !== "thinking") {
-        history[history.length - 1] = { ...last, content: (last.content || "") + content };
-        setStreamingIdx(history.length - 1);
-      } else {
-        history.push({
-          role: "assistant",
-          content,
-          role_id: roleId,
-          kind: "text",
-        });
-        setStreamingIdx(history.length - 1);
-      }
-      return { ...prev, history };
-    });
-  }
-
-  function scheduleTokenPump() {
-    if (tokenPumpScheduledRef.current) return;
-    tokenPumpScheduledRef.current = true;
-    const pump = () => {
-      const next = tokenQueueRef.current.shift();
-      if (!next) {
-        tokenPumpScheduledRef.current = false;
-        return;
-      }
-      appendTokenToSnapshot(next.content, next.role_id);
-      // Keep yielding frames while the queue has more Expert tokens.
-      if (tokenQueueRef.current.length > 0) {
-        window.requestAnimationFrame(pump);
-      } else {
-        tokenPumpScheduledRef.current = false;
-      }
-    };
-    window.requestAnimationFrame(pump);
-  }
-
-  function handleStreamEvent({ event, data }: { event: string; data: string }) {
-    if (event === "state" && data) {
-      const payload = JSON.parse(data) as ChatSnapshot;
-      if (payload.execution) setAgentExecution({ harness: payload.execution.harness, model_id: payload.execution.model_id });
-      const status = String(payload.status || "").toLowerCase();
-      const isGateStatus =
-        status.startsWith("waiting_") ||
-        status === "completed" ||
-        status === "error" ||
-        status === "planning_failed" ||
-        status === "execution_failed" ||
-        status === "stopped";
-      // Merge carefully: graph token events accumulate on the client, while
-      // node `updates` may still carry a shorter placeholder. Prefer the
-      // longer in-progress assistant tail so Expert streaming isn't wiped.
-      // Exception: once we hit a waiting/terminal gate, trust the server
-      // history and drop Thinking placeholders so ClarificationForm can mount.
-      setSnapshot((prev) => {
-        if (isGateStatus) {
-          const hist = Array.isArray(payload.history) ? payload.history : [];
-          return {
-            ...payload,
-            history: hist.filter(
-              (h) => h.kind !== "thinking" && h.phase !== "thinking"
-            ),
-          };
-        }
-        if (!prev?.history?.length) return payload;
-        const prevHist = prev.history;
-        const nextHist = Array.isArray(payload.history) ? [...payload.history] : [];
-        if (!nextHist.length) return payload;
-        const prevLast = prevHist[prevHist.length - 1];
-        const nextLast = nextHist[nextHist.length - 1];
-        const prevText = (prevLast?.content || "").trim();
-        const nextText = (nextLast?.content || "").trim();
-        const nextLooksPlaceholder =
-          Boolean(nextLast?.phase) ||
-          /思考中|Thinking|正在设计|designing the pipeline|准备澄清|preparing clarification|撰写|Summarizing|正在总结/i.test(
-            nextText
-          );
-        if (
-          prevLast?.role === "assistant" &&
-          nextLast?.role === "assistant" &&
-          prevLast.kind !== "thinking" &&
-          prevText.length > nextText.length &&
-          (nextLooksPlaceholder || nextText.length === 0 || prevText.startsWith(nextText))
-        ) {
-          nextHist[nextHist.length - 1] = {
-            ...nextLast,
-            content: prevLast.content,
-            role_id: prevLast.role_id || nextLast.role_id,
-            kind: prevLast.kind || "text",
-            phase: undefined,
-          };
-          return { ...payload, history: nextHist };
-        }
-        return payload;
-      });
-      // Don't kill the streaming caret on every node update — only clear when
-      // the run reached a waiting/terminal status (forms need to mount).
-      if (isGateStatus) {
-        tokenQueueRef.current = [];
-        tokenPumpScheduledRef.current = false;
-        setStreamingIdx(-1);
-      }
-    } else if (event === "stream_start" && data) {
-      const info = JSON.parse(data) as { role_id?: string; turn_id?: string; kind?: string };
-      setSnapshot(prev => {
-        if (!prev) return prev;
-        const history = [...prev.history];
-        const last = history[history.length - 1];
-        // Prefer the structured `phase` marker (set by backend on placeholder
-        // messages). Fall back to legacy substring matching while older backends
-        // still in the wild may not emit `phase` yet.
-        const isGraphPlaceholder =
-          last && last.role === "assistant" && last.kind !== "thinking" && (
-            Boolean(last.phase) ||
-            last.content.includes("Thinking") || last.content.includes("思考中") ||
-            last.content.includes("Summarizing") || last.content.includes("正在总结") ||
-            last.content.includes("汇总") || last.content.includes("撰写小报告") ||
-            last.content.includes("writing sub-report") ||
-            last.content.includes("撰写研究草案") ||
-            last.content.includes("writing the draft report")
-          );
-        if (isGraphPlaceholder && last) {
-          // Graph engine: replace status placeholder with an empty answer bubble.
-          history[history.length - 1] = {
-            role: "assistant",
-            content: "",
-            role_id: info.role_id || last.role_id,
-            kind: "text",
-          };
-          setStreamingIdx(history.length - 1);
-          tokenQueueRef.current = [];
-          tokenPumpScheduledRef.current = false;
-        } else if (info.kind === "thinking") {
-          // kimi-code reasoning stream only (explicit kind).
-          if (last?.role === "assistant" && last.kind === "thinking") {
-            history[history.length - 1] = {
-              ...last,
-              turn_id: info.turn_id || last.turn_id,
-              role_id: info.role_id || last.role_id,
-            };
-            setStreamingIdx(history.length - 1);
-          } else {
-            history.push({
-              role: "assistant",
-              content: "",
-              kind: "thinking",
-              phase: "thinking",
-              turn_id: info.turn_id,
-              role_id: info.role_id,
-            });
-            setStreamingIdx(history.length - 1);
-          }
-        } else if (last?.role === "assistant" && last.kind === "thinking") {
-          // Answer tokens after a Thinking block: open a fresh text bubble.
-          history.push({ role: "assistant", content: "", role_id: info.role_id, kind: "text" });
-          setStreamingIdx(history.length - 1);
-        } else if (last?.role === "assistant" && !(last.content || "").trim()) {
-          // Reuse blank assistant bubble (graph tokens may arrive before placeholder state).
-          history[history.length - 1] = {
-            ...last,
-            content: "",
-            role_id: info.role_id || last.role_id,
-            kind: last.kind === "thinking" ? "text" : last.kind,
-          };
-          setStreamingIdx(history.length - 1);
-        } else {
-          // Science Expert / graph: never invent a thinking bubble on stream_start.
-          history.push({ role: "assistant", content: "", role_id: info.role_id, kind: "text" });
-          setStreamingIdx(history.length - 1);
-        }
-        return { ...prev, history };
-      });
-    } else if (event === "token" && data) {
-      const token = JSON.parse(data) as { content?: string; role_id?: string };
-      if (token.content) {
-        // Queue + rAF pump: even if the proxy delivers many Expert frames in
-        // one TCP read, the UI still paints them progressively.
-        tokenQueueRef.current.push({
-          content: token.content,
-          role_id: token.role_id,
-        });
-        scheduleTokenPump();
-      }
-    } else if (event === "thinking" && data) {
-      // kimi-code reasoning stream: accumulate into a dedicated
-      // `kind:"thinking"` assistant message so the timeline can render it
-      // as a collapsible block above the final answer.
-      const evt = JSON.parse(data) as { content?: string; turn_id?: string };
-      if (evt.content) {
-        setSnapshot(prev => {
-          if (!prev) return prev;
-          const history = [...prev.history];
-          const last = history[history.length - 1];
-          if (last && last.role === "assistant" && last.kind === "thinking") {
-            history[history.length - 1] = { ...last, content: last.content + evt.content };
-          } else {
-            history.push({ role: "assistant", content: evt.content || "", kind: "thinking", turn_id: evt.turn_id });
-          }
-          return { ...prev, history };
-        });
-      }
-    } else if (event === "error" && data) {
-      // SSE error frames (e.g. AskUser/Approve ACK failed) do not reject
-      // streamSSEFromPost — surface them so the user can retry the gate.
-      try {
-        const payload = JSON.parse(data) as { message?: string; detail?: string };
-        const msg = String(payload.message || payload.detail || "").trim();
-        if (msg) setError(msg);
-      } catch {
-        const raw = String(data || "").trim();
-        if (raw) setError(raw);
-      }
-      setStreamingIdx(-1);
-      setRunStatus("stopped");
+  function handleStreamEvent(event: { event: string; data: string }) {
+    if (event.event !== "error") {
+      const payload = updateStream(event);
+      if (payload?.execution) setAgentExecution({ harness: payload.execution.harness, model_id: payload.execution.model_id });
+      return;
     }
+    // Interaction ACK failures arrive as SSE frames, not rejected requests.
+    if (event.data) {
+      try {
+        const payload = JSON.parse(event.data) as { message?: string; detail?: string };
+        const message = String(payload.message || payload.detail || "").trim();
+        if (message) setError(message);
+      } catch {
+        const message = String(event.data).trim();
+        if (message) setError(message);
+      }
+    }
+    stopStream();
+    setRunStatus("stopped");
   }
 
   async function addComposerFiles(picked: File[]) {
@@ -1782,7 +1548,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         runningRef.current = false;
         setPendingTurn(null);
         setRunning(false); setStartingTurn(false);
-        setStreamingIdx(-1);
+        stopStream();
         abortRef.current = null;
       }
       await refreshChatQuota();
@@ -1822,7 +1588,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     } finally {
       if (ownsView()) {
         setRunning(false); setStartingTurn(false);
-        setStreamingIdx(-1);
+        stopStream();
         abortRef.current = null;
       }
       await refreshChatQuota();
@@ -1875,7 +1641,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     } finally {
       if (ownsView()) {
         setRunning(false); setStartingTurn(false);
-        setStreamingIdx(-1);
+        stopStream();
         abortRef.current = null;
       }
     }
@@ -1898,7 +1664,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         await refreshCurrentSession(sid);
       }
     } finally {
-      if (ownsView()) { setRunning(false); setStartingTurn(false); setStreamingIdx(-1); abortRef.current = null; }
+      if (ownsView()) { setRunning(false); setStartingTurn(false); stopStream(); abortRef.current = null; }
     }
   }
 
@@ -1932,7 +1698,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     } finally {
       if (ownsView()) {
         setRunning(false); setStartingTurn(false);
-        setStreamingIdx(-1);
+        stopStream();
         abortRef.current = null;
       }
     }
@@ -1974,7 +1740,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     } finally {
       if (ownsView()) {
         setRunning(false); setStartingTurn(false);
-        setStreamingIdx(-1);
+        stopStream();
         abortRef.current = null;
       }
     }
@@ -2009,7 +1775,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     } finally {
       if (ownsView()) {
         setRunning(false); setStartingTurn(false);
-        setStreamingIdx(-1);
+        stopStream();
         abortRef.current = null;
       }
     }
@@ -2069,7 +1835,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     } finally {
       if (ownsView()) {
         setRunning(false); setStartingTurn(false);
-        setStreamingIdx(-1);
+        stopStream();
         abortRef.current = null;
       }
     }
@@ -2109,7 +1875,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     } finally {
       if (ownsView()) {
         setRunning(false); setStartingTurn(false);
-        setStreamingIdx(-1);
+        stopStream();
         abortRef.current = null;
       }
     }
@@ -2360,7 +2126,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     setModelSwitchNotice("");
     setKeyPanelProvider("");
     setError("");
-    setStreamingIdx(-1);
+    stopStream();
     setRunStatus("stopped");
     const remembered = sessionStorage.getItem(activeSessionStorageKey(next));
     const nextId = targetId ?? remembered ?? ((next === "science_expert" ? scientistSessionId : "") || sessionCandidates(sessions, next, null, sessionStorage.getItem(LEGACY_SESSION_STORAGE_KEY))[0] || "");
