@@ -1,6 +1,13 @@
 """Allocate compact, citable evidence to independent report chapters."""
 from __future__ import annotations
 
+import json
+
+from .research_evidence import evidence_excerpt
+from .research_evidence_passages import selected_passages
+
+MAX_CONTEXT_CHARS = 24000
+
 PREDICTION_TERMS = {
     "identity_evolution": ("conserved", "motif"),
     "function_pathways": ("activity site", "metal ion"),
@@ -46,9 +53,89 @@ def select_chapter_evidence(core, materials, predictions, remote, retrieved, cur
     return result
 
 
-def chapter_bundle(state, payload, chapter, remit, evidence, context):
+def _source_metadata(source):
+    # Full URLs, query payloads and source records remain in the dossier.
+    # A specialist needs citation identity and the scientific query scope.
+    limits = {"title": 256, "kind": 64, "evidence_level": 120, "year": 32,
+              "sha256": 64, "sequence_sha256": 64, "query_tool": 80}
+    row = {"id": source["id"]}
+    for key, maximum in limits.items():
+        if key in source:
+            value = source[key]
+            row[key] = value[:maximum] if isinstance(value, str) else value
+    extraction = source.get("extraction")
+    if isinstance(extraction, dict):
+        row["extraction"] = {k: extraction[k] for k in
+                             ("format", "units", "truncated", "characters") if k in extraction}
+    arguments = source.get("query_arguments")
+    if isinstance(arguments, dict):
+        selected = {}
+        payloads = {"sequence", "structure", "structure_pdb", "pdb", "input",
+                    "content", "text", "path", "file_path", "local_path"}
+        for key, value in arguments.items():
+            if (key in payloads or not isinstance(value, (str, int, float, bool, type(None)))
+                    or len(str(value)) > 240):
+                continue
+            candidate = {**selected, key: value}
+            if len(json.dumps(candidate, ensure_ascii=False)) <= 600:
+                selected = candidate
+        if selected:
+            row["query_arguments"] = selected
+        if selected != arguments:
+            row["query_arguments_excerpted"] = True
+    return row
+
+
+def source_context(sources, limit=14, *, query=""):
+    """Select chapter-specific excerpts under one serialized context budget."""
+    rows = []
+    for source in sources[:min(limit, 14)]:
+        kind = source.get("kind")
+        maximum = 14000 if kind == "database" else 12000 if kind == "user_material" else 9000 if kind == "public_service" else 2400
+        if query:
+            selected = selected_passages(source, query, maximum)
+            text = "\n\n".join(p["text"] for p in selected["passages"])
+            excerpted = bool(source.get("excerpted")) or text != str(source.get("text", ""))
+        else:
+            text, excerpted = evidence_excerpt(source, maximum)
+        rows.append({**_source_metadata(source), "text": text, "excerpted": excerpted})
+
+    def capped(maximum):
+        result = []
+        for row in rows:
+            text = row["text"]
+            if len(text) > maximum:
+                boundary = max(text.rfind("\n\n", maximum // 2, maximum),
+                               text.rfind(". ", maximum // 2, maximum))
+                text = text[:boundary + 1 if boundary >= 0 else maximum].rstrip()
+            result.append({**row, "text": text,
+                           "excerpted": row["excerpted"] or text != row["text"]})
+        return result
+
+    def size(value):
+        return len(json.dumps(value, ensure_ascii=False))
+
+    if size(rows) <= MAX_CONTEXT_CHARS:
+        return rows
+    if size(capped(0)) > MAX_CONTEXT_CHARS:
+        raise ValueError("Source metadata exceeds chapter context budget")
+    low, high = 0, max((len(row["text"]) for row in rows), default=0)
+    while low < high:
+        midpoint = (low + high + 1) // 2
+        if size(capped(midpoint)) <= MAX_CONTEXT_CHARS:
+            low = midpoint
+        else:
+            high = midpoint - 1
+    return capped(low)
+
+
+def chapter_bundle(state, payload, chapter, remit, evidence, context=None):
     """Raw prediction arrays stay in the dossier, never duplicated in every prompt."""
-    selected = context(evidence)
+    # The shared question stays in the writing brief; chapter evidence follows
+    # its own remit so broad protein names cannot displace specialist annotations.
+    query = " ".join(str(value or "") for value in (chapter["title"], remit))
+    # Older callers can still supply a one-argument context builder.
+    selected = source_context(evidence, query=query) if context is None else context(evidence)
     return {
         "protein": state.get("protein"),
         "research_question": payload.get("focus"),

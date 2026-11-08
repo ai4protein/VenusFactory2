@@ -59,6 +59,12 @@ receipts for both views. Rechecking a report preserves its saved drafts, evidenc
 request budget and queue lifecycle; it never rewrites the historical checkpoint.
 Source-review receipts and revision feedback belong to `research_source_review.py`;
 author and editor modules consume those receipts without owning the reviewer.
+Chapter evidence selection and writer context belong to `research_chapter_context.py`.
+Specialists receive topic-selected source excerpts under one serialized context
+budget, with citation identities, query scope and material extraction limits.
+Original records and full prediction arrays remain in the dossier; the independent
+reviewer resolves its anchors against those originals.
+
 
 Tool discovery separates session navigation from model metadata. Harness adapters
 use the shared discovery broker to track which tool was inspected during a turn.

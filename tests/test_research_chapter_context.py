@@ -50,7 +50,7 @@ def test_bundle_keeps_citable_evidence_without_duplicating_raw_arrays():
              "sources": selected, "remote_services": []}
     before = copy.deepcopy(state)
     bundle = chapter_bundle(state, {"focus": "binding"}, {"title": "Structure"},
-                            "binding remit", selected, lf.source_context)
+                            "binding remit", selected)
     assert len(json.dumps(bundle)) < 2000
     assert bundle["evidence_scope"]["selected_source_ids"] == ["S1", "S2"]
     assert "calculations_and_predictions" not in bundle
@@ -85,3 +85,77 @@ async def test_all_specialists_get_bounded_citable_context_and_dossier_stays_com
     assert max(len(json.dumps(c)) for c in calls) < 10000
     assert result["sections"][0]["data"] == raw
     assert len(result["sources"]) == len(sources)
+
+
+def test_writer_context_has_a_total_bound_and_retains_each_selected_source():
+    selected = [source(f"S{i}", "database") for i in range(1, 15)]
+    for row in selected:
+        row["text"] = "Measured conditions with assay-specific units and interpretation. " * 1000
+        row["query_arguments"] = {"sequence": "M" * 10000}
+    before = copy.deepcopy(selected)
+    result = lf.source_context(selected, query="measured assay conditions")
+    assert len(json.dumps(result, ensure_ascii=False)) <= 24000
+    assert [s["id"] for s in result] == [s["id"] for s in selected]
+    assert all(s["text"] and s["excerpted"] for s in result)
+    assert all("query_arguments" not in s for s in result)
+    assert selected == before
+
+
+def test_chapter_remit_selects_late_processing_annotation():
+    row = source("S1", "database")
+    row["text"] = json.dumps({
+        "comments": [{"description": "Human beta hemoglobin function and clinical observations " * 90} for _ in range(24)],
+        "features": [
+            {"type": "Initiator methionine", "description": "Removed", "location": {"start": 1, "end": 1}},
+            {"type": "Chain", "description": "Beta-globin", "location": {"start": 2, "end": 147}},
+        ],
+    })
+    state = {"sources": [row], "remote_services": []}
+    bundle = chapter_bundle(state, {"focus": "Review function and maturation of human hemoglobin beta"}, {"title": "Variants and modifications"},
+                            "Cleavage, maturation and residue numbering", [row])
+    text = bundle["sources"][0]["text"]
+    assert "Initiator methionine" in text and '"type":"Chain"' in text
+    assert "Removed" in text and "147" in text
+    assert "Signal" not in text
+    assert bundle["evidence_scope"]["selected_source_ids"] == ["S1"]
+
+
+def test_material_metadata_and_verbatim_excerpt_remain_available():
+    material = source("S2", "user_material")
+    material["text"] = "Page 7\nThe measured activity was 14.5 nmol/min at 25 C."
+    material["extraction"] = {"format": "pdf", "units": 8, "truncated": True, "characters": 10000}
+    output = lf.source_context([material], query="measured activity")
+    assert output[0]["text"] == material["text"]
+    assert output[0]["extraction"] == material["extraction"]
+
+
+def test_shared_context_budget_also_applies_to_legacy_callers():
+    selected = [source(f"S{i}", "user_material") for i in range(1, 15)]
+    for row in selected:
+        row["text"] = "Verbatim page with observations. " * 1000
+    result = lf.source_context(selected)
+    assert len(json.dumps(result, ensure_ascii=False)) <= 24000
+    assert len(result) == 14 and all(row["excerpted"] for row in result)
+
+
+def test_query_scope_keeps_database_chain_and_conditions_without_raw_sequence():
+    row = source("S1", "public_service")
+    row["query_arguments"] = {
+        "database": "pdb100", "chain": "B", "evalue": 0.001, "sequence": "M" * 5000,
+    }
+    result = lf.source_context([row], query="structural homology")[0]
+    assert result["query_arguments"] == {"database": "pdb100", "chain": "B", "evalue": 0.001}
+    assert result["query_arguments_excerpted"] is True
+    assert row["query_arguments"]["sequence"] == "M" * 5000
+
+
+def test_existing_one_argument_context_builder_remains_callable():
+    selected = [source("S1", "database")]
+    called = []
+    def legacy_context(values):
+        called.append(values)
+        return [{"id": "S1", "text": "Existing caller context."}]
+    bundle = chapter_bundle({"remote_services": []}, {}, {"title": "Identity"},
+                            "Sequence identity", selected, legacy_context)
+    assert called == [selected]
+    assert bundle["sources"] == [{"id": "S1", "text": "Existing caller context."}]

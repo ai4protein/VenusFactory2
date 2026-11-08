@@ -15,6 +15,7 @@ from urllib.parse import urlsplit
 
 from backend.web_v2 import research_report as research
 from agent.harness.model_availability import ModelServiceUnavailable
+from .research_chapter_context import source_context
 
 # Document helpers remain importable here for existing report scripts.
 from .research_documents import (
@@ -91,17 +92,6 @@ def chapter_database_sources(sources, chapter_id):
     wanted = _CHAPTER_TARGET_RESOURCES.get(chapter_id, ())
     focused = [source for resource in wanted for key, source in target if key == resource]
     return common[:2] + focused[:2] + common[2:4]
-
-
-def source_context(sources, limit=14):
-    from .research_evidence import evidence_excerpt
-    rows = []
-    for source in sources[:limit]:
-        maximum = 14000 if source.get("kind") == "database" else 12000 if source.get("kind") == "user_material" else 9000 if source.get("kind") == "public_service" else 2400
-        text, excerpted = evidence_excerpt(source, maximum)
-        row = {k: v for k, v in source.items() if k in {"id", "title", "url", "kind", "evidence_level", "year", "extraction", "sha256", "query_tool", "query_arguments"}}
-        rows.append({**row, "text": text, "excerpted": excerpted})
-    return rows
 
 
 async def structure_evidence(entry):
@@ -245,7 +235,7 @@ async def run_long_report(payload, update, *, service_cache=None, checkpoint=Non
             curated = [s for s in base_sources if s.get('kind') == 'literature'][:4]
             evidence = select_chapter_evidence(core, materials, predictions, remote, retrieved, curated)
             chapter.update(status='writing', retrieval=retrieval, source_ids=[s['id'] for s in evidence]); publish()
-            bundle = chapter_bundle(state, payload, chapter, remit, evidence, source_context)
+            bundle = chapter_bundle(state, payload, chapter, remit, evidence)
             system = ('You are an independent protein research specialist. Write only your assigned chapter in ' + ('Chinese' if lang == 'zh' else 'English') +
                 '. Produce a detailed scholarly chapter: 1,500–2,200 Chinese characters or 700–1,100 English words when evidence permits. '
                 'Use descriptive subsections, quantitative evidence tables, mechanisms, assay conditions, conflicting findings and specific gaps. '
