@@ -29,6 +29,7 @@ def _name(value):
 def _key(name, arguments):
     name=_name(name)
     targets={
+        "write_session_file":("path",),
         "prepare_research_dataset":("data_file","output_file"),
         "validate_research_evaluation":("evaluation_file",),
         "train_research_model":("source_file","parent_experiment_id","variant"),
@@ -36,7 +37,11 @@ def _key(name, arguments):
         "run_research_python":("path",),
     }
     fields=targets.get(name)
-    if isinstance(arguments,dict) and fields and fields[0] in arguments:
+    if name == "submit_research_checkpoint":
+        # Each successful save replaces this workspace's active checkpoint.
+        # Plan/evidence validation still decides which steps it can complete.
+        value = None
+    elif isinstance(arguments,dict) and fields and fields[0] in arguments:
         value={key:arguments.get(key,"auto" if key=="variant" else "") for key in fields}
         if "variant" in value and value["variant"] == "auto":
             value["variant"] = "candidate" if value["parent_experiment_id"] else "baseline"

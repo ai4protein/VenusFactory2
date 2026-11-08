@@ -56,3 +56,39 @@ def test_actual_budget_denial_remains_an_error(tmp_path):
     detail="DisclosureError: Execution budget reached."
     result=feedback_state(call("write_session_file",{},failed=True,output=detail+chr(10)+NOTE),tmp_path)
     assert result["errors"][0]["error"]==detail
+
+
+@pytest.mark.parametrize("broker", [False, True])
+def test_rewritten_file_resolves_old_write_failure_without_clearing_other_work(tmp_path, broker):
+    def write(path, content, failed):
+        name, args = "write_session_file", {"path": path, "content": content}
+        if broker:
+            name, args = "call_tool", {"name": name, "arguments": args}
+        return call(name, args, failed=failed, output="Execution budget reached" if failed else "Saved")
+    previous = feedback_state(write("src/model.py", "old candidate", True), tmp_path)
+    snapshot = copy.deepcopy(previous)
+    unrelated = feedback_state(write("README.md", "notes", False), tmp_path, previous)
+    assert unrelated["errors"] == previous["errors"]
+    still_failed = feedback_state(write("src/model.py", "corrected candidate", True), tmp_path, previous)
+    assert len(still_failed["pending"]) == 1
+    repaired = feedback_state(write("src/model.py", "corrected candidate", False), tmp_path, previous)
+    assert repaired == {"pending": [], "errors": []}
+    assert previous == snapshot
+    assert "old candidate" not in str(previous)
+
+
+def test_successful_checkpoint_resolves_rejected_save_but_not_failed_training(tmp_path):
+    events = call("submit_research_checkpoint", {
+        "summary": "first attempt", "completed_steps": ["unknown"], "artifacts": ["report.md"]
+    }, failed=True, output="Unknown plan step")
+    previous = feedback_state(events, tmp_path)
+    previous = feedback_state(call("train_research_model", {"source_file": "src/model.py"},
+        failed=True, output="Fitting failed"), tmp_path, previous)
+    snapshot = copy.deepcopy(previous)
+    result = feedback_state(call("submit_research_checkpoint", {
+        "summary": "Partial work", "completed_steps": [], "artifacts": ["report.md"]
+    }, failed=False, output="Checkpoint saved"), tmp_path, previous)
+    assert len(result["pending"]) == 1
+    assert result["pending"][0]["tool"].endswith("train_research_model")
+    assert result["errors"][0]["error"] == "Fitting failed"
+    assert previous == snapshot

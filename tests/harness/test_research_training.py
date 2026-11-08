@@ -59,6 +59,9 @@ async def service_at(tmp_path):
 @pytest.mark.asyncio
 async def test_fit_revision_reproduction_and_training_only_mount(tmp_path):
     service=await service_at(tmp_path)
+    with pytest.raises(ValueError, match="first model with variant=baseline"):
+        await service.train_research_model("mean","algorithm.py","evaluation.json","Missing parent",variant="candidate")
+    assert not list((service.development.root/"training").glob("*/receipt.json"))
     baseline=await service.train_research_model("mean","algorithm.py","evaluation.json","Fit a reference",variant="baseline")
     b=baseline["experiment"];bt=baseline["training"]
     assert b["validation"]["score"]>0 and not b["test_used_for_feedback"]
@@ -69,6 +72,11 @@ async def test_fit_revision_reproduction_and_training_only_mount(tmp_path):
     assert service.development.summary()["generations"][0]["validation"]["diagnostics"]==diagnostics
     assert bt["validation_and_test_mounted"] is False
     assert bt["training_rows"]==8 and len(service.development.records())==1
+    for variant in ("candidate", "ablation"):
+        with pytest.raises(ValueError, match=b["id"]) as error:
+            await service.train_research_model("revision","algorithm.py","evaluation.json","Missing parent",variant=variant)
+        assert "same split" in str(error.value)
+    assert len(list((service.development.root/"training").glob("*/receipt.json"))) == 1
     await service.write_research_file("algorithm.py",LINEAR)
     child=await service.train_research_model("linear","algorithm.py","","Test a linear relation",
                     parent_experiment_id=b["id"],strategy="few_shot")

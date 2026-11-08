@@ -78,7 +78,16 @@ async def fit_model(workspace, development, runner, *, name, source_file, evalua
         variant = "candidate" if parent_experiment_id else "baseline"
     require(variant in {"baseline", "candidate", "ablation"}, "Invalid experiment variant")
     parent = development.record(parent_experiment_id) if parent_experiment_id else None
-    require(parent is not None or variant == "baseline", "Start with variant=baseline")
+    if parent is None and variant != "baseline":
+        previous = development.records()[-3:]
+        if previous:
+            identities = ", ".join(row["id"] for row in previous)
+            raise ValueError(
+                "A candidate or ablation needs parent_experiment_id from a measured experiment on the same split. "
+                f"Recent experiment IDs: {identities}. "
+                "Select the parent you are improving; do not restart it as an unlinked baseline.")
+        raise ValueError("Measure the first model with variant=baseline, then use its returned experiment.id "
+                         "as parent_experiment_id for a candidate or ablation.")
     require(len(list((development.root/"training").glob("*/receipt.json"))) < 64,
             "Training attempt budget reached")
     if evaluation_file:
