@@ -56,6 +56,15 @@ jobs:
           tests/harness/test_execution_catalog.py tests/harness/test_adapters.py
           tests/test_research_review_recovery.py tests/harness/test_research_algorithm_checks.py
 
+      - name: Verify training-only input descriptions
+        env:
+          PYTHONPATH: src
+          PYTHON_DOTENV_DISABLED: '1'
+        run: >-
+          python -m pytest -q tests/harness/test_research_input_profile.py
+          -k 'not real_training'
+
+
   source-and-frontend:
     runs-on: ubuntu-latest
     steps:

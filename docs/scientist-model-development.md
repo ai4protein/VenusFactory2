@@ -57,6 +57,17 @@ Encode sequence and categorical features, convert numeric strings where needed,
 and use the same transformation during fitting and prediction. Fit learned
 transformations on the training partition and retain them with the model.
 
+Dataset preparation returns a placeholder row/query example and a compact profile
+of the training partition: stored types, empty fields, numeric-string counts,
+distinct-value counts and length ranges. Profiles cover at most 16 fields and
+explicitly report omitted fields. Verified resume context restores the same
+profile; held-out observations and targets do not contribute to it.
+
+A failed field lookup identifies the nested training-row access and the direct
+prediction-input access. Array-shape errors explain the estimator's feature-matrix
+requirement. Other estimator errors retain their own cause without unrelated
+input-format instructions.
+
 The platform persists fitted state, records dependencies and runs predictions in
 isolated processes. Failed fits return the final exception and applicable input
 contract; full execution logs remain in the training receipts. Before a worker is

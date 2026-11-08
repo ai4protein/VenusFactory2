@@ -153,6 +153,43 @@ module=importlib.util.module_from_spec(spec)
 sys.modules[spec.name]=module
 spec.loader.exec_module(module)
 training=json.loads((base/"training.json").read_text())
+
+def fit_failure(exc):
+    # Keep full chained stderr as local evidence; expose a compact root cause.
+    detail = str(exc).splitlines()[0] if str(exc) else type(exc).__name__
+    message = f"{type(exc).__name__}: {detail[:240]}."
+    fields = training["train"][0]["inputs"] if training["train"] else {}
+    key = exc.args[0] if isinstance(exc, KeyError) and exc.args else None
+    if isinstance(key, str) and key in fields:
+        field = repr(key)[:120]
+        return message + (
+            " Input contract: in fit, iterate training['train']; "
+            f"read row['inputs'][{field}] and row['target']. "
+            f"In predict, read inputs[{field}] directly; it has no nested 'inputs' key."
+        )
+    lower = detail.lower()
+    if "all arrays must be of the same length" in lower:
+        return message + (
+            " Tabular contract: build the feature table from row['inputs'] in training['train'], "
+            "and targets from row['target']; training itself also contains task/strategy metadata. "
+            "Every feature column and target vector must describe the same samples."
+        )
+    if any(text in lower for text in ("2d array", "1d array", "could not convert string",
+                                       "dtype=")):
+        return message + (
+            " Feature contract: a numeric estimator needs a two-dimensional feature matrix "
+            "(one row per sample). Encode raw strings/dicts in your pipeline first. "
+            "Column-name selectors require actual tabular columns, not a list of strings. "
+            "Retain the fitted transformation and apply it to the single prediction input."
+        )
+    if isinstance(exc, KeyError) or "string indices" in lower or "list indices" in lower:
+        return message + (
+            " Input contract: training is a dict; rows=training['train'] is the sample list. "
+            "Each row has row['inputs'] and row['target']. predict receives the inputs dict alone. "
+            "Before numeric fitting, encode sequence/categorical features and convert numeric strings."
+        )
+    return message
+
 try:
     state=module.fit(training,__VF_SEED__)
 except FileNotFoundError as exc:
@@ -163,12 +200,7 @@ except FileNotFoundError as exc:
         "instead of reopening the uploaded CSV. Keep validation and test data outside fitting."
     ) from exc
 except (TypeError, ValueError, KeyError, IndexError) as exc:
-    raise ValueError(
-        f"{type(exc).__name__}: {str(exc)[:240]}. "
-        "Input contract: training is a dict; rows=training['train'] is the sample list. "
-        "For each row use row['inputs'] (a feature dict) and row['target']. "
-        "Iterating training itself returns key strings; encode sequence/categorical features before numeric fitting."
-    ) from exc
+    raise ValueError(fit_failure(exc)) from exc
 size=module._vf_save(state)
 print(json.dumps({"trained_rows":len(training["train"]),"state_bytes":size}))
 """

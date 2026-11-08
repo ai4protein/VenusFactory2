@@ -250,7 +250,7 @@ class ResearchWorkspace:
     async def prepare_research_dataset(self, data_file: str, target_column: str, input_columns: list[str],
             group_column: str, provenance: str, grouping: str, id_column: str='', task: str='regression',
             seed: int=0, validation_fraction: float=0.15, test_fraction: float=0.15, output_file: str='') -> dict:
-        """Prepare deterministic group-disjoint splits from a measured CSV/TSV. Select input and target columns and a biologically justified group column; related observations stay together. IDs may be generated when id_column is empty. Returns evaluation_file, hashes and split counts. With host-protected data, read training_data.file for analysis; evaluation_file is an opaque training/review reference and contains no sample rows. Original values are preserved; no samples are invented or silently discarded."""
+        """Prepare deterministic group-disjoint splits from a measured CSV/TSV. Select input and target columns and a biologically justified group column; related observations stay together. IDs may be generated when id_column is empty. Returns evaluation_file, hashes, split counts, a bounded training-only input profile and fit/predict row shapes. With host-protected data, read training_data.file for analysis; evaluation_file is an opaque training/review reference and contains no sample rows. Original values are preserved; no samples are invented or silently discarded."""
         from .research_dataset import prepare_dataset
         result=prepare_dataset(self.workspace, data_file=data_file,target_column=target_column,
             input_columns=input_columns,group_column=group_column,provenance=provenance,grouping=grouping,

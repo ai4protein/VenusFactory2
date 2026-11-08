@@ -9,13 +9,22 @@ from collections import defaultdict
 
 from utils.scoped_files import read_bytes
 from .research_development import require, validate_data, immutable_copy, inspect_evaluation
+from .research_input_profile import training_input_profile
 
 
 
 def model_interface(task, columns):
     """Describe the callable shape without observations or fitted-method choices."""
+    fields = {name: "<original CSV string>" for name in columns[:4]}
     return {
         "schema": "venusfactory.training-interface.v1",
+        "entrypoints": "Module-level fit and predict functions; helper classes may be used behind them.",
+        "shape_example": {
+            "kind": "placeholder values only; not observations",
+            "training_row": {"inputs": fields, "target": "<measured target>"},
+            "prediction_inputs": fields,
+            "omitted_input_fields": max(0, len(columns)-len(fields)),
+        },
         "input_fields": {name: "original CSV string" for name in columns},
         "fit": {
             "signature": "fit(training, seed)",
@@ -116,6 +125,7 @@ def prepare_dataset(workspace, *, data_file, target_column, input_columns, group
     result.update(source_file=data_file,table_sha256=source_sha,source_rows=len(rows),
                   input_columns=input_columns,input_type="Original table strings; convert numerical features in fit/predict.",
                   model_interface=model_interface(task,input_columns),
+                  training_profile=training_input_profile(data["splits"]["train"],input_columns),
                   next_step="Write a complete fit(training, seed) and predict(model, inputs) module, then call train_research_model with this evaluation_file and variant=baseline.")
     if data_store:
         result.update(protected_data_access(data))

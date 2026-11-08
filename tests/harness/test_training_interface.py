@@ -65,7 +65,12 @@ async def test_tool_preparation_and_resumed_context_share_shape_without_values(t
         "Synthetic interface fixture", "Independent fixture groups", id_column="id")
     restored = prepared_dataset_context(service.workspace, episodes)
     assert restored["model_interface"] == prepared["model_interface"]
+    assert restored["training_profile"] == prepared["training_profile"]
     contract = prepared["model_interface"]
+    shape = contract["shape_example"]
+    assert shape["training_row"]["inputs"] == shape["prediction_inputs"]
+    assert "inputs" not in shape["prediction_inputs"]
+    assert "placeholder" in shape["kind"]
     assert contract["input_fields"] == {"sequence": "original CSV string", "condition": "original CSV string"}
     assert "ONE" in contract["predict"]["inputs"]
     assert contract["predict"]["returns"] == {"value": "finite number"}
