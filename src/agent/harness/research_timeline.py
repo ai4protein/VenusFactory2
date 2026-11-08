@@ -41,22 +41,35 @@ class ResearchTimeline:
 
     def tool(self, event):
         row = public_value({k:event[k] for k in ('tool','status','call_id','job_id','job_number','position','progress','error_type') if k in event}, self.workspace)
-        if self.events and self.events[-1].get('tool') == row.get('tool') and row.get('status') in {'completed','failed'}:
-            row = {**self.events[-1], **row}
         row.update(timestamp=time.time(), role=self.stages[-1]['role'] if self.stages else 'MLS', episode=self.episode)
+        terminal = {'completed', 'failed', 'cancelled', 'interrupted'}
+        match = None
+        for index in range(len(self.events) - 1, -1, -1):
+            previous = self.events[index]
+            if (previous.get('tool'), previous.get('role')) != (row.get('tool'), row['role']):
+                continue
+            if row.get('call_id'):
+                if previous.get('call_id') != row['call_id']:
+                    continue
+                # Legacy providers may restart their counter on a retry.
+                if previous.get('status') in terminal and row.get('status') not in terminal:
+                    break
+            else:
+                # Without an ID only the most recent unfinished operation can
+                # receive progress. Finished calls must keep their own history.
+                if index != len(self.events) - 1 or previous.get('call_id') or previous.get('status') in terminal:
+                    break
+                if row.get('job_id') and previous.get('job_id') not in (None, row['job_id']):
+                    break
+            match = index
+            break
+        if match is not None:
+            previous = self.events[match]
+            row = {**previous, **row, 'timestamp':previous['timestamp']}
+            self.events[match] = row
+        else:
+            self.events.append(row)
         write_json(self.folder/'current_tool.json', row)
-        if row.get('call_id'):
-            for index, previous in enumerate(self.events):
-                if previous.get('call_id') == row['call_id']:
-                    self.events[index] = {**previous, **row, 'timestamp':previous['timestamp']}
-                    write_json(self.folder/'current_tool.json', self.events[index])
-                    write_json(self.folder/'timeline.json', self.events[-100:])
-                    return
-        # Compatibility for providers without a call identifier.
-        old = self.events[-1] if self.events else {}
-        if (old.get('tool'),old.get('status'),old.get('job_id')) == (row.get('tool'),row.get('status'),row.get('job_id')):
-            self.events[-1] = {**row, 'timestamp':old['timestamp']}
-        else: self.events.append(row)
         write_json(self.folder/'timeline.json', self.events[-100:])
 
     def finish(self, status):

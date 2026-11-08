@@ -165,6 +165,7 @@ async def run(request, *, tools=None, event_sink=None):
     output.mkdir(mode=0o700)
     token = secrets.token_urlsafe(32)
     calls = executions = lookups = 0
+    call_scope = secrets.token_hex(12)
     checkpoint_saved = False
     checkpoint_calls = 0
     is_research = 'submit_research_checkpoint' in mapping
@@ -242,7 +243,7 @@ async def run(request, *, tools=None, event_sink=None):
                 if interaction is not None:
                     raise ValueError("Waiting for the user's response; no further actions are allowed")
                 calls += 1
-                call_id = str(calls)
+                call_id = f"{call_scope}:{calls}"
                 arguments = params.get('arguments', {})
                 if name in {SEARCH, DESCRIBE}:
                     if not metadata_call and executions >= profile.budget.tool_calls:
@@ -348,7 +349,7 @@ async def run(request, *, tools=None, event_sink=None):
                 observation = observation or Observation('tool', str(params.get('name', 'unknown')))
                 observation.finish(failed=True,error_type=type(exc).__name__)
             if event_sink and method == "tools/call":
-                send({"kind": "research_tool_status", "status": "failed", "tool": params.get("name", ""), "call_id": locals().get("call_id"), "error_type": type(exc).__name__})
+                send({"kind": "research_tool_status", "status": "failed", "tool": locals().get("name") or params.get("name", ""), "call_id": locals().get("call_id"), "error_type": type(exc).__name__})
             message=type(exc).__name__
             failed_tool=locals().get('tool') if method=='tools/call' else None
             # Give model developers actionable contract failures without exposing
