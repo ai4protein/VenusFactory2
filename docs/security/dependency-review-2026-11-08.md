@@ -1,5 +1,7 @@
 # Dependency security review — 2026-11-08
 
+This is the earlier audit snapshot. The [9 November follow-up](dependency-review-2026-11-09.md) supersedes its platform Transformers constraint and remaining-advisory inventory.
+
 ## Changes
 
 The platform initializer now applies both the model compatibility constraints and

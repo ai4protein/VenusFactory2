@@ -6,6 +6,7 @@
 | `macos.txt` | macOS dependency profile; Linux sandbox and GPU support differ |
 | `service-security.txt` | Validated service versions, applied by the initializer together with the model compatibility constraints |
 | `optional/cube.txt` | Optional CubeSandbox SDK; requires a separately configured local service |
+| `optional/esm3.txt` | Isolated ESM3 preprocessing environment; audited separately from the platform |
 | `optional/e2b.txt` | Optional E2B SDK; requires the configured local E2B infrastructure |
 
 The default session sandbox is bubblewrap, a Linux system dependency. It does not
@@ -30,3 +31,9 @@ apply to independently versioned third-party environments. All platform dependen
 CI resolves both platform profiles and audits them against OSV. See the
 [security review](../docs/security/dependency-review-2026-11-08.md#continuous-audit)
 for the exact open model-runtime advisories and the strict audit command.
+
+ESM3 structure-token generation runs in its own interpreter. The core platform
+uses Transformers 5.10.4; ESM3's upstream Transformers 4 requirement is confined
+to the optional runtime. Do not combine the two dependency profiles.
+See [runtime setup](../docs/model-runtimes.md#esm3-structure-token-preprocessing)
+and the [updated security review](../docs/security/dependency-review-2026-11-09.md).

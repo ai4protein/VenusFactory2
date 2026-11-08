@@ -409,3 +409,30 @@ python3 scripts/run_structure.py mol1 doctor
 Installing software does not publish an MCP tool or change an online/local
 administrator switch. Existing working services keep their current interpreters.
 New ProSST, ESM-1v, ESM-IF1 and ProtSSN installations also use their own environments.
+
+
+## ESM3 structure-token preprocessing
+
+ESM3 has a separate environment because its upstream dependency constraints differ
+from Factory's prediction and training stack. Install it on Linux with:
+
+```sh
+python initialize.py install --tools esm3 --manager auto --torch-type auto
+```
+
+The initializer verifies dependencies and creates a disabled runtime profile.
+Provide an authorized ESM3 structure-encoder checkpoint at
+`runtime/local/model-runtimes/esm3/weights/esm3_structure_encoder_v0.pth`,
+or set `esm3.weights` in `configs/model_runtimes.json`. Rerun the installer
+to verify encoding against a reference PDB, then enable that runtime profile.
+An environment without the encoder checkpoint remains unavailable.
+
+Factory's structure-data merger and the existing ESM3 CSV/JSON command now dispatch
+to that interpreter. The worker loads tensor-only checkpoint data and returns
+validated structure tokens. Missing, disabled or unverified installations do not
+fall back to the platform Python. The worker inherits the calling job's lifecycle
+and has a bounded execution timeout.
+
+This is dependency isolation, not a replacement for the session sandbox. The
+optional upstream stack still has reviewed advisories, listed separately in the
+[dependency review](security/dependency-review-2026-11-09.md).

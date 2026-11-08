@@ -128,7 +128,7 @@ def read_baseline(path: Path) -> list[dict]:
         if reviewed > date.today() or not 0 < (expires - reviewed).days <= 31:
             raise ValueError("Open-advisory review dates must be within 31 days")
         profiles = entry.get("profiles")
-        if not isinstance(profiles, list) or not profiles or not set(profiles) <= {"linux", "macos"}:
+        if not isinstance(profiles, list) or not profiles or not set(profiles) <= {"linux", "macos", "esm3"}:
             raise ValueError("Open advisories require an explicit supported profile")
         for profile in profiles:
             for identifier in ids:
@@ -157,7 +157,8 @@ def classify(findings: dict, baseline: list[dict], profile: str, today: date) ->
     overdue = sum(row["state"] == "review_overdue" for row in rows)
     return {
         "profile": profile, "checked_at": datetime.now(timezone.utc).isoformat(),
-        "scope": ("Resolved optional sandbox-client dependencies" if profile in {"cube", "e2b"} else "Resolved platform dependencies") + "; excludes independent third-party model environments",
+        "scope": ("Resolved isolated ESM3 runtime dependencies" if profile == "esm3" else
+                  ("Resolved optional sandbox-client dependencies" if profile in {"cube", "e2b"} else "Resolved platform dependencies") + "; excludes independent third-party model environments"),
         "package_count": len(findings), "advisory_record_count": len(rows),
         "new_count": new, "overdue_count": overdue,
         "status": "action_required" if new or overdue else "known_open" if rows else "clear",
@@ -181,7 +182,7 @@ def render(report: dict) -> str:
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("resolved", type=Path)
-    parser.add_argument("--profile", choices=("linux", "macos", "cube", "e2b"), required=True)
+    parser.add_argument("--profile", choices=("linux", "macos", "cube", "e2b", "esm3"), required=True)
     parser.add_argument("--baseline", type=Path, default=BASELINE)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--strict", action="store_true", help="Fail on all open advisories, including recorded legacy model risks")
@@ -204,7 +205,7 @@ def main(argv=None) -> int:
         with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as stream:
             stream.write(summary)
     if os.environ.get("GITHUB_ACTIONS") == "true" and report["status"] == "known_open":
-        print("::warning title=Open model-runtime advisories::Known Torch/Transformers risks remain open. See the audit summary and docs/security/dependency-review-2026-11-08.md.")
+        print("::warning title=Open model-runtime advisories::Known dependency risks remain open. See the audit summary and docs/security/dependency-review-2026-11-08.md.")
     return code
 
 

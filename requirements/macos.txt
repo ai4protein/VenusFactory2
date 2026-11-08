@@ -3,7 +3,6 @@ Bio==1.8.0
 biopython==1.88
 biotite==1.4.0
 datasets==5.0.1
-esm==3.2.3
 fake_useragent==2.1.0
 joblib==1.5.1
 lxml==6.1.0
@@ -20,7 +19,7 @@ scipy==1.16.0
 sentencepiece==0.2.1
 torchmetrics==1.7.3
 tqdm==4.67.1
-transformers==4.48.1
+transformers==5.10.4
 wandb==0.20.1
 vplm==0.0.1
 python-dotenv==1.2.2

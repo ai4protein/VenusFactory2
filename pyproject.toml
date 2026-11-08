@@ -18,16 +18,16 @@ requires-python = ">=3.12"
 # they ship as platform-specific wheels (cu128 / cu118 / cpu). See README.
 dependencies = [
     # --- Core ML / training -------------------------------------------------
-    "transformers==4.48.1",
+    "transformers==5.10.4",
     "accelerate>=1.15.0",
     "peft>=0.15.2",
     "datasets>=5.0.1",
-    "tokenizers>=0.21.4",
+    "tokenizers>=0.22.2",
     "safetensors>=0.6.2",
     "sentencepiece>=0.2.1",
     "torchmetrics>=1.7.3",
     "einops>=0.8.1",
-    "huggingface-hub>=0.34.4",
+    "huggingface-hub>=1.5.0",
     "hf-xet>=1.1.9",
     "lightning-utilities>=0.14.3",
     "bitsandbytes>=0.47.0 ; sys_platform != 'darwin'",
@@ -37,7 +37,6 @@ dependencies = [
     "biopython>=1.88",
     "biotite>=1.4.0",
     "biotraj>=1.2.2",
-    "esm>=3.2.3",
     "vplm>=0.0.1",
     "py3Dmol>=2.5.3",
     "pydssp>=0.9.1",
