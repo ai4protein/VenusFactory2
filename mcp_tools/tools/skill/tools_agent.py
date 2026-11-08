@@ -7,7 +7,7 @@ share one implementation.
 import json
 from typing import Optional
 
-from langchain.tools import tool
+from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
 try:

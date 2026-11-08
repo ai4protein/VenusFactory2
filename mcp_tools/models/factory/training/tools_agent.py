@@ -3,7 +3,7 @@
 import json
 from typing import Any, Dict, List, Optional
 
-from langchain.tools import tool
+from langchain_core.tools import tool
 from pydantic import BaseModel, Field, model_validator
 
 from mcp_tools.tools.runtime_tool_policy import assert_tool_allowed, tool_denied_json

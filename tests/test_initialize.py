@@ -241,3 +241,20 @@ def test_frontend_prebuild_has_python_without_environment_activation(tmp_path, m
     assert launcher.is_file() and 'exec ' in launcher.read_text()
     assert str(launcher.parent) in calls[-1][1]["extra_env"]["PATH"]
     assert calls[0][0][1] == "ci" and calls[1][0][1:] == ["run", "build"]
+
+
+def test_tar_with_npz_members_is_not_misclassified_as_zip(tmp_path):
+    # Real parameter bundles contain ZIP-formatted NPZ files inside a TAR.
+    nested = io.BytesIO()
+    with zipfile.ZipFile(nested, "w") as handle:
+        handle.writestr("alphafold/weight.npy", b"tensor-fixture")
+    payload = nested.getvalue()
+    archive = tmp_path / "params.tar"
+    with tarfile.open(archive, "w") as handle:
+        member = tarfile.TarInfo("params_model_1.npz")
+        member.size = len(payload)
+        handle.addfile(member, io.BytesIO(payload))
+    assert zipfile.is_zipfile(archive)  # This was the misleading old detection.
+    assets.extract(archive, tmp_path / "params")
+    assert (tmp_path / "params/params_model_1.npz").read_bytes() == payload
+    assert not (tmp_path / "params/alphafold").exists()

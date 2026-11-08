@@ -4,7 +4,7 @@ import json
 import os
 import re
 import tarfile
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, Optional
 from urllib.parse import quote
@@ -34,7 +34,8 @@ def get_save_path(subdir1: str, subdir2: str | None = None) -> Path:
 
 _WEB_V2_AREAS = {"uploads", "work", "results", "sessions", "manifests", "cache", "agent"}
 _WEB_V2_ALLOWED_KINDS = {"upload", "work", "result", "manifest", "artifact"}
-_ABS_PATH_PATTERN = re.compile(r"/(?:home|Users|tmp|var|opt|mnt|data)(?:/[^/\s]+)+")
+_ABS_PATH_PATTERN = re.compile(r'''(?<![\w:/])/(?:home|Users|tmp|var|opt|mnt|data)(?:/[^/\s"'\\<>;,)}\]]+)+''')
+_WINDOWS_PATH_PATTERN = re.compile(r'''(?<![\w])(?:[A-Za-z]:[\\/][^\s"'<>;,)}\]]+|\\\\[A-Za-z0-9_.-]+[\\/][^\s"'<>;,)}\]]+)''')
 
 
 def get_temp_outputs_base_dir() -> Path:
@@ -71,20 +72,41 @@ def to_project_relative_path(path: str | Path) -> str:
 
 
 def redact_path_text(text: str | None) -> str:
-    """Redact absolute path segments from user-facing text."""
+    """Redact path values while preserving JSON escapes, code and newlines."""
     raw = str(text or "")
     if not raw:
         return raw
 
-    project_root = get_project_root().resolve().as_posix()
-    normalized = raw.replace("\\", "/")
-    if project_root in normalized:
-        normalized = normalized.replace(project_root, ".")
+    project_root = get_project_root().resolve()
+    def fragment(value):
+        # Normalize detected paths only; replacing every backslash corrupts
+        # JSON-encoded tool receipts, Python strings and scientific notation.
+        for spelling in {str(project_root), project_root.as_posix()}:
+            value = value.replace(spelling, ".")
+        value = _WINDOWS_PATH_PATTERN.sub(
+            lambda match: PureWindowsPath(match.group(0)).name, value)
+        return _ABS_PATH_PATTERN.sub(
+            lambda match: to_project_relative_path(match.group(0)), value)
 
-    return _ABS_PATH_PATTERN.sub(
-        lambda m: to_project_relative_path(m.group(0)) if m.group(0).startswith("/") else m.group(0),
-        normalized,
-    )
+    if raw.lstrip().startswith(("{", "[")):
+        try:
+            value = json.loads(raw)
+        except (ValueError, RecursionError):
+            pass
+        else:
+            def walk(item):
+                if isinstance(item, str):
+                    return fragment(item)
+                if isinstance(item, list):
+                    return [walk(child) for child in item]
+                if isinstance(item, dict):
+                    return {key: walk(child) for key, child in item.items()}
+                return item
+            try:
+                return json.dumps(walk(value), ensure_ascii=False)
+            except RecursionError:
+                pass
+    return fragment(raw)
 
 
 def get_dated_temp_root(now: Optional[datetime] = None, use_utc: bool = False) -> Path:

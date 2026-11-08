@@ -1,4 +1,4 @@
-from langchain.tools import tool
+from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 from mcp_tools.models.pretrained.admet.service import predict_admet
 

@@ -24,7 +24,7 @@ class Parameters(BaseModel):
 
 
 class LigandParameters(Parameters):
-    chains_to_design: str = Field('', title='Chains to design', max_length=100)
+    chains_to_design: str = Field('', title='Chains to design', max_length=100, pattern=r'^$|^[A-Za-z0-9](?:,[A-Za-z0-9])*$')
     fixed_residues: str = Field('', title='Fixed residues (A12 A13)', max_length=10000)
     redesigned_residues: str = Field('', title='Design only these residues (A12 A13)', max_length=10000)
     temperature: float = Field(.1, gt=0, le=10)
@@ -41,7 +41,7 @@ class LigandParameters(Parameters):
     ligand_mpnn_use_atom_context: bool = True
     ligand_mpnn_use_side_chain_context: bool = False
     ligand_mpnn_cutoff_for_score: float = Field(8, gt=0, le=100)
-    parse_these_chains_only: str = Field('', max_length=100)
+    parse_these_chains_only: str = Field('', max_length=100, pattern=r'^$|^[A-Za-z0-9](?:,[A-Za-z0-9])*$')
     parse_atoms_with_zero_occupancy: bool = False
     pack_side_chains: bool = False
     number_of_packs_per_design: int = Field(1, ge=1, le=16)
@@ -229,6 +229,9 @@ def validate_inputs(platform,owner,key,config,data=None):
     if data:
         ext=Path(data.get('name','')).suffix.lower()
         if ext!=('.pdbqt' if key=='vina' else '.pdb'):raise ValueError('Choose a '+('receptor PDBQT' if key=='vina' else 'PDB')+' file')
+    if key == 'ligandmpnn' and data:
+        from .inputs import validate_ligand_design
+        validate_ligand_design(data.get('structure', ''), p)
     ligand=None
     if config.get('ligand_dataset_id'):
         ligand=platform.owned('datasets',config['ligand_dataset_id'],owner)
@@ -307,6 +310,21 @@ def commands(key,p,cfg,source,ligand,work,out):
     raise ValueError('Unknown external model')
 
 
+
+def normalize_ligand_fasta(out, private):
+    """Keep server checkpoint locations out of downloadable sequence headers."""
+    for path in [*out.rglob('*.fa'), *out.rglob('*.fasta')]:
+        original = path.read_text()
+        public = '\n'.join(re.sub(r'model_path=([^,\n]+)',
+            lambda match: 'model_checkpoint=' + Path(match.group(1)).name, line)
+            if line.startswith('>') else line for line in original.splitlines()) + '\n'
+        if public != original:
+            backup = private / path.relative_to(out)
+            backup.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+            backup.write_text(original)
+            path.write_text(public)
+
+
 def collect(key,out):
     rows=[]
     if key in {'ligandmpnn','antibmpnn'}:
@@ -343,6 +361,11 @@ def collect(key,out):
                 for row in rows:
                     row['accepted']=row['structure'].startswith('Accepted/')
                     row['outcome']='accepted' if row['accepted'] else 'candidate_not_accepted'
+    if key == 'ligandmpnn':
+        for row in rows:
+            match = re.search(r'(?:^|,\s*)num_res=(\d+)\b', row.get('description', ''))
+            if match and int(match.group(1)) == 0:
+                raise ValueError('LigandMPNN did not design any protein residues; check chain and residue settings')
     if not rows:raise ValueError('The runtime finished without model output; see the job log')
     return rows
 
@@ -387,10 +410,11 @@ def run(platform,owner,key,data,config):
     if ligand_data:
         ligand=work/('ligand'+Path(ligand_data['name']).suffix.lower());ligand.write_text(ligand_data.get('content') or ligand_data['structure'])
     argv=commands(key,p,cfg,source,ligand,work,out)
-    env=dict(os.environ)
-    if cfg.get('cuda_visible_devices') is not None:env['CUDA_VISIBLE_DEVICES']=str(cfg['cuda_visible_devices'])
-    # Runtimes never inherit provider secrets.
-    env={k:v for k,v in env.items() if not any(t in k.upper() for t in ['API_KEY','TOKEN','SECRET','PASSWORD'])}
+    from mcp_tools.models.execution import environment
+    env=environment(cfg)
+    launcher=cfg.get('python') or cfg.get('executable')
+    if launcher:
+        env['PATH']=str(Path(launcher).parent)+os.pathsep+env.get('PATH','')
     env.update(OMP_NUM_THREADS=str(max(1,min(int(cfg.get('cpus',2)),8))),OPENBLAS_NUM_THREADS='2',MKL_NUM_THREADS='2',XLA_PYTHON_CLIENT_PREALLOCATE='false')
     if key=='diffdock' and cfg.get('cache'):env['TORCH_HOME']=cfg['cache']
     if key=='boltzgen' and cfg.get('cache'):env['HF_HUB_OFFLINE']='1'
@@ -399,6 +423,8 @@ def run(platform,owner,key,data,config):
     with (work/'runtime.log').open('ab') as log:
         for cmd in argv:
             execute_command(cmd,cwd=cfg.get('root',work),env=env,log=log,timeout=max(1,min(int(cfg.get('timeout_seconds',3600)),86400)))
+    if key == 'ligandmpnn':
+        normalize_ligand_fasta(out, work / 'private-runtime-output')
     rows=collect(key,out)
     artifacts=[str(f) for f in out.rglob('*') if f.is_file() and not f.is_symlink() and f.suffix.lower() in {'.fa','.fasta','.pdb','.cif','.pdbqt','.sdf','.csv','.json','.png','.pdf','.html'}]
     return {'kind':'table','rows':rows,'artifacts':artifacts,'parameters':p,'runtime':key}

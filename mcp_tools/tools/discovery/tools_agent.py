@@ -3,7 +3,7 @@
 import json
 from typing import Literal
 
-from langchain.tools import tool
+from langchain_core.tools import tool
 
 from .service import search
 

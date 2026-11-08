@@ -109,7 +109,7 @@ def _convert_outputs_to_pdb(outputs, to_pdb_fn, OFProtein, atom14_to_atom37_fn):
             atom_positions=pred_pos,
             atom_mask=mask,
             residue_index=resid,
-            b_factors=outputs["plddt"][i],
+            b_factors=outputs["plddt"][i] * (100.0 if outputs["plddt"][i].max() <= 1.0 else 1.0),
             chain_index=outputs["chain_index"][i] if "chain_index" in outputs else None,
         )
         pdbs.append(to_pdb_fn(pred))
@@ -118,6 +118,13 @@ def _convert_outputs_to_pdb(outputs, to_pdb_fn, OFProtein, atom14_to_atom37_fn):
 
 def predict_local(sequence: str, output_dir: str = "./protein_structures",
                   output_file: Optional[str] = None) -> Tuple[Optional[str], Optional[Dict[str, Any]]]:
+    from mcp_tools.models.pretrained.runners.esmfold import run
+    return run(sequence, output_dir, output_file)
+
+
+def _predict_local_in_process(sequence: str, output_dir: str = "./protein_structures",
+                              output_file: Optional[str] = None, *,
+                              model_name: str = "facebook/esmfold_v1", chunk_size: int = 64):
     """
     Local ESMFold prediction (requires GPU).
     Returns (PDB path, result info) or (None, None).
@@ -131,9 +138,10 @@ def predict_local(sequence: str, output_dir: str = "./protein_structures",
     os.makedirs(output_dir, exist_ok=True)
     out_file = output_file or os.path.join(output_dir, "structure.pdb")
 
-    tokenizer = AutoTokenizer.from_pretrained("facebook/esmfold_v1")
-    model = EsmForProteinFolding.from_pretrained("facebook/esmfold_v1", low_cpu_mem_usage=True)
-    model = model.cuda()
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = EsmForProteinFolding.from_pretrained(model_name, low_cpu_mem_usage=True)
+    model = model.cuda().eval()
+    model.trunk.set_chunk_size(chunk_size)
     torch.backends.cuda.matmul.allow_tf32 = True
 
     try:
@@ -386,10 +394,11 @@ def run_local_cli(args: argparse.Namespace) -> None:
             print(p, struct.b_factor.mean())
 
     elif args.sequence is not None:
-        with torch.no_grad():
-            output = model.infer_pdb(args.sequence)
+        tokenized_input = tokenizer([args.sequence], return_tensors="pt", add_special_tokens=False)["input_ids"].cuda()
+        with torch.inference_mode():
+            output = model(tokenized_input)
         with open(args.out_file, "w") as f:
-            f.write(output)
+            f.write("\n".join(convert_outputs(output)))
         struct = bsio.load_structure(args.out_file, extra_fields=["b_factor"])
         print(struct.b_factor.mean())
 

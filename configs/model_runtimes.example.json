@@ -131,5 +131,69 @@
   "interproscan": {
     "enabled": false,
     "contact_email": ""
+  },
+  "esmfold": {
+    "enabled": false,
+    "python": "runtime/local/model-runtimes/esmfold/env/bin/python",
+    "weights": "runtime/local/model-runtimes/esmfold/weights",
+    "installation": "runtime/local/model-runtimes/esmfold/installation.json",
+    "timeout_seconds": 1800,
+    "fold_chunk_size": 64,
+    "max_sequence_length": 1024
+  },
+  "esmfold2": {
+    "enabled": false,
+    "python": "runtime/local/model-runtimes/esmfold2/env/bin/python",
+    "weights": "runtime/local/model-runtimes/esmfold2/weights",
+    "installation": "runtime/local/model-runtimes/esmfold2/installation.json",
+    "timeout_seconds": 1800,
+    "root": "runtime/local/model-runtimes/esmfold2/source",
+    "ccd": "runtime/local/model-runtimes/esmfold2/ccd/ccd.pkl"
+  },
+  "rfd4_proteina": {
+    "enabled": false,
+    "python": "runtime/local/model-runtimes/rfd4_proteina/env/bin/python",
+    "weights": "runtime/local/model-runtimes/rfd4_proteina/weights",
+    "installation": "runtime/local/model-runtimes/rfd4_proteina/installation.json",
+    "timeout_seconds": 1800,
+    "root": "runtime/local/model-runtimes/rfd4_proteina/source"
+  },
+  "rfantibody": {
+    "enabled": false,
+    "python": "runtime/local/model-runtimes/rfantibody/source/.venv/bin/python",
+    "weights": "runtime/local/model-runtimes/rfantibody/source/weights",
+    "installation": "runtime/local/model-runtimes/rfantibody/installation.json",
+    "timeout_seconds": 1800,
+    "root": "runtime/local/model-runtimes/rfantibody/source"
+  },
+  "alphafold2": {
+    "enabled": false,
+    "python": "runtime/local/model-runtimes/alphafold2/env/bin/python",
+    "root": "runtime/local/model-runtimes/alphafold2/source",
+    "data_dir": "runtime/local/model-runtimes/alphafold2/data",
+    "bio_bin": "runtime/local/model-runtimes/alphafold2/bioenv/bin",
+    "cache": "runtime/local/model-runtimes/alphafold2/cache",
+    "installation": "runtime/local/model-runtimes/alphafold2/installation.json",
+    "timeout_seconds": 3600
+  },
+  "protenix": {
+    "enabled": false,
+    "python": "runtime/local/model-runtimes/protenix/env/bin/python",
+    "root": "runtime/local/model-runtimes/protenix/source",
+    "data_dir": "runtime/local/model-runtimes/protenix/data",
+    "bio_bin": "runtime/local/model-runtimes/protenix/bioenv/bin",
+    "cache": "runtime/local/model-runtimes/protenix/cache",
+    "installation": "runtime/local/model-runtimes/protenix/installation.json",
+    "timeout_seconds": 3600
+  },
+  "mol1": {
+    "enabled": false,
+    "python": "runtime/local/model-runtimes/mol1/env/bin/python",
+    "root": "runtime/local/model-runtimes/mol1/source",
+    "data_dir": "runtime/local/model-runtimes/mol1/data",
+    "bio_bin": "runtime/local/model-runtimes/mol1/bioenv/bin",
+    "cache": "runtime/local/model-runtimes/mol1/cache",
+    "installation": "runtime/local/model-runtimes/mol1/installation.json",
+    "timeout_seconds": 3600
   }
 }

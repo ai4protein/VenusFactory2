@@ -102,7 +102,9 @@ def download(url, path: Path, *, expected=None, algorithm="sha256", max_bytes=16
 def extract(archive: Path, destination: Path, *, max_bytes=32 * 2**30):
     """Only regular files/directories; reject traversal, links and device nodes."""
     destination.mkdir(parents=True, exist_ok=True)
-    if zipfile.is_zipfile(archive):
+    # A tar containing NPZ/PyTorch ZIP members can also pass is_zipfile().
+    # Recognize the outer tar before inspecting ZIP footer signatures.
+    if not tarfile.is_tarfile(archive) and zipfile.is_zipfile(archive):
         with zipfile.ZipFile(archive) as handle:
             entries = handle.infolist()
             for entry in entries:

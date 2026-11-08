@@ -8,10 +8,10 @@ tools/denovo/tools_agent.py — ProteinMPNN LangChain @tool 定义
 import json
 from typing import Dict, List, Optional
 
-from langchain.tools import tool
+from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
-from mcp_tools.models.pretrained.design.tools_mcp import call_proteinmpnn_design, call_proteinmpnn_score
+from .operations import call_proteinmpnn_design, call_proteinmpnn_score
 
 
 class ProteinMPNNSequenceDesignFromStructureInput(BaseModel):

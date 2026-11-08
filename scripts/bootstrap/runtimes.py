@@ -63,6 +63,12 @@ class Runtimes:
             return {"status": "manual", "message": spec["manual"]}
         if spec.get("gpu") and not self.gpu:
             return {"status": "blocked", "message": "This optional runtime requires an NVIDIA GPU"}
+        if spec.get("installer") == "structure":
+            from .structure_runtimes import install
+            return install(self, name)
+        if spec.get("installer") == "generative":
+            from .generative_runtimes import install
+            return install(self, name)
         target = inside(self.root, self.base / name)
         receipt_path = target / "installation.json"
         receipt = read_json(receipt_path, {})
@@ -114,6 +120,9 @@ class Runtimes:
                 else:
                     self.env.pip(python, "torch==2.8.0", torch=True)
                     self.env.pip(python, *spec["packages"])
+                    if name in {"prosst", "esmif1", "protssn"}:
+                        self.env.pip(python, "torch-scatter", "torch-sparse", "torch-cluster", "torch-spline-conv",
+                                     links=f"https://data.pyg.org/whl/torch-2.8.0+{self.env.torch_type}.html")
                 atomic_json(marker, dependency_key)
         profile = {"enabled": False, "python": self.relative(python),
                    "installation": self.relative(receipt_path), "timeout_seconds": 1800}
@@ -229,6 +238,7 @@ class Runtimes:
         path.write_text(text.replace(old, new), encoding="utf-8")
 
     def foundation(self, name, profile, source, target):
+        python = self.root / profile["python"]
         if name == "esmif1":
             weights = download("https://dl.fbaipublicfiles.com/fair-esm/models/esm_if1_gvp4_t16_142M_UR50.pt", target / "weights/esm_if1_gvp4_t16_142M_UR50.pt")
             profile.update(weights=self.relative(weights))
@@ -247,11 +257,11 @@ revision=json.loads(marker.read_text())['revision'] if marker.exists() else 'mai
 folder=snapshot_download(model,revision=revision,cache_dir=cache,token=False)
 marker.write_text(json.dumps({'revision':Path(folder).name,'snapshot':folder}))
 """
-            self.run([self.python, "-c", code, model, cache, record])
+            self.run([python, "-c", code, model, cache, record])
             weights = Path(read_json(record)["snapshot"])
             profile["cache"] = self.relative(target / "cache")
         else:
-            snapshot(self.run, self.python, model, weights)
+            snapshot(self.run, python, model, weights)
         profile.update(weights=self.relative(weights), model_id=model)
         required = list(weights.glob("*.safetensors")) or list(weights.glob("*.bin"))
         if name == "prosst":
@@ -272,7 +282,7 @@ marker.write_text(json.dumps({'revision':Path(folder).name,'snapshot':folder}))
             profile["structure_weights"] = self.relative(structure)
         elif name == "protssn":
             archive_root = target / "archive"
-            snapshot(self.run, self.python, "tyang816/ProtSSN", archive_root, "ProtSSN.zip")
+            snapshot(self.run, python, "tyang816/ProtSSN", archive_root, "ProtSSN.zip")
             unpack = target / "unpacked"
             extract(archive_root / "ProtSSN.zip", unpack)
             gnn = target / "gnn"

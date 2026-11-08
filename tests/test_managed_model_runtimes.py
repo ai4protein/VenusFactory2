@@ -50,7 +50,7 @@ def test_mpnn_design_and_score_share_dispatch(monkeypatch):
 def test_mcp_gateway_imports_canonical_model_package():
     import os,subprocess
     root=Path(__file__).resolve().parents[1]
-    code='from mcp_tools import mcp_server; from mcp_tools.models.pretrained.design import tools_mcp; assert tools_mcp.proteinmpnn_design.__module__ == "mcp_tools.models.pretrained.design.proteinmpnn.protein_mpnn_function"'
+    code='from mcp_tools import mcp_server; from mcp_tools.models.pretrained.design import tools_mcp, operations; assert operations.proteinmpnn_design.__module__ == "mcp_tools.models.pretrained.design.proteinmpnn.protein_mpnn_function"; assert tools_mcp.call_proteinmpnn_design is operations.call_proteinmpnn_design; assert tools_mcp.call_proteinmpnn_score is operations.call_proteinmpnn_score'
     result=subprocess.run([sys.executable,'-c',code],cwd=root,capture_output=True,text=True,
         env={**os.environ,'PYTHONPATH':str(root)+os.pathsep+str(root/'src')},timeout=90)
     assert result.returncode==0,result.stderr[-4000:]
@@ -105,3 +105,28 @@ def test_protssn_explicit_missing_weights_does_not_download(tmp_path,monkeypatch
     import huggingface_hub
     monkeypatch.setattr(huggingface_hub,'hf_hub_download',lambda **kw:pytest.fail('Should not download configured weights'))
     with pytest.raises((ValueError,FileNotFoundError)):model_directory(tmp_path,False,10)
+
+def test_runtime_keeps_scheduler_gpu_binding_and_excludes_host_secrets(monkeypatch):
+    from mcp_tools.models.execution import environment
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "GPU-scheduler-assignment")
+    monkeypatch.setenv("PBS_JOBCOOKIE", "not-for-model-subprocess")
+    monkeypatch.setenv("EXAMPLE_API_KEY", "not-for-model-subprocess")
+    env=environment({"cuda_visible_devices":"0"})
+    assert env["CUDA_VISIBLE_DEVICES"]=="GPU-scheduler-assignment"
+    assert "PBS_JOBCOOKIE" not in env and "EXAMPLE_API_KEY" not in env
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "")
+    assert environment({"cuda_visible_devices":"0"})["CUDA_VISIBLE_DEVICES"]==""
+    monkeypatch.delenv("CUDA_VISIBLE_DEVICES")
+    assert environment({"cuda_visible_devices":"0"})["CUDA_VISIBLE_DEVICES"]=="0"
+
+def test_generative_runtime_requires_matching_inference_evidence(tmp_path):
+    import json,sys
+    from mcp_tools.models.execution import profile
+    record=tmp_path/"installation.json"
+    settings={"esmfold2":{"python":sys.executable,"installation":str(record)}}
+    for data in [{"runtime":"esmfold2","verified":False},{"runtime":"different","verified":True}]:
+        record.write_text(json.dumps(data))
+        with pytest.raises(ValueError,match="evidence"):
+            profile("esmfold2",settings)
+    record.write_text(json.dumps({"runtime":"esmfold2","verified":True}))
+    assert profile("esmfold2",settings)[1]==sys.executable

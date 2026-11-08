@@ -28,6 +28,8 @@ def parser():
     p.add_argument("--harnesses", help="Optional clients: kimi-code,deepseek-harness,codex,claude-code or all")
     p.add_argument("--dependencies", choices=("base", "platform"), help="base: Python only; platform: full API/MCP/ML dependencies")
     p.add_argument("--tools", help="Comma-separated tool IDs; replaces the profile selection. Use 'all' to include manual/GPU tools")
+    p.add_argument("--alphafold-databases", choices=("none", "reduced", "full"), default="none",
+                   help="Explicit AlphaFold2 database download: about 650/3000 GiB free required; default none")
     p.add_argument("--manager", choices=("auto", "uv", "conda"), default="auto")
     p.add_argument("--torch-type", choices=("auto", "cpu", "cu128"), default="auto")
     p.add_argument("--environment", default=".venv", help="Platform environment prefix, relative to the repository by default")
@@ -79,6 +81,10 @@ def selection(args, manifest):
         raise ValueError("Unknown stage: " + ",".join(sorted(set(stages) - set(STAGES))))
     tool_profile = 'full' if args.components is not None and args.profile == 'minimal' else args.profile
     selected = list(manifest["tools"]) if args.tools == "all" else ([x.strip() for x in args.tools.split(",") if x.strip()] if args.tools is not None else manifest["profiles"][tool_profile])
+    aliases = {"alphafold": "alphafold2", "proteinix": "protenix", "mol-1": "mol1", "mol_1": "mol1"}
+    selected = [aliases.get(name.lower(), name.lower()) for name in selected]
+    if args.alphafold_databases != "none" and ("tools" not in stages or "alphafold2" not in selected):
+        raise ValueError("--alphafold-databases requires --tools alphafold2")
     if set(selected) - set(manifest["tools"]):
         raise ValueError("Unknown tool: " + ",".join(sorted(set(selected) - set(manifest["tools"]))))
     return [stage for stage in STAGES if stage in stages], list(dict.fromkeys(selected))
@@ -141,6 +147,7 @@ def main(argv=None):
         python = environment / "bin/python"
         plan = {"system": system, "manager": choose_manager(args.manager), "dependencies": dependencies,
                 "torch_type": torch_type, "environment": str(environment), "reuse_environment": args.use_existing_environment, "hf_endpoint": endpoint,
+                "alphafold_databases": args.alphafold_databases,
                 "stages": stages, "tools": [{"id": name, **manifest["tools"][name]} for name in selected] if "tools" in stages else [],
                 "harnesses": selected_harnesses, "factory_preset": preset, "factory_bytes": sum(f["size"] for f in factory_files(root, preset)) if "factory" in stages else 0,
                 "backbones": backbones,
@@ -187,6 +194,7 @@ def main(argv=None):
                 run = Runner(root, session / "install.log")
                 env = Environment(root, run, args.manager, torch_type)
                 runtimes = Runtimes(root, env, python, manifest, system["gpu"])
+                runtimes.alphafold_databases = args.alphafold_databases
                 result = {"steps": {}, "log": str(run.log), "plan": str(session / "plan.json")}
                 for index, stage in enumerate(stages, 1):
                     progress.ui.line(f'[{index}/{len(stages)}] {stage}')
@@ -223,6 +231,7 @@ def main(argv=None):
                                     status[name] = runtimes.install(name)
                                 except Exception as error:
                                     status[name] = {"status": "failed", "message": str(error)}
+                                progress.ui.line(f"  {name}: {status[name]['status']}" + (f" — {status[name]['message']}" if status[name].get("message") else ""))
                                 result["steps"][stage] = status
                                 atomic_json(session / "result.json", result)
                         elif stage == "factory":

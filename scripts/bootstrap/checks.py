@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import urllib.request
 from fnmatch import fnmatch
 from pathlib import Path
@@ -44,9 +46,16 @@ def tool_health(root, name, python, hashes=False):
     if not config:
         return {"status": "missing", "enabled": False}
     missing = []
-    for key in ("python", "executable", "root", "weights", "packing_weights", "model_dir", "confidence_model_dir", "structure_weights", "installation"):
+    for key in ("python", "executable", "root", "weights", "packing_weights", "model_dir", "confidence_model_dir", "structure_weights", "ccd", "data_dir", "bio_bin", "installation"):
         if config.get(key) and not (root / config[key]).exists():
             missing.append(key)
+    if name == "bindcraft" and config.get("advanced"):
+        advanced = read_json(root / config["advanced"], {})
+        if advanced.get("save_design_animations"):
+            bin_dir = (root / config["python"]).parent if config.get("python") else Path(python).parent
+            search_path = str(bin_dir) + os.pathsep + os.environ.get("PATH", "")
+            if not shutil.which("ffmpeg", path=search_path):
+                missing.append("ffmpeg")
     checks = []
     if name == "proteinmpnn":
         base = root / config.get("weights", "ckpt/ProteinMPNN")
@@ -58,6 +67,10 @@ def tool_health(root, name, python, hashes=False):
         checks = [base / "AE.pt", base / "2048.joblib"]
     missing += [str(p.relative_to(root)) if p.is_relative_to(root) else p.name for p in checks if not p.is_file() or not p.stat().st_size]
     receipt = read_json(root / config["installation"], {}) if config.get("installation") and (root / config["installation"]).is_file() else {}
+    for path in receipt.get("required_files", []):
+        asset = root / path
+        if not asset.is_file() or not asset.stat().st_size:
+            missing.append("required_asset:" + path)
     if hashes:
         for path, info in receipt.get("assets", {}).items():
             file = root / path
@@ -67,7 +80,10 @@ def tool_health(root, name, python, hashes=False):
     imports = {"ligandmpnn": "torch,prody,ml_collections,tree", "antibmpnn": "torch,peptides,pandas",
                "s4pred": "torch,Bio", "proteinmpnn": "torch,numpy", "prosst": "torch,transformers,torch_geometric",
                "esm1v": "torch,transformers", "esmif1": "torch,torch_geometric", "protssn": "torch,transformers,torch_geometric",
-               "admet_ai": "admet_ai", "bindcraft": "jax,colabdesign,pyrosetta", "diffdock": "torch,esm,torch_geometric,rdkit"}
+               "admet_ai": "admet_ai", "bindcraft": "jax,colabdesign,pyrosetta", "diffdock": "torch,esm,torch_geometric,rdkit",
+               "esmfold": "torch,transformers,biotite", "esmfold2": "torch,esm.models.esmfold2",
+               "mol1": "torch,mol", "protenix": "torch,protenix", "alphafold2": "jax,haiku,openmm",
+               "rfd4_proteina": "torch,rfproteina", "rfantibody": "torch,rfantibody"}
     if not missing and name in imports:
         try:
             capture([executable, "-c", "import " + imports[name]], timeout=90)

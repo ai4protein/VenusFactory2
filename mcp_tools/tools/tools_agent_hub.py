@@ -14,7 +14,7 @@ Tool inventory (all @tool from mutation, predict, search, train, file, skill):
   FILE (10): maxit_structure_convert, read_fasta, extract_uids_from_fasta, uid_file_to_chunks, unzip_archive, ungzip_file, pdb_chain_sequences, pdb_dir_to_fasta, check_pdb_apo, extract_uniprot_id_from_rcsb_metadata
   SKILL (1–2): read_skill, python_repl (if langchain_experimental installed)
 """
-from langchain.tools import BaseTool
+from langchain_core.tools import BaseTool
 from mcp_tools.tools.database.tools_agent import (
     # AlphaFold
     download_alphafold_structure_by_uniprot_id_tool,

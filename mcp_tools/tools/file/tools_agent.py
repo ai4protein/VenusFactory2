@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from mcp_tools.tools.path_sanitizer import to_client_file_path
 
-from langchain.tools import tool
+from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
 from .converter.maxit import convert as maxit_convert

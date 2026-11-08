@@ -4,7 +4,7 @@
 import json
 import os
 from typing import List, Optional, Literal
-from langchain.tools import tool
+from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 from .deepsearch.arxiv_search import query_arxiv
 from .deepsearch.biorxiv_search import query_biorxiv

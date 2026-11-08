@@ -251,6 +251,10 @@ in this research checkout are:
   PyRosetta, with the official AlphaFold 2022-12-06 parameter archive. JAX 0.4.35
   needs the older `nvidia-cuda-nvcc-cu12==12.6.85` package layout. Follow upstream
   dependency licensing and size the GPU for the target and binder length.
+  When animation saving is enabled, put ffmpeg on this runtime's PATH.
+  The tested environment uses imageio-ffmpeg==0.6.0 and a runtime-local
+  bin/ffmpeg symlink to its bundled executable; no system-wide install is needed.
+  The health check reports a missing encoder before a long design job starts.
 - BoltzGen: `boltzgen==0.3.2`, Torch 2.7.1 with CUDA 12.6 and cuequivariance
   packages pinned to 0.5.1. Download its inference assets before enabling:
   `runtime/local/model-runtimes/boltzgen-env/bin/boltzgen download all --cache runtime/local/model-runtimes/boltzgen-cache`.
@@ -297,3 +301,111 @@ as `requirements.installed.txt`.
 Use `python3 initialize.py plan`, `python3 initialize.py install` or `python3 initialize.py doctor` from the repository root.
 The declarative catalogue is `configs/bootstrap.json`; implementation lives in
 `scripts/bootstrap/`. See [installation and health checks](installation.md).
+
+## RFD4-Proteina, RFantibody and ESMFold runtimes
+
+Install optional environments and public assets without changing the Web Python:
+
+```bash
+python3 initialize.py install --tools rfd4_proteina,rfantibody,esmfold,esmfold2 --stages tools
+python3 initialize.py doctor --tools rfd4_proteina,rfantibody,esmfold,esmfold2 --stages tools
+```
+
+| Runtime ID | Implementation | Environment and assets |
+| --- | --- | --- |
+| `rfd4_proteina` | Official RFD4-Proteina | Python 3.12; CUDA 12 profile; pinned native flow/autoencoder bundle |
+| `rfantibody` | Official RFantibody | Upstream uv lockfile; RFdiffusion-Ab, ProteinMPNN and RF2 weights |
+| `esmfold` | Original ESMFold | Hugging Face `facebook/esmfold_v1`; independent subprocess; PDB output |
+| `esmfold2` | Biohub ESMFold2 | Python 3.12; Torch 2.11; defaults to ESMFold2-Fast; bundled ESMC and CCD data |
+
+These are separate software/model versions. The original local implementation loaded
+ESMFold v1; renaming it to ESMFold2 would not upgrade its weights. ESMFold2-Fast
+downloads approximately 26 GB of checkpoint data plus its CCD dictionary.
+The CCD asset is pinned and checksum-verified along with the model files.
+
+Source revisions and weight revisions are recorded in `configs/bootstrap.json`.
+Environments, clones, weights, dependency snapshots and inference receipts belong in
+`runtime/local/model-runtimes/<runtime>/`, which is excluded from Git.
+A public Hugging Face mirror can be selected through `HF_ENDPOINT` for
+installation; the default remains Hugging Face. Do not pass API credentials into
+scientific model subprocesses.
+
+Installing a package does not publish a new Chat tool or enable an online service.
+The initializer reports `needs_validation` until the configured runtime has
+real inference evidence. Keep administrator switches, session ownership and queue
+limits in place. Run optional native CLIs through a GPU task slot, with an explicit
+interpreter, working directory, output folder and timeout. RFantibody also needs its
+virtual environment's `bin` directory on PATH because its CLI launches child
+Python processes.
+
+A small generated structure verifies software execution and file delivery. It does
+not establish a useful binder, model accuracy or experimental validity. Keep rejected
+designs distinguished from candidates accepted by scientific filters.
+
+### Previously published Scientist models
+
+Publication metadata remains readable when a frozen model interface no longer
+matches the installed runtime. Such entries are marked **Needs revalidation** and
+are excluded from callable model search. Describing and predicting still validate
+the full evidence; matching a code fingerprint alone is not a new scientific review.
+Use the operator's explicit numerical migration/review process before restoring
+execution. Never rewrite a historical policy fingerprint simply to remove an error.
+
+LigandMPNN design selections must identify protein residues with complete backbone atoms. The preflight rejects missing chains, DNA-only selections, invalid residue labels and masks with no designable residues. A completed subprocess with zero designed residues is treated as a failed prediction. Downloadable FASTA headers retain the checkpoint filename without exposing its server path.
+
+
+## Install independent structure predictors
+
+Install one tool, or several with a comma-separated list. Installation runs on
+Linux without sudo and shows five stages, download sizes, speed, elapsed time
+and a final report:
+
+```bash
+python3 initialize.py install --tools alphafold2,protenix,mol1 --manager uv
+python3 initialize.py doctor --tools alphafold2,protenix,mol1 --verify-hashes
+```
+
+Each tool lives under `runtime/local/model-runtimes/<id>/`: `source/` is a pinned
+upstream checkout, `env/` is its private Python, `bioenv/` contains native search
+programs, and `data/`, `cache/`, and `installation.json` hold its assets and
+installation record. These downloaded files stay outside Git. Native search
+programs use a private Conda prefix, even when Python packages use uv. The
+installer can prepare the manager itself; it never installs into system Python.
+
+| Tool ID | Official implementation | Default assets |
+| --- | --- | --- |
+| `alphafold2` | [DeepMind AlphaFold](https://github.com/google-deepmind/alphafold) | Monomer, pTM and multimer-v3 parameters; databases are separate |
+| `protenix` | [ByteDance Protenix](https://github.com/bytedance/Protenix) | Public `protenix_base_default_v1.0.0` checkpoint and inference reference data |
+| `mol1` | [Molence Mol-1](https://github.com/molence/Mol-1) | `mol-1-base` checkpoint, common data and template sequence database |
+
+`Proteinix` is accepted as an alias for `protenix`; `Mol-1` is an alias for `mol1`.
+The Protenix code includes newer model support, but the installer does not select
+or redistribute its restricted v2 weights. Protenix template-search databases, RNA MSA databases and training
+datasets are not part of a default inference installation.
+
+AlphaFold2's full sequence pipeline needs large databases. Download them explicitly
+only when required; the full platform installation also leaves them out:
+
+```bash
+# Budget at least 650 GiB free for reduced databases, or 3,000 GiB for full.
+python3 initialize.py install --tools alphafold2 --alphafold-databases reduced
+```
+
+Rerun the same command to reuse completed environments and downloads. Existing
+administrator profiles are preserved. `dependencies_and_files` means installation
+checks passed; it does not mean a scientific benchmark or the full MSA pipeline
+has passed. New structure profiles remain disabled for platform use until a
+bounded prediction has been checked and their service is enabled.
+
+
+Use the native CLI after installation; the helper selects the private interpreter,
+reference-data root, CUDA compiler and cache without activating an environment:
+
+```bash
+python3 scripts/run_structure.py protenix pred --help
+python3 scripts/run_structure.py mol1 doctor
+```
+
+Installing software does not publish an MCP tool or change an online/local
+administrator switch. Existing working services keep their current interpreters.
+New ProSST, ESM-1v, ESM-IF1 and ProtSSN installations also use their own environments.

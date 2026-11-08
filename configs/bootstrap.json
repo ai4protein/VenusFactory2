@@ -39,7 +39,14 @@
       "boltzgen",
       "diffdock",
       "bindcraft",
-      "signalp"
+      "signalp",
+      "rfd4_proteina",
+      "rfantibody",
+      "esmfold2",
+      "esmfold",
+      "alphafold2",
+      "protenix",
+      "mol1"
     ]
   },
   "tools": {
@@ -98,24 +105,96 @@
     "prosst": {
       "repository": "https://github.com/ai4protein/ProSST.git",
       "revision": "main",
-      "platform_environment": true,
       "kind": "pretrained",
-      "license": "CC-BY-NC-ND-4.0"
+      "license": "CC-BY-NC-ND-4.0",
+      "python": "3.12",
+      "packages": [
+        "numpy<2",
+        "pandas",
+        "scipy",
+        "biopython",
+        "biotite",
+        "transformers==4.57.6",
+        "huggingface-hub==0.36.2",
+        "accelerate",
+        "safetensors",
+        "tqdm",
+        "scikit-learn",
+        "PyYAML",
+        "joblib",
+        "einops",
+        "fair-esm==2.0.0",
+        "torch-geometric==2.6.1"
+      ]
     },
     "esm1v": {
-      "platform_environment": true,
       "kind": "pretrained",
-      "license": "See facebook/esm1v model card"
+      "license": "See facebook/esm1v model card",
+      "python": "3.12",
+      "packages": [
+        "numpy<2",
+        "pandas",
+        "scipy",
+        "biopython",
+        "biotite",
+        "transformers==4.57.6",
+        "huggingface-hub==0.36.2",
+        "accelerate",
+        "safetensors",
+        "tqdm",
+        "scikit-learn",
+        "PyYAML",
+        "joblib",
+        "einops",
+        "fair-esm==2.0.0",
+        "torch-geometric==2.6.1"
+      ]
     },
     "esmif1": {
-      "platform_environment": true,
       "kind": "pretrained",
-      "license": "See facebookresearch/esm LICENSE"
+      "license": "See facebookresearch/esm LICENSE",
+      "python": "3.12",
+      "packages": [
+        "numpy<2",
+        "pandas",
+        "scipy",
+        "biopython",
+        "biotite",
+        "transformers==4.57.6",
+        "huggingface-hub==0.36.2",
+        "accelerate",
+        "safetensors",
+        "tqdm",
+        "scikit-learn",
+        "PyYAML",
+        "joblib",
+        "einops",
+        "fair-esm==2.0.0",
+        "torch-geometric==2.6.1"
+      ]
     },
     "protssn": {
-      "platform_environment": true,
       "kind": "pretrained",
-      "license": "See tyang816/ProtSSN model card"
+      "license": "See tyang816/ProtSSN model card",
+      "python": "3.12",
+      "packages": [
+        "numpy<2",
+        "pandas",
+        "scipy",
+        "biopython",
+        "biotite",
+        "transformers==4.57.6",
+        "huggingface-hub==0.36.2",
+        "accelerate",
+        "safetensors",
+        "tqdm",
+        "scikit-learn",
+        "PyYAML",
+        "joblib",
+        "einops",
+        "fair-esm==2.0.0",
+        "torch-geometric==2.6.1"
+      ]
     },
     "admet_ai": {
       "python": "3.12",
@@ -156,6 +235,110 @@
       "manual": "Obtain the SignalP 6 academic package and fast weights from DTU. No public-weight substitute is installed.",
       "kind": "pretrained",
       "license": "DTU terms"
+    },
+    "rfd4_proteina": {
+      "repository": "https://github.com/RosettaCommons/RFD4-Proteina.git",
+      "revision": "68058693cb88762a8aaf806571e13b291ce6318a",
+      "python": "3.12",
+      "installer": "generative",
+      "gpu": true,
+      "kind": "pretrained",
+      "license": "See pinned upstream LICENSE",
+      "weight_repository": "nvidia/RFD4-Proteina",
+      "weight_revision": "621b785abf9d61dd24f4b81ae4dbd1330728f030"
+    },
+    "rfantibody": {
+      "repository": "https://github.com/RosettaCommons/RFantibody.git",
+      "revision": "3e5a5bb1cb98befde9fc049ae3ff58cabb491f67",
+      "python": "3.10",
+      "installer": "generative",
+      "gpu": true,
+      "kind": "pretrained",
+      "license": "See pinned upstream LICENSE"
+    },
+    "esmfold2": {
+      "repository": "https://github.com/Biohub/esm.git",
+      "revision": "8f0834cbc350aeaf507f755475873f7c61fa44a1",
+      "python": "3.12",
+      "installer": "generative",
+      "gpu": true,
+      "kind": "pretrained",
+      "license": "See pinned upstream LICENSE",
+      "weight_repository": "biohub/ESMFold2-Fast",
+      "weight_revision": "45fe8656f5b3ef493c17fcf9abe9a2968902e712",
+      "ccd_repository": "biohub/ESMFold2",
+      "ccd_revision": "69869f737beffec5294845ede23db5fc0b4f509e",
+      "ccd_sha256": "9ff44b1927c6b9198e38ffe0928706827a09a350c15530beeeabebfa88038fc5"
+    },
+    "esmfold": {
+      "python": "3.12",
+      "installer": "generative",
+      "gpu": true,
+      "kind": "pretrained",
+      "license": "MIT",
+      "weight_repository": "facebook/esmfold_v1",
+      "weight_revision": "75a3841ee059df2bf4d56688166c8fb459ddd97a",
+      "packages": [
+        "transformers==4.57.6",
+        "accelerate",
+        "biotite",
+        "biopython",
+        "pandas",
+        "tqdm"
+      ]
+    },
+    "alphafold2": {
+      "repository": "https://github.com/google-deepmind/alphafold.git",
+      "revision": "c77e5d2a8961d1a353632c462914ff0a32a950f6",
+      "python": "3.11",
+      "installer": "structure",
+      "gpu": false,
+      "kind": "pretrained",
+      "license": "Apache-2.0 code; CC-BY-4.0 parameters",
+      "minimum_free_gib": 40,
+      "weights_url": "https://storage.googleapis.com/alphafold/alphafold_params_2022-12-06.tar",
+      "weights_md5": "5cc59a561e80601862948ff36c6b040b",
+      "recommended_gpu": true,
+      "cpu_supported": true
+    },
+    "protenix": {
+      "repository": "https://github.com/bytedance/Protenix.git",
+      "revision": "85767b811c40ed46e73a9b39519cf6bfca8701ba",
+      "python": "3.12",
+      "installer": "structure",
+      "gpu": true,
+      "kind": "pretrained",
+      "license": "Apache-2.0 code; v1 public weights only (v2 excluded)",
+      "minimum_free_gib": 35,
+      "asset_base": "https://protenix.tos-cn-beijing.volces.com",
+      "model_id": "protenix_base_default_v1.0.0",
+      "checkpoint": "protenix_base_default_v1.0.0.pt",
+      "sequence_database": "search_database/pdb_seqres_2022_09_28.fasta",
+      "asset_sha256": {
+        "common.tar.gz": "08ea594f429df35494c062e3dfcacaf48fa761e4ea4a8bcb6d5107d211e64dbd"
+      },
+      "checkpoint_sha256": "2b7d5a8b30494514fc47fd2271a16260528cdba170ba09cc112fdecd8f85ec04"
+    },
+    "mol1": {
+      "repository": "https://github.com/molence/Mol-1.git",
+      "revision": "e6e64866ee89640a91cef7ee777a85f1d8be03bb",
+      "python": "3.12",
+      "installer": "structure",
+      "gpu": false,
+      "kind": "pretrained",
+      "license": "Apache-2.0; see upstream model and third-party notices",
+      "minimum_free_gib": 35,
+      "asset_base": "https://mol-1-release.oss-cn-shanghai.aliyuncs.com",
+      "model_id": "mol-1-base",
+      "checkpoint": "mol-1-base.pt",
+      "sequence_database": "search_database/pdb_seqres_20261001.fasta",
+      "asset_sha256": {
+        "common.tar.gz": "f6f953dac716bf89b46799738c85f5e0d4626e0cc905bb805a161671fd5cf898",
+        "search_database.tar.gz": "66cf966d64c9f346e55f9d2121d47ebb1d046a88e93437c149e91d3fdfbcf57d"
+      },
+      "checkpoint_sha256": "d5b83a86884aa6870565b1a249e8f13c232dfc6dfa311089ab0c7868212b6bd6",
+      "recommended_gpu": true,
+      "cpu_supported": true
     }
   },
   "skills": {

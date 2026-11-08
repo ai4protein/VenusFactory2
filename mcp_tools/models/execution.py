@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import json
 import signal
 import subprocess
 import sys
@@ -26,6 +27,15 @@ def profile(key, settings=None):
     cfg = dict(settings.get(key, {}))
     if cfg.get('enabled') is False:
         raise ValueError(f'{key} runtime is disabled')
+    if key in {'rfd4_proteina', 'rfantibody', 'esmfold2', 'alphafold2', 'protenix', 'mol1'} or (key == 'esmfold' and cfg.get('installation')):
+        receipt_path = cfg.get('installation')
+        receipt = {}
+        if receipt_path:
+            path = repository_path(receipt_path)
+            if path.is_file():
+                receipt = json.loads(path.read_text())
+        if receipt.get('runtime') != key or receipt.get('verified') is not True:
+            raise ValueError(f'{key} runtime requires verified inference evidence')
     python = repository_path(cfg['python']) if cfg.get('python') else Path(sys.executable)
     if not python.is_file():
         raise ValueError(f'{key} runtime Python is not installed')
@@ -47,7 +57,9 @@ def environment(cfg):
     if cfg.get('cache'):
         cache = repository_path(cfg['cache'])
         env.update(HF_HOME=str(cache/'huggingface'),HF_HUB_CACHE=str(cache/'huggingface/hub'),TORCH_HOME=str(cache/'torch'))
-    if cfg.get('cuda_visible_devices') is not None:
+    if cfg.get('ccd'):
+        env['ESMCFOLD_CCD_PATH'] = str(repository_path(cfg['ccd']))
+    if 'CUDA_VISIBLE_DEVICES' not in env and cfg.get('cuda_visible_devices') is not None:
         env['CUDA_VISIBLE_DEVICES'] = str(cfg['cuda_visible_devices'])
     return env
 
@@ -55,7 +67,9 @@ def environment(cfg):
 def command(key, arguments, *, cwd=None, settings=None):
     cfg, python = profile(key, settings)
     timeout = max(1,min(int(cfg.get('timeout_seconds',3600)),86400))
-    return RuntimeCommand([python,*map(str,arguments)],environment(cfg),Path(cwd or PROJECT),timeout,key)
+    env = environment(cfg)
+    env['PATH'] = str(Path(python).parent) + os.pathsep + env.get('PATH', '')
+    return RuntimeCommand([python,*map(str,arguments)],env,Path(cwd or PROJECT),timeout,key)
 
 
 def execute(spec):

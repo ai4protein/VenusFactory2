@@ -16,6 +16,7 @@ CONSTANT = {"plm_models": MODELS, "dataset_configs": {}}
 
 @pytest.fixture
 def online(monkeypatch, tmp_path):
+    monkeypatch.setenv("WEBUI_V2_MODE", "online")
     monkeypatch.setattr(api, "is_online_mode", lambda: True)
     monkeypatch.setattr(api, "_safe_read_json", lambda path: CONSTANT)
     monkeypatch.setenv("VENUS_JOB_QUEUE_ROOT", str(tmp_path / "queue"))

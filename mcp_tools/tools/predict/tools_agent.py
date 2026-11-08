@@ -4,7 +4,7 @@ import json
 import os
 from typing import Optional
 
-from langchain.tools import tool
+from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
 # Operations (features, finetuned, structure)
@@ -28,7 +28,7 @@ class CalculatePhyschemInput(BaseModel):
 
 class CalculatePhyschemSequenceInput(BaseModel):
     sequence: str = Field(..., description="One raw amino-acid sequence or one FASTA record. No file needed.")
-    output_file: Optional[str] = Field(default=None, description="Optional output JSON path.")
+    output_file: Optional[str] = Field(default=None, description="Save the result JSON here. If the user specifies a filename, pass that filename (or /workspace/filename); otherwise a default name is used.")
     out_dir: Optional[str] = Field(default=None, description="Optional output directory.")
 
 

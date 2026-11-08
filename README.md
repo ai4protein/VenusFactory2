@@ -100,6 +100,11 @@ progress. Model packages and weights can be added later. For example:
 python3 initialize.py install --tools proteinmpnn,ligandmpnn
 ```
 
+Each runtime gets its own Python environment and model directory. Optional
+structure and design runtimes include AlphaFold2, Protenix, Mol-1, RFD4-Proteina,
+RFantibody, ESMFold and ESMFold2-Fast, alongside BindCraft and BoltzGen. See the
+[runtime guide](docs/model-runtimes.md) for versions, installation and validation.
+
 For a full installation, use `python3 install_full.py`. Some components require a
 GPU or a separate license. See the [installation guide](docs/installation.md) for
 hardware requirements, component selection and health checks, and the

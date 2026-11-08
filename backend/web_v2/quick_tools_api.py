@@ -949,6 +949,9 @@ async def run_quick_tool_properties(body: PropertiesRunBody):
         file_info = payload.get("file_info") if isinstance(payload, dict) else None
         source_path = Path(str(file_info.get("file_path", ""))) if isinstance(file_info, dict) else None
         if source_path and source_path.exists() and source_path.is_file():
+            if kind in {"rsa", "sasa", "secondary_structure"}:
+                from backend.web_v2.property_results import residue_rows
+                payload["rows"] = residue_rows(json.loads(source_path.read_text()), kind, body.chain_id)
             staged = _stage_result_file(source_path, "quick_tools", run_id, kind)
             file_info["file_path"] = to_web_v2_public_path(staged)
             file_info["file_name"] = staged.name

@@ -6,7 +6,7 @@ _REPO_ROOT = next((p for p in Path(__file__).absolute().parents if (p / "src").i
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 from typing import List, Optional, Literal
-from langchain.tools import tool
+from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 from Bio.PDB import PDBParser
 from Bio.SeqUtils import seq1

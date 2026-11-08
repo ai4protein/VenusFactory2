@@ -4,7 +4,7 @@ import json
 import os
 from typing import Optional
 
-from langchain.tools import tool
+from langchain_core.tools import tool
 from pydantic import BaseModel, Field, model_validator
 
 from mcp_tools.tools.protein_io import extract_first_sequence_from_fasta_file
