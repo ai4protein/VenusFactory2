@@ -41,7 +41,7 @@ pip==26.2.2
 pydantic-settings==2.16.2
 pypdf==6.21.4
 setuptools==84.2.1
-soupsieve==3.0.4
+soupsieve==4.0.1
 starlette==1.10.0
 truststore==0.10.5
 typing_extensions==4.16.0
