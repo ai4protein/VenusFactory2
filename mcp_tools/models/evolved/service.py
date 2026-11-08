@@ -9,6 +9,7 @@ from pathlib import Path
 
 from agent.rsi.engine.scientist_model_library import ScientistModelLibrary, _require
 from mcp_tools.tools.runtime_tool_policy import assert_tool_allowed
+from mcp_tools.models.catalog_snapshot import catalog_snapshot
 
 TOOL_NAMES = {
     "list": "list_evolved_models",
@@ -58,28 +59,27 @@ def discovery_card(card):
 
 def catalog_cards(library):
     """Public publication metadata, shared by listing and capability search."""
-    from agent.harness.contracts import digest
+    from .catalog import recorded_metadata
 
-    catalog = library.catalog()
+    catalog = recorded_metadata(library)
     cards = []
     implementations = {}
     from agent.rsi.engine.model_plugins import get_model_plugin
-    for item in catalog["entries"]:
-        entry = library._object("entries", item["entry_id"])
-        origin = library._object("origins/" + digest(item["key"]), entry["canonical_origin"])
+    for item in catalog["models"]:
+        origin = item["origin"]
         plugin_id = item["key"]["plugin_id"]
         if plugin_id not in implementations:
             try:
                 implementations[plugin_id] = get_model_plugin(plugin_id).source_sha256
             except (ValueError, KeyError, FileNotFoundError):
                 implementations[plugin_id] = None
-        packet = library._object("packets", entry["packet_id"])
-        compatible = bool(implementations[plugin_id]) and packet["assessment"].get("plugin_sha256") == implementations[plugin_id]
+        compatible = bool(implementations[plugin_id]) and item["plugin_sha256"] == implementations[plugin_id]
         cards.append({**public_card(item["entry_id"], item["key"], origin, verified_now=False),
                       "runtime_compatible": compatible})
     return cards, catalog
 
 
+@catalog_snapshot
 def list_models(library, query="", stage="", limit=10, offset=0):
     _require(type(limit) is int and 1 <= limit <= 50, "Limit must be between 1 and 50")
     _require(type(offset) is int and offset >= 0, "Invalid catalog offset")

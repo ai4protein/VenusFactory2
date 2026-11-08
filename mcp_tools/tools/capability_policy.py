@@ -155,7 +155,7 @@ class CapabilityStore:
         return cached(('capabilities', str(self.path)), self.rows)
 
     def enabled(self, key):
-        return bool(self.rows().get(key, {}).get('enabled', True))
+        return bool(self.catalog_rows().get(key, {}).get('enabled', True))
 
     def tool_enabled(self, name):
         name=canonical(name); rows=self.catalog_rows()

@@ -14,6 +14,7 @@ from mcp_tools.tools.discovery import service
 from mcp_tools.tools.discovery.tools_agent import search_research_tools_tool
 from mcp_tools.tools.discovery.tools_mcp import mcp
 from mcp_tools.models.evolved.tools_agent import EVOLVED_MODEL_TOOLS
+from mcp_tools.models.evolved import catalog as metadata_cache
 
 
 @pytest.fixture(autouse=True)
@@ -107,10 +108,16 @@ def test_cache_refreshes_on_new_publication_and_does_not_share_mutable_cards(tmp
     index = tmp_path / "index"
     index.mkdir()
     calls = []
-    monkeypatch.setattr(evolved, "configured_library", lambda: SimpleNamespace(root=tmp_path))
-    monkeypatch.setattr(evolved, "catalog_cards", lambda _: (calls.append(1) or [card()], {}))
-    monkeypatch.setattr(service.time, "monotonic", lambda: 100)
-    service._CACHE.clear()
+    record = card()
+    metadata = {"models": [{"entry_id": record["entry_id"],
+                            "key": {"plugin_id": record["interface"], "scope": record["scope"]},
+                            "origin": {"stage": record["stage"], "paper": record["paper"]},
+                            "plugin_sha256": "fixture"}],
+                "indexed_entries": 1, "counting_rule": "fixture"}
+    library = SimpleNamespace(root=tmp_path, discovery_metadata=lambda: (calls.append(1) or metadata))
+    monkeypatch.setattr(evolved, "configured_library", lambda: library)
+    monkeypatch.setattr(metadata_cache.time, "monotonic", lambda: 100)
+    metadata_cache._CACHE.clear()
     first = service.model_cards()
     first[0]["scope"]["protein"] = "modified"
     assert service.model_cards()[0]["scope"]["protein"] == "AT5G51820"
@@ -149,7 +156,7 @@ def test_conversation_search_describe_predict_with_published_model(published, tm
     from langchain_core.messages import AIMessage
 
     store, root, verified, entry, seen = published
-    service._CACHE.clear()
+    metadata_cache._CACHE.clear()
     monkeypatch.setattr(service, "is_local_mode", lambda: True)
     monkeypatch.setattr(service, "available_tools", lambda: EVOLVED_MODEL_TOOLS)
     events = []

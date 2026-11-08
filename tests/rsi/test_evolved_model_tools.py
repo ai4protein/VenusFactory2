@@ -252,3 +252,14 @@ def test_context_discovery_is_compact_and_details_remain_on_demand(context_publi
     full = service.dispatch("describe", entry_id=entry)
     assert full["scope"] == scope
     assert full["input_contract"]["values"]["columns"] == scope["covariates"]
+
+
+def test_warm_metadata_does_not_bypass_current_policy_or_evidence(published, monkeypatch):
+    store, root, verified, entry, _ = published
+    assert service.dispatch("list")["matching_entries"] == 1
+    from mcp_tools.tools.capability_policy import CapabilityStore
+    monkeypatch.setattr(CapabilityStore, "enabled", lambda *args: False)
+    assert service.dispatch("list")["matching_entries"] == 0
+    from agent.rsi.engine.storage import atomic_json
+    atomic_json(root / "goal.json", {"changed_after_discovery": True})
+    assert not service.dispatch("describe", entry_id=entry)["success"]

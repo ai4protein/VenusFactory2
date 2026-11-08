@@ -43,3 +43,15 @@ operator selection and independent admission remain separate requirements.
 Agent discovery returns short model names and descriptions. The
 `describe_evolved_model` tool loads the exact applicability scope, input columns
 and validation metrics only after a model is selected.
+
+
+Agent discovery and Model Plaza share a short-lived metadata snapshot. Its
+15-second lifetime starts after reading completes, and concurrent requests share
+one read. New index entries invalidate it. Discovery reads each model's canonical
+publication without traversing older retraining variants; the operator catalog
+still reports the complete origin history.
+
+Runtime compatibility and administrator switches are checked for each catalog
+response. Invocation checks current permissions and evidence independently of
+the metadata snapshot. Online Model Plaza excludes the local research library;
+curator-selected publications retain their author information and normal access.

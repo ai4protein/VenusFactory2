@@ -137,3 +137,44 @@ def test_overlapping_audits_keep_first_completed_report(storage, tmp_path, monke
         futures = [pool.submit(run) for _ in range(2)]
         assert sorted(f.result(timeout=20) for f in futures) == ["preserved", "written"]
     assert json.loads(output.read_text())["verified_entries"] == 1
+
+
+def test_discovery_uses_canonical_origin_without_scanning_retrained_variants(storage, monkeypatch):
+    store, root, verified, calls = storage
+    first = store.publish(root, verified["packet"]["model_id"])
+    verified["packet"]["model"]["recipe"]["seed"] += 1
+    verified["packet"]["model"]["model_state"] = {"variant": True}
+    store.publish(root, verified["packet"]["model_id"])
+    assert store.catalog()["entries"][0]["recorded_origins"] == 2
+    reads = []
+    original = store._object
+
+    def read(area, identity):
+        reads.append((area, identity))
+        return original(area, identity)
+
+    monkeypatch.setattr(store, "_object", read)
+    calls.clear()
+    metadata = store.discovery_metadata()
+    assert metadata["indexed_entries"] == 1 and not calls
+    assert metadata["models"][0]["entry_id"] == first["entry_id"]
+    assert sum(area.startswith("origins/") for area, _ in reads) == 1
+    for private in ("source_code", "model_state", "goal_sha256", str(root)):
+        assert private not in json.dumps(metadata)
+
+
+@pytest.mark.parametrize("area", ["entries", "origin", "packets", "index"])
+def test_discovery_rejects_modified_registry_objects(storage, area):
+    store, _, identity, _ = published(storage)
+    entry = store._object("entries", identity)
+    index = next((store.root / "index").glob("*.json"))
+    key = index.stem
+    paths = {
+        "entries": store.root / "entries" / f"{identity}.json",
+        "origin": store.root / "origins" / key / f"{entry['canonical_origin']}.json",
+        "packets": store.root / "packets" / f"{entry['packet_id']}.json",
+        "index": index,
+    }
+    atomic_json(paths[area], {"entry_id": "a" * 64} if area == "index" else {"modified": True})
+    with pytest.raises(ValueError):
+        store.discovery_metadata()

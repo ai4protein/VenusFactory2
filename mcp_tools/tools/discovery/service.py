@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-import copy
 import json
 import logging
-import threading
-import time
-from collections import Counter, OrderedDict
+from collections import Counter
 from itertools import zip_longest
 
 from mcp_tools.tools.runtime_tool_policy import is_local_mode
@@ -16,8 +13,6 @@ from .platform_models import platform_models
 from mcp_tools.models.catalog_snapshot import catalog_snapshot
 
 logger = logging.getLogger(__name__)
-_CACHE = OrderedDict()
-_CACHE_LOCK = threading.Lock()
 
 
 def available_tools():
@@ -31,24 +26,7 @@ def available_tools():
 def model_cards():
     from mcp_tools.models.evolved import service as evolved
 
-    library = evolved.configured_library()
-    index = library.root / "index"
-    try:
-        changed = index.stat().st_mtime_ns
-    except FileNotFoundError:
-        changed = None
-    key = (str(library.root), changed, int(time.monotonic() // 15))
-    with _CACHE_LOCK:
-        if key in _CACHE:
-            _CACHE.move_to_end(key)
-            return copy.deepcopy(_CACHE[key])
-    # Only public metadata is cached. describe/predict always check live evidence.
-    cards, _ = evolved.catalog_cards(library)
-    with _CACHE_LOCK:
-        _CACHE[key] = copy.deepcopy(cards)
-        _CACHE.move_to_end(key)
-        while len(_CACHE) > 8:
-            _CACHE.popitem(last=False)
+    cards, _ = evolved.catalog_cards(evolved.configured_library())
     return cards
 
 

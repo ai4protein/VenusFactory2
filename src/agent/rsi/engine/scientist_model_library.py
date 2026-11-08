@@ -29,6 +29,8 @@ from agent.rsi.datasets.source_lineage import program_hash
 from .storage import atomic_json, file_lock, safe_child
 from .versions import VersionStore
 
+_COUNTING_RULE = "program + task scope + frozen training data + model interface; not algorithmic novelty"
+
 
 def _require(condition, message):
     if not condition:
@@ -598,13 +600,42 @@ class ScientistModelLibrary:
             self._bind_verified(entry_id, self._binding(entry_id), value)
         return resolved
 
-    def catalog(self, *, verify=False):
-        entries = []
+    def _indexed_entries(self):
         for index in sorted((self.root / "index").glob("*.json")):
             key_id = _identity(index.stem)
             entry_id = _read(safe_child(self.root, "index/" + index.name))["entry_id"]
             entry = self._object("entries", entry_id)
             _require(digest(entry["key"]) == key_id, "Model index scope changed")
+            yield key_id, entry_id, entry
+
+    def discovery_metadata(self):
+        """Read canonical publication metadata without scanning superseded origins."""
+        models = []
+        for key_id, entry_id, entry in self._indexed_entries():
+            origin = self._object("origins/" + key_id, entry["canonical_origin"])
+            packet = self._object("packets", entry["packet_id"])
+            _require(
+                origin["key_id"] == key_id and origin["packet_id"] == entry["packet_id"],
+                "Model binding changed",
+            )
+            models.append({
+                "entry_id": entry_id,
+                "key": entry["key"],
+                "origin": {
+                    k: origin[k] for k in ("stage", "paper", "evidence_kind", "runtime_migration")
+                    if k in origin
+                },
+                "plugin_sha256": packet.get("assessment", {}).get("plugin_sha256"),
+            })
+        return {
+            "models": models,
+            "indexed_entries": len(models),
+            "counting_rule": _COUNTING_RULE,
+        }
+
+    def catalog(self, *, verify=False):
+        entries = []
+        for key_id, entry_id, entry in self._indexed_entries():
             if verify:
                 self.resolve(entry_id, replay_training=True)
             origins = [
@@ -627,7 +658,7 @@ class ScientistModelLibrary:
             "verified_entries": len(entries) if verify else None,
             "distinct_programs": len({e["key"]["program_sha256"] for e in entries}),
             "distinct_scopes": len({digest(e["key"]["scope"]) for e in entries}),
-            "counting_rule": "program + task scope + frozen training data + model interface; not algorithmic novelty",
+            "counting_rule": _COUNTING_RULE,
         }
 
     def predict(self, entry_id, inputs, scope, *, session_id, mode="science_agent"):
