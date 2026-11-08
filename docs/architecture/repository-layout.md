@@ -70,8 +70,11 @@ author and editor modules consume those receipts without owning the reviewer.
 Chapter evidence selection and writer context belong to `research_chapter_context.py`.
 Specialists receive topic-selected source excerpts under one serialized context
 budget, with citation identities, query scope and material extraction limits.
-Original records and full prediction arrays remain in the dossier; the independent
-reviewer resolves its anchors against those originals.
+Passage selection for both writing and review belongs to
+`research_evidence_passages.py`. Its shared tokenizer retains scientific
+abbreviations and splits structured field names for retrieval. Original records
+and full prediction arrays remain in the dossier; the independent reviewer
+resolves its anchors against those originals.
 
 
 Tool discovery separates session navigation from model metadata. Harness adapters

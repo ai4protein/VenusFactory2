@@ -6,7 +6,11 @@ import json
 import re
 
 MAX_PASSAGE = 1600
-STOP_WORDS = set("the and for with that this from have has are was were which their into than its not can could should would been also about these those such use using protein".split())
+STOP_WORDS = set((
+    "the and for with that this from have has are was were which their into than "
+    "its not can could should would been also about these those such use using "
+    "protein an as at be by do if in is it no of on or so to up us we"
+).split())
 
 
 def digest(value):
@@ -21,7 +25,15 @@ def source_digest(source):
 
 
 def terms(text):
-    words = {word.casefold() for word in re.findall(r"[A-Za-z0-9_]{3,}", text)}
+    # Keep scientific abbreviations (pH, Km, Kd) and full identifiers while
+    # matching structured fields such as kineticParameters to ordinary prose.
+    names = re.sub(r"([A-Z])([A-Z][a-z])", r"\1 \2", text)
+    names = re.sub(r"([a-z0-9])([A-Z][a-z])", r"\1 \2", names).replace("_", " ")
+    words = {
+        word.casefold()
+        for word in re.findall(r"[A-Za-z0-9_]{2,}", text + " " + names)
+        if len(word) >= 3 or word.isalpha()
+    }
     for phrase in re.findall(r"[\u3400-\u9fff]{2,}", text):
         words.update(phrase[index:index+2] for index in range(len(phrase)-1))
     return words - STOP_WORDS

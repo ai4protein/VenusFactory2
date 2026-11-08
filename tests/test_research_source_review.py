@@ -39,6 +39,60 @@ def test_json_and_plain_anchors_match_original_saved_evidence():
         assert resolve_passage(plain,passage["location"])==passage["text"]
 
 
+
+def retrieval_source(measurement):
+    return {
+        **SOURCE,
+        "text": json.dumps({
+            "references": [
+                {"source": "Reference index", "description": "Background annotation. " * 15,
+                 "id": str(100000 + index)}
+                for index in range(12)
+            ],
+            "measurement": measurement,
+        }),
+    }
+
+
+@pytest.mark.parametrize("query", ["pH", "pI", "Km", "Kd", "Ki"])
+def test_short_scientific_queries_retrieve_measurements(query):
+    source = retrieval_source({"assay": query + " was measured for this sample."})
+    original = copy.deepcopy(source)
+    selected = selected_passages(source, query, 600)
+    assert selected["passages"][0]["location"]["json_pointer"] == "/measurement"
+    assert sum(len(p["text"]) for p in selected["passages"]) <= 600
+    assert all(resolve_passage(source, p["location"]) == p["text"]
+               for p in selected["passages"])
+    assert source == original
+
+
+@pytest.mark.parametrize("field,query", [
+    ("kineticParameters", "kinetic parameters"),
+    ("michaelisConstants", "Michaelis constants"),
+    ("RNAExpression", "RNA expression"),
+    ("pHDependence", "pH dependence"),
+    ("binding_affinity", "binding affinity"),
+])
+def test_structured_field_queries_retrieve_measurements(field, query):
+    source = retrieval_source({field: {"value": 8.2, "unit": "mM"}})
+    selected = selected_passages(source, query, 600)
+    assert selected["passages"][0]["location"]["json_pointer"] == "/measurement"
+    assert resolve_passage(source, selected["passages"][0]["location"]) == selected["passages"][0]["text"]
+
+
+def test_writer_and_reviewer_share_ph_evidence_selection():
+    from backend.web_v2.research_chapter_context import source_context
+    source = retrieval_source({"phDependence": {"texts": [{"value": "Optimum pH is 6-8."}]}})
+    original = copy.deepcopy(source)
+    writer = source_context([source], query="pH")
+    document = {**DOCUMENT, "text": "The optimum pH is 6-8. [S1]"}
+    reviewer = sr.packet(sr.units(document, [source]), [source])
+    assert "Optimum pH is 6-8." in writer[0]["text"]
+    assert any("Optimum pH is 6-8." in p["text"]
+               for p in reviewer["sources"][0]["passages"])
+    assert source == original
+
+
 def test_short_table_heading_and_long_paragraph_claims_are_not_dropped():
     doc={**DOCUMENT,"text":"## A strong experimental claim\n\n|Value|Result|\n|---|---|\n|Class|1 [S1]|\n\n"+
          "A factual assertion. "*500+"[S1]"}
