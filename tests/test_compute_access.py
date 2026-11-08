@@ -236,3 +236,20 @@ def test_workflow_counts_predictions_but_not_training_or_database_queries(tmp_pa
     nodes += [{'kind':'tool' if name.startswith('tool:') else 'model', 'model_id':name} for name in models]
     assert service.compute_demands('a', 'workflow', {'graph':{'nodes':nodes}}) == {'workflow':1, 'prediction':4}
     assert service.compute_demands('a', 'predict', {'model_id':'features'}) == {'prediction':0}
+
+
+def test_researcher_children_share_prediction_quota_with_other_entries(store, tmp_path):
+    q = JobQueue(tmp_path/'queue')
+    store.admit('other-model-entry', 'a', {'prediction': 19})
+    parent, _ = queued(q, 'a', 'protein-research')
+    assert store.status('a')['prediction']['used'] == 19
+    child, _ = queued(q, 'a', 'mcp:model_prediction', {
+        'tool': 'predict_protein_function', 'parent_job': parent})
+    assert q.get(child, 'a')['metadata']['parent_job'] == parent
+    assert store.status('a')['prediction']['used'] == 20
+    with pytest.raises(HTTPException) as error:
+        queued(q, 'a', 'mcp:model_prediction', {
+            'tool': 'predict_residue_function', 'parent_job': parent})
+    assert error.value.detail['code'] == 'COMPUTE_DAILY_LIMIT_REACHED'
+    assert len(q.list('a')) == 2
+    assert store.status('b')['prediction']['remaining'] == 20

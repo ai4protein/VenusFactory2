@@ -25,7 +25,7 @@ SCOPES = [
     ('literature', 'Research literature', '研究文献', False),
     ('web', 'Web & dataset search', '网页与数据集检索', False),
     ('properties', 'Sequence properties', '序列理化性质', False),
-    ('ai_predictions', 'AI model panel', 'AI 模型联合预测', True),
+    ('ai_predictions', 'AI model panel', 'AI 模型联合预测', False),
     ('predict_function', 'Function prediction', '功能预测', True),
     ('mutation', 'Mutation scoring', '突变评分', True),
     ('residue', 'Residue prediction', '残基预测', True),

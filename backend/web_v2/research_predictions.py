@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 import time
 
-from mcp_tools.tools.runtime_tool_policy import is_online_mode
+from mcp_tools.tools.runtime_tool_policy import assert_tool_call_allowed
 
 ROOT = Path(__file__).resolve().parents[2]
 GENERAL = {'Solubility', 'Subcellular Localization', 'Membrane Protein', 'Metal Ion Binding', 'Stability', 'Sortingsignal'}
@@ -44,7 +44,6 @@ def candidates(context, *, root=ROOT):
                     # Missing weights do not trigger large automatic downloads from a report.
                     if not (adapter / 'lr5e-4_bt12k_ga8.pt').is_file() or not (adapter / 'lr5e-4_bt12k_ga8.json').is_file(): continue
                     identity = hashlib.sha256(f'{tool}:{task}:{dataset}:{model}'.encode()).hexdigest()[:16]
-                    from mcp_tools.tools.runtime_tool_policy import assert_tool_call_allowed
                     try: assert_tool_call_allowed(tool, {'task':task,'model_name':model,'adapter_path':str(adapter)})
                     except (ValueError,RuntimeError): continue
                     group.append({'id': identity, 'task': task, 'label_zh': LABELS.get(task, task), 'model': model,
@@ -56,7 +55,7 @@ def candidates(context, *, root=ROOT):
 
 def options():
     rows = candidates({})
-    return {'available': not is_online_mode(), 'candidate_count': len(rows),
+    return {'available': bool(rows), 'candidate_count': len(rows),
             'limit': bounded_setting('VENUS_REPORT_PREDICTION_LIMIT', 16, 32),
             'properties': list(dict.fromkeys(r['task'] for r in rows)),
             'backbones': list(dict.fromkeys(r['model'] for r in rows))}
@@ -74,16 +73,18 @@ def read_result(path):
 
 async def queued_prediction(spec, sequence_file, output, on_status):
     from mcp_tools.scheduler.client import invoke
-    if is_online_mode(): raise ValueError('Predictions are available in local mode')
     owner = os.environ.get('VENUS_QUEUE_OWNER')
     if not owner: raise ValueError('Predictions require an owned research job')
-    return await invoke(spec['tool'], {'fasta_file': str(sequence_file), 'task': spec['task'],
-        'model_name': spec['model'], 'adapter_path': spec['adapter_path'], 'output_file': str(output)},
-        owner=owner, parent_job=os.environ.get('VENUS_QUEUE_JOB_ID'), on_status=on_status)
+    arguments = {'fasta_file': str(sequence_file), 'task': spec['task'],
+        'model_name': spec['model'], 'adapter_path': spec['adapter_path'], 'output_file': str(output)}
+    # A report may wait in the queue while an administrator disables a model.
+    assert_tool_call_allowed(spec['tool'], arguments)
+    return await invoke(spec['tool'], arguments, owner=owner,
+        parent_job=os.environ.get('VENUS_QUEUE_JOB_ID'), on_status=on_status)
 
 
 async def run_predictions(context, update, folder, *, execute=None):
-    if is_online_mode(): raise ValueError('Predictions are available in local mode')
+    from mcp_tools.scheduler.client import ToolJobError
     execute = execute or queued_prediction
     sequence = context.get('sequence', '')
     if not sequence or not set(sequence) <= set('ACDEFGHIKLMNPQRSTVWY'):
@@ -95,11 +96,9 @@ async def run_predictions(context, update, folder, *, execute=None):
     rows = [{k: v for k, v in spec.items() if k != 'adapter_path'} | {'status': 'queued', 'sequence_sha256': digest} for spec in specs]
     update(rows)
     deadline = time.monotonic() + bounded_setting('VENUS_REPORT_PREDICTION_SECONDS', 900, 1800)
-    for spec, row in zip(specs, rows):
+    for index, (spec, row) in enumerate(zip(specs, rows)):
         if time.monotonic() >= deadline:
             row.update(status='deferred', message='Report prediction time budget reached'); update(rows); continue
-        if is_online_mode():
-            row.update(status='deferred', message='Available in local mode'); update(rows); continue
         output = folder / (spec['id'] + '.csv')
         row.update(started=time.time())
         def progress(job):
@@ -114,6 +113,16 @@ async def run_predictions(context, update, folder, *, execute=None):
             row.update(status='completed', values=read_result(output), evidence_level='model_prediction', output_file=output.name)
         except asyncio.TimeoutError:
             row.update(status='deferred', message='Prediction time limit reached')
+        except ToolJobError as error:
+            if error.code == 429:
+                daily_limit = error.detail.get('code') == 'COMPUTE_DAILY_LIMIT_REACHED'
+                message = 'Daily prediction allowance reached' if daily_limit else 'Prediction queue capacity reached'
+                row['finished'] = time.time()
+                for pending in rows[index:]:
+                    pending.update(status='deferred', message=message)
+                update(rows)
+                break
+            row.update(status='unavailable', message='Model output unavailable')
         except Exception:
             row.update(status='unavailable', message='Model output unavailable')
         row['finished'] = time.time(); update(rows)

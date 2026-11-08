@@ -46,6 +46,8 @@ class ReportPolicyTests(unittest.TestCase):
             rows = {o['id']: o for o in r.analysis_options()}
             self.assertFalse(rows['mutation']['available'])
             self.assertTrue(rows['properties']['available'])
+            self.assertTrue(rows['ai_predictions']['available'])
+            self.assertEqual(r.validate_scopes(['ai_predictions']), ['ai_predictions'])
             with self.assertRaises(ValueError): r.validate_scopes(['mutation'])
         with patch.object(r, 'is_online_mode', return_value=False):
             self.assertEqual(r.validate_scopes(['mutation']), ['mutation'])

@@ -8,9 +8,10 @@ from mcp_tools.scheduler.service import base_url, service_key
 
 
 class ToolJobError(RuntimeError):
-    def __init__(self, code, message):
+    def __init__(self, code, message, detail=None):
         super().__init__(message)
         self.code = code
+        self.detail = detail if isinstance(detail, dict) else {}
 
 
 async def rpc(name, arguments):
@@ -19,7 +20,7 @@ async def rpc(name, arguments):
         result=await client.call_tool(name,arguments)
         data = json.loads(result.content[0].text)
         if 'error' in data:
-            raise ToolJobError(data['error']['code'], data['error']['message'])
+            raise ToolJobError(data['error']['code'], data['error']['message'], data['error'].get('detail'))
         return data
 
 

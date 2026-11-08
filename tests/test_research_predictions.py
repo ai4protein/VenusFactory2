@@ -45,7 +45,7 @@ class PredictionTests(unittest.IsolatedAsyncioTestCase):
             if spec['id']=='1':return {'status':'success'} # Missing CSV must not be called success.
             output.write_text('header,sequence,score\nquery,MKTAYIAKQRQISFVK,0.8\n')
             return {'status':'success'}
-        with tempfile.TemporaryDirectory() as tmp, patch.object(p,'candidates',return_value=specs),patch.object(p,'is_online_mode',return_value=False):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(p,'candidates',return_value=specs):
             rows=await p.run_predictions({'sequence':'MKTAYIAKQRQISFVK'},lambda x:updates.append(json.loads(json.dumps(x))),tmp,execute=execute)
         self.assertEqual(calls,['0','1','2'])
         self.assertEqual([x['status'] for x in rows],['unavailable','unavailable','completed'])
@@ -53,13 +53,9 @@ class PredictionTests(unittest.IsolatedAsyncioTestCase):
         self.assertGreater(len(updates),3)
         self.assertIn('Model predictions, not experimental',p.report_appendix(rows))
 
-    async def test_online_never_dispatches_gpu_and_cancellation_propagates(self):
-        execute=AsyncMock()
-        with patch.object(p,'is_online_mode',return_value=True):
-            with self.assertRaises(ValueError):await p.run_predictions({},lambda x:None,'unused',execute=execute)
-        execute.assert_not_awaited()
+    async def test_cancellation_propagates(self):
         spec={'id':'a','task':'Solubility','model':'ESM2','dataset':'sol','tool':'predict_protein_function','adapter_path':'unused'}
-        with tempfile.TemporaryDirectory() as tmp,patch.object(p,'candidates',return_value=[spec]),patch.object(p,'is_online_mode',return_value=False):
+        with tempfile.TemporaryDirectory() as tmp,patch.object(p,'candidates',return_value=[spec]):
             with self.assertRaises(asyncio.CancelledError):
                 await p.run_predictions({'sequence':'MKTAYIAKQRQISFVK'},lambda x:None,tmp,execute=AsyncMock(side_effect=asyncio.CancelledError))
 
@@ -88,7 +84,7 @@ class PredictionTests(unittest.IsolatedAsyncioTestCase):
     async def test_mcp_prediction_preserves_parent_and_owner(self):
         spec={'tool':'predict_protein_function','task':'Solubility','model':'ESM2','adapter_path':'ckpt'}
         invoke=AsyncMock(return_value={'status':'success'})
-        with patch.object(p,'is_online_mode',return_value=False),patch.dict('os.environ',{'VENUS_QUEUE_OWNER':'alice','VENUS_QUEUE_JOB_ID':'parent'}),patch('mcp_tools.scheduler.client.invoke',invoke):
+        with patch.dict('os.environ',{'VENUS_QUEUE_OWNER':'alice','VENUS_QUEUE_JOB_ID':'parent'}),patch('mcp_tools.scheduler.client.invoke',invoke):
             await p.queued_prediction(spec,Path('query.fasta'),Path('result.csv'),lambda x:None)
         self.assertEqual(invoke.call_args.kwargs['owner'],'alice')
         self.assertEqual(invoke.call_args.kwargs['parent_job'],'parent')
