@@ -32,6 +32,13 @@ Scientist evidence. Consolidate numerical code in a new policy version with an
 explicit migration; matching scores alone do not preserve the source contract.
 `context_baseline_refit.py` remains independent for numerical verification.
 
+`context_feedback_dispatch.verification_session` owns numerical replay reuse during
+one model or shared-goal audit. Its bounded cache stores input digests and verified
+source bindings; each reuse checks current source bytes. Nested donor verification
+shares this scope, and the scope is discarded when the audit ends. New audits
+replay their evidence independently. Publication, ownership, retirement and model
+artifact checks remain in the registry and lifecycle modules.
+
 Engine modules that build isolated execution bundles remain together: their
 relative source dependencies are part of the runtime contract. Moving an engine
 file requires updating and testing the generated execution bundle as well.

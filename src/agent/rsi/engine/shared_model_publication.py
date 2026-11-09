@@ -17,7 +17,7 @@ from agent.science_goal import GoalSpec, GoalStore, goal_cycle_prompt, validate_
 
 from agent.rsi import model_tasks, shared_library_experience
 from .context_feedback_dispatch import FIELD as FEEDBACK_FIELD
-from .context_feedback_dispatch import policy_for
+from .context_feedback_dispatch import policy_for, verification_session
 from .model_lifecycle import ModelLifecycle
 from .protein_model import digest
 from .shared_goal_history import SUPPORTED_POLICIES, make_prompt, project
@@ -388,6 +388,7 @@ def _context(folder):
     return root, state, protocol, tasks, data, episodes, usage, records
 
 
+@verification_session()
 def validate_shared_goal(folder, model_id=None, *, replay_training=True):
     from .scientist_model_library import _model
 

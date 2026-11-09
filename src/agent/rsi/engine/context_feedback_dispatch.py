@@ -1,5 +1,12 @@
 """Versioned feedback routing without changing legacy numerical replay."""
 
+import hashlib
+import json
+from collections import OrderedDict
+from contextlib import contextmanager
+from contextvars import ContextVar
+from pathlib import Path
+
 try:
     from agent.rsi import context_feedback_profiles as legacy
 except ImportError:  # Standalone capability bundle.
@@ -64,5 +71,81 @@ def comparison(rows, scope, candidate_metrics, *, policy=POLICY):
     return legacy.comparison(rows, scope, candidate_metrics, policy=policy)
 
 
+# A numerical replay is reusable only during one publication/resolution audit.
+# Retain identities and source bindings, never model rows or a cross-request verdict.
+_MAX_VERIFIED_FEEDBACK = 256
+_VERIFIED_FEEDBACK = ContextVar("context_feedback_verification", default=None)
+
+
+@contextmanager
+def verification_session():
+    if _VERIFIED_FEEDBACK.get() is not None:
+        yield
+        return
+    token = _VERIFIED_FEEDBACK.set(OrderedDict())
+    try:
+        yield
+    finally:
+        _VERIFIED_FEEDBACK.reset(token)
+
+
+def _sources_match(implementation):
+    if not isinstance(implementation, dict) or not 1 <= len(implementation) <= 8:
+        return False
+    root = Path(__file__).parent
+    for name, expected in implementation.items():
+        if not isinstance(name, str) or Path(name).name != name:
+            return False
+        path = root / name
+        try:
+            if path.is_symlink() or hashlib.sha256(path.read_bytes()).hexdigest() != expected:
+                return False
+        except OSError:
+            return False
+    return True
+
+
+def _feedback_key(task, rows, feedback):
+    values = [task, rows, feedback]
+    try:
+        payload = json.dumps(values, sort_keys=True, allow_nan=False, separators=(",", ":"))
+    except (TypeError, ValueError):
+        return None
+    # JSON encoding erases tuple/list and numeric-subclass distinctions. Such
+    # Python inputs must still pass the original verifier on every invocation.
+    pending = [values]
+    while pending:
+        value = pending.pop()
+        if type(value) is dict:
+            if any(type(name) is not str for name in value):
+                return None
+            pending.extend(value.values())
+        elif type(value) is list:
+            pending.extend(value)
+        elif type(value) not in (str, int, float, bool, type(None)):
+            return None
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 def verify_feedback(task, rows, feedback):
-    return selected(task).verify_feedback(task, rows, feedback)
+    module = selected(task)
+    verified = _VERIFIED_FEEDBACK.get()
+    if verified is None:
+        return module.verify_feedback(task, rows, feedback)
+    key = _feedback_key(task, rows, feedback)
+    if key is None:
+        return module.verify_feedback(task, rows, feedback)
+    if key in verified and _sources_match(verified[key]):
+        verified.move_to_end(key)
+        return None
+
+    # Only the unchanged versioned verifier can establish a successful result.
+    result = module.verify_feedback(task, rows, feedback)
+    packet = feedback.get("baseline_comparison")
+    implementation = packet.get("implementation") if isinstance(packet, dict) else None
+    if _sources_match(implementation):
+        verified[key] = dict(implementation)
+        verified.move_to_end(key)
+        while len(verified) > _MAX_VERIFIED_FEEDBACK:
+            verified.popitem(last=False)
+    return result

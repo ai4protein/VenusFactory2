@@ -23,6 +23,7 @@ from agent.rsi.datasets.source_lineage import program_hash
 from agent.science_goal import GoalSpec, GoalStore, validate_assessment
 
 from . import library_experience, training_attempt_memory
+from .context_feedback_dispatch import verification_session
 from .experience import ModelExperienceStore
 from .lineage_promotion import gain_error, validate_evolution
 from .model_lifecycle import ModelLifecycle
@@ -275,6 +276,7 @@ def _experience(root, identity):
     return ModelExperienceStore(folder)._entry(identity)
 
 
+@verification_session()
 def validate_model_goal(folder, model_id, *, replay_training=True, runtime_migration=False):
     """Validate existing evidence without an LLM call or future-label scoring."""
     root = _root(folder)
