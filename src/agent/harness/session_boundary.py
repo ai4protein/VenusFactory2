@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+
 from mcp_tools.tools.tool_surface import RETIRED_CODE_TOOLS
 
 UNSAFE_TOOLS = RETIRED_CODE_TOOLS | {'unzip_archive', 'ungzip_file'}
@@ -93,6 +94,64 @@ def bind_arguments(name, arguments, workspace):
     return visit(dict(arguments))
 
 
+def mcp_input_schema(tool):
+    """Session bindings belong to the server, never to a tool-call argument."""
+    schema = tool.get_input_schema().model_json_schema()
+    metadata = getattr(tool, "metadata", None) or {}
+    if metadata.get("workspace_relative_paths"):
+        schema["additionalProperties"] = False
+    steps = metadata.get("plan_step_ids")
+    field = schema.get("properties", {}).get("completed_steps")
+    if isinstance(steps, list) and isinstance(field, dict):
+        field["description"] = "Exact IDs of completed plan steps; never include titles or descriptions. Use [] for a partial checkpoint."
+        if steps:
+            field.setdefault("items", {})["enum"] = list(steps)
+        else:
+            field["maxItems"] = 0
+    return schema
+
+
+def prepare_tool_arguments(name, tool, arguments, workspace):
+    from mcp_tools.common.tool_arguments import validate_tool_arguments
+
+    # Research workspace tools own their relative-path validation. Legacy
+    # scientific tools still receive their normal host-path normalization.
+    if (getattr(tool, "metadata", None) or {}).get("workspace_relative_paths"):
+        fields = mcp_input_schema(tool).get("properties", {})
+        if not isinstance(arguments, dict):
+            raise ValueError("Use a JSON object with the declared tool arguments")
+        extra = set(arguments) - set(fields)
+        if extra:
+            # Report names, never caller-supplied values or source code. A read
+            # receipt's byte counts are not write arguments or a permission issue.
+            names = sorted(key if isinstance(key, str) and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,63}", key)
+                           else "<invalid field name>" for key in extra)
+            message = ("Use the declared tool arguments. Unexpected fields: " +
+                       ", ".join(names[:12]) + ". Allowed fields: " +
+                       ", ".join(sorted(fields)[:32]) +
+                       ". Remove the extra fields and retry; output metadata is not input.")
+            if extra & {"workspace", "workspace_root", "session_id", "session_dir", "root", "cwd", "mounts", "mount", "backend", "control"}:
+                message += " The session workspace is assigned by the server."
+            raise ValueError(message)
+        args = relative_workspace_arguments(arguments)
+        validate_tool_arguments(tool, args)
+        return args
+    from agent.graph.helpers.tool_io import _normalize_output_paths, _sanitize_tool_invoke_input
+    args = _sanitize_tool_invoke_input(name, tool, bind_arguments(name, arguments, workspace), str(workspace), {})
+    # A new scientific tool may not yet appear in the legacy write-prefix list.
+    # Never let omitted output arguments fall back to a shared platform folder.
+    output_keys = ('out_dir', 'output_dir', 'out_path', 'output_file')
+    if not any(args.get(key) for key in output_keys):
+        fields = mcp_input_schema(tool).get('properties', {})
+        for key in output_keys:
+            if key in fields:
+                args[key] = None
+                break
+    args = _normalize_output_paths(name, tool, args, str(workspace))
+    validate_tool_arguments(tool, args)
+    return args
+
+
 def public_value(value, workspace):
     """Virtualize owned artifact paths; do not send host topology to a model."""
     if isinstance(value, dict): return {k: public_value(v, workspace) for k, v in value.items()}
@@ -117,8 +176,10 @@ def public_value(value, workspace):
 
 def session_tools(workspace, control):
     from langchain_core.tools import StructuredTool
+
     from mcp_tools.tools.capability_policy import guard_tool
     from mcp_tools.tools.runtime_tool_policy import is_tool_allowed
+
     from .research_workspace import ResearchWorkspace
     from .session_sandbox import run_shell
     service = ResearchWorkspace(workspace, control, {'steps': []})

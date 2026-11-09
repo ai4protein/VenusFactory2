@@ -1,8 +1,9 @@
-"""Lossless tool-call identity mapping and backend-independent execution audits."""
+"""Worker event transport, tool-call identity mapping and execution audits."""
 
 from __future__ import annotations
 
 import json
+import sys
 
 KIMI_REPEAT_NOTICE = (
     "\n\n<system-reminder>\n"
@@ -11,6 +12,10 @@ KIMI_REPEAT_NOTICE = (
     "try a different method or parameters instead of repeating the same call.\n"
     "</system-reminder>"
 )
+
+
+def emit(value):
+    print(json.dumps(value, ensure_ascii=False), file=sys.__stdout__, flush=True)
 
 
 def normalize_kimi_tool_result(output, *, is_error=False):

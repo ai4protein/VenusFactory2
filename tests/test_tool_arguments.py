@@ -57,7 +57,7 @@ def test_nested_and_custom_validator_errors_do_not_echo_secrets():
 
 @pytest.mark.parametrize("relative", [False, True])
 def test_session_binding_precedes_required_output_validation(tmp_path, relative):
-    from agent.harness.web_native_worker import prepare_tool_arguments
+    from agent.harness.session_boundary import prepare_tool_arguments
 
     def download(record_id: str, out_path: str):
         """Download a record."""
@@ -67,9 +67,9 @@ def test_session_binding_precedes_required_output_validation(tmp_path, relative)
                                        metadata={"workspace_relative_paths": relative})
     if relative:
         with pytest.raises(ToolArgumentError, match="out_path"):
-            prepare_tool_arguments(tool.name, tool, {"record_id": "P00918"}, tmp_path, lambda x: x)
+            prepare_tool_arguments(tool.name, tool, {"record_id": "P00918"}, tmp_path)
     else:
-        args = prepare_tool_arguments(tool.name, tool, {"record_id": "P00918"}, tmp_path, lambda x: x)
+        args = prepare_tool_arguments(tool.name, tool, {"record_id": "P00918"}, tmp_path)
         assert Path(args["out_path"]).is_relative_to(tmp_path)
         assert args["record_id"] == "P00918"
 

@@ -65,6 +65,11 @@ exception, or a dependency across package boundaries.
    runtime or research directories. Commit refactoring separately from unrelated
    features.
 
+Keep experimental fixes provisional until the intended behavior passes its
+acceptance check. A passing protocol or regression suite is not evidence that a
+model-quality workaround helped. Retain the failed experiment and its source
+binding separately instead of adding another special case to the main path.
+
 Review the affected subsystem as a whole after several feature batches: identify
 cycles, duplicated state, obsolete adapters and oversized modules with unrelated
 responsibilities. Refactor around those responsibilities, rather than moving files

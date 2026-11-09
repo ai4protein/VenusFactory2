@@ -7,12 +7,11 @@ from fastmcp import Client
 from jsonschema import Draft202012Validator
 from pydantic import ValidationError
 
-from agent.harness.web_native_worker import mcp_input_schema
+from agent.harness.session_boundary import mcp_input_schema
 from mcp_tools.common.tool_arguments import ToolArgumentError, validate_tool_arguments
 from mcp_tools.models.evolved.contract import PredictionArguments
 from mcp_tools.models.evolved.tools_agent import predict_with_evolved_model_tool as prediction
 from mcp_tools.models.evolved.tools_mcp import mcp
-
 
 BASE = {"entry_id": "a" * 64, "inputs": [{"id": "sample", "values": [0, 1.0]}]}
 REF = {"scope_ref": "b" * 64}

@@ -91,6 +91,12 @@ The MCP discovery package owns catalog lookup and the mapping of model, dataset
 and task choices to a selected tool's declared input fields. Search returns names
 and summaries; only description loads that interface. Availability is refreshed
 at description and enforced again by the invocation path.
+Session-bound argument preparation and exposed input schemas belong to
+`src/agent/harness/session_boundary.py`. Workers call that boundary instead of
+importing one another. `events.py` owns the JSON event transport shared by the
+worker entry point and its adapters; tool results and diagnostics retain separate
+streams.
+
 The selected tool's own input model is validated through
 `mcp_tools/common/tool_arguments.py` after session paths are bound and again at
 MCP admission. Native harnesses share this boundary. Contract failures name the

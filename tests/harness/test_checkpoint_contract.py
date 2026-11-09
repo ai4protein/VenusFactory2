@@ -1,6 +1,7 @@
 import pytest
+
 from agent.harness.research_workspace import ResearchWorkspace
-from agent.harness.web_native_worker import mcp_input_schema
+from agent.harness.session_boundary import mcp_input_schema
 
 
 def service(tmp_path, steps=("inspect", "fit")):

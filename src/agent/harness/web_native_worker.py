@@ -8,17 +8,24 @@ import json
 import os
 import secrets
 import shutil
-from pathlib import Path
 from dataclasses import replace
+from pathlib import Path
 from types import SimpleNamespace
 
-from .contracts import Profile, Task
 from .capability_boundary import CURRENT_CAPABILITY_FACTS
+from .contracts import Profile, Task
+from .events import emit
 from .host import RuntimeContext
 from .registry import builtin_registry
-from .web_langgraph_worker import emit
-from .session_boundary import UNSAFE_TOOLS, SECURITY_INSTRUCTIONS, bind_arguments, public_value, session_tools
-from .tool_disclosure import ToolDisclosure, DisclosureError, ToolInspectionRequired, SEARCH, DESCRIBE, GUIDANCE
+from .session_boundary import (
+    SECURITY_INSTRUCTIONS,
+    UNSAFE_TOOLS,
+    mcp_input_schema,
+    prepare_tool_arguments,
+    public_value,
+    session_tools,
+)
+from .tool_disclosure import DESCRIBE, GUIDANCE, SEARCH, DisclosureError, ToolDisclosure, ToolInspectionRequired
 
 
 def native_prompt(request):
@@ -38,66 +45,6 @@ def native_prompt(request):
         + "\n\n" + CURRENT_CAPABILITY_FACTS
         + "\n\n## Current user request\n" + request["text"]
     )
-
-
-def mcp_input_schema(tool):
-    """Session bindings belong to the server, never to a tool-call argument."""
-    schema = tool.get_input_schema().model_json_schema()
-    metadata = getattr(tool, "metadata", None) or {}
-    if metadata.get("workspace_relative_paths"):
-        schema["additionalProperties"] = False
-    steps = metadata.get("plan_step_ids")
-    field = schema.get("properties", {}).get("completed_steps")
-    if isinstance(steps, list) and isinstance(field, dict):
-        field["description"] = "Exact IDs of completed plan steps; never include titles or descriptions. Use [] for a partial checkpoint."
-        if steps:
-            field.setdefault("items", {})["enum"] = list(steps)
-        else:
-            field["maxItems"] = 0
-    return schema
-
-
-def prepare_tool_arguments(name, tool, arguments, workspace, host_paths):
-    from mcp_tools.common.tool_arguments import validate_tool_arguments
-
-    # Research workspace tools own their relative-path validation. Legacy
-    # scientific tools still receive their normal host-path normalization.
-    if (getattr(tool, "metadata", None) or {}).get("workspace_relative_paths"):
-        fields = mcp_input_schema(tool).get("properties", {})
-        if not isinstance(arguments, dict):
-            raise ValueError("Use a JSON object with the declared tool arguments")
-        extra = set(arguments) - set(fields)
-        if extra:
-            # Report names, never caller-supplied values or source code. A read
-            # receipt's byte counts are not write arguments or a permission issue.
-            import re
-            names = sorted(key if isinstance(key, str) and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,63}", key)
-                           else "<invalid field name>" for key in extra)
-            message = ("Use the declared tool arguments. Unexpected fields: " +
-                       ", ".join(names[:12]) + ". Allowed fields: " +
-                       ", ".join(sorted(fields)[:32]) +
-                       ". Remove the extra fields and retry; output metadata is not input.")
-            if extra & {"workspace", "workspace_root", "session_id", "session_dir", "root", "cwd", "mounts", "mount", "backend", "control"}:
-                message += " The session workspace is assigned by the server."
-            raise ValueError(message)
-        from .session_boundary import relative_workspace_arguments
-        args = relative_workspace_arguments(arguments)
-        validate_tool_arguments(tool, args)
-        return args
-    from agent.graph.helpers.tool_io import _normalize_output_paths, _sanitize_tool_invoke_input
-    args = _sanitize_tool_invoke_input(name, tool, bind_arguments(name, arguments, workspace), str(workspace), {})
-    # A new scientific tool may not yet appear in the legacy write-prefix list.
-    # Never let omitted output arguments fall back to a shared platform folder.
-    output_keys = ('out_dir', 'output_dir', 'out_path', 'output_file')
-    if not any(args.get(key) for key in output_keys):
-        fields = mcp_input_schema(tool).get('properties', {})
-        for key in output_keys:
-            if key in fields:
-                args[key] = None
-                break
-    args = _normalize_output_paths(name, tool, args, str(workspace))
-    validate_tool_arguments(tool, args)
-    return args
 
 
 def web_tool_name(name, harness):
@@ -125,7 +72,7 @@ async def run(request, *, tools=None, event_sink=None):
 
         tools = filter_tools([t for t in get_tools() if t.name not in UNSAFE_TOOLS])[0]
         tools += session_tools(request["workspace"], Path(request["control"])/"session-tools")
-    from .interactions import interaction_tools, INTERACTION_NAMES, INTERACTION_GUIDANCE
+    from .interactions import INTERACTION_GUIDANCE, INTERACTION_NAMES, interaction_tools
     interaction = None
     def request_input(value):
         nonlocal interaction
@@ -150,6 +97,7 @@ async def run(request, *, tools=None, event_sink=None):
             return False
 
     from mcp_tools.tools.tool_surface import WORKSPACE_PRIMITIVES
+
     from .research_focus import admitted_tools
     focus = admitted_tools(request, mapping)
     from mcp_tools.models.evolved.discovery import ScopedModelCatalog
@@ -333,7 +281,7 @@ async def run(request, *, tools=None, event_sink=None):
                     if canonical_name not in INTERACTION_NAMES:
                         assert_tool_allowed(canonical_name)
                     args = (arguments if canonical_name in INTERACTION_NAMES else
-                            prepare_tool_arguments(canonical_name, tool, arguments, workspace, host_paths))
+                            prepare_tool_arguments(canonical_name, tool, arguments, workspace))
                     from mcp_tools.scheduler.catalog import classify, native_tools
                     registered = native_tools()
                     if canonical_name in registered and classify(canonical_name, tool.metadata)["execution"] == "queued":

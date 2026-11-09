@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from agent.harness.tool_disclosure import ToolDisclosure, DisclosureError, brief_description
+from agent.harness.tool_disclosure import DisclosureError, ToolDisclosure, brief_description
 
 
 def catalog(count=1, enabled=None):
@@ -65,8 +65,10 @@ def test_brief_descriptions_do_not_copy_argument_sections():
 
 def test_new_scientific_tool_defaults_are_bound_to_each_session(tmp_path):
     from pathlib import Path
+
     from langchain_core.tools import StructuredTool
-    from agent.harness.web_native_worker import prepare_tool_arguments
+
+    from agent.harness.session_boundary import prepare_tool_arguments
 
     def compute(sequence: str, out_dir: str | None = None, output_file: str | None = None):
         """Calculate sequence properties and write an optional result file."""
@@ -75,12 +77,12 @@ def test_new_scientific_tool_defaults_are_bound_to_each_session(tmp_path):
     tool = StructuredTool.from_function(compute, name='calculate_new_property')
     for session in ('one', 'two'):
         workspace = tmp_path/session; workspace.mkdir()
-        args = prepare_tool_arguments(tool.name, tool, {'sequence':'ACDE'}, workspace, lambda v:v)
+        args = prepare_tool_arguments(tool.name, tool, {'sequence':'ACDE'}, workspace)
         assert Path(args['out_dir']).is_relative_to(workspace)
-        explicit = prepare_tool_arguments(tool.name, tool, {'sequence':'ACDE','output_file':'/workspace/result.json'}, workspace, lambda v:v)
+        explicit = prepare_tool_arguments(tool.name, tool, {'sequence':'ACDE','output_file':'/workspace/result.json'}, workspace)
         assert explicit['output_file'] == str(workspace/'result.json')
         with pytest.raises(ValueError, match='this conversation'):
-            prepare_tool_arguments(tool.name, tool, {'sequence':'ACDE','out_dir':str(tmp_path/'other')}, workspace, lambda v:v)
+            prepare_tool_arguments(tool.name, tool, {'sequence':'ACDE','out_dir':str(tmp_path/'other')}, workspace)
 
 
 @pytest.mark.asyncio
@@ -88,8 +90,9 @@ def test_new_scientific_tool_defaults_are_bound_to_each_session(tmp_path):
 async def test_shared_protocol_dispatches_to_original_tool_and_records_real_identity(tmp_path, monkeypatch, harness):
     import httpx
     from langchain_core.tools import StructuredTool
+
     from agent.harness import web_native_worker as worker
-    from agent.harness.contracts import Profile, Budget, ModelBinding
+    from agent.harness.contracts import Budget, ModelBinding, Profile
     from mcp_tools.scheduler import catalog as scheduler
     from mcp_tools.tools import runtime_tool_policy
 

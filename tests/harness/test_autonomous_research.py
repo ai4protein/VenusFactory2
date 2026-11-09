@@ -6,7 +6,14 @@ import pytest
 
 from agent.harness import Profile
 from agent.harness.autonomous_research import AutonomousResearch, create, parse_plan, verified_checkpoint
-from agent.harness.research_workspace import ResearchWorkspace, run_python, safe_file, publish_proposals, run_capability, describe_capability
+from agent.harness.research_workspace import (
+    ResearchWorkspace,
+    publish_proposals,
+    run_capability,
+    run_python,
+    safe_file,
+)
+
 
 def profile():
     return Profile.from_dict({'mode':'science_expert','harness':'expert-deepseek-harness','model':{'provider':'dmx','model':'glm-4-flash','base_url':'https://www.dmxapi.cn/v1'},'budget':{'model_calls':12,'tool_calls':12,'wall_seconds':120,'output_tokens':4096,'thinking':'disabled'}})
@@ -163,12 +170,13 @@ def test_delivery_kind_must_match_the_planned_research(tmp_path,deliverable,kind
 @pytest.mark.asyncio
 async def test_native_path_adapter_supports_existing_files_and_live_python_progress(tmp_path):
     import asyncio
-    from agent.harness.web_native_worker import prepare_tool_arguments
+
+    from agent.harness.session_boundary import prepare_tool_arguments
     service = ResearchWorkspace(tmp_path / "work", tmp_path / "control", parse_plan(json.dumps(plan())))
     tools = {t.name: t for t in service.tools()}
     async def invoke(name, args):
         tool = tools[name]
-        prepared = prepare_tool_arguments(name, tool, args, service.workspace, lambda value: value)
+        prepared = prepare_tool_arguments(name, tool, args, service.workspace)
         return await tool.ainvoke(prepared)
     await invoke("write_session_file", {"path": "helper.py", "content": "value=1\n"})
     await invoke("write_session_file", {"path": "helper.py", "content": "value=2\n"})

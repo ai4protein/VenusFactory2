@@ -11,9 +11,7 @@ import contextlib
 import json
 import sys
 
-
-def emit(value):
-    print(json.dumps(value, ensure_ascii=False), file=sys.__stdout__, flush=True)
+from .events import emit
 
 
 def answer_text(content):
@@ -31,7 +29,14 @@ async def run(request, *, tools=None, model=None):
     from langchain_openai import ChatOpenAI
 
     from mcp_tools.tools.runtime_tool_policy import assert_tool_allowed
-    from .session_boundary import UNSAFE_TOOLS, SECURITY_INSTRUCTIONS, bind_arguments, public_value, session_tools
+
+    from .session_boundary import (
+        SECURITY_INSTRUCTIONS,
+        UNSAFE_TOOLS,
+        prepare_tool_arguments,
+        public_value,
+        session_tools,
+    )
 
     if tools is None:
         from dotenv import load_dotenv
@@ -58,7 +63,6 @@ async def run(request, *, tools=None, model=None):
     @wrap_tool_call
     async def observed_tool(call, handler):
         from agent.chat_agent_utils import _tool_output_indicates_failure
-        from agent.graph.helpers.tool_io import _normalize_output_paths, _sanitize_tool_invoke_input
 
         nonlocal calls
         tool_call = call.tool_call
@@ -68,15 +72,15 @@ async def run(request, *, tools=None, model=None):
         calls += 1
         tool = mapping[name]
         assert_tool_allowed(tool.name)
-        from .web_native_worker import prepare_tool_arguments
-        args = prepare_tool_arguments(tool.name, tool, tool_call["args"], request["workspace"], lambda x:x)
+        args = prepare_tool_arguments(tool.name, tool, tool_call["args"], request["workspace"])
         emit({"kind": "tool_call_start", "tool_call_id": cid, "tool_name": name, "args": args})
         from backend.web_v2.usage_store import Observation
         observation = Observation('tool', tool.name)
         try:
+            import os
+
             from backend.web_v2.compute_access import inline_prediction
             from mcp_tools.scheduler.catalog import classify
-            import os
             inline_prediction(os.getenv('VENUS_QUEUE_OWNER') or 'chat:'+str(request.get('session_id')), tool.name, classify(tool.name, tool.metadata)['category'])
             result = await handler(call.override(tool_call={**tool_call, "args": args}))
             content = public_value(result.content, request["workspace"])
@@ -128,8 +132,9 @@ async def run(request, *, tools=None, model=None):
     from .capability_guidance import discovery_instructions
 
     prompt += "\n\n" + SECURITY_INSTRUCTIONS + "\n\n" + discovery_instructions(mapping)
-    from .capability_boundary import CURRENT_CAPABILITY_FACTS
     from uuid import uuid4
+
+    from .capability_boundary import CURRENT_CAPABILITY_FACTS
 
     current_user = HumanMessage(
         id="user-" + uuid4().hex,

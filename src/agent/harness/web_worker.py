@@ -20,7 +20,7 @@ async def run(request):
 def main():
     request = json.loads(sys.stdin.readline())
     sys.path[:] = request.pop("python_paths")
-    from agent.harness.web_langgraph_worker import emit
+    from agent.harness.events import emit
 
     with contextlib.redirect_stdout(sys.stderr):
         try:
