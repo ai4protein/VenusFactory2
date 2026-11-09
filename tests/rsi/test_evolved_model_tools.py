@@ -160,6 +160,8 @@ async def test_mcp_context_description_and_inference(context_published, use_refe
             )
         ).data
         assert result["success"] and result["session_binding"] == "mcp_transport_session"
+        assert result["scope"] == card["scope"]
+        assert result["evaluation_scope"] == card["evaluation_scope"]
         assert seen == rows
 
 
@@ -350,6 +352,10 @@ def test_reference_prediction_keeps_the_complete_context_and_host_session(contex
     ))
     assert result["success"] and seen == rows
     assert result["receipt"]["scope_sha256"] == digest(scope)
+    assert result["scope"] == scope
+    assert digest(result["scope"]) == result["receipt"]["scope_sha256"]
+    assert result["scope"]["unit"] == scope["unit"]
+    assert result["evaluation_scope"] == card["evaluation_scope"]
     assert result["receipt"]["session_id"] == "reference-chat"
 
 

@@ -51,3 +51,6 @@ version, protein/property/scenario and visibility; model source directories do n
 
 Agent discovers capabilities by search, reads selected interfaces and scope, then
 calls through MCP. Do not inline thousands of model descriptions into a prompt.
+Prediction results carry their verified scope, including target, units and applicable
+conditions, bound to the inference receipt. Successful execution alone does not
+establish a complete answer: report the values with their units and relevant limits.

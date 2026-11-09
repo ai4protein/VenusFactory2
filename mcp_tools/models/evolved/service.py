@@ -14,6 +14,8 @@ from .scope import ModelScopeError, bind_scope, scope_reference
 from .contract import PredictionArguments
 from mcp_tools.common.tool_arguments import ToolArgumentError, validate_arguments
 
+EVALUATION_SCOPE = "Frozen task validation; this does not establish performance on arbitrary proteins."
+
 TOOL_NAMES = {
     "list": "list_evolved_models",
     "describe": "describe_evolved_model",
@@ -200,7 +202,7 @@ def describe_model(library, entry_id):
         "input_fields": fields,
         "input_contract": {"schema": "evolved_model_inputs.v1", "target_required": False, **contract},
         "maximum_prediction_rows": 256,
-        "evaluation_scope": "Frozen task validation; this does not establish performance on arbitrary proteins.",
+        "evaluation_scope": EVALUATION_SCOPE,
     }
 
 
@@ -219,6 +221,8 @@ def predict_model(library, entry_id, inputs, scope=None, *, scope_ref=None, sess
     result = library.predict(entry_id, inputs, scope, session_id=session_id)
     return {
         **result,
+        "scope": scope,
+        "evaluation_scope": EVALUATION_SCOPE,
         "session_binding": session_binding,
         "scientific_evidence": "Ordinary Agent inference, not a new autonomous model or a new reuse experiment.",
     }
