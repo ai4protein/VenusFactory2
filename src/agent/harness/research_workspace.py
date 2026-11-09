@@ -19,6 +19,7 @@ from pydantic import Field
 from .contracts import digest, file_hash
 from .host import write_json
 from .research_questions import validate_input_questions
+from .workspace_json import JsonSelection
 from utils.scoped_files import open_file, read_bytes, write_bytes, copy_file, parts
 
 ExperimentVariant = Annotated[
@@ -85,11 +86,12 @@ class ResearchWorkspace:
         from backend.web_v2.research_files import list_files
         return {'files':[{'path':row['rel'],'bytes':row['size']} for row in list_files({'workspace':self.workspace},limit=500)['files']]}
 
-    async def read_research_file(self, path: str, offset_bytes: int=0, max_bytes: int=20000, view: Literal["auto", "text"]="auto") -> dict:
-        """Preview a file. CSV/TSV defaults to columns and three sample rows; analyze full tables with isolated Python. Use view='text' for a targeted raw window. Text windows return next_offset_bytes; PDFs return up to 30 pages."""
+    async def read_research_file(self, path: str, offset_bytes: int=0, max_bytes: int=20000, view: Literal["auto", "text"]="auto", select: JsonSelection | None=None) -> dict:
+        """Read a session file. Large JSON defaults to a field index; select.path reads a field, and select.match_field plus select.match_values retrieve exact string IDs from an array. Selection returns complete values, paged by select.offset/limit; max_bytes bounds the selected value. CSV/TSV shows three sample rows. Use isolated Python for full-data analysis, or view='text' with next_offset_bytes for raw text. PDFs return up to 30 pages."""
         if view not in ("auto", "text"): raise ValueError("view must be auto or text")
         p=Path(path)
         if p.suffix.lower()=='.pdf':
+            if select is not None: raise ValueError('JSON select requires a .json file')
             if offset_bytes: raise ValueError('Byte offsets apply to text files only')
             import io
             data=read_bytes(self.workspace,path,max_bytes=20*1024**2)
@@ -100,7 +102,7 @@ class ResearchWorkspace:
             reader=PdfReader(io.BytesIO(data))
             return {'path':path,'pages':len(reader.pages),'text':'\n'.join(page.extract_text() or '' for page in reader.pages[:30])[:200000],'sha256':hashlib.sha256(data).hexdigest()}
         from .workspace_preview import file_preview
-        return file_preview(self.workspace,path,offset_bytes=offset_bytes,max_bytes=max_bytes,view=view)
+        return await asyncio.to_thread(file_preview,self.workspace,path,offset_bytes=offset_bytes,max_bytes=max_bytes,view=view,select=select)
 
     async def write_research_file(self, path: str, content: str) -> dict:
         """Create or revise Python code, a report, or a small data file in this workspace."""

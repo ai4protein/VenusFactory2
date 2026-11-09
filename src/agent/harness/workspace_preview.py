@@ -69,12 +69,19 @@ def _protected_table_notice(text):
     return isinstance(value, dict) and value.get("data_access") == "protected_research_table"
 
 
-def file_preview(workspace, path, *, offset_bytes=0, max_bytes=20000, view="auto"):
+def file_preview(workspace, path, *, offset_bytes=0, max_bytes=20000, view="auto", select=None):
     """Default to a small table sample; raw text remains explicitly available."""
     _validate_window(offset_bytes, max_bytes)
     if view not in ("auto", "text"):
         raise ValueError("view must be auto or text")
     suffix = Path(path).suffix.lower()
+    if select is not None and (view != "auto" or offset_bytes != 0 or suffix != ".json"):
+        raise ValueError("JSON select requires a .json file, view='auto' and offset_bytes=0")
+    if suffix == ".json" and view == "auto" and offset_bytes == 0:
+        from .workspace_json import json_preview
+        structured = json_preview(workspace, path, max_bytes=max_bytes, select=select)
+        if structured is not None:
+            return structured
     table = view == "auto" and offset_bytes == 0 and suffix in TABLE_SUFFIXES
     window = text_window(workspace, path, offset_bytes=offset_bytes,
                          max_bytes=min(max_bytes, TABLE_PREFIX_BYTES) if table else max_bytes)

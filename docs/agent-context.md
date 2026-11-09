@@ -19,3 +19,12 @@ Restart the relevant service after editing environment settings. Online users ca
 Text accounting uses conservative UTF-8 byte estimates, not billing token counts. The conversation budget is clamped to the selected model capacity with room for output, native instructions and tool definitions. Native harnesses continue to manage their own in-turn tool context. This setting controls host-supplied conversation memory, not an exact tokenizer-independent cap on the entire wire request. Large single inputs should be attached as files.
 
 Compaction uses one request to the same admitted free model and relay, counts against the existing model-call budget, and never switches to a paid provider. Internal summary text is not streamed into the user's answer. Cancellation stops compaction. A failed summary leaves the previous working history intact so a retry can recover. Summaries are lossy; exact older details can be checked in the retained archive.
+
+Large recorded tool observations retain their full JSON in the session workspace.
+The shared `read_session_file` interface indexes large JSON by named fields before
+loading records. `select.path` chooses a field or array; `match_field` and
+`match_values` select exact string-valued records within it, with bounded paging.
+Input rows and prediction rows remain separate. A successful prefix read is not
+evidence that a requested prediction was read. Raw text pagination remains
+available; analysis of files beyond the 8 MiB structured-read limit uses the
+isolated session Python runtime.
