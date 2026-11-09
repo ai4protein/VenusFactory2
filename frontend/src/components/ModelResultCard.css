@@ -1,0 +1,44 @@
+/* Scientific tool output is distinct from the assistant's prose. */
+.model-result-card {
+  min-width: 0;
+  margin: 12px 0;
+  border: 1px solid #e2e5e9;
+  border-radius: 6px;
+  padding: 16px 18px;
+  background: #fff;
+  color: #252b33;
+  font-size: 14px;
+}
+.model-result-card > header { font-weight: 600; margin-bottom: 10px; }
+.model-result-values, .model-result-scope { overflow-x: auto; overflow-wrap: anywhere; }
+.model-result-card table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.model-result-card th, .model-result-card td {
+  padding: 7px 10px;
+  text-align: left;
+  border-bottom: 1px solid #eef0f2;
+  vertical-align: top;
+}
+.model-result-card th { color: #59616c; font-weight: 500; }
+.model-result-card details { margin-top: 12px; }
+.model-result-card summary { cursor: pointer; font-weight: 500; padding: 4px 0; }
+.model-result-scope { max-height: 320px; margin-top: 8px; }
+.model-result-card footer { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.model-result-card footer button {
+  border: 1px solid #dce1e6;
+  border-radius: 4px;
+  background: #fff;
+  color: inherit;
+  padding: 5px 10px;
+  font: inherit;
+  cursor: pointer;
+}
+.model-result-card footer button:hover { background: #f3f5f7; }
+.model-result-card footer button:focus-visible, .model-result-card summary:focus-visible {
+  outline: 2px solid #607d9b;
+  outline-offset: 2px;
+}
+.model-result-card footer span { color: #67717d; font-size: 12px; }
+@media (max-width: 600px) {
+  .model-result-card { padding: 12px; }
+  .model-result-card th, .model-result-card td { padding: 6px; }
+}

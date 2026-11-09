@@ -168,7 +168,13 @@ async def test_native_harness_uses_scoped_card_but_queues_the_original_tool(publ
     assert len(queued)==1 and queued[0][0]=="predict_with_evolved_model"
     assert queued[0][1]["entry_id"]==entry and queued[0][2]["session_id"]=="scoped-harness"
     assert seen==[{"id":"x","sequence":"AA"}]
-    assert any(e.get("kind")=="completed" for e in events)
+    completed = next(e for e in events if e.get("kind") == "completed")
+    assert completed["text"] == "Prediction: 0.25."
+    cards = [e["result"] for e in events if e.get("kind") == "model_result"]
+    assert len(cards) == 1 and not cards[0].get("file_error")
+    payload = json.loads((workspace / cards[0]["files"]["json"]).read_text())
+    assert payload["predictions"][0]["prediction"] == 0.25
+    assert payload["receipt"]["session_id"] == "scoped-harness"
 
 
 def test_online_policy_cannot_be_bypassed_by_the_disclosure_callback(monkeypatch):

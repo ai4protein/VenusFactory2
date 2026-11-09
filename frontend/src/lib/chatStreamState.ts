@@ -39,7 +39,7 @@ export function sanitizeChatSnapshot(snapshot: ChatSnapshot): ChatSnapshot {
 /** Legacy graph status messages predate structured phase markers. */
 function isTextPlaceholder(item: ChatHistoryItem): boolean {
   if (item.role !== "assistant" || item.kind === "thinking"
-      || item.kind === "checkpoint" || item.kind === "compaction") return false;
+      || item.kind === "checkpoint" || item.kind === "compaction" || item.kind === "model_result") return false;
   return Boolean(item.phase) || /思考中|Thinking|正在设计|designing the pipeline|准备澄清|preparing clarification|撰写|Summarizing|正在总结|汇总|writing sub-report|writing the draft report/i.test(item.content || "");
 }
 
@@ -67,7 +67,8 @@ export function mergeChatSnapshot(previous: ChatSnapshot | null, incoming: ChatS
   const next = incoming.history[incoming.history.length - 1];
   const text = (last.content || "").trim(), nextText = (next.content || "").trim();
   if (last.role !== "assistant" || next.role !== "assistant" || last.kind === "thinking"
-      || next.kind === "checkpoint" || next.kind === "compaction" || !sameIdentity(last, next)
+      || next.kind === "checkpoint" || next.kind === "compaction" || next.kind === "model_result"
+      || last.kind === "model_result" || !sameIdentity(last, next)
       || text.length <= nextText.length
       || !(isTextPlaceholder(next) || !nextText || text.startsWith(nextText))) return incoming;
   const history = [...incoming.history];
@@ -88,7 +89,7 @@ function startStream(snapshot: ChatSnapshot, info: StreamStart): ChatSnapshot {
       history.push({ role: "assistant", content: "", ...identity, kind: "thinking", phase: "thinking" });
     }
   } else if (last && sameIdentity(last, identity)
-      && (isTextPlaceholder(last) || last.role === "assistant" && last.kind !== "thinking" && !(last.content || "").trim())) {
+      && (isTextPlaceholder(last) || last.role === "assistant" && last.kind !== "thinking" && last.kind !== "model_result" && !(last.content || "").trim())) {
     history[history.length - 1] = {
       role: "assistant", content: "", role_id: info.role_id || last.role_id,
       turn_id: info.turn_id || last.turn_id, kind: "text",
@@ -106,7 +107,7 @@ function appendDeltas(snapshot: ChatSnapshot, deltas: ChatDelta[], thinking = fa
     const last = history[history.length - 1];
     const kind = thinking ? "thinking" : "text";
     if (last?.role === "assistant" && (last.kind === "thinking") === thinking
-        && !last.phase?.startsWith("research_") && last.kind !== "checkpoint" && last.kind !== "compaction"
+        && !last.phase?.startsWith("research_") && last.kind !== "checkpoint" && last.kind !== "compaction" && last.kind !== "model_result"
         && sameIdentity(last, delta)) {
       history[history.length - 1] = { ...last, content: (last.content || "") + delta.content };
     } else {
@@ -127,6 +128,7 @@ export function chatStreamReducer(state: ChatStreamState, action: ChatStreamActi
     const previous = state.snapshot, incoming = action.snapshot;
     const sameTail = previous?.history?.length && incoming.history?.length
       && sameHistoryTurn(previous, incoming)
+      && previous.history[previous.history.length - 1].kind === incoming.history[incoming.history.length - 1].kind
       && sameIdentity(previous.history[previous.history.length - 1], incoming.history[incoming.history.length - 1]);
     return {
       snapshot: mergeChatSnapshot(previous, incoming),

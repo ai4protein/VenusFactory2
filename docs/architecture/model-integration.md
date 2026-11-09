@@ -62,3 +62,12 @@ before numerical replay. Scope, data and evidence validation still run at execut
 Prediction results carry their verified scope, including target, units and applicable
 conditions, bound to the inference receipt. Successful execution alone does not
 establish a complete answer: report the values with their units and relevant limits.
+
+The evolved-model delivery module owns prediction exports. Native executors call it
+after the original tool returns, under the existing workspace lock. It checks the
+session-bound receipt against normalized inputs, scope and output before writing
+CSV, JSON and a report through the shared descriptor-anchored file API. The chat
+stores a separate result card; model-authored answers and scientific history remain
+unchanged. Reload/replay deduplicates cards by receipt identity, and downloads keep
+the normal session authorization. Export failure retains the computed result without
+requesting another inference.

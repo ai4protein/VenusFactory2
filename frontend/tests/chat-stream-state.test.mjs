@@ -147,3 +147,28 @@ test('functional plan updates remain supported without another copy of history s
   assert.equal(state.snapshot.history.at(-1).content, 'Existing result');
   assert.deepEqual(state.snapshot.plan, [{ step: 1 }]);
 });
+
+
+test('tool result cards survive reload and never absorb subsequent model text', () => {
+  const card = { role: 'assistant', kind: 'model_result', turn_id: 'a',
+    content: 'Prediction: 0.9942129558371191',
+    model_result: { receipt_id: 'a'.repeat(64), scope_markdown: 'Temperature: 21.8–65.5 C',
+      files: { json: 'results/predictions/a/result.json' } } };
+  const snapshot = freeze(saved([user(), card]));
+  let state = chatStreamReducer(render(snapshot), { type: 'tokens', deltas: [{ content: 'Interpretation', turn_id: 'a' }] });
+  assert.equal(state.snapshot.history.length, 3);
+  assert.deepEqual(state.snapshot.history[1], card);
+  assert.equal(state.snapshot.history[2].kind, 'text');
+  assert.equal(state.snapshot.history[2].content, 'Interpretation');
+  state = chatStreamReducer(state, { type: 'state', snapshot: saved(state.snapshot.history, { status: 'error' }) });
+  state = chatStreamReducer(state, { type: 'replace', value: JSON.parse(JSON.stringify(state.snapshot)) });
+  assert.deepEqual(state.snapshot.history[1], card);
+  assert.equal(state.streamingIdx, -1);
+
+  const incoming = freeze(saved([user(), { ...card, content: '' }]));
+  assert.equal(mergeChatSnapshot(saved([user(), answer('Unfinished model preview')]), incoming), incoming);
+  assert.equal(mergeChatSnapshot(snapshot, saved([user(), answer('')] )).history.at(-1).kind, 'text');
+  const started = chatStreamReducer(render(incoming), { type: 'start', info: { turn_id: 'a' } });
+  assert.equal(started.snapshot.history.length, 3);
+  assert.deepEqual(started.snapshot.history[1], incoming.history[1]);
+});

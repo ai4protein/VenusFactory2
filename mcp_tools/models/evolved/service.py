@@ -228,6 +228,7 @@ def predict_model(library, entry_id, inputs, scope=None, *, scope_ref=None, sess
     result = library.predict(entry_id, inputs, scope, session_id=session_id)
     return {
         **result,
+        "interface": key["plugin_id"],
         "scope": scope,
         "evaluation_scope": EVALUATION_SCOPE,
         "session_binding": session_binding,

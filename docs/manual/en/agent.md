@@ -30,4 +30,6 @@ Do not paste API keys into a conversation. Deployment credentials are managed in
 
 Ask for a tool by protein, property or experimental scenario. Agent searches the registered catalog and inspects a matching model's interface and scope before running it. A research output becomes a shared tool only after independent review and publication, and it must be enabled in the current deployment.
 
+Registered Scientist model predictions appear in a result card with their units. Expand **Applicability** to check the supported conditions. Open **View report**, **CSV** or **JSON** to preview and download the complete result; long tables show a short preview in the conversation.
+
 See [Scientist](manual:scientist) to develop a capability and [Library](manual:library) to manage results.

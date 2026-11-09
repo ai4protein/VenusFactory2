@@ -352,6 +352,14 @@ async def run(request, *, tools=None, event_sink=None):
                         from backend.web_v2.compute_access import inline_prediction
                         inline_prediction(os.getenv('VENUS_QUEUE_OWNER') or 'chat:'+str(request.get('session_id')), canonical_name, classify(canonical_name, tool.metadata)['category'])
                         value = await tool.ainvoke(args, config={"configurable": {"session_id": request.get("session_id")}})
+                    if canonical_name == "predict_with_evolved_model" and not _tool_output_indicates_failure(value)[0]:
+                        from mcp_tools.models.evolved.result_delivery import deliver_prediction
+                        card = deliver_prediction(workspace, value, args, session_id=request.get("session_id"))
+                        value = json.loads(value) if isinstance(value, str) else dict(value)
+                        value["result_files"] = card["files"]
+                        if card.get("file_error"):
+                            value["file_export_error"] = "Prediction completed, but result files could not be saved."
+                        send({"kind": "model_result", "result": public_value(card, workspace)})
                 value = public_value(value, workspace)
                 failed, _ = _tool_output_indicates_failure(value)
                 if canonical_name == 'submit_research_checkpoint' and not failed:

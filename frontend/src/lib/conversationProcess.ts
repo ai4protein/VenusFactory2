@@ -17,7 +17,7 @@ export function toolState(tool: ToolExecution, live = true): ToolState {
 
 export function isResearchStatusItem(item: ChatHistoryItem): boolean {
   if (item.role !== "assistant") return false;
-  if (["thinking", "checkpoint", "compaction"].includes(item.kind || "") || item.phase === "compaction") return false;
+  if (["thinking", "checkpoint", "compaction", "model_result"].includes(item.kind || "") || item.phase === "compaction") return false;
   if (item.phase === "sub_report_checkpoint") return false;
   if (item.kind === "status" || item.phase?.startsWith("research_")) return true;
   const content = (item.content || "").trim();

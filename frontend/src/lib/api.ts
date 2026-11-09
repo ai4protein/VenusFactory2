@@ -27,7 +27,14 @@ export type ChatHistoryItem = {
   /** kimi-code engine writes message kind. "thinking" → collapsible reasoning
    * block rendered above the answer; "status" → foldable research noise;
    * "text" (or undefined) → regular message. */
-  kind?: "text" | "thinking" | "status" | "checkpoint" | "compaction";
+  kind?: "text" | "thinking" | "status" | "checkpoint" | "compaction" | "model_result";
+  /** Host-produced prediction files and scope, separate from model-authored text. */
+  model_result?: {
+    receipt_id: string;
+    scope_markdown: string;
+    files: Partial<Record<"report" | "csv" | "json", string>>;
+    file_error?: boolean;
+  };
   /** Optional kimi turn id; used to group thinking + text from the same turn. */
   turn_id?: string;
 };

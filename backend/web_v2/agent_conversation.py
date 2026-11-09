@@ -65,3 +65,16 @@ def record_tool_observation(pending, event, harness):
 
 def completed_messages(previous, text, observations, answer, harness):
     return copy.deepcopy(previous) + [message("user", text, harness)] + copy.deepcopy(observations) + [message("assistant", answer, harness)]
+
+
+def record_model_result(state, event, turn_id):
+    """Persist a trusted tool result separately from model-authored text."""
+    result = copy.deepcopy(event["result"])
+    history = state.setdefault("history", [])
+    identity = result["receipt_id"]
+    if any(row.get("kind") == "model_result"
+           and row.get("model_result", {}).get("receipt_id") == identity for row in history):
+        return False
+    history.append({"role": "assistant", "kind": "model_result", "turn_id": turn_id,
+                    "content": result.pop("content"), "model_result": result})
+    return True

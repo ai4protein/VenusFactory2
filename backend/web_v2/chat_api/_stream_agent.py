@@ -20,7 +20,7 @@ from agent.harness.host import write_json
 from agent.kimi_client import KimiEvent
 from agent.rsi.engine.model_gateway import GatewayPolicy
 from backend.web_v2.agent_execution import ROOT, admit, runtime_paths
-from backend.web_v2.agent_conversation import continuation_messages, record_tool_observation, completed_messages
+from backend.web_v2.agent_conversation import continuation_messages, record_tool_observation, completed_messages, record_model_result
 from backend.web_v2.agent_context import ContextPolicy, prepare_context, summarize_via_relay, turn_count, cancellable
 from backend.web_v2.chat_api._hooks_runtime import _is_cancelled, _session_store
 from backend.web_v2.chat_api._shared import _snapshot, _to_json, clear_expert_gates
@@ -278,6 +278,10 @@ async def _stream_agent(state, text, attachment_paths, *, retry=False, interacti
                                 outcome = "waiting_for_input"
                                 await _session_store.save(sid)
                                 yield f"event: state\ndata: {_to_json(_snapshot(state))}\n\n"
+                            elif kind == "model_result":
+                                if record_model_result(state, row, turn_id):
+                                    await _session_store.save(sid)
+                                    yield f"event: state\ndata: {_to_json(_snapshot(state))}\n\n"
                             elif kind == "completed":
                                 if completed is not None:
                                     raise ValueError("Duplicate completion")

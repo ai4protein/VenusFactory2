@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useRef, useState, useCallback } from "react";
+import { ModelResultCard } from "./ModelResultCard";
 import type { ChatHistoryItem, SecurityEvent } from "../lib/api";
 import { submitFeedback } from "../lib/api";
 import { renderMarkdown } from "../lib/markdown";
@@ -543,13 +544,14 @@ export function ChatTimeline({ items, streamingIndex = -1, running = false, onSu
   const t = useLang().t(TIMELINE_STRINGS);
   const processes = buildConversationProcesses(items, (toolExecutions as ToolExecution[]).filter(tool => !isResearchNoiseTool(tool)), running);
   const processAt = new Map(processes.map(process => [process.anchor, process]));
-  const lastAssistantIdx = items.reduce((last, item, idx) => item.role === "assistant" && !isProcessItem(item) && item.content.trim() ? idx : last, -1);
+  const lastAssistantIdx = items.reduce((last, item, idx) => item.role === "assistant" && item.kind !== "model_result" && !isProcessItem(item) && item.content.trim() ? idx : last, -1);
   const renderProcess = (index: number) => {
     const process = processAt.get(index);
     return process ? <ConversationProcessView key={`${sessionId}/${process.key}`} process={process}/> : null;
   };
   const renderMessage = (item: ChatHistoryItem, idx: number) => {
     if (isProcessItem(item)) return null;
+    if (item.kind === "model_result") return <ModelResultCard item={item} lang={lang}/>;
     if (item.kind === "compaction" || item.phase === "compaction") {
       return <details className="chat-compaction"><summary>{t.compaction}</summary><div className="chat-compaction-body"><ChatMessageBody html={renderMarkdown((item.content || "").replace(/^🗜️\s*/, "").trim())}/></div></details>;
     }
