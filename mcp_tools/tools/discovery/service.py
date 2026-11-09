@@ -2,23 +2,23 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from collections import Counter
 from itertools import zip_longest
 
+from mcp_tools.models.catalog_snapshot import catalog_snapshot
 from mcp_tools.tools.runtime_tool_policy import is_local_mode
+
 from .matching import query_groups, relevance
 from .platform_models import platform_models
-from mcp_tools.models.catalog_snapshot import catalog_snapshot
 
 logger = logging.getLogger(__name__)
 
 
 def available_tools():
     # Import after the hub has registered this tool to avoid a circular import.
-    from mcp_tools.tools.tools_agent_hub import get_tools
     from mcp_tools.tools.runtime_tool_policy import filter_tools
+    from mcp_tools.tools.tools_agent_hub import get_tools
 
     return filter_tools(get_tools())[0]
 
@@ -43,10 +43,8 @@ def search(query="", kind="all", stage="", limit=10, offset=0, *, tool_catalog=N
 
     groups = query_groups(query)
     tool_results, model_results = [], []
-    from mcp_tools.tools.runtime_tool_policy import is_tool_allowed
-
     from mcp_tools.scheduler.catalog import tool_family
-    tools = []
+    from mcp_tools.tools.runtime_tool_policy import is_tool_allowed
     catalog = tool_catalog if tool_catalog is not None else [
         {"name": t.name, "description": t.description, "parameters": t.tool_call_schema.model_json_schema(), "metadata": t.metadata, "model_family": tool_family(t.name, t)}
         for t in available_tools()
@@ -92,13 +90,11 @@ def search(query="", kind="all", stage="", limit=10, offset=0, *, tool_catalog=N
         and is_tool_allowed("predict_with_evolved_model")
     ]
     if cards:
-        from mcp_tools.models.evolved.service import discovery_card
+        from mcp_tools.models.evolved.service import discovery_card, model_relevance
     for card in cards:
         if stage and card["stage"] != stage:
             continue
-        scope = card["scope"]
-        title = " · ".join(str(scope.get(k, "")) for k in ("protein", "target"))
-        score = relevance(groups, title, json.dumps(card, ensure_ascii=False))
+        score = model_relevance(groups, card)
         if score is None:
             continue
         model_results.append((score, card["entry_id"], {
@@ -110,12 +106,15 @@ def search(query="", kind="all", stage="", limit=10, offset=0, *, tool_catalog=N
     if kind != "tools" and not stage:
         from agent.harness.research_workspace import capability_cards
         for item in capability_cards():
-            if not settings.enabled('model:capability:' + item['id']) or not is_tool_allowed('run_generated_capability'): continue
+            if not settings.enabled('model:capability:' + item['id']) or not is_tool_allowed('run_generated_capability'):
+                continue
             score = relevance(groups, item["name"], item["name"] + " " + item["description"])
             if score is not None:
                 model_results.append((score, item["id"], {"kind": "research_capability", "model_family": "rsi", "name": item["name"], "entry_id": item["id"], "description": item["description"], "validation": item["validation"], **{k:item[k] for k in ("author","author_email","version","scope","review_status") if k in item}, "describe": {"tool": "describe_generated_capability", "arguments": {"capability_id": item["id"]}}, "predict_tool": "run_generated_capability"}))
 
-    order = lambda item: (-item[0], item[1])
+    def order(item):
+        return -item[0], item[1]
+
     tool_results.sort(key=order)
     model_results.sort(key=order)
     if groups:

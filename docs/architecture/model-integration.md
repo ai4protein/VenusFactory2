@@ -51,6 +51,9 @@ version, protein/property/scenario and visibility; model source directories do n
 
 Agent discovers capabilities by search, reads selected interfaces and scope, then
 calls through MCP. Do not inline thousands of model descriptions into a prompt.
+Dedicated RSI search and unified search share protein/property relevance ranking.
+Enablement, runtime compatibility and stage filters apply before stable pagination;
+metadata order cannot push a named protein behind incidental description matches.
 The RSI category returns concise registered-model cards. Describing a selected
 card binds its immutable model and exact applicability scope for the current
 discovery session; the exposed call then accepts scientific inputs only. Resolving

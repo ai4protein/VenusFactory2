@@ -3,17 +3,17 @@
 from __future__ import annotations
 
 import json
-import os
 import uuid
 from pathlib import Path
 
 from agent.rsi.engine.scientist_model_library import ScientistModelLibrary, _require
-from mcp_tools.tools.runtime_tool_policy import assert_tool_allowed
+from mcp_tools.common.tool_arguments import ToolArgumentError, validate_arguments
 from mcp_tools.models.catalog_snapshot import catalog_snapshot
-from .scope import ModelScopeError, bind_scope, scope_reference
+from mcp_tools.tools.runtime_tool_policy import assert_tool_allowed
+
 from .contract import PredictionArguments
 from .inputs import ModelInputError, validate_model_inputs
-from mcp_tools.common.tool_arguments import ToolArgumentError, validate_arguments
+from .scope import ModelScopeError, bind_scope, scope_reference
 
 EVALUATION_SCOPE = "Frozen task validation; this does not establish performance on arbitrary proteins."
 
@@ -63,6 +63,15 @@ def discovery_card(card):
     }
 
 
+def model_relevance(groups, card):
+    """Use the same protein/property ranking in each discovery entry point."""
+    from mcp_tools.tools.discovery.matching import relevance
+
+    scope = card["scope"]
+    title = " · ".join(str(scope.get(key, "")) for key in ("protein", "target"))
+    return relevance(groups, title, json.dumps(card, ensure_ascii=False))
+
+
 def runtime_implementation(plugin_id):
     from agent.rsi.engine.model_plugins import get_model_plugin
 
@@ -98,25 +107,29 @@ def list_models(library, query="", stage="", limit=10, offset=0):
         isinstance(query, str) and len(query) <= 200 and isinstance(stage, str) and len(stage) <= 80,
         "Invalid catalog filter",
     )
-    cards = []
-    from mcp_tools.tools.discovery.matching import query_groups, relevance
+    ranked = []
+    from mcp_tools.tools.discovery.matching import query_groups
     groups = query_groups(query)
     published, catalog = catalog_cards(library)
     from mcp_tools.tools.capability_policy import CapabilityStore
     switches = CapabilityStore()
     for card in published:
-        if not card.get("runtime_compatible", True): continue
-        if not switches.enabled('model:scientist:' + card['entry_id']): continue
+        if not card.get("runtime_compatible", True):
+            continue
+        if not switches.enabled('model:scientist:' + card['entry_id']):
+            continue
         if stage and card["stage"] != stage:
             continue
-        if relevance(groups, card["entry_id"], json.dumps(card, ensure_ascii=False)) is None:
+        score = model_relevance(groups, card)
+        if score is None:
             continue
-        cards.append(card)
+        ranked.append((score, card["entry_id"], card))
+    ranked.sort(key=lambda item: (-item[0], item[1]))
     return {
-        "models": [discovery_card(card) for card in cards[offset : offset + limit]],
-        "matching_entries": len(cards),
+        "models": [discovery_card(card) for _, _, card in ranked[offset : offset + limit]],
+        "matching_entries": len(ranked),
         "indexed_entries": catalog["indexed_entries"],
-        "next_offset": offset + limit if offset + limit < len(cards) else None,
+        "next_offset": offset + limit if offset + limit < len(ranked) else None,
         "availability": "Recorded publications; prediction revalidates current evidence.",
         "counting_rule": catalog["counting_rule"],
     }
