@@ -27,7 +27,7 @@ def test_no_retired_code_tools_in_any_global_catalog():
 
 def test_legacy_entry_is_a_migration_receipt_not_a_second_llm(monkeypatch):
     from mcp_tools.models.factory.training.tools_agent import agent_generated_code_tool
-    monkeypatch.setattr('mcp_tools.models.factory.training.train_operations.generate_and_execute_code',lambda *a,**k:pytest.fail('retired generation must not run'))
+    monkeypatch.setattr('requests.sessions.Session.request',lambda *a,**k:pytest.fail('retired generation must not make model requests'))
     result=json.loads(agent_generated_code_tool.invoke({'task_description':'write and run code'}))
     assert not result['success'] and result['code']=='tool_retired'
     assert 'write_session_file' in result['error'] and 'run_session_python' in result['error']

@@ -12,8 +12,7 @@ def config_env(tmp_path, monkeypatch):
     monkeypatch.setattr('mcp_tools.tools.runtime_tool_policy.is_online_mode', lambda: False)
     def forbidden(*args, **kwargs):
         pytest.fail('Training configuration must not invoke a second LLM or make an HTTP request')
-    monkeypatch.setattr(ops, 'generate_ai_training_config', forbidden)
-    monkeypatch.setattr(ops.requests, 'post', forbidden)
+    monkeypatch.setattr('requests.sessions.Session.request', forbidden)
     configs = tmp_path / 'configs'
     configs.mkdir()
     monkeypatch.setattr(ops, 'get_save_path', lambda *args: str(configs))

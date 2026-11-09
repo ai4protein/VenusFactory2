@@ -1,4 +1,4 @@
-# train: LangChain @tool layer; calls core (train_operations), returns JSON.
+"""Training tool contracts; session scope and execution are owned by the shared core."""
 
 import json
 from typing import Any, Dict, List, Optional
@@ -47,23 +47,11 @@ class CSVTrainingConfigInput(BaseModel):
 
 
 class CodeExecutionInput(BaseModel):
-    task_description: str = Field(
-        ...,
-        description="Clear description of the task: e.g. 'Split train.csv into train/val/test 70/15/15', 'Train a classifier on train.csv and save model', 'Load model X and predict on new_data.csv'. Required. Code is generated and executed in a sandbox.",
-    )
-    input_files: Optional[List[str]] = Field(
-        default=None,
-        description="Optional list of absolute or relative paths to input files (CSV, FASTA, etc.). These paths are passed to the generated code. Omit or empty for tasks that need no input files.",
-    )
-    output_dir: Optional[str] = Field(
-        default=None,
-        description=(
-            "Optional output directory for generated files. Prefer the session-scoped "
-            "agent dir (e.g. temp_outputs/web_v2/sessions/{sid}/...) so artifacts stay "
-            "isolated per session. When omitted, falls back to the parent dir of the "
-            "first input file, or the global Code_Execution/Generated_Outputs path."
-        ),
-    )
+    """Legacy request shape retained solely for the tool-retired response."""
+
+    task_description: str = Field(..., description="Legacy task description.")
+    input_files: Optional[List[str]] = Field(default=None, description="Legacy input paths; no files are accessed.")
+    output_dir: Optional[str] = Field(default=None, description="Legacy output path; no files are written.")
 
 
 class ModelTrainingInput(BaseModel):

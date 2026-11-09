@@ -88,6 +88,13 @@ user turn cannot inherit the previous streamed answer. Waiting and terminal
 snapshots are authoritative, and leaving the view discards queued animation work
 without cancelling the backend job.
 
+Training configuration is deterministic: the calling agent supplies explicit
+settings to the shared Factory core. Code execution uses the session-bound sandbox
+tools. The retired `agent_generated_code` name returns a migration response and
+never starts another model request or interpreter. Training modules do not load
+LLM credentials or carry a second code-generation implementation; startup owns
+environment configuration.
+
 Model training streams reconstruct curves and test metrics with
 `backend/web_v2/training_progress.py`, a log parser without filesystem or queue
 dependencies. The model API owns job access, output files and download URLs.
