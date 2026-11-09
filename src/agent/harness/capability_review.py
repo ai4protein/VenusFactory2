@@ -15,7 +15,7 @@ from jsonschema import Draft202012Validator, ValidationError
 from .contracts import digest, file_hash
 from .host import write_json
 from .research_prediction_diagnostics import prediction_diagnostics
-from .research_evaluation import ROW_LIMITS, validate_data, scores
+from .research_evaluation import ROW_LIMITS, validate_data, scores, training_evidence_summary
 
 POLICY = 'public-capability-review.v1'
 COMMON_CHECKS = ['interface', 'scope', 'dependencies', 'reproducibility', 'limitations']
@@ -141,11 +141,7 @@ async def check_cases(bundle, manifest, cases, control, runner):
         rows.append({'input_sha256': digest(case['inputs']), 'passed': True, 'rejected': rejected, 'output_sha256': digest(output)})
     return rows
 
-async def model_evaluation(bundle, manifest, control, runner):
-    from .research_workspace import safe_file, invoke_bundle
-    import shutil
-    import uuid
-    spec = manifest['review_spec']; data = json.loads(safe_file(bundle, spec['evaluation_file']).read_text())
+def evaluation_strategy(manifest, data):
     strategy = data.get('strategy', 'supervised') if isinstance(data, dict) else 'supervised'
     development = manifest.get('development')
     if development:
@@ -153,6 +149,33 @@ async def model_evaluation(bundle, manifest, control, runner):
                     if row['id'] == development['selected_experiment_id']]
         ensure(len(selected) == 1, 'Selected development generation is missing or ambiguous')
         strategy = selected[0]['strategy']
+    return strategy
+
+
+def training_document(bundle, manifest, path):
+    """Large measured tables are evidence, not reviewer prose."""
+    if manifest['review_spec']['kind'] != 'model' or path.suffix != '.json':
+        return None
+    ensure(path.stat().st_size <= 20*1024**2, 'Review evidence JSON exceeds 20 MiB')
+    try:
+        value = json.loads(path.read_text())
+    except ValueError:
+        return None
+    if not isinstance(value, dict) or not isinstance(value.get('train'), list):
+        return None
+    from .research_workspace import safe_file
+    data = json.loads(safe_file(bundle, manifest['review_spec']['evaluation_file']).read_text())
+    strategy = evaluation_strategy(manifest, data)
+    validate_data(data, strategy)
+    return training_evidence_summary(value, data, strategy)
+
+
+async def model_evaluation(bundle, manifest, control, runner):
+    from .research_workspace import safe_file, invoke_bundle
+    import shutil
+    import uuid
+    spec = manifest['review_spec']; data = json.loads(safe_file(bundle, spec['evaluation_file']).read_text())
+    strategy = evaluation_strategy(manifest, data)
     validate_data(data, strategy)
     splits = data['splits']
     vin = schema_validator(spec['input_schema'])
@@ -222,7 +245,12 @@ async def review_proposal(bundle, *, reviewer, control, runner):
                         fitted_dependencies[dependency] = version
                     docs.append({'path': name, 'text': path.read_text()})
             elif name != spec.get('evaluation_file') and path.suffix in {'.md', '.txt', '.json'}:
-                ensure(path.stat().st_size <= 30000, 'Provide a compact review document'); docs.append({'path': name, 'text': path.read_text()})
+                summary = training_document(bundle, manifest, path)
+                if summary is not None:
+                    docs.append({'path': name, 'sha256': expected, **summary})
+                else:
+                    ensure(path.stat().st_size <= 30000, 'Provide a compact review document')
+                    docs.append({'path': name, 'text': path.read_text()})
         versions = {**fitted_dependencies,
                     **{name: importlib.metadata.version(name) for name in spec['dependencies']}}
         record['automatic']['dependency_versions'] = versions

@@ -249,13 +249,15 @@ class ResearchWorkspace:
     @guard_operation('prepare_research_dataset')
     async def prepare_research_dataset(self, data_file: str, target_column: str, input_columns: list[str],
             group_column: str, provenance: str, grouping: str, id_column: str='', task: str='regression',
-            seed: int=0, validation_fraction: float=0.15, test_fraction: float=0.15, output_file: str='') -> dict:
-        """Prepare deterministic group-disjoint splits from a measured CSV/TSV. Select input and target columns and a biologically justified group column; related observations stay together. IDs may be generated when id_column is empty. Returns evaluation_file, hashes, split counts, a bounded training-only input profile and fit/predict row shapes. With host-protected data, read training_data.file for analysis; evaluation_file is an opaque training/review reference and contains no sample rows. Original values are preserved; no samples are invented or silently discarded."""
+            seed: int=0, validation_fraction: float=0.15, test_fraction: float=0.15, output_file: str='',
+            task_column: str='', support_size: int=0, unlabeled_file: str='', unlabeled_id_column: str='') -> dict:
+        """Prepare deterministic group-disjoint splits from a measured CSV/TSV. Select input and target columns and a biologically justified group column; related observations stay together. IDs may be generated when id_column is empty. Returns evaluation_file, hashes, split counts, a bounded training-only input profile and fit/predict row shapes. With host-protected data, read training_data.file for analysis; evaluation_file is an opaque training/review reference and contains no sample rows. Original values are preserved; no samples are invented or silently discarded. Optional task_column plus support_size=1..64 creates disjoint training/validation/test tasks with fixed support/query observations; prediction inputs include same-task support. Optional unlabeled_file selects a separate CSV/TSV with the same input columns and no measured-target column; set unlabeled_id_column when supplied. Task identity and group annotations must reflect the biological study."""
         from .research_dataset import prepare_dataset
         result=prepare_dataset(self.workspace, data_file=data_file,target_column=target_column,
             input_columns=input_columns,group_column=group_column,provenance=provenance,grouping=grouping,
             id_column=id_column,task=task,seed=seed,validation_fraction=validation_fraction,
-            test_fraction=test_fraction,output_file=output_file,data_store=self.data_store)
+            test_fraction=test_fraction,output_file=output_file,data_store=self.data_store,
+            task_column=task_column,support_size=support_size,unlabeled_file=unlabeled_file,unlabeled_id_column=unlabeled_id_column)
         return self.record('prepare_research_dataset',{'source_file':data_file,'source_sha256':result['table_sha256']},result)
 
     @guard_operation('train_research_model')

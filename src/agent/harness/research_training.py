@@ -10,7 +10,7 @@ import uuid
 from .contracts import digest, file_hash
 from .host import write_json
 from .research_development import STRATEGIES, immutable_copy, require
-from .research_evaluation import evaluation_digest, validate_data
+from .research_evaluation import evaluation_digest, validate_data, training_view, evaluation_bytes
 from .tool_diagnostics import python_failure, bounded_message
 from .research_algorithm_checks import algorithm_diagnostics, checked_algorithm_digest, validate_algorithm as validate_algorithm
 from utils.scoped_files import read_bytes, write_bytes
@@ -56,15 +56,14 @@ async def fit_model(workspace, development, runner, *, name, source_file, evalua
     if parent:
         require(parent["evaluation_sha256"] == data_hash, "Keep parent data and splits unchanged")
     code = read_bytes(workspace, source_file, max_bytes=200000).decode("utf-8")
-    training = {"task": data["task"], "strategy": strategy, "train": data["splits"]["train"],
-                "unlabeled": data.get("unlabeled", [])}
+    training = training_view(data, strategy)
     identity = uuid.uuid4().hex
     folder = development.root/"training"/identity
     work = folder/"workspace";work.mkdir(parents=True)
     write_bytes(folder, "algorithm.py", code.encode("utf-8"))
     inputs = {"runtime.py": (code+"\n"+RUNTIME_SUFFIX).encode(),
               "train.py": training_script(seed).encode(),
-              "training.json": json.dumps(training, sort_keys=True, allow_nan=False).encode()}
+              "training.json": evaluation_bytes(training)}
     for path, content in inputs.items():
         write_bytes(work, path, content)
     record = {"id": identity, "attempt_protocol": ATTEMPT_PROTOCOL,

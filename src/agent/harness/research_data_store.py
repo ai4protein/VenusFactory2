@@ -217,27 +217,51 @@ class ResearchDataStore:
         if preparation["source_file"] != path or preparation["source_sha256"] != hashlib.sha256(original).hexdigest():
             raise ValueError("Prepared data does not match its protected input")
         assignment = {key: sorted(row["id"] for row in rows) for key, rows in data["splits"].items()}
-        partition = hashlib.sha256(json.dumps(assignment, sort_keys=True).encode()).hexdigest()
-        entry = self.entries[path]
-        previous_partitions={v.get("partition") for v in self.entries.values() if v.get("sha256")==entry["sha256"]}
-        if previous_partitions - {None, partition}:
-            raise ValueError("Keep the original held-out partition; changing the split would expose withheld observations")
-        delimiter = "\t" if path.lower().endswith((".tsv", ".tab")) else ","
-        reader = csv.DictReader(io.StringIO(original.decode("utf-8-sig")), delimiter=delimiter)
-        buffer = io.StringIO()
-        writer = csv.DictWriter(buffer, fieldnames=reader.fieldnames, delimiter=delimiter)
-        writer.writeheader()
         allowed = set(assignment["train"])
-        for index, row in enumerate(reader, 1):
-            identity = row[preparation["id_column"]].strip() if preparation["id_column"] else entry["sha256"][:12]+":"+str(index)
-            if identity in allowed:
-                writer.writerow(row)
-        raw = buffer.getvalue().encode()
-        view = hashlib.sha256(raw).hexdigest()
-        self._put("views/" + view, raw)
-        entry.update(partition=partition, view_sha256=view)
+        partition_data = assignment
+        if "support" in data:
+            supports = {key: sorted(row["id"] for row in rows) for key, rows in data["support"].items()}
+            allowed.update(supports["train"])
+            partition_data = {"queries": assignment, "support": supports}
+        partition = hashlib.sha256(json.dumps(partition_data, sort_keys=True).encode()).hexdigest()
+        plans = [(path, original, partition, allowed, preparation["id_column"], None)]
+        if "unlabeled" in preparation:
+            pool = preparation["unlabeled"]
+            pool_raw = self.original_bytes(pool["source_file"])
+            if hashlib.sha256(pool_raw).hexdigest() != pool["source_sha256"]:
+                raise ValueError("Prepared unlabeled data differs from its protected input")
+            columns = list(dict.fromkeys(([pool["id_column"]] if pool["id_column"] else [])+preparation["input_columns"]))
+            pool_partition = hashlib.sha256(json.dumps({"role": "unlabeled", "columns": columns}, sort_keys=True).encode()).hexdigest()
+            plans.append((pool["source_file"], pool_raw, pool_partition, None, pool["id_column"], columns))
+        # Validate every source before exposing either view. A failed second
+        # input must not publish the first input's training observations.
+        for source, _, fixed_partition, _, _, _ in plans:
+            entry = self.entries[source]
+            previous = {value.get("partition") for value in self.entries.values()
+                        if value.get("sha256") == entry["sha256"]}
+            if previous - {None, fixed_partition}:
+                raise ValueError("Keep the original held-out partition; changing the split would expose withheld observations")
+        views = []
+        for source, raw, fixed_partition, selected_ids, id_column, columns in plans:
+            delimiter = "\t" if source.lower().endswith((".tsv", ".tab")) else ","
+            reader = csv.DictReader(io.StringIO(raw.decode("utf-8-sig")), delimiter=delimiter)
+            fields = reader.fieldnames if columns is None else columns
+            buffer = io.StringIO()
+            writer = csv.DictWriter(buffer, fieldnames=fields, delimiter=delimiter)
+            writer.writeheader()
+            for index, row in enumerate(reader, 1):
+                identity = row[id_column].strip() if id_column else self.entries[source]["sha256"][:12]+":"+str(index)
+                if selected_ids is None or identity in selected_ids:
+                    writer.writerow({column: row[column] for column in fields})
+            content = buffer.getvalue().encode()
+            view = hashlib.sha256(content).hexdigest()
+            views.append((source, fixed_partition, view, content))
+        for source, fixed_partition, view, content in views:
+            self._put("views/"+view, content)
+            self.entries[source].update(partition=fixed_partition, view_sha256=view)
         self._save()
-        self._restore_view(path)
+        for source, _, _, _ in views:
+            self._restore_view(source)
 
     def original_bytes(self, path):
         self._reload()

@@ -7,8 +7,7 @@ from pathlib import Path
 
 from utils.scoped_files import read_bytes
 from .research_evaluation import evaluation_digest
-from .research_dataset import model_interface, protected_data_access
-from .research_input_profile import training_input_profile
+from .research_dataset import prepared_details, protected_data_access
 
 
 def prepared_dataset_context(workspace, episodes, *, data_store=None):
@@ -40,18 +39,24 @@ def prepared_dataset_context(workspace, episodes, *, data_store=None):
                 if (preparation["source_file"] != result["source_file"]
                         or preparation["source_sha256"] != result["table_sha256"]):
                     continue
+                pool = preparation.get("unlabeled")
+                if pool:
+                    pool_bytes = data_store.original_bytes(pool["source_file"]) if data_store else read_bytes(workspace, pool["source_file"], max_bytes=20*1024**2)
+                    if hashlib.sha256(pool_bytes).hexdigest() != pool["source_sha256"]:
+                        continue
                 splits = {name: {"rows": len(values),
                                   "groups": len({entry["group"] for entry in values})}
                           for name, values in data["splits"].items()}
                 columns = {name: preparation[name]
                            for name in ("target_column", "input_columns", "group_column", "id_column")}
+                if "task_column" in preparation:
+                    columns["task_column"] = preparation["task_column"]
                 return {
                     "status": "verified", "source_file": result["source_file"],
                     "evaluation_file": result["evaluation_file"],
                     "evaluation_sha256": result["evaluation_sha256"],
                     "task": data["task"], "columns": columns, "splits": splits,
-                    "model_interface": model_interface(data["task"], preparation["input_columns"]),
-                    "training_profile": training_input_profile(data["splits"]["train"], preparation["input_columns"]),
+                    **prepared_details(data),
                     **(protected_data_access(data) if data_store else {}),
                     "input_type": "Original table strings; convert numerical features in fit/predict.",
                     "next_step": "Reuse this evaluation_file. Write the complete .py algorithm and train a baseline.",

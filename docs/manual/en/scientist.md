@@ -30,13 +30,19 @@ If the selected model rejects requests because of quota, credentials or rate lim
 
 ## Develop and evaluate models
 
+For studies across proteins or assay conditions, include a task identifier and
+explain which samples are related. Scientist can keep whole tasks together and
+reserve measured support examples for adapting to a new task. Upload genuinely
+unlabeled observations as a separate table with matching feature columns. The
+query measurements used for validation and final testing stay protected.
+
 Scientist can implement statistical models, custom neural models, few-shot adaptation, semi-supervised learning, meta-learning or other justified methods. It may use enabled training MCP tools or develop a custom model in the session sandbox. PLM training is not required; online PLM training is restricted to ESM2-8M and all work follows deployment budgets and tool availability.
 
 Model research requires a measured baseline and a revised experiment on matched validation data. The system can retain a baseline when a revision does not help. Advanced method names, repeated iterations or a better validation score alone do not establish novelty, statistical significance or biological effectiveness. Final testing and independent review are distinct from feedback used to revise a model.
 
 ## Receive and reuse the results
 
-**Research outputs** shows the selected models or methods with their README, usage card, test report and download. Each release includes runnable code, a JSON interface, example input/output, interface tests and recorded dependencies. Learned models also include their fitted state and training code. Raw evaluation datasets stay in the research workspace.
+**Research outputs** shows the selected models or methods with their README, usage card, test report and download. Each release includes runnable code, a JSON interface, example input/output, interface tests and recorded dependencies. Learned models also include their fitted state and training code. Raw evaluation datasets stay in protected study storage.
 
 The included test command replays both developer examples and independently reviewed cases. It checks declared outputs, invalid inputs and any reviewed prediction bounds and repeatability requirements. Rebuilding an unchanged release produces the same package; changed release contents are saved separately so earlier downloads remain available.
 

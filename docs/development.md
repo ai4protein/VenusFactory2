@@ -95,7 +95,6 @@ refactor separate from new product behavior, with a bounded regression target.
 | Training pipeline (`train_operations.py`) | Separate dataset preparation, training launch and result packaging; use the shared admission policy | Dataset split validation, resume checkpoints, queued cancellation, online ESM2 8M restrictions and artifact ownership |
 | Model API (`custom_model_api.py`) | Keep training, evaluation and prediction submission separate; share ownership and admission policy | Owner isolation, online limits, idempotent queue submission and existing route contracts |
 | RSI engine (`generated_context*.py`) | Share new execution primitives without rewriting published source-bound policy versions | Standalone bundles, saved feedback replay, registered-model inference, strict scope checks and complete source bindings |
-| Scientist data preparation (`research_dataset.py`, `research_data_store.py`) | Add host-prepared task episodes and unlabeled pools; the protected CSV/TSV entry point currently supports supervised partitions only | Disjoint training/validation/test tasks, support/query identities, no held-out labels in the sandbox, immutable parent splits and training/review parity |
 | Model registry (`scientist_model_library.py`, `shared_model_publication.py`) | Separate costly acquisition and ancestor replay from per-request inference | Preserve immutable evidence bindings and retirement checks; reject changed source/data and compare actual prediction values and cold/warm latency |
 | Session result access (`workspace_preview.py`, `research_workspace.py`) | Keep structured inspection and targeted reads in the shared file interface; distinguish inputs, outputs and omitted records without harness-specific prompt rules | Reloaded conversations must recover queried records and correct units through actual file reads; preserve bounded output, session isolation, pagination and immutable result receipts |
 | Researcher review (`research_source_review.py`) | Keep response decoding separate from shared source-anchor validation; resolve unsupported field-to-value relationships before promoting a semantic reviewer | Unchanged decisions on saved-response replay, followed by new-protein and complete multi-chapter acceptance checks |
@@ -108,6 +107,9 @@ validation belong in their owning modules.
 Scientist partition validation, evaluation identities and scoring belong in
 `src/agent/harness/research_evaluation.py`. Data preparation, fitting and independent
 admission use that module; it must not depend on executors or workspace services.
+Task episode construction belongs in `research_episodes.py`; `research_dataset.py`
+coordinates table preparation, while `research_data_store.py` owns protected views
+and immutable partition bindings. Resume uses the same metadata builder as preparation.
 
 ## Before a commit
 

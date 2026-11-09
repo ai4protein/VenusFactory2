@@ -150,7 +150,10 @@ role remains free to build other representations and algorithms.
    registration policy; this change does not grant public access to user models.
 
 The host snapshots runtime source and fitted artifacts outside the writable
-session workspace, scores predictions itself and persists immutable receipts.
+session workspace, scores predictions itself and persists immutable receipts. Training-input
+JSON is checked against the selected generation's frozen training view. Independent
+Review receives its hash, fields and counts, rather than the complete measured
+table; the unchanged private input remains available for actual refitting.
 Identical evaluation tables share one immutable, content-addressed snapshot
 within a study. Lineages require identical evaluation records. Older receipts
 without a snapshot remain unchanged and require the original matching table. Renaming a model, editing only
@@ -176,12 +179,34 @@ matched budgets, repeated independent tasks and suitable ablations.
 
 ## Measurement access during autonomous model development
 
-The protected CSV/TSV preparation tool currently creates group-disjoint supervised
-partitions. It does not yet prepare task episodes or a separate unlabeled pool.
-Those advanced strategies are supported by the execution/evaluation contract and
-legacy supplied evaluations; using them with protected uploads still requires a
-host-side preparation interface. They must not bypass protected storage by copying
-held-out labels into a custom workspace JSON.
+The protected CSV/TSV preparation tool supports ordinary group-disjoint splits,
+whole-task episodes and a separate unlabeled pool through the same interface:
+
+- Set `task_column` and `support_size` (1–64) to prepare task episodes. Tasks linked
+  by a shared biological group stay in the same partition. Deterministic support
+  selection leaves the remaining observations as queries; no task is silently
+  discarded. The training partition must contain multiple tasks.
+- Query rows have `task_id` and `inputs["support"]`, a list of same-task
+  `{id, inputs, target}` observations. Fitting receives only training tasks.
+  Validation and final predictions receive their own fixed support observations,
+  never the query target. Support/query identities, inputs and task bindings are
+  checked again during evaluation and admission.
+- Set `unlabeled_file` and optionally `unlabeled_id_column` for a second table with
+  the same selected feature columns and no measured-target column. Its selected
+  fields enter `training["unlabeled"]`; unused columns stay private. Exact input
+  and ID overlaps with all labeled support/query records are rejected.
+
+These options can be combined. An unlabeled pool contains base features; task
+query inputs additionally carry support observations. The model author chooses
+how to use either resource. A supervised control can ignore them while preserving
+the same frozen evaluation queries. Related sequences still require biologically
+appropriate group annotations; schema checks do not infer homology.
+
+Prepared evaluations remain bounded to 20 MiB and 21,024 source observations;
+expanding support lists cannot bypass the size limit. Original uploads remain
+private. Changing support/query roles or the labeled partition after preparation
+is rejected. Resume verifies both source tables and restores their interface
+metadata without including held-out observations in model context.
 
 New model topics keep uploaded measurement tables in host-owned storage outside
 the Agent workspace. Original uploads are copied and hashed in bounded chunks;
