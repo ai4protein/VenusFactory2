@@ -7,7 +7,7 @@ from agent.rsi.campaigns.shared_model_campaign import SharedCampaignStore, bind_
 from agent.rsi.datasets import model_tasks
 
 from .campaign_evidence import observed_usage, read, require, tree
-from .campaign_scoring import context_controls, score_model
+from .campaign_scoring import fixed_controls, score_model
 from .scientist_model_library import ScientistModelLibrary
 from .shared_campaign_study import load, outside, publication_binding, verify
 from .storage import atomic_json, safe_child
@@ -77,9 +77,9 @@ def assess_batch(definition, store, library, batch_id, output):
         # Controls cover failed and unpublished acquisitions too. They cannot repair publication evidence.
         try:
             require(data is not None, "Task data failed validation")
-            row["context_controls"] = context_controls(task, data, output, identity, independent_refit=True)
+            row["controls"] = fixed_controls(task, data, output, identity)
         except Exception as exc:
-            row["context_controls"] = {"status": "evidence_failed", "error_type": type(exc).__name__, "error": str(exc)}
+            row["controls"] = {"status": "evidence_failed", "error_type": type(exc).__name__, "error": str(exc)}
         result["rows"].append(row)
     result["all_allocated_scopes_verified"] = all(row["verified_callable"] for row in result["rows"])
     result["completed_goal_with_all_scopes_verified"] = (
@@ -95,9 +95,7 @@ def artifact_bindings(record):
     for row in record["rows"]:
         if "predictions" in row:
             result.append(row["predictions"])
-        result.extend(
-            item["predictions"] for item in row["context_controls"].get("outcomes", []) if "predictions" in item
-        )
+        result.extend(item["predictions"] for item in row["controls"].get("outcomes", []) if "predictions" in item)
     return result
 
 
@@ -122,8 +120,7 @@ def checkpoint(path, definition, batch_id, output):
 def summarize(definition, batches, complete):
     rows = [row for batch in batches for row in batch["rows"]]
     failed = any(
-        row["evaluation_status"] == "evidence_failed" or row["context_controls"]["status"] == "evidence_failed"
-        for row in rows
+        row["evaluation_status"] == "evidence_failed" or row["controls"]["status"] == "evidence_failed" for row in rows
     )
     return {
         "schema": "shared_campaign_descriptive_evaluation.v1",
@@ -134,7 +131,7 @@ def summarize(definition, batches, complete):
         "verified_callable": sum(row["verified_callable"] for row in rows),
         "future_scored": sum(row["final_metrics"] is not None for row in rows),
         "without_scored_model": sum(row["final_metrics"] is None for row in rows),
-        "controls_completed": sum(row["context_controls"]["status"] == "completed" for row in rows),
+        "controls_completed": sum(row["controls"]["status"] == "completed" for row in rows),
         "original_campaign_status": definition["snapshot"]["original_campaign_status"],
         "batches": batches,
         "external_model_calls": 0,

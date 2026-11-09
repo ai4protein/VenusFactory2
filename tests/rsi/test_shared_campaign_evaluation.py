@@ -91,7 +91,7 @@ def test_all_failed_scopes_receive_controls_and_cost_is_once_per_batch(terminal)
         for row in batch["rows"]
     )
     assert all(
-        row["context_controls"]["independent_refit"]["baseline_refit_performed"]
+        row["controls"]["independent_refit"]["baseline_refit_performed"]
         for batch in report["batches"]
         for row in batch["rows"]
     )
@@ -131,7 +131,7 @@ def test_control_failure_is_not_hidden_by_missing_model(terminal, monkeypatch):
     def fail(*a, **k):
         raise ValueError("synthetic independent refit failure")
 
-    monkeypatch.setattr(evaluation, "context_controls", fail)
+    monkeypatch.setattr(evaluation, "fixed_controls", fail)
     result = evaluation.evaluate(terminal.study, terminal.tmp / "scores")
     assert result["status"] == "evidence_failed" and result["assessed"] == 4 and not result["controls_completed"]
 
@@ -158,7 +158,7 @@ async def test_partial_native_fixture_retains_denominator_and_real_predictions(t
     batch = report["batches"][0]
     assert batch["original_goal_status"] == batch["original_batch_status"] == "budget_exhausted"
     assert not batch["completed_goal_with_all_scopes_verified"]
-    assert all(row["context_controls"]["status"] == "completed" for row in batch["rows"])
+    assert all(row["controls"]["status"] == "completed" for row in batch["rows"])
     assert fixtures.read(store.root / "campaign.json") == state
     evaluation.audit(tmp_path / "study", tmp_path / "scores", tmp_path / "replay")
     # Removing only the registry index cannot silently improve or reduce the cohort.
@@ -166,3 +166,52 @@ async def test_partial_native_fixture_retains_denominator_and_real_predictions(t
     (library / "index" / (model["key_id"] + ".json")).unlink()
     with pytest.raises(ValueError, match="inventory is incomplete"):
         study.admit(store.root, library, tmp_path / "incomplete")
+
+
+def test_mixed_cohort_keeps_sequence_scopes_and_unsupported_alignment(tmp_path):
+    from test_generated_sequence import FUTURE, SCOPE, TRAIN, VALID
+
+    from agent.harness.contracts import file_hash
+
+    batches = [fixtures.batch(tmp_path, 0), fixtures.batch(tmp_path, 1)]
+    batches[1]["training_baseline_feedback"] = "none"
+    for index, task in enumerate(batches[1]["tasks"]):
+        task.update(plugin_id="generated_sequence.v1", scope={**SCOPE, "protein": f"sequence_fixture_{index}"})
+        reference = tmp_path / f"sequence_reference_{index}.txt"
+        reference.write_text("Synthetic sequence-control fixture")
+        task["references"] = [{"path": str(reference), "sha256": file_hash(reference)}]
+        for phase, rows in (("training", TRAIN), ("validation", VALID), ("future", FUTURE)):
+            path = tmp_path / f"sequence_{index}_{phase}.json"
+            atomic_json(path, rows)
+            task["data"][phase] = {"path": str(path), "sha256": file_hash(path)}
+    store = fixtures.create(tmp_path / "run", batches)
+
+    def finish(state):
+        for record in state["batches"].values():
+            record.update(
+                status="failed",
+                attempts=[
+                    {
+                        "status": "failed",
+                        "usage_known": False,
+                        "charged": {"model_calls": 1, "tool_calls": 0, "wall_seconds": 1.0},
+                    }
+                ],
+            )
+        state.update(status="publication_invalid", usage={"model_calls": 2, "tool_calls": 0, "wall_seconds": 2.0})
+
+    store.mutate(finish)
+    definition = study.admit(store.root, tmp_path / "run/library", tmp_path / "study")
+    assert len(definition["snapshot"]["tasks"]) == 4
+    report = evaluation.evaluate(tmp_path / "study", tmp_path / "scores")
+    assert report["status"] == "completed" and report["allocated"] == report["assessed"] == 4
+    sequence_rows = report["batches"][1]["rows"]
+    assert all(row["controls"]["status"] == "partial" for row in sequence_rows)
+    assert all(row["controls"]["independent_refit_methods"] == [] for row in sequence_rows)
+    for row in sequence_rows:
+        controls = row["controls"]["outcomes"]
+        assert [c["status"] for c in controls] == ["completed"] * 4 + ["unsupported"] * 2
+        assert controls[0]["metrics"]["mse_skill_vs_training_mean"] == pytest.approx(0)
+        assert all(c["metrics"] is None for c in controls[-2:])
+        assert "seconds" not in str(row["controls"])
+    assert evaluation.audit(tmp_path / "study", tmp_path / "scores", tmp_path / "replay")["status"] == "passed"

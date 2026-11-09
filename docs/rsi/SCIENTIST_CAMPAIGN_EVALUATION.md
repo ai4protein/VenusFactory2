@@ -119,10 +119,15 @@ python scripts/rsi/evaluation/evaluate_shared_campaign.py audit --study STUDY --
 
 Scoring begins only after verifying the frozen study. Native publication checks
 and training replay precede prediction; prediction inputs exclude labels. This
-adapter currently supports measured context-response tasks. Every allocated task
-also receives fixed training-only mean, ridge, random-forest and SVR controls, plus
-applicable thermal-response controls. A separate implementation refits these
-controls and compares their predictions before metrics are accepted.
+adapter supports measured context-response and sequence-regression tasks. Every
+allocated task receives fixed training-only mean, ridge, random-forest and SVR
+controls. Context tasks add applicable thermal-response controls; sequence tasks
+use amino-acid composition and length, with additive and pairwise positional
+controls where alignment permits. Unsupported positional controls remain explicit.
+
+Context controls and applicable positional controls have independent numerical
+refits. Composition controls reuse the versioned implementations and are rerun in
+the full cohort audit; they do not claim a separate mathematical implementation.
 
 Shared execution costs appear once per batch. Task rows reference that batch and
 do not repeat its token or call totals. Original coordinator and goal statuses

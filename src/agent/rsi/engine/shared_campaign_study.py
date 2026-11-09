@@ -13,12 +13,12 @@ from agent.rsi.campaigns.shared_model_campaign import TERMINAL, SharedCampaignSt
 from agent.rsi.datasets import model_tasks
 
 from .campaign_evidence import read, require, source_identity, tree
+from .campaign_scoring import SUPPORTED_SHARED_PLUGINS
 from .model_plugins import get_model_plugin
 from .scientist_model_library import ScientistModelLibrary
 from .storage import atomic_json, safe_child
 
 SCHEMA = "shared_campaign_descriptive_study.v1"
-CONTEXT_PLUGINS = {"generated_context.v1", "generated_context.v2", "generated_context.v3"}
 
 
 def versions():
@@ -128,7 +128,10 @@ def snapshot(store, library):
         goals[batch] = {"status": goal["status"] if goal else None, "files": tree(root)}
         for task in spec["tasks"]:
             require(task["id"] not in tasks, "Duplicate allocated task identity")
-            require(task["plugin_id"] in CONTEXT_PLUGINS, "Shared evaluation currently supports context-response tasks")
+            require(
+                task["plugin_id"] in SUPPORTED_SHARED_PLUGINS,
+                "Shared evaluation requires context-response or sequence-regression tasks",
+            )
             if goal is not None:
                 require(
                     read(safe_child(root, "targets/" + task["id"] + "/model_task.json")) == task,
@@ -168,7 +171,7 @@ def admit(campaign, library, output):
                 for task in batch["tasks"]
             },
             "selection": "All current indexed publications from every allocated terminal batch; no score-based selection",
-            "controls": "Fixed training-only context baselines with independent numerical refit on every allocation",
+            "controls": "Fixed training-only controls on every allocation; context and applicable positional controls use independent refits",
             "cost_attribution": "Once per original batch; per-task rows reference batch_id",
             "interpretation": "Post-acquisition descriptive assessment; no causal RSI effect or new acquisition",
             "final_labels_decoded": False,
