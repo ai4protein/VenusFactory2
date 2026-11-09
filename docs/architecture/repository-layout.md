@@ -63,6 +63,12 @@ user turn cannot inherit the previous streamed answer. Waiting and terminal
 snapshots are authoritative, and leaving the view discards queued animation work
 without cancelling the backend job.
 
+Model training streams reconstruct curves and test metrics with
+`backend/web_v2/training_progress.py`, a log parser without filesystem or queue
+dependencies. The model API owns job access, output files and download URLs.
+Reconnecting replays the saved worker log; parsing a metric never starts a task
+or grants artifact access.
+
 Researcher keeps job ownership and recovery in `backend/web_v2/research_jobs.py`.
 The long-form coordinator schedules retrieval and specialist writers; document
 acceptance and rendering belong to `research_documents.py`. API views and ZIP

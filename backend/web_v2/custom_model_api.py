@@ -1,17 +1,12 @@
 import json
 import math
 import os
-import queue
 import re
-import signal
-import subprocess
 import sys
-import threading
 import time
 import uuid
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import pandas as pd
 from datasets import load_dataset
@@ -22,7 +17,6 @@ from pydantic import BaseModel, Field
 from mcp_tools.tools.runtime_tool_policy import assert_local_feature, is_online_mode
 from mcp_tools.common.command import preview_command, preview_eval_command, preview_predict_command
 from mcp_tools.common.common_utils import (
-    build_web_v2_download_url,
     build_run_id_utc,
     create_run_manifest,
     ensure_within_roots,
@@ -59,6 +53,7 @@ def _require_local_custom_model(feature: str) -> None:
 
 from backend.web_v2.job_access import browser_owner, custom_request_scope, guard_artifact
 from backend.web_v2.job_records import JobRecords, page_jobs
+from backend.web_v2.training_progress import TrainingProgress, parse_training_line
 
 router = APIRouter(dependencies=[Depends(custom_request_scope)], prefix="/api/custom-model", tags=["custom-model-v2"])
 
@@ -258,37 +253,6 @@ def _sse(event: str, data: Dict[str, Any]) -> str:
     return f"event: {event}\ndata: {json.dumps(safe_data, ensure_ascii=True, allow_nan=False)}\n\n"
 
 
-@dataclass
-class TrainingLiveState:
-    current_epoch: int = -1
-    epochs: List[int] = field(default_factory=list)
-    train_loss: List[Optional[float]] = field(default_factory=list)
-    val_loss: List[Optional[float]] = field(default_factory=list)
-    val_metrics: Dict[str, List[Optional[float]]] = field(default_factory=dict)
-    test_metrics: Dict[str, float] = field(default_factory=dict)
-    output_dir: str = ""
-    csv_path: str = ""
-
-
-def _extract_log_content(line: str) -> str:
-    match = re.search(r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} - [A-Za-z]+ - INFO - (.*)", line)
-    return match.group(1).strip() if match else line.strip()
-
-
-def _ensure_epoch_slot(state: TrainingLiveState, epoch: int) -> int:
-    if epoch not in state.epochs:
-        state.epochs.append(epoch)
-        state.train_loss.append(None)
-        state.val_loss.append(None)
-        for metric in state.val_metrics.values():
-            metric.append(None)
-    idx = state.epochs.index(epoch)
-    for metric in state.val_metrics.values():
-        while len(metric) < len(state.epochs):
-            metric.append(None)
-    return idx
-
-
 def _write_test_metrics_csv(output_dir: str, metrics: Dict[str, float]) -> str:
     try:
         # Keep metrics in the job's granted output directory. Replaying a
@@ -314,106 +278,6 @@ def _training_metrics_download(path: str) -> str:
     # identity resolvable instead of falling back to a basename.
     value = os.path.relpath(Path(path).resolve(), _PROJECT_ROOT)
     return "/api/custom-model/artifacts/download?" + urlencode({"path": value})
-
-
-def _parse_training_line(line: str, state: TrainingLiveState) -> List[Dict[str, Any]]:
-    events: List[Dict[str, Any]] = []
-    content = _extract_log_content(line)
-    num_pattern = r"([-+]?\d*\.?\d+(?:[eE][-+]?\d+)?|nan|inf|-inf)"
-
-    train_match = re.search(rf"Epoch (\d+) Train Loss: {num_pattern}", content, re.IGNORECASE)
-    if train_match:
-        epoch = int(train_match.group(1))
-        loss = float(train_match.group(2))
-        idx = _ensure_epoch_slot(state, epoch)
-        state.train_loss[idx] = loss
-        events.append(
-            {
-                "event": "training_metrics",
-                "data": {
-                    "epochs": state.epochs,
-                    "train_loss": state.train_loss,
-                    "val_loss": state.val_loss,
-                    "val_metrics": state.val_metrics,
-                },
-            }
-        )
-        return events
-
-    val_loss_match = re.search(rf"Epoch (\d+) Val Loss: {num_pattern}", content, re.IGNORECASE)
-    if val_loss_match:
-        epoch = int(val_loss_match.group(1))
-        loss = float(val_loss_match.group(2))
-        idx = _ensure_epoch_slot(state, epoch)
-        state.val_loss[idx] = loss
-        events.append(
-            {
-                "event": "training_metrics",
-                "data": {
-                    "epochs": state.epochs,
-                    "train_loss": state.train_loss,
-                    "val_loss": state.val_loss,
-                    "val_metrics": state.val_metrics,
-                },
-            }
-        )
-        return events
-
-    val_metric_match = re.search(rf"Epoch (\d+) Val ([A-Za-z0-9_\-]+): {num_pattern}", content, re.IGNORECASE)
-    if val_metric_match:
-        epoch = int(val_metric_match.group(1))
-        metric_name = val_metric_match.group(2).strip().lower()
-        metric_value = float(val_metric_match.group(3))
-        idx = _ensure_epoch_slot(state, epoch)
-        if metric_name not in state.val_metrics:
-            state.val_metrics[metric_name] = [None] * len(state.epochs)
-        while len(state.val_metrics[metric_name]) < len(state.epochs):
-            state.val_metrics[metric_name].append(None)
-        state.val_metrics[metric_name][idx] = metric_value
-        events.append(
-            {
-                "event": "training_metrics",
-                "data": {
-                    "epochs": state.epochs,
-                    "train_loss": state.train_loss,
-                    "val_loss": state.val_loss,
-                    "val_metrics": state.val_metrics,
-                },
-            }
-        )
-        return events
-
-    test_loss_match = re.search(rf"Test Loss:\s*{num_pattern}", content, re.IGNORECASE)
-    if test_loss_match:
-        state.test_metrics["loss"] = float(test_loss_match.group(1))
-        state.csv_path = _write_test_metrics_csv(state.output_dir, state.test_metrics)
-        events.append(
-            {
-                "event": "test_results",
-                "data": {
-                    "metrics": state.test_metrics,
-                    "csv_download_url": _training_metrics_download(state.csv_path),
-                },
-            }
-        )
-        return events
-
-    test_metric_match = re.search(rf"Test ([A-Za-z0-9_\-]+):\s*{num_pattern}", content, re.IGNORECASE)
-    if test_metric_match:
-        metric_name = test_metric_match.group(1).strip().lower()
-        if metric_name != "loss":
-            state.test_metrics[metric_name] = float(test_metric_match.group(2))
-            state.csv_path = _write_test_metrics_csv(state.output_dir, state.test_metrics)
-            events.append(
-                {
-                    "event": "test_results",
-                    "data": {
-                        "metrics": state.test_metrics,
-                        "csv_download_url": _training_metrics_download(state.csv_path),
-                    },
-                }
-            )
-    return events
 
 
 def _normalized_output_model_name(raw_name: str) -> str:
@@ -1007,7 +871,8 @@ def _create_task(task,script,args,owner):
 def _task_stream(identity,owner):
     from backend.web_v2.job_queue import JobQueue, TERMINAL
     q=JobQueue();job=_owned_task(identity,owner);identity=job['id'];task=job['metadata']['task'];args=job['metadata']['args']
-    train_state=TrainingLiveState(output_dir=str(args.get('output_dir',''))) if task=='training' else None
+    train_state=TrainingProgress() if task=='training' else None
+    csv_path=''
     spec=json.loads((q.files(identity)/'command.json').read_text())
     yield _sse('start',{'run_id':identity,'command':redact_path_text(' '.join(spec['command'])),'task':task,**_register_task(job)})
     log=q.files(identity)/'worker.log';log.touch(exist_ok=True)
@@ -1025,7 +890,10 @@ def _task_stream(identity,owner):
                 line=line.rstrip('\n')
                 yield _sse('log',{'line':redact_path_text(line)})
                 if train_state is not None:
-                    for evt in _parse_training_line(line,train_state):
+                    for evt in parse_training_line(line,train_state):
+                        if evt['event']=='test_results':
+                            csv_path=_write_test_metrics_csv(str(args.get('output_dir','')),train_state.test_metrics)
+                            evt['data']['csv_download_url']=_training_metrics_download(csv_path)
                         yield _sse(evt['event'],evt['data'])
                         if evt['event']=='training_metrics':
                             epochs=evt['data'].get('epochs',[]);total=int(args.get('num_epochs',0) or 0)
@@ -1037,9 +905,9 @@ def _task_stream(identity,owner):
     done={'success':job['status']=='completed','aborted':job['status']=='cancelled','message':job['message'],
           'run_id':identity,'final_progress':1.0 if job['status']=='completed' else 0.0}
     if train_state is not None:
-        done['training_metrics']={'epochs':train_state.epochs,'train_loss':train_state.train_loss,'val_loss':train_state.val_loss,'val_metrics':train_state.val_metrics}
-        if train_state.csv_path:
-            done['csv_download_url']=_training_metrics_download(train_state.csv_path)
+        done['training_metrics']=train_state.metrics()
+        if csv_path:
+            done['csv_download_url']=_training_metrics_download(csv_path)
             done['test_metrics']=train_state.test_metrics
     yield _sse('done',done)
 
@@ -1097,7 +965,6 @@ async def custom_job_cancel(identity: str, owner=Depends(_queue_owner)):
 
 @router.post('/jobs/{identity}/retry')
 async def custom_job_retry(identity: str, owner=Depends(_queue_owner)):
-    from backend.web_v2.job_queue import JobQueue
     old=_owned_task(identity,owner);task=old['metadata']['task']
     if old['status'] not in {'failed','interrupted','cancelled'}:raise HTTPException(409,'Only stopped tasks can retry')
     if task!='training':_require_local_custom_model('custom_model_'+task)

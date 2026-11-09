@@ -154,12 +154,33 @@ def test_training_csv_download_is_stable_and_owner_scoped(online, monkeypatch):
         alice.get('/api/custom-model/session')
         owner = hashlib.sha256(alice.cookies.get('vf_custom_jobs').encode()).hexdigest()
         JobRecords().grant(output, 'custom', owner)
-        state = api.TrainingLiveState(output_dir=str(output))
-        first = api._parse_training_line('Test Loss: 0.5', state)
-        last = api._parse_training_line('Test Accuracy: 0.75', state)
-        url = last[0]['data']['csv_download_url']
-        assert url == first[0]['data']['csv_download_url']
-        assert Path(state.csv_path).parent == output
+        queue = JobQueue()
+        identity = queue.submit(owner, 'custom:training', 'cpu', metadata={
+            'task': 'training', 'args': {'output_dir': str(output), 'num_epochs': 1},
+            'output_root': str(output),
+        })
+        files = queue.files(identity)
+        files.mkdir(parents=True, exist_ok=True)
+        (files / 'command.json').write_text(json.dumps({'command': ['training']}))
+        (files / 'worker.log').write_text(
+            'Epoch 0 Train Loss: 0.4\nTest Loss: 0.5\nTest Accuracy: 0.75\n'
+        )
+        queue.finish(identity, 'completed')
+        stream_url = '/api/custom-model/jobs/' + identity + '/stream'
+        frames = alice.post(stream_url)
+        assert frames.status_code == 200
+        events = [json.loads(frame.split('data: ', 1)[1]) for frame in frames.text.split('\n\n')
+                  if frame.startswith('event: test_results\n')]
+        url = events[-1]['csv_download_url']
+        assert url == events[0]['csv_download_url']
+        assert (output / 'test_results_metrics.csv').is_file()
+        replay = alice.post(stream_url)
+        assert replay.status_code == 200
+        prefixes = ('event: training_metrics\n', 'event: test_results\n', 'event: done\n')
+        assert [f for f in replay.text.split('\n\n') if f.startswith(prefixes)] == [
+            f for f in frames.text.split('\n\n') if f.startswith(prefixes)
+        ]
+        assert bob.post(stream_url).status_code == 404
         response = alice.get(url)
         assert response.status_code == 200
         assert 'accuracy,0.750000' in response.text and 'loss,0.500000' in response.text
