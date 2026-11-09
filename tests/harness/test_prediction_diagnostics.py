@@ -2,7 +2,7 @@
 import json
 import pytest
 from agent.harness.research_prediction_diagnostics import prediction_diagnostics
-from agent.harness.research_development import scores
+from agent.harness.research_evaluation import scores
 
 
 def test_regression_constant_matches_train_mean_without_query_labels():

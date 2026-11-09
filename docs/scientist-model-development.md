@@ -159,13 +159,29 @@ as a measured improvement. The public workspace copy is informational only.
 
 Validation feedback uses MAE/RMSE or accuracy plus a training-mean/majority
 reference. The final Review additionally checks a submitted metric claim against
-recomputed test predictions. Developer-supplied splits are not a concealed
+recomputed test predictions. Dataset preflight, training and admission use one
+partition validator in `research_evaluation.py`; measured generations and final
+admission also share its scoring functions.
+Train supports 5–20,000 rows, validation 2–512 and test 3–512. Every supplied
+unlabeled pool is checked for targets, duplicate identities and overlap with
+labeled partitions, including when used alongside a supervised control. Admission
+applies the selected generation's strategy prerequisites. These checks run before
+model evaluation; they do not rewrite existing experiment or admission receipts.
+
+Developer-supplied splits are not a concealed
 benchmark: the report explicitly discloses this. Repeated use of a supplied test
 set does not establish unbiased generalization, causal RSI benefit or statistical
 significance. Publication-grade claims still need sealed external evaluation,
 matched budgets, repeated independent tasks and suitable ablations.
 
 ## Measurement access during autonomous model development
+
+The protected CSV/TSV preparation tool currently creates group-disjoint supervised
+partitions. It does not yet prepare task episodes or a separate unlabeled pool.
+Those advanced strategies are supported by the execution/evaluation contract and
+legacy supplied evaluations; using them with protected uploads still requires a
+host-side preparation interface. They must not bypass protected storage by copying
+held-out labels into a custom workspace JSON.
 
 New model topics keep uploaded measurement tables in host-owned storage outside
 the Agent workspace. Original uploads are copied and hashed in bounded chunks;

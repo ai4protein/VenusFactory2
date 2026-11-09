@@ -8,7 +8,8 @@ import math
 from collections import defaultdict
 
 from utils.scoped_files import read_bytes
-from .research_development import require, validate_data, immutable_copy, inspect_evaluation
+from .research_development import require, immutable_copy, inspect_evaluation
+from .research_evaluation import validate_data
 from .research_input_profile import training_input_profile
 
 

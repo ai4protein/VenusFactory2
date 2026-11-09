@@ -5,7 +5,6 @@ receipts, after fresh execution and a separate, tool-free reviewer request.
 """
 from __future__ import annotations
 import ast
-from collections import Counter
 import importlib.metadata
 import json
 import math
@@ -16,6 +15,7 @@ from jsonschema import Draft202012Validator, ValidationError
 from .contracts import digest, file_hash
 from .host import write_json
 from .research_prediction_diagnostics import prediction_diagnostics
+from .research_evaluation import ROW_LIMITS, validate_data, scores
 
 POLICY = 'public-capability-review.v1'
 COMMON_CHECKS = ['interface', 'scope', 'dependencies', 'reproducibility', 'limitations']
@@ -50,7 +50,7 @@ def requirements():
         'evaluation_preflight': {
             'tool': 'validate_research_evaluation',
             'when': 'Before fitting; this checks the same data contract as evaluate_research_model.',
-            'row_limits': {'train': [5,20000], 'validation': [2,512], 'test': [3,512]},
+            'row_limits': {name: list(bounds) for name, bounds in ROW_LIMITS.items()},
             'returns': 'Counts and hashes only. The original data and targets are not returned.',
         },
         'evaluation_file_format': {
@@ -146,20 +146,19 @@ async def model_evaluation(bundle, manifest, control, runner):
     import shutil
     import uuid
     spec = manifest['review_spec']; data = json.loads(safe_file(bundle, spec['evaluation_file']).read_text())
-    ensure(data.get('task') in {'regression', 'classification'}, 'Evaluation task must be regression or classification')
-    ensure(all(isinstance(data.get(k), str) and data[k].strip() for k in ['provenance', 'grouping']), 'Document data provenance and grouping')
-    splits = data.get('splits', {}); seen_ids = set(); seen_groups = set(); seen_inputs = set()
-    for name, minimum in [('train', 5), ('validation', 2), ('test', 3)]:
-        rows = splits.get(name, [])
-        ensure(isinstance(rows, list) and minimum <= len(rows) <= (512 if name == 'test' else 20000), 'Provide bounded nonempty train/validation/test splits')
-        ids = set(); groups = set(); inputs = set()
-        for row in rows:
-            ensure(isinstance(row, dict) and all(isinstance(row.get(k), str) and row[k] for k in ['id', 'group']) and isinstance(row.get('inputs'), dict) and 'target' in row, 'Each split row needs id, group, inputs and target')
-            schema_validator(spec['input_schema']).validate(row['inputs'])
-            ensure(row['id'] not in ids, 'Duplicate sample ID'); ids.add(row['id']); groups.add(row['group']); inputs.add(digest(row['inputs']))
-            ensure(type(row['target']) in (int, float, str) and (type(row['target']) is str or math.isfinite(row['target'])), 'Targets must be finite scalars')
-        ensure(not (ids & seen_ids or groups & seen_groups or inputs & seen_inputs), 'Leakage: IDs, related groups or exact inputs overlap splits')
-        seen_ids |= ids; seen_groups |= groups; seen_inputs |= inputs
+    strategy = data.get('strategy', 'supervised') if isinstance(data, dict) else 'supervised'
+    development = manifest.get('development')
+    if development:
+        selected = [row for row in development['generations']
+                    if row['id'] == development['selected_experiment_id']]
+        ensure(len(selected) == 1, 'Selected development generation is missing or ambiguous')
+        strategy = selected[0]['strategy']
+    validate_data(data, strategy)
+    splits = data['splits']
+    vin = schema_validator(spec['input_schema'])
+    for name in ROW_LIMITS:
+        for row in splits[name]:
+            vin.validate(row['inputs'])
     test = splits['test']; arguments = [r['inputs'] for r in test]
     one = await invoke_bundle(bundle, manifest, arguments, control, runner=runner, batch=True)
     two = await invoke_bundle(bundle, manifest, arguments, control, runner=runner, batch=True)
@@ -188,18 +187,12 @@ async def model_evaluation(bundle, manifest, control, runner):
     vout = schema_validator(spec['output_schema'])
     for row in one: vout.validate(row)
     predictions = [r[spec['prediction_key']] for r in one]; targets = [r['target'] for r in test]; train = [r['target'] for r in splits['train']]
-    if data['task'] == 'regression':
-        ensure(all(type(x) in (int, float) and math.isfinite(x) for x in predictions+targets+train), 'Regression values must be finite numbers')
-        center = sum(train)/len(train); score = sum(abs(p-y) for p, y in zip(predictions, targets))/len(targets)
-        baseline = sum(abs(center-y) for y in targets)/len(targets); metric = 'mae'
-    else:
-        ensure(all(type(x) in (int, float, str) for x in predictions), 'Classification predictions must be scalar labels')
-        majority = Counter(train).most_common(1)[0][0]; score = sum(p == y for p, y in zip(predictions, targets))/len(targets)
-        baseline = sum(majority == y for y in targets)/len(targets); metric = 'accuracy'
+    measured = scores(data['task'], predictions, targets, train)
+    metric, score, baseline = measured['metric'], measured['score'], measured['reference']
     if 'claimed_metric' in data:
         ensure(type(data['claimed_metric']) in (int, float) and math.isfinite(data['claimed_metric']) and math.isclose(score, data['claimed_metric'], rel_tol=1e-5, abs_tol=1e-6), 'Reported held-out metric does not match host recomputation')
     return {'task': data['task'], 'metric': metric, 'score': score, 'baseline': baseline,
-            'baseline_method': 'training_mean' if metric == 'mae' else 'training_majority',
+            'baseline_method': measured['reference_method'],
             'diagnostics': prediction_diagnostics(data['task'], predictions, train, split='test'),
             'split_counts': {k: len(v) for k, v in splits.items()}, 'disjoint_ids_groups_inputs': True,
             'provenance': data['provenance'], 'grouping': data['grouping'], 'predictions_sha256': digest(one),

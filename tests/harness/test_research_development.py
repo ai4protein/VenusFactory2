@@ -7,7 +7,8 @@ import zipfile
 import pytest
 
 from agent.harness.research_workspace import ResearchWorkspace, run_python, publish_proposals, run_capability
-from agent.harness.research_development import Development, validate_data, build_delivery, model_goal
+from agent.harness.research_development import Development, build_delivery, model_goal
+from agent.harness.research_evaluation import validate_data
 from agent.harness.capability_review import review_proposal
 
 

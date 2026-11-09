@@ -9,7 +9,8 @@ import uuid
 
 from .contracts import digest, file_hash
 from .host import write_json
-from .research_development import STRATEGIES, evaluation_digest, immutable_copy, require, validate_data
+from .research_development import STRATEGIES, immutable_copy, require
+from .research_evaluation import evaluation_digest, validate_data
 from .tool_diagnostics import python_failure, bounded_message
 from .research_algorithm_checks import algorithm_diagnostics, checked_algorithm_digest, validate_algorithm as validate_algorithm
 from utils.scoped_files import read_bytes, write_bytes
@@ -55,9 +56,6 @@ async def fit_model(workspace, development, runner, *, name, source_file, evalua
     if parent:
         require(parent["evaluation_sha256"] == data_hash, "Keep parent data and splits unchanged")
     code = read_bytes(workspace, source_file, max_bytes=200000).decode("utf-8")
-    require(isinstance(data.get("unlabeled", []), list), "Unlabeled observations must be a list")
-    if data.get("unlabeled"):
-        validate_data(data, "semi_supervised")
     training = {"task": data["task"], "strategy": strategy, "train": data["splits"]["train"],
                 "unlabeled": data.get("unlabeled", [])}
     identity = uuid.uuid4().hex

@@ -8,7 +8,6 @@ from __future__ import annotations
 import hashlib
 import ast
 import json
-import math
 from pathlib import Path
 import re
 import time
@@ -17,6 +16,7 @@ import uuid
 from .contracts import digest, file_hash
 from .host import write_json
 from .research_prediction_diagnostics import prediction_diagnostics
+from .research_evaluation import evaluation_digest, validate_data, scores
 from utils.scoped_files import read_bytes, copy_file, write_bytes
 
 STRATEGIES = {
@@ -82,50 +82,11 @@ def require(value, message):
     if not value: raise ValueError(message)
 
 
-def evaluation_digest(data):
-    # A final metric claim is checked by Review, never part of the data identity.
-    return digest({k:v for k,v in data.items() if k!='claimed_metric'})
-
-
-def validate_data(data, strategy):
-    require(isinstance(data,dict),'Evaluation data must be a JSON object')
-    require(data.get('task') in {'regression','classification'},'Declare regression or classification')
-    require(all(isinstance(data.get(k),str) and data[k].strip() for k in ['provenance','grouping']),'Declare data provenance and grouping')
-    seen_ids=set();seen_groups=set();seen_inputs=set();task_sets=[]
-    for name,minimum in [('train',5),('validation',2),('test',3)]:
-        rows=data.get('splits',{}).get(name)
-        maximum=20000 if name=='train' else 512
-        count=len(rows) if isinstance(rows,list) else 'not a list'
-        require(isinstance(rows,list) and minimum<=len(rows)<=maximum,
-                f'Provide bounded train/validation/test splits: {name} requires {minimum}..{maximum} rows; got {count}')
-        ids=set();groups=set();inputs=set();tasks=set()
-        for row in rows:
-            require(isinstance(row,dict) and all(isinstance(row.get(k),str) and row[k] for k in ['id','group']) and isinstance(row.get('inputs'),dict),'Each row needs id, group and inputs')
-            target=row.get('target');require(type(target) in (int,float,str) and (isinstance(target,str) or math.isfinite(target)),'Provide finite targets')
-            if data['task']=='regression':require(type(target) in (int,float),'Regression requires numeric targets')
-            require(row['id'] not in ids,'Duplicate sample ID');ids.add(row['id']);groups.add(row['group']);inputs.add(digest(row['inputs']))
-            if strategy=='meta_learning':
-                require(isinstance(row.get('task_id'),str) and row['task_id'],'Meta-learning requires task_id for every row');tasks.add(row['task_id'])
-        require(not(ids&seen_ids or groups&seen_groups or inputs&seen_inputs),'Leakage: IDs, groups or inputs overlap splits')
-        seen_ids|=ids;seen_groups|=groups;seen_inputs|=inputs;task_sets.append(tasks)
-    if strategy=='meta_learning':
-        require(len(task_sets[0])>=2 and all(task_sets[1:]) and not any(task_sets[i]&task_sets[j] for i in range(3) for j in range(i)),'Meta-learning requires multiple training tasks and disjoint validation/test tasks')
-    if strategy=='semi_supervised':
-        rows=data.get('unlabeled',[]);require(isinstance(rows,list) and 1<=len(rows)<=20000,'Semi-supervised learning requires genuine unlabeled observations')
-        for row in rows:
-            require(isinstance(row,dict) and set(row)=={'id','inputs'} and isinstance(row['id'],str) and row['id'] and isinstance(row['inputs'],dict),'Unlabeled rows contain id and inputs only')
-            key=digest(row['inputs']);require(row['id'] not in seen_ids and key not in seen_inputs,'Unlabeled data overlap labeled or held-out observations')
-            seen_ids.add(row['id']);seen_inputs.add(key)
-    json.dumps(data,allow_nan=False)
-    return data
-
-
 def inspect_evaluation(workspace, evaluation_file, strategy='supervised', *, data_store=None):
     """Check the same partition contract used by measured generations."""
     require(strategy in STRATEGIES, 'Use a declared strategy or custom')
     raw=data_store.load_evaluation(evaluation_file) if data_store else read_bytes(workspace,evaluation_file,max_bytes=20*1024**2)
     data=validate_data(json.loads(raw),strategy)
-    require(isinstance(data.get('unlabeled',[]),list),'Unlabeled observations must be a list')
     splits={}
     for name,rows in data['splits'].items():
         if name not in {'train','validation','test'}: continue
@@ -143,21 +104,6 @@ def inspect_evaluation(workspace, evaluation_file, strategy='supervised', *, dat
         'unlabeled_rows':len(data.get('unlabeled',[])),
         'checks':['row_limits','finite_targets','disjoint_ids','disjoint_groups','disjoint_exact_inputs'],
     }
-
-
-def scores(task, predictions, targets, train):
-    require(len(predictions)==len(targets) and bool(targets),'Prediction count differs from query count')
-    if task=='regression':
-        require(all(type(p) in (int,float) and math.isfinite(p) for p in predictions),'Predictions must be finite numbers')
-        mean=sum(train)/len(train)
-        return {'metric':'mae','direction':'minimize','score':sum(abs(p-y) for p,y in zip(predictions,targets))/len(targets),
-            'rmse':math.sqrt(sum((p-y)**2 for p,y in zip(predictions,targets))/len(targets)),
-            'reference':sum(abs(mean-y) for y in targets)/len(targets),'reference_method':'training_mean'}
-    from collections import Counter
-    require(all(type(p) in (int,float,str) and (isinstance(p,str) or math.isfinite(p)) for p in predictions),'Predictions must be finite scalar class labels')
-    majority=Counter(train).most_common(1)[0][0]
-    return {'metric':'accuracy','direction':'maximize','score':sum(p==y for p,y in zip(predictions,targets))/len(targets),
-        'reference':sum(majority==y for y in targets)/len(targets),'reference_method':'training_majority'}
 
 
 def immutable_copy(root, path, raw):

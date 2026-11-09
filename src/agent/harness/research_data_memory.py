@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 from utils.scoped_files import read_bytes
-from .research_development import evaluation_digest
+from .research_evaluation import evaluation_digest
 from .research_dataset import model_interface, protected_data_access
 from .research_input_profile import training_input_profile
 
