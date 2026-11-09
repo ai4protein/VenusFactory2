@@ -5,7 +5,7 @@ import json
 from langchain_core.tools import tool
 from langchain_core.runnables import RunnableConfig
 
-from mcp_tools.models.evolved.service import dispatch
+from mcp_tools.models.evolved.service import PREDICTION_DESCRIPTION, dispatch
 
 
 @tool("list_evolved_models")
@@ -20,12 +20,12 @@ def describe_evolved_model_tool(entry_id: str) -> str:
     return json.dumps(dispatch("describe", entry_id=entry_id), ensure_ascii=False)
 
 
-@tool("predict_with_evolved_model")
+@tool("predict_with_evolved_model", description=PREDICTION_DESCRIPTION)
 def predict_with_evolved_model_tool(
     entry_id: str, inputs: list[dict], config: RunnableConfig,
     scope_ref: str | None = None, scope: dict | None = None,
 ) -> str:
-    """Predict with a registered Scientist model using scope_ref from describe_evolved_model. Follow its input_fields and input_contract for 1-256 unlabelled records; preserve record IDs and values. The full inline scope is also accepted. Evidence and inputs are revalidated; this never trains or publishes a model. Local only."""
+    """Execute the shared model prediction contract in the current chat session."""
     host = config.get("configurable", {})
     session = host.get("session_id") or host.get("thread_id")
     return json.dumps(

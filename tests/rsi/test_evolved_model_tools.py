@@ -154,8 +154,9 @@ async def test_mcp_context_description_and_inference(context_published, use_refe
         assert card["input_fields"] == list(rows[0])
         result = (
             await client.call_tool(
-                "predict_with_evolved_model", {"entry_id": entry, "inputs": rows,
-                    **({"scope_ref": card["scope_ref"]} if use_reference else {"scope": card["scope"]})}
+                card["prediction_call"]["tool"], {"inputs": rows,
+                    **(card["prediction_call"]["arguments"] if use_reference
+                       else {"entry_id": entry, "scope": card["scope"]})}
             )
         ).data
         assert result["success"] and result["session_binding"] == "mcp_transport_session"
@@ -344,7 +345,7 @@ def test_reference_prediction_keeps_the_complete_context_and_host_session(contex
     card = service.dispatch("describe", entry_id=entry)
     assert card["scope_ref"] == scope_reference(entry, scope)
     result = json.loads(predict_with_evolved_model_tool.invoke(
-        {"entry_id": entry, "inputs": rows, "scope_ref": card["scope_ref"]},
+        {**card["prediction_call"]["arguments"], "inputs": rows},
         config={"configurable": {"thread_id": "reference-chat"}},
     ))
     assert result["success"] and seen == rows

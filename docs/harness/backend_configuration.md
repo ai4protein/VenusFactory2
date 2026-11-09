@@ -43,6 +43,9 @@ session isolation and resource limits still apply.
    contract with `executed=false`. Review it and retry; the initial operation
    was not executed. This uses the same discovery allowance and permission checks
    as an explicit `describe_tool` request.
+   A selected Scientist model also returns `prediction_call.arguments` with its
+   entry and scope reference together. Add `inputs` to that same object; neither
+   identifier replaces the other.
 4. For guidance, search the `guides` category, then find a relevant manual section
    or skill. Only `read_skill(skill_id)` loads that skill's contents.
 

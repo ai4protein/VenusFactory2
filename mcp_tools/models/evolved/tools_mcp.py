@@ -2,7 +2,7 @@
 
 from fastmcp import Context, FastMCP
 
-from mcp_tools.models.evolved.service import dispatch
+from mcp_tools.models.evolved.service import PREDICTION_DESCRIPTION, dispatch
 
 mcp = FastMCP("Venus_Evolved_Models")
 
@@ -19,12 +19,12 @@ def describe_evolved_model(entry_id: str) -> dict:
     return dispatch("describe", entry_id=entry_id)
 
 
-@mcp.tool(name="predict_with_evolved_model")
+@mcp.tool(name="predict_with_evolved_model", description=PREDICTION_DESCRIPTION)
 def predict_with_evolved_model(
     entry_id: str, inputs: list[dict], ctx: Context,
     scope_ref: str | None = None, scope: dict | None = None,
 ) -> dict:
-    """Predict with a registered model using scope_ref from describe_evolved_model and its input_fields/input_contract for 1-256 unlabelled records. Preserve IDs and values. The full inline scope is also accepted. Evidence and inputs are revalidated; this never trains or publishes models. Local only."""
+    """Execute the shared prediction contract in the current MCP session."""
     return dispatch(
         "predict",
         entry_id=entry_id,

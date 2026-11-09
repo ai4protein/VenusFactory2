@@ -19,6 +19,15 @@ TOOL_NAMES = {
 }
 
 
+PREDICTION_DESCRIPTION = (
+    "Predict with a selected Scientist model. Add inputs to prediction_call.arguments returned by "
+    "describe_evolved_model: supply entry_id, scope_ref and inputs together in one argument object. "
+    "Use 1-256 unlabelled records matching input_fields/input_contract; preserve IDs and values. "
+    "The exact full inline scope can replace scope_ref. Evidence and inputs are revalidated; "
+    "this never trains or publishes a model. Local only."
+)
+
+
 def configured_library():
     """The deployment operator owns this path; it is never a model tool argument."""
     from mcp_tools.common.installation import scientist_library_root
@@ -183,9 +192,16 @@ def describe_model(library, entry_id):
         featured = key["plugin_id"] == "generated_features.v1"
         fields = ["id", "sequence", "features"] if featured else ["id", "sequence"]
         contract = {"kind": "sequence_with_features" if featured else "sequence"}
+    reference = scope_reference(entry_id, key["scope"])
     return {
         **public_card(entry_id, key, publication["origin"], verified_now=False),
-        "scope_ref": scope_reference(entry_id, key["scope"]),
+        "scope_ref": reference,
+        "prediction_call": {
+            "tool": "predict_with_evolved_model",
+            "arguments": {"entry_id": entry_id, "scope_ref": reference},
+            "add_argument": "inputs",
+            "instruction": "Add the requested records as inputs in this same arguments object; keep both identifiers.",
+        },
         "validation_metrics_status": "recorded",
         "validation_metrics": publication["packet"]["assessment"]["metrics"],
         "input_fields": fields,
