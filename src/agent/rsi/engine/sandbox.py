@@ -47,7 +47,9 @@ def bwrap_command(
         "--new-session",
     ]
     from agent.harness.system_mounts import system_mounts
+    from agent.harness.python_runtime_mounts import python_runtime_mounts
     cmd += system_mounts()
+    cmd += python_runtime_mounts(python_root)
     cmd += [
         "--proc",
         "/proc",
@@ -64,9 +66,6 @@ def bwrap_command(
         "--ro-bind",
         str(kimi_bin.resolve()),
         "/opt/kimi/kimi",
-        "--ro-bind",
-        str(python_root.resolve()),
-        "/opt/venus-runtime",
         "--bind",
         str(workspace.resolve()),
         "/workspace",

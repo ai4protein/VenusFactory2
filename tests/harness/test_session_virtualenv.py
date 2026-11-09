@@ -10,8 +10,9 @@ import pytest
 from agent.harness import session_sandbox as sandbox
 
 
+@pytest.mark.parametrize("runner", ["session", "kimi"])
 @pytest.mark.asyncio
-async def test_actual_virtualenv_mounts_stdlib_and_active_packages_only(tmp_path, monkeypatch):
+async def test_actual_virtualenv_mounts_stdlib_and_active_packages_only(tmp_path, monkeypatch, runner):
     monkeypatch.setenv("VENUS_SESSION_SANDBOX", "bwrap")
     runtime = tmp_path / "environment"
     venv.EnvBuilder(with_pip=False, symlinks=True).create(runtime)
@@ -41,7 +42,17 @@ async def test_actual_virtualenv_mounts_stdlib_and_active_packages_only(tmp_path
         prefix=str(runtime), base_prefix=sys.base_prefix,
         executable=str(runtime / "bin/python"), version_info=sys.version_info,
     ))
-    result = await sandbox.execute(work, tmp_path / "control", "python", "probe.py", 20)
+    if runner == "session":
+        result = await sandbox.execute(work, tmp_path / "control", "python", "probe.py", 20)
+    else:
+        import subprocess
+        from agent.rsi.engine.sandbox import bwrap_command
+        private, capabilities = tmp_path / "private", tmp_path / "capabilities"
+        private.mkdir(); capabilities.mkdir()
+        command = bwrap_command(work, private, capabilities, Path("/usr/bin/true"), runtime, 0)
+        command = command[:command.index("--") + 1] + ["/opt/venus-runtime/bin/python", "-I", "probe.py"]
+        completed = subprocess.run(command, capture_output=True, text=True, timeout=20)
+        result = {"exit_code": completed.returncode, "stdout": completed.stdout, "stderr": completed.stderr}
     assert result["exit_code"] == 0, result
     assert json.loads(result["stdout"])["value"] == 73
 

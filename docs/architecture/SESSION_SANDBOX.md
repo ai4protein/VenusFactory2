@@ -4,6 +4,11 @@ Session-authored code is invoked only through `write_session_file` followed by
 `run_session_python`, or the bounded `run_session_shell` tool. It does not run in
 the API process or through an unrestricted harness shell.
 
+Native harnesses and session code share `python_runtime_mounts` for read-only
+Python binaries, the standard library and the selected environment's packages.
+Virtualenv interpreter links are resolved on the host; environment configuration
+and unrelated host package directories are not mounted.
+
 ## Lifetime
 
 1. Validate the active task and the session-owned workspace.
