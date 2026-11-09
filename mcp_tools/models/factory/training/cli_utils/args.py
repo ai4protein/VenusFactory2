@@ -2,11 +2,10 @@ import argparse
 import json
 import os
 import warnings
-from typing import Dict, Any
 from time import localtime, strftime
 
 
-def parse_args() -> Dict[str, Any]:
+def parse_args() -> argparse.Namespace:
     """Parse and validate command line arguments."""
     parser = create_argument_parser()
     args = parser.parse_args()
@@ -139,69 +138,66 @@ def add_wandb_args(parser: argparse.ArgumentParser):
     wandb_group.add_argument('--wandb_project', type=str, default='VenusFactory2')
     wandb_group.add_argument('--wandb_run_name', type=str)
 
+def _normalize_list_option(value, name: str) -> list[str]:
+    """Normalize comma-separated CLI values and JSON arrays at one boundary."""
+    values = value.split(",") if isinstance(value, str) else value
+    if not isinstance(values, list) or any(not isinstance(item, str) for item in values):
+        raise ValueError(f"{name} must be a comma-separated string or a list of names")
+    return [item.strip() for item in values if item.strip()]
+
+
 def validate_args(args: argparse.Namespace):
     """Validate command line arguments."""
     if args.batch_size is None and args.batch_token is None:
         raise ValueError("batch_size or batch_token must be provided")
-    
-    if args.training_method == 'ses-adapter':
-        if args.structure_seq is None:
+
+    if args.training_method == "ses-adapter":
+        channels = [] if args.structure_seq is None else _normalize_list_option(args.structure_seq, "structure_seq")
+        if not channels:
             raise ValueError("structure_seq must be provided for ses-adapter")
-        args.structure_seq = args.structure_seq.split(',')
+        args.structure_seq = channels
     else:
         args.structure_seq = []
 
+
 def process_dataset_config(args: argparse.Namespace):
-    """Process dataset configuration file."""
+    """Merge dataset defaults, then normalize metrics exactly once."""
+    if args.dataset_config:
+        with open(args.dataset_config, encoding="utf-8") as stream:
+            config = json.load(stream)
 
-    # Handle metrics specially
-    if args.metrics:
-        args.metrics = args.metrics.split(',')
-        if args.metrics == ['None']:
-            args.metrics = ['loss']
-            warnings.warn("No metrics provided, using default metrics: loss")
+        # Explicit CLI values take precedence over dataset defaults.
+        for key in [
+            "dataset", "pdb_type", "pdb_dir", "train_file", "valid_file", "test_file",
+            "num_labels", "problem_type", "monitor", "monitor_strategy", "metrics",
+            "normalize", "gnn_config", "gnn_model_path", "c_alpha_max_neighbors",
+        ]:
+            if getattr(args, key) is None and key in config:
+                setattr(args, key, config[key])
 
-    if not args.dataset_config:
-        return
-        
-    config = json.load(open(args.dataset_config))
-    
-    # Update args with dataset config values if not already set
-    for key in ['dataset', 'pdb_type', 'pdb_dir', 'train_file', 'valid_file', 'test_file',
-                'num_labels', 'problem_type', 'monitor', 'monitor_strategy', 
-                'metrics', 'normalize', 'gnn_config', 'gnn_model_path', 'c_alpha_max_neighbors']:
-        if getattr(args, key) is None and key in config:
-            setattr(args, key, config[key])
-    
-    # structure_seq, pdb_dir, structure_merge_key, structure_merge_key_format from config
-    if 'structure_seq' in config and config['structure_seq']:
-        args.structure_seq = config['structure_seq'] if isinstance(config['structure_seq'], list) else config['structure_seq'].split(',')
-    if 'pdb_dir' in config and getattr(args, 'pdb_dir', None) is None:
-        args.pdb_dir = config['pdb_dir']
-    if 'structure_merge_key' in config:
-        args.structure_merge_key = config['structure_merge_key']
-    # VenusX: PDB files are interpro_id-uid, HF has uid and interpro_id as separate columns
-    if 'structure_merge_key_format' in config:
-        args.structure_merge_key_format = config['structure_merge_key_format']
+        # Structure channels and table mappings are defined by the dataset preset.
+        # Leave channels in their original representation until validate_args.
+        if config.get("structure_seq"):
+            args.structure_seq = config["structure_seq"]
+        for key in ("structure_merge_key", "structure_merge_key_format"):
+            if key in config:
+                setattr(args, key, config[key])
 
-    # Handle sequence and label column names specially - always override with config if present
-    for key in ['sequence_column_name', 'label_column_name']:
-        if key in config:
-            old_value = getattr(args, key)
-            setattr(args, key, config[key])
-            # Note: We'll log this information later when logger is available
-            args._column_override_info = getattr(args, '_column_override_info', {})
-            args._column_override_info[key] = {'old': old_value, 'new': config[key]}
-        else:
-            args._column_override_info = getattr(args, '_column_override_info', {})
-            args._column_override_info[key] = {'default': getattr(args, key)}
-    
-    # Handle metrics specially
-    if args.metrics:
-        args.metrics = args.metrics.split(',')
-        if args.metrics == ['None']:
-            args.metrics = ['loss']
-            warnings.warn("No metrics provided, using default metrics: loss")
+        for key in ("sequence_column_name", "label_column_name"):
+            info = getattr(args, "_column_override_info", {})
+            if key in config:
+                old_value = getattr(args, key)
+                setattr(args, key, config[key])
+                info[key] = {"old": old_value, "new": config[key]}
+            else:
+                info[key] = {"default": getattr(args, key)}
+            args._column_override_info = info
+
+    if args.metrics is not None:
+        args.metrics = _normalize_list_option(args.metrics, "metrics")
+        if args.metrics == ["None"]:
+            args.metrics = ["loss"]
+            warnings.warn("No metrics provided, using default metrics: loss", stacklevel=2)
 
 def setup_output_dirs(args: argparse.Namespace):
     """Setup output directories."""

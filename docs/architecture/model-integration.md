@@ -43,6 +43,13 @@ owner's runtime storage. Pretrained backbones and task checkpoints are distinct:
 DeepSol and another solubility dataset may share ESM2-650M while producing different
 model IDs, weights and scopes. Existing `ckpt/` distributions remain supported.
 
+Training merges dataset defaults before normalizing metrics and structure channels.
+The CLI boundary accepts comma-separated strings or JSON lists and passes lists
+to model code. Explicit CLI values override dataset defaults, while a preset owns
+its sequence/label column mappings and selected structure channels. SES adapters
+require at least one nonempty structure channel; malformed values fail before a
+model or dataset is loaded.
+
 Scientist creates a repository-like deliverable with code, report, tests and
 artifacts. Research completion and public admission are separate. Reproducibility,
 interface validation, evaluation evidence, leakage checks and independent review
