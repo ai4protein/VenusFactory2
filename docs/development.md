@@ -65,6 +65,11 @@ exception, or a dependency across package boundaries.
    runtime or research directories. Commit refactoring separately from unrelated
    features.
 
+Remove investigation-only traces and their configuration switches when closing a
+fix. Operational diagnostics belong in the existing job or service logs, tied to
+the actual task identity; do not keep hard-coded investigation sessions in model
+or request code.
+
 Keep experimental fixes provisional until the intended behavior passes its
 acceptance check. A passing protocol or regression suite is not evidence that a
 model-quality workaround helped. Retain the failed experiment and its source

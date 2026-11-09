@@ -69,30 +69,8 @@ _ALLOWED_FILE_ROOTS = [
     (_PROJECT_ROOT / "ckpt").resolve(),
     _WEB_V2_ROOT,
 ]
-_DEBUG_LOG_PATH = os.getenv("CUSTOM_MODEL_DEBUG_LOG_PATH", "").strip()
 
 
-def _debug_log(hypothesis_id: str, location: str, message: str, data: Dict[str, Any], run_id: str = "pre-fix") -> None:
-    if not _DEBUG_LOG_PATH:
-        return
-    payload = {
-        "sessionId": "029b38",
-        "runId": run_id,
-        "hypothesisId": hypothesis_id,
-        "location": location,
-        "message": message,
-        "data": data,
-        "timestamp": int(time.time() * 1000),
-    }
-    try:
-        log_path = Path(_DEBUG_LOG_PATH).expanduser().resolve()
-        if not ensure_within_roots(log_path, _ALLOWED_FILE_ROOTS):
-            return
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(log_path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(payload, ensure_ascii=True) + "\n")
-    except Exception:
-        pass
 
 
 def _to_project_rel(path: Path) -> str:
@@ -586,22 +564,6 @@ def _normalize_training_args(payload: Dict[str, Any], constant: Dict[str, Any]) 
         sources=sources,
     )
 
-    # region agent log
-    _debug_log(
-        "H1",
-        "backend/web_v2/custom_model_api.py:_normalize_training_args",
-        "normalized training args snapshot",
-        {
-            "dataset_selection": dataset_selection,
-            "payload_dataset_custom": str(payload.get("dataset_custom", "")).strip(),
-            "final_dataset": args.get("dataset"),
-            "has_train_file": bool(args.get("train_file")),
-            "has_valid_file": bool(args.get("valid_file")),
-            "has_test_file": bool(args.get("test_file")),
-            "training_method": args.get("training_method"),
-        },
-    )
-    # endregion
     return args
 
 
@@ -785,20 +747,6 @@ def _build_exec_cmd(script: str, args: Dict[str, Any]) -> List[str]:
                 cmd.extend([str(v) for v in value])
         else:
             cmd.extend([f"--{key}", str(value)])
-    # region agent log
-    _debug_log(
-        "H2",
-        "backend/web_v2/custom_model_api.py:_build_exec_cmd",
-        "built execution command",
-        {
-            "script": script,
-            "has_dataset_key": "dataset" in args,
-            "dataset_value": args.get("dataset"),
-            "cmd_has_dataset_flag": "--dataset" in cmd,
-            "cmd_len": len(cmd),
-        },
-    )
-    # endregion
     return cmd
 
 

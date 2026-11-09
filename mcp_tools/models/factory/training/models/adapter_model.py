@@ -1,35 +1,12 @@
 import torch
 import gc
-import json
-import time
 import torch.nn as nn
 import torch.nn.functional as F
 from typing import Tuple
 from mcp_tools.models.factory.training.models.pooling import Attention1dPoolingHead, MeanPoolingHead, LightAttentionPoolingHead
 from mcp_tools.models.factory.training.models.pooling import MeanPooling, MeanPoolingProjection
 from mcp_tools.models.factory.training.models.pooling import ResidueClassificationHeadWithProjection
-import os
 
-_DEBUG_LOG_PATH = os.getenv("ADAPTER_MODEL_DEBUG_LOG_PATH", "").strip()
-
-
-def _debug_log(hypothesis_id: str, location: str, message: str, data: dict, run_id: str = "pre-fix") -> None:
-    if not _DEBUG_LOG_PATH:
-        return
-    payload = {
-        "sessionId": "029b38",
-        "runId": run_id,
-        "hypothesisId": hypothesis_id,
-        "location": location,
-        "message": message,
-        "data": data,
-        "timestamp": int(time.time() * 1000),
-    }
-    try:
-        with open(_DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
-            f.write(json.dumps(payload, ensure_ascii=True) + "\n")
-    except Exception:
-        pass
 
 def rotate_half(x):
     x1, x2 = x.chunk(2, dim=-1)
@@ -164,19 +141,6 @@ class AdapterModel(nn.Module):
                 self.classifier = Attention1dPoolingHead(args.hidden_size, args.num_labels, args.pooling_dropout)
             elif args.pooling_method == 'mean':
                 dataset_name = str(getattr(args, "dataset", "") or "")
-                # region agent log
-                _debug_log(
-                    "H4",
-                    "mcp_tools/models/factory/training/models/adapter_model.py:AdapterModel.__init__",
-                    "mean pooling branch dataset check",
-                    {
-                        "dataset_type": type(args.dataset).__name__ if hasattr(args, "dataset") else "missing",
-                        "dataset_value": getattr(args, "dataset", None),
-                        "dataset_name": dataset_name,
-                        "pooling_method": getattr(args, "pooling_method", None),
-                    },
-                )
-                # endregion
                 if "PPI" in dataset_name:
                     self.pooling = MeanPooling()
                     self.projection = MeanPoolingProjection(args.hidden_size, args.num_labels, args.pooling_dropout)
