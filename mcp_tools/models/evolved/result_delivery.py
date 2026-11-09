@@ -82,6 +82,26 @@ def _scope_markdown(payload):
     return "\n".join(lines) + "\n\n" + _cell(payload["evaluation_scope"])
 
 
+def _applicability_summary(payload):
+    """Summarize scientific constraints; retain the complete scope separately."""
+    fields = []
+    for key, value in payload["scope"].items():
+        if key == "covariates" and isinstance(value, list):
+            for column in value:
+                if isinstance(column, dict) and set(column) == {"name", "minimum", "maximum", "unit"}:
+                    fields.append((column["name"], f'{column["minimum"]} to {column["maximum"]} {column["unit"]}'))
+                else:
+                    fields.extend(_scope_rows(column, "covariates"))
+        elif key == "class_labels" and isinstance(value, list):
+            fields.extend((f"class {index}", label) for index, label in enumerate(value))
+        else:
+            fields.extend(_scope_rows(value, key.replace("_", " ")))
+    # Provenance digests stay in the full scope and receipt, not the short prose.
+    summary = "; ".join(f"{_cell(key)}: {_cell(value)}"
+                        for key, value in fields if not key.endswith("sha256"))
+    return summary + ". " + _cell(payload["evaluation_scope"])
+
+
 def _prediction_markdown(payload, limit=None):
     scope = payload["scope"]
     title = " · ".join(str(scope[k]) for k in ("protein", "target") if scope.get(k))
@@ -115,7 +135,8 @@ def deliver_prediction(workspace, result, arguments, *, session_id):
              "json": folder + "/result.json"}
     card = {"receipt_id": payload["receipt_id"],
             "content": _prediction_markdown(payload, PREVIEW_ROWS),
-            "scope_markdown": scope_text, "files": files}
+            "scope_markdown": scope_text, "applicability_summary": _applicability_summary(payload),
+            "files": files}
     table = io.StringIO(newline="")
     writer = csv.writer(table)
     writer.writerow(["id", "prediction", "unit"])

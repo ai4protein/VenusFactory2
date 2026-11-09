@@ -8,17 +8,17 @@ import json
 import os
 import secrets
 import shutil
-from pathlib import Path
 from dataclasses import replace
+from pathlib import Path
 from types import SimpleNamespace
 
-from .contracts import Profile, Task
 from .capability_boundary import CURRENT_CAPABILITY_FACTS
+from .contracts import Profile, Task
 from .host import RuntimeContext
 from .registry import builtin_registry
+from .session_boundary import SECURITY_INSTRUCTIONS, UNSAFE_TOOLS, bind_arguments, public_value, session_tools
+from .tool_disclosure import DESCRIBE, GUIDANCE, SEARCH, DisclosureError, ToolDisclosure, ToolInspectionRequired
 from .web_langgraph_worker import emit
-from .session_boundary import UNSAFE_TOOLS, SECURITY_INSTRUCTIONS, bind_arguments, public_value, session_tools
-from .tool_disclosure import ToolDisclosure, DisclosureError, ToolInspectionRequired, SEARCH, DESCRIBE, GUIDANCE
 
 
 def native_prompt(request):
@@ -125,7 +125,7 @@ async def run(request, *, tools=None, event_sink=None):
 
         tools = filter_tools([t for t in get_tools() if t.name not in UNSAFE_TOOLS])[0]
         tools += session_tools(request["workspace"], Path(request["control"])/"session-tools")
-    from .interactions import interaction_tools, INTERACTION_NAMES, INTERACTION_GUIDANCE
+    from .interactions import INTERACTION_GUIDANCE, INTERACTION_NAMES, interaction_tools
     interaction = None
     def request_input(value):
         nonlocal interaction
@@ -150,6 +150,7 @@ async def run(request, *, tools=None, event_sink=None):
             return False
 
     from mcp_tools.tools.tool_surface import WORKSPACE_PRIMITIVES
+
     from .research_focus import admitted_tools
     focus = admitted_tools(request, mapping)
     from mcp_tools.models.evolved.discovery import ScopedModelCatalog
@@ -356,6 +357,7 @@ async def run(request, *, tools=None, event_sink=None):
                         from mcp_tools.models.evolved.result_delivery import deliver_prediction
                         card = deliver_prediction(workspace, value, args, session_id=request.get("session_id"))
                         value = json.loads(value) if isinstance(value, str) else dict(value)
+                        value["applicability_summary"] = card["applicability_summary"]
                         value["result_files"] = card["files"]
                         if card.get("file_error"):
                             value["file_export_error"] = "Prediction completed, but result files could not be saved."
@@ -364,7 +366,8 @@ async def run(request, *, tools=None, event_sink=None):
                 failed, _ = _tool_output_indicates_failure(value)
                 if canonical_name == 'submit_research_checkpoint' and not failed:
                     checkpoint_saved = True
-                if observation: observation.finish(failed=failed)
+                if observation:
+                    observation.finish(failed=failed)
                 if event_sink:
                     send({"kind": "research_tool_status", "status": "failed" if failed else "completed", "tool": name, "call_id": call_id, "result": str(value)[:3000]})
                 result = {

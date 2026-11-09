@@ -106,6 +106,11 @@ Evolved-model calls can carry a compact `scope_ref` from their selected
 model description. `mcp_tools/models/evolved/scope.py` binds it to the immutable
 entry and complete scope before numerical execution; the library still owns
 evidence verification and prediction receipts.
+`mcp_tools/models/evolved/result_delivery.py` checks those receipts before creating
+session-owned exports. It derives the short applicability summary supplied to
+native harnesses from the same checked scope, preserving named bounds and units.
+The complete scope, prediction values and receipt remain in the tool result and
+downloadable JSON; the host does not rewrite the assistant's final answer.
 
 Skills are instructions, not executable plugins. Keep upstream licenses and the
 submodule revision. Native IDs take precedence; collisions use `sas_<name>`.
