@@ -1,14 +1,15 @@
 """Independent, source-anchored review of every report prose block."""
 from __future__ import annotations
 
-from collections import deque
+import asyncio
 import json
 import re
 import time
+from collections import deque
 
 import httpx
 
-from .research_evidence_passages import digest, source_digest, selected_passages, resolve_passage, chunks
+from .research_evidence_passages import chunks, digest, resolve_passage, selected_passages, source_digest
 from .research_measurements import measured_values_anchored
 
 VERSION = "source_review.v2.1"
@@ -284,6 +285,12 @@ async def review_documents(state, payload, documents, model_call, publish):
             if invalid:
                 attempt["validation_errors"] = invalid
                 recoverable = True
+        except asyncio.CancelledError:
+            # Cancellation also carries the worker deadline. Persist the stop
+            # before propagating it; never leave a terminal job's audit running.
+            attempt.update(status="interrupted", error="CancelledError")
+            review["status"] = "interrupted"
+            raise
         except Exception as exc:
             attempt.update(status="unavailable" if state.get("execution_blocker") else "invalid",
                            error=type(exc).__name__)

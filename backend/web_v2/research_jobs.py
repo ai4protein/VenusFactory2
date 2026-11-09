@@ -1,18 +1,19 @@
 """Private, durable research jobs managed by the shared queue."""
 from __future__ import annotations
+
 import asyncio
 import hashlib
 import json
 import os
-from pathlib import Path
 import re
 import sys
 import time
 import uuid
+from pathlib import Path
 
-from backend.web_v2.job_queue import JobQueue, launch, PROJECT, TERMINAL
+from backend.web_v2.job_queue import PROJECT, TERMINAL, JobQueue, launch
 from backend.web_v2.job_records import JobRecords
-from backend.web_v2.research_report import ACCESSION, clean_sequence, model_option, run_research, validate_scopes
+from backend.web_v2.research_report import ACCESSION, clean_sequence, model_option, validate_scopes
 
 
 def write(path, value):
@@ -109,7 +110,6 @@ class ResearchJobs:
         write(folder/'request.json', row)
         info = self.records.register('report', identity, owner, 'research', row['title'], row['created'])
         self.records.grant(folder, 'report', owner)
-        from backend.web_v2.research_report import EXPENSIVE
         env = dict(os.environ, VENUS_REPORT_ROOT=str(self.root))
         try:
             qid, _ = launch([sys.executable, '-u', '-m', 'backend.web_v2.research_jobs', identity], owner=owner,
@@ -150,7 +150,10 @@ class ResearchJobs:
             review = state.pop("source_review", None)
             state.pop("source_review_history", None)
             if review:
-                state["source_review_summary"] = {k: review.get(k) for k in ("policy", "status", "pending", "documents")}
+                summary = {k: review.get(k) for k in ("policy", "status", "pending", "documents")}
+                if status in TERMINAL | {"incomplete"} and summary["status"] == "checking":
+                    summary["status"] = "interrupted"
+                state["source_review_summary"] = summary
             for chapter in state.get("chapters", []):
                 chapter.pop("draft_history", None)
         return {**state, 'resumable': resumable, 'stop_reason': reason, 'id': identity, 'title': row['title'], 'created': row['created'], 'status': status,

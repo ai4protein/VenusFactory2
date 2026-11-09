@@ -1,4 +1,5 @@
 """Review transport recovery must preserve source verification and total budgets."""
+import asyncio
 import copy
 import json
 
@@ -215,3 +216,52 @@ async def test_prior_review_policy_is_preserved_but_cannot_certify_current_docum
     assert current["model_calls"] == 2
     assert current["source_review_history"] == [previous]
     assert sr.document_ready(docs[0], current["sources"], new["chapter_0"])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("deadline", [False, True])
+async def test_interrupted_review_is_terminal_and_resume_retains_calls_and_accepted_units(monkeypatch, deadline):
+    monkeypatch.setattr(sr, "MAX_UNITS", 1)
+    current, docs, calls = state(limit=3), documents(2), []
+    waiting = asyncio.Event()
+    interrupt = True
+    published = []
+
+    async def complete(model, messages, tokens):
+        current["model_calls"] += 1
+        request = json.loads(messages[1]["content"])
+        identity = request["units"][0]["document_id"]
+        calls.append(identity)
+        if identity == "chapter_1" and interrupt:
+            waiting.set()
+            await asyncio.Future()
+        return answer(request), False
+
+    def publish():
+        published.append(copy.deepcopy(current))
+
+    task = asyncio.create_task(sr.review_documents(current, {"model_id": "fixture"}, docs, complete, publish))
+    await asyncio.wait_for(waiting.wait(), timeout=1)
+    if deadline:
+        with pytest.raises(TimeoutError):
+            await asyncio.wait_for(task, timeout=0.01)
+    else:
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+    review = current["source_review"]
+    assert review["status"] == "interrupted"
+    attempt = copy.deepcopy(review["attempts"][-1])
+    assert attempt["status"] == "interrupted" and attempt["error"] == "CancelledError"
+    assert attempt["finished"] >= attempt["started"] and attempt["model_call"] == 2
+    assert current["model_calls"] == 2 and current["model_call_limit"] == 3
+    assert review["pending"] == 1 and len(review["units"]) == 1
+    assert published[-1]["source_review"]["attempts"][-1] == attempt
+    assert sr.document_receipt(docs[0], current["sources"], review["units"])["status"] == "completed"
+    assert sr.document_receipt(docs[1], current["sources"], review["units"])["status"] == "partial"
+    interrupt = False
+    receipts = await sr.review_documents(current, {"model_id": "fixture"}, docs, complete, publish)
+    assert calls == ["chapter_0", "chapter_1", "chapter_1"]
+    assert current["model_calls"] == 3 and current["model_call_limit"] == 3
+    assert review["attempts"][1] == attempt
+    assert all(sr.document_ready(doc, current["sources"], receipts[doc["id"]]) for doc in docs)

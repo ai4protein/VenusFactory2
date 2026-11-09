@@ -182,3 +182,25 @@ def test_legacy_specialist_report_requires_review_without_modifying_checkpoint(
         assert bundle.read("drafts/01.md").decode() == original["chapters"][0]["draft"]
         assert bundle.read("drafts/editor.md").decode() == original["review"]
     assert state == original
+
+
+@pytest.mark.parametrize("queue_status", ["failed", "interrupted", "cancelled", "completed", "incomplete", "paused", "waiting_for_input", "running", "queued"])
+def test_terminal_job_view_does_not_report_a_live_source_review_or_rewrite_its_audit(
+    tmp_path, monkeypatch, accepted, queue_status
+):
+    accepted["source_review"].update(status="checking", pending=1)
+    accepted["source_review"]["attempts"].append({"status": "running", "request": {"units": []}})
+    original = copy.deepcopy(accepted)
+    jobs, identity = owner_job(tmp_path, accepted)
+    checkpoint = jobs.folder(identity) / "state.json"
+    saved = checkpoint.read_bytes()
+    monkeypatch.setattr(jobs.queue, "public", lambda *args: {"status": queue_status, "message": ""})
+
+    view = jobs.get("alice", identity)
+    expected = "checking" if queue_status in {"running", "queued"} else "interrupted"
+    assert view["source_review_summary"]["status"] == expected
+    assert view["source_review_summary"]["pending"] == 1
+    assert view["model_calls"] == original["model_calls"]
+    audit = jobs.get("alice", identity, include_evidence=True)
+    assert audit["source_review"] == original["source_review"]
+    assert checkpoint.read_bytes() == saved
