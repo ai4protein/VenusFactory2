@@ -1,0 +1,272 @@
+"""Serving-audit integrity tests. Synthetic fixtures are not scientific models."""
+
+import copy
+import json
+import os
+
+import pytest
+
+from test_scientist_model_library import storage  # noqa: F401
+from agent.harness.contracts import digest
+from agent.rsi.engine import inference_audit as audit, inference_evidence as evidence
+from agent.rsi.engine import scientist_model_library as library
+from agent.rsi.engine.storage import atomic_json
+
+
+@pytest.fixture
+def publication(storage):
+    store, root, verified, calls = storage
+    identity = store.publish(root, "b" * 64)["entry_id"]
+    return store, root, verified, calls, identity
+
+
+def test_unprepared_inference_still_uses_full_verification(publication):
+    store, _, _, calls, identity = publication
+    audit.resolve(store, identity)
+    assert calls == [True, False]
+    assert not (store.root / ".inference").exists()
+
+
+def test_full_audit_survives_restart_without_replaying_training(publication, monkeypatch):
+    store, _, verified, calls, identity = publication
+    result = store.prepare_inference([identity])
+    assert calls == [True, True]
+    assert result["prepared_entries"] == 1 and result["training_replayed"] is True
+    assert result["external_model_calls"] == result["new_autonomous_models"] == 0
+    monkeypatch.setattr(library, "validate_model_goal", lambda *a, **kw: pytest.fail("Repeated acquisition replay"))
+    reopened = library.ScientistModelLibrary(store.root)
+    value = audit.resolve(reopened, identity)
+    assert value["packet"] == verified["packet"]
+    assert value["inference_audit_id"] == result["models"][0]["audit_id"]
+    assert stat_mode(store.root / ".inference") == 0o700
+    assert stat_mode(store.root / ".inference/signing-key") == 0o600
+
+
+def stat_mode(path):
+    return path.stat().st_mode & 0o777
+
+
+@pytest.mark.parametrize("change", ["new_file", "deleted_file", "content_same_mtime", "symlink", "fifo", "retirement"])
+def test_changed_goal_evidence_fails_before_prediction(publication, change):
+    store, root, _, _, identity = publication
+    path = root / "controller/state.json"
+    atomic_json(path, {"status": "registered"})
+    old = path.stat()
+    store.prepare_inference([identity])
+    if change == "new_file":
+        (root / "unrecorded.txt").write_text("new evidence")
+    elif change == "deleted_file":
+        path.unlink()
+    elif change == "content_same_mtime":
+        data = path.read_bytes().replace(b"registered", b"retired___")
+        path.write_bytes(data)
+        os.utime(path, ns=(old.st_atime_ns, old.st_mtime_ns))
+        assert path.stat().st_size == old.st_size
+    elif change == "symlink":
+        (root / "alias").symlink_to(path)
+    elif change == "fifo":
+        os.mkfifo(root / "pipe")
+    else:
+        atomic_json(path, {"status": "retired"})
+    with pytest.raises((ValueError, OSError)):
+        audit.resolve(store, identity)
+
+
+@pytest.mark.parametrize("part", ["entry", "index", "origin", "packet"])
+def test_live_registry_bindings_are_not_cached(publication, part):
+    store, _, _, _, identity = publication
+    store.prepare_inference([identity])
+    patterns = {"entry": "entries/*.json", "index": "index/*.json",
+                "origin": "origins/*/*.json", "packet": "packets/*.json"}
+    atomic_json(next(store.root.glob(patterns[part])), {"forged": True})
+    with pytest.raises((ValueError, KeyError)):
+        audit.resolve(store, identity)
+
+
+@pytest.mark.parametrize("part", ["record", "signature", "snapshot", "key_missing", "key_permissions", "area_permissions"])
+def test_model_written_or_damaged_audits_are_not_accepted(publication, part):
+    store, _, _, _, identity = publication
+    store.prepare_inference([identity])
+    area = store.root / ".inference"
+    path = area / "entries" / (identity + ".json")
+    envelope = json.loads(path.read_text())
+    if part == "record":
+        envelope["record"]["verified"]["skill"] = 999
+        # A content digest is not a host signature.
+        envelope["signature"] = digest(envelope["record"])
+        atomic_json(path, envelope)
+    elif part == "signature":
+        envelope["signature"] = "0" * 64
+        atomic_json(path, envelope)
+    elif part == "snapshot":
+        atomic_json(area / "snapshots" / (envelope["record"]["snapshot_id"] + ".json"), {})
+    elif part == "key_missing":
+        (area / "signing-key").unlink()
+    elif part == "key_permissions":
+        (area / "signing-key").chmod(0o644)
+    else:
+        area.chmod(0o755)
+    with pytest.raises((ValueError, OSError)):
+        audit.resolve(store, identity)
+
+
+def test_external_task_data_is_bound_even_when_outside_goal(publication):
+    store, root, _, _, identity = publication
+    raw = root.parent / "dataset.json"
+    atomic_json(raw, [{"value": 1}])
+    atomic_json(root / "model_task.json", {"data": {"training": {"path": str(raw), "sha256": "fixture"}}})
+    store.prepare_inference([identity])
+    atomic_json(raw, [{"value": 2}])
+    with pytest.raises(ValueError, match="changed"):
+        audit.resolve(store, identity)
+
+
+def test_ancestor_retirement_and_external_data_invalidate_child(publication, monkeypatch):
+    store, root, _, _, identity = publication
+    donor_root = root.parent / "donor"
+    donor_root.mkdir()
+    atomic_json(donor_root / "goal.json", {})
+    atomic_json(donor_root / "protocol.json", {})
+    atomic_json(donor_root / "state.json", {"status": "registered"})
+    donor = library.ScientistModelLibrary(root.parent / "donor_library")
+    donor_model = copy.deepcopy(store.resolve(identity))
+    donor_model["origin"].update(goal_sha256=library.file_hash(donor_root / "goal.json"),
+                                protocol_sha256=library.file_hash(donor_root / "protocol.json"))
+    published = donor._publish_verified(donor_root, donor_model)
+    # Preserve the publication anchors while adding a declared history fixture.
+    declaration = {"library_experience": {"fixture": True}}
+    atomic_json(root / "protocol.json", declaration)
+    entry = store._object("entries", identity)
+    origin_path = store.root / "origins" / digest(entry["key"]) / (entry["canonical_origin"] + ".json")
+    # Recreate a fresh storage fixture publication, bound to the new protocol.
+    revised = copy.deepcopy(store._object("packets", entry["packet_id"]))
+    verified = {"packet": revised, "key": entry["key"], "skill": 0.5,
+                "origin": {k: v for k, v in json.loads(origin_path.read_text()).items()
+                           if k not in {"goal", "key_id", "packet_id"}}}
+    verified["origin"]["protocol_sha256"] = library.file_hash(root / "protocol.json")
+    second = library.ScientistModelLibrary(root.parent / "recipient_library")
+    identity = second._publish_verified(root, verified)["entry_id"]
+    monkeypatch.setattr(library, "validate_model_goal", lambda *a, **kw: copy.deepcopy(verified))
+    monkeypatch.setattr(library.library_experience, "read_frozen",
+                        lambda *a: {"manifest": {"selection": {"library_root": str(donor.root),
+                                                               "entry_ids": [published["entry_id"]]}}})
+    second.prepare_inference([identity])
+    atomic_json(donor_root / "state.json", {"status": "retired"})
+    with pytest.raises(ValueError, match="changed"):
+        audit.resolve(second, identity)
+
+
+def test_runtime_changes_require_a_new_complete_audit(publication, monkeypatch):
+    store, _, _, _, identity = publication
+    store.prepare_inference([identity])
+    original = evidence.runtime_identity
+    monkeypatch.setattr(evidence, "runtime_identity", lambda: {**original(), "python": "different runtime"})
+    with pytest.raises(ValueError, match="runtime changed"):
+        audit.resolve(store, identity)
+
+
+def test_changes_during_audit_never_create_a_usable_record(publication, monkeypatch):
+    store, root, verified, _, identity = publication
+
+    def mutate(*args, **kwargs):
+        (root / "new-during-audit").write_text("changed")
+        return copy.deepcopy(verified)
+
+    monkeypatch.setattr(library, "validate_model_goal", mutate)
+    with pytest.raises(ValueError, match="during the full"):
+        store.prepare_inference([identity])
+    assert not (store.root / ".inference/entries" / (identity + ".json")).exists()
+
+
+def test_failed_reaudit_preserves_the_prior_receipt_without_accepting_changed_data(publication, monkeypatch):
+    store, root, _, _, identity = publication
+    store.prepare_inference([identity])
+    path = store.root / ".inference/entries" / (identity + ".json")
+    before = path.read_bytes()
+    (root / "changed-data").write_text("changed")
+    def reject(*args, **kwargs):
+        raise ValueError("Full audit rejected")
+    monkeypatch.setattr(library, "validate_model_goal", reject)
+    with pytest.raises(ValueError, match="Full audit rejected"):
+        store.prepare_inference([identity])
+    assert path.read_bytes() == before
+    with pytest.raises(ValueError, match="changed"):
+        audit.resolve(store, identity)
+
+
+def test_explicit_scientific_verification_always_replays(publication):
+    store, _, _, calls, identity = publication
+    store.prepare_inference([identity])
+    store.resolve(identity, replay_training=True)
+    assert calls == [True, True, True]
+
+
+def test_volatile_regular_locks_and_bytecode_do_not_change_frozen_evidence(publication):
+    store, root, _, _, identity = publication
+    store.prepare_inference([identity])
+    (root / "runtime.lock").touch()
+    (root / "__pycache__").mkdir()
+    (root / "__pycache__/module.pyc").write_bytes(b"bytecode")
+    audit.resolve(store, identity)
+    (root / "__pycache__/unsafe").symlink_to(root / "goal.json")
+    with pytest.raises(ValueError, match="Symlink"):
+        audit.resolve(store, identity)
+
+
+def test_prepared_prediction_keeps_scope_and_receipt_contract(publication, monkeypatch):
+    store, _, verified, _, identity = publication
+    store.prepare_inference([identity])
+    class Plugin:
+        def predict(self, model, rows, scope):
+            return [{"id": row["id"], "sequence": row["sequence"], "prediction": 0.25} for row in rows]
+    monkeypatch.setattr(library, "get_model_plugin", lambda _: Plugin())
+    monkeypatch.setattr(library, "validate_model_goal", lambda *a, **kw: pytest.fail("Unexpected replay"))
+    result = store.predict(identity, [{"id": "x", "sequence": "AA", "target": 99}],
+                           verified["key"]["scope"], session_id="test-agent")
+    assert result["receipt"]["inference_audit_id"]
+    assert result["receipt"]["session_id"] == "test-agent"
+    assert result["predictions"][0]["prediction"] == 0.25
+    with pytest.raises(ValueError, match="applicability"):
+        store.predict(identity, [], {"wrong": True}, session_id="test-agent")
+
+
+def test_copied_audit_cannot_move_to_another_owner_library(publication):
+    import shutil
+    store, _, _, _, identity = publication
+    store.prepare_inference([identity])
+    other = store.root.with_name("other-library")
+    shutil.copytree(store.root, other)
+    with pytest.raises(ValueError, match="identity changed"):
+        audit.resolve(library.ScientistModelLibrary(other), identity)
+
+
+def test_verification_source_content_is_part_of_runtime_identity(tmp_path, monkeypatch):
+    base = tmp_path / "agent"
+    for folder in ("rsi/engine", "harness"):
+        (base / folder).mkdir(parents=True)
+    source = base / "harness/validator.py"
+    source.write_text("valid = True\n")
+    monkeypatch.setattr(evidence, "__file__", str(base / "rsi/engine/inference_evidence.py"))
+    before = evidence.runtime_identity()
+    source.write_text("valid = False\n")
+    assert evidence.runtime_identity() != before
+
+
+@pytest.mark.parametrize("budget", ["files", "bytes", "record"])
+def test_resource_limits_fail_before_publishing_a_record(publication, monkeypatch, budget):
+    store, _, _, _, identity = publication
+    module, name = ((audit, "MAX_RECORD_BYTES") if budget == "record" else
+                    (evidence, "MAX_FILES" if budget == "files" else "MAX_BYTES"))
+    monkeypatch.setattr(module, name, 1)
+    with pytest.raises(ValueError, match="budget"):
+        store.prepare_inference([identity])
+    assert not (store.root / ".inference/entries" / (identity + ".json")).exists()
+
+
+def test_parallel_preparation_uses_one_host_key_and_complete_records(publication):
+    from concurrent.futures import ThreadPoolExecutor
+    store, _, _, _, identity = publication
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(lambda _: store.prepare_inference([identity]), range(2)))
+    assert results[0] == results[1]
+    assert audit.resolve(store, identity)["inference_audit_id"] == results[0]["models"][0]["audit_id"]

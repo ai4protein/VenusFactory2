@@ -84,3 +84,39 @@ stores a separate result card; model-authored answers and scientific history rem
 unchanged. Reload/replay deduplicates cards by receipt identity, and downloads keep
 the normal session authorization. Export failure retains the computed result without
 requesting another inference.
+
+## Preparing registered models for inference
+
+Full Scientist publication verification replays training, scientific feedback and
+historical model dependencies. Keep that audit in registration and explicit
+verification; ordinary Agent prediction can use a host-prepared audit instead:
+
+```bash
+PYTHONPATH=src python scripts/rsi/scientist_model_library.py \
+  --library research_runs/rsi/scientist_model_library_v1 \
+  prepare-inference --entry-ids runtime/selected-model-ids.json
+```
+
+The input is a JSON array of existing entry IDs (1–256). Preparation groups IDs
+from the same research goal, runs the original full verification, and checks that
+all evidence is unchanged before and after it. It makes no LLM calls and does not
+create a model or grant public visibility. Run it as the service owner after
+publication or a source/runtime upgrade, outside request workers.
+
+The host stores signed records and a private signing key in the library's
+`.inference/` directory. This directory must stay outside session/sandbox mounts,
+downloads and source control. Evidence snapshots include complete original and
+ancestral goal trees, registry bindings, declared source datasets, current
+verification/model code and numeric package versions. Per-request validation
+hashes actual file contents; it does not trust timestamps or repeat baseline
+training. Changed evidence, retirement, a changed index or an invalid signature
+blocks prepared inference until a full audit passes again. Locks and generated
+Python bytecode are excluded from content identity; symlinks and special files
+are rejected even in those locations.
+
+Unprepared models retain the original verification path. `resolve()` and the
+`verify` CLI command always perform a scientific audit regardless of preparation.
+Successful prepared predictions include an `inference_audit_id` in their ordinary
+usage receipt. They preserve scope/input validation, ownership, administrator
+policy, queue limits and prediction export behavior. A prepared private model is
+still private and still requires the separate curated-publication process.

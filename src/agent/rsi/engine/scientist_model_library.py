@@ -688,10 +688,18 @@ class ScientistModelLibrary:
             "counting_rule": _COUNTING_RULE,
         }
 
+    def prepare_inference(self, entry_ids):
+        """Host-only preparation; preserves the full numerical and ancestry audit."""
+        from .inference_audit import prepare
+
+        return prepare(self, entry_ids)
+
     def predict(self, entry_id, inputs, scope, *, session_id, mode="science_agent"):
         get_research_mode(mode)
         _require(isinstance(session_id, str) and bool(session_id.strip()), "Inference requires a session identifier")
-        verified = self.resolve(entry_id)
+        from .inference_audit import resolve
+
+        verified = resolve(self, entry_id)
         model = verified["packet"]["model"]
         _require(scope == model["scope"], "Model applicability mismatch")
         rows = model_tasks.inference_inputs(inputs, model["plugin_id"])
@@ -699,6 +707,7 @@ class ScientistModelLibrary:
         receipt = {
             "schema": 1,
             "kind": "model_library_inference",
+            **({"inference_audit_id": verified["inference_audit_id"]} if "inference_audit_id" in verified else {}),
             "call_id": uuid.uuid4().hex,
             "entry_id": entry_id,
             "session_id": session_id,

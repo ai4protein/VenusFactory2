@@ -33,6 +33,8 @@ def main():
     verify = commands.add_parser("verify", help="Replay current-runtime training and provenance for 1..256 model IDs")
     verify.add_argument("--entry-ids", type=Path, required=True, help="JSON array of registered entry IDs")
     verify.add_argument("--output", type=Path, required=True)
+    prepare = commands.add_parser("prepare-inference", help="Seal a full host audit for content-checked inference")
+    prepare.add_argument("--entry-ids", type=Path, required=True)
     inspect = commands.add_parser("inspect")
     inspect.add_argument("--entry-id", required=True)
     infer = commands.add_parser("predict")
@@ -67,6 +69,8 @@ def main():
         }
         _write_new_output(args.output, report, "Verification")
         result = {"output": str(args.output), "verified_entries": len(values), "training_replayed": True}
+    elif args.action == "prepare-inference":
+        result = library.prepare_inference(json.loads(args.entry_ids.read_text()))
     elif args.action == "inspect":
         verified = library.resolve(args.entry_id)
         result = {k: verified[k] for k in ("entry_id", "key", "origin", "skill")}
