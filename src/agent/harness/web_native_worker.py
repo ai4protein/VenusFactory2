@@ -58,6 +58,8 @@ def mcp_input_schema(tool):
 
 
 def prepare_tool_arguments(name, tool, arguments, workspace, host_paths):
+    from mcp_tools.common.tool_arguments import validate_tool_arguments
+
     # Research workspace tools own their relative-path validation. Legacy
     # scientific tools still receive their normal host-path normalization.
     if (getattr(tool, "metadata", None) or {}).get("workspace_relative_paths"):
@@ -79,7 +81,9 @@ def prepare_tool_arguments(name, tool, arguments, workspace, host_paths):
                 message += " The session workspace is assigned by the server."
             raise ValueError(message)
         from .session_boundary import relative_workspace_arguments
-        return relative_workspace_arguments(arguments)
+        args = relative_workspace_arguments(arguments)
+        validate_tool_arguments(tool, args)
+        return args
     from agent.graph.helpers.tool_io import _normalize_output_paths, _sanitize_tool_invoke_input
     args = _sanitize_tool_invoke_input(name, tool, bind_arguments(name, arguments, workspace), str(workspace), {})
     # A new scientific tool may not yet appear in the legacy write-prefix list.
@@ -91,7 +95,9 @@ def prepare_tool_arguments(name, tool, arguments, workspace, host_paths):
             if key in fields:
                 args[key] = None
                 break
-    return _normalize_output_paths(name, tool, args, str(workspace))
+    args = _normalize_output_paths(name, tool, args, str(workspace))
+    validate_tool_arguments(tool, args)
+    return args
 
 
 def web_tool_name(name, harness):
@@ -354,7 +360,8 @@ async def run(request, *, tools=None, event_sink=None):
             failed_tool=locals().get('tool') if method=='tools/call' else None
             # Give model developers actionable contract failures without exposing
             # arbitrary plugin tracebacks, host paths or credentials.
-            if isinstance(exc, DisclosureError) or isinstance(exc, (ValueError, FileNotFoundError)) and ((getattr(failed_tool,'metadata',None) or {}).get('workspace_relative_paths') or params.get('name') in INTERACTION_NAMES):
+            from mcp_tools.common.tool_arguments import ToolArgumentError
+            if isinstance(exc, (DisclosureError, ToolArgumentError)) or isinstance(exc, (ValueError, FileNotFoundError)) and ((getattr(failed_tool,'metadata',None) or {}).get('workspace_relative_paths') or params.get('name') in INTERACTION_NAMES):
                 from .tool_diagnostics import contract_error
                 message = contract_error(exc, workspace)
             if accepted_call:

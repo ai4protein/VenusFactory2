@@ -10,6 +10,7 @@ from backend.web_v2.job_queue import JobQueue, TERMINAL, launch
 from backend.web_v2.job_records import JobRecords
 from mcp_tools.tools.runtime_tool_policy import assert_tool_call_allowed
 from mcp_tools.scheduler.catalog import classify, native_tools
+from mcp_tools.common.tool_arguments import validate_tool_arguments
 
 MAX_PAYLOAD = 4_000_000
 MAX_RESULT = 16_000_000
@@ -35,7 +36,7 @@ class ToolJobs:
         tools=native_tools()
         if route=='native':
             if name not in tools:raise ValueError('Unknown registered tool')
-            tools[name].get_input_schema().model_validate(arguments)
+            validate_tool_arguments(tools[name], arguments)
         if route=='public_service':
             from mcp_tools.tools.research.services import SERVICE_IDS
             if name != 'query_public_protein_service' or arguments.get('service') not in SERVICE_IDS:

@@ -18,6 +18,7 @@ from starlette.routing import Mount, Route
 
 from mcp_tools.scheduler.catalog import catalog, classify
 from mcp_tools.scheduler.jobs import ToolJobs
+from mcp_tools.common.tool_arguments import ToolArgumentError
 from mcp_tools.scheduler.service import REPOSITORY_ID, service_key
 
 scheduler=FastMCP('VenusFactory Tool Scheduler')
@@ -32,6 +33,8 @@ async def operation(fn, *args, **kwargs):
         detail = exc.detail
         message = detail.get('message', 'Computation is unavailable') if isinstance(detail, dict) else str(detail)
         return {'error': {'code': exc.status_code, 'message': message, 'detail': detail}}
+    except ToolArgumentError as exc:
+        return {'error': {'code': 422, 'message': str(exc)}}
     except ValueError as exc:
         full = 'queue is full' in str(exc).lower()
         return {'error': {'code': 429 if full else 422, 'message': 'Task queue is full' if full else 'Invalid tool arguments'}}

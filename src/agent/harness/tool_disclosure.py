@@ -318,6 +318,8 @@ class ToolDisclosure:
             raise DisclosureError('Use search_tools, describe_tool, then call_tool.')
         if not self._available(name):
             raise DisclosureError('Tool unavailable. Search for an enabled tool.')
+        if not isinstance(arguments, dict):
+            raise DisclosureError('Use a JSON object for tool arguments.')
         for key in self._model_selectors.get(name, ()):
             if not arguments.get(key):
                 raise DisclosureError('Specify the requested model explicitly using matching_models from describe_tool; do not use a generic default.')

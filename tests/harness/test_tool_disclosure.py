@@ -124,6 +124,11 @@ async def test_shared_protocol_dispatches_to_original_tool_and_records_real_iden
             assert found['tools'][0] == {'name':'protein_length','description':'Calculate sequence length.'}
             described = json.loads((await call('describe_tool', {'name':'protein_length'}))['result']['content'][0]['text'])
             assert described['inputSchema']['required'] == ['sequence']
+            rejected = await call('call_tool', {'name':'protein_length','arguments':{'extra':'private-input-marker'}})
+            assert rejected['result']['isError'] is True
+            feedback = rejected['result']['content'][0]['text']
+            assert 'sequence' in feedback and 'private-input-marker' not in feedback
+            assert not calls
             result = await call('call_tool', {'name':'protein_length','arguments':{'sequence':'ACDE'}})
             assert json.loads(result['result']['content'][0]['text']) == {'length':4}
             return {'status':'completed','text':'The sequence has four residues.'}
@@ -392,3 +397,36 @@ def test_reader_hint_does_not_leak_into_a_new_unrelated_search():
     assert c.metadata("describe_tool", {"name": "list_evolved_models"})["suggested_arguments"]
     c.metadata("search_tools", {"category": "rsi", "query": "list_evolved_models"})
     assert "suggested_arguments" not in c.metadata("describe_tool", {"name": "list_evolved_models"})
+
+
+
+def test_optional_and_explicit_null_arguments_keep_declared_semantics():
+    name = "read_record"
+    tool = SimpleNamespace(name=name, description="Read a record.")
+    schema = {"type": "object", "properties": {
+        "query": {"type": "string"},
+        "cursor": {"type": ["string", "null"]},
+        "limit": {"type": "integer", "default": 10},
+    }, "required": ["query", "cursor"]}
+    c = ToolDisclosure({name: tool}, schema=lambda _: schema, allowed=lambda _: True, direct={name})
+    payload = {"query": "protein", "cursor": None}
+    assert c.resolve(name, payload)[2] == payload
+    assert "limit" not in payload
+
+
+@pytest.mark.parametrize("payload", [None, [], "private-input-marker"])
+def test_direct_tools_require_an_argument_object(payload):
+    name = "read_record"
+    c = ToolDisclosure({name: SimpleNamespace(name=name, description="Read a record.")},
+                       schema=lambda _: {"type": "object"}, allowed=lambda _: True, direct={name})
+    with pytest.raises(DisclosureError, match="JSON object"):
+        c.resolve(name, payload)
+
+
+def test_revoked_tool_does_not_reveal_its_required_arguments():
+    name = "private_model"
+    c = ToolDisclosure({name: SimpleNamespace(name=name, description="Predict.")},
+                       schema=lambda _: (_ for _ in ()).throw(AssertionError("Disabled schema read")),
+                       allowed=lambda _: False, direct={name})
+    with pytest.raises(DisclosureError, match="unavailable"):
+        c.resolve(name, {})

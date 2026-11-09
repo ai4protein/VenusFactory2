@@ -91,6 +91,11 @@ The MCP discovery package owns catalog lookup and the mapping of model, dataset
 and task choices to a selected tool's declared input fields. Search returns names
 and summaries; only description loads that interface. Availability is refreshed
 at description and enforced again by the invocation path.
+The selected tool's own input model is validated through
+`mcp_tools/common/tool_arguments.py` after session paths are bound and again at
+MCP admission. Native harnesses share this boundary. Contract failures name the
+missing or invalid fields without copying input values or validator traces; no
+compute job is created for invalid arguments.
 
 Model origin is separate from scientific function. For example, ProteinMPNN and
 LigandMPNN are both pretrained methods; DeepSol · ESM2-650M is a factory-trained
