@@ -17,10 +17,10 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVR
 
-if __package__:
-    from . import reference_thermal_baselines as reference_thermal
+try:
+    from agent.rsi import reference_thermal_baselines as reference_thermal
     from .generated_context import validate_rows
-else:  # Frozen standalone capability bundle.
+except ImportError:
     import reference_thermal_baselines as reference_thermal
     from generated_context import validate_rows
 
@@ -84,14 +84,8 @@ def thermal_predictions(name, x_train, targets, x_query, temperature_column):
 
 
 def score_rows(training, validation, scope, *, timings=True):
-    """Validate the v1 interface before the shared fixed-control evaluation."""
     validate_rows(training, scope, labels=True)
     validate_rows(validation, scope, labels=True)
-    return score_validated_rows(training, validation, scope, timings=timings)
-
-
-def score_validated_rows(training, validation, scope, *, timings=True):
-    """Score rows validated by their versioned interface; never refit on scoring labels."""
     if {r["id"] for r in training} & {r["id"] for r in validation} or {r["group"] for r in training} & {
         r["group"] for r in validation
     }:

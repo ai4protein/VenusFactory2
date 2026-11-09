@@ -57,6 +57,9 @@ exception, or a dependency across package boundaries.
    modules in the same RSI engine use relative imports. Preserve standalone bundle
    execution, stable tool names and frozen research evidence. Do not relax source
    hashes or numerical verification to make historical results pass.
+   Published scientific modules may bind their complete source bytes, including
+   imports. Check saved feedback and a registered model before consolidating them;
+   use a new policy version when those bindings would change.
 4. Run the maintainer checks above and focused behavioral tests. Changes to a
    bundled runtime also need a standalone execution check; changes to research
    validation need replay and rejection checks.
@@ -90,8 +93,8 @@ refactor separate from new product behavior, with a bounded regression target.
 | --- | --- | --- |
 | Chat UI (`ChatPage.tsx`) | Separate session navigation, composer actions and history presentation from page coordination | Switching mode or session must preserve running jobs, drafts and streamed answers |
 | Model API (`custom_model_api.py`) | Keep training, evaluation and prediction submission separate; share ownership and admission policy | Owner isolation, online limits, idempotent queue submission and existing route contracts |
-| RSI engine (`generated_context*.py`) | Share repeated execution primitives while retaining version-specific scientific contracts | Standalone bundles, strict scope checks, unchanged numerical results and complete source bindings |
-| Model registry (`scientist_model_library.py`, `shared_model_publication.py`) | Separate frozen acquisition evidence from current runtime compatibility for shared-goal models | Verify original receipts with their original implementation; require a separate validated migration before using a changed runtime, while retaining rejected historical entries |
+| RSI engine (`generated_context*.py`) | Share new execution primitives without rewriting published source-bound policy versions | Standalone bundles, saved feedback replay, registered-model inference, strict scope checks and complete source bindings |
+| Model registry (`scientist_model_library.py`, `shared_model_publication.py`) | Separate costly acquisition and ancestor replay from per-request inference | Preserve immutable evidence bindings and retirement checks; reject changed source/data and compare actual prediction values and cold/warm latency |
 | Researcher review (`research_source_review.py`) | Separate response decoding from the shared source-anchor validator; resolve unsupported field-to-value relationships before promoting a semantic reviewer | Unchanged decisions on saved-response replay, followed by new-protein and complete multi-chapter acceptance checks |
 
 The layout check rejects imports from shared Harness contracts or worker adapters

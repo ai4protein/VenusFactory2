@@ -1,0 +1,24 @@
+{
+  "source_commit": "0b2a662191a41d81e096fcc3f643b09d26672a49",
+  "meaning": "Released feedback source identities are part of the persisted comparison contract. Preserve these records; new scientific implementations require a separately versioned policy.",
+  "policies": {
+    "1": {
+      "context_feedback.py": "6a780998daa7d2dd666702cdf853094f6ce3c192cff25e5028ce36bd99e76883",
+      "context_controls.py": "2e70bff80cab215d2ff1cd19db9d171ec1d261e53b2c3ab218a87901d0ecc04b",
+      "generated_context.py": "f820fc0ef40b04d6004ed79beb6084a7c5fcee833f1017834256f0b6121355da",
+      "reference_thermal_baselines.py": "3b41468e4b7349afdcea6f6dc00af2869760efa32cac143e616b191edd2f40b5"
+    },
+    "2": {
+      "context_v2_feedback.py": "78bc80cb2a4b8722b6a735989089093eab00d5ac4c8817b6ba4198235d2d7451",
+      "context_v2_controls.py": "b2ba1577235f607791c5293bf93dcc58cf5490268d0aa5caa72afe91a8aff907",
+      "generated_context_v2.py": "272de847c62b7344526559cce09dd9b4c28b050662eb2f7577d9efda6c611393",
+      "reference_thermal_baselines.py": "3b41468e4b7349afdcea6f6dc00af2869760efa32cac143e616b191edd2f40b5"
+    },
+    "3": {
+      "context_v3_feedback.py": "dd8ce270256ed2de783c8e85e7da6b41d216b735193a28893b8d3f789da41ef7",
+      "context_v3_controls.py": "bf67105996f26c913d17f55c0b9eb37ff58a7a6876a291fb5b80f9956a08a1dc",
+      "generated_context_v3.py": "e5ac61506b4b7b344cc05e5471c6946d641af438d0f6940e32bad433cee254bf",
+      "reference_thermal_baselines.py": "3b41468e4b7349afdcea6f6dc00af2869760efa32cac143e616b191edd2f40b5"
+    }
+  }
+}

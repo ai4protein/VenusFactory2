@@ -20,13 +20,16 @@ New imports use the owning package, such as
 `agent.rsi.engine.model_gateway`. `_compat.py` lazily maps previous flat Python
 import names to the same modules for older callers. It does not duplicate code or
 eagerly load model libraries. Modules within the same engine use relative imports;
-do not route their internal dependencies through the legacy alias layer. Frozen
-historical source snapshots are not rewritten.
+do not route new dependencies through the legacy alias layer. Published scientific
+modules whose source bytes are part of a saved contract retain their recorded
+imports. Historical source snapshots are not rewritten.
 
-The three contextual model interfaces share fixed estimators and scoring in
-`engine/context_controls.py`. Version adapters retain their own scope and row
-validation. Standalone feedback bundles include the shared implementation and
-bind its source hash; historical evidence keeps its original frozen code.
+Published contextual feedback policies bind the complete bytes of their numerical
+modules. Keep `context_controls.py`, `context_v2_controls.py`,
+`context_v3_controls.py` and their feedback modules unchanged within those policy
+versions, including import layout. Their separate implementations preserve saved
+Scientist evidence. Consolidate numerical code in a new policy version with an
+explicit migration; matching scores alone do not preserve the source contract.
 `context_baseline_refit.py` remains independent for numerical verification.
 
 Engine modules that build isolated execution bundles remain together: their

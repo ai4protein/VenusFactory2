@@ -53,7 +53,6 @@ def run_controls(task, *, score_partition="validation"):
         "task_sha256": digest(task),
         "implementation_sha256": sha256_file(Path(__file__)),
         "numeric_implementation_sha256": sha256_file(Path(controls.__file__)),
-        "shared_implementation_sha256": sha256_file(Path(context_controls.__file__)),
         "reference_implementation_sha256": sha256_file(Path(reference_thermal.__file__)),
         "fit_partition": "training",
         "score_partition": score_partition,

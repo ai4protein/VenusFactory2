@@ -30,7 +30,7 @@ jobs:
           tests/test_repository_state_exclusions.py tests/test_layout_checks.py tests/test_incremental_install.py
           tests/test_initialize.py tests/test_skill_validation.py tests/test_hub_progress.py
           tests/test_dependency_audit.py tests/test_legacy_install.py tests/test_torch_detect.py
-          tests/test_esm3_runtime.py
+          tests/test_esm3_runtime.py tests/test_scientific_contracts.py
       - name: Verify isolated virtualenv mount layout
         env:
           PYTHONPATH: src

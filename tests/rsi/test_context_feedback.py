@@ -246,7 +246,7 @@ async def test_real_mcp_feedback_submission_and_host_numeric_replay(tmp_path, po
 
 
 @pytest.mark.parametrize("version", [1, 2, 3])
-def test_standalone_feedback_binds_shared_controls_and_rejects_modified_source(tmp_path, version):
+def test_standalone_feedback_binds_versioned_controls_and_rejects_modified_source(tmp_path, version):
     from test_context_baseline_refit import fixture
 
     scope, training, scoring = fixture("numeric")
@@ -258,14 +258,18 @@ def test_standalone_feedback_binds_shared_controls_and_rejects_modified_source(t
     metrics = candidate(rows)
     expected = module.comparison(rows, scope, metrics)
     _, _, bundle = make_bundle(
-        tmp_path / "capability", "develop", {"training.json": rows}, scope,
-        {"provider": "synthetic"}, plugin_id=f"generated_context.v{version}",
+        tmp_path / "capability",
+        "develop",
+        {"training.json": rows},
+        scope,
+        {"provider": "synthetic"},
+        plugin_id=f"generated_context.v{version}",
         training_baseline_feedback=module.POLICY,
     )
     # Alter a disposable copy; leave the version store immutable.
     standalone = tmp_path / "standalone"
     shutil.copytree(bundle, standalone)
-    script = r'''
+    script = r"""
 import importlib, json, sys
 from pathlib import Path
 bundle, module_name = sys.argv[1:]
@@ -273,8 +277,9 @@ sys.path.insert(0, bundle)
 module = importlib.import_module(module_name)
 rows, scope, metrics = json.load(sys.stdin)
 first = module.comparison(rows, scope, metrics)
-core = Path(bundle) / "context_controls.py"
-assert Path(importlib.import_module("context_controls").__file__).resolve() == core.resolve()
+control_module = module_name.replace("_feedback", "_controls")
+core = Path(bundle) / (control_module + ".py")
+assert Path(importlib.import_module(control_module).__file__).resolve() == core.resolve()
 assert not any(name == "agent" or name.startswith("agent.") for name in sys.modules)
 core.chmod(core.stat().st_mode | 0o200)
 core.write_text(core.read_text() + "\n# synthetic source alteration\n")
@@ -286,13 +291,49 @@ try:
 except ValueError as error:
     assert "numerical replay" in str(error)
 else:
-    raise AssertionError("Changed shared control source accepted")
+    raise AssertionError("Changed versioned control source accepted")
 print(json.dumps(first, allow_nan=False))
-'''
+"""
     result = subprocess.run(
         [sys.executable, "-I", "-c", script, str(standalone), f"context{suffix}_feedback"],
-        cwd=tmp_path, input=json.dumps([rows, scope, metrics]), capture_output=True, text=True, timeout=60,
+        cwd=tmp_path,
+        input=json.dumps([rows, scope, metrics]),
+        capture_output=True,
+        text=True,
+        timeout=60,
     )
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout) == expected
-    assert "context_controls.py" in expected["implementation"]
+    assert f"context{suffix}_controls.py" in expected["implementation"]
+
+
+@pytest.mark.parametrize("version", [1, 2, 3])
+def test_released_feedback_records_remain_verifiable(version):
+    from test_context_baseline_refit import fixture
+
+    scope, training, scoring = fixture("numeric")
+    if version > 1:
+        scope["interface_version"] = f"generated_context.v{version}"
+    suffix = "" if version == 1 else f"_v{version}"
+    module = importlib.import_module(f"agent.rsi.engine.context{suffix}_feedback")
+    rows = training + scoring
+    metrics = candidate(rows)
+    recorded = module.comparison(rows, scope, metrics)
+    # Numerical replay alone misses this regression: the stored source identity
+    # is also part of the equality contract used by publication and inference.
+    bindings = json.loads((Path(__file__).parent / "fixtures/context_feedback_abi.json").read_text())
+    recorded["implementation"] = bindings["policies"][str(version)]
+    persisted = {**metrics, "baseline_comparison": recorded}
+    original = deepcopy(persisted)
+    task = {
+        "phase": "develop",
+        "scope": scope,
+        "plugin_id": f"generated_context.v{version}",
+        module.FIELD: module.POLICY,
+    }
+    module.verify_feedback(task, rows, json.loads(json.dumps(persisted)))
+    assert persisted == original
+    changed = deepcopy(persisted)
+    changed["baseline_comparison"]["controls"][0]["metrics"]["rmse"] += 1
+    with pytest.raises(ValueError, match="numerical replay"):
+        module.verify_feedback(task, rows, changed)

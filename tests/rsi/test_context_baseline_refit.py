@@ -53,7 +53,6 @@ def test_independent_refits_match_production_without_calling_it(kind, version, m
         scope["interface_version"] = f"generated_context.v{version}"
     saved = controls.score_rows(training, future, scope)
     monkeypatch.setattr(controls, "score_rows", lambda *a, **k: pytest.fail("Production evaluator called"))
-    monkeypatch.setattr(context_controls, "score_validated_rows", lambda *a, **k: pytest.fail("Shared evaluator called"))
     actual = refit.refit_predictions(training, refit.query_rows(future), scope)
     assert set(actual) == {r["method"] for r in saved}
     for row in saved:
