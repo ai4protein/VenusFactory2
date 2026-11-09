@@ -6,11 +6,26 @@ import json
 import re
 
 MAX_PASSAGE = 1600
+# Reserve a bounded share for input identity and interpretation fields in the
+# original database/service response, even when the draft names a wrong subject.
+QUALIFIER_FIELDS = frozenset({
+    "organism", "genes", "query_structure", "input_summary", "parameters",
+    "units", "calibration", "interpretation", "evidence_level",
+})
+
+
 STOP_WORDS = set((
     "the and for with that this from have has are was were which their into than "
     "its not can could should would been also about these those such use using "
     "protein an as at be by do if in is it no of on or so to up us we"
 ).split())
+
+
+def source_qualifier(location):
+    parts = location.get("json_pointer", "").strip("/").split("/")
+    if parts[0] == "data":
+        parts = parts[1:]
+    return bool(parts and parts[0] in QUALIFIER_FIELDS)
 
 
 def digest(value):
@@ -52,6 +67,19 @@ def chunks(text, limit=MAX_PASSAGE):
         offset = stop
 
 
+def render_json_fragment(value, location):
+    include_key = location.get("include_key", False)
+    if type(include_key) is not bool:
+        raise ValueError("Invalid JSON field anchor")
+    if include_key:
+        pointer = location["json_pointer"]
+        if not pointer or isinstance(value, (dict, list)):
+            raise ValueError("A named JSON field must identify a scalar")
+        key = pointer.rsplit("/", 1)[-1].replace("~1", "/").replace("~0", "~")
+        value = {key: value}
+    return value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+
+
 def candidates(source):
     """JSON pointers and text offsets refer to saved source content, never a draft."""
     original = str(source.get("text", ""))
@@ -65,24 +93,30 @@ def candidates(source):
             anchor = {**location, "offset": offset, "length": len(piece)}
             rows.append({"id": source["id"]+":"+digest([anchor,piece])[:16],
                          "source_id": source["id"], "location": anchor, "text": piece,
-                         "_terms": terms(piece+" "+hint)})
-    def walk(value, pointer="", depth=0):
+                         "_terms": terms(piece+" "+hint), "_qualifier": source_qualifier(location)})
+    def walk(value, pointer="", depth=0, named_field=False):
         if len(rows) >= 2048 or depth > 16:
             return
+        location = {"json_pointer": pointer}
+        if named_field and not isinstance(value, (dict, list)):
+            location["include_key"] = True
+        rendered = render_json_fragment(value, location)
         if isinstance(value, str):
-            add(value, {"json_pointer": pointer})
+            add(rendered, location)
             return
-        rendered = json.dumps(value, ensure_ascii=False, separators=(",", ":"))
         if (len(rendered) <= MAX_PASSAGE or depth >= 10) and not re.search(r"\b[ACDEFGHIKLMNPQRSTVWY]{60,}\b", rendered):
             hint = ""
             if any('"type":"' + kind + '"' in rendered for kind in (
                 "Initiator methionine", "Signal", "Transit peptide", "Propeptide", "Chain", "Peptide")):
                 hint = "processing cleavage maturation mature N-terminal signal peptide 成熟 切除 信号肽"
-            add(rendered, {"json_pointer": pointer}, hint)
+            add(rendered, location, hint)
         elif isinstance(value, dict):
-            for key, child in value.items():
+            entries = list(value.items())
+            if pointer in {"", "/data"}:
+                entries.sort(key=lambda item: item[0] not in QUALIFIER_FIELDS)
+            for key, child in entries:
                 escaped = str(key).replace("~","~0").replace("/","~1")
-                walk(child,pointer+"/"+escaped,depth+1)
+                walk(child,pointer+"/"+escaped,depth+1,named_field=True)
         elif isinstance(value, list):
             for index, child in enumerate(value):
                 walk(child,pointer+"/"+str(index),depth+1)
@@ -103,20 +137,34 @@ def candidates(source):
 
 def selected_passages(source, query, budget):
     wanted = terms(query)
-    ranked = sorted(enumerate(candidates(source)),
+    available = candidates(source)
+    ranked = sorted(enumerate(available),
                     key=lambda row: (-len(wanted & row[1]["_terms"]), row[0]))
     selected, used = [], 0
+    reserved = set()
+    # Context shares the same character and passage ceilings as query matches.
+    # Keep these excerpts complete; never truncate a qualifier to reserve it.
+    for row in available:
+        size = len(row["text"])
+        if row.get("_qualifier") and len(reserved) < 3 and used + size <= budget // 3:
+            selected.append({key: value for key, value in row.items() if not key.startswith("_")})
+            reserved.add(row["id"])
+            used += size
+    query_selected = 0
     for _, row in ranked:
+        if row["id"] in reserved:
+            continue
         size = len(row["text"])
         if used+size > budget:
-            if selected or budget-used < 160:
+            if query_selected or budget-used < 160:
                 continue
             row = {**row, "text": row["text"][:budget-used],
                    "location": {**row["location"], "length": budget-used}}
             row["id"] = source["id"]+":"+digest([row["location"],row["text"]])[:16]
             size = len(row["text"])
-        selected.append({key:value for key,value in row.items() if key!="_terms"})
+        selected.append({key:value for key,value in row.items() if not key.startswith("_")})
         used += size
+        query_selected += 1
         if len(selected) >= 8:
             break
     return {**{key: source.get(key) for key in ("service", "query_tool", "query_arguments", "sequence_sha256")},
@@ -142,7 +190,7 @@ def resolve_passage(source, location):
         for token in pointer[1:].split("/"):
             token=token.replace("~1","/").replace("~0","~")
             value=value[int(token)] if isinstance(value,list) else value[token]
-    text=value if isinstance(value,str) else json.dumps(value,ensure_ascii=False,separators=(",",":"))
+    text = render_json_fragment(value, location)
     offset,length=location["offset"],location["length"]
     if type(offset) is not int or type(length) is not int or offset<0 or length<1:
         raise ValueError("Invalid JSON passage span")

@@ -12,7 +12,7 @@ import httpx
 from .research_evidence_passages import chunks, digest, resolve_passage, selected_passages, source_digest
 from .research_measurements import measured_values_anchored
 
-VERSION = "source_review.v2.1"
+VERSION = "source_review.v2.2"
 MAX_PACKET_CHARS = 28000
 MAX_UNITS = 8
 MAX_RECOVERY_ROUNDS = 2
