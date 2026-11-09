@@ -69,6 +69,7 @@ import {
   uploadFiles
 } from "../lib/api";
 import { streamSSEFromPost, streamSSEFromGet } from "../lib/sse";
+import { runChatStreamAction, runChatUpdateAction, cancelChatStreamAction } from "../lib/chatActions";
 import { WorkspaceFilePicker } from "../components/WorkspaceFilePicker";
 import { type WorkspaceFile } from "../lib/workspaceApi";
 import {
@@ -112,6 +113,7 @@ const STRINGS = {
     errNoUserMsg: "No previous user message in current session.",
     errStreamMsg: "Failed to stream message.",
     errRetryMsg: "Failed to retry message.",
+    errStopRun: "Could not stop this task. Please retry.",
     errClarification: "Failed to submit clarification.",
     errAskUser: "Failed to submit answers to the agent.",
     errApproval: "Failed to submit approval decision.",
@@ -276,6 +278,7 @@ const STRINGS = {
     errNoUserMsg: "当前会话中没有以往的用户消息。",
     errStreamMsg: "消息流式传输失败。",
     errRetryMsg: "重试消息失败。",
+    errStopRun: "暂时无法停止任务，请重试。",
     errClarification: "提交澄清答复失败。",
     errAskUser: "提交回答给 Agent 失败。",
     errApproval: "提交批准决定失败。",
@@ -644,6 +647,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   const [chatQuota, setChatQuota] = useState<ChatQuota | null>(null);
   const [startingTurn, setStartingTurn] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const viewMounted = useRef(true);
   const agentWorking = !researcherMode && chatMode === "science_agent" && (running || isRunActive(snapshot?.status));
   function detachStream() {
     sessionPreviews.current.remember(snapshotRef.current);
@@ -767,7 +771,9 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   // Leaving Chat (other routes / remount) must detach the SSE reader so a
   // new mount can poll fresh state. Backend keeps the graph running.
   useEffect(() => {
+    viewMounted.current = true;
     return () => {
+      viewMounted.current = false;
       abortRef.current?.abort();
       abortRef.current = null;
     };
@@ -906,6 +912,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       // Back-forward cache restores the old React tree without remounting —
       // clear a zombie "running" flag so the UI can rejoin the checkpoint.
       if (ev.persisted) {
+        abortRef.current?.abort();
         setRunning(false);
         stopStream();
         setRunStatus("stopped");
@@ -1245,7 +1252,7 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       if (opts?.updateUrl !== false) syncSessionUrl(sid, requestedMode);
     } else if (sessionLoad.current.pending || sessionLoad.current.target !== sid) return;
     const requestedSessionRevision = sessionLoad.current.revision;
-    const isCurrentRequest = () => activeModeRef.current === requestedMode && sessionLoad.current.revision === requestedSessionRevision && sessionLoad.current.target === sid;
+    const isCurrentRequest = () => viewMounted.current && activeModeRef.current === requestedMode && sessionLoad.current.revision === requestedSessionRevision && sessionLoad.current.target === sid;
     try {
       const s = sanitizeChatSnapshot(await getChatSession(sid));
       if (!isCurrentRequest()) return;
@@ -1555,330 +1562,121 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     }
   }
 
+  function currentSessionView(sid = sessionId) {
+    const revision = sessionLoad.current.revision;
+    const mode = activeModeRef.current;
+    return () => viewMounted.current && sessionLoad.current.target === sid && sessionLoad.current.revision === revision &&
+      activeModeRef.current === mode && visibleModeRef.current !== "researcher";
+  }
+
+  async function submitSessionAction(url: string, body: unknown, errorMessage: string, refreshOnFailure = false) {
+    const sid = sessionId;
+    return runChatStreamAction({
+      stream: abortRef,
+      current: currentSessionView(sid),
+      request: (signal, onEvent) => streamSSEFromPost(url, body, onEvent, signal, getChatSessionAuthHeaders(sid)),
+      onStart: () => {
+        runningRef.current = true;
+        setError(""); setRunning(true); setRunStatus("running"); setStartingTurn(true);
+      },
+      onEvent: event => { setStartingTurn(false); handleStreamEvent(event); },
+      onSuccess: () => { void fetchSessions().catch(() => {}); },
+      onError: async error => {
+        setError(error instanceof Error ? error.message : errorMessage);
+        setRunStatus("stopped");
+        if (refreshOnFailure) await refreshCurrentSession(sid, { syncComposer: false }).catch(() => {});
+      },
+      onFinish: () => {
+        runningRef.current = false;
+        setRunning(false); setStartingTurn(false); stopStream();
+      },
+    });
+  }
+
   async function retryLastMessage() {
     if (!sessionId || agentWorking) return;
     if (!snapshot?.history?.some((h) => h.role === "user")) {
       setError(t.errNoUserMsg);
       return;
     }
-    setError("");
-    setRunning(true);
-    setRunStatus("running");
-    const controller = new AbortController();
-    abortRef.current = controller;
-    setStartingTurn(true);
-    const ownsView = () => abortRef.current === controller;
-    try {
-      await streamSSEFromPost(
-        `/api/chat/sessions/${encodeURIComponent(sessionId)}/messages/retry/stream`,
-        {},
-        event => { if (ownsView()) { setStartingTurn(false); handleStreamEvent(event); } },
-        controller.signal,
-        getChatSessionAuthHeaders(sessionId)
-      );
-      await fetchSessions();
-    } catch (err) {
-      if (!ownsView()) return;
-      if (err instanceof DOMException && err.name === "AbortError") {
-        setRunStatus("stopped");
-      } else {
-        setError(err instanceof Error ? err.message : t.errRetryMsg);
-        setRunStatus("stopped");
-      }
-    } finally {
-      if (ownsView()) {
-        setRunning(false); setStartingTurn(false);
-        stopStream();
-        abortRef.current = null;
-      }
-      await refreshChatQuota();
-    }
+    await submitSessionAction(`/api/chat/sessions/${encodeURIComponent(sessionId)}/messages/retry/stream`, {}, t.errRetryMsg);
+    await refreshChatQuota();
   }
 
   async function abortRun() {
-    setRunStatus("stopping");
-    if (sessionId) {
-      try {
-        await cancelChatSession(sessionId);
-      } catch {
-        // best effort cancellation
-      }
-    }
-    abortRef.current?.abort();
-    setRunning(false);
-    // Keep "Stopping" until backend status confirms stopped/completed.
-    setTimeout(() => {
-      void refreshCurrentSession();
-    }, 600);
+    if (!sessionId) return;
+    const sid = sessionId;
+    const current = currentSessionView(sid);
+    await cancelChatStreamAction({
+      stream: abortRef, current,
+      request: () => cancelChatSession(sid),
+      onStart: () => setRunStatus("stopping"),
+      onSuccess: () => {
+        setRunning(false);
+        // Refresh only the cancelled view, without interrupting a later turn.
+        setTimeout(() => {
+          if (current() && !abortRef.current) void refreshCurrentSession(sid, { syncComposer: false }).catch(() => {});
+        }, 600);
+      },
+      onError: error => {
+        setRunStatus("running");
+        setError(error instanceof Error ? error.message : t.errStopRun);
+      },
+    });
   }
 
   async function submitClarification(answers: ClarificationAnswer[]) {
     if (!sessionId || agentWorking) return;
-    setError("");
-    setRunning(true);
-    setRunStatus("running");
-    const controller = new AbortController();
-    abortRef.current = controller;
-    setStartingTurn(true);
-    const ownsView = () => abortRef.current === controller;
-    try {
-      await streamSSEFromPost(
-        getClarificationRespondUrl(sessionId),
-        { answers },
-        event => { if (ownsView()) { setStartingTurn(false); handleStreamEvent(event); } },
-        controller.signal,
-        getChatSessionAuthHeaders(sessionId)
-      );
-      await fetchSessions();
-    } catch (err) {
-      if (!ownsView()) return;
-      if (err instanceof DOMException && err.name === "AbortError") {
-        setRunStatus("stopped");
-        return;
-      }
-      setError(err instanceof Error ? err.message : t.errClarification);
-      setRunStatus("stopped");
-    } finally {
-      if (ownsView()) {
-        setRunning(false); setStartingTurn(false);
-        stopStream();
-        abortRef.current = null;
-      }
-    }
+    await submitSessionAction(getClarificationRespondUrl(sessionId), { answers }, t.errClarification);
   }
 
   async function submitInteraction(answer: UserResponse) {
     if (!sessionId || agentWorking) return;
-    const sid = sessionId;
-    setError(""); setRunning(true); setRunStatus("running"); setStartingTurn(true);
-    const controller = new AbortController(); abortRef.current = controller;
-    const ownsView = () => abortRef.current === controller;
-    try {
-      await streamSSEFromPost(`/api/chat/sessions/${encodeURIComponent(sid)}/interactions/respond/stream`, answer,
-        event => { if (ownsView()) { setStartingTurn(false); handleStreamEvent(event); } },
-        controller.signal, getChatSessionAuthHeaders(sid));
-      await fetchSessions();
-    } catch (err) {
-      if (ownsView() && !(err instanceof DOMException && err.name === "AbortError")) {
-        setError(err instanceof Error ? err.message : t.errAskUser);
-        await refreshCurrentSession(sid);
-      }
-    } finally {
-      if (ownsView()) { setRunning(false); setStartingTurn(false); stopStream(); abortRef.current = null; }
-    }
+    await submitSessionAction(`/api/chat/sessions/${encodeURIComponent(sessionId)}/interactions/respond/stream`, answer, t.errAskUser, true);
   }
 
   async function submitAskUser(answers: ClarificationAnswer[]) {
     if (!sessionId || agentWorking) return;
-    setError("");
     setModelSwitchNotice(t.noticeAskUserSubmitted);
-    setRunning(true);
-    setRunStatus("running");
-    const controller = new AbortController();
-    abortRef.current = controller;
-    setStartingTurn(true);
-    const ownsView = () => abortRef.current === controller;
-    try {
-      await streamSSEFromPost(
-        getAskUserRespondUrl(sessionId),
-        { answers },
-        event => { if (ownsView()) { setStartingTurn(false); handleStreamEvent(event); } },
-        controller.signal,
-        getChatSessionAuthHeaders(sessionId)
-      );
-      await fetchSessions();
-    } catch (err) {
-      if (!ownsView()) return;
-      if (err instanceof DOMException && err.name === "AbortError") {
-        setRunStatus("stopped");
-        return;
-      }
-      setError(err instanceof Error ? err.message : t.errAskUser);
-      setRunStatus("stopped");
-    } finally {
-      if (ownsView()) {
-        setRunning(false); setStartingTurn(false);
-        stopStream();
-        abortRef.current = null;
-      }
-    }
+    await submitSessionAction(getAskUserRespondUrl(sessionId), { answers }, t.errAskUser);
   }
 
   async function submitApproval(decision: ApprovalDecision) {
     if (!sessionId || agentWorking) return;
-    setError("");
-    setModelSwitchNotice(
-      decision.decision === "approved" ? t.noticeApprovalApproved : t.noticeApprovalRejected
-    );
-    setRunning(true);
-    setRunStatus("running");
-    const controller = new AbortController();
-    abortRef.current = controller;
-    setStartingTurn(true);
-    const ownsView = () => abortRef.current === controller;
-    try {
-      await streamSSEFromPost(
-        getApprovalDecideUrl(sessionId),
-        {
-          decision: decision.decision,
-          selected_label: decision.selected_label || "",
-          feedback: decision.feedback || "",
-        },
-        event => { if (ownsView()) { setStartingTurn(false); handleStreamEvent(event); } },
-        controller.signal,
-        getChatSessionAuthHeaders(sessionId)
-      );
-      await fetchSessions();
-    } catch (err) {
-      if (!ownsView()) return;
-      if (err instanceof DOMException && err.name === "AbortError") {
-        setRunStatus("stopped");
-        return;
-      }
-      setError(err instanceof Error ? err.message : t.errApproval);
-      setRunStatus("stopped");
-    } finally {
-      if (ownsView()) {
-        setRunning(false); setStartingTurn(false);
-        stopStream();
-        abortRef.current = null;
-      }
-    }
+    setModelSwitchNotice(decision.decision === "approved" ? t.noticeApprovalApproved : t.noticeApprovalRejected);
+    await submitSessionAction(getApprovalDecideUrl(sessionId), {
+      decision: decision.decision,
+      selected_label: decision.selected_label || "",
+      feedback: decision.feedback || "",
+    }, t.errApproval);
   }
 
   async function confirmPlan(plan: PlanStep[], autoExecute: boolean) {
     if (!sessionId || agentWorking) return;
-    setError("");
-    setRunning(true);
-    setRunStatus("running");
-    const controller = new AbortController();
-    abortRef.current = controller;
-    setStartingTurn(true);
-    const ownsView = () => abortRef.current === controller;
-    try {
-      await streamSSEFromPost(
-        getPlanConfirmUrl(sessionId),
-        { plan, auto_execute: autoExecute },
-        event => { if (ownsView()) { setStartingTurn(false); handleStreamEvent(event); } },
-        controller.signal,
-        getChatSessionAuthHeaders(sessionId)
-      );
-      await fetchSessions();
-    } catch (err) {
-      if (!ownsView()) return;
-      if (err instanceof DOMException && err.name === "AbortError") {
-        setRunStatus("stopped");
-        return;
-      }
-      setError(err instanceof Error ? err.message : t.errConfirmPlan);
-      setRunStatus("stopped");
-    } finally {
-      if (ownsView()) {
-        setRunning(false); setStartingTurn(false);
-        stopStream();
-        abortRef.current = null;
-      }
-    }
+    await submitSessionAction(getPlanConfirmUrl(sessionId), { plan, auto_execute: autoExecute }, t.errConfirmPlan);
   }
 
   async function handleIterationDecision(action: "satisfied" | "modify_plan" | "continue") {
     if (!sessionId || agentWorking) return;
+    const sid = sessionId;
+    const current = currentSessionView(sid);
     setError("");
-    try {
-      const result = await iterationDecide(sessionId, action);
-      if (result.status === "waiting_for_plan_confirmation" && result.plan) {
-        setSnapshot(prev => prev ? {
-          ...prev,
-          status: "waiting_for_plan_confirmation",
-          waiting_for: "plan_confirmation",
-          plan: result.plan!,
-        } : prev);
-      } else {
-        setSnapshot(prev => prev ? {
-          ...prev,
-          status: result.status,
-          waiting_for: "",
-        } : prev);
-      }
-      await refreshCurrentSession();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t.errIteration);
-    }
+    await runChatUpdateAction({
+      current: () => current() && !abortRef.current,
+      request: () => iterationDecide(sid, action),
+      onSuccess: () => refreshCurrentSession(sid, { syncComposer: false }),
+      onError: error => setError(error instanceof Error ? error.message : t.errIteration),
+    });
   }
 
   async function handleStepDecision(action: "continue" | "abort") {
     if (!sessionId || agentWorking) return;
-    setError("");
-    setRunning(true);
-    setRunStatus("running");
-    const controller = new AbortController();
-    abortRef.current = controller;
-    setStartingTurn(true);
-    const ownsView = () => abortRef.current === controller;
-    try {
-      await streamSSEFromPost(
-        getStepDecideUrl(sessionId),
-        { action },
-        event => { if (ownsView()) { setStartingTurn(false); handleStreamEvent(event); } },
-        controller.signal,
-        getChatSessionAuthHeaders(sessionId)
-      );
-      await fetchSessions();
-    } catch (err) {
-      if (!ownsView()) return;
-      if (err instanceof DOMException && err.name === "AbortError") {
-        setRunStatus("stopped");
-        return;
-      }
-      setError(err instanceof Error ? err.message : t.errStepDecision);
-      setRunStatus("stopped");
-    } finally {
-      if (ownsView()) {
-        setRunning(false); setStartingTurn(false);
-        stopStream();
-        abortRef.current = null;
-      }
-    }
+    await submitSessionAction(getStepDecideUrl(sessionId), { action }, t.errStepDecision);
   }
 
-  async function handleSubReportDecision(
-    action: "continue" | "skip" | "rewrite",
-    comment?: string
-  ): Promise<boolean> {
+  async function handleSubReportDecision(action: "continue" | "skip" | "rewrite", comment?: string): Promise<boolean> {
     if (!sessionId || running) return false;
-    setError("");
-    setRunning(true);
-    setRunStatus("running");
-    const controller = new AbortController();
-    abortRef.current = controller;
-    setStartingTurn(true);
-    const ownsView = () => abortRef.current === controller;
-    try {
-      await streamSSEFromPost(
-        getSubReportDecideUrl(sessionId),
-        { action, comment: comment || "" },
-        event => { if (ownsView()) { setStartingTurn(false); handleStreamEvent(event); } },
-        controller.signal,
-        getChatSessionAuthHeaders(sessionId)
-      );
-      await fetchSessions();
-      return true;
-    } catch (err) {
-      if (!ownsView()) return false;
-      if (err instanceof DOMException && err.name === "AbortError") {
-        setRunStatus("stopped");
-        return false;
-      }
-      setError(err instanceof Error ? err.message : t.errSubReport);
-      setRunStatus("stopped");
-      return false;
-    } finally {
-      if (ownsView()) {
-        setRunning(false); setStartingTurn(false);
-        stopStream();
-        abortRef.current = null;
-      }
-    }
+    return submitSessionAction(getSubReportDecideUrl(sessionId), { action, comment: comment || "" }, t.errSubReport);
   }
 
   async function copySessionId(value: string) {

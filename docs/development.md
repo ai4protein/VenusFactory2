@@ -91,7 +91,7 @@ refactor separate from new product behavior, with a bounded regression target.
 
 | Subsystem owner | Consolidation target | Verification before merging |
 | --- | --- | --- |
-| Chat UI (`ChatPage.tsx`) | Separate session navigation, composer actions and history presentation from page coordination | Switching mode or session must preserve running jobs, drafts and streamed answers |
+| Chat UI (`ChatPage.tsx`) | Separate session navigation and history presentation from page coordination; keep response/retry action lifecycle in `frontend/src/lib/chatActions.ts` | Switching mode or session must preserve running jobs, drafts and streamed answers; delayed cancellation and interaction acknowledgments must not affect another conversation |
 | Training pipeline (`train_operations.py`) | Separate dataset preparation, training launch and result packaging; use the shared admission policy | Dataset split validation, resume checkpoints, queued cancellation, online ESM2 8M restrictions and artifact ownership |
 | Model API (`custom_model_api.py`) | Keep training, evaluation and prediction submission separate; share ownership and admission policy | Owner isolation, online limits, idempotent queue submission and existing route contracts |
 | RSI engine (`generated_context*.py`) | Share new execution primitives without rewriting published source-bound policy versions | Standalone bundles, saved feedback replay, registered-model inference, strict scope checks and complete source bindings |
@@ -110,6 +110,14 @@ admission use that module; it must not depend on executors or workspace services
 Task episode construction belongs in `research_episodes.py`; `research_dataset.py`
 coordinates table preparation, while `research_data_store.py` owns protected views
 and immutable partition bindings. Resume uses the same metadata builder as preparation.
+
+Chat response, approval and retry actions share `frontend/src/lib/chatActions.ts`.
+The page owns session selection and optimistic first-turn submission;
+`useChatStream.ts` owns rendered stream state and `sse.ts` owns transport recovery.
+Capture the original session and stream before an asynchronous action. Its late
+result may update that session only; stopping one conversation must never abort
+the currently visible conversation by looking up a different stream after awaiting
+the server. Detaching a reader during navigation does not cancel the server job.
 
 ## Before a commit
 
