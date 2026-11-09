@@ -115,7 +115,11 @@ def explicit_proposal(text):
 
 def validate_assessments(response, request, sources):
     """Validate coverage and source anchors independently of the model verdict."""
-    rows = parse_response(response)
+    return _validate_assessment_rows(parse_response(response), request, sources)
+
+
+def _validate_assessment_rows(rows, request, sources):
+    """Apply the same source contract to complete responses and recovery rows."""
     expected = {row["id"]: row for row in request["units"]}
     if (len(rows) != len(expected) or any(not isinstance(row, dict) for row in rows)
             or any(not isinstance(row.get("unit_id"), str) for row in rows)
@@ -188,7 +192,7 @@ def partial_assessments(response, request, sources):
         single = {**request, "units": [expected[identity]]}
         try:
             # Use the full scientific and source-anchor validator for each unit.
-            checked.extend(validate_assessments(json.dumps({"assessments": [row]}), single, sources))
+            checked.extend(_validate_assessment_rows([row], single, sources))
             invalid.pop(identity)
         except (ValueError, KeyError, TypeError) as exc:
             invalid[identity] = str(exc)[:500]

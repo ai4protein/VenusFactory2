@@ -91,6 +91,7 @@ refactor separate from new product behavior, with a bounded regression target.
 | Chat UI (`ChatPage.tsx`) | Separate session navigation, composer actions and history presentation from page coordination | Switching mode or session must preserve running jobs, drafts and streamed answers |
 | Model API (`custom_model_api.py`) | Keep training, evaluation and prediction submission separate; share ownership and admission policy | Owner isolation, online limits, idempotent queue submission and existing route contracts |
 | RSI engine (`generated_context*.py`) | Share repeated execution primitives while retaining version-specific scientific contracts | Standalone bundles, strict scope checks, unchanged numerical results and complete source bindings |
+| Researcher review (`research_source_review.py`) | Separate response decoding from the shared source-anchor validator; resolve unsupported field-to-value relationships before promoting a semantic reviewer | Unchanged decisions on saved-response replay, followed by new-protein and complete multi-chapter acceptance checks |
 
 The layout check rejects imports from shared Harness contracts or worker adapters
 back into worker entry points. The dispatcher owns worker selection; reusable
