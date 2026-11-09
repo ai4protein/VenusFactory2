@@ -10,6 +10,7 @@ from pathlib import Path
 from agent.rsi.engine.scientist_model_library import ScientistModelLibrary, _require
 from mcp_tools.tools.runtime_tool_policy import assert_tool_allowed
 from mcp_tools.models.catalog_snapshot import catalog_snapshot
+from .scope import ModelScopeError, bind_scope, scope_reference
 
 TOOL_NAMES = {
     "list": "list_evolved_models",
@@ -184,6 +185,7 @@ def describe_model(library, entry_id):
         contract = {"kind": "sequence_with_features" if featured else "sequence"}
     return {
         **public_card(entry_id, key, publication["origin"], verified_now=False),
+        "scope_ref": scope_reference(entry_id, key["scope"]),
         "validation_metrics_status": "recorded",
         "validation_metrics": publication["packet"]["assessment"]["metrics"],
         "input_fields": fields,
@@ -193,17 +195,17 @@ def describe_model(library, entry_id):
     }
 
 
-def predict_model(library, entry_id, inputs, scope, *, session_id=None, session_binding="tool_request"):
+def predict_model(library, entry_id, inputs, scope=None, *, scope_ref=None, session_id=None, session_binding="tool_request"):
     from mcp_tools.tools.runtime_tool_policy import assert_tool_call_allowed
     assert_tool_call_allowed('predict_with_evolved_model', {'entry_id':entry_id})
     _require(isinstance(inputs, list) and 1 <= len(inputs) <= 256, "Predict accepts 1 to 256 input rows")
-    _require(isinstance(scope, dict), "Explicit model applicability scope required")
     _require(len(json.dumps(inputs, allow_nan=False).encode()) <= 1024 * 1024, "Input batch is too large")
     _require(all(isinstance(row, dict) for row in inputs), "Inputs must be records")
     if session_id is None:
         session_id = "agent_tool_request_" + uuid.uuid4().hex
         session_binding = "tool_request"
     _require(isinstance(session_id, str) and 0 < len(session_id) <= 256, "Invalid host session")
+    scope = bind_scope(library, entry_id, scope, scope_ref)
     result = library.predict(entry_id, inputs, scope, session_id=session_id)
     return {
         **result,
@@ -229,6 +231,8 @@ def dispatch(action, *, session_id=None, session_binding="tool_request", **argum
         else:
             result = predict_model(library, **arguments, session_id=session_id, session_binding=session_binding)
         return {"success": True, **result}
+    except ModelScopeError as exc:
+        return {"success": False, "error_code": "invalid_model_scope", "error": str(exc)}
     except Exception as exc:
         return {
             "success": False,

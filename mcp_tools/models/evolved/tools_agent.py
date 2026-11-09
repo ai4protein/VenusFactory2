@@ -21,13 +21,17 @@ def describe_evolved_model_tool(entry_id: str) -> str:
 
 
 @tool("predict_with_evolved_model")
-def predict_with_evolved_model_tool(entry_id: str, inputs: list[dict], scope: dict, config: RunnableConfig) -> str:
-    """Predict with a verified Scientist model. Copy the exact scope from describe and follow its input_fields and input_contract for 1-256 records. Context models require id/protein/group/values; sequence models require id/sequence (features when specified). No target labels, training or publication required. Local only."""
+def predict_with_evolved_model_tool(
+    entry_id: str, inputs: list[dict], config: RunnableConfig,
+    scope_ref: str | None = None, scope: dict | None = None,
+) -> str:
+    """Predict with a registered Scientist model using scope_ref from describe_evolved_model. Follow its input_fields and input_contract for 1-256 unlabelled records; preserve record IDs and values. The full inline scope is also accepted. Evidence and inputs are revalidated; this never trains or publishes a model. Local only."""
     host = config.get("configurable", {})
     session = host.get("session_id") or host.get("thread_id")
     return json.dumps(
         dispatch(
-            "predict", entry_id=entry_id, inputs=inputs, scope=scope, session_id=session, session_binding="chat_session"
+            "predict", entry_id=entry_id, inputs=inputs, scope=scope, scope_ref=scope_ref,
+            session_id=session, session_binding="chat_session"
         ),
         ensure_ascii=False,
     )

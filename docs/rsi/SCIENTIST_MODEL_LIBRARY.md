@@ -99,14 +99,19 @@ Local Agent chat (LangChain) and the existing MCP server expose
 They use `research_runs/rsi/scientist_model_library_v1` by default. An operator
 may set `VENUS_SCIENTIST_MODEL_LIBRARY`; tool arguments cannot select a path.
 These tools are disabled in online mode because this catalog belongs to the
-local research owner. No deployment service is restarted by adding the tools.
+local research owner.
 
-Search results describe recorded publications and do not imply fresh
-verification. Describe and predict revalidate the current origin, retirement
-state and numerical evidence. Responses expose task scope and validation
-metrics, without source code, dataset records, internal paths or LLM settings.
-Prediction requires the exact described scope and at most 256 input records;
-target labels are removed before inference. No tool trains or publishes models.
+Search returns names and short descriptions. `describe_evolved_model` reads the
+selected publication, its input contract, full scope, recorded metrics and
+`scope_ref`. Pass that reference with `entry_id` and up to 256 unlabelled records
+to `predict_with_evolved_model`. The reference binds the selected entry and its
+complete scope, so callers do not need to retype the scope object. Existing calls
+with the full inline `scope` remain supported.
+
+Prediction checks current publication bindings, evidence, runtime policy and
+scientific inputs. A scope reference does not bypass those checks. Target labels
+are removed before inference. Responses contain no source code, dataset records,
+internal paths or LLM settings. These tools do not train or publish models.
 
 The MCP wrapper binds usage to the actual transport session. The LangChain
 wrapper uses the host's configurable session_id or thread_id; when neither is

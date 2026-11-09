@@ -20,13 +20,17 @@ def describe_evolved_model(entry_id: str) -> dict:
 
 
 @mcp.tool(name="predict_with_evolved_model")
-def predict_with_evolved_model(entry_id: str, inputs: list[dict], scope: dict, ctx: Context) -> dict:
-    """Predict with a verified model using its exact described scope, input_fields and input_contract for 1-256 records. Context models use id/protein/group/values; sequence models use id/sequence (features when specified). No target labels required. This never trains or publishes models. Local only."""
+def predict_with_evolved_model(
+    entry_id: str, inputs: list[dict], ctx: Context,
+    scope_ref: str | None = None, scope: dict | None = None,
+) -> dict:
+    """Predict with a registered model using scope_ref from describe_evolved_model and its input_fields/input_contract for 1-256 unlabelled records. Preserve IDs and values. The full inline scope is also accepted. Evidence and inputs are revalidated; this never trains or publishes models. Local only."""
     return dispatch(
         "predict",
         entry_id=entry_id,
         inputs=inputs,
         scope=scope,
+        scope_ref=scope_ref,
         session_id=ctx.session_id,
         session_binding="mcp_transport_session",
     )

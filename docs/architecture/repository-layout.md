@@ -102,6 +102,10 @@ LigandMPNN are both pretrained methods; DeepSol · ESM2-650M is a factory-traine
 task model; a reviewed Scientist solubility predictor is an RSI artifact. All use
 the same discovery, queue and access-control path. An unreviewed research result
 must not become public merely because its code executed successfully.
+Evolved-model calls can carry a compact `scope_ref` from their selected
+model description. `mcp_tools/models/evolved/scope.py` binds it to the immutable
+entry and complete scope before numerical execution; the library still owns
+evidence verification and prediction receipts.
 
 Skills are instructions, not executable plugins. Keep upstream licenses and the
 submodule revision. Native IDs take precedence; collisions use `sas_<name>`.
