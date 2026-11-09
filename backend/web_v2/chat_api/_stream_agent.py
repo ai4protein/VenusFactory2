@@ -290,7 +290,7 @@ async def _stream_agent(state, text, attachment_paths, *, retry=False, interacti
                                 state["error"] = row.get("error_type", "Agent execution failed")
                             elif kind in {"text", "tool_call_start", "tool_result"}:
                                 if kind != "text":
-                                    record_tool_observation(state["agent_pending_turn"], row, profile.harness)
+                                    record_tool_observation(state["agent_pending_turn"], row, profile.harness, workspace=workspace)
                                     if kind == "tool_result":
                                         await _session_store.save(sid)
                                     with (control / "events.jsonl").open("a") as log:

@@ -64,11 +64,10 @@ def estimate(value):
     return len(text.encode("utf-8")) + 16
 
 
-def clip(text, budget):
+def clip(text, budget, *, marker="\n[excerpt; see conversation archive]\n"):
     raw = str(text).encode("utf-8")
     if len(raw) <= budget:
         return str(text)
-    marker = "\n[excerpt; see conversation archive]\n"
     available = max(0, budget - len(marker.encode()))
     head = available * 2 // 3
     tail = available - head

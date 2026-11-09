@@ -166,6 +166,15 @@ Changing credentials/configuration may create a new pool namespace; queue limits
 still apply across pools. Both deployments can compete for the same physical
 GPU, so budget their GPU slots together or assign separate devices.
 
+Large Agent tool observations are saved under the owning session's
+`context/tool-observations/` before their working-memory preview is shortened.
+The next turn receives separate result and argument excerpts within a 12,000-byte
+UTF-8 window, plus the path to the full JSON record under `/workspace`. The saved
+record includes the original arguments, output and completion status. Follow-up
+questions can retrieve omitted details from that record. Archive writes use the shared
+descriptor-anchored file boundary. If a write fails, the observation remains
+explicitly excerpted and carries no nonexistent file reference.
+
 ## Scientist deliverables
 
 Scientist generates a project workspace with source, dependency declarations,
