@@ -7,9 +7,10 @@ import math
 from pathlib import Path
 
 try:
-    from agent.rsi import context_v3_controls, generated_context_v3, reference_thermal_baselines
+    from . import context_controls, context_v3_controls, generated_context_v3, reference_thermal_baselines
     from .protein_model import digest
 except ImportError:  # Frozen standalone MCP capability.
+    import context_controls
     import context_v3_controls
     import generated_context_v3
     import reference_thermal_baselines
@@ -78,6 +79,7 @@ def comparison(rows, scope, candidate_metrics):
     modules = [
         Path(__file__),
         Path(context_v3_controls.__file__),
+        Path(context_controls.__file__),
         Path(generated_context_v3.__file__),
         Path(reference_thermal_baselines.__file__),
     ]

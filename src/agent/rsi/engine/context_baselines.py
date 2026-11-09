@@ -6,8 +6,10 @@ import numpy as np
 import scipy
 import sklearn
 
-from agent.rsi import context_controls
-from agent.rsi import reference_thermal_baselines as reference_thermal
+from agent.rsi.datasets.model_tasks import load_task
+
+from . import context_controls
+from . import reference_thermal_baselines as reference_thermal
 from .context_controls import (
     METHODS as METHODS,
 )
@@ -26,7 +28,6 @@ from .context_controls import (
 from .context_controls import (
     thermal_predictions as thermal_predictions,
 )
-from agent.rsi.datasets.model_tasks import load_task
 from .protein_model import digest
 from .storage import sha256_file
 
@@ -42,9 +43,9 @@ def run_controls(task, *, score_partition="validation"):
     training, validation = data["training"], data[score_partition]
     controls = context_controls
     if task["plugin_id"] == "generated_context.v2":
-        from agent.rsi import context_v2_controls as controls
+        from . import context_v2_controls as controls
     elif task["plugin_id"] == "generated_context.v3":
-        from agent.rsi import context_v3_controls as controls
+        from . import context_v3_controls as controls
     outcomes = controls.score_rows(training, validation, task["scope"])
     return {
         "schema": VERSION,
@@ -52,6 +53,7 @@ def run_controls(task, *, score_partition="validation"):
         "task_sha256": digest(task),
         "implementation_sha256": sha256_file(Path(__file__)),
         "numeric_implementation_sha256": sha256_file(Path(controls.__file__)),
+        "shared_implementation_sha256": sha256_file(Path(context_controls.__file__)),
         "reference_implementation_sha256": sha256_file(Path(reference_thermal.__file__)),
         "fit_partition": "training",
         "score_partition": score_partition,

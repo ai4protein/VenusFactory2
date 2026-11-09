@@ -23,6 +23,12 @@ eagerly load model libraries. Modules within the same engine use relative import
 do not route their internal dependencies through the legacy alias layer. Frozen
 historical source snapshots are not rewritten.
 
+The three contextual model interfaces share fixed estimators and scoring in
+`engine/context_controls.py`. Version adapters retain their own scope and row
+validation. Standalone feedback bundles include the shared implementation and
+bind its source hash; historical evidence keeps its original frozen code.
+`context_baseline_refit.py` remains independent for numerical verification.
+
 Engine modules that build isolated execution bundles remain together: their
 relative source dependencies are part of the runtime contract. Moving an engine
 file requires updating and testing the generated execution bundle as well.

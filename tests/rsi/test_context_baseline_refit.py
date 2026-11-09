@@ -8,7 +8,7 @@ import pytest
 from test_context_v2 import make_task, save
 
 from agent.rsi import context_baseline_refit as refit
-from agent.rsi import context_controls, context_v2_controls, shared_context_evaluation
+from agent.rsi import context_controls, context_v2_controls, context_v3_controls, shared_context_evaluation
 
 
 def fixture(kind="ordinary"):
@@ -45,14 +45,15 @@ def fixture(kind="ordinary"):
 
 
 @pytest.mark.parametrize("kind", ["numeric", "ordinary", "reference"])
-@pytest.mark.parametrize("version", [1, 2])
+@pytest.mark.parametrize("version", [1, 2, 3])
 def test_independent_refits_match_production_without_calling_it(kind, version, monkeypatch):
     scope, training, future = fixture(kind)
-    controls = context_controls if version == 1 else context_v2_controls
-    if version == 2:
-        scope["interface_version"] = "generated_context.v2"
+    controls = {1: context_controls, 2: context_v2_controls, 3: context_v3_controls}[version]
+    if version > 1:
+        scope["interface_version"] = f"generated_context.v{version}"
     saved = controls.score_rows(training, future, scope)
     monkeypatch.setattr(controls, "score_rows", lambda *a, **k: pytest.fail("Production evaluator called"))
+    monkeypatch.setattr(context_controls, "score_validated_rows", lambda *a, **k: pytest.fail("Shared evaluator called"))
     actual = refit.refit_predictions(training, refit.query_rows(future), scope)
     assert set(actual) == {r["method"] for r in saved}
     for row in saved:

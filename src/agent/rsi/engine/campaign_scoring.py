@@ -47,6 +47,8 @@ def context_controls(task, data, output, identity, *, independent_refit=False):
         for k in (
             "schema",
             "implementation_sha256",
+            "numeric_implementation_sha256",
+            "shared_implementation_sha256",
             "reference_implementation_sha256",
             "versions",
             "fit_partition",

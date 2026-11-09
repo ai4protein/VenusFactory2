@@ -1,6 +1,9 @@
 """Training-only comparisons, frozen intervention binding and real MCP execution."""
 
+import importlib
 import json
+import shutil
+import subprocess
 import sys
 from copy import deepcopy
 from pathlib import Path
@@ -15,9 +18,9 @@ from test_generated_context import CODE, ROWS, SCOPE
 from agent.harness import Budget, ModelBinding, Profile
 from agent.rsi import context_feedback as feedback
 from agent.rsi import generated_context as api
+from agent.rsi.campaigns.scientist_model_campaign import admit_allocations, bind_goal
 from agent.rsi.engine.context_controls import score_rows
 from agent.rsi.engine.protein_model import digest
-from agent.rsi.campaigns.scientist_model_campaign import admit_allocations, bind_goal
 from agent.rsi.engine.storage import atomic_json, sha256_file
 from agent.rsi.engine.tool_contracts import validate_generated_result
 
@@ -240,3 +243,56 @@ async def test_real_mcp_feedback_submission_and_host_numeric_replay(tmp_path, po
         atomic_json(work / ("code_ledger_" + digest(ledger) + ".json"), ledger)
         with pytest.raises(ValueError, match="numerical replay"):
             validate_generated_result("evaluate_model_code", changed, workspace=work, capability=caps)
+
+
+@pytest.mark.parametrize("version", [1, 2, 3])
+def test_standalone_feedback_binds_shared_controls_and_rejects_modified_source(tmp_path, version):
+    from test_context_baseline_refit import fixture
+
+    scope, training, scoring = fixture("numeric")
+    if version > 1:
+        scope["interface_version"] = f"generated_context.v{version}"
+    suffix = "" if version == 1 else f"_v{version}"
+    module = importlib.import_module(f"agent.rsi.engine.context{suffix}_feedback")
+    rows = training + scoring
+    metrics = candidate(rows)
+    expected = module.comparison(rows, scope, metrics)
+    _, _, bundle = make_bundle(
+        tmp_path / "capability", "develop", {"training.json": rows}, scope,
+        {"provider": "synthetic"}, plugin_id=f"generated_context.v{version}",
+        training_baseline_feedback=module.POLICY,
+    )
+    # Alter a disposable copy; leave the version store immutable.
+    standalone = tmp_path / "standalone"
+    shutil.copytree(bundle, standalone)
+    script = r'''
+import importlib, json, sys
+from pathlib import Path
+bundle, module_name = sys.argv[1:]
+sys.path.insert(0, bundle)
+module = importlib.import_module(module_name)
+rows, scope, metrics = json.load(sys.stdin)
+first = module.comparison(rows, scope, metrics)
+core = Path(bundle) / "context_controls.py"
+assert Path(importlib.import_module("context_controls").__file__).resolve() == core.resolve()
+assert not any(name == "agent" or name.startswith("agent.") for name in sys.modules)
+core.chmod(core.stat().st_mode | 0o200)
+core.write_text(core.read_text() + "\n# synthetic source alteration\n")
+try:
+    module.verify_feedback(
+        {"phase": "develop", "scope": scope, "plugin_id": scope.get("interface_version", "generated_context.v1"),
+         module.FIELD: module.POLICY}, rows, {**metrics, "baseline_comparison": first},
+    )
+except ValueError as error:
+    assert "numerical replay" in str(error)
+else:
+    raise AssertionError("Changed shared control source accepted")
+print(json.dumps(first, allow_nan=False))
+'''
+    result = subprocess.run(
+        [sys.executable, "-I", "-c", script, str(standalone), f"context{suffix}_feedback"],
+        cwd=tmp_path, input=json.dumps([rows, scope, metrics]), capture_output=True, text=True, timeout=60,
+    )
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout) == expected
+    assert "context_controls.py" in expected["implementation"]
