@@ -96,16 +96,55 @@ into another fresh directory. It compares the complete report, development
 barrier and saved predictions; changing a score or rehashing an altered artifact
 does not establish agreement. Keep the original study and evidence available.
 
-## Current validation
+## Terminal shared campaigns
 
-On 23 October 2026, 171 focused integration tests passed across the evaluator,
-campaign scheduling, model-library publication, cross-task experience and the
-sequence/classification interfaces. The new tests include real isolated numerical
-prediction, all-failure cohorts, held-out scoring barriers, deduplicated fitted
-artifacts, missing token usage and altered-result rejection. Synthetic publication
-fixtures contribute zero scientific models.
+Shared-program cohorts have a separate descriptive entry point. It includes every
+task from every terminal batch, including executions that failed before creating a
+goal directory. The current indexed library is discovered automatically; there is
+no successful-task selector. Single-goal publication checks remain unchanged.
 
-The GFP transfer pilot remains a 24-allocation prospective study. Its externally
-generated models and efficacy results are still pending model access. The latest
-explicitly authorized single GLM-5.2 access request returned HTTP 403. No
-availability probe is an autonomous model or a scientific replicate.
+Admission hashes the training, validation and final dataset files without decoding
+their labels. It freezes the full task allocation, coordinator and goal states,
+publication reports, canonical origins, evaluator sources and numerical environment.
+The supplied library may be a subsequently revalidated local library, but each
+entry must still belong to the original goal and allocated scope. Revalidation is
+not counted as a new autonomous acquisition.
+
+```sh
+python scripts/rsi/evaluation/evaluate_shared_campaign.py admit --campaign CAMPAIGN --library LIBRARY --output STUDY
+python scripts/rsi/evaluation/evaluate_shared_campaign.py evaluate --study STUDY --output SCORES
+python scripts/rsi/evaluation/evaluate_shared_campaign.py evaluate --study STUDY --output SCORES --resume
+python scripts/rsi/evaluation/evaluate_shared_campaign.py audit --study STUDY --evaluation SCORES --output REPLAY
+```
+
+Scoring begins only after verifying the frozen study. Native publication checks
+and training replay precede prediction; prediction inputs exclude labels. This
+adapter currently supports measured context-response tasks. Every allocated task
+also receives fixed training-only mean, ridge, random-forest and SVR controls, plus
+applicable thermal-response controls. A separate implementation refits these
+controls and compares their predictions before metrics are accepted.
+
+Shared execution costs appear once per batch. Task rows reference that batch and
+do not repeat its token or call totals. Original coordinator and goal statuses
+are reported separately, even when they disagree. Missing models, failed
+predictions and failed evidence checks remain distinct. A partially successful
+batch never becomes a completed research goal through evaluation.
+
+Checkpoints bind the study, task order and saved prediction files. Resuming
+verifies all frozen evidence and completed checkpoints; it cannot skip a failed
+batch or substitute a new model. A full audit recomputes into a fresh directory
+and compares reports and artifacts. These retrospective scores describe the
+frozen cohort; causal RSI claims require a separately admitted prospective
+comparison with matched resources.
+
+## Source ownership and validation
+
+The single-goal evaluator owns paired-study rules. The shared study module owns
+cohort freezing and publication bindings; the shared evaluator owns batch
+checkpoints and aggregation. Both reuse the same acquisition-evidence reader,
+numerical scorer, registry validator and baseline implementations.
+
+Focused tests cover label-free admission, all-failure denominators, changed
+sources or assets, missing publications, interrupted scoring, independent control
+refits and numerical replay. Synthetic native seams test storage and lifecycle
+contracts; their fitted fixtures are not autonomous scientific model evidence.
