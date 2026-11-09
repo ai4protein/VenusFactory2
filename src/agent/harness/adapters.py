@@ -10,106 +10,13 @@ import time
 from pathlib import Path
 
 from .host import write_json
+from .kimi_adapter import KimiAdapter  # Compatibility for existing expert and CLI callers.
 
 
 def task_message(task):
     from agent.rsi.engine.runtime import build_task_message
 
     return build_task_message(task.instructions, task.prompt, interaction="chat" if task.phase == "chat" else "bounded")
-
-
-class KimiAdapter:
-    def __init__(self, runtimes):
-        self.runtimes = runtimes
-
-    async def run(self, ctx):
-        from agent.rsi.engine.model_policy import read_model_configuration
-        from agent.rsi.engine.runtime import run_task
-        from agent.rsi.engine.sandbox import SandboxKimi
-
-        p, t = ctx.profile, ctx.task
-        if t.mcp_entry not in {"pilot_tools.py", "protein_tools.py", "generated_tools.py", "web_tools.py"}:
-            raise ValueError("Unsupported MCP entry for this pinned Kimi sandbox adapter")
-        cfg = t.output / "runtime-private.toml"
-        # The child receives only a short-lived local gateway token, never the upstream key.
-        q = json.dumps
-        loop_control = ""
-        if t.phase == "chat" and t.mcp_entry == "web_tools.py":
-            loop_control = (
-                "[loop_control]\nmax_retries_per_step = 1\n"
-                + "max_steps_per_turn = " + str(p.budget.model_calls) + "\n"
-            )
-        cfg.write_text(
-            'default_model = "research"\n'
-            + loop_control
-            + '[models.research]\nprovider = "research"\n'
-            + "model = "
-            + q(p.model.model)
-            + "\nmax_context_size = "
-            + str(p.model.context_tokens)
-            + "\nmax_output_size = "
-            + str(p.budget.output_tokens)
-            + '\ncapabilities = ["tool_use"]\n[providers.research]\ntype = "openai"\n'
-            + "base_url = "
-            + q(ctx.relay.base_url)
-            + "\napi_key = "
-            + q(ctx.relay.token)
-            + "\n"
-        )
-        cfg.chmod(0o600)
-        _, identity = read_model_configuration(cfg)
-        started = time.monotonic()
-        startup_limit = min(180.0, p.budget.wall_seconds)
-        sandbox = SandboxKimi(
-            workspace=t.workspace,
-            control_dir=t.output / "control",
-            capability_dir=t.capability,
-            kimi_bin=Path(self.runtimes["kimi_bin"]),
-            config_path=cfg,
-            python_root=Path(self.runtimes["python_root"]),
-            expected_model=identity,
-            mcp_entry=t.mcp_entry,
-            relay=ctx.relay,
-            startup_timeout_s=startup_limit,
-            mcp_startup_timeout_s=startup_limit,
-            mcp_tool_timeout_s=p.budget.wall_seconds,
-            prepare_mcp=True,
-        )
-        stage = "server_startup"
-        try:
-            async with sandbox:
-                stage = "phase_deadline"
-                remaining = p.budget.wall_seconds - (time.monotonic() - started)
-                if remaining <= 0:
-                    raise TimeoutError("Native phase deadline exhausted during startup")
-                result = await run_task(
-                    sandbox.client,
-                    prompt=t.prompt,
-                    system_prompt=t.instructions,
-                    model="research",
-                    output_dir=t.output,
-                    timeout_s=remaining,
-                    mcp_startup_timeout_s=min(startup_limit, remaining),
-                    max_tool_calls=p.budget.tool_calls,
-                    allowed_mcp_tools=t.tools,
-                    request_gateway=True,
-                    interaction="chat" if t.phase == "chat" else "bounded",
-                )
-            result["sandbox_stopped"] = sandbox.stopped
-            result["server_startup_timeout_s"] = startup_limit
-            result["capability_preparation"] = sandbox.capability_preparation
-            return result
-        except TimeoutError:
-            return {
-                "status": "timeout",
-                "timeout_stage": sandbox.startup_stage if stage == "server_startup" else stage,
-                "tool_calls": 0,
-                "sandbox_stopped": sandbox.stopped,
-                "server_startup_timeout_s": startup_limit,
-                "wall_seconds": round(time.monotonic() - started, 3),
-            }
-        finally:
-            cfg.unlink(missing_ok=True)
 
 
 class ScientistAdapter:

@@ -177,6 +177,11 @@ receipts automatically. `VENUS_KIMI_BIN`, `VENUS_CODEX_BIN`, `VENUS_CLAUDE_BIN`,
 An install/version check does not make an LLM request, configure credentials or
 override the administrator's permitted model routes.
 
+The Kimi adapter supports the verified 0.19.2 and 2.5.2 protocols. Select an
+administrator-installed binary with `VENUS_KIMI_BIN`; unsupported versions fail
+explicitly. Version 2.5.2 uses the authenticated Web server inside the same session
+sandbox. Installing another binary does not replace an already running service.
+
 Official installation references: [Codex CLI](https://developers.openai.com/codex/cli/),
 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness),
 [Kimi Code](https://github.com/MoonshotAI/kimi-code),

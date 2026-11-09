@@ -94,7 +94,7 @@ def builtin_registry():
     registry.register(
         AdapterSpec(
             "kimi-code",
-            "agent.harness.adapters:KimiAdapter",
+            "agent.harness.kimi_adapter:KimiAdapter",
             ("science_agent",),
             ("chat_completions",),
             controls,

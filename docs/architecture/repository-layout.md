@@ -58,6 +58,23 @@ The research CLI retains a thin compatibility entry point. Frozen experiments
 keep their original source snapshots and bindings; changing current discovery
 does not migrate an earlier experiment.
 
+Kimi protocol selection belongs to `agent.harness.kimi_adapter`, with the existing
+`adapters.KimiAdapter` import retained for compatibility. The adapter probes the
+configured executable before selecting the supported 0.19.2 server or 2.5.2 Web
+protocol. The Web transport, transcript projection and ephemeral sandbox each
+have one module; they share the existing MCP worker and audited filesystem mounts.
+The Web server requires its private bearer token, and task instructions are bound
+to its private `SYSTEM.md`. Reconnection replays transcript cursors without
+resubmitting a prompt or duplicating tool events. Cancellation waits for the server
+and MCP worker to stop, then removes temporary credentials.
+
+Provider response receipts remain the source for reported token accounting. The
+native session rollup is recorded separately: it can still be zero immediately
+after turn completion and must not erase a nonzero streamed observation. Neither
+runtime usage nor a connection check independently verifies provider billing.
+The legacy RSI runtime and its published source bindings are not rewritten by a
+protocol upgrade.
+
 Prediction result plots belong to `mcp_tools/common/visualization.py`; API
 workflows import those functions instead of maintaining their own renderers.
 Legacy Quick and Advanced routes use canonical package imports. Compatibility

@@ -125,7 +125,14 @@ npm run build
 
 Run service/worker integration tests on Linux with bubblewrap available. Real GPU
 inference, public services and live model-provider probes are separate acceptance
-checks, not implied by offline regression. CI checks source boundaries, tutorial
+checks, not implied by offline regression.
+Native Kimi protocol checks are opt-in through `VENUS_TEST_KIMI_BIN` (2.5.2) and
+`VENUS_TEST_KIMI_LEGACY_BIN` (0.19.2): run
+`tests/harness/test_native_kimi_web.py` with the installed platform Python. These
+tests start the actual SDK and isolated MCP process with a localhost mock model;
+they cover tool execution, stream recovery, authentication and cancellation
+without making an external LLM request.
+ CI checks source boundaries, tutorial
 consistency and the frontend; full backend validation uses the installed platform
 environment. Refresh README screenshots when navigation changes, recording their
 capture details in `docs/images/manifest.json`.

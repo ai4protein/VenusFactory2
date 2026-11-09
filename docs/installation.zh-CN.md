@@ -138,6 +138,10 @@ Codex/Claude 使用官方 npm 包的原生执行文件，Kimi 使用官方 relea
 `VENUS_CLAUDE_BIN`、`VENUS_DSH_BIN`、`VENUS_DSH_SITE` 配置优先。
 安装只检查 CLI/SDK，不调用 LLM、不配置密钥，也不会改变免费模型路由和管理员禁用策略。
 
+Kimi 适配层支持已验证的 0.19.2 和 2.5.2 协议，可用 `VENUS_KIMI_BIN` 指定管理员安装的
+执行文件；未支持的版本会明确拒绝运行。2.5.2 在会话沙箱内启动带鉴权的 Web 服务。
+安装其他版本不会替换已经运行的服务。
+
 ProteinMPNN 下载 vanilla、soluble、CA 三类权重；LigandMPNN 下载设计和侧链 packing 权重；
 AntiBMPNN 使用官方 Zenodo 权重。三个工具执行小规模序列设计，S4PRED 对 76 个残基做实际预测，
 ADMET-AI 执行乙醇预测。ProSST、ESM、ProtSSN 记录模型加载验证，不能当作完整科学评测。
