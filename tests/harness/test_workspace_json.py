@@ -263,3 +263,37 @@ async def test_structured_read_does_not_block_the_event_loop(tmp_path, monkeypat
     finally:
         release.set()
         await task
+
+
+@pytest.mark.asyncio
+async def test_brief_disclosure_is_enough_to_select_exact_records_and_recover_bad_fields(tmp_path):
+    from agent.harness.tool_disclosure import ToolDisclosure
+    from mcp_tools.common.tool_arguments import ToolArgumentError
+
+    service = ResearchWorkspace(tmp_path / "work", tmp_path / "control", {"steps": []})
+    tool = next(t for t in service.workspace_tools() if t.name == "read_session_file")
+    catalog = ToolDisclosure({tool.name: tool}, schema=mcp_input_schema, allowed=lambda tool: True, direct={tool.name})
+    public = next(t for t in catalog.surface() if t["name"] == tool.name)
+    assert len(public["description"]) <= 180
+    assert "JSON fields and records by ID" in public["description"]
+    assert "match_values" in public["inputSchema"]["properties"]["select"]["description"]
+    assert len(json.dumps(public)) < 4000
+    value = result_fixture()
+    raw = write_json(service.workspace, "results.json", value)
+    bad = {"path": "/workspace/results.json", "select": {"path": ["predictions"], "view": "text"}}
+    with pytest.raises(ToolArgumentError) as error:
+        prepare_tool_arguments(tool.name, tool, bad, service.workspace)
+    assert "Declared object fields for select: limit, match_field, match_values, offset, path." in str(error.value)
+    assert "view" not in str(error.value)
+    corrected = {
+        "path": bad["path"],
+        "select": {
+            "path": ["predictions"],
+            "match_field": "id",
+            "match_values": ["protein-17", "protein-420"],
+        },
+    }
+    result = await tool.ainvoke(prepare_tool_arguments(tool.name, tool, corrected, service.workspace))
+    assert result["value"] == [value["predictions"][17], value["predictions"][420]]
+    assert not result["truncated"] and result["missing_values"] == []
+    assert (service.workspace / "results.json").read_bytes() == raw

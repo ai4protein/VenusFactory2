@@ -86,8 +86,16 @@ class ResearchWorkspace:
         from backend.web_v2.research_files import list_files
         return {'files':[{'path':row['rel'],'bytes':row['size']} for row in list_files({'workspace':self.workspace},limit=500)['files']]}
 
-    async def read_research_file(self, path: str, offset_bytes: int=0, max_bytes: int=20000, view: Literal["auto", "text"]="auto", select: JsonSelection | None=None) -> dict:
-        """Read a session file. Large JSON defaults to a field index; select.path reads a field, and select.match_field plus select.match_values retrieve exact string IDs from an array. Selection returns complete values, paged by select.offset/limit; max_bytes bounds the selected value. CSV/TSV shows three sample rows. Use isolated Python for full-data analysis, or view='text' with next_offset_bytes for raw text. PDFs return up to 30 pages."""
+    async def read_research_file(
+        self, path: str, offset_bytes: int=0, max_bytes: int=20000,
+        view: Literal["auto", "text"]="auto",
+        select: Annotated[JsonSelection | None, Field(description=(
+            'For JSON fields or exact records, e.g. {"path":["rows"],"match_field":"id",'
+            '"match_values":["record-1"]}. Omit matching to read the selected field; '
+            'offset/limit page arrays. Use paths from the file index.'
+        ))]=None,
+    ) -> dict:
+        """Read file content, or select exact JSON fields and records by ID. Large JSON defaults to a field index without array records; use select to read those records. Selection returns complete values, paged by select.offset/limit; max_bytes bounds the selected value. CSV/TSV shows three sample rows. Use isolated Python for full-data analysis, or view='text' with next_offset_bytes for raw text. PDFs return up to 30 pages."""
         if view not in ("auto", "text"): raise ValueError("view must be auto or text")
         p=Path(path)
         if p.suffix.lower()=='.pdf':
