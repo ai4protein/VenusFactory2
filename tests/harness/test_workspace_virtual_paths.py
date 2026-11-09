@@ -91,7 +91,7 @@ async def test_write_rejects_read_metadata_with_actionable_fields(tmp_path):
     with pytest.raises(ValueError) as error:
         prepare_tool_arguments(tool.name, tool, bad, workspace)
     message = str(error.value)
-    assert "Unexpected fields: bytes, offset_bytes, truncated" in message
+    assert "Unexpected fields." in message
     assert "Allowed fields: content, path" in message
     assert "assigned by the server" not in message
     assert source not in message and not (workspace/"src/analysis.py").exists()
@@ -109,6 +109,7 @@ def test_argument_diagnostics_do_not_echo_values_or_invalid_key_names(tmp_path):
     with pytest.raises(ValueError) as error:
         prepare_tool_arguments(tool.name, tool, args, tmp_path/"work")
     message = str(error.value)
-    assert "workspace_root" in message and "<invalid field name>" in message
+    assert "Unexpected fields." in message
+    assert "workspace_root" not in message and "malicious" not in message
     assert "assigned by the server" in message
     assert "/private/account" not in message and "payload" not in message

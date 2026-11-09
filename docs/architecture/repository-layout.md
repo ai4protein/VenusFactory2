@@ -110,9 +110,12 @@ streams.
 
 The selected tool's own input model is validated through
 `mcp_tools/common/tool_arguments.py` after session paths are bound and again at
-MCP admission. Native harnesses share this boundary. Contract failures name the
-missing or invalid fields without copying input values or validator traces; no
-compute job is created for invalid arguments.
+MCP admission. Native harnesses share this boundary. The common contract module
+also owns closed-surface field checks and bounded feedback, including declared
+fields of a malformed nested object. The session boundary owns path binding and
+server-assigned workspace policy. Feedback never copies submitted values,
+undeclared field names or validator traces; no compute job is created for invalid
+arguments.
 
 Model origin is separate from scientific function. For example, ProteinMPNN and
 LigandMPNN are both pretrained methods; DeepSol · ESM2-650M is a factory-trained

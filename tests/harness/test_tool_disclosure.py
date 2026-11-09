@@ -90,14 +90,19 @@ def test_new_scientific_tool_defaults_are_bound_to_each_session(tmp_path):
 async def test_shared_protocol_dispatches_to_original_tool_and_records_real_identity(tmp_path, monkeypatch, harness):
     import httpx
     from langchain_core.tools import StructuredTool
+    from pydantic import BaseModel, ConfigDict, Field
 
     from agent.harness import web_native_worker as worker
     from agent.harness.contracts import Budget, ModelBinding, Profile
     from mcp_tools.scheduler import catalog as scheduler
     from mcp_tools.tools import runtime_tool_policy
 
+    class AnalysisOptions(BaseModel):
+        model_config = ConfigDict(extra="forbid")
+        limit: int = Field(default=20, ge=1)
+
     calls, events = [], []
-    async def compute(sequence: str):
+    async def compute(sequence: str, options: AnalysisOptions | None = None):
         calls.append(sequence)
         return {'length': len(sequence)}
     tool = StructuredTool.from_function(coroutine=compute, name='protein_length',
@@ -137,7 +142,14 @@ async def test_shared_protocol_dispatches_to_original_tool_and_records_real_iden
             feedback = rejected['result']['content'][0]['text']
             assert 'sequence' in feedback and 'private-input-marker' not in feedback
             assert not calls
-            result = await call('call_tool', {'name':'protein_length','arguments':{'sequence':'ACDE'}})
+            rejected = await call('call_tool', {'name':'protein_length', 'arguments':{
+                'sequence':'private-input-marker', 'options':{'private_nested_key':1}}})
+            assert rejected['result']['isError'] is True and 'error' not in rejected
+            feedback = rejected['result']['content'][0]['text']
+            assert 'Declared object fields for options: limit.' in feedback
+            assert 'private' not in feedback and not calls
+            result = await call('call_tool', {'name':'protein_length',
+                'arguments':{'sequence':'ACDE', 'options':{'limit':4}}})
             assert json.loads(result['result']['content'][0]['text']) == {'length':4}
             return {'status':'completed','text':'The sequence has four residues.'}
     monkeypatch.setattr(worker,'builtin_registry',lambda:SimpleNamespace(resolve=lambda *args:(SimpleNamespace(run=adapter),None)))

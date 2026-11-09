@@ -112,27 +112,21 @@ def mcp_input_schema(tool):
 
 
 def prepare_tool_arguments(name, tool, arguments, workspace):
-    from mcp_tools.common.tool_arguments import validate_tool_arguments
+    from mcp_tools.common.tool_arguments import (
+        ToolArgumentError, validate_argument_fields, validate_tool_arguments,
+    )
 
     # Research workspace tools own their relative-path validation. Legacy
     # scientific tools still receive their normal host-path normalization.
     if (getattr(tool, "metadata", None) or {}).get("workspace_relative_paths"):
-        fields = mcp_input_schema(tool).get("properties", {})
-        if not isinstance(arguments, dict):
-            raise ValueError("Use a JSON object with the declared tool arguments")
-        extra = set(arguments) - set(fields)
-        if extra:
-            # Report names, never caller-supplied values or source code. A read
-            # receipt's byte counts are not write arguments or a permission issue.
-            names = sorted(key if isinstance(key, str) and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]{0,63}", key)
-                           else "<invalid field name>" for key in extra)
-            message = ("Use the declared tool arguments. Unexpected fields: " +
-                       ", ".join(names[:12]) + ". Allowed fields: " +
-                       ", ".join(sorted(fields)[:32]) +
-                       ". Remove the extra fields and retry; output metadata is not input.")
-            if extra & {"workspace", "workspace_root", "session_id", "session_dir", "root", "cwd", "mounts", "mount", "backend", "control"}:
-                message += " The session workspace is assigned by the server."
-            raise ValueError(message)
+        try:
+            validate_argument_fields(mcp_input_schema(tool), arguments)
+        except ToolArgumentError as exc:
+            # Workspace ownership is session policy, not part of a tool schema.
+            host_fields = {"workspace", "workspace_root", "session_id", "session_dir", "root", "cwd", "mounts", "mount", "backend", "control"}
+            if isinstance(arguments, dict) and host_fields.intersection(arguments):
+                raise ToolArgumentError(str(exc) + " The session workspace is assigned by the server.") from None
+            raise
         args = relative_workspace_arguments(arguments)
         validate_tool_arguments(tool, args)
         return args
