@@ -60,10 +60,11 @@ def _schema(properties, required=()):
 
 
 class ToolDisclosure:
-    def __init__(self, mapping, *, schema, allowed, direct=(), detailed=()):
+    def __init__(self, mapping, *, schema, allowed, direct=(), detailed=(), model_catalog=None):
         if CONTROLS & mapping.keys():
             raise ValueError('Tool name conflicts with discovery transport')
         self.mapping = mapping
+        self.model_catalog = model_catalog
         self.schema = schema
         self.allowed = allowed
         self.direct = set(direct) & mapping.keys()
@@ -111,7 +112,7 @@ class ToolDisclosure:
             if name.startswith(prefix):
                 name = name[len(prefix):]
                 break
-        if name in self.mapping:
+        if name in self.mapping or self.model_catalog and self.model_catalog.owns(name):
             return name
         from mcp_tools.tools.capability_policy import canonical
         matches = [key for key, tool in self.mapping.items()
@@ -119,6 +120,8 @@ class ToolDisclosure:
         return matches[0] if len(matches) == 1 else name
 
     def _available(self, name):
+        if self.model_catalog and self.model_catalog.owns(name):
+            return self.model_catalog.available(name)
         return name in self.mapping and bool(self.allowed(self.mapping[name]))
 
     def surface(self):
@@ -168,6 +171,14 @@ class ToolDisclosure:
             return result
         if not query.strip() and not category:
             return self.overview()
+        model_page = None
+        if self.model_catalog and category == self.model_catalog.category:
+            try:
+                model_page = self.model_catalog.search(query, limit, offset)
+            except ValueError as exc:
+                raise DisclosureError(str(exc)) from None
+            if model_page is not None and model_page["total"]:
+                return model_page
         candidates = [n for n in self.mapping if n not in self.direct and self._available(n)
                       and (not category or category in self._categories(n))]
         # If the caller already knows an exact name but selected a wrong facet,
@@ -272,6 +283,14 @@ class ToolDisclosure:
                 next_step='Call next_action, then call_tool with the selected reader and its declared arguments. '
                           'No model, database or guide records have been searched; repeating search_tools repeats only this index.',
             )
+        if model_page is not None:
+            result.pop("records_searched", None)
+            result["registered_models_searched"] = True
+            result["matching_registered_models"] = 0
+            result["next_step"] = (
+                "No registered model matched this query. Inspect a listed capability to search other records, "
+                "or broaden the model query."
+            )
         return result
 
     def metadata(self, method, arguments):
@@ -289,6 +308,13 @@ class ToolDisclosure:
                         'next_step':'This navigation tool is already exposed. Call it directly with these arguments.'}
             if not self._available(name):
                 raise DisclosureError('Tool unavailable. Search for an enabled tool.')
+            if self.model_catalog and self.model_catalog.owns(name):
+                try:
+                    result = self.model_catalog.describe(name)
+                except ValueError as exc:
+                    raise DisclosureError(str(exc)) from None
+                self.inspected.add(name)
+                return result
             tool = self.mapping[name]
             input_schema = self.schema(tool)
             if input_schema.get('description') == tool.description:
@@ -331,6 +357,11 @@ class ToolDisclosure:
             raise DisclosureError('Tool unavailable. Search for an enabled tool.')
         if not isinstance(arguments, dict):
             raise DisclosureError('Use a JSON object for tool arguments.')
+        if self.model_catalog and self.model_catalog.owns(name):
+            try:
+                return self.model_catalog.resolve(name, arguments)
+            except ValueError as exc:
+                raise DisclosureError(str(exc)) from None
         for key in self._model_selectors.get(name, ()):
             if not arguments.get(key):
                 raise DisclosureError('Specify the requested model explicitly using matching_models from describe_tool; do not use a generic default.')

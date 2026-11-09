@@ -51,6 +51,11 @@ version, protein/property/scenario and visibility; model source directories do n
 
 Agent discovers capabilities by search, reads selected interfaces and scope, then
 calls through MCP. Do not inline thousands of model descriptions into a prompt.
+The RSI category returns concise registered-model cards. Describing a selected
+card binds its immutable model and exact applicability scope for the current
+discovery session; the exposed call then accepts scientific inputs only. Resolving
+that call uses the original prediction tool, permissions and queue. A new session
+must inspect the model again. Existing explicit entry/scope tool calls remain valid.
 Prediction results carry their verified scope, including target, units and applicable
 conditions, bound to the inference receipt. Successful execution alone does not
 establish a complete answer: report the values with their units and relevant limits.

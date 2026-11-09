@@ -152,9 +152,10 @@ async def run(request, *, tools=None, event_sink=None):
     from mcp_tools.tools.tool_surface import WORKSPACE_PRIMITIVES
     from .research_focus import admitted_tools
     focus = admitted_tools(request, mapping)
+    from mcp_tools.models.evolved.discovery import ScopedModelCatalog
     disclosure = ToolDisclosure(mapping, schema=mcp_input_schema, allowed=available,
                                 direct=WORKSPACE_PRIMITIVES | INTERACTION_NAMES | {'submit_research_checkpoint'} | focus,
-                                detailed=focus)
+                                detailed=focus, model_catalog=ScopedModelCatalog(mapping, available))
     send({"kind": "catalog", "tools": ["mcp__venusfactory__" + name for name in sorted(disclosure.names)]})
     if request.get("handshake"):
         import sys
@@ -190,6 +191,7 @@ async def run(request, *, tools=None, event_sink=None):
     transport_limit = profile.budget.tool_calls + lookup_limit + checkpoint_limit
     runtime_profile = replace(profile, budget=replace(profile.budget, tool_calls=transport_limit))
     workspace_call = asyncio.Lock()
+    discovery_lock = asyncio.Lock()
 
     def host_paths(value):
         if isinstance(value, str) and (value == "/workspace" or value.startswith("/workspace/")):
@@ -214,7 +216,7 @@ async def run(request, *, tools=None, event_sink=None):
             result['content'].append({'type': 'text', 'text': note})
         return result
 
-    def discovery_result(method, arguments, *, inspection_required=False):
+    async def discovery_result(method, arguments, *, inspection_required=False):
         nonlocal executions, lookups
         if is_research:
             if lookups >= lookup_limit:
@@ -226,7 +228,11 @@ async def run(request, *, tools=None, event_sink=None):
             executions += 1
         send({"kind": "tool_usage", "tool_calls": executions,
               "discovery_calls": lookups, "transport_calls": calls})
-        value = public_value(disclosure.metadata(method, arguments), workspace)
+        # Registry metadata can live on a slow shared filesystem. Keep the MCP
+        # event loop responsive while serializing session-local discovery state.
+        async with discovery_lock:
+            metadata = await asyncio.to_thread(disclosure.metadata, method, arguments)
+        value = public_value(metadata, workspace)
         if inspection_required:
             value = {
                 "error_code": "tool_inspection_required", "executed": False,
@@ -277,12 +283,13 @@ async def run(request, *, tools=None, event_sink=None):
                 arguments = params.get('arguments', {})
                 if name in {SEARCH, DESCRIBE}:
                     return web.json_response({'jsonrpc': '2.0', 'id': body['id'],
-                                              'result': discovery_result(name, arguments)})
+                                              'result': await discovery_result(name, arguments)})
                 try:
-                    name, tool, arguments = disclosure.resolve(name, arguments)
+                    async with discovery_lock:
+                        name, tool, arguments = disclosure.resolve(name, arguments)
                 except ToolInspectionRequired as exc:
                     return web.json_response({'jsonrpc': '2.0', 'id': body['id'],
-                        'result': discovery_result(DESCRIBE, {'name': exc.name}, inspection_required=True)})
+                        'result': await discovery_result(DESCRIBE, {'name': exc.name}, inspection_required=True)})
                 except DisclosureError:
                     # Rejected discovery attempts did not execute a tool. They
                     # still consume the finite transport allowance.
