@@ -70,7 +70,7 @@ acceptance check. A passing protocol or regression suite is not evidence that a
 model-quality workaround helped. Retain the failed experiment and its source
 binding separately instead of adding another special case to the main path.
 
-Review the affected subsystem as a whole after several feature batches: identify
+Review the affected subsystem as a whole after every two or three feature batches: identify
 cycles, duplicated state, obsolete adapters and oversized modules with unrelated
 responsibilities. Refactor around those responsibilities, rather than moving files
 only to make directories look smaller. Record concrete unresolved issues with an

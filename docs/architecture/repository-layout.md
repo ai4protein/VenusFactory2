@@ -67,7 +67,8 @@ Model training streams reconstruct curves and test metrics with
 `backend/web_v2/training_progress.py`, a log parser without filesystem or queue
 dependencies. The model API owns job access, output files and download URLs.
 Reconnecting replays the saved worker log; parsing a metric never starts a task
-or grants artifact access.
+or grants artifact access. Model routes share JSON event encoding in
+`backend/web_v2/sse_events.py`; non-finite metrics become null values for browser parsing.
 
 Researcher keeps job ownership and recovery in `backend/web_v2/research_jobs.py`.
 The long-form coordinator schedules retrieval and specialist writers; document

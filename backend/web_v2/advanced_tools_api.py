@@ -1,3 +1,4 @@
+from backend.web_v2.sse_events import encode_event as _sse
 from backend.web_v2.model_contracts import (DirectedEvolutionBody, ProteinDiscoveryBody, SequenceDesignBody, _proteinmpnn_model_options)
 
 from mcp_tools.tools.capability_policy import guard_operation
@@ -145,10 +146,6 @@ def _enforce_online_fasta_limit(normalized_fasta: str, source: str = "FASTA inpu
             status_code=400,
             detail=f"{source} contains {count} sequences. Online mode supports up to {_ONLINE_FASTA_LIMIT} sequences per run.",
         )
-
-
-def _sse(event: str, data: Dict[str, Any]) -> str:
-    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
 def _stream_success(payload: Dict[str, Any], final_message: str) -> list[str]:

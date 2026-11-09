@@ -1,3 +1,4 @@
+from backend.web_v2.sse_events import encode_event as _sse
 
 from mcp_tools.tools.capability_policy import guard_operation
 from backend.web_v2.job_access import guard_artifact
@@ -172,10 +173,6 @@ def _load_normalized_fasta_from_path(path: str) -> str:
 def _enforce_online_fasta_limit_for_path(path: str, source: str = "FASTA input") -> None:
     normalized = _load_normalized_fasta_from_path(path)
     _enforce_online_fasta_limit(normalized, source=source)
-
-
-def _sse(event: str, data: Dict[str, Any]) -> str:
-    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
 def _stream_success(payload: Dict[str, Any], final_message: str = "Quick tool completed.") -> list[str]:

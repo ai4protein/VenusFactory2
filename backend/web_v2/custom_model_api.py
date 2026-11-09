@@ -1,3 +1,4 @@
+from backend.web_v2.sse_events import encode_event
 import json
 import math
 import os
@@ -240,17 +241,7 @@ def _load_model_config(model_path: str) -> Dict[str, Any]:
 
 
 def _sse(event: str, data: Dict[str, Any]) -> str:
-    def _sanitize(value: Any) -> Any:
-        if isinstance(value, float):
-            return value if math.isfinite(value) else None
-        if isinstance(value, list):
-            return [_sanitize(v) for v in value]
-        if isinstance(value, dict):
-            return {str(k): _sanitize(v) for k, v in value.items()}
-        return value
-
-    safe_data = _sanitize(data)
-    return f"event: {event}\ndata: {json.dumps(safe_data, ensure_ascii=True, allow_nan=False)}\n\n"
+    return encode_event(event, data, ensure_ascii=True)
 
 
 def _write_test_metrics_csv(output_dir: str, metrics: Dict[str, float]) -> str:
