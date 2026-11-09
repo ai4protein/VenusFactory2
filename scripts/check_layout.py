@@ -14,9 +14,10 @@ def harness_worker_import_errors(path, tree, root):
     relative = path.relative_to(root)
     if relative.parent.as_posix() != "src/agent/harness":
         return []
-    protected = path.stem in {"events", "session_boundary"} or (
-        path.stem.endswith("_worker") and path.stem != "web_worker"
-    )
+    protected = path.stem in {
+        "events", "session_boundary", "installation", "adapters", "kimi_adapter",
+        "kimi_web_client", "kimi_web_events", "kimi_web_sandbox",
+    } or (path.stem.endswith("_worker") and path.stem != "web_worker")
     if not protected:
         return []
     errors = []

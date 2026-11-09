@@ -13,7 +13,10 @@ checks = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(checks)
 
 
-@pytest.mark.parametrize("source", ["events", "session_boundary", "web_native_worker", "dsh_worker"])
+@pytest.mark.parametrize("source", [
+    "events", "session_boundary", "web_native_worker", "dsh_worker", "installation",
+    "adapters", "kimi_adapter", "kimi_web_client", "kimi_web_events", "kimi_web_sandbox",
+])
 @pytest.mark.parametrize("statement", [
     "from .web_worker import emit",
     "from agent.harness.web_worker import _mcp_input_schema",
@@ -35,6 +38,12 @@ def test_shared_contracts_and_adapters_reject_entry_point_imports(source, statem
     ("events", "from .request_recovery import audit_recovery"),
     ("web_native_worker", "from .session_boundary import prepare_tool_arguments"),
     ("dsh_worker", "import library.worker"),
+    ("kimi_adapter", "from .kimi_web_sandbox import KimiWebSandbox"),
+    ("kimi_web_client", "from .kimi_web_events import KimiTranscript"),
+    ("kimi_web_events", "from agent.kimi_client import KimiEvent"),
+    ("kimi_web_sandbox", "from .prepared_mcp import PreparedMcp"),
+    ("installation", "from agent.rsi.engine.model_policy import read_model_configuration"),
+    ("adapters", "from .kimi_adapter import KimiAdapter"),
 ])
 def test_dispatch_and_shared_contract_imports_remain_valid(source, statement):
     path = ROOT / f"src/agent/harness/{source}.py"

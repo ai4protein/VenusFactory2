@@ -92,15 +92,17 @@ refactor separate from new product behavior, with a bounded regression target.
 | Subsystem owner | Consolidation target | Verification before merging |
 | --- | --- | --- |
 | Chat UI (`ChatPage.tsx`) | Separate session navigation, composer actions and history presentation from page coordination | Switching mode or session must preserve running jobs, drafts and streamed answers |
+| Training pipeline (`train_operations.py`) | Separate dataset preparation, training launch and result packaging; use the shared admission policy | Dataset split validation, resume checkpoints, queued cancellation, online ESM2 8M restrictions and artifact ownership |
 | Model API (`custom_model_api.py`) | Keep training, evaluation and prediction submission separate; share ownership and admission policy | Owner isolation, online limits, idempotent queue submission and existing route contracts |
 | RSI engine (`generated_context*.py`) | Share new execution primitives without rewriting published source-bound policy versions | Standalone bundles, saved feedback replay, registered-model inference, strict scope checks and complete source bindings |
 | Model registry (`scientist_model_library.py`, `shared_model_publication.py`) | Separate costly acquisition and ancestor replay from per-request inference | Preserve immutable evidence bindings and retirement checks; reject changed source/data and compare actual prediction values and cold/warm latency |
 | Session result access (`workspace_preview.py`, `research_workspace.py`) | Keep structured inspection and targeted reads in the shared file interface; distinguish inputs, outputs and omitted records without harness-specific prompt rules | Reloaded conversations must recover queried records and correct units through actual file reads; preserve bounded output, session isolation, pagination and immutable result receipts |
-| Researcher review (`research_source_review.py`) | Separate response decoding from the shared source-anchor validator; resolve unsupported field-to-value relationships before promoting a semantic reviewer | Unchanged decisions on saved-response replay, followed by new-protein and complete multi-chapter acceptance checks |
+| Researcher review (`research_source_review.py`) | Keep response decoding separate from shared source-anchor validation; resolve unsupported field-to-value relationships before promoting a semantic reviewer | Unchanged decisions on saved-response replay, followed by new-protein and complete multi-chapter acceptance checks |
 
-The layout check rejects imports from shared Harness contracts or worker adapters
-back into worker entry points. The dispatcher owns worker selection; reusable
-events and session argument validation belong in their owning modules.
+The layout check rejects imports from shared Harness contracts, runtime discovery,
+protocol adapters, Web transport and sandbox modules back into worker entry
+points. The dispatcher owns worker selection; reusable events and session argument
+validation belong in their owning modules.
 
 ## Before a commit
 
@@ -132,8 +134,8 @@ Native Kimi protocol checks are opt-in through `VENUS_TEST_KIMI_BIN` (2.5.2) and
 tests start the actual SDK and isolated MCP process with a localhost mock model;
 they cover tool execution, stream recovery, authentication and cancellation
 without making an external LLM request.
- CI checks source boundaries, tutorial
-consistency and the frontend; full backend validation uses the installed platform
+
+CI checks source boundaries, tutorial consistency and the frontend; full backend validation uses the installed platform
 environment. Refresh README screenshots when navigation changes, recording their
 capture details in `docs/images/manifest.json`.
 
