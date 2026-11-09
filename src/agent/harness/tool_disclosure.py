@@ -6,9 +6,10 @@ calls must still pass the host's normal policy, argument and queue checks.
 from __future__ import annotations
 
 import re
-from mcp_tools.tools.discovery.matching import query_groups, relevance
-from .capability_boundary import CAPABILITY_BOUNDARY
 
+from mcp_tools.tools.discovery.matching import query_groups, relevance
+
+from .capability_boundary import CAPABILITY_BOUNDARY
 
 SEARCH = 'search_tools'
 DESCRIBE = 'describe_tool'
@@ -29,6 +30,8 @@ GUIDANCE = CAPABILITY_BOUNDARY + '\n\n' + (
     'Follow up using earlier tool observations, '
     'refreshing availability before execution. Ask for missing scientific inputs, never server keys. '
     'An empty search is not proof the platform lacks the capability; try another relevant category or query. '
+    'For predictions, report values, units and any returned assay conditions or applicability bounds '
+    'explicitly; a generic reference to the model scope is insufficient. '
     'Explain user-facing requirements concisely; omit raw tool IDs, server configuration and optional '
     'parameters unless requested. Only enabled tools are discoverable. '
     'ask_user and request_confirmation remain directly available.'
@@ -194,8 +197,8 @@ class ToolDisclosure:
         if known_name in self.mapping:
             query = known_name
         groups = query_groups(query)
+        from mcp_tools.tools.capability_policy import ADAPTER_TOOLS, canonical
         from mcp_tools.tools.discovery.platform_models import platform_models
-        from mcp_tools.tools.capability_policy import canonical, ADAPTER_TOOLS
         native = {canonical(getattr(self.mapping[n], 'name', n)) for n in candidates}
         known = {v for values in ADAPTER_TOOLS.values() for v in values}
         models = platform_models(query, native) if query.strip() and native & known else []
