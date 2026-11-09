@@ -109,16 +109,17 @@ def response_text(pending: dict, response: InteractionResponse) -> str:
 
 INTERACTION_NAMES = frozenset({"ask_user", "request_confirmation"})
 INTERACTION_GUIDANCE = (
-    "When missing information or a user decision actually blocks progress, call ask_user with short questions "
-    "(options optional; text answers supported). For a concrete plan or action requiring the user's decision, "
-    "call request_confirmation. These are the platform equivalents of AskUserQuestion, request_user_input "
-    "and plan confirmation; do not use terminal prompts or harness-native interactive commands. "
-    "An explicit user request already authorizes its ordinary analysis and saving outputs in this session. "
-    "Do not pause to ask whether to do that same requested work, or to approve each research iteration. "
-    "Ask only for a genuinely missing decision or additional authorization, such as destructive or external actions. "
-    "The platform checkpoints and pauses this turn. Do not perform the pending action until an explicit answer "
-    "is supplied in a resumed turn. Do not ask again for answers already in context. Confirmation never enables "
-    "disabled tools or changes sandbox/access/resource policy. Never ask users to paste credentials."
+    "Finish the current request with its answer and actual results. Optional next steps belong in the answer; "
+    "do not pause to offer more work, check satisfaction or ask whether to continue after delivering the result. "
+    "Use ask_user only when missing information or a decision blocks unfinished work. "
+    "Use request_confirmation only for a concrete action that needs additional authorization. "
+    "The user's request already authorizes its ordinary analysis and session outputs; do not seek approval "
+    "for that work or each research iteration. These tools pause execution until an explicit response; "
+    "do not perform the pending action before that response or repeat questions answered in context. "
+    "They replace harness-native questions, terminal prompts and plan confirmations. "
+    "Ask concise questions, with options or free-text answers as appropriate. "
+    "A response never enables disabled tools or changes sandbox, access or resource limits. "
+    "Never ask for credentials."
 )
 
 
@@ -138,7 +139,7 @@ def interaction_tools(on_request):
         return {"status": "waiting_for_input", "interaction_id": gate.id}
 
     return [StructuredTool.from_function(coroutine=ask_user, name="ask_user", args_schema=AskInput,
-               description="Pause for user input: single/multiple choice or free text. Questions must be concise and necessary."),
+               description="Pause only for missing information required to finish the current request. Accept choices or free text. Do not use for optional follow-ups after delivering results."),
             StructuredTool.from_function(coroutine=request_confirmation, name="request_confirmation", args_schema=ConfirmInput,
                description="Pause for necessary additional authorization or a missing decision. Do not ask again to perform requested analysis or save its session outputs. Does not grant system permissions.")]
 

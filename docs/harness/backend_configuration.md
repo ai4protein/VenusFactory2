@@ -57,6 +57,12 @@ used by Model Plaza; model variants are checked again before execution.
 No tool or model becomes public merely by appearing in a skill or an RSI result.
 Scientist artifacts continue to require the platform's publication review.
 
+The shared interaction tools pause an unfinished request for missing input or
+additional authorization. A completed request should return its answer and actual
+results; optional next steps stay in the answer instead of opening a follow-up
+question. Pending interactions remain durable and require an explicit response;
+they never change tool permissions or resource limits.
+
 ## Harness 与模型兼容性
 
 安装了 Harness、配置了 Key，并不代表所有组合均已通过在线验证。选择接口的 `readiness` 标记的是静态准入；实际工具调用还取决于供应商当前端点、工具调用能力及限流状态。
