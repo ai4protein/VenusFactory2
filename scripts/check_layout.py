@@ -9,6 +9,38 @@ ROOT = Path(__file__).resolve().parents[1]
 OLD_MODULES = ('tools', 'src.tools', 'tool_runtime', 'web_v2', 'src.tool_runtime', 'src.web_v2', 'web', 'src.web', 'gradio', 'archive', 'mcp_tools.runtimes', 'mcp_tools.tool_runtime', 'mcp_tools.tools.train', 'mcp_tools.tools.mutation', 'mcp_tools.tools.denovo', 'mcp_tools.tools.external', 'mcp_tools.tools.evolved', 'mcp_tools.tools.admet', 'mcp_tools.runtime_config', 'mcp_tools.model_identity')
 
 
+def harness_worker_import_errors(path, tree, root):
+    """Keep shared boundaries and worker adapters independent of entry points."""
+    relative = path.relative_to(root)
+    if relative.parent.as_posix() != "src/agent/harness":
+        return []
+    protected = path.stem in {"events", "session_boundary"} or (
+        path.stem.endswith("_worker") and path.stem != "web_worker"
+    )
+    if not protected:
+        return []
+    errors = []
+    for node in ast.walk(tree):
+        names = []
+        if isinstance(node, ast.Import):
+            names = [alias.name for alias in node.names]
+        elif isinstance(node, ast.ImportFrom):
+            base = node.module or ""
+            if node.level:
+                package = ["agent", "harness"][: 3 - node.level]
+                base = ".".join([*package, *([base] if base else [])])
+            names = [base, *(base + "." + alias.name for alias in node.names)]
+        for name in names:
+            name = name.removeprefix("src.")
+            if name.startswith("agent.harness.") and name.split(".")[2].endswith("_worker"):
+                errors.append(
+                    f"{relative}:{node.lineno}: shared contracts and worker adapters must not import "
+                    "worker entry points; use harness.events or harness.session_boundary"
+                )
+                break
+    return errors
+
+
 def check(root=ROOT):
     errors = []
     for name in ('config', 'script', 'Scripts', 'epitope_miner', 'insulin_variants', 'src/tools', 'src/tool_runtime', 'src/web_v2', 'src/web', 'src/webui.py', 'src/frpc_hub.py', 'Scripts_notebook.ipynb', 'install_config.json', 'mcp_tools/runtimes', 'mcp_tools/tool_runtime', 'mcp_tools/tools/train', 'mcp_tools/tools/mutation', 'mcp_tools/tools/denovo', 'mcp_tools/tools/external', 'mcp_tools/tools/evolved', 'third_party', 'requirements-sandbox-cube.txt', 'requirements-sandbox-e2b.txt'):
@@ -33,6 +65,7 @@ def check(root=ROOT):
             except (SyntaxError, UnicodeError) as exc:
                 errors.append(str(path.relative_to(root)) + ': ' + str(exc))
                 continue
+            errors.extend(harness_worker_import_errors(path, tree, root))
             for node in ast.walk(tree):
                 names = ([node.module] if isinstance(node, ast.ImportFrom) and not node.level
                          else [a.name for a in node.names] if isinstance(node, ast.Import) else [])

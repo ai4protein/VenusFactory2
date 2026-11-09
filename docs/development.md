@@ -76,6 +76,21 @@ responsibilities. Refactor around those responsibilities, rather than moving fil
 only to make directories look smaller. Record concrete unresolved issues with an
 owner and next verification step; do not create a parallel checklist for every fix.
 
+## Consolidation priorities
+
+Address these responsibilities when next changing their subsystem. Keep each
+refactor separate from new product behavior, with a bounded regression target.
+
+| Subsystem owner | Consolidation target | Verification before merging |
+| --- | --- | --- |
+| Chat UI (`ChatPage.tsx`) | Separate session navigation, composer actions and history presentation from page coordination | Switching mode or session must preserve running jobs, drafts and streamed answers |
+| Model API (`custom_model_api.py`) | Keep training, evaluation and prediction submission separate; share ownership and admission policy | Owner isolation, online limits, idempotent queue submission and existing route contracts |
+| RSI engine (`generated_context*.py`) | Share repeated execution primitives while retaining version-specific scientific contracts | Standalone bundles, strict scope checks, unchanged numerical results and complete source bindings |
+
+The layout check rejects imports from shared Harness contracts or worker adapters
+back into worker entry points. The dispatcher owns worker selection; reusable
+events and session argument validation belong in their owning modules.
+
 ## Before a commit
 
 Use Python 3.12 and Node 24. Keep credentials, runtime installations, session data,
