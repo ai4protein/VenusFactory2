@@ -50,6 +50,14 @@ Scientific capabilities are served through MCP; model packages own implementatio
 and runtime adapters. Agent code plans work and calls tools; it does not contain
 another copy of model inference code.
 
+Harness runtime discovery belongs to `agent.harness.installation`. Agent and
+Scientist services pass their checkout root to that module; discovery must not
+construct a research service or load an experimental CLI script. The module keeps
+the existing environment > managed receipt > legacy installation/PATH precedence.
+The research CLI retains a thin compatibility entry point. Frozen experiments
+keep their original source snapshots and bindings; changing current discovery
+does not migrate an earlier experiment.
+
 Prediction result plots belong to `mcp_tools/common/visualization.py`; API
 workflows import those functions instead of maintaining their own renderers.
 Legacy Quick and Advanced routes use canonical package imports. Compatibility

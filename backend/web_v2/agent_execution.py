@@ -10,6 +10,7 @@ from pathlib import Path
 from agent.harness import Profile
 from agent.harness.catalog import ExecutionCatalog, free_model, resolve_credential
 from agent.harness.contracts import digest
+from agent.harness.installation import default_runtimes
 from agent.harness.provider_config import online
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -29,9 +30,7 @@ def catalog(*, for_admin=False):
 
 
 def runtime_paths():
-    from backend.web_v2.science_goals import ScienceGoalService
-
-    return ScienceGoalService(root=ROOT).runtime_paths()
+    return default_runtimes(ROOT)
 
 
 def options():

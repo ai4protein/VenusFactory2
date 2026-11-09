@@ -10,7 +10,6 @@ from backend.web_v2.research_delivery import project_summary
 
 import fcntl
 import hashlib
-import importlib.util
 import json
 import os
 import re
@@ -24,6 +23,7 @@ from agent.harness import Profile, builtin_registry
 from agent.harness.catalog import ExecutionCatalog, resolve_credential
 from agent.harness.provider_config import online as provider_online
 from agent.harness.contracts import digest
+from agent.harness.installation import default_runtimes
 from agent.rsi.campaigns.case_plugins import PLUGINS
 from agent.rsi.campaigns.paper_campaign import SUITES, admitted_campaign, campaign_cases
 from agent.rsi.engine.reproduction_goal_contract import CASES, CRITERIA, allocation
@@ -443,12 +443,7 @@ class ScienceGoalService:
         return profile
 
     def runtime_paths(self):
-        spec = importlib.util.spec_from_file_location(
-            "venus_goal_probe", self.root / "scripts/rsi/run_harness_probe.py"
-        )
-        module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        return module.default_runtimes()
+        return default_runtimes(self.root)
 
     def execution_catalog(self):
         return ExecutionCatalog(
