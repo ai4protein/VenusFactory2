@@ -148,6 +148,11 @@ The single-goal evaluator owns paired-study rules. The shared study module owns
 cohort freezing and publication bindings; the shared evaluator owns batch
 checkpoints and aggregation. Both reuse the same acquisition-evidence reader,
 numerical scorer, registry validator and baseline implementations.
+The registry checks publication metadata before large evidence scans. Runtime
+migration certificates are read by the migration module for both metadata
+inspection and numerical revalidation. A migrated artifact may have a new runtime
+ID, but its certificate must bind that ID and packet to the original model and
+goal. Metadata inspection never substitutes for the execution checks at inference.
 
 Focused tests cover label-free admission, all-failure denominators, changed
 sources or assets, missing publications, interrupted scoring, independent control

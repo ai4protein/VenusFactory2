@@ -18,14 +18,15 @@ from agent.harness.events import audit_requests, audit_trace
 from agent.harness.native_expert_audit import audit_native_expert
 from agent.harness.native_expert_team import NATIVE_EXPERT_HARNESSES
 from agent.research_modes import get_research_mode
+from agent.rsi.datasets import model_tasks
+from agent.rsi.datasets.source_lineage import program_hash
 from agent.science_goal import GoalSpec, GoalStore, validate_assessment
 
-from agent.rsi import library_experience, model_tasks, training_attempt_memory
+from . import library_experience, training_attempt_memory
 from .experience import ModelExperienceStore
 from .lineage_promotion import gain_error, validate_evolution
 from .model_lifecycle import ModelLifecycle
 from .model_plugins import get_model_plugin
-from agent.rsi.datasets.source_lineage import program_hash
 from .storage import atomic_json, file_lock, safe_child
 from .versions import VersionStore
 
@@ -570,10 +571,15 @@ class ScientistModelLibrary:
         not current numerical or native-execution evidence. Inference still
         requires resolve(); no successful inspection is cached as verification.
         """
-        entry, _, origin, _ = self._binding(entry_id)
+        entry, _, origin, folder = self._binding(entry_id)
         packet = self._object("packets", entry["packet_id"])
         _require(model_key(packet["model"], None) == entry["key"], "Published model scope changed")
-        _require(packet["model_id"] == origin["model_id"], "Published model identity changed")
+        if "runtime_migration" in origin:
+            from .model_runtime_migration import inspect_migration
+
+            inspect_migration(self, folder, origin, packet)
+        else:
+            _require(packet["model_id"] == origin["model_id"], "Published model identity changed")
         publication = {
             "key": entry["key"],
             "packet": packet,

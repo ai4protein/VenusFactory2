@@ -14,8 +14,8 @@ import uuid
 from pathlib import Path
 
 from agent.harness.contracts import digest, file_hash
+from agent.rsi.datasets import model_tasks
 
-from agent.rsi import model_tasks
 from .model_lifecycle import ModelLifecycle
 from .model_plugins import get_model_plugin
 from .scientist_model_library import _identity, _read, _require, _tree, validate_model_goal
@@ -113,13 +113,32 @@ def migration_view(original, packet, identity):
     }
 
 
-def verify_migration(library, folder, identity, *, replay_training=False):
-    folder = library.goal(folder)
+def _certificate(library, folder, identity):
     root = safe_child(library.root, "migrations/" + _identity(identity))
     _tree(root)
     certificate = _read(root / "certificate.json")
-    _require(digest(certificate) == identity and certificate.get("kind") == KIND, "Migration certificate changed")
+    _require(
+        digest(certificate) == identity and certificate.get("schema") == 1 and certificate.get("kind") == KIND,
+        "Migration certificate changed",
+    )
     _require(certificate["goal"] == str(folder.relative_to(library.owner)), "Migration belongs to another goal")
+    return root, certificate
+
+
+def inspect_migration(library, folder, origin, packet):
+    """Bind original and runtime artifact IDs without numerical execution."""
+    _, certificate = _certificate(library, folder, origin["runtime_migration"])
+    _require(
+        certificate["original_model_id"] == origin["model_id"]
+        and certificate["model_id"] == packet["model_id"]
+        and certificate["packet_sha256"] == digest(packet),
+        "Migration publication binding changed",
+    )
+
+
+def verify_migration(library, folder, identity, *, replay_training=False):
+    folder = library.goal(folder)
+    root, certificate = _certificate(library, folder, identity)
     original = validate_model_goal(
         folder, certificate["original_model_id"], replay_training=replay_training, runtime_migration=True
     )

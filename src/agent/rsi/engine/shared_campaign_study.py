@@ -117,6 +117,7 @@ def snapshot(store, library):
         all(row["status"] in TERMINAL and row["attempts"] for row in state["batches"].values()),
         "Every shared batch must have a terminal attempt",
     )
+    registered = publications(library, store, specifications)
     tasks, assets, goals = {}, {}, {}
     for batch, spec in specifications.items():
         root = safe_child(store.root, "goals/" + batch)
@@ -149,7 +150,7 @@ def snapshot(store, library):
         "tasks": tasks,
         "assets": assets,
         "goals": goals,
-        "publications": publications(library, store, specifications),
+        "publications": registered,
     }
 
 

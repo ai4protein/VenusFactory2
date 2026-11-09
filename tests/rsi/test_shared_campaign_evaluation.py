@@ -215,3 +215,18 @@ def test_mixed_cohort_keeps_sequence_scopes_and_unsupported_alignment(tmp_path):
         assert all(c["metrics"] is None for c in controls[-2:])
         assert "seconds" not in str(row["controls"])
     assert evaluation.audit(tmp_path / "study", tmp_path / "scores", tmp_path / "replay")["status"] == "passed"
+
+
+def test_invalid_publication_rejects_before_large_goal_and_data_scan(terminal, monkeypatch):
+    def invalid(*args, **kwargs):
+        raise ValueError("Synthetic invalid publication")
+
+    def unexpected(*args, **kwargs):
+        pytest.fail("Scanned large evidence after a known publication failure")
+
+    monkeypatch.setattr(study, "publications", invalid)
+    monkeypatch.setattr(study, "tree", unexpected)
+    monkeypatch.setattr(model_tasks, "bound_file", unexpected)
+    with pytest.raises(ValueError, match="Synthetic invalid publication"):
+        admit(terminal)
+    assert not terminal.study.exists()
