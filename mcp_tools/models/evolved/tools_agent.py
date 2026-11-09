@@ -2,10 +2,11 @@
 
 import json
 
-from langchain_core.tools import tool
+from langchain_core.tools import StructuredTool, tool
 from langchain_core.runnables import RunnableConfig
 
-from mcp_tools.models.evolved.service import PREDICTION_DESCRIPTION, dispatch
+from mcp_tools.models.evolved.contract import PREDICTION_DESCRIPTION, PredictionArguments
+from mcp_tools.models.evolved.service import dispatch
 
 
 @tool("list_evolved_models")
@@ -20,7 +21,6 @@ def describe_evolved_model_tool(entry_id: str) -> str:
     return json.dumps(dispatch("describe", entry_id=entry_id), ensure_ascii=False)
 
 
-@tool("predict_with_evolved_model", description=PREDICTION_DESCRIPTION)
 def predict_with_evolved_model_tool(
     entry_id: str, inputs: list[dict], config: RunnableConfig,
     scope_ref: str | None = None, scope: dict | None = None,
@@ -37,4 +37,16 @@ def predict_with_evolved_model_tool(
     )
 
 
+class _PredictionTool(StructuredTool):
+    @property
+    def tool_call_schema(self):
+        # This explicit public contract has no injected fields. LangChain's
+        # inferred subset otherwise discards its root-level alternative rules.
+        return self.get_input_schema()
+
+
+predict_with_evolved_model_tool = _PredictionTool.from_function(
+    predict_with_evolved_model_tool, name="predict_with_evolved_model",
+    description=PREDICTION_DESCRIPTION, args_schema=PredictionArguments,
+)
 EVOLVED_MODEL_TOOLS = [list_evolved_models_tool, describe_evolved_model_tool, predict_with_evolved_model_tool]

@@ -14,18 +14,7 @@ def scope_reference(entry_id, scope):
 
 
 def bind_scope(library, entry_id, scope=None, scope_ref=None):
-    if scope is None and scope_ref is None:
-        raise ModelScopeError(
-            "Prediction requires entry_id, inputs and scope_ref together in the same arguments object. "
-            "Add inputs to prediction_call.arguments from describe_evolved_model; keep both identifiers. "
-            "The exact inline scope may replace scope_ref."
-        )
-    if scope is not None and not isinstance(scope, dict):
-        raise ModelScopeError("scope must be a JSON object; alternatively use scope_ref from describe_evolved_model.")
-    if scope_ref is not None and (
-        not isinstance(scope_ref, str) or re.fullmatch(r"[0-9a-f]{64}", scope_ref) is None
-    ):
-        raise ModelScopeError("Use the exact scope_ref returned by describe_evolved_model.")
+    # Argument shape and required alternatives belong to PredictionArguments.
     expected = library.inspect_publication(entry_id)["key"]["scope"]
     if scope_ref is not None and scope_ref != scope_reference(entry_id, expected):
         raise ModelScopeError("Scope reference does not match this model. Read describe_evolved_model again.")

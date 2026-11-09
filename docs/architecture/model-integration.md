@@ -20,6 +20,9 @@ permission to publish or execute.
 
 1. Declare a typed input schema, output format, resource class, timeout and online
    policy. Preserve stable public names; expose adjustable scientific parameters.
+   Required parameter combinations belong in the shared input contract as well as
+   execution validation. Agent, MCP and queue admission must expose and enforce
+   the same alternatives; prompts do not replace missing schema constraints.
 2. Add the implementation under its owning model family. Expensive dependencies
    load inside a claimed worker/subprocess, not when API modules are imported.
 3. Put installations and weights outside source; add a disabled profile to

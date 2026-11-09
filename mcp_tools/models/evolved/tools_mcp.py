@@ -1,8 +1,10 @@
 """MCP access to the same owner-configured Scientist model library."""
 
 from fastmcp import Context, FastMCP
+from fastmcp.tools import Tool
 
-from mcp_tools.models.evolved.service import PREDICTION_DESCRIPTION, dispatch
+from mcp_tools.models.evolved.contract import PREDICTION_DESCRIPTION, PredictionArguments
+from mcp_tools.models.evolved.service import dispatch
 
 mcp = FastMCP("Venus_Evolved_Models")
 
@@ -19,7 +21,6 @@ def describe_evolved_model(entry_id: str) -> dict:
     return dispatch("describe", entry_id=entry_id)
 
 
-@mcp.tool(name="predict_with_evolved_model", description=PREDICTION_DESCRIPTION)
 def predict_with_evolved_model(
     entry_id: str, inputs: list[dict], ctx: Context,
     scope_ref: str | None = None, scope: dict | None = None,
@@ -34,3 +35,10 @@ def predict_with_evolved_model(
         session_id=ctx.session_id,
         session_binding="mcp_transport_session",
     )
+
+
+# FastMCP infers independent parameters from a function signature. Publish the
+# same cross-field contract enforced by the service and Agent queue instead.
+mcp.add_tool(Tool.from_function(
+    predict_with_evolved_model, description=PREDICTION_DESCRIPTION,
+).model_copy(update={"parameters": PredictionArguments.model_json_schema()}))

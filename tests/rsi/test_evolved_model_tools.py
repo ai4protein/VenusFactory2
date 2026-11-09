@@ -371,7 +371,8 @@ def test_invalid_scope_binding_never_starts_numerical_replay(published, monkeypa
         "contradictory_scope": {"scope_ref": reference, "scope": {}},
     }[binding]
     result = service.dispatch("predict", entry_id=entry, inputs=[{"id": "x", "sequence": "AA"}], **arguments)
-    assert not result["success"] and result["error_code"] == "invalid_model_scope" and not seen
+    expected_error = "invalid_model_arguments" if binding in {"absent", "malformed"} else "invalid_model_scope"
+    assert not result["success"] and result["error_code"] == expected_error and not seen
     assert "private-input-marker" not in json.dumps(result)
 
 

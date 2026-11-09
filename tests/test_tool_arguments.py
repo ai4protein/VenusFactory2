@@ -93,3 +93,24 @@ async def test_scheduler_returns_safe_feedback_without_launching_a_job(tmp_path,
     assert "private-marker" not in json.dumps(result)
     assert not list((tmp_path / "queue" / "mcp-inputs").glob("*.json"))
     assert not scheduler.queue.list("fixture")
+
+
+def test_root_error_reports_only_declared_safe_alternative_names():
+    from pydantic import ConfigDict, model_validator
+
+    class Inputs(BaseModel):
+        model_config = ConfigDict(json_schema_extra={"anyOf": [
+            {"required": ["left"]}, {"required": ["right"]},
+            {"required": ["private-undeclared-marker"]},
+        ]})
+        left: str | None = None
+        right: str | None = None
+
+        @model_validator(mode="after")
+        def reject(self):
+            raise ValueError("private-validator-marker")
+
+    with pytest.raises(ToolArgumentError) as error:
+        validate_tool_arguments(SimpleNamespace(get_input_schema=lambda: Inputs), {})
+    assert "left or right" in str(error.value)
+    assert "private" not in str(error.value)
