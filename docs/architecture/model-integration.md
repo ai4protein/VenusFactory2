@@ -49,6 +49,9 @@ to model code. Explicit CLI values override dataset defaults, while a preset own
 its sequence/label column mappings and selected structure channels. SES adapters
 require at least one nonempty structure channel; malformed values fail before a
 model or dataset is loaded.
+Dataset presets in `src/constant.json` reference versioned JSON files under
+`data/`. The layout check validates those paths and documents; a planned dataset
+without a configuration is not an executable preset.
 
 Scientist creates a repository-like deliverable with code, report, tests and
 artifacts. Research completion and public admission are separate. Reproducibility,

@@ -1,7 +1,8 @@
-"""Prevent shared contracts from depending on executable Harness adapters."""
+"""Protect source boundaries and references shipped in the application registry."""
 
 import ast
 import importlib.util
+import json
 from pathlib import Path
 
 import pytest
@@ -38,3 +39,35 @@ def test_shared_contracts_and_adapters_reject_entry_point_imports(source, statem
 def test_dispatch_and_shared_contract_imports_remain_valid(source, statement):
     path = ROOT / f"src/agent/harness/{source}.py"
     assert not checks.harness_worker_import_errors(path, ast.parse(statement), ROOT)
+
+
+def write_dataset_registry(root, reference):
+    (root / "src").mkdir()
+    (root / "src/constant.json").write_text(json.dumps({"dataset_configs": {"Example": reference}}))
+
+
+@pytest.mark.parametrize("reference", ["data/missing.json", "data/config", "../outside.json", ""])
+def test_dataset_registry_rejects_unusable_config_paths(tmp_path, reference):
+    write_dataset_registry(tmp_path, reference)
+    errors = checks.dataset_config_errors(tmp_path)
+    assert len(errors) == 1
+    assert "dataset_configs.Example" in errors[0]
+
+
+@pytest.mark.parametrize("content", ["not json", "[]", "null"])
+def test_dataset_registry_rejects_invalid_config_documents(tmp_path, content):
+    write_dataset_registry(tmp_path, "data/preset.json")
+    (tmp_path / "data").mkdir()
+    (tmp_path / "data/preset.json").write_text(content)
+    assert checks.dataset_config_errors(tmp_path)
+
+
+def test_dataset_registry_accepts_nested_shipped_config(tmp_path):
+    write_dataset_registry(tmp_path, "data/example/preset.json")
+    (tmp_path / "data/example").mkdir(parents=True)
+    (tmp_path / "data/example/preset.json").write_text('{"dataset": "public/example"}')
+    assert checks.dataset_config_errors(tmp_path) == []
+
+
+def test_shipped_dataset_registry_has_no_broken_references():
+    assert checks.dataset_config_errors(ROOT) == []

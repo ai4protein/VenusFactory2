@@ -41,8 +41,40 @@ def harness_worker_import_errors(path, tree, root):
     return errors
 
 
-def check(root=ROOT):
+def dataset_config_errors(root):
+    """Every advertised training preset must ship a readable repository config."""
+    registry_path = root / "src/constant.json"
+    try:
+        registry = json.loads(registry_path.read_text(encoding="utf-8"))["dataset_configs"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return ["src/constant.json: cannot read dataset preset registry"]
+    if not isinstance(registry, dict):
+        return ["src/constant.json: dataset_configs must be an object"]
     errors = []
+    for name, relative in registry.items():
+        prefix = f"src/constant.json: dataset_configs.{name}: "
+        if not isinstance(relative, str) or not relative:
+            errors.append(prefix + "expected a repository-relative JSON path")
+            continue
+        path = root / relative
+        if Path(relative).is_absolute() or not path.resolve().is_relative_to(root.resolve()):
+            errors.append(prefix + "configuration must be inside the repository")
+            continue
+        if path.suffix != ".json" or not path.is_file():
+            errors.append(prefix + f"missing configuration: {relative}")
+            continue
+        try:
+            config = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            errors.append(prefix + f"unreadable JSON configuration: {relative}")
+            continue
+        if not isinstance(config, dict):
+            errors.append(prefix + f"configuration must be a JSON object: {relative}")
+    return errors
+
+
+def check(root=ROOT):
+    errors = dataset_config_errors(root)
     for name in ('config', 'script', 'Scripts', 'epitope_miner', 'insulin_variants', 'src/tools', 'src/tool_runtime', 'src/web_v2', 'src/web', 'src/webui.py', 'src/frpc_hub.py', 'Scripts_notebook.ipynb', 'install_config.json', 'mcp_tools/runtimes', 'mcp_tools/tool_runtime', 'mcp_tools/tools/train', 'mcp_tools/tools/mutation', 'mcp_tools/tools/denovo', 'mcp_tools/tools/external', 'mcp_tools/tools/evolved', 'third_party', 'requirements-sandbox-cube.txt', 'requirements-sandbox-e2b.txt'):
         path = root / name
         if path.exists() or path.is_symlink():
