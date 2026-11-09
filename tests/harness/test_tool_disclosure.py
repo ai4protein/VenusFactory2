@@ -119,11 +119,16 @@ async def test_shared_protocol_dispatches_to_original_tool_and_records_real_iden
             assert len(listing) == 5 and 'protein_length' not in {r['name'] for r in listing}
             assert len(json.dumps(listing)) < 6000
             assert 'error' in await call('protein_length', {'sequence':'ACDE'})
-            assert (await call('call_tool', {'name':'protein_length','arguments':{'sequence':'ACDE'}}))['result']['isError'] is True
+            uninspected = await call('call_tool', {'name':'protein_length','arguments':{'sequence':'private-input-marker'}})
+            assert uninspected['result']['isError'] is True and not calls
+            feedback = json.loads(uninspected['result']['content'][0]['text'])
+            assert feedback['error_code'] == 'tool_inspection_required' and feedback['executed'] is False
+            assert feedback['contract']['name'] == 'protein_length'
+            assert feedback['contract']['inputSchema']['required'] == ['sequence']
+            assert 'Detailed notes.' in feedback['contract']['description']
+            assert 'private-input-marker' not in json.dumps(feedback)
             found = json.loads((await call('search_tools', {'query':'protein_length'}))['result']['content'][0]['text'])
             assert found['tools'][0] == {'name':'protein_length','description':'Calculate sequence length.'}
-            described = json.loads((await call('describe_tool', {'name':'protein_length'}))['result']['content'][0]['text'])
-            assert described['inputSchema']['required'] == ['sequence']
             rejected = await call('call_tool', {'name':'protein_length','arguments':{'extra':'private-input-marker'}})
             assert rejected['result']['isError'] is True
             feedback = rejected['result']['content'][0]['text']
@@ -430,3 +435,30 @@ def test_revoked_tool_does_not_reveal_its_required_arguments():
                        allowed=lambda _: False, direct={name})
     with pytest.raises(DisclosureError, match="unavailable"):
         c.resolve(name, {})
+
+
+def test_selected_contract_deduplicates_only_equal_root_description():
+    from copy import deepcopy
+    tool = SimpleNamespace(name="protein_measure", description="Measure a protein.")
+    original = {"type": "object", "description": tool.description,
+                "properties": {"sequence": {"type": "string", "description": "Protein sequence"}},
+                "required": ["sequence"], "additionalProperties": False}
+    saved = deepcopy(original)
+    c = ToolDisclosure({tool.name: tool}, schema=lambda _: original, allowed=lambda _: True)
+    result = c.metadata("describe_tool", {"name": tool.name})
+    assert result["description"] == tool.description
+    assert result["inputSchema"] == {key: value for key, value in saved.items() if key != "description"}
+    assert original == saved
+    original["description"] = "A separate input constraint explanation."
+    assert c.metadata("describe_tool", {"name": tool.name})["inputSchema"]["description"] == original["description"]
+
+
+def test_inspection_request_never_reads_a_schema_or_keeps_caller_values():
+    from agent.harness.tool_disclosure import ToolInspectionRequired
+    c = catalog(2)
+    c.schema = lambda _: pytest.fail("Only the budgeted host may disclose the selected contract")
+    with pytest.raises(ToolInspectionRequired) as caught:
+        c.resolve("call_tool", {"name": "protein_model_0",
+                               "arguments": {"sequence": "private-input-marker"}})
+    assert caught.value.name == "protein_model_0"
+    assert not c.inspected and "private-input-marker" not in str(caught.value)

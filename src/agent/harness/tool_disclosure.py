@@ -38,6 +38,14 @@ class DisclosureError(ValueError):
     """A safe, actionable message that contains no host or credential details."""
 
 
+class ToolInspectionRequired(DisclosureError):
+    """Select one contract for disclosure without executing the attempted call."""
+
+    def __init__(self, name):
+        super().__init__("Read describe_tool for this tool before calling it.")
+        self.name = name
+
+
 def brief_description(value, limit=180):
     text = str(value or '').strip()
     # Tool docstrings often embed full argument/reference sections.
@@ -282,10 +290,13 @@ class ToolDisclosure:
             if not self._available(name):
                 raise DisclosureError('Tool unavailable. Search for an enabled tool.')
             tool = self.mapping[name]
+            input_schema = self.schema(tool)
+            if input_schema.get('description') == tool.description:
+                input_schema = {key: value for key, value in input_schema.items() if key != 'description'}
             result = {'name': name, 'description': tool.description,
                       'call_via': name if name in self.direct else 'call_tool',
                       'next_step': ('This tool is directly exposed; call it by name with its arguments.' if name in self.direct else 'Use call_tool(name, arguments). This capability is not a directly exposed native function.'),
-                      'inputSchema': self.schema(tool)}
+                      'inputSchema': input_schema}
             query_field = result['inputSchema'].get('properties', {}).get('query', {})
             if name in self._navigation_queries and query_field.get('type') == 'string':
                 result['suggested_arguments'] = {'query': self._navigation_queries[name]}
@@ -313,7 +324,7 @@ class ToolDisclosure:
             if not self._available(name):
                 raise DisclosureError('Tool unavailable. Search for an enabled tool; do not guess its name.')
             if name not in self.inspected and name not in self.direct:
-                raise DisclosureError('Read describe_tool for this tool before calling it.')
+                raise ToolInspectionRequired(name)
         else:
             raise DisclosureError('Use search_tools, describe_tool, then call_tool.')
         if not self._available(name):

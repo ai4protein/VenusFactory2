@@ -18,7 +18,7 @@ from .host import RuntimeContext
 from .registry import builtin_registry
 from .web_langgraph_worker import emit
 from .session_boundary import UNSAFE_TOOLS, SECURITY_INSTRUCTIONS, bind_arguments, public_value, session_tools
-from .tool_disclosure import ToolDisclosure, DisclosureError, SEARCH, DESCRIBE, GUIDANCE
+from .tool_disclosure import ToolDisclosure, DisclosureError, ToolInspectionRequired, SEARCH, DESCRIBE, GUIDANCE
 
 
 def native_prompt(request):
@@ -214,6 +214,33 @@ async def run(request, *, tools=None, event_sink=None):
             result['content'].append({'type': 'text', 'text': note})
         return result
 
+    def discovery_result(method, arguments, *, inspection_required=False):
+        nonlocal executions, lookups
+        if is_research:
+            if lookups >= lookup_limit:
+                raise DisclosureError("Discovery budget reached. Use inspected interfaces or save a checkpoint.")
+            lookups += 1
+        else:
+            if executions >= profile.budget.tool_calls:
+                raise DisclosureError("Execution budget reached.")
+            executions += 1
+        send({"kind": "tool_usage", "tool_calls": executions,
+              "discovery_calls": lookups, "transport_calls": calls})
+        value = public_value(disclosure.metadata(method, arguments), workspace)
+        if inspection_required:
+            value = {
+                "error_code": "tool_inspection_required", "executed": False,
+                "contract": value,
+                "next_step": "Review this contract, then retry call_tool with all required arguments. "
+                             "The interface is now available; another describe_tool call is unnecessary.",
+            }
+        from backend.web_v2.usage_store import Observation
+        Observation('tool', method).finish()
+        return with_budget_feedback({
+            'content': [{'type': 'text', 'text': json.dumps(value, ensure_ascii=False)}],
+            'isError': inspection_required,
+        })
+
     async def rpc(http):
         nonlocal calls, executions, lookups, checkpoint_saved, checkpoint_calls
         if not secrets.compare_digest(http.headers.get("Authorization", ""), "Bearer " + token):
@@ -243,28 +270,19 @@ async def run(request, *, tools=None, event_sink=None):
                     raise DisclosureError("Tool transport budget reached. Finish this iteration.")
                 if checkpoint_saved:
                     raise DisclosureError("Checkpoint saved; finish this iteration without further calls.")
-                metadata_call = is_research and name in {SEARCH, DESCRIBE}
-                if metadata_call and lookups >= lookup_limit:
-                    raise DisclosureError("Discovery budget reached. Use inspected interfaces or save a checkpoint.")
                 if interaction is not None:
                     raise ValueError("Waiting for the user's response; no further actions are allowed")
                 calls += 1
                 call_id = f"{call_scope}:{calls}"
                 arguments = params.get('arguments', {})
                 if name in {SEARCH, DESCRIBE}:
-                    if not metadata_call and executions >= profile.budget.tool_calls:
-                        raise DisclosureError("Execution budget reached.")
-                    if metadata_call: lookups += 1
-                    else: executions += 1
-                    send({"kind": "tool_usage", "tool_calls": executions,
-                          "discovery_calls": lookups, "transport_calls": calls})
-                    value = public_value(disclosure.metadata(name, arguments), workspace)
-                    from backend.web_v2.usage_store import Observation
-                    Observation('tool', name).finish()
-                    return web.json_response({'jsonrpc': '2.0', 'id': body['id'], 'result': with_budget_feedback({
-                        'content': [{'type': 'text', 'text': json.dumps(value, ensure_ascii=False)}], 'isError': False})})
+                    return web.json_response({'jsonrpc': '2.0', 'id': body['id'],
+                                              'result': discovery_result(name, arguments)})
                 try:
                     name, tool, arguments = disclosure.resolve(name, arguments)
+                except ToolInspectionRequired as exc:
+                    return web.json_response({'jsonrpc': '2.0', 'id': body['id'],
+                        'result': discovery_result(DESCRIBE, {'name': exc.name}, inspection_required=True)})
                 except DisclosureError:
                     # Rejected discovery attempts did not execute a tool. They
                     # still consume the finite transport allowance.

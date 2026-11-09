@@ -39,6 +39,10 @@ session isolation and resource limits still apply.
    quota and queue checks. A provider that emits a discovered MCP name directly
    is routed back through this broker; it still requires prior inspection and
    current permission. Other namespaces remain rejected.
+   If a selected tool has not been inspected, the response supplies that tool's
+   contract with `executed=false`. Review it and retry; the initial operation
+   was not executed. This uses the same discovery allowance and permission checks
+   as an explicit `describe_tool` request.
 4. For guidance, search the `guides` category, then find a relevant manual section
    or skill. Only `read_skill(skill_id)` loads that skill's contents.
 
