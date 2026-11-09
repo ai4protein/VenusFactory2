@@ -8,16 +8,11 @@ No credentials, model service, training decision or library write is needed.
 from __future__ import annotations
 
 import copy
-import json
-import math
 from pathlib import Path
 
 from agent.harness.contracts import digest, file_hash
-
 from agent.rsi import context_feedback_dispatch as context_feedback
 from agent.rsi import library_experience, model_tasks, training_attempt_memory
-from .model_plugins import get_model_plugin
-from .prediction_metrics import measure, measure_context
 from agent.rsi.campaigns.scientist_model_campaign import (
     ALL_ALLOCATIONS,
     TERMINAL,
@@ -26,38 +21,29 @@ from agent.rsi.campaigns.scientist_model_campaign import (
     bind_goal,
     execution_policy,
 )
+
+from .campaign_evidence import (
+    observed_usage as observed_usage,
+)
+from .campaign_evidence import (
+    read as read,
+)
+from .campaign_evidence import (
+    require as require,
+)
+from .campaign_evidence import (
+    source_identity as source_identity,
+)
+from .campaign_evidence import (
+    tree as tree,
+)
+from .campaign_scoring import context_controls as context_controls
+from .campaign_scoring import score_model
+from .model_plugins import get_model_plugin
 from .scientist_model_library import ScientistModelLibrary, validate_model_goal
-from .source_snapshot import research_implementation_paths
 from .storage import atomic_json, safe_child
 
-REPOSITORY = Path(__file__).resolve().parents[4]
 LIBRARY_RETRIEVAL = "library_retrieval.v1"
-
-
-def require(value, message):
-    if not value:
-        raise ValueError(message)
-
-
-def read(path):
-    require(path.is_file() and not path.is_symlink(), "Missing or symlinked evaluation evidence")
-    return json.loads(path.read_text())
-
-
-def source_identity():
-    return {str(p.relative_to(REPOSITORY)): file_hash(p) for p in research_implementation_paths(REPOSITORY)}
-
-
-def tree(root):
-    if not root.exists():
-        return {}
-    require(root.is_dir() and not root.is_symlink(), "Invalid goal evidence directory")
-    result = {}
-    for path in sorted(root.rglob("*")):
-        require(not path.is_symlink(), "Symlinked goal evidence")
-        if path.is_file() and not path.name.endswith(".lock"):
-            result[str(path.relative_to(root))] = file_hash(path)
-    return result
 
 
 def paired_design(specifications, pairs):
@@ -269,108 +255,6 @@ def admit_descriptive(campaign, output):
     return definition
 
 
-def context_controls(task, data, output, identity):
-    """Refit fixed training-only controls and score their predictions independently."""
-    from .context_baselines import run_controls
-
-    controls = run_controls(task, score_partition="future")
-    result = {
-        k: controls[k]
-        for k in (
-            "schema",
-            "implementation_sha256",
-            "reference_implementation_sha256",
-            "versions",
-            "fit_partition",
-            "score_partition",
-            "future_scored",
-            "new_autonomous_models",
-        )
-    }
-    result["outcomes"] = []
-    for item in controls["outcomes"]:
-        row = {"method": item["method"], "status": item["status"]}
-        if item["status"] != "completed":
-            row["error"] = item["error"]
-        else:
-            require(
-                [p["id"] for p in item["predictions"]] == [r["id"] for r in data["future"]],
-                "Fixed-control prediction identities differ",
-            )
-            predictions = [
-                {
-                    "id": r["id"],
-                    "protein": r["protein"],
-                    "group": r["group"],
-                    "values_sha256": digest(r["values"]),
-                    "prediction": p["prediction"],
-                }
-                for r, p in zip(data["future"], item["predictions"], strict=True)
-            ]
-            row["metrics"] = measure_context(data["training"], data["future"], predictions, scope=task["scope"])
-            path = output / "control_predictions" / identity / (item["method"] + ".json")
-            atomic_json(path, predictions)
-            row["predictions"] = {"path": str(path.relative_to(output)), "sha256": file_hash(path)}
-        result["outcomes"].append(row)
-    result["status"] = "completed" if all(r["status"] == "completed" for r in result["outcomes"]) else "partial"
-    return result
-
-
-def observed_usage(root, record):
-    physical, tools, token_rows, host_seconds, missing = 0, 0, [], 0.0, []
-    for folder in sorted((root / "episodes").glob("cycle_*/execution")):
-        request_file = folder / "model_requests.jsonl"
-        events_file = folder / "events.jsonl"
-        if not request_file.exists() or not events_file.exists():
-            missing.append(str(folder.relative_to(root)))
-        requests = [json.loads(line) for line in request_file.read_text().splitlines()] if request_file.exists() else []
-        ids = [row["call"] for row in requests if row.get("event") == "request"]
-        require(len(ids) == len(set(ids)), "Duplicate physical request record")
-        physical += len(ids)
-        responses = [row for row in requests if row.get("event") == "response"]
-        require(len({row["call"] for row in responses}) == len(responses), "Duplicate response usage")
-        for row in responses:
-            require(row["call"] in ids, "Unpaired response usage")
-            usage = row.get("usage") or {}
-            values = [
-                usage.get("prompt_tokens", usage.get("input_tokens")),
-                usage.get("completion_tokens", usage.get("output_tokens")),
-            ]
-            valid = all(type(v) is int and v >= 0 for v in values)
-            token_rows.append(values if valid else None)
-        token_rows.extend([None] * (len(ids) - len(responses)))
-        if events_file.exists():
-            tools += sum(
-                json.loads(line).get("kind") == "tool_call_start" for line in events_file.read_text().splitlines()
-            )
-        run_file = folder / "run.json"
-        if run_file.exists():
-            seconds = read(run_file).get("host_wall_seconds")
-            if type(seconds) in (int, float) and math.isfinite(seconds) and seconds >= 0:
-                host_seconds += seconds
-            else:
-                missing.append(str(run_file.relative_to(root)))
-        else:
-            missing.append(str(run_file.relative_to(root)))
-    known = bool(record["attempts"]) and all(a.get("usage_known") is True for a in record["attempts"])
-    charged = {
-        k: sum(a["charged"][k] for a in record["attempts"]) for k in ("model_calls", "tool_calls", "wall_seconds")
-    }
-    complete = known and not missing and charged["model_calls"] == physical and charged["tool_calls"] == tools
-    return {
-        "physical_requests_observed": physical,
-        "tool_calls_observed": tools,
-        "call_accounting_complete": complete,
-        "input_tokens_observed": sum(v[0] for v in token_rows if v is not None),
-        "output_tokens_observed": sum(v[1] for v in token_rows if v is not None),
-        "token_accounting_complete": complete and all(v is not None for v in token_rows),
-        "host_execution_seconds_observed": host_seconds,
-        "charged_budget": charged,
-        "missing_execution_evidence": missing,
-        "scope": "Observed values are lower bounds when accounting is incomplete; charged reservations are reported separately",
-    }
-
-
 def published_models(store, identity, allocation, record):
     """Score this allocation's model, even when publication deduplicated its key."""
     root = store.goal(identity)
@@ -575,38 +459,8 @@ def evaluate(study, output):
                 plugin = get_model_plugin(allocation["task"]["plugin_id"])
                 for item in models:
                     model = item.pop("model")
-                    require(
-                        model["scope"] == allocation["task"]["scope"]
-                        and model["training_sha256"] == digest(data["training"]),
-                        "Scoring model differs from the admitted task",
-                    )
                     artifact = output / "predictions" / identity / (str(item["generation"]) + ".json")
-                    try:
-                        predictions = plugin.predict(
-                            model, model_tasks.inference_inputs(data["future"], plugin.id), model["scope"]
-                        )
-                        if plugin.id in {"generated_context.v1", "generated_context.v2", "generated_context.v3"}:
-                            metrics = measure_context(
-                                data["training"], data["future"], predictions, scope=model["scope"]
-                            )
-                        else:
-                            metrics = measure(
-                                data["training"],
-                                data["future"],
-                                predictions,
-                                classes=len(model["scope"]["class_labels"])
-                                if "class_labels" in model["scope"]
-                                else None,
-                            )
-                    except Exception as exc:
-                        item.update(status="prediction_failed", error_type=type(exc).__name__, metrics=None)
-                    else:
-                        atomic_json(artifact, predictions)
-                        item.update(
-                            status="scored",
-                            metrics=metrics,
-                            predictions={"path": str(artifact.relative_to(output)), "sha256": file_hash(artifact)},
-                        )
+                    item.update(score_model(allocation["task"], data, model, output, artifact))
                     row["generations"].append(item)
                 if models:
                     row["evaluation_status"] = row["generations"][-1]["status"]
