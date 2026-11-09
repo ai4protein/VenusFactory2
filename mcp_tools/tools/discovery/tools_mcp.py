@@ -17,7 +17,7 @@ def register_discovery_tools(server):
         query: str = "", kind: Literal["all", "tools", "models"] = "all",
         stage: str = "", limit: int = 10, offset: int = 0,
     ) -> dict:
-        """Search scientific tools and platform and curator-published protein models by protein ID, property or task (English/Chinese). For model inventory use kind='models', query=''. Results include bounded pages and current counts. For platform models, inspect the returned tool schema and selection hints; for Scientist models, use their describe and predict tools with the exact scope. Protein models are scientific tools, separate from the chat LLM selector."""
+        """Search scientific tools and platform and curator-published protein models by protein ID, property or task (English/Chinese). For model inventory use kind='models', query=''. Results include bounded pages and current counts. For platform models, inspect the returned tool schema and selection hints; for Scientist models, describe the selected entry and use its scope_ref and required inputs for prediction. Protein models are scientific tools, separate from the chat LLM selector."""
         mounted = await server.list_tools()
         catalog = [
             {"name": t.name, "description": t.description, "parameters": t.parameters}

@@ -94,6 +94,14 @@ def free_catalog(payload):
     return sorted(selected, key=lambda entry: entry["id"])
 
 
+def _omit_parallel_default(payload):
+    # True permits parallel calls; omitting this SDK default permits the provider
+    # default too. Keep False: it is an explicit serial-execution constraint.
+    # Requiring support for the optional True field can exclude free providers.
+    if payload.get("parallel_tool_calls") is True:
+        payload.pop("parallel_tool_calls")
+
+
 def enforce_free_request(payload, metadata):
     """Run after common budget/tool filtering; witness the actual transmitted body."""
     if not isinstance(payload, dict) or not free_model_id(payload.get("model")):
@@ -132,6 +140,7 @@ def enforce_free_request(payload, metadata):
         }:
             raise ValueError("Unapproved message extension")
     result = copy.deepcopy(payload)
+    _omit_parallel_default(result)
     thinking = result.pop("thinking", None)
     if thinking is not None:
         if not isinstance(thinking, dict) or thinking.get("type") not in {"enabled", "disabled"}:
@@ -146,6 +155,7 @@ def enforce_free_request(payload, metadata):
         "free_route": {"policy": POLICY, "provider": result["provider"]},
         "thinking_sent": None,
         "reasoning_sent": result.get("reasoning"),
+        "parallel_tool_calls_sent": result.get("parallel_tool_calls"),
         "request_sha256": hashlib.sha256(encoded).hexdigest(),
         "request_bytes": len(encoded),
     }
@@ -182,7 +192,7 @@ def enforce_free_responses_request(payload, metadata):
     # encrypted reasoning blocks or native-client reasoning summaries.
     payload.pop("prompt_cache_key", None)
     payload.pop("include", None)
-    payload.pop("parallel_tool_calls", None)
+    _omit_parallel_default(payload)
     if isinstance(payload.get("reasoning"), dict):
         payload["reasoning"].pop("summary", None)
         if not payload["reasoning"]:
@@ -222,6 +232,7 @@ def enforce_free_responses_request(payload, metadata):
     return result, {
         **metadata,
         "free_route": {"policy": POLICY, "provider": result["provider"]},
+        "parallel_tool_calls_sent": result.get("parallel_tool_calls"),
         "request_sha256": hashlib.sha256(encoded).hexdigest(),
         "request_bytes": len(encoded),
     }

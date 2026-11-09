@@ -136,5 +136,5 @@ def search(query="", kind="all", stage="", limit=10, offset=0, *, tool_catalog=N
         "model_stages": dict(sorted(Counter(c["stage"] for c in cards).items())),
         "model_catalog_status": model_status,
         "next_offset": offset + limit if offset + limit < total else None,
-        "model_usage": "Describe the selected entry, then predict with its exact scope and required inputs. Ask for missing inputs. Published protein models are callable scientific tools, separate from the chat language-model selector.",
+        "model_usage": "Describe the selected entry and follow its input contract. For an evolved model, pass its scope_ref to prediction; preserve supplied record IDs and values. Ask for missing inputs. Published protein models are callable scientific tools, separate from the chat language-model selector.",
     }

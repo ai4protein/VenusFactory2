@@ -1,31 +1,51 @@
 # Research model access
 
-New live research requests are restricted by `configs/rsi/model_access.json` to
-DMXAPI `glm-4-flash` and `unisound-u2-flash`. Their free status comes from the
-user-provided list, not a live tariff lookup. Speech models are not admitted.
-There is no fallback to another provider, model or protocol.
+Live research uses the enabled free routes in the server execution catalog.
+`configs/rsi/model_access.json` points to
+`configs/harness/free_execution_catalog.json`; `VENUS_EXECUTION_CATALOG` can select
+a server-owned catalog. Credentials come from the configured environment or
+credential file. See the [backend configuration guide](../harness/backend_configuration.md)
+for route, protocol and output-budget settings.
 
-The common research gateway checks the policy before creating a live client and
-again before each request. Paid aliases, different endpoints, unlisted protocols,
-excess output budgets, and missing or malformed policies are rejected before
-upstream transmission. A request records the policy digest. Explicit
-`httpx.MockTransport` tests remain offline and are identified as such; there is no
-environment variable or CLI switch that disables the live check.
+The common gateway checks model access before opening a client and before each
+request. It records the policy digest, transmitted request hash, actual usage
+and provider failures. A native harness receives a temporary relay token rather
+than the upstream API key. Role requests and harness requests share the run's
+physical request budget.
 
-New profiles in `configs/harness/free_text/` use a matched 4,096-token output
-ceiling and no provider-specific thinking parameter. They cover Scientist and
-Agent with Kimi Code and DeepSeek harness adapters. These are prepared profiles,
-not evidence of function-call compatibility. Codex still requires the separately
-implemented Responses protocol; these Chat Completions profiles do not establish
-Codex compatibility.
+## Free routing
 
-The policy is included in new execution source snapshots. Historical frozen
-snapshots and profiles are unchanged and remain available for offline audits.
-Do not run historical paid-model snapshots. The policy controls the current
-research gateways; it is not an account-wide billing control and does not modify
-the separate deployment checkout or its environment.
+DMX entries must be explicitly enabled with zero configured input and output
+prices. OpenRouter additionally requires an explicit free route and enforces
+zero maximum provider prices, no provider fallback and support for required
+parameters. Fixed-model routes validate the returned model identity; a successful
+OpenRouter response must attest zero billed cost.
 
-Both free aliases returned HTTP 403 with `insufficient_user_quota` in the
-2026-10-23 preflight. Resolve account access before further requests. The two
-preflights produced no Scientist goals or autonomous models. After restoration,
-validate one bounded tool-call request, then start a new frozen lifecycle pilot.
+The shared OpenRouter policy applies to Chat Completions, native Responses and
+the Codex/Claude protocol bridges. It omits the optional
+`parallel_tool_calls=true` SDK default, which can otherwise exclude a provider
+that has not advertised that parameter. An explicit `false` value is retained:
+a caller's serial-execution constraint must not be weakened for compatibility.
+Request evidence reflects the normalized payload.
+
+OpenRouter's [provider-routing documentation](https://openrouter.ai/docs/guides/routing/provider-selection#requiring-providers-to-support-all-parameters)
+defines `require_parameters`. Tool schemas, model identity, price limits and
+explicit execution constraints remain required.
+
+## Protocols and verification
+
+Kimi Code and DeepSeek Harness use Chat Completions. Codex can use native
+Responses or the explicit Responses-to-Chat bridge; Claude Code uses the
+Messages-to-Chat bridge for these free routes. The bridges support text, tool
+declarations and paired tool history. They validate tool responses before
+execution and preserve provider-reported usage.
+
+Static configuration readiness does not establish live compatibility. Verify
+each selected harness/model combination with a bounded tool call before a
+research campaign. Store the source revision, protocol, limits, raw failure
+evidence and numerical acceptance checks with that campaign. Exhausting a run
+budget is distinct from provider rate limiting; neither implies completion.
+
+Historical snapshots retain their original bindings and evidence. New snapshots
+include the current policy. Offline tests with `httpx.MockTransport` do not
+contact providers or establish live availability.

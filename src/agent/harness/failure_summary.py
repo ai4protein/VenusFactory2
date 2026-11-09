@@ -37,10 +37,14 @@ def public_failure(path, fallback="runtime_error"):
             else:
                 code = "model_response_invalid"
             break
+        if row.get("event") == "budget_rejected":
+            code = "model_call_budget_exhausted"
+            break
         if row.get("event") == "policy_rejected":
             code = "model_protocol_incompatible"
             break
     messages = {
+        "model_call_budget_exhausted": "This run reached its model request limit.",
         "upstream_rate_limited": "Model provider returned 429 (rate limited). Please try again later.",
         "upstream_timeout": "Model response timed out. Please retry.",
         "model_unavailable": "Model temporarily unavailable. Choose another model or retry later.",

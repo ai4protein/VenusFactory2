@@ -219,3 +219,25 @@ def test_openrouter_paid_entry_cannot_be_enabled_by_allowlist_edit(access):
         model_access.authorize_model(
             model="cohere/north-mini-code", base_url=BASE_URL, protocol="chat_completions", output_tokens=128
         )
+
+
+@pytest.mark.parametrize("parallel", [True, False])
+@pytest.mark.parametrize("protocol", ["chat", "responses"])
+def test_parallel_permission_is_optional_but_serial_constraint_is_retained(parallel, protocol):
+    from agent.rsi.engine.openrouter_policy import enforce_free_responses_request
+    original = (example(parallel_tool_calls=parallel) if protocol == "chat" else
+                {"model": MODEL, "input": "Read a protein", "parallel_tool_calls": parallel})
+    original_copy = copy.deepcopy(original)
+    enforce = enforce_free_request if protocol == "chat" else enforce_free_responses_request
+    sent, witness = enforce(original, {"parallel_tool_calls_sent": parallel})
+    assert original == original_copy
+    if parallel:
+        assert "parallel_tool_calls" not in sent
+        assert witness["parallel_tool_calls_sent"] is None
+    else:
+        assert sent["parallel_tool_calls"] is False
+        assert witness["parallel_tool_calls_sent"] is False
+    assert sent["provider"] == PROVIDER
+    encoded = json.dumps(sent, sort_keys=True, ensure_ascii=False,
+                         separators=(",", ":"), allow_nan=False).encode()
+    assert witness["request_sha256"] == hashlib.sha256(encoded).hexdigest()

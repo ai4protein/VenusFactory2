@@ -197,3 +197,54 @@ def test_real_output_or_ambiguous_completion_does_not_become_an_empty_answer(tmp
     path.write_text(json.dumps({"event": "response", "status": 200, "completed": True,
         "response_completion": shape}))
     assert public_failure(path)["code"] == "runtime_error"
+
+
+def test_fixed_request_budget_is_not_reported_as_a_provider_rate_limit(tmp_path):
+    from agent.harness.failure_summary import public_failure
+    path = tmp_path / "requests.jsonl"
+    rows = [
+        {"event": "response", "status": 200, "completed": True},
+        {"event": "budget_rejected", "code": "private-untrusted-marker"},
+    ]
+    path.write_text("\n".join(json.dumps(row) for row in rows))
+    result = public_failure(path)
+    assert result["code"] == "model_call_budget_exhausted"
+    assert "private-untrusted-marker" not in json.dumps(result)
+    path.write_text("\n".join(json.dumps(row) for row in rows + [
+        {"event": "response", "status": 200, "completed": True},
+    ]))
+    assert public_failure(path)["code"] == "runtime_error"
+
+
+@pytest.mark.asyncio
+async def test_codex_free_bridge_does_not_require_optional_parallel_support(tmp_path):
+    from agent.harness.responses_bridge import ResponsesChatBridge
+    from test_responses_bridge import request, answer
+    model = "nvidia/nemotron-3.5-lightning:free"
+    seen = []
+    async def upstream(req):
+        body = json.loads(req.content)
+        seen.append(body)
+        if "parallel_tool_calls" in body:
+            return httpx.Response(404, json={"error": {"message": "No matching provider"}})
+        assert body["provider"]["require_parameters"] is True
+        assert body["provider"]["allow_fallbacks"] is False
+        assert body["provider"]["max_price"]["prompt"] == 0
+        data = answer(False); data["model"] = model; data["usage"]["cost"] = 0
+        return httpx.Response(200, json=data)
+    path = tmp_path / "requests.jsonl"
+    policy = GatewayPolicy(model=model, mode="science_agent", scientific_tools={"protein_probe"})
+    async with ResponsesChatBridge(policy=policy, upstream_url="https://openrouter.ai/api/v1",
+            api_key="fixture-secret", output=path, transport=httpx.MockTransport(upstream)) as relay:
+        async with httpx.AsyncClient(trust_env=False) as client:
+            body = request(True)
+            body.update(model=model, parallel_tool_calls=True)
+            result = await client.post(relay.base_url + "/responses", json=body,
+                                       headers={"Authorization": "Bearer " + relay.token})
+            assert result.status_code == 200, result.text
+            assert b"response.completed" in result.content
+    assert len(seen) == 1 and seen[0]["tools"][0]["function"]["name"] == "mcp__venusfactory__protein_probe"
+    rows = [json.loads(line) for line in path.read_text().splitlines()]
+    assert next(row for row in rows if row["event"] == "request")["parallel_tool_calls_sent"] is None
+    assert next(row for row in rows if row["event"] == "response")["provider_evidence"]["billed_cost"] == 0
+    assert "fixture-secret" not in path.read_text()
