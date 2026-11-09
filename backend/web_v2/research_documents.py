@@ -11,7 +11,6 @@ import json
 import re
 import time
 
-
 MINIMUM_CHAPTERS = 5
 
 
@@ -59,7 +58,9 @@ def chapter_ready(chapter, sources=None):
         return False
     if chapter.get("evidence_review_required"):
         from .research_source_review import document_ready
-        return sources is not None and document_ready(chapter_document(chapter), sources, chapter.get("source_review"))
+        if sources is None or not chapter.get("id") or not chapter.get("title"):
+            return False
+        return document_ready(chapter_document(chapter), sources, chapter.get("source_review"))
     return True
 
 
@@ -125,12 +126,17 @@ def chapter_signature(state):
     ], sort_keys=True, ensure_ascii=False).encode()).hexdigest()
 
 
+def source_review_required(state):
+    """Specialist reports require review even when older checkpoints lack the flag."""
+    return state.get("workflow") == "specialist_research_v2" or bool(state.get("evidence_review_required"))
+
+
 def review_ready(state, lang):
     if state.get("review_status", "completed") != "completed" or not state.get("review"):
         return False
     sources = state.get("sources", [])
     audit = editor_audit(state["review"], [s["id"] for s in sources], lang)
-    if state.get("evidence_review_required"):
+    if source_review_required(state):
         from .research_source_review import document_ready
         document = {"id": "editor", "title": "Integrated assessment", "text": state["review"]}
         if (not document_ready(document, sources, state.get("review_source_review"))
@@ -139,10 +145,14 @@ def review_ready(state, lang):
     return not incomplete_review(audit, state.get("review_truncated", False), bool(sources))
 
 
-def incomplete_review(audit, truncated, has_sources):
+def incomplete_chapter(audit, truncated=False, has_sources=True):
+    """Structural eligibility for source review, shared by writers and recovery."""
     return bool(truncated or audit["long_sequence"] or audit["unknown_citations"]
-                or not audit["substantial"] or (has_sources and not audit["has_citations"])
-                or not audit.get("citation_coverage_ok", True))
+                or not audit["substantial"] or (has_sources and not audit["has_citations"]))
+
+
+def incomplete_review(audit, truncated, has_sources):
+    return incomplete_chapter(audit, truncated, has_sources) or not audit.get("citation_coverage_ok", True)
 
 
 def cite_report(text, sources):
@@ -161,6 +171,9 @@ def report_view(state, lang):
     A queue failure, cancellation or running state is never promoted to success.
     """
     value = copy.deepcopy(state)
+    if source_review_required(value):
+        from .research_source_review import VERSION
+        value["evidence_review_required"] = VERSION
     sources = value.get("sources", [])
     chapters = value.get("chapters")
     demoted = False
@@ -182,7 +195,7 @@ def report_view(state, lang):
         minimum = max(MINIMUM_CHAPTERS, minimum) if type(minimum) is int else MINIMUM_CHAPTERS
         value.update(completed_chapters=completed, minimum_chapters=minimum,
                      minimum_met=completed >= minimum)
-        requires_editor = value.get("workflow") == "specialist_research_v2" or bool(value.get("evidence_review_required"))
+        requires_editor = source_review_required(value)
         value["partial"] = bool(value.get("partial") or value.get("collection_partial")
                                 or completed != len(chapters) or not value["minimum_met"]
                                 or (requires_editor and not review_ready(value, lang)))
@@ -199,8 +212,9 @@ def report_view(state, lang):
 
 
 def assemble(state, lang):
-    from . import research_predictions
     from mcp_tools.tools.research import services as public_services
+
+    from . import research_predictions
 
     zh = lang == 'zh'
     title = state.get('protein', {}).get('name', 'Protein research')

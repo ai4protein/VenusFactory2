@@ -7,11 +7,13 @@ import zipfile
 from unittest.mock import patch
 
 import pytest
-from research_source_review_fixture import with_source_review
-from backend.web_v2 import research_longform as lf, research_report as research
+
+from backend.web_v2 import research_longform as lf
+from backend.web_v2 import research_report as research
 from backend.web_v2.job_queue import JobQueue
 from backend.web_v2.research_dossier import build_dossier
 from backend.web_v2.research_jobs import ResearchJobs, write
+from research_source_review_fixture import with_source_review
 
 PROSE = "The reference records the measured observation under the stated assay conditions. " * 40 + "[S1]"
 
@@ -141,3 +143,42 @@ def test_rechecked_report_still_cannot_exceed_resume_or_model_budget(tmp_path, a
     assert result["completed_chapters"] == 4
     with pytest.raises(ValueError, match="budget"):
         jobs.resume("alice", identity)
+
+
+@pytest.mark.parametrize("saved_policy", [None, False])
+def test_legacy_specialist_report_requires_review_without_modifying_checkpoint(
+    tmp_path, accepted, saved_policy
+):
+    state = accepted
+    if saved_policy is None:
+        state.pop("evidence_review_required")
+    else:
+        state["evidence_review_required"] = saved_policy
+    state.pop("source_review")
+    state.pop("review_source_review")
+    for chapter in state["chapters"]:
+        chapter.pop("evidence_review_required")
+        chapter.pop("source_review")
+    original = copy.deepcopy(state)
+    jobs, identity = owner_job(tmp_path, state)
+    checkpoint = jobs.folder(identity) / "state.json"
+    saved = checkpoint.read_bytes()
+
+    result = jobs.get("alice", identity, include_evidence=True)
+
+    assert result["completed_chapters"] == 0
+    assert not result["minimum_met"]
+    assert result["status"] == result["phase"] == "incomplete"
+    assert result["review_status"] == "partial"
+    assert result["model_calls"] == original["model_calls"]
+    assert PROSE not in result["report"]
+    assert checkpoint.read_bytes() == saved
+    with build_dossier(state) as handle, zipfile.ZipFile(handle) as bundle:
+        overview = json.loads(bundle.read("overview.json"))
+        assert overview["completed_chapters"] == 0
+        assert overview["status"] == "incomplete"
+        assert overview["model_calls"] == original["model_calls"]
+        assert PROSE not in bundle.read("report.md").decode()
+        assert bundle.read("drafts/01.md").decode() == original["chapters"][0]["draft"]
+        assert bundle.read("drafts/editor.md").decode() == original["review"]
+    assert state == original

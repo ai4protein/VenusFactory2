@@ -68,8 +68,12 @@ The long-form coordinator schedules retrieval and specialist writers; document
 acceptance and rendering belong to `research_documents.py`. API views and ZIP
 exports use that document layer, which does not call models or launch jobs.
 Completed-chapter counts and delivery status are derived from current review
-receipts for both views. Rechecking a report preserves its saved drafts, evidence,
-request budget and queue lifecycle; it never rewrites the historical checkpoint.
+receipts for both views. Specialist reports require independent source review even
+when an older checkpoint has no review flag; a missing receipt or chapter identity
+leaves the draft unaccepted. Writers, repairs and recovery share the document
+layer's structural checks before source review. Rechecking a report preserves its
+saved drafts, evidence, request budget and queue lifecycle; it never rewrites the
+historical checkpoint.
 Source-review receipts and revision feedback belong to `research_source_review.py`;
 author and editor modules consume those receipts without owning the reviewer.
 Explicit measurement checks belong to `research_measurements.py`; values retain

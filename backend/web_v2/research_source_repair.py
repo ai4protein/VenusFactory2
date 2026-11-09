@@ -3,11 +3,18 @@ from __future__ import annotations
 
 import hashlib
 import json
-from .research_source_review import feedback, revision_input, review_documents, document_ready
+
+from .research_source_review import document_ready, feedback, review_documents, revision_input
 
 
 async def repair_chapters(state, payload, chapters, model_call, publish):
-    from .research_documents import chapter_document, audit_chapter, remember_chapter, normalize_source_citations
+    from .research_documents import (
+        audit_chapter,
+        chapter_document,
+        incomplete_chapter,
+        normalize_source_citations,
+        remember_chapter,
+    )
     for chapter in chapters:
         document = chapter_document(chapter)
         if not feedback(state, document) or state.get("execution_blocker"):
@@ -34,8 +41,7 @@ async def repair_chapters(state, payload, chapters, model_call, publish):
             text = normalize_source_citations(text, state["sources"])
             audit = audit_chapter(text, chapter["source_ids"], payload.get("lang", "en"))
             remember_chapter(chapter, text, audit, truncated)
-            valid = bool(text and not truncated and audit["substantial"] and not audit["long_sequence"]
-                         and not audit["unknown_citations"] and audit["has_citations"])
+            valid = not incomplete_chapter(audit, truncated)
             chapter.update(draft=text, audit=audit, length=audit["length"],
                            draft_status="completed" if valid else "partial", status="reviewing" if valid else "partial")
             publish()
@@ -49,8 +55,8 @@ async def repair_chapters(state, payload, chapters, model_call, publish):
 
 
 async def review_editor(state, payload, model_call, publish):
-    from .research_editor import write_editor_review, editorial_input
     from .research_documents import editor_audit, incomplete_review, review_ready
+    from .research_editor import editorial_input, write_editor_review
     lang = payload.get("lang", "en")
     signature = hashlib.sha256(json.dumps(editorial_input(state, payload), sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     if review_ready(state, lang) and state.get("review_input_sha256") == signature:

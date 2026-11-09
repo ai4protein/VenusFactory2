@@ -4,23 +4,43 @@ Each chapter has its own retrieval, context, model calls and persisted draft.
 The coordinator shares immutable evidence IDs, not hidden reasoning or credentials.
 """
 from __future__ import annotations
+
 import asyncio
 import copy
-from datetime import datetime, timezone
 import json
 import os
 import re
 import time
+from datetime import datetime, timezone
 from urllib.parse import urlsplit
 
-from backend.web_v2 import research_report as research
 from agent.harness.model_availability import ModelServiceUnavailable
-from .research_chapter_context import source_context
+from backend.web_v2 import research_report as research
+
+from .research_chapter_context import source_context as source_context
 
 # Document helpers remain importable here for existing report scripts.
 from .research_documents import (
-    MINIMUM_CHAPTERS, text_size, chapter_body, normalize_source_citations, contains_long_sequence, chapter_document,
-    chapter_ready, remember_chapter, chapter_text, audit_chapter, assemble,
+    MINIMUM_CHAPTERS,
+    assemble,
+    audit_chapter,
+    chapter_document,
+    chapter_ready,
+    incomplete_chapter,
+    normalize_source_citations,
+    remember_chapter,
+)
+from .research_documents import (
+    chapter_body as chapter_body,
+)
+from .research_documents import (
+    chapter_text as chapter_text,
+)
+from .research_documents import (
+    contains_long_sequence as contains_long_sequence,
+)
+from .research_documents import (
+    text_size as text_size,
 )
 
 CHAPTERS = [
@@ -123,13 +143,13 @@ async def run_long_report(payload, update, *, service_cache=None, checkpoint=Non
         state['model_call_limit'] = report_model_call_limit(checkpoint)
         # Legacy checkpoints cannot distinguish collection and writer failures.
         state.setdefault('collection_partial', bool(state.get('partial')))
-    from .research_source_review import VERSION, document_ready, review_documents
+    from .research_source_review import VERSION, review_documents
     state["evidence_review_required"] = VERSION
     for chapter in state["chapters"]:
         chapter["evidence_review_required"] = VERSION
         if chapter.get("status") == "completed" and not chapter_ready(chapter, state.get("sources", [])):
             audit = audit_chapter(chapter.get("draft", ""), chapter.get("source_ids", []), lang)
-            valid = audit["substantial"] and audit["has_citations"] and not audit["long_sequence"] and not audit["unknown_citations"]
+            valid = not incomplete_chapter(audit)
             chapter.update(status="reviewing" if valid else "partial", draft_status="completed" if valid else "partial")
     state.pop('execution_blocker', None)
     service_error = None
@@ -211,7 +231,7 @@ async def run_long_report(payload, update, *, service_cache=None, checkpoint=Non
             remote = [s for s in base_sources if s.get('kind') == 'public_service' and s.get('service') in relevant]
             if identity in {'function_pathways', 'interactions_regulation'}:
                 remote.sort(key=lambda s: s.get('service') != 'kegg')
-            from .research_chapter_context import chapter_predictions, select_chapter_evidence, chapter_bundle
+            from .research_chapter_context import chapter_bundle, chapter_predictions, select_chapter_evidence
             predictions = chapter_predictions([s for s in base_sources if s.get('kind') == 'prediction'], identity)
             from backend.web_v2.research_materials import chapter_materials
             materials=chapter_materials(base_sources,index,terms)
@@ -251,7 +271,7 @@ async def run_long_report(payload, update, *, service_cache=None, checkpoint=Non
                 audit = audit_chapter(draft, chapter['source_ids'], lang)
                 remember_chapter(chapter, draft, audit, truncated)
                 chapter.update(draft=draft, audit=audit, length=audit['length'])
-                if truncated or audit['long_sequence'] or not audit['substantial'] or audit['unknown_citations'] or (evidence and not audit['has_citations']):
+                if incomplete_chapter(audit, truncated, bool(evidence)):
                     chapter.update(status='revising'); publish()
                     # One bounded revision per specialist; no fabricated padding is allowed.
                     revision = {'role': 'user', 'content': 'Revise into a complete, substantial chapter using only the evidence above. Correct unsupported citations; preserve uncertainty. Return the full revised chapter. Use square brackets exactly as in these allowed citations: ' + ', '.join('['+identity+']' for identity in chapter['source_ids']) + '. Validation feedback: ' + json.dumps(audit) + '. Do not emit raw protein sequences; refer to the verified FASTA. Prior draft:\n' + draft[:12000]}
@@ -259,7 +279,8 @@ async def run_long_report(payload, update, *, service_cache=None, checkpoint=Non
                     if revised.strip():
                         draft, truncated = normalize_source_citations(revised, evidence), revision_truncated
                     audit = audit_chapter(draft, chapter['source_ids'], lang)
-                chapter.update(draft=draft, audit=audit, length=audit['length'], status='partial' if truncated or audit['long_sequence'] or audit['unknown_citations'] or not audit['substantial'] or (evidence and not audit['has_citations']) else 'completed')
+                chapter.update(draft=draft, audit=audit, length=audit['length'],
+                               status='partial' if incomplete_chapter(audit, truncated, bool(evidence)) else 'completed')
             except Exception:
                 chapter.update(status='partial' if chapter.get('draft') else 'unavailable', message='Chapter writer temporarily unavailable')
             if chapter.get("draft"):
