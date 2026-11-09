@@ -56,6 +56,9 @@ card binds its immutable model and exact applicability scope for the current
 discovery session; the exposed call then accepts scientific inputs only. Resolving
 that call uses the original prediction tool, permissions and queue. A new session
 must inspect the model again. Existing explicit entry/scope tool calls remain valid.
+Selected-model calls validate input with the original model interface before
+joining the compute queue. Explicit prediction calls use the same input check
+before numerical replay. Scope, data and evidence validation still run at execution.
 Prediction results carry their verified scope, including target, units and applicable
 conditions, bound to the inference receipt. Successful execution alone does not
 establish a complete answer: report the values with their units and relevant limits.

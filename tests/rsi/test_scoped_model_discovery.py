@@ -6,7 +6,7 @@ import pytest
 
 from test_evolved_model_tools import published, context_published, model_storage  # noqa: F401
 from agent.harness.tool_disclosure import ToolDisclosure, ToolInspectionRequired, DisclosureError
-from agent.harness.web_native_worker import mcp_input_schema, prepare_tool_arguments
+from agent.harness.web_native_worker import mcp_input_schema
 from mcp_tools.models.evolved import discovery, service
 from mcp_tools.models.evolved.tools_agent import EVOLVED_MODEL_TOOLS
 
@@ -54,17 +54,15 @@ def test_inspected_model_identity_and_host_fields_cannot_be_overridden(published
     assert "private-marker" not in str(error.value) and not seen
 
 
-def test_inspection_is_session_scoped_and_invalid_input_still_fails_before_queue(published, tmp_path):
+def test_inspection_is_session_scoped_and_invalid_input_still_fails_before_queue(published):
     _, _, _, entry, seen = published
     name = discovery.ScopedModelCatalog.prefix + entry
     catalog = index()
     catalog.metadata("describe_tool", {"name": name})
     with pytest.raises(ToolInspectionRequired):
         index().resolve("call_tool", {"name": name, "arguments": {"inputs": []}})
-    key, tool, arguments = catalog.resolve("call_tool", {"name": name, "arguments": {"inputs": []}})
-    from mcp_tools.common.tool_arguments import ToolArgumentError
-    with pytest.raises(ToolArgumentError, match="inputs"):
-        prepare_tool_arguments(key, tool, arguments, tmp_path, lambda x: x)
+    with pytest.raises(DisclosureError, match="inputs"):
+        catalog.resolve("call_tool", {"name": name, "arguments": {"inputs": []}})
     assert not seen
 
 
@@ -147,16 +145,18 @@ async def test_native_harness_uses_scoped_card_but_queues_the_original_tool(publ
     async def adapter(ctx):
         connection=json.loads((ctx.task.capability/"connection.json").read_text())
         async with httpx.AsyncClient(trust_env=False) as client:
-            async def call(tool,args):
+            async def call(tool,args,error=False):
                 response=await client.post(connection["url"],headers={"Authorization":"Bearer "+connection["token"]},
                     json={"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":tool,"arguments":args}})
                 result=response.json()["result"]
-                assert not result["isError"],result
-                return json.loads(result["content"][0]["text"])
+                assert result["isError"] is error, result
+                return result["content"][0]["text"] if error else json.loads(result["content"][0]["text"])
             page=await call("search_tools",{"category":"rsi","query":entry})
             assert page["tools"][0]["name"]==name and not queued
             card=await call("describe_tool",{"name":name})
             assert card["scope"]==verified["key"]["scope"] and not queued
+            rejected=await call("call_tool",{"name":name,"arguments":{"inputs":[{"id":"x","sequence":"INVALID!"}]}},error=True)
+            assert "input contract" in rejected and not queued
             result=await call("call_tool",{"name":name,"arguments":{"inputs":[{"id":"x","sequence":"AA"}]}})
             assert result["success"] and result["predictions"][0]["prediction"]==0.25
             return {"status":"completed","text":"Prediction: 0.25."}
@@ -189,3 +189,17 @@ def test_navigation_adapter_import_does_not_load_scientific_runtime():
     root=Path(__file__).resolve().parents[2]
     code="import sys; from mcp_tools.models.evolved.discovery import ScopedModelCatalog; assert 'mcp_tools.models.evolved.service' not in sys.modules; assert 'agent.rsi.engine.scientist_model_library' not in sys.modules"
     subprocess.run([sys.executable,"-c",code],cwd=root,env={**os.environ,"PYTHON_DOTENV_DISABLED":"1"},check=True)
+
+
+def test_wrong_protein_feedback_precedes_queue_and_inspected_scope_cannot_be_mutated(context_published):
+    entry, scope, rows, seen = context_published
+    catalog = index()
+    name = discovery.ScopedModelCatalog.prefix + entry
+    card = catalog.metadata("describe_tool", {"name": name})
+    card["scope"]["protein"] = "unrelated-protein"
+    with pytest.raises(DisclosureError, match="Search the RSI category"):
+        catalog.resolve("call_tool", {"name": name, "arguments": {
+            "inputs": [{**rows[0], "protein": "unrelated-protein"}]}})
+    assert not seen
+    _, _, args = catalog.resolve("call_tool", {"name": name, "arguments": {"inputs": rows}})
+    assert args["inputs"] is rows and set(args) == {"entry_id", "scope_ref", "inputs"}

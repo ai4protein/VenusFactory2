@@ -66,7 +66,10 @@ class ScopedModelCatalog:
             raise ValueError("Model unavailable. Search for an enabled model.")
         # Snapshot only metadata that describe has actually verified. Neither
         # search nor a guessed identifier creates an executable binding.
-        self.bindings[name] = {"entry_id": entry, "scope_ref": card["scope_ref"]}
+        self.bindings[name] = {
+            "entry_id": entry, "scope_ref": card["scope_ref"],
+            "interface": card["interface"], "scope": deepcopy(card["scope"]),
+        }
         from .contract import PredictionArguments
         field = deepcopy(PredictionArguments.model_json_schema()["properties"]["inputs"])
         return {
@@ -92,4 +95,12 @@ class ScopedModelCatalog:
         key, tool = self.tools["predict_with_evolved_model"]
         # No scientific input is invented or normalized. The downstream contract,
         # queue and numerical replay recheck the exact binding and supplied rows.
-        return key, tool, {**self.bindings[name], "inputs": arguments["inputs"]}
+        binding = self.bindings[name]
+        payload = {field: binding[field] for field in ("entry_id", "scope_ref")}
+        payload["inputs"] = arguments["inputs"]
+        from .contract import PredictionArguments
+        from .inputs import validate_model_inputs
+        from mcp_tools.common.tool_arguments import validate_arguments
+        validate_arguments(PredictionArguments, payload)
+        validate_model_inputs(binding["interface"], binding["scope"], payload["inputs"])
+        return key, tool, payload

@@ -126,7 +126,7 @@ def test_context_contract_matches_actual_prediction_inputs(context_published):
 
 @pytest.mark.parametrize("invalid", ["sequence_only", "wrong_protein", "missing_value", "nonfinite", "out_of_range"])
 @pytest.mark.parametrize("use_reference", [False, True])
-def test_context_contract_does_not_weaken_input_validation(context_published, invalid, use_reference):
+def test_context_contract_does_not_weaken_input_validation(context_published, invalid, use_reference, monkeypatch):
     entry, scope, rows, seen = context_published
     row = {**rows[0], "values": list(rows[0]["values"])}
     if invalid == "sequence_only":
@@ -141,8 +141,14 @@ def test_context_contract_does_not_weaken_input_validation(context_published, in
         row["values"][0] = 101
     binding = ({"scope_ref": service.dispatch("describe", entry_id=entry)["scope_ref"]}
                if use_reference else {"scope": scope})
+    monkeypatch.setattr(service.configured_library(), "predict",
+                        lambda *a, **k: pytest.fail("Invalid scientific inputs reached numerical replay"))
     result = service.dispatch("predict", entry_id=entry, inputs=[row], **binding)
     assert not result["success"] and not seen
+    assert result["error_code"] == "invalid_model_inputs"
+    if invalid == "wrong_protein":
+        assert "Search the RSI category" in result["error"]
+        assert "another_protein" not in result["error"]
 
 
 @pytest.mark.asyncio
@@ -422,3 +428,18 @@ def test_reference_changes_with_entry_scope_and_interface_version():
     assert reference != scope_reference("b" * 64, scope)
     assert reference != scope_reference("a" * 64, {**scope, "interface_version": "generated_context.v3"})
     assert reference != scope_reference("a" * 64, {"protein": "fixture"})
+
+
+def test_unrecognized_input_validator_error_is_private(published, monkeypatch):
+    from types import SimpleNamespace
+    from agent.rsi.engine import model_plugins
+    _, _, verified, entry, seen = published
+
+    def reject(*args, **kwargs):
+        raise ValueError("PRIVATE-CANARY /private/candidate.py")
+    monkeypatch.setattr(model_plugins, "get_model_plugin",
+                        lambda name: SimpleNamespace(validate_rows=reject))
+    result = service.dispatch("predict", entry_id=entry, scope=verified["key"]["scope"],
+                              inputs=[{"id": "q", "sequence": "AA"}])
+    assert result["error_code"] == "invalid_model_inputs" and not seen
+    assert "PRIVATE-CANARY" not in json.dumps(result) and "/private/" not in json.dumps(result)

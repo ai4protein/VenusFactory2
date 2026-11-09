@@ -13,9 +13,8 @@ def scope_reference(entry_id, scope):
     return digest({"schema": "evolved_model_scope.v1", "entry_id": entry_id, "scope": scope})
 
 
-def bind_scope(library, entry_id, scope=None, scope_ref=None):
+def bind_scope(entry_id, expected, scope=None, scope_ref=None):
     # Argument shape and required alternatives belong to PredictionArguments.
-    expected = library.inspect_publication(entry_id)["key"]["scope"]
     if scope_ref is not None and scope_ref != scope_reference(entry_id, expected):
         raise ModelScopeError("Scope reference does not match this model. Read describe_evolved_model again.")
     if scope is not None and scope != expected:

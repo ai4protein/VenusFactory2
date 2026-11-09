@@ -12,6 +12,7 @@ from mcp_tools.tools.runtime_tool_policy import assert_tool_allowed
 from mcp_tools.models.catalog_snapshot import catalog_snapshot
 from .scope import ModelScopeError, bind_scope, scope_reference
 from .contract import PredictionArguments
+from .inputs import ModelInputError, validate_model_inputs
 from mcp_tools.common.tool_arguments import ToolArgumentError, validate_arguments
 
 EVALUATION_SCOPE = "Frozen task validation; this does not establish performance on arbitrary proteins."
@@ -212,12 +213,18 @@ def predict_model(library, entry_id, inputs, scope=None, *, scope_ref=None, sess
     validate_arguments(PredictionArguments, {
         "entry_id": entry_id, "inputs": inputs, "scope_ref": scope_ref, "scope": scope,
     })
-    _require(len(json.dumps(inputs, allow_nan=False).encode()) <= 1024 * 1024, "Input batch is too large")
+    try:
+        encoded_inputs = json.dumps(inputs, allow_nan=False).encode()
+    except ValueError:
+        raise ModelInputError("Input values must be finite JSON numbers. Check the model's required fields.") from None
+    _require(len(encoded_inputs) <= 1024 * 1024, "Input batch is too large")
     if session_id is None:
         session_id = "agent_tool_request_" + uuid.uuid4().hex
         session_binding = "tool_request"
     _require(isinstance(session_id, str) and 0 < len(session_id) <= 256, "Invalid host session")
-    scope = bind_scope(library, entry_id, scope, scope_ref)
+    key = library.inspect_publication(entry_id)["key"]
+    scope = bind_scope(entry_id, key["scope"], scope, scope_ref)
+    validate_model_inputs(key["plugin_id"], scope, inputs)
     result = library.predict(entry_id, inputs, scope, session_id=session_id)
     return {
         **result,
@@ -245,6 +252,8 @@ def dispatch(action, *, session_id=None, session_binding="tool_request", **argum
         else:
             result = predict_model(library, **arguments, session_id=session_id, session_binding=session_binding)
         return {"success": True, **result}
+    except ModelInputError as exc:
+        return {"success": False, "error_code": "invalid_model_inputs", "error": str(exc)}
     except ToolArgumentError as exc:
         return {"success": False, "error_code": "invalid_model_arguments", "error": str(exc)}
     except ModelScopeError as exc:
