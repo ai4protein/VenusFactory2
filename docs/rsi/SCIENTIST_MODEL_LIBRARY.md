@@ -54,6 +54,30 @@ historical records; they do not silently replace an invalid canonical origin.
 Legacy goals retain their original scope and source provenance. They are listed
 with unspecified stage and no inferred paper attribution.
 
+## Batch behavior in new task goals
+
+New single-task and shared-program goals freeze `prediction_batch_review` in their
+goal definition and protocol before development. The matching schema-2 assessment
+policy checks the per-observation prediction interface with at most three additional
+calls: reversed validation rows, a fixed sample and a single row. These calls receive
+unlabeled inputs. Input identities and predicted classes must match; numeric predictions
+and class probabilities use `rtol=1e-6`, `atol=1e-12`. Exact same-batch replay remains a
+separate requirement. Development prompts disclose this contract.
+
+Failed predictions, modified fitted state or inconsistent batch results reject the
+candidate even if its validation score is sufficient. The next goal cycle receives
+the rejection reason and can revise the implementation. Schema-3 numerical evidence
+stores the canonical unlabeled inputs and probe outputs in `batch_predictions.json`,
+alongside the original predictions and exact replay. Export, lineage audits and
+publication verify these records against the frozen policy.
+
+This contract applies to models advertised as independent predictions per observation.
+It does not establish a contract for transductive or joint-batch inference. Metamodels,
+few-shot methods and semi-supervised training can satisfy it when adaptation belongs
+to the fitted state. Historical goals keep their original policy and acceptance;
+they are not relabelled as having passed this additional review. These bounded probes
+are a regression check, not a proof for every possible input.
+
 ## Runtime compatibility
 
 Historical native Scientist records can select the fixed pre-Responses audit

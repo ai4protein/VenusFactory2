@@ -13,9 +13,10 @@ import json
 import uuid
 from pathlib import Path
 
+from agent.rsi import model_tasks, shared_library_experience
 from agent.science_goal import GoalSpec, GoalStore, goal_cycle_prompt, validate_assessment
 
-from agent.rsi import model_tasks, shared_library_experience
+from . import prediction_batches
 from .context_feedback_dispatch import FIELD as FEEDBACK_FIELD
 from .context_feedback_dispatch import policy_for, verification_session
 from .model_lifecycle import ModelLifecycle
@@ -32,6 +33,7 @@ CRITERIA = ("all_targets_accepted", "all_targets_freshly_reused")
 
 
 from agent.rsi.layout import recorded_relative
+
 
 def require(ok, message):
     if not ok:
@@ -281,7 +283,8 @@ def _context(folder):
                 "Training history leaked into shared reuse",
             )
         prompt = shared_library_experience.append_prompt(
-            make_prompt(goal_cycle_prompt(prefix), phase, history), phase, historical if phase == "develop" else None
+            prediction_batches.append_prompt(make_prompt(goal_cycle_prompt(prefix), phase, history), protocol, phase),
+            phase, historical if phase == "develop" else None
         )
         shared_library_experience.verify_episode(root, prefix, protocol, cycle)
         require(
@@ -302,7 +305,7 @@ def _context(folder):
                         expected_outcomes[identity] = {"status": "training_failed"}
                         continue
                     controller = current / "targets" / identity / "controller"
-                    policy = model_tasks.policy_for_task(definition, data[identity])
+                    policy = prediction_batches.apply_policy(model_tasks.policy_for_task(definition, data[identity]), protocol)
                     require(read(controller / "policy.json") == policy, "Shared controller policy changed")
                     lifecycle = ModelLifecycle(controller, policy)
                     local = lifecycle._state()
@@ -430,7 +433,14 @@ def validate_shared_goal(folder, model_id=None, *, replay_training=True):
         result = _model(
             root,
             record,
-            {"scope": task["scope"], "model_plugin_id": task["plugin_id"]},
+            {
+                "scope": task["scope"],
+                "model_plugin_id": task["plugin_id"],
+                **(
+                    {prediction_batches.FIELD: protocol[prediction_batches.FIELD]}
+                    if prediction_batches.FIELD in protocol else {}
+                ),
+            },
             data[identity],
             episodes,
             task["minimum_skill"],

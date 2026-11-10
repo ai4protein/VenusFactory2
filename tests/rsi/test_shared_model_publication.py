@@ -15,6 +15,7 @@ from test_shared_model_program import CODE, task_pair
 
 from agent.rsi import context_transfer, library_experience
 from agent.rsi import scientist_model_library as library
+from agent.rsi.engine import prediction_batches
 from agent.rsi.engine.model_origin_view import origin_view
 from agent.rsi.engine.protein_model import digest
 from agent.rsi.engine.shared_model_publication import validate_shared_goal
@@ -112,6 +113,7 @@ async def test_shared_publication_resolution_agent_prediction_and_donor_projecti
     views = []
     for outcome in result["outcomes"]:
         verified = shared.resolve(outcome["entry_id"], replay_training=True)
+        assert verified["packet"]["assessment"][prediction_batches.FIELD]["passed"]
         assert verified["origin"]["shared_execution_id"] == result["shared_execution_id"]
         assert verified["origin"]["usage_attribution"] == "shared_goal_total_count_once"
         view = origin_view(verified)

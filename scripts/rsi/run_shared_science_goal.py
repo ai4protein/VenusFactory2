@@ -27,6 +27,7 @@ from agent.harness import Profile, Task
 from agent.harness.contracts import digest, file_hash
 from agent.harness.host import execute
 from agent.rsi import model_tasks, shared_library_experience
+from agent.rsi.engine import prediction_batches
 from agent.rsi.engine.context_feedback_dispatch import policy_for as feedback_policy
 from agent.rsi.engine.model_access import authorize_profile
 from agent.rsi.engine.model_lifecycle import ModelLifecycle
@@ -119,6 +120,7 @@ def prepare(
     if historical is not None:
         admission[shared_library_experience.FIELD] = shared_library_experience.binding(historical)
     store = GoalStore.create(output, goal, profile, admission=admission)
+    review = prediction_batches.freeze_goal(store)
     if historical is not None:
         require(
             shared_library_experience.freeze(store.root, historical) == admission[shared_library_experience.FIELD],
@@ -153,6 +155,7 @@ def prepare(
         store.root / "protocol.json",
         {
             "schema": SCHEMA,
+            prediction_batches.FIELD: review,
             **(
                 {shared_library_experience.FIELD: admission[shared_library_experience.FIELD]}
                 if historical is not None
@@ -175,6 +178,7 @@ class SharedScientistGoal:
         self.store, self.credential = store, credential
         state = store.read()
         self.protocol = read(store.root / "protocol.json")
+        prediction_batches.verify_goal(state, self.protocol)
         require(self.protocol["schema"] == SCHEMA, "Unsupported shared goal")
         require(
             tuple(state["definition"]["goal"]["criteria"]) == CRITERIA
@@ -240,12 +244,15 @@ class SharedScientistGoal:
             )
         return records
 
+    def acceptance_policy(self, task_id):
+        policy = model_tasks.policy_for_task(self.by_id[task_id], self.data[task_id])
+        return prediction_batches.apply_policy(policy, self.protocol)
+
     def lifecycle(self, task_id, record):
-        task = self.by_id[task_id]
         folder = safe_child(self.store.root, record["development_episode"])
         controller = safe_child(self.store.root, record["controller"])
         require(controller == folder / "targets" / task_id / "controller", "Shared model controller changed")
-        policy = model_tasks.policy_for_task(task, self.data[task_id])
+        policy = self.acceptance_policy(task_id)
         require(read(controller / "policy.json") == policy, "Shared target acceptance policy changed")
         lifecycle = ModelLifecycle(controller, policy)
         mid = record["model_id"]
@@ -354,7 +361,7 @@ class SharedScientistGoal:
             capability,
             folder / "execution",
             shared_library_experience.append_prompt(
-                make_shared_prompt(context, phase, history),
+                prediction_batches.append_prompt(make_shared_prompt(context, phase, history), self.protocol, phase),
                 phase,
                 self.library_experience if phase == "develop" else None,
             ),
@@ -441,7 +448,7 @@ class SharedScientistGoal:
                         outcome["target_outcomes"][task_id] = {"status": "training_failed"}
                         continue
                     controller = folder / "targets" / task_id / "controller"
-                    lifecycle = ModelLifecycle(controller, model_tasks.policy_for_task(definition, self.data[task_id]))
+                    lifecycle = ModelLifecycle(controller, self.acceptance_policy(task_id))
                     mid = lifecycle.submit(
                         work / "targets" / task_id / "candidate.json", session_id=run["session_id"], mode=profile.mode
                     )

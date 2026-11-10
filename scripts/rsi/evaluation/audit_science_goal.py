@@ -5,6 +5,7 @@ from __future__ import annotations
 # Direct-script entry point; implementation imports remain package-qualified.
 import sys as _entry_sys
 from pathlib import Path as _EntryPath
+
 _entry_root = _EntryPath(__file__).resolve().parents[3]
 _entry_sys.path[:0] = [str(_entry_root), str(_entry_root / 'src'), str(_entry_root / 'scripts/rsi')]
 
@@ -14,16 +15,17 @@ import copy
 import json
 from pathlib import Path
 
-from scripts.rsi.evaluation.audit_generated_campaign import read, require_equal, verify_snapshot
 from run_generated_lifecycle import policy_for
 from run_protein_lifecycle import prepare_case
 from run_science_goal import evidence
+from scripts.rsi.evaluation.audit_generated_campaign import read, require_equal, verify_snapshot
 
 from agent.harness.contracts import digest, file_hash
 from agent.harness.events import audit_requests, audit_trace
 from agent.harness.host import write_json
 from agent.rsi import model_tasks
 from agent.rsi import training_attempt_memory as attempt_memory
+from agent.rsi.engine import prediction_batches
 from agent.rsi.engine.model_lifecycle import ModelLifecycle
 from agent.rsi.engine.model_plugins import get_model_plugin
 from agent.science_goal import GoalStore, goal_cycle_prompt, validate_assessment
@@ -37,6 +39,7 @@ def audit(args):
     if state["status"] != "completed" or state["inflight"]:
         raise ValueError("This replay requires a verified, terminal model goal")
     protocol = read(store.root / "protocol.json")
+    prediction_batches.verify_goal(state, protocol)
     for name, sha in protocol["implementation"].items():
         require_equal(file_hash(store.root / "implementation" / name), sha, "Archived source changed")
     task_definition = None
@@ -82,8 +85,10 @@ def audit(args):
                 if cycle["phase"] == "reuse"
                 else "In this episode, inspect the supplied protein task, author deterministic numerical fit/predict source code, evaluate using training-only feedback, and submit one actually tested candidate. Independent controller acceptance follows this episode."
             )
-            expected_prompt = (
-                goal_cycle_prompt(prefix) + attempt_memory.context(packet) + "\n\nNext goal stage: " + action
+            expected_prompt = prediction_batches.append_prompt(
+                goal_cycle_prompt(prefix) + attempt_memory.context(packet) + "\n\nNext goal stage: " + action,
+                protocol,
+                cycle["phase"],
             )
             require_equal(
                 lock["task"]["prompt_sha256"], digest(expected_prompt), "Training-memory prompt binding differs"
@@ -145,12 +150,13 @@ def audit(args):
     policy = (
         model_tasks.policy_for_task(task_definition, task_data) if task_definition else policy_for(scope, train, val)
     )
+    policy = prediction_batches.apply_policy(policy, protocol)
     lc = ModelLifecycle(controller, policy)
     mid = record["model_id"]
     model = lc._model(mid)
     publication = lc._state()
     acceptance_path = lc.root / ("assessment_" + mid + ".json")
-    accepted = read(acceptance_path)
+    accepted = lc._verified_assessment(mid, publication, model)
     require_equal(digest(accepted), publication["candidates"][mid]["assessment_sha256"], "Acceptance evidence changed")
     require_equal(
         mid in publication["published"] and accepted["passed"] and accepted["training_replayed"],

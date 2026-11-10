@@ -23,6 +23,7 @@ from agent.rsi import context_feedback_dispatch as context_feedback
 from agent.rsi import library_experience, model_tasks
 from agent.rsi import training_attempt_memory as attempt_memory
 from agent.rsi.datasets.library_source import REFIT_TOOL
+from agent.rsi.engine import prediction_batches
 from agent.rsi.engine.model_lifecycle import ModelLifecycle
 from agent.rsi.engine.model_plugins import get_model_plugin
 from agent.rsi.engine.provider_access import access_wait
@@ -42,6 +43,7 @@ class GeneratedModelGoal:
         self.store = store
         self.credential = credential
         self.protocol = read(store.root / "protocol.json")
+        prediction_batches.verify_goal(store.read(), self.protocol)
         attempt_memory.verify_goal(store.read(), self.protocol)
         context_feedback.verify_goal(store.read(), self.protocol)
         self.scope = self.protocol["scope"]
@@ -83,6 +85,7 @@ class GeneratedModelGoal:
         root = (self.store.root / record["controller"]).resolve()
         root.relative_to(self.store.root)
         lc = ModelLifecycle(root, read(root / "policy.json"))
+        prediction_batches.require_bound_policy(lc.policy, self.protocol)
         mid = record["model_id"]
         lc._model(mid)
         return lc, mid
@@ -92,7 +95,7 @@ class GeneratedModelGoal:
         lc, mid = self.lifecycle(state)
         if lc:
             current = lc._state()
-            report = read(lc.root / ("assessment_" + mid + ".json"))
+            report = lc._verified_assessment(mid, current, lc._model(mid))
             passed = mid in current["published"] and report["passed"] and report["training_replayed"]
             if digest(report) != current["candidates"][mid]["assessment_sha256"]:
                 raise ValueError("Acceptance evidence changed")
@@ -122,8 +125,10 @@ class GeneratedModelGoal:
 
     def acceptance_policy(self, state):
         if "model_task" in self.protocol:
-            return model_tasks.policy_for_task(read(self.store.root / "model_task.json"), self.data)
-        return policy_for(self.scope, self.data["training"], self.data["validation"])
+            policy = model_tasks.policy_for_task(read(self.store.root / "model_task.json"), self.data)
+        else:
+            policy = policy_for(self.scope, self.data["training"], self.data["validation"])
+        return prediction_batches.apply_policy(policy, self.protocol)
 
     async def cycle(self, index, profile, state, context):
         folder = self.store.root / "episodes" / f"cycle_{index:03d}"
@@ -175,7 +180,7 @@ class GeneratedModelGoal:
             work,
             capability,
             folder / "execution",
-            context + "\n\nNext goal stage: " + action,
+            prediction_batches.append_prompt(context + "\n\nNext goal stage: " + action, self.protocol, phase),
             SYSTEM,
             frozenset(declaration["tools"]),
             phase=phase,
@@ -215,7 +220,8 @@ class GeneratedModelGoal:
                 outcome["attempt_evidence_sha256"] = digest(attempts)
         if run["status"] == "completed" and audit["passed"]:
             if phase == "develop":
-                lc = ModelLifecycle(folder / "controller", self.acceptance_policy(state))
+                policy = prediction_batches.apply_policy(self.acceptance_policy(state), self.protocol)
+                lc = ModelLifecycle(folder / "controller", policy)
                 mid = lc.submit(work / "candidate.json", session_id=run["session_id"], mode=profile.mode)
                 accepted = lc.assess(mid, training=self.data["training"], validation=self.data["validation"])
                 write_json(folder / "acceptance.json", accepted)
@@ -292,6 +298,7 @@ def prepare(args):
     )
     extra = {"admission": model_tasks.admission(task_definition)} if task_definition else {}
     store = GoalStore.create(args.output, goal, profile, condition=getattr(args, "condition", "science_goal"), **extra)
+    review = prediction_batches.freeze_goal(store)
     if memory_policy == attempt_memory.CUMULATIVE_POLICY:
 
         def bind_memory(state):
@@ -339,6 +346,7 @@ def prepare(args):
         store.root / "protocol.json",
         {
             "scope": scope,
+            prediction_batches.FIELD: review,
             "source": source,
             "split": split,
             "case": task_definition["id"] if task_definition else args.case,

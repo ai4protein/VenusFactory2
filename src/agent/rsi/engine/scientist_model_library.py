@@ -22,7 +22,7 @@ from agent.rsi.datasets import model_tasks
 from agent.rsi.datasets.source_lineage import program_hash
 from agent.science_goal import GoalSpec, GoalStore, validate_assessment
 
-from . import library_experience, training_attempt_memory
+from . import library_experience, prediction_batches, training_attempt_memory
 from .experience import ModelExperienceStore
 from .lineage_promotion import gain_error, validate_evolution
 from .model_lifecycle import ModelLifecycle
@@ -77,6 +77,7 @@ def _episodes(root, state, protocol):
     from .context_feedback_dispatch import verify_bundle, verify_goal
 
     verify_goal(state, protocol)
+    prediction_batches.verify_goal(state, protocol)
     training_attempt_memory.verify_goal(state, protocol)
     base = Profile.from_dict(state["definition"]["profile"])
     _require(base.harness in NATIVE_EXPERT_HARNESSES, "No publication auditor for this Scientist harness yet")
@@ -156,6 +157,7 @@ def _model(
         version = _identity(reference["version_id"])
         _read(safe_child(controller, f"numerical_evidence/versions/{version}/manifest.json"))
     policy = _read(controller / "policy.json")
+    prediction_batches.require_bound_policy(policy, protocol)
     plugin_id = protocol.get("model_plugin_id", "generated_python.v1")
     _require(plugin_id in model_tasks.PLUGINS, "Unsupported generated-model interface")
     plugin = get_model_plugin(plugin_id)

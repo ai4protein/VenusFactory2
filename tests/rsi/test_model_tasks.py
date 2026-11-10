@@ -78,6 +78,10 @@ def prepared(tmp_path, task):
 def test_real_training_acceptance_and_fresh_inference_from_arbitrary_task(tmp_path, task):
     store, driver = prepared(tmp_path, task)
     assert driver.protocol["case"] == task["id"]
+    from agent.rsi.engine import prediction_batches
+    assert driver.protocol[prediction_batches.FIELD] == prediction_batches.contract()
+    assert store.read()["definition"][prediction_batches.FIELD] == prediction_batches.contract()
+    assert driver.acceptance_policy({})["schema"] == 2
     assert driver.acceptance_policy({})["minimum_skill"] == 0.2
     model = fit_candidate(driver.data["training"], driver.scope, {"source_code": CODE, "seed": 1234})
     lc = ModelLifecycle(store.root / "controller", driver.acceptance_policy({}))

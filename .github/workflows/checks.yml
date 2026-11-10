@@ -106,7 +106,9 @@ jobs:
         run: >-
           python -m pytest -q tests/rsi/test_inference_audit.py
           tests/rsi/test_model_library_verification.py tests/rsi/test_atomic_json.py
-          tests/rsi/test_model_lifecycle.py tests/rsi/test_prediction_replay.py tests/rsi/test_science_goal.py
+          tests/rsi/test_model_lifecycle.py tests/rsi/test_prediction_replay.py tests/rsi/test_prediction_batches.py
+          tests/rsi/test_model_tasks.py tests/rsi/test_science_goal.py tests/rsi/test_shared_science_goal.py
+          tests/rsi/test_numerical_evidence.py tests/rsi/test_shared_model_publication.py
           tests/test_research_source_review_flow.py tests/test_evolved_tool_scheduling.py
           tests/rsi/test_package_layout.py tests/rsi/test_sabio_assay_tasks.py
           tests/rsi/test_capability_discovery.py tests/test_platform_model_discovery.py

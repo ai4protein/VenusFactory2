@@ -62,7 +62,12 @@ def prepared(tmp_path, *, reject_second=False, max_cycles=6, history_policy=None
     store = shared.prepare(
         tmp_path / "goal", tasks, profile, goal, training_baseline_feedback="group_baselines.v2", **options
     )
-    return store, shared.SharedScientistGoal(store, None)
+    driver = shared.SharedScientistGoal(store, None)
+    from agent.rsi.engine import prediction_batches
+    assert driver.protocol[prediction_batches.FIELD] == prediction_batches.contract()
+    assert store.read()["definition"][prediction_batches.FIELD] == prediction_batches.contract()
+    assert all(driver.acceptance_policy(task["id"])["schema"] == 2 for task in tasks)
+    return store, driver
 
 
 def synthetic_executor(monkeypatch):

@@ -5,6 +5,7 @@ from __future__ import annotations
 # Direct-script entry point; implementation imports remain package-qualified.
 import sys as _entry_sys
 from pathlib import Path as _EntryPath
+
 _entry_root = _EntryPath(__file__).resolve().parents[3]
 _entry_sys.path[:0] = [str(_entry_root), str(_entry_root / 'src'), str(_entry_root / 'scripts/rsi')]
 
@@ -16,10 +17,11 @@ from pathlib import Path
 from agent.harness.contracts import digest, file_hash
 from agent.rsi import model_tasks
 from agent.rsi import training_attempt_memory as attempt_memory
+from agent.rsi.datasets.source_lineage import program_hash
+from agent.rsi.engine import prediction_batches
 from agent.rsi.engine.experience import ModelExperienceStore
 from agent.rsi.engine.model_lifecycle import ModelLifecycle
 from agent.rsi.engine.model_plugins import get_model_plugin
-from agent.rsi.datasets.source_lineage import program_hash
 from agent.rsi.engine.storage import atomic_json
 
 
@@ -30,6 +32,7 @@ def read(path):
 def audit(root, *, score_future=True):
     root = root.resolve()
     state, protocol = read(root / "goal.json"), read(root / "protocol.json")
+    prediction_batches.verify_goal(state, protocol)
     if state["status"] not in {"completed", "budget_exhausted", "cancelled"} or state["inflight"]:
         raise ValueError("Audit requires a terminal goal")
     if digest(state["definition"]) != state["definition_sha256"]:
@@ -66,10 +69,11 @@ def audit(root, *, score_future=True):
         folder = (root / record["controller"]).resolve()
         folder.relative_to(root)
         lc = ModelLifecycle(folder, read(folder / "policy.json"))
+        prediction_batches.require_bound_policy(lc.policy, protocol)
         mid = record["model_id"]
         model = lc._model(mid)
         controller = lc._state()
-        report = read(folder / ("assessment_" + mid + ".json"))
+        report = lc._verified_assessment(mid, controller, model)
         assert mid in controller["published"] and report["passed"] and report["training_replayed"]
         assert digest(report) == controller["candidates"][mid]["assessment_sha256"]
         assert lc.policy["training_sha256"] == digest(data["training"])

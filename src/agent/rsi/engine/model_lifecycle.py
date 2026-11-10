@@ -11,13 +11,14 @@ import json
 from pathlib import Path
 
 from agent.research_modes import get_research_mode
+from agent.rsi.engine.protein_references import audit_source_references
 
+from . import prediction_batches
 from .code_sandbox import capture_code_runs
 from .model_plugins import get_model_plugin
 from .numeric_runtime import capture_runtime
 from .numerical_evidence import archive_assessment, prediction_replay_summary, verify_assessment
 from .protein_model import digest
-from agent.rsi.engine.protein_references import audit_source_references
 from .storage import atomic_json, file_lock
 from .versions import VersionStore
 
@@ -26,21 +27,15 @@ class ModelLifecycle:
     def __init__(self, root: Path, policy: dict):
         self.root = root
         self.root.mkdir(parents=True, exist_ok=True)
-        if (
-            set(policy)
-            != {
-                "schema",
-                "scope",
-                "plugin_id",
-                "plugin_sha256",
-                "training_sha256",
-                "validation_sha256",
-                "minimum_skill",
-                "max_candidates",
-            }
-            or policy["schema"] != 1
-        ):
+        fields = {"schema", "scope", "plugin_id", "plugin_sha256", "training_sha256",
+                  "validation_sha256", "minimum_skill", "max_candidates"}
+        schema = policy.get("schema")
+        if schema == 2:
+            fields.add(prediction_batches.FIELD)
+        if type(schema) is not int or schema not in (1, 2) or set(policy) != fields:
             raise ValueError("invalid predeclared assessment policy")
+        if schema == 2:
+            prediction_batches.validate_contract(policy[prediction_batches.FIELD])
         if (
             policy["max_candidates"] != 1
             or type(policy["minimum_skill"]) not in (float, int)
@@ -128,16 +123,23 @@ class ModelLifecycle:
 
                 # Replay the same batch, without labels. Comparing a subset with
                 # a full batch would conflate repeatability and batch-size effects.
-                repeated_predictions = plugin.predict(
-                    model, inference_inputs(validation, plugin.id), self.policy["scope"]
+                inputs = inference_inputs(validation, plugin.id)
+                repeated_predictions = plugin.predict(model, inputs, self.policy["scope"])
+                batches = (
+                    prediction_batches.collect(plugin, model, inputs, self.policy["scope"])
+                    if self.policy["schema"] == 2 else None
                 )
+            batch_review = (
+                prediction_batches.summarize(predictions, batches, self.policy[prediction_batches.FIELD], plugin.id)
+                if batches is not None else None
+            )
             replay = prediction_replay_summary(predictions, repeated_predictions)
             evidence = archive_assessment(
                 self.root, model_id, model, self.policy, metrics, predictions, validation, executions, capture_runtime(),
-                repeated_predictions=repeated_predictions,
+                repeated_predictions=repeated_predictions, batch_predictions=batches,
             )
             score_passed = metrics[plugin.acceptance_metric] > self.policy["minimum_skill"]
-            passed = score_passed and replay["exact_match"]
+            passed = score_passed and replay["exact_match"] and (batch_review is None or batch_review["passed"])
             report = {
                 "schema": 1,
                 "model_id": model_id,
@@ -148,9 +150,11 @@ class ModelLifecycle:
                 "passed": passed,
                 "training_replayed": True,
                 "prediction_replay": replay,
+                **({prediction_batches.FIELD: batch_review} if batch_review is not None else {}),
                 "rejection_reasons": (
                     ([] if score_passed else ["performance_threshold"])
                     + ([] if replay["exact_match"] else ["prediction_not_repeatable"])
+                    + ([] if batch_review is None or batch_review["passed"] else ["prediction_batch_inconsistent"])
                 ),
                 "numerical_evidence": evidence,
             }
