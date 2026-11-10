@@ -153,7 +153,10 @@ async def run_long_report(payload, update, *, service_cache=None, checkpoint=Non
             chapter.update(status="reviewing" if valid else "partial", draft_status="completed" if valid else "partial")
     state.pop('execution_blocker', None)
     service_error = None
+    from .research_documents import refresh_review_progress
     def publish():
+        if refresh_review_progress(state):
+            state["report"] = assemble(state, lang)
         update(state)
     async def model_call(*args, attempt=None, **kwargs):
         nonlocal service_error

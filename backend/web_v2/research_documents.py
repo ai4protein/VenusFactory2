@@ -64,6 +64,36 @@ def chapter_ready(chapter, sources=None):
     return True
 
 
+def refresh_review_progress(state):
+    """Project bound review receipts into chapter progress without completing a report."""
+    from .research_source_review import VERSION, document_ready, document_signature
+
+    review = state.get("source_review", {})
+    receipts = review.get("documents", {})
+    sources = state.get("sources", [])
+    changed = False
+    for chapter in state.get("chapters", []):
+        if chapter.get("status") in {"searching", "writing", "revising"}:
+            continue
+        receipt = receipts.get(chapter["id"])
+        if not isinstance(receipt, dict) or receipt.get("policy") != VERSION:
+            continue
+        if chapter.get("draft_status") != "completed" and not chapter_ready(chapter, sources):
+            continue
+        document = chapter_document(chapter)
+        if receipt.get("input_sha256") != document_signature(document, sources):
+            continue
+        status = ("completed" if document_ready(document, sources, receipt)
+                  else "reviewing" if review.get("status") == "checking" else "partial")
+        changed |= chapter.get("source_review") != receipt or chapter.get("status") != status
+        chapter.update(source_review=copy.deepcopy(receipt), status=status)
+    completed = sum(chapter_ready(chapter, sources) for chapter in state.get("chapters", []))
+    minimum_met = completed >= MINIMUM_CHAPTERS
+    changed |= state.get("completed_chapters") != completed or state.get("minimum_met") != minimum_met
+    state.update(completed_chapters=completed, minimum_met=minimum_met)
+    return changed
+
+
 def remember_chapter(chapter, draft, audit, truncated=False):
     history = chapter.setdefault("draft_history", [])
     if not history or history[-1]["draft"] != draft:

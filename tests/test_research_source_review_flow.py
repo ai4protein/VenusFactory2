@@ -1,3 +1,4 @@
+import asyncio
 import copy
 import hashlib
 import json
@@ -46,11 +47,11 @@ class FixtureModel:
         return (BAD if self.bad_chapter and self.writers==1 else "")+PROSE,False
 
 
-async def run(model, checkpoint=None):
+async def run(model, checkpoint=None, update=None):
     async def collect(*args, **kwargs):
         return {"sources":[copy.deepcopy(SOURCE)],"steps":[],"sections":[],"protein":{"name":"Fixture protein"}}
     with patch.object(lf.research,"run_research",side_effect=collect),patch.object(lf.research,"complete",side_effect=model.__call__):
-        return await lf.run_long_report(PAYLOAD,lambda value:None,checkpoint=checkpoint)
+        return await lf.run_long_report(PAYLOAD,update or (lambda value:None),checkpoint=checkpoint)
 
 
 @pytest.mark.asyncio
@@ -72,7 +73,10 @@ async def test_complete_report_resume_and_dossier():
 @pytest.mark.parametrize("where",["chapter","editor"])
 async def test_source_failure_triggers_author_revision_and_independent_recheck(where):
     model=FixtureModel(bad_chapter=where=="chapter",bad_editor=where=="editor")
-    state=await run(model)
+    snapshots = []
+    state=await run(model,update=lambda value: snapshots.append(copy.deepcopy(value)))
+    if where == "chapter":
+        assert any(c["status"] == "revising" for snapshot in snapshots for c in snapshot["chapters"])
     assert state["phase"]=="completed" and len(model.calls)==(14 if where=="chapter" else 13)
     assert "A signal peptide is removed." not in state["report"]
     assert any("unsupported" in a["response"] for a in state["source_review"]["attempts"])
@@ -109,7 +113,9 @@ async def test_changed_source_requires_new_review_and_editor_synthesis():
     model=FixtureModel()
     first=await run(model)
     changed=copy.deepcopy(first);changed["sources"][0]["text"]=json.dumps({"type":"Initiator methionine","description":"Removed after processing"})
-    second=await run(model,changed)
+    snapshots = []
+    second=await run(model,changed,update=lambda value: snapshots.append(copy.deepcopy(value)))
+    assert snapshots[0]["completed_chapters"] == 0 and not snapshots[0]["minimum_met"]
     assert second["phase"]=="completed" and len(model.calls)==14 and model.writers==8
     assert first["chapters"][0]["source_review"]["input_sha256"]!=second["chapters"][0]["source_review"]["input_sha256"]
 
@@ -124,3 +130,53 @@ async def test_changed_chapter_invalidates_synthesis_even_if_sources_unchanged()
     second=await run(model,state)
     assert second["partial"] and second["review_status"]!="completed"
     assert "Integrated assessment" not in second["report"]
+
+
+@pytest.mark.asyncio
+async def test_completed_chapters_are_checkpointed_before_later_review_is_cancelled(monkeypatch):
+    monkeypatch.setattr(sr, "MAX_UNITS", 5)
+    waiting = asyncio.Event()
+    snapshots = []
+
+    class PausingModel(FixtureModel):
+        def __init__(self):
+            super().__init__()
+            self.review_batches = 0
+
+        async def __call__(self, model, messages, tokens):
+            if messages[0]["content"] == sr.SYSTEM:
+                self.review_batches += 1
+                if self.review_batches == 2:
+                    self.calls.append(messages)
+                    waiting.set()
+                    await asyncio.Future()
+            return await super().__call__(model, messages, tokens)
+
+    model = PausingModel()
+    task = asyncio.create_task(run(model, update=lambda value: snapshots.append(copy.deepcopy(value))))
+    await asyncio.wait_for(waiting.wait(), timeout=2)
+    during = snapshots[-1]
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    saved = snapshots[-1]
+    for checkpoint in (during, saved):
+        assert checkpoint["completed_chapters"] == 5
+        assert checkpoint["minimum_met"] is True
+        assert checkpoint["phase"] == "reviewing"
+        assert sum(c["status"] == "completed" for c in checkpoint["chapters"]) == 5
+        assert len(checkpoint["source_review"]["documents"]) == 8
+        assert sum(r["status"] == "completed" for r in checkpoint["source_review"]["documents"].values()) == 5
+        assert checkpoint.get("review_status") != "completed"
+    assert saved["source_review"]["status"] == "interrupted"
+    assert all(c["status"] in {"completed", "partial"} for c in saved["chapters"])
+    assert saved["model_calls"] == 10 and model.writers == 8
+    with build_dossier({**saved, "id": "interrupted-fixture", "status": "interrupted"}) as handle, zipfile.ZipFile(handle) as bundle:
+        exported = json.loads(bundle.read("verification/source-review.json"))
+        assert exported["status"] == "interrupted"
+        assert sum(row["status"] == "completed" for row in exported["documents"].values()) == 5
+    resumed = await run(model, saved)
+    assert resumed["phase"] == "completed" and resumed["completed_chapters"] == 8
+    assert resumed["model_calls"] == 13 and model.writers == 8
+    assert model.review_batches == 4
+    assert saved["source_review"]["attempts"][-1]["status"] == "interrupted"

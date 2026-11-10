@@ -257,6 +257,8 @@ async def test_interrupted_review_is_terminal_and_resume_retains_calls_and_accep
     assert attempt["finished"] >= attempt["started"] and attempt["model_call"] == 2
     assert current["model_calls"] == 2 and current["model_call_limit"] == 3
     assert review["pending"] == 1 and len(review["units"]) == 1
+    assert review["documents"]["chapter_0"]["status"] == "completed"
+    assert review["documents"]["chapter_1"]["status"] == "partial"
     assert published[-1]["source_review"]["attempts"][-1] == attempt
     assert sr.document_receipt(docs[0], current["sources"], review["units"])["status"] == "completed"
     assert sr.document_receipt(docs[1], current["sources"], review["units"])["status"] == "partial"

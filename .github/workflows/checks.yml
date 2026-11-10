@@ -102,6 +102,7 @@ jobs:
           python -m pytest -q tests/rsi/test_inference_audit.py
           tests/rsi/test_model_library_verification.py tests/rsi/test_atomic_json.py
           tests/rsi/test_model_lifecycle.py tests/rsi/test_prediction_replay.py tests/rsi/test_science_goal.py
+          tests/test_research_source_review_flow.py
           tests/rsi/test_package_layout.py tests/rsi/test_sabio_assay_tasks.py
           tests/rsi/test_capability_discovery.py tests/test_platform_model_discovery.py
           tests/test_mutation_tool_contracts.py tests/harness/test_tool_disclosure.py

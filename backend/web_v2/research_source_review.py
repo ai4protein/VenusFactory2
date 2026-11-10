@@ -154,6 +154,15 @@ async def review_documents(state, payload, documents, model_call, publish):
     pending = [unit for unit in required
                if cached.get(unit["id"], {}).get("input_sha256") != unit["input_sha256"]]
     review.update(status="checking" if pending else "completed", pending=len(pending))
+    def checkpoint():
+        receipts = {document["id"]: document_receipt(document, sources, cached) for document in documents}
+        review.setdefault("documents", {}).update(receipts)
+        review["pending"] = sum(cached.get(unit["id"], {}).get("input_sha256") != unit["input_sha256"]
+                                for unit in required)
+        return receipts
+
+    checkpoint()
+    publish()
     queue = deque((request, 0, None) for request in packets(pending, sources))
     while queue:
         request, recovery_round, parent_attempt = queue.popleft()
@@ -166,8 +175,10 @@ async def review_documents(state, payload, documents, model_call, publish):
         review["attempts"].append(attempt)
         if len(json.dumps(request, ensure_ascii=False)) > MAX_PACKET_CHARS:
             attempt.update(status="invalid", validation_error="Review packet exceeds context budget", finished=time.time())
+            checkpoint()
             publish()
             continue
+        checkpoint()
         publish()
         recoverable = False
         try:
@@ -204,8 +215,7 @@ async def review_documents(state, payload, documents, model_call, publish):
                 attempt["validation_error"] = str(exc)[:500]
         finally:
             attempt.update(finished=time.time(), model_call=state.get("model_calls"))
-            review["pending"] = sum(cached.get(unit["id"], {}).get("input_sha256") != unit["input_sha256"]
-                                    for unit in required)
+            checkpoint()
             publish()
         if attempt["status"] != "completed":
             if state.get("execution_blocker") or not recoverable:
@@ -222,9 +232,9 @@ async def review_documents(state, payload, documents, model_call, publish):
                 attempt["recovery"] = "split" if len(selected) > 1 else "retry"
             else:
                 attempt["recovery"] = "exhausted"
+            checkpoint()
             publish()
-    receipts = {document["id"]: document_receipt(document, sources, cached) for document in documents}
-    review.setdefault("documents", {}).update(receipts)
+    receipts = checkpoint()
     review["status"] = "completed" if review["documents"] and all(row["status"] == "completed" for row in review["documents"].values()) else "partial"
     publish()
     return receipts
