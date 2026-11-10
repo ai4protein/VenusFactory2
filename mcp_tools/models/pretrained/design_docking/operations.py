@@ -38,33 +38,39 @@ def execute(model, structure_file, parameters, ligand_file=''):
         copied.append(str(source.parent / relative))
     return {**result, 'artifacts': copied}
 
-def ligandmpnn_design(structure_file: str, parameters: LigandParameters, ligand_file: str = '') -> dict:
-    """Design protein amino-acid sequences conditioned on ligand atoms with LigandMPNN, using a protein-ligand complex PDB. Keep ligand atoms in that PDB; this adapter does not use a separate ligand_file. Parameters can be {} for defaults, or specify designed chains, fixed residues and sampling settings. Returns designed sequences and files."""
-    return execute('ligandmpnn', structure_file, parameters.model_dump() if hasattr(parameters, 'model_dump') else parameters, ligand_file)
+def _parameter_values(parameters):
+    if parameters is None:
+        return {}
+    return parameters.model_dump() if hasattr(parameters, 'model_dump') else parameters
+
+
+def ligandmpnn_design(structure_file: str, parameters: LigandParameters | None = None) -> dict:
+    """Design protein amino-acid sequences conditioned on ligand atoms with LigandMPNN, using a protein-ligand complex PDB. Keep ligand atoms in that PDB; this adapter does not use a separate ligand_file. Omit parameters for defaults, or provide an object selecting designed chains, fixed residues and sampling settings. Returns designed sequences and files."""
+    return execute('ligandmpnn', structure_file, _parameter_values(parameters))
 
 MODEL_TOOLS['ligandmpnn'] = 'ligandmpnn_design'
-def antibmpnn_design(structure_file: str, parameters: AntibodyParameters, ligand_file: str = '') -> dict:
+def antibmpnn_design(structure_file: str, parameters: AntibodyParameters) -> dict:
     """Design antibody amino-acid sequences with AntiBMPNN using an antibody structure PDB and design_positions in parameters. Specify chains_to_design when needed; returns designed antibody sequences and files. A separate ligand_file is not used."""
-    return execute('antibmpnn', structure_file, parameters.model_dump() if hasattr(parameters, 'model_dump') else parameters, ligand_file)
+    return execute('antibmpnn', structure_file, _parameter_values(parameters))
 
 MODEL_TOOLS['antibmpnn'] = 'antibmpnn_design'
-def vina_dock(structure_file: str, parameters: VinaParameters, ligand_file: str = '') -> dict:
+def vina_dock(structure_file: str, parameters: VinaParameters, ligand_file: str) -> dict:
     """Dock a small molecule into a protein using AutoDock Vina. Supply the prepared receptor PDBQT as structure_file, the ligand PDBQT as ligand_file, and the docking-box center in parameters; box size and search settings are adjustable. Returns docking poses and scoring-function estimates."""
-    return execute('vina', structure_file, parameters.model_dump() if hasattr(parameters, 'model_dump') else parameters, ligand_file)
+    return execute('vina', structure_file, _parameter_values(parameters), ligand_file)
 
 MODEL_TOOLS['vina'] = 'vina_dock'
-def bindcraft_design(structure_file: str, parameters: BindCraftParameters, ligand_file: str = '') -> dict:
-    """Design protein binders for a target protein with BindCraft. Supply the target PDB; parameters select target chains, optional hotspot residues, binder lengths and design count. Returns candidate binders and computational evaluation files. A separate ligand_file is not used."""
-    return execute('bindcraft', structure_file, parameters.model_dump() if hasattr(parameters, 'model_dump') else parameters, ligand_file)
+def bindcraft_design(structure_file: str, parameters: BindCraftParameters | None = None) -> dict:
+    """Design protein binders for a target protein with BindCraft. Supply the target PDB; optional parameters select target chains, hotspot residues, binder lengths and design count. Returns candidate binders and computational evaluation files. A separate ligand_file is not used."""
+    return execute('bindcraft', structure_file, _parameter_values(parameters))
 
 MODEL_TOOLS['bindcraft'] = 'bindcraft_design'
-def boltzgen_design(structure_file: str, parameters: BoltzGenParameters, ligand_file: str = '') -> dict:
-    """Generate protein or peptide binders for a target with BoltzGen. Supply a target PDB; parameters select the target chain, binder length, optional binding residues and sampling budget. Returns binder designs and evaluation files. A separate ligand_file is not used."""
-    return execute('boltzgen', structure_file, parameters.model_dump() if hasattr(parameters, 'model_dump') else parameters, ligand_file)
+def boltzgen_design(structure_file: str, parameters: BoltzGenParameters | None = None) -> dict:
+    """Generate protein or peptide binders for a target with BoltzGen. Supply a target PDB; optional parameters select the target chain, binder length, binding residues and sampling budget. Returns binder designs and evaluation files. A separate ligand_file is not used."""
+    return execute('boltzgen', structure_file, _parameter_values(parameters))
 
 MODEL_TOOLS['boltzgen'] = 'boltzgen_design'
-def diffdock_dock(structure_file: str, parameters: DiffDockParameters, ligand_file: str = '') -> dict:
-    """Predict protein-small-molecule binding poses with DiffDock. Supply a protein PDB and either ligand_file in SDF/MOL format or parameters.ligand_smiles. Parameters also control sample count and diffusion steps; returns poses and confidence scores."""
-    return execute('diffdock', structure_file, parameters.model_dump() if hasattr(parameters, 'model_dump') else parameters, ligand_file)
+def diffdock_dock(structure_file: str, parameters: DiffDockParameters | None = None, ligand_file: str = '') -> dict:
+    """Predict protein-small-molecule binding poses with DiffDock. Supply a protein PDB and either ligand_file in SDF/MOL format or parameters.ligand_smiles. Optional parameters also control sample count and diffusion steps; returns poses and confidence scores."""
+    return execute('diffdock', structure_file, _parameter_values(parameters), ligand_file)
 
 MODEL_TOOLS['diffdock'] = 'diffdock_dock'

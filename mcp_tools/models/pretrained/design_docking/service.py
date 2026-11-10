@@ -222,6 +222,8 @@ def validate(key,config):
 
 def validate_inputs(platform,owner,key,config,data=None):
     config=config or {};p=validate(key,config)
+    if config.get('ligand_dataset_id') and key not in {'vina', 'diffdock'}:
+        raise ValueError('This model uses the supplied structure and does not accept a separate ligand file')
     if key=='admet_ai':
         from mcp_tools.models.pretrained.admet.service import validate_input
         if data:validate_input(data,p)

@@ -96,8 +96,8 @@ def describe_model_choices(tool_name, input_schema, requested=()):
         model_count=len(wanted),
         matching_models=options,
         selection_rule=(
-            "For the requested model, use its explicit arguments instead of generic defaults; "
-            "ask for required scientific inputs only."
+            "Use matching_models for model selectors. Ask only for missing scientific_inputs. "
+            "Fields absent from inputSchema.required are optional and may be omitted."
         ),
     )
     if len(wanted) > len(options):

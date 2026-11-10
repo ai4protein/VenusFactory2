@@ -11,7 +11,9 @@ def test_tools_expose_full_validated_scientific_parameters():
     assert set(tools) == set(NAMES.values())
     for model,name in NAMES.items():
         schema = tools[name].get_input_schema().model_json_schema()
-        nested = schema['properties']['parameters']['$ref'].split('/')[-1]
+        parameter = schema['properties']['parameters']
+        reference = parameter.get('$ref') or next(branch['$ref'] for branch in parameter.get('anyOf', []) if '$ref' in branch)
+        nested = reference.split('/')[-1]
         assert set(schema['$defs'][nested]['properties']) == set(MODELS[model][-1].model_fields)
         assert tools[name].metadata['queue_resource'] == ('cpu' if model=='vina' else 'gpu')
 
