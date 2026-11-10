@@ -71,7 +71,8 @@ class ScanBudget:
 
 
 def tree_digest(root, *, python_only=False, budget=None):
-    """Hash a bounded file batch concurrently, preserving every content check."""
+    """Overlap traversal and bounded batch reads, preserving every content check."""
+    from collections import deque
     from concurrent.futures import ThreadPoolExecutor
 
     root = ordinary(root)
@@ -79,22 +80,25 @@ def tree_digest(root, *, python_only=False, budget=None):
     directories, files = [], {}
     budget = budget or ScanBudget()
     stack = [(str(root), "", False)]
-    batch = []
+    batch, pending = [], deque()
 
-    def hash_entry(item):
-        entry = item[1]
-        before = entry.stat(follow_symlinks=False)
-        budget.consume(before.st_size)
-        return file_digest(Path(entry.path), before=before)
+    def hash_batch(items):
+        records = {}
+        for relative, entry in items:
+            before = entry.stat(follow_symlinks=False)
+            budget.consume(before.st_size)
+            records[relative] = file_digest(Path(entry.path), before=before)
+        return records
 
-    def flush(pool):
-        records = pool.map(hash_entry, batch)
-        for item, record in zip(batch, records, strict=True):
-            files[item[0]] = record
-        batch.clear()
+    def submit(pool):
+        if batch:
+            pending.append(pool.submit(hash_batch, tuple(batch)))
+            batch.clear()
+        if len(pending) == 8:
+            files.update(pending.popleft().result())
 
-    # One core still bounds CPU work; four readers overlap filesystem latency.
-    # At most sixteen files are queued, each reader uses a 1 MiB buffer.
+    # Four readers share bounded batches, so traversal can continue during I/O.
+    # At most 128 files are queued or running; each reader uses a 1 MiB buffer.
     with ThreadPoolExecutor(max_workers=4) as pool:
         while stack:
             parent, prefix, parent_volatile = stack.pop()
@@ -113,8 +117,10 @@ def tree_digest(root, *, python_only=False, budget=None):
                         continue
                     batch.append((relative, entry))
                     if len(batch) == 16:
-                        flush(pool)
-        flush(pool)
+                        submit(pool)
+        submit(pool)
+        while pending:
+            files.update(pending.popleft().result())
     return {"directories": sorted(directories), "files": files}
 
 def _read(path):
