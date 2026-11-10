@@ -279,7 +279,7 @@ def test_parallel_hashing_is_bounded_and_preserves_content(tmp_path, monkeypatch
     root = tmp_path / "tree"
     root.mkdir()
     expected = {}
-    for index in range(40):
+    for index in range(300):
         content = ("file-" + str(index)).encode()
         path = root / str(index)
         path.write_bytes(content)
@@ -414,3 +414,33 @@ def test_large_verification_metadata_still_obeys_record_budget(publication, monk
     with pytest.raises(ValueError, match="record budget"):
         store.prepare_inference([identity])
     assert not (store.root / ".inference/entries" / (identity + ".json")).exists()
+
+
+@pytest.mark.parametrize("limit", ["files", "bytes"])
+def test_late_scan_budget_failure_cannot_return_a_partial_snapshot(tmp_path, monkeypatch, limit):
+    # Enough files to cross the bounded queue, then fail inside a later read.
+    for index in range(300):
+        (tmp_path / f"{index:04d}.json").write_bytes(b"{}")
+    monkeypatch.setattr(evidence, "MAX_FILES" if limit == "files" else "MAX_BYTES", 257)
+    with pytest.raises(ValueError, match="scan budget"):
+        evidence.tree_digest(tmp_path)
+
+
+def test_mixed_directory_scan_preserves_exact_content_and_filters(tmp_path):
+    import hashlib
+    expected = {}
+    for folder in ("a", "b", "b/nested"):
+        directory = tmp_path / folder
+        directory.mkdir(parents=True, exist_ok=True)
+        for index in range(101):
+            content = f"{folder} / {index}\n".encode()
+            name = f"{folder}/{index:03d}.py"
+            (tmp_path / name).write_bytes(content)
+            expected[name] = {"bytes": len(content), "sha256": hashlib.sha256(content).hexdigest()}
+    (tmp_path / "a/readme.txt").write_bytes(b"notes")
+    (tmp_path / "b/temporary.lock").write_bytes(b"lock")
+    (tmp_path / "b/__pycache__").mkdir()
+    (tmp_path / "b/__pycache__/cached.py").write_bytes(b"cached")
+    assert evidence.tree_digest(tmp_path, python_only=True) == {"directories": [], "files": expected}
+    expected["a/readme.txt"] = {"bytes": 5, "sha256": hashlib.sha256(b"notes").hexdigest()}
+    assert evidence.tree_digest(tmp_path) == {"directories": ["a", "b", "b/nested"], "files": expected}
