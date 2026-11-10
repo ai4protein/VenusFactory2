@@ -1,15 +1,15 @@
 """Deterministic task-disjoint support/query preparation from measured rows."""
 from __future__ import annotations
 
-from collections import defaultdict
 import hashlib
 import json
+from collections import defaultdict
 
 from .contracts import digest
 from .research_evaluation import EPISODE_SCHEMA
 
 
-def prepare_episodes(rows, *, seed, support_size, validation_fraction, test_fraction):
+def prepare_episodes(rows, *, seed, support_size, validation_fraction, test_fraction, group_partitions=None):
     tasks = defaultdict(list)
     for row in rows:
         tasks[row["task_id"]].append(row)
@@ -39,11 +39,23 @@ def prepare_episodes(rows, *, seed, support_size, validation_fraction, test_frac
         return hashlib.sha256((str(seed)+"\0"+value).encode()).hexdigest(), value
 
     blocks.sort(key=lambda block: order(json.dumps(block)))
-    nv = max(1, round(len(blocks)*validation_fraction))
-    nt = max(1, round(len(blocks)*test_fraction))
-    if nv+nt >= len(blocks):
-        raise ValueError("Holdout fractions leave no training tasks")
-    assignment = {"validation": blocks[:nv], "test": blocks[nv:nv+nt], "train": blocks[nv+nt:]}
+    if group_partitions is None:
+        nv = max(1, round(len(blocks)*validation_fraction))
+        nt = max(1, round(len(blocks)*test_fraction))
+        if nv+nt >= len(blocks):
+            raise ValueError("Holdout fractions leave no training tasks")
+        assignment = {"validation": blocks[:nv], "test": blocks[nv:nv+nt], "train": blocks[nv+nt:]}
+    else:
+        assignment = {name: [] for name in ("validation", "test", "train")}
+        if set(group_partitions) != {row["group"] for row in rows} or not set(group_partitions.values()) <= set(assignment):
+            raise ValueError("Provide a valid partition for every biological group")
+        for block in blocks:
+            assigned = {group_partitions[row["group"]] for task in block for row in tasks[task]}
+            if len(assigned) != 1:
+                raise ValueError("A connected task/group component cannot cross provided partitions")
+            assignment[assigned.pop()].append(block)
+        if any(not selected for selected in assignment.values()):
+            raise ValueError("Provided task groups must cover all three partitions")
     splits, supports = {}, {}
     for split, selected in assignment.items():
         queries, support_rows = [], []
@@ -62,4 +74,5 @@ def prepare_episodes(rows, *, seed, support_size, validation_fraction, test_frac
         splits[split] = queries
         supports[split] = support_rows
     return splits, supports, {"schema": EPISODE_SCHEMA, "support_size": support_size,
-                              "support_key": "support", "split_method": "whole_connected_task_groups"}
+                              "support_key": "support", "split_method": ("provided_connected_task_groups" if group_partitions is not None
+                                               else "whole_connected_task_groups")}

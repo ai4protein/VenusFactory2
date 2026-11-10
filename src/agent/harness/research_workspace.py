@@ -1,25 +1,22 @@
 """Goal-scoped files, isolated Python execution and reusable program receipts."""
 from __future__ import annotations
 
-from mcp_tools.tools.capability_policy import guard_operation
-import asyncio
 import hashlib
 import json
-import os
-from pathlib import Path
-import shutil
-import signal
-import sys
-import time
 import re
+import shutil
 import uuid
+from pathlib import Path
 from typing import Annotated, Literal
+
 from pydantic import Field
+
+from mcp_tools.tools.capability_policy import guard_operation
+from utils.scoped_files import copy_file, open_file, parts, read_bytes, write_bytes
 
 from .contracts import digest, file_hash
 from .host import write_json
 from .research_questions import validate_input_questions
-from utils.scoped_files import open_file, read_bytes, write_bytes, copy_file, parts
 
 ExperimentVariant = Annotated[
     Literal["auto", "baseline", "candidate", "ablation"],
@@ -218,8 +215,8 @@ class ResearchWorkspace:
 
     async def get_research_baseline(self, reference: str='', sequence_column: str='sequence', output_field: str='value', output_file: str='') -> dict:
         """List classic sequence-regression controls. Select a reference ID and output_file to save runnable fit/predict code with verified sequence encoding; omit output_file to read the source. Existing different files are never overwritten. Fit it with train_research_model, then develop a measured revision. Preserve its platform-reference provenance."""
-        from .research_reference_baselines import reference_baseline
         from .research_development import immutable_copy
+        from .research_reference_baselines import reference_baseline
         result=reference_baseline(reference,sequence_column,output_field)
         if output_file:
             if not reference or not isinstance(output_file,str) or not output_file.endswith('.py'):
@@ -250,14 +247,15 @@ class ResearchWorkspace:
     async def prepare_research_dataset(self, data_file: str, target_column: str, input_columns: list[str],
             group_column: str, provenance: str, grouping: str, id_column: str='', task: str='regression',
             seed: int=0, validation_fraction: float=0.15, test_fraction: float=0.15, output_file: str='',
-            task_column: str='', support_size: int=0, unlabeled_file: str='', unlabeled_id_column: str='') -> dict:
-        """Prepare deterministic group-disjoint splits from a measured CSV/TSV. Select input and target columns and a biologically justified group column; related observations stay together. IDs may be generated when id_column is empty. Returns evaluation_file, hashes, split counts, a bounded training-only input profile and fit/predict row shapes. With host-protected data, read training_data.file for analysis; evaluation_file is an opaque training/review reference and contains no sample rows. Original values are preserved; no samples are invented or silently discarded. Optional task_column plus support_size=1..64 creates disjoint training/validation/test tasks with fixed support/query observations; prediction inputs include same-task support. Optional unlabeled_file selects a separate CSV/TSV with the same input columns and no measured-target column; set unlabeled_id_column when supplied. Task identity and group annotations must reflect the biological study."""
+            task_column: str='', support_size: int=0, unlabeled_file: str='', unlabeled_id_column: str='', split_column: str='') -> dict:
+        """Prepare group-disjoint splits from a measured CSV/TSV or preserve a supplied partition column. Select input and target columns and a biologically justified group column; related observations stay together. IDs may be generated when id_column is empty. Returns evaluation_file, hashes, split counts, a bounded training-only input profile and fit/predict row shapes. With host-protected data, read training_data.file for analysis; evaluation_file is an opaque training/review reference and contains no sample rows. Original values are preserved; no samples are invented or silently discarded. Optional task_column plus support_size=1..64 creates disjoint training/validation/test tasks with fixed support/query observations; prediction inputs include same-task support. Optional unlabeled_file selects a separate CSV/TSV with the same input columns and no measured-target column; set unlabeled_id_column when supplied. Optional split_column preserves supplied train/validation/test memberships; related groups and connected tasks must remain together. Holdout fractions apply only when split_column is empty; seed still determines episode support selection. Task identity and group annotations must reflect the biological study."""
         from .research_dataset import prepare_dataset
         result=prepare_dataset(self.workspace, data_file=data_file,target_column=target_column,
             input_columns=input_columns,group_column=group_column,provenance=provenance,grouping=grouping,
             id_column=id_column,task=task,seed=seed,validation_fraction=validation_fraction,
             test_fraction=test_fraction,output_file=output_file,data_store=self.data_store,
-            task_column=task_column,support_size=support_size,unlabeled_file=unlabeled_file,unlabeled_id_column=unlabeled_id_column)
+            task_column=task_column,support_size=support_size,unlabeled_file=unlabeled_file,unlabeled_id_column=unlabeled_id_column,
+            split_column=split_column)
         return self.record('prepare_research_dataset',{'source_file':data_file,'source_sha256':result['table_sha256']},result)
 
     @guard_operation('train_research_model')
@@ -284,8 +282,9 @@ class ResearchWorkspace:
 
     def workspace_tools(self):
         from langchain_core.tools import StructuredTool
-        from mcp_tools.tools.runtime_tool_policy import is_tool_allowed
+
         from mcp_tools.tools.capability_policy import guard_tool
+        from mcp_tools.tools.runtime_tool_policy import is_tool_allowed
         from mcp_tools.tools.tool_surface import WORKSPACE_ALIASES
         return [guard_tool(StructuredTool.from_function(coroutine=getattr(self, method), name=name,
                     metadata={'workspace_relative_paths': True}))
@@ -293,8 +292,9 @@ class ResearchWorkspace:
 
     def tools(self):
         from langchain_core.tools import StructuredTool
-        from mcp_tools.tools.runtime_tool_policy import is_tool_allowed
+
         from mcp_tools.tools.capability_policy import guard_tool
+        from mcp_tools.tools.runtime_tool_policy import is_tool_allowed
         return self.workspace_tools() + [guard_tool(StructuredTool.from_function(coroutine=getattr(self,name),name=name,metadata={"workspace_relative_paths": True, "discovery_category": "training", **({"plan_step_ids": [step["id"] for step in self.plan["steps"]]} if name == "submit_research_checkpoint" else {})})) for name in RESEARCH_TOOLS if is_tool_allowed(name)]
 
 def log_tail(path, limit=10000):
@@ -326,8 +326,8 @@ async def invoke_bundle(bundle, manifest, inputs, control, *, runner=run_python,
     value=json.loads(read_bytes(work,'capability_result.json',max_bytes=2000000));json.dumps(value,allow_nan=False);return value
 
 def publish_proposals(proposals, goal_id, library=None, *, publication=None):
-    from .capability_review import admitted
     from .capability_catalog import register
+    from .capability_review import admitted
     if library is None:
         raise ValueError('Choose the private research library; public publication requires operator selection')
     library=Path(library)
@@ -363,8 +363,9 @@ def capability_cards(library=LIBRARY):
     return [c for c in rows if c.get('visibility') == 'public' and c.get('publication',{}).get('policy') == 'operator_selected.v1'] if Path(library).resolve() == LIBRARY.resolve() else rows
 
 def search_capabilities(query='', limit=10, library=LIBRARY, offset=0):
-    from .capability_catalog import search, discovery_card
     from mcp_tools.tools.capability_policy import CapabilityStore
+
+    from .capability_catalog import discovery_card, search
     rows = CapabilityStore().rows()
     prefix = 'model:capability:'
     disabled = [key[len(prefix):] for key,row in rows.items() if key.startswith(prefix) and not row['enabled']]
@@ -375,8 +376,8 @@ def search_capabilities(query='', limit=10, library=LIBRARY, offset=0):
 
 
 def admitted_manifest(capability_id, library):
-    from .capability_review import admitted
     from .capability_catalog import require_registered
+    from .capability_review import admitted
     if not re.fullmatch('[a-f0-9]{64}',capability_id):raise ValueError('Invalid capability ID')
     bundle=Path(library)/capability_id;manifest=json.loads(safe_file(bundle,'manifest.json').read_text())
     if digest({k:v for k,v in manifest.items() if k!='id'})!=capability_id:raise ValueError('Capability manifest changed')

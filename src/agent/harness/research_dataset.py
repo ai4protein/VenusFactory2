@@ -1,5 +1,6 @@
 """Reproducible group splits from user-selected experimental table columns."""
 from __future__ import annotations
+
 import csv
 import hashlib
 import io
@@ -7,11 +8,11 @@ import math
 from collections import defaultdict
 
 from utils.scoped_files import read_bytes
-from .research_development import require, immutable_copy, inspect_evaluation
-from .research_evaluation import validate_data, evaluation_bytes
-from .research_episodes import prepare_episodes
-from .research_input_profile import training_input_profile
 
+from .research_development import immutable_copy, inspect_evaluation, require
+from .research_episodes import prepare_episodes
+from .research_evaluation import evaluation_bytes, validate_data
+from .research_input_profile import training_input_profile
 
 
 def model_interface(task, columns, *, episodic=False):
@@ -91,6 +92,8 @@ def prepared_details(data):
         "model_interface": model_interface(data["task"], preparation["input_columns"], episodic="support" in data),
         "training_profile": training_input_profile(data["splits"]["train"], preparation["input_columns"]),
     }
+    if preparation.get("split_column"):
+        result["partitioning"] = {"method": "provided_column", "column": preparation["split_column"]}
     if "support" in data:
         result["episodes"] = {
             "task_column": preparation["task_column"], "support_size": preparation["episode"]["support_size"],
@@ -125,33 +128,43 @@ def read_table(workspace, path, *, data_store=None, maximum=21024):
 def prepare_dataset(workspace, *, data_file, target_column, input_columns, group_column,
                     provenance, grouping, id_column="", task="regression", seed=0,
                     validation_fraction=0.15, test_fraction=0.15, output_file="", data_store=None,
-                    task_column="", support_size=0, unlabeled_file="", unlabeled_id_column=""):
+                    task_column="", support_size=0, unlabeled_file="", unlabeled_id_column="", split_column=""):
     require(task in {"regression","classification"}, "Declare regression or classification")
     require(type(seed) is int and 0 <= seed < 2**32, "Use an unsigned 32-bit split seed")
-    require(all(type(x) in (int,float) and math.isfinite(x) and 0 < x < 1
-                for x in (validation_fraction,test_fraction))
-            and validation_fraction+test_fraction < 0.8, "Holdout fractions must be positive and sum to less than 0.8")
+    if not split_column:
+        require(all(type(x) in (int,float) and math.isfinite(x) and 0 < x < 1
+                    for x in (validation_fraction,test_fraction))
+                and validation_fraction+test_fraction < 0.8, "Holdout fractions must be positive and sum to less than 0.8")
     require(isinstance(input_columns,list) and 1 <= len(input_columns) <= 128
             and all(isinstance(x,str) and x for x in input_columns)
             and len(set(input_columns))==len(input_columns), "Select distinct input columns")
     require(target_column not in input_columns, "The prediction target cannot be an input feature")
     require(all(isinstance(x,str) and x.strip() for x in (target_column,group_column,provenance,grouping)),
             "Declare the measured target, biological grouping and provenance")
-    require(all(isinstance(value, str) for value in (task_column, unlabeled_file, unlabeled_id_column)),
-            "Task and unlabeled selectors must be column names or empty strings")
+    require(all(isinstance(value, str) for value in (task_column, unlabeled_file, unlabeled_id_column, split_column)),
+            "Task, partition and unlabeled selectors must be column names or empty strings")
+    require(not split_column or split_column not in [target_column, group_column, id_column, task_column, *input_columns],
+            "The partition column must be distinct from targets, inputs, groups, IDs and tasks")
     require(type(support_size) is int and (1 <= support_size <= 64 if task_column else support_size == 0),
             "Set task_column and support_size=1..64 together for task episodes")
     require(not task_column or "support" not in input_columns, "support is reserved for episode observations")
     require(not unlabeled_id_column or unlabeled_file, "unlabeled_id_column requires unlabeled_file")
     source_sha, fields, source_rows = read_table(workspace, data_file, data_store=data_store)
-    requested=[target_column,group_column,*input_columns]+([id_column] if id_column else [])+([task_column] if task_column else [])
+    requested=[target_column,group_column,*input_columns]+([id_column] if id_column else [])+([task_column] if task_column else [])+([split_column] if split_column else [])
     require(set(requested)<=set(fields), "Selected columns are missing; available columns: "+", ".join(fields)[:1000])
     rows=[];groups=defaultdict(list)
+    group_partitions = {} if split_column else None
     for index,row in enumerate(source_rows,1):
         identity=row[id_column].strip() if id_column else source_sha[:12]+":"+str(index)
         group=row[group_column].strip()
         target=row[target_column].strip()
         require(identity and group and target, f"Missing identity, group or measured target at row {index}")
+        if split_column:
+            partition = row[split_column].strip().lower()
+            require(partition in {"train", "validation", "test"},
+                    f"Use train, validation or test in the partition column at row {index}")
+            require(group_partitions.setdefault(group, partition) == partition,
+                    "A biological group cannot cross provided partitions")
         if task=="regression":
             try: target=float(target)
             except ValueError as exc:raise ValueError(f"Non-numeric measured target at row {index}") from exc
@@ -162,10 +175,16 @@ def prepare_dataset(workspace, *, data_file, target_column, input_columns, group
             require(bool(record["task_id"]), f"Missing task identity at row {index}")
         rows.append(record);groups[group].append(record)
     require(len(groups)>=3, "At least three biological groups are required for disjoint splits")
-    ordered=sorted(groups,key=lambda g:(hashlib.sha256((str(seed)+"\\0"+g).encode()).hexdigest(),g))
-    nv=max(1,round(len(ordered)*validation_fraction));nt=max(1,round(len(ordered)*test_fraction))
-    require(nv+nt<len(ordered), "Holdout fractions leave no training groups")
-    assignment={"validation":ordered[:nv],"test":ordered[nv:nv+nt],"train":ordered[nv+nt:]}
+    if group_partitions is not None:
+        require(set(group_partitions.values()) == {"train", "validation", "test"},
+                "The partition column must cover all three partitions")
+        assignment = {name: sorted(group for group, split in group_partitions.items() if split == name)
+                      for name in ("validation", "test", "train")}
+    else:
+        ordered=sorted(groups,key=lambda g:(hashlib.sha256((str(seed)+"\\0"+g).encode()).hexdigest(),g))
+        nv=max(1,round(len(ordered)*validation_fraction));nt=max(1,round(len(ordered)*test_fraction))
+        require(nv+nt<len(ordered), "Holdout fractions leave no training groups")
+        assignment={"validation":ordered[:nv],"test":ordered[nv:nv+nt],"train":ordered[nv+nt:]}
     data={"task":task,"provenance":provenance,"grouping":grouping,
           "splits":{name:[row for group in selected for row in groups[group]] for name,selected in assignment.items()},
           "preparation":{"source_file":data_file,"source_sha256":source_sha,
@@ -173,13 +192,18 @@ def prepare_dataset(workspace, *, data_file, target_column, input_columns, group
                          "id_column":id_column,"group_column":group_column,"seed":seed,
                          "validation_fraction":validation_fraction,"test_fraction":test_fraction,
                          "method":"sha256_ordered_whole_groups","source_rows":len(rows)}}
+    if split_column:
+        data["preparation"].update(split_column=split_column, method="provided_whole_groups")
+        data["preparation"].pop("validation_fraction")
+        data["preparation"].pop("test_fraction")
     if task_column:
         splits, support, episode = prepare_episodes(rows, seed=seed, support_size=support_size,
-            validation_fraction=validation_fraction, test_fraction=test_fraction)
+            validation_fraction=validation_fraction, test_fraction=test_fraction, group_partitions=group_partitions)
         data["splits"] = splits
         data["support"] = support
         data["preparation"].update(task_column=task_column, episode=episode,
-                                   method="sha256_connected_task_groups_support_query")
+                                   method=("provided_connected_task_groups_support_query" if split_column
+                                           else "sha256_connected_task_groups_support_query"))
     if unlabeled_file:
         pool_sha, pool_fields, pool_rows = read_table(workspace, unlabeled_file, data_store=data_store, maximum=20000)
         require(target_column not in pool_fields, "The unlabeled table must not contain the measured target column")

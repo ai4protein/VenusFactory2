@@ -196,6 +196,21 @@ whole-task episodes and a separate unlabeled pool through the same interface:
   fields enter `training["unlabeled"]`; unused columns stay private. Exact input
   and ID overlaps with all labeled support/query records are rejected.
 
+Use optional `split_column` to retain a paper's existing `train`, `validation`
+and `test` assignments. Every row needs one of these values (case-insensitive),
+and all three partitions must be present. The partition column must be separate
+from targets, inputs, groups, IDs and task identities. Biological groups and
+connected task/group components cannot cross partitions. The host still validates
+sample counts, duplicates, exact-input overlap and hidden-label boundaries.
+
+With a supplied partition column, validation/test fractions do not assign rows;
+the seed still selects the fixed support observations within each task. This
+allows a new, explicitly documented source-training curation to retain earlier
+held-out tasks and support/query observations. Admit a new study for revised
+source data; an existing protected input cannot be repartitioned to reveal its
+held-out observations. Preparation and restored Scientist context both identify
+the supplied partition column. Without it, seeded grouping behaves as before.
+
 These options can be combined. An unlabeled pool contains base features; task
 query inputs additionally carry support observations. The model author chooses
 how to use either resource. A supervised control can ignore them while preserving
