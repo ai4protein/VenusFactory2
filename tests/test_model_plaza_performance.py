@@ -23,7 +23,8 @@ def isolated(tmp_path, monkeypatch):
     return store
 
 
-def test_fresh_catalog_does_not_import_inference_or_registered_tool_implementations(tmp_path):
+@pytest.mark.parametrize("mode", ["online", "local"])
+def test_fresh_catalog_does_not_import_inference_or_registered_tool_implementations(tmp_path, mode):
     code = """
 import json,sys
 from backend.web_v2.model_platform import Platform
@@ -33,13 +34,14 @@ assert result['items'] and not result['unavailable_sources'], result['unavailabl
 assert not result['unavailable_tools']
 assert not ({'torch','transformers','sklearn','backend.web_v2.advanced_tools_api'} & set(sys.modules))
 assert 'mcp_tools.tools.search.tools_agent' not in sys.modules
+assert 'agent.rsi.engine.context_feedback_dispatch' not in sys.modules
 assert all('contract' not in c and 'parameter_schema' not in c for c in result['items'])
 design = next(c for c in result['items'] if c['adapter']=='design')
 fields = p.model('owner',design['id'],detail=True)['parameter_schema']['properties']
 assert {'fixed_residues_text','pssm_rules_text','model_family','model_name','temperatures'} <= fields.keys()
 print(len(result['items']))
 """
-    env = dict(os.environ, VENUS_MODEL_RUNTIMES_CONFIG=str(tmp_path/'absent.json'))
+    env = dict(os.environ, WEBUI_V2_MODE=mode, VENUS_MODEL_RUNTIMES_CONFIG=str(tmp_path/'absent.json'))
     result = subprocess.run([sys.executable, '-c', code, str(tmp_path/'platform')], env=env, capture_output=True, text=True, timeout=45)
     assert result.returncode == 0, result.stdout + result.stderr
 
