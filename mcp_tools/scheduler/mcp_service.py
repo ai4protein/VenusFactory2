@@ -19,7 +19,7 @@ from starlette.routing import Mount, Route
 from mcp_tools.scheduler.catalog import catalog, classify
 from mcp_tools.scheduler.jobs import ToolJobs
 from mcp_tools.common.tool_arguments import ToolArgumentError
-from mcp_tools.scheduler.service import REPOSITORY_ID, service_key
+from mcp_tools.scheduler.service import identity, service_key
 
 scheduler=FastMCP('VenusFactory Tool Scheduler')
 
@@ -112,6 +112,7 @@ class QueueMiddleware(Middleware):
 
 
 def application(mcp):
+    service_identity = identity()
     public=mcp.http_app(path='/mcp')
     internal=scheduler.http_app(path='/mcp',stateless_http=True)
     @asynccontextmanager
@@ -121,5 +122,5 @@ def application(mcp):
             await stack.enter_async_context(internal.lifespan(internal))
             yield
     async def health(request):
-        return JSONResponse({'service':'venusfactory-tools','repository_id':REPOSITORY_ID,'pid':os.getpid(),'status':'ready'})
+        return JSONResponse({**service_identity, 'pid': os.getpid(), 'status': 'ready'})
     return Starlette(routes=[Route('/health',health),Mount('/scheduler',internal),Mount('/',public)],lifespan=lifespan)

@@ -75,3 +75,15 @@ Use a separate checkout or worktree for development and validation. Do not chang
 source files or replace frontend assets underneath a running allocation. Drain
 active jobs and stop the bundle before updating its checkout, rebuilding and
 starting the next revision. Pushing to `main` alone does not deploy that revision.
+
+MCP reuse also checks the loaded code fingerprint, Python environment, mode and
+queue location. An old service at the requested port is not silently reused or
+killed. Stop its allocation and restart the bundle from one tested checkout.
+The private process record and loopback health response contain only identifiers;
+credentials and runtime paths are not returned by health. A failed new MCP start
+is reaped and its process record is removed.
+
+Worker pools include the loaded code fingerprint in their namespace. A new API
+process running changed source therefore starts a new pool, while an existing
+pool can finish its own work. This does not make editing a running checkout safe:
+keep the separate-checkout and drain-before-update procedure above.

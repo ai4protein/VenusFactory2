@@ -18,6 +18,7 @@ import sys
 import time
 from .job_queue import JobQueue, PROJECT, TERMINAL, process_token, stop_process_tree
 from .task_store import LeaseLost
+from backend.runtime_identity import loaded_source_revision
 
 ENV_PREFIXES=('VENUS','WEBUI','PYTHON','CUDA','OMP_','OPENBLAS_','MKL_','CONDA','HF_','HUGGINGFACE','LD_','LC_')
 SECRET_WORDS=('KEY','SECRET','TOKEN','PASSWORD','CREDENTIAL','AUTH')
@@ -37,6 +38,8 @@ def namespace_for(env):
     stable={k:v for k,v in public.items() if k not in {'VENUS_QUEUE_JOB_ID','VENUS_QUEUE_OWNER','VENUS_QUEUE_LEASE_TOKEN','TEMP_OUTPUTS_DIR','SHLVL','_'}}
     if 'PYTHONPATH' in stable:stable['PYTHONPATH']=os.pathsep.join(dict.fromkeys(stable['PYTHONPATH'].split(os.pathsep)))
     stable.update({k:env[k] for k in refs})
+    # The same checkout and environment can contain a new revision after restart.
+    stable["__venus_source_revision__"] = loaded_source_revision()
     return hashlib.sha256(json.dumps(stable,sort_keys=True).encode()).hexdigest()[:24]
 
 

@@ -85,3 +85,21 @@ def test_invalid_idle_setting_keeps_bounded_retirement(value,monkeypatch):
 def test_manually_managed_pool_remains_available(monkeypatch):
     monkeypatch.setenv('VENUS_WORKER_AUTOSTART','0')
     assert pool.idle_timeout()==0
+
+
+def test_source_update_starts_a_different_pool_without_stopping_old_one(queue, monkeypatch):
+    monkeypatch.setenv('VENUS_WORKER_IDLE_TIMEOUT', '30')
+    version = ['first-source']
+    monkeypatch.setattr(pool, 'loaded_source_revision', lambda: version[0])
+    first, proc = launch([sys.executable, '-c', 'pass'], owner='owner', kind='test', queue=queue)
+    assert proc.wait(25) == 0
+    first_namespace = queue.get(first)['namespace']
+    first_record = json.loads((queue.root/'pools'/first_namespace/'supervisor.json').read_text())
+    version[0] = 'second-source'
+    second, proc = launch([sys.executable, '-c', 'pass'], owner='owner', kind='test', queue=queue)
+    assert proc.wait(25) == 0
+    second_namespace = queue.get(second)['namespace']
+    second_record = json.loads((queue.root/'pools'/second_namespace/'supervisor.json').read_text())
+    assert first_namespace != second_namespace
+    assert first_record['pid'] != second_record['pid']
+    assert process_token(first_record['pid']) == first_record['token']

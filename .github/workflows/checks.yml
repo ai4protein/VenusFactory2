@@ -31,7 +31,8 @@ jobs:
           tests/test_initialize.py tests/test_skill_validation.py tests/test_hub_progress.py
           tests/test_dependency_audit.py tests/test_legacy_install.py tests/test_torch_detect.py
           tests/test_esm3_runtime.py tests/test_scientific_contracts.py
-          tests/test_deployment_services.py tests/harness/test_runtime_discovery.py
+          tests/test_deployment_services.py tests/test_mcp_service_lifecycle.py
+          tests/test_runtime_identity.py tests/harness/test_runtime_discovery.py
       - name: Verify isolated virtualenv mount layout
         env:
           PYTHONPATH: src
@@ -115,7 +116,7 @@ jobs:
           tests/test_design_docking_contracts.py tests/test_external_mcp_dispatch.py tests/test_external_models.py
           tests/test_model_plaza_performance.py tests/rsi/test_feedback_verification_scope.py
           tests/test_workflow_components.py tests/test_workflow_persistence.py
-          tests/test_api_startup.py
+          tests/test_api_startup.py tests/test_mcp_service_health.py
           tests/test_research_reference_context.py tests/test_research_pdb_kegg.py
           tests/test_research_report.py tests/test_research_longform.py tests/test_research_input_snapshot.py
           tests/test_research_target_evidence.py tests/test_research_chapter_context.py
