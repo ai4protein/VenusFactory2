@@ -189,13 +189,7 @@ async def run_long_report(payload, update, *, service_cache=None, checkpoint=Non
         state['collection_partial'] = bool(base.get('partial'))
     state['phase'] = 'chapters'
     base_sources = list(state['sources'])
-    entry = {}
-    if base_sources and base_sources[0].get('kind') == 'database':
-        try:
-            entry = json.loads(base_sources[0]['text'])
-            entry['primaryAccession'] = state.get('protein', {}).get('accession', '')
-        except ValueError:
-            pass
+    entry = research.reference_entry(base_sources, state.get('protein', {}).get('accession', ''))
     identity_text = ' '.join(str(state.get('protein', {}).get(k, '')) for k in ('name', 'organism', 'accession')).strip() or payload.get('protein') or 'unidentified protein'
     def add(rows):
         found = []

@@ -116,6 +116,10 @@ jobs:
           tests/test_model_plaza_performance.py tests/rsi/test_feedback_verification_scope.py
           tests/test_workflow_components.py tests/test_workflow_persistence.py
           tests/test_api_startup.py
+          tests/test_research_reference_context.py tests/test_research_pdb_kegg.py
+          tests/test_research_report.py tests/test_research_longform.py tests/test_research_input_snapshot.py
+          tests/test_research_target_evidence.py tests/test_research_chapter_context.py
+          tests/test_research_dossier.py tests/test_public_knowledge_queries.py
           tests/harness/test_generated_capability_discovery.py
           -k 'not reviewed_operator_release'
 

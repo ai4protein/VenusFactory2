@@ -260,7 +260,7 @@ def literature_queries(entry, protein, proposed):
     if not entry:
         return ['"' + plain(protein, 160).replace('"', '') + '"']
     name = protein_card(entry)['name']
-    genes = [g.get('geneName', {}).get('value', '') for g in entry.get('genes', [])]
+    genes = [(g.get('geneName') or {}).get('value', '') for g in (entry.get('genes') or [])]
     aliases = [name, *[g for g in genes if len(g) > 2]][:5]
     anchor = '(' + ' OR '.join('TITLE_ABS:"' + a.replace('"', '') + '"' for a in aliases) + ')'
     organism = entry.get('organism', {}).get('scientificName', '')
@@ -289,9 +289,47 @@ def compact_entry(entry):
         counts[db] = counts.get(db, 0) + 1
         if counts[db] <= 6:
             refs.append(x)
-    return {'proteinDescription': entry.get('proteinDescription'), 'genes': entry.get('genes'), 'organism': entry.get('organism'),
+    pubmed = list(dict.fromkeys(str(item['id'])
+        for ref in entry.get('references', [])
+        for item in ref.get('citation', {}).get('citationCrossReferences', [])
+        if item.get('database') == 'PubMed' and str(item.get('id', '')).isdigit()))[:6]
+    return {'primaryAccession': entry.get('primaryAccession', ''),
+            'proteinDescription': entry.get('proteinDescription'), 'genes': entry.get('genes'), 'organism': entry.get('organism'),
             'comments': entry.get('comments', [])[:25], 'features': features[:80], 'crossReferences': refs,
-            'crossReferenceCounts': counts, 'scope': 'Selected annotations and up to six cross-references per database; see full UniProt record for all entries.'}
+            'references': [{'citation': {'citationCrossReferences': [{'database': 'PubMed', 'id': identifier}]}}
+                           for identifier in pubmed],
+            'crossReferenceCounts': counts, 'scope': 'Selected annotations, up to six cross-references per database and six PubMed references; see full UniProt record for all entries.'}
+
+
+def reference_entry(sources, accession):
+    """Resolve saved UniProt annotations independently of source ordering.
+
+    PDB inputs keep the observed construct as the target and nest the mapped
+    reference annotation under ``entry``. Older snapshots omit primaryAccession.
+    """
+    if not accession or not ACCESSION.fullmatch(accession):
+        return {}
+    for source in sources:
+        if source.get('kind') != 'database':
+            continue
+        try:
+            url = urlsplit(source.get('url', ''))
+            if (url.scheme != 'https' or url.hostname not in {'www.uniprot.org', 'uniprot.org'}
+                    or url.path.rstrip('/') != '/uniprotkb/' + accession):
+                continue
+            saved = json.loads(source.get('text', ''))
+        except (ValueError, TypeError):
+            continue
+        if not isinstance(saved, dict):
+            continue
+        entry = saved.get('entry', saved)
+        if (not isinstance(entry, dict)
+                or entry.get('primaryAccession', accession) != accession
+                or not isinstance(entry.get('proteinDescription'), dict)
+                or not isinstance(entry.get('organism'), dict)):
+            continue
+        return {**entry, 'primaryAccession': accession}
+    return {}
 
 
 async def complete(model_id, messages, output_tokens=3000):
