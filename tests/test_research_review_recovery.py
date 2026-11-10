@@ -7,6 +7,7 @@ import httpx
 import pytest
 
 from backend.web_v2 import research_source_review as sr
+from backend.web_v2 import research_source_validation as validation
 
 SOURCE = {"id": "S1", "kind": "database", "title": "Annotation",
           "text": "The initiator methionine is removed.", "url": "https://example.org/entry"}
@@ -159,7 +160,7 @@ def test_ambiguous_batch_cannot_salvage_an_apparently_supported_unit(failure):
     response = json.loads(answer(request))
     response["assessments"][1]["unit_id"] = "chapter_0:1" if failure == "duplicate" else "foreign:1"
     with pytest.raises(ValueError, match="identities"):
-        sr.partial_assessments(json.dumps(response), request, [SOURCE])
+        validation.partial_assessments(json.dumps(response), request, [SOURCE])
 
 
 def test_partial_assessment_cannot_split_away_an_unsupported_claim_within_one_unit():
@@ -167,7 +168,7 @@ def test_partial_assessment_cannot_split_away_an_unsupported_claim_within_one_un
     request = sr.packet(sr.units(doc, [SOURCE]), [SOURCE])
     response = json.loads(answer(request))
     response["assessments"][0]["issues"] = [{"claim":"signal peptide","reason":"Not established by the annotation."}]
-    checked, invalid = sr.partial_assessments(json.dumps(response), request, [SOURCE])
+    checked, invalid = validation.partial_assessments(json.dumps(response), request, [SOURCE])
     assert not checked and set(invalid) == {"mixed:1"}
 
 
@@ -181,21 +182,21 @@ def test_review_cannot_certify_measured_values_absent_from_its_quotes(claim,quot
     doc={"id":"value","title":"Measurement","text":claim}
     request=sr.packet(sr.units(doc,[source]),[source])
     with pytest.raises(ValueError,match="measured value"):
-        sr.validate_assessments(answer(request),request,[source])
+        validation.validate_assessments(answer(request),request,[source])
 
 
 def test_measurement_guard_accepts_identical_values_with_decimal_formatting():
     source={**SOURCE,"text":"The structure resolution is 1.700 Å."}
     doc={"id":"value","title":"Measurement","text":"The structure resolution is 1.7 Å. [S1]"}
     request=sr.packet(sr.units(doc,[source]),[source])
-    assert sr.validate_assessments(answer(request),request,[source])[0]["passed"]
+    assert validation.validate_assessments(answer(request),request,[source])[0]["passed"]
 
 
 def test_measurement_guard_allows_values_attached_to_source_units():
     source={**SOURCE,"text":"The binding affinity is 80nM."}
     doc={"id":"value","title":"Measurement","text":"The binding affinity is 80 nM. [S1]"}
     request=sr.packet(sr.units(doc,[source]),[source])
-    assert sr.validate_assessments(answer(request),request,[source])[0]["passed"]
+    assert validation.validate_assessments(answer(request),request,[source])[0]["passed"]
 
 @pytest.mark.asyncio
 async def test_prior_review_policy_is_preserved_but_cannot_certify_current_documents(monkeypatch):

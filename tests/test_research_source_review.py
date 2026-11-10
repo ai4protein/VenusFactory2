@@ -3,6 +3,7 @@ import json
 import pytest
 from backend.web_v2.research_evidence_passages import selected_passages, resolve_passage, source_digest
 from backend.web_v2 import research_source_review as sr
+from backend.web_v2 import research_source_validation as validation
 
 SOURCE = {"id":"S1","kind":"database","title":"Reference annotation",
           "text":json.dumps({"features":[{"type":"Initiator methionine","description":"Removed",
@@ -119,14 +120,14 @@ def test_incomplete_or_unanchored_verdicts_are_rejected(mutation):
     elif mutation=="bad_issue":row.update(verdict="uncertain",issues=[{"claim":"not present","reason":"Missing evidence"}])
     else:row["authority"]="trust me"
     with pytest.raises((ValueError,KeyError,TypeError)):
-        sr.validate_assessments(json.dumps(response),request,[SOURCE])
+        validation.validate_assessments(json.dumps(response),request,[SOURCE])
 
 
 def test_fabricated_packet_cannot_replace_original_evidence():
     request=sr.packet(sr.units(DOCUMENT,[SOURCE]),[SOURCE])
     request["sources"][0]["passages"][0]["text"]="Invented signal peptide cleavage."
     with pytest.raises(ValueError,match="original source"):
-        sr.validate_assessments(assessment(request),request,[SOURCE])
+        validation.validate_assessments(assessment(request),request,[SOURCE])
 
 
 def test_explicit_proposals_need_no_fake_measurement_citations():
@@ -134,7 +135,7 @@ def test_explicit_proposals_need_no_fake_measurement_citations():
     request=sr.packet(sr.units(document,[]),[])
     response={"assessments":[{"unit_id":request["units"][0]["id"],"classification":"proposal",
                              "verdict":"supported","issues":[],"evidence":[]}]}
-    assert sr.validate_assessments(json.dumps(response),request,[])[0]["passed"]
+    assert validation.validate_assessments(json.dumps(response),request,[])[0]["passed"]
 
 
 @pytest.mark.asyncio
@@ -201,7 +202,7 @@ def test_independent_reviewer_cannot_accept_a_wrong_concentration_unit():
     document = {**DOCUMENT, "text": "The measured constant is 2.9 nM. [S1]"}
     request = sr.packet(sr.units(document, [source]), [source])
     with pytest.raises(ValueError, match="measured value and unit"):
-        sr.validate_assessments(assessment(request), request, [source])
+        validation.validate_assessments(assessment(request), request, [source])
 
 
 @pytest.mark.asyncio

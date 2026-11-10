@@ -113,8 +113,12 @@ leaves the draft unaccepted. Writers, repairs and recovery share the document
 layer's structural checks before source review. Rechecking a report preserves its
 saved drafts, evidence, request budget and queue lifecycle; it never rewrites the
 historical checkpoint.
-Source-review receipts and revision feedback belong to `research_source_review.py`;
-author and editor modules consume those receipts without owning the reviewer.
+Source-review receipts, revision feedback and bounded recovery belong to
+`research_source_review.py`; author and editor modules consume those receipts
+without owning the reviewer. Response decoding, complete and partial assessment
+validation belong to `research_source_validation.py`. That pure module checks
+coverage, original-source anchors and measured values without calling models or
+changing report state; normal responses and retry results use the same validator.
 Explicit measurement checks belong to `research_measurements.py`; values retain
 their dimensions and unit conversions. Changes to acceptance policy invalidate
 older receipts while preserving their original review evidence.

@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from backend.web_v2.research_source_review import measured_values_anchored
+from backend.web_v2.research_measurements import measured_values_anchored
 from backend.web_v2.research_measurements import measurements
 
 
