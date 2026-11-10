@@ -14,6 +14,8 @@ import sys
 import threading
 from pathlib import Path
 
+from agent.rsi._compat import relocated_source
+
 from .storage import safe_child
 
 MAX_FILES = 100_000
@@ -203,7 +205,10 @@ def capture(declared):
     trees = {name: tree_digest(Path(name), budget=budget) for name in declared["trees"]}
     files = {}
     for name in declared["files"]:
-        path = ordinary(name)
+        logical_path = ordinary(name)
+        path = ordinary(relocated_source(logical_path))
         budget.consume(path.lstat().st_size)
         files[name] = file_digest(path)
+        if path != logical_path:
+            files[name]["resolved_path"] = str(path)
     return {"dependencies": declared, "trees": trees, "files": files, "runtime": runtime_identity()}
