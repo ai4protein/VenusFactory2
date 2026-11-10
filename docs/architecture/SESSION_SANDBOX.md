@@ -27,6 +27,18 @@ sandbox. Running code checks task cancellation every 250 ms. The worker queue
 also stops descendants when a parent job is cancelled or its lease is lost.
 There is no preallocated code sandbox per conversation or SSE connection.
 
+## Native harness caches
+
+Kimi's private HOME retains its session records. Its `XDG_CACHE_HOME` points to
+`/tmp/cache` inside the existing per-process sandbox tmpfs, so bundled web assets
+are discarded when the namespace exits. Both supported native protocols use
+this mount layout. Workspace results, event logs and session state remain on
+their persistent mounts. Historical research directories and their signed
+content bindings are unchanged.
+
+This applies to the native harness process. Session-authored analysis still
+uses the separately admitted, disk-backed scratch profile described below.
+
 ## Shared admission
 
 `runtime/control/sandboxes/` is private host scheduling state shared by local

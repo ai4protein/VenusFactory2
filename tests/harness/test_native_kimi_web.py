@@ -116,6 +116,8 @@ async def test_actual_kimi_system_binding_tool_use_and_cleanup(tmp_path, monkeyp
     assert not (output / "runtime-private.toml").exists()
     assert not (output / "control/private_home/.kimi-code/config.toml").exists()
     assert not (output / "control/private_home/.kimi-code/server.token").exists()
+    assert not (output / "control/private_home/.cache").exists()
+    assert (output / "events.jsonl").is_file()
 
 
 @pytest.mark.asyncio
@@ -151,6 +153,7 @@ async def test_actual_native_cancellation_reaps_children_and_removes_credentials
                 await asyncio.wait_for(execution, 15)
             assert sandbox.stopped and sandbox.proc.returncode is not None and sandbox.prepared_mcp.stopped
             assert sandbox.prepared_mcp.process.returncode is not None
+            assert not (sandbox.private_home / ".cache").exists()
             assert not (output / "runtime-private.toml").exists()
             for name in ("config.toml", "server.token"):
                 assert not (sandbox.private_home / ".kimi-code" / name).exists()

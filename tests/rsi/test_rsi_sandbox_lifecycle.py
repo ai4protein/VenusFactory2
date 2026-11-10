@@ -117,3 +117,45 @@ def test_kimi_rejects_invalid_mcp_timeouts(tmp_path, timeout):
             config_path=tmp_path / "config", python_root=Path(sys.prefix),
             mcp_tool_timeout_s=timeout,
         )
+
+
+@pytest.mark.asyncio
+async def test_native_cache_is_disposable_and_workspace_and_session_state_persist(tmp_path):
+    import json
+    import shutil
+
+    if not shutil.which("bwrap"):
+        pytest.skip("bubblewrap unavailable")
+    work, private, capabilities = [tmp_path / name for name in ("workspace", "home", "capabilities")]
+    for path in (work, private, capabilities):
+        path.mkdir()
+    command = bwrap_command(work, private, capabilities, Path(sys.executable), Path(sys.prefix), 0)
+    prefix = command[: command.index("--") + 1]
+    script = (
+        "import json,os; from pathlib import Path; "
+        "cache=Path(os.environ['XDG_CACHE_HOME']); "
+        "assert cache == Path('/tmp/cache') and cache.is_dir(); "
+        "assert not (cache/'web-asset.js').exists(); "
+        "(cache/'web-asset.js').write_text('disposable'); "
+        "Path('/workspace/model.py').write_text('model artifact'); "
+        "state=Path.home()/'.kimi-code'; state.mkdir(exist_ok=True); "
+        "(state/'session.json').write_text(json.dumps({'turns': 1})); "
+        "print('isolated cache')"
+    )
+    # Separate namespaces must never reuse cache content, even with the same HOME.
+    for _ in range(2):
+        process = await asyncio.create_subprocess_exec(
+            *prefix, "/opt/venus-runtime/bin/python", "-c", script,
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+        )
+        try:
+            stdout, stderr = await asyncio.wait_for(process.communicate(), 10)
+        finally:
+            if process.returncode is None:
+                process.kill()
+                await process.wait()
+        assert process.returncode == 0, stderr.decode()
+        assert stdout.decode().strip() == "isolated cache"
+        assert not (private / ".cache").exists()
+        assert (work / "model.py").read_text() == "model artifact"
+        assert json.loads((private / ".kimi-code/session.json").read_text()) == {"turns": 1}

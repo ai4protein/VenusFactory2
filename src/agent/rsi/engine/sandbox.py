@@ -57,6 +57,8 @@ def bwrap_command(
         "/dev",
         "--tmpfs",
         "/tmp",
+        "--dir",
+        "/tmp/cache",
         "--tmpfs",
         "/home",
         "--dir",
@@ -88,6 +90,12 @@ def bwrap_command(
         "--setenv",
         "HOME",
         "/runtime_home",
+        # Kimi extracts its bundled web assets into the XDG cache even in server
+        # mode. Keep these reproducible assets out of persistent research evidence;
+        # /tmp already belongs to this namespace and disappears with its processes.
+        "--setenv",
+        "XDG_CACHE_HOME",
+        "/tmp/cache",
         "--setenv",
         "PATH",
         "/opt/venus-runtime/bin:/usr/bin:/bin",
