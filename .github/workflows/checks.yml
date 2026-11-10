@@ -19,7 +19,7 @@ jobs:
         run: >-
           python -m pip install -c requirements/service-security.txt
           "pytest>=8,<10" "pytest-asyncio>=1" "fastapi>=0.162.0"
-          "httpx>=0.28.1" "httpx2>=2.16.0" "python-dotenv>=1.1.1" "PyYAML>=6.0.2"
+          "httpx>=0.28.1" "httpx2>=2.16.0" "python-dotenv>=1.1.1" "PyYAML>=6.0.2" "psutil>=6"
       - name: Test browser identities and worker lifecycle
         env:
           PYTHONPATH: src
@@ -31,6 +31,7 @@ jobs:
           tests/test_initialize.py tests/test_skill_validation.py tests/test_hub_progress.py
           tests/test_dependency_audit.py tests/test_legacy_install.py tests/test_torch_detect.py
           tests/test_esm3_runtime.py tests/test_scientific_contracts.py
+          tests/test_deployment_services.py tests/harness/test_runtime_discovery.py
       - name: Verify isolated virtualenv mount layout
         env:
           PYTHONPATH: src

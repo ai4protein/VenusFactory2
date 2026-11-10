@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -88,6 +90,51 @@ def prepare_harness_home(plan, source=None):
             dst.chmod(0o600)
 
 
+def deployment_identity(frontend_dist, root=ROOT):
+    """Record the loaded revision privately, without reading environment values."""
+    root = Path(root).resolve()
+    result = {"source_root": str(root), "source_revision": None, "source_dirty": None,
+              "frontend_index_sha256": hashlib.sha256((Path(frontend_dist) / "index.html").read_bytes()).hexdigest()}
+    try:
+        def git(*arguments):
+            return subprocess.run(["git", "-C", str(root), *arguments], check=True,
+                                  capture_output=True, text=True, timeout=10).stdout.strip()
+
+        if Path(git("rev-parse", "--show-toplevel")).resolve() == root:
+            result["source_revision"] = git("rev-parse", "HEAD")
+            result["source_dirty"] = bool(git("status", "--porcelain", "--untracked-files=normal"))
+    except (OSError, subprocess.SubprocessError):
+        pass  # Source archives can run without Git metadata.
+    return result
+
+
+def service_ready(port, kind):
+    """Require working chat catalogs before advertising an API as ready."""
+    def read(path):
+        with urlopen(f"http://127.0.0.1:{port}{path}", timeout=2) as response:
+            return json.load(response)
+
+    try:
+        health = read("/health")
+        if not isinstance(health, dict):
+            return False
+        if kind == "mcp":
+            return health.get("status") == "ready"
+        if health.get("success") is not True:
+            return False
+        agent = read("/api/chat/agent-execution-options")
+        if not isinstance(agent, dict) or not all(
+            isinstance(agent.get(key), list) for key in ("harnesses", "models", "combinations")
+        ):
+            return False
+        scientist = read("/api/chat/science-goals/catalog?view=composer")
+        return (isinstance(scientist, dict)
+                and isinstance(scientist.get("drivers"), list)
+                and isinstance(scientist.get("execution"), dict))
+    except (OSError, ValueError):
+        return False
+
+
 def remember_children(processes, owned):
     import psutil
     for process in processes:
@@ -148,7 +195,9 @@ def main(argv=None):
 
     for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
         signal.signal(sig, request_stop)
-    state = {"job_id": os.getenv("PBS_JOBID"), "host": socket.gethostname(), "status": "starting", "services": []}
+    state = {"job_id": os.getenv("PBS_JOBID"), "host": socket.gethostname(), "status": "starting", "services": [],
+             "started_at": datetime.now(timezone.utc).isoformat(),
+             **deployment_identity(args.frontend_dist)}
 
     def save():
         pending = control / "deployment.json.tmp"
@@ -174,16 +223,10 @@ def main(argv=None):
             if any(child.poll() is not None for child in children):
                 raise RuntimeError("A web process exited during startup; inspect its log")
             for port, kind in list(pending):
-                try:
-                    with urlopen(f"http://127.0.0.1:{port}/health", timeout=2) as response:
-                        body = json.load(response)
-                    ready = body.get("success") if kind == "api" else body.get("status") == "ready"
-                    if ready:
-                        pending.remove((port, kind))
-                except (OSError, ValueError):
-                    pass
+                if service_ready(port, kind):
+                    pending.remove((port, kind))
             if pending and time.monotonic() >= deadline:
-                raise RuntimeError("Services did not become healthy before the startup deadline")
+                raise RuntimeError("Services or chat catalogs did not become ready before the startup deadline")
             time.sleep(.5)
         if not stopping and args.frp_executable:
             log = (control / "frp.log").open("ab"); streams.append(log)
