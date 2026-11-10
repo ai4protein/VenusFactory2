@@ -87,10 +87,13 @@ jobs:
       - name: Install and verify the generated-code sandbox
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends bubblewrap apparmor-profiles apparmor-utils
+          sudo apt-get install -y --no-install-recommends bubblewrap apparmor-profiles apparmor-utils patchelf
           sudo install -m 0644 /usr/share/apparmor/extra-profiles/bwrap-userns-restrict /etc/apparmor.d/bwrap-userns-restrict
           sudo apparmor_parser -r /etc/apparmor.d/bwrap-userns-restrict
           bwrap --unshare-all --die-with-parent --ro-bind / / -- /usr/bin/true
+          # setup-python uses an absolute loader path; the sandbox relocates this prefix.
+          runtime_python=$(python -c 'import os,sys; print(os.path.realpath(sys.executable))')
+          sudo patchelf --set-rpath '$ORIGIN/../lib' "$runtime_python"
       - name: Install registry test dependencies
         run: >-
           python -m pip install -c requirements/service-security.txt
@@ -102,34 +105,17 @@ jobs:
           "uvicorn>=0.41.0" "datasets>=5.0.1" "plotly>=6.2.0"
           "biotite>=1.4.0" "matplotlib>=3.10.3" "langchain-community>=0.4.1"
           "fake-useragent>=2.1.0" "beautifulsoup4>=4.13.4" "zeep>=4.3.3"
-      - name: Verify isolated Python imports
+      - name: Verify isolated model execution
         env:
           PYTHONPATH: src
           PYTHON_DOTENV_DISABLED: '1'
         run: |
           python - <<'PY'
-          import json, subprocess, sys
-          from pathlib import Path
-          from agent.harness.python_runtime_mounts import python_runtime_mounts
-          probe = "import json,sys; print(json.dumps({'prefix':sys.prefix,'base_prefix':sys.base_prefix,'path':sys.path})); import numpy; print(numpy.__version__)"
-          print("Host runtime", sys.executable, sys.prefix, flush=True)
-          prefix = str(Path(sys.prefix).resolve())
-          base = ["bwrap", "--unshare-all", "--die-with-parent", "--cap-drop", "ALL"]
-          for directory in ("/usr", "/bin", "/lib", "/lib64"):
-              if Path(directory).exists():
-                  base += ["--ro-bind", directory, directory]
-          base += ["--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp", "--dir", "/home", "--dir", "/opt"]
-          statuses = []
-          for label, mounts, environment in [
-              ("prefix", ["--ro-bind", prefix, "/opt/venus-runtime"], []),
-              ("runtime_libraries", python_runtime_mounts(prefix), []),
-              ("prefix_loader", ["--ro-bind", prefix, "/opt/venus-runtime"], ["--setenv", "LD_LIBRARY_PATH", "/opt/venus-runtime/lib"]),
-          ]:
-              command = base + mounts + ["--clearenv"] + environment + ["--", "/opt/venus-runtime/bin/python", "-I", "-c", probe]
-              result = subprocess.run(command, capture_output=True, text=True, timeout=30)
-              print(json.dumps({"probe":label,"exit_code":result.returncode,"stdout":result.stdout,"stderr":result.stderr}), flush=True)
-              statuses.append(result.returncode)
-          raise SystemExit(statuses[0])
+          from agent.rsi.engine.code_sandbox import run_code
+          source = "def fit(features, targets, seed):\n    return sum(targets) / len(targets)\ndef predict(model, features):\n    return [model for row in features]\n"
+          result = run_code(source, {"operation": "fit", "input_kind": "features", "features": [[0], [1]], "targets": [1.0, 3.0], "seed": 1})
+          assert result["model"] == 2.0, result
+          print("Isolated model runtime: OK")
           PY
       - name: Verify model evidence and progressive discovery
         env:
