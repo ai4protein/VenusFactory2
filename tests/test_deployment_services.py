@@ -57,3 +57,79 @@ def test_stopping_bundle_leaves_unrelated_process_alive():
             if child.poll() is None:
                 child.terminate()
             child.wait(timeout=5)
+
+
+@pytest.fixture
+def readiness_server():
+    import json
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    responses = {
+        "/health": (200, {"success": True}),
+        "/api/chat/agent-execution-options": (200, {"harnesses": [], "models": [], "combinations": []}),
+        "/api/chat/science-goals/catalog?view=composer": (200, {"drivers": [], "execution": {}}),
+    }
+    requests = []
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            requests.append(self.path)
+            status, body = responses.get(self.path, (404, {}))
+            payload = json.dumps(body).encode()
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+
+        def log_message(self, *args):
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield server.server_port, responses, requests
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+@pytest.mark.parametrize("endpoint", [
+    "/api/chat/agent-execution-options",
+    "/api/chat/science-goals/catalog?view=composer",
+])
+def test_health_success_does_not_hide_broken_chat_catalog(readiness_server, endpoint):
+    port, responses, requests = readiness_server
+    original = responses[endpoint]
+    responses[endpoint] = (500, {"detail": "ImportError"})
+    assert not deployment.service_ready(port, "api")
+    assert endpoint in requests
+    responses[endpoint] = original
+    assert deployment.service_ready(port, "api")
+
+
+def test_initial_installation_can_start_before_api_keys_are_configured(readiness_server):
+    port, responses, requests = readiness_server
+    assert deployment.service_ready(port, "api")
+    assert requests == list(responses)
+
+
+@pytest.mark.parametrize("endpoint,body", [
+    ("/health", []),
+    ("/api/chat/agent-execution-options", {"success": True}),
+    ("/api/chat/science-goals/catalog?view=composer", None),
+])
+def test_malformed_catalog_is_not_ready(readiness_server, endpoint, body):
+    port, responses, _ = readiness_server
+    responses[endpoint] = (200, body)
+    assert not deployment.service_ready(port, "api")
+
+
+def test_mcp_readiness_does_not_request_web_catalogs(readiness_server):
+    port, responses, requests = readiness_server
+    responses["/health"] = (200, {"status": "ready"})
+    assert deployment.service_ready(port, "mcp")
+    assert requests == ["/health"]

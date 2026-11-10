@@ -214,9 +214,18 @@ npm run build
 ```
 
 Back up each mode's SQLite databases consistently and retain files/checkpoints
-together. Before upgrades, check active jobs, publish one frontend build to both
-modes, restart idle API/MCP processes, then verify a real queued tool call and a
-Scientist project download. Do not rewrite prior experimental results.
+together. Keep the running service checkout unchanged: develop and test in a separate
+worktree, then deploy a coherent revision and restart idle API/MCP processes. Python
+processes cache imported modules; updating source underneath them can mix old loaded
+modules with newly imported files even while `/health` still returns success.
+
+Before upgrades, check active jobs and publish one frontend build to both modes.
+The bundled launcher (`scripts/deploy_services.py`) checks Agent and Scientist
+configuration catalogs as well as API/MCP health before starting its tunnel. Empty
+catalogs are permitted for a fresh installation without configured API keys; broken
+or malformed catalogs are not ready. These startup checks make no LLM requests.
+After deployment, verify a real queued tool call and a Scientist project download.
+Do not rewrite prior experimental results.
 
 ## Retired interfaces and shared calculation code
 

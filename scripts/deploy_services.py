@@ -88,6 +88,33 @@ def prepare_harness_home(plan, source=None):
             dst.chmod(0o600)
 
 
+def service_ready(port, kind):
+    """Require working chat catalogs before advertising an API as ready."""
+    def read(path):
+        with urlopen(f"http://127.0.0.1:{port}{path}", timeout=2) as response:
+            return json.load(response)
+
+    try:
+        health = read("/health")
+        if not isinstance(health, dict):
+            return False
+        if kind == "mcp":
+            return health.get("status") == "ready"
+        if health.get("success") is not True:
+            return False
+        agent = read("/api/chat/agent-execution-options")
+        if not isinstance(agent, dict) or not all(
+            isinstance(agent.get(key), list) for key in ("harnesses", "models", "combinations")
+        ):
+            return False
+        scientist = read("/api/chat/science-goals/catalog?view=composer")
+        return (isinstance(scientist, dict)
+                and isinstance(scientist.get("drivers"), list)
+                and isinstance(scientist.get("execution"), dict))
+    except (OSError, ValueError):
+        return False
+
+
 def remember_children(processes, owned):
     import psutil
     for process in processes:
@@ -174,16 +201,10 @@ def main(argv=None):
             if any(child.poll() is not None for child in children):
                 raise RuntimeError("A web process exited during startup; inspect its log")
             for port, kind in list(pending):
-                try:
-                    with urlopen(f"http://127.0.0.1:{port}/health", timeout=2) as response:
-                        body = json.load(response)
-                    ready = body.get("success") if kind == "api" else body.get("status") == "ready"
-                    if ready:
-                        pending.remove((port, kind))
-                except (OSError, ValueError):
-                    pass
+                if service_ready(port, kind):
+                    pending.remove((port, kind))
             if pending and time.monotonic() >= deadline:
-                raise RuntimeError("Services did not become healthy before the startup deadline")
+                raise RuntimeError("Services or chat catalogs did not become ready before the startup deadline")
             time.sleep(.5)
         if not stopping and args.frp_executable:
             log = (control / "frp.log").open("ab"); streams.append(log)
