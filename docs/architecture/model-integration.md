@@ -85,6 +85,15 @@ original discovery path. Keep `.discovery/` outside session mounts and downloads
 This cache provides recorded descriptions only: selected-model inspection and
 prediction keep their original content and scientific-evidence checks.
 
+`agent.harness.capability_catalog` owns discovery for reviewed Scientist programs.
+Dedicated search and unified tool/model search use its current-version and public
+publication filters. Unified search ranks ID references with the existing bilingual
+matcher, merges them with the other model families, and loads compact cards only
+for the selected page. Inventory counts include enabled published programs. Search
+returns bounded name, description and scope summaries; full validation, interfaces
+and publication evidence stay behind selected-program inspection. The index is not
+an admission receipt: description and execution still validate the original bundle.
+
 Selected-model calls validate input with the original model interface before
 joining the compute queue. Explicit prediction calls use the same input check
 before numerical replay. Scope, data and evidence validation still run at execution.

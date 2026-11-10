@@ -18,7 +18,7 @@ def isolated(tmp_path, monkeypatch):
     from mcp_tools.models.pretrained.design_docking import service as external
     monkeypatch.setattr(external, "availability", lambda name: (name not in {"bindcraft","boltzgen"}, None))
     from agent.harness import research_workspace
-    monkeypatch.setattr(research_workspace, "capability_cards", lambda: [])
+    monkeypatch.setattr(research_workspace, "LIBRARY", tmp_path / "published-capabilities")
 
 
 def tools():

@@ -18,13 +18,13 @@ from mcp_tools.models.evolved import catalog as metadata_cache
 
 
 @pytest.fixture(autouse=True)
-def isolated_discovery_runtime(monkeypatch):
+def isolated_discovery_runtime(tmp_path, monkeypatch):
     # These fixtures describe a synthetic local catalog, not the deployment's
     # mode or the real Scientist capabilities already published on the server.
     monkeypatch.setattr(service, "platform_models", lambda *a, **kw: [])
     from agent.harness import research_workspace
     from mcp_tools.tools import runtime_tool_policy
-    monkeypatch.setattr(research_workspace, "capability_cards", lambda: [])
+    monkeypatch.setattr(research_workspace, "LIBRARY", tmp_path / "published-capabilities")
     monkeypatch.setattr(runtime_tool_policy, "is_online_mode", lambda: False)
 
 
