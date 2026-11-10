@@ -414,3 +414,29 @@ def test_large_verification_metadata_still_obeys_record_budget(publication, monk
     with pytest.raises(ValueError, match="record budget"):
         store.prepare_inference([identity])
     assert not (store.root / ".inference/entries" / (identity + ".json")).exists()
+
+
+@pytest.mark.parametrize("change", ["canonical_content", "restored_original", "symlink", "missing"])
+def test_relocated_task_source_remains_bound_during_prepared_inference(publication, change):
+    import hashlib
+    store, root, _, _, identity = publication
+    old = root.parent / "source_checkout/src/agent/rsi/sabio_assay_encoder.py"
+    current = old.parent / "engine/sabio_assay_encoder.py"
+    current.parent.mkdir(parents=True)
+    original = b"source frozen by task"
+    current.write_bytes(original)
+    atomic_json(root / "model_task.json", {"references": [{"path": str(old), "sha256": hashlib.sha256(original).hexdigest()}]})
+    prepared = store.prepare_inference([identity])
+    assert audit.resolve(store, identity)["inference_audit_id"] == prepared["models"][0]["audit_id"]
+    if change == "canonical_content":
+        stamp = current.stat()
+        current.write_bytes(b"source forged by task")
+        os.utime(current, ns=(stamp.st_atime_ns, stamp.st_mtime_ns))
+    elif change == "restored_original":
+        old.write_bytes(original)
+    elif change == "symlink":
+        old.symlink_to(current)
+    else:
+        current.unlink()
+    with pytest.raises((ValueError, OSError)):
+        audit.resolve(store, identity)
