@@ -210,12 +210,13 @@ async def model_evaluation(bundle, manifest, control, runner):
     vout = schema_validator(spec['output_schema'])
     for row in one: vout.validate(row)
     predictions = [r[spec['prediction_key']] for r in one]; targets = [r['target'] for r in test]; train = [r['target'] for r in splits['train']]
-    measured = scores(data['task'], predictions, targets, train)
+    measured = scores(data['task'], predictions, targets, train, query_rows=test if 'support' in data else None)
     metric, score, baseline = measured['metric'], measured['score'], measured['reference']
     if 'claimed_metric' in data:
         ensure(type(data['claimed_metric']) in (int, float) and math.isfinite(data['claimed_metric']) and math.isclose(score, data['claimed_metric'], rel_tol=1e-5, abs_tol=1e-6), 'Reported held-out metric does not match host recomputation')
     return {'task': data['task'], 'metric': metric, 'score': score, 'baseline': baseline,
             'baseline_method': measured['reference_method'],
+            **({'episodes': measured['episodes']} if 'episodes' in measured else {}),
             'diagnostics': prediction_diagnostics(data['task'], predictions, train, split='test'),
             'split_counts': {k: len(v) for k, v in splits.items()}, 'disjoint_ids_groups_inputs': True,
             'provenance': data['provenance'], 'grouping': data['grouping'], 'predictions_sha256': digest(one),

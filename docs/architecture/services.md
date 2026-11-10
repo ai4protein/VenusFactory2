@@ -189,6 +189,13 @@ project/               Authored workspace, preserving directory structure
 checksums.json         SHA-256 manifest
 ```
 
+For support/query experiments, validation and independent Review also report a
+score with equal weight per protein task, alongside the existing pooled score.
+They compare regression predictions with each task's support mean and median
+(classification uses support majority). These comparisons appear in the model
+report and introduce no automatic superiority requirement. Query labels remain
+in host storage; aggregate metrics enter the research record.
+
 Pause a running study before creating its ZIP. Incomplete studies can export
 their evidence without being labelled successful. Export access is bound to
 the owning conversation; worker configuration, credentials, other conversations

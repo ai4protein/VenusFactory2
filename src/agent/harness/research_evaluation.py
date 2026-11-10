@@ -195,28 +195,94 @@ def training_evidence_summary(value, data, strategy):
             "training_view_sha256": digest(expected)}
 
 
-def scores(task, predictions, targets, train):
+def scores(task, predictions, targets, train, *, query_rows=None):
     _require(len(predictions) == len(targets) and bool(targets),
              "Prediction count differs from query count")
     if task == "regression":
         _require(all(type(p) in (int, float) and math.isfinite(p) for p in predictions),
                  "Predictions must be finite numbers")
         mean = sum(train) / len(train)
-        return {
+        result = {
             "metric": "mae", "direction": "minimize",
             "score": sum(abs(p-y) for p, y in zip(predictions, targets)) / len(targets),
             "rmse": math.sqrt(sum((p-y)**2 for p, y in zip(predictions, targets)) / len(targets)),
             "reference": sum(abs(mean-y) for y in targets) / len(targets),
             "reference_method": "training_mean",
         }
+    else:
+        from collections import Counter
+        _require(all(type(p) in (int, float, str)
+                     and (isinstance(p, str) or math.isfinite(p)) for p in predictions),
+                 "Predictions must be finite scalar class labels")
+        majority = Counter(train).most_common(1)[0][0]
+        result = {
+            "metric": "accuracy", "direction": "maximize",
+            "score": sum(p == y for p, y in zip(predictions, targets)) / len(targets),
+            "reference": sum(majority == y for y in targets) / len(targets),
+            "reference_method": "training_majority",
+        }
+    if query_rows is not None:
+        result["episodes"] = _episode_scores(task, predictions, targets, query_rows)
+    return result
+
+
+def _episode_scores(task, predictions, targets, rows):
+    """Equal-task metrics and support-only controls; expose no per-query labels."""
     from collections import Counter
-    _require(all(type(p) in (int, float, str)
-                 and (isinstance(p, str) or math.isfinite(p)) for p in predictions),
-             "Predictions must be finite scalar class labels")
-    majority = Counter(train).most_common(1)[0][0]
-    return {
-        "metric": "accuracy", "direction": "maximize",
-        "score": sum(p == y for p, y in zip(predictions, targets)) / len(targets),
-        "reference": sum(majority == y for y in targets) / len(targets),
-        "reference_method": "training_majority",
-    }
+    from statistics import fmean, median
+
+    _require(isinstance(rows, list) and len(rows) == len(predictions),
+             "Episode queries must align with predictions")
+    groups = {}
+    allowed = (int, float) if task == "regression" else (int, float, str)
+    for row, prediction, target in zip(rows, predictions, targets):
+        _require(isinstance(row, dict) and isinstance(row.get("task_id"), str)
+                 and bool(row["task_id"]) and isinstance(row.get("inputs"), dict)
+                 and row.get("target") == target,
+                 "Episode task identity or query target does not match")
+        support = row.get("inputs", {}).get("support")
+        _require(isinstance(support, list) and bool(support)
+                 and all(isinstance(item, dict) for item in support),
+                 "Episode queries require frozen support observations")
+        values = [item.get("target") for item in support]
+        _require(all(type(value) in allowed and
+                     (isinstance(value, str) or math.isfinite(value)) for value in values+[target]),
+                 "Episode support and query targets must be finite scalar values")
+        identity = digest(support)
+        if row["task_id"] not in groups:
+            references = ({"support_mean": fmean(values), "support_median": median(values)}
+                          if task == "regression" else
+                          {"support_majority": Counter(values).most_common(1)[0][0]})
+            groups[row["task_id"]] = {"support": identity, "references": references,
+                                      "predictions": [], "targets": []}
+        group = groups[row["task_id"]]
+        _require(group["support"] == identity, "Support observations changed within a task")
+        group["predictions"].append(prediction)
+        group["targets"].append(target)
+
+    def equal(a, b):
+        return math.isclose(a, b, rel_tol=1e-9, abs_tol=1e-12) if task == "regression" else a == b
+
+    def aggregate(method=None):
+        per_task, pooled, matches = [], [], 0
+        for group in groups.values():
+            values = (group["predictions"] if method is None else
+                      [group["references"][method]] * len(group["targets"]))
+            measurements = [abs(p-y) if task == "regression" else float(p == y)
+                            for p, y in zip(values, group["targets"])]
+            per_task.append(fmean(measurements)); pooled.extend(measurements)
+            matches += int(all(equal(a, b) for a, b in zip(values, group["predictions"])))
+        result = {"macro_score": fmean(per_task), "pooled_score": fmean(pooled)}
+        if method is not None:
+            result["matching_prediction_tasks"] = matches
+        return result
+
+    return {"schema": "venusfactory.episode-scores.v1", "task_count": len(groups),
+            "query_count": len(rows), "metric": "mae" if task == "regression" else "accuracy",
+            "weighting": "one equal weight per task",
+            "score": aggregate(),
+            "references": {name: aggregate(name) for name in next(iter(groups.values()))["references"]},
+            "constant_within_task_count": sum(all(equal(value, group["predictions"][0])
+                                                  for value in group["predictions"])
+                                              for group in groups.values()),
+            "reference_scope": "Each task's supplied support measurements only; no query-target fitting."}

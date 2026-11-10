@@ -227,7 +227,8 @@ class Development:
         replay=await invoke_bundle(bundle,manifest,queries,folder/'replay',runner=runner,batch=True)
         require(digest(results)==digest(replay),'Predictions changed on fresh-process replay')
         require(isinstance(results,list) and all(isinstance(v,dict) and prediction_key in v for v in results),'Return the declared prediction_key for each query')
-        measured=scores(data['task'],[v[prediction_key] for v in results],[r['target'] for r in data['splits']['validation']],[r['target'] for r in data['splits']['train']])
+        measured=scores(data['task'],[v[prediction_key] for v in results],[r['target'] for r in data['splits']['validation']],[r['target'] for r in data['splits']['train']],
+            query_rows=data['splits']['validation'] if 'support' in data else None)
         measured['diagnostics']=prediction_diagnostics(data['task'],[v[prediction_key] for v in results],
             [r['target'] for r in data['splits']['train']],split='validation')
         comparison=None

@@ -225,6 +225,9 @@ async def test_meta_fit_revision_independent_review_zip_and_private_agent_call(t
         strategy="meta_learning", parent_experiment_id=base["experiment"]["id"])
     t, e = child["training"], child["experiment"]
     assert e["comparison"]["improved_on_validation"] and e["validation"]["score"] < 1e-6
+    assert e["validation"]["episodes"]["score"]["macro_score"] < 1e-6
+    assert e["validation"]["episodes"]["references"]["support_median"]["macro_score"] > 0
+    assert e["validation"]["episodes"]["task_count"] == 2
     training = json.loads((work/t["reproduction_script"]).with_name("training.json").read_text())
     assert {row["task_id"] for row in training["train"]} == {row["task_id"] for row in data["splits"]["train"]}
     assert all(value not in json.dumps(training) for value in hidden_queries)
@@ -248,6 +251,9 @@ async def test_meta_fit_revision_independent_review_zip_and_private_agent_call(t
         assert len(training_docs) == 1 and "text" not in training_docs[0]
         assert training_docs[0]["training_rows"] == len(data["splits"]["train"])
         assert len(json.dumps(training_docs)) < 2000
+        episodes = context["host_evidence"]["evaluation"]["episodes"]
+        assert episodes["task_count"] == 2 and episodes["score"]["macro_score"] < 1e-6
+        assert episodes["references"]["support_mean"]["macro_score"] > 0
         return {"decision": "approve", "summary": "Synthetic protocol test only", "issues": [],
             "checks": {key: {"passed": True, "reason": "Controlled software fixture"} for key in context["required_checks"]},
             "tests": [{"inputs": {**example, "x": "3"}, "invariants": {"finite_prediction": True}},
@@ -262,6 +268,13 @@ async def test_meta_fit_revision_independent_review_zip_and_private_agent_call(t
     with zipfile.ZipFile(work/delivery["package"]) as archive:
         assert all(value not in archive.read(name).decode("utf-8", errors="ignore")
                    for value in hidden_queries for name in archive.namelist())
+    with zipfile.ZipFile(work/delivery["model_package"]) as archive:
+        text = archive.read("evaluation/test-report.md").decode()
+        assert "Few-shot comparisons" in text and "Equal-task score" in text
+        assert "Support mean" in text and "Support median" in text
+        report = json.loads(archive.read("evaluation/test-report.json"))
+        assert report["final_test"]["episodes"]["score"]["macro_score"] < 1e-6
+        assert report["validation_trajectory"]["generations"][1]["validation"]["episodes"]["task_count"] == 2
     library = tmp_path/"private-capabilities"
     entry = publish_proposals([bundle], "meta-protocol", library)[0]
     prediction = await run_capability(entry["id"], example, library=library)

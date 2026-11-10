@@ -114,6 +114,27 @@ def encode(value):
     return (json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False) + '\n').encode()
 
 
+def episode_comparison_table(development, evaluation):
+    rows = [("Validation", str(index), generation['validation'].get('episodes'))
+            for index, generation in enumerate((development or {}).get('generations', []))]
+    rows.append(("Final test", "Selected", (evaluation or {}).get('episodes')))
+    rows = [(split, generation, value) for split, generation, value in rows if value]
+    if not rows:
+        return ''
+    text = '\n## Few-shot comparisons\n\nEach task has equal weight in the task-balanced score. '
+    text += 'Support controls use only that task\'s supplied measurements.\n\n'
+    text += '| Split | Generation | Method | Tasks | Metric | Equal-task score | Pooled score |\n'
+    text += '|---|---|---|---|---|---|---|\n'
+    for split, generation, episode in rows:
+        methods = {'Model': episode['score']}
+        methods.update({name.replace('_', ' ').capitalize(): value
+                        for name, value in episode['references'].items()})
+        for method, value in methods.items():
+            text += (f"| {split} | {generation} | {method} | {episode['task_count']} | "
+                     f"{episode['metric']} | {value['macro_score']:.6g} | {value['pooled_score']:.6g} |\n")
+    return text
+
+
 def build_delivery(workspace, bundle, receipt, *, goal_id=''):
     from agent.harness.capability_review import admitted
     bundle = Path(bundle)
@@ -180,6 +201,7 @@ def build_delivery(workspace, bundle, receipt, *, goal_id=''):
         report_text += '\nSelected experiment: `' + development['selected_experiment_id'] + '`.\n'
     if evaluation:
         report_text += '\n## Final test\n\n```json\n' + json.dumps(evaluation, indent=2, ensure_ascii=False) + '\n```\n'
+    report_text += episode_comparison_table(development, evaluation)
     report_text += '\n## Independent Review\n\n' + receipt['independent']['summary'] + '\n\n## Limitations\n\n' + report['evidence_limit'] + '\n'
     contract = {'schema': SCHEMA, 'id': identity, 'family_id': family, 'kind': kind,
                 'name': manifest['name'], 'author': spec['author'], 'version': spec['version'], 'scope': spec['scope'],
