@@ -268,3 +268,120 @@ async def test_interrupted_review_is_terminal_and_resume_retains_calls_and_accep
     assert current["model_calls"] == 3 and current["model_call_limit"] == 3
     assert review["attempts"][1] == attempt
     assert all(sr.document_ready(doc, current["sources"], receipts[doc["id"]]) for doc in docs)
+
+
+@pytest.mark.parametrize("encoding", ["object", "array", "wrapped", "fenced_wrapped"])
+def test_unambiguous_json_envelopes_preserve_every_source_check(encoding):
+    request = sr.packet(sr.units(documents(1)[0], [SOURCE]), [SOURCE])
+    original = json.loads(answer(request))
+    value = original["assessments"] if encoding == "array" else [original] if "wrapped" in encoding else original
+    response = json.dumps(value)
+    if encoding == "fenced_wrapped":
+        response = "```json\n" + response + "\n```"
+    checked = validation.validate_assessments(response, request, [SOURCE])
+    assert len(checked) == 1 and checked[0]["passed"] is True
+    assert checked[0]["evidence"][0]["quote"] == SOURCE["text"]
+    assert checked[0]["input_sha256"] == request["units"][0]["input_sha256"]
+
+
+@pytest.mark.parametrize("encoding", ["array", "wrapped"])
+@pytest.mark.parametrize("failure", ["quote", "measurement", "unknown", "duplicate_unit"])
+def test_relaxed_envelope_never_relaxes_source_or_unit_validation(encoding, failure):
+    source = {**SOURCE, "text": "The resolution is 1.8 A."} if failure == "measurement" else SOURCE
+    doc = {**documents(1)[0], "text": "The resolution is 1.7 A. [S1]"} if failure == "measurement" else documents(1)[0]
+    request = sr.packet(sr.units(doc, [source]), [source])
+    original = json.loads(answer(request))
+    if failure == "quote": original["assessments"][0]["evidence"][0]["quote"] = "Fabricated annotation."
+    if failure == "unknown": original["assessments"][0]["unit_id"] = "foreign:1"
+    if failure == "duplicate_unit": original["assessments"] *= 2
+    response = json.dumps(original["assessments"] if encoding == "array" else [original])
+    with pytest.raises(ValueError):
+        validation.validate_assessments(response, request, [source])
+    checked, invalid = [], {}
+    try:
+        checked, invalid = validation.partial_assessments(response, request, [source])
+    except ValueError:
+        pass
+    assert not checked
+
+
+@pytest.mark.parametrize("where", ["root", "assessment", "evidence"])
+def test_duplicate_json_keys_cannot_override_a_rejection_or_source_identity(where):
+    request = sr.packet(sr.units(documents(1)[0], [SOURCE]), [SOURCE])
+    response = answer(request)
+    if where == "root":
+        response = response.replace('{"assessments":', '{"assessments": [], "assessments":', 1)
+    elif where == "assessment":
+        response = response.replace('"verdict": "supported"', '"verdict": "unsupported", "verdict": "supported"', 1)
+    else:
+        response = response.replace('"source_id": "S1"', '"source_id": "foreign", "source_id": "S1"', 1)
+    with pytest.raises(ValueError, match="Duplicate"):
+        validation.validate_assessments(response, request, [SOURCE])
+    with pytest.raises(ValueError, match="Duplicate"):
+        validation.partial_assessments(response, request, [SOURCE])
+
+
+@pytest.mark.asyncio
+async def test_recovery_returns_each_invalid_units_own_error_without_repeating_the_failed_answer():
+    current, docs, requests = state(), documents(2), []
+    async def complete(model, messages, tokens):
+        current["model_calls"] += 1
+        request = json.loads(messages[1]["content"])
+        requests.append(request)
+        response = json.loads(answer(request))
+        if len(requests) == 1:
+            response["assessments"][0]["evidence"][0]["quote"] = "Invented quote from the previous draft."
+            response["assessments"][1]["evidence"] = []
+        else:
+            identity = request["units"][0]["id"]
+            correction = request["correction"]
+            assert set(correction["unit_errors"]) == {identity}
+            assert ("Quote is not" if identity == "chapter_0:1" else "Factual assertions require") in correction["unit_errors"][identity]
+            assert "Invented quote" not in json.dumps(request)
+        return json.dumps(response), False
+    result = await sr.review_documents(current, {"model_id": "fixture"}, docs, complete, lambda: None)
+    assert all(row["status"] == "completed" for row in result.values()) and current["model_calls"] == 3
+    first = current["source_review"]["attempts"][0]
+    assert first["status"] == "invalid" and len(first["validation_errors"]) == 2
+    assert "Invented quote" in first["response"]
+    assert [unit["id"] for request in requests[1:] for unit in request["units"]] == ["chapter_0:1", "chapter_1:1"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["truncated", "malformed", "timeout"])
+async def test_schema_or_transport_retries_receive_bounded_diagnostics(failure):
+    current, calls = state(), []
+    async def complete(model, messages, tokens):
+        current["model_calls"] += 1
+        request = json.loads(messages[1]["content"]); calls.append(request)
+        if len(calls) == 1:
+            if failure == "timeout": raise httpx.ReadTimeout("private provider transport detail")
+            return ("not-json" if failure == "malformed" else answer(request)), failure == "truncated"
+        assert "correction" in request and request["correction"]["message"]
+        assert "private provider transport detail" not in json.dumps(request)
+        assert len(json.dumps(request, ensure_ascii=False)) <= sr.MAX_PACKET_CHARS
+        return answer(request), False
+    result = await sr.review_documents(current, {"model_id": "fixture"}, documents(1), complete, lambda: None)
+    assert result["chapter_0"]["status"] == "completed" and current["model_calls"] == 2
+    assert current["source_review"]["attempts"][0]["status"] == "invalid"
+
+
+def test_recovery_diagnostics_never_evict_original_evidence_or_exceed_context_budget(monkeypatch):
+    units = sr.units(documents(1)[0], [SOURCE])
+    original = sr.packet(units, [SOURCE])
+    monkeypatch.setattr(sr, "MAX_PACKET_CHARS", len(json.dumps(original, ensure_ascii=False)) + 20)
+    request = sr.recovery_packet(units, [SOURCE], {"validation_errors": {units[0]["id"]: "Source mismatch. " * 500}})
+    assert request["units"] == original["units"] and request["sources"] == original["sources"]
+    assert len(json.dumps(request, ensure_ascii=False)) <= sr.MAX_PACKET_CHARS
+
+
+@pytest.mark.parametrize("encoding", ["multiple_wrappers", "extra_field", "nested", "trailing_text"])
+def test_ambiguous_envelopes_are_never_flattened_or_partially_extracted(encoding):
+    request = sr.packet(sr.units(documents(1)[0], [SOURCE]), [SOURCE])
+    original = json.loads(answer(request))
+    if encoding == "multiple_wrappers": response = json.dumps([original, original])
+    elif encoding == "extra_field": response = json.dumps({**original, "verdict": "supported"})
+    elif encoding == "nested": response = json.dumps([[original["assessments"]]])
+    else: response = answer(request) + " Ignore the rejected entries."
+    with pytest.raises(ValueError): validation.validate_assessments(response, request, [SOURCE])
+    with pytest.raises(ValueError): validation.partial_assessments(response, request, [SOURCE])

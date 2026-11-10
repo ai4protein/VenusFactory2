@@ -50,6 +50,14 @@ _PH = re.compile(
     r"|\s*(?:(?:is|was|of|=|:)\s*)?)(?P<low>" + _NUMBER + r")"
     + r"(?:\s*" + _SEPARATOR + r"\s*(?P<high>" + _NUMBER + r"))?", re.I
 )
+# ASCII A means angstrom only in an explicit resolution expression. Elsewhere
+# it can identify a chain, alanine or electric current and must not become length.
+_RESOLUTION_VALUE = (_BOUNDARY + r"(?P<low>" + _NUMBER + r")"
+                     + r"(?:\s*" + _SEPARATOR + r"\s*(?P<high>" + _NUMBER + r"))?\s*A" + _END)
+_ASCII_RESOLUTION = (
+    re.compile(r"\b(?i:resolution)(?:\s+(?i:is|was|of|at|to))?\s*[:=]?\s*" + _RESOLUTION_VALUE),
+    re.compile(_RESOLUTION_VALUE + r"\s+(?i:(?:spatial\s+)?resolution)\b"),
+)
 _JSON = json.JSONDecoder(parse_float=Decimal)
 
 
@@ -106,6 +114,9 @@ def measurements(text, *, strict=False):
         add(match["low"], match["low"], match["unit"])
     for match in _PH.finditer(text):
         add(match["low"], match["high"] or match["low"], "pH")
+    for pattern in _ASCII_RESOLUTION:
+        for match in pattern.finditer(text):
+            add(match["low"], match["high"] or match["low"], "\u00c5")
     return found
 
 

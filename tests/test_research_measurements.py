@@ -89,3 +89,28 @@ def test_thousands_separators_preserve_the_complete_number():
 
 def test_exponent_fragments_are_not_standalone_measurements():
     assert not measured_values_anchored("The concentration is -3 M.", [{"quote": "The concentration is 1 x 10^-3 M."}])
+
+
+@pytest.mark.parametrize("claim", [
+    "The structure resolution is 1.7 A.", "Resolution: 1.7 A.",
+    "The structure has 1.7 A resolution.", "The structure has 1.7 A spatial resolution.",
+    "Resolution is 1.7-2.0 A.",
+])
+def test_ascii_resolution_units_do_not_bypass_numeric_review(claim):
+    assert measurements(claim), "Explicit ASCII resolution must be checked"
+    assert not measured_values_anchored(claim, [{"quote": "The structure resolution is 1.8 A."}])
+    assert measured_values_anchored(claim, [{"quote": claim.replace(" A", " \u00c5")}])
+
+
+def test_ascii_resolution_equates_to_declared_length_units():
+    assert measured_values_anchored("The resolution is 1.7 A.", [{"quote": "The resolution is 0.17 nm."}])
+    assert not measured_values_anchored("The resolution is 1.7 A.", [{"quote": "The temperature is 1.7 C."}])
+
+
+@pytest.mark.parametrize("text", [
+    "The current is 2 A.", "We used model 1A.", "The sequence has 2 A residues.",
+    "The resolution of chain A is not reported; condition 2 A was tested.",
+    "The resolution is unknown. 2 A chains are present.",
+])
+def test_ascii_a_without_resolution_context_is_not_a_length(text):
+    assert not measurements(text)

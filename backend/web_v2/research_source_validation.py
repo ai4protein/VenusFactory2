@@ -8,13 +8,28 @@ from .research_evidence_passages import resolve_passage, source_digest
 from .research_measurements import measured_values_anchored
 
 
+def _unique_object(pairs):
+    value = {}
+    for key, item in pairs:
+        if key in value:
+            raise ValueError("Duplicate JSON object key")
+        value[key] = item
+    return value
+
+
 def parse_response(text):
-    tick=chr(96)*3
-    match=re.fullmatch(r"\s*"+tick+r"(?:json)?\s*([\s\S]*?)\s*"+tick+r"\s*",text)
-    value=json.loads(match.group(1) if match else text)
-    if not isinstance(value,dict) or set(value)!={"assessments"} or not isinstance(value["assessments"],list):
+    """Normalize unambiguous envelopes; all rows still pass the same source checks."""
+    tick = chr(96) * 3
+    match = re.fullmatch(r"\s*" + tick + r"(?:json)?\s*([\s\S]*?)\s*" + tick + r"\s*", text)
+    value = json.loads(match.group(1) if match else text, object_pairs_hook=_unique_object)
+    if (isinstance(value, list) and len(value) == 1 and isinstance(value[0], dict)
+            and set(value[0]) == {"assessments"}):
+        value = value[0]
+    if isinstance(value, dict) and set(value) == {"assessments"}:
+        value = value["assessments"]
+    if not isinstance(value, list):
         raise ValueError("Return an assessments array only")
-    return value["assessments"]
+    return value
 
 
 def explicit_proposal(text):
