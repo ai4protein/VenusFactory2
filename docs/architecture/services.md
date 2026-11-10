@@ -134,7 +134,11 @@ flowchart LR
 
 The queue belongs to the backend's shared persistence layer; MCP uses that same
 queue library instead of creating a second scheduler. Model inference and weight loading run in task workers; increasing the API
-worker count should not create extra model replicas. Scientific adapter code lives in
+worker count should not create extra model replicas. Registered numerical RSI
+models use the CPU queue in both Chat and Model Plaza; GPU prediction and PLM
+training retain their own slots. Queued MCP calls preserve their originating
+transport session in private job metadata and prediction receipts, independently
+of the worker's internal MCP connection. Scientific adapter code lives in
 `mcp_tools/models/` and `mcp_tools/tools/`; installed software and weights live outside source folders.
 The name `runtime/` refers to deployment state; `mcp_tools/scheduler/` is the
 Python implementation of task submission and execution, so these are distinct.

@@ -65,7 +65,8 @@ def classify(name, metadata=None):
     en, zh, resource, timeout = CATEGORIES[category]
     if name in {'query_gget','query_opentargets','query_ensembl','query_europepmc','query_pubchem','query_kegg'}:resource='api:'+name.removeprefix('query_')
     if name in {'query_ncbi','query_ncbi_blast'} or name.startswith(('download_ncbi','search_ncbi')):resource='api:ncbi'
-    if name in {'generate_training_config'}:resource='cpu'
+    # Registered numerical Scientist models use the CPU sandbox, not a PLM/GPU runtime.
+    if name in {'generate_training_config', 'predict_with_evolved_model'}:resource='cpu'
     return {'category': category, 'category_label': en, 'category_label_zh': zh,
             'resource': meta.get('queue_resource', resource), 'timeout_seconds': min(7200,max(5,int(meta.get('timeout_seconds',timeout)))),
             'execution': 'inline' if name in INLINE or meta.get('workspace_relative_paths') else 'queued'}

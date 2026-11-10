@@ -101,7 +101,8 @@ class QueueMiddleware(Middleware):
         sid=getattr(ctx,'session_id',None) or get_http_headers().get('mcp-session-id') or secrets.token_hex(16)
         owner='mcp:'+hashlib.sha256(str(sid).encode()).hexdigest()
         jobs=ToolJobs()
-        job=await asyncio.to_thread(jobs.submit,name,context.message.arguments or {},owner=owner,route='mcp')
+        job=await asyncio.to_thread(jobs.submit,name,context.message.arguments or {},
+                                    owner=owner,route='mcp',session_id=str(sid))
         final=await jobs.wait(job['id'],owner)
         result=final.get('result',{})
         if 'content' in result:

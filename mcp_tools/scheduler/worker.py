@@ -52,9 +52,11 @@ async def execute(spec):
     os.environ['VENUS_MCP_QUEUE_WORKER']='1'
     from fastmcp import Client
     from mcp_tools.mcp_server import mcp
-    async with Client(mcp) as client:
-        value=await client.call_tool(spec['name'],spec['arguments'],raise_on_error=False)
-        return mcp_result(value)
+    from mcp_tools.scheduler.context import bind_mcp_session
+    with bind_mcp_session(spec.get('session_id')):
+        async with Client(mcp) as client:
+            value=await client.call_tool(spec['name'],spec['arguments'],raise_on_error=False)
+            return mcp_result(value)
 
 
 def main():

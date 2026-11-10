@@ -5,6 +5,7 @@ from fastmcp.tools import Tool
 
 from mcp_tools.models.evolved.contract import PREDICTION_DESCRIPTION, PredictionArguments
 from mcp_tools.models.evolved.service import dispatch
+from mcp_tools.scheduler.context import mcp_session_id
 
 mcp = FastMCP("Venus_Evolved_Models")
 
@@ -32,7 +33,7 @@ def predict_with_evolved_model(
         inputs=inputs,
         scope=scope,
         scope_ref=scope_ref,
-        session_id=ctx.session_id,
+        session_id=mcp_session_id(ctx.session_id),
         session_binding="mcp_transport_session",
     )
 
