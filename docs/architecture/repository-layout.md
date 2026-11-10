@@ -51,8 +51,9 @@ and runtime adapters. Agent code plans work and calls tools; it does not contain
 another copy of model inference code.
 
 Harness runtime discovery belongs to `agent.harness.installation`. Agent and
-Scientist services pass their checkout root to that module; discovery must not
-construct a research service or load an experimental CLI script. The module keeps
+Scientist services and standalone goal runners call this module directly. The
+installation root locates binaries and receipts; discovery must not load Python
+source from that root or construct a Web service. The module keeps
 the existing environment > managed receipt > legacy installation/PATH precedence.
 The research CLI retains a thin compatibility entry point. Frozen experiments
 keep their original source snapshots and bindings; changing current discovery

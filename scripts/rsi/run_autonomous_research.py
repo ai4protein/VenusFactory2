@@ -9,6 +9,7 @@ import sys
 ROOT=Path(__file__).resolve().parents[2];sys.path.insert(0,str(ROOT/'src'))
 from agent.harness import Profile
 from agent.harness.catalog import resolve_credential
+from agent.harness.installation import default_runtimes
 from agent.harness.autonomous_research import AutonomousResearch, create
 from agent.science_goal import GoalStore
 
@@ -20,8 +21,7 @@ def main():
         create(args.output,Profile.from_dict(json.loads(Path(args.profile).read_text())),args.objective,{k:getattr(args,k) for k in ['max_cycles','model_calls','tool_calls','wall_seconds']});return
     store=GoalStore(args.output);profile=Profile.from_dict(store.read()['definition']['profile'])
     if args.action=='resume':store.resume()
-    from backend.web_v2.science_goals import ScienceGoalService
-    runtime=AutonomousResearch(store,resolve_credential(profile.model,args.credential_toml),ScienceGoalService(root=ROOT).runtime_paths())
+    runtime=AutonomousResearch(store,resolve_credential(profile.model,args.credential_toml),default_runtimes(ROOT))
     result=asyncio.run(runtime.run());print(json.dumps({'status':result['status'],'cycles':len(result['cycles'])}))
 
 if __name__=='__main__':main()

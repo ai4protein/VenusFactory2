@@ -97,3 +97,44 @@ assert 'scripts.rsi.run_harness_probe' not in sys.modules
         timeout=30,
     )
     assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("action", ["run", "resume"])
+def test_standalone_scientist_uses_shared_discovery_without_web_service(tmp_path, monkeypatch, capsys, action):
+    from scripts.rsi import run_autonomous_research as runner
+
+    profile = json.loads((ROOT / "configs/harness/free_science_goal.json").read_text())
+    observed = {}
+
+    class Store:
+        def __init__(self, folder):
+            observed["folder"] = folder
+
+        def read(self):
+            return {"definition": {"profile": profile}}
+
+        def resume(self):
+            observed["resumed"] = True
+
+    class Research:
+        def __init__(self, store, credential, runtimes):
+            observed["runtimes"] = runtimes
+
+        async def run(self):
+            return {"status": "completed", "cycles": [0]}
+
+    resources = tmp_path / "installation"
+    folder = tmp_path / "goal"
+    monkeypatch.setattr(runner, "ROOT", resources)
+    monkeypatch.setattr(runner, "GoalStore", Store)
+    monkeypatch.setattr(runner, "AutonomousResearch", Research)
+    monkeypatch.setattr(runner, "resolve_credential", lambda *args: "test-credential")
+    monkeypatch.setattr(sys, "argv", ["run_autonomous_research.py", action, "--output", str(folder)])
+    # A detached runner must not instantiate a Web service to locate its Harness.
+    monkeypatch.setitem(sys.modules, "backend.web_v2.science_goals", None)
+    runner.main()
+    assert observed["folder"] == str(folder)
+    assert observed.get("resumed", False) is (action == "resume")
+    assert observed["runtimes"] == installation.default_runtimes(resources)
+    assert json.loads(capsys.readouterr().out) == {"status": "completed", "cycles": 1}
+    assert not resources.exists()
