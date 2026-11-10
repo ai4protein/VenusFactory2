@@ -477,3 +477,33 @@ def test_inspection_request_never_reads_a_schema_or_keeps_caller_values():
                                "arguments": {"sequence": "private-input-marker"}})
     assert caught.value.name == "protein_model_0"
     assert not c.inspected and "private-input-marker" not in str(caught.value)
+
+
+def test_category_page_does_not_claim_complete_model_coverage():
+    c = catalog(30)
+    for tool in c.mapping.values():
+        tool.metadata = {"discovery_category": "compute"}
+    page = c.metadata('search_tools', {'category': 'compute'})
+    assert page['search_scope'] == 'category_page'
+    assert len(page['tools']) == 8 and page['total'] == 30
+    assert 'exact name' in page['next_step']
+    assert 'unavailable' in page['summary']
+    next_page = page['next_page']
+    assert next_page['name'] == 'search_tools'
+    second = c.metadata(next_page['name'], next_page['arguments'])
+    assert not {t['name'] for t in page['tools']} & {t['name'] for t in second['tools']}
+    found = c.metadata('search_tools', {'category': 'compute', 'query': 'protein_model_29'})
+    assert found['tools'][0]['name'] == 'protein_model_29'
+    assert found['next_offset'] is None
+
+
+def test_query_pagination_preserves_the_query_and_last_page_stops():
+    c = catalog(30)
+    for tool in c.mapping.values():
+        tool.metadata = {"discovery_category": "compute"}
+    page = c.metadata('search_tools', {'category': 'compute', 'query': 'solubility', 'offset': 20})
+    assert page['search_scope'] == 'matching_page'
+    assert page['next_page']['arguments']['query'] == 'solubility'
+    last = c.metadata('search_tools', page['next_page']['arguments'])
+    assert len(last['tools']) == 2 and last['next_offset'] is None
+    assert 'next_page' not in last

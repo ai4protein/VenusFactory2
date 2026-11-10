@@ -22,7 +22,7 @@ GUIDANCE = CAPABILITY_BOUNDARY + '\n\n' + (
     'Available session file operations are also directly exposed; invoke them by name to read, write and run code. '
     'The initial category overview contains no individual models or skills. Summarize it for general '
     'capability questions in a few sentences; avoid tool counts or an exhaustive category list. '
-    'A specific task normally needs one targeted search. '
+    'A named model needs a search using its exact name; a category page is not an availability check. '
     'For help or workflows choose guides; read the selected manual section or skill only when needed. '
     'Discovery results are pointers, not retrieved evidence: only claim to have read a manual, skill '
     'or database record after calling its reader. Treat guidance as reference, not permission. '
@@ -129,7 +129,7 @@ class ToolDisclosure:
         result = [
             {'name': SEARCH, 'description': 'List categories, or search one category for enabled capability names and brief descriptions.',
              'inputSchema': _schema({'category': {'type': 'string', 'default': '', 'description': 'Category ID from the initial overview; omit to list categories.',
-                 'enum': ['', *[row['id'] for row in self.overview()['categories']]]}, 'query': {'type': 'string', 'default': '', 'maxLength': 200},
+                 'enum': ['', *[row['id'] for row in self.overview()['categories']]]}, 'query': {'type': 'string', 'default': '', 'maxLength': 200, 'description': 'Requested model name or task. Omit only to browse a category page.'},
                                     'limit': {'type': 'integer', 'default': 8, 'minimum': 1, 'maximum': 20},
                                     'offset': {'type': 'integer', 'default': 0, 'minimum': 0}})},
             {'name': DESCRIBE, 'description': 'Read one tool’s full input contract before calling it.',
@@ -272,6 +272,24 @@ class ToolDisclosure:
                               if match_mode == 'category_navigation' else
                               'Inspect a relevant capability with describe_tool(name) before calling it. '
                               'If no match, broaden the query or choose another category.')}
+
+        if not query.strip() or result['next_offset'] is not None:
+            result['query'] = query
+            result['search_scope'] = 'category_page' if not query.strip() else 'matching_page'
+            result['summary'] = (
+                f"Showing {len(page)} of {len(matches)} enabled capabilities in this category"
+                + (f" matching {query!r}. " if query.strip() else '. ')
+                + 'This page cannot establish that a requested model is unavailable.'
+            )
+            result['next_step'] = (
+                'For a named model, search_tools with this category and its exact name as query '
+                'before answering availability. Do not substitute an unrelated listed tool.'
+            )
+            if result['next_offset'] is not None:
+                result['next_page'] = {'name': SEARCH, 'arguments': {
+                    'category': category, 'query': query, 'limit': limit,
+                    'offset': result['next_offset'],
+                }}
 
         if match_mode == 'category_navigation' and page:
             # A reader is a pointer to records, never evidence that a model is
