@@ -69,7 +69,8 @@ def model_relevance(groups, card):
 
     scope = card["scope"]
     title = " · ".join(str(scope.get(key, "")) for key in ("protein", "target"))
-    return relevance(groups, title, json.dumps(card, ensure_ascii=False))
+    description = discovery_card(card)["description"]
+    return relevance(groups, title, description + "\n" + json.dumps(card, ensure_ascii=False))
 
 
 def runtime_implementation(plugin_id):

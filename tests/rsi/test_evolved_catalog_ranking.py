@@ -97,3 +97,29 @@ def test_equal_relevance_has_stable_pagination_despite_metadata_enumeration(cata
     second, next_combined = pages(library, offset=1, limit=1)
     assert first["models"][0]["entry_id"] == combined["results"][0]["entry_id"] == format(1, "064x")
     assert second["models"][0]["entry_id"] == next_combined["results"][0]["entry_id"] == format(2, "064x")
+
+
+@pytest.mark.parametrize("query", [
+    "predict ADH1 expression", "ADH1 expression prediction", "ADH1 丰度预测",
+])
+def test_prediction_intent_matches_the_card_in_both_search_entries(catalog, query):
+    cards, store, library = catalog
+    wanted = cards[-1]["entry_id"]
+    direct = evolved.list_models(library, query=query, stage="expression", limit=2)
+    combined = discovery.search(query, kind="models", stage="expression", limit=2, tool_catalog=[])
+    assert direct["models"][0]["entry_id"] == combined["results"][0]["entry_id"] == wanted
+    assert direct["matching_entries"] == combined["matching_results"] == 10001
+    assert all("scope" not in row and "inputSchema" not in row for row in direct["models"])
+    store.set("model:scientist:" + wanted, False, 0, {}, "fixture-admin")
+    direct = evolved.list_models(library, query=query, stage="expression", limit=2)
+    combined = discovery.search(query, kind="models", stage="expression", limit=2, tool_catalog=[])
+    assert direct["matching_entries"] == combined["matching_results"] == 10000
+    assert wanted not in [row["entry_id"] for row in direct["models"] + combined["results"]]
+
+
+@pytest.mark.parametrize("query", ["ADH1 docking", "ADH1 training", "ADH1 structure"])
+def test_prediction_description_does_not_supply_other_capabilities(catalog, query):
+    _, _, library = catalog
+    assert evolved.list_models(library, query=query)["matching_entries"] == 0
+    result = discovery.search(query, kind="models", stage="expression", tool_catalog=[])
+    assert result["matching_results"] == 0
