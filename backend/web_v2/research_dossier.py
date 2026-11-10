@@ -56,6 +56,10 @@ def build_dossier(report, inputs=None):
                 "id", "job_number", "title", "created", "protein", "focus", "model_id",
                 "status", "partial", "completed_chapters", "minimum_met", "analyses",
                 "model_calls", "model_call_limit", "queries", "literature_queries", "input_snapshot", "evidence_review_required")}
+            metadata["steps"] = [
+                {k: step.get(k) for k in ("id", "status", "message")}
+                for step in report.get("steps", [])
+            ]
             data("overview.json", metadata)
             from .research_documents import chapter_ready, chapter_text
             index = []
@@ -129,7 +133,7 @@ def build_dossier(report, inputs=None):
             add("README.md", "# Protein research dossier\n\n"
                 "Start with [report.md](report.md).\n\n"
                 f"Report status: {status}.\n\n"
-                "- overview.json: target, scope, model and collection queries.\n"
+                "- overview.json: target, scope, model, collection queries and step outcomes.\n"
                 "- chapters/: completed chapters, revision placeholders and citation checks.\n"
                 "- drafts/: unaccepted outputs retained for inspection, excluded from the report.\n"
                 "- references.json and sources/: references and evidence snapshots.\n"

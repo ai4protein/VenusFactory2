@@ -1,9 +1,12 @@
+import copy
 import hashlib
 import io
 import json
 import zipfile
+
 import pytest
-from backend.web_v2.research_dossier import build_dossier, archive_chunks
+
+from backend.web_v2.research_dossier import archive_chunks, build_dossier
 
 
 def report():
@@ -70,9 +73,10 @@ def test_stream_closes_spooled_file_on_complete_and_on_early_close():
 def test_download_zip_is_owner_scoped_and_private(tmp_path, monkeypatch, saved_input):
     from fastapi import FastAPI, Request
     from fastapi.testclient import TestClient
+
     from backend.web_v2 import report_api as api
-    from backend.web_v2.research_jobs import ResearchJobs, write
     from backend.web_v2.job_queue import JobQueue
+    from backend.web_v2.research_jobs import ResearchJobs, write
     queue = JobQueue(tmp_path / "queue")
     jobs = ResearchJobs(tmp_path / "reports", queue)
     identity = "b" * 32
@@ -117,3 +121,35 @@ def test_download_zip_is_owner_scoped_and_private(tmp_path, monkeypatch, saved_i
     with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
         assert b"PRIVATE_REVIEW_RESPONSE" in archive.read("verification/source-review.json")
         assert archive.read("inputs/protein.fasta") == (b">query\nACDE\n" if saved_input else b">query\nMKWA\n")
+
+
+def test_dossier_retains_collection_outcomes_without_internal_state():
+    state = report()
+    state["steps"] = [
+        {"id": "identity", "status": "completed", "message": "Reference protein"},
+        {"id": "ensembl", "status": "unavailable", "message": "Source temporarily unavailable",
+         "owner": "private-owner", "log_path": "/private/secret", "api_key": "not-exported"},
+        {"id": "opentargets_drugs", "status": "empty", "message": "0"},
+        {"id": "opentargets_diseases", "status": "completed", "message": "1"},
+    ]
+    original = copy.deepcopy(state)
+    handle = build_dossier(state)
+    with handle, zipfile.ZipFile(handle) as archive:
+        overview = json.loads(archive.read("overview.json"))
+        assert overview["steps"] == [
+            {"id": "identity", "status": "completed", "message": "Reference protein"},
+            {"id": "ensembl", "status": "unavailable", "message": "Source temporarily unavailable"},
+            {"id": "opentargets_drugs", "status": "empty", "message": "0"},
+            {"id": "opentargets_diseases", "status": "completed", "message": "1"},
+        ]
+        assert overview["partial"] is True
+        contents = b"".join(archive.read(n) for n in archive.namelist())
+        for private in (b"private-owner", b"/private/secret", b"not-exported"):
+            assert private not in contents
+    assert state == original
+
+
+def test_legacy_dossier_does_not_infer_unrecorded_collection_outcomes():
+    handle = build_dossier(report())
+    with handle, zipfile.ZipFile(handle) as archive:
+        assert json.loads(archive.read("overview.json"))["steps"] == []
