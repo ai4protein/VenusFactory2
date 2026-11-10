@@ -11,7 +11,6 @@ from mcp_tools.common.common_utils import get_save_path
 from mcp_tools.tools.protein_io import extract_first_chain_from_pdb_file
 from mcp_tools.common.prediction_runners import run_zero_shot_prediction
 
-DEFAULT_BACKEND = "local"
 
 
 def _error_dict(error_type: str, message: str, suggestion: Optional[str] = None) -> Dict[str, Any]:
@@ -64,8 +63,6 @@ def zero_shot_mutation_sequence_prediction(
     sequence: Optional[str] = None,
     fasta_file: Optional[str] = None,
     model_name: str = "ESM2-650M",
-    api_key: Optional[str] = None,
-    backend: Optional[str] = None,
     out_dir: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
@@ -119,8 +116,6 @@ def zero_shot_mutation_sequence_prediction(
 def zero_shot_mutation_structure_prediction(
     structure_file: str,
     model_name: str = "ESM-IF1",
-    api_key: Optional[str] = None,
-    backend: Optional[str] = None,
     out_dir: Optional[str] = None,
 ) -> Dict[str, Any]:
     """

@@ -5,7 +5,7 @@ from typing import Optional
 
 from fastmcp import FastMCP
 
-from mcp_tools.models.pretrained.mutation.models.mutation_operations import zero_shot_mutation_sequence_prediction, zero_shot_mutation_structure_prediction, DEFAULT_BACKEND
+from mcp_tools.models.pretrained.mutation.models.mutation_operations import zero_shot_mutation_sequence_prediction, zero_shot_mutation_structure_prediction
 
 
 mcp = FastMCP("Venus_Mutation_MCP")
@@ -16,8 +16,6 @@ def mcp_zero_shot_mutation_sequence_prediction(
     sequence: Optional[str] = None,
     fasta_file: Optional[str] = None,
     model_name: str = "ESM2-650M",
-    api_key: Optional[str] = None,
-    backend: Optional[str] = None,
     out_dir: Optional[str] = None,
 ) -> str:
     """Predict beneficial mutations from a protein SEQUENCE (zero-shot).
@@ -33,15 +31,12 @@ def mcp_zero_shot_mutation_sequence_prediction(
     `zero_shot_mutation_structure_prediction` instead — that's where
     "ProSST-2048", "ProtSSN", "MIF-ST", "ESM-IF1", "VenusREM" live.
 
-    `out_dir` (optional): output directory for the CSV/heatmap. When omitted,
-    falls back to the global temp_outputs Zero_shot/HeatMap path.
+    `out_dir` (optional): output directory for CSV and heatmap files.
     """
     result = zero_shot_mutation_sequence_prediction(
         sequence=sequence,
         fasta_file=fasta_file,
         model_name=model_name,
-        api_key=api_key,
-        backend=backend or DEFAULT_BACKEND,
         out_dir=out_dir,
     )
     return json.dumps(result, ensure_ascii=False, indent=2)
@@ -51,8 +46,6 @@ def mcp_zero_shot_mutation_sequence_prediction(
 def mcp_zero_shot_mutation_structure_prediction(
     structure_file: str,
     model_name: str = "ESM-IF1",
-    api_key: Optional[str] = None,
-    backend: Optional[str] = None,
     out_dir: Optional[str] = None,
 ) -> str:
     """Predict beneficial mutations from a PDB STRUCTURE (zero-shot).
@@ -70,14 +63,11 @@ def mcp_zero_shot_mutation_structure_prediction(
     For sequence-only scoring use `zero_shot_mutation_sequence_prediction`
     instead.
 
-    `out_dir` (optional): output directory for the CSV/heatmap. When omitted,
-    falls back to the global temp_outputs Zero_shot/HeatMap path.
+    `out_dir` (optional): output directory for CSV and heatmap files.
     """
     result = zero_shot_mutation_structure_prediction(
         structure_file=structure_file,
         model_name=model_name,
-        api_key=api_key,
-        backend=backend or DEFAULT_BACKEND,
         out_dir=out_dir,
     )
     return json.dumps(result, ensure_ascii=False, indent=2)

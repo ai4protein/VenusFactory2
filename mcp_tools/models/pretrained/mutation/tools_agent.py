@@ -5,22 +5,22 @@ import os
 from typing import Optional
 
 from langchain_core.tools import tool
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from mcp_tools.tools.protein_io import extract_first_sequence_from_fasta_file
 
-from mcp_tools.models.pretrained.mutation.models.mutation_operations import zero_shot_mutation_sequence_prediction, zero_shot_mutation_structure_prediction, DEFAULT_BACKEND
+from mcp_tools.models.pretrained.mutation.models.mutation_operations import zero_shot_mutation_sequence_prediction, zero_shot_mutation_structure_prediction
 
 
 class ZeroShotSequenceInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     sequence: Optional[str] = Field(default=None, description="Protein sequence (one-letter). Required unless fasta_file provided.")
     fasta_file: Optional[str] = Field(default=None, description="Path to FASTA file. First sequence used. Required unless sequence provided.")
     model_name: str = Field(default="ESM2-650M", description="Model: ESM-1v, ESM2-650M, ESM-1b, VenusPLM. Default ESM2-650M.")
-    backend: str = Field(default=DEFAULT_BACKEND, description="Backend: local or pjlab.")
-    api_key: Optional[str] = Field(default=None, description="Optional API key for prediction service.")
     out_dir: Optional[str] = Field(
         default=None,
-        description="Output directory for the prediction CSV/heatmap. When omitted, falls back to the global temp_outputs Zero_shot/HeatMap path (backward-compat).",
+        description="Output directory for prediction CSV and heatmap files. The conversation assigns the default location.",
     )
 
     @model_validator(mode="after")
@@ -31,13 +31,13 @@ class ZeroShotSequenceInput(BaseModel):
 
 
 class ZeroShotStructureInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     structure_file: str = Field(..., description="Path to PDB structure file. First chain used.")
     model_name: str = Field(default="ESM-IF1", description="Model: ProSST-20/128/512/1024/2048/4096, VenusREM (foldseek-based), SaProt, ProtSSN, ESM-IF1, MIF-ST. Default ESM-IF1.")
-    backend: str = Field(default=DEFAULT_BACKEND, description="Backend: local or pjlab.")
-    api_key: Optional[str] = Field(default=None, description="Optional API key for prediction service.")
     out_dir: Optional[str] = Field(
         default=None,
-        description="Output directory for the prediction CSV/heatmap. When omitted, falls back to the global temp_outputs Zero_shot/HeatMap path (backward-compat).",
+        description="Output directory for prediction CSV and heatmap files. The conversation assigns the default location.",
     )
 
 
@@ -46,8 +46,6 @@ def zero_shot_mutation_sequence_prediction_tool(
     sequence: Optional[str] = None,
     fasta_file: Optional[str] = None,
     model_name: str = "ESM2-650M",
-    api_key: Optional[str] = None,
-    backend: Optional[str] = None,
     out_dir: Optional[str] = None,
 ) -> str:
     """Predict beneficial mutations from sequence (zero-shot). Returns status JSON with data/file_info or error."""
@@ -59,16 +57,12 @@ def zero_shot_mutation_sequence_prediction_tool(
             result = zero_shot_mutation_sequence_prediction(
                 fasta_file=fasta_path,
                 model_name=model_name,
-                api_key=api_key,
-                backend=backend or DEFAULT_BACKEND,
                 out_dir=out_dir,
             )
         elif sequence:
             result = zero_shot_mutation_sequence_prediction(
                 sequence=sequence,
                 model_name=model_name,
-                api_key=api_key,
-                backend=backend or DEFAULT_BACKEND,
                 out_dir=out_dir,
             )
         else:
@@ -82,8 +76,6 @@ def zero_shot_mutation_sequence_prediction_tool(
 def zero_shot_mutation_structure_prediction_tool(
     structure_file: str,
     model_name: str = "ESM-IF1",
-    api_key: Optional[str] = None,
-    backend: Optional[str] = None,
     out_dir: Optional[str] = None,
 ) -> str:
     """Score and rank amino-acid substitutions from a protein PDB using the explicitly selected zero-shot model. Scores prioritize candidates for experiments; they are not measured activity or guaranteed improvements. Returns scores and output files."""
@@ -101,8 +93,6 @@ def zero_shot_mutation_structure_prediction_tool(
         result = zero_shot_mutation_structure_prediction(
             actual_path,
             model_name=model_name,
-            api_key=api_key,
-            backend=backend or DEFAULT_BACKEND,
             out_dir=out_dir,
         )
         return json.dumps(result, ensure_ascii=False, indent=2)

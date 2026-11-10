@@ -130,6 +130,11 @@ def prepare_tool_arguments(name, tool, arguments, workspace):
         args = relative_workspace_arguments(arguments)
         validate_tool_arguments(tool, args)
         return args
+    # Closed scientific contracts must reject caller-supplied host options before
+    # the legacy normalizer drops unknown fields and hides the invalid request.
+    contract = mcp_input_schema(tool)
+    if contract.get("additionalProperties") is False:
+        validate_argument_fields(contract, arguments)
     from agent.graph.helpers.tool_io import _normalize_output_paths, _sanitize_tool_invoke_input
     args = _sanitize_tool_invoke_input(name, tool, bind_arguments(name, arguments, workspace), str(workspace), {})
     # A new scientific tool may not yet appear in the legacy write-prefix list.

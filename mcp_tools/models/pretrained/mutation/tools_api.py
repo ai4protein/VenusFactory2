@@ -6,27 +6,27 @@ from typing import Optional
 
 from backend.web_v2.compute_access import metered_prediction
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
-from mcp_tools.models.pretrained.mutation.models.mutation_operations import zero_shot_mutation_sequence_prediction, zero_shot_mutation_structure_prediction, DEFAULT_BACKEND
+from mcp_tools.models.pretrained.mutation.models.mutation_operations import zero_shot_mutation_sequence_prediction, zero_shot_mutation_structure_prediction
 
 
 router = APIRouter(prefix="/api/v1/mutation", tags=["mutation"])
 
 
 class ZeroShotSequenceBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     sequence: Optional[str] = Field(default=None, description="Protein sequence (one-letter). One of sequence or fasta_file required.")
     fasta_file: Optional[str] = Field(default=None, description="Path to FASTA file. One of sequence or fasta_file required.")
     model_name: str = Field(default="ESM2-650M", description="Model name. Default ESM2-650M.")
-    backend: str = Field(default=DEFAULT_BACKEND, description="Backend: local or pjlab.")
-    api_key: Optional[str] = Field(default=None, description="Optional API key.")
 
 
 class ZeroShotStructureBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     structure_file: str = Field(..., description="Path to PDB structure file.")
     model_name: str = Field(default="ESM-IF1", description="Model name. Default ESM-IF1.")
-    backend: str = Field(default=DEFAULT_BACKEND, description="Backend: local or pjlab.")
-    api_key: Optional[str] = Field(default=None, description="Optional API key.")
 
 
 @router.post("/zero-shot/sequence")
@@ -40,8 +40,6 @@ def api_zero_shot_mutation_sequence(body: ZeroShotSequenceBody):
         sequence=body.sequence,
         fasta_file=body.fasta_file,
         model_name=body.model_name,
-        api_key=body.api_key,
-        backend=body.backend,
     )
     return result
 
@@ -54,7 +52,5 @@ def api_zero_shot_mutation_structure(body: ZeroShotStructureBody):
     result = zero_shot_mutation_structure_prediction(
         structure_file=body.structure_file,
         model_name=body.model_name,
-        api_key=body.api_key,
-        backend=body.backend,
     )
     return result
