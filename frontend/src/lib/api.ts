@@ -1,4 +1,5 @@
-import { shareRead } from "./readRequests";
+import type { SessionMeta } from "./chatSessions";
+import { shareRead, invalidateRead } from "./readRequests";
 import { validateUploads } from "./uploadLimits";
 import { quotaHeaders, quotaError, fetchQuota } from "./onlineQuota";
 export type AgentExecutionSelection = { harness: string; model_id: string };
@@ -321,7 +322,12 @@ async function extractErrorDetail(res: Response): Promise<string> {
   return "";
 }
 
+function sessionListReadKey() {
+  return "sessions:" + JSON.stringify(quotaHeaders());
+}
+
 export async function createChatSession(chatMode: "science_agent" | "science_expert" = "science_agent") {
+  const historyKey = sessionListReadKey();
   const res = await fetch(`${API_ROOT}/api/chat/sessions`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...quotaHeaders() },
@@ -338,6 +344,7 @@ export async function createChatSession(chatMode: "science_agent" | "science_exp
     session_access_token?: string;
     token_expires_at?: string;
   };
+  invalidateRead(historyKey);
   if (data.session_access_token) {
     persistSessionToken(data.session_id, data.session_access_token, data.token_expires_at || "");
   }
@@ -345,24 +352,13 @@ export async function createChatSession(chatMode: "science_agent" | "science_exp
 }
 
 export async function listChatSessions() {
-  return shareRead("sessions:" + JSON.stringify(quotaHeaders()), async () => {
+  return shareRead(sessionListReadKey(), async () => {
   const res = await fetch(`${API_ROOT}/api/chat/sessions`, { cache: "no-store" });
   if (!res.ok) {
     const detail = await extractErrorDetail(res);
     throw new Error(parseErrorStatus(res.status, detail));
   }
-  return res.json() as Promise<{
-    sessions: Array<{
-      session_id: string;
-      created_at: string;
-      model_name: string;
-      history_size: number;
-      status: string;
-      title?: string;
-      has_content?: boolean;
-      chat_mode: "science_agent" | "science_expert";
-    }>;
-  }>;
+  return res.json() as Promise<{ sessions: SessionMeta[] }>;
   });
 }
 
@@ -383,6 +379,7 @@ export async function getChatSession(sessionId: string) {
 }
 
 export async function deleteChatSession(sessionId: string) {
+  const historyKey = sessionListReadKey();
   const res = await fetch(`${API_ROOT}/api/chat/sessions/${encodeURIComponent(sessionId)}`, {
     method: "DELETE",
     headers: getChatSessionAuthHeaders(sessionId)
@@ -392,6 +389,7 @@ export async function deleteChatSession(sessionId: string) {
     throw new Error(parseErrorStatus(res.status, detail));
   }
   const result = await res.json() as { success: boolean; session_id: string };
+  invalidateRead(historyKey);
   const tokens = loadTokenMap(); delete tokens[sessionId]; saveTokenMap(tokens);
   localStorage.setItem('vf_library_revision', String(Date.now()));
   window.dispatchEvent(new Event('vf:library-changed'));

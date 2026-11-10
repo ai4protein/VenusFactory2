@@ -91,7 +91,7 @@ refactor separate from new product behavior, with a bounded regression target.
 
 | Subsystem owner | Consolidation target | Verification before merging |
 | --- | --- | --- |
-| Chat UI (`ChatPage.tsx`) | Separate session navigation and history presentation from page coordination; keep response/retry action lifecycle in `frontend/src/lib/chatActions.ts` | Switching mode or session must preserve running jobs, drafts and streamed answers; delayed cancellation and interaction acknowledgments must not affect another conversation |
+| Chat UI (`ChatPage.tsx`) | Keep sidebar metadata and refresh ordering in `useChatSessionHistory.ts` / `chatSessions.ts`, response/retry lifecycle in `chatActions.ts`, and navigation in the page; separate composer responsibilities when next extending them | Switching mode or session must preserve running jobs, drafts and streamed answers; delayed cancellation and interaction acknowledgments must not affect another conversation |
 | Training pipeline (`train_operations.py`) | Separate dataset preparation, training launch and result packaging; use the shared admission policy | Dataset split validation, resume checkpoints, queued cancellation, online ESM2 8M restrictions and artifact ownership |
 | Model API (`custom_model_api.py`) | Keep training, evaluation and prediction submission separate; share ownership and admission policy | Owner isolation, online limits, idempotent queue submission and existing route contracts |
 | RSI engine (`generated_context*.py`) | Share new execution primitives without rewriting published source-bound policy versions | Standalone bundles, saved feedback replay, registered-model inference, strict scope checks and complete source bindings |
@@ -112,6 +112,12 @@ coordinates table preparation, while `research_data_store.py` owns protected vie
 and immutable partition bindings. Resume uses the same metadata builder as preparation.
 
 Chat response, approval and retry actions share `frontend/src/lib/chatActions.ts`.
+Sidebar metadata, cache writes and refresh scheduling belong in `useChatSessionHistory.ts`;
+`chatSessions.ts` owns metadata reconciliation and request ordering. Bootstrap and
+periodic refresh use the same path. Browser metadata is a preview, never proof of
+session ownership. A late list or deletion response must not restore a removed row
+or change the selected conversation. Successful creation and deletion invalidate
+the previous coalesced list read through `readRequests.ts`.
 The page owns session selection and optimistic first-turn submission;
 `useChatStream.ts` owns rendered stream state and `sse.ts` owns transport recovery.
 Capture the original session and stream before an asynchronous action. Its late

@@ -9,3 +9,8 @@ export function shareRead<T>(key: string, load: () => Promise<T>): Promise<T> {
   pending.set(key, promise);
   return promise;
 }
+
+/** End a read generation after a successful mutation without cancelling its readers. */
+export function invalidateRead(key: string) {
+  pending.delete(key);
+}

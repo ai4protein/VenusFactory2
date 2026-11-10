@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
+import { sessionsForMode } from '../src/lib/chatSessions.ts';
 import { runChatStreamAction, runChatUpdateAction, cancelChatStreamAction } from '../src/lib/chatActions.ts';
 import { streamSSEFromPost } from '../src/lib/sse.ts';
 
@@ -143,7 +144,7 @@ function pageFixture() {
     activeModeRef.current = mode;
     visibleModeRef.current = mode === 'researcher' ? 'researcher' : mode === 'science_expert' ? 'scientist' : 'agent';
   };
-  return { bindings, controller, abortRef, updates, refreshes, timers, navigate, viewMounted };
+  return { bindings, controller, abortRef, updates, refreshes, timers, navigate, viewMounted, activeModeRef };
 }
 
 for (const mode of ['science_agent', 'science_expert', 'researcher']) {
@@ -258,4 +259,89 @@ test('browser history restoration detaches the frozen reader before rejoining', 
     assert.equal(f.abortRef.current, persisted ? null : f.controller);
     assert.deepEqual(pulls, [true]);
   }
+});
+
+function deleteFixture(remove, refresh, open) {
+  const f = pageFixture();
+  let rows = [ { session_id: 'first', chat_mode: 'science_agent' },
+    { session_id: 'scientist', chat_mode: 'science_expert' }, { session_id: 'next', chat_mode: 'science_agent' } ];
+  const forgotten = [], drafts = [];
+  const handler = pageHandler('deleteAndSelectNextSession', { ...f.bindings,
+    researcherMode: false, running: false, sessions: rows, activeModeRef: f.activeModeRef,
+    refreshCurrentSession: open || f.bindings.refreshCurrentSession,
+    deleteChatSession: remove, fetchSessions: refresh || (async () => rows), sessionsForMode,
+    sessionPreviews: { current: { forget: id => forgotten.push(id) } },
+    setSessions: update => { rows = update(rows); },
+    createAndActivateSession: (...args) => drafts.push(args),
+    t: { errDeleteSession: 'delete failed' },
+  });
+  return { ...f, handler, forgotten, drafts, get rows() { return rows; } };
+}
+
+for (const mode of ['science_agent', 'science_expert', 'researcher']) {
+  test(`a delayed deletion cannot navigate away from a newly selected ${mode} conversation`, async () => {
+    const wait = deferred(), removed = [];
+    const f = deleteFixture(id => { removed.push(id); return wait.promise; });
+    const result = f.handler('first');
+    f.navigate(mode);
+    wait.resolve();
+    assert.equal(await result, true);
+    assert.deepEqual(removed, ['first']);
+    assert.deepEqual(f.forgotten, ['first']);
+    assert.equal(f.rows.some(row => row.session_id === 'first'), false);
+    assert.deepEqual(f.refreshes, []);
+    assert.deepEqual(f.drafts, []);
+  });
+}
+
+test('navigation after deletion but before history refresh cannot select another session', async () => {
+  const refresh = deferred();
+  const f = deleteFixture(async () => {}, () => refresh.promise);
+  const result = f.handler('first');
+  await Promise.resolve();
+  assert.equal(f.rows.some(row => row.session_id === 'first'), false);
+  f.navigate();
+  refresh.resolve([{ session_id: 'next', chat_mode: 'science_agent' }]);
+  assert.equal(await result, true);
+  assert.deepEqual(f.refreshes, []);
+});
+
+test('deleting the visible chat selects only the next conversation in its own mode', async () => {
+  const f = deleteFixture(async () => {});
+  assert.equal(await f.handler('first'), true);
+  assert.deepEqual(f.refreshes, [['next']]);
+  assert.deepEqual(f.drafts, []);
+});
+
+test('a successful deletion stays removed when the subsequent history request fails', async () => {
+  const f = deleteFixture(async () => {}, async () => { throw new Error('offline'); });
+  assert.equal(await f.handler('first'), true);
+  assert.equal(f.rows.some(row => row.session_id === 'first'), false);
+  assert.deepEqual(f.refreshes, [['next']]);
+});
+
+test('failed deletion retains the conversation and reports only to its original view', async () => {
+  for (const moved of [false, true]) {
+    const wait = deferred();
+    const f = deleteFixture(() => wait.promise);
+    const result = f.handler('first');
+    if (moved) f.navigate();
+    wait.reject(new Error('permission denied'));
+    assert.equal(await result, false);
+    assert.equal(f.rows.some(row => row.session_id === 'first'), true);
+    assert.deepEqual(f.updates, moved ? [['error', '']] : [['error', ''], ['error', 'permission denied']]);
+  }
+});
+
+test('deletion remains successful if the next conversation cannot be loaded', async () => {
+  const f = deleteFixture(async () => {}, undefined, async () => { throw new Error('session unavailable'); });
+  assert.equal(await f.handler('first'), true);
+  assert.equal(f.rows.some(row => row.session_id === 'first'), false);
+});
+
+test('deleting the final conversation in a mode opens a draft without selecting another mode', async () => {
+  const f = deleteFixture(async () => {}, async () => [{ session_id: 'scientist', chat_mode: 'science_expert' }]);
+  assert.equal(await f.handler('first'), true);
+  assert.deepEqual(f.drafts, [[true, false]]);
+  assert.deepEqual(f.refreshes, []);
 });

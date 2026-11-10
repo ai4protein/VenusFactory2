@@ -1,6 +1,6 @@
 import { useChatStream } from "../lib/useChatStream";
 import { sanitizeChatSnapshot } from "../lib/chatStreamState";
-import { mergeHistoryActivity, submissionHistoryRow, type HistoryActivity } from "../lib/optimisticHistory";
+import { mergeHistoryActivity, submissionHistoryRow } from "../lib/optimisticHistory";
 import { NewChatStart } from "../components/NewChatStart";
 import { ChatModeIcon } from "../components/ChatModeIcon";
 import { UnifiedChatHistory } from "../components/UnifiedChatHistory";
@@ -16,7 +16,7 @@ import { validateUploads } from "../lib/uploadLimits";
 import { QuotaNotice } from "../components/QuotaNotice";
 import { openQuota, QUOTA_CHANGED, quotaRetryLabel, isDailyQuotaMessage } from "../lib/onlineQuota";
 import { SidebarContent, useSidebar } from "../components/AppSidebar";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { chatSessionLocation, chatRouteKey } from "../lib/chatSessionRoute";
 import { ResearcherPanel, type ResearcherPanelHandle } from "../components/ResearcherPanel";
@@ -26,8 +26,8 @@ import { ChatNotice, useDismissibleError } from "../components/ChatNotice";
 import { AgentExecutionPicker } from "../components/AgentExecutionPicker";
 import { ContextUsageRing } from "../components/ContextUsageRing";
 import { isRunActive } from "../lib/runProgress";
-import { RunSpinner } from "../components/RunSpinner";
-import { activeSessionStorageKey, sessionsForMode, sessionCandidates } from "../lib/chatSessions";
+import { activeSessionStorageKey, sessionsForMode, sessionCandidates, abbreviateSessionTitle } from "../lib/chatSessions";
+import { useChatSessionHistory } from "../lib/useChatSessionHistory";
 import { SessionPreviewCache } from "../lib/sessionPreviewCache";
 import { PageLoading } from "../components/PageLoading";
 import { isFreeResearchModel } from "../lib/researchUi";
@@ -60,7 +60,6 @@ import {
   getStepDecideUrl,
   getSubReportDecideUrl,
   iterationDecide,
-  listChatSessions,
   type AgentExecutionSelection,
   type ChatQuota,
   type ChatSnapshot,
@@ -421,105 +420,6 @@ const STRINGS = {
   }
 };
 
-type SessionMeta = {
-  session_id: string;
-  created_at: string;
-  model_name: string;
-  history_size: number;
-  status: string;
-  title?: string;
-  has_content?: boolean;
-  chat_mode?: ChatMode;
-};
-
-const TITLE_SKIP_PREFIXES = [
-  "📝",
-  "clarification details",
-  "**clarification",
-  "澄清详情",
-  "澄清细节",
-];
-
-/** Compress a user message into a short sidebar label (not a full copy). */
-function abbreviateSessionTitle(raw: string, maxLen = 22): string {
-  const lines = raw
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line && !line.startsWith(">"));
-  let text = (lines.length ? lines.join(" ") : raw).replace(/\s+/g, " ").trim();
-  if (!text) return "";
-  const lower = text.toLowerCase();
-  if (TITLE_SKIP_PREFIXES.some((p) => lower.startsWith(p) || text.startsWith(p))) {
-    return "";
-  }
-
-  // Prefer the first clause / sentence.
-  const hardSeps = ["。", "！", "？", "；", ". ", "! ", "? ", "; "];
-  for (const sep of hardSeps) {
-    if (text.includes(sep)) {
-      const head = text.split(sep)[0]?.trim() || "";
-      if (head.length >= 4) {
-        text = head;
-        break;
-      }
-    }
-  }
-  if (text.length > maxLen) {
-    for (const sep of ["，", ", "]) {
-      if (text.includes(sep)) {
-        const head = text.split(sep)[0]?.trim() || "";
-        if (head.length >= 4) {
-          text = head;
-          break;
-        }
-      }
-    }
-  }
-
-  // English-heavy prompts → keep a few leading words.
-  const asciiRatio = [...text].filter((ch) => ch.charCodeAt(0) < 128).length / Math.max(text.length, 1);
-  if (asciiRatio > 0.7) {
-    const words = text.split(/\s+/);
-    if (words.length > 3) text = words.slice(0, 3).join(" ");
-  }
-
-  text = text.replace(/^[\s·\-–—:：,，;；]+|[\s·\-–—:：,，;；]+$/g, "");
-  if (!text) return "";
-  if (text.length <= maxLen) return text;
-  let cut = text.slice(0, maxLen - 1);
-  if (asciiRatio > 0.7) {
-    const sp = cut.lastIndexOf(" ");
-    if (sp >= 6) cut = cut.slice(0, sp);
-  }
-  return `${cut.trimEnd()}…`;
-}
-
-function titleFromHistory(history: Array<{ role?: string; content?: unknown }> | undefined): string {
-  if (!history?.length) return "";
-  for (const item of history) {
-    if (item?.role !== "user") continue;
-    const content = item.content;
-    let raw = "";
-    if (typeof content === "string") raw = content;
-    else if (Array.isArray(content)) {
-      raw = content
-        .map((part) => {
-          if (typeof part === "string") return part;
-          if (part && typeof part === "object") {
-            const obj = part as { text?: string; content?: string };
-            return obj.text || obj.content || "";
-          }
-          return "";
-        })
-        .filter(Boolean)
-        .join(" ");
-    }
-    const title = abbreviateSessionTitle(raw);
-    if (title) return title;
-  }
-  return "";
-}
-
 // Last-resort fallback identifier used only when the model registry has not
 // loaded yet AND we cannot read any model id from the active session. The real
 // model list comes from GET /api/models via useModelRegistry().
@@ -594,13 +494,6 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   }, [sessionId]);
   const { snapshot, streamingIdx, setSnapshot, stopStream, discardStream, updateStream } = useChatStream();
   const [pendingTurn, setPendingTurn] = useState<PendingChatTurn | null>(null);
-  const [sessions, setSessions] = useState<SessionMeta[]>([]);
-  const [historyActivity, setHistoryActivity] = useState<Record<string, HistoryActivity>>({});
-  const sessionHistoryRevision = useRef(0);
-  const onHistoryActivity = useCallback((key: string, row: HistoryActivity | null) => {
-    sessionHistoryRevision.current++;
-    setHistoryActivity(previous => { const next = { ...previous }; if (row) next[key] = row; else delete next[key]; return next; });
-  }, []);
   const [message, setMessage] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [composerElement, setComposerElement] = useState<HTMLDivElement | null>(null);
@@ -624,6 +517,8 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   const [researcherRunning, setResearcherRunning] = useState(false);
   const [chatMode, setChatMode] = useState<ChatMode>(() => workspaceParams.get("mode") === "scientist" ? "science_expert" : "science_agent");
   const activeModeRef = useRef(chatMode);
+  const { sessions, setSessions, historyActivity, onHistoryActivity, activeSessionTitle, fetchSessions } =
+    useChatSessionHistory(sessionId, snapshot, chatMode);
   const researcherPanelRef = useRef<ResearcherPanelHandle>(null);
   const [researchReports, setResearchReports] = useState<ResearchHistoryRow[]>([]);
   const goalRunning = chatMode === "science_expert" && scientistRunning;
@@ -682,8 +577,6 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
   const [fileSourceMenuOpen, setFileSourceMenuOpen] = useState(false);
   const [workspacePickerOpen, setWorkspacePickerOpen] = useState(false);
   const LEGACY_SESSION_STORAGE_KEY = "vf2_active_session_id";
-  const SESSION_CACHE_KEY = "vf2_session_list_cache_v2";
-  const SESSION_OWNED_KEY = "vf2_owned_session_ids";
   const COPY_HINT_MS = 1200;
   const [copiedSessionId, setCopiedSessionId] = useState("");
   const modeChoiceRevision = useRef(0);
@@ -738,18 +631,18 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         if (routeMode !== activeModeRef.current || researcherMode) handleChatModeChange(routeMode, "", false);
         createAndActivateSession(false, claimNewChatDraft(routeMode, freshDraftId, sessionStorage));
       }
-      void refreshChatQuota().then(q => fetchSessions(q?.mode === "local")).catch(() => {});
+      void Promise.all([refreshChatQuota(), fetchSessions()]).catch(() => {});
       return;
     }
     if (routeMode === "researcher") {
-      void refreshChatQuota().then(q => fetchSessions(q?.mode === "local")).catch(() => {});
+      void Promise.all([refreshChatQuota(), fetchSessions()]).catch(() => {});
       return;
     }
     if (helpQuestion) {
       if (activeModeRef.current !== 'science_agent') handleChatModeChange('science_agent', undefined, false);
       createAndActivateSession(false);
       setMessage(helpQuestion);
-      void refreshChatQuota().then(q => fetchSessions(q?.mode === 'local')).catch(() => {});
+      void Promise.all([refreshChatQuota(), fetchSessions()]).catch(() => {});
       return;
     }
     // A URL is an explicit selection. Never replace it with a cached or
@@ -948,107 +841,6 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, chatMode, researcherMode]);
 
-  // Keep sidebar label in sync with the first user message of the active chat.
-  const activeSessionTitle = titleFromHistory(snapshot?.history);
-  useEffect(() => {
-    if (!sessionId) return;
-    const historySize = snapshot?.history?.length ?? 0;
-    // Never blank out an existing title with "" while history is still loading.
-    if (!activeSessionTitle && historySize === 0) return;
-    setSessions((prev) => {
-      let changed = false;
-      const next = prev.map((item) => {
-        if (item.session_id !== sessionId) return item;
-        const nextTitle = activeSessionTitle || item.title || "";
-        if ((item.title || "") === nextTitle && item.history_size === historySize && item.status === snapshot?.status) return item;
-        changed = true;
-        return { ...item, title: nextTitle, history_size: historySize, status: snapshot?.status || "" };
-      });
-      if (!prev.some(item => item.session_id === sessionId)) {
-        changed = true;
-        next.unshift({ session_id: sessionId, created_at: snapshot?.created_at || new Date().toISOString(),
-          model_name: snapshot?.model_name || "", history_size: historySize,
-          status: snapshot?.status || "", title: activeSessionTitle, has_content: true, chat_mode: activeModeRef.current });
-      }
-      if (!changed) return prev;
-      try {
-        localStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(next));
-      } catch {
-        /* ignore */
-      }
-      return next;
-    });
-  }, [sessionId, activeSessionTitle, snapshot?.history?.length, snapshot?.status]);
-
-  useEffect(() => {
-    let alive = true, pending = false;
-    const refresh = async () => {
-      if (!alive || pending) return;
-      pending = true;
-      try { await fetchSessions(); } catch { /* Reconnect on the next tick. */ }
-      finally { pending = false; }
-    };
-    const timer = window.setInterval(() => void refresh(), 3000);
-    return () => { alive = false; window.clearInterval(timer); };
-  }, [chatQuota?.mode]);
-
-  async function fetchSessions(localMode = chatQuota?.mode === "local") {
-    const revision = sessionHistoryRevision.current;
-    const data = await listChatSessions();
-    const allServer = (data.sessions || []).filter(hasSessionContent);
-    const list = allServer; // Server-side visitor ownership is authoritative.
-    // Preserve locally derived titles when the API omits them (older server
-    // process, or race before the first message is persisted).
-    let merged: SessionMeta[] = [];
-    if (revision !== sessionHistoryRevision.current) return list;
-    setSessions((prev) => {
-      const prevById = new Map(prev.map((item) => [item.session_id, item]));
-      merged = list.map((item) => {
-        const prior = prevById.get(item.session_id);
-        const serverTitle = (item.title || "").trim();
-        const priorTitle = (prior?.title || "").trim();
-        const activeTitle =
-          item.session_id === sessionId ? titleFromHistory(snapshot?.history) : "";
-        const raw = serverTitle || activeTitle || priorTitle || "";
-        return {
-          ...item,
-          // Always compress — older clients may have stored near-full questions.
-          title: abbreviateSessionTitle(raw) || raw,
-        };
-      });
-      try {
-        localStorage.setItem(SESSION_CACHE_KEY, JSON.stringify(merged));
-      } catch {
-        /* ignore */
-      }
-      return merged;
-    });
-    // React may defer the updater; return the fetched identities immediately.
-    return list;
-  }
-
-  function readOwnedSessionIds(): string[] {
-    try {
-      const parsed = JSON.parse(localStorage.getItem(SESSION_OWNED_KEY) || "[]") as unknown;
-      return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string" && Boolean(item)) : [];
-    } catch {
-      return [];
-    }
-  }
-
-  function writeOwnedSessionIds(ids: string[]) {
-    try { localStorage.setItem(SESSION_OWNED_KEY, JSON.stringify(Array.from(new Set(ids.filter(Boolean))))); } catch { /* Server owns the session list. */ }
-  }
-
-  function rememberOwnedSession(nextSessionId: string) {
-    if (!nextSessionId) return;
-    writeOwnedSessionIds([...readOwnedSessionIds(), nextSessionId]);
-  }
-
-  function forgetOwnedSession(targetSessionId: string) {
-    writeOwnedSessionIds(readOwnedSessionIds().filter((item) => item !== targetSessionId));
-  }
-
   async function refreshChatQuota(): Promise<ChatQuota | null> {
     try {
       const quota = await getChatQuota();
@@ -1068,10 +860,6 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     return () => { window.removeEventListener(QUOTA_CHANGED, changed); window.removeEventListener("focus", changed); window.removeEventListener("storage", changed); };
   }, []);
 
-  function hasSessionContent(item: SessionMeta) {
-    return item.has_content ?? Boolean(item.history_size || item.title?.trim());
-  }
-
   function syncSessionUrl(sid: string, mode: ChatMode | "researcher", replace = false) {
     handledRoute.current = chatRouteKey(sid, mode);
     navigate(chatSessionLocation(lang, sid, mode, workspaceParams), { replace });
@@ -1087,7 +875,6 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     if (sessionCreation.current) return sessionCreation.current;
     sessionCreation.current = (async () => {
       const created = await createChatSession("science_expert");
-      rememberOwnedSession(created.session_id);
       moveResearchDraft("scientist:draft", "scientist:" + created.session_id);
       rememberActiveSession("science_expert", created.session_id);
       if (activeModeRef.current === "science_expert" && visibleModeRef.current !== "researcher") {
@@ -1124,28 +911,31 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
 
   async function deleteAndSelectNextSession(targetId: string) {
     const deletingActive = !researcherMode && targetId === sessionId;
+    const ownsSelection = currentSessionView(targetId);
     if (running && deletingActive) return false;
     setError("");
     try {
       await deleteChatSession(targetId);
       sessionPreviews.current.forget(targetId);
-      forgetOwnedSession(targetId);
-      if (deletingActive) {
-        rememberActiveSession(activeModeRef.current, "");
-        setSessionId("");
-        setSnapshot(null);
-        syncSessionUrl("", activeModeRef.current, true);
-      }
-      const list = await fetchSessions();
-      if (!deletingActive) return true;
-
-      const next = sessionsForMode(list, activeModeRef.current).find((item) => item.session_id !== targetId);
+      setSessions(previous => previous.filter(row => row.session_id !== targetId));
+      const list = await fetchSessions().catch(() => sessions);
+      // A delayed delete may update history, but cannot navigate a different view.
+      if (!deletingActive || !ownsSelection()) return true;
+      const next = sessionsForMode(list, activeModeRef.current).find(row => row.session_id !== targetId);
       if (next) {
-        await refreshCurrentSession(next.session_id);
-      }
+        const opening = refreshCurrentSession(next.session_id);
+        const ownsNext = currentSessionView(next.session_id);
+        try { await opening; }
+        catch (err) {
+          if (ownsNext()) {
+            createAndActivateSession(true, false);
+            setError(err instanceof Error ? err.message : t.errHintSession);
+          }
+        }
+      } else createAndActivateSession(true, false);
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : t.errDeleteSession);
+      if (!deletingActive || ownsSelection()) setError(err instanceof Error ? err.message : t.errDeleteSession);
       return false;
     }
   }
@@ -1154,26 +944,8 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
     let bootstrapRevision = sessionLoad.current.revision;
     setError("");
     const quotaRequest = refreshChatQuota();
-    const sessionsRequest = listChatSessions().catch(() => null);
-    let list: SessionMeta[] = [];
-    try {
-      const raw = localStorage.getItem(SESSION_CACHE_KEY);
-      if (raw) {
-        const cached = JSON.parse(raw) as SessionMeta[];
-        if (Array.isArray(cached) && cached.length > 0) {
-          list = cached.filter(hasSessionContent);
-          setSessions(list);
-        }
-      }
-    } catch {
-      // best effort cache read
-    }
-    try {
-      const [quota, data] = await Promise.all([quotaRequest, sessionsRequest]);
-      if (data) { list = (data.sessions || []).filter(hasSessionContent); setSessions(list); }
-    } catch {
-      // keep cached list if server refresh fails
-    }
+    const sessionsRequest = fetchSessions().catch(() => sessions);
+    const [, list] = await Promise.all([quotaRequest, sessionsRequest]);
     const mode = activeModeRef.current;
     const remembered = sessionStorage.getItem(activeSessionStorageKey(mode));
     if (remembered === "") return;
@@ -1309,7 +1081,6 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
         snapshotRef.current = null;
       }
       if (msg.includes("404") || msg.includes("not found") || msg.includes("Not Found")) {
-        forgetOwnedSession(sid);
         if (sid === sessionId && routeSessionId !== sid) {
           setSessionId("");
           setSnapshot(null);
@@ -1428,7 +1199,6 @@ export function ChatPage({ workspaceEnabled = false }: ChatPageProps) {
       if (!activeSessionId) {
         const created = await createChatSession("science_agent");
         activeSessionId = created.session_id;
-        rememberOwnedSession(activeSessionId);
         checkSubmission();
         pending = { ...pending, sessionId: activeSessionId };
         showActivity(activeSessionId);

@@ -87,6 +87,10 @@ frame queue; `ChatPage.tsx` owns navigation and user actions. A new session, run
 user turn cannot inherit the previous streamed answer. Waiting and terminal
 snapshots are authoritative, and leaving the view discards queued animation work
 without cancelling the backend job.
+Sidebar history uses `useChatSessionHistory.ts` for cache and request lifecycle and
+`chatSessions.ts` for metadata reconciliation. The API and page share that metadata
+contract. Server ownership remains authoritative; transient submission rows stay
+out of persisted history, and stale refreshes cannot overwrite later user actions.
 
 Training configuration is deterministic: the calling agent supplies explicit
 settings to the shared Factory core. Code execution uses the session-bound sandbox
