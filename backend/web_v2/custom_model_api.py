@@ -133,20 +133,26 @@ def _scan_folders_under(root: Path, max_depth: int = 5) -> List[str]:
     if not root or not root.is_dir():
         return []
     _assert_allowed_path(root, detail="Root path is not allowed.")
+    if max_depth < 1:
+        return []
     result: List[str] = []
-    for path in sorted(root.rglob("*")):
-        if not path.is_dir():
-            continue
-        try:
-            rel = path.relative_to(root)
-        except ValueError:
-            continue
-        if not rel.parts or len(rel.parts) > max_depth:
-            continue
-        try: guard_artifact(path)
-        except HTTPException: continue
-        result.append(_to_project_rel(path))
-    return result
+    for current, directories, _ in os.walk(root, topdown=True, followlinks=False):
+        depth = len(Path(current).relative_to(root).parts)
+        descend = []
+        for name in directories:
+            path = Path(current) / name
+            if path.is_symlink():
+                continue
+            try:
+                guard_artifact(path)
+            except HTTPException:
+                continue
+            result.append(_to_project_rel(path))
+            if depth + 1 < max_depth:
+                descend.append(name)
+        # Prune before traversal: hidden and out-of-depth trees are never scanned.
+        directories[:] = descend
+    return sorted(result)
 
 
 def _scan_models_in_folder(folder_path: str) -> List[Dict[str, str]]:
@@ -171,7 +177,7 @@ def _scan_models_in_folder(folder_path: str) -> List[Dict[str, str]]:
     return models
 
 
-def _read_tabular_df(file_path: str, sample_n: int = 3) -> pd.DataFrame:
+def _read_tabular_df(file_path: str, sample_n: int | None = 3) -> pd.DataFrame:
     path = _resolve_client_file_path(file_path)
     if not path.is_file():
         raise HTTPException(status_code=404, detail="File not found.")
@@ -189,20 +195,7 @@ def _read_tabular_df(file_path: str, sample_n: int = 3) -> pd.DataFrame:
 
 
 def _read_tabular_columns(file_path: str) -> List[str]:
-    path = _resolve_client_file_path(file_path)
-    if not path.is_file():
-        raise HTTPException(status_code=404, detail="File not found.")
-    ext = path.suffix.lower()
-    try:
-        if ext == ".csv":
-            return list(pd.read_csv(path, nrows=0).columns)
-        if ext == ".tsv":
-            return list(pd.read_csv(path, sep="\t", nrows=0).columns)
-        if ext in {".xlsx", ".xls"}:
-            return list(pd.read_excel(path, nrows=0).columns)
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Failed to parse headers from {file_path}: {exc}") from exc
-    raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}. Only csv/tsv/xlsx/xls are supported.")
+    return list(_read_tabular_df(file_path, sample_n=0).columns)
 
 
 def _load_model_config(model_path: str) -> Dict[str, Any]:

@@ -234,3 +234,45 @@ def test_cookie_namespace_uses_config_when_mode_env_is_absent(monkeypatch):
     monkeypatch.setattr(config, "get_config", lambda: SimpleNamespace(
         server=SimpleNamespace(is_online=True)))
     assert cookie_name("platform") == "vf_model_workspace"
+
+
+@pytest.mark.parametrize("max_depth", [1, 2, 3])
+def test_custom_folder_discovery_prunes_depth_and_private_trees(tmp_path, monkeypatch, max_depth):
+    from backend.web_v2 import custom_model_api as api
+    monkeypatch.setenv("WEBUI_V2_MODE", "local")
+    monkeypatch.setenv("VENUS_JOB_QUEUE_ROOT", str(tmp_path / "queue"))
+    monkeypatch.setattr(api, "_ALLOWED_FILE_ROOTS", [tmp_path])
+    monkeypatch.setattr(api, "_PROJECT_ROOT", tmp_path)
+    root = tmp_path / "models"
+    public = root / "public" / "generation" / "weights" / "extra"
+    public.mkdir(parents=True)
+    private = root / "private-run"
+    (private / "weights" / "internal").mkdir(parents=True)
+    JobRecords().grant(private, "custom", "another-visitor")
+    outside = tmp_path / "outside"
+    (outside / "hidden").mkdir(parents=True)
+    (root / "alias").symlink_to(outside, target_is_directory=True)
+    visited = set()
+    original_scandir = os.scandir
+
+    def traced_scandir(path):
+        if isinstance(path, (str, os.PathLike)):
+            resolved = Path(path).resolve()
+            if resolved.is_relative_to(root):
+                visited.add(resolved)
+        return original_scandir(path)
+
+    app = FastAPI()
+    app.include_router(api.router)
+    with TestClient(app) as client, monkeypatch.context() as patch:
+        patch.setattr(os, "scandir", traced_scandir)
+        response = client.get("/api/custom-model/models/folders", params={
+            "root": str(root), "max_depth": max_depth})
+    assert response.status_code == 200, response.text
+    expected = ["models"]
+    for level in range(1, max_depth + 1):
+        expected.append("/".join(["models", "public", "generation", "weights"][:level + 1]))
+    assert response.json()["folders"] == expected
+    assert root in visited
+    assert all(not path.is_relative_to(private) for path in visited)
+    assert all(len(path.relative_to(root).parts) < max_depth for path in visited)

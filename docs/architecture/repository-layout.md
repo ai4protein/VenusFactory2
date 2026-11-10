@@ -99,6 +99,11 @@ never starts another model request or interpreter. Training modules do not load
 LLM credentials or carry a second code-generation implementation; startup owns
 environment configuration.
 
+Custom Model headers and previews use the same authorized table reader in
+`backend/web_v2/custom_model_api.py`. Folder discovery applies its depth limit
+before entering subdirectories and prunes inaccessible or linked directories.
+Listing model folders must not require walking another visitor's result tree.
+
 Model training streams reconstruct curves and test metrics with
 `backend/web_v2/training_progress.py`, a log parser without filesystem or queue
 dependencies. The model API owns job access, output files and download URLs.

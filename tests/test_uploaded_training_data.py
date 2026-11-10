@@ -46,3 +46,40 @@ def test_invalid_uploaded_tables_fail_before_enqueue(tmp_path, monkeypatch, issu
     if issue == 'column': args['sequence_column_name'] = 'missing'
     with pytest.raises(HTTPException) as error: api._uploaded_training_stats(args)
     assert error.value.status_code == 400
+
+
+@pytest.mark.parametrize("extension", ["csv", "tsv", "xlsx"])
+def test_uploaded_table_headers_and_preview_use_the_same_columns(tmp_path, monkeypatch, extension):
+    import pandas as pd
+    source = pd.DataFrame({"sequence": ["ACDE", "MKWV", "GAVL", "SSSS"],
+                           "activity": [1.5, 2.0, 3.0, 4.5]})
+    path = tmp_path / ("measurements." + extension)
+    if extension == "xlsx":
+        source.to_excel(path, index=False)
+    else:
+        source.to_csv(path, index=False, sep="\t" if extension == "tsv" else ",")
+    checked = []
+
+    def resolve(value):
+        checked.append(value)
+        return path
+
+    monkeypatch.setattr(api, "_resolve_client_file_path", resolve)
+    assert api._read_tabular_columns(str(path)) == source.columns.tolist()
+    pd.testing.assert_frame_equal(api._read_tabular_df(str(path)), source.head(3))
+    pd.testing.assert_frame_equal(api._read_tabular_df(str(path), sample_n=None), source)
+    assert checked == [str(path)] * 3
+
+
+@pytest.mark.parametrize("reader", ["_read_tabular_columns", "_read_tabular_df"])
+def test_uploaded_table_readers_enforce_access_before_reading(tmp_path, monkeypatch, reader):
+    path = tmp_path / "private.csv"
+    path.write_text("sequence,label\nACDE,1\n")
+
+    def denied(value):
+        raise HTTPException(404, "File not found")
+
+    monkeypatch.setattr(api, "_resolve_client_file_path", denied)
+    with pytest.raises(HTTPException) as error:
+        getattr(api, reader)(str(path))
+    assert error.value.status_code == 404
