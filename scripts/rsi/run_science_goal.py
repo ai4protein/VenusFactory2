@@ -231,6 +231,7 @@ class GeneratedModelGoal:
                 else:
                     outcome.update(
                         status="candidate_rejected",
+                        rejection_reasons=accepted.get("rejection_reasons", []),
                         summary="Candidate failed independent development acceptance; goal remains unmet",
                     )
             else:

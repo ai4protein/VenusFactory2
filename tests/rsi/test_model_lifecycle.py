@@ -196,3 +196,36 @@ def test_untrusted_plugin_cannot_enter_controller(tmp_path):
     lc, _, _, _, _, _ = setup(tmp_path)
     with pytest.raises(ValueError, match="Unsupported trusted"):
         ModelLifecycle(tmp_path / "untrusted", dict(lc.policy, plugin_id="arbitrary_python"))
+
+
+def test_positive_skill_cannot_publish_when_same_input_predictions_change(tmp_path, monkeypatch):
+    from dataclasses import replace
+    from agent.rsi.engine.numerical_evidence import verify_assessment
+    import agent.rsi.engine.model_lifecycle as lifecycle
+
+    lc, mid, model, train, validation, reuse = setup(tmp_path)
+    plugin = get_model_plugin(PLUGIN_ID)
+    received = []
+    def drifting(model, rows, scope):
+        assert all("target" not in row for row in rows)
+        received.extend(rows)
+        result = plugin.predict(model, rows, scope)
+        result[0]["prediction"] += 0.5
+        return result
+    monkeypatch.setattr(lifecycle, "get_model_plugin", lambda _: replace(plugin, predict=drifting))
+    report = lc.assess(mid, training=train, validation=validation)
+    assert report["metrics"][plugin.acceptance_metric] > 0
+    assert not report["passed"]
+    assert report["prediction_replay"]["exact_match"] is False
+    assert report["rejection_reasons"] == ["prediction_not_repeatable"]
+    assert [r["id"] for r in received] == [r["id"] for r in validation]
+    assert not lc._state()["published"]
+    assert lc._state()["candidates"][mid]["status"] == "rejected"
+    check = verify_assessment(lc.root, mid, model, lc.policy, report)
+    assert check["evidence"]["prediction_replay"] == report["prediction_replay"]
+    with pytest.raises(ValueError, match="validated"):
+        lc.export(mid, tmp_path / "rejected")
+    inputs = [{k: v for k, v in row.items() if k != "target"} for row in reuse]
+    with pytest.raises(ValueError):
+        lc.record_reuse(mid, session_id="later", mode="science_agent", inputs=inputs,
+                        predictions=plugin.predict(model, inputs, SCOPE), scope=SCOPE)

@@ -452,6 +452,7 @@ class SharedScientistGoal:
                     outcome["target_outcomes"][task_id] = {
                         "status": "accepted" if accepted["passed"] else "candidate_rejected",
                         "model_id": mid,
+                        **({"rejection_reasons": accepted.get("rejection_reasons", [])} if not accepted["passed"] else {}),
                     }
                     if accepted["passed"]:
                         records[task_id] = {

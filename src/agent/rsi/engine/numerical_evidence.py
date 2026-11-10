@@ -11,7 +11,23 @@ from .versions import VersionStore
 REFERENCE_KEYS = {"schema", "version_id", "evidence_sha256", "predictions_sha256"}
 
 
-def archive_assessment(root, model_id, model, policy, metrics, predictions, validation, executions, runtime):
+def prediction_replay_summary(predictions, repeated_predictions):
+    """Compare the complete output, including class probabilities and row order."""
+    reference = digest(predictions)
+    repeated = digest(repeated_predictions)
+    return {
+        "schema": 1,
+        "rows": len(predictions),
+        "reference_sha256": reference,
+        "replayed_sha256": repeated,
+        "exact_match": reference == repeated,
+    }
+
+
+def archive_assessment(
+    root, model_id, model, policy, metrics, predictions, validation, executions, runtime,
+    *, repeated_predictions=None,
+):
     if model.get("plugin_id") in {
         "generated_context.v1",
         "generated_context.v2",
@@ -35,7 +51,7 @@ def archive_assessment(root, model_id, model, policy, metrics, predictions, vali
     ):
         raise ValueError("Per-row evidence does not match evaluated predictions")
     evidence = {
-        "schema": 1,
+        "schema": 2 if repeated_predictions is not None else 1,
         "model_id": model_id,
         "model_sha256": digest(model),
         "policy_sha256": digest(policy),
@@ -47,11 +63,16 @@ def archive_assessment(root, model_id, model, policy, metrics, predictions, vali
         "isolated_executions": executions,
         "scope": "Immutable assessment predictions and runtime diagnostics; exact replay requirements unchanged",
     }
+    if repeated_predictions is not None:
+        evidence["prediction_replay"] = prediction_replay_summary(predictions, repeated_predictions)
+        evidence["scope"] = "Frozen assessment predictions, same-input prediction replay and runtime diagnostics"
     metadata = {"kind": "assessment_numerical_evidence", "model_id": model_id, "policy_sha256": digest(policy)}
     with tempfile.TemporaryDirectory(prefix="numerical-evidence-", dir=root) as tmp:
         folder = Path(tmp)
         atomic_json(folder / "evidence.json", evidence)
         atomic_json(folder / "predictions.json", predictions)
+        if repeated_predictions is not None:
+            atomic_json(folder / "repeated_predictions.json", repeated_predictions)
         manifest = VersionStore(root / "numerical_evidence").snapshot(folder, metadata=metadata)
     return {
         "schema": 1,
@@ -70,14 +91,16 @@ def verify_assessment(root, model_id, model, policy, report):
     versions = VersionStore(root / "numerical_evidence")
     manifest = versions.verify(reference["version_id"])
     expected_metadata = {"kind": "assessment_numerical_evidence", "model_id": model_id, "policy_sha256": digest(policy)}
-    if set(manifest["files"]) != {"evidence.json", "predictions.json"} or manifest["metadata"] != expected_metadata:
+    files = set(manifest["files"])
+    original_files = {"evidence.json", "predictions.json"}
+    if files not in (original_files, original_files | {"repeated_predictions.json"}) or manifest["metadata"] != expected_metadata:
         raise ValueError("Numerical evidence scope changed")
     folder = root / "numerical_evidence/versions" / reference["version_id"]
     evidence = json.loads((folder / "evidence.json").read_text())
     predictions = json.loads((folder / "predictions.json").read_text())
     if (
         digest(evidence) != reference["evidence_sha256"]
-        or evidence["schema"] != 1
+        or evidence["schema"] not in (1, 2)
         or evidence["model_id"] != model_id
         or evidence["model_sha256"] != digest(model)
         or evidence["policy_sha256"] != digest(policy)
@@ -90,4 +113,17 @@ def verify_assessment(root, model_id, model, policy, report):
         or len(predictions) != report["metrics"]["rows"]
     ):
         raise ValueError("Numerical evidence binding changed")
+    if evidence["schema"] == 2:
+        if files != original_files | {"repeated_predictions.json"}:
+            raise ValueError("Prediction replay evidence is missing")
+        repeated = json.loads((folder / "repeated_predictions.json").read_text())
+        replay = prediction_replay_summary(predictions, repeated)
+        if (
+            evidence.get("prediction_replay") != replay
+            or report.get("prediction_replay") != replay
+            or (report.get("passed") and not replay["exact_match"])
+        ):
+            raise ValueError("Prediction replay binding changed")
+    elif files != original_files or "prediction_replay" in report:
+        raise ValueError("Legacy assessment has no prediction replay evidence")
     return {"status": "verified", "evidence": evidence, "predictions": predictions}

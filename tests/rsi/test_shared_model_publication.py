@@ -228,7 +228,20 @@ async def test_exhausted_shared_goal_publishes_only_qualified_reused_targets(tmp
     assert verified["origin"]["shared_published_target_count"] == 1
     assert verified["origin"]["parent_goal_status"] == "budget_exhausted"
     assert sha256_file(store.root / "goal.json") == before
-    rejected = state["cycles"][0]["target_outcomes"]["synthetic_1"]["model_id"]
+    rejected_outcome = state["cycles"][0]["target_outcomes"]["synthetic_1"]
+    assert rejected_outcome["rejection_reasons"] == ["performance_threshold"]
+    original = (store.root / "goal.json").read_bytes()
+    changed_reasons = deepcopy(state)
+    changed_reasons["cycles"][0]["target_outcomes"]["synthetic_1"]["rejection_reasons"] = [
+        "prediction_not_repeatable"
+    ]
+    atomic_json(store.root / "goal.json", changed_reasons)
+    try:
+        with pytest.raises(ValueError, match="Shared per-target outcomes changed"):
+            validate_shared_goal(store.root)
+    finally:
+        (store.root / "goal.json").write_bytes(original)
+    rejected = rejected_outcome["model_id"]
     with pytest.raises(ValueError, match="not a qualified"):
         validate_shared_goal(store.root, rejected)
     changed = deepcopy(state)

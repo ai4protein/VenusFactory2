@@ -79,11 +79,15 @@ def test_all_model_plugins_archive_the_actual_evaluated_rows_and_runtime(tmp_pat
     assert check["status"] == "verified"
     assert check["predictions"] == get_model_plugin(plugin_id).predict(model, rows, lc.policy["scope"])
     witness = check["evidence"]
+    assert witness["schema"] == 2
+    assert witness["prediction_replay"] == report["prediction_replay"]
+    assert report["prediction_replay"]["exact_match"] is True
+    assert report["prediction_replay"]["rows"] == len(rows)
     assert witness["training_sha256"] == lc.policy["training_sha256"]
     assert witness["validation_sha256"] == lc.policy["validation_sha256"]
     assert witness["host_runtime"]["packages"]["numpy"]["version"]
     calls = witness["isolated_executions"]
-    assert [c["operation"] for c in calls] == ([] if plugin_id == "aligned_site_ridge.v1" else ["fit", "predict"])
+    assert [c["operation"] for c in calls] == ([] if plugin_id == "aligned_site_ridge.v1" else ["fit", "predict", "predict"])
     for call in calls:
         assert call["source_sha256"] == model["source_sha256"]
         assert len(call["request_sha256"]) == len(call["result_sha256"]) == 64

@@ -13,6 +13,30 @@ fixtures; an external-model Codex publication/reuse campaign is still unverified
 See [CODEX_RESPONSES.md](CODEX_RESPONSES.md). LLM/provider bindings remain independent
 of the harness. Fixture providers cannot publish scientific entries.
 
+## Prediction replay at admission
+
+New assessments independently replay training and then run prediction twice on
+exactly the same validation batch. The second call receives no target labels.
+The entire ordered output must match, including classification probabilities.
+A candidate with positive validation skill but different replay outputs is
+rejected with `prediction_not_repeatable`; its source, scores and both outputs
+remain available for revision.
+
+The next research episode receives a bounded summary of host rejection codes
+and affected task identifiers. Validation labels and per-row predictions remain
+outside the agent prompt. Shared publication verifies these outcomes against
+the corresponding assessment records.
+
+Version 2 numerical evidence stores `predictions.json`,
+`repeated_predictions.json` and `evidence.json` in an immutable snapshot. The
+assessment and exported capability include a bound `prediction_replay` summary.
+Export and reuse verify these records. Earlier version 1 evidence remains
+readable and does not claim this additional check.
+
+This check uses the same batch size and order. Smaller batches can produce
+different floating-point rounding; batch-size diagnostics are separate from
+same-input replay and do not replace frozen evaluation results.
+
 ## Identity and counts
 
 The catalog groups executable program syntax, scientific scope, frozen training

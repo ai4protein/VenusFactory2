@@ -334,6 +334,8 @@ def _context(folder):
                         "status": "accepted" if report["passed"] else "candidate_rejected",
                         "model_id": mid,
                     }
+                    if not report["passed"] and "rejection_reasons" in report:
+                        expected_outcomes[identity]["rejection_reasons"] = report["rejection_reasons"]
                     if report["passed"]:
                         records[identity] = {
                             "controller": controller.relative_to(root).as_posix(),

@@ -15,7 +15,7 @@ from agent.research_modes import get_research_mode
 from .code_sandbox import capture_code_runs
 from .model_plugins import get_model_plugin
 from .numeric_runtime import capture_runtime
-from .numerical_evidence import archive_assessment, verify_assessment
+from .numerical_evidence import archive_assessment, prediction_replay_summary, verify_assessment
 from .protein_model import digest
 from agent.rsi.engine.protein_references import audit_source_references
 from .storage import atomic_json, file_lock
@@ -124,10 +124,20 @@ class ModelLifecycle:
                 if digest(rebuilt) != digest(model):
                     raise ValueError("candidate does not match independently replayed training")
                 metrics, predictions = plugin.evaluate_with_predictions(model, validation, self.policy["scope"])
+                from agent.rsi.datasets.model_tasks import inference_inputs
+
+                # Replay the same batch, without labels. Comparing a subset with
+                # a full batch would conflate repeatability and batch-size effects.
+                repeated_predictions = plugin.predict(
+                    model, inference_inputs(validation, plugin.id), self.policy["scope"]
+                )
+            replay = prediction_replay_summary(predictions, repeated_predictions)
             evidence = archive_assessment(
-                self.root, model_id, model, self.policy, metrics, predictions, validation, executions, capture_runtime()
+                self.root, model_id, model, self.policy, metrics, predictions, validation, executions, capture_runtime(),
+                repeated_predictions=repeated_predictions,
             )
-            passed = metrics[plugin.acceptance_metric] > self.policy["minimum_skill"]
+            score_passed = metrics[plugin.acceptance_metric] > self.policy["minimum_skill"]
+            passed = score_passed and replay["exact_match"]
             report = {
                 "schema": 1,
                 "model_id": model_id,
@@ -137,6 +147,11 @@ class ModelLifecycle:
                 "acceptance_metric": plugin.acceptance_metric,
                 "passed": passed,
                 "training_replayed": True,
+                "prediction_replay": replay,
+                "rejection_reasons": (
+                    ([] if score_passed else ["performance_threshold"])
+                    + ([] if replay["exact_match"] else ["prediction_not_repeatable"])
+                ),
                 "numerical_evidence": evidence,
             }
             if isinstance(model.get("recipe", {}).get("source_code"), str):

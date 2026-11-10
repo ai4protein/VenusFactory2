@@ -113,6 +113,37 @@ class GoalStore:
         return self.mutate(change)
 
 
+def _rejection_reasons(value):
+    if not isinstance(value, list):
+        return []
+    return [code for code in ("performance_threshold", "prediction_not_repeatable") if code in value]
+
+
+def _cycle_outcome_context(outcome):
+    """Expose bounded host rejection codes, never per-row assessment evidence."""
+    context = {key: outcome.get(key) for key in ("index", "status", "summary")}
+    reasons = _rejection_reasons(outcome.get("rejection_reasons"))
+    if reasons:
+        context["rejection_reasons"] = reasons
+    targets = outcome.get("target_outcomes")
+    if isinstance(targets, dict):
+        rejected = []
+        count = 0
+        for task_id, result in targets.items():
+            if not isinstance(task_id, str) or len(task_id) > 256 or not isinstance(result, dict):
+                continue
+            reasons = _rejection_reasons(result.get("rejection_reasons"))
+            if reasons:
+                count += 1
+                if len(rejected) < 8:
+                    rejected.append({"task_id": task_id, "rejection_reasons": reasons})
+        if rejected:
+            context["target_rejections"] = rejected
+            if count > len(rejected):
+                context["omitted_target_rejections"] = count - len(rejected)
+    return context
+
+
 def goal_cycle_prompt(state):
     spec = state["definition"]["goal"]
     condition = state["definition"].get("condition", "science_goal")
@@ -125,7 +156,7 @@ def goal_cycle_prompt(state):
         + json.dumps(
             {
                 "progress": state["progress"],
-                "episodes": [{k: x.get(k) for k in ["index", "status", "summary"]} for x in state["cycles"]],
+                "episodes": [_cycle_outcome_context(x) for x in state["cycles"]],
             },
             ensure_ascii=False,
         )

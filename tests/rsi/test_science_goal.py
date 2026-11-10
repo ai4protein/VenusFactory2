@@ -5,7 +5,7 @@ import pytest
 
 from agent.harness import Budget, ModelBinding, Profile, Task
 from agent.harness.contracts import file_hash
-from agent.science_goal import GoalSpec, GoalStore, run_goal
+from agent.science_goal import GoalSpec, GoalStore, goal_cycle_prompt, run_goal
 
 
 def profile(mode="science_expert"):
@@ -300,3 +300,56 @@ async def test_model_service_interruption_cannot_extend_an_exhausted_budget(tmp_
     assert final["status"] == "budget_exhausted"
     with pytest.raises(ValueError):
         store.resume()
+
+
+@pytest.mark.asyncio
+async def test_host_rejection_reaches_next_episode_without_validation_rows(tmp_path):
+    store = create(tmp_path, max_cycles=2)
+    prompts = []
+
+    async def cycle(index, selected, checkpoint, prompt):
+        prompts.append(prompt)
+        return {
+            **outcome("Candidate failed independent development acceptance"),
+            "status": "candidate_rejected",
+            "rejection_reasons": ["prediction_not_repeatable", "PRIVATE_REASON"],
+            "validation": [{"id": "PRIVATE_ROW", "target": 987654321}],
+        }
+
+    state = await run_goal(store, cycle, lambda s: assessment(store, s))
+    assert state["status"] == "budget_exhausted" and len(prompts) == 2
+    assert "prediction_not_repeatable" not in prompts[0]
+    assert "prediction_not_repeatable" in prompts[1]
+    assert all(value not in prompts[1] for value in ("PRIVATE_ROW", "PRIVATE_REASON", "987654321"))
+
+
+def test_shared_rejection_context_is_bounded_and_omits_raw_assessment(tmp_path):
+    state = create(tmp_path).read()
+    state["cycles"] = [{
+        "index": 0, "status": "completed", "summary": "Shared development finished",
+        "target_outcomes": {
+            **{f"task_{i}": {
+                "status": "candidate_rejected", "rejection_reasons": ["performance_threshold"],
+                "validation": "PRIVATE_VALIDATION", "metrics": {"score": "PRIVATE_SCORE"},
+            } for i in range(12)},
+            "unknown": {"rejection_reasons": ["PRIVATE_REASON"]},
+            "malformed": {"rejection_reasons": "prediction_not_repeatable"},
+            "missing": None,
+        },
+    }]
+    prompt = goal_cycle_prompt(state)
+    context = json.JSONDecoder().raw_decode(prompt.split("previous episode outcomes: ", 1)[1])[0]
+    episode = context["episodes"][0]
+    assert len(episode["target_rejections"]) == 8
+    assert episode["omitted_target_rejections"] == 4
+    assert all(item["rejection_reasons"] == ["performance_threshold"] for item in episode["target_rejections"])
+    assert all(value not in prompt for value in ("PRIVATE_VALIDATION", "PRIVATE_SCORE", "PRIVATE_REASON", "prediction_not_repeatable"))
+
+
+def test_legacy_cycle_context_keeps_its_original_prompt(tmp_path):
+    state = create(tmp_path).read()
+    cycle = {"index": 0, "status": "completed", "summary": "An archived episode"}
+    state["cycles"] = [{**cycle, "target_outcomes": {"task": {"status": "candidate_rejected"}}}]
+    prompt = goal_cycle_prompt(state)
+    assert json.dumps({"progress": {}, "episodes": [cycle]}, ensure_ascii=False) in prompt
+    assert "rejection_reasons" not in prompt
