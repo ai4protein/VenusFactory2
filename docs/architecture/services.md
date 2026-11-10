@@ -226,22 +226,31 @@ npm run build
 
 Back up each mode's SQLite databases consistently and retain files/checkpoints
 together. Keep the running service checkout unchanged: develop and test in a separate
-worktree, then deploy a coherent revision and restart idle API/MCP processes. Python
-processes cache imported modules; updating source underneath them can mix old loaded
-modules with newly imported files even while `/health` still returns success.
+worktree. Drain active work and stop the old bundle before updating its checkout
+and frontend build. Python processes cache imported modules; updating source underneath
+them can mix old loaded modules with newly imported files even while `/health` still
+returns success. Replacing frontend assets can also break an already open browser.
+A push to `main` does not update an already running service.
 
 Before upgrades, check active jobs and publish one frontend build to both modes.
-The bundled launcher (`scripts/deploy_services.py`) checks Agent and Scientist
-configuration catalogs as well as API/MCP health before starting its tunnel. Empty
-catalogs are permitted for a fresh installation without configured API keys; broken
-or malformed catalogs are not ready. These startup checks make no LLM requests.
+The bundled launcher (`scripts/deploy_services.py`) checks Agent, Scientist and
+Researcher configuration, Model Plaza and Workflow catalogs, and API/MCP health
+before starting its tunnel. Empty catalogs are permitted for a fresh installation
+without configured API keys; broken or malformed catalogs are not ready. These startup checks make no LLM requests
+and submit no prediction or training jobs. Failed checks record the service port,
+endpoint and failure type in `pending_checks` without storing response bodies.
 The private `runtime/services/deployment.json` records the startup time, Git
 revision, dirty state and frontend index digest. Use that startup record rather than
 assuming the current checkout revision is what an existing process has loaded.
 Source archives without Git metadata are supported; their revision remains unknown.
+
+Model Plaza and Workflow listings return compact cards; selecting a component
+loads its full input contract and adjustable parameters through the detail endpoint.
 The Agent model picker has a bounded configuration request and an explicit retry
 when loading fails; changing pages cancels the request. It does not poll the catalog.
-CI runs the deployment-readiness, shared-runtime-discovery and frontend recovery tests.
+CI loads the complete API in fresh online/local processes without network access
+or inference runtimes, in addition to deployment-readiness, Workflow, shared-runtime
+discovery and frontend recovery tests.
 
 After deployment, verify a real queued tool call and a Scientist project download.
 Do not rewrite prior experimental results.

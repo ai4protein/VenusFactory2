@@ -91,6 +91,7 @@ jobs:
           "fastmcp>=3.4.11" "aiohttp>=3.14.5" "jsonschema>=4.26,<5"
           "langchain-core>=1.7.4" "langchain>=1.4.8" "biopython>=1.88"
           "fastapi>=0.162.0" "psutil>=6"
+          "uvicorn>=0.41.0" "datasets>=5.0.1" "plotly>=6.2.0"
       - name: Verify model evidence and progressive discovery
         env:
           PYTHONPATH: src
@@ -111,6 +112,8 @@ jobs:
           tests/harness/test_web_native_catalog.py tests/harness/test_context_relay.py
           tests/test_design_docking_contracts.py tests/test_external_mcp_dispatch.py tests/test_external_models.py
           tests/test_model_plaza_performance.py tests/rsi/test_feedback_verification_scope.py
+          tests/test_workflow_components.py tests/test_workflow_persistence.py
+          tests/test_api_startup.py
           tests/harness/test_generated_capability_discovery.py
           -k 'not reviewed_operator_release'
 

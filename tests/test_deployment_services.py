@@ -69,6 +69,9 @@ def readiness_server():
         "/health": (200, {"success": True}),
         "/api/chat/agent-execution-options": (200, {"harnesses": [], "models": [], "combinations": []}),
         "/api/chat/science-goals/catalog?view=composer": (200, {"drivers": [], "execution": {}}),
+        "/api/report/options": (200, {"models": [], "analyses": [], "chapters": []}),
+        "/api/model-platform/catalog?limit=1": (200, {"items": [], "categories": {}, "total": 0}),
+        "/api/model-platform/workflow-components?limit=1": (200, {"items": [], "categories": {}, "kinds": {}, "total": 0}),
     }
     requests = []
 
@@ -100,8 +103,11 @@ def readiness_server():
 @pytest.mark.parametrize("endpoint", [
     "/api/chat/agent-execution-options",
     "/api/chat/science-goals/catalog?view=composer",
+    "/api/report/options",
+    "/api/model-platform/catalog?limit=1",
+    "/api/model-platform/workflow-components?limit=1",
 ])
-def test_health_success_does_not_hide_broken_chat_catalog(readiness_server, endpoint):
+def test_health_success_does_not_hide_broken_workspace_catalog(readiness_server, endpoint):
     port, responses, requests = readiness_server
     original = responses[endpoint]
     responses[endpoint] = (500, {"detail": "ImportError"})
@@ -121,6 +127,9 @@ def test_initial_installation_can_start_before_api_keys_are_configured(readiness
     ("/health", []),
     ("/api/chat/agent-execution-options", {"success": True}),
     ("/api/chat/science-goals/catalog?view=composer", None),
+    ("/api/report/options", {"models": [], "analyses": [], "chapters": {}}),
+    ("/api/model-platform/catalog?limit=1", {"items": [], "categories": {}, "total": True}),
+    ("/api/model-platform/workflow-components?limit=1", {"items": [], "categories": {}, "total": 0}),
 ])
 def test_malformed_catalog_is_not_ready(readiness_server, endpoint, body):
     port, responses, _ = readiness_server
@@ -170,3 +179,62 @@ def test_source_archive_can_start_without_a_git_repository(tmp_path):
     assert identity["source_revision"] is None
     assert identity["source_dirty"] is None
     assert len(identity["frontend_index_sha256"]) == 64
+
+
+def test_readiness_diagnostic_identifies_endpoint_without_response_content(readiness_server):
+    port, responses, _ = readiness_server
+    endpoint = "/api/report/options"
+    responses[endpoint] = (500, {"detail": "private configuration must not be logged"})
+    failure = deployment.readiness_failure(port, "api")
+    assert failure == {"path": endpoint, "reason": "HTTP 500"}
+    assert "private" not in str(failure)
+
+
+def test_readiness_rejects_oversized_response(readiness_server):
+    port, responses, _ = readiness_server
+    responses["/health"] = (200, {"success": True, "padding": "x" * deployment._MAX_READINESS_BYTES})
+    assert deployment.readiness_failure(port, "api") == {"path": "/health", "reason": "invalid JSON response"}
+
+
+def test_failed_catalog_prevents_tunnel_and_records_startup_failure(tmp_path, monkeypatch):
+    import json
+
+    dist = tmp_path / "frontend"
+    dist.mkdir()
+    (dist / "index.html").write_text("fixture")
+    runtime = tmp_path / "runtime"
+    plan = {"mode": "online", "port": 46001, "mcp_port": 46002,
+            "runtime": runtime / "online", "command": ["fixture-service"], "env": {}}
+    monkeypatch.setattr(deployment, "service_plan", lambda args: [plan])
+    monkeypatch.setattr(deployment, "prepare_harness_home", lambda plan: None)
+    monkeypatch.setattr(deployment, "deployment_identity", lambda dist: {"source_revision": "fixture"})
+    monkeypatch.setattr(deployment, "remember_children", lambda *args: None)
+    monkeypatch.setattr(deployment.signal, "signal", lambda *args: None)
+    clock = iter([0, 121])
+    monkeypatch.setattr(deployment.time, "monotonic", lambda: next(clock))
+
+    class Socket:
+        def __enter__(self): return self
+        def __exit__(self, *args): pass
+        def setsockopt(self, *args): pass
+        def bind(self, *args): pass
+
+    class Process:
+        pid = 12345
+        def poll(self): return None
+
+    launched, stopped = [], []
+    monkeypatch.setattr(deployment.socket, "socket", lambda: Socket())
+    monkeypatch.setattr(deployment.subprocess, "Popen", lambda command, **kwargs: (launched.append(command), Process())[1])
+    monkeypatch.setattr(deployment, "stop_children", lambda children, owned: stopped.extend(children))
+    failure = {"path": "/api/report/options", "reason": "HTTP 500"}
+    monkeypatch.setattr(deployment, "readiness_failure", lambda port, kind: failure if kind == "api" else None)
+    with pytest.raises(RuntimeError, match=r"api:46001 /api/report/options.*HTTP 500"):
+        deployment.main(["--mode", "online", "--runtime-root", str(runtime),
+                         "--frontend-dist", str(dist), "--frp-executable", str(tmp_path / "frpc"),
+                         "--frp-config", str(tmp_path / "frpc.ini")])
+    assert launched == [["fixture-service"]]
+    assert len(stopped) == 1
+    state = json.loads((runtime / "services/deployment.json").read_text())
+    assert state["status"] == "failed"
+    assert state["pending_checks"] == [{"port": 46001, "kind": "api", **failure}]

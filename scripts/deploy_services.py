@@ -14,6 +14,7 @@ import socket
 import subprocess
 import sys
 import time
+from urllib.error import HTTPError
 from urllib.request import urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -108,31 +109,52 @@ def deployment_identity(frontend_dist, root=ROOT):
     return result
 
 
-def service_ready(port, kind):
-    """Require working chat catalogs before advertising an API as ready."""
-    def read(path):
+API_READINESS_CONTRACTS = (
+    ("/api/chat/agent-execution-options", {"harnesses": list, "models": list, "combinations": list}),
+    ("/api/chat/science-goals/catalog?view=composer", {"drivers": list, "execution": dict}),
+    ("/api/report/options", {"models": list, "analyses": list, "chapters": list}),
+    ("/api/model-platform/catalog?limit=1", {"items": list, "categories": dict, "total": int}),
+    ("/api/model-platform/workflow-components?limit=1", {"items": list, "categories": dict, "kinds": dict, "total": int}),
+)
+_MAX_READINESS_BYTES = 1024 * 1024
+
+
+def readiness_failure(port, kind):
+    """Probe workspace contracts without executing models or returning response bodies."""
+    if kind not in {"api", "mcp"}:
+        raise ValueError("Unknown service kind")
+    path = "/health"
+
+    def read():
         with urlopen(f"http://127.0.0.1:{port}{path}", timeout=2) as response:
-            return json.load(response)
+            raw = response.read(_MAX_READINESS_BYTES + 1)
+        if len(raw) > _MAX_READINESS_BYTES:
+            raise ValueError("Oversized readiness response")
+        return json.loads(raw)
 
     try:
-        health = read("/health")
-        if not isinstance(health, dict):
-            return False
-        if kind == "mcp":
-            return health.get("status") == "ready"
-        if health.get("success") is not True:
-            return False
-        agent = read("/api/chat/agent-execution-options")
-        if not isinstance(agent, dict) or not all(
-            isinstance(agent.get(key), list) for key in ("harnesses", "models", "combinations")
-        ):
-            return False
-        scientist = read("/api/chat/science-goals/catalog?view=composer")
-        return (isinstance(scientist, dict)
-                and isinstance(scientist.get("drivers"), list)
-                and isinstance(scientist.get("execution"), dict))
-    except (OSError, ValueError):
-        return False
+        health = read()
+        ready = isinstance(health, dict) and (
+            health.get("status") == "ready" if kind == "mcp" else health.get("success") is True
+        )
+        if not ready:
+            return {"path": path, "reason": "service is not healthy"}
+        if kind == "api":
+            for path, fields in API_READINESS_CONTRACTS:
+                value = read()
+                if not isinstance(value, dict) or any(type(value.get(key)) is not expected for key, expected in fields.items()):
+                    return {"path": path, "reason": "invalid response contract"}
+    except HTTPError as exc:
+        return {"path": path, "reason": f"HTTP {exc.code}"}
+    except OSError:
+        return {"path": path, "reason": "connection failed or timed out"}
+    except ValueError:
+        return {"path": path, "reason": "invalid JSON response"}
+    return None
+
+
+def service_ready(port, kind):
+    return readiness_failure(port, kind) is None
 
 
 def remember_children(processes, owned):
@@ -222,11 +244,19 @@ def main(argv=None):
             remember_children(children, owned)
             if any(child.poll() is not None for child in children):
                 raise RuntimeError("A web process exited during startup; inspect its log")
-            for port, kind in list(pending):
-                if service_ready(port, kind):
+            failures = []
+            for port, kind in sorted(pending):
+                failure = readiness_failure(port, kind)
+                if failure is None:
                     pending.remove((port, kind))
+                else:
+                    failures.append({"port": port, "kind": kind, **failure})
+            if state.get("pending_checks") != failures:
+                state["pending_checks"] = failures
+                save()
             if pending and time.monotonic() >= deadline:
-                raise RuntimeError("Services or chat catalogs did not become ready before the startup deadline")
+                detail = "; ".join(f"{item['kind']}:{item['port']} {item['path']} ({item['reason']})" for item in failures)
+                raise RuntimeError("Services did not become ready before the startup deadline: " + detail)
             time.sleep(.5)
         if not stopping and args.frp_executable:
             log = (control / "frp.log").open("ab"); streams.append(log)

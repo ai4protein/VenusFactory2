@@ -45,7 +45,9 @@ python scripts/deploy_services.py --mode local --local-port 7862
 For an existing FRP installation, pass `--frp-executable /path/to/frpc` and
 `--frp-config /private/path/to/frpc.ini`. Only the online port belongs in the public
 web route. Keep the configuration outside Git and readable only by the service
-owner. FRP starts after API and MCP readiness checks succeed.
+owner. FRP starts after API/MCP health and Agent, Scientist, Researcher, Model Plaza
+and Workflow catalog checks succeed. Failed checks appear in `pending_checks` in
+`runtime/services/deployment.json` with the endpoint and failure type.
 
 Kimi configuration and daemon state live in `runtime/{online,local}/control/kimi`.
 Existing provider settings are copied once with private permissions; global
@@ -68,3 +70,8 @@ Updates should pass source/secret checks, dependency auditing, API security test
 and the frontend build before replacing the running job. Back up private state
 and record the deployed commit. Generated logs, environment files, databases and
 dependency environments remain ignored by Git.
+
+Use a separate checkout or worktree for development and validation. Do not change
+source files or replace frontend assets underneath a running allocation. Drain
+active jobs and stop the bundle before updating its checkout, rebuilding and
+starting the next revision. Pushing to `main` alone does not deploy that revision.
