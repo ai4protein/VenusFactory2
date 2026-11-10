@@ -23,6 +23,12 @@ eagerly load model libraries. Modules within the same engine use relative import
 do not route new dependencies through the legacy alias layer. Published scientific
 modules whose source bytes are part of a saved contract retain their recorded
 imports. Historical source snapshots are not rewritten.
+Missing flat-layout source references use the same alias table within their
+original checkout; complete source hashes and symlink rejection still apply. An
+existing file takes precedence, including when its contents fail verification.
+Prepared inference records retain the declared path and bind its resolved path,
+so a later change requires another full audit. New task preparation stores encoder
+bytes with its immutable dataset artifacts instead of referencing an installation.
 
 Published contextual feedback policies bind the complete bytes of their numerical
 modules. Keep `context_controls.py`, `context_v2_controls.py`,

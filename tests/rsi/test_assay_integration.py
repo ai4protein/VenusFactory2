@@ -143,13 +143,14 @@ def test_agent_describes_full_assay_inputs_and_uses_plugin(tmp_path):
             return {"predictions": plugin.predict(model, inputs, scope), "entry_id": entry_id}
 
     library = Library()
-    card = service.describe_model(library, "synthetic_entry")
+    entry_id = "e" * 64
+    card = service.describe_model(library, entry_id)
     assert card["input_fields"] == list(api.INPUT_FIELDS)
     assert card["input_contract"]["kind"] == "protein_substrate_assay"
     assert card["input_contract"]["representation"] == task["scope"]["representation"]
     assert card["input_contract"]["target_required"] is False
     inputs = api.inference_inputs(parts["future"])
-    result = service.predict_model(library, "synthetic_entry", inputs, task["scope"])
+    result = service.predict_model(library, entry_id, inputs, task["scope"])
     assert len(result["predictions"]) == len(inputs)
 
 

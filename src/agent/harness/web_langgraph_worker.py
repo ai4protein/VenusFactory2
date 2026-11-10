@@ -26,7 +26,6 @@ async def run(request, *, tools=None, model=None):
     from langchain.agents import create_agent
     from langchain.agents.middleware import wrap_tool_call
     from langchain_core.messages import AIMessage, HumanMessage, messages_from_dict, messages_to_dict
-    from langchain_openai import ChatOpenAI
 
     from mcp_tools.tools.runtime_tool_policy import assert_tool_allowed
 
@@ -108,16 +107,20 @@ async def run(request, *, tools=None, model=None):
             )
             raise
 
-    llm = model or ChatOpenAI(
-        model=request["model"],
-        base_url=request["base_url"],
-        api_key=request["token"],
-        max_tokens=request["budget"]["output_tokens"],
-        temperature=request["budget"]["temperature"],
-        timeout=request["budget"]["request_seconds"] + 30,
-        max_retries=0,
-        model_kwargs={"parallel_tool_calls": False},
-    )
+    llm = model
+    if llm is None:
+        from langchain_openai import ChatOpenAI
+
+        llm = ChatOpenAI(
+            model=request["model"],
+            base_url=request["base_url"],
+            api_key=request["token"],
+            max_tokens=request["budget"]["output_tokens"],
+            temperature=request["budget"]["temperature"],
+            timeout=request["budget"]["request_seconds"] + 30,
+            max_retries=0,
+            model_kwargs={"parallel_tool_calls": False},
+        )
     prompt = (
         "You are VenusFactory's conversational protein-science agent. Answer ordinary questions directly. "
         "Freely choose the actual registered scientific tools when computation or evidence is needed. "

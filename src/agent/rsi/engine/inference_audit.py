@@ -2,8 +2,9 @@
 
 Only the operator prepares these records, outside agent/session mounts. A signed
 record can skip recomputation, never checks of current files, ancestry or runtime.
-Missing records use the original full verification path. Invalid records fail
-closed until a new complete audit succeeds.
+Runtime-specific indexes let hosts stage an upgrade without replacing the legacy
+reader pointer. Missing records use the original full verification path. Invalid
+records fail closed until a new complete audit succeeds.
 """
 
 from __future__ import annotations
@@ -68,6 +69,11 @@ def _signature(key, record):
     return hmac.new(key, digest(record).encode("ascii"), hashlib.sha256).hexdigest()
 
 
+def _index_path(area, entry_id, runtime_id=None):
+    prefix = "runtimes/" + runtime_id + "/" if runtime_id else ""
+    return safe_child(area, prefix + "entries/" + entry_id + ".json")
+
+
 def prepare(library, entry_ids):
     """Perform full training/provenance replay once per origin, then seal evidence."""
     from .scientist_model_library import _identity, _require
@@ -87,6 +93,7 @@ def prepare(library, entry_ids):
             after = inference_evidence.capture(inference_evidence.dependencies(library, identities))
             _require(before == after, "Evidence or runtime changed during the full inference audit")
             snapshot_id = digest(after)
+            runtime_id = digest(after["runtime"])
             snapshot_path = safe_child(area, "snapshots/" + snapshot_id + ".json")
             if snapshot_path.exists():
                 _require(_read(snapshot_path) == after, "Immutable inference snapshot changed")
@@ -108,8 +115,13 @@ def prepare(library, entry_ids):
                     _require(_read(audit_path) == envelope, "Immutable inference audit changed")
                 else:
                     _write(audit_path, envelope)
-                _write(safe_child(area, "entries/" + identity + ".json"), {"audit_id": audit_id})
-                outcomes.append({"entry_id": identity, "audit_id": audit_id, "snapshot_id": snapshot_id})
+                _write(_index_path(area, identity, runtime_id), {"audit_id": audit_id})
+                # Older readers retain their own source-bound audit during staging.
+                legacy = _index_path(area, identity)
+                if not legacy.exists():
+                    _write(legacy, {"audit_id": audit_id})
+                outcomes.append({"entry_id": identity, "audit_id": audit_id,
+                                 "snapshot_id": snapshot_id, "verification_runtime_id": runtime_id})
     return {"schema": SCHEMA, "models": outcomes, "prepared_entries": len(outcomes),
             "training_replayed": True, "external_model_calls": 0, "new_autonomous_models": 0}
 
@@ -120,7 +132,10 @@ def resolve(library, entry_id):
 
     entry_id = _identity(entry_id)
     area = _area(library)
-    path = safe_child(area, "entries/" + entry_id + ".json")
+    runtime_id = digest(inference_evidence.runtime_identity())
+    path = _index_path(area, entry_id, runtime_id)
+    if not path.exists():
+        path = _index_path(area, entry_id)
     if not path.exists():
         return library.resolve(entry_id)
     pointer = _read(path)

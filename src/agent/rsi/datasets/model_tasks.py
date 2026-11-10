@@ -7,6 +7,7 @@ import math
 import re
 from pathlib import Path
 
+from agent.rsi._compat import relocated_source
 from agent.rsi.engine.model_plugins import get_model_plugin
 from agent.rsi.engine.protein_model import digest
 from agent.rsi.engine.storage import sha256_file
@@ -53,7 +54,7 @@ def bound_file(row):
         raise ValueError("Task files require a path and SHA256")
     if not isinstance(row["sha256"], str) or not re.fullmatch(r"[0-9a-f]{64}", row["sha256"]):
         raise ValueError("Invalid task asset hash")
-    path = ordinary(row["path"])
+    path = ordinary(relocated_source(row["path"]))
     if sha256_file(path) != row["sha256"]:
         raise ValueError("Task asset changed")
     return path

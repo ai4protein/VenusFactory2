@@ -103,14 +103,26 @@ def search(query="", kind="all", stage="", limit=10, offset=0, *, tool_catalog=N
             **discovery_card(card),
         }))
 
-    if kind != "tools" and not stage:
-        from agent.harness.research_workspace import capability_cards
-        for item in capability_cards():
-            if not settings.enabled('model:capability:' + item['id']) or not is_tool_allowed('run_generated_capability'):
+    capability_count = 0
+    if kind != "tools" and not stage and is_tool_allowed("run_generated_capability"):
+        from agent.harness import capability_catalog, research_workspace
+
+        def rank_capability(name, search_text, capability_kind):
+            if capability_kind == "model":
+                search_text += " predict prediction"
+            return relevance(groups, name, search_text)
+
+        references = capability_catalog.ranked_references(
+            research_workspace.LIBRARY, rank_capability, public_only=True,
+        )
+        for identity, score in references:
+            if not settings.enabled("model:capability:" + identity):
                 continue
-            score = relevance(groups, item["name"], item["name"] + " " + item["description"])
+            capability_count += 1
             if score is not None:
-                model_results.append((score, item["id"], {"kind": "research_capability", "model_family": "rsi", "name": item["name"], "entry_id": item["id"], "description": item["description"], "validation": item["validation"], **{k:item[k] for k in ("author","author_email","version","scope","review_status") if k in item}, "describe": {"tool": "describe_generated_capability", "arguments": {"capability_id": item["id"]}}, "predict_tool": "run_generated_capability"}))
+                model_results.append((score, identity, {
+                    "kind": "research_capability", "entry_id": identity,
+                }))
 
     def order(item):
         return -item[0], item[1]
@@ -122,16 +134,34 @@ def search(query="", kind="all", stage="", limit=10, offset=0, *, tool_catalog=N
     else:
         combined = [item for pair in zip_longest(tool_results, model_results) for item in pair if item is not None]
     total = len(combined)
+    page = [item[2] for item in combined[offset:offset + limit]]
+    selected = [item["entry_id"] for item in page if item["kind"] == "research_capability"]
+    if selected:
+        compact = capability_catalog.discovery_cards(
+            research_workspace.LIBRARY, selected, public_only=True,
+        )
+        # A publication can be withdrawn or superseded between index and page reads.
+        page = [item for item in page if item["kind"] != "research_capability"
+                or item["entry_id"] in compact]
+        for item in page:
+            if item["kind"] != "research_capability":
+                continue
+            identity = item["entry_id"]
+            card = compact[identity]
+            item.update({key: value for key, value in card.items() if key not in {"id", "kind"}})
+            item.update(model_family="rsi", describe={
+                "tool": "describe_generated_capability", "arguments": {"capability_id": identity},
+            }, predict_tool="run_generated_capability")
     return {
         "success": True,
         "query": query,
         "kind": kind,
-        "results": [item[2] for item in combined[offset:offset + limit]],
+        "results": page,
         "matching_results": total,
         "matching_tools": len(tool_results),
         "matching_models": len(model_results),
         "available_tools": len(tools),
-        "indexed_models": len(cards) + len(platform_models("", [t["name"] for t in tools])) if kind != "tools" else 0,
+        "indexed_models": len(cards) + capability_count + len(platform_models("", [t["name"] for t in tools])) if kind != "tools" else 0,
         "model_stages": dict(sorted(Counter(c["stage"] for c in cards).items())),
         "model_catalog_status": model_status,
         "next_offset": offset + limit if offset + limit < total else None,

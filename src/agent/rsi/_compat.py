@@ -7,6 +7,7 @@ import importlib
 import importlib.abc
 import importlib.util
 import sys
+from pathlib import Path
 
 MODULES = {'adaptive_runtime': 'engine.adaptive_runtime',
  'antibody_baselines': 'engine.antibody_baselines',
@@ -220,3 +221,18 @@ class _Alias(importlib.abc.MetaPathFinder, importlib.abc.Loader):
 def install():
     if not any(type(item).__module__ == __name__ and type(item).__name__ == "_Alias" for item in sys.meta_path):
         sys.meta_path.insert(0, _Alias())
+
+
+def relocated_source(path):
+    """Resolve a missing flat-layout source within its original checkout only.
+
+    Existing paths remain authoritative. Callers still reject symlinks and verify
+    complete recorded bytes; the import alias table grants no content exception.
+    """
+    path = Path(path)
+    if path.exists() or path.is_symlink() or path.suffix != ".py":
+        return path
+    if path.parent.parts[-3:] != ("src", "agent", "rsi"):
+        return path
+    module = MODULES.get(path.stem)
+    return path.parent.joinpath(*module.split(".")).with_suffix(".py") if module else path

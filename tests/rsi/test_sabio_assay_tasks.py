@@ -191,3 +191,25 @@ def test_similarity_connects_identical_references():
     report = tasks.similarity_evidence(refs)
     assert report["edges"] == [["A", "B"]]
     assert report["pairs"][0]["identity"] == report["pairs"][0]["minimum_coverage"] == 1
+
+
+def test_prepared_tasks_own_encoder_bytes_after_the_installation_moves(tmp_path, monkeypatch):
+    from pathlib import Path
+    source, sequences, _, _ = synthetic_sources(tmp_path)
+    installed = tmp_path / "installed_encoder.py"
+    original = Path(encoder.__file__).read_bytes()
+    installed.write_bytes(original)
+    monkeypatch.setattr(encoder, "__file__", str(installed))
+    output = tmp_path / "prepared"
+    manifest = tasks.prepare(source, [sequences], [], output)
+    installed.unlink()
+    snapshot = output / "sabio_assay_encoder.py"
+    assert snapshot.read_bytes() == original
+    definitions = [json.loads(model_tasks.bound_file(ref).read_text()) for ref in manifest["tasks"]]
+    assert admit(definitions)
+    for definition in definitions:
+        refs = [ref for ref in definition["references"] if ref["sha256"] == definition["scope"]["representation"]["encoder_sha256"]]
+        assert refs == [{"path": str(snapshot), "sha256": hashlib.sha256(original).hexdigest()}]
+    snapshot.write_bytes(original + b"# changed\n")
+    with pytest.raises(ValueError, match="changed"):
+        admit(definitions)

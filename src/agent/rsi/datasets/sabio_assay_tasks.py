@@ -287,7 +287,8 @@ def prepare(observations, sequence_snapshots, taxonomy_snapshots, output):
         for row in retained
     ]
     atomic_json(output / "encoded_inputs.json", feature_rows)
-    encoder_path = Path(encoder.__file__).resolve()
+    encoder_path = output / "sabio_assay_encoder.py"
+    encoder_path.write_bytes(Path(encoder.__file__).read_bytes())
     references_bound = (
         inputs
         + [
