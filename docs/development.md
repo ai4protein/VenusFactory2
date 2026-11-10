@@ -125,6 +125,11 @@ result may update that session only; stopping one conversation must never abort
 the currently visible conversation by looking up a different stream after awaiting
 the server. Detaching a reader during navigation does not cancel the server job.
 
+Frontend CSV/TSV display parsing belongs in `frontend/src/lib/delimitedTable.ts`.
+Chat attachments, file previews and model-result tables share it; keep quoted cells,
+identifiers and numeric precision as strings. Preview limits stop at complete
+records. File changes must discard stale reads without changing original downloads.
+
 ## Before a commit
 
 Use Python 3.12 and Node 24. Keep credentials, runtime installations, session data,

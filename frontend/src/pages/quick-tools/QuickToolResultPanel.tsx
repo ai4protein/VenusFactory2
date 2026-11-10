@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { extractDownloadPath, getDownloadUrl } from "../../lib/quickToolsApi";
 import { CopyableTextBlock } from "../../components/CommandPreviewCard";
 import { useLang } from "../../lib/i18n";
+import { parseDelimitedTable, tableRecords } from "../../lib/delimitedTable";
 
 const STRINGS = {
   en: {
@@ -11,8 +12,8 @@ const STRINGS = {
     tabRaw: "Raw",
     tabHeatmap: "Heatmap",
     tabAi: "AI Expert",
-    loadingCsv: "Loading CSV result...",
-    csvLoadFailed: "Failed to load CSV result. Fallback to JSON preview when available.",
+    loadingCsv: "Loading table...",
+    csvLoadFailed: "Table preview unavailable. Showing the saved result when available.",
     labelFilter: "Label Filter",
     filterAll: "All",
     rowsTruncatedPrefix: "Showing first ",
@@ -37,8 +38,8 @@ const STRINGS = {
     tabRaw: "原始数据",
     tabHeatmap: "热图",
     tabAi: "AI 专家",
-    loadingCsv: "正在加载 CSV 结果……",
-    csvLoadFailed: "加载 CSV 结果失败，若有 JSON 数据将回退到 JSON 预览。",
+    loadingCsv: "正在加载表格……",
+    csvLoadFailed: "表格暂时无法预览，将显示已有结果。",
     labelFilter: "标签筛选",
     filterAll: "全部",
     rowsTruncatedPrefix: "仅展示前 ",
@@ -72,12 +73,14 @@ export function QuickToolResultPanel(props: QuickToolResultPanelProps) {
   const t = useLang().t(STRINGS);
   const [tab, setTab] = useState<ResultTab>("table");
   const [labelFilter, setLabelFilter] = useState<"all" | "0" | "1">("all");
-  const [csvRows, setCsvRows] = useState<Record<string, unknown>[]>([]);
-  const [csvLoading, setCsvLoading] = useState(false);
-  const [csvLoadFailed, setCsvLoadFailed] = useState(false);
+  const [csvResult, setCsvResult] = useState<{ path: string; rows: Record<string, unknown>[]; failed: boolean } | null>(null);
   const downloadPath = useMemo(() => extractDownloadPath(props.resultPayload), [props.resultPayload]);
   const tableRows = useMemo(() => extractTableRows(props.resultPayload), [props.resultPayload]);
   const csvPath = useMemo(() => extractCsvPath(props.resultPayload), [props.resultPayload]);
+  const currentCsv = csvResult?.path === csvPath ? csvResult : null;
+  const csvRows = currentCsv?.rows ?? [];
+  const csvLoading = Boolean(csvPath && !currentCsv);
+  const csvLoadFailed = currentCsv?.failed === true;
   const useCsvAsSource = Boolean(csvPath);
   const fallbackToJsonRows = useCsvAsSource && csvLoadFailed;
   const effectiveTableRows = useCsvAsSource && !fallbackToJsonRows ? csvRows : tableRows;
@@ -128,41 +131,23 @@ export function QuickToolResultPanel(props: QuickToolResultPanelProps) {
   }, [showHeatmapTab, tab]);
 
   useEffect(() => {
-    let cancelled = false;
-
-    if (!csvPath) {
-      setCsvRows([]);
-      setCsvLoading(false);
-      setCsvLoadFailed(false);
-      return () => {
-        cancelled = true;
-      };
+    const controller = new AbortController();
+    setCsvResult(null);
+    if (csvPath) {
+      void (async () => {
+        try {
+          const res = await fetch(getDownloadUrl(csvPath), { signal: controller.signal });
+          if (!res.ok) throw new Error(`Failed to fetch table (${res.status})`);
+          const text = await res.text();
+          const table = parseDelimitedTable(text, /\.tsv$/i.test(csvPath) ? "\t" : ",");
+          const rows = tableRecords(table).map(normalizeSequenceHeaderRow);
+          if (!controller.signal.aborted) setCsvResult({ path: csvPath, rows, failed: false });
+        } catch {
+          if (!controller.signal.aborted) setCsvResult({ path: csvPath, rows: [], failed: true });
+        }
+      })();
     }
-
-    void (async () => {
-      try {
-        setCsvLoading(true);
-        setCsvLoadFailed(false);
-        const res = await fetch(getDownloadUrl(csvPath));
-        if (!res.ok) throw new Error(`Failed to fetch csv (${res.status})`);
-        const text = await res.text();
-        const parsedRows = parseCsvToRows(text);
-        if (!cancelled) {
-          setCsvRows(parsedRows);
-          setCsvLoading(false);
-        }
-      } catch {
-        if (!cancelled) {
-          setCsvRows([]);
-          setCsvLoading(false);
-          setCsvLoadFailed(true);
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => controller.abort();
   }, [csvPath]);
 
   return (
@@ -251,7 +236,7 @@ export function QuickToolResultPanel(props: QuickToolResultPanelProps) {
                 </div>
               )}
             </>
-          ) : !useCsvAsSource && !csvLoading ? (
+          ) : !csvLoading ? (
             <div className="quick-tools-v2-empty-note">{t.emptyTable}</div>
           ) : null}
         </div>
@@ -461,7 +446,7 @@ function extractCsvPath(payload: Record<string, unknown> | null): string {
 }
 
 function looksLikeCsvPath(path: string): boolean {
-  return path.trim().toLowerCase().endsWith(".csv");
+  return /\.(csv|tsv)$/i.test(path.trim());
 }
 
 function findFirstCsvPath(value: unknown, visited = new Set<unknown>()): string {
@@ -486,84 +471,6 @@ function findFirstCsvPath(value: unknown, visited = new Set<unknown>()): string 
     if (found) return found;
   }
   return "";
-}
-
-function parseCsvToRows(csvText: string): Record<string, unknown>[] {
-  const text = csvText.replace(/^\uFEFF/, "");
-  const lines = splitCsvLines(text).filter((line) => line.trim().length > 0);
-  if (lines.length === 0) return [];
-
-  const headers = parseCsvLine(lines[0]);
-  if (headers.length === 0) return [];
-
-  const rows: Record<string, unknown>[] = [];
-  for (let i = 1; i < lines.length; i += 1) {
-    const cells = parseCsvLine(lines[i]);
-    const row: Record<string, unknown> = {};
-    headers.forEach((header, idx) => {
-      row[header || `column_${idx + 1}`] = cells[idx] ?? "";
-    });
-    rows.push(normalizeSequenceHeaderRow(row));
-  }
-  return rows;
-}
-
-function splitCsvLines(text: string): string[] {
-  const lines: string[] = [];
-  let current = "";
-  let inQuotes = false;
-
-  for (let i = 0; i < text.length; i += 1) {
-    const ch = text[i];
-    if (ch === "\"") {
-      if (inQuotes && text[i + 1] === "\"") {
-        current += "\"\"";
-        i += 1;
-      } else {
-        inQuotes = !inQuotes;
-        current += "\"";
-      }
-      continue;
-    }
-    if ((ch === "\n" || ch === "\r") && !inQuotes) {
-      if (current.length > 0) {
-        lines.push(current);
-        current = "";
-      }
-      if (ch === "\r" && text[i + 1] === "\n") i += 1;
-      continue;
-    }
-    current += ch;
-  }
-  if (current.length > 0) lines.push(current);
-  return lines;
-}
-
-function parseCsvLine(line: string): string[] {
-  const out: string[] = [];
-  let current = "";
-  let inQuotes = false;
-
-  for (let i = 0; i < line.length; i += 1) {
-    const ch = line[i];
-    if (ch === "\"") {
-      if (inQuotes && line[i + 1] === "\"") {
-        current += "\"";
-        i += 1;
-      } else {
-        inQuotes = !inQuotes;
-      }
-      continue;
-    }
-    if (ch === "," && !inQuotes) {
-      out.push(current);
-      current = "";
-      continue;
-    }
-    current += ch;
-  }
-  out.push(current);
-  return out;
 }
 
 function toFunctionalResidueRows(rows: Record<string, unknown>[]): Record<string, unknown>[] {

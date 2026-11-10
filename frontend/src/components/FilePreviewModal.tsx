@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { MolstarViewer } from "./MolstarViewer";
 import { fileUrlFor } from "../lib/richContent";
 import { renderMarkdown } from "../lib/markdown";
+import { parseDelimitedTable, type DelimitedTable } from "../lib/delimitedTable";
+import { useLang } from "../lib/i18n";
 
 /**
  * Modal that previews a session file inline. Picks renderer by extension:
@@ -43,28 +45,26 @@ function fmtSize(n: number): string {
   return `${(n / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function parseDelim(text: string, sep: string): { headers: string[]; rows: string[][] } | null {
-  const lines = text.split(/\r?\n/).filter((l) => l.length > 0);
-  if (lines.length < 1) return null;
-  const headers = lines[0].split(sep);
-  const rows = lines.slice(1).map((l) => l.split(sep));
-  return { headers, rows };
-}
-
-function CsvView({ url, sep }: { url: string; sep: string }) {
-  const [data, setData] = useState<{ headers: string[]; rows: string[][] } | null>(null);
-  const [err, setErr] = useState<string>("");
+function CsvView({ url, sep }: { url: string; sep: "," | "\t" }) {
+  const zh = useLang().lang === "zh";
+  const [data, setData] = useState<DelimitedTable | null>(null);
+  const [err, setErr] = useState(false);
   useEffect(() => {
-    let cancelled = false;
-    fetch(url)
+    const controller = new AbortController();
+    setData(null); setErr(false);
+    fetch(url, { signal: controller.signal })
       .then((r) => (r.ok ? r.text() : Promise.reject(new Error(`HTTP ${r.status}`))))
-      .then((t) => { if (!cancelled) setData(parseDelim(t.slice(0, 1_000_000), sep)); })
-      .catch((e) => { if (!cancelled) setErr(String(e)); });
-    return () => { cancelled = true; };
+      .then((text) => {
+        if (!controller.signal.aborted) setData(parseDelimitedTable(text, sep, { maxRows: 200, maxChars: 1_000_000 }));
+      })
+      .catch(() => { if (!controller.signal.aborted) setErr(true); });
+    return () => controller.abort();
   }, [url, sep]);
-  if (err) return <div className="fpm-error">{err}</div>;
-  if (!data) return <div className="fpm-loading">Loading…</div>;
-  const rows = data.rows.slice(0, 200);
+  if (err) return <div className="fpm-error">{zh ? "无法预览此表格，可下载查看。" : "Table preview unavailable. Download to view the file."}</div>;
+  if (!data) return <div className="fpm-loading">{zh ? "正在加载…" : "Loading…"}</div>;
+  if (!data.headers.length) return <div className="fpm-loading">{data.truncated
+    ? (zh ? "请下载查看完整表格。" : "Download to view the complete table.")
+    : (zh ? "表格为空。" : "This table is empty.")}</div>;
   return (
     <div className="fpm-csv">
       <table>
@@ -72,18 +72,16 @@ function CsvView({ url, sep }: { url: string; sep: string }) {
           <tr>{data.headers.map((h, i) => <th key={i}>{h}</th>)}</tr>
         </thead>
         <tbody>
-          {rows.map((row, i) => (
+          {data.rows.map((row, i) => (
             <tr key={i}>
               {row.map((cell, j) => <td key={j}>{cell}</td>)}
             </tr>
           ))}
         </tbody>
       </table>
-      {data.rows.length > rows.length && (
-        <div className="fpm-csv-truncated">
-          Showing first {rows.length} of {data.rows.length} rows.
-        </div>
-      )}
+      {data.truncated && <div className="fpm-csv-truncated">{zh
+        ? `显示前 ${data.rows.length} 行，下载可查看完整表格。`
+        : `Showing the first ${data.rows.length} rows. Download for the complete table.`}</div>}
     </div>
   );
 }
@@ -170,7 +168,7 @@ export function FilePreviewModal({
       />
     );
   } else if (CSV_EXTS.has(ext)) {
-    body = <CsvView url={url} sep={ext === "tsv" ? "\t" : ","} />;
+    body = <CsvView key={url} url={url} sep={ext === "tsv" ? "\t" : ","} />;
   } else if (MD_EXTS.has(ext)) {
     body = <MarkdownView url={url} />;
   } else if (FASTA_EXTS.has(ext)) {

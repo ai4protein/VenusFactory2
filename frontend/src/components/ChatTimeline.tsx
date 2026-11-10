@@ -3,6 +3,7 @@ import { ModelResultCard } from "./ModelResultCard";
 import type { ChatHistoryItem, SecurityEvent } from "../lib/api";
 import { submitFeedback } from "../lib/api";
 import { renderMarkdown } from "../lib/markdown";
+import { parseDelimitedTable } from "../lib/delimitedTable";
 import { ToolExecutionList, isResearchNoiseTool, type ToolExecution } from "./ToolExecutionCard";
 import { StructureFileButton } from "./StructureFileButton";
 import { isStructureFile, openStructure, structurePathFromLink } from "../lib/structurePreview";
@@ -166,16 +167,6 @@ const RE_IMAGE = /🖼️\s*\*\*Generated Image:\*\*\s*\[([^\]]+)\]\(([^)]+)\)/g
 const RE_FILE_PREVIEW = /\*\*File Preview\s*\(([^)]+)\):\*\*\s*```[^\n]*\n([\s\S]*?)```/g;
 const IMAGE_EXT_RE = /\.(?:png|jpe?g|gif|webp|bmp|svg|tiff?)$/i;
 
-function parseCSVLike(text: string): { headers: string[]; rows: string[][] } | null {
-  const lines = text.trim().split("\n").filter((l) => l.trim());
-  if (lines.length < 2) return null;
-  const sep = lines[0].includes("\t") ? "\t" : ",";
-  const headers = lines[0].split(sep).map((h) => h.trim());
-  if (headers.length < 2) return null;
-  const rows = lines.slice(1).map((line) => line.split(sep).map((c) => c.trim()));
-  return { headers, rows };
-}
-
 function extractRichAttachments(text: string): { cleanText: string; attachments: RichAttachment[] } {
   const attachments: RichAttachment[] = [];
   let cleanText = text;
@@ -194,12 +185,16 @@ function extractRichAttachments(text: string): { cleanText: string; attachments:
   for (const m of text.matchAll(RE_FILE_PREVIEW)) {
     const filename = m[1];
     const content = m[2];
-    if (filename.match(/\.csv$/i)) {
-      const parsed = parseCSVLike(content);
-      if (parsed) {
-        attachments.push({ type: "csv_table", filename, ...parsed });
-        cleanText = cleanText.replace(m[0], "");
-        continue;
+    if (/\.(csv|tsv)$/i.test(filename)) {
+      try {
+        const parsed = parseDelimitedTable(content, /\.tsv$/i.test(filename) ? "\t" : ",");
+        if (parsed.headers.length && parsed.rows.length) {
+          attachments.push({ type: "csv_table", filename, ...parsed });
+          cleanText = cleanText.replace(m[0], "");
+          continue;
+        }
+      } catch {
+        // Keep incomplete or malformed previews as their original code block.
       }
     }
     // non-CSV previews stay as code blocks in markdown
