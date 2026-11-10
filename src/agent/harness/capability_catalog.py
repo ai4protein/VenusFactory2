@@ -42,25 +42,60 @@ def register(library, manifest, receipt, goal_id, *, publication=None):
         con.execute('INSERT INTO capability_heads VALUES (?,?) ON CONFLICT(family) DO UPDATE SET id=excluded.id', (family, manifest['id']))
     return card
 
+def _conditions(*, public_only=False, excluded=()):
+    conditions, values = CURRENT, []
+    if public_only:
+        conditions += " AND json_extract(card,'$.visibility')='public' AND json_extract(card,'$.publication.policy')='operator_selected.v1'"
+    if excluded:
+        conditions += ' AND id NOT IN (SELECT value FROM json_each(?))'
+        values.append(json.dumps(list(excluded)))
+    return conditions, values
+
+
 def search(library, query='', limit=10, offset=0, *, public_only=False, excluded=()):
     if not isinstance(query, str) or len(query) > 200:
         raise ValueError('Use a search query of at most 200 characters')
     if type(limit) is not int or not 1 <= limit <= 50 or type(offset) is not int or offset < 0:
         raise ValueError('Use limit 1-50 and a nonnegative offset')
     terms = query.casefold().split()
-    conditions = ' AND '.join("search_text LIKE ? ESCAPE '\\'" for _ in terms) or '1=1'
-    conditions = '(' + conditions + ') AND ' + CURRENT
-    values = ['%'+word.replace('\\','\\\\').replace('%','\\%').replace('_','\\_')+'%' for word in terms]
-    if public_only:
-        conditions += " AND json_extract(card,'$.visibility')='public' AND json_extract(card,'$.publication.policy')='operator_selected.v1'"
-    if excluded:
-        conditions += ' AND id NOT IN (SELECT value FROM json_each(?))'
-        values.append(json.dumps(list(excluded)))
+    pattern = ' AND '.join("search_text LIKE ? ESCAPE '\\'" for _ in terms) or '1=1'
+    conditions, values = _conditions(public_only=public_only, excluded=excluded)
+    conditions = '(' + pattern + ') AND ' + conditions
+    values = ['%'+word.replace('\\','\\\\').replace('%','\\%').replace('_','\\_')+'%' for word in terms] + values
     with database(library) as con:
         total = con.execute('SELECT COUNT(*) FROM capabilities WHERE '+conditions, values).fetchone()[0]
         rows = con.execute('SELECT card FROM capabilities WHERE '+conditions+' ORDER BY created DESC,id LIMIT ? OFFSET ?', [*values,limit,offset]).fetchall()
     items = [json.loads(row[0]) for row in rows]
     return {'total':total,'items':items,'next_offset':offset+len(items) if offset+len(items)<total else None}
+
+
+def ranked_references(library, rank, *, public_only=False, excluded=()):
+    """Return eligible IDs and scores (None for no match), without decoding cards.
+
+    The caller supplies its shared rank(name, search_text, kind) matcher so merged
+    tool/model results use one relevance policy. All eligible IDs are retained for
+    inventory counts; only the selected page needs discovery_cards afterwards.
+    """
+    conditions, values = _conditions(public_only=public_only, excluded=excluded)
+    with database(library) as con:
+        con.create_function('capability_rank', 3, rank, deterministic=True)
+        return con.execute(
+            "SELECT id, capability_rank(name,search_text,json_extract(card,'$.kind')) "
+            'FROM capabilities WHERE '+conditions, values,
+        ).fetchall()
+
+
+def discovery_cards(library, identities, *, public_only=False, excluded=()):
+    """Load compact cards for a selected page, rechecking current publication."""
+    if not identities:
+        return {}
+    conditions, values = _conditions(public_only=public_only, excluded=excluded)
+    conditions += ' AND id IN (SELECT value FROM json_each(?))'
+    with database(library) as con:
+        rows = con.execute('SELECT card FROM capabilities WHERE '+conditions,
+                           [*values, json.dumps(list(identities))]).fetchall()
+    items = [discovery_card(json.loads(row[0])) for row in rows]
+    return {item['id']: item for item in items}
 
 
 def discovery_card(card):
