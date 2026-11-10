@@ -46,6 +46,11 @@ def prioritize_platform_models(cards):
 
 
 
+def catalog_card_summary(card):
+    """Load complete input contracts only when a component is selected."""
+    return {key: value for key, value in card.items() if key not in {"parameter_schema", "contract"}}
+
+
 def require(ok, message):
     if not ok:
         raise ValueError(message)
@@ -263,7 +268,7 @@ class Platform:
         counts = {c: sum(m['category'] == c for m in matching) for c in [*CATEGORIES, 'processing', 'search']}
         found = [m for m in matching if not category or m['category'] == category]
         found = prioritize_platform_models(found)
-        return {'items': [{k: v for k, v in card.items() if k not in {'parameter_schema', 'contract'}} for card in found[offset:offset+limit]], 'total': len(found), 'registered': len(cards),
+        return {'items': [catalog_card_summary(card) for card in found[offset:offset+limit]], 'total': len(found), 'registered': len(cards),
                 'categories': counts, 'unavailable_sources': base['unavailable_sources'] if not mine else [],
                 'unavailable_tools': unavailable}
 
@@ -312,7 +317,7 @@ class Platform:
     def workflow_components(self, owner, query='', category='', source='', kind='', offset=0, limit=24):
         from backend.web_v2.workflow_tools import catalog
         base = self.catalog(owner, limit=100000)
-        tools, unavailable = catalog()
+        tools, unavailable = catalog(detail=False)
         rows = [{**m, 'node_kind': 'tool' if m['adapter'] == 'capability' else 'model'}
                 for m in base['items'] if m['workflow']] + tools
         counts = {c: sum(m['category'] == c for m in rows) for c in {m['category'] for m in rows}}
@@ -321,7 +326,7 @@ class Platform:
         found = [m for m in rows if (not category or m['category'] == category) and (not source or m['source'] == source)
                  and (not kind or m['node_kind'] == kind) and all(w in json.dumps(m, ensure_ascii=False).casefold() for w in words)]
         found = prioritize_platform_models(found)
-        return {'items': found[offset:offset+limit], 'total': len(found), 'categories': counts, 'kinds': kinds,
+        return {'items': [catalog_card_summary(card) for card in found[offset:offset+limit]], 'total': len(found), 'categories': counts, 'kinds': kinds,
                 'unavailable_sources': base['unavailable_sources'], 'unavailable_tools': unavailable}
 
     def workflow_component(self, owner, identity):

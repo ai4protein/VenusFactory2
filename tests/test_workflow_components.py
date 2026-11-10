@@ -62,6 +62,9 @@ def test_tool_catalog_category_source_search_and_pagination(setup):
     found=p.workflow_components(owner,query='PubMed',kind='tool')
     assert [c['id'] for c in found['items']]==['tool:query_pubmed']
     assert not found['unavailable_tools']
+    assert all('contract' not in c and 'parameter_schema' not in c for c in a['items'] + b['items'] + tools['items'])
+    detail = p.workflow_component(owner, 'tool:query_pubmed')
+    assert 'query' in detail['contract']['properties']
 
 
 def test_registered_tool_reads_managed_input_and_computes_properties(setup):
@@ -119,6 +122,7 @@ def test_workflow_component_http_contract_and_private_visibility(setup,monkeypat
 
 def test_http_training_workflow_completes_in_separate_worker(tmp_path,monkeypatch):
     monkeypatch.setenv('WEBUI_V2_MODE','local')
+    monkeypatch.setenv('VENUS_WORKER_AUTOSTART', '1')
     p=Platform(tmp_path);monkeypatch.setattr(api,'service',p)
     app=FastAPI();app.include_router(api.router)
     with TestClient(app) as client:

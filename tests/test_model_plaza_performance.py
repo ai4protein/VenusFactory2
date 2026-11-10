@@ -24,12 +24,13 @@ def isolated(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("mode", ["online", "local"])
-def test_fresh_catalog_does_not_import_inference_or_registered_tool_implementations(tmp_path, mode):
+@pytest.mark.parametrize("listing", ["plaza_catalog", "workflow_components"])
+def test_fresh_catalog_does_not_import_inference_or_registered_tool_implementations(tmp_path, mode, listing):
     code = """
 import json,sys
 from backend.web_v2.model_platform import Platform
 p = Platform(sys.argv[1])
-result = p.plaza_catalog('owner', limit=10000)
+result = getattr(p, sys.argv[2])('owner', limit=10000)
 assert result['items'] and not result['unavailable_sources'], result['unavailable_sources']
 assert not result['unavailable_tools']
 assert not ({'torch','transformers','sklearn','backend.web_v2.advanced_tools_api'} & set(sys.modules))
@@ -42,7 +43,7 @@ assert {'fixed_residues_text','pssm_rules_text','model_family','model_name','tem
 print(len(result['items']))
 """
     env = dict(os.environ, WEBUI_V2_MODE=mode, VENUS_MODEL_RUNTIMES_CONFIG=str(tmp_path/'absent.json'))
-    result = subprocess.run([sys.executable, '-c', code, str(tmp_path/'platform')], env=env, capture_output=True, text=True, timeout=45)
+    result = subprocess.run([sys.executable, '-c', code, str(tmp_path/'platform'), listing], env=env, capture_output=True, text=True, timeout=45)
     assert result.returncode == 0, result.stdout + result.stderr
 
 
