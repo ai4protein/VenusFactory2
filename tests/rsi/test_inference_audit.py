@@ -88,7 +88,8 @@ def test_model_written_or_damaged_audits_are_not_accepted(publication, part):
     store, _, _, _, identity = publication
     store.prepare_inference([identity])
     area = store.root / ".inference"
-    path = area / "entries" / (identity + ".json")
+    pointer = json.loads((area / "entries" / (identity + ".json")).read_text())
+    path = area / "audits" / (pointer["audit_id"] + ".json")
     envelope = json.loads(path.read_text())
     if part == "record":
         envelope["record"]["verified"]["skill"] = 999
@@ -270,3 +271,69 @@ def test_parallel_preparation_uses_one_host_key_and_complete_records(publication
         results = list(pool.map(lambda _: store.prepare_inference([identity]), range(2)))
     assert results[0] == results[1]
     assert audit.resolve(store, identity)["inference_audit_id"] == results[0]["models"][0]["audit_id"]
+
+def test_parallel_hashing_is_bounded_and_preserves_content(tmp_path, monkeypatch):
+    import hashlib
+    import threading
+    import time
+    root = tmp_path / "tree"
+    root.mkdir()
+    expected = {}
+    for index in range(40):
+        content = ("file-" + str(index)).encode()
+        path = root / str(index)
+        path.write_bytes(content)
+        expected[path.name] = {"bytes": len(content), "sha256": hashlib.sha256(content).hexdigest()}
+    original = evidence.file_digest
+    lock = threading.Lock()
+    current = peak = 0
+
+    def observe(path, *, before=None):
+        nonlocal current, peak
+        with lock:
+            current += 1
+            peak = max(peak, current)
+        try:
+            time.sleep(0.005)
+            return original(path, before=before)
+        finally:
+            with lock:
+                current -= 1
+    monkeypatch.setattr(evidence, "file_digest", observe)
+    assert evidence.tree_digest(root) == {"directories": [], "files": expected}
+    assert 1 < peak <= 4
+
+
+def test_directory_stat_cannot_hide_replacement_before_hashing(tmp_path, monkeypatch):
+    path = tmp_path / "model.json"
+    path.write_text("original")
+    original = evidence.file_digest
+
+    def replace(file_path, *, before=None):
+        file_path.unlink()
+        file_path.write_text("replacement")
+        return original(file_path, before=before)
+    monkeypatch.setattr(evidence, "file_digest", replace)
+    with pytest.raises(ValueError, match="changed"):
+        evidence.tree_digest(tmp_path)
+
+
+def test_reaudit_preserves_signed_history_referenced_by_old_usage(publication):
+    store, root, _, _, identity = publication
+    first = store.prepare_inference([identity])["models"][0]
+    first_path = store.root / ".inference/audits" / (first["audit_id"] + ".json")
+    original = first_path.read_bytes()
+    # The fixture host verifier accepts this new non-model evidence file.
+    (root / "additional-host-evidence.json").write_text("{}")
+    second = store.prepare_inference([identity])["models"][0]
+    assert second["audit_id"] != first["audit_id"]
+    assert first_path.read_bytes() == original
+    assert audit.resolve(store, identity)["inference_audit_id"] == second["audit_id"]
+
+
+def test_reused_read_buffer_does_not_leak_between_file_sizes(tmp_path):
+    import hashlib
+    for index, content in enumerate([b"x" * (1024 * 1024 + 19), b"short", b"", b"y" * 125]):
+        path = tmp_path / str(index)
+        path.write_bytes(content)
+        assert evidence.file_digest(path) == {"bytes": len(content), "sha256": hashlib.sha256(content).hexdigest()}

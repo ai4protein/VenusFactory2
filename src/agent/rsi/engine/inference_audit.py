@@ -94,9 +94,15 @@ def prepare(library, entry_ids):
             for identity in identities:
                 record = {"schema": SCHEMA, "library": str(library.root), "entry_id": identity,
                           "snapshot_id": snapshot_id, "verified": verified[identity]}
-                path = safe_child(area, "entries/" + identity + ".json")
-                _write(path, {"record": record, "signature": _signature(key, record)})
-                outcomes.append({"entry_id": identity, "audit_id": digest(record), "snapshot_id": snapshot_id})
+                audit_id = digest(record)
+                envelope = {"record": record, "signature": _signature(key, record)}
+                audit_path = safe_child(area, "audits/" + audit_id + ".json")
+                if audit_path.exists():
+                    _require(_read(audit_path) == envelope, "Immutable inference audit changed")
+                else:
+                    _write(audit_path, envelope)
+                _write(safe_child(area, "entries/" + identity + ".json"), {"audit_id": audit_id})
+                outcomes.append({"entry_id": identity, "audit_id": audit_id, "snapshot_id": snapshot_id})
     return {"schema": SCHEMA, "models": outcomes, "prepared_entries": len(outcomes),
             "training_replayed": True, "external_model_calls": 0, "new_autonomous_models": 0}
 
@@ -110,9 +116,13 @@ def resolve(library, entry_id):
     path = safe_child(area, "entries/" + entry_id + ".json")
     if not path.exists():
         return library.resolve(entry_id)
-    envelope = _read(path)
+    pointer = _read(path)
+    _require(set(pointer) == {"audit_id"}, "Invalid inference audit index")
+    audit_id = _identity(pointer["audit_id"])
+    envelope = _read(safe_child(area, "audits/" + audit_id + ".json"))
     _require(set(envelope) == {"record", "signature"}, "Invalid inference audit envelope")
     record = envelope["record"]
+    _require(digest(record) == audit_id, "Immutable inference audit changed")
     _require(isinstance(record, dict) and isinstance(envelope["signature"], str)
              and hmac.compare_digest(_signature(_key(area), record), envelope["signature"]),
              "Host inference audit signature changed")

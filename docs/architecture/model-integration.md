@@ -103,13 +103,14 @@ all evidence is unchanged before and after it. It makes no LLM calls and does no
 create a model or grant public visibility. Run it as the service owner after
 publication or a source/runtime upgrade, outside request workers.
 
-The host stores signed records and a private signing key in the library's
+The host stores immutable signed records and a private signing key in the library's
 `.inference/` directory. This directory must stay outside session/sandbox mounts,
 downloads and source control. Evidence snapshots include complete original and
 ancestral goal trees, registry bindings, declared source datasets, current
 verification/model code and numeric package versions. Per-request validation
-hashes actual file contents; it does not trust timestamps or repeat baseline
-training. Changed evidence, retirement, a changed index or an invalid signature
+hashes actual file contents with four bounded file readers; it does not trust
+timestamps or repeat baseline training. Preparing a later revision preserves the
+earlier audit IDs referenced by existing usage receipts. Changed evidence, retirement, a changed index or an invalid signature
 blocks prepared inference until a full audit passes again. Locks and generated
 Python bytecode are excluded from content identity; symlinks and special files
 are rejected even in those locations.

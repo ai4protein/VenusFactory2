@@ -11,12 +11,14 @@ import importlib.metadata
 import os
 import stat
 import sys
+import threading
 from pathlib import Path
 
 from .storage import safe_child
 
 MAX_FILES = 100_000
 MAX_BYTES = 4 * 1024**3
+_READ_BUFFER = threading.local()
 
 
 def require(condition, message):
@@ -31,18 +33,21 @@ def ordinary(path):
     return path
 
 
-def file_digest(path):
+def file_digest(path, *, before=None):
     """Hash actual bytes, rejecting special files and replacement during reading."""
-    before = path.lstat()
+    before = before or path.lstat()
     require(stat.S_ISREG(before.st_mode), "Inference evidence must be a regular file")
     fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
-    with os.fdopen(fd, "rb") as stream:
+    with os.fdopen(fd, "rb", buffering=0) as stream:
         opened = os.fstat(stream.fileno())
         require((opened.st_dev, opened.st_ino) == (before.st_dev, before.st_ino),
                 "Inference evidence changed while opening")
         h = hashlib.sha256()
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            h.update(chunk)
+        if not hasattr(_READ_BUFFER, "data"):
+            _READ_BUFFER.data = bytearray(1024 * 1024)
+        view = memoryview(_READ_BUFFER.data)
+        while size := stream.readinto(view):
+            h.update(view[:size])
         after = os.fstat(stream.fileno())
     stamp = lambda s: (s.st_dev, s.st_ino, s.st_size, s.st_mtime_ns, s.st_ctime_ns)
     require(stamp(before) == stamp(after) == stamp(path.lstat()),
@@ -53,41 +58,62 @@ def file_digest(path):
 class ScanBudget:
     def __init__(self):
         self.files = self.bytes = 0
+        self.lock = threading.Lock()
 
     def consume(self, size):
-        self.files += 1
-        self.bytes += size
-        require(self.files <= MAX_FILES and self.bytes <= MAX_BYTES,
-                "Inference evidence exceeds its scan budget")
+        with self.lock:
+            self.files += 1
+            self.bytes += size
+            require(self.files <= MAX_FILES and self.bytes <= MAX_BYTES,
+                    "Inference evidence exceeds its scan budget")
 
 
 def tree_digest(root, *, python_only=False, budget=None):
-    """Scan every directory without following links; never trust mtime as a hash."""
+    """Hash a bounded file batch concurrently, preserving every content check."""
+    from concurrent.futures import ThreadPoolExecutor
+
     root = ordinary(root)
     require(root.is_dir(), "Missing inference evidence directory")
     directories, files = [], {}
     budget = budget or ScanBudget()
-    stack = [root]
-    while stack:
-        parent = stack.pop()
-        with os.scandir(parent) as entries:
-            for entry in sorted(entries, key=lambda item: item.name):
-                path = Path(entry.path)
-                relative = path.relative_to(root)
-                require(not entry.is_symlink(), "Symlinked inference evidence")
-                volatile = "__pycache__" in relative.parts
-                if entry.is_dir(follow_symlinks=False):
-                    stack.append(path)
-                    if not volatile and not python_only:
-                        directories.append(relative.as_posix())
-                    continue
-                require(entry.is_file(follow_symlinks=False), "Nonregular inference evidence")
-                if volatile or entry.name.endswith(".lock") or (python_only and path.suffix != ".py"):
-                    continue
-                budget.consume(entry.stat(follow_symlinks=False).st_size)
-                files[relative.as_posix()] = file_digest(path)
-    return {"directories": sorted(directories), "files": files}
+    stack = [(str(root), "", False)]
+    batch = []
 
+    def hash_entry(item):
+        entry = item[1]
+        before = entry.stat(follow_symlinks=False)
+        budget.consume(before.st_size)
+        return file_digest(Path(entry.path), before=before)
+
+    def flush(pool):
+        records = pool.map(hash_entry, batch)
+        for item, record in zip(batch, records, strict=True):
+            files[item[0]] = record
+        batch.clear()
+
+    # One core still bounds CPU work; four readers overlap filesystem latency.
+    # At most sixteen files are queued, each reader uses a 1 MiB buffer.
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        while stack:
+            parent, prefix, parent_volatile = stack.pop()
+            with os.scandir(parent) as entries:
+                for entry in sorted(entries, key=lambda item: item.name):
+                    relative = prefix + entry.name
+                    require(not entry.is_symlink(), "Symlinked inference evidence")
+                    volatile = parent_volatile or entry.name == "__pycache__"
+                    if entry.is_dir(follow_symlinks=False):
+                        stack.append((entry.path, relative + "/", volatile))
+                        if not volatile and not python_only:
+                            directories.append(relative)
+                        continue
+                    require(entry.is_file(follow_symlinks=False), "Nonregular inference evidence")
+                    if volatile or entry.name.endswith(".lock") or (python_only and not entry.name.endswith(".py")):
+                        continue
+                    batch.append((relative, entry))
+                    if len(batch) == 16:
+                        flush(pool)
+        flush(pool)
+    return {"directories": sorted(directories), "files": files}
 
 def _read(path):
     import json
