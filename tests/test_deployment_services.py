@@ -133,3 +133,40 @@ def test_mcp_readiness_does_not_request_web_catalogs(readiness_server):
     responses["/health"] = (200, {"status": "ready"})
     assert deployment.service_ready(port, "mcp")
     assert requests == ["/health"]
+
+
+def test_deployment_identity_tracks_source_and_frontend_without_credentials(tmp_path, monkeypatch):
+    import hashlib
+    import subprocess
+
+    root = tmp_path / "release"
+    root.mkdir()
+    dist = tmp_path / "frontend"
+    dist.mkdir()
+    (dist / "index.html").write_text("fixture frontend")
+    (root / "app.py").write_text("version = 1\n")
+    for args in (("init",), ("add", "app.py"),
+                 ("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "fixture")):
+        subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True)
+    monkeypatch.setenv("DMX_API_KEY", "synthetic-do-not-record")
+    first = deployment.deployment_identity(dist, root)
+    assert len(first["source_revision"]) == 40
+    assert first["source_dirty"] is False
+    assert first["frontend_index_sha256"] == hashlib.sha256(b"fixture frontend").hexdigest()
+    assert "synthetic-do-not-record" not in str(first)
+    (root / "app.py").write_text("version = 2\n")
+    (dist / "index.html").write_text("second frontend")
+    second = deployment.deployment_identity(dist, root)
+    assert second["source_revision"] == first["source_revision"]
+    assert second["source_dirty"] is True
+    assert second["frontend_index_sha256"] != first["frontend_index_sha256"]
+
+
+def test_source_archive_can_start_without_a_git_repository(tmp_path):
+    root, dist = tmp_path / "release", tmp_path / "frontend"
+    root.mkdir(); dist.mkdir()
+    (dist / "index.html").write_text("fixture")
+    identity = deployment.deployment_identity(dist, root)
+    assert identity["source_revision"] is None
+    assert identity["source_dirty"] is None
+    assert len(identity["frontend_index_sha256"]) == 64

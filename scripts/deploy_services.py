@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -86,6 +88,24 @@ def prepare_harness_home(plan, source=None):
         else:
             shutil.copy2(src, dst)
             dst.chmod(0o600)
+
+
+def deployment_identity(frontend_dist, root=ROOT):
+    """Record the loaded revision privately, without reading environment values."""
+    root = Path(root).resolve()
+    result = {"source_root": str(root), "source_revision": None, "source_dirty": None,
+              "frontend_index_sha256": hashlib.sha256((Path(frontend_dist) / "index.html").read_bytes()).hexdigest()}
+    try:
+        def git(*arguments):
+            return subprocess.run(["git", "-C", str(root), *arguments], check=True,
+                                  capture_output=True, text=True, timeout=10).stdout.strip()
+
+        if Path(git("rev-parse", "--show-toplevel")).resolve() == root:
+            result["source_revision"] = git("rev-parse", "HEAD")
+            result["source_dirty"] = bool(git("status", "--porcelain", "--untracked-files=normal"))
+    except (OSError, subprocess.SubprocessError):
+        pass  # Source archives can run without Git metadata.
+    return result
 
 
 def service_ready(port, kind):
@@ -175,7 +195,9 @@ def main(argv=None):
 
     for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
         signal.signal(sig, request_stop)
-    state = {"job_id": os.getenv("PBS_JOBID"), "host": socket.gethostname(), "status": "starting", "services": []}
+    state = {"job_id": os.getenv("PBS_JOBID"), "host": socket.gethostname(), "status": "starting", "services": [],
+             "started_at": datetime.now(timezone.utc).isoformat(),
+             **deployment_identity(args.frontend_dist)}
 
     def save():
         pending = control / "deployment.json.tmp"

@@ -11,10 +11,34 @@ export type AgentExecutionOptions = {
   harnesses: Array<{ id: string; label: string; ready: boolean; reason?: string; model_catalog: string }>;
 };
 
-export async function getAgentExecutionOptions(): Promise<AgentExecutionOptions> {
-  const response = await fetch(`${API_ROOT}/api/chat/agent-execution-options`);
-  if (!response.ok) throw new Error(`Execution options: HTTP ${response.status}`);
-  return response.json();
+export async function getAgentExecutionOptions(signal?: AbortSignal): Promise<AgentExecutionOptions> {
+  const controller = new AbortController();
+  const cancel = () => controller.abort(signal?.reason);
+  if (signal?.aborted) cancel();
+  else signal?.addEventListener("abort", cancel, { once: true });
+  const timeout = setTimeout(() => controller.abort(new DOMException("Model options timed out", "TimeoutError")), 15_000);
+  try {
+    const response = await fetch(`${API_ROOT}/api/chat/agent-execution-options`, { signal: controller.signal, cache: "no-store" });
+    if (!response.ok) throw new Error(`Execution options: HTTP ${response.status}`);
+    const data = await response.json();
+    const record = (value: unknown): value is Record<string, unknown> => value !== null && typeof value === "object" && !Array.isArray(value);
+    const strings = (value: unknown) => Array.isArray(value) && value.every(item => typeof item === "string");
+    if (!record(data) || !record(data.default)
+      || typeof data.default.harness !== "string" || typeof data.default.model_id !== "string"
+      || typeof data.shared_default_model !== "string"
+      || !Array.isArray(data.harnesses) || !data.harnesses.every(item => record(item)
+        && typeof item.id === "string" && typeof item.label === "string" && typeof item.ready === "boolean")
+      || !Array.isArray(data.models) || !data.models.every(item => record(item)
+        && [item.id, item.label, item.provider, item.model].every(value => typeof value === "string") && typeof item.ready === "boolean")
+      || !Array.isArray(data.combinations) || !data.combinations.every(item => record(item)
+        && typeof item.harness === "string" && typeof item.model_id === "string" && typeof item.ready === "boolean" && strings(item.reasons))) {
+      throw new Error("Invalid model options response");
+    }
+    return data as AgentExecutionOptions;
+  } finally {
+    clearTimeout(timeout);
+    signal?.removeEventListener("abort", cancel);
+  }
 }
 
 export type ChatHistoryItem = {

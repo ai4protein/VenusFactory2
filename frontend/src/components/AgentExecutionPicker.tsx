@@ -14,14 +14,16 @@ type Props = {
 export function AgentExecutionPicker({ value, onChange, onReadyChange, locked, busy, lang, online }: Props) {
   const [options, setOptions] = useState<AgentExecutionOptions | null>(null);
   const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const zh = lang === "zh";
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
     setFailed(false);
-    getAgentExecutionOptions().then(data => { if (active) setOptions(data); })
+    getAgentExecutionOptions(controller.signal).then(data => { if (active) setOptions(data); })
       .catch(() => { if (active) setFailed(true); });
-    return () => { active = false; };
-  }, []);
+    return () => { active = false; controller.abort(); };
+  }, [attempt]);
   useEffect(() => {
     if (!locked && !busy && options) {
       const harness = value?.harness || options.default.harness;
@@ -34,12 +36,18 @@ export function AgentExecutionPicker({ value, onChange, onReadyChange, locked, b
   const ready = Boolean((locked && value?.harness === "langgraph") || current?.ready && (value ? modelAvailability(options?.combinations || [], harness, value.model_id, zh).ready : locked));
   useEffect(() => { onReadyChange(ready); }, [ready, onReadyChange]);
   return <>
-    <ComposerSelect label="Harness" ariaLabel="Agent harness" value={harness}
+    {failed ? <span className="composer-picker-wrap">
+      <button type="button" className="composer-picker" onClick={() => { setFailed(false); setAttempt(count => count + 1); }}
+        aria-label={zh ? "重新加载模型和 Harness" : "Retry loading models and harnesses"}>
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13 6a5 5 0 1 0 0 4M13 2v4H9"/></svg>
+        <span>{zh ? "重新加载" : "Retry loading"}</span>
+      </button>
+    </span> : <ComposerSelect label="Harness" ariaLabel="Agent harness" value={harness}
       disabled={locked || busy || !options} disabledHint={locked ? (zh ? "在新对话中更换" : "Start a new chat to change") : undefined}
-      placeholder={failed ? (zh ? "加载失败" : "Could not load") : (zh ? "加载中…" : "Loading…")}
+      placeholder={zh ? "加载中…" : "Loading…"}
       items={[...(locked && value?.harness === "langgraph" ? [{ value: "langgraph", label: "LangGraph" }] : []),
         ...(options?.harnesses || []).map(h => ({ value: h.id, label: h.label, disabled: !h.ready, hint: zh ? "未配置" : "Not configured" }))]}
-      onChange={next => onChange({ harness: next, model_id: preferredModel(options?.combinations || [], next, value?.model_id, options?.shared_default_model) })}/>
+      onChange={next => onChange({ harness: next, model_id: preferredModel(options?.combinations || [], next, value?.model_id, options?.shared_default_model) })}/>}
     {value && <ComposerSelect label={zh ? "模型" : "Model"} ariaLabel="Agent LLM" value={value.model_id} helpText={zh ? "根据API反馈速度不一可能需要耐心等待" : "API response times vary. Please allow some time for a response."}
       disabled={locked || busy || !options} disabledHint={locked ? (zh ? "在新对话中更换" : "Start a new chat to change") : undefined}
       placeholder={zh ? "暂无可用模型" : "No models available"}
