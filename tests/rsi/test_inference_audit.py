@@ -347,7 +347,9 @@ def replace_signed_fixture_record(store, result, change):
     identity = digest(record)
     atomic_json(area / "audits" / (identity + ".json"),
                 {"record": record, "signature": audit._signature(audit._key(area), record)})
-    atomic_json(area / "entries" / (record["entry_id"] + ".json"), {"audit_id": identity})
+    runtime_id = digest(evidence.runtime_identity())
+    atomic_json(area / "runtimes" / runtime_id / "entries" / (record["entry_id"] + ".json"),
+                {"audit_id": identity})
     return identity
 
 
@@ -470,3 +472,67 @@ def test_mixed_directory_scan_preserves_exact_content_and_filters(tmp_path):
     assert evidence.tree_digest(tmp_path, python_only=True) == {"directories": [], "files": expected}
     expected["a/readme.txt"] = {"bytes": 5, "sha256": hashlib.sha256(b"notes").hexdigest()}
     assert evidence.tree_digest(tmp_path) == {"directories": ["a", "b", "b/nested"], "files": expected}
+
+
+def test_staged_runtime_preserves_legacy_reader_and_both_source_bindings(publication, monkeypatch):
+    store, _, _, calls, identity = publication
+    runtime_a = evidence.runtime_identity()
+    runtime_b = {**runtime_a, "python": runtime_a["python"] + " staged-fixture"}
+    active = [runtime_a]
+    monkeypatch.setattr(evidence, "runtime_identity", lambda: copy.deepcopy(active[0]))
+    first = store.prepare_inference([identity])["models"][0]
+    area = store.root / ".inference"
+    legacy = area / "entries" / (identity + ".json")
+    original = legacy.read_bytes()
+    # Simulate an installation prepared by the older, single-index implementation.
+    (area / "runtimes" / first["verification_runtime_id"] / "entries" / (identity + ".json")).unlink()
+    active[0] = runtime_b
+    with pytest.raises(ValueError, match="runtime changed"):
+        audit.resolve(store, identity)
+    second = store.prepare_inference([identity])["models"][0]
+    assert first["verification_runtime_id"] != second["verification_runtime_id"]
+    assert first["audit_id"] != second["audit_id"]
+    assert legacy.read_bytes() == original
+    assert audit.resolve(store, identity)["inference_audit_id"] == second["audit_id"]
+    active[0] = runtime_a
+    assert audit.resolve(store, identity)["inference_audit_id"] == first["audit_id"]
+    assert calls == [True, True, True]
+
+
+@pytest.mark.parametrize("damage", ["malformed", "foreign_runtime", "symlink"])
+def test_bad_active_runtime_index_never_falls_back_to_a_valid_legacy_audit(publication, monkeypatch, damage):
+    store, _, _, _, identity = publication
+    current = evidence.runtime_identity()
+    other = {**current, "python": current["python"] + " other-fixture"}
+    monkeypatch.setattr(evidence, "runtime_identity", lambda: copy.deepcopy(other))
+    previous = store.prepare_inference([identity])["models"][0]
+    monkeypatch.setattr(evidence, "runtime_identity", lambda: copy.deepcopy(current))
+    prepared = store.prepare_inference([identity])["models"][0]
+    area = store.root / ".inference"
+    pointer = area / "runtimes" / prepared["verification_runtime_id"] / "entries" / (identity + ".json")
+    # The legacy record is valid for the current runtime; it cannot rescue a bad active index.
+    atomic_json(area / "entries" / (identity + ".json"), {"audit_id": prepared["audit_id"]})
+    if damage == "malformed":
+        atomic_json(pointer, {"audit_id": prepared["audit_id"], "skip_verification": True})
+    elif damage == "foreign_runtime":
+        atomic_json(pointer, {"audit_id": previous["audit_id"]})
+    else:
+        pointer.unlink()
+        pointer.symlink_to(area / "entries" / (identity + ".json"))
+    with pytest.raises((ValueError, OSError)):
+        audit.resolve(store, identity)
+
+
+def test_old_audits_still_reject_changed_evidence_after_another_runtime_is_prepared(publication, monkeypatch):
+    store, root, _, _, identity = publication
+    first_runtime = evidence.runtime_identity()
+    active = [first_runtime]
+    monkeypatch.setattr(evidence, "runtime_identity", lambda: copy.deepcopy(active[0]))
+    first = store.prepare_inference([identity])["models"][0]
+    active[0] = {**first_runtime, "python": first_runtime["python"] + " staged-fixture"}
+    store.prepare_inference([identity])
+    (root / "new-evidence.txt").write_text("changed")
+    active[0] = first_runtime
+    with pytest.raises(ValueError, match="changed"):
+        audit.resolve(store, identity)
+    assert first["verification_runtime_id"] == digest(first_runtime)

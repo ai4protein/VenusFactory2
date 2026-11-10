@@ -137,6 +137,19 @@ and checks its identity and current registry binding. Earlier inline records
 remain readable and immutable; source upgrades still require full preparation.
 The 32 MiB audit-record limit remains in force.
 
+Preparation also returns a `verification_runtime_id`, the content fingerprint of
+verification code and its numerical environment. Audit pointers are stored per
+fingerprint, so preparation from a new frozen source checkout can use the same
+library without replacing the legacy reader's pointer. Each worker selects its own
+runtime audit and still checks every evidence binding. An invalid selected audit
+fails closed; another runtime's record cannot substitute for it. Old single-index
+libraries remain readable with their original verification rules.
+
+For an upgrade, prepare and test the target IDs from the new immutable checkout
+before directing workers to it. Keep the old checkout available for workers still
+using it; do not edit a running worker's source in place. Retaining an older audit
+does not preserve access to changed or retired model evidence.
+
 Evidence snapshots include complete original and
 ancestral goal trees, registry bindings, declared source datasets, current
 verification/model code and numeric package versions. Per-request validation
