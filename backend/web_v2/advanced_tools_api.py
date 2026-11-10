@@ -21,7 +21,6 @@ from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from mcp_tools.tools.runtime_tool_policy import assert_local_feature
-from mcp_tools.tools.discovery.workflow import handle_VenusMine
 from mcp_tools.models.pretrained.mutation.workflow import handle_mutation_prediction_advance
 from mcp_tools.tools.predict.workflows import handle_protein_function_prediction_advance
 from mcp_tools.tools.predict.workflows import handle_protein_residue_function_prediction
@@ -42,7 +41,6 @@ from mcp_tools.common.constants import LLM_MODELS
 from mcp_tools.common.file_handlers import validate_and_normalize_fasta_content
 from mcp_tools.common.llm_helpers import LLMConfig, call_llm_api, get_api_key, get_chat_base_url
 from mcp_tools.models.pretrained.design.proteinmpnn.protein_mpnn_run import proteinmpnn_run
-from mcp_tools.models.pretrained.design.proteinmpnn.protein_mpnn_utils import parse_PDB
 
 
 router = APIRouter(prefix="/api/advanced-tools", tags=["advanced-tools-v2"])
@@ -629,6 +627,8 @@ def _parse_optional_json_object(field: str, text: str) -> dict[str, Any]:
 
 
 def _build_homomer_tied_positions(pdb_path: str, chains: list[str]) -> list[dict[str, list[int]]]:
+    from mcp_tools.models.pretrained.design.proteinmpnn.protein_mpnn_utils import parse_PDB
+
     chain_list = chains
     if not chain_list:
         pdb_dict_list = parse_PDB(pdb_path)
@@ -1024,6 +1024,8 @@ async def run_sequence_design(body: SequenceDesignBody):
 @guard_operation('download_foldseek_results_by_pdb_file')
 async def run_protein_discovery(body: ProteinDiscoveryBody):
     _require_local_venusmine()
+    from mcp_tools.tools.discovery.workflow import handle_VenusMine
+
     if not body.pdb_file:
         raise HTTPException(status_code=400, detail="PDB file is required.")
     safe_pdb_file = _resolve_upload_file(body.pdb_file)

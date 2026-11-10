@@ -16,7 +16,7 @@ import pandas as pd
 from backend.web_v2.compute_access import metered_prediction
 from fastapi import Request, APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from mcp_tools.tools.runtime_tool_policy import assert_local_feature
 from mcp_tools.common.common_utils import (
@@ -40,7 +40,6 @@ from backend.web_v2.advanced_tools_api import (
     ProteinDiscoveryBody as AdvancedProteinDiscoveryBody,
     run_protein_discovery as run_advanced_protein_discovery,
 )
-from mcp_tools.models.pretrained.mutation.models.mutation_operations import zero_shot_mutation_sequence_prediction, zero_shot_mutation_structure_prediction, DEFAULT_BACKEND
 from mcp_tools.models.factory.prediction.fintuned_operations import predict_protein_function, predict_residue_function
 from mcp_tools.tools.predict.features.features_operations import (
     calculate_physchem_from_fasta,
@@ -565,12 +564,11 @@ async def quick_tool_ai_summary(body: QuickToolAiSummaryBody):
 
 
 class MutationRunBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     sequence: str = Field(default="", description="Protein sequence (optional if fasta_file provided).")
     fasta_file: str = Field(default="", description="FASTA file path.")
     structure_file: str = Field(default="", description="PDB file path for structure mode.")
     model_name: str = Field(default="ESM2-650M", description="Model name.")
-    backend: str = Field(default=DEFAULT_BACKEND, description="Backend key.")
-    api_key: str = Field(default="", description="Optional API key.")
 
 
 class SequenceDesignRunBody(BaseModel):
