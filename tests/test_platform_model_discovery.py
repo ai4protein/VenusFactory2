@@ -195,3 +195,29 @@ def test_new_search_discards_previous_model_choice_hint(next_search):
     second = disclosure.metadata("describe_tool", {"name": tool.name})
     choices = {row["arguments"]["model_name"] for row in second["matching_models"]}
     assert {"ProSST-2048", "ProSST-128", "ESM-IF1"} <= choices
+
+
+@pytest.mark.parametrize("harness", ["kimi-code", "deepseek-harness", "codex", "claude-code"])
+def test_searching_another_tool_preserves_the_explicit_model_selection(harness):
+    mapping = {web_tool_name(t.name, harness): t for t in tools()}
+    disclosure = ToolDisclosure(mapping, schema=lambda t: t.parameters, allowed=lambda _: True)
+    disclosure.metadata("search_tools", {"category": "compute", "query": "ProSST-2048"})
+    disclosure.metadata("search_tools", {"category": "compute", "query": "LigandMPNN"})
+    name = web_tool_name("zero_shot_mutation_structure_prediction", harness)
+    detail = disclosure.metadata("describe_tool", {"name": name})
+    assert detail["matching_models"] == [{"name": "ProSST-2048", "arguments": {"model_name": "ProSST-2048"}}]
+    assert detail["model_count"] == 1
+    disclosure.metadata("search_tools", {"category": "compute", "query": "ProSST-128"})
+    revised = disclosure.metadata("describe_tool", {"name": name})
+    assert revised["matching_models"] == [{"name": "ProSST-128", "arguments": {"model_name": "ProSST-128"}}]
+
+
+def test_retained_model_selection_still_checks_live_availability():
+    mapping = {t.name: t for t in tools()}
+    disclosure = ToolDisclosure(mapping, schema=lambda t: t.parameters, allowed=lambda _: True)
+    disclosure.metadata("search_tools", {"category": "compute", "query": "ProSST-2048"})
+    disclosure.metadata("search_tools", {"category": "compute", "query": "LigandMPNN"})
+    card = next(c for c in platform_catalog.official_cards() if c["name"] == "ProSST-2048")
+    CapabilityStore().set("model:" + card["id"], False, 0, selector(card), "fixture")
+    detail = disclosure.metadata("describe_tool", {"name": "zero_shot_mutation_structure_prediction"})
+    assert not detail.get("matching_models")
