@@ -19,7 +19,8 @@ def sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
-def atomic_json(path: Path, value: Any) -> None:
+def atomic_json(path: Path, value: Any, *, exclusive: bool = False) -> None:
+    """Publish complete JSON, optionally refusing any existing destination."""
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
     try:
@@ -28,7 +29,12 @@ def atomic_json(path: Path, value: Any) -> None:
             stream.write("\n")
             stream.flush()
             os.fsync(stream.fileno())
-        os.replace(name, path)
+        if exclusive:
+            # Linking the completed, synced file is atomic and fails if the
+            # destination exists. No blocking advisory lock or partial output.
+            os.link(name, path)
+        else:
+            os.replace(name, path)
     finally:
         if os.path.exists(name):
             os.unlink(name)

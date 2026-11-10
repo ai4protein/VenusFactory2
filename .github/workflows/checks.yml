@@ -100,6 +100,7 @@ jobs:
           OPENBLAS_NUM_THREADS: '1'
         run: >-
           python -m pytest -q tests/rsi/test_inference_audit.py
+          tests/rsi/test_model_library_verification.py tests/rsi/test_atomic_json.py
           tests/rsi/test_package_layout.py tests/rsi/test_sabio_assay_tasks.py
           tests/rsi/test_capability_discovery.py tests/test_platform_model_discovery.py
           tests/harness/test_generated_capability_discovery.py

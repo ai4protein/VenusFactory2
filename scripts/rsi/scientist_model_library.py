@@ -5,15 +5,15 @@ import json
 from pathlib import Path
 
 from agent.rsi.engine.scientist_model_library import ScientistModelLibrary
-from agent.rsi.engine.storage import atomic_json, file_lock
+from agent.rsi.engine.storage import atomic_json
 
 
 def _write_new_output(path, value, label):
-    # Concurrent audits must not replace another invocation's completed report.
-    with file_lock(path.with_name(f".{path.name}.lock")):
-        if path.exists() or path.is_symlink():
-            raise ValueError(f"{label} output already exists")
-        atomic_json(path, value)
+    # Concurrent audits publish once without waiting on a network filesystem lock.
+    try:
+        atomic_json(path, value, exclusive=True)
+    except FileExistsError as exc:
+        raise ValueError(f"{label} output already exists") from exc
 
 
 def main():
