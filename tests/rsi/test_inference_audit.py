@@ -337,3 +337,80 @@ def test_reused_read_buffer_does_not_leak_between_file_sizes(tmp_path):
         path = tmp_path / str(index)
         path.write_bytes(content)
         assert evidence.file_digest(path) == {"bytes": len(content), "sha256": hashlib.sha256(content).hexdigest()}
+
+
+def replace_signed_fixture_record(store, result, change):
+    area = store.root / ".inference"
+    previous = result["models"][0]["audit_id"]
+    record = json.loads((area / "audits" / (previous + ".json")).read_text())["record"]
+    change(record)
+    identity = digest(record)
+    atomic_json(area / "audits" / (identity + ".json"),
+                {"record": record, "signature": audit._signature(audit._key(area), record)})
+    atomic_json(area / "entries" / (record["entry_id"] + ".json"), {"audit_id": identity})
+    return identity
+
+
+def test_large_learned_state_is_served_without_duplicating_the_model_packet(storage, monkeypatch):
+    store, root, verified, calls = storage
+    verified["packet"]["model"]["model_state"]["weights"] = [0.25] * 200_000
+    identity = store.publish(root, "b" * 64)["entry_id"]
+    monkeypatch.setattr(audit, "MAX_RECORD_BYTES", 512 * 1024)
+    packet = next((store.root / "packets").glob("*.json"))
+    assert packet.stat().st_size > audit.MAX_RECORD_BYTES
+    result = store.prepare_inference([identity])
+    path = store.root / ".inference/audits" / (result["models"][0]["audit_id"] + ".json")
+    assert path.stat().st_size < audit.MAX_RECORD_BYTES
+    resolved = audit.resolve(library.ScientistModelLibrary(store.root), identity)
+    assert resolved["packet"] == verified["packet"] and resolved["skill"] == verified["skill"]
+    assert calls == [True, True]
+
+
+def test_prepared_reference_preserves_every_verified_field(publication):
+    store, _, _, _, identity = publication
+    before = store.resolve(identity)
+    store.prepare_inference([identity])
+    after = audit.resolve(store, identity)
+    assert {key: value for key, value in after.items() if key != "inference_audit_id"} == before
+
+
+@pytest.mark.parametrize("change", ["foreign_reference", "embedded_packet"])
+def test_signed_packet_reference_cannot_override_current_publication(publication, change):
+    store, _, verified, _, identity = publication
+    result = store.prepare_inference([identity])
+
+    def modify(record):
+        if change == "foreign_reference":
+            record["packet_id"] = "0" * 64
+        else:
+            record["verified"]["packet"] = verified["packet"]
+
+    replace_signed_fixture_record(store, result, modify)
+    with pytest.raises(ValueError, match="audit packet changed"):
+        audit.resolve(store, identity)
+
+
+def test_legacy_inline_audit_keeps_its_signature_and_serving_contract(publication):
+    store, _, verified, calls, identity = publication
+    prepared = store.prepare_inference([identity])
+
+    def inline(record):
+        record["schema"] = audit.LEGACY_SCHEMA
+        record.pop("packet_id")
+        record["verified"]["packet"] = copy.deepcopy(verified["packet"])
+
+    previous = replace_signed_fixture_record(store, prepared, inline)
+    value = audit.resolve(library.ScientistModelLibrary(store.root), identity)
+    assert value["packet"] == verified["packet"] and value["inference_audit_id"] == previous
+    assert calls == [True, True]
+    store.prepare_inference([identity])
+    assert (store.root / ".inference/audits" / (previous + ".json")).is_file()
+
+
+def test_large_verification_metadata_still_obeys_record_budget(publication, monkeypatch):
+    store, _, verified, _, identity = publication
+    verified["validation_trace"] = "x" * (1024 * 1024)
+    monkeypatch.setattr(audit, "MAX_RECORD_BYTES", 512 * 1024)
+    with pytest.raises(ValueError, match="record budget"):
+        store.prepare_inference([identity])
+    assert not (store.root / ".inference/entries" / (identity + ".json")).exists()

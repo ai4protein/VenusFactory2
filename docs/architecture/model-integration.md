@@ -105,7 +105,14 @@ publication or a source/runtime upgrade, outside request workers.
 
 The host stores immutable signed records and a private signing key in the library's
 `.inference/` directory. This directory must stay outside session/sandbox mounts,
-downloads and source control. Evidence snapshots include complete original and
+downloads and source control. Version 2 audit records reference the existing
+immutable model packet by its content identity, preserving the other verified
+metadata without duplicating learned parameters. Prediction reloads that packet
+and checks its identity and current registry binding. Earlier inline records
+remain readable and immutable; source upgrades still require full preparation.
+The 32 MiB audit-record limit remains in force.
+
+Evidence snapshots include complete original and
 ancestral goal trees, registry bindings, declared source datasets, current
 verification/model code and numeric package versions. Per-request validation
 hashes actual file contents with four bounded file readers; it does not trust

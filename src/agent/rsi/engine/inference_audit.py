@@ -19,7 +19,8 @@ from agent.harness.contracts import digest
 from . import inference_evidence
 from .storage import atomic_json, file_lock, safe_child
 
-SCHEMA = "scientist_inference_audit.v1"
+SCHEMA = "scientist_inference_audit.v2"
+LEGACY_SCHEMA = "scientist_inference_audit.v1"
 MAX_RECORD_BYTES = 32 * 1024**2
 
 
@@ -92,8 +93,14 @@ def prepare(library, entry_ids):
             else:
                 _write(snapshot_path, after)
             for identity in identities:
+                publication = verified[identity]
+                packet_id = digest(publication["packet"])
+                _require(library._object("packets", packet_id) == publication["packet"],
+                         "Verified model packet changed")
                 record = {"schema": SCHEMA, "library": str(library.root), "entry_id": identity,
-                          "snapshot_id": snapshot_id, "verified": verified[identity]}
+                          "snapshot_id": snapshot_id, "packet_id": packet_id,
+                          "verified": {name: value for name, value in publication.items()
+                                       if name != "packet"}}
                 audit_id = digest(record)
                 envelope = {"record": record, "signature": _signature(key, record)}
                 audit_path = safe_child(area, "audits/" + audit_id + ".json")
@@ -126,9 +133,12 @@ def resolve(library, entry_id):
     _require(isinstance(record, dict) and isinstance(envelope["signature"], str)
              and hmac.compare_digest(_signature(_key(area), record), envelope["signature"]),
              "Host inference audit signature changed")
-    _require(set(record) == {"schema", "library", "entry_id", "snapshot_id", "verified"}
-             and record["schema"] == SCHEMA and record["library"] == str(library.root)
-             and record["entry_id"] == entry_id, "Inference audit identity changed")
+    fields = {"schema", "library", "entry_id", "snapshot_id", "verified"}
+    if record.get("schema") == SCHEMA:
+        fields.add("packet_id")
+    _require(set(record) == fields and record.get("schema") in {SCHEMA, LEGACY_SCHEMA}
+             and record["library"] == str(library.root) and record["entry_id"] == entry_id
+             and isinstance(record["verified"], dict), "Inference audit identity changed")
     snapshot_id = _identity(record["snapshot_id"])
     snapshot = _read(safe_child(area, "snapshots/" + snapshot_id + ".json"))
     _require(digest(snapshot) == snapshot_id, "Inference evidence snapshot changed")
@@ -136,5 +146,12 @@ def resolve(library, entry_id):
     # No result may be promoted from a timestamp or a model-written flag.
     current = inference_evidence.capture(snapshot["dependencies"])
     _require(current == snapshot, "Inference evidence or runtime changed; a full host audit is required")
-    value = library._bind_verified(entry_id, library._binding(entry_id), record["verified"])
+    binding = library._binding(entry_id)
+    verified = record["verified"]
+    if record["schema"] == SCHEMA:
+        packet_id = _identity(record["packet_id"])
+        _require("packet" not in verified and packet_id == binding[0]["packet_id"],
+                 "Inference audit packet changed")
+        verified = {**verified, "packet": library._object("packets", packet_id)}
+    value = library._bind_verified(entry_id, binding, verified)
     return {**value, "inference_audit_id": digest(record)}
