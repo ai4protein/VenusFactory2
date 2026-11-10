@@ -178,3 +178,41 @@ def test_discovery_rejects_modified_registry_objects(storage, area):
     atomic_json(paths[area], {"entry_id": "a" * 64} if area == "index" else {"modified": True})
     with pytest.raises(ValueError):
         store.discovery_metadata()
+
+
+@pytest.mark.parametrize("area", ["entries", "origin", "packets", "index"])
+def test_persistent_discovery_never_masks_registry_tampering(storage, area):
+    from mcp_tools.models.evolved import catalog
+    store, _, identity, _ = published(storage)
+    entry = store._object("entries", identity)
+    index = next((store.root / "index").glob("*.json"))
+    paths = {
+        "entries": store.root / "entries" / f"{identity}.json",
+        "origin": store.root / "origins" / index.stem / f"{entry['canonical_origin']}.json",
+        "packets": store.root / "packets" / f"{entry['packet_id']}.json",
+        "index": index,
+    }
+    catalog.recorded_metadata(store)
+    catalog._CACHE.clear()
+    atomic_json(paths[area], {"entry_id": "a" * 64} if area == "index" else {"modified": True})
+    with pytest.raises(ValueError):
+        catalog.recorded_metadata(store)
+
+
+def test_same_size_packet_edit_with_restored_mtime_is_rejected_after_cache(storage):
+    import os
+    from mcp_tools.models.evolved import catalog
+    store, _, identity, _ = published(storage)
+    entry = store._object("entries", identity)
+    packet = store.root / "packets" / (entry["packet_id"] + ".json")
+    catalog.recorded_metadata(store)
+    info = packet.stat()
+    original = packet.read_text()
+    changed = original.replace('"model_id"', '"other_id"', 1)
+    assert len(changed) == len(original) and changed != original
+    packet.chmod(0o600)
+    packet.write_text(changed)
+    packet.chmod(info.st_mode & 0o777)
+    os.utime(packet, ns=(info.st_atime_ns, info.st_mtime_ns))
+    with pytest.raises(ValueError, match="identity"):
+        catalog.recorded_metadata(store)

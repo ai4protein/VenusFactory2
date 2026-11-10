@@ -69,6 +69,18 @@ card binds its immutable model and exact applicability scope for the current
 discovery session; the exposed call then accepts scientific inputs only. Resolving
 that call uses the original prediction tool, permissions and queue. A new session
 must inspect the model again. Existing explicit entry/scope tool calls remain valid.
+
+`mcp_tools/models/evolved/catalog.py` owns recorded discovery metadata. Its private
+`.discovery/` cache survives MCP worker restarts and contains no model weights or
+generated source. An authenticated record binds the library and registry file
+identities; creation, removal, replacement or changed file metadata invalidates it.
+Building or refreshing this metadata reads complete immutable model packets;
+unchanged catalogs do not. Concurrent workers share that build, while runtime compatibility and administrator switches are
+checked for each catalog response. Read-only or unsupported hosts retain the
+original discovery path. Keep `.discovery/` outside session mounts and downloads.
+This cache provides recorded descriptions only: selected-model inspection and
+prediction keep their original content and scientific-evidence checks.
+
 Selected-model calls validate input with the original model interface before
 joining the compute queue. Explicit prediction calls use the same input check
 before numerical replay. Scope, data and evidence validation still run at execution.
