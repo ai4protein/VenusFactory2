@@ -92,6 +92,8 @@ jobs:
           "langchain-core>=1.7.4" "langchain>=1.4.8" "biopython>=1.88"
           "fastapi>=0.162.0" "psutil>=6"
           "uvicorn>=0.41.0" "datasets>=5.0.1" "plotly>=6.2.0"
+          "biotite>=1.4.0" "matplotlib>=3.10.3" "langchain-community>=0.4.1"
+          "fake-useragent>=2.1.0" "beautifulsoup4>=4.13.4" "zeep>=4.3.3"
       - name: Verify model evidence and progressive discovery
         env:
           PYTHONPATH: src
