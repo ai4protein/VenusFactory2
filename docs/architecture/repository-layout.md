@@ -136,7 +136,10 @@ Specialists receive topic-selected source excerpts under one serialized context
 budget, with citation identities, query scope and material extraction limits.
 Passage selection for both writing and review belongs to
 `research_evidence_passages.py`. Its shared tokenizer retains scientific
-abbreviations and splits structured field names for retrieval. Original records
+abbreviations and splits structured field names for retrieval. JSON field paths
+also participate in retrieval when a record is split into scalar values. Writer
+excerpts retain those paths under the same total context budget; review quotes and
+locations still resolve against the original record. Original records
 and full prediction arrays remain in the dossier; the independent reviewer
 resolves its anchors against those originals.
 

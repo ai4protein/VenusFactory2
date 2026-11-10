@@ -59,13 +59,15 @@ def candidates(source):
     def add(text, location, hint=""):
         if re.search(r"\b[ACDEFGHIKLMNPQRSTVWY]{60,}\b", text):
             return
+        pointer = location.get("json_pointer", "").replace("~1", "/").replace("~0", "~")
+        field_terms = {word for word in terms(pointer) if not word.isdecimal()}
         for offset, piece in chunks(text):
             if not piece.strip():
                 continue
             anchor = {**location, "offset": offset, "length": len(piece)}
             rows.append({"id": source["id"]+":"+digest([anchor,piece])[:16],
                          "source_id": source["id"], "location": anchor, "text": piece,
-                         "_terms": terms(piece+" "+hint)})
+                         "_terms": terms(piece+" "+hint) | field_terms})
     def walk(value, pointer="", depth=0):
         if len(rows) >= 2048 or depth > 16:
             return

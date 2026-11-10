@@ -159,3 +159,49 @@ def test_existing_one_argument_context_builder_remains_callable():
                             "Sequence identity", selected, legacy_context)
     assert called == [selected]
     assert bundle["sources"] == [{"id": "S1", "text": "Existing caller context."}]
+
+
+@pytest.mark.parametrize("field,value,query", [
+    ("catalyticEfficiency", 42.5, "catalytic efficiency"),
+    ("subcellular_location", "periplasm", "subcellular location"),
+    ("meltingTemperature", 58.2, "melting temperature"),
+    ("rate/volume~normalized", 8.2, "rate volume normalized"),
+])
+def test_large_database_records_retain_field_identity_for_writers(field, value, query):
+    from backend.web_v2.research_evidence_passages import selected_passages, resolve_passage
+    record = {"metadata": {str(i): {"annotation": "Unrelated record metadata. " * 30}
+                           for i in range(16)}, "measurement": {field: value,
+                           "background": "Unrelated assay description. " * 100}}
+    row = source("S1", "database")
+    row["text"] = json.dumps(record)
+    before = copy.deepcopy(row)
+    pointer = "/measurement/" + field.replace("~", "~0").replace("/", "~1")
+    selected = selected_passages(row, query, 600)
+    assert selected["passages"][0]["location"]["json_pointer"] == pointer
+    for passage in selected["passages"]:
+        assert resolve_passage(row, passage["location"]) == passage["text"]
+    context = lf.source_context([row], query=query)[0]
+    assert json.dumps(pointer) in context["text"]
+    assert str(value) in context["text"]
+    assert row == before
+
+
+def test_field_labels_remain_inside_the_shared_writer_context_budget():
+    selected = []
+    for index in range(14):
+        row = source("S" + str(index), "database")
+        row["text"] = json.dumps({
+            "activityMeasurements": {"maximalRate": 7.3 + index,
+                "description": "Additional assay conditions and background. " * 100},
+            "unrelated": "Other annotations. " * 300,
+        })
+        selected.append(row)
+    before = copy.deepcopy(selected)
+    result = lf.source_context(selected, query="activity measurements maximal rate")
+    assert len(json.dumps(result, ensure_ascii=False)) <= 24000
+    assert len(result) == 14
+    for index, row in enumerate(result):
+        assert 'Source field "/activityMeasurements/maximalRate"' in row["text"]
+        assert str(7.3 + index) in row["text"]
+        assert row["excerpted"]
+    assert selected == before

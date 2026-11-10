@@ -94,7 +94,13 @@ def source_context(sources, limit=14, *, query=""):
         maximum = 14000 if kind == "database" else 12000 if kind == "user_material" else 9000 if kind == "public_service" else 2400
         if query:
             selected = selected_passages(source, query, maximum)
-            text = "\n\n".join(p["text"] for p in selected["passages"])
+            excerpts = []
+            for passage in selected["passages"]:
+                pointer = passage["location"].get("json_pointer")
+                label = ("Source field " + json.dumps(pointer, ensure_ascii=False) + ":\n"
+                         if pointer else "")
+                excerpts.append(label + passage["text"])
+            text = "\n\n".join(excerpts)
             excerpted = bool(source.get("excerpted")) or text != str(source.get("text", ""))
         else:
             text, excerpted = evidence_excerpt(source, maximum)
