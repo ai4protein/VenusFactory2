@@ -7,10 +7,9 @@ import json
 from collections import Counter, deque
 
 from agent.harness.contracts import digest
-
-from agent.rsi.engine.model_scope_inventory import canonical_scope
 from agent.rsi.datasets.model_tasks import bound_file, read_task
 from agent.rsi.datasets.research_project_catalog import build_catalog, require
+from agent.rsi.engine.model_scope_inventory import canonical_scope
 from agent.rsi.engine.shared_model_bundle import admit
 
 SCHEMA = "shared_acquisition_plan.v1"
@@ -49,6 +48,7 @@ def plan_acquisition(
     batch_size=32,
     previous_panels=(),
     registered_catalogs=(),
+    coverage_policy=None,
 ):
     """Revalidate admission, exclude named history, and allocate without fitting.
 
@@ -81,7 +81,13 @@ def plan_acquisition(
         scopes = {canonical_scope(row["key"]) for row in value["entries"]}
         excluded.update(scopes)
         registry_bindings.append({"reference": reference, "entries": len(value["entries"]), "scopes": len(scopes)})
-    groups, bindings = {}, {}
+    policy = None
+    if coverage_policy is not None:
+        from .property_coverage import select_by_property, validate_policy
+
+        policy = json.loads(bound_file(coverage_policy).read_text())
+        require(validate_policy(policy) == target_count, "Property quotas must equal target count")
+    groups, bindings, coverage_records = {}, {}, []
     skipped = Counter()
     unique_scopes, unique_ids = set(), set()
     for entry in sorted(catalog["entries"], key=lambda e: e["id"]):
@@ -106,6 +112,17 @@ def plan_acquisition(
         require(canonical_scope(task) == scope, "Interface conversion changed scientific scope")
         group = (entry["project_id"], task["paper"]["doi"], task["plugin_id"], task["stage"])
         groups.setdefault(group, deque()).append(task)
+        coverage_records.append(
+            {
+                "id": task["id"],
+                "stage": task["stage"],
+                "target": task["scope"]["target"],
+                "protein": task["scope"]["protein"],
+                "study_doi": task["paper"]["doi"],
+                "scenario": entry["scenario"],
+                "interface": task["plugin_id"],
+            }
+        )
         bindings[task["id"]] = {
             "candidate_id": entry["id"],
             "task": entry["task"],
@@ -116,23 +133,34 @@ def plan_acquisition(
             "measurement_key": entry["measurement_key"],
         }
     available = sum(map(len, groups.values()))
-    require(available >= target_count, f"Only {available} eligible unallocated scopes; requested {target_count}")
+    group_capacity = {key: len(queue) for key, queue in groups.items()}
+    coverage = select_by_property(coverage_records, policy) if policy is not None else None
+    selection_target = target_count
+    if coverage is None:
+        require(available >= target_count, f"Only {available} eligible unallocated scopes; requested {target_count}")
+    else:
+        selected_ids = set(coverage["selected_ids"])
+        selection_target = len(selected_ids)
+        for key, queue in groups.items():
+            groups[key] = deque(t for t in queue if t["id"] in selected_ids)
+        for name, family in coverage["assignments"].items():
+            bindings[name]["property_family"] = family
     capacity = [
         {
             "project_id": key[0],
             "study_doi": key[1],
             "plugin_id": key[2],
             "stage": key[3],
-            "available_scopes": len(values),
+            "available_scopes": group_capacity[key],
         }
         for key, values in sorted(groups.items())
     ]
     batches, chosen, counts = [], [], Counter()
     # Rotate whole homogeneous batches, retaining small projects before filling
     # the remaining allocation from larger cohorts. No model outcomes are read.
-    while len(chosen) < target_count:
+    while len(chosen) < selection_target:
         for group, queue in sorted(groups.items()):
-            size = min(batch_size, len(queue), target_count - len(chosen))
+            size = min(batch_size, len(queue), selection_target - len(chosen))
             if not size:
                 continue
             tasks = [queue.popleft() for _ in range(size)]
@@ -141,7 +169,7 @@ def plan_acquisition(
             chosen.extend(tasks)
             counts[group[0]] += size
     selected = [bindings[t["id"]] for t in chosen]
-    require(len({v["scope_key"] for v in selected}) == target_count, "Repeated selected scientific scope")
+    require(len({v["scope_key"] for v in selected}) == selection_target, "Repeated selected scientific scope")
     require(not {v["scope_key"] for v in selected} & excluded, "Prior scope reallocated")
     # Recheck explicitly bound inputs after the potentially lengthy admission.
     for reference in [
@@ -149,12 +177,13 @@ def plan_acquisition(
         catalog_reference,
         *previous_panels,
         *registered_catalogs,
+        *([coverage_policy] if coverage_policy is not None else []),
         *(row["task"] for row in selected),
     ]:
         bound_file(reference)
     for row in selected:
         read_task(bound_file(row["task"]))
-    return {
+    result = {
         "schema": SCHEMA,
         "status": "prepared_allocation_only",
         "manifest": manifest_reference,
@@ -164,7 +193,7 @@ def plan_acquisition(
         "batch_size": batch_size,
         "batch_count": len(batches),
         "available_scopes": available,
-        "remaining_unallocated_scopes": available - target_count,
+        "remaining_unallocated_scopes": available - len(chosen),
         "capacity": capacity,
         "selection_counts": dict(sorted(counts.items())),
         "excluded_scope_count": len(excluded),
@@ -180,3 +209,14 @@ def plan_acquisition(
         "final_labels_scored": False,
         "completion_claim": False,
     }
+
+    if coverage is not None:
+        result.update(
+            schema="shared_acquisition_plan.v2",
+            coverage_policy=coverage_policy,
+            coverage=coverage,
+            selected_count=len(chosen),
+            status="prepared_allocation_only" if coverage["coverage_satisfied"] else "prepared_partial_allocation",
+            selection_rule=coverage["selection_basis"],
+        )
+    return result

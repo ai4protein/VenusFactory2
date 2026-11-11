@@ -1,0 +1,108 @@
+{
+  "schema": "property_coverage_policy.v1",
+  "families": {
+    "enzyme_catalysis": {
+      "target": 8,
+      "max_per_study": 4,
+      "min_studies": 2
+    },
+    "molecular_recognition": {
+      "target": 8,
+      "max_per_study": 4,
+      "min_studies": 2
+    },
+    "stability_resilience": {
+      "target": 8,
+      "max_per_study": 4,
+      "min_studies": 2
+    },
+    "production_developability": {
+      "target": 8,
+      "max_per_study": 4,
+      "min_studies": 2
+    },
+    "localization_transport": {
+      "target": 8,
+      "max_per_study": 4,
+      "min_studies": 2
+    },
+    "immune_properties": {
+      "target": 8,
+      "max_per_study": 4,
+      "min_studies": 2
+    },
+    "protein_abundance": {
+      "target": 0,
+      "max_per_study": 0,
+      "min_studies": 0
+    }
+  },
+  "rules": [
+    {
+      "stage": "activity",
+      "family": "enzyme_catalysis"
+    },
+    {
+      "stage": "kinetics",
+      "family": "enzyme_catalysis"
+    },
+    {
+      "stage": "substrate_specificity",
+      "family": "enzyme_catalysis"
+    },
+    {
+      "stage": "binding",
+      "family": "molecular_recognition"
+    },
+    {
+      "stage": "stability",
+      "family": "stability_resilience"
+    },
+    {
+      "stage": "solubility",
+      "family": "production_developability"
+    },
+    {
+      "stage": "developability",
+      "family": "production_developability"
+    },
+    {
+      "stage": "expression",
+      "family": "protein_abundance",
+      "targets": [
+        "protein_abundance",
+        "protein_abundance_log2_fold_change",
+        "qc_relative_protein_abundance"
+      ]
+    },
+    {
+      "stage": "expression",
+      "family": "production_developability",
+      "targets": [
+        "Yield (uM)",
+        "GroE Yield (uM)",
+        "TF Yield (uM)",
+        "protein_expression_yield"
+      ]
+    },
+    {
+      "stage": "function_annotation",
+      "family": "localization_transport",
+      "targets": [
+        "subcellular_localization",
+        "secretion",
+        "signal_peptide"
+      ]
+    },
+    {
+      "stage": "other",
+      "family": "immune_properties",
+      "targets": [
+        "immunogenicity",
+        "antigenicity",
+        "allergenicity"
+      ]
+    }
+  ],
+  "max_per_protein": 2
+}

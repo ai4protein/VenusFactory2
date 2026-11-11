@@ -133,6 +133,7 @@ jobs:
           tests/rsi/test_numerical_evidence.py tests/rsi/test_shared_model_publication.py
           tests/test_research_source_review_flow.py tests/test_evolved_tool_scheduling.py
           tests/rsi/test_package_layout.py tests/rsi/test_sabio_assay_tasks.py
+          tests/rsi/test_property_coverage.py tests/rsi/test_shared_acquisition_plan.py tests/rsi/test_research_project_catalog.py
           tests/rsi/test_capability_discovery.py tests/test_platform_model_discovery.py
           tests/test_mutation_tool_contracts.py tests/harness/test_tool_disclosure.py
           tests/harness/test_capability_boundary.py tests/harness/test_selected_tool_contract.py
