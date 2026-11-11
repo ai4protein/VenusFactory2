@@ -146,10 +146,10 @@ jobs:
           tests/test_research_target_evidence.py tests/test_research_chapter_context.py
           tests/test_research_dossier.py tests/test_public_knowledge_queries.py
           tests/harness/test_generated_capability_discovery.py
+          tests/harness/test_capability_admission.py tests/harness/test_curated_publication.py
           tests/harness/test_research_provided_splits.py tests/harness/test_research_dataset.py
           tests/harness/test_research_advanced_data.py tests/harness/test_research_data_store.py
           tests/harness/test_research_data_memory.py
-          -k 'not reviewed_operator_release'
 
   source-and-frontend:
     runs-on: ubuntu-latest

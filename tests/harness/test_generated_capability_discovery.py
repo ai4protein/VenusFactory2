@@ -1,12 +1,14 @@
 """Public RSI discovery: bounded pages, curator ownership and live model switches."""
 import json
+
 import pytest
-from fastmcp import FastMCP, Client
-from agent.harness import research_workspace as rw
+from fastmcp import Client, FastMCP
+
 from agent.harness import capability_catalog as index
-from mcp_tools.tools.discovery.tools_mcp import register_discovery_tools
+from agent.harness import research_workspace as rw
 from mcp_tools.tools import capability_policy as policy
 from mcp_tools.tools.discovery import service as discovery
+from mcp_tools.tools.discovery.tools_mcp import register_discovery_tools
 
 
 @pytest.mark.asyncio
@@ -174,14 +176,17 @@ def test_selected_page_rechecks_publication_after_index_read(tmp_path, monkeypat
 
 
 @pytest.mark.asyncio
-async def test_reviewed_operator_release_is_discovered_invoked_and_revoked_over_mcp(tmp_path, monkeypatch):
+@pytest.mark.parametrize('kind', ['tool', 'model'])
+async def test_reviewed_operator_release_is_discovered_invoked_and_revoked_over_mcp(tmp_path, monkeypatch, kind):
     from functools import partial
+
     from fastmcp.exceptions import ToolError
+    from test_capability_admission import candidate, model_candidate, reviewer, spec
+
     from agent.harness.capability_review import review_proposal
     from agent.harness.curated_publication import publish_candidate
     from mcp_tools.tools import runtime_tool_policy
     from mcp_tools.tools.discovery.research_capabilities import search_generated_capabilities
-    from test_capability_admission import candidate, spec, reviewer
     shared=tmp_path/'shared'
     monkeypatch.setattr(rw,'LIBRARY',shared)
     monkeypatch.setattr(runtime_tool_policy,'is_online_mode',lambda:False)
@@ -189,10 +194,13 @@ async def test_reviewed_operator_release_is_discovered_invoked_and_revoked_over_
     monkeypatch.setattr(policy,'CapabilityStore',lambda:switches)
     monkeypatch.setattr(discovery,'model_cards',lambda:[])
     monkeypatch.setattr(discovery,'platform_models',lambda *a:[])
-    service=await candidate(tmp_path,spec())
+    service=await model_candidate(tmp_path) if kind == 'model' else await candidate(tmp_path,spec())
     bundle=service.proposals[0]
     receipt=await review_proposal(bundle,reviewer=reviewer,control=tmp_path/'review',runner=rw.run_python)
-    assert receipt['status']=='approved'
+    assert receipt['status']=='approved', receipt
+    if kind == 'model':
+        assert receipt['automatic']['evaluation']['training_reproduced']
+        assert receipt['automatic']['evaluation']['score'] == 1
     rw.publish_proposals([bundle],'fixture-goal',tmp_path/'private')
     for name in ('search_capabilities','describe_capability','run_capability'):
         monkeypatch.setattr(rw,name,partial(getattr(rw,name),library=shared))
@@ -216,6 +224,7 @@ async def test_reviewed_operator_release_is_discovered_invoked_and_revoked_over_
         detail=(await client.call_tool('describe_generated_capability',{'capability_id':card['id']})).data
         assert detail['input_schema']['required']==['sequence']
         assert detail['review_status']=='approved'
+        assert detail['kind'] == kind
         result=(await client.call_tool('run_generated_capability',{'capability_id':card['id'],'inputs':{'sequence':'ACDE'}})).data
         assert result=={'value':4}
         with pytest.raises(ToolError):
