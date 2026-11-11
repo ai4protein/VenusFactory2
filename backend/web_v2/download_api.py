@@ -1,3 +1,4 @@
+from backend.web_v2.blocking_workflow import offload_workflow
 import os
 import shutil
 import subprocess
@@ -348,7 +349,8 @@ async def download_meta():
 
 
 @router.post("/uniprot")
-async def download_uniprot(payload: SequenceDownloadRequest):
+@offload_workflow
+def download_uniprot(payload: SequenceDownloadRequest):
     run_id = build_run_id_utc()
     task_folder = _task_folder("UniProt", run_id)
     id_value, file_path, input_preview = _resolve_inputs(payload, task_folder)
@@ -385,7 +387,8 @@ async def download_uniprot(payload: SequenceDownloadRequest):
 
 
 @router.post("/ncbi")
-async def download_ncbi(payload: SequenceDownloadRequest):
+@offload_workflow
+def download_ncbi(payload: SequenceDownloadRequest):
     run_id = build_run_id_utc()
     task_folder = _task_folder("NCBI", run_id)
     id_value, file_path, input_preview = _resolve_inputs(payload, task_folder)
@@ -422,7 +425,8 @@ async def download_ncbi(payload: SequenceDownloadRequest):
 
 
 @router.post("/rcsb-structure")
-async def download_rcsb_structure(payload: RcsbStructureDownloadRequest):
+@offload_workflow
+def download_rcsb_structure(payload: RcsbStructureDownloadRequest):
     run_id = build_run_id_utc()
     task_folder = _task_folder("RCSB", run_id)
     id_value, file_path, input_preview = _resolve_inputs(payload, task_folder)
@@ -489,7 +493,8 @@ async def download_rcsb_structure(payload: RcsbStructureDownloadRequest):
 
 
 @router.post("/alphafold-structure")
-async def download_alphafold_structure(payload: DownloadRequestBase):
+@offload_workflow
+def download_alphafold_structure(payload: DownloadRequestBase):
     run_id = build_run_id_utc()
     task_folder = _task_folder("AlphaFold", run_id)
     id_value, file_path, input_preview = _resolve_inputs(payload, task_folder)
@@ -552,7 +557,8 @@ async def download_alphafold_structure(payload: DownloadRequestBase):
 
 
 @router.post("/rcsb-metadata")
-async def download_rcsb_metadata(payload: DownloadRequestBase):
+@offload_workflow
+def download_rcsb_metadata(payload: DownloadRequestBase):
     run_id = build_run_id_utc()
     task_folder = _task_folder("RCSB", run_id)
     id_value, file_path, input_preview = _resolve_inputs(payload, task_folder)
@@ -588,7 +594,8 @@ async def download_rcsb_metadata(payload: DownloadRequestBase):
 
 
 @router.post("/interpro-metadata")
-async def download_interpro_metadata(payload: DownloadRequestBase):
+@offload_workflow
+def download_interpro_metadata(payload: DownloadRequestBase):
     run_id = build_run_id_utc()
     task_folder = _task_folder("InterPro", run_id)
     id_value, file_path, input_preview = _resolve_inputs(payload, task_folder)

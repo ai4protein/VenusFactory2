@@ -140,7 +140,7 @@ jobs:
           tests/test_design_docking_contracts.py tests/test_external_mcp_dispatch.py tests/test_external_models.py
           tests/test_model_plaza_performance.py tests/rsi/test_feedback_verification_scope.py
           tests/test_workflow_components.py tests/test_workflow_persistence.py
-          tests/test_api_startup.py tests/test_mcp_service_health.py
+          tests/test_api_startup.py tests/test_http_workflow_responsiveness.py tests/test_blocking_workflow.py tests/test_mcp_service_health.py
           tests/test_research_reference_context.py tests/test_research_pdb_kegg.py
           tests/test_research_report.py tests/test_research_longform.py tests/test_research_input_snapshot.py
           tests/test_research_target_evidence.py tests/test_research_chapter_context.py

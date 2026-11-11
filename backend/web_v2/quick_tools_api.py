@@ -1,3 +1,4 @@
+from backend.web_v2.blocking_workflow import offload_workflow
 from backend.web_v2.sse_events import encode_event as _sse
 
 from mcp_tools.tools.capability_policy import guard_operation
@@ -535,7 +536,8 @@ class QuickToolAiSummaryBody(BaseModel):
 
 
 @router.post("/ai-summary")
-async def quick_tool_ai_summary(body: QuickToolAiSummaryBody):
+@offload_workflow
+def quick_tool_ai_summary(body: QuickToolAiSummaryBody):
     api_key = get_api_key(body.llm_provider, body.user_api_key)
     if not api_key:
         raise HTTPException(status_code=400, detail="No API key available. Set OPENAI_API_KEY or provide key.")
@@ -641,7 +643,8 @@ def _parse_fixed_residues_text(text: str) -> dict[str, list[int]]:
 @router.post("/run/sequence-design")
 @guard_operation('proteinmpnn_sequence_design_from_structure')
 @metered_prediction
-async def run_quick_tool_sequence_design(body: SequenceDesignRunBody):
+@offload_workflow
+def run_quick_tool_sequence_design(body: SequenceDesignRunBody):
     input_path = _resolve_upload_input(body.structure_file)
     if not input_path.lower().endswith(".pdb"):
         raise HTTPException(status_code=400, detail="Sequence Design only supports .pdb input.")
@@ -720,7 +723,8 @@ async def run_quick_tool_protein_discovery(body: ProteinDiscoveryRunBody):
 
 @router.post("/run/mutation")
 @metered_prediction
-async def run_quick_tool_mutation(body: MutationRunBody):
+@offload_workflow
+def run_quick_tool_mutation(body: MutationRunBody):
     # Run local scripts directly (legacy quick-tool behavior) to avoid requiring an external Gradio service.
     model_type = "sequence"
     model_name = body.model_name or "ESM2-650M"
@@ -852,7 +856,8 @@ class ProteinFunctionRunBody(BaseModel):
 
 @router.post("/run/protein-function")
 @metered_prediction
-async def run_quick_tool_protein_function(body: ProteinFunctionRunBody):
+@offload_workflow
+def run_quick_tool_protein_function(body: ProteinFunctionRunBody):
     fasta_path = _resolve_upload_input(body.fasta_file)
     _enforce_online_fasta_limit_for_path(fasta_path, source="Protein Function FASTA")
     run_id = build_run_id_utc()
@@ -886,7 +891,8 @@ class ResidueFunctionRunBody(BaseModel):
 
 @router.post("/run/residue-function")
 @metered_prediction
-async def run_quick_tool_residue_function(body: ResidueFunctionRunBody):
+@offload_workflow
+def run_quick_tool_residue_function(body: ResidueFunctionRunBody):
     fasta_path = _resolve_upload_input(body.fasta_file)
     _enforce_online_fasta_limit_for_path(fasta_path, source="Functional Residue FASTA")
     run_id = build_run_id_utc()
@@ -917,7 +923,8 @@ class PropertiesRunBody(BaseModel):
 
 
 @router.post("/run/properties")
-async def run_quick_tool_properties(body: PropertiesRunBody):
+@offload_workflow
+def run_quick_tool_properties(body: PropertiesRunBody):
     safe_file_path = _resolve_upload_input(body.file_path)
     if safe_file_path.lower().endswith((".fasta", ".fa")):
         _enforce_online_fasta_limit_for_path(safe_file_path, source="Physicochemical FASTA")

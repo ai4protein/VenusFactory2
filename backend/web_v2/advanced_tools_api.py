@@ -1,3 +1,4 @@
+from backend.web_v2.blocking_workflow import offload_workflow
 from backend.web_v2.sse_events import encode_event as _sse
 from backend.web_v2.model_contracts import (DirectedEvolutionBody, ProteinDiscoveryBody, SequenceDesignBody, _proteinmpnn_model_options)
 
@@ -646,6 +647,10 @@ def _build_homomer_tied_positions(pdb_path: str, chains: list[str]) -> list[dict
 
 @router.get("/meta")
 async def advanced_tools_meta():
+    return _advanced_tools_meta()
+
+
+def _advanced_tools_meta():
     if not _CONSTANT_PATH.exists():
         raise HTTPException(status_code=404, detail="constant.json not found.")
     data = json.loads(_CONSTANT_PATH.read_text(encoding="utf-8"))
@@ -739,7 +744,8 @@ async def download_advanced_result(request: Request, file_path: str, inline: boo
 
 
 @router.post("/ai-summary")
-async def advanced_ai_summary(body: AdvancedAiSummaryBody):
+@offload_workflow
+def advanced_ai_summary(body: AdvancedAiSummaryBody):
     api_key = get_api_key(body.llm_provider, body.user_api_key)
     if not api_key:
         raise HTTPException(status_code=400, detail="No API key available. Set provider key or provide user key.")
@@ -769,7 +775,8 @@ async def advanced_ai_summary(body: AdvancedAiSummaryBody):
 
 @router.post("/directed-evolution/run")
 @metered_prediction
-async def run_directed_evolution(body: DirectedEvolutionBody):
+@offload_workflow
+def run_directed_evolution(body: DirectedEvolutionBody):
     if body.input_mode not in {"sequence", "structure"}:
         raise HTTPException(status_code=400, detail="input_mode must be 'sequence' or 'structure'.")
 
@@ -819,12 +826,13 @@ async def run_directed_evolution(body: DirectedEvolutionBody):
 @router.post("/protein-function/run")
 @guard_operation('predict_protein_function')
 @metered_prediction
-async def run_protein_function(body: ProteinFunctionBody):
+@offload_workflow
+def run_protein_function(body: ProteinFunctionBody):
     fasta_file = _ensure_fasta_path(body.file_path, body.sequence)
     if _online_fasta_limit_enabled():
         normalized = _load_normalized_fasta_from_path(fasta_file)
         _enforce_online_fasta_limit(normalized, source="Protein Function FASTA")
-    meta = await advanced_tools_meta()
+    meta = _advanced_tools_meta()
     datasets = body.datasets or meta.get("dataset_mapping_function", {}).get(body.task, [])
     if not datasets:
         raise HTTPException(status_code=400, detail=f"No dataset mapping found for task: {body.task}")
@@ -857,7 +865,8 @@ async def run_protein_function(body: ProteinFunctionBody):
 @router.post("/functional-residue/run")
 @guard_operation('predict_residue_function')
 @metered_prediction
-async def run_functional_residue(body: FunctionalResidueBody):
+@offload_workflow
+def run_functional_residue(body: FunctionalResidueBody):
     fasta_file = _ensure_fasta_path(body.file_path, body.sequence)
     if _online_fasta_limit_enabled():
         normalized = _load_normalized_fasta_from_path(fasta_file)
@@ -895,7 +904,8 @@ async def run_functional_residue(body: FunctionalResidueBody):
 @router.post("/sequence-design/run")
 @guard_operation('proteinmpnn_sequence_design_from_structure')
 @metered_prediction
-async def run_sequence_design(body: SequenceDesignBody):
+@offload_workflow
+def run_sequence_design(body: SequenceDesignBody):
     safe_pdb_file = _resolve_upload_file(body.structure_file)
     if not safe_pdb_file.lower().endswith(".pdb"):
         raise HTTPException(status_code=400, detail="Sequence Design only supports .pdb input.")
@@ -1022,7 +1032,8 @@ async def run_sequence_design(body: SequenceDesignBody):
 
 @router.post("/protein-discovery/run")
 @guard_operation('download_foldseek_results_by_pdb_file')
-async def run_protein_discovery(body: ProteinDiscoveryBody):
+@offload_workflow
+def run_protein_discovery(body: ProteinDiscoveryBody):
     _require_local_venusmine()
     from mcp_tools.tools.discovery.workflow import handle_VenusMine
 

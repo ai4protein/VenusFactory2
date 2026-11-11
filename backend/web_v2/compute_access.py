@@ -223,7 +223,8 @@ def metered_prediction(function):
     if inspect.iscoroutinefunction(function):
         @functools.wraps(function)
         async def wrapped(*args, **kwargs):
-            admit()
+            from starlette.concurrency import run_in_threadpool
+            await run_in_threadpool(admit)
             return await function(*args, **kwargs)
     else:
         @functools.wraps(function)

@@ -12,6 +12,7 @@ def test_complete_api_loads_and_serves_workspace_contracts(tmp_path, mode):
     root = Path(__file__).resolve().parents[1]
     env = dict(os.environ, WEBUI_V2_MODE=mode, PYTHON_DOTENV_DISABLED="1",
                VENUS_RUNTIME_ROOT=str(tmp_path / "runtime"),
+               WEBUI_V2_FRONTEND_DIST=str(tmp_path / "frontend"),
                VENUS_MODEL_CONFIG=str(root / "model-config.yaml.example"),
                VENUS_MODEL_RUNTIMES_CONFIG=str(tmp_path / "absent-runtimes.json"),
                KIMI_CODE_HOME=str(tmp_path / "kimi"), VENUS_WORKER_AUTOSTART="0",

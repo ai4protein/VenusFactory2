@@ -286,3 +286,13 @@ people; visit recording begins with this release. Reset all allowances restores 
 current deployment's daily chat, prediction and Workflow allowances after confirmation.
 It preserves historical admissions, conversation ownership, idempotency, running tasks,
 grant keys and IP burst protection, and writes an administrator audit event.
+
+### Compatibility HTTP workflows
+
+The older Quick/Advanced prediction and database download routes preserve their
+existing JSON and SSE responses. Synchronous workflow execution and postprocessing
+run outside the API event loop, with one active compatibility workflow per API
+process (legacy exporters share scratch filenames). This limit is separate from metadata request threads and does not replace
+the CPU/GPU queue or visitor quotas. Streaming routes await the same adapters,
+so waiting for ProSST, ProteinMPNN or a remote download cannot stop page loading.
+New integrations should use the durable job submission/status/event endpoints.
