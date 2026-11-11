@@ -1,5 +1,8 @@
 # Research protocols
 
+The active acquisition plan is the [property-first RSI programme](RESEARCH_PROJECT_MODELS_10000.md).
+New breadth-oriented cohorts use its property policy and report unfilled coverage explicitly.
+
 This directory contains reusable experiment protocols and scientific contracts.
 For the running software, use the [repository layout](../architecture/repository-layout.md),
 [model integration guide](../architecture/model-integration.md),

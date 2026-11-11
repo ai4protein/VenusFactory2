@@ -149,6 +149,81 @@
         "protein-specific abundance under deletion-genotype contexts"
       ],
       "constraint": "2292 source-bound protein tasks admitted with all 19 measured covariates and common deleted-genotype partitions (600/200/200 per task). Cross-study genotype matching is not same-sample pairing. Preparation created no trained or published models; feature variants do not add scientific scopes."
+    },
+    {
+      "id": "skempi2",
+      "research_use": "Measured effects of mutations on protein-protein affinity and kinetics",
+      "url": "https://life.bsc.es/pid/skempi2/",
+      "papers": [
+        "10.1093/bioinformatics/bty635"
+      ],
+      "status": "source_identified_not_admitted",
+      "license_reference": "https://life.bsc.es/pid/skempi2/info/terms",
+      "property_families": [
+        "molecular_recognition"
+      ],
+      "model_opportunities": [
+        "complex-specific mutation effects",
+        "transfer to unseen protein complexes"
+      ],
+      "constraint": "Preserve censoring, temperature, method and original references; match mutations to WT/complex sequences. Separate Kd, kon, koff and derived thermodynamics, and split related complexes and duplicate source measurements together."
+    },
+    {
+      "id": "jain_antibody_developability",
+      "research_use": "Paired antibody sequences and measured biophysical assays in a common IgG1 context",
+      "url": "https://www.pnas.org/doi/10.1073/pnas.1616408114",
+      "papers": [
+        "10.1073/pnas.1616408114"
+      ],
+      "status": "source_identified_not_imported",
+      "property_families": [
+        "production_developability",
+        "stability_resilience",
+        "molecular_recognition"
+      ],
+      "model_opportunities": [
+        "cross-antibody expression yield",
+        "self-interaction and aggregation",
+        "assay-specific nonspecific binding"
+      ],
+      "constraint": "Join original Dataset S2 sequences and S3 assay values; verify reuse terms and related-antibody groups. A single measurement per antibody does not support a separate per-antibody predictor; do not equate clinical stage with assay success."
+    },
+    {
+      "id": "deeploc2_localization",
+      "research_use": "Experimentally supported eukaryotic protein localization and sorting-signal annotations",
+      "url": "https://services.healthtech.dtu.dk/services/DeepLoc-2.0/",
+      "papers": [
+        "10.1093/nar/gkac278"
+      ],
+      "status": "source_identified_classification_adapter_required",
+      "property_families": [
+        "localization_transport"
+      ],
+      "model_opportunities": [
+        "multilabel subcellular localization",
+        "sorting-signal prediction"
+      ],
+      "constraint": "Preserve published homology partitions and independent HPA test set; verify annotation evidence and reuse terms. Requires classification-aware admission, metrics and controls; missing annotations are not negative labels."
+    },
+    {
+      "id": "iedb_assay_context",
+      "research_use": "Experimentally measured immune epitopes with host, receptor, assay and source-publication context",
+      "url": "https://www.iedb.org/database_export_v3.php",
+      "papers": [],
+      "references": [
+        "https://academic.oup.com/nar/article/53/D1/D436/7903371"
+      ],
+      "status": "source_identified_not_imported",
+      "property_families": [
+        "immune_properties",
+        "molecular_recognition"
+      ],
+      "model_opportunities": [
+        "assay-specific T-cell response",
+        "B-cell assay recognition",
+        "peptide-MHC binding"
+      ],
+      "constraint": "Separate functional T-cell response, B-cell response, MHC binding and ligand elution. Retain measured negatives, assay definitions and source references; deduplicate studies and peptide/protein relatives before grouped splits. Review reuse terms and classification controls before admission."
     }
   ],
   "domain_baselines": [
@@ -174,5 +249,12 @@
       "evidence": "research_runs/rsi/20261025_protpredict_scientist_pilot_v1/final_evaluation_audit_v1/audit.json",
       "scope": "Partial author-method reproduction with 19 measured covariates, author core package versions and a frozen 50-iteration five-fold reference-protein search. Four-task final prediction comparison independently replayed; two Scientist scopes published, one completed two generations, neither final generated model beat its strongest fixed control."
     }
+  ],
+  "allocation_policy": "configs/rsi/property_coverage_v1.json",
+  "coverage_priority": [
+    "measured_property",
+    "application_scenario",
+    "independent_source_study",
+    "protein"
   ]
 }

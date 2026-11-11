@@ -1,173 +1,159 @@
-# Research-project-driven acquisition of 10,000 specialized models
+# Property-first RSI research programme
 
-## Latest verified checkpoint - 25 October 2026
+## Objective
 
-The source pool now has 3271 candidates: 3238 admitted tasks and 33 deferred,
-across seven projects (stability 534, expression 2699, solubility 5). The added
-2292 ProtPredict tasks retain all 19 measured features under a common genotype
-holdout. Independent verification covers 2292000 exported observations and
-43548000 feature values. No models were trained or published by preparation.
-The new context interface passed 637 affected regression tests, 27 source/export
-checks and replay of four real historical models. Paper-method controls and new
-free-model acquisition experiments remain next. The target stays 10000 verified
-callable models with broader domain coverage. See CONTEXT_V2_PROTPREDICT_20261025.md.
+Develop a Scientist that turns protein-engineering questions and available evidence
+into useful, independently evaluated models and reusable methods. Prioritize coverage
+of **measured property, application scenario and independent source study**, followed
+by protein coverage. A 10,000-model library remains a long-term scale target; reaching
+that number through many copies of one endpoint does not complete the programme.
 
+Maintain the three complementary modes:
 
-The target is 10,000 independently trained, validated and callable models for
-protein research. The same modelling algorithm may be used for different proteins,
-properties or measured scenarios. Algorithm diversity is reported separately.
-Each model has an explicit scientific scope and an independently validated artifact.
+- **Agent:** answer questions and use enabled tools through category search, compact
+  capability descriptions and selected full interfaces. Test reuse of reviewed models.
+- **Scientist:** PI, planning, implementation, experiments, critique, revision and
+  independent delivery review. Preserve evidence, trained artifacts and a reproducible
+  project with an English report. Test learning from earlier development experience.
+- **Researcher:** gather protein-specific evidence, database records and computational
+  results into a cited report and a downloadable material package, using specialist
+  subtasks when appropriate.
 
-## Model identity and coverage
+Harnesses and model providers remain replaceable. Research runs use explicitly
+budgeted free DMX/OpenRouter models, without paid fallback. Keep production services,
+other users' files and online Overleaf separate from research execution. The manuscript
+remains **Recursive Self-improvement AI Agents for Protein Engineering**. Claims follow
+completed experiments and their actual scope.
 
-The primary coverage axes are **protein or protein family × measured property ×
-experimental or application context**. Different proteins sharing a property,
-different properties of one protein, and distinct measured contexts may each yield
-a counted model. Repeated seeds, renamed programs, repeated fits, arbitrary train/test
-splits and prompt wrappers do not create additional scientific scopes. Revisions of
-one scope are a lineage; the current released version contributes one primary count.
-A shared backbone can support many specialized models when their learned components,
-scope-specific validation and callable artifacts are explicit. A single multi-output
-model is not multiplied by the number of questions it can answer.
+## Property and scenario coverage
 
-Coverage includes solubility, expression, folding stability, thermal stability,
-activity, kinetics, substrate specificity and other supported protein properties.
-Scenarios use recorded variables such as expression system, assay method, substrate,
-temperature, pH or formulation. Missing metadata remain unknown; do not fabricate
-conditions or take a Cartesian product of unsupported combinations.
+The next pilot allocates up to eight tasks in each of six families. Each family aims
+for at least two independent studies, at most four tasks from a study, and no more
+than two allocations per protein across the panel. These are sampling constraints,
+not statistical power calculations. Insufficient data leave explicit gaps; another
+property cannot consume that allocation.
 
-Researcher projects are the discovery unit. A project manifest records the original
-study, protein scope, scientific question, measured endpoint and units, scenario,
-source/permission evidence and observation groups. The source registry is
-`configs/rsi/research_project_sources_v1.json`. Reviewed sources include eSOL protein production, curated designed-domain stability,
-Arabidopsis thermal-context and food/fermentation yeast expression studies. SoDoPE, FireProtDB,
-ProtaBank, SABIO-RK and researcher-provided projects are acquisition routes requiring
-individual data review; listing a source does not imply it has been imported.
+| Family | Representative measured endpoints | Scenario distinctions to retain |
+| --- | --- | --- |
+| Enzyme catalysis | Activity, kcat, Km, Ki, substrate specificity | Substrate, assay, pH, temperature, new enzyme |
+| Molecular recognition | Kd, binding and specificity | Target, ligand, construct, assay, selectivity panel |
+| Stability and resilience | Folding free energy, thermal stability, measured stress tolerance | Sequence variants, temperature response, pH and solvent conditions |
+| Production and developability | Solubility, expression yield, aggregation | Expression host, preparation, concentration, construct |
+| Localization and transport | Localization, secretion, targeting | Organism, compartment, construct and assay |
+| Immune properties | Immunogenicity, antigenicity, allergenicity | Host, assay and experimentally established endpoint |
 
-## Admission and implementation
+The existing protein-abundance library is a retained specialist collection. Its new
+allocation is **zero in this pilot**. It remains available for dedicated studies and
+appropriate reuse; its scale is not evidence of broad protein-engineering coverage.
+A thermal-response curve and sequence-dependent stability prediction are reported as
+different input/scenario tasks even when both belong to the stability family.
 
-`research_project_catalog.py` wraps existing model-task admission. It checks source
-hashes, task/scope agreement, declared grouping and partition separation, minimum
-data availability, duplicate scopes and duplicate measurements. It detects exact
-sequence partition conflicts across admitted tasks. The initial feasibility floor
-is 40 training, 15 validation and 15 future observations, with 5/3/3 declared groups.
-These are software admission thresholds, not a power calculation or a guarantee of
-biological independence. Group definitions require scientific review. A protein with
-one observation remains a data opportunity, not a fitted protein-specific model.
+The policy lives in `configs/rsi/property_coverage_v1.json`. Classification uses
+explicit stage/endpoint rules. Unknown endpoints remain unclassified until reviewed;
+renaming a task does not create a property. Canonical study identifiers prevent project
+aliases from multiplying the same source quota. New endpoint rules require scientific
+review of the measured quantity and the actual inputs.
 
-Catalog entries are admitted, deferred, duplicate or invalid. Catalog sizes are not
-published-model counts. Accepted tasks export to the existing persistent Scientist
-campaign runner; the original manifest is bound into every exported task's references.
-Campaign profiles may use authorized DMX free models or verified zero-priced
-OpenRouter routes, with no paid fallback. Provider/model identities and budgets are
-frozen per experiment. Catalog preparation and classical controls make no external
-model requests.
+## Data admission and counting
 
-The current bridge supports measured sequence-regression and contextual tasks. Classifier tasks are deferred
-until their appropriate control suite is implemented. Existing generated-code model
-interfaces cap some training tasks at 600 observations; increasing that capacity is
-a separate sandbox/resource-validation change. No broad-scale autonomous literature
-mining or 10,000-model acquisition has been completed by this catalog revision.
+Use public measurements with original study references, reuse terms, measurement
+units, uncertainty/censoring information and a traceable transformation record. Keep
+source files and hashes. Deduplicate shared measurements across databases. Preserve
+study-provided partitions or freeze grouped partitions before development; record
+sequence, protein, study and assay overlap as applicable.
 
-## Traditional and contemporary comparisons
+A protein with one observation is not enough for a dedicated predictor. The source
+catalog checks minimum rows and independent groups. Classification tasks additionally
+need appropriate class-aware metrics and controls; they are not relabelled as regression
+to satisfy the pilot. Shortfalls guide source acquisition and adapter work.
 
-Sequence tasks begin with training-mean, amino-acid-composition ridge regression,
-random forest and support-vector regression controls, using 20 residue fractions
-and log sequence length. Contextual tasks use their declared numeric covariates
-with appropriate thermal-curve or transcript/culture controls. Hyperparameters are fixed before
-validation; scaling is fitted on training data. The new runner scores validation
-only, leaving the future partition for frozen final comparisons. These controls are
-independently implemented host baselines, not Scientist-generated model discoveries.
+Count these quantities separately:
 
-Add domain controls when their inputs, endpoints, permissions and original training
-overlap can be checked: SWI/Protein-Sol for compatible solubility tasks; additive
-mutation and structure-energy models for suitable stability tasks; family averages,
-homologue transfer and substrate/context regression for enzyme prediction. Imported
-published predictors must be labelled as fixed external models. An inaccessible or
-incompatible method is reported as such, never assigned a synthetic score. Modern
-representation and deep-learning controls supplement this traditional comparison.
+1. Property families and measured endpoints covered.
+2. Application scenarios, input types and independent source studies.
+3. Protein identities and distinct protein/property/scenario scopes.
+4. Generated programs, trained artifacts, independently accepted deliveries and
+   successfully reused models.
+5. Lineage revisions and original methods, with evidence for any novelty claim.
 
-Compare methods on the same source data, partitions and endpoint. Predeclare tuning
-budgets and count feature preparation, calls, CPU/GPU time and memory. Report
-endpoint-specific errors, ranking, calibration where appropriate, and uncertainty
-clustered by project/protein. Count **valid**, **better than a baseline**, **better
-than the strongest eligible baseline**, and **reused successfully** separately.
-Model count is not a statistical replicate count.
+Repeated seeds, refits, renamed programs, prompt wrappers and arbitrary partitions do
+not add scientific scopes. A multi-output model is not multiplied by the number of
+questions it can answer. The same algorithm may serve distinct valid scopes; algorithm
+diversity is a separate result.
 
-## Expansion and RSI experiments
+## Allocate a property-balanced pilot
 
-1. Audit available data and prioritize concrete project demand, missing coverage,
-   label quality and expected useful models per unit compute. Do not assign arbitrary
-   quotas to properties or expand a source solely to reach 10,000.
-2. Use the catalog to select reuse, adaptation or a new model. Train through the
-   Scientist lifecycle, independently validate, register and demonstrate a fresh call.
-3. Progress through 32, 128, 512, 1,000, 3,000 and 10,000 accepted scopes as planning
-   checkpoints. Preserve a ledger for rejected, data-limited and failed tasks.
-4. Freeze project/protein groups for evaluation before exposing their labels to
-   acquisition or development-strategy selection. Separate interpolation within a
-   known protein, transfer to a new protein and transfer to a new scenario.
-5. Compare a fixed library, acquisition without reuse, acquisition with reuse, and
-   evolving development strategy under matched total budgets. A persistent single
-   agent separates long execution from expert-team coordination. An equal-budget
-   extra-search control separates recursive improvement from additional attempts.
-6. Promote development strategies on development projects, then measure their
-   descendants on untouched projects and proteins. Trace strategy changes to model
-   acquisition and subsequent research-task benefit. Library scale alone is not RSI.
+From the repository root:
 
-The paper's central claim should be that a Scientist progressively turns research
-needs into validated specialized models and learns to do this better. Report the
-eventual observed model count, coverage and benefit; 10,000 remains a target until
-verified. Keep the approved manuscript title unchanged.
+```bash
+python scripts/rsi/data_preparation/plan_property_campaign.py \
+  --manifest research_runs/my_sources/manifest.json \
+  --exclude-panel research_runs/my_prior_panel/allocation.json \
+  --registered-catalog research_runs/my_registry_snapshot/catalog.json \
+  --output research_runs/my_property_pilot
+```
 
-## Primary references
+Use real source-bound manifests and applicable prior snapshots. The output contains
+`catalog.json`, `allocation.json` and `coverage.json`; it performs no model requests or
+training. A partial allocation reports missing families and source diversity. Review
+these gaps before choosing additional sources. Source, policy and selected task hashes
+are rechecked before the allocation is returned. Omit an exclusion option only if there
+is no corresponding history, and record the actual exclusion scope.
 
-- eSOL: https://doi.org/10.1073/pnas.0811922106 and https://doi.org/10.1073/pnas.1201380109
-- SWI/SoDoPE: https://doi.org/10.1093/bioinformatics/btaa578
-- Protein-Sol: https://protein-sol.manchester.ac.uk/software
-- Designed-domain stability: https://doi.org/10.1038/s41586-023-06328-6
-- FireProtDB: https://doi.org/10.1093/nar/gkaa981 and https://doi.org/10.1093/nar/gkaf1211
-- ProtaBank: https://doi.org/10.1002/pro.3406
-- SABIO-RK: https://doi.org/10.1093/nar/gkx1065
+The existing `plan_acquisition` function accepts a bound `coverage_policy` reference.
+Its legacy no-policy behavior remains for reproducing frozen historical experiments;
+new breadth-oriented cohorts use the property policy. Do not overwrite closed studies
+to make their composition appear balanced.
 
-Reuse rights and original-study overlap are checked per data source. Counts of
-measurements, proteins or database entries are not evidence of the number of
-trainable and independently useful models obtainable from that source.
+## Experiments and acceptance
 
+First complete non-abundance pilot cases, then expand successful areas without
+letting one property or study dominate subsequent cohorts. Select tasks from source
+metadata before inspecting model performance. Log rejected, unsupported, data-limited
+and failed tasks as well as successful deliveries.
 
-## Implemented scope-based completion — 24 October 2026
+Scientist receives the question, measured inputs and resource budget. It chooses and
+implements appropriate methods, including classical learning, few-shot, semi-supervised
+or meta-learning strategies where the data support them. Compare methods on identical
+inputs and partitions with fixed domain controls, and report tuning, compute and request
+costs. A useful reviewed model need not outperform every traditional baseline.
 
-New campaigns now default to `scientific_scope.v1`: project-manifest-bound scope
-identities and duplicate measurement groups determine completion, while raw
-program entries remain a secondary count. Historical campaigns keep their prior
-protocol. The change passed 180 tests and a read-only audit of three real newly
-published scopes. At that checkpoint, the shared library's terminal audit had seven verified
-entries across six task scopes. The original prepared catalog had 103 admitted tasks,
-which are not 103 published models. See `SCIENTIFIC_SCOPE_COVERAGE_20261024.md` for
-batch outcomes, comparisons and the remaining execution/scaling work.
+RSI experiments compare a frozen library, autonomous development without history,
+development with reusable programs, and development with evolving strategy under
+matched budgets. Use untouched projects for transfer claims and equal-budget search
+controls. Report within-protein prediction, new-protein adaptation and new-scenario
+transfer separately. Model-library growth alone does not establish improvement.
 
+Private model delivery requires reproducible training, real fitted state, input/output
+checks, scope and resource limits, evaluation evidence and a successful fresh invocation.
+Public platform admission is separate: an operator selects and reviews local products;
+external contributors apply by email, with author email retained in approved metadata.
+Scientist cannot automatically publish an anonymous user's model to the public catalog.
 
-## Federated acquisition and execution checkpoint — 25 October 2026
+## Immediate execution order
 
-Three source manifests now contain 979 candidates: 946 admitted tasks and 33
-deferred tasks. The admitted stages are stability (534), expression (407) and
-solubility (5). These are acquisition opportunities, not trained models. A fixed
-checkpoint replay verified 10 completed two-generation plant allocations across
-7 proteins. The paired campaign is still running, so its final effect is unknown.
+1. Complete the prepared CatPred Ki/Km native Scientist studies and their matched
+   reference comparison. They are two endpoints from one data source, not two independent
+   source studies and not evidence of all six families.
+2. Audit the existing eSOL, sequence-stability, enzyme-assay and antibody data for
+   reusable partitions and eligible sources before allocating new studies.
+3. Fill missing localization, secretion and immune-property coverage with measured,
+   source-reviewed data and the required classification adapters and controls.
+4. Run matched RSI/history and held-out transfer experiments on the admitted panel.
+5. Test accepted products through Agent discovery and invocation, then update paper
+   results and Researcher examples from completed evidence.
 
-A 40-request free OpenRouter pilot produced no validated models. Its failures
-motivate a versioned submission-to-host handoff contract, now covered by 221
-passing tests and two historical-publication replays. Prospective benefit remains
-to be measured. See `SCALING_AND_HANDOFF_20261025.md` for source, execution, budget
-and evaluation evidence and the next controlled experiments.
+## Sources for the missing properties
 
+| Source | Intended coverage | Required admission work |
+| --- | --- | --- |
+| [SKEMPI 2.0](https://life.bsc.es/pid/skempi2/) | Mutation-dependent protein interaction affinity and kinetics | Preserve exact/censored measurements and temperature; map wild-type/mutant residues to structures; group related complexes and original studies before splitting. Do not combine Kd, kon, koff and derived binding-energy changes into one target. |
+| [Jain et al. antibody measurements](https://www.pnas.org/doi/10.1073/pnas.1616408114) | Measured antibody expression, thermal stability, self-interaction and nonspecific binding | Join paired variable-domain sequences from Dataset S2 to assay measurements in S3; retain assay-specific units and construct context. One cross-antibody endpoint model is a scope, not one fitted model for every antibody row. |
+| [DeepLoc 2.0 source data](https://services.healthtech.dtu.dk/services/DeepLoc-2.0/) | Experimentally supported subcellular localization and sorting signals | Preserve the published homology partitions and independent HPA test cohort. Add multilabel metrics and classification controls before task admission; unavailable labels are not negative observations. |
+| [IEDB assay exports](https://www.iedb.org/database_export_v3.php) | Measured T-cell/B-cell response and peptide–MHC binding in defined contexts | Keep assay type, host, MHC, response definition and source publication. Functional response, binding and ligand elution are different endpoints; use explicit negatives and study/sequence-aware splits. |
 
-## Source reconstruction checkpoint - 25 October 2026
-
-ProtPredict adds 2292 source proteins with sufficient genotype-held-out
-observations, but none are admitted yet: its 19 measured covariates require a
-versioned interface beyond the existing 16-feature contract. The federated
-catalog remains 946 admitted tasks. The source adapter passed 13 tests and a
-full independent numerical reconstruction. The prospective handoff pilot
-published and reused two first-generation models but completed neither
-two-generation goal; both remained below the strongest fixed control.
-See PROTPREDICT_AND_HANDOFF_20261025.md.
+These are source-admission priorities, not trained models or accepted tasks. Downloaded
+snapshots stay under ignored `research_runs/sources/` with URLs, dates and checksums.
+Source availability alone does not imply an adequate independent training/test split.
+The CatPred Ki and Km experiments both occupy the enzyme-catalysis family in this policy;
+they do not fill the molecular-recognition quota simply by renaming the endpoint.
