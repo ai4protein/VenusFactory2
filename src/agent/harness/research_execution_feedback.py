@@ -22,6 +22,20 @@ def _failure_message(value, workspace):
     return bounded_message("\n".join(evidence).strip() or "Tool failed", workspace, 1200)
 
 
+
+def failure_summary(value):
+    """Keep the diagnostic headline, not a source excerpt or caret underline."""
+    lines = [line.strip() for line in str(value).splitlines() if line.strip()]
+    if not lines:
+        return "Tool failed"
+    # A Python traceback puts its exception after the stack; typed tool errors
+    # and source-check diagnostics put their actual message first.
+    if lines[0].startswith("Traceback (most recent call last):"):
+        lines = [line for line in lines if not re.fullmatch(r"[~^]+", line)]
+        return lines[-1][:700]
+    return lines[0][:700]
+
+
 def _name(value):
     name=str(value or "tool").rsplit("__",1)[-1]
     return {"run_session_python":"run_research_python", "edit_session_file":"write_session_file"}.get(name,name)

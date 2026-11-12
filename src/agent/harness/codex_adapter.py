@@ -14,9 +14,36 @@ from .mcp_config import codex_mcp_configuration, scientific_server
 from .responses_gateway import ResponsesPolicy
 
 
+def _failure_text(item, workspace):
+    """Keep repair evidence without forwarding arbitrary native metadata."""
+    from backend.web_v2.redact import redact_for_kimi
+
+    from .session_boundary import public_value
+    from .tool_diagnostics import bounded_message
+
+    result = item.get("result")
+    parts = result.get("content", []) if isinstance(result, dict) else []
+    messages = [part["text"] for part in parts if isinstance(part, dict)
+                and part.get("type") == "text" and isinstance(part.get("text"), str)] if isinstance(parts, list) else []
+    if not any(message.strip() for message in messages) and isinstance(result, dict):
+        data = result.get("structured_content")
+        if isinstance(data, dict):
+            messages = [data[key] for key in ("error", "message") if isinstance(data.get(key), str)]
+    if not any(message.strip() for message in messages):
+        error = item.get("error")
+        if isinstance(error, dict) and isinstance(error.get("message"), str):
+            messages = [error["message"]]
+    text = "\n".join(messages).strip() or "Native MCP tool failed without a diagnostic."
+    # The server already sanitizes its error content. Apply the host boundary
+    # again for native transport errors, including Bearer/PEM credentials, before
+    # truncation; shortening first can cut a secret in the middle of a token.
+    return bounded_message(redact_for_kimi(public_value(text, workspace)), workspace)
+
+
 class CodexEvents:
-    def __init__(self, allowed_tools, limit, validator=None):
+    def __init__(self, allowed_tools, limit, validator=None, *, workspace=None):
         self.allowed = set(allowed_tools)
+        self.workspace = Path(workspace) if workspace is not None else Path("/workspace")
         self.limit, self.validator = limit, validator
         self.started, self.finished = {}, set()
         self.thread_id = None
@@ -91,7 +118,7 @@ class CodexEvents:
                 if isinstance(result, dict):
                     failed |= bool(result.get("isError", result.get("is_error", False)))
                 if failed:
-                    text = json.dumps({"native_tool_error": True}, sort_keys=True)
+                    text = _failure_text(item, self.workspace)
                 else:
                     data = result.get("structured_content")
                     if data is None:
@@ -274,7 +301,9 @@ class CodexAdapter:
             validate_tool_result(task, name, data)
 
         web_tools = task.phase == 'chat' and task.mcp_entry == 'web_tools.py'
-        state = CodexEvents(task.tools, ctx.profile.budget.tool_calls, None if web_tools else validator)
+        state = CodexEvents(
+            task.tools, ctx.profile.budget.tool_calls, None if web_tools else validator, workspace=task.workspace
+        )
         result = {
             "status": "running",
             "engine": "codex",

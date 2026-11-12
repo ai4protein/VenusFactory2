@@ -29,7 +29,13 @@ def test_failure_feedback_is_bounded_and_excludes_arguments(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_next_iteration_receives_actual_failures_not_only_critic_summary(tmp_path):
+@pytest.mark.parametrize("diagnostic", [
+    "Leakage: groups overlap splits",
+    "Model source check failed: line 13, column 78: unmatched ']'. Repair the saved source.\n"
+    "    counts = [part.count(residue) for residue in AMINO_ACIDS]]\n"
+    "                                                         ^",
+])
+async def test_next_iteration_receives_actual_failures_not_only_critic_summary(tmp_path, diagnostic):
     profile=Profile("science_expert","expert-deepseek-harness",
                     ModelBinding("dmx","unisound-u2-flash","https://www.dmxapi.cn/v1"),
                     Budget(model_calls=12,tool_calls=6,wall_seconds=30))
@@ -46,15 +52,15 @@ async def test_next_iteration_receives_actual_failures_not_only_critic_summary(t
         if role=="SC":return json.dumps({"decision":"needs_revision","summary":"Unfinished work","issues":["Continue"]})
         raise AssertionError(role)
     async def executor(request,service,events):
-        events.extend(failure("evaluate_research_model","Leakage: groups overlap splits"
+        events.extend(failure("evaluate_research_model",diagnostic
             + "\nExecution budget: 4 tool calls remain; 15 read-only discovery calls remain. "
             "Save a checkpoint when the current step is ready. Checkpoint saves have a separate allowance: 2 remain."))
         events.append({"kind":"completed","text":"Partial work","event_audit":{"passed":True}})
     state=await AutonomousResearch(store,"fixture",{},consult=consult,executor=executor,tools=[]).run()
     assert state["status"]=="budget_exhausted"
-    assert state["cycles"][0]["summary"] == "Execution needs revision: Leakage: groups overlap splits"
+    assert state["cycles"][0]["summary"] == "Execution needs revision: " + diagnostic.splitlines()[0]
     assert seen[0] is None
-    assert seen[1]["errors"]==[{"tool":"evaluate_research_model","error":"Leakage: groups overlap splits"}]
+    assert seen[1]["errors"]==[{"tool":"evaluate_research_model","error":diagnostic}]
     assert seen[1]["iteration"]==1
     assert state["progress"]["execution_feedback"]["iteration"]==2
 
@@ -145,3 +151,8 @@ def test_development_guidance_does_not_invent_parent_experiments():
         {"status":"needs_revision","issues":["Prediction failed on empty input"]}]})
     assert step["stage"]=="revise_submission"
     assert step["issues"]==["Prediction failed on empty input"]
+
+
+def test_traceback_summary_keeps_exception_after_stack():
+    from agent.harness.research_execution_feedback import failure_summary
+    assert failure_summary("Traceback (most recent call last):\n  File \"model.py\", line 2\n    1 / 0\n    ~~~~^\nZeroDivisionError: division by zero") == "ZeroDivisionError: division by zero"

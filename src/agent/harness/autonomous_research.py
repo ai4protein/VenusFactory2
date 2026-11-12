@@ -15,7 +15,7 @@ from agent.science_goal import GoalSpec, GoalStore, run_goal
 from .scientist_gateway_policy import ScientistGatewayPolicy, ScientistResponsesPolicy
 from .contracts import Profile, file_hash, digest
 from .events import audit_requests
-from .research_execution_feedback import execution_feedback, iteration_feedback, feedback_state, repair_source_context
+from .research_execution_feedback import execution_feedback, iteration_feedback, feedback_state, repair_source_context, failure_summary
 from .gateway import EvidenceGateway
 from .host import write_json
 from .native_expert_team import NATIVE_EXPERT_HARNESSES, critic_decision, role_content
@@ -532,7 +532,7 @@ class AutonomousResearch:
                 write_json(folder/'host_review.json',host_review)
                 progress['host_review']=host_review
                 if host_issues:
-                    review={'decision':'needs_revision','summary':'Execution needs revision: '+host_issues[0].strip().splitlines()[-1][:700],
+                    review={'decision':'needs_revision','summary':'Execution needs revision: '+failure_summary(host_issues[0]),
                             'issues':host_issues}
                     self.activity(folder,'SC',json.dumps({'source':'automatic_checks',**review},ensure_ascii=False))
                 accepted_steps={row['id'] for row in step_checks if row['passed']}

@@ -117,3 +117,96 @@ def test_native_failures_and_unadmitted_actions_cannot_complete():
         state.consume({"type": "turn.completed"})
     with pytest.raises(ValueError):
         initialized().consume({"type": "item.started", "item": {"type": "command_execution"}})
+
+
+@pytest.mark.parametrize("error_source", ["failed_status", "isError", "is_error", "transport", "structured"])
+def test_native_failure_preserves_repair_evidence_and_attempt_identity(tmp_path, error_source):
+    from agent.harness.research_execution_feedback import feedback_state
+
+    identity = "a" * 32
+    diagnostic = f"TrainingAttemptError: Training attempt {identity} failed: fit is an unfinished placeholder"
+    state = CodexEvents({"train_research_model"}, 1, workspace=tmp_path)
+    state.consume({"type": "thread.started", "thread_id": "fixture-thread"})
+    state.consume({"type": "turn.started"})
+    arguments = {"source_file": "src/model.py"}
+    events = state.consume(tool_event(tool="train_research_model", arguments=arguments))
+    result = {"content": [{"type": "text", "text": diagnostic}], "structured_content": None}
+    changes = {"tool": "train_research_model", "arguments": arguments, "result": result}
+    if error_source == "failed_status":
+        changes["status"] = "failed"
+    elif error_source in {"isError", "is_error"}:
+        result[error_source] = True
+    elif error_source == "transport":
+        changes.update(result=None, error={"message": diagnostic, "private_metadata": "must not be forwarded"})
+    else:
+        changes.update(status="failed", result={"structured_content": {"error": diagnostic, "private_metadata": "must not be forwarded"}})
+    events += state.consume(tool_event("item.completed", **changes))
+    assert events[-1]["is_error"] is True
+    assert events[-1]["output"] == diagnostic
+    feedback = feedback_state(events, tmp_path)
+    assert feedback["pending"][0]["training_attempt_id"] == identity
+    assert feedback["pending"][0]["source_file"] == "src/model.py"
+    assert "unfinished placeholder" in feedback["errors"][0]["error"]
+    assert state.tool_errors == 1
+
+
+def test_native_error_redacts_credentials_and_host_paths_before_bounding(tmp_path):
+    state = CodexEvents({"inspect_task"}, 1, workspace=tmp_path)
+    state.consume({"type": "thread.started", "thread_id": "fixture-thread"})
+    state.consume({"type": "turn.started"})
+    state.consume(tool_event())
+    diagnostic = (
+        "ValueError: invalid input " + str(tmp_path / "src/model.py") + "\n"
+        "Other file: /home/another-user/private/model.py\n"
+        "Authorization: Bearer " + "fixture-secret-" * 20 + "\n"
+        "API_KEY=sk-" + "fixture-key-" * 20 + "\n"
+        "-----BEGIN RSA PRIVATE KEY-----\nprivate-body\n-----END RSA PRIVATE KEY-----\n"
+        + "padding " * 2000 + "\nRepair the missing expected_sha256 argument."
+    )
+    output = state.consume(tool_event("item.completed", status="failed", result=None, error={"message": diagnostic}))[0]["output"]
+    assert len(output) <= 1600
+    assert output.startswith("ValueError: invalid input /workspace/src/model.py")
+    assert output.endswith("Repair the missing expected_sha256 argument.")
+    assert all(value not in output for value in (str(tmp_path), "another-user", "fixture-secret", "fixture-key", "private-body"))
+
+
+@pytest.mark.parametrize("result", [None, {}, {"content": [None, {"type": "image", "data": "private"}]}, {"structured_content": {"other": "private"}}, {"content": None}])
+def test_native_error_without_message_does_not_forward_metadata(result):
+    state = initialized()
+    state.consume(tool_event())
+    output = state.consume(tool_event("item.completed", status="failed", result=result, error={"code": 42}))[0]["output"]
+    assert output == "Native MCP tool failed without a diagnostic."
+
+
+def test_failed_output_is_not_success_evidence_and_success_still_requires_validation(tmp_path):
+    validated = []
+
+    def validate(name, data):
+        validated.append((name, data))
+        raise ValueError("Invalid success evidence")
+
+    state = CodexEvents({"inspect_task"}, 2, validate, workspace=tmp_path)
+    state.consume({"type": "thread.started", "thread_id": "fixture-thread"})
+    state.consume({"type": "turn.started"})
+    state.consume(tool_event())
+    state.consume(tool_event("item.completed", status="failed", result={"content": [{"type": "text", "text": "Bad input"}]}))
+    assert validated == []
+    state.consume(tool_event(id="second"))
+    with pytest.raises(ValueError, match="Invalid success evidence"):
+        state.consume(tool_event("item.completed", id="second"))
+    assert validated == [("inspect_task", {"x": 1})]
+
+
+@pytest.mark.parametrize("diagnostic, hidden", [
+    ("Authorization: Bearer fixtureBearerCredential123456789", "fixtureBearerCredential123456789"),
+    ("API_KEY=sk-fixtureCredential123456789012345678", "sk-fixtureCredential123456789012345678"),
+    ("-----BEGIN RSA PRIVATE KEY-----\nfixture-private-body\n-----END RSA PRIVATE KEY-----", "fixture-private-body"),
+    ("Cannot read /home/other-user/private/file.py", "/home/other-user"),
+])
+def test_short_native_errors_are_redacted_without_relying_on_truncation(diagnostic, hidden):
+    state = initialized()
+    state.consume(tool_event())
+    output = state.consume(tool_event("item.completed", status="failed", result={"content": [{"type": "text", "text": diagnostic}]}))[0]["output"]
+    assert hidden not in output
+    assert "trace shortened" not in output
+    assert output
