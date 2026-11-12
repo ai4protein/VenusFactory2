@@ -319,6 +319,8 @@ class AutonomousResearch:
         context['resources'] = {'online':os.getenv('VENUS_SCIENTIST_ONLINE')=='1', 'budget':state['definition']['goal'],
             'training':'Use enabled training MCP for platform PLMs; online only ESM2-8M. Isolated Python supports custom statistical and learning algorithms.'}
         development=Development(self.store.root/'development',data_store=data_store)
+        from .research_attempt_resolution import training_progress, training_snapshot
+        training_before = training_snapshot(development)
         context['model_development']={'prior_generations':development.summary(),
             'guidance_tool':'get_research_strategy_guide',
             'workflow':'Prepare checked data, fit a baseline, measure a justified revision, then submit independent Review.',
@@ -569,6 +571,7 @@ class AutonomousResearch:
         finally:
             timeline.finish(result['status'])
             progress['development']=development.summary()
+            progress['training_progress'] = training_progress(development, training_before, progress.get('training_progress'))
             if service is not None and service.latest_submission:
                 progress['review_submission']=service.latest_submission
             progress['execution_feedback']={'iteration':index+1, **feedback_state(events,workspace,progress.get('execution_feedback'),development=development)}
@@ -581,10 +584,14 @@ class AutonomousResearch:
             progress.pop('reviewed_episode',None)
         from .model_availability import model_service_blocker
         blocker=model_service_blocker(folder/'model_requests.jsonl')
+        if not blocker and progress.get('training_progress', {}).get('intervention_required'):
+            blocker = {'source': 'research_progress', 'code': 'unchanged_training_failure',
+                'message': 'Training repeated the same failing implementation for three research cycles without a new measured model. '
+                    'The project and remaining budget are saved. Revise the implementation or model configuration before resuming.'}
         if blocker and result['status']!='completed':
             progress['execution_blocker']=blocker
             result.update(execution_blocker=blocker,summary=blocker['message'])
-            write_json(folder/'model_service.json',blocker)
+            write_json(folder/('model_service.json' if blocker['source']=='model_gateway' else 'training_stagnation.json'),blocker)
         elif not blocker:
             progress.pop('execution_blocker',None)
         from .execution_followup import execution_usage

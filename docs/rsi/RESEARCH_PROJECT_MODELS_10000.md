@@ -52,6 +52,13 @@ across all attempts. Route health, coding performance, research quality and deli
 reliability are separate outcomes. A route returning HTTP 200 is not necessarily capable
 of producing valid plans, executable code or an acceptable model.
 
+For operational recovery, completed fits are reused from host-owned experiment records.
+Three implementation cycles that repeat the same failing algorithm, data, seed and
+error without a new measured generation interrupt execution and retain the remaining
+budget. PI receives the failure evidence before that limit. A changed experiment or a
+new measured model breaks the repetition; SC rejection of a measured model continues
+the scientific revision loop. Resume preserves the existing project and accounting.
+
 ## Property and scenario coverage
 
 The next pilot allocates up to eight tasks in each of six families. Each family aims

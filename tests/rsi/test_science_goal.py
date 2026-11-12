@@ -266,14 +266,17 @@ async def test_user_question_cannot_mask_an_exhausted_goal(tmp_path, limits, exp
     assert state["usage"]["model_calls"] == 1
 
 @pytest.mark.asyncio
-async def test_model_service_suspension_saves_budget_and_resumes_without_repeating(tmp_path):
+@pytest.mark.parametrize("blocker", [
+    {"source": "model_gateway", "code": "quota", "http_status": 403},
+    {"source": "research_progress", "code": "unchanged_training_failure"},
+])
+async def test_execution_interruption_saves_budget_and_resumes_without_repeating(tmp_path, blocker):
     store = create(tmp_path, max_cycles=4)
     seen = []
     async def cycle(index, *args):
         seen.append(index)
         if index == 0:
-            blocker = {"source": "model_gateway", "code": "quota", "http_status": 403}
-            return {**outcome("Model quota exhausted"), "status": "failed",
+            return {**outcome("Execution interrupted"), "status": "failed",
                     "execution_blocker": blocker, "progress": {"execution_blocker": blocker}}
         (store.root / "accepted.json").write_text("{}")
         (store.root / "reused.json").write_text("{}")
@@ -291,11 +294,15 @@ async def test_model_service_suspension_saves_budget_and_resumes_without_repeati
 
 
 @pytest.mark.asyncio
-async def test_model_service_interruption_cannot_extend_an_exhausted_budget(tmp_path):
+@pytest.mark.parametrize("blocker", [
+    {"source": "model_gateway", "code": "quota", "http_status": 403},
+    {"source": "research_progress", "code": "unchanged_training_failure"},
+])
+async def test_execution_interruption_cannot_extend_an_exhausted_budget(tmp_path, blocker):
     store = create(tmp_path, max_cycles=1)
     async def cycle(*args):
         return {**outcome(), "status": "failed",
-                "execution_blocker": {"source": "model_gateway", "code": "quota", "http_status": 403}}
+                "execution_blocker": blocker}
     final = await run_goal(store, cycle, lambda s: assessment(store, s))
     assert final["status"] == "budget_exhausted"
     with pytest.raises(ValueError):

@@ -136,3 +136,65 @@ def resolve_attempts(feedback, development):
     if resolved:
         result["superseded"] = resolved[-64:]
     return result
+
+
+def training_snapshot(development):
+    """Capture host record identities before an episode, without exposing data."""
+    return {
+        "attempts": {p.parent.name for p in (development.root / "training").glob("*/receipt.json")},
+        "experiments": {row["id"] for row in development.records()},
+    }
+
+
+def training_progress(development, before, previous=None):
+    """Detect unchanged failed fits across three actual implementation cycles.
+
+    A renamed file or comment change is not a new algorithm. Changed source,
+    data, seed, lineage, failure or a new measured generation breaks the streak.
+    Scientific rejection of successfully measured experiments is not stagnation.
+    """
+    from .tool_diagnostics import bounded_message
+
+    after = training_snapshot(development)
+    attempts = []
+    for identity in after["attempts"] - before["attempts"]:
+        try:
+            attempts.append(_receipt(development.root / "training", identity))
+        except (OSError, ValueError, KeyError, TypeError):
+            # Missing, unfinished or modified receipts cannot prove repeated work.
+            return {"same_failure_cycles": 0, "intervention_required": False}
+    attempts.sort(key=lambda row: row["created"])
+    report = {
+        "fit_attempts": len(attempts),
+        "measured_generations": len(after["experiments"] - before["experiments"]),
+        "same_failure_cycles": 0,
+        "intervention_required": False,
+    }
+    if not attempts or report["measured_generations"] or any(row["status"] != "failed" for row in attempts):
+        return report
+
+    def fingerprint(row):
+        error = row.get("error", "").replace(row["source_file"], "<algorithm>")
+        error = re.sub(r"line [0-9]+", "line <n>", error)
+        return digest({
+            "algorithm": row.get("algorithm_ast_sha256") or row["algorithm_sha256"],
+            "scope": _scope(row), "training": row["training_sha256"], "seed": row["seed"],
+            "stage": row.get("stage"), "error_type": row.get("error_type"), "error": error,
+        })
+
+    identities = {fingerprint(row) for row in attempts}
+    if len(identities) != 1:
+        return report
+    signature = identities.pop()
+    previous = previous or {}
+    repeats = previous.get("same_failure_cycles", 0) + 1 if previous.get("signature") == signature else 1
+    latest = attempts[-1]
+    report.update(
+        signature=signature, same_failure_cycles=repeats, intervention_required=repeats >= 3,
+        source_file=latest["source_file"],
+        error=bounded_message(latest.get("error", "Fitting failed"), development.root, 600),
+        evidence=[{"attempt_id": row["id"], "receipt_sha256": row["receipt_sha256"]} for row in attempts[-3:]],
+        instruction="Repeated fitting failures use the same algorithm and inputs. Repair the saved implementation "
+                    "from its observed error or change the justified approach; renaming a file does not repair it.",
+    )
+    return report

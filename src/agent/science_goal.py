@@ -403,12 +403,18 @@ async def run_goal(
                     )
                     s["status"] = "budget_exhausted" if exhausted else "waiting_for_input"
                 blocker = outcome.get("execution_blocker")
-                if s["status"] == "active" and isinstance(blocker, dict) and blocker.get("source") == "model_gateway":
+                gateway_blocker = isinstance(blocker, dict) and blocker.get("source") == "model_gateway"
+                stalled_training = (isinstance(blocker, dict) and blocker.get("source") == "research_progress"
+                                    and blocker.get("code") == "unchanged_training_failure")
+                if s["status"] == "active" and (gateway_blocker or stalled_training):
                     exhausted = len(s["cycles"]) >= spec.max_cycles or any(
                         s["usage"][key] >= getattr(spec, key) for key in reserve)
                     s["status"] = "budget_exhausted" if exhausted else "interrupted"
-                    s["events"].append({"event": "model_service_unavailable", "index": index,
-                                        "code": blocker["code"], "http_status": blocker["http_status"]})
+                    event = {"event": "model_service_unavailable" if gateway_blocker else "unchanged_training_failure",
+                             "index": index, "code": blocker["code"]}
+                    if gateway_blocker:
+                        event["http_status"] = blocker["http_status"]
+                    s["events"].append(event)
                 if stop_on_uncheckpointed_failure and uncheckpointed_failure and s["status"] == "active":
                     # A missing executor checkpoint cannot support later publication.
                     # Preserve its reservation and stop before spending on more cycles.

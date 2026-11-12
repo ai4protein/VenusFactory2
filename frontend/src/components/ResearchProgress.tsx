@@ -14,6 +14,7 @@ export function ResearchProgress({ goal: g, lang }: { goal: ScienceGoal; lang: s
     authentication: say("Check the selected model credentials before continuing.", "请检查所选大模型的密钥配置，再继续研究。"),
     access: say("The selected model denied access. Continue when access is restored.", "所选大模型暂时无法访问，可在服务恢复后继续。"),
     rate_limit: say("The selected model is rate-limited. Try continuing later.", "所选大模型暂时限流，请稍后继续。"),
+    unchanged_training_failure: say("Training is repeating the same error. Progress is saved; revise the approach or model selection before continuing.", "训练连续重复同一错误。进度已保存，请调整方案或所选大模型后继续。"),
     configuration: say("Check the selected model route before continuing.", "请检查所选大模型的路由配置，再继续研究。"),
   } as Record<string, string>)[blocker.code] || say("The selected model is unavailable.", "所选大模型暂不可用。") : "";
 

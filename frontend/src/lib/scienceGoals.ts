@@ -56,7 +56,7 @@ export type ScienceGoal = {
   project?: { file_count: number; available: boolean; status: string; research_completed: boolean; files: string[] };
   parameters?: Record<string, string>;
   research?: {
-    execution_blocker?: { code: string; http_status: number; message: string };
+    execution_blocker?: { source?: string; code: string; http_status?: number; message: string };
     development?: ResearchDevelopment;
     deliveries?: ResearchDelivery[];
     selected_deliveries?: ResearchDelivery[];

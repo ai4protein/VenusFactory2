@@ -64,8 +64,11 @@ def test_class_methods_report_missing_module_entrypoints_without_running_code():
     def predict(self, inputs):
         return 1.0
 """
-    with pytest.raises(ValueError, match="module-level functions, not class methods"):
+    with pytest.raises(ValueError, match="Implement module-level fit") as error:
         validate_algorithm(source)
+    assert "Predictor.fit as a class method" in str(error.value)
+    assert "Implement module-level predict(model, inputs)" in str(error.value)
+    assert "Predictor.predict as a class method" in str(error.value)
 
 
 
