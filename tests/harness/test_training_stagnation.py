@@ -31,19 +31,21 @@ async def fail(service, name="broken.py", code=BROKEN, seed=0):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("comment_position", ["after", "before"])
-async def test_same_failed_algorithm_across_cycles_is_not_repaired_by_renaming(tmp_path, comment_position):
+@pytest.mark.parametrize("syntax_failure", [False, True])
+async def test_same_failed_algorithm_across_cycles_is_not_repaired_by_renaming(tmp_path, comment_position, syntax_failure):
     service = await service_at(tmp_path)
     report = None
+    broken = BROKEN.replace("training['inputs']", "training['train']]") if syntax_failure else BROKEN
     for index in range(3):
         before = training_snapshot(service.development)
-        code = ("# revision\n\n" * index + BROKEN if comment_position == "before"
-                else BROKEN + f"\n# revision {index}\n")
+        code = ("# revision\n\n" * index + broken if comment_position == "before"
+                else broken + f"\n# revision {index}\n")
         await fail(service, f"revision_{index}.py", code)
         report = training_progress(service.development, before, report)
         assert report["same_failure_cycles"] == index + 1
         assert report["intervention_required"] is (index == 2)
     assert report["fit_attempts"] == 1 and report["measured_generations"] == 0
-    assert "KeyError" in report["error"]
+    assert ("not valid Python" if syntax_failure else "KeyError") in report["error"]
     assert len(report["evidence"]) == 1
     assert "splits" not in json.dumps(report) and str(tmp_path) not in json.dumps(report)
     before = training_snapshot(service.development)
@@ -210,3 +212,17 @@ async def test_real_scientist_stops_unchanged_failures_before_exhaustion(tmp_pat
     store.resume()
     assert store.read()["status"] == "active" and store.read()["usage"] == result["usage"]
     assert (store.root / "cycle_002.json").read_bytes() == saved
+
+
+@pytest.mark.asyncio
+async def test_incomplete_tokenization_does_not_hide_changed_invalid_source(tmp_path):
+    service = await service_at(tmp_path)
+    previous = None
+    for value in ("first attempt", "changed attempt", "another change"):
+        before = training_snapshot(service.development)
+        # The body of an unterminated string is not returned as a token.
+        source = 'def fit(training, seed):\n    note = """' + value
+        await fail(service, code=source)
+        previous = training_progress(service.development, before, previous)
+        assert previous["same_failure_cycles"] == 1
+        assert not previous["intervention_required"]

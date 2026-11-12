@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import math
 import re
+import tokenize
 
 from .contracts import digest
 from utils.scoped_files import open_file, read_bytes
@@ -146,6 +148,28 @@ def training_snapshot(development):
     }
 
 
+def _algorithm_identity(development, row):
+    if row.get("algorithm_ast_sha256"):
+        return "ast:" + row["algorithm_ast_sha256"]
+    raw = read_bytes(development.root / "training", row["id"] + "/algorithm.py", max_bytes=200000)
+    if hashlib.sha256(raw).hexdigest() != row["algorithm_sha256"]:
+        raise ValueError("Training source snapshot changed")
+    # Syntax failures have no AST. Token comparison still distinguishes edits
+    # while ignoring comments/blank lines, without executing the submitted code.
+    tokens = []
+    try:
+        for token in tokenize.generate_tokens(io.StringIO(raw.decode("utf-8")).readline):
+            if token.type not in {tokenize.COMMENT, tokenize.NL, tokenize.ENCODING, tokenize.ENDMARKER}:
+                tokens.append((token.type, token.string))
+    except tokenize.TokenError as error:
+        if error.args[0] != "EOF in multi-line statement":
+            # An unterminated string can hide its content from tokenization.
+            return "source:" + row["algorithm_sha256"]
+    except (IndentationError, SyntaxError, UnicodeError):
+        return "source:" + row["algorithm_sha256"]
+    return "tokens:" + digest(tokens)
+
+
 def training_progress(development, before, previous=None):
     """Detect unchanged failed fits across three actual implementation cycles.
 
@@ -178,14 +202,17 @@ def training_progress(development, before, previous=None):
         # The source reporter adds a line number after the path. Comments and
         # blank lines move it without changing the measured algorithm/failure.
         error = re.sub(r"(?m)^At <algorithm>:[0-9]+:", "At <algorithm>:<n>:", error)
-        error = re.sub(r"line [0-9]+", "line <n>", error)
+        error = re.sub(r"line [0-9]+(?:, column [0-9]+)?", "line <n>", error)
         return digest({
-            "algorithm": row.get("algorithm_ast_sha256") or row["algorithm_sha256"],
+            "algorithm": _algorithm_identity(development, row),
             "scope": _scope(row), "training": row["training_sha256"], "seed": row["seed"],
             "stage": row.get("stage"), "error_type": row.get("error_type"), "error": error,
         })
 
-    identities = {fingerprint(row) for row in attempts}
+    try:
+        identities = {fingerprint(row) for row in attempts}
+    except (OSError, ValueError, KeyError, TypeError):
+        return report
     if len(identities) != 1:
         return report
     signature = identities.pop()
