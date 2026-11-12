@@ -720,6 +720,75 @@ def run_train_tool(config_path: str) -> str:
         }, ensure_ascii=False)
 
 
+def _prediction_scale_attachment(output_file, frame, problem_type):
+    """Validate the adjacent result metadata and its CSV fields, not a claimed CSV hash."""
+    if problem_type != "regression":
+        return {}
+    from mcp_tools.models.factory.prediction.output_scale import SCHEMA, output_scale
+    from mcp_tools.models.factory.target_transform import METHODS, _inverse_metadata
+    from mcp_tools.models.factory.target_transform import SCHEMA as TRANSFORM_SCHEMA
+
+    path = Path(str(output_file) + ".output-scale.json")
+    columns = {"prediction_value_space", "prediction_unit", "inverse_transform_applied"}
+    import stat
+    try:
+        descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except FileNotFoundError:
+        if columns & set(frame.columns):
+            raise ValueError("Prediction scale metadata is missing for the declared CSV output space") from None
+        return {}  # Legacy CSV: retain its output without inventing a scale.
+    except OSError as exc:
+        raise ValueError("Invalid prediction scale metadata file") from exc
+    with os.fdopen(descriptor, "rb") as stream:
+        info = os.fstat(stream.fileno())
+        if not stat.S_ISREG(info.st_mode) or info.st_size > 65536:
+            raise ValueError("Invalid prediction scale metadata file")
+        raw = stream.read(65537)
+    if len(raw) > 65536:
+        raise ValueError("Prediction scale metadata exceeds its size limit")
+    scale = json.loads(raw)
+    required = {"schema", "value_space", "normalization", "unit", "inverse_transform_available", "inverse_transform_applied"}
+    allowed = required | {"checkpoint_config_sha256", "transform_schema", "transform_sha256", "inverse"}
+    if (not isinstance(scale, dict) or not required <= set(scale) or set(scale) - allowed
+            or scale["schema"] != SCHEMA):
+        raise ValueError("Invalid prediction scale metadata schema")
+    unit, method = scale["unit"], scale["normalization"]
+    if not isinstance(unit, str) or not unit.strip() or len(unit) > 64 or any(c in unit for c in "\r\n\x00"):
+        raise ValueError("Invalid prediction unit metadata")
+    if not isinstance(method, str) or method not in METHODS | {"unknown"}:
+        raise ValueError("Invalid prediction normalization metadata")
+    for key in ("inverse_transform_available", "inverse_transform_applied"):
+        if type(scale[key]) is not bool:
+            raise ValueError("Prediction inverse-transform flags must be boolean")
+    for key in ("checkpoint_config_sha256", "transform_sha256"):
+        if key in scale and (not isinstance(scale[key], str) or re.fullmatch(r"[a-f0-9]{64}", scale[key]) is None):
+            raise ValueError("Invalid prediction scale hash format")
+    applied = scale["inverse_transform_applied"]
+    if scale["inverse_transform_available"] != applied:
+        raise ValueError("Prediction scale does not describe the emitted result")
+    if applied:
+        if (method not in METHODS or scale["value_space"] != "original_target"
+                or scale.get("transform_schema") != TRANSFORM_SCHEMA or "transform_sha256" not in scale
+                or scale.get("inverse") != _inverse_metadata(method)):
+            raise ValueError("Invalid inverse-transform result semantics")
+    else:
+        config = {"problem_type": "regression", "target_unit": unit}
+        if method != "unknown":
+            config["normalize"] = None if method == "none" else method
+        expected = output_scale(config)
+        if (scale["value_space"] != expected["value_space"] or unit != expected["unit"]
+                or {"transform_schema", "transform_sha256", "inverse"} & set(scale)):
+            raise ValueError("Prediction scale is inconsistent with its declared normalization")
+    successful = frame.loc[frame["error"].isna()] if "error" in frame else frame
+    if successful.empty or not columns <= set(successful.columns):
+        raise ValueError("Prediction scale cannot be bound to successful CSV rows")
+    if (not successful["prediction_value_space"].eq(scale["value_space"]).all()
+            or not successful["prediction_unit"].eq(unit).all()
+            or not successful["inverse_transform_applied"].astype(str).str.lower().eq(str(applied).lower()).all()):
+        raise ValueError("Prediction scale metadata differs from CSV output fields")
+    return {"output_scale": scale, "biological_metadata": {"output_scale": scale}, "output_scale_file": str(path)}
+
+
 @guard_operation('protein_model_predict')
 def run_predict_tool(config_path: str, sequence: Optional[str] = None, csv_file: Optional[str] = None) -> str:
     """Predict protein properties using a user trained model. Can perform single sequence prediction or batch prediction from CSV file."""
@@ -837,6 +906,8 @@ def run_predict_tool(config_path: str, sequence: Optional[str] = None, csv_file:
                     result["total_predictions"] = len(df)
                 except Exception as e:
                     result["preview_error"] = f"Could not load results: {str(e)}"
+                else:
+                    result.update(_prediction_scale_attachment(output_file, df, predict_config["problem_type"]))
         else:
             result = {
                 "success": False,
