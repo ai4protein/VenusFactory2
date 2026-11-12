@@ -7,7 +7,6 @@ from typing import Dict, Optional, Any
 from .constants import (
     DATASET_TO_TASK_MAP,
     REGRESSION_TASKS_FUNCTION,
-    REGRESSION_TASKS_FUNCTION_MAX_MIN,
     LABEL_MAPPING_FUNCTION,
 )
 
@@ -31,12 +30,9 @@ def map_labels(row: pd.Series, task: str) -> Any:
         if pd.notna(scaled_value) and scaled_value != 'N/A':
             try:
                 scaled_value = float(scaled_value)
-                if current_task in REGRESSION_TASKS_FUNCTION_MAX_MIN:
-                    min_val, max_val = REGRESSION_TASKS_FUNCTION_MAX_MIN[current_task]
-                    original_value = scaled_value * (max_val - min_val) + min_val
-                    return round(original_value, 2)
-                else:
-                    return round(scaled_value, 2)
+                # Display the inference value unchanged in scale. Only a
+                # verified checkpoint transform can restore target units.
+                return round(scaled_value, 2)
             except (ValueError, TypeError):
                 return scaled_value
         return scaled_value
@@ -64,7 +60,9 @@ def map_labels(row: pd.Series, task: str) -> Any:
     labels_key = ("DeepLocMulti" if row.get('Dataset') == "DeepLocMulti"
                  else "DeepLocBinary" if row.get('Dataset') == "DeepLocBinary"
                  else current_task)
-    labels = LABEL_MAPPING_FUNCTION.get(labels_key)
+    labels = LABEL_MAPPING_FUNCTION.get(labels_key) or LABEL_MAPPING_FUNCTION.get(
+        DATASET_TO_TASK_MAP.get(row.get("Dataset", ""), current_task)
+    )
 
     pred_val = row.get("prediction", row.get("predicted_class"))
     if pred_val is None or pred_val == "N/A":
@@ -87,41 +85,22 @@ def map_labels_individual(row: pd.Series, current_task: str, regression_tasks_ma
     Args:
         row: DataFrame row containing prediction data
         current_task: Current task name
-        regression_tasks_max_min: Optional dictionary with regression task min/max values
+        regression_tasks_max_min: Deprecated compatibility argument; ignored.
+            Target transforms belong to checkpoint inference, not label formatting.
     
     Returns:
         Mapped label as string
     """
-    # Define regression tasks max-min values for denormalization
-    if regression_tasks_max_min is None:
-        regression_tasks_max_min = {
-            "Stability": [40.1995166, 66.8968874],
-            "Optimum temperature": [2, 120]
-        }
-
-    # For regression tasks, return the numeric value with denormalization
+    # Retain the old argument for caller compatibility, but never infer a
+    # checkpoint's target transform from a task name or display-time range.
     if current_task in REGRESSION_TASKS_FUNCTION:
-        scaled_value = row.get("prediction", row.get("predicted_class"))
-        if pd.notna(scaled_value) and scaled_value != 'N/A':
+        value = row.get("prediction", row.get("predicted_class"))
+        if pd.notna(value) and value != 'N/A':
             try:
-                scaled_value = float(scaled_value)
-
-                # Apply denormalization for specific tasks
-                if current_task == "Stability" and current_task in regression_tasks_max_min:
-                    min_val, max_val = regression_tasks_max_min["Stability"]
-                    original_value = scaled_value * (max_val - min_val) + min_val
-                    return f"{round(original_value, 2)}"
-                elif current_task == "Optimum temperature" and current_task in regression_tasks_max_min:
-                    min_val, max_val = regression_tasks_max_min["Optimum temperature"]
-                    original_value = scaled_value * (max_val - min_val) + min_val
-                    return f"{round(original_value, 1)}°C"
-                else:
-                    return f"{round(scaled_value, 3)}"
-
+                return str(round(float(value), 3))
             except (ValueError, TypeError):
-                return str(scaled_value)
-
-        return str(scaled_value)
+                pass
+        return str(value)
 
     # Handle multi-label classification tasks
     if row.get('Dataset') == 'SortingSignal':
@@ -143,7 +122,9 @@ def map_labels_individual(row: pd.Series, current_task: str, regression_tasks_ma
     labels_key = ("DeepLocMulti" if row.get('Dataset') == "DeepLocMulti"
                 else "DeepLocBinary" if row.get('Dataset') == "DeepLocBinary"
                 else current_task)
-    labels = LABEL_MAPPING_FUNCTION.get(labels_key)
+    labels = LABEL_MAPPING_FUNCTION.get(labels_key) or LABEL_MAPPING_FUNCTION.get(
+        DATASET_TO_TASK_MAP.get(row.get("Dataset", ""), current_task)
+    )
 
     pred_val = row.get("predicted_class")
     if pred_val is None or pred_val == "N/A":

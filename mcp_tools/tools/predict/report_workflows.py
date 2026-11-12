@@ -263,11 +263,6 @@ def handle_individual_function_prediction(content, selected_chain, current_file,
 
     # Process and format results
     raw_function_df = pd.concat(all_function_results, ignore_index=True)
-    # Define regression tasks max-min values for denormalization
-    REGRESSION_TASKS_FUNCTION_MAX_MIN = {
-        "Stability": [40.1995166, 66.8968874],
-        "Optimum temperature": [2, 120]
-    }
     # Generate function prediction report in table format
     # Create table header
     result = ""
@@ -280,7 +275,7 @@ def handle_individual_function_prediction(content, selected_chain, current_file,
         current_task = DATASET_TO_TASK_MAP.get(dataset, '')
 
         # Map prediction values to text labels
-        predicted_class = map_labels_individual(row, current_task, REGRESSION_TASKS_FUNCTION_MAX_MIN)
+        predicted_class = map_labels_individual(row, current_task)
 
         # Get confidence score
         confidence_score = row.get('probabilities', 0.5)
@@ -322,7 +317,7 @@ def handle_individual_function_prediction(content, selected_chain, current_file,
 
         elif dataset == "Thermostability":
             task_name = "**Thermal Stability**"
-            result_text = f"`{predicted_class}`"
+            result_text = f"`{predicted_class}` (model output; scale and unit unspecified)"
             confidence_text = "**N/A**"  # Regression task
 
         elif dataset == "SortingSignal":
@@ -332,7 +327,7 @@ def handle_individual_function_prediction(content, selected_chain, current_file,
 
         elif dataset == "DeepET_Topt":
             task_name = "**Optimal Temperature**"
-            result_text = f"`{predicted_class}`"
+            result_text = f"`{predicted_class}` (model output; scale and unit unspecified)"
             confidence_text = "**N/A**"  # Regression task
 
         # Add table row

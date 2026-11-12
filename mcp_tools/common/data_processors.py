@@ -10,7 +10,6 @@ from .constants import (
     DATASET_MAPPING_FUNCTION,
     LABEL_MAPPING_FUNCTION,
     REGRESSION_TASKS_FUNCTION,
-    REGRESSION_TASKS_FUNCTION_MAX_MIN,
     DATASET_TO_TASK_MAP
 )
 
@@ -172,12 +171,9 @@ def map_prediction_labels(row: pd.Series, task: str) -> str:
         if pd.notna(scaled_value) and scaled_value != 'N/A':
             try:
                 scaled_value = float(scaled_value)
-                if current_task in REGRESSION_TASKS_FUNCTION_MAX_MIN:
-                    min_val, max_val = REGRESSION_TASKS_FUNCTION_MAX_MIN[current_task]
-                    original_value = scaled_value * (max_val - min_val) + min_val
-                    return round(original_value, 2)
-                else:
-                    return round(scaled_value, 2)
+                # Display the inference value unchanged in scale. Only a
+                # verified checkpoint transform can restore target units.
+                return round(scaled_value, 2)
             except (ValueError, TypeError):
                 return scaled_value
         return scaled_value
@@ -200,7 +196,9 @@ def map_prediction_labels(row: pd.Series, task: str) -> str:
     labels_key = ("DeepLocMulti" if row.get('Dataset') == "DeepLocMulti"
                  else "DeepLocBinary" if row.get('Dataset') == "DeepLocBinary"
                  else current_task)
-    labels = LABEL_MAPPING_FUNCTION.get(labels_key)
+    labels = LABEL_MAPPING_FUNCTION.get(labels_key) or LABEL_MAPPING_FUNCTION.get(
+        DATASET_TO_TASK_MAP.get(row.get("Dataset", ""), current_task)
+    )
 
     pred_val = row.get("prediction", row.get("predicted_class"))
     if pred_val is None or pred_val == "N/A":
