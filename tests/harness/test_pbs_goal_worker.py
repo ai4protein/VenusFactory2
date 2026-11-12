@@ -50,7 +50,7 @@ def test_freeze_includes_full_tracked_source_not_deployment_files(repo, tmp_path
     snapshot.verify_source(json.loads(json.dumps(value)))
 
 
-@pytest.mark.parametrize("kind", ["dirty", "staged", "symlink", "tracked_env", "export_ignore", "export_subst"])
+@pytest.mark.parametrize("kind", ["dirty", "staged", "symlink", "tracked_env"])
 def test_freeze_rejects_uncommitted_or_nonexact_source(repo, tmp_path, kind):
     if kind in {"dirty", "staged"}:
         (repo / "src/code.py").write_text("VALUE = 2\n")
@@ -61,11 +61,6 @@ def test_freeze_rejects_uncommitted_or_nonexact_source(repo, tmp_path, kind):
             (repo / "link.py").symlink_to("src/code.py")
         elif kind == "tracked_env":
             (repo / ".env").write_text("NOT_A_REAL_KEY=placeholder\n")
-        elif kind == "export_ignore":
-            (repo / ".gitattributes").write_text("src/code.py export-ignore\n")
-        else:
-            (repo / ".gitattributes").write_text("src/code.py export-subst\n")
-            (repo / "src/code.py").write_text("COMMIT = '$Format:%H$'\n")
         git(repo, "add", ".")
         git(repo, "commit", "-qm", "Invalid snapshot fixture")
     with pytest.raises(ValueError):
@@ -457,3 +452,38 @@ def test_external_reference_commit_is_bound_to_manifest(repo, tmp_path):
     value["gitlinks"] = {"vendor/optional": "a" * 40}
     with pytest.raises(ValueError, match="manifest changed"):
         snapshot.verify_source(value)
+
+
+@pytest.mark.parametrize("kind", ["export_ignore_file", "export_ignore_directory", "export_subst", "nested_attributes"])
+def test_release_archive_attributes_do_not_drop_or_replace_tracked_bytes(repo, tmp_path, kind):
+    code = "COMMIT = '$Format:%H$'\n"
+    (repo / "src/code.py").write_text(code)
+    if kind == "export_ignore_file":
+        attributes = "src/code.py export-ignore\n"
+    elif kind == "export_ignore_directory":
+        attributes = "src export-ignore\n"
+    elif kind == "nested_attributes":
+        attributes = "scripts export-ignore\n"
+        (repo / "src/.gitattributes").write_text("*.py export-subst export-ignore\n")
+    else:
+        attributes = "src/code.py export-subst\n"
+    (repo / ".gitattributes").write_text(attributes)
+    git(repo, "add", ".")
+    git(repo, "commit", "-qm", "Release archive attributes fixture")
+    info = repo / ".git/info/attributes"
+    info.parent.mkdir(exist_ok=True)
+    info.write_text(".env.example export-ignore\n")
+    before = {"attributes": (repo / ".gitattributes").read_bytes(), "info": info.read_bytes(),
+              "config": (repo / ".git/config").read_bytes(), "status": git(repo, "status", "--porcelain")}
+    value = snapshot.freeze_source(repo, tmp_path / "frozen-release")
+    expected = set(git(repo, "ls-tree", "-r", "--name-only", "HEAD").splitlines())
+    assert set(value["files"]) == expected
+    for name in expected:
+        actual = (Path(value["root"]) / name).read_bytes()
+        original = subprocess.run(["git", "-C", str(repo), "show", "HEAD:" + name],
+                                  check=True, capture_output=True).stdout
+        assert actual == original
+    assert (Path(value["root"]) / "src/code.py").read_text() == code
+    assert before == {"attributes": (repo / ".gitattributes").read_bytes(), "info": info.read_bytes(),
+                      "config": (repo / ".git/config").read_bytes(), "status": git(repo, "status", "--porcelain")}
+    snapshot.verify_source(value)

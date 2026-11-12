@@ -80,6 +80,29 @@ def _archive(repository, commit, output):
         proc.stdout.close()
 
 
+def _exact_archive(repository, commit, output):
+    """Ignore release-export attributes in a private object-only repository.
+
+    The alternate object store is read-only from this operation: no refs, config
+    or attributes in the source repository are changed, and no fetch occurs.
+    """
+    common = _git(repository, "rev-parse", "--git-common-dir").decode().strip()
+    objects = (Path(repository) / common / "objects").resolve()
+    if not objects.is_dir() or any(c in str(objects) for c in "\r\n\x00"):
+        raise ValueError("Invalid source Git object directory")
+    object_format = _git(repository, "rev-parse", "--show-object-format").decode().strip()
+    if object_format not in {"sha1", "sha256"}:
+        raise ValueError("Unsupported Git object format")
+    with tempfile.TemporaryDirectory(prefix="pbs-source-objects-") as temporary:
+        private = Path(temporary)
+        _git(private, "init", "--bare", "--quiet", "--template=", "--object-format=" + object_format)
+        (private / "objects/info/alternates").write_text(str(objects) + "\n")
+        (private / "info").mkdir(exist_ok=True)
+        # info/attributes outranks the committed release .gitattributes files.
+        (private / "info/attributes").write_text("* -export-ignore -export-subst\n")
+        return _archive(private, commit, output)
+
+
 def freeze_source(repository: Path, destination: Path) -> dict:
     """Export a clean committed tree, without untracked deployment contents."""
     repository, destination = Path(repository).resolve(), Path(destination).absolute()
@@ -111,7 +134,7 @@ def freeze_source(repository: Path, destination: Path) -> dict:
         stage = Path(temporary)
         files, total, members = {}, 0, 0
         with tempfile.TemporaryFile() as archive:
-            deadline = _archive(repository, commit, archive)
+            deadline = _exact_archive(repository, commit, archive)
             with tarfile.open(fileobj=archive, mode="r|") as tree:
                 for member in tree:
                     if time.monotonic() > deadline:
