@@ -249,3 +249,16 @@ async def test_nested_argument_error_is_rejected_before_queue_admission(tmp_path
     assert "private" not in json.dumps(result)
     assert not scheduler.queue.list("fixture")
     assert not list((tmp_path / "queue" / "mcp-inputs").glob("*.json"))
+
+
+def test_direct_tool_wrapper_feedback_does_not_unwrap_or_echo_payload():
+    contract = WindowInput.model_json_schema()
+    payload = {"arguments": {"query": "private-query", "files": ["private-file"]}}
+    original = json.dumps(payload)
+    with pytest.raises(ToolArgumentError, match="Remove the outer arguments object") as error:
+        validate_argument_fields(contract, payload)
+    assert "call_tool" in str(error.value) and "Allowed fields: options, query" in str(error.value)
+    assert "private" not in str(error.value) and "files" not in str(error.value)
+    assert json.dumps(payload) == original
+    # A tool that genuinely declares arguments keeps that contract.
+    validate_argument_fields({"properties": {"arguments": {"type": "object"}}}, payload)

@@ -39,6 +39,12 @@ def validate_argument_fields(contract, arguments):
         raise ToolArgumentError("Use a JSON object with the declared tool arguments")
     declared = contract.get("properties", {})
     if any(name not in declared for name in arguments):
+        if set(arguments) == {"arguments"} and "arguments" not in declared and isinstance(arguments["arguments"], dict):
+            raise ToolArgumentError(_feedback([
+                "This direct tool accepts its fields at the top level. Remove the outer arguments object; "
+                "only call_tool uses the name/arguments envelope.",
+                _field_hint("Allowed fields", declared),
+            ]))
         raise ToolArgumentError(
             _feedback(
                 [
