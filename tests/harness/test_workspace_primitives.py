@@ -47,7 +47,7 @@ async def test_native_workspace_primitives_keep_boundaries(tmp_path, monkeypatch
             surface = (await rpc("tools/list", {}))["result"]["tools"]
             names = {tool["name"] for tool in surface}
             assert WORKSPACE_PRIMITIVES <= names
-            assert len(names) <= 10
+            assert len(names) <= 11
             assert "evaluate_research_model" not in names
             assert "run_session_shell" not in names
             assert (await call("call_tool", {"name": "evaluate_research_model",
@@ -57,12 +57,21 @@ async def test_native_workspace_primitives_keep_boundaries(tmp_path, monkeypatch
             assert not saved["result"]["isError"]
             read = await call("read_session_file", {"path": "sum.py"})
             assert not read["result"]["isError"]
+            version = json.JSONDecoder().raw_decode(read["result"]["content"][0]["text"])[0]["sha256"]
+            arguments = {"path":"sum.py", "old_text":"sum([2, 4, 7])", "new_text":"sum([2, 4, 8])", "expected_sha256":version}
+            edited = await call("edit_session_file", arguments)
+            assert not edited["result"]["isError"]
+            assert (await call("edit_session_file", arguments))["result"]["isError"] is True
             executed = await call("run_session_python", {"path": "sum.py", "timeout_seconds": 30})
             assert not executed["result"]["isError"]
-            assert json.loads((workspace / "result.json").read_text()) == {"total": 13}
+            assert json.loads((workspace / "result.json").read_text()) == {"total": 14}
             assert (await call("read_session_file", {"path": "../other-user.txt"}))["result"]["isError"] is True
             assert (await call("write_session_file", {"path": "../other-user.txt", "content": "overwritten"}))["result"]["isError"] is True
+            assert (await call("edit_session_file", {**arguments, "path":"../other-user.txt"}))["result"]["isError"] is True
             assert (tmp_path / "other-user.txt").read_text() == "outside workspace"
+            disabled.add("edit_session_file")
+            assert "edit_session_file" not in {tool["name"] for tool in (await rpc("tools/list", {}))["result"]["tools"]}
+            assert (await call("edit_session_file", arguments))["result"]["isError"] is True
             disabled.add("write_session_file")
             assert "write_session_file" not in {tool["name"] for tool in
                 (await rpc("tools/list", {}))["result"]["tools"]}
@@ -73,7 +82,7 @@ async def test_native_workspace_primitives_keep_boundaries(tmp_path, monkeypatch
     monkeypatch.setattr(worker, "builtin_registry", lambda: SimpleNamespace(
         resolve=lambda *args: (SimpleNamespace(run=adapter), None)))
     profile = Profile("science_agent", harness, ModelBinding("fixture", "unused", "http://127.0.0.1:1"),
-                      Budget(tool_calls=12))
+                      Budget(tool_calls=16))
     await worker.run({"profile": profile.public(), "workspace": str(workspace), "control": str(control),
         "session_id": "fixture", "runtimes": {}, "base_url": "http://127.0.0.1:1",
         "token": "fixture", "text": "Analyze these data"}, tools=service.tools(), event_sink=lambda event: None)

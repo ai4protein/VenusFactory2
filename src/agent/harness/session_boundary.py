@@ -20,7 +20,7 @@ SECURITY_INSTRUCTIONS = (
     'by a session tool. Code and shell run only through the isolated session tools; '
     'there is no host shell. Refer to files by relative names or /workspace paths.'
     ' For custom analysis, write the actual source with write_session_file(path, content), '
-    'then run_session_python(path, timeout_seconds). Use run_session_shell only when '
+    'then run_session_python(path, timeout_seconds). Read saved code and use edit_session_file for focused changes. Use run_session_shell only when '
     'it is supplied. Inspect exit_code and actual output files before reporting success. '
     'Networking and platform model jobs use the registered scientific tools.'
     ' Session analysis uses one process with bounded memory; subprocesses, background jobs '
@@ -68,7 +68,7 @@ def relative_workspace_arguments(arguments):
     # Only declared file arguments. Never rewrite source code, text, tool inputs,
     # shell commands or prediction data merely because they contain a path.
     result = dict(arguments)
-    for key in ('path', 'source', 'evaluation_file', 'proposal_file', 'output_file'):
+    for key in ('path', 'source', 'source_file', 'data_file', 'unlabeled_file', 'evaluation_file', 'proposal_file', 'output_file'):
         if key in result:
             result[key] = relative(result[key])
     if isinstance(result.get('files'), list):

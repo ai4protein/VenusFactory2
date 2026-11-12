@@ -26,8 +26,16 @@ def text_window(workspace, path, *, offset_bytes=0, max_bytes=20000):
         size = os.fstat(stream.fileno()).st_size
         if offset_bytes > size:
             raise ValueError("offset_bytes is beyond this file")
-        stream.seek(offset_bytes)
-        raw = stream.read(min(max_bytes, size-offset_bytes))
+        full_hash = None
+        if size <= 200000:
+            whole = stream.read(200001)
+            if len(whole) != size:
+                raise ValueError("File changed while reading; read it again")
+            full_hash = hashlib.sha256(whole).hexdigest()
+            raw = whole[offset_bytes:offset_bytes+max_bytes]
+        else:
+            stream.seek(offset_bytes)
+            raw = stream.read(min(max_bytes, size-offset_bytes))
     if b"\x00" in raw:
         raise ValueError("Binary file: inspect it with an appropriate scientific tool or isolated Python")
     try:
@@ -43,6 +51,8 @@ def text_window(workspace, path, *, offset_bytes=0, max_bytes=20000):
               "offset_bytes": offset_bytes, "truncated": truncated,
               "next_offset_bytes": end if end < size else None}
     result["slice_sha256" if truncated else "sha256"] = hashlib.sha256(raw[:used]).hexdigest()
+    if full_hash is not None:
+        result["file_sha256"] = full_hash
     if end < size:
         result["next_step"] = "Read the next window if needed; use isolated Python for full-table analysis."
     return result

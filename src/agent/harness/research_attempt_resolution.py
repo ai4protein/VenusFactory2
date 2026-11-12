@@ -199,6 +199,12 @@ def training_progress(development, before, previous=None):
 
     def fingerprint(row):
         error = row.get("error", "").replace(row["source_file"], "<algorithm>")
+        check = row.get("source_check", {})
+        if row.get("stage") == "preflight" and check.get("valid") is False:
+            # Presentation excerpts/carets vary with whitespace and comments.
+            # The verified source identity below still binds the actual code.
+            error = json.dumps([{key: issue.get(key) for key in ("code", "severity", "message")}
+                                for issue in check["issues"]], sort_keys=True)
         # The source reporter adds a line number after the path. Comments and
         # blank lines move it without changing the measured algorithm/failure.
         error = re.sub(r"(?m)^At <algorithm>:[0-9]+:", "At <algorithm>:<n>:", error)

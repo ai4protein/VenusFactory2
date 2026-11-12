@@ -46,6 +46,12 @@ prove that user-supplied grouping labels encode true protein homology.
 
 ## Inspecting inputs and saving progress
 
+Supplied source is inspected before a new implementation is written. For focused
+repairs, `edit_session_file` changes one exact fragment using the version hash
+from `read_session_file`. Compiler errors include a bounded source excerpt and
+column marker. A repair still requires a new training and validation attempt;
+previous source snapshots and failed receipts remain unchanged.
+
 The shared file reader previews large text, sequence and table files in bounded
 UTF-8 windows. Use the returned next_offset_bytes to continue reading, or analyze
 the full dataset with isolated Python. A preview includes the full file size and

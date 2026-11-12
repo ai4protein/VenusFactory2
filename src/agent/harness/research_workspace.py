@@ -12,7 +12,7 @@ from typing import Annotated, Literal
 from pydantic import Field
 
 from mcp_tools.tools.capability_policy import guard_operation
-from utils.scoped_files import copy_file, open_file, parts, read_bytes, write_bytes
+from utils.scoped_files import copy_file, open_file, parts, read_bytes, replace_text, write_bytes
 
 from .contracts import digest, file_hash
 from .host import write_json
@@ -104,6 +104,12 @@ class ResearchWorkspace:
         if len(content.encode())>200000:raise ValueError('File is too large')
         data=content.encode();write_bytes(self.workspace,path,data)
         return self.record('write_research_file',{'path':path,'content':content},{'path':path,'sha256':hashlib.sha256(data).hexdigest()})
+
+    async def edit_research_file(self, path: str, old_text: str, new_text: str, expected_sha256: str) -> dict:
+        """Replace one exact occurrence in a saved UTF-8 file. Read it first; pass full-file sha256 or file_sha256, never slice_sha256. Use surrounding text to make the match unique. Changed files, missing or ambiguous matches are rejected; no code executes."""
+        result = replace_text(self.workspace, path, old_text, new_text, expected_sha256)
+        return self.record('edit_research_file', {'path':path, 'old_text':old_text,
+            'new_text':new_text, 'expected_sha256':expected_sha256}, result)
 
     @guard_operation('run_research_python')
     async def run_research_python(self, path: str, timeout_seconds: int=120) -> dict:

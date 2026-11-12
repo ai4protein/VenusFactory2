@@ -226,3 +226,17 @@ async def test_incomplete_tokenization_does_not_hide_changed_invalid_source(tmp_
         previous = training_progress(service.development, before, previous)
         assert previous["same_failure_cycles"] == 1
         assert not previous["intervention_required"]
+
+
+@pytest.mark.asyncio
+async def test_compiler_excerpt_formatting_does_not_reset_same_failure(tmp_path):
+    service = await service_at(tmp_path)
+    report = None
+    for index in range(3):
+        before = training_snapshot(service.development)
+        # The error excerpt changes, while the failing Python tokens do not.
+        code = BROKEN.replace("training['inputs']", "training [ 'train' ]" + " " * index + "] # " + str(index))
+        await fail(service, f"format_{index}.py", code)
+        report = training_progress(service.development, before, report)
+        assert report["same_failure_cycles"] == index + 1
+    assert report["intervention_required"] is True

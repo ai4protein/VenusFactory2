@@ -24,7 +24,7 @@ def _failure_message(value, workspace):
 
 def _name(value):
     name=str(value or "tool").rsplit("__",1)[-1]
-    return "run_research_python" if name=="run_session_python" else name
+    return {"run_session_python":"run_research_python", "edit_session_file":"write_session_file"}.get(name,name)
 
 def _key(name, arguments):
     name=_name(name)
@@ -141,6 +141,7 @@ def repair_source_context(workspace, feedback, *, input_fields=(), task=""):
         return {"path":path,"sha256":sha256(raw).hexdigest(),"code":code,
                 "redacted":code!=original,"source_check":public_value(checks,workspace),"error":_failure_message(row.get("error","Fitting failed"),workspace),
                 "instruction":"This is the current saved source for an unresolved fitting action. "
-                    "Repair its complete implementation using the observed error and model interface, save it, and fit again. "
+                    "Repair the observed failure using edit_session_file(path, old_text, new_text, expected_sha256) for a focused change. "
+                    "Use this source SHA256, preserve working code, then fit again. "
                     + reference_hint + "The file may have changed since the failure; do not replace working code with placeholders."}
     return None

@@ -6,10 +6,10 @@ to directory descriptors, with links and special files refused at open time.
 """
 from contextlib import contextmanager
 from pathlib import Path, PurePosixPath
+import hashlib
 import os
 import stat
 import uuid
-
 
 def parts(relative):
     if not isinstance(relative, str) or not relative or '\\' in relative or '\0' in relative:
@@ -38,10 +38,8 @@ def parent_fd(root, relative, *, create=False):
     finally:
         os.close(fd)
 
-
-def open_file(root, relative, *, max_bytes=None):
-    with parent_fd(root, relative) as (directory, name):
-        fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC | os.O_NONBLOCK, dir_fd=directory)
+def _open_at(directory, name, *, max_bytes=None):
+    fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC | os.O_NONBLOCK, dir_fd=directory)
     try:
         info = os.fstat(fd)
         if not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
@@ -54,12 +52,15 @@ def open_file(root, relative, *, max_bytes=None):
         raise
 
 
+def open_file(root, relative, *, max_bytes=None):
+    with parent_fd(root, relative) as (directory, name):
+        return _open_at(directory, name, max_bytes=max_bytes)
+
 def read_bytes(root, relative, *, max_bytes=100*1024**2):
     with open_file(root, relative, max_bytes=max_bytes) as stream:
         data = stream.read(max_bytes+1)
         if len(data) > max_bytes: raise ValueError('Session file is too large')
         return data
-
 
 def open_absolute(path, *, max_bytes=None):
     """For an already-authorized local Library path; refuse links in any ancestor."""
@@ -69,8 +70,19 @@ def open_absolute(path, *, max_bytes=None):
 
 
 @contextmanager
-def atomic_writer(root, relative):
-    with parent_fd(root, relative, create=True) as (directory, name):
+def atomic_writer(root, relative, *, expected_sha256=None, max_bytes=100*1024**2):
+    with parent_fd(root, relative, create=expected_sha256 is None) as (directory, name):
+        # Serialize cooperating writers across API/worker processes. The lock
+        # stays on the directory descriptor and is released when it closes.
+        import fcntl
+        fcntl.flock(directory, fcntl.LOCK_EX)
+        if expected_sha256 is not None:
+            with _open_at(directory, name, max_bytes=max_bytes) as current:
+                data = current.read(max_bytes + 1)
+            if len(data) > max_bytes:
+                raise ValueError('Session file is too large')
+            if hashlib.sha256(data).hexdigest() != expected_sha256:
+                raise ValueError('File changed since it was read; read it again before editing')
         try:
             info = os.stat(name, dir_fd=directory, follow_symlinks=False)
         except FileNotFoundError:
@@ -88,11 +100,41 @@ def atomic_writer(root, relative):
             try: os.unlink(temporary, dir_fd=directory)
             except FileNotFoundError: pass
 
-
 def write_bytes(root, relative, data):
     with atomic_writer(root, relative) as stream:
         stream.write(data)
 
+
+def replace_text(root, relative, old_text, new_text, expected_sha256, *, max_bytes=200000):
+    """One exact UTF-8 replacement, conditional on the version that was read."""
+    if (not isinstance(expected_sha256, str) or len(expected_sha256) != 64
+            or any(c not in '0123456789abcdef' for c in expected_sha256)):
+        raise ValueError('Use the SHA256 returned by read_session_file')
+    if not isinstance(old_text, str) or not old_text or not isinstance(new_text, str):
+        raise ValueError('Provide nonempty old_text and replacement new_text')
+    if old_text == new_text:
+        raise ValueError('The replacement is unchanged')
+    raw = read_bytes(root, relative, max_bytes=max_bytes)
+    if hashlib.sha256(raw).hexdigest() != expected_sha256:
+        raise ValueError('File changed since it was read; read it again before editing')
+    if b'\x00' in raw:
+        raise ValueError('Only UTF-8 text files can be edited')
+    try:
+        text = raw.decode('utf-8')
+    except UnicodeError:
+        raise ValueError('Only UTF-8 text files can be edited') from None
+    position = text.find(old_text)
+    if position < 0:
+        raise ValueError('old_text was not found; read the current file before editing')
+    if text.find(old_text, position + 1) >= 0:
+        raise ValueError('old_text is ambiguous; include enough surrounding text for one exact match')
+    data = (text[:position] + new_text + text[position + len(old_text):]).encode('utf-8')
+    if len(data) > max_bytes:
+        raise ValueError('Edited file is too large')
+    with atomic_writer(root, relative, expected_sha256=expected_sha256, max_bytes=max_bytes) as stream:
+        stream.write(data)
+    return {'path': relative, 'before_sha256': expected_sha256,
+            'sha256': hashlib.sha256(data).hexdigest(), 'bytes': len(data), 'replacements': 1}
 
 def copy_file(source_root, source_name, target_root, target_name, *, max_bytes=100*1024**2):
     with open_file(source_root, source_name, max_bytes=max_bytes) as src, atomic_writer(target_root, target_name) as dst:
@@ -102,7 +144,6 @@ def copy_file(source_root, source_name, target_root, target_name, *, max_bytes=1
             if total > max_bytes: raise ValueError('Session file is too large')
             dst.write(data)
     return total
-
 
 def chunks(stream, *, max_bytes=None):
     """Consume the already authorized descriptor, including bounded ZIP inputs."""

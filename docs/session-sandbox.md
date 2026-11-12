@@ -13,10 +13,18 @@ Sandbox execution is exposed through the authenticated per-session MCP gateway:
 
 `Harness -> MCP tools/call -> CPU queue -> local sandbox -> session artifacts`
 
-Agent uses `list_session_files`, `read_session_file`, `write_session_file`,
-`run_session_python` and `run_session_shell`. Scientist uses the corresponding
-research file tools and `run_research_python`, with execution receipts for review.
+Agent and Scientist share `list_session_files`, `read_session_file`,
+`write_session_file`, `edit_session_file` and `run_session_python`. Agent also
+supports the bounded `run_session_shell` tool. Execution receipts support review.
 Both execution tools use the same sandbox service.
+
+For a small correction, read the file and call `edit_session_file` with its
+full-file `sha256` (or `file_sha256` on a paged preview), the exact old text and
+its replacement. The match must be unique and the file must still have that
+version. Edits preserve other contents and do not execute code. They support
+UTF-8 text files up to 200,000 bytes; use the full hash, never `slice_sha256`.
+Conditional edits and ordinary file writes share a directory lock across worker
+processes. Stale edits are rejected instead of overwriting a newer tool write.
 
 The backend binds the current conversation/research workspace when creating the
 MCP tool instances. Each execution mounts that directory at `/workspace` and

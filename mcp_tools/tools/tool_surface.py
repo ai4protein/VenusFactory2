@@ -7,6 +7,7 @@ WORKSPACE_ALIASES = {
     'list_research_files': 'list_session_files',
     'read_research_file': 'read_session_file',
     'write_research_file': 'write_session_file',
+    'edit_research_file': 'edit_session_file',
     'run_research_python': 'run_session_python',
 }
 

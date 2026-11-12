@@ -61,7 +61,7 @@ async def test_session_tools_support_code_without_host_repl(tmp_path):
     await tools['write_session_file'].ainvoke({'path':'calc.py','content':'print(sum([1,2,3]))'})
     value=await tools['run_session_python'].ainvoke({'path':'calc.py','timeout_seconds':10})
     assert value['exit_code']==0 and value['stdout'].strip()=='6'
-    assert set(tools)=={'list_session_files','read_session_file','write_session_file','run_session_python','run_session_shell'}
+    assert set(tools)=={'list_session_files','read_session_file','write_session_file','edit_session_file','run_session_python','run_session_shell'}
     with pytest.raises(ValueError):await tools['read_session_file'].ainvoke({'path':'../private'})
 
 

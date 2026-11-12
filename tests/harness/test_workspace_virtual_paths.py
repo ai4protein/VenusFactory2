@@ -22,6 +22,10 @@ async def test_virtual_file_roundtrip_uses_anchored_session_access(tmp_path):
     read = await invoke("read_session_file", path="/workspace/results/a.json")
     assert read["text"] == content
     assert (workspace/"results/a.json").read_text() == content
+    edited = await invoke("edit_session_file", path="/workspace/results/a.json",
+                          old_text='"value":7', new_text='"value":8', expected_sha256=read["sha256"])
+    assert edited["path"] == "results/a.json"
+    assert (workspace/"results/a.json").read_text() == content.replace('"value":7', '"value":8')
 
 
 @pytest.mark.parametrize("path", [
@@ -113,3 +117,22 @@ def test_argument_diagnostics_do_not_echo_values_or_invalid_key_names(tmp_path):
     assert "workspace_root" not in message and "malicious" not in message
     assert "assigned by the server" in message
     assert "/private/account" not in message and "payload" not in message
+
+
+@pytest.mark.parametrize("name,field", [("prepare_research_dataset", "data_file"),
+                                         ("prepare_research_dataset", "unlabeled_file"),
+                                         ("train_research_model", "source_file")])
+def test_model_data_and_source_arguments_follow_the_virtual_path_contract(tmp_path, name, field):
+    service = ResearchWorkspace(tmp_path/"work", tmp_path/"control", {"steps":[]})
+    tool = next(tool for tool in service.tools() if tool.name == name)
+    arguments = ({"data_file":"inputs/data.csv", "target_column":"value",
+                  "input_columns":["sequence"], "group_column":"protein",
+                  "provenance":"Software fixture", "grouping":"Independent proteins"}
+                 if name == "prepare_research_dataset" else
+                 {"name":"fixture", "source_file":"src/model.py", "evaluation_file":"evaluation.json",
+                  "hypothesis":"Software path contract"})
+    arguments[field] = "/workspace/inputs/source.py"
+    assert prepare_tool_arguments(name, tool, arguments, service.workspace)[field] == "inputs/source.py"
+    for value in ("/etc/passwd", "/workspace/../other-session/data.csv", "/workspace/.env"):
+        with pytest.raises(ValueError):
+            prepare_tool_arguments(name, tool, {**arguments, field:value}, service.workspace)

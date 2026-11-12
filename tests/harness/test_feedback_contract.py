@@ -92,3 +92,13 @@ def test_successful_checkpoint_resolves_rejected_save_but_not_failed_training(tm
     assert result["pending"][0]["tool"].endswith("train_research_model")
     assert result["errors"][0]["error"] == "Fitting failed"
     assert previous == snapshot
+
+
+@pytest.mark.parametrize("first,second", [("edit_session_file", "write_session_file"),
+                                         ("write_session_file", "edit_session_file")])
+def test_edit_and_rewrite_resolve_the_same_failed_file_operation(tmp_path, first, second):
+    previous = feedback_state(call(first, {"path":"src/model.py"}, failed=True, output="File changed"), tmp_path)
+    unrelated = feedback_state(call(second, {"path":"notes.md"}, failed=False, output="Saved"), tmp_path, previous)
+    assert unrelated["errors"] == previous["errors"]
+    updated = feedback_state(call(second, {"path":"src/model.py"}, failed=False, output="Saved"), tmp_path, previous)
+    assert updated == {"pending": [], "errors": []}

@@ -20,6 +20,9 @@ class AlgorithmValidationError(ValueError):
             if location and item.get("column"):
                 location += f", column {item['column']}"
             lines.append((location+": " if location else "")+item["message"])
+            if item.get("source_excerpt"):
+                lines.append(item["source_excerpt"])
+                lines.append(" " * (item["excerpt_column"] - 1) + "^")
         super().__init__("Model source check failed: " + "\n".join(lines))
 
 
@@ -123,6 +126,13 @@ def algorithm_diagnostics(source, *, input_fields=()):
             issue("invalid_python", "Model source is not valid Python: "
                   + str(getattr(exc, "msg", exc)) + ". Repair the saved .py source before training.",
                   line=getattr(exc, "lineno", None), column=getattr(exc, "offset", None))
+            line, column = getattr(exc, "lineno", None), getattr(exc, "offset", None)
+            source_lines = source.splitlines()
+            if isinstance(line, int) and 1 <= line <= len(source_lines):
+                text = source_lines[line - 1]
+                position = max(0, min((column or 1) - 1, len(text)))
+                start = max(0, position - 100)
+                issues[-1].update(source_excerpt=text[start:start+200], excerpt_column=position-start+1)
         for warning in recorded:
             issue("compiler_warning", str(warning.message), severity="warning", line=warning.lineno)
     if tree is not None:

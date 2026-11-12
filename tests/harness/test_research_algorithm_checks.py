@@ -141,3 +141,23 @@ def test_prediction_nesting_is_a_hint_and_literal_inputs_column_remains_valid():
 def test_helpers_with_similarly_named_rows_do_not_acquire_dataset_contract():
     source = "def helper(rows):\n    return [row['sequence'] for row in rows]\n" + VALID
     assert algorithm_diagnostics(source, input_fields=("sequence",))["issues"] == []
+
+
+def test_compiler_error_exposes_exact_bounded_source_location():
+    source = "def fit(training, seed):\n    counts = [part.count(x) for x in 'ACDE']]\ndef predict(model, inputs):\n    return {}\n"
+    result = algorithm_diagnostics(source)
+    item = result["issues"][0]
+    assert item["code"] == "invalid_python" and item["line"] == 2
+    assert item["source_excerpt"] == source.splitlines()[1]
+    assert item["source_excerpt"][item["excerpt_column"]-1] == "]"
+    with pytest.raises(AlgorithmValidationError) as caught:
+        validate_algorithm(source)
+    assert item["source_excerpt"] in str(caught.value) and "^" in str(caught.value)
+
+
+def test_long_syntax_error_excerpt_remains_near_the_error():
+    source = "value = [" + "1, " * 1000 + "]]"
+    item = algorithm_diagnostics(source)["issues"][0]
+    assert len(item["source_excerpt"]) <= 200
+    assert 1 <= item["excerpt_column"] <= len(item["source_excerpt"])
+    assert item["source_excerpt"][item["excerpt_column"]-1] == "]"
