@@ -10,6 +10,7 @@ import json
 import os
 import re
 import shutil
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
@@ -17,6 +18,11 @@ from typing import Any, Optional
 from mcp_tools.common.common_utils import get_project_root, to_project_relative_path
 from agent.rsi.engine.context import get_resources
 from mcp_tools.models.identity import trained_metadata
+from mcp_tools.models.factory.target_transform import (
+    SCHEMA as TARGET_TRANSFORM_SCHEMA,
+    checkpoint_transform_path,
+    load_checkpoint_transform,
+)
 from agent.rsi.engine.storage import atomic_json, file_lock
 
 _REGISTRY_ROOT_NAME = "user_trained"
@@ -170,6 +176,13 @@ def _register_trained_model_unlocked(
     if not _is_under_allowed_roots(src_model):
         return {"success": False, "error": "model_path must be under the project (ckpt/ or temp_outputs/)"}
 
+    # Check original training state before creating any published artifact.
+    # A missing legacy transform stays missing; never refit it during registration.
+    try:
+        target_transform = load_checkpoint_transform(src_model, config)
+    except (ValueError, OSError) as exc:
+        return {"success": False, "error": f"Invalid checkpoint target transform: {exc}"}
+
     base_name = model_id or config.get("dataset_custom") or config.get("output_name") or out_dir.name
     slug = _slugify(str(base_name))
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
@@ -181,44 +194,61 @@ def _register_trained_model_unlocked(
         dest_dir.relative_to(registry_root().resolve())
     except ValueError:
         return {"success": False, "error": "Refusing model_id that escapes ckpt/user_trained"}
-    if get_resources() is not None and dest_dir.exists():
-        return {"success": False, "error": "Research model IDs are immutable; choose a new ID"}
-    dest_dir.mkdir(parents=True, exist_ok=True)
-    dest_model = dest_dir / Path(src_model.name).name
-    if src_model.resolve() != dest_model.resolve():
-        shutil.copy2(src_model, dest_model)
-
+    if dest_dir.exists():
+        return {"success": False, "error": "Model IDs are immutable; choose a new ID for a new version"}
+    # Validate the index before publication, then build the whole artifact away
+    # from its final path. Failed copies cannot damage an existing registration.
+    index = _load_index()
+    dest_dir.parent.mkdir(parents=True, exist_ok=True)
+    dest_model = dest_dir / src_model.name
     dest_config = dest_dir / _CONFIG_COPY_NAME
-    # Point config at the registered model location for future predict calls.
     registered_config = dict(config)
+    if target_transform is not None:
+        registered_config["target_transform_schema"] = TARGET_TRANSFORM_SCHEMA
+        registered_config["target_transform"] = target_transform
+        registered_config.setdefault("problem_type", "regression")
+        registered_config.setdefault("normalize", None if target_transform["method"] == "none" else target_transform["method"])
+        registered_config.setdefault("target_unit", target_transform["target_unit"])
+        registered_config.setdefault("label_column_name", target_transform["label_column"])
     registered_config["output_dir"] = _stored_path(dest_dir)
     registered_config["output_model_name"] = dest_model.name
     registered_config["model_path"] = _stored_path(dest_model)
     registered_config["registered_model_id"] = final_id
-    dest_config.write_text(json.dumps(registered_config, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    manifest = {
-        "model_id": final_id,
-        "status": "candidate" if research else "registered",
-        "independent_validation": False,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "config_path": _stored_path(dest_config),
-        "model_path": _stored_path(dest_model),
-        "output_dir": _stored_path(dest_dir),
-        "plm_model": registered_config.get("plm_model"),
-        "training_method": registered_config.get("training_method"),
-        "problem_type": registered_config.get("problem_type"),
-        "num_labels": registered_config.get("num_labels"),
-        "source_config_path": _stored_path(cfg_path),
-        "source_output_dir": _stored_path(out_dir),
-        "metrics": metrics or {},
-        **trained_metadata(registered_config, weights=dest_model),
-    }
-    (dest_dir / _MANIFEST_NAME).write_text(
-        json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    try:
+        with tempfile.TemporaryDirectory(prefix=".register-", dir=dest_dir.parent) as temporary:
+            staging = Path(temporary)
+            staged_model = staging / src_model.name
+            shutil.copy2(src_model, staged_model)
+            if target_transform is not None:
+                shutil.copy2(checkpoint_transform_path(src_model), checkpoint_transform_path(staged_model))
+                # Keep the original receipt bytes; never re-sign a changed copy.
+                if load_checkpoint_transform(staged_model, registered_config) != target_transform:
+                    raise ValueError("Target transform changed during registration")
+            atomic_json(staging / _CONFIG_COPY_NAME, registered_config)
+            atomic_json(staged_model.with_suffix(".json"), registered_config)
+            manifest = {
+                "model_id": final_id,
+                "status": "candidate" if research else "registered",
+                "independent_validation": False,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "config_path": _stored_path(dest_config),
+                "model_path": _stored_path(dest_model),
+                "output_dir": _stored_path(dest_dir),
+                "plm_model": registered_config.get("plm_model"),
+                "training_method": registered_config.get("training_method"),
+                "problem_type": registered_config.get("problem_type"),
+                "num_labels": registered_config.get("num_labels"),
+                "source_config_path": _stored_path(cfg_path),
+                "source_output_dir": _stored_path(out_dir),
+                "metrics": metrics or {},
+                **trained_metadata(registered_config, weights=staged_model),
+            }
+            atomic_json(staging / _MANIFEST_NAME, manifest)
+            os.rename(staging, dest_dir)
+    except (ValueError, OSError) as exc:
+        return {"success": False, "error": f"Could not stage checkpoint artifact: {exc}"}
 
-    index = _load_index()
     models = [m for m in index.get("models", []) if isinstance(m, dict) and m.get("model_id") != final_id]
     models.insert(0, {
         "model_id": final_id,
@@ -233,7 +263,24 @@ def _register_trained_model_unlocked(
         **{k:manifest[k] for k in ("schema_version","model_type","runtime_id","backbone","training_dataset","training_method","provenance","artifact","version")},
     })
     index["models"] = models
-    _save_index(index)
+    try:
+        _save_index(index)
+    except (OSError, ValueError) as exc:
+        # A failure after an atomic index replacement may already be committed.
+        # Inspect the durable index before deleting this newly created artifact.
+        try:
+            persisted = json.loads(index_path().read_text()) if index_path().exists() else {"models": []}
+            if not isinstance(persisted, dict) or not isinstance(persisted.get("models"), list):
+                raise ValueError("Registration index is malformed")
+            committed = any(
+                item.get("model_id") == final_id and item.get("model_path") == manifest["model_path"]
+                for item in persisted.get("models", []) if isinstance(item, dict)
+            )
+        except (OSError, ValueError):
+            return {"success": False, "error": f"Registration index state is unknown: {exc}"}
+        if not committed:
+            shutil.rmtree(dest_dir)
+            return {"success": False, "error": f"Could not publish registration index: {exc}"}
 
     return {
         "success": True,
@@ -252,8 +299,6 @@ def register_trained_model(config_path: str, *, model_id: Optional[str] = None,
                            output_dir: Optional[str] = None, model_path: Optional[str] = None,
                            metrics: Optional[dict[str, Any]] = None) -> dict[str, Any]:
     kwargs = dict(model_id=model_id, output_dir=output_dir, model_path=model_path, metrics=metrics)
-    if get_resources() is None:
-        return _register_trained_model_unlocked(config_path, **kwargs)
     with file_lock(registry_root() / ".registry.lock"):
         return _register_trained_model_unlocked(config_path, **kwargs)
 

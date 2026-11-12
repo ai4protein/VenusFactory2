@@ -110,6 +110,35 @@ unchanged. Reload/replay deduplicates cards by receipt identity, and downloads k
 the normal session authorization. Export failure retains the computed result without
 requesting another inference.
 
+## Factory checkpoint target scale
+
+New scalar-regression training fits target normalization on the training split
+only; validation and test labels use that fitted transform. Classification labels
+remain categorical. The supported transforms and serialization contract live in
+[`target_transform.py`](../../mcp_tools/models/factory/target_transform.py).
+
+A checkpoint such as `model.pt` travels with `model.json` and
+`model.target-transform.json`. The configuration records the method and explicit
+target unit; the transform file stores fitted statistics and SHA-256 digests of
+both the weights and transform. Publish these files together. The loader verifies
+them before allocating the model. Registration preserves these bindings and uses
+an immutable model ID; changed weights or statistics require a new registered
+version.
+
+Prediction restores original target values only when verified statistics are
+available. Legacy checkpoints without them retain their model-space scores and
+report `inverse_transform_available=false`; units are never inferred from a task
+name. Evaluation with verified state converts predictions before comparing them
+with original target labels, so loss, metrics and exported values share a scale.
+Quantile inversion is approximate and clamps to the training range; its metadata
+records these limits.
+
+Custom prediction returns `output_scale` metadata with its result. The
+[prediction CLI](../../src/predict.py) writes the same metadata beside batch CSVs
+as `<output>.csv.output-scale.json`; restored predictions also retain
+`prediction_model_space`. Consumers should carry the scale, unit and inverse
+limits into result cards and reports.
+
 ## Preparing registered models for inference
 
 Full Scientist publication verification replays training, scientific feedback and
