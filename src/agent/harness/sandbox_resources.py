@@ -80,12 +80,8 @@ def cgroup_headroom(folder, limit, used):
     return max(0, ceiling - usage + min(usage, reclaimable))
 
 
-def memory_headroom():
-    """Minimum of host available memory and the process's actual cgroup budget."""
-    values = []
-    for line in Path('/proc/meminfo').read_text().splitlines():
-        if line.startswith('MemAvailable:'):
-            values.append(int(line.split()[1])*1024)
+def cgroup_memory_files():
+    """Walk every applicable memory controller, including tighter parent limits."""
     for line in Path('/proc/self/cgroup').read_text().splitlines():
         _, controllers, location = line.split(':', 2)
         if 'memory' in controllers.split(','):
@@ -101,7 +97,37 @@ def memory_headroom():
             limit,used=folder/names[0],folder/names[1]
             if limit.exists() and used.exists():
                 raw=limit.read_text().strip()
-                if raw!='max':values.append(cgroup_headroom(folder,raw,used.read_text()))
+                if raw!='max':yield folder, raw, used
+
+
+def memory_ceiling():
+    """Total host/cgroup allocation, distinct from transient memory pressure."""
+    values = [int(line.split()[1])*1024 for line in Path('/proc/meminfo').read_text().splitlines()
+              if line.startswith('MemTotal:')]
+    values.extend(int(raw) for _, raw, _ in cgroup_memory_files())
+    if not values:raise RuntimeError('Memory allocation accounting unavailable')
+    return min(values)
+
+
+def validate_capacity(limits):
+    if limits.memory>limits.reserved:
+        raise ValueError('Sandbox memory exceeds the shared budget')
+    ceiling = memory_ceiling()
+    if limits.memory + limits.reserve_free >= ceiling:
+        mode = 'ONLINE' if online() else 'LOCAL'
+        raise ValueError(
+            f'Sandbox configuration cannot fit this compute allocation ({ceiling//MIB} MiB): '
+            f'the sandbox needs {limits.memory//MIB} MiB plus {limits.reserve_free//MIB} MiB of host reserve. '
+            'Request a larger allocation or configure '
+            f'VENUS_SANDBOX_{mode}_MEMORY_MB for this workload; '
+            'the host reserve is not reduced automatically.')
+
+
+def memory_headroom():
+    """Minimum of host available memory and the process's actual cgroup budget."""
+    values = [int(line.split()[1])*1024 for line in Path('/proc/meminfo').read_text().splitlines()
+              if line.startswith('MemAvailable:')]
+    values.extend(cgroup_headroom(folder, raw, used.read_text()) for folder, raw, used in cgroup_memory_files())
     if not values:raise RuntimeError('Memory accounting unavailable')
     return min(values)
 
@@ -198,8 +224,9 @@ class Reservations:
 
 @asynccontextmanager
 async def admission(workspace, *, on_progress=None):
-    limits=Limits.load();store=Reservations();identity=None;started=time.monotonic()
-    if limits.memory>limits.reserved:raise ValueError('Sandbox memory exceeds the shared budget')
+    limits=Limits.load()
+    validate_capacity(limits)
+    store=Reservations();identity=None;started=time.monotonic()
     try:
         while identity is None:
             assert_active_job()

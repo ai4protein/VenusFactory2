@@ -199,3 +199,19 @@ the original objective, not approve a planner's substituted data.
 Planning and review requests use JSON output. An invalid structured response
 gets at most one formatting repair within the existing model-call budget,
 instead of consuming a whole research iteration on Markdown/JSON mismatch.
+
+
+## Compute allocation and sandbox memory
+
+Local sandbox execution defaults to an 8 GiB address-space limit and a 4 GiB
+host-memory reserve. The memory controller checks the smallest host/cgroup limit,
+including parent cgroups. A PBS job or container limited to 8 GiB cannot satisfy
+that configuration. It now fails immediately with the allocation and required
+budget instead of waiting for a misleading "resources are busy" timeout.
+
+Allocate sufficient memory for the sandbox, host reserve and controller process
+(for example, 16 GiB for one default local sandbox), or set
+`VENUS_SANDBOX_LOCAL_MEMORY_MB` for the actual workload. The platform does not
+silently reduce sandbox limits or the host reserve. Temporary memory pressure and
+other active reservations still wait in the admission queue. Online budgets,
+concurrency limits and isolated execution remain enforced.

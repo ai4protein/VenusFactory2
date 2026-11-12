@@ -180,3 +180,47 @@ def test_worker_crash_destroys_guest_and_next_admission_reclaims_scratch(tmp_pat
         time.sleep(2.1);assert not (work/'late').exists()
     finally:
         if child.poll() is None:child.kill();child.wait(timeout=5)
+
+
+@pytest.mark.asyncio
+async def test_impossible_allocation_fails_before_waiting_or_reserving(tmp_path, monkeypatch):
+    monkeypatch.setenv('VENUS_SANDBOX_LOCAL_MEMORY_MB', '8192')
+    monkeypatch.setenv('VENUS_SANDBOX_TOTAL_MEMORY_MB', '16384')
+    monkeypatch.setenv('VENUS_SANDBOX_MEMORY_RESERVE_MB', '4096')
+    monkeypatch.setenv('WEBUI_V2_MODE', 'local')
+    monkeypatch.delenv('VENUS_SCIENTIST_ONLINE', raising=False)
+    monkeypatch.setattr(resources, 'memory_ceiling', lambda: 8192 * resources.MIB)
+    def forbidden(*args, **kwargs):
+        raise AssertionError('Impossible allocations must not wait for a reservation')
+    monkeypatch.setattr(resources.Reservations, 'acquire', forbidden)
+    work = script(tmp_path, "open('ran','w').close()")
+    with pytest.raises(ValueError, match='configuration cannot fit.*8192 MiB'):
+        await execute(work, tmp_path/'control', 'python', 'run.py', 5)
+    assert not (work/'ran').exists() and not (tmp_path/'control').exists()
+    assert not (tmp_path/'admission').exists()
+
+
+@pytest.mark.parametrize('insufficient_gib', [10, 12])
+def test_static_capacity_never_reduces_sandbox_or_host_reserve(monkeypatch, insufficient_gib):
+    monkeypatch.setattr(resources, 'memory_ceiling', lambda: 16 * 1024 * resources.MIB)
+    limits = resources.Limits(8*1024*resources.MIB, 2, 16*1024*resources.MIB,
+                              4*1024*resources.MIB, 2*1024*resources.MIB, 60)
+    resources.validate_capacity(limits)
+    assert limits.memory == 8*1024*resources.MIB and limits.reserve_free == 4*1024*resources.MIB
+    monkeypatch.setattr(resources, 'memory_ceiling', lambda: insufficient_gib * 1024 * resources.MIB)
+    with pytest.raises(ValueError, match='host reserve is not reduced'):
+        resources.validate_capacity(limits)
+
+
+def test_memory_ceiling_honors_parent_limits_and_is_not_free_memory(tmp_path, monkeypatch):
+    usage = tmp_path/'usage';usage.write_text('200000000')
+    monkeypatch.setattr(resources, 'cgroup_memory_files', lambda: iter([
+        (tmp_path, str(16*1024*resources.MIB), usage), (tmp_path, str(8*1024*resources.MIB), usage)]))
+    original = Path.read_text
+    def read(self, *args, **kwargs):
+        if str(self) == '/proc/meminfo':
+            return 'MemTotal: 67108864 kB\nMemAvailable: 262144 kB\n'
+        return original(self, *args, **kwargs)
+    monkeypatch.setattr(Path, 'read_text', read)
+    assert resources.memory_ceiling() == 8*1024*resources.MIB
+    assert resources.memory_headroom() == 256*resources.MIB
