@@ -48,6 +48,14 @@ async def test_harness_receives_complete_selected_training_contract(tmp_path, mo
     expected = next(tool.description for tool in service.tools() if tool.name == "train_research_model")
 
     async def adapter(ctx):
+        from agent.harness.adapters import task_message
+        assert ctx.task.phase == "chat"  # Existing Web tool/sandbox policy is retained.
+        assert ctx.task.interaction_mode == "research_execution"
+        prompt = task_message(ctx.task)
+        assert "Scientist execution: continue the assigned research goal." in prompt
+        assert "do not invent a persistent research goal" not in prompt
+        assert "create a goal, ask questions" not in prompt
+        assert "Use ask_user or request_confirmation" in prompt
         connection = json.loads((ctx.task.capability / "connection.json").read_text())
         async with httpx.AsyncClient(trust_env=False, timeout=30) as client:
             headers = {"Authorization": "Bearer " + connection["token"]}

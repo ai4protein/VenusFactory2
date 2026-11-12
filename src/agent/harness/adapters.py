@@ -16,7 +16,7 @@ from .kimi_adapter import KimiAdapter  # Compatibility for existing expert and C
 def task_message(task):
     from agent.rsi.engine.runtime import build_task_message
 
-    return build_task_message(task.instructions, task.prompt, interaction="chat" if task.phase == "chat" else "bounded")
+    return build_task_message(task.instructions, task.prompt, interaction=task.interaction_mode)
 
 
 class ScientistAdapter:

@@ -137,6 +137,7 @@ class Task:
     tools: frozenset[str]
     mcp_entry: str = "generated_tools.py"
     phase: str = "develop"
+    interaction: str | None = None
 
     def __post_init__(self):
         if (not self.tools and self.phase != "chat") or any(not re.fullmatch(r"[a-zA-Z0-9_]+", t) for t in self.tools):
@@ -145,6 +146,16 @@ class Task:
             raise ValueError("MCP entry must be a bundle-local Python filename")
         if self.phase not in {"develop", "reuse", "probe", "chat"}:
             raise ValueError("Unknown phase")
+        if self.interaction is not None and (
+            self.interaction != "research_execution" or self.phase != "chat"
+            or self.mcp_entry != "web_tools.py" or not self.tools
+        ):
+            raise ValueError("Research interaction requires explicit Web MCP tools")
+
+    @property
+    def interaction_mode(self):
+        # Phase continues to select the existing transport and sandbox policy.
+        return self.interaction or ("chat" if self.phase == "chat" else "bounded")
 
     def binding(self):
         return {
@@ -153,6 +164,7 @@ class Task:
             "tools": sorted(self.tools),
             "mcp_entry": self.mcp_entry,
             "phase": self.phase,
+            **({"interaction": self.interaction} if self.interaction is not None else {}),
             "inputs": {
                 str(p.relative_to(self.workspace)): file_hash(p)
                 for p in sorted(self.workspace.rglob("*"))

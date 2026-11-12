@@ -412,7 +412,8 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None):
         [{key: row[key] for key in ('id', 'name', 'description')}
          for row in disclosure.overview()['categories']], ensure_ascii=False)
     task = Task(
-        workspace, capability, output, public_value(native_prompt(request), workspace), instructions, frozenset(disclosure.names), "web_tools.py", "chat"
+        workspace, capability, output, public_value(native_prompt(request), workspace), instructions, frozenset(disclosure.names), "web_tools.py", "chat",
+        interaction="research_execution" if is_research else None,
     )
     adapter, _ = builtin_registry().resolve(runtime_profile, request["runtimes"])
     ctx = RuntimeContext(

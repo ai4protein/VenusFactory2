@@ -63,6 +63,15 @@ def build_task_message(system_prompt, prompt, *, interaction="bounded"):
             "are valid; do not invent a persistent research goal or require a file artifact. "
             "If information is missing, ask the user in your reply.\n\n" + prompt
         )
+    if interaction == "research_execution":
+        return (
+            "Scientist execution: continue the assigned research goal.\n" + system_prompt
+            + "\nFollow the current plan within the supplied budget using only declared VenusFactory MCP tools "
+            "and this session workspace. Preserve the scientific objective, acceptance criteria and data splits. "
+            "Save actual work and a research checkpoint before ending the iteration; an ended iteration is not "
+            "a completed study or an accepted model. Use ask_user or request_confirmation for essential missing "
+            "input or permission, then preserve progress and wait.\n\nCurrent research context:\n" + prompt
+        )
     if interaction != "bounded":
         raise ValueError("Unknown task interaction")
     return (
@@ -204,7 +213,7 @@ async def run_task(
                             )
                     questions = await client.list_pending_questions(sid)
                     if questions:
-                        if interaction == "chat":
+                        if interaction in {"chat", "research_execution"}:
                             raise ConversationNeedsInput(questions)
                         raise RuntimeError("task requested human input; task is not autonomous")
                     await asyncio.sleep(0.4)
@@ -282,7 +291,7 @@ async def run_task(
                         result["status"] = (
                             "runtime_error" if event.is_error or result.get("error_code") else "completed"
                         )
-                        if interaction == "chat" and result["status"] == "completed" and not result["text"].strip():
+                        if interaction in {"chat", "research_execution"} and result["status"] == "completed" and not result["text"].strip():
                             result["status"] = "incomplete"
                         break
     except ConversationNeedsInput as exc:

@@ -116,7 +116,7 @@ class KimiAdapter:
                     max_tool_calls=p.budget.tool_calls,
                     allowed_mcp_tools=t.tools,
                     request_gateway=True,
-                    interaction="chat" if t.phase == "chat" else "bounded",
+                    interaction=t.interaction_mode,
                 )
                 if web_protocol and result.get("session_id"):
                     try:

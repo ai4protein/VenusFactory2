@@ -222,14 +222,15 @@ async def test_chat_can_answer_without_tools_or_artifacts(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_empty_chat_completion_is_incomplete(tmp_path):
+@pytest.mark.parametrize("interaction", ["chat", "research_execution"])
+async def test_empty_chat_completion_is_incomplete(tmp_path, interaction):
     client = FakeClient([KimiEvent(kind="turn_ended")])
-    result = await run_task(client, prompt="q", system_prompt="p", model="m", output_dir=tmp_path, interaction="chat")
+    result = await run_task(client, prompt="q", system_prompt="p", model="m", output_dir=tmp_path, interaction=interaction)
     assert result["status"] == "incomplete"
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("interaction,expected", [("chat", "needs_input"), ("bounded", "runtime_error")])
+@pytest.mark.parametrize("interaction,expected", [("chat", "needs_input"), ("research_execution", "needs_input"), ("bounded", "runtime_error")])
 async def test_pending_question_keeps_conversation_distinct_from_autonomous_episode(tmp_path, interaction, expected):
     class QuestionClient(FakeClient):
         async def list_pending_questions(self, sid):
@@ -246,7 +247,7 @@ async def test_pending_question_keeps_conversation_distinct_from_autonomous_epis
         interaction=interaction,
     )
     assert result["status"] == expected and client.aborted
-    if interaction == "chat":
+    if interaction in {"chat", "research_execution"}:
         assert result["questions"][0]["question_id"] == "q1"
 
 
