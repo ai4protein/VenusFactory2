@@ -188,7 +188,7 @@ def build_delivery(workspace, bundle, receipt, *, goal_id=''):
     automatic = receipt['automatic']
     review_cases = receipt['independent'].get('tests')
     review_checks = automatic.get('independent_cases')
-    from agent.harness.contracts import digest
+    from agent.harness.contracts import digest, file_hash
     if (not isinstance(review_cases, list) or len(review_cases) < 2 or
             not isinstance(review_checks, list) or len(review_checks) != len(review_cases) or
             any(not isinstance(case, dict) or not isinstance(check, dict) or
@@ -196,6 +196,14 @@ def build_delivery(workspace, bundle, receipt, *, goal_id=''):
                 check.get('input_sha256') != digest(case.get('inputs'))
                 for case, check in zip(review_cases, review_checks))):
         raise ValueError('Independent review cases do not match the saved execution evidence')
+    scientific_acceptance = None
+    if is_model and (bundle / 'scientific_acceptance.json').is_file():
+        scientific_acceptance = json.loads(read_bytes(bundle, 'scientific_acceptance.json', max_bytes=100000))
+        if (scientific_acceptance.get('candidate_id') != identity or
+                scientific_acceptance.get('manifest_sha256') != file_hash(bundle / 'manifest.json') or
+                scientific_acceptance.get('selected_experiment_id') != development['selected_experiment_id'] or
+                scientific_acceptance.get('assessment', {}).get('verdict') != 'useful'):
+            raise ValueError('Scientific acceptance differs from the delivered model')
     evaluation = automatic.get('evaluation')
     dependencies = dict(automatic['dependency_versions'])
     dependencies['jsonschema'] = importlib.metadata.version('jsonschema')
@@ -239,6 +247,13 @@ def build_delivery(workspace, bundle, receipt, *, goal_id=''):
         report_text += '\n## Final test\n\n```json\n' + json.dumps(evaluation, indent=2, ensure_ascii=False) + '\n```\n'
     report_text += episode_comparison_table(development, evaluation)
     report_text += multilabel_comparison_table(development, evaluation)
+    if scientific_acceptance:
+        report['scientific_acceptance'] = scientific_acceptance
+        assessment = scientific_acceptance['assessment']
+        report_text += '\n## Scientific acceptance (SC)\n\n' + assessment['use_case'] + '\n'
+        for name, check in assessment['checks'].items():
+            report_text += '\n- ' + name.replace('_', ' ').capitalize() + ': ' + check['reason']
+        report_text += '\n\nScope limits: ' + '; '.join(assessment['limitations']) + '\n'
     report_text += '\n## Independent Review\n\n' + receipt['independent']['summary'] + '\n\n## Limitations\n\n' + report['evidence_limit'] + '\n'
     contract = {'schema': SCHEMA, 'id': identity, 'family_id': family, 'kind': kind,
                 'name': manifest['name'], 'author': spec['author'], 'version': spec['version'], 'scope': spec['scope'],
@@ -263,6 +278,8 @@ def build_delivery(workspace, bundle, receipt, *, goal_id=''):
         'evaluation/test-report.json': encode(report), 'evaluation/test-report.md': report_text.encode(),
         'requirements.txt': ('\n'.join(k + '==' + v for k, v in sorted(dependencies.items())) + '\n').encode(),
     }
+    if scientific_acceptance:
+        outputs['evaluation/scientific-acceptance.json'] = encode(scientific_acceptance)
     outputs.update(documentation)
     checksums = {name: hashlib.sha256(data).hexdigest() for name, data in {**runtime, **outputs}.items()}
     package = io.BytesIO()

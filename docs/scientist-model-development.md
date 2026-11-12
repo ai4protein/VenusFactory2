@@ -1,13 +1,32 @@
 # Scientist: model development and recursive improvement
 
 Scientist develops models from a research goal, supplied data and a resource
-budget through PI → planning → implementation → Critic → revision. A delivery
+budget through PI → planning → implementation → SC scientific acceptance → revision. A delivery
 contains fitted models, reproducible code, measured evaluation and a research
 report. Registration follows a separate admission Review.
 
 The PI derives a research direction from the goal and available materials. Plan
 steps keep their scientific acceptance criteria while their approach can change
 in response to experiments. Completed steps retain their verified evidence.
+
+## Scientific acceptance and revision
+
+SC receives a fresh evidence packet containing the objective, fixed acceptance
+criteria, execution receipts, measured validation trajectories and candidate
+scope. PI and implementation endorsements are excluded. Each submitted model
+requires an explicit usefulness verdict and evidence-backed checks for goal fit,
+scientific value, evaluation validity, and scope and limitations. Constant
+predictions cannot establish input-specific predictive value; a documented
+reference purpose is assessed separately. There is no universal baseline-win rule.
+
+A negative verdict or missing evidence prevents technical Review and registration,
+persists an actionable request for PI, and continues the research loop. Accepted
+verdicts are bound to the selected experiment, runtime, evaluation and manifest
+hashes. Completion rechecks the saved evidence and verdict; changing a model or
+receipt cannot inherit the previous acceptance. Independent technical Review uses
+its own fresh context and does not receive SC's endorsement. Successful deliveries
+include the SC assessment and technical test report. Closed historical protocols
+remain unchanged; resumed topics use the new acceptance policy.
 
 ## Algorithm freedom
 

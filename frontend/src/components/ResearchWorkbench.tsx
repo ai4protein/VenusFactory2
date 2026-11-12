@@ -53,7 +53,7 @@ export function ResearchWorkbench({ goal: g, sessionId, lang }: { goal: ScienceG
     };
     void load(); return () => abort.abort();
   }, [fileKey, revision, tab, textFile, lang]);
-  const roles = [{ id:'PI', name:'PI' }, { id:'CB', name:'Plan' }, { id:'MLS', name:'Implement' }, { id:'SC', name:'Critic' }, { id:'REVIEW', name:'Review' }];
+  const roles = [{ id:'PI', name:'PI' }, { id:'CB', name:'Plan' }, { id:'MLS', name:'Implement' }, { id:'SC', name:say('Acceptance','验收') }, { id:'REVIEW', name:'Review' }];
   const matches = (role: string) => stage === 'all' || role === stage;
   const selectStage = (id: string) => { setStage(id); setTab('logs'); };
   return <section className="research-workbench">
@@ -79,7 +79,7 @@ export function ResearchWorkbench({ goal: g, sessionId, lang }: { goal: ScienceG
       </div>
     </div>}
     {tab === 'logs' && <div className="research-activity-view"><label>{say('Stage','阶段')} <select value={stage} onChange={e => setStage(e.target.value)}><option value="all">{say('All','全部')}</option>{roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}</select></label>
-      {(g.activity || []).filter((a,i,all) => matches(a.role) && all.findIndex(b => b.role===a.role && b.episode===a.episode && publicReport(b.content)===publicReport(a.content))===i).map(a => <details key={a.id} className="research-role-report"><summary><strong>{a.role === 'CB' ? 'Plan' : a.role === 'MLS' ? 'Implement' : a.role === 'SC' ? 'Critic' : a.role}</strong><span>{say('Iteration','轮次')} {a.episode}</span>{a.timestamp && <time>{new Date(a.timestamp*1000).toLocaleTimeString()}</time>}</summary><p>{publicReport(a.content)}</p></details>)}
+      {(g.activity || []).filter((a,i,all) => matches(a.role) && all.findIndex(b => b.role===a.role && b.episode===a.episode && publicReport(b.content)===publicReport(a.content))===i).map(a => <details key={a.id} className="research-role-report"><summary><strong>{a.role === 'CB' ? 'Plan' : a.role === 'MLS' ? 'Implement' : a.role === 'SC' ? say('Acceptance','验收') : a.role}</strong><span>{say('Iteration','轮次')} {a.episode}</span>{a.timestamp && <time>{new Date(a.timestamp*1000).toLocaleTimeString()}</time>}</summary><p>{publicReport(a.content)}</p></details>)}
       <ol className="research-tool-log">{(live?.timeline || []).filter((e,i,all) => matches(e.role) && !(all[i+1]?.tool===e.tool && ['running','queued'].includes(e.status))).map((e,i) => <li key={`${e.timestamp}-${i}`}><time>{new Date(e.timestamp*1000).toLocaleTimeString()}</time><span>{e.tool.replace(/_/g,' ')}</span><small>{e.status === 'completed' ? '✓' : e.status === 'running' ? say('Running','运行中') : e.status === 'queued' ? say('Queued','排队中') : say('Review log','查看记录')}</small></li>)}</ol>
       {matches('MLS') && (live?.execution || live?.tool?.progress) && <div className="research-experiment-log"><strong>{say('Execution output','实验日志')}</strong>{live.tool?.progress?.progress && <progress max={live.tool.progress.progress.total} value={live.tool.progress.progress.step}/>}<pre>{live.tool?.progress?.stdout_tail || [live.execution?.stdout_tail, live.execution?.stderr_tail].filter(Boolean).join('\n') || say('Waiting for output…','等待执行输出…')}</pre></div>}
       {!g.activity?.length && !live?.timeline?.length && <p role="status">{say('Waiting for the first research update…','等待首条研究进展…')}</p>}

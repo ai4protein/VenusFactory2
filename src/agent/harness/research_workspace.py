@@ -124,7 +124,7 @@ class ResearchWorkspace:
 
     @guard_operation('propose_research_capability')
     async def propose_research_capability(self, name: str='', description: str='', source: str='', files: list[str] | None=None, test_inputs: list[dict] | None=None, review_spec: dict | None=None, proposal_file: str='') -> dict:
-        """Submit a private candidate for independent Review. Prefer proposal_file: a workspace JSON with name, description, source, files, test_inputs and review_spec. Edit and resubmit that file after revision; unchanged metadata are preserved. Inline fields remain supported and save review/proposal.json. Read get_research_review_requirements first. Submission does not grant public release."""
+        """Submit a private candidate for SC scientific acceptance and independent technical Review. Prefer proposal_file: a workspace JSON with name, description, source, files, test_inputs and review_spec. Edit and resubmit that file after revision; unchanged metadata are preserved. Inline fields remain supported and save review/proposal.json. Read get_research_review_requirements first. Submission does not grant public release."""
         from .review_submission import ReviewSubmission
         submission=ReviewSubmission(self.workspace,self.control,
             dict(name=name,description=description,source=source,files=files,test_inputs=test_inputs,review_spec=review_spec),proposal_file)

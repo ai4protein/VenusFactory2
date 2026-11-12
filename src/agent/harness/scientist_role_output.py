@@ -12,7 +12,7 @@ def object_schema(properties):
             "required": list(properties), "additionalProperties": False}
 
 
-def specification(role, protocol):
+def specification(role, protocol, *, model_acceptance=False):
     text = {"type": "string", "minLength": 1, "maxLength": 2000}
     strings = {"type": "array", "items": {"type": "string"}}
     if role == "PI":
@@ -33,6 +33,9 @@ def specification(role, protocol):
             "decision": {"enum": ["ready_for_host_validation", "needs_revision"]},
             "summary": text, "issues": strings,
         })
+        if model_acceptance:
+            from .scientific_acceptance import model_schema
+            schema = model_schema()
     else:
         return None
     if role == "CB":

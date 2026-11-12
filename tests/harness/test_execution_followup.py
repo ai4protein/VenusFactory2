@@ -63,7 +63,10 @@ async def test_scientist_performs_one_correction_then_reviews_the_actual_work(tm
         if role=="CB":return json.dumps({"summary":"Calculate lengths",
             "steps":[{"id":"compute","title":"Calculate lengths","acceptance":"Executed code saves lengths.json"}],
             "needs_input":[]})
-        assert context["execution"]["report"]=="Measured lengths saved"
+        assert "report" not in context["execution"]  # SC sees measurements, not the executor endorsement.
+        assert context["execution"]["step_checks"][0]["passed"]
+        preview=next(row for row in context["artifact_previews"] if row["path"]=="lengths.json")
+        assert json.loads(preview["content"])=={"lengths":[4,2]}
         return json.dumps({"decision":"ready_for_host_validation","summary":"Verified lengths","issues":[]})
     async def executor(request,service,events):
         attempts.append(request)

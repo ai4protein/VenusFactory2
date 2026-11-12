@@ -74,7 +74,8 @@ def test_successful_retry_clears_only_the_matching_invocation(tmp_path):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("tamper", [False, True])
 @pytest.mark.parametrize("completed_steps", [[], ["draft"], ["draft", "review"]])
-async def test_independent_review_does_not_require_prior_critic_approval(tmp_path, monkeypatch, tamper, completed_steps):
+@pytest.mark.parametrize("critic_ready", [False, True])
+async def test_sc_gate_blocks_rejection_without_requiring_completed_review_steps(tmp_path, monkeypatch, tamper, completed_steps, critic_ready):
     from agent.harness import autonomous_research as ar
     profile=Profile("science_expert","expert-deepseek-harness",
                     ModelBinding("dmx","unisound-u2-flash","https://www.dmxapi.cn/v1"),
@@ -89,7 +90,10 @@ async def test_independent_review_does_not_require_prior_critic_approval(tmp_pat
             {"id":"draft","title":"Prepare candidate","acceptance":"Candidate README"},
             {"id":"review","title":"Complete independent review","acceptance":"Verified review receipt","verification":"review"}],
             "needs_input":[],"deliverable":"tool"})
-        if role=="SC": return json.dumps({"decision":"needs_revision","summary":"Independent review is pending","issues":["Complete independent review"]})
+        if role=="SC": return json.dumps({
+            "decision":"ready_for_host_validation" if critic_ready else "needs_revision",
+            "summary":"Useful analysis ready for technical Review" if critic_ready else "Result does not meet the research goal",
+            "issues":[] if critic_ready else ["PI must revise the scientific approach"]})
         raise AssertionError(role)
     async def executor(request, service, events):
         await service.write_research_file("README.md", "Candidate awaiting independent verification.")
@@ -108,11 +112,14 @@ async def test_independent_review_does_not_require_prior_critic_approval(tmp_pat
     monkeypatch.setattr(ar,"audit_requests",lambda *a:{"passed":True,"model_calls":3})
     monkeypatch.setattr(ar,"review_proposal",review)
     state=await AutonomousResearch(store,"fixture",{},consult=consult,executor=executor,tools=[]).run()
-    assert reviewed==([] if tamper else ["candidate"])
+    assert reviewed==(["candidate"] if critic_ready and not tamper else [])
     assert state["status"]!="completed"
     assert not state["progress"].get("capabilities")
-    if not tamper:
+    if critic_ready and not tamper:
         assert state["progress"]["publication_reviews"][0]["issues"]==["Add boundary tests"]
+    elif not critic_ready:
+        assert state["progress"]["sc_revision"]["issues"]
+        assert not state["progress"].get("publication_reviews")
 
 
 def test_completed_plan_still_requests_missing_independent_submission():

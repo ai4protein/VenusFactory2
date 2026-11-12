@@ -5,7 +5,7 @@ const stages = [
   { name: "PI", detail: ["Set direction", "确定方向"], title: ["Principal Investigator: define the research goal", "研究负责人：明确研究目标"] },
   { name: "Plan", detail: ["Design experiments", "规划实验"], title: ["Biology and modelling experts plan data and experiments", "生物学与建模专家规划数据和实验"] },
   { name: "Implement", detail: ["Build, train & test", "开发、训练与测试"], title: ["Develop methods, run experiments and collect evidence", "开发方法、执行实验并积累证据"] },
-  { name: "Critic", detail: ["Assess & improve", "评议与迭代"], title: ["Scientific critique guides the next round of improvement", "科学评议推动下一轮改进"] },
+  { name: "SC", detail: ["Scientific acceptance", "科学验收"], title: ["Assess usefulness from measured evidence; return unmet goals to PI", "依据实测证据验收成果价值，未达到目标时退回 PI"] },
   { name: "Review", detail: ["Validate & deliver", "验证与交付"], title: ["Review the evidence, code and model deliverables", "审核证据、代码与模型交付物"] },
 ];
 

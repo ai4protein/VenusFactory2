@@ -21,7 +21,7 @@ Paper-based work can reproduce a defined part of a study, address a limitation o
 ## Start and guide the research
 
 1. Select Scientist, enter the goal and attach any materials. Choose an available model/harness and a budget.
-2. Send the goal to start the RSI topic. Follow **PI → Plan → Implement → Critic**, with revised plans and repeated experiments as needed.
+2. Send the goal to start the RSI topic. Follow **PI → Plan → Implement → SC (Acceptance)**, with revised plans and repeated experiments as needed.
 3. Use the revision controls or composer to add constraints, correct assumptions or supply new data in the same topic.
 4. Inspect the plan, intermediate results, model iterations, activity and project files. Model iterations show measured baselines, revisions, validation scores and their parent experiments.
 5. Review the final project and test report. Independent **Review** checks reusable candidates before admission.
@@ -42,6 +42,12 @@ Scientist can implement statistical models, custom neural models, few-shot adapt
 
 Model research requires a measured baseline and a revised experiment on matched validation data. The system can retain a baseline when a revision does not help. Advanced method names, repeated iterations or a better validation score alone do not establish novelty, statistical significance or biological effectiveness. Final testing and independent review are distinct from feedback used to revise a model.
 
+## Scientific acceptance
+
+SC independently assesses whether the model answers the research goal and has a useful, supported application. It examines measured results and controls, evaluation validity, and scope and limitations. A model can be useful without beating every baseline; claims of better prediction, lower cost, data efficiency or a new application need corresponding evidence.
+
+If the result is ineffective or evidence is insufficient, SC returns specific revision requests to PI. The topic continues through revised plans and experiments. A rejected candidate cannot proceed to technical Review or registration. After SC accepts the measured model version, independent Review checks final testing, interfaces and reproducibility. The model's test report includes both decisions.
+
 ## Receive and reuse the results
 
 **Research outputs** shows the selected models or methods with their README, usage card, test report and download. Each release includes runnable code, a JSON interface, example input/output, interface tests and recorded dependencies. Learned models also include their fitted state and training code. Raw evaluation datasets stay in protected study storage.
@@ -50,7 +56,7 @@ The included test command replays both developer examples and independently revi
 
 Use **Download project (.zip)** for the selected releases and research report. Each release has its own README with use and reproduction commands. A draft without a reviewed release downloads the working project. Experiments, ablations and previous versions remain in the topic; expand their records when you need the details. Revisions of the same purpose appear as versions of one capability instead of filling the tool list with every trial.
 
-Research completion and public-tool admission are separate. Code execution or Critic agreement alone does not publish a model. Independent checks review interfaces, scope, reproducibility and evaluation evidence. Rejected candidates remain available for revision. Only reviewed, published and enabled capabilities can be discovered and called by [Agent](./Agent.md), Model Plaza or workflows.
+Research completion and public-tool admission are separate. Code execution or SC acceptance alone does not publish a model. Independent checks review interfaces, scope, reproducibility and evaluation evidence. Rejected candidates remain available for revision. Only reviewed, published and enabled capabilities can be discovered and called by [Agent](./Agent.md), Model Plaza or workflows.
 
 
 ## Share a model with the platform

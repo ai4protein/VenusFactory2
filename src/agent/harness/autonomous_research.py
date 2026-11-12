@@ -28,11 +28,18 @@ from .research_workspace import ResearchWorkspace, publish_proposals, safe_file
 from .capability_review import REVIEW_PROMPT, review_proposal
 from .research_development import Development, model_goal, build_delivery
 from .research_topic import SCIENTIST_PURPOSE, topic_context
+from . import scientific_acceptance as sc_acceptance
 from .tool_disclosure import ToolDisclosure, CONTROLS, GUIDANCE
 from agent.rsi.artifacts.contract import SCHEMA as DELIVERY_SCHEMA, selected_deliveries, has_delivery
 
 def development_next_action(summary, progress):
     """Expose only the next missing model-development stage."""
+    sc_revision = progress.get('sc_revision')
+    if sc_revision and sc_revision.get('requests'):
+        return {'stage':'revise_scientific_model', 'tool':'train_research_model',
+                'issues':sc_revision['issues'], 'requests':sc_revision.get('requests', []),
+                'rejected_experiment_ids':sc_revision.get('experiment_ids', []),
+                'instruction':'SC did not accept the model usefulness. PI must use this evidence to revise the scientific approach, comparison or supported scope, then implement and measure the required experiment. Do not repeat unchanged work or claim success from execution alone. Preserve the objective and acceptance criteria. Submit a supported candidate for a fresh SC assessment and independent technical Review.'}
     revisions = [r for r in progress.get('publication_reviews', []) if r.get('status') != 'approved']
     if revisions:
         return {'stage':'revise_submission', 'tool':'propose_research_capability',
@@ -63,7 +70,7 @@ ROLES={
  'REVIEW':REVIEW_PROMPT,
  'PI':"You are the Principal Investigator. Interpret the user's protein, property, materials and research objective. Choose one testable next experiment using the available data, tools and budget. For model development, propose a plausible feature representation, learning method and conventional comparison, and explain the scientific reason for the next revision using measured feedback. State assumptions that data inspection must check. Preserve the actual target and observed measurements. Return a concise public research direction; execution results come from the implementation phase.",
  'CB':'You are the Computational Biologist. Turn the PI direction into 3..6 feasible milestones (maximum 24) for this objective and its supplied materials. Return one JSON object: {"summary":"...","deliverable":"model","steps":[{"id":"step1","title":"...","acceptance":"measured endpoint and evidence","approach":"specific method and comparison","verification":"model"}],"needs_input":[]}. For each training or revision step, name the feature representation, learner or training procedure, comparison and scientific rationale in approach. Choose a conventional baseline suited to the data; get_research_baseline provides sequence-regression controls when applicable, with reference provenance. Use enabled tools and inspect actual inputs before setting sample counts or performance requirements. Acceptance fixes the research endpoint, observed data, splits and required evidence; approach records the method and may change after failed experiments. Preserve existing step IDs, acceptance criteria and verified completed steps. The host manages status and evidence. Use progress.user_updates and revision_history when replanning. Place needs_input only at the plan top level, for specific missing information that blocks every useful next step and cannot be obtained from supplied materials or public sources. Choose reasonable assumptions for optional preferences. Seek public measured data through enabled tools when necessary; never replace missing measurements with invented data or a different property\'s proxy labels. Describe prospective work; do not claim experiments or results before execution.',
- 'SC':'You are the Scientific Critic. Treat the original user objective and supplied sequences as authoritative; reject invented or substituted inputs even if the plan says otherwise. Review the original objective, plan, actual tool receipts, Python exit codes, artifact previews and submitted checkpoint. Require actual executed work for empirical claims. A script or proposed experiment alone is not experimental evidence. Do not accept placeholder/synthetic data as measured biological evidence. Assess the completed step IDs claimed in the checkpoint, not all future unfinished work. Valid data inspection, training or evaluation milestones may be accepted while delivery remains pending. For a claimed final reusable-model delivery, require its proposal receipt and runtime artifacts; a training script alone is insufficient. Check that completed step IDs satisfy their acceptance criteria; missing work requires revision. Your research review does not grant public admission; a separate independent Review checks reusable candidates. Return only JSON with decision ("ready_for_host_validation" or "needs_revision"), summary (nonempty string), and issues (list of strings).',
+ 'SC':sc_acceptance.PROMPT,
 }
 
 def parse_plan(text, previous=None, *, objective=''):
@@ -142,7 +149,7 @@ def method_changes(previous, current, episode):
 def create(root, profile, objective, limits):
     if profile.harness not in NATIVE_EXPERT_HARNESSES:raise ValueError('Select a native Scientist harness')
     store=GoalStore.create(root,GoalSpec(objective,CRITERIA,**limits),profile)
-    write_json(store.root/'protocol.json',{'kind':DRIVER,'delivery_schema':DELIVERY_SCHEMA})
+    write_json(store.root/'protocol.json',{'kind':DRIVER,'delivery_schema':DELIVERY_SCHEMA,'scientific_acceptance':sc_acceptance.POLICY})
     (store.root/'workspace').mkdir()
     return store
 
@@ -161,9 +168,11 @@ class AutonomousResearch:
     async def consult(self, role, context, profile, relay, folder):
         if self.consult_override:return await self.consult_override(role,context)
         from .scientist_role_output import specification, request_fields, output_content
-        spec = specification(role, profile.model.protocol) if hasattr(getattr(relay, 'policy', None), 'role_output') else None
+        spec = specification(role, profile.model.protocol, model_acceptance=role=='SC' and bool(context.get('scientific_acceptance',{}).get('models'))) if hasattr(getattr(relay, 'policy', None), 'role_output') else None
         output_spec = spec
         instruction=SCIENTIST_PURPOSE+ROLES[role]+' Respond in the language of the research objective.'
+        if role=='SC' and context.get('scientific_acceptance',{}).get('models'):
+            instruction += ' Exact response schema: '+json.dumps(sc_acceptance.model_schema(),ensure_ascii=False)
         if role=='CB':
             instruction += (' For each step, choose verification: artifact for documents; execution for computed analysis; '
                 'data for checked data splits; model for fitted and measured models; revision for a measured descendant; '
@@ -269,6 +278,10 @@ class AutonomousResearch:
     async def episode(self, index, profile, state, context_prompt):
         started=time.monotonic();folder=self.store.root/'episodes'/f'cycle_{index:03d}';folder.mkdir(parents=True,exist_ok=True)
         state=apply_revisions(self.store)
+        protocol_path=self.store.root/'protocol.json'
+        protocol=json.loads(protocol_path.read_text()) if protocol_path.exists() else {'kind':DRIVER,'delivery_schema':DELIVERY_SCHEMA}
+        if protocol.get('scientific_acceptance')!=sc_acceptance.POLICY:
+            write_json(protocol_path,{**protocol,'scientific_acceptance':sc_acceptance.POLICY})
         workspace=self.store.root/'workspace';progress=copy.deepcopy(state['progress']);events=[];relay=None;tools=[];service=None
         from .research_data_store import store_for_goal
         data_store=store_for_goal(self.store.root)
@@ -440,8 +453,21 @@ class AutonomousResearch:
                 context['execution']['step_checks']=step_checks
                 progress['step_checks']=step_checks
                 phase('SC')
-                review=await self.structured('SC',context,profile,relay,folder,critic_decision)
+                progress.pop('reviewed_episode',None)
+                progress['research_completed']=False
+                sc_context=sc_acceptance.evidence_context(context,service.proposals,development)
+                validator=sc_acceptance.parse_model_review if sc_context['scientific_acceptance']['models'] else critic_decision
+                review=await self.structured('SC',sc_context,profile,relay,folder,validator)
                 write_json(folder/'review.json',review)
+                acceptance=sc_acceptance.record(folder,review,sc_context,goal_root=self.store.root)
+                progress['scientific_acceptance']=acceptance
+                if not acceptance['passed']:
+                    review={**review,'decision':'needs_revision','issues':acceptance['issues']}
+                    progress['sc_revision']=sc_acceptance.revision_feedback(acceptance,sc_context,review,index)
+                    progress.pop('reviewed_episode',None)
+                    progress['research_completed']=False
+                elif acceptance['approved_models'] or not progress.get('sc_revision',{}).get('requests'):
+                    progress.pop('sc_revision',None)
                 checkpoint_valid=verified_checkpoint(workspace,checkpoint,service.receipts,require_completed_steps=False)
                 request_valid=audit_requests(folder/'model_requests.jsonl')['passed']
                 host_issues=[row['error'] for row in context['execution']['failures']]
@@ -452,7 +478,7 @@ class AutonomousResearch:
                 step_issues=[f"Step {row['id']}: {issue}" for row in step_checks for issue in row['issues']]
                 host_issues.extend(step_issues)
                 host_review={'passed':not host_issues,'execution_passed':reviewable,'issues':host_issues,
-                             'steps':step_checks,'model_decision':review['decision']}
+                             'steps':step_checks,'model_decision':review['decision'],'scientific_acceptance_passed':acceptance['passed']}
                 write_json(folder/'host_review.json',host_review)
                 progress['host_review']=host_review
                 if host_issues:
@@ -469,9 +495,9 @@ class AutonomousResearch:
                     plan=accepted_plan
                     progress['artifacts']=checkpoint['artifacts']
                     progress['reviewed_episode']=index
-                # Independent candidate review must not wait for the Critic to
-                # claim that the review itself has already finished.
-                if reviewable:
+                # SC must accept usefulness before technical Review. Pending
+                # technical-review plan steps themselves are not a circular gate.
+                if reviewable and acceptance['passed']:
                     reviews={r['name']:r for r in progress.get('publication_reviews',[])}
                     for bundle in service.proposals:
                         phase('REVIEW')
@@ -489,8 +515,10 @@ class AutonomousResearch:
                         if receipt['status']=='approved' and audit_requests(folder/'model_requests.jsonl')['passed']:
                             try:
                                 delivery=None
+                                scientific_binding=sc_acceptance.bind_delivery(bundle,acceptance)
                                 if candidate.get('development') or candidate['review_spec']['kind']=='tool':
                                     delivery=build_delivery(workspace,bundle,receipt,goal_id=self.store.root.name)
+                                    if scientific_binding:delivery['scientific_acceptance']=scientific_binding
                                 kwargs={'library':self.store.root/'private_capabilities'}
                                 published=publish_proposals([bundle],self.store.root.name,**kwargs)
                                 progress['capabilities']=list({r['id']:r for r in [*progress.get('capabilities',[]),*published]}.values())
@@ -557,12 +585,18 @@ class AutonomousResearch:
         if plan.get('deliverable')=='tool' and not progress.get('capabilities'):
             return {'criteria':checks,'delivery_pending':True}
         protocol=self.store.root/'protocol.json'
-        modern_delivery=protocol.exists() and json.loads(protocol.read_text()).get('delivery_schema')==DELIVERY_SCHEMA
+        protocol_data=json.loads(protocol.read_text()) if protocol.exists() else {}
+        modern_delivery=protocol_data.get('delivery_schema')==DELIVERY_SCHEMA
+        strict_sc=protocol_data.get('scientific_acceptance')==sc_acceptance.POLICY
+        if strict_sc and (progress.get('sc_revision') or progress.get('last_review',{}).get('decision','ready_for_host_validation')!='ready_for_host_validation'):
+            return {'criteria':checks,'scientific_acceptance_pending':True}
         if plan.get('deliverable')=='model' or model_goal(state['definition']['goal']['objective']) or (plan.get('deliverable')=='tool' and modern_delivery):
             kind='method' if plan.get('deliverable')=='tool' and not model_goal(state['definition']['goal']['objective']) else 'model'
             if not has_delivery(progress.get('deliveries',[]),kind):return {'criteria':checks,'delivery_pending':True}
             for delivery in selected_deliveries(progress['deliveries']):
                 if delivery['candidate_id'] not in {c['id'] for c in progress.get('capabilities',[])}:return {'criteria':checks,'delivery_pending':True}
+                if strict_sc and delivery.get('kind')=='model' and not sc_acceptance.verify_delivery(self.store.root,delivery):
+                    return {'criteria':checks,'scientific_acceptance_pending':True}
                 for artifact in delivery['artifacts']:
                     try:
                         if file_hash(safe_file(self.store.root/'workspace',artifact['path']))!=artifact['sha256']:return {'criteria':checks,'delivery_pending':True}

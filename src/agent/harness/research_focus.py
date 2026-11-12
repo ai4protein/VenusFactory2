@@ -12,6 +12,8 @@ def selected_tools(context, tools):
             "prepare_research_dataset", "get_research_baseline", "train_research_model")
     elif stage=="evaluate_revision":
         wanted=("train_research_model","evaluate_research_model")
+    elif stage=="revise_scientific_model":
+        wanted=("train_research_model","evaluate_research_model","propose_research_capability")
     elif stage in {"submit_for_review","revise_submission"}:
         wanted=("get_research_review_requirements","propose_research_capability","train_research_model")
     else:
