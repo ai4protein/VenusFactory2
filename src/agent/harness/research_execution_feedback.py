@@ -110,7 +110,7 @@ def iteration_feedback(events, workspace, previous, *, development=None):
     return feedback_state(events,workspace,previous,development=development)["errors"]
 
 
-def repair_source_context(workspace, feedback, *, input_fields=()):
+def repair_source_context(workspace, feedback, *, input_fields=(), task=""):
     """Read one current candidate implicated in an unresolved fitting failure."""
     from hashlib import sha256
     from utils.scoped_files import read_bytes
@@ -132,10 +132,15 @@ def repair_source_context(workspace, feedback, *, input_fields=()):
             continue
         code=public_value(original,workspace)
         checks=algorithm_diagnostics(original, input_fields=input_fields)
+        reference_hint = ("For sequence regression or multilabel tasks, get_research_baseline(reference, output_file, task) "
+                          "can save a verified comparison implementation in a new file. ")
+        if task == "multilabel":
+            reference_hint = ("For a sequence-only multilabel comparison, inspect get_research_baseline(task='multilabel'): "
+                              "training_prevalence, aac_logistic and terminal_logistic are available fixed controls. "
+                              "The parsed row['target'] maps label names directly to 0/1/None; the CSV target-column name is not a nested key. ")
         return {"path":path,"sha256":sha256(raw).hexdigest(),"code":code,
                 "redacted":code!=original,"source_check":public_value(checks,workspace),"error":_failure_message(row.get("error","Fitting failed"),workspace),
                 "instruction":"This is the current saved source for an unresolved fitting action. "
                     "Repair its complete implementation using the observed error and model interface, save it, and fit again. "
-                    "For sequence-regression encoding errors, get_research_baseline(reference, output_file) can save a verified comparison implementation in a new file. "
-                    "The file may have changed since the failure; do not replace working code with placeholders."}
+                    + reference_hint + "The file may have changed since the failure; do not replace working code with placeholders."}
     return None

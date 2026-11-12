@@ -168,6 +168,19 @@ def fit_failure(exc):
             f"In predict, read inputs[{field}] directly; it has no nested 'inputs' key."
         )
     lower = detail.lower()
+    target_mapping_error = (
+        isinstance(key, str) and key not in {"train", "inputs", "target", "labels"}
+        or "uniformly strings or numbers" in lower and "dict" in lower
+        or "unhashable type" in lower and "dict" in lower
+    )
+    if training.get("task") == "multilabel" and target_mapping_error:
+        return message + (
+            " Multilabel target contract: row['target'] already maps each label name to 0, 1 or None; "
+            "the original CSV target-column name is not another nested key. "
+            "For each label in training['labels'], use row['target'][label] and exclude None cells from its loss. "
+            "LabelEncoder is for scalar classes, not these target dictionaries. "
+            "predict returns independent probabilities for every declared label."
+        )
     if "all arrays must be of the same length" in lower:
         return message + (
             " Tabular contract: build the feature table from row['inputs'] in training['train'], "

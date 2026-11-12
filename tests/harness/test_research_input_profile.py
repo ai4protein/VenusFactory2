@@ -124,3 +124,42 @@ async def test_real_training_failure_reports_the_relevant_contract(tmp_path, sou
     assert receipt["status"] == "failed" and receipt["stage"] == "fitting"
     assert receipt["validation_and_test_mounted"] is False
     assert not service.development.records()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("expression", [
+    "[row['target']['localization'] for row in training['train']]",
+    "LabelEncoder().fit_transform([row['target'] for row in training['train']])",
+])
+async def test_real_multilabel_failure_explains_parsed_target_mapping(tmp_path, expression):
+    from agent.harness.research_workspace import ResearchWorkspace
+    service = ResearchWorkspace(tmp_path/'work', tmp_path/'control', {'steps': []})
+    labels = ['Cytoplasm', 'Nucleus']
+    splits = {name: [{'id':name+str(i), 'group':name+str(i), 'inputs':{'sequence':'A'*i},
+                     'target':{'Cytoplasm': i%2, 'Nucleus': int(i%3==0)}} for i in values]
+              for name, values in [('train', range(1,9)), ('validation', range(10,13)), ('test', range(14,17))]}
+    await service.write_research_file('evaluation.json', json.dumps({
+        'task':'multilabel', 'labels':labels, 'provenance':'Synthetic fixture',
+        'grouping':'Disjoint synthetic sequences', 'splits':splits}))
+    source = ("from sklearn.preprocessing import LabelEncoder\n"
+              "def fit(training, seed):\n    values = " + expression + "\n    return {'values': values}\n"
+              "def predict(model, inputs):\n    return {'value':model['values']}\n")
+    await service.write_research_file('algorithm.py', source)
+    with pytest.raises(ValueError) as raised:
+        await service.train_research_model('Synthetic mapping check', 'algorithm.py', 'evaluation.json', 'Check typed feedback')
+    message = str(raised.value)
+    assert "Multilabel target contract" in message
+    assert "original CSV target-column name is not another nested key" in message
+    assert "row['target'][label]" in message
+    assert "LabelEncoder is for scalar classes" in message
+    assert "At algorithm.py:" in message
+    assert str(tmp_path) not in message
+    assert not service.development.records()
+
+
+def test_multilabel_interface_distinguishes_csv_column_from_parsed_labels():
+    interface = model_interface('multilabel', ['sequence'], labels=['Nucleus', 'Cytoplasm'])
+    assert "row['target'][label]" in interface['fit']['target_access']
+    assert "CSV target-column name" in interface['fit']['target_access']
+    assert "LabelEncoder" in interface['fit']['target_encoding']
+    assert set(interface['shape_example']['training_row']['target']) == {'Nucleus', 'Cytoplasm'}

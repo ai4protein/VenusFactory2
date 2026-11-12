@@ -59,7 +59,8 @@ def test_unsafe_or_unbounded_sources_stay_out_of_context(tmp_path,kind):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("within_iteration",[False,True])
-async def test_repair_context_reaches_executor_after_failed_fit_without_budget_reset(tmp_path,monkeypatch,within_iteration):
+@pytest.mark.parametrize("task",["regression","multilabel"])
+async def test_repair_context_reaches_executor_after_failed_fit_without_budget_reset(tmp_path,monkeypatch,within_iteration,task):
     from agent.harness import autonomous_research as module
     from agent.harness.contracts import Profile
     class Relay:
@@ -75,7 +76,14 @@ async def test_repair_context_reaches_executor_after_failed_fit_without_budget_r
     cycles=1 if within_iteration else 2
     store=module.create(tmp_path/"goal",profile,"Develop a predictor from supplied measurements",
                         dict(max_cycles=cycles,model_calls=12*cycles,tool_calls=12*cycles,wall_seconds=120*cycles))
-    data = "id,group,x,target\n" + "".join(f"{i},g{i},{i},{2*i+1}\n" for i in range(40))
+    import csv
+    import io
+    buffer=io.StringIO()
+    writer=csv.writer(buffer);writer.writerow(["id","group","x","target"])
+    for i in range(40):
+        target=json.dumps({"Cytoplasm":i%2,"Nucleus":int(i%3==0)}) if task=="multilabel" else str(2*i+1)
+        writer.writerow([str(i),f"g{i}",str(i),target])
+    data=buffer.getvalue()
     source = store.root / "workspace/inputs/data.csv"
     source.parent.mkdir()
     source.write_text(data)
@@ -95,7 +103,7 @@ async def test_repair_context_reaches_executor_after_failed_fit_without_budget_r
         if len(attempts)==1:
             await service.read_research_file("inputs/data.csv")
             prepared=await service.prepare_research_dataset(
-                "inputs/data.csv","target",["x"],"group","Synthetic fixture","Independent fixture groups")
+                "inputs/data.csv","target",["x"],"group","Synthetic fixture","Independent fixture groups",task=task)
             await service.write_research_file("src/model.py",SOURCE)
             try:
                 await service.train_research_model("Fixture","src/model.py",prepared["evaluation_file"],"Interface fixture")
@@ -112,6 +120,10 @@ async def test_repair_context_reaches_executor_after_failed_fit_without_budget_r
             repair=context["model_development"]["repair_source"]
             assert repair["code"]==SOURCE
             assert "unfinished placeholder" in repair["error"]
+            assert context["model_development"]["prepared_dataset"]["task"]==task
+            if task=="multilabel":
+                assert "get_research_baseline(task='multilabel')" in repair["instruction"]
+                assert "row['target'] maps label names directly" in repair["instruction"]
             assert request["budget"]["tool_calls"]==(8 if within_iteration else 12)
             await service.write_research_file("README.md","This fixture has no trained model.")
             await service.submit_research_checkpoint("Partial work saved",[],["README.md"],[])
@@ -167,3 +179,15 @@ def test_dataset_contract_hints_reach_only_the_failed_source(tmp_path):
     assert "row['inputs']['sequence']" in hint["message"]
     assert context["code"] == source
     assert context["sha256"] == hashlib.sha256(source.encode()).hexdigest()
+
+
+
+def test_multilabel_repair_names_compatible_controls_without_modifying_candidate(tmp_path):
+    (tmp_path/'src').mkdir()
+    path = tmp_path/'src/model.py';path.write_text(SOURCE)
+    context = repair_source_context(tmp_path, feedback_state(failure(), tmp_path),
+                                    input_fields=('sequence',), task='multilabel')
+    assert "get_research_baseline(task='multilabel')" in context['instruction']
+    assert 'terminal_logistic' in context['instruction']
+    assert "row['target'] maps label names directly" in context['instruction']
+    assert context['code'] == path.read_text() == SOURCE

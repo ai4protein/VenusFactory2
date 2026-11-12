@@ -50,6 +50,8 @@ def model_interface(task, columns, *, episodic=False, labels=None):
         result["labels"] = labels
         result["shape_example"]["training_row"]["target"] = {label: "<0 or 1; null means unobserved>" for label in labels}
         result["fit"]["labels"] = "training['labels'] fixes output names. Exclude null targets from each label's loss; labels need not be mutually exclusive."
+        result["fit"]["target_access"] = "Targets are already parsed: row['target'][label] for label in training['labels']. Do not index row['target'] with the original CSV target-column name."
+        result["fit"]["target_encoding"] = "Build per-label observed binary targets; LabelEncoder on target dictionaries is not multilabel encoding."
         result["predict"]["returns"] = {"value": {label: "<finite probability 0..1>" for label in labels}}
         result["predict"]["probabilities"] = "Return all declared labels. Independent probabilities need not sum to one."
     if episodic:
