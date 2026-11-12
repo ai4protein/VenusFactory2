@@ -18,8 +18,14 @@ VERIFICATION_DESCRIPTIONS = MappingProxyType({
         "A measured candidate or ablation linked to its parent baseline, with unchanged checkpointed evidence. "
         "A revision need not outperform the baseline to be measured."
     ),
-    "review": "Independent Review has approved the candidate; a generated assertion of approval is not evidence.",
-    "delivery": "Record the reviewed deliverable package, not just a proposed file list.",
+    "review": (
+        "Independent Review has approved a reusable model/tool candidate; SC assessment of an analysis report "
+        "does not supply this evidence. Ordinary reports use artifact; completed computations use execution."
+    ),
+    "delivery": (
+        "Record the reviewed model/tool deliverable package, not just a proposed file list. "
+        "An ordinary analysis report uses artifact, not delivery."
+    ),
 })
 VERIFICATION_DESCRIPTION = "Choose the evidence required for this step. " + " ".join(
     f"{kind}: {VERIFICATION_DESCRIPTIONS[kind]}" for kind in VERIFICATION_KINDS

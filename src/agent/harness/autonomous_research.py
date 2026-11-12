@@ -174,6 +174,13 @@ def parse_plan(text, previous=None, *, objective=''):
     if model_goal(objective) or previous_deliverable=='model':value['deliverable']='model'
     elif previous_deliverable=='tool' and value.get('deliverable')!='model':value['deliverable']='tool'
     else:value.setdefault('deliverable','analysis')
+    if value['deliverable']=='analysis':
+        for row in value['steps']:
+            if row.get('verification') in {'review','delivery'}:
+                raise ValueError(f"Step {row['id'][:80]!r}: analysis plans cannot use {row['verification']!r} verification. "
+                    'Use artifact for ordinary reports and execution for completed computations. '
+                    'Review and delivery require a reusable model/tool candidate and its independent admission '
+                    'or reviewed package, not SC report assessment.')
     return value
 
 def method_changes(previous, current, episode):

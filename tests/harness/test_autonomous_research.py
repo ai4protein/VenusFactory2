@@ -224,3 +224,73 @@ async def test_format_repair_is_bounded_and_does_not_fabricate_a_plan(tmp_path):
     runner=AutonomousResearch(None,'fixture',{},consult=consult,tools=[])
     with pytest.raises(ValueError):await runner.structured('CB',{},profile(),SimpleNamespace(calls=1),tmp_path,parse_plan)
     assert len(calls)==2
+
+
+@pytest.mark.parametrize("verification", ["review", "delivery"])
+@pytest.mark.parametrize("explicit_analysis", [True, False])
+def test_analysis_plan_rejects_capability_package_requirements(verification, explicit_analysis):
+    value = plan()
+    if explicit_analysis:
+        value["deliverable"] = "analysis"
+    value["steps"][0]["verification"] = verification
+    with pytest.raises(ValueError, match="analysis plans cannot use"):
+        parse_plan(json.dumps(value))
+
+
+@pytest.mark.parametrize("verification", ["review", "delivery"])
+@pytest.mark.parametrize("deliverable", ["model", "tool"])
+def test_capability_plans_keep_review_and_delivery_verification(verification, deliverable):
+    value = plan()
+    value["deliverable"] = deliverable
+    value["steps"][0]["verification"] = verification
+    result = parse_plan(json.dumps(value))
+    assert result["deliverable"] == deliverable
+    assert result["steps"][0]["verification"] == verification
+
+
+@pytest.mark.parametrize("verification", ["review", "delivery"])
+def test_verification_compatibility_uses_effective_model_objective(verification):
+    value = plan()
+    value["deliverable"] = "analysis"
+    value["steps"][0]["verification"] = verification
+    result = parse_plan(json.dumps(value), objective="Develop a protein prediction model")
+    assert result["deliverable"] == "model"
+    assert result["steps"][0]["verification"] == verification
+
+
+@pytest.mark.parametrize("verification", ["review", "delivery"])
+@pytest.mark.parametrize("deliverable", ["model", "tool"])
+def test_verification_compatibility_preserves_previous_capability_deliverable(verification, deliverable):
+    value = plan()
+    value["deliverable"] = deliverable
+    value["steps"][0]["verification"] = verification
+    previous = parse_plan(json.dumps(value))
+    original = json.dumps(previous, sort_keys=True)
+    value["deliverable"] = "analysis"
+    value["steps"][0]["verification"] = "artifact"
+    result = parse_plan(json.dumps(value), previous)
+    assert result["deliverable"] == deliverable
+    assert result["steps"][0]["verification"] == verification
+    assert json.dumps(previous, sort_keys=True) == original
+
+
+@pytest.mark.parametrize("verification", ["review", "delivery"])
+def test_legacy_locked_analysis_package_requirement_cannot_be_silently_downgraded(verification):
+    previous = parse_plan(json.dumps(plan()))
+    previous["steps"][0]["verification"] = verification
+    original = json.dumps(previous, sort_keys=True)
+    proposed = plan()
+    proposed["steps"][0]["verification"] = "artifact"
+    with pytest.raises(ValueError, match="analysis plans cannot use"):
+        parse_plan(json.dumps(proposed), previous)
+    assert json.dumps(previous, sort_keys=True) == original
+
+
+@pytest.mark.parametrize("verification", ["review", "delivery"])
+def test_locked_analysis_artifact_is_not_changed_by_a_replan(verification):
+    value = plan()
+    value["steps"][0]["verification"] = "artifact"
+    previous = parse_plan(json.dumps(value))
+    value["steps"][0]["verification"] = verification
+    result = parse_plan(json.dumps(value), previous)
+    assert result["steps"][0]["verification"] == "artifact"
