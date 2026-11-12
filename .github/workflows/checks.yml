@@ -65,7 +65,7 @@ jobs:
           tests/harness/test_execution_catalog.py tests/harness/test_adapters.py
           tests/harness/test_episode_scores.py tests/harness/test_prediction_diagnostics.py
           tests/test_research_review_recovery.py tests/test_research_measurements.py
-          tests/harness/test_research_algorithm_checks.py
+          tests/harness/test_research_algorithm_checks.py tests/harness/test_focused_repair.py
 
       - name: Verify training-only input descriptions
         env:
