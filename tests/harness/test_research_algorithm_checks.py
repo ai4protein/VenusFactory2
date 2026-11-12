@@ -2,7 +2,9 @@
 import pytest
 
 from agent.harness.research_algorithm_checks import (
-    AlgorithmValidationError, algorithm_diagnostics, validate_algorithm,
+    AlgorithmValidationError,
+    algorithm_diagnostics,
+    validate_algorithm,
 )
 
 VALID = """def fit(rows, random_seed):
@@ -95,3 +97,47 @@ def test_undefined_prediction_object_is_a_nonblocking_repair_hint():
 def test_dynamic_model_globals_remain_usable():
     source = "globals()['offset'] = 1\n" + VALID.replace('state["mean"]', 'state["mean"] + offset')
     assert validate_algorithm(source)
+
+
+@pytest.mark.parametrize("name", ["fit", "predict"])
+def test_class_method_diagnostic_names_the_exact_missing_module_entrypoint(name):
+    source = "class BaselineModel:\n    def fit(self, training, seed):\n        return self\n    def predict(self, model, inputs):\n        return 0\n"
+    result = algorithm_diagnostics(source)
+    item = next(x for x in result["issues"] if f"module-level {name}(" in x["message"])
+    assert f"BaselineModel.{name}" in item["message"]
+    assert item["line"] == (2 if name == "fit" else 4)
+    assert "class method" in item["message"]
+    assert len({x["message"] for x in result["issues"]}) == 2
+
+
+def test_three_argument_prediction_explains_single_fitted_state_transport():
+    source = VALID.replace("def predict(state, query):", "def predict(encoder, state, query):")
+    result = algorithm_diagnostics(source)
+    item = next(x for x in result["issues"] if x["code"] == "invalid_entrypoint")
+    assert "['encoder', 'state', 'query']" in item["message"]
+    assert "single model argument" in item["message"] and "two positional" in item["message"]
+    assert not result["valid"]
+
+
+def test_training_row_hint_uses_names_not_observations_or_targets():
+    source = "def fit(observations, seed):\n    values = [sample['sequence'] for sample in observations['train']]\n    return {'rows': values}\ndef predict(model, query):\n    return {'value': 0}\n"
+    result = algorithm_diagnostics(source, input_fields=("sequence", "substrate_smiles"))
+    hint = next(x for x in result["issues"] if x["code"] == "training_row_field")
+    assert "sample['inputs']['sequence']" in hint["message"] and hint["line"] == 2
+    assert hint["severity"] == "warning" and result["valid"]
+    assert algorithm_diagnostics(source)["issues"] == []
+    assert algorithm_diagnostics(source.replace("sample['sequence']", "sample['inputs']['sequence']"),
+                                 input_fields=("sequence",))["issues"] == []
+
+
+def test_prediction_nesting_is_a_hint_and_literal_inputs_column_remains_valid():
+    source = VALID.replace('state["mean"]', 'query["inputs"]["x"]')
+    result = algorithm_diagnostics(source, input_fields=("x",))
+    assert result["valid"]
+    assert any(x["code"] == "prediction_input_nesting" for x in result["issues"])
+    assert algorithm_diagnostics(source, input_fields=("inputs",))["issues"] == []
+
+
+def test_helpers_with_similarly_named_rows_do_not_acquire_dataset_contract():
+    source = "def helper(rows):\n    return [row['sequence'] for row in rows]\n" + VALID
+    assert algorithm_diagnostics(source, input_fields=("sequence",))["issues"] == []

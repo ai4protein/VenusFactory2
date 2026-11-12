@@ -38,7 +38,72 @@ def _unimplemented(statement):
 
 
 
-def algorithm_diagnostics(source):
+def _entrypoint_message(name, node, tree):
+    signature = "fit(training, seed)" if name == "fit" else "predict(model, inputs)"
+    if node is None:
+        methods = [(owner.name, method) for owner in tree.body if isinstance(owner, ast.ClassDef)
+                   for method in owner.body if isinstance(method, (ast.FunctionDef, ast.AsyncFunctionDef))
+                   and method.name == name]
+        if methods:
+            owner, method = methods[0]
+            detail = f"Found {owner}.{name} as a class method, not a module entrypoint. "
+            location = method
+        else:
+            detail = f"The module has no callable {name} entrypoint. "
+            location = next((n for n in tree.body if isinstance(n, ast.AsyncFunctionDef) and n.name == name), None)
+    else:
+        args = [a.arg for a in node.args.posonlyargs + node.args.args]
+        detail = f"{name} declares parameters {args!r}; the host passes exactly two positional arguments. "
+        location = node
+    if name == "fit":
+        repair = ("It may call a helper class, but must return the fitted estimator or one dict containing "
+                  "the learner and its fitted transformations. Read rows from training['train'].")
+    else:
+        repair = ("Recover the learner and fitted transformations from the single model argument. "
+                  "inputs is one query dict. Return a dict such as {'value': scalar}; do not refit on query targets.")
+    return f"Implement module-level {signature}. " + detail + repair, location
+
+
+def _input_contract_hints(functions, input_fields, issue):
+    """Conservative AST hints, not an algorithm whitelist or a static type proof."""
+    fields = set(input_fields)
+    if not fields or not all(isinstance(name, str) for name in fields):
+        return
+    fit = functions.get("fit")
+    if fit and fit.args.posonlyargs + fit.args.args:
+        training = (fit.args.posonlyargs + fit.args.args)[0].arg
+        for node in ast.walk(fit):
+            if not isinstance(node, (ast.ListComp, ast.SetComp, ast.GeneratorExp)) or len(node.generators) != 1:
+                continue
+            generator = node.generators[0]
+            iterator = generator.iter
+            if not (isinstance(generator.target, ast.Name) and isinstance(iterator, ast.Subscript)
+                    and isinstance(iterator.value, ast.Name) and iterator.value.id == training
+                    and isinstance(iterator.slice, ast.Constant) and iterator.slice.value == "train"):
+                continue
+            row = generator.target.id
+            for access in ast.walk(node.elt):
+                if (isinstance(access, ast.Subscript) and isinstance(access.value, ast.Name)
+                        and access.value.id == row and isinstance(access.slice, ast.Constant)
+                        and isinstance(access.slice.value, str) and access.slice.value in fields
+                        and access.slice.value not in {"id", "group", "task_id", "inputs", "target"}):
+                    key = repr(access.slice.value)[:100]
+                    issue("training_row_field", f"Training rows store the declared feature at {row}['inputs'][{key}], "
+                          f"not directly at {row}[{key}]. Targets are {row}['target']. "
+                          "Check this indexing unless your code explicitly transformed the row first.",
+                          access, severity="warning")
+    predict = functions.get("predict")
+    if predict and len(predict.args.posonlyargs + predict.args.args) == 2 and "inputs" not in fields:
+        query = (predict.args.posonlyargs + predict.args.args)[1].arg
+        for node in ast.walk(predict):
+            if (isinstance(node, ast.Subscript) and isinstance(node.value, ast.Name) and node.value.id == query
+                    and isinstance(node.slice, ast.Constant) and node.slice.value == "inputs"):
+                issue("prediction_input_nesting", f"{query} is already the query feature dictionary. "
+                      f"Read {query}[field] directly; the prepared contract has no outer 'inputs' key. "
+                      "Check this indexing unless your code intentionally wrapped the query.", node, severity="warning")
+
+
+def algorithm_diagnostics(source, *, input_fields=()):
     issues = []
     tree = None
 
@@ -66,15 +131,15 @@ def algorithm_diagnostics(source):
             node = functions.get(name)
             if (node is None or len(node.args.posonlyargs)+len(node.args.args) != 2
                     or node.args.vararg or node.args.kwarg or node.args.kwonlyargs):
-                issue("invalid_entrypoint", "Implement fit(training, seed) -> fitted parameter dict or estimator; "
-                      "predict(model, inputs) -> prediction dict. These must be module-level functions, "
-                      "not class methods. A helper class is allowed behind them.", node)
+                message, location = _entrypoint_message(name, node, tree)
+                issue("invalid_entrypoint", message, location)
                 continue
             body = list(node.body)
             if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant) and isinstance(body[0].value.value, str):
                 body.pop(0)
             if not body or all(_unimplemented(statement) for statement in body):
                 issue("unfinished_entrypoint", f"{name} is an unfinished placeholder. Implement its calculations before training.", node)
+        _input_contract_hints(functions, input_fields, issue)
         # Dynamic globals remain legal, so unresolved globals are repair hints,
         # never an admission rule. Skip modules with wildcard imports.
         if not any(isinstance(n, ast.ImportFrom) and any(a.name == "*" for a in n.names) for n in tree.body):

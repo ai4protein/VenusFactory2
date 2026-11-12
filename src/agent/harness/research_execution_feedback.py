@@ -110,7 +110,7 @@ def iteration_feedback(events, workspace, previous, *, development=None):
     return feedback_state(events,workspace,previous,development=development)["errors"]
 
 
-def repair_source_context(workspace, feedback):
+def repair_source_context(workspace, feedback, *, input_fields=()):
     """Read one current candidate implicated in an unresolved fitting failure."""
     from hashlib import sha256
     from utils.scoped_files import read_bytes
@@ -131,7 +131,7 @@ def repair_source_context(workspace, feedback):
         except (OSError,ValueError,UnicodeError):
             continue
         code=public_value(original,workspace)
-        checks=algorithm_diagnostics(original)
+        checks=algorithm_diagnostics(original, input_fields=input_fields)
         return {"path":path,"sha256":sha256(raw).hexdigest(),"code":code,
                 "redacted":code!=original,"source_check":public_value(checks,workspace),"error":_failure_message(row.get("error","Fitting failed"),workspace),
                 "instruction":"This is the current saved source for an unresolved fitting action. "

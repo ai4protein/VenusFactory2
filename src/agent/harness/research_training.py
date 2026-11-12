@@ -78,7 +78,7 @@ async def fit_model(workspace, development, runner, *, name, source_file, evalua
               "parent_experiment_id": parent_experiment_id or None}
     write_json(folder/"receipt.json", record)
     try:
-        record["source_check"] = algorithm_diagnostics(code)
+        record["source_check"] = algorithm_diagnostics(code, input_fields=training["train"][0]["inputs"])
         code_hash = checked_algorithm_digest(record["source_check"])
         record.update(algorithm_ast_sha256=code_hash, stage="fitting")
         write_json(folder/"receipt.json", record)

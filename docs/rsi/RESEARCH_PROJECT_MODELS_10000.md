@@ -188,9 +188,11 @@ Scientist cannot automatically publish an anonymous user's model to the public c
 
 ## Immediate execution order
 
-1. Complete the prepared CatPred Ki/Km native Scientist studies and their matched
-   reference comparison. They are two endpoints from one data source, not two independent
-   source studies and not evidence of all six families.
+1. Resolve the native model-interface failures observed in the closed CatPred Ki/Km
+   studies, then run a separately budgeted Scientist trial and matched reference
+   comparison. The closed pair produced no accepted model and stays in the acquisition
+   denominator. Ki/Km are two endpoints from one data source, not two independent studies
+   and not evidence of all six families.
 2. Audit the existing eSOL, sequence-stability, enzyme-assay and antibody data for
    reusable partitions and eligible sources before allocating new studies.
 3. Fill missing localization, secretion and immune-property coverage with measured,

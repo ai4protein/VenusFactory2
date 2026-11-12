@@ -155,3 +155,15 @@ def test_credentials_in_current_source_are_redacted_with_original_hash_retained(
     assert secret not in context["code"]
     assert context["redacted"] is True
     assert context["sha256"]==hashlib.sha256(source.encode()).hexdigest()
+
+
+def test_dataset_contract_hints_reach_only_the_failed_source(tmp_path):
+    (tmp_path/"src").mkdir()
+    source = "def fit(training, seed):\n    x = [row['sequence'] for row in training['train']]\n    return {'x': x}\ndef predict(model, inputs):\n    return {'value': 0}\n"
+    (tmp_path/"src/model.py").write_text(source)
+    feedback = feedback_state(failure(), tmp_path)
+    context = repair_source_context(tmp_path, feedback, input_fields=("sequence", "substrate_smiles"))
+    hint = next(x for x in context["source_check"]["issues"] if x["code"] == "training_row_field")
+    assert "row['inputs']['sequence']" in hint["message"]
+    assert context["code"] == source
+    assert context["sha256"] == hashlib.sha256(source.encode()).hexdigest()

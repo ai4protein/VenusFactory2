@@ -353,7 +353,8 @@ class AutonomousResearch:
                 tools=scientific+service.tools()
                 if plan.get('deliverable')=='model':
                     context['model_development']['next_action']=development_next_action(development.summary(),progress)
-                    repair = repair_source_context(workspace, progress.get('execution_feedback'))
+                    repair = repair_source_context(workspace, progress.get('execution_feedback'),
+                        input_fields=(prepared or {}).get('model_interface', {}).get('input_fields', {}))
                     if repair is not None:context['model_development']['repair_source'] = repair
                 focus=selected_tools(context,tools)
                 context['model_development']['selected_tools']=focus
@@ -390,7 +391,8 @@ class AutonomousResearch:
                     else:
                         continuation['model_development'].pop('prepared_dataset', None)
                     continuation['execution_receipts'] = service.receipts[-6:]
-                    repair = repair_source_context(workspace, feedback_state(events, workspace, progress.get('execution_feedback'), development=development))
+                    repair = repair_source_context(workspace, feedback_state(events, workspace, progress.get('execution_feedback'), development=development),
+                        input_fields=(prepared or {}).get('model_interface', {}).get('input_fields', {}))
                     if repair is not None:continuation['model_development']['repair_source'] = repair
                     else:continuation['model_development'].pop('repair_source', None)
                     focus = selected_tools(continuation, tools)
