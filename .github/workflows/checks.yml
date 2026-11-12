@@ -154,6 +154,7 @@ jobs:
           tests/harness/test_research_provided_splits.py tests/harness/test_research_dataset.py
           tests/harness/test_research_advanced_data.py tests/harness/test_research_data_store.py
           tests/harness/test_research_data_memory.py
+          tests/harness/test_research_worker_recovery.py
 
   source-and-frontend:
     runs-on: ubuntu-latest
