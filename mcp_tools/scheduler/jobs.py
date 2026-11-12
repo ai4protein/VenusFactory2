@@ -80,8 +80,14 @@ class ToolJobs:
         result=self.queue.files(identity)/'mcp-result.json'
         progress=self.queue.files(identity)/'mcp-progress.json'
         if progress.is_file():public['progress']=json.loads(progress.read_text())
-        if row['status'] in TERMINAL and result.is_file():
+        # The worker can finish between the metadata read and public(). Bind
+        # result delivery to the status actually returned to the caller.
+        if public['status'] in TERMINAL and result.is_file():
             public['result']=json.loads(result.read_text())
+        elif public['status'] == 'completed':
+            # Never manufacture success or rerun a completed computation when
+            # its worker failed to persist a usable result.
+            public['result']={'is_error':True,'message':'Completed tool task has no stored result'}
         return public
 
     def list(self, owner):
