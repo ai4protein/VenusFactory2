@@ -32,7 +32,7 @@ from . import scientific_acceptance as sc_acceptance
 from .tool_disclosure import ToolDisclosure, CONTROLS, GUIDANCE
 from agent.rsi.artifacts.contract import SCHEMA as DELIVERY_SCHEMA, selected_deliveries, has_delivery
 
-def development_next_action(summary, progress, prepared=None):
+def development_next_action(summary, progress, prepared=None, *, materials=None):
     """Expose only the next missing model-development stage."""
     sc_revision = progress.get('sc_revision')
     if sc_revision and sc_revision.get('requests'):
@@ -59,19 +59,31 @@ def development_next_action(summary, progress, prepared=None):
         return {'stage':'evaluate_revision', 'tool':'train_research_model',
                 'eligible_parent_ids':baselines[-8:], 'evaluation_tool':'evaluate_research_model',
                 'instruction':'Inspect the baseline validation diagnostics. If predictions are constant or match the training reference, check feature variation and learned parameters on training data. Implement and fit a justified revision, then evaluate variant=candidate with the measured baseline parent_experiment_id and identical data splits. A constant baseline may be retained when its purpose and measured limitations are explicit.'}
-    action = {'stage':'evaluate_baseline', 'tool':'train_research_model',
+    action = {'stage':'evaluate_baseline', 'tool':'prepare_research_dataset',
               'evaluation_tool':'evaluate_research_model'}
     if prepared is not None:
+        # Preparing observations does not establish an executable model. Point
+        # at verified supplied source before suggesting another implementation.
+        sources = [{'path':row['path'], 'sha256':row['sha256']}
+                   for row in (materials or {}).get('files', [])
+                   if isinstance(row,dict) and isinstance(row.get('path'),str)
+                   and row['path'].endswith('.py') and row.get('sha256')][:4]
         action['evaluation_file'] = prepared['evaluation_file']
-        action['instruction'] = ('Data preparation is complete. Reuse this evaluation_file in train_research_model; '
-            'the visible source table is the training view, not an unsplit dataset. Do not prepare or repartition it again. ')
+        action['tool'] = 'read_session_file' if sources else 'write_session_file'
+        if sources:
+            action['supplied_sources'] = sources
+            action['instruction'] = ('Read the supplied Python source with read_session_file before writing a replacement. '
+                'Check its task, features and fit/predict contract; reuse compatible code and preserve its attribution. ')
+        else:
+            action['instruction'] = 'Implement a complete fit(training, seed) and predict(model, inputs) module before fitting. '
+        action['instruction'] += ('Data preparation is complete, but no baseline has been measured. '
+            'Reuse this evaluation_file; the visible table contains training rows only. Do not prepare or repartition it again. ')
     else:
         action['dataset_tool'] = 'prepare_research_dataset'
         action['instruction'] = 'Inspect table headers and prepare_research_dataset by biological groups. '
-    action['instruction'] += ('For sequence regression or multilabel tasks, get_research_baseline(reference, output_file, task) can save a runnable reference '
-        'with verified feature encoding; preserve its provenance and check that its task and inputs match this study. '
-        'Alternatively write your own complete fit(training, seed) and predict(model, inputs). '
-        'Call train_research_model with variant=baseline to fit and measure it. Already-fitted custom runtimes can use evaluate_research_model.')
+    action['instruction'] += ('Sequence regression and multilabel studies can inspect get_research_baseline for a compatible fixed control. '
+        'Do not overwrite supplied code with placeholders. Fit the complete saved source with train_research_model(variant=baseline); '
+        'use the actual source path, not an invented filename. Already-fitted runtimes can use evaluate_research_model.')
     return action
 
 
@@ -330,7 +342,7 @@ class AutonomousResearch:
         if prepared is not None:
             context['model_development']['prepared_dataset'] = prepared
         if model_goal(context['objective']) or progress.get('plan',{}).get('deliverable')=='model':
-            context['model_development']['next_action']=development_next_action(development.summary(),progress,prepared)
+            context['model_development']['next_action']=development_next_action(development.summary(),progress,prepared,materials=context['supplied_materials'])
         policy=ScientistGatewayPolicy(model=profile.model.model,mode='science_agent',scientific_tools=set(),max_calls=profile.budget.model_calls,temperature=profile.budget.temperature,max_tokens=profile.budget.output_tokens,thinking=profile.budget.thinking)
         gateway=EvidenceGateway
         if profile.model.protocol=='responses':
@@ -378,7 +390,7 @@ class AutonomousResearch:
                 from mcp_tools.tools.tool_surface import WORKSPACE_PRIMITIVES
                 tools=scientific+service.tools()
                 if plan.get('deliverable')=='model':
-                    context['model_development']['next_action']=development_next_action(development.summary(),progress,prepared)
+                    context['model_development']['next_action']=development_next_action(development.summary(),progress,prepared,materials=context['supplied_materials'])
                     repair = repair_source_context(workspace, progress.get('execution_feedback'),
                         input_fields=(prepared or {}).get('model_interface', {}).get('input_fields', {}), task=(prepared or {}).get('task', ''))
                     if repair is not None:context['model_development']['repair_source'] = repair
@@ -413,7 +425,7 @@ class AutonomousResearch:
                     current_development = development.summary()
                     continuation['model_development']['prior_generations'] = current_development
                     prepared = prepared_dataset_context(workspace, self.store.root/'episodes',data_store=data_store)
-                    continuation['model_development']['next_action'] = development_next_action(current_development, progress, prepared)
+                    continuation['model_development']['next_action'] = development_next_action(current_development, progress, prepared, materials=continuation['supplied_materials'])
                     if prepared is not None:
                         continuation['model_development']['prepared_dataset'] = prepared
                     else:

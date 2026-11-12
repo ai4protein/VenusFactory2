@@ -68,7 +68,8 @@ def test_no_host_receipt_means_no_verified_dataset(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_next_scientist_iteration_reuses_host_verified_preparation(tmp_path, monkeypatch):
+@pytest.mark.parametrize("source_status", ["absent", "verified", "changed"])
+async def test_next_scientist_iteration_reuses_host_verified_preparation(tmp_path, monkeypatch, source_status):
     from agent.harness import Profile
     from agent.harness import autonomous_research as module
 
@@ -105,7 +106,16 @@ async def test_next_scientist_iteration_reuses_host_verified_preparation(tmp_pat
     item = {"path": "inputs/data.csv", "name": "data.csv",
             "sha256": hashlib.sha256(raw).hexdigest()}
     store_for_goal(store.root).ingest(item["path"], raw, item["sha256"])
-    store.mutate(lambda state: state["progress"].update(inputs=[item]))
+    inputs = [item]
+    source = "def fit(training, seed):\n    return len(training['train'])\ndef predict(model, inputs):\n    return {'value': model}\n"
+    if source_status != "absent":
+        source_path = store.root / "workspace/inputs/reference.py"
+        source_path.write_text(source)
+        inputs.append({"path": "inputs/reference.py", "name": "reference.py",
+                       "sha256": hashlib.sha256(source.encode()).hexdigest()})
+        if source_status == "changed":
+            source_path.write_text(source + "# changed after upload\n")
+    store.mutate(lambda state: state["progress"].update(inputs=inputs))
     contexts = []
     requests = []
     research_plan = {"summary": "Prepare observations and fit a predictor",
@@ -142,6 +152,17 @@ async def test_next_scientist_iteration_reuses_host_verified_preparation(tmp_pat
     next_action = requests[1]["model_development"]["next_action"]
     assert "dataset_tool" not in next_action
     assert next_action["evaluation_file"] == contexts[1]["evaluation_file"]
+    if source_status == "verified":
+        assert next_action["tool"] == "read_session_file"
+        assert next_action["supplied_sources"] == [{"path": "inputs/reference.py", "sha256": inputs[1]["sha256"]}]
+        assert "read_session_file" in requests[1]["tools"]
+        assert (store.root / "workspace/inputs/reference.py").read_text() == source
+        assert source not in json.dumps(requests[1])  # Metadata only; source is disclosed on demand.
+    else:
+        assert next_action["tool"] == "write_session_file"
+        assert "supplied_sources" not in next_action
+    assert requests[0]["model_development"]["next_action"]["tool"] == "prepare_research_dataset"
+    assert not list((store.root / "development/experiments").glob("*/receipt.json"))
     from agent.harness.research_focus import instructions
     assert "do not prepare it again" in instructions(requests[1], 12)
     assert "then use prepare_research_dataset" not in instructions(requests[1], 12)

@@ -42,8 +42,9 @@ def instructions(context, tool_calls):
         "Use context.model_development.next_action and the selected tool interfaces. Other enabled capabilities remain searchable. "
         "When model_development.repair_source is present, repair that saved implementation from its actual failure before refitting. "
         + data_step +
-        "Preserve observed targets and biological groups. Write a complete fit(training, seed) and "
-        "predict(model, inputs) module, then call train_research_model. Defining functions is not fitting a model. "
+        "Preserve observed targets and biological groups. Read supplied source before replacing it. Reuse compatible code "
+        "or implement complete fit(training, seed) and predict(model, inputs) functions, then fit the actual saved file. "
+        "Do not create placeholder functions when a working reference is supplied. Defining functions is not fitting a model. "
         "Use host validation feedback to implement and measure a child generation on the same split. Keep failed trials as evidence. "
         "Existing fitted runtimes can use evaluate_research_model; platform PLMs can use enabled queued training tools "
         "(online ESM2-8M only). Choose statistical, neural, few-shot, semi-supervised or meta-learning methods when data justify them. "
