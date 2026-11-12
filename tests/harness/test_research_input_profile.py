@@ -90,6 +90,13 @@ def fit(training, seed):
 def predict(model, inputs):
     return {'value': 0.0}
 """
+CSV_BUFFER_ERROR = """import pandas as pd
+def fit(training, seed):
+    rows = pd.read_csv(training)
+    return {'rows': rows}
+def predict(model, inputs):
+    return {'value': 0.0}
+"""
 PARAMETER_ERROR = """def fit(training, seed):
     rows = training['train']
     raise ValueError('Unsupported estimator option')
@@ -102,6 +109,7 @@ def predict(model, inputs):
 @pytest.mark.parametrize("source, expected, absent", [
     (KEY_ERROR, "row['inputs']['x']", "Feature contract:"),
     (MATRIX_ERROR, "two-dimensional feature matrix", "Iterating training itself"),
+    (CSV_BUFFER_ERROR, "Do not pass training to pandas.read_csv", "Feature contract:"),
     (PARAMETER_ERROR, "Unsupported estimator option", "Input contract:"),
 ])
 async def test_real_training_failure_reports_the_relevant_contract(tmp_path, source, expected, absent):

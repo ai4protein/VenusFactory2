@@ -168,6 +168,15 @@ def fit_failure(exc):
             f"In predict, read inputs[{field}] directly; it has no nested 'inputs' key."
         )
     lower = detail.lower()
+    if (isinstance(exc, (TypeError, ValueError))
+            and lower.startswith("invalid file path or buffer object type:")
+            and "<class 'dict'>" in lower):
+        return message + (
+            " Input contract: fit receives an in-memory training dictionary, not a CSV path or file buffer. "
+            "Do not pass training to pandas.read_csv. Use rows=training['train']; "
+            "X=[row['inputs'] for row in rows] and y=[row['target'] for row in rows]. "
+            "Build and fit the representation from X, then retain that transformation for predict."
+        )
     target_mapping_error = (
         isinstance(key, str) and key not in {"train", "inputs", "target", "labels"}
         or "uniformly strings or numbers" in lower and "dict" in lower
