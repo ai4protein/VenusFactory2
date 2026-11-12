@@ -5,23 +5,23 @@ from mcp_tools.tools.runtime_tool_policy import assert_tool_allowed
 
 @tool('search_generated_capabilities')
 def search_generated_capabilities(query: str='', limit: int=10, offset: int=0) -> str:
-    """Search operator-published Scientist models and computations. Results include an ID, compact scope summary, author email, version and review status; private research is excluded. Page with offset. Describe a match for its full input/output contract, limitations and review evidence, then run it by ID."""
+    """Search public Scientist capabilities and your reviewed private deliveries. Results include an ID, compact scope summary, author email, version and review status; private results stay owner-only. Page with offset. Describe a match for its full input/output contract, limitations and review evidence, then run it by ID."""
     assert_tool_allowed('search_generated_capabilities')
-    from agent.harness.research_workspace import search_capabilities
+    from .generated_scope import search as search_capabilities
     return json.dumps(search_capabilities(query,limit,offset=offset),ensure_ascii=False)
 
 @tool('describe_generated_capability')
 def describe_generated_capability(capability_id: str) -> str:
     """Inspect a Scientist-created program's scope, sample input and validation before using it."""
     assert_tool_allowed('describe_generated_capability')
-    from agent.harness.research_workspace import describe_capability
+    from .generated_scope import describe as describe_capability
     return json.dumps(describe_capability(capability_id),ensure_ascii=False)
 
 @tool('run_generated_capability')
 async def run_generated_capability(capability_id: str, inputs: dict) -> str:
-    """Run a published Scientist-created model or computation with JSON inputs in an isolated process. Describe its input and scope first."""
+    """Run an accessible reviewed Scientist model or computation with JSON inputs in an isolated process. Describe its input and scope first."""
     assert_tool_allowed('run_generated_capability')
-    from agent.harness.research_workspace import run_capability
+    from .generated_scope import run as run_capability
     return json.dumps(await run_capability(capability_id,inputs),ensure_ascii=False)
 
 RESEARCH_CAPABILITY_TOOLS=[search_generated_capabilities,describe_generated_capability,run_generated_capability]

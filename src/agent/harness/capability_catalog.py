@@ -42,24 +42,27 @@ def register(library, manifest, receipt, goal_id, *, publication=None):
         con.execute('INSERT INTO capability_heads VALUES (?,?) ON CONFLICT(family) DO UPDATE SET id=excluded.id', (family, manifest['id']))
     return card
 
-def _conditions(*, public_only=False, excluded=()):
+def _conditions(*, public_only=False, excluded=(), included=None):
     conditions, values = CURRENT, []
     if public_only:
         conditions += " AND json_extract(card,'$.visibility')='public' AND json_extract(card,'$.publication.policy')='operator_selected.v1'"
     if excluded:
         conditions += ' AND id NOT IN (SELECT value FROM json_each(?))'
         values.append(json.dumps(list(excluded)))
+    if included is not None:
+        conditions += ' AND id IN (SELECT value FROM json_each(?))'
+        values.append(json.dumps(list(included)))
     return conditions, values
 
 
-def search(library, query='', limit=10, offset=0, *, public_only=False, excluded=()):
+def search(library, query='', limit=10, offset=0, *, public_only=False, excluded=(), included=None):
     if not isinstance(query, str) or len(query) > 200:
         raise ValueError('Use a search query of at most 200 characters')
     if type(limit) is not int or not 1 <= limit <= 50 or type(offset) is not int or offset < 0:
         raise ValueError('Use limit 1-50 and a nonnegative offset')
     terms = query.casefold().split()
     pattern = ' AND '.join("search_text LIKE ? ESCAPE '\\'" for _ in terms) or '1=1'
-    conditions, values = _conditions(public_only=public_only, excluded=excluded)
+    conditions, values = _conditions(public_only=public_only, excluded=excluded, included=included)
     conditions = '(' + pattern + ') AND ' + conditions
     values = ['%'+word.replace('\\','\\\\').replace('%','\\%').replace('_','\\_')+'%' for word in terms] + values
     with database(library) as con:
@@ -69,14 +72,14 @@ def search(library, query='', limit=10, offset=0, *, public_only=False, excluded
     return {'total':total,'items':items,'next_offset':offset+len(items) if offset+len(items)<total else None}
 
 
-def ranked_references(library, rank, *, public_only=False, excluded=()):
+def ranked_references(library, rank, *, public_only=False, excluded=(), included=None):
     """Return eligible IDs and scores (None for no match), without decoding cards.
 
     The caller supplies its shared rank(name, search_text, kind) matcher so merged
     tool/model results use one relevance policy. All eligible IDs are retained for
     inventory counts; only the selected page needs discovery_cards afterwards.
     """
-    conditions, values = _conditions(public_only=public_only, excluded=excluded)
+    conditions, values = _conditions(public_only=public_only, excluded=excluded, included=included)
     with database(library) as con:
         con.create_function('capability_rank', 3, rank, deterministic=True)
         return con.execute(
@@ -85,11 +88,11 @@ def ranked_references(library, rank, *, public_only=False, excluded=()):
         ).fetchall()
 
 
-def discovery_cards(library, identities, *, public_only=False, excluded=()):
+def discovery_cards(library, identities, *, public_only=False, excluded=(), included=None):
     """Load compact cards for a selected page, rechecking current publication."""
     if not identities:
         return {}
-    conditions, values = _conditions(public_only=public_only, excluded=excluded)
+    conditions, values = _conditions(public_only=public_only, excluded=excluded, included=included)
     conditions += ' AND id IN (SELECT value FROM json_each(?))'
     with database(library) as con:
         rows = con.execute('SELECT card FROM capabilities WHERE '+conditions,
@@ -99,7 +102,7 @@ def discovery_cards(library, identities, *, public_only=False, excluded=()):
 
 
 def discovery_card(card):
-    result = {key:card[key] for key in ('id','family_id','kind','author','author_email','version','review_status') if key in card}
+    result = {key:card[key] for key in ('id','family_id','kind','author','author_email','version','review_status','visibility') if key in card}
     result.update(name=card['name'][:120],description=card['description'][:240])
     scope = card.get('scope') or {}
     result['scope'] = {key:[value[:80] for value in scope.get(key,[])[:3]]

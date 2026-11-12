@@ -100,10 +100,10 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None):
 
     from .research_focus import admitted_tools
     focus = admitted_tools(request, mapping)
-    from mcp_tools.models.evolved.discovery import ScopedModelCatalog
+    from mcp_tools.tools.discovery.scoped import ScopedScientistCatalog
     disclosure = ToolDisclosure(mapping, schema=mcp_input_schema, allowed=available,
                                 direct=WORKSPACE_PRIMITIVES | INTERACTION_NAMES | {'submit_research_checkpoint'} | focus,
-                                detailed=focus, model_catalog=ScopedModelCatalog(mapping, available))
+                                detailed=focus, model_catalog=ScopedScientistCatalog(mapping, available))
     send({"kind": "catalog", "tools": ["mcp__venusfactory__" + name for name in sorted(disclosure.names)]})
     if request.get("handshake"):
         import sys

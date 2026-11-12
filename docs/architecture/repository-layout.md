@@ -150,6 +150,17 @@ SHA-256 digest for the session directory. MCP submission validates that mapping
 before binding the child worker to the goal's workspace. The original session
 identity remains unchanged for ownership checks and event recovery.
 
+Private Scientist capability discovery derives ownership from the live worker
+lease and its parent task in `backend/web_v2/research_capability_access.py`.
+The current session database determines which goal libraries are accessible;
+model arguments cannot choose a user or storage path. `generated_scope.py` in
+the MCP discovery package combines those reviewed deliveries with operator-published
+capabilities. Search returns compact metadata, description loads one contract,
+and execution rechecks ownership, enablement, SC and technical review evidence.
+`scoped.py` exposes that same view to native harnesses alongside the older model
+registry. Invocation resolves to the existing queued tool rather than a separate
+prediction backend. Public publication remains an operator action.
+
 Tool discovery separates session navigation from model metadata. Harness adapters
 use the shared discovery broker to track which tool was inspected during a turn.
 The MCP discovery package owns catalog lookup and the mapping of model, dataset

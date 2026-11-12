@@ -20,6 +20,7 @@ from pathlib import Path
 
 import pytest
 from test_autonomous_research import profile
+from test_private_research_capabilities import configure_access, verify_private_reuse
 from test_research_development import review_spec
 from test_scientific_acceptance import BASELINE, LEARNER, accepted
 
@@ -223,10 +224,10 @@ def wait_for_file(path, process, timeout=60):
 
 @pytest.mark.skipif(sys.platform != "linux", reason="Isolated fitting and process ownership run on Linux")
 def test_real_scientist_recovers_after_measured_fit_without_retraining_baseline(tmp_path, monkeypatch):
-    monkeypatch.setenv("VENUS_JOB_QUEUE_ROOT", str(tmp_path / "queue"))
-    monkeypatch.setenv("VENUS_USAGE_DB", str(tmp_path / "usage.sqlite3"))
+    access = configure_access(tmp_path, monkeypatch)
+    source_session = "scientist-fixture"
     store = ar.create(
-        tmp_path / "goal",
+        access.root / hashlib.sha256(source_session.encode()).hexdigest() / ("c" * 32),
         profile(),
         "Develop a quadratic predictor for synthetic recovery testing",
         {"max_cycles": 4, "model_calls": 48, "tool_calls": 48, "wall_seconds": 480},
@@ -292,6 +293,7 @@ def test_real_scientist_recovers_after_measured_fit_without_retraining_baseline(
         fresh.join(5)
         assert fresh.exitcode == 0
         assert json.loads((store.root / "reuse-result.json").read_text())["value"] == pytest.approx(9)
+        asyncio.run(verify_private_reuse(access, store, source_session, monkeypatch))
     finally:
         for process in processes:
             if process.is_alive():

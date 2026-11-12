@@ -105,16 +105,15 @@ def search(query="", kind="all", stage="", limit=10, offset=0, *, tool_catalog=N
 
     capability_count = 0
     if kind != "tools" and not stage and is_tool_allowed("run_generated_capability"):
-        from agent.harness import capability_catalog, research_workspace
+        from .generated_scope import GeneratedScope
 
         def rank_capability(name, search_text, capability_kind):
             if capability_kind == "model":
                 search_text += " predict prediction"
             return relevance(groups, name, search_text)
 
-        references = capability_catalog.ranked_references(
-            research_workspace.LIBRARY, rank_capability, public_only=True,
-        )
+        capability_scope = GeneratedScope()
+        references = capability_scope.references(rank_capability)
         for identity, score in references:
             if not settings.enabled("model:capability:" + identity):
                 continue
@@ -137,9 +136,7 @@ def search(query="", kind="all", stage="", limit=10, offset=0, *, tool_catalog=N
     page = [item[2] for item in combined[offset:offset + limit]]
     selected = [item["entry_id"] for item in page if item["kind"] == "research_capability"]
     if selected:
-        compact = capability_catalog.discovery_cards(
-            research_workspace.LIBRARY, selected, public_only=True,
-        )
+        compact = capability_scope.cards(selected)
         # A publication can be withdrawn or superseded between index and page reads.
         page = [item for item in page if item["kind"] != "research_capability"
                 or item["entry_id"] in compact]
