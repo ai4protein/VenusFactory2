@@ -189,7 +189,7 @@ class Development:
                 'training-only preprocessing belongs in model code, not in evaluation targets. '
                 'The optional claimed_metric may be omitted; host metrics are computed independently.'}
 
-    async def evaluate(self, workspace, runner, *, name, source, files, evaluation_file, prediction_key, hypothesis, strategy, parent_experiment_id='', variant='auto'):
+    async def evaluate(self, workspace, runner, *, name, source, files, evaluation_file, prediction_key, hypothesis, strategy, parent_experiment_id='', variant='auto', training=None):
         from .research_workspace import invoke_bundle
         require(strategy in STRATEGIES,'Use a declared strategy or custom')
         if variant == 'auto':
@@ -255,6 +255,10 @@ class Development:
             'prediction_equivalence':{'split':'validation','method':'exact_declared_prediction_values',
                                       'matched_experiment_ids':equivalent},
             'fresh_process_replay':True,'score_origin':'host_validation','test_used_for_feedback':False}
+        if training is not None:
+            require(set(training)=={'attempt_id','device'} and training['device']=='cuda' and
+                    re.fullmatch('[a-f0-9]{32}',training['attempt_id']), 'Invalid host training binding')
+            record['training']=dict(training)
         record['evaluation_visibility']='host_only' if self.data_store else 'agent_workspace'
         record['receipt_sha256']=digest(record);write_json(folder/'receipt.json',record)
         # User-facing evidence is regenerated from the host receipt, never read
@@ -293,7 +297,12 @@ class Development:
                 if len(branch)>1 and branch[-1]['id']==identity:
                     chain=branch;break
         require(len(chain)>=2 and chain[-1]['variant']=='baseline','Model delivery requires a measured baseline and a revised generation')
-        return {'selected_experiment_id':identity,'generations':list(reversed(chain)),'claim':'Measured development trajectory; biological novelty and superiority are not inferred from the strategy name.'}
+        result={'selected_experiment_id':identity,'generations':list(reversed(chain)),'claim':'Measured development trajectory; biological novelty and superiority are not inferred from the strategy name.'}
+        from .research_training import selected_training_compute
+        compute=selected_training_compute(self,identity,manifest)
+        if compute:
+            result['training_compute']=compute
+        return result
 
 
 # Public import retained for saved clients and existing development integrations.

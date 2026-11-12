@@ -60,8 +60,9 @@ prove that user-supplied grouping labels encode true protein homology.
 
 ## CPU and PBS GPU training
 
-Agent-authored `train_research_model` fits run in the CPU analysis sandbox. GPU
-training uses enabled platform tools: `generate_training_config` prepares the
+Agent-authored `train_research_model` fits use CPU by default; the opt-in PBS
+backend below supports isolated GPU fitting and CPU prediction. Platform PLM
+training uses enabled tools: `generate_training_config` prepares the
 session data and settings, `train_protein_model` produces a fitted checkpoint,
 and `protein_model_predict` checks the resulting model. These calls use the
 shared CPU/GPU job queue and preserve their parent research job and session
@@ -72,8 +73,9 @@ starting the research process and its tool workers on the allocated node. Honor
 the scheduler's device binding; do not select a host GPU outside that allocation.
 Use a separate queue directory for each independent experimental allocation.
 The current SQLite queue is a single-host service, not a distributed queue shared
-between PBS nodes. A GPU allocation does not expose devices to arbitrary session
-Python or install a missing deep-learning dependency automatically.
+between PBS nodes. GPU allocation alone does not expose devices to session
+Python or install missing dependencies; authored GPU fitting requires the explicit
+PBS backend.
 
 Record the PBS job, allocation, tool job IDs, fitted checkpoint, prediction result
 and terminal states with the experiment. A completed training integration test
@@ -443,3 +445,45 @@ external evaluation require a frozen candidate and a separate declared protocol.
 Sources: [DeepLoc 2.0 data](https://services.healthtech.dtu.dk/services/DeepLoc-2.0/),
 [publication](https://pmc.ncbi.nlm.nih.gov/articles/PMC9252801/), and the authors'
 [code license](https://github.com/teevee112/DeepLoc-2.0/blob/main/LICENSE).
+
+## Authored GPU training on PBS
+
+Create a Scientist goal with the normal `run_autonomous_research.py create`
+command, then submit that existing goal from the repository root:
+
+```bash
+qsub -q YOUR_GPU_QUEUE \
+  -v VENUS_SERVICE_PYTHON="$CONDA_PREFIX/bin/python",VENUS_RESEARCH_GOAL="runtime/local/scientist/my-topic" \
+  scripts/examples/scientist_gpu.pbs
+```
+
+The template requests one GPU, two CPUs and 16 GiB of memory in a separate PBS
+research job. It creates a job-specific queue and sandbox reservation directory;
+it does not reuse the web service's SQLite queue across compute nodes. The goal
+retains its existing profile, data, request budget and checkpoints. Configure its
+provider credentials privately using the normal deployment setup. A paused goal
+requires an explicit resume through the goal interface.
+
+`train_research_model(device="cuda")` fits authored Python in bubblewrap using
+only the GPU assigned by PBS. This opt-in path requires
+`VENUS_RESEARCH_GPU_BACKEND=pbs`, local mode, an unambiguous GPU UUID, and verified
+cgroup v1 memory/device membership and permissions. Unsupported cgroup layouts,
+missing allocations and online requests fail before authored execution. There is
+no host execution or CPU fallback. Normal `device="cpu"` calls remain unchanged.
+
+The sandbox keeps its network, filesystem and syscall isolation. Its private
+process directory permits CUDA thread naming, while kernel controls remain
+read-only. CUDA needs a large virtual address range, so GPU execution uses the
+PBS allocation's kernel memory cap plus the configured per-process-tree resident
+memory watchdog instead of the CPU address-space limit. The hard cap covers the
+whole PBS job; the smaller watchdog limit is checked during execution. A sudden
+allocation can therefore terminate the research job at its PBS limit. Queue,
+wall-time, output/storage limits and cancellation cleanup still apply.
+
+Return CPU-portable state from `fit`: for example, detach tensors to CPU or save
+numeric parameters. Validation, final-test prediction and Agent reuse remain CPU
+operations. The measured experiment binds the GPU training receipt; independent
+Review must repeat that fitting step inside a verified GPU allocation and then
+replay its predictions on CPU. A successful fit alone cannot publish a model.
+The initial backend is for an allocated local research worker; it does not submit
+a new PBS job for each tool call or enable GPU-authored training in the web UI.

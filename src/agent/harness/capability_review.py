@@ -207,7 +207,14 @@ async def model_evaluation(bundle, manifest, control, runner):
                      if key in data}
     training_data['splits'] = {'train': data['splits']['train']}
     (retrain/spec['evaluation_file']).write_text(json.dumps(training_data))
-    receipt = await runner(retrain, Path(control)/'refit-runs', spec['reproduction_script'], 120)
+    fitting_runner = runner
+    compute = (manifest.get('development') or {}).get('training_compute')
+    if compute:
+        ensure(compute.get('backend') == 'pbs' and compute.get('device') == 'cuda'
+               and compute.get('inference_device') == 'cpu' and compute.get('training_receipt_sha256'),
+               'Unsupported model training-compute binding')
+        from .pbs_gpu import run_python as fitting_runner
+    receipt = await fitting_runner(retrain, Path(control)/'refit-runs', spec['reproduction_script'], 120)
     ensure(receipt['exit_code'] == 0, 'Training reproduction failed')
     for name, sha in manifest['files'].items():
         if name.endswith('.py'): ensure(file_hash(safe_file(retrain, name)) == sha, 'Reproduction modified runtime code')
@@ -229,6 +236,7 @@ async def model_evaluation(bundle, manifest, control, runner):
             'split_counts': {k: len(v) for k, v in splits.items()}, 'disjoint_ids_groups_inputs': True,
             'provenance': data['provenance'], 'grouping': data['grouping'], 'predictions_sha256': digest(one),
             'training_reproduced': True, 'reproduction_script_sha256': receipt['script_sha256'],
+            **({'reproduction_compute': receipt['gpu']} if compute else {}),
             'scope': 'Host replay of supplied held-out records; provenance and grouping semantics require independent review. No superiority requirement.'}
 
 async def review_proposal(bundle, *, reviewer, control, runner):

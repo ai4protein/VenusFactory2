@@ -64,7 +64,7 @@ def validate_execution(kind, payload, timeout):
 
 
 
-def command(workspace, kind, payload, timeout, *, scratch, memory):
+def command(workspace, kind, payload, timeout, *, scratch, memory, gpu=None):
     validate_execution(kind, payload, timeout)
     cmd = [shutil.which('bwrap') or 'bwrap', '--unshare-all', '--new-session', '--die-with-parent', '--as-pid-1', '--hostname', 'session', '--cap-drop', 'ALL']
     for p in ['/usr/bin','/usr/lib','/usr/lib64','/usr/share/zoneinfo','/usr/share/fonts','/bin','/lib','/lib64']:
@@ -86,6 +86,23 @@ def command(workspace, kind, payload, timeout, *, scratch, memory):
            'HF_HUB_OFFLINE':'1','TRANSFORMERS_OFFLINE':'1','HF_DATASETS_OFFLINE':'1'}
     if os.getenv('VENUS_SCIENTIST_ONLINE') == '1' or os.getenv('WEBUI_V2_MODE') == 'online': env['VENUS_SCIENTIST_ONLINE']='1'
     for k,v in env.items(): cmd += ['--setenv',k,v]
+    if gpu is not None:
+        # CUDA names its own threads through private PID-namespace procfs.
+        # Keep kernel controls read-only, the device set minimal, and seccomp intact.
+        proc_index=next(i for i in range(len(cmd)-1) if cmd[i:i+2]==['--remount-ro','/proc'])
+        del cmd[proc_index:proc_index+2]
+        mounts=[]
+        for path in gpu.devices:
+            mounts+=['--dev-bind',path,path]
+        for path in ['/proc/sys','/proc/irq','/proc/bus','/proc/fs']:
+            if Path(path).exists():
+                mounts+=['--ro-bind',path,path]
+        if Path('/proc/sysrq-trigger').exists():
+            mounts+=['--ro-bind','/dev/null','/proc/sysrq-trigger']
+        position=cmd.index('--remount-ro')
+        cmd[position:position]=mounts
+        cmd+=['--setenv','CUDA_VISIBLE_DEVICES',gpu.gpu_uuid,
+              '--setenv','VENUS_SANDBOX_MEMORY_POLICY','pbs']
     return cmd+['--','/opt/venus-runtime/bin/python','-I','-u','/runner.py',kind,str(timeout),payload]
 
 
@@ -94,11 +111,15 @@ def tail(path, limit=12000):
         f.seek(max(0,Path(path).stat().st_size-limit));return f.read(limit).decode(errors='replace')
 
 
-async def execute(workspace, control, kind, payload, timeout=120, *, on_progress=None):
+async def execute(workspace, control, kind, payload, timeout=120, *, on_progress=None, device="cpu"):
     validate_execution(kind, payload, timeout)
     if os.getenv('VENUS_SCIENTIST_ONLINE') == '1' or os.getenv('WEBUI_V2_MODE') == 'online': timeout=min(timeout,60)
     assert_active_job()
     selected=backend()
+    if device not in {'cpu','cuda'}:
+        raise ValueError('Unsupported execution device')
+    if device=='cuda' and (kind!='python' or selected!='bwrap'):
+        raise SandboxUnavailable('GPU research requires the PBS bubblewrap Python backend')
     check_workspace(workspace)
     if selected == 'cubesandbox':
         from .session_cube import execute as cube_execute
@@ -107,7 +128,11 @@ async def execute(workspace, control, kind, payload, timeout=120, *, on_progress
         from .session_e2b import execute as e2b_execute
         return await e2b_execute(workspace,control,kind,payload,timeout,on_progress=on_progress)
     async with admission(workspace,on_progress=on_progress) as (store,identity,limits):
-        return await _execute_bwrap(workspace,control,kind,payload,timeout,store,identity,limits,on_progress)
+        gpu=None
+        if device=='cuda':
+            from .pbs_gpu import capture
+            gpu=capture(limits)
+        return await _execute_bwrap(workspace,control,kind,payload,timeout,store,identity,limits,on_progress,gpu=gpu)
 
 
 async def _settle(task, *, propagate=False):
@@ -121,7 +146,7 @@ async def _settle(task, *, propagate=False):
     return result
 
 
-async def _execute_bwrap(workspace, control, kind, payload, timeout, store, identity, limits, on_progress):
+async def _execute_bwrap(workspace, control, kind, payload, timeout, store, identity, limits, on_progress, *, gpu=None):
     from backend.web_v2.job_queue import QueueCancelled
     if Path(control).resolve().is_relative_to(Path(workspace).resolve()):
         raise ValueError('Sandbox control must be outside the session mount')
@@ -133,6 +158,8 @@ async def _execute_bwrap(workspace, control, kind, payload, timeout, store, iden
         target=control/(identity+'.json')
         target.write_text(json.dumps({'run_id':identity,'backend':'bwrap','status':status,
             'elapsed_seconds':round(time.monotonic()-started,3),'memory_limit_bytes':limits.memory,
+            'memory_policy':'resident-watchdog-and-pbs-cgroup' if gpu else 'address-space',
+            **({'gpu':gpu.receipt()} if gpu else {}),
             'process_policy':'single-process-with-threads','temporary_files_removed':not Path(scratch.name).exists()}))
         target.chmod(0o600)
     output_bytes=0;output_exceeded=False
@@ -153,7 +180,8 @@ async def _execute_bwrap(workspace, control, kind, payload, timeout, store, iden
         await asyncio.gather(*pumps,return_exceptions=True)
     try:
         store.scratch(identity,scratch.name)
-        argv=command(workspace,kind,payload,timeout,scratch=scratch.name,memory=limits.memory)
+        kwargs={'gpu':gpu} if gpu else {}
+        argv=command(workspace,kind,payload,timeout,scratch=scratch.name,memory=limits.memory,**kwargs)
         with out.open('wb') as stdout, err.open('wb') as stderr:
             # Clearing only the guest environment leaves the bwrap supervisor's
             # inherited credentials readable through procfs. Sanitize at launch.
@@ -177,6 +205,10 @@ async def _execute_bwrap(workspace, control, kind, payload, timeout, store, iden
                         check_workspace(workspace)
                         check_workspace(scratch.name)
                         if memory_headroom()<limits.reserve_free//2:raise MemoryError('Host memory reserve reached')
+                        if gpu:
+                            from .pbs_gpu import process_rss
+                            if process_rss(proc.pid)>limits.memory:
+                                raise MemoryError('GPU sandbox resident-memory limit reached')
                         if min(shutil.disk_usage(workspace).free,shutil.disk_usage(scratch.name).free)<limits.disk_free:
                             raise ValueError('Host disk reserve reached')
                         if on_progress:on_progress({'status':'running','tool':'run_research_python' if kind=='python' else 'run_session_shell',
@@ -191,6 +223,8 @@ async def _execute_bwrap(workspace, control, kind, payload, timeout, store, iden
                 await _settle(asyncio.create_task(reap()),propagate=True)
         status='completed' if proc.returncode==0 else 'failed'
         result={'run_id':identity,'backend':'bwrap','exit_code':proc.returncode,'stdout':tail(out),'stderr':tail(err,6000)}
+        if gpu:
+            result['gpu']=gpu.receipt()
         if on_progress:on_progress({**result,'status':'completed' if proc.returncode==0 else 'failed','stdout_tail':result['stdout'],'stderr_tail':result['stderr']})
         return result
     except (asyncio.CancelledError, QueueCancelled):

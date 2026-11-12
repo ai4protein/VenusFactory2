@@ -1,0 +1,24 @@
+#!/bin/bash
+#PBS -N scientist_gpu
+#PBS -l select=1:ncpus=2:ngpus=1:mem=16gb
+#PBS -l walltime=02:00:00
+#PBS -j oe
+
+set -Eeuo pipefail
+umask 077
+REPOSITORY="${VENUS_REPOSITORY:-${PBS_O_WORKDIR:?Submit from the repository root}}"
+PYTHON="${VENUS_SERVICE_PYTHON:-python}"
+cd "$REPOSITORY"
+: "${VENUS_RESEARCH_GOAL:?Set the existing Scientist goal directory}"
+: "${PBS_JOBID:?Use qsub to allocate the GPU}"
+export WEBUI_V2_MODE=local VENUS_SCIENTIST_ONLINE=0
+export VENUS_RESEARCH_GPU_BACKEND=pbs
+export VENUS_JOB_QUEUE_ROOT="$REPOSITORY/runtime/pbs/$PBS_JOBID/queue"
+export VENUS_SANDBOX_CONTROL_ROOT="$REPOSITORY/runtime/pbs/$PBS_JOBID/sandboxes"
+export VENUS_QUEUE_GPU_SLOTS=1 VENUS_QUEUE_CPU_SLOTS=1
+export VENUS_SANDBOX_LOCAL_MEMORY_MB=8192 VENUS_SANDBOX_TOTAL_MEMORY_MB=16384
+export VENUS_SANDBOX_MEMORY_RESERVE_MB=4096
+export OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
+export PYTHONPATH="$REPOSITORY:$REPOSITORY/src${PYTHONPATH:+:$PYTHONPATH}"
+# PBS supplies CUDA_VISIBLE_DEVICES. Never replace it with a guessed GPU index.
+exec "$PYTHON" -u scripts/rsi/run_autonomous_research.py run --output "$VENUS_RESEARCH_GOAL"

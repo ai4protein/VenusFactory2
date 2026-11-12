@@ -22,12 +22,13 @@ from .research_execution_feedback import _key as feedback_key
 
 async def fit_model(workspace, development, runner, *, name, source_file, evaluation_file,
                     hypothesis, strategy="supervised", parent_experiment_id="",
-                    variant="auto", prediction_key="value", seed=0, on_progress=None):
+                    variant="auto", prediction_key="value", seed=0, on_progress=None, device="cpu"):
     require(isinstance(source_file, str) and Path(source_file).suffix.lower() == ".py",
             "source_file must be the saved .py implementation with fit(training, seed) and predict(model, inputs). "
             "Pass the dataset JSON as evaluation_file; data files cannot be executed as model source.")
     require(source_file != evaluation_file, "source_file and evaluation_file must refer to different files")
     require(strategy in STRATEGIES, "Use a declared training strategy")
+    require(device in {"cpu", "cuda"}, "Training device must be cpu or cuda")
     require(type(seed) is int and 0 <= seed < 2**32, "Seed must be an unsigned 32-bit integer")
     if variant == "auto":
         variant = "candidate" if parent_experiment_id else "baseline"
@@ -69,7 +70,7 @@ async def fit_model(workspace, development, runner, *, name, source_file, evalua
     record = {"id": identity, "attempt_protocol": ATTEMPT_PROTOCOL,
               "feedback_key": feedback_key("train_research_model", {
                   "source_file": source_file, "parent_experiment_id": parent_experiment_id, "variant": variant}),
-              "variant": variant, "prediction_key": prediction_key, "status": "running", "created": time.time(), "seed": seed,
+              "device": device, "variant": variant, "prediction_key": prediction_key, "status": "running", "created": time.time(), "seed": seed,
               "algorithm_sha256": hashlib.sha256(code.encode()).hexdigest(),
               "source_snapshot": "algorithm.py", "stage": "preflight", "evaluation_sha256": data_hash,
               "training_sha256": digest(training), "training_rows": len(training["train"]),
@@ -83,7 +84,10 @@ async def fit_model(workspace, development, runner, *, name, source_file, evalua
         record.update(algorithm_ast_sha256=code_hash, stage="fitting")
         write_json(folder/"receipt.json", record)
         kwargs = {"on_progress": on_progress} if on_progress is not None else {}
-        execution = await runner(work, folder/"execution", "train.py", 120, **kwargs)
+        fitting_runner = runner
+        if device == "cuda":
+            from .pbs_gpu import run_python as fitting_runner
+        execution = await fitting_runner(work, folder/"execution", "train.py", 120, **kwargs)
         record["execution"] = execution
         require(execution["exit_code"] == 0, "Training failed: "+python_failure(
                 execution.get("stderr_tail") or execution.get("stderr") or "inspect the training log", work, 800,
@@ -109,7 +113,8 @@ async def fit_model(workspace, development, runner, *, name, source_file, evalua
         experiment = await development.evaluate(
             workspace, runner, name=name, source=prefix+"runtime.py", files=fitted_paths,
             evaluation_file=prefix+"evaluation.json", prediction_key=prediction_key, hypothesis=hypothesis,
-            strategy=strategy, parent_experiment_id=parent_experiment_id, variant=variant)
+            strategy=strategy, parent_experiment_id=parent_experiment_id, variant=variant,
+            **({'training': {'attempt_id': identity, 'device': device}} if device == 'cuda' else {}))
         record.update(status="completed", stage="completed", finished=time.time(), state_sha256=state_hash, experiment_id=experiment["id"],
                       runtime_files=[prefix+"runtime.py", *fitted_paths], state_format=state_metadata["format"],
                       dependency_versions=state_metadata["dependencies"], python_version=state_metadata["python"],
@@ -141,3 +146,33 @@ async def fit_model(workspace, development, runner, *, name, source_file, evalua
         if isinstance(exc, Exception):
             raise TrainingAttemptError(identity, bounded_message(str(exc), work, 1000)) from exc
         raise
+
+
+def selected_training_compute(development, identity, manifest):
+    """Bind GPU refitting to the training attempt in the measured experiment."""
+    binding = development.record(identity).get("training")
+    if binding is None:
+        return None
+    import re
+    require(binding.get("device") == "cuda" and
+            re.fullmatch("[a-f0-9]{32}", binding.get("attempt_id", "")), "Invalid GPU training binding")
+    path = development.root / "training" / binding["attempt_id"] / "receipt.json"
+    require(path.is_file(), "Selected GPU training receipt is missing")
+    record = json.loads(path.read_text())
+    receipt_hash = record.get("receipt_sha256")
+    require(receipt_hash == digest({key: value for key, value in record.items() if key != "receipt_sha256"}),
+            "GPU training receipt changed")
+    require(record.get("status") == "completed" and record.get("device") == "cuda" and
+            record.get("experiment_id") == identity, "Selected GPU training is incomplete or mismatched")
+    require(record["source"] == manifest["source"] and set(record["runtime_files"]) == set(manifest["files"]),
+            "GPU training does not describe the selected runtime")
+    spec = manifest["review_spec"]
+    require(spec["reproduction_script"] == record["reproduction_script"] and
+            set(spec["fitted_files"]) == set(record["fitted_files"]),
+            "GPU Review must reproduce the selected training entrypoint and fitted files")
+    execution = record.get("execution", {})
+    compute = execution.get("gpu", {})
+    require(execution.get("exit_code") == 0 and compute.get("backend") == "pbs" and
+            compute.get("device") == "cuda" and compute.get("inference_device") == "cpu",
+            "GPU allocation evidence is missing")
+    return {**compute, "training_receipt_sha256": receipt_hash}

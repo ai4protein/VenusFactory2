@@ -9,7 +9,10 @@ import shutil
 kind, seconds, payload = sys.argv[1], int(sys.argv[2]), sys.argv[3]
 resource.setrlimit(resource.RLIMIT_CPU,(seconds,seconds))
 memory=int(os.environ['VENUS_SANDBOX_MEMORY_BYTES'])
-resource.setrlimit(resource.RLIMIT_AS,(memory,memory))
+# CUDA reserves large virtual address ranges. Only a host-verified PBS cgroup
+# profile can use physical-memory accounting instead of the CPU address cap.
+if os.environ.get('VENUS_SANDBOX_MEMORY_POLICY') != 'pbs':
+    resource.setrlimit(resource.RLIMIT_AS,(memory,memory))
 resource.setrlimit(resource.RLIMIT_FSIZE,(100*1024**2,100*1024**2))
 resource.setrlimit(resource.RLIMIT_NOFILE,(128,128))
 resource.setrlimit(resource.RLIMIT_NPROC,(16,16))
