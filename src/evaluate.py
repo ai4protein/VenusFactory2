@@ -1,72 +1,187 @@
-import sys
-import os
+"""Evaluate Factory sequence models with task-appropriate predictions and metrics."""
 import argparse
-import torch
-import re
 import json
 import os
-import warnings
+import re
+import sys
+
 import pandas as pd
+import torch
 import torch.nn as nn
-from tqdm import tqdm
-from torchmetrics.classification import Accuracy, Recall, Precision, MatthewsCorrCoef, AUROC, F1Score, MatthewsCorrCoef
-from torchmetrics.classification import BinaryAccuracy, BinaryRecall, BinaryAUROC, BinaryF1Score, BinaryPrecision, BinaryMatthewsCorrCoef, BinaryF1Score
-from torchmetrics.regression import SpearmanCorrCoef
-from transformers import AutoTokenizer, AutoModelForMaskedLM, AutoModel
-from transformers import logging
-from datasets import load_dataset
 from torch.utils.data import DataLoader
-from mcp_tools.models.factory.training.data.batch_sampler import BatchSampler
+from torchmetrics.classification import (
+    AUROC,
+    Accuracy,
+    BinaryAUROC,
+    BinaryAveragePrecision,
+    F1Score,
+    MatthewsCorrCoef,
+    MulticlassAUROC,
+    MulticlassAveragePrecision,
+    MultilabelAUROC,
+    MultilabelAveragePrecision,
+    Precision,
+    Recall,
+)
+from torchmetrics.regression import MeanSquaredError, SpearmanCorrCoef
+from tqdm import tqdm
+
 from mcp_tools.models.factory.training.loop.metrics import MultilabelF1Max
-from mcp_tools.models.factory.training.models.inference_loader import load_inference_model
-from typing import Dict, Any, Union, Tuple
-from mcp_tools.models.factory.training.data.dataloader import prepare_dataloaders
-from datetime import datetime
 
-# ignore warning information
-logging.set_verbosity_error()
-warnings.filterwarnings("ignore")
+_SCORE_METRICS = (BinaryAUROC, BinaryAveragePrecision, MulticlassAUROC,
+                  MulticlassAveragePrecision, MultilabelAUROC, MultilabelAveragePrecision)
 
-def evaluate(model, plm_model, metrics, dataloader, loss_function, device=None):
-    total_loss = 0
-    total_samples = len(dataloader.dataset)
-    print(f"Total samples: {total_samples}")
-    epoch_iterator = tqdm(dataloader)
-    pred_labels = []
-    
-    for i, batch in enumerate(epoch_iterator, 1):
-            
-        for k, v in batch.items():
-            batch[k] = v.to(device)
-        # Use the label column name from args if available, otherwise default to "label"
-        label_column_name = getattr(args, 'label_column_name', 'label')
-        label = batch[label_column_name]
-        
-        logits = model(plm_model, batch)
-        pred_labels.extend(logits.argmax(dim=1).cpu().numpy())
-        
-        for metric_name, metric in metrics_dict.items():
-            if args.problem_type == 'regression' and args.num_labels == 1:
-                loss = loss_function(logits.squeeze(), label.squeeze())
-                metric(logits.squeeze(), label.squeeze())
-            elif args.problem_type == 'multi_label_classification':
-                loss = loss_function(logits, label.float())
-                metric(logits, label)
+
+def build_metrics(names, problem_type, num_labels, device=None):
+    """Construct metrics for the declared task, including an empty selection."""
+    constructors = {"accuracy": Accuracy, "recall": Recall, "precision": Precision,
+                    "f1": F1Score, "mcc": MatthewsCorrCoef, "auroc": AUROC}
+    result = {}
+    for name in names:
+        if problem_type == "regression":
+            regression = {"spearman_corr": SpearmanCorrCoef, "mse": MeanSquaredError}
+            if name not in regression:
+                raise ValueError(f"Invalid regression metric: {name}")
+            metric = regression[name]()
+        elif name == "f1_max" and problem_type == "multi_label_classification":
+            metric = MultilabelF1Max(num_labels=num_labels)
+        elif name in constructors:
+            if problem_type == "multi_label_classification":
+                options = {"task": "multilabel", "num_labels": num_labels}
+            elif num_labels <= 2:
+                options = {"task": "binary"}
             else:
-                loss = loss_function(logits, label)
-                metric(torch.argmax(logits, 1), label)
-                
-        total_loss += loss.item() * len(label)
-        epoch_iterator.set_postfix(eval_loss=loss.item())
-    
-    epoch_loss = total_loss / len(dataloader.dataset)
-    for k, v in metrics.items():
-        metrics[k] = [v.compute().item()]
-        print(f"{k}: {metrics[k][0]}")
-    metrics['loss'] = [epoch_loss]
-    return metrics, pred_labels
+                options = {"task": "multiclass", "num_classes": num_labels}
+            metric = constructors[name](**options)
+        else:
+            raise ValueError(f"Invalid metric for {problem_type}: {name}")
+        result[name] = metric.to(device)
+    return result
+
+
+def evaluation_loss(problem_type, num_labels):
+    if problem_type == "regression":
+        return nn.MSELoss()
+    if problem_type == "multi_label_classification" or num_labels == 1:
+        return nn.BCEWithLogitsLoss()
+    return nn.CrossEntropyLoss()
+
+
+def _batch_predictions(logits, labels, problem_type):
+    if problem_type == "regression":
+        predictions = logits.reshape(-1)
+        targets = labels.reshape(-1).float()
+        sample_count = int(labels.shape[0]) if labels.ndim else 1
+        if predictions.shape != targets.shape or predictions.numel() != sample_count:
+            raise ValueError("Regression requires one prediction for each target.")
+        return predictions, targets, predictions, None
+    if problem_type == "multi_label_classification":
+        if logits.shape != labels.shape or logits.ndim != 2:
+            raise ValueError("Multilabel predictions and targets must have shape (samples, labels).")
+        probabilities = logits.sigmoid()
+        return logits, labels.float(), (probabilities > 0.5).long(), probabilities
+    if logits.ndim == 1 or logits.shape[-1] == 1:
+        values = logits.reshape(-1)
+        probabilities = values.sigmoid()
+        return values, labels.reshape(-1).float(), (probabilities > 0.5).long(), probabilities
+    if logits.ndim != 2:
+        raise ValueError("Classification logits must have shape (samples, classes).")
+    probabilities = logits.softmax(dim=1)
+    return logits, labels.reshape(-1).long(), logits.argmax(dim=1), probabilities
+
+
+def evaluation_target_transform(config):
+    """Only compare checkpoint outputs with raw labels in a known target space."""
+    if getattr(config, "problem_type", None) != "regression":
+        return None
+    transform = getattr(config, "target_transform", None)
+    if transform is not None:
+        from mcp_tools.models.factory.target_transform import validate_target_transform
+        validate_target_transform(transform)
+        return transform
+    scale = getattr(config, "prediction_output_scale", None)
+    if (not isinstance(scale, dict) or scale.get("value_space") != "original_target"
+            or getattr(config, "normalize", None) not in (None, "none")):
+        raise ValueError("Regression evaluation against original labels requires verified target-transform "
+                         "statistics or an explicitly unnormalized checkpoint; this checkpoint output scale is unknown or normalized.")
+    return None
+
+
+@torch.inference_mode()
+def evaluate(model, plm_model, metrics, dataloader, loss_function, device=None, *,
+             problem_type=None, label_column_name=None, target_transform=None):
+    """Return metric columns and predictions without mutating the metric mapping."""
+    legacy_args = globals().get("args")
+    problem_type = problem_type or getattr(legacy_args, "problem_type", None)
+    if problem_type is None:
+        problem_type = "regression" if isinstance(loss_function, (nn.MSELoss, nn.L1Loss)) else "single_label_classification"
+    if problem_type not in {"regression", "single_label_classification", "multi_label_classification"}:
+        raise ValueError(f"Unsupported evaluation problem type: {problem_type}")
+    label_column_name = label_column_name or getattr(legacy_args, "label_column_name", None) or "label"
+    if problem_type == "regression" and target_transform is None and legacy_args is not None:
+        target_transform = evaluation_target_transform(legacy_args)
+    if target_transform is not None and problem_type != "regression":
+        raise ValueError("Target transforms apply only to regression evaluation.")
+    model.eval()
+    if plm_model is not None:
+        plm_model.eval()
+    for metric in metrics.values():
+        metric.reset()
+    total_loss, total_samples = 0.0, 0
+    pred_labels = []
+    epoch_iterator = tqdm(dataloader)
+    for batch in epoch_iterator:
+        batch = {key: value.to(device) if torch.is_tensor(value) else value for key, value in batch.items()}
+        label = batch[label_column_name]
+        logits = model(plm_model, batch)
+        if target_transform is not None:
+            from mcp_tools.models.factory.target_transform import inverse_targets
+            restored = inverse_targets(logits.detach().cpu().numpy(), target_transform)
+            logits = torch.as_tensor(restored, dtype=logits.dtype, device=logits.device)
+            if not torch.isfinite(logits).all():
+                raise ValueError("Inverse target transform exceeds the evaluation tensor range.")
+        loss_inputs, loss_targets, predictions, probabilities = _batch_predictions(logits, label, problem_type)
+        count = int(label.shape[0]) if label.ndim else 1
+        loss = loss_function(loss_inputs, loss_targets)
+        mean_loss = loss.mean()
+        total_loss += mean_loss.item() if getattr(loss_function, "reduction", "mean") == "sum" else mean_loss.item() * count
+        total_samples += count
+        pred_labels.extend(predictions.detach().cpu().tolist())
+        for metric in metrics.values():
+            values = predictions
+            if isinstance(metric, _SCORE_METRICS):
+                values = probabilities
+                if isinstance(metric, (BinaryAUROC, BinaryAveragePrecision)) and values.ndim == 2:
+                    values = values[:, 1]
+            targets = loss_targets if problem_type == "regression" else label.long().reshape(predictions.shape)
+            metric.update(values, targets)
+        epoch_iterator.set_postfix(eval_loss=mean_loss.item())
+    if not total_samples:
+        raise ValueError("The evaluation dataset contains no samples.")
+    result = {name: [metric.compute().detach().cpu().tolist()] for name, metric in metrics.items()}
+    result["loss"] = [total_loss / total_samples]
+    return result, pred_labels
+
+
+def save_evaluation_results(metrics, predictions, dataframe, directory):
+    """Write predictions in input row order using the existing CSV filenames."""
+    if len(dataframe) != len(predictions):
+        raise ValueError("Prediction count differs from input rows; evaluation must not drop samples.")
+    result = dataframe.copy()
+    result["pred_label"] = predictions
+    os.makedirs(directory, exist_ok=True)
+    pd.DataFrame(metrics).to_csv(os.path.join(directory, "evaluation_metrics.csv"), index=False)
+    result.to_csv(os.path.join(directory, "evaluation_result.csv"), index=False)
+
 
 if __name__ == '__main__':
+    from datasets import load_dataset
+    from transformers import logging
+
+    from mcp_tools.models.factory.training.data.batch_sampler import BatchSampler
+    from mcp_tools.models.factory.training.models.inference_loader import load_inference_model
+
+    logging.set_verbosity_error()
     parser = argparse.ArgumentParser()
 
     # model params
@@ -142,66 +257,15 @@ if __name__ == '__main__':
     
     if args.test_file is None:
         raise ValueError("test_file is required (can be provided directly or via --dataset_config)")
-    if args.metrics is None:
-        raise ValueError("metrics is required (can be provided directly or via --dataset_config)")
     if args.test_result_dir is None:
         raise ValueError("test_result_dir is required")
 
     os.makedirs(args.test_result_dir, exist_ok=True)
     model, plm_model, tokenizer, device = load_inference_model(args)
+    target_transform = evaluation_target_transform(args)
 
-    # Define metric configurations
-    metric_configs = {
-        'accuracy': {
-            'binary': BinaryAccuracy,
-            'multi': lambda: Accuracy(task="multiclass", num_classes=args.num_labels)
-        },
-        'recall': {
-            'binary': BinaryRecall,
-            'multi': lambda: Recall(task="multiclass", num_classes=args.num_labels)
-        },
-        'precision': {
-            'binary': BinaryPrecision,
-            'multi': lambda: Precision(task="multiclass", num_classes=args.num_labels)
-        },
-        'f1': {
-            'binary': BinaryF1Score,
-            'multi': lambda: F1Score(task="multiclass", num_classes=args.num_labels)
-        },
-        'mcc': {
-            'binary': BinaryMatthewsCorrCoef,
-            'multi': lambda: MatthewsCorrCoef(task="multiclass", num_classes=args.num_labels)
-        },
-        'auroc': {
-            'binary': BinaryAUROC,
-            'multi': lambda: AUROC(task="multiclass", num_classes=args.num_labels)
-        },
-        'f1_max': {
-            'any': lambda: MultilabelF1Max(num_labels=args.num_labels)
-        },
-        'spearman_corr': {
-            'any': SpearmanCorrCoef
-        }
-    }
-
-    # Initialize metrics dictionary
-    metrics_dict = {}
-    args.metrics = args.metrics.split(',')
-
-    # Create metrics based on configurations
-    for metric_name in args.metrics:
-        if metric_name not in metric_configs:
-            raise ValueError(f"Invalid metric: {metric_name}")
-            
-        config = metric_configs[metric_name]
-        if 'any' in config:
-            metrics_dict[metric_name] = config['any']()
-        else:
-            metrics_dict[metric_name] = (config['binary']() if args.num_labels == 2 
-                                       else config['multi']())
-        
-        # Move metric to device
-        metrics_dict[metric_name].to(device)
+    metric_names = [name.strip() for name in (args.metrics or "").split(",") if name.strip()]
+    metrics_dict = build_metrics(metric_names, args.problem_type, args.num_labels, device)
 
     def param_num(model):
         total = sum([param.numel() for param in model.parameters() if param.requires_grad])
@@ -222,7 +286,7 @@ if __name__ == '__main__':
         
         for e in examples:
             # Use the sequence column name from args if available, otherwise default to "aa_seq"
-            sequence_column_name = getattr(args, 'sequence_column_name', 'aa_seq')
+            sequence_column_name = (getattr(args, 'sequence_column_name', None) or 'aa_seq')
             aa_seq = e[sequence_column_name]
             if args.use_foldseek:
                 foldseek_seq = e["foldseek_seq"]
@@ -261,7 +325,7 @@ if __name__ == '__main__':
             if args.use_ss8:
                 ss8_seqs.append(ss8_seq)
             # Use the label column name from args if available, otherwise default to "label"
-            label_column_name = getattr(args, 'label_column_name', 'label')
+            label_column_name = (getattr(args, 'label_column_name', None) or 'label')
             labels.append(e[label_column_name])
         
         if 'ankh' in args.plm_model:
@@ -288,7 +352,7 @@ if __name__ == '__main__':
         data_dict = {
             "aa_seq_input_ids": aa_input_ids,
             "aa_seq_attention_mask": attention_mask,
-            "label": labels
+            label_column_name: labels
         }
         
         if "ProSST" in args.plm_model and prosst_stru_tokens:
@@ -312,12 +376,12 @@ if __name__ == '__main__':
         
         return data_dict
         
-    loss_function = nn.CrossEntropyLoss()
+    loss_function = evaluation_loss(args.problem_type, args.num_labels)
     
     def process_data_line(data):
         # Use the column names from args if available, otherwise use defaults
-        sequence_column_name = getattr(args, 'sequence_column_name', 'aa_seq')
-        label_column_name = getattr(args, 'label_column_name', 'label')
+        sequence_column_name = (getattr(args, 'sequence_column_name', None) or 'aa_seq')
+        label_column_name = (getattr(args, 'label_column_name', None) or 'label')
         
         if args.problem_type == 'multi_label_classification':
             label_list = data[label_column_name].split(',')
@@ -368,6 +432,7 @@ if __name__ == '__main__':
     
     if args.test_file.endswith('json'):
         test_dataset, test_token_num = process_dataset_from_json(args.test_file)
+        test_result_df = pd.DataFrame(test_dataset)
     elif args.test_file.endswith('csv'):
         test_dataset, test_token_num = process_dataset_from_list(load_dataset("csv", data_files=args.test_file)['train'])
         if args.test_result_dir:
@@ -396,6 +461,8 @@ if __name__ == '__main__':
     if args.batch_size is None:
         if args.batch_token is None:
             raise ValueError("batch_size or batch_token must be specified")
+        if any(count > args.batch_token for count in test_token_num):
+            raise ValueError("batch_token is smaller than an input sequence; increase it or use batch_size.")
         test_loader = DataLoader(
             test_dataset, 
             num_workers=args.num_workers, 
@@ -413,8 +480,8 @@ if __name__ == '__main__':
 
     print("---------- Start Eval ----------")
     with torch.no_grad():
-        metric, pred_labels = evaluate(model, plm_model, metrics_dict, test_loader, loss_function, device)
+        metric, pred_labels = evaluate(model, plm_model, metrics_dict, test_loader, loss_function, device,
+                                       problem_type=args.problem_type, label_column_name=args.label_column_name,
+                                       target_transform=target_transform)
         if args.test_result_dir:
-            pd.DataFrame(metric).to_csv(f"{args.test_result_dir}/evaluation_metrics.csv", index=False)
-            test_result_df["pred_label"] = pred_labels
-            test_result_df.to_csv(f"{args.test_result_dir}/evaluation_result.csv", index=False)
+            save_evaluation_results(metric, pred_labels, test_result_df, args.test_result_dir)
