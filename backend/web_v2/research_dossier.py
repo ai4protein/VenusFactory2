@@ -8,7 +8,7 @@ MAX_ENTRY_BYTES = 16 * 1024 * 1024
 MAX_TOTAL_BYTES = 64 * 1024 * 1024
 
 
-def build_dossier(report, inputs=None):
+def build_dossier(report, inputs=None, prediction_files=None):
     """Return a seekable archive. Never follow paths or fetch URLs in evidence."""
     if not report.get("report"):
         raise ValueError("The report is not ready yet")
@@ -106,11 +106,27 @@ def build_dossier(report, inputs=None):
             prediction_index = []
             analysis_files = {section.get("id"): f"analyses/{i:03d}.json"
                               for i, section in enumerate(report.get("sections", []), 1)}
-            for prediction in report.get("predictions", []):
+            artifacts = {row.get("id"): row for row in prediction_files or []}
+            for number, prediction in enumerate(report.get("predictions", []), 1):
                 item = {k: prediction.get(k) for k in (
                     "id", "task", "model", "dataset", "tool", "status", "message",
-                    "sequence_sha256", "job_number", "started", "finished", "evidence_level")}
+                    "sequence_sha256", "job_number", "started", "finished", "evidence_level", "output_scale")}
                 item["analysis_file"] = analysis_files.get("prediction_" + str(prediction.get("id")))
+                artifact = artifacts.get(prediction.get("id"), {})
+                item["artifact"] = {"status": "unverified", "reason": artifact.get("reason", "missing_receipt_binding")}
+                if artifact.get("status") == "included":
+                    raw = artifact.get("content")
+                    if (not isinstance(raw, bytes) or len(raw) != artifact.get("bytes")
+                            or hashlib.sha256(raw).hexdigest() != artifact.get("sha256")
+                            or (prediction.get("output_scale") is not None
+                                and artifact.get("output_scale") != prediction["output_scale"])):
+                        raise ValueError("Prediction artifact changed before packaging")
+                    # Archive paths are generated here, never taken from a tool result.
+                    path = f"predictions/{number:03d}.csv"
+                    add(path, raw)
+                    item["artifact"] = {key: artifact.get(key) for key in ("status", "bytes", "sha256", "validation", "output_scale")}
+                    item["artifact"]["file"] = path
+                    item["output_scale"] = artifact.get("output_scale")
                 prediction_index.append(item)
             if prediction_index:
                 data("predictions/index.json", prediction_index)
@@ -138,7 +154,10 @@ def build_dossier(report, inputs=None):
                 "- drafts/: unaccepted outputs retained for inspection, excluded from the report.\n"
                 "- references.json and sources/: references and evidence snapshots.\n"
                 "- verification/: independent claim assessments, quoted passages and original-source locations, when available.\n"
-                "- analyses/, predictions/index.json and services/: calculation results, prediction status and service receipts.\n"
+                "- analyses/, predictions/ and services/: calculation results, verified CSVs, prediction status and service receipts.\n"
+                "- predictions/index.json: each CSV is included or unverified, with a reason and output scale. "
+                "worker_sha256 matches the original worker receipt byte for byte; complete_saved_values "
+                "matches a complete legacy preview semantically, not its original byte representation.\n"
                 "- materials/: extracted text with available page, sheet or row markers.\n"
                 "- inputs/: saved computation inputs and reference metadata, when present.\n"
                 "- manifest.json: file sizes and SHA-256 checksums.\n\n"
@@ -146,7 +165,8 @@ def build_dossier(report, inputs=None):
                 "Original attachments remain available in the conversation. "
                 "Chapter completion checks do not establish biological validity.\n")
             manifest = {"schema": "venusfactory.research-dossier.v1", "report_id": report.get("id"),
-                        "partial": bool(report.get("partial")), "files": files}
+                        "partial": bool(report.get("partial")), "files": files,
+                        "predictions": [{"id": item["id"], **item["artifact"]} for item in prediction_index]}
             archive.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
         target.seek(0)
         return target

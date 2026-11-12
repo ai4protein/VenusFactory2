@@ -156,7 +156,14 @@ async def download(identity: str, format: Literal['md', 'html', 'json', 'zip'] =
             from backend.web_v2.research_input_snapshot import load_inputs
             snapshot = await call(load_inputs, service.folder(result['id'])/'input_snapshots', result['input_snapshot'])
             inputs = {**inputs, **snapshot}
-        handle = await call(build_dossier, result, inputs)
+        from backend.web_v2.research_prediction_delivery import prediction_artifacts
+        artifacts = await call(prediction_artifacts, service, who, result)
+        handle = await call(build_dossier, result, inputs, artifacts)
+        try:
+            await call(service.owned, who, result['id'])
+        except BaseException:
+            handle.close()
+            raise
         return StreamingResponse(archive_chunks(handle), media_type='application/zip',
             background=BackgroundTask(handle.close),
             headers={'Content-Disposition': f'attachment; filename="{result["job_number"]}.zip"',

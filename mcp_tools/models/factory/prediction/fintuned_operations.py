@@ -9,6 +9,7 @@ from mcp_tools.tools.capability_policy import guard_operation
 from mcp_tools.models.factory.runners.finetuned import in_runtime
 
 import csv
+import hashlib
 import json
 import os
 import sys
@@ -194,14 +195,24 @@ def _download_success_response(
     source: str = _SOURCE,
 ) -> str:
     path = Path(file_path)
-    file_size = path.stat().st_size if path.exists() else 0
     fmt = path.suffix.lstrip(".").lower() or "csv"
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        before = os.fstat(handle.fileno())
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+        after = os.fstat(handle.fileno())
+    if (before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (after.st_size, after.st_mtime_ns, after.st_ctime_ns):
+        raise ValueError("Prediction output changed before its receipt was saved")
+    file_size = after.st_size
+    output_sha256 = digest.hexdigest()
     out: Dict[str, Any] = {
         "status": "success",
         "file_info": {
             "file_path": to_client_file_path(path if path.exists() else file_path),
             "file_name": path.name,
             "file_size": file_size,
+            "sha256": output_sha256,
             "format": fmt,
         },
         "content_preview": (content_preview or "")[:_PREVIEW_LEN],
