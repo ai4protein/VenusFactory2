@@ -18,6 +18,7 @@ from utils.scoped_files import read_bytes, write_bytes
 from .research_model_state import RUNTIME_SUFFIX, training_script, read_fitted_state
 from .research_attempt_resolution import VERSION as ATTEMPT_PROTOCOL, TrainingAttemptError, equivalent_fit
 from .research_execution_feedback import _key as feedback_key
+from .research_training_errors import training_data_diagnostic
 
 
 def validate_training_timeout(value, device):
@@ -101,9 +102,15 @@ async def fit_model(workspace, development, runner, *, name, source_file, evalua
             from .pbs_gpu import run_python as fitting_runner
         execution = await fitting_runner(work, folder/"execution", "train.py", timeout_seconds, **kwargs)
         record["execution"] = execution
-        require(execution["exit_code"] == 0, "Training failed: "+python_failure(
-                execution.get("stderr_tail") or execution.get("stderr") or "inspect the training log", work, 800,
-                source_file=source_file, source_text=code))
+        if execution["exit_code"] != 0:
+            details = execution.get("stderr_tail") or execution.get("stderr") or "inspect the training log"
+            message = "Training failed: " + python_failure(
+                details, work, 800, source_file=source_file, source_text=code)
+            diagnostic = training_data_diagnostic(details, data, stage=record["stage"])
+            if diagnostic:
+                record["diagnostic"] = diagnostic
+                message += "\nTraining diagnostic: " + json.dumps(diagnostic, sort_keys=True)
+            raise ValueError(message)
         require(all(read_bytes(work, path) == content for path, content in inputs.items()),
                 "Training modified its source or input data")
         state_metadata, state_files, state_hash = read_fitted_state(work)
