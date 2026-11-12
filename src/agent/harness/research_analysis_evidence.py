@@ -128,3 +128,57 @@ def checkpointed(receipts, workspace, artifacts):
         except (ValueError, OSError, KeyError, TypeError):
             continue
     return accepted
+
+
+
+def checkpoint_diagnostic(service, checkpoint):
+    """Offer current verified records when an execution claim omitted its evidence.
+
+    This is a repair hint, not step acceptance. Other execution evidence continues
+    to use the same host validator as final review.
+    """
+    from .research_plan_evidence import checkpoint_steps, requirements
+
+    selected = set(checkpoint["completed_steps"])
+    steps = [step["id"] for step in service.plan["steps"]
+             if step["id"] in selected and "execution" in requirements(step)]
+    if not steps:
+        return None
+
+    candidates = []
+    for row in service.receipts:
+        saved = row.get("result", {})
+        artifact = saved.get("artifact") if isinstance(saved, dict) else None
+        if row.get("tool") != "queued_analysis" or not isinstance(artifact, dict):
+            continue
+        path, sha = artifact.get("path"), artifact.get("sha256")
+        if not isinstance(path, str) or not isinstance(sha, str):
+            continue
+        if checkpointed([row], service.workspace, {path: sha}):
+            candidates.append({"path": path, "sha256": sha, "tool": saved["evidence"]["tool"]})
+    if not candidates:
+        return None
+
+    # Check execution alone; data/model/Review requirements retain their normal
+    # downstream checks and must not be replaced by an analysis citation.
+    probe = {"steps": [{"id": steps[0], "verification": "execution"}]}
+    checks = checkpoint_steps(probe, {**checkpoint, "completed_steps": [steps[0]]},
+        workspace=service.workspace, receipts=service.receipts,
+        experiments=service.development.records(), progress={})
+    if checks[0]["passed"]:
+        return None
+    unique = {item["path"]: item for item in candidates}
+    return {
+        "code": "analysis_evidence_not_cited",
+        "step_ids": steps,
+        "available_evidence": list(unique.values()),
+        "message": "Partial work was saved, but the claimed execution steps do not cite verified computation evidence.",
+        "repair": (
+            "Inspect the relevant available_evidence file, then call submit_research_checkpoint again "
+            "with its exact path added to artifacts, keeping your report and other result files. "
+            "Keep a step in completed_steps only if its scientific acceptance criteria are actually satisfied. "
+            "If work is unfinished, submit completed_steps=[] to save a partial checkpoint. "
+            "Do not rerun a valid calculation merely to obtain a missing citation. "
+            "These records prove execution, not target relevance, report accuracy or scientific acceptance."
+        ),
+    }

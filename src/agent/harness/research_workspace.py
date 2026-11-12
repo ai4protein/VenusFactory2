@@ -202,13 +202,29 @@ class ResearchWorkspace:
             raise ValueError('completed_steps accepts exact step IDs only, without titles or descriptions. '
                              'Current step IDs: '+json.dumps(sorted(ids))+
                              '. Put explanations in summary; do not mark unfinished steps complete.')
-        if completed_steps and not artifacts:
-            raise ValueError('Completed steps require existing artifact filenames. '
-                             'Use completed_steps=[] for a partial checkpoint without completed work.')
         saved=[]
         for name in artifacts:
             data=read_bytes(self.workspace,name);saved.append({'path':name,'sha256':hashlib.sha256(data).hexdigest(),'bytes':len(data)})
-        self.checkpoint={'summary':summary[:6000],'completed_steps':completed_steps,'artifacts':saved,'needs_input':needs_input}
+        checkpoint={'summary':summary[:6000],'completed_steps':completed_steps,'artifacts':saved,'needs_input':needs_input}
+        from .research_analysis_evidence import checkpoint_diagnostic
+        diagnostic = checkpoint_diagnostic(self, checkpoint)
+        if completed_steps and not artifacts and diagnostic is None:
+            raise ValueError('Completed steps require existing artifact filenames. '
+                             'Use completed_steps=[] for a partial checkpoint without completed work.')
+        if diagnostic is not None:
+            write_json(self.control/'checkpoint-draft.json', {
+                'schema': 'research-checkpoint-draft.v1',
+                'submitted': {'summary': summary, 'completed_steps': completed_steps,
+                              'artifacts': artifacts, 'needs_input': needs_input},
+                'checkpoint': checkpoint, 'diagnostic': diagnostic,
+            })
+            blocked = set(diagnostic['step_ids'])
+            self.checkpoint = {**checkpoint, 'partial': True,
+                               'completed_steps': [step for step in completed_steps if step not in blocked]}
+            write_json(self.control/'checkpoint.json', self.checkpoint)
+            return {'status': 'error', 'checkpointed': False, 'partial_saved': True,
+                    'artifacts': saved, 'error': diagnostic}
+        self.checkpoint=checkpoint
         write_json(self.control/'checkpoint.json',self.checkpoint)
         return {'checkpointed':True,'artifacts':saved}
 
