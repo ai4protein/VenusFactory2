@@ -70,9 +70,15 @@ class EvidenceGateway(ModelGateway):
         from .empty_response_recovery import POLICY as EMPTY_POLICY
         from .empty_response_recovery import eligible, response_shape
         from .request_recovery import POLICY, matches_rejection
+        from .research_handoff import admit_model_request, closed_phase_response, request_scope
 
-        if request.headers.get("Authorization") != "Bearer " + self.token:
+        try:
+            scope = request_scope(self, request.headers.get("Authorization"))
+        except PermissionError:
             return web.json_response({"error": "invalid relay credential"}, status=401)
+        rejected = closed_phase_response(self, scope)
+        if rejected is not None:
+            return rejected
         if request.path != "/v1/chat/completions" or request.method != "POST":
             return web.json_response({"error": "unsupported model route"}, status=404)
         from .research_handoff import closed_response
@@ -81,6 +87,9 @@ class EvidenceGateway(ModelGateway):
             return handoff
         try:
             incoming = await request.json()
+            rejected = closed_phase_response(self, scope)
+            if rejected is not None:
+                return rejected
             if not isinstance(incoming, dict) or type(incoming.get("stream", False)) is not bool:
                 raise ValueError("Invalid streaming request")
             client_stream = incoming.get("stream", False)
@@ -115,22 +124,18 @@ class EvidenceGateway(ModelGateway):
             deadline = time.monotonic() + self.timeout_s
             logical_call, previous = None, None
             for attempt in range(1, 3 if self.request_recovery != "none" else 2):
+                rejected = closed_phase_response(self, scope)
+                if rejected is not None:
+                    return rejected
                 handoff = closed_response(self.policy, self.record)
                 if handoff is not None:
                     return handoff
                 if time.monotonic() >= deadline:
                     self.record({"event": "request_deadline_exhausted", "logical_call": logical_call})
                     return web.json_response({"error": "logical request deadline exhausted"}, status=502)
-                if self.calls >= self.policy.max_calls:
-                    self.record({"event": "budget_rejected", "code": "model_call_budget_exhausted"})
-                    # This is a fixed run budget, not a temporary provider limit.
-                    # A retry cannot replenish it; native SDKs must stop immediately.
-                    return web.json_response(
-                        {"error": {"message": "model call budget exhausted",
-                                   "type": "budget_exhausted", "code": "model_call_budget_exhausted"}},
-                        status=400,
-                    )
-                self.calls += 1
+                rejected = admit_model_request(self, scope)
+                if rejected is not None:
+                    return rejected
                 call, started = self.calls, time.monotonic()
                 logical_call = logical_call or call
                 recovery = (

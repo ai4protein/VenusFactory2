@@ -426,8 +426,15 @@ class ResponsesGateway(ModelGateway):
         super().__init__(**kwargs)
 
     async def handle(self, request):
-        if request.headers.get("Authorization") != "Bearer " + self.token:
+        from .research_handoff import admit_model_request, closed_phase_response, request_scope
+
+        try:
+            scope = request_scope(self, request.headers.get("Authorization"))
+        except PermissionError:
             return web.json_response({"error": "invalid relay credential"}, status=401)
+        rejected = closed_phase_response(self, scope)
+        if rejected is not None:
+            return rejected
         if request.path != "/v1/responses" or request.method != "POST":
             return web.json_response({"error": "unsupported model route"}, status=404)
         from .research_handoff import closed_response
@@ -436,6 +443,9 @@ class ResponsesGateway(ModelGateway):
             return handoff
         try:
             incoming = await request.json()
+            rejected = closed_phase_response(self, scope)
+            if rejected is not None:
+                return rejected
             if not isinstance(incoming, dict) or type(incoming.get("stream", False)) is not bool:
                 raise ValueError("Invalid streaming request")
             client_stream = incoming.get("stream", False)
@@ -454,11 +464,9 @@ class ResponsesGateway(ModelGateway):
         handoff = closed_response(self.policy, self.record)
         if handoff is not None:
             return handoff
-        if self.calls >= self.policy.max_calls:
-            self.record({"event": "budget_rejected", "code": "model_call_budget_exhausted"})
-            return web.json_response({"error": {"message": "model call budget exhausted",
-                "type": "budget_exhausted", "code": "model_call_budget_exhausted"}}, status=400)
-        self.calls += 1
+        rejected = admit_model_request(self, scope)
+        if rejected is not None:
+            return rejected
         call, started = self.calls, time.monotonic()
         self.record(
             {"event": "request", "call": call, "total_deadline_s": self.timeout_s, "transport": "web_responses_live_text_v1" if self.on_text is not None else TRANSPORT, **metadata}

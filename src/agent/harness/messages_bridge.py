@@ -11,7 +11,6 @@ import asyncio
 import copy
 import hashlib
 import json
-import secrets
 import time
 
 import httpx
@@ -339,10 +338,20 @@ class MessagesBridge(EvidenceGateway):
         # Role calls and native Messages consume this same physical request counter.
         if request.path == "/v1/chat/completions":
             return await super().handle(request)
-        auth = request.headers.get("Authorization", "")
-        key = request.headers.get("x-api-key", "")
-        if not (secrets.compare_digest(auth, "Bearer " + self.token) or secrets.compare_digest(key, self.token)):
+        from .research_handoff import admit_model_request, closed_phase_response, request_scope
+
+        credentials = (request.headers.get("Authorization", ""), "Bearer " + request.headers.get("x-api-key", ""))
+        for credential in credentials:
+            try:
+                scope = request_scope(self, credential)
+                break
+            except PermissionError:
+                continue
+        else:
             return self.error("authentication_error", "Invalid relay credential", 401)
+        rejected = closed_phase_response(self, scope)
+        if rejected is not None:
+            return rejected
         if request.path != self.native_route or request.method != "POST":
             return self.error("invalid_request_error", "Unsupported relay route", 404)
         from .research_handoff import closed_response
@@ -350,7 +359,11 @@ class MessagesBridge(EvidenceGateway):
         if handoff is not None:
             return handoff
         try:
-            payload, native = self.translate_request(await request.json())
+            incoming = await request.json()
+            rejected = closed_phase_response(self, scope)
+            if rejected is not None:
+                return rejected
+            payload, native = self.translate_request(incoming)
             if self.on_text is not None:
                 payload["stream"] = True
             payload, metadata = self.policy.apply(payload)
@@ -366,10 +379,9 @@ class MessagesBridge(EvidenceGateway):
         handoff = closed_response(self.policy, self.record)
         if handoff is not None:
             return handoff
-        if self.calls >= self.policy.max_calls:
-            self.record({"event": "budget_rejected", "code": "model_call_budget_exhausted"})
-            return self.error("invalid_request_error", "Model call budget exhausted", 400)
-        self.calls += 1
+        rejected = admit_model_request(self, scope)
+        if rejected is not None:
+            return rejected
         call, started = self.calls, time.monotonic()
         self.record({"event": "request", "call": call, "transport": self.transport_name, **metadata, **native})
         status, usage, completed, error_type, evidence = None, None, False, None, {}

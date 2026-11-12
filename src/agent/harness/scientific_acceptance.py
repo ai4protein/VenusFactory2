@@ -27,6 +27,9 @@ STUDY_PROMPT = 'You are the independent Scientific Critic (SC) of an ongoing pro
 
 def prompt_for_review(context):
     acceptance = context.get("scientific_acceptance", {})
+    if acceptance.get("analysis_review_policy"):
+        from .analysis_report_review import PROMPT as ANALYSIS_PROMPT
+        return ANALYSIS_PROMPT
     if acceptance.get("study_evidence_required") and not acceptance.get("models"):
         return STUDY_PROMPT + (
             " Return revision_requests under the supplied study_review_policy. "
@@ -208,6 +211,7 @@ def evidence_context(context, proposals, development):
             "supplied_materials",
             "available_tools",
             "artifact_previews",
+            "analysis_evidence",
         )
         if key in context
     }
@@ -221,6 +225,7 @@ def evidence_context(context, proposals, development):
             "failures",
             "superseded_attempts",
             "step_checks",
+            "interruption",
         )
         if key in execution
     }
@@ -244,6 +249,10 @@ def evidence_context(context, proposals, development):
     if result["scientific_acceptance"]["study_evidence_required"]:
         result["scientific_acceptance"]["study_review_policy"] = study_review_state.POLICY
         result["measurement_state"] = study_review_state.measurement_state(result)
+    if (not history and not models and context.get("plan", {}).get("deliverable") == "analysis"
+            and context.get("analysis_evidence", {}).get("computations")):
+        from .analysis_report_review import POLICY as ANALYSIS_POLICY
+        result["scientific_acceptance"]["analysis_review_policy"] = ANALYSIS_POLICY
     facts = {"evaluated_experiment_ids": [row["id"] for row in history],
              "baseline_experiment_ids": [row["id"] for row in history if row["variant"] == "baseline"],
              "revised_experiment_ids": [row["id"] for row in history if row["variant"] == "candidate"],
@@ -261,6 +270,17 @@ def assess(review, context):
     """Fail closed on missing assessments, unmeasured versions or fabricated IDs."""
     models = context["scientific_acceptance"]["models"]
     issues = list(review["issues"])
+    if context.get("execution", {}).get("interruption"):
+        issues.append("Execution was interrupted; partial evidence cannot establish research completion.")
+    if context["scientific_acceptance"].get("analysis_review_policy"):
+        from .analysis_report_review import POLICY as ANALYSIS_POLICY
+        from .analysis_report_review import validate
+        try:
+            if context["scientific_acceptance"]["analysis_review_policy"] != ANALYSIS_POLICY:
+                raise ValueError("Unsupported analysis review policy")
+            validate(review, context)
+        except (ValueError, KeyError, TypeError) as exc:
+            issues.append("analysis_review_inconsistent: " + str(exc))
     if context["scientific_acceptance"].get("study_review_policy") is not None:
         try:
             study_review_state.validate(review, context)

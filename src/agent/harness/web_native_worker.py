@@ -494,6 +494,7 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
                     send(row)
 
     pending = asyncio.create_task(adapter.run(ctx))
+    interruption = None
     try:
         while not pending.done():
             forward()
@@ -507,6 +508,9 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
                 with contextlib.suppress(asyncio.CancelledError):
                     await pending
                 forward()
+                break
+            if checkpoint_handoff is not None and checkpoint_handoff.request_budget_exhausted:
+                pending.cancel()
                 break
             await asyncio.sleep(0.1)
         if interaction is not None:
@@ -529,25 +533,38 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
             (control/'checkpoint_handoff.json').write_text(json.dumps(event,ensure_ascii=False,indent=2))
             send(event)
             return
-        result = await pending
-        forward()
-        if result.get("status") != "completed":
-            raise RuntimeError(result.get("error_type") or result.get("status", "Native turn failed"))
-        event_audit = None
-        if request.get("audit_required"):
-            from .events import audit_trace
-            event_audit = audit_trace(trace, disclosure.names, transport_limit)
-            if not event_audit["passed"]:
-                raise ValueError("Scientific tool trace did not pass validation")
-        text = result.get("final_text") or result.get("text") or result.get("final_message") or ""
-        if not text.strip():
-            raise ValueError("Empty native answer")
-        send({"kind": "text", "text": text})
-        messages = request.get("messages", []) + [
-            {"role": "user", "content": request["text"]},
-            {"role": "assistant", "content": text},
-        ]
-        send({"kind": "completed", "messages": messages, "text": text, "tool_calls": executions, "discovery_calls": lookups, "checkpoint_calls": checkpoint_calls, "event_audit": event_audit})
+        if checkpoint_handoff is not None and checkpoint_handoff.request_budget_exhausted:
+            try:
+                result = await pending
+                termination = result.get("status", "finished")
+            except asyncio.CancelledError:
+                if asyncio.current_task().cancelling():
+                    raise
+                termination = "cancelled_after_model_request_limit"
+            except Exception as exc:
+                termination = "error_after_model_request_limit:" + type(exc).__name__
+            interruption = {"kind": "research_interrupted", "reason": "native_model_request_limit",
+                            "native_termination": termination, "research_complete": False}
+        else:
+            result = await pending
+            forward()
+            if result.get("status") != "completed":
+                raise RuntimeError(result.get("error_type") or result.get("status", "Native turn failed"))
+            event_audit = None
+            if request.get("audit_required"):
+                from .events import audit_trace
+                event_audit = audit_trace(trace, disclosure.names, transport_limit)
+                if not event_audit["passed"]:
+                    raise ValueError("Scientific tool trace did not pass validation")
+            text = result.get("final_text") or result.get("text") or result.get("final_message") or ""
+            if not text.strip():
+                raise ValueError("Empty native answer")
+            send({"kind": "text", "text": text})
+            messages = request.get("messages", []) + [
+                {"role": "user", "content": request["text"]},
+                {"role": "assistant", "content": text},
+            ]
+            send({"kind": "completed", "messages": messages, "text": text, "tool_calls": executions, "discovery_calls": lookups, "checkpoint_calls": checkpoint_calls, "event_audit": event_audit})
     finally:
         async def shutdown():
             nonlocal closing
@@ -566,3 +583,14 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None, 
         from .session_sandbox import _settle
 
         await _settle(asyncio.create_task(shutdown()), propagate=True)
+    if interruption is not None:
+        # Report partial evidence only after every admitted tool has stopped.
+        # Missing/unpaired/failed traces remain evidence against completion.
+        from .events import audit_trace
+
+        forward()
+        audit = audit_trace(trace, disclosure.names, transport_limit)
+        interruption.update(tool_calls=executions, discovery_calls=lookups,
+                            checkpoint_calls=checkpoint_calls, event_audit=audit)
+        (control / "request_budget_interruption.json").write_text(json.dumps(interruption, ensure_ascii=False, indent=2))
+        send(interruption)

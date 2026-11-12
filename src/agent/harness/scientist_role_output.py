@@ -4,6 +4,7 @@ from __future__ import annotations
 import copy
 import json
 import re
+
 from jsonschema import Draft202012Validator, ValidationError
 
 
@@ -12,7 +13,7 @@ def object_schema(properties):
             "required": list(properties), "additionalProperties": False}
 
 
-def specification(role, protocol, *, model_acceptance=False, study_acceptance=False, study_review_policy=None):
+def specification(role, protocol, *, model_acceptance=False, study_acceptance=False, study_review_policy=None, analysis_review_policy=None):
     text = {"type": "string", "minLength": 1, "maxLength": 2000}
     strings = {"type": "array", "items": {"type": "string"}}
     if role == "PI":
@@ -48,6 +49,12 @@ def specification(role, protocol, *, model_acceptance=False, study_acceptance=Fa
                     raise ValueError("Unsupported study review evidence policy")
                 schema["properties"]["revision_requests"] = request_schema()
                 schema["required"].append("revision_requests")
+        elif analysis_review_policy is not None:
+            from .analysis_report_review import POLICY
+            from .analysis_report_review import schema as analysis_schema
+            if analysis_review_policy != POLICY:
+                raise ValueError("Unsupported analysis review evidence policy")
+            schema = analysis_schema()
     else:
         return None
     if role == "CB":

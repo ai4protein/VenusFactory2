@@ -570,6 +570,20 @@ Sources: [DeepLoc 2.0 data](https://services.healthtech.dtu.dk/services/DeepLoc-
 [publication](https://pmc.ncbi.nlm.nih.gov/articles/PMC9252801/), and the authors'
 [code license](https://github.com/teevee112/DeepLoc-2.0/blob/main/LICENSE).
 
+## Research request and evidence boundaries
+
+Native implementation has a physical API-request ceiling that leaves three calls
+for SC and technical Review. Retries count toward that ceiling. If the native
+phase reaches it without a valid checkpoint, admitted tools are stopped before
+SC reviews the preserved partial results. This review cannot complete the plan
+or publish a model; the next episode continues from the saved work.
+
+For analysis deliverables, checkpoint the report and the recorded computation
+artifacts. SC cites exact report quotations, result fields and input provenance.
+The host checks file hashes and declared values, including numeric display
+precision; SC judges whether those results answer the original research question.
+This is separate from measured-model usefulness review and technical admission.
+
 ## Authored GPU training on PBS
 
 Use `submit-pbs`, `status-pbs` and `cancel-pbs` from the section above for

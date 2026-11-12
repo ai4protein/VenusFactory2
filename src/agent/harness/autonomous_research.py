@@ -23,6 +23,7 @@ from .research_updates import apply_revisions
 from .research_plan_evidence import VERIFICATION_KINDS, checkpoint_steps
 from .research_focus import selected_tools, instructions as execution_instructions
 from .research_questions import validate_input_questions
+from .research_request_budget import REVIEW_RESERVE, request_ceiling
 from .research_workspace import ResearchWorkspace, publish_proposals, safe_file
 
 from .capability_review import REVIEW_PROMPT, review_proposal
@@ -214,7 +215,7 @@ class AutonomousResearch:
     async def consult(self, role, context, profile, relay, folder):
         if self.consult_override:return await self.consult_override(role,context)
         from .scientist_role_output import specification, request_fields, output_content
-        spec = specification(role, profile.model.protocol, model_acceptance=role=='SC' and bool(context.get('scientific_acceptance',{}).get('models')), study_acceptance=role=='SC' and context.get('scientific_acceptance',{}).get('study_evidence_required',False), study_review_policy=context.get('scientific_acceptance',{}).get('study_review_policy')) if hasattr(getattr(relay, 'policy', None), 'role_output') else None
+        spec = specification(role, profile.model.protocol, model_acceptance=role=='SC' and bool(context.get('scientific_acceptance',{}).get('models')), study_acceptance=role=='SC' and context.get('scientific_acceptance',{}).get('study_evidence_required',False), study_review_policy=context.get('scientific_acceptance',{}).get('study_review_policy'), analysis_review_policy=context.get('scientific_acceptance',{}).get('analysis_review_policy')) if hasattr(getattr(relay, 'policy', None), 'role_output') else None
         output_spec = spec
         role_prompt=sc_acceptance.prompt_for_review(context) if role=='SC' else ROLES[role]
         instruction=SCIENTIST_PURPOSE+role_prompt+' Respond in the language of the research objective.'
@@ -279,7 +280,7 @@ class AutonomousResearch:
                     # hint; structured() still enforces the complete host schema.
                     format_retry=isinstance(exc,httpx.HTTPStatusError) and exc.response.status_code in {400,404,422} and (spec is not None or 'response_format' in payload)
                     transient=not isinstance(exc,httpx.HTTPStatusError) or exc.response.status_code in {429,500,502,503,504}
-                    if attempt or not (transient or format_retry) or relay.calls>=profile.budget.model_calls-3:raise
+                    if attempt or not (transient or format_retry) or relay.calls>=request_ceiling(role,profile.budget.model_calls):raise
                     if format_retry:
                         payload.pop('response_format', None)
                         if spec:
@@ -307,7 +308,7 @@ class AutonomousResearch:
                 except (ValueError,KeyError,TypeError) as exc:problem=exc
             if isinstance(problem, sc_acceptance.StudyReviewInconsistent):
                 consistency_error=problem
-            if attempt or relay.calls>=profile.budget.model_calls-3:
+            if attempt or relay.calls>=request_ceiling(role,profile.budget.model_calls):
                 if consistency_error:
                     raise sc_acceptance.StudyReviewInconsistent(str(problem)) from problem
                 raise problem
@@ -434,8 +435,8 @@ class AutonomousResearch:
                 if profile.model.protocol=='responses':policy.allowed={'mcp__venusfactory__'+n for n in names}
                 else:policy.scientific_tools=frozenset(names)
                 remaining=profile.budget.model_calls-relay.calls
-                if remaining<4:raise ValueError('No budget left for execution and review')
-                native=replace(profile,mode='science_agent',harness=NATIVE_EXPERT_HARNESSES[profile.harness],budget=replace(profile.budget,model_calls=remaining-3,wall_seconds=max(1,profile.budget.wall_seconds-(time.monotonic()-started))))
+                if remaining<=REVIEW_RESERVE:raise ValueError('No budget left for execution and review')
+                native=replace(profile,mode='science_agent',harness=NATIVE_EXPERT_HARNESSES[profile.harness],budget=replace(profile.budget,model_calls=remaining-REVIEW_RESERVE,wall_seconds=max(1,profile.budget.wall_seconds-(time.monotonic()-started))))
                 instructions=execution_instructions(context,native.budget.tool_calls)
                 request={'session_id':self.store.root.name,'profile':native.public(),'runtimes':self.runtimes,'research_focus':focus,'workspace':str(workspace),'control':str(folder),'messages':[],'text':json.dumps(context,ensure_ascii=False),'instructions':instructions,'base_url':relay.base_url,'token':relay.token,'budget':native.public()['budget'],'lang':'zh' if any('\u4e00'<=c<='\u9fff' for c in context['objective']) else 'en'}
                 phase('MLS')
@@ -444,12 +445,12 @@ class AutonomousResearch:
                     from .web_native_worker import run
                     request['audit_required']=True
                     from .research_handoff import native_phase
-                    with native_phase(policy) as handoff:
-                        await run(request,tools=tools,event_sink=event_sink,checkpoint_handoff=handoff,analysis_recorder=service.record_queued_analysis)
+                    with native_phase(policy,relay=relay,reserve_calls=REVIEW_RESERVE) as handoff:
+                        await run({**request,"token":handoff.relay_token},tools=tools,event_sink=event_sink,checkpoint_handoff=handoff,analysis_recorder=service.record_queued_analysis)
                 from .execution_followup import execution_followup, execution_usage
                 followup = execution_followup(
                     request, native, events, checkpoint=service.checkpoint,
-                    remaining_calls=profile.budget.model_calls-relay.calls-3,
+                    remaining_calls=profile.budget.model_calls-relay.calls-REVIEW_RESERVE,
                     remaining_seconds=max(0,profile.budget.wall_seconds-(time.monotonic()-started)))
                 if followup is not None:
                     retry_folder=folder/'execution_retry';retry_folder.mkdir()
@@ -485,8 +486,8 @@ class AutonomousResearch:
                         await self.executor_override(followup,service,events)
                     else:
                         from .research_handoff import native_phase
-                        with native_phase(policy) as handoff:
-                            await run(followup,tools=tools,event_sink=event_sink,checkpoint_handoff=handoff,analysis_recorder=service.record_queued_analysis)
+                        with native_phase(policy,relay=relay,reserve_calls=REVIEW_RESERVE) as handoff:
+                            await run({**followup,"token":handoff.relay_token},tools=tools,event_sink=event_sink,checkpoint_handoff=handoff,analysis_recorder=service.record_queued_analysis)
                 awaiting=next((e for e in events if e.get('kind')=='interaction'),None)
                 if awaiting:
                     from .interactions import Interaction
@@ -495,18 +496,34 @@ class AutonomousResearch:
                     progress.pop('reviewed_episode',None)
                     self.activity(folder,'MLS',json.dumps(gate,ensure_ascii=False))
                     raise AwaitUser()
-                execution=next((e for e in reversed(events) if e.get('kind')=='completed'),None)
+                execution=next((e for e in reversed(events) if e.get('kind') in {'completed','research_interrupted'}),None)
                 if not execution:raise ValueError('Native executor did not complete')
-                if not (execution.get('event_audit') or {}).get('passed'):raise ValueError('Scientific execution evidence was not validated')
-                self.activity(folder,'MLS',execution['text'])
+                interrupted=(execution.get('kind')=='research_interrupted'
+                    and execution.get('reason')=='native_model_request_limit'
+                    and execution.get('research_complete') is False)
+                if execution.get('kind')=='research_interrupted' and not interrupted:
+                    raise ValueError('Native executor interruption was not recognized')
+                if not interrupted and not (execution.get('event_audit') or {}).get('passed'):
+                    raise ValueError('Scientific execution evidence was not validated')
+                execution_report=('Execution reached its model request limit. Review partial evidence; research is not complete.'
+                    if interrupted else execution['text'])
+                self.activity(folder,'MLS',execution_report)
                 checkpoint=service.checkpoint
-                context['execution']={'report':execution['text'],'checkpoint':checkpoint,'receipts':service.receipts,'tool_results':[e for e in events if e.get('kind')=='tool_result'][-20:]}
+                context['execution']={'report':execution_report,'checkpoint':checkpoint,'receipts':service.receipts,'tool_results':[e for e in events if e.get('kind')=='tool_result'][-20:]}
+                if interrupted:
+                    context['execution']['interruption']={key:copy.deepcopy(execution[key]) for key in
+                        ('reason','research_complete','event_audit','native_termination') if key in execution}
                 previews=[]
                 for row in (checkpoint or {}).get('artifacts',[]):
                     p=safe_file(workspace,row['path']);preview={'path':row['path'],'sha256':row['sha256']}
-                    if p.suffix in {'.json','.txt','.md','.csv','.py'} and p.stat().st_size<=40000:preview['content']=p.read_text(errors='replace')
+                    if p.suffix in {'.json','.txt','.md','.csv','.py'} and p.stat().st_size<=40000:preview['content']=p.read_bytes().decode('utf-8',errors='replace')
                     previews.append(preview)
                 context['artifact_previews']=previews
+                if any(row.get('tool')=='queued_analysis' for row in service.receipts):
+                    from .research_analysis_provenance import build_evidence_index
+                    context['analysis_evidence']=build_evidence_index(workspace,receipts=service.receipts,
+                        inputs=progress.get('inputs',[]),checkpoint=checkpoint,
+                        source_reader=data_store.input_bytes if data_store else None)
                 current_feedback=feedback_state(events,workspace,progress.get('execution_feedback'),development=development)
                 context['execution']['failures']=current_feedback['errors']
                 context['execution']['superseded_attempts']=current_feedback.get('superseded', [])
@@ -527,6 +544,10 @@ class AutonomousResearch:
                 elif sc_context['scientific_acceptance'].get('study_evidence_required'):
                     def validator(raw):
                         return sc_acceptance.parse_study_review(raw, sc_context)
+                if sc_context['scientific_acceptance'].get('analysis_review_policy'):
+                    from .analysis_report_review import parse_review
+                    def validator(raw):
+                        return parse_review(raw,sc_context)
                 review=await self.structured('SC',sc_context,profile,relay,folder,validator)
                 progress.pop('review_evidence_error',None)
                 write_json(folder/'review.json',review)
@@ -542,6 +563,7 @@ class AutonomousResearch:
                 checkpoint_valid=verified_checkpoint(workspace,checkpoint,service.receipts,require_completed_steps=False)
                 request_valid=audit_requests(folder/'model_requests.jsonl')['passed']
                 host_issues=[row['error'] for row in context['execution']['failures']]
+                if interrupted:host_issues.append('Execution reached its model request limit; inspect partial work and submit a verified checkpoint in a later episode.')
                 if not checkpoint_valid:host_issues.append('Submit a checkpoint with unchanged artifacts and execution receipts.')
                 if not request_valid:host_issues.append('Model request evidence did not pass verification.')
                 reviewable=not host_issues
