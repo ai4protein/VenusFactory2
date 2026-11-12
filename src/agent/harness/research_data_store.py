@@ -240,7 +240,10 @@ class ResearchDataStore:
             previous = {value.get("partition") for value in self.entries.values()
                         if value.get("sha256") == entry["sha256"]}
             if previous - {None, fixed_partition}:
-                raise ValueError("Keep the original held-out partition; changing the split would expose withheld observations")
+                raise ValueError("Keep the original held-out partition; changing the split would expose withheld observations. "
+                                 "The source is already prepared. Reuse its previously returned evaluation_file in "
+                                 "train_research_model; in Scientist it is model_development.prepared_dataset.evaluation_file. "
+                                 "The visible table contains training rows only and must not be split again.")
         views = []
         for source, raw, fixed_partition, selected_ids, id_column, columns in plans:
             delimiter = "\t" if source.lower().endswith((".tsv", ".tab")) else ","

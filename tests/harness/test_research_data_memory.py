@@ -139,4 +139,11 @@ async def test_next_scientist_iteration_reuses_host_verified_preparation(tmp_pat
     assert contexts[0] is None and contexts[1]["status"] == "verified"
     assert requests[1]["model_development"]["prepared_dataset"]["columns"]["target_column"] == "measurement"
     assert requests[1]["model_development"]["selected_tools"] == ["get_research_baseline", "train_research_model"]
+    next_action = requests[1]["model_development"]["next_action"]
+    assert "dataset_tool" not in next_action
+    assert next_action["evaluation_file"] == contexts[1]["evaluation_file"]
+    from agent.harness.research_focus import instructions
+    assert "do not prepare it again" in instructions(requests[1], 12)
+    assert "then use prepare_research_dataset" not in instructions(requests[1], 12)
+    assert requests[0]["model_development"]["next_action"]["dataset_tool"] == "prepare_research_dataset"
     assert result["status"] != "completed"

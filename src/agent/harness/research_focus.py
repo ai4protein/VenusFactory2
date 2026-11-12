@@ -30,13 +30,19 @@ def admitted_tools(request, mapping):
     return {name for name in names if name in mapping}
 
 def instructions(context, tool_calls):
+    prepared = context.get("model_development", {}).get("prepared_dataset")
+    data_step = (
+        "The dataset has already been prepared. Use model_development.prepared_dataset.evaluation_file in training; "
+        "the source file exposes training rows only. Preserve the fixed split and do not prepare it again. "
+        if prepared else
+        "Inspect table headers and biological groups, then use prepare_research_dataset for measured tabular data. "
+    )
     return (
         "You are the Machine Learning Specialist. Execute the next unfinished research step using the supplied real materials. "
         "Use context.model_development.next_action and the selected tool interfaces. Other enabled capabilities remain searchable. "
         "When model_development.repair_source is present, repair that saved implementation from its actual failure before refitting. "
-        "Reuse model_development.prepared_dataset when present: its source and splits were hash-verified. "
-        "Otherwise inspect table headers before choosing columns. Preserve observed targets and biological groups. "
-        "For a tabular model, prepare_research_dataset makes reproducible splits; write a complete fit(training, seed) and "
+        + data_step +
+        "Preserve observed targets and biological groups. Write a complete fit(training, seed) and "
         "predict(model, inputs) module, then call train_research_model. Defining functions is not fitting a model. "
         "Use host validation feedback to implement and measure a child generation on the same split. Keep failed trials as evidence. "
         "Existing fitted runtimes can use evaluate_research_model; platform PLMs can use enabled queued training tools "
