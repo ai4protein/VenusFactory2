@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src"))
 from agent.harness import Profile
 from agent.harness.autonomous_research import AutonomousResearch, create
@@ -23,6 +24,8 @@ def main(argv=None):
     parser.add_argument("--output", required=True, help="Scientist goal directory")
     parser.add_argument("--profile", help="Profile JSON used when creating a goal")
     parser.add_argument("--objective")
+    parser.add_argument("--input", action="append", default=[], metavar="PATH",
+                        help="Local input file to snapshot when creating a goal; repeat for multiple files")
     parser.add_argument("--credential-toml")
     parser.add_argument("--pbs-config", help="Administrator-owned PBS configuration")
     parser.add_argument("--resource-profile", default="gpu")
@@ -34,6 +37,8 @@ def main(argv=None):
     ]:
         parser.add_argument("--" + name, type=int, default=default)
     args = parser.parse_args(argv)
+    if args.input and args.action != "create":
+        parser.error("--input applies only to create; later attachments use research revision")
     pbs_action = args.action.endswith("-pbs")
     if pbs_action and not args.pbs_config:
         parser.error("--pbs-config is required for PBS actions")
@@ -57,12 +62,18 @@ def main(argv=None):
     if args.action == "create":
         if not args.profile or not args.objective:
             parser.error("create requires --profile and --objective")
-        create(
-            args.output, Profile.from_dict(json.loads(Path(args.profile).read_text())),
-            args.objective, {key: getattr(args, key) for key in [
-                "max_cycles", "model_calls", "tool_calls", "wall_seconds",
-            ]},
-        )
+        from agent.harness.research_cli_inputs import prepare_inputs, stage_inputs
+
+        profile = Profile.from_dict(json.loads(Path(args.profile).read_text()))
+        with prepare_inputs(args.input) as inputs:
+            store = create(
+                args.output, profile, args.objective,
+                {key: getattr(args, key) for key in [
+                    "max_cycles", "model_calls", "tool_calls", "wall_seconds",
+                ]},
+            )
+            if inputs:
+                stage_inputs(store, inputs)
         return
     from agent.harness.pbs_goal import assert_execution_allowed
 

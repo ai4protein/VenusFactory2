@@ -141,7 +141,8 @@ checkout. For an already prepared goal, start at `submit-pbs`:
 python scripts/rsi/run_autonomous_research.py create \
   --output runtime/local/scientist-goals/my-topic \
   --profile configs/my-scientist-profile.json \
-  --objective "Develop and evaluate a predictor from the supplied measurements."
+  --objective "Develop and evaluate a predictor from the supplied measurements." \
+  --input ./measurements.csv --input ./paper.pdf
 python scripts/rsi/run_autonomous_research.py submit-pbs \
   --output runtime/local/scientist-goals/my-topic \
   --pbs-config configs/pbs-goals.local.json --resource-profile gpu
@@ -152,6 +153,22 @@ python scripts/rsi/run_autonomous_research.py cancel-pbs \
   --output runtime/local/scientist-goals/my-topic \
   --pbs-config configs/pbs-goals.local.json
 ```
+
+Repeat `--input PATH` during `create` for each supplied file, up to 32 files with
+unique filenames. The CLI validates all inputs before creating the goal, copies
+independent snapshots to `workspace/inputs/`, and records their original name,
+size, SHA-256 and relative path in `progress.inputs` with `source_type="cli"`.
+External file paths are not included in model context. Files generated later in
+the workspace are not treated as uploaded materials.
+
+Model-development tables use the same protected data store as Web uploads;
+the workspace exposes metadata and, after preparation, training rows. Raw labels
+remain outside the execution sandbox. Source files are not modified. Failed
+preparation retains its files and `cli-input-preparation.json` diagnostics and
+leaves the goal interrupted. Correct the inputs and create a new goal.
+`--input` is not accepted by `run`, `resume` or PBS commands; later attachments
+use research revision. These local paths are unavailable in online mode, where
+inputs must use the existing session upload flow.
 
 Submission freezes the source revision and records the goal, profile, resource
 request and scheduler identity. Status and cancellation use that recorded job.
