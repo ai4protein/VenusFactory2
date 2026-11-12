@@ -50,7 +50,7 @@ def environment(cfg):
                'VENUS_JOB_QUEUE_ROOT','VENUS_CAPABILITY_DB','VENUS_MODEL_RUNTIMES_CONFIG'}
     env = {k:v for k,v in os.environ.items() if k in allowed}
     env.update(PYTHONPATH=os.pathsep.join([str(PROJECT),str(PROJECT/'src')]),
-               PYTHONNOUSERSITE='1',PYTHON_DOTENV_DISABLED='1')
+               PYTHONNOUSERSITE='1',PYTHON_DOTENV_DISABLED='1',PYTHONDONTWRITEBYTECODE='1')
     if os.getenv('VENUS_TOOL_WORKSPACE'):
         # Session-authored checkpoints are untrusted tensor data, never pickle code.
         env['TORCH_FORCE_WEIGHTS_ONLY_LOAD'] = '1'

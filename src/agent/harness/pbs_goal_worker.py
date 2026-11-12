@@ -156,6 +156,7 @@ def run_record(record_path):
             async with queue_run(record), tool_service(record):
                 return await AutonomousResearch(store, credential, runtimes).run()
         result = asyncio.run(execute())
+        verify_source(record["source"])  # Children must not mutate the admitted source.
         goal_status = result["status"]
         return result
     except BaseException as exc:

@@ -109,13 +109,13 @@ def ensure_service(*, listener=None, scheduler_only=False, env_overrides=None):
         bootstrap = control / "bootstrap.py"
         paths = [str(ROOT / "src"), str(ROOT), *(p for p in sys.path if p and Path(p).exists())]
         options = {"_VENUS_SCHEDULER_ONLY": scheduler_only, "_VENUS_LISTENER_FD": listener.fileno() if listener is not None else None}
-        bootstrap.write_text("import sys,runpy,os\nsys.path=" + repr(paths) + "\nos.chdir(" + repr(str(ROOT)) +
+        bootstrap.write_text("import sys\nsys.dont_write_bytecode=True\nimport runpy,os\nsys.path=" + repr(paths) + "\nos.chdir(" + repr(str(ROOT)) +
                              ")\nrunpy.run_module(\"mcp_tools.mcp_server\",run_name=\"__main__\",init_globals=" + repr(options) + ")\n")
         env = dict(os.environ, MCP_HTTP_HOST="127.0.0.1", MCP_HTTP_PORT=str(port()), PYTHONDONTWRITEBYTECODE="1")
         if env_overrides:
             env.update(env_overrides)
         with (control / "server.log").open("ab") as log:
-            proc = subprocess.Popen([sys.executable, "-I", "-u", str(bootstrap)], cwd=ROOT, env=env,
+            proc = subprocess.Popen([sys.executable, "-I", "-B", "-u", str(bootstrap)], cwd=ROOT, env=env,
                                     stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT, start_new_session=True,
                                     pass_fds=(listener.fileno(),) if listener is not None else ())
         token = process_token(proc.pid)

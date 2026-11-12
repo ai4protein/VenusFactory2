@@ -15,6 +15,7 @@ from agent.harness import pbs_goal_worker as worker
 from agent.science_goal import GoalSpec, GoalStore
 
 ROOT = Path(__file__).resolve().parents[2]
+REAL_VERIFY_SOURCE = snapshot.verify_source
 
 
 def git(repo, *args):
@@ -174,7 +175,7 @@ def context(tmp_path, monkeypatch):
 def test_worker_verifies_allocation_then_free_route_and_preserves_goal_status(context):
     result = worker.run_record(context.path)
     assert result["status"] == "waiting_for_input"
-    assert context.calls == ["claim", "source", "allocation", "ready", "free", "runtime", "run"]
+    assert context.calls == ["claim", "source", "allocation", "ready", "free", "runtime", "run", "source"]
     assert context.finished == [("waiting_for_input", None)]
     assert os.environ["VENUS_SCIENTIST_PBS_RECORD"] == str(context.path)
     for name in ("VENUS_JOB_QUEUE_ROOT", "VENUS_SANDBOX_CONTROL_ROOT", "VENUS_RUNTIME_ROOT"):
@@ -500,3 +501,22 @@ def test_release_archive_attributes_do_not_drop_or_replace_tracked_bytes(repo, t
     assert before == {"attributes": (repo / ".gitattributes").read_bytes(), "info": info.read_bytes(),
                       "config": (repo / ".git/config").read_bytes(), "status": git(repo, "status", "--porcelain")}
     snapshot.verify_source(value)
+
+
+def test_worker_rejects_source_pollution_after_children_exit(context, repo, tmp_path, monkeypatch):
+    from agent.harness import autonomous_research
+
+    monkeypatch.setattr(snapshot, "verify_source", REAL_VERIFY_SOURCE)
+    context.record["source"] = snapshot.freeze_source(repo, tmp_path / "frozen-worker")
+    monkeypatch.setattr(worker, "_source_bindings", lambda source: None)
+    unexpected = Path(context.record["source"]["root"]) / "unexpected.pyc"
+
+    async def polluted_run():
+        unexpected.write_bytes(b"synthetic-child-cache")
+        return {"status": "completed", "cycles": []}
+
+    monkeypatch.setattr(autonomous_research, "AutonomousResearch", lambda *args: SimpleNamespace(run=polluted_run))
+    with pytest.raises(ValueError, match="Source snapshot contents changed"):
+        worker.run_record(context.path)
+    assert unexpected.exists()  # Preserve the failed attempt for diagnosis.
+    assert context.finished == [("interrupted", "ValueError")]

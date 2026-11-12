@@ -81,7 +81,7 @@ def _ensure_pool_locked(q, namespace, env, folder):
     boot=dict(env,VENUS_JOB_QUEUE_ROOT=str(q.root),PYTHONPATH=str(PROJECT)+os.pathsep+str(PROJECT/'src')+os.pathsep+env.get('PYTHONPATH',''))
     for key in ('VENUS_QUEUE_JOB_ID','VENUS_QUEUE_OWNER','VENUS_QUEUE_LEASE_TOKEN'):boot.pop(key,None)
     with (folder/'supervisor.log').open('ab') as log:
-        proc=subprocess.Popen([sys.executable,'-u','-m','backend.web_v2.worker_pool','supervise',namespace],env=boot,cwd=PROJECT,
+        proc=subprocess.Popen([sys.executable,'-B','-u','-m','backend.web_v2.worker_pool','supervise',namespace],env=boot,cwd=PROJECT,
                               stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
     token=process_token(proc.pid)
     if not token:raise RuntimeError('Worker supervisor did not start')
@@ -156,7 +156,7 @@ def execute(q, row):
                     if time.monotonic()>until:raise RuntimeError('Execution lease is still held')
                     q.heartbeat(identity,lease);time.sleep(.1)
         with log_path.open('ab') as log:
-            proc=subprocess.Popen([sys.executable,'-u','-m','backend.web_v2.worker_pool','child',identity,lease],env=env,cwd=spec['cwd'],
+            proc=subprocess.Popen([sys.executable,'-B','-u','-m','backend.web_v2.worker_pool','child',identity,lease],env=env,cwd=spec['cwd'],
                                   stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
         child_token=process_token(proc.pid);started=time.monotonic();beat=0
         while proc.poll() is None:
@@ -286,7 +286,7 @@ def supervise(namespace):
                     for slot in range(count):
                         key=(family,slot);old=workers.get(key)
                         if old is None or old.poll() is not None:
-                            workers[key]=subprocess.Popen([sys.executable,'-u','-m','backend.web_v2.worker_pool','work',namespace,family],stdin=subprocess.DEVNULL)
+                            workers[key]=subprocess.Popen([sys.executable,'-B','-u','-m','backend.web_v2.worker_pool','work',namespace,family],stdin=subprocess.DEVNULL)
                 with q.connection(True) as c:
                     q._recover(c)
                     pending=c.execute("SELECT COUNT(*) FROM jobs WHERE namespace=? AND status IN ('queued','running')",(namespace,)).fetchone()[0]
