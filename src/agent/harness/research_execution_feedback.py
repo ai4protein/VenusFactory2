@@ -7,18 +7,24 @@ from .tool_diagnostics import bounded_message
 
 
 def _failure_message(value, workspace):
-    """Keep execution evidence distinct from host scheduling guidance."""
-    text = re.sub(
-        r"Execution budget: [0-9]+ tool calls remain;\s*[0-9]+ read-only discovery calls remain\.\s*"
-        r"Save a checkpoint when the current step is ready\.\s*"
-        r"Checkpoint saves have a separate allowance:\s*[0-9]+ remain\.", "", str(value))
-    lines = text.splitlines()
-    evidence = [line for line in lines if not (
-        line.startswith("Execution budget: ")
-        and " tool calls remain; " in line
-        and " read-only discovery calls remain." in line
-        and "Checkpoint saves have a separate allowance:" in line
-    ) and line != "Checkpoint saved. End this iteration with a short summary; do not call further tools."]
+    """Keep execution evidence distinct from exact host scheduling footers."""
+    text = str(value)
+    normal = "Save a checkpoint when the current step is ready."
+    urgent = "Save submit_research_checkpoint now with actual artifacts and only completed steps."
+    # Native transports can concatenate separate MCP text blocks without a
+    # newline. Match only the complete terminal footer emitted by the host;
+    # a partial or merely similar sentence remains part of the diagnostic.
+    footer = re.search(
+        r"Execution budget: (0|[1-9][0-9]*) tool calls remain; "
+        r"(?:0|[1-9][0-9]*) read-only discovery calls remain\. "
+        + "(" + re.escape(normal) + "|" + re.escape(urgent) + ")"
+        + r" Checkpoint saves have a separate allowance: (?:0|[1-9][0-9]*) remain\.\Z",
+        text,
+    )
+    if footer and footer.group(2) == (urgent if int(footer.group(1)) <= 2 else normal):
+        text = text[:footer.start()]
+    evidence = [line for line in text.splitlines()
+                if line != "Checkpoint saved. End this iteration with a short summary; do not call further tools."]
     return bounded_message("\n".join(evidence).strip() or "Tool failed", workspace, 1200)
 
 
