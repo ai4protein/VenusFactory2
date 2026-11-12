@@ -17,7 +17,8 @@ CONTROLS = frozenset({SEARCH, DESCRIBE, CALL})
 GUIDANCE = CAPABILITY_BOUNDARY + '\n\n' + (
     'Discover progressively: categories first; then search_tools(category=ID, query=task_or_model) '
     'for names and brief descriptions; then describe_tool(name) only for a selected capability. '
-    'call_tool uses that declared interface. Use matching_models arguments for a specifically requested model. '
+    'For a tool exposed by name, pass its declared fields directly; only call_tool takes the name/arguments envelope. '
+    'Use matching_models arguments for a specifically requested model. '
     'search_tools, describe_tool and call_tool are already exposed; call these navigation functions directly. '
     'Available session file operations are also directly exposed; invoke them by name to read, write and run code. '
     'The initial category overview contains no individual models or skills. Summarize it for general '
