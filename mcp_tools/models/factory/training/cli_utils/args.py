@@ -63,6 +63,8 @@ def add_dataset_args(parser: argparse.ArgumentParser):
     data_group.add_argument('--dataset', type=str)
     data_group.add_argument('--dataset_config', type=str)
     data_group.add_argument('--normalize', type=str)
+    data_group.add_argument('--target_unit', type=str, default=None,
+                            help='Explicit target unit saved with regression models; unspecified remains unknown')
     data_group.add_argument('--num_labels', type=int)
     data_group.add_argument('--problem_type', type=str)
     data_group.add_argument('--sequence_column_name', type=str, default='aa_seq')
@@ -170,9 +172,9 @@ def process_dataset_config(args: argparse.Namespace):
         for key in [
             "dataset", "pdb_type", "pdb_dir", "train_file", "valid_file", "test_file",
             "num_labels", "problem_type", "monitor", "monitor_strategy", "metrics",
-            "normalize", "gnn_config", "gnn_model_path", "c_alpha_max_neighbors",
+            "normalize", "target_unit", "gnn_config", "gnn_model_path", "c_alpha_max_neighbors",
         ]:
-            if getattr(args, key) is None and key in config:
+            if getattr(args, key, None) is None and key in config:
                 setattr(args, key, config[key])
 
         # Structure channels and table mappings are defined by the dataset preset.

@@ -1,15 +1,21 @@
-import os
 import json
+import os
+import tempfile
+from pathlib import Path
+
 import torch
 import torch.nn.functional as F
-from tqdm import tqdm
-from accelerate import Accelerator
-from mcp_tools.models.factory.training.loop.scheduler import create_scheduler
-from mcp_tools.models.factory.training.loop.metrics import setup_metrics
-from mcp_tools.models.factory.training.loop.loss_function import MultiClassFocalLossWithAlpha
 import wandb
-from mcp_tools.models.factory.training.models.model_factory import create_plm_and_tokenizer
+from accelerate import Accelerator
 from peft import PeftModel
+from tqdm import tqdm
+
+from mcp_tools.models.factory.target_transform import checkpoint_transform_path, save_checkpoint_transform
+from mcp_tools.models.factory.training.loop.loss_function import MultiClassFocalLossWithAlpha
+from mcp_tools.models.factory.training.loop.metrics import setup_metrics
+from mcp_tools.models.factory.training.loop.scheduler import create_scheduler
+from mcp_tools.models.factory.training.models.model_factory import create_plm_and_tokenizer
+
 
 class Trainer:
     def __init__(self, args, model, plm_model, logger, train_loader):
@@ -423,6 +429,42 @@ class Trainer:
         else:
             model_state = {k: v.cpu() for k, v in self.model.state_dict().items()}
             torch.save(model_state, path)
+        # Keep checkpoint formats unchanged. Publish the fitted state only after
+        # weights are saved; interrupted/mismatched publication fails on loading.
+        target_transform = getattr(self.args, "target_transform", None)
+        new_classification = (
+            hasattr(self.args, "target_transform")
+            and hasattr(self.args, "target_transform_schema")
+            and self.args.target_transform_schema is None
+            and self.args.problem_type in {
+                "single_label_classification", "multi_label_classification",
+                "residue_single_label_classification", "residue_multi_label_classification",
+            }
+        )
+        if target_transform is not None or new_classification:
+            # Every new checkpoint (including alternate/last names) carries its
+            # own saved scale contract. CLI defaults cannot replace this record.
+            config = dict(vars(self.args))
+            if new_classification:
+                config.update(normalize=None, target_transform=None, target_transform_schema=None)
+            config_path = Path(path).with_suffix(".json")
+            descriptor, temporary = tempfile.mkstemp(prefix="." + config_path.name + ".", dir=config_path.parent)
+            try:
+                with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+                    json.dump(config, stream, allow_nan=False)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                os.replace(temporary, config_path)
+            finally:
+                if os.path.exists(temporary):
+                    os.unlink(temporary)
+            if target_transform is not None:
+                save_checkpoint_transform(path, target_transform, config=config)
+            else:
+                # Only this successfully overwritten classification checkpoint
+                # loses its stale regression sidecar; legacy calls are untouched.
+                checkpoint_transform_path(path).unlink(missing_ok=True)
+
 
     def load_initial_model(self, model_path: str):
         """

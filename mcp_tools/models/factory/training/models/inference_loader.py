@@ -2,13 +2,20 @@
 Unified inference model loader for predict (single + batch) and evaluate.
 Uses model_factory.create_plm_and_tokenizer and loads adapter/LoRA checkpoints in one place.
 """
-import os
 import json
+import os
+
 import torch
-from mcp_tools.models.factory.training.models.model_factory import create_plm_and_tokenizer, get_hidden_size, get_vocab_size
+from peft import PeftModel
+
+from mcp_tools.models.factory.target_transform import load_checkpoint_transform, target_output_scale
 from mcp_tools.models.factory.training.models.adapter_model import AdapterModel
 from mcp_tools.models.factory.training.models.lora_model import LoraModel
-from peft import PeftModel
+from mcp_tools.models.factory.training.models.model_factory import (
+    create_plm_and_tokenizer,
+    get_hidden_size,
+    get_vocab_size,
+)
 
 
 def _resolve_model_path(args):
@@ -26,6 +33,9 @@ def _load_config_into_args(args, config_path):
     try:
         with open(config_path, "r") as f:
             config = json.load(f)
+        if not isinstance(config, dict):
+            raise ValueError("Checkpoint configuration must be a JSON object")
+        args._checkpoint_config = config
         for key in (
             "pooling_method",
             "problem_type",
@@ -33,6 +43,9 @@ def _load_config_into_args(args, config_path):
             "num_attention_head",
             "attention_probs_dropout",
             "pooling_dropout",
+            "normalize",
+            "target_unit",
+            "label_column_name",
         ):
             if key in config:
                 setattr(args, key, config[key])
@@ -80,12 +93,29 @@ def load_inference_model(args, verbose=True):
     if not os.path.exists(model_path):
         raise FileNotFoundError(f"Model file not found: {model_path}")
 
-    config_name = model_path.split("/")[-1].replace(".pt", ".json")
+    config_name = os.path.splitext(os.path.basename(model_path))[0] + ".json"
     config_path = os.path.join(os.path.dirname(model_path), config_name)
-    if _load_config_into_args(args, config_path) and verbose:
-        print(f"Loaded configuration from {config_path}")
-    elif verbose:
-        print(f"Model config not found at {config_path}. Using command line arguments.")
+    if not os.path.isfile(config_path):
+        registered_config = os.path.join(os.path.dirname(model_path), "training_config.json")
+        if os.path.isfile(registered_config):
+            config_path = registered_config
+    args._checkpoint_config = {}
+    loaded_config = _load_config_into_args(args, config_path)
+    if verbose:
+        if loaded_config:
+            print(f"Loaded configuration from {config_path}")
+        else:
+            print(f"Model config not found at {config_path}. Using command line arguments.")
+
+    # Verify saved statistics against the actual checkpoint before loading a PLM.
+    # Missing legacy metadata remains unknown; CLI defaults cannot prove scale.
+    saved_config = args._checkpoint_config
+    args.target_transform = load_checkpoint_transform(model_path, saved_config)
+    if args.target_transform is not None and (
+        getattr(args, "problem_type", None) != "regression" or getattr(args, "num_labels", None) != 1
+    ):
+        raise ValueError("Checkpoint target transform requires scalar regression")
+    args.prediction_output_scale = target_output_scale(saved_config, args.target_transform)
 
     _normalize_structure_seq_args(args)
 

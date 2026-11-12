@@ -1,18 +1,24 @@
-import sys
-import os
 import argparse
-import torch
-import re
 import json
 import os
+import re
+import sys
 import warnings
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
-from pathlib import Path
+import torch
 from tqdm import tqdm
 from transformers import logging
+
+from mcp_tools.models.factory.target_transform import inverse_targets, target_output_scale
 from mcp_tools.models.factory.training.models.inference_loader import load_inference_model
-from mcp_tools.models.factory.training.models.pooling import MeanPooling, Attention1dPoolingHead, LightAttentionPoolingHead
+from mcp_tools.models.factory.training.models.pooling import (
+    Attention1dPoolingHead,
+    LightAttentionPoolingHead,
+    MeanPooling,
+)
 
 # Ignore warning information
 logging.set_verbosity_error()
@@ -221,6 +227,24 @@ def process_sequence(args, tokenizer, plm_model_name, aa_seq, foldseek_seq="", s
     return data_dict
 
 
+def _regression_result(values, args):
+    """Restore units only from loader-verified statistics, never task names."""
+    raw = np.asarray(values)
+    state = getattr(args, "target_transform", None)
+    restored = inverse_targets(raw, state) if state is not None else raw
+    def as_value(array):
+        return array.item() if array.size == 1 else array.tolist()
+    result = {
+        "predictions": as_value(restored),
+        "output_scale": target_output_scale(
+            getattr(args, "_checkpoint_config", None), state, inverse_applied=state is not None,
+        ),
+    }
+    if state is not None:
+        result["raw_predictions"] = as_value(raw)
+    return result
+
+
 def predict(model, data_dict, device, args, plm_model, verbose=True):
     """Run prediction on the processed input data. Returns dict with batch-compatible keys (lists)."""
     if verbose:
@@ -233,18 +257,17 @@ def predict(model, data_dict, device, args, plm_model, verbose=True):
             predictions = plm_model(input_ids=aa_seq, attention_mask=attention_mask).predicted_values.item()
             if verbose:
                 print(f"Prediction result: {predictions}")
-            return {"predictions": predictions}
+            return _regression_result(predictions, args)
     for k, v in data_dict.items():
         if isinstance(v, torch.Tensor):
             data_dict[k] = v.to(device)
     with torch.no_grad():
         outputs = model(plm_model, data_dict)
         if args.problem_type == "regression":
-            predictions = outputs.squeeze().cpu().numpy()
-            pred = predictions.item() if np.isscalar(predictions) or predictions.size == 1 else predictions.tolist()
+            result = _regression_result(outputs.squeeze().cpu().numpy(), args)
             if verbose:
-                print(f"Prediction result: {pred}")
-            return {"predictions": pred}
+                print(f"Prediction result: {result['predictions']}")
+            return result
         elif args.problem_type == "single_label_classification":
             probabilities = torch.nn.functional.softmax(outputs, dim=1)
             predicted_classes = torch.argmax(probabilities, dim=1).cpu().numpy().tolist()
@@ -304,6 +327,12 @@ def _run_batch(args, model, plm_model, tokenizer, device):
             if args.problem_type == "regression":
                 p = pred_result["predictions"]
                 result_row["prediction"] = p[0] if isinstance(p, list) and len(p) == 1 else p
+                if "raw_predictions" in pred_result:
+                    result_row["prediction_model_space"] = pred_result["raw_predictions"]
+                scale = pred_result["output_scale"]
+                result_row["prediction_value_space"] = scale["value_space"]
+                result_row["prediction_unit"] = scale["unit"]
+                result_row["inverse_transform_applied"] = scale["inverse_transform_applied"]
             elif args.problem_type == "single_label_classification":
                 result_row["predicted_class"] = pred_result["predicted_classes"][0]
                 for i, prob in enumerate(pred_result["probabilities"][0]):
@@ -331,6 +360,11 @@ def _run_batch(args, model, plm_model, tokenizer, device):
     out_path = os.path.join(args.output_dir, args.output_file)
     os.makedirs(args.output_dir, exist_ok=True)
     pd.DataFrame(results).to_csv(out_path, index=False)
+    if args.problem_type == "regression":
+        state = getattr(args, "target_transform", None)
+        scale = target_output_scale(getattr(args, "_checkpoint_config", None), state, inverse_applied=state is not None)
+        with open(out_path + ".output-scale.json", "w", encoding="utf-8") as stream:
+            json.dump(scale, stream, indent=2, allow_nan=False)
     print(f"Saved {len(results)} results to {out_path}")
     return 0
 

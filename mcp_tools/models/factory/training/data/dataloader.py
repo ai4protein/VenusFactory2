@@ -1,15 +1,18 @@
 import json
-import torch
-import datasets
 from pathlib import Path
-from torch.utils.data import DataLoader
-from mcp_tools.models.factory.training.data.collator import Collator
+from typing import Any, Dict, List, Union
+
+import datasets
+import pandas as pd
+import torch
+from torch.utils.data import DataLoader, Dataset
+
+from mcp_tools.models.factory.target_transform import SCHEMA as TARGET_TRANSFORM_SCHEMA
 from mcp_tools.models.factory.training.data.batch_sampler import BatchSampler
+from mcp_tools.models.factory.training.data.collator import Collator
 from mcp_tools.models.factory.training.data.norm import normalize_dataset
 from mcp_tools.models.factory.training.data.structure_seq_merge import ensure_structure_columns
-from torch.utils.data import Dataset
-from typing import Dict, Any, List, Union
-import pandas as pd
+
 
 def _load_split_file(file_path: str) -> datasets.Dataset:
     """Load a local split file into a HuggingFace Dataset."""
@@ -42,7 +45,7 @@ def _load_dataset_dict(args) -> datasets.DatasetDict:
         loaded = {split: _load_split_file(path) for split, path in split_paths.items()}
         if "train" not in loaded:
             raise ValueError("Custom file training requires train_file.")
-        from mcp_tools.models.factory.training.data.split_policy import holdout_indices, assert_disjoint_sequences
+        from mcp_tools.models.factory.training.data.split_policy import assert_disjoint_sequences, holdout_indices
         sequence_column = args.sequence_column_name
         missing = [name for name in ("validation", "test") if name not in loaded]
         if missing:
@@ -90,13 +93,21 @@ def prepare_dataloaders(args, tokenizer, logger):
     test_dataset = dataset_dict['test']
     test_dataset_token_lengths = [len(item[aa_seq_key]) for item in test_dataset]
     
-    if args.normalize is not None:
-        train_dataset, val_dataset, test_dataset = normalize_dataset(
-            train_dataset, val_dataset, test_dataset, 
-            args.normalize, 
-            label_column_name=args.label_column_name
+    # Persist only transforms fitted for scalar regression in this training run.
+    # Classification labels are categorical even if a legacy preset has normalize.
+    args.target_transform = None
+    args.target_transform_schema = None
+    if args.problem_type == "regression" and args.num_labels == 1:
+        train_dataset, val_dataset, test_dataset, args.target_transform = normalize_dataset(
+            train_dataset, val_dataset, test_dataset,
+            args.normalize, label_column_name=args.label_column_name,
+            target_unit=getattr(args, "target_unit", None), seed=getattr(args, "seed", 0),
+            return_transform=True,
         )
-    
+        args.target_transform_schema = TARGET_TRANSFORM_SCHEMA
+    elif args.problem_type == "regression" and args.normalize is not None:
+        raise ValueError("Target normalization supports scalar regression only (num_labels=1)")
+
     # log dataset info
     logger.info("Dataset Statistics:")
     logger.info("------------------------")
