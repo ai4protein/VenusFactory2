@@ -144,9 +144,9 @@ class Development:
         return sorted([json.loads(p.read_text()) for p in self.root.glob('experiments/*/receipt.json')],key=lambda r:r['created'])
 
     def record(self, identity):
-        require(isinstance(identity,str) and re.fullmatch('[a-f0-9]{32}',identity),'Invalid experiment ID')
+        require(isinstance(identity,str) and re.fullmatch('[a-f0-9]{32}',identity),'Invalid experiment ID. Use experiment.id returned by successful training/evaluation, not a model name or a failed training-attempt ID. If no model has finished training, measure a baseline with parent_experiment_id empty.')
         path=self.root/'experiments'/identity/'receipt.json'
-        require(path.is_file(),'Unknown experiment ID')
+        require(path.is_file(),'Unknown experiment ID. Select experiment.id from this research project’s measured generations. Failed training attempts do not create experiments; if none exist, train the first baseline without a parent.')
         row=json.loads(path.read_text())
         require(row['receipt_sha256']==digest({k:v for k,v in row.items() if k!='receipt_sha256'}),'Experiment receipt changed')
         return row

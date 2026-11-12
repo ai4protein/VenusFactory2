@@ -205,3 +205,22 @@ async def test_preflight_failures_count_toward_training_attempt_budget(tmp_path)
     with pytest.raises(ValueError, match="Training attempt budget reached"):
         await service.train_research_model("broken", "algorithm.py", "evaluation.json", "Fixture")
     assert len(list(training.glob("*/receipt.json"))) == 64
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("parent", ["enzyme_ki_predictor_v5", "0" * 32])
+async def test_model_names_and_failed_attempts_cannot_be_used_as_measured_parents(tmp_path, parent):
+    service = await service_at(tmp_path)
+
+    async def forbidden(*args, **kwargs):
+        raise AssertionError("Invalid parent must not start a training process")
+
+    service.runner = forbidden
+    with pytest.raises(ValueError, match="experiment.id"):
+        await service.train_research_model("revision", "algorithm.py", "evaluation.json",
+            "Revise a baseline", parent_experiment_id=parent, variant="candidate")
+    assert not service.development.records()
+    assert not list(service.development.root.glob("training/*/receipt.json"))
+    tool = next(x for x in service.tools() if x.name == "train_research_model")
+    schema = tool.args_schema.model_json_schema()
+    assert "failed training-attempt" in schema["properties"]["parent_experiment_id"]["description"]

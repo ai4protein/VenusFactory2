@@ -25,6 +25,33 @@ other users' files and online Overleaf separate from research execution. The man
 remains **Recursive Self-improvement AI Agents for Protein Engineering**. Claims follow
 completed experiments and their actual scope.
 
+## Stability acceptance before expansion
+
+The immediate engineering objective is a stable autonomous development system. A
+successful API request, valid plan, saved checkpoint or passing software test does not
+establish successful research. New model-count expansion follows end-to-end evidence.
+
+A real-data acceptance run must show all of the following:
+
+1. A short research objective and supplied measurements lead to an executable plan
+   without an operator writing the candidate algorithm or its fitted parameters.
+2. The system fits a model, preserves its fitted state, evaluates it on fixed partitions
+   and develops a measured revision. Failed attempts remain in the trajectory.
+3. SC independently assesses usefulness against the objective and evidence. Rejection
+   returns actionable scientific revisions to PI; neither budget exhaustion nor a
+   successful process exit changes rejection into acceptance.
+4. A scientifically accepted candidate passes independent technical Review, delivers a
+   reproducible project and English report, and runs through the private Agent interface
+   in a fresh process. Public publication remains an operator decision.
+5. Reconnection, mode changes and a recoverable worker interruption preserve the same
+   task and evidence without duplicate training or lost state.
+
+Repeat accepted runs and test an independent property/source before calling the system
+stable. Report completion rate, rejection reasons, useful deliveries and resource use
+across all attempts. Route health, coding performance, research quality and delivery
+reliability are separate outcomes. A route returning HTTP 200 is not necessarily capable
+of producing valid plans, executable code or an acceptable model.
+
 ## Property and scenario coverage
 
 The next pilot allocates up to eight tasks in each of six families. Each family aims
