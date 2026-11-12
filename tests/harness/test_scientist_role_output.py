@@ -10,7 +10,7 @@ import pytest
 from agent.harness import autonomous_research as ar
 from agent.harness.native_expert_team import critic_decision
 from agent.harness.scientist_gateway_policy import ScientistGatewayPolicy, ScientistResponsesPolicy
-from agent.harness.scientist_role_output import specification, request_fields, output_content
+from agent.harness.scientist_role_output import specification, request_fields, output_content, RoleOutputError
 
 
 def policy_for(protocol):
@@ -226,3 +226,81 @@ def test_exact_single_output_envelope_preserves_schema(role, protocol):
     ]:
         with pytest.raises(ValueError):
             output_content(response_for(spec, json.dumps(bad)), spec, "fixture")
+
+
+def empty_completed_chat(content):
+    # Public response shape observed for CB: HTTP 200/stop, usage, no output.
+    return {"model": "fixture", "choices": [{"finish_reason": "stop", "message": {
+        "role": "assistant", "content": content}}],
+        "usage": {"prompt_tokens": 5648, "completion_tokens": 415, "total_tokens": 6063}}
+
+
+@pytest.mark.parametrize("content", [None, "", " \n\t"])
+def test_complete_empty_chat_enters_bounded_role_repair(content):
+    spec = specification("CB", "chat_completions")
+    with pytest.raises(RoleOutputError, match="completed without an answer") as error:
+        output_content(empty_completed_chat(content), spec, "fixture")
+    assert error.value.raw == (content or "")
+
+
+@pytest.mark.parametrize("mutation", ["model", "truncated", "unknown_tool", "role", "list", "refusal", "oversize"])
+def test_empty_repair_does_not_relax_response_identity_or_shape(mutation):
+    spec = specification("CB", "chat_completions")
+    value = empty_completed_chat(None)
+    choice = value["choices"][0]
+    if mutation == "model":
+        value["model"] = "other"
+    elif mutation == "truncated":
+        choice["finish_reason"] = "length"
+    elif mutation == "unknown_tool":
+        value = response_for(spec)
+        value["choices"][0]["message"]["tool_calls"][0]["function"]["name"] = "run_session_python"
+    elif mutation == "role":
+        choice["message"]["role"] = "user"
+    elif mutation == "list":
+        choice["message"]["content"] = []
+    elif mutation == "refusal":
+        choice["message"]["refusal"] = "I cannot provide that response."
+    else:
+        choice["message"]["content"] = " " * 128001
+    with pytest.raises(ValueError) as error:
+        output_content(value, spec, "fixture")
+    assert not isinstance(error.value, RoleOutputError)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("content", [None, "", " \n\t"])
+@pytest.mark.parametrize("repair_succeeds", [True, False])
+async def test_empty_cb_retries_same_role_once_without_restarting_pi(
+        monkeypatch, tmp_path, content, repair_succeeds):
+    original = httpx.AsyncClient
+    policy = policy_for("chat_completions")
+    spec = specification("CB", "chat_completions")
+    seen = []
+    relay = SimpleNamespace(base_url="http://fixture", token="fixture", calls=0, policy=policy)
+
+    def handler(request):
+        sent, metadata = policy.apply(json.loads(request.content))
+        seen.append((sent, metadata))
+        relay.calls += 1
+        body = response_for(spec) if repair_succeeds and len(seen) == 2 else empty_completed_chat(content)
+        return httpx.Response(200, json=body)
+
+    monkeypatch.setattr(ar.httpx, "AsyncClient",
+                        lambda **kw: original(transport=httpx.MockTransport(handler), **kw))
+    profile = SimpleNamespace(model=SimpleNamespace(protocol="chat_completions", model="fixture"),
+                              budget=SimpleNamespace(request_seconds=2, model_calls=8))
+    call = ar.AutonomousResearch(None, "fixture", {}).structured(
+        "CB", {"objective": "Compare a model with its baseline."}, profile, relay, tmp_path, ar.parse_plan)
+    if repair_succeeds:
+        assert (await call)["summary"] == body_for("CB")["summary"]
+    else:
+        with pytest.raises(RoleOutputError, match="completed without an answer"):
+            await call
+    assert len(seen) == relay.calls == 2
+    assert [metadata["role_output"] for _, metadata in seen] == ["CB", "CB"]
+    assert all(sent["tools"] == [spec["tool"]] and sent["model"] == "fixture" for sent, _ in seen)
+    repair = json.loads(seen[1][0]["messages"][-1]["content"].split("\n\nYour task")[0])["format_repair"]
+    assert repair["previous_response"] == (content or "")
+    assert "completed without an answer" in repair["validation_error"]
+    assert policy._role_output is None

@@ -119,6 +119,12 @@ def output_content(value, spec, model):
                      and all(isinstance(item, dict) and item.get("type") in {"message", "reasoning"}
                              for item in output))
     if text_only:
+        if spec["protocol"] == "chat_completions":
+            content = message.get("content")
+            if not message.get("refusal") and (content is None or (
+                    isinstance(content, str) and len(content) <= 128000 and not content.strip())):
+                raise RoleOutputError(
+                    "The model completed without an answer. Return the required structured output.", content)
         from .native_expert_team import role_content
         raw = role_content(value, spec["protocol"], model).strip()
         lines = raw.splitlines()
