@@ -100,7 +100,13 @@ def capture(limits):
             row.split()[:2] == ["c", f"{major}:{minor}"] and "r" in row.split()[-1] and "w" in row.split()[-1]
             for row in permissions
         )
-        broad = any(row.split()[:2] in (["a", "*:*"], ["c", "*:*"], ["c", f"{major}:*"]) for row in permissions)
+        # PBS may allow node creation (m) broadly but restrict reads/writes to
+        # the assigned GPU. The guest has no CAP_MKNOD and /dev is read-only.
+        broad = any(
+            row.split()[:2] in (["a", "*:*"], ["c", "*:*"], ["c", f"{major}:*"])
+            and bool(set(row.split()[-1]) & {"r", "w"})
+            for row in permissions
+        )
         if not exact or broad:
             raise SandboxUnavailable("PBS must enforce explicit CUDA-device permissions")
         descriptor = os.open(device, os.O_RDWR | os.O_CLOEXEC | os.O_NOFOLLOW)

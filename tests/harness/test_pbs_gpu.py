@@ -269,3 +269,19 @@ async def test_gpu_resident_watchdog_reaps_process_and_releases_reservation(tmp_
     assert receipt["memory_policy"] == "resident-watchdog-and-pbs-cgroup"
     with resources.Reservations().locked() as rows:
         assert not rows
+
+
+@pytest.mark.parametrize("rule", ["c 195:* m", "c *:* m"])
+def test_pbs_node_creation_permission_is_not_gpu_read_write_access(allocation, rule):
+    files, _, device_file = allocation
+    files[device_file] += rule + "\n"
+    assert pbs_gpu.capture(LIMITS).device == "/dev/nvidia3"
+
+
+@pytest.mark.parametrize("permission", ["r", "w"])
+def test_broad_read_or_write_is_still_rejected(allocation, permission):
+    files, opened, device_file = allocation
+    files[device_file] += "c 195:* " + permission + "\n"
+    with pytest.raises(SandboxUnavailable, match="explicit CUDA-device permissions"):
+        pbs_gpu.capture(LIMITS)
+    assert not opened
