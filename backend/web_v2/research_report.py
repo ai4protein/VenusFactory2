@@ -219,8 +219,14 @@ def knowledge_plan(entry, scopes):
     return planned
 
 
+def literature_arguments(query):
+    from mcp_tools.tools.research.knowledge_queries import EuropePMCInput
+    validated = EuropePMCInput(query=query, limit=6)
+    return {'query': validated.query, 'limit': validated.limit}
+
+
 async def literature(query):
-    obj = await knowledge_tool('query_europepmc', {'query': query[:300], 'limit': 6})
+    obj = await knowledge_tool('query_europepmc', literature_arguments(query))
     return [{'title': plain(r.get('title'), 240), 'url': r['url'],
              'kind': 'literature', 'text': plain(r.get('abstractText'), 2400), 'year': r.get('pubYear', ''),
              'authors': plain(r.get('authorString'), 300), 'evidence_level': r['evidence_level'], 'doi': r.get('doi', ''),
@@ -281,10 +287,13 @@ def _literature_anchor(entry, protein):
     if not aliases:
         genes = [(g.get('geneName') or {}).get('value', '') for g in (entry.get('genes') or [])]
         aliases = [plain(gene, 80) for gene in genes if gene][:5] or [plain(protein, 160)]
-    anchor = '(' + ' OR '.join('TITLE_ABS:"' + a.replace('"', '') + '"' for a in aliases) + ')'
-    organism = entry.get('organism', {}).get('scientificName', '')
+    organism = plain(entry.get('organism', {}).get('scientificName', ''), 80)
     species = ' AND ("' + organism.replace('"', '') + '"' + (' OR human' if organism == 'Homo sapiens' else '') + ')' if organism else ''
-    return anchor + species
+    while True:
+        anchor = '(' + ' OR '.join('TITLE_ABS:"' + a.replace('"', '') + '"' for a in aliases) + ')'
+        if len(anchor + species) <= 300 or len(aliases) == 1:
+            return anchor + species
+        aliases.pop()
 
 
 def literature_topic_query(entry, protein, terms):
@@ -292,7 +301,13 @@ def literature_topic_query(entry, protein, terms):
     words = set(re.findall(r'[a-z]+', str(terms).casefold()))
     keywords = [word for word in _LITERATURE_TOPICS if word in words or word + 's' in words]
     base = _literature_anchor(entry, protein)
-    return base + (' AND (' + ' OR '.join(keywords) + ')' if keywords else '')
+    # Preserve complete clauses under the shared API's 500-character bound.
+    while keywords:
+        query = base + ' AND (' + ' OR '.join(keywords) + ')'
+        if len(query) <= 500:
+            return query
+        keywords.pop()
+    return base
 
 
 def literature_queries(entry, protein, proposed):

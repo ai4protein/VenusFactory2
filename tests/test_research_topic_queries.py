@@ -63,3 +63,37 @@ def test_single_word_full_name_is_retained_but_generic_name_uses_gene_fallback()
     entry["proteinDescription"]["recommendedName"]["fullName"]["value"] = "Uncharacterized protein"
     query = research.literature_topic_query(entry, "P01308", "structure")
     assert 'TITLE_ABS:"INS"' in query and "Uncharacterized protein" not in query
+
+
+@pytest.mark.asyncio
+async def test_literature_adapter_preserves_complete_query_over_old_300_character_cutoff(monkeypatch):
+    entry = reference()
+    entry["proteinDescription"]["alternativeNames"] = [
+        {"fullName": {"value": "Carbonate dehydratase II"}},
+        {"fullName": {"value": "Carbonic anhydrase C"}},
+        {"fullName": {"value": "Carbonic anhydrase II"}},
+        {"fullName": {"value": "Cyanamide hydratase CA2"}},
+    ]
+    query = research.literature_topic_query(entry, "CA2", " ".join(research._LITERATURE_TOPICS))
+    assert 300 < len(query) <= 500
+    captured = []
+    async def tool(name, arguments):
+        captured.append((name, arguments))
+        return {"status": "completed", "records": []}
+    monkeypatch.setattr(research, "knowledge_tool", tool)
+    assert await research.literature(query) == []
+    assert captured == [("query_europepmc", {"query": query, "limit": 6})]
+    assert query.count('(') == query.count(')') and query.count('"') % 2 == 0
+
+
+def test_long_aliases_and_topics_shrink_by_complete_clauses():
+    entry = reference()
+    entry["proteinDescription"]["alternativeNames"] = [
+        {"fullName": {"value": "Specific protein " + str(i) + "x" * 150}} for i in range(8)]
+    query = research.literature_topic_query(entry, "CA2", " ".join(research._LITERATURE_TOPICS))
+    assert len(query) <= 500 and query.endswith(')')
+    assert 'TITLE_ABS:"Carbonic anhydrase 2"' in query and '"Homo sapiens"' in query
+    assert query.count('(') == query.count(')') and query.count('"') % 2 == 0
+    assert research.literature_arguments(query)["query"] == query
+    with pytest.raises(ValueError):
+        research.literature_arguments("x" * 501)
