@@ -252,7 +252,9 @@ def evidence_context(context, proposals, development):
     if (not history and not models and context.get("plan", {}).get("deliverable") == "analysis"
             and context.get("analysis_evidence", {}).get("computations")):
         from .analysis_report_review import POLICY as ANALYSIS_POLICY
+        from .analysis_report_review import review_targets
         result["scientific_acceptance"]["analysis_review_policy"] = ANALYSIS_POLICY
+        result["analysis_review_targets"] = review_targets(result)
     facts = {"evaluated_experiment_ids": [row["id"] for row in history],
              "baseline_experiment_ids": [row["id"] for row in history if row["variant"] == "baseline"],
              "revised_experiment_ids": [row["id"] for row in history if row["variant"] == "candidate"],

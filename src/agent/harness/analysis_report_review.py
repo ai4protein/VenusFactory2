@@ -23,6 +23,8 @@ Assess every cited task's input provenance: registered_input needs recorded iden
 derived_input needs a recorded ordered chain of output hashes to input hashes from registered
 materials; new_subject is permitted for exploration but requires your explicit judgment that it
 addresses this original objective; unverified cannot support a positive completed step.
+Use analysis_review_targets: computation_task_ids are host job IDs, whereas completed_step_ids
+are plan step IDs. Copy these identities; do not interchange them or assess unclaimed steps.
 Return one step_assessment per checkpoint.completed_steps. Use needs_revision for missing or
 contradictory evidence, with specific corrections. You may use no claims when rejecting unfinished
 work. Scientific relevance, sufficiency and interpretation remain your responsibility; the host
@@ -32,18 +34,24 @@ checks only declared references, identity, values and report quotations. Do not 
 def schema():
     text = {"type": "string", "minLength": 1, "maxLength": 2000}
     identity = {"type": "string", "minLength": 1, "maxLength": 120}
-    task = {"type": "string", "pattern": "^[a-f0-9]{32}$"}
+    task = {"type": "string", "pattern": "^[a-f0-9]{32}$",
+            "description": "Copy a verified computation task_id from analysis_review_targets.computation_task_ids "
+                           "or analysis_evidence.computations. This is a 32-character lowercase hexadecimal host job ID, "
+                           "not a plan step_id or a claim id."}
     ids = {"type": "array", "maxItems": 64, "uniqueItems": True, "items": identity}
     claim = object_schema({
-        "id": identity, "task_id": task,
-        "result_pointer": {"type": "string", "maxLength": 1000},
+        "id": {**identity, "description": "A local identifier for this claim, referenced by step_assessments.claim_ids."},
+        "task_id": task,
+        "result_pointer": {"type": "string", "maxLength": 1000,
+                           "description": "Copy an actual scalar result_fields[].pointer from the cited computation; do not rename fields."},
         "report_path": {"type": "string", "minLength": 1, "maxLength": 1000},
-        "report_quote": text,
+        "report_quote": {**text, "description": "An exact substring of the checkpointed report preview, including its displayed value; not a paraphrase or tool result."},
         "display_value": {"type": "string", "minLength": 1, "maxLength": 800,
-                          "description": "Exact displayed scalar as text; preserve decimal places. No unit conversion."},
+                          "description": "Exact displayed scalar as text; preserve decimal places. For numbers omit units and prose from this field; put those in report_quote. No unit conversion."},
     })
     step = object_schema({
-        "step_id": identity,
+        "step_id": {**identity, "description": "Copy exactly one analysis_review_targets.completed_step_ids entry "
+                    "(execution.checkpoint.completed_steps). Include every claimed step once and no other plan steps."},
         "verdict": {"enum": ["supported", "contradicted", "insufficient_evidence"]},
         "reason": text, "claim_ids": ids,
     })
@@ -95,6 +103,33 @@ def _index(context):
     if not isinstance(value, dict) or value.get("schema") != "research-analysis-provenance.v1":
         raise ValueError("Host analysis provenance is unavailable.")
     return value
+
+
+def review_targets(context):
+    """Navigation IDs derived from host evidence, never an acceptance verdict."""
+    index = _index(context)
+    checkpoint = context.get("execution", {}).get("checkpoint") or {}
+    completed = list(checkpoint.get("completed_steps", []))
+    plan_ids = [step["id"] for step in context.get("plan", {}).get("steps", [])]
+    task_ids = list(dict.fromkeys(row["task_id"] for row in index.get("computations", [])
+                                 if row.get("status") == "verified" and
+                                 isinstance(row.get("task_id"), str) and re.fullmatch(r"[a-f0-9]{32}", row["task_id"])))
+    return {
+        "completed_step_ids": completed[:24],
+        "completed_step_ids_omitted": max(0, len(completed) - 24),
+        "unclaimed_plan_step_ids": [identity for identity in plan_ids if identity not in completed][:24],
+        "computation_task_ids": task_ids[:64],
+        "computation_task_ids_omitted": max(0, len(task_ids) - 64),
+        "instruction": "Assess only completed_step_ids. Claims cite computation_task_ids, not step IDs. "
+                       "These IDs do not establish scientific validity. needs_revision may use empty claims and "
+                       "input_assessments, but must still assess every claimed completed step.",
+    }
+
+
+def _step_id_feedback(identities, known):
+    # Do not echo arbitrary model-supplied strings, paths or potential secrets.
+    values = [identity[:80] if identity in known else "<unknown step id>" for identity in identities[:8]]
+    return json.dumps(values, ensure_ascii=False) + (f" (+{len(identities)-8} omitted)" if len(identities) > 8 else "")
 
 
 def _unique_rows(rows, key, label):
@@ -228,9 +263,15 @@ def validate(review, context):
     checkpoint = context.get("execution", {}).get("checkpoint") or {}
     completed = checkpoint.get("completed_steps", [])
     plan = {step["id"]: step for step in context.get("plan", {}).get("steps", [])}
-    if (len(set(completed)) != len(completed) or not set(completed) <= set(plan)
-            or set(assessments) != set(completed)):
-        raise ValueError("Assess each exact checkpoint completed_step once, without additional steps.")
+    if len(set(completed)) != len(completed) or not set(completed) <= set(plan):
+        raise ValueError("Host checkpoint completed_steps must be unique and present in the plan.")
+    if set(assessments) != set(completed):
+        missing = [identity for identity in completed if identity not in assessments]
+        extra = [identity for identity in assessments if identity not in completed]
+        raise ValueError("Assess each exact checkpoint completed_step once, without additional steps. "
+                         "Missing step_ids: " + _step_id_feedback(missing, plan) + "; extra step_ids: " +
+                         _step_id_feedback(extra, plan) + ". Copy analysis_review_targets.completed_step_ids; "
+                         "revise unsupported verdicts instead of preserving an invalid review.")
     referenced_tasks = {claim["task_id"] for claim in claims.values()}
     if set(inputs) != referenced_tasks:
         raise ValueError("Assess the input provenance of each cited task exactly once.")

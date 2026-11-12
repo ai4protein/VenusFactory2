@@ -202,7 +202,12 @@ def validate_output(raw, spec):
     except ValidationError as exc:
         path = ".".join(re.sub(r"[^a-zA-Z0-9_]", "", str(part))[:40] for part in exc.absolute_path)[:160] or "plan"
         detail = "Expected " + str(exc.schema.get("type","the declared fields"))
-        if exc.validator == "enum":
+        if exc.validator == "pattern":
+            detail = ("Expected a 32-character lowercase hexadecimal host record ID copied from the supplied "
+                      "host evidence, not a plan step ID."
+                      if exc.schema.get("pattern") == "^[a-f0-9]{32}$" else
+                      "Expected a string matching the declared format.")
+        elif exc.validator == "enum":
             detail = "Allowed values: " + ", ".join(str(x) for x in exc.schema["enum"])
         elif exc.validator in {"required","additionalProperties"}:
             detail = "Allowed fields: " + ", ".join(exc.schema.get("properties",{}))
