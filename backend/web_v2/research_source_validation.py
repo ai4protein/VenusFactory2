@@ -33,7 +33,70 @@ def parse_response(text):
 
 
 def explicit_proposal(text):
-    return bool(re.search(r"\b(?:we propose|we recommend|proposed|recommended|future experiments?|test whether|could be tested|should be tested)\b|建议|拟开展|可检验|下一步",text,re.I))
+    """Conservative prospective-only syntax, supplementary to semantic review.
+
+    One proposal marker cannot exempt another sentence, heading or observation.
+    Ambiguous mixed prose must be split and reviewed with factual evidence; this
+    guard does not attempt to determine the truth of arbitrary natural language.
+    """
+    neutral = re.compile(
+        r"(?:future experiments?|next steps?|research priorities|research suggestions|"
+        r"(?:proposed|recommended) experiments?|experimental proposals|"
+        r"后续实验|研究建议|下一步|建议实验|未来实验)", re.I)
+    prefix = re.compile(
+        r"(?:we\s+(?:propose|recommend)\b|(?:proposed|recommended)\s+(?:experiments?|tests?|analyses|assays?)\b|"
+        r"future experiments?\s+(?:should|could|will)\b|(?:test|measure|compare|evaluate|assess|investigate)\b|"
+        r"(?:(?:the|this|these|that)\s+)?"
+        r"(?:(?:binding|expression|regulatory|functional|proposed|candidate|predicted|possible|"
+        r"temperature|dose|concentration|physiological)\s+){0,4}"
+        r"(?:hypotheses|hypothesis|effects?|activity|expression|binding|stability|solubility|"
+        r"affinity|localization|kinetics|yield)\s+(?:could|should|may|can)\s+be\s+"
+        r"(?:tested|evaluated|assessed|measured|compared|investigated)\b|"
+        r"(?:下一步)?建议|拟开展|下一步(?:检验|测试|测量|比较)|"
+        r"(?:该|这一|此)?(?:假设|效应|活性|表达|结合|稳定性|溶解度|亲和力|定位|产量)"
+        r"(?:可以|可|应该|应|需要|需)(?:(?:通过|在)[^，,。;；!?！？]{1,60})?"
+        r"(?:检验|测试|测量|比较|评估|验证))", re.I)
+    observation = re.compile(
+        r"\b(?:was|were|observed|(?<!be )measured|reported|confirmed|demonstrated|established|already|"
+        r"shows?|demonstrates?)\b|"
+        r"已知|已有|已经|观察到|测得|证实|表明|显示", re.I)
+    assertion = re.compile(r"\b(?:is|are|has|have|contains?|binds?|cataly[sz]es?)\b", re.I)
+    explanation = re.compile(r"\b(?:because|since|although|whereas|but)\b|因为|由于|然而", re.I)
+    list_item = re.compile(
+        r"(?:(?:and\s+)?(?:expression|yield|stability|solubility|activity|affinity|purity|"
+        r"aggregation|folding|localization|kinetics|controls?)"
+        r"(?:\s+(?:at|under|in|with)\s+[^,:;]+)?|"
+        r"(?:e\.g\.|i\.e\.|for example)\s+(?:with|using|via|at|under|in)\s+[^,:;]+)", re.I)
+    parts = []
+    for line in text.splitlines():
+        line = re.sub(r"\[S\d+\]", "", line).strip()
+        clean = re.sub(r"^(?:#{1,6}\s*|[-*>]+\s*|\d+[.)]\s*)", "", line).strip(" *")
+        if neutral.fullmatch(clean):
+            continue
+        # Protect abbreviation dots, not following prose: E. coli and e.g.
+        # remain in their clause; a later sentence still needs its own scope.
+        clean = re.sub(r"\b[A-Z]\.(?=\s+[a-z]{2,}\b)|\b(?:e\.g\.|i\.e\.)",
+                       lambda match: match.group().replace(".", "\u2024"), clean)
+        parts.extend(part.replace("\u2024", ".") for part in
+                     re.split(r"(?<=[!?;。！？；])\s*|(?<!\d)\.(?=\s|$)", clean))
+    parts = [part.strip(" .!?;。！？；") for part in parts if part.strip(" .!?;。！？；")]
+    if not parts:
+        return False
+    for part in parts:
+        if not prefix.match(part) or observation.search(part) or explanation.search(part):
+            return False
+        # A declared hypothesis may contain a present-tense proposition; an
+        # independent sentence or comma clause cannot borrow its "whether".
+        clauses = re.split(r"[,，]", part)
+        for index, clause in enumerate(clauses):
+            prospective = bool(prefix.match(clause.strip()))
+            if index and not prospective and not list_item.fullmatch(clause.strip()):
+                return False
+            if assertion.search(clause) and not re.search(r"\bwhether\b", clause, re.I):
+                return False
+            if index and assertion.search(clause) and not prospective:
+                return False
+    return True
 
 
 def validate_assessments(response, request, sources):
@@ -91,7 +154,7 @@ def _validate_assessment_rows(rows, request, sources):
             if row["classification"] == "factual" and not measured_values_anchored(unit["text"], evidence):
                 raise ValueError("Quoted evidence does not contain the claimed measured value and unit; preserve source values and units")
             if row["classification"] == "proposal" and not explicit_proposal(unit["text"]):
-                raise ValueError("Uncited proposals must be explicitly proposed")
+                raise ValueError("Proposal-only units must contain only explicitly prospective actions. Split existing facts or observations into separate factual units and supply their source evidence; planned numerical conditions may remain in pure proposals.")
         elif not row["issues"]:
             raise ValueError("Unsupported or uncertain units require an identified issue")
         checked.append({**row, "evidence": evidence, "input_sha256": unit["input_sha256"],
