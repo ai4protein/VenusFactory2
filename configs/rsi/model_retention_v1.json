@@ -1,0 +1,10 @@
+{
+  "schema": "model_retention_policy.v1",
+  "metric_directions": {
+    "rmse": "min",
+    "mae": "min",
+    "spearman": "max",
+    "mse_skill_vs_training_mean": "max"
+  },
+  "archive_validation_dominated": true
+}

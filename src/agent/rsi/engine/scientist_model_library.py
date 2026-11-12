@@ -647,8 +647,13 @@ class ScientistModelLibrary:
 
     def discovery_metadata(self):
         """Read canonical publication metadata without scanning superseded origins."""
+        from .model_curation import effective_archived
+
+        archived = effective_archived(self)
         models = []
         for key_id, entry_id, entry in self._indexed_entries():
+            if entry_id in archived:
+                continue
             origin = self._object("origins/" + key_id, entry["canonical_origin"])
             packet = self._object("packets", entry["packet_id"])
             _require(

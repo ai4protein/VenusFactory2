@@ -81,6 +81,62 @@ not add scientific scopes. A multi-output model is not multiplied by the number 
 questions it can answer. The same algorithm may serve distinct valid scopes; algorithm
 diversity is a separate result.
 
+## Curate the existing library
+
+Keep a compact default catalog without removing distinct protein, property, assay,
+scenario or interface coverage. Sharing an algorithm across different proteins is not
+by itself redundant. Similar scores on different datasets are not a comparison.
+
+`configs/rsi/model_retention_v1.json` defines the host-operated retention policy.
+The planner compares entries only when their full scope, input interface, implementation,
+training partition and validation partition agree. It verifies the archived numerical
+predictions and their evidence bindings before using recorded validation metrics.
+
+- Identical validation predictions and objectives retain the smaller serialized model;
+  equal-size ties use a deterministic identity. This establishes agreement on the stored
+  validation rows, not universal equivalence.
+- A model may also be archived when a retained model is no worse on every configured
+  validation objective, strictly better on at least one, and has no larger serialized
+  payload. This is a catalog-selection rule, not a statistical significance claim.
+- Preserve metric tradeoffs, smaller-payload alternatives, subgroup advantages and
+  incomparable evidence. Serialized payload size does not measure latency or peak memory.
+- Preserve entries that require runtime-migration review. Missing evidence does not
+  justify declaring a model redundant. Unique scopes are retained without new fitting.
+
+From the repository root, generate and inspect a plan before applying it:
+
+```bash
+python scripts/rsi/evaluation/curate_model_library.py \
+  --library research_runs/rsi/scientist_model_library_v1 plan \
+  --output research_runs/model_retention_plan.json
+
+python scripts/rsi/evaluation/curate_model_library.py \
+  --library research_runs/rsi/scientist_model_library_v1 apply \
+  --plan research_runs/model_retention_plan.json
+
+python scripts/rsi/evaluation/curate_model_library.py \
+  --library research_runs/rsi/scientist_model_library_v1 restore \
+  --entry-id <full-entry-id> --reason "Reconsider for a distinct use case"
+```
+
+Applying a plan rechecks the catalog and evidence, and records a reversible curation
+event. Default Agent/Scientist capability discovery and Model Plaza use the same filtered
+metadata. Each archived entry points to a retained replacement; archive/restore changes
+invalidate discovery caches. This is a host operation, not an autonomous publication tool.
+
+Original programs, fitted state, evaluation files, publication objects and frozen
+experimental histories remain intact. Explicit entry-ID lookup keeps existing research
+references usable, subject to the usual evidence and execution checks. If a replacement
+is no longer canonical, the original becomes discoverable again. Archiving is distinct
+from an administrator disabling an unsafe or unavailable capability.
+
+Report historical registrations, active catalog entries, archived revisions and distinct
+scientific scopes separately. Curation neither changes historical experiment results nor
+adds accepted models. Preserve frozen RSI comparison libraries and donor histories;
+new live discovery uses the curated catalog. Filling missing properties requires new
+measurements and evaluated models, not discarding unique abundance scopes to improve a
+percentage.
+
 ## Allocate a property-balanced pilot
 
 From the repository root:

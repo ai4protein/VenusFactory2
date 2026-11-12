@@ -6,9 +6,6 @@ these are cache invalidators, never scientific or inference verification.
 Evidence verification and runtime policy are checked when a model is used.
 """
 
-from collections import OrderedDict
-from concurrent.futures import Future
-from copy import deepcopy
 import errno
 import hashlib
 import hmac
@@ -17,6 +14,9 @@ import os
 import stat
 import threading
 import time
+from collections import OrderedDict
+from concurrent.futures import Future
+from copy import deepcopy
 
 from agent.rsi.engine.storage import atomic_json, file_lock, safe_child
 
@@ -30,7 +30,7 @@ _MAX_LIBRARIES = 8
 _SCHEMA = "evolved_discovery_metadata.v1"
 _MAX_RECORD_BYTES = 64 * 1024**2
 _MAX_REGISTRY_PATHS = 250_000
-_AREAS = ("index", "entries", "origins", "packets")
+_AREAS = ("index", "entries", "origins", "packets", "curation")
 
 
 def _encoded(value):
@@ -50,7 +50,7 @@ def _key(library):
         except FileNotFoundError:
             records.append((str(path.relative_to(library.root)), None))
             if len(records) > _MAX_REGISTRY_PATHS:
-                raise ValueError("Model discovery registry exceeds its path budget")
+                raise ValueError("Model discovery registry exceeds its path budget") from None
             continue
         if not (stat.S_ISREG(info.st_mode) or stat.S_ISDIR(info.st_mode)):
             raise ValueError("Symlinked or non-regular model registry path")
