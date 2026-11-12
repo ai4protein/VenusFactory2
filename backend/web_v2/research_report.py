@@ -256,20 +256,40 @@ async def web_search(query):
         return result['results']
 
 
-def literature_queries(entry, protein, proposed):
+_LITERATURE_TOPICS = (
+    'sequence', 'evolution', 'ortholog', 'isoform', 'function', 'catalysis', 'substrate', 'pathway',
+    'structure', 'binding', 'ligand', 'dynamics', 'interaction', 'regulation', 'expression',
+    'localization', 'mutation', 'variant', 'phosphorylation', 'phenotype', 'stability',
+    'solubility', 'purification', 'assay', 'engineering', 'directed', 'mutagenesis',
+    'design', 'dataset', 'benchmark', 'application', 'reproducibility',
+)
+
+
+def _literature_anchor(entry, protein):
     if not entry:
-        return ['"' + plain(protein, 160).replace('"', '') + '"']
+        return '"' + plain(protein, 160).replace('"', '') + '"'
     name = protein_card(entry)['name']
     genes = [(g.get('geneName') or {}).get('value', '') for g in (entry.get('genes') or [])]
     aliases = [name, *[g for g in genes if len(g) > 2]][:5]
     anchor = '(' + ' OR '.join('TITLE_ABS:"' + a.replace('"', '') + '"' for a in aliases) + ')'
     organism = entry.get('organism', {}).get('scientificName', '')
     species = ' AND ("' + organism.replace('"', '') + '"' + (' OR human' if organism == 'Homo sapiens' else '') + ')' if organism else ''
-    base = anchor + species
-    ids = [x['id'] for ref in entry.get('references', []) for x in ref.get('citation', {}).get('citationCrossReferences', [])
+    return anchor + species
+
+
+def literature_topic_query(entry, protein, terms):
+    """Keep the target anchor and only recognized scientific topic words."""
+    words = set(re.findall(r'[a-z]+', str(terms).casefold()))
+    keywords = [word for word in _LITERATURE_TOPICS if word in words or word + 's' in words]
+    base = _literature_anchor(entry, protein)
+    return base + (' AND (' + ' OR '.join(keywords) + ')' if keywords else '')
+
+
+def literature_queries(entry, protein, proposed):
+    base = _literature_anchor(entry, protein)
+    focused = literature_topic_query(entry, protein, ' '.join(proposed))
+    ids = [x['id'] for ref in (entry or {}).get('references', []) for x in ref.get('citation', {}).get('citationCrossReferences', [])
            if x.get('database') == 'PubMed' and str(x.get('id', '')).isdigit()][:6]
-    keywords = [w for w in ('engineering', 'mutation', 'binding', 'structure', 'stability', 'catalysis') if any(w in q.lower() for q in proposed)]
-    focused = base + (' AND (' + ' OR '.join(keywords) + ')' if keywords else '')
     curated = 'SRC:MED AND (' + ' OR '.join('EXT_ID:' + x for x in ids) + ')' if ids else base
     return list(dict.fromkeys([curated, focused, base]))[:3]
 

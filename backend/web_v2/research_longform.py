@@ -235,8 +235,7 @@ async def run_long_report(payload, update, *, service_cache=None, checkpoint=Non
             retrieved = []
             retrieval = []
             if 'literature' in payload['analyses'] or 'engineering' in payload['analyses']:
-                queries = research.literature_queries(entry, identity_text, [terms])
-                query = queries[1] if len(queries) > 1 else queries[0]
+                query = research.literature_topic_query(entry, identity_text, terms)
                 chapter['literature_query'] = query
                 try:
                     retrieved += add(await research.literature(query)); retrieval.append({'tool': 'literature', 'status': 'completed'})

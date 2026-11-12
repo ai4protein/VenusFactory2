@@ -86,6 +86,8 @@ async def test_specialists_use_reference_identity_without_replacing_construct(mo
     result = await longform.run_long_report(payload, lambda _: None, checkpoint=saved)
     assert saved == before
     assert len({row["chapter"] for row in bundles}) == 8
+    focused = [chapter["literature_query"] for chapter in result["chapters"]]
+    assert len(set(focused)) == 8 and all(query in queries for query in focused)
     assert all('TITLE_ABS:"CA2"' in chapter["literature_query"]
                and '"Homo sapiens"' in chapter["literature_query"] for chapter in result["chapters"])
     assert len([url for url in fetches if "rest.uniprot.org" in url]) == 1
