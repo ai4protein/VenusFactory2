@@ -55,3 +55,19 @@ def public_failure(path, fallback="runtime_error"):
         "model_protocol_incompatible": "Model request is incompatible with the selected harness.",
     }
     return {"code": code, "message": messages.get(code, "Agent turn did not complete: " + fallback)}
+
+
+def research_failure(path, error):
+    """Explain generic native failures without replacing specific research errors.
+
+    This is diagnostic only; service-block and retry policy remain separate.
+    """
+    message = str(error)
+    result = {"error_type": type(error).__name__, "message": message[:400]}
+    if type(error) is RuntimeError and message in {
+        "runtime_error", "protocol_failed", "incomplete", "timeout", "Native turn failed"
+    }:
+        hint = public_failure(path, fallback=message)
+        if hint["code"] != message:
+            result.update(code=hint["code"], message=hint["message"])
+    return result

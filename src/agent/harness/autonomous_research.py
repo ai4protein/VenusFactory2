@@ -599,8 +599,12 @@ class AutonomousResearch:
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            result.update(summary='Research episode needs revision: '+type(exc).__name__+': '+str(exc)[:400],error_type=type(exc).__name__)
-            write_json(folder/'failure.json',{'error_type':type(exc).__name__,'message':str(exc)[:400]})
+            from .failure_summary import research_failure
+            failure=research_failure(folder/'model_requests.jsonl',exc)
+            result.update(summary='Research episode needs revision: '+failure['error_type']+': '+failure['message'],error_type=failure['error_type'])
+            if 'code' in failure:
+                result['error_code']=failure['code']
+            write_json(folder/'failure.json',failure)
         finally:
             timeline.finish(result['status'])
             progress['development']=development.summary()
