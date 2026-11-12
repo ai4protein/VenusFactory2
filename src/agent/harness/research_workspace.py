@@ -105,8 +105,9 @@ class ResearchWorkspace:
         data=content.encode();write_bytes(self.workspace,path,data)
         return self.record('write_research_file',{'path':path,'content':content},{'path':path,'sha256':hashlib.sha256(data).hexdigest()})
 
-    async def edit_research_file(self, path: str, old_text: str, new_text: str, expected_sha256: str) -> dict:
-        """Replace one exact occurrence in a saved UTF-8 file. Read it first; pass full-file sha256 or file_sha256, never slice_sha256. Use surrounding text to make the match unique. Changed files, missing or ambiguous matches are rejected; no code executes."""
+    async def edit_research_file(self, path: str, old_text: str, new_text: str,
+            expected_sha256: Annotated[str, Field(description="Required full-file SHA256 from read_session_file (sha256 or file_sha256), never slice_sha256. Read the current file first; use its hash unchanged.")]) -> dict:
+        """Read the file first, then replace one exact occurrence using its full-file expected_sha256. Pass sha256 or file_sha256 from read_session_file, never slice_sha256. Use surrounding text to make the match unique. Changed files, missing or ambiguous matches are rejected; no code executes."""
         result = replace_text(self.workspace, path, old_text, new_text, expected_sha256)
         return self.record('edit_research_file', {'path':path, 'old_text':old_text,
             'new_text':new_text, 'expected_sha256':expected_sha256}, result)
@@ -271,12 +272,13 @@ class ResearchWorkspace:
             evaluation_file: Annotated[str, Field(description="Evaluation reference returned by prepare_research_dataset; pass it unchanged, not as data to pandas or fit. For a revision, use an empty string to reuse the parent experiment's frozen splits.")],
             hypothesis: str, strategy: str='supervised', parent_experiment_id: Annotated[str, Field(description="Use experiment.id from a successfully measured training/evaluation result, never a model name or failed training-attempt ID. Leave empty for the first baseline; a candidate needs a measured parent on the same frozen dataset.")]='',
             variant: ExperimentVariant = "auto", prediction_key: str='value', seed: int=0,
-            device: Annotated[Literal["cpu", "cuda"], Field(description="cpu by default. cuda fits in an operator-enabled local PBS GPU allocation; there is no host or CPU fallback. Return CPU-portable weights/parameters: held-out prediction and Agent reuse run on CPU, while independent Review repeats GPU fitting.")]='cpu') -> dict:
+            device: Annotated[Literal["cpu", "cuda"], Field(description="cpu by default. cuda fits in an operator-enabled local PBS GPU allocation; there is no host or CPU fallback. Return CPU-portable weights/parameters: held-out prediction and Agent reuse run on CPU, while independent Review repeats GPU fitting.")]='cpu',
+            timeout_seconds: Annotated[int, Field(ge=1, le=1800, description="Fitting wall-time allowance; default 120 seconds. CPU fits allow up to 120; verified local PBS GPU fits allow up to 1800. The research phase budget still applies. Independent Review refits with the recorded allowance.")]=120) -> dict:
         """Fit and validate agent-written model code in the session sandbox. fit(training, seed): rows=training["train"]; each row has an inputs dict and a target. Encode input fields into features before calling a numeric estimator; use the SAME feature transformation in fit and predict. Raw dictionaries or amino-acid strings are not numeric feature vectors. Fit transformations on training rows only and retain them with the learner. Return a parameter dict (arrays/estimators allowed) or fitted estimator. predict(model, inputs) receives ONE inputs dict, not a batch, and returns {"value": prediction}; use prediction_key instead of value if specified. Regression requires a finite number; classification a scalar label; multilabel requires an object mapping every training["labels"] name to a probability in [0,1]. Exclude null target labels during fitting. The host saves fitted state and evaluates held-out data in isolation. Without a parent, evaluation_file creates a baseline. For a revision, cite parent_experiment_id and set evaluation_file="" to reuse frozen splits. Returns measured metrics, fitted files and reproduction entrypoint. Independent Review follows training."""
         from .research_training import fit_model
         args=dict(name=name,source_file=source_file,evaluation_file=evaluation_file,hypothesis=hypothesis,
                   strategy=strategy,parent_experiment_id=parent_experiment_id,variant=variant,
-                  prediction_key=prediction_key,seed=seed,device=device)
+                  prediction_key=prediction_key,seed=seed,device=device,timeout_seconds=timeout_seconds)
         progress=(lambda value:write_json(self.control/'execution.json',progress_view(value))) if self.runner is run_python else None
         result=await fit_model(self.workspace,self.development,self.runner,on_progress=progress,**args)
         return self.record('train_research_model',args,result)

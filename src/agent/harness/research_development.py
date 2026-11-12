@@ -256,8 +256,11 @@ class Development:
                                       'matched_experiment_ids':equivalent},
             'fresh_process_replay':True,'score_origin':'host_validation','test_used_for_feedback':False}
         if training is not None:
-            require(set(training)=={'attempt_id','device'} and training['device']=='cuda' and
+            require(set(training) in ({'attempt_id','device'}, {'attempt_id','device','timeout_seconds'}) and training['device']=='cuda' and
                     re.fullmatch('[a-f0-9]{32}',training['attempt_id']), 'Invalid host training binding')
+            if 'timeout_seconds' in training:
+                from .research_training import validate_training_timeout
+                validate_training_timeout(training['timeout_seconds'], 'cuda')
             record['training']=dict(training)
         record['evaluation_visibility']='host_only' if self.data_store else 'agent_workspace'
         record['receipt_sha256']=digest(record);write_json(folder/'receipt.json',record)

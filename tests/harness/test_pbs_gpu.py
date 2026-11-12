@@ -154,14 +154,16 @@ def test_cpu_mount_policy_unchanged_gpu_only_mounts_allocated_devices(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_gpu_fit_cpu_validation_and_gpu_refit_are_distinct(tmp_path, monkeypatch):
+@pytest.mark.parametrize("timeout_seconds", [120, 1800])
+async def test_gpu_fit_cpu_validation_and_gpu_refit_are_distinct(tmp_path, monkeypatch, timeout_seconds):
     calls = []
     compute = pbs_gpu.Allocation(JOB, UUID, "/dev/nvidia3", 16 * GIB).receipt()
 
     async def gpu_runner(workspace, control, script, timeout=120, **kwargs):
-        calls.append(script)
-        result = await run_python(workspace, control, script, timeout, **kwargs)
+        calls.append((script, timeout))
+        result = await run_python(workspace, control, script, min(timeout, 120), **kwargs)
         result["gpu"] = compute
+        result["timeout_seconds"] = timeout
         return result
 
     monkeypatch.setattr(pbs_gpu, "run_python", gpu_runner)
@@ -183,9 +185,9 @@ async def test_gpu_fit_cpu_validation_and_gpu_refit_are_distinct(tmp_path, monke
     revision = "def fit(training,seed):\n rows=training['train']\n return {'slope':sum(r['target']/r['inputs']['x'] for r in rows)/len(rows)}\ndef predict(model,inputs):\n return {'value':model['slope']*inputs['x']}\n"
     await service.write_research_file("model.py", revision)
     child = await service.train_research_model(
-        "linear", "model.py", "", "Fit a slope", parent_experiment_id=parent["experiment"]["id"], device="cuda"
+        "linear", "model.py", "", "Fit a slope", parent_experiment_id=parent["experiment"]["id"], device="cuda", timeout_seconds=timeout_seconds
     )
-    assert calls == ["train.py"]  # held-out replay must use the original CPU runner
+    assert calls == [("train.py", timeout_seconds)]  # held-out replay must use the original CPU runner
     training = child["training"]
     experiment = child["experiment"]
     spec = {
@@ -205,15 +207,25 @@ async def test_gpu_fit_cpu_validation_and_gpu_refit_are_distinct(tmp_path, monke
     manifest["development"] = service.development.selected(experiment["id"], manifest, data)
     assert manifest["development"]["training_compute"]["training_receipt_sha256"] == training["receipt_sha256"]
     assessment = await model_evaluation(service.workspace, manifest, tmp_path / "review", run_python)
-    assert calls == ["train.py", spec["reproduction_script"]]
+    assert calls == [("train.py", timeout_seconds), (spec["reproduction_script"], timeout_seconds)]
     assert assessment["score"] == 0 and assessment["training_reproduced"]
     assert assessment["reproduction_compute"] == compute
+    assert training["timeout_seconds"] == timeout_seconds
+    assert manifest["development"]["training_compute"]["training_timeout_seconds"] == timeout_seconds
     changed = copy.deepcopy(manifest)
     changed["review_spec"]["reproduction_script"] = "other.py"
     with pytest.raises(ValueError, match="entrypoint"):
         selected_training_compute(service.development, experiment["id"], changed)
     path = service.development.root / "training" / training["id"] / "receipt.json"
     saved = json.loads(path.read_text())
+    from agent.harness.contracts import digest
+    altered = copy.deepcopy(saved)
+    altered["timeout_seconds"] = 1
+    altered["receipt_sha256"] = digest({k: v for k, v in altered.items() if k != "receipt_sha256"})
+    path.write_text(json.dumps(altered))
+    with pytest.raises(ValueError, match="timeout does not match"):
+        selected_training_compute(service.development, experiment["id"], manifest)
+    path.write_text(json.dumps(saved))
     saved["execution"]["gpu"]["gpu_uuid"] = "forged"
     path.write_text(json.dumps(saved))
     with pytest.raises(ValueError, match="receipt changed"):

@@ -209,12 +209,15 @@ async def model_evaluation(bundle, manifest, control, runner):
     (retrain/spec['evaluation_file']).write_text(json.dumps(training_data))
     fitting_runner = runner
     compute = (manifest.get('development') or {}).get('training_compute')
+    fitting_timeout = 120
     if compute:
         ensure(compute.get('backend') == 'pbs' and compute.get('device') == 'cuda'
                and compute.get('inference_device') == 'cpu' and compute.get('training_receipt_sha256'),
                'Unsupported model training-compute binding')
         from .pbs_gpu import run_python as fitting_runner
-    receipt = await fitting_runner(retrain, Path(control)/'refit-runs', spec['reproduction_script'], 120)
+        from .research_training import validate_training_timeout
+        fitting_timeout = validate_training_timeout(compute.get('training_timeout_seconds', 120), 'cuda')
+    receipt = await fitting_runner(retrain, Path(control)/'refit-runs', spec['reproduction_script'], fitting_timeout)
     ensure(receipt['exit_code'] == 0, 'Training reproduction failed')
     for name, sha in manifest['files'].items():
         if name.endswith('.py'): ensure(file_hash(safe_file(retrain, name)) == sha, 'Reproduction modified runtime code')

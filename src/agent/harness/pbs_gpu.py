@@ -15,6 +15,8 @@ from pathlib import Path, PurePosixPath
 
 from .session_sandbox import SandboxUnavailable
 
+MAX_TRAINING_SECONDS = 1800
+
 
 @dataclass(frozen=True)
 class Allocation:
@@ -119,7 +121,7 @@ def compute_options():
     from .sandbox_resources import Limits
     from .session_sandbox import backend
 
-    result = {"training_devices": ["cpu"], "prediction_device": "cpu"}
+    result = {"training_devices": ["cpu"], "prediction_device": "cpu", "max_training_seconds": {"cpu": 120}}
     try:
         if backend() != "bwrap":
             return result
@@ -130,7 +132,8 @@ def compute_options():
         **result,
         "training_devices": ["cpu", "cuda"],
         "gpu_backend": "pbs",
-        "gpu_instruction": "Use device=cuda for fitting; return CPU-portable fitted state. Review refits on GPU.",
+        "max_training_seconds": {"cpu": 120, "cuda": MAX_TRAINING_SECONDS},
+        "gpu_instruction": "Use device=cuda and timeout_seconds for fitting; return CPU-portable fitted state. Review uses the same GPU fitting timeout. The research phase budget still applies.",
     }
 
 

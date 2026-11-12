@@ -55,9 +55,16 @@ def check_workspace(workspace):
                 if total > limit: raise ValueError('Session storage limit reached')
 
 
-def validate_execution(kind, payload, timeout):
+def validate_execution(kind, payload, timeout, *, gpu=False):
     if kind not in {'python', 'shell'}: raise ValueError('Unsupported session execution')
-    if type(timeout) is not int or not 1 <= timeout <= 300: raise ValueError('Timeout must be 1..300 seconds')
+    maximum = 300
+    if gpu:
+        from .pbs_gpu import MAX_TRAINING_SECONDS
+        if kind != 'python':
+            raise ValueError('GPU execution supports Python only')
+        maximum = MAX_TRAINING_SECONDS
+    if type(timeout) is not int or not 1 <= timeout <= maximum:
+        raise ValueError(f'Timeout must be 1..{maximum} seconds')
     if not isinstance(payload,str) or not payload or len(payload.encode()) > 200000: raise ValueError('Invalid command')
     if kind == 'python' and Path(payload).suffix.lower() != '.py':
         raise ValueError('Pass a saved .py script to run_session_python. Read data with read_session_file, or write a Python script that loads the data file.')
@@ -65,7 +72,7 @@ def validate_execution(kind, payload, timeout):
 
 
 def command(workspace, kind, payload, timeout, *, scratch, memory, gpu=None):
-    validate_execution(kind, payload, timeout)
+    validate_execution(kind, payload, timeout, gpu=gpu is not None)
     cmd = [shutil.which('bwrap') or 'bwrap', '--unshare-all', '--new-session', '--die-with-parent', '--as-pid-1', '--hostname', 'session', '--cap-drop', 'ALL']
     for p in ['/usr/bin','/usr/lib','/usr/lib64','/usr/share/zoneinfo','/usr/share/fonts','/bin','/lib','/lib64']:
         if Path(p).exists(): cmd += ['--ro-bind',p,p]
@@ -112,7 +119,7 @@ def tail(path, limit=12000):
 
 
 async def execute(workspace, control, kind, payload, timeout=120, *, on_progress=None, device="cpu"):
-    validate_execution(kind, payload, timeout)
+    validate_execution(kind, payload, timeout, gpu=device == "cuda")
     if os.getenv('VENUS_SCIENTIST_ONLINE') == '1' or os.getenv('WEBUI_V2_MODE') == 'online': timeout=min(timeout,60)
     assert_active_job()
     selected=backend()
@@ -159,7 +166,7 @@ async def _execute_bwrap(workspace, control, kind, payload, timeout, store, iden
         target.write_text(json.dumps({'run_id':identity,'backend':'bwrap','status':status,
             'elapsed_seconds':round(time.monotonic()-started,3),'memory_limit_bytes':limits.memory,
             'memory_policy':'resident-watchdog-and-pbs-cgroup' if gpu else 'address-space',
-            **({'gpu':gpu.receipt()} if gpu else {}),
+            **({'gpu':gpu.receipt(), 'timeout_seconds':timeout} if gpu else {}),
             'process_policy':'single-process-with-threads','temporary_files_removed':not Path(scratch.name).exists()}))
         target.chmod(0o600)
     output_bytes=0;output_exceeded=False
@@ -225,6 +232,7 @@ async def _execute_bwrap(workspace, control, kind, payload, timeout, store, iden
         result={'run_id':identity,'backend':'bwrap','exit_code':proc.returncode,'stdout':tail(out),'stderr':tail(err,6000)}
         if gpu:
             result['gpu']=gpu.receipt()
+            result['timeout_seconds']=timeout
         if on_progress:on_progress({**result,'status':'completed' if proc.returncode==0 else 'failed','stdout_tail':result['stdout'],'stderr_tail':result['stderr']})
         return result
     except (asyncio.CancelledError, QueueCancelled):

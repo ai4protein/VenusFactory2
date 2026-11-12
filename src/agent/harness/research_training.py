@@ -20,15 +20,27 @@ from .research_attempt_resolution import VERSION as ATTEMPT_PROTOCOL, TrainingAt
 from .research_execution_feedback import _key as feedback_key
 
 
+def validate_training_timeout(value, device):
+    """Authored CPU fits retain their bound; verified PBS fits can run longer."""
+    from .pbs_gpu import MAX_TRAINING_SECONDS
+
+    require(device in {"cpu", "cuda"}, "Training device must be cpu or cuda")
+    maximum = MAX_TRAINING_SECONDS if device == "cuda" else 120
+    require(type(value) is int and 1 <= value <= maximum,
+            f"{device} training timeout_seconds must be an integer in 1..{maximum}")
+    return value
+
+
 async def fit_model(workspace, development, runner, *, name, source_file, evaluation_file,
                     hypothesis, strategy="supervised", parent_experiment_id="",
-                    variant="auto", prediction_key="value", seed=0, on_progress=None, device="cpu"):
+                    variant="auto", prediction_key="value", seed=0, on_progress=None, device="cpu", timeout_seconds=120):
     require(isinstance(source_file, str) and Path(source_file).suffix.lower() == ".py",
             "source_file must be the saved .py implementation with fit(training, seed) and predict(model, inputs). "
             "Pass the dataset JSON as evaluation_file; data files cannot be executed as model source.")
     require(source_file != evaluation_file, "source_file and evaluation_file must refer to different files")
     require(strategy in STRATEGIES, "Use a declared training strategy")
     require(device in {"cpu", "cuda"}, "Training device must be cpu or cuda")
+    validate_training_timeout(timeout_seconds, device)
     require(type(seed) is int and 0 <= seed < 2**32, "Seed must be an unsigned 32-bit integer")
     if variant == "auto":
         variant = "candidate" if parent_experiment_id else "baseline"
@@ -70,7 +82,7 @@ async def fit_model(workspace, development, runner, *, name, source_file, evalua
     record = {"id": identity, "attempt_protocol": ATTEMPT_PROTOCOL,
               "feedback_key": feedback_key("train_research_model", {
                   "source_file": source_file, "parent_experiment_id": parent_experiment_id, "variant": variant}),
-              "device": device, "variant": variant, "prediction_key": prediction_key, "status": "running", "created": time.time(), "seed": seed,
+              "device": device, "timeout_seconds": timeout_seconds, "variant": variant, "prediction_key": prediction_key, "status": "running", "created": time.time(), "seed": seed,
               "algorithm_sha256": hashlib.sha256(code.encode()).hexdigest(),
               "source_snapshot": "algorithm.py", "stage": "preflight", "evaluation_sha256": data_hash,
               "training_sha256": digest(training), "training_rows": len(training["train"]),
@@ -87,7 +99,7 @@ async def fit_model(workspace, development, runner, *, name, source_file, evalua
         fitting_runner = runner
         if device == "cuda":
             from .pbs_gpu import run_python as fitting_runner
-        execution = await fitting_runner(work, folder/"execution", "train.py", 120, **kwargs)
+        execution = await fitting_runner(work, folder/"execution", "train.py", timeout_seconds, **kwargs)
         record["execution"] = execution
         require(execution["exit_code"] == 0, "Training failed: "+python_failure(
                 execution.get("stderr_tail") or execution.get("stderr") or "inspect the training log", work, 800,
@@ -114,7 +126,7 @@ async def fit_model(workspace, development, runner, *, name, source_file, evalua
             workspace, runner, name=name, source=prefix+"runtime.py", files=fitted_paths,
             evaluation_file=prefix+"evaluation.json", prediction_key=prediction_key, hypothesis=hypothesis,
             strategy=strategy, parent_experiment_id=parent_experiment_id, variant=variant,
-            **({'training': {'attempt_id': identity, 'device': device}} if device == 'cuda' else {}))
+            **({'training': {'attempt_id': identity, 'device': device, 'timeout_seconds': timeout_seconds}} if device == 'cuda' else {}))
         record.update(status="completed", stage="completed", finished=time.time(), state_sha256=state_hash, experiment_id=experiment["id"],
                       runtime_files=[prefix+"runtime.py", *fitted_paths], state_format=state_metadata["format"],
                       dependency_versions=state_metadata["dependencies"], python_version=state_metadata["python"],
@@ -175,4 +187,11 @@ def selected_training_compute(development, identity, manifest):
     require(execution.get("exit_code") == 0 and compute.get("backend") == "pbs" and
             compute.get("device") == "cuda" and compute.get("inference_device") == "cpu",
             "GPU allocation evidence is missing")
-    return {**compute, "training_receipt_sha256": receipt_hash}
+    timeout = validate_training_timeout(record.get("timeout_seconds", 120), "cuda")
+    require(type(binding.get("timeout_seconds", 120)) is int and
+            binding.get("timeout_seconds", 120) == timeout,
+            "GPU training timeout does not match the measured experiment")
+    require(type(execution.get("timeout_seconds", 120)) is int and
+            execution.get("timeout_seconds", 120) == timeout,
+            "GPU training timeout does not match execution receipt")
+    return {**compute, "training_receipt_sha256": receipt_hash, "training_timeout_seconds": timeout}

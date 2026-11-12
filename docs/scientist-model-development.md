@@ -481,6 +481,18 @@ whole PBS job; the smaller watchdog limit is checked during execution. A sudden
 allocation can therefore terminate the research job at its PBS limit. Queue,
 wall-time, output/storage limits and cancellation cleanup still apply.
 
+GPU fitting accepts `timeout_seconds` (default 120, maximum 1800). CPU fits keep
+their 120-second maximum; ordinary CPU session execution and online limits are
+unchanged. The requested allowance is bound to the measured experiment and its
+training receipt; independent Review uses that same allowance. Validation and
+prediction keep their existing CPU limits. Existing GPU records without a duration
+retain their original 120-second allowance.
+
+The native research phase and total goal budgets must leave time for the fit,
+evaluation and later Review; a larger tool allowance does not extend those budgets
+or the PBS walltime. When a phase exits or is cancelled, its admitted MCP calls are
+cancelled and their sandbox cleanup is awaited before the next phase starts.
+
 Return CPU-portable state from `fit`: for example, detach tensors to CPU or save
 numeric parameters. Validation, final-test prediction and Agent reuse remain CPU
 operations. The measured experiment binds the GPU training receipt; independent
