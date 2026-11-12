@@ -124,14 +124,19 @@ async def test_different_parent_and_ablation_do_not_resolve_candidate_failure(tm
     parent=baseline["experiment"]["id"]
     exc=await failed_fit(service,parent)
     state=feedback_state(failed_call(str(exc),parent=parent),service.workspace)
-    await service.write_research_file("src/revision.py",LINEAR)
+    # Each branch must be an actual distinct fit; renaming/reparenting an
+    # identical model is rejected before failure-resolution logic is consulted.
+    await service.write_research_file("src/revision.py",LINEAR.replace("my-slope*mx", "my-slope*mx+0.25"))
     await service.train_research_model("ablation","src/revision.py","","Controlled removal",
                                       parent_experiment_id=parent,variant="ablation")
     assert feedback_state([],service.workspace,state,development=service.development)["pending"]
-    sibling=await service.train_research_model("sibling","src/replacement.py","evaluation.json","Another baseline")
+    await service.write_research_file("src/sibling.py",GOOD.replace("/ len(rows)", "/ (len(rows)+1)"))
+    sibling=await service.train_research_model("sibling","src/sibling.py","evaluation.json","Another baseline")
+    await service.write_research_file("src/revision.py",LINEAR.replace("my-slope*mx", "my-slope*mx+0.5"))
     await service.train_research_model("other branch","src/revision.py","","Different parent",
                                       parent_experiment_id=sibling["experiment"]["id"])
     assert feedback_state([],service.workspace,state,development=service.development)["pending"]
+    await service.write_research_file("src/revision.py",LINEAR)
     candidate=await service.train_research_model("revision","src/revision.py","","Measured replacement",
                                                 parent_experiment_id=parent)
     result=feedback_state([],service.workspace,state,development=service.development)
@@ -200,7 +205,10 @@ async def test_coordinator_reaches_independent_review_after_measured_replacement
                          {"id":"review","title":"Independent review","acceptance":"Review receipt","verification":"review"}]})
         if role=="SC":
             seen.append(copy.deepcopy(context["execution"]))
-            return json.dumps({"decision":"ready_for_host_validation","summary":"Measured work inspected","issues":[]})
+            evidence = ([row["id"] for row in context["development_measurements"]["experiments"]]
+                        if context["scientific_acceptance"].get("study_evidence_required") else [])
+            return json.dumps({"decision":"ready_for_host_validation","summary":"Measured work inspected","issues":[],
+                               **({"evidence_ids": evidence} if evidence else {})})
         raise AssertionError(role)
     async def executor(request,service,events):
         iterations.append(True)
