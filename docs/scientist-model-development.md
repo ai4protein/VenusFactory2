@@ -19,6 +19,13 @@ scientific value, evaluation validity, and scope and limitations. Constant
 predictions cannot establish input-specific predictive value; a documented
 reference purpose is assessed separately. There is no universal baseline-win rule.
 
+SC also receives a bounded history of host-recorded validation before a model
+proposal exists. The history preserves a baseline, recent measured revisions,
+exact-prediction matches and receipt identities. A missing submission is distinct
+from missing evaluation. Study-level objections return to PI even when no model
+assessment was possible; they do not discard earlier experiments or bypass the
+separate model-admission checks.
+
 A negative verdict or missing evidence prevents technical Review and registration,
 persists an actionable request for PI, and continues the research loop. Accepted
 verdicts are bound to the selected experiment, runtime, evaluation and manifest
@@ -43,6 +50,28 @@ experiments require unlabeled observations with no target field or overlap with
 labeled/held-out records. Review must inspect the actual implementation, meaningful
 baselines, support/query design, ablations and uncertainty. These checks do not
 prove that user-supplied grouping labels encode true protein homology.
+
+## CPU and PBS GPU training
+
+Agent-authored `train_research_model` fits run in the CPU analysis sandbox. GPU
+training uses enabled platform tools: `generate_training_config` prepares the
+session data and settings, `train_protein_model` produces a fitted checkpoint,
+and `protein_model_predict` checks the resulting model. These calls use the
+shared CPU/GPU job queue and preserve their parent research job and session
+ownership. Online training retains the ESM2-8M policy.
+
+On a PBS cluster, request GPU, CPU, memory and wall-time resources before
+starting the research process and its tool workers on the allocated node. Honor
+the scheduler's device binding; do not select a host GPU outside that allocation.
+Use a separate queue directory for each independent experimental allocation.
+The current SQLite queue is a single-host service, not a distributed queue shared
+between PBS nodes. A GPU allocation does not expose devices to arbitrary session
+Python or install a missing deep-learning dependency automatically.
+
+Record the PBS job, allocation, tool job IDs, fitted checkpoint, prediction result
+and terminal states with the experiment. A completed training integration test
+establishes execution, while a scientific model still requires measured utility,
+independent SC acceptance and technical Review.
 
 ## Repeated experiments and model changes
 

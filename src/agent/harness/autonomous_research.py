@@ -33,6 +33,21 @@ from .tool_disclosure import ToolDisclosure, CONTROLS, GUIDANCE
 from agent.rsi.artifacts.contract import SCHEMA as DELIVERY_SCHEMA, selected_deliveries, has_delivery
 
 def development_next_action(summary, progress, prepared=None, *, materials=None):
+    action = _development_next_action(summary, progress, prepared, materials=materials)
+    feedback = progress.get('sc_revision') or {}
+    if feedback.get('issues') and not feedback.get('requests'):
+        # Study-level feedback still reaches PI when no model was submitted.
+        # Keep the measured workflow stage: a missing proposal is not a failed fit.
+        action['scientific_feedback'] = {
+            'summary': feedback.get('summary', ''), 'issues': feedback['issues'],
+            'measured_experiment_ids': feedback.get('measured_experiment_ids', []),
+            'instruction': 'Address SC study feedback using the existing host measurements. '
+                'Distinguish a missing experiment from incomplete submission or delivery; '
+                'preserve completed evidence and revise only the unresolved work.'}
+    return action
+
+
+def _development_next_action(summary, progress, prepared=None, *, materials=None):
     """Expose only the next missing model-development stage."""
     sc_revision = progress.get('sc_revision')
     if sc_revision and sc_revision.get('requests'):
