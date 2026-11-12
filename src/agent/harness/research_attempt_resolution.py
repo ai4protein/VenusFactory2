@@ -77,6 +77,26 @@ def _verified_replacement(development, row):
     return experiment
 
 
+
+def equivalent_fit(development, *, algorithm_sha256, state_sha256, evaluation_sha256, prediction_key):
+    """Find an already measured fit, independent of filenames and parent choice."""
+    training = development.root / "training"
+    for path in sorted(training.glob("*/receipt.json")):
+        try:
+            row = _receipt(training, path.parent.name)
+            if (row.get("status") != "completed"
+                    or row.get("algorithm_ast_sha256") != algorithm_sha256
+                    or row.get("state_sha256") != state_sha256
+                    or row.get("evaluation_sha256") != evaluation_sha256
+                    or row.get("prediction_key") != prediction_key):
+                continue
+            experiment = _verified_replacement(development, row)
+            return experiment["id"]
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
+    return None
+
+
 def resolve_attempts(feedback, development):
     """Host receipts, never a model's success claim, link a measured replacement."""
     from .research_development import immutable_copy

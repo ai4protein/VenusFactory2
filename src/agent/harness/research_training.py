@@ -16,7 +16,7 @@ from .research_algorithm_checks import algorithm_diagnostics, checked_algorithm_
 from utils.scoped_files import read_bytes, write_bytes
 
 from .research_model_state import RUNTIME_SUFFIX, training_script, read_fitted_state
-from .research_attempt_resolution import VERSION as ATTEMPT_PROTOCOL, TrainingAttemptError
+from .research_attempt_resolution import VERSION as ATTEMPT_PROTOCOL, TrainingAttemptError, equivalent_fit
 from .research_execution_feedback import _key as feedback_key
 
 
@@ -91,13 +91,11 @@ async def fit_model(workspace, development, runner, *, name, source_file, evalua
         require(all(read_bytes(work, path) == content for path, content in inputs.items()),
                 "Training modified its source or input data")
         state_metadata, state_files, state_hash = read_fitted_state(work)
-        if parent:
-            for prior in (development.root/"training").glob("*/receipt.json"):
-                previous = json.loads(prior.read_text())
-                if previous.get("experiment_id") == parent_experiment_id:
-                    require((previous.get("algorithm_ast_sha256"),previous.get("state_sha256"))
-                            != (code_hash,state_hash),
-                            "A revision must change the algorithm or fitted state, not only names or comments")
+        previous_id = equivalent_fit(development, algorithm_sha256=code_hash, state_sha256=state_hash,
+            evaluation_sha256=data_hash, prediction_key=prediction_key)
+        require(previous_id is None,
+                "A revision must change the algorithm or fitted state, not only names or comments. "
+                f"This fit is already measured as experiment {previous_id}; reuse that evidence, or implement a justified change before fitting again.")
 
         prefix = "models/"+identity+"/"
         exported = {**inputs, **state_files}
@@ -124,6 +122,10 @@ async def fit_model(workspace, development, runner, *, name, source_file, evalua
         next_step = "Inspect host validation, revise the algorithm with parent_experiment_id, "
         next_step += "then submit the selected generation for independent Review. No model is published by training."
         diagnostics = experiment["validation"]["diagnostics"]
+        if experiment.get("prediction_equivalence", {}).get("matched_experiment_ids"):
+            next_step = ("The declared predictions exactly match an earlier experiment on the fixed validation inputs. "
+                         "Seed or artifact-byte changes alone do not demonstrate new predictive behavior. "
+                         "Measure a justified change or provide evidence for a different practical benefit. " + next_step)
         if diagnostics["constant_predictions"]:
             behavior = "Validation predictions are constant"
             if diagnostics["matches_training_reference"]:

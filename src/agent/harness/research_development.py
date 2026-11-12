@@ -16,7 +16,7 @@ import uuid
 from .contracts import digest, file_hash
 from .host import write_json
 from .research_prediction_diagnostics import prediction_diagnostics
-from .research_evaluation import evaluation_digest, validate_data, scores
+from .research_evaluation import prediction_values_digest, evaluation_digest, validate_data, scores
 from utils.scoped_files import read_bytes, copy_file, write_bytes
 
 STRATEGIES = {
@@ -153,7 +153,14 @@ class Development:
 
     def summary(self):
         rows=self.records()
-        return {'count':len(rows),'generations':[{k:r[k] for k in ['id','name','strategy','variant','parent','hypothesis','validation','comparison','runtime_sha256']} for r in rows[-12:]]}
+        generations = []
+        for row in rows[-12:]:
+            entry = {key:row[key] for key in ('id', 'name', 'strategy', 'variant', 'parent',
+                     'hypothesis', 'validation', 'comparison', 'runtime_sha256')}
+            if 'prediction_equivalence' in row:
+                entry['prediction_equivalence'] = row['prediction_equivalence']
+            generations.append(entry)
+        return {'count':len(rows), 'generations':generations}
 
     def evaluation_snapshot(self, identity):
         record=self.record(identity)
@@ -232,6 +239,10 @@ class Development:
             query_rows=data['splits']['validation'] if 'support' in data else None)
         measured['diagnostics']=prediction_diagnostics(data['task'],[v[prediction_key] for v in results],
             [r['target'] for r in data['splits']['train']],split='validation')
+        prediction_values_sha = prediction_values_digest([v[prediction_key] for v in results])
+        equivalent = [row['id'] for row in self.records()
+                      if row['evaluation_sha256'] == data_sha and row['prediction_key'] == prediction_key
+                      and row.get('prediction_values_sha256') == prediction_values_sha]
         comparison=None
         if parent:
             before=parent['validation'];delta=before['score']-measured['score'] if measured['direction']=='minimize' else measured['score']-before['score']
@@ -240,7 +251,10 @@ class Development:
             'source':source,'files':manifest['files'],'runtime_sha256':fingerprint,'implementation_sha256':implementation,'evaluation_sha256':data_sha,'evaluation_file':evaluation_file,
             'evaluation_snapshot_id':data_sha,'evaluation_snapshot_sha256':hashlib.sha256(snapshot_raw).hexdigest(),'evaluation_origin':evaluation_origin,
             'prediction_key':prediction_key,'split_counts':{k:len(v) for k,v in data['splits'].items()},'validation':measured,'comparison':comparison,
-            'predictions_sha256':digest(results),'fresh_process_replay':True,'score_origin':'host_validation','test_used_for_feedback':False}
+            'predictions_sha256':digest(results),'prediction_values_sha256':prediction_values_sha,
+            'prediction_equivalence':{'split':'validation','method':'exact_declared_prediction_values',
+                                      'matched_experiment_ids':equivalent},
+            'fresh_process_replay':True,'score_origin':'host_validation','test_used_for_feedback':False}
         record['evaluation_visibility']='host_only' if self.data_store else 'agent_workspace'
         record['receipt_sha256']=digest(record);write_json(folder/'receipt.json',record)
         # User-facing evidence is regenerated from the host receipt, never read

@@ -203,6 +203,20 @@ def training_evidence_summary(value, data, strategy):
             "training_view_sha256": digest(expected)}
 
 
+def prediction_values_digest(predictions):
+    """Exact scored-value identity, ignoring numeric spelling and output metadata."""
+    def canonical(value):
+        if type(value) in (int, float):
+            numerator, denominator = (value, 1) if type(value) is int else value.as_integer_ratio()
+            return ["number", numerator, denominator]
+        if isinstance(value, str):
+            return ["label", value]
+        if isinstance(value, dict):
+            return ["labels", [[name, canonical(value[name])] for name in sorted(value)]]
+        raise ValueError("Use validated scalar predictions or multilabel probabilities")
+    return digest([canonical(value) for value in predictions])
+
+
 def scores(task, predictions, targets, train, *, query_rows=None):
     _require(len(predictions) == len(targets) and bool(targets),
              "Prediction count differs from query count")

@@ -44,6 +44,21 @@ labeled/held-out records. Review must inspect the actual implementation, meaning
 baselines, support/query design, ablations and uncertainty. These checks do not
 prove that user-supplied grouping labels encode true protein homology.
 
+## Repeated experiments and model changes
+
+A renamed source or another parent link does not create a new model. If an
+algorithm and its fitted state have already been measured on the same prepared
+training data and evaluation split, fitting returns that experiment's identity
+in a diagnostic instead of adding another generation. The attempted fit and its
+source are retained for inspection.
+
+Validation also compares the declared prediction values with earlier experiments
+on the same frozen inputs. Exact matches are shown to PI and SC even when random
+seed metadata or extra output fields differ. Equal aggregate scores alone are
+not treated as equal predictions, and a match on validation inputs does not prove
+equivalence outside them. A change may still have practical value, but benefits
+such as lower cost or a different use case need evidence in the SC assessment.
+
 ## Inspecting inputs and saving progress
 
 Supplied source is inspected before a new implementation is written. For focused
