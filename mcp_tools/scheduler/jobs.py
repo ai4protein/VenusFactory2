@@ -1,5 +1,6 @@
 """Durable tool submissions. Arguments/results are private; queue rows hold metadata."""
 import asyncio
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -49,7 +50,12 @@ class ToolJobs:
         if parent_job and parent['kind'] == 'scientist':
             meta = parent['metadata']
             folder = Path(meta['goal_folder'])
-            if folder.name != meta.get('goal_id') or folder.parent.name != meta.get('session_id'):
+            session = meta.get('session_id')
+            if (not isinstance(session, str) or not session
+                    or folder.name != meta.get('goal_id')
+                    or folder.parent.name != hashlib.sha256(session.encode()).hexdigest()
+                    or folder.is_symlink() or folder.parent.is_symlink()
+                    or (folder / 'workspace').is_symlink()):
                 raise ValueError('Invalid research workspace')
             workspace = str((folder / 'workspace').resolve(strict=True))
         spec_id=uuid.uuid4().hex

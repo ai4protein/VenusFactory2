@@ -145,6 +145,11 @@ and full prediction arrays remain in the dossier; the independent reviewer
 resolves its anchors against those originals.
 
 
+Scientist Web jobs retain the browser session ID in queue metadata and use its
+SHA-256 digest for the session directory. MCP submission validates that mapping
+before binding the child worker to the goal's workspace. The original session
+identity remains unchanged for ownership checks and event recovery.
+
 Tool discovery separates session navigation from model metadata. Harness adapters
 use the shared discovery broker to track which tool was inspected during a turn.
 The MCP discovery package owns catalog lookup and the mapping of model, dataset
