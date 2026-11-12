@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import re
 
+GENERIC_ANALYSIS = ("analysis", "analyses", "分析")
+
 ALIASES = (
+    GENERIC_ANALYSIS,
+    ("sequence", "sequences", "序列"),
     ("stability", "thermal", "thermostability", "稳定性", "热稳定性", "热稳定", "耐热"),
     ("solubility", "soluble", "溶解度", "可溶性"),
     ("expression", "abundance", "表达", "丰度"),
@@ -32,6 +36,13 @@ ZH_FILLERS = ("有哪些", "有什么", "可以", "能够", "可用", "查询", 
 
 def query_groups(query):
     remaining = query.casefold().strip()
+    # Keep compound IDs intact, but let hyphenated known descriptors such as
+    # sequence-analysis follow the same AND matching as sequence analysis.
+    descriptor_words = STOP | {alias for group in ALIASES for alias in group if alias.isascii()}
+    descriptor_phrase = '-' in remaining and all(word in descriptor_words for word in remaining.split('-'))
+    if re.fullmatch(r"[a-z0-9][a-z0-9_.-]*", remaining) and (
+            any(separator in remaining for separator in "_.") or ('-' in remaining and not descriptor_phrase)):
+        return [(remaining,)]
     groups = []
     for aliases in ALIASES:
         hits = []
@@ -50,7 +61,12 @@ def query_groups(query):
     for word in re.findall(r"[a-z0-9][a-z0-9_.-]*|[\u4e00-\u9fff]+", remaining):
         if word not in STOP:
             groups.append((word,))
-    return list(dict.fromkeys(groups))
+    groups = list(dict.fromkeys(groups))
+    # Generic task wording must not exclude a calculator whose description
+    # states its actual scientific operation. Keep substantive terms ANDed.
+    # An analysis-only query remains a keyword search, never a full-catalog fallback.
+    substantive = [group for group in groups if group != GENERIC_ANALYSIS]
+    return substantive or groups
 
 
 def relevance(groups, title, text):
@@ -61,4 +77,7 @@ def relevance(groups, title, text):
         if not any(word in text for word in alternatives):
             return None
         score += 4 if any(word in title for word in alternatives) else 1
+    if len(groups) == 1 and any(
+            title == word or title == word.replace("_", " ") for word in groups[0]):
+        score += 8  # Exact names precede tools merely mentioning that name.
     return score
