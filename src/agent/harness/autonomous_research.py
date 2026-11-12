@@ -385,7 +385,9 @@ class AutonomousResearch:
                 else:
                     from .web_native_worker import run
                     request['audit_required']=True
-                    await run(request,tools=tools,event_sink=event_sink)
+                    from .research_handoff import native_phase
+                    with native_phase(policy) as handoff:
+                        await run(request,tools=tools,event_sink=event_sink,checkpoint_handoff=handoff)
                 from .execution_followup import execution_followup, execution_usage
                 followup = execution_followup(
                     request, native, events, checkpoint=service.checkpoint,
@@ -424,7 +426,9 @@ class AutonomousResearch:
                     if self.executor_override:
                         await self.executor_override(followup,service,events)
                     else:
-                        await run(followup,tools=tools,event_sink=event_sink)
+                        from .research_handoff import native_phase
+                        with native_phase(policy) as handoff:
+                            await run(followup,tools=tools,event_sink=event_sink,checkpoint_handoff=handoff)
                 awaiting=next((e for e in events if e.get('kind')=='interaction'),None)
                 if awaiting:
                     from .interactions import Interaction

@@ -140,6 +140,7 @@ jobs:
           tests/test_mutation_tool_contracts.py tests/harness/test_tool_disclosure.py
           tests/harness/test_capability_boundary.py tests/harness/test_selected_tool_contract.py
           tests/harness/test_web_native_catalog.py tests/harness/test_context_relay.py
+          tests/harness/test_research_handoff.py tests/harness/test_research_checkpoint_budget.py
           tests/test_design_docking_contracts.py tests/test_external_mcp_dispatch.py tests/test_external_models.py
           tests/test_model_plaza_performance.py tests/rsi/test_feedback_verification_scope.py
           tests/test_workflow_components.py tests/test_workflow_persistence.py

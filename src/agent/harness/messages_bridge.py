@@ -345,6 +345,10 @@ class MessagesBridge(EvidenceGateway):
             return self.error("authentication_error", "Invalid relay credential", 401)
         if request.path != self.native_route or request.method != "POST":
             return self.error("invalid_request_error", "Unsupported relay route", 404)
+        from .research_handoff import closed_response
+        handoff = closed_response(self.policy, self.record)
+        if handoff is not None:
+            return handoff
         try:
             payload, native = self.translate_request(await request.json())
             if self.on_text is not None:
@@ -359,6 +363,9 @@ class MessagesBridge(EvidenceGateway):
         if self._rate_limited:
             self.record({"event": "upstream_retry_suppressed", "status": 429})
             return self.error("api_error", "upstream_http_429", 400)
+        handoff = closed_response(self.policy, self.record)
+        if handoff is not None:
+            return handoff
         if self.calls >= self.policy.max_calls:
             self.record({"event": "budget_rejected", "code": "model_call_budget_exhausted"})
             return self.error("invalid_request_error", "Model call budget exhausted", 400)

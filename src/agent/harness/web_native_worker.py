@@ -61,7 +61,7 @@ def web_tool_name(name, harness):
     return name[:limit] + "_" + suffix
 
 
-async def run(request, *, tools=None, event_sink=None):
+async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None):
     send = event_sink or emit
     from aiohttp import web
 
@@ -124,6 +124,8 @@ async def run(request, *, tools=None, event_sink=None):
     checkpoint_saved = False
     checkpoint_calls = 0
     is_research = 'submit_research_checkpoint' in mapping
+    if checkpoint_handoff is not None and (not is_research or not request.get("audit_required")):
+        raise ValueError("Checkpoint handoff requires an audited Scientist tool surface")
     lookup_limit = min(48, 2 * profile.budget.tool_calls) if is_research else 0
     # Read-only discovery has its own finite allowance; it cannot consume the
     # research execution allowance or increase actual compute/inference quotas.
@@ -262,6 +264,8 @@ async def run(request, *, tools=None, event_sink=None):
                     # Questions do not need model catalogs, scientific imports,
                     # workspace inspection or a compute queue slot.
                     async with workspace_call:
+                        if checkpoint_saved:
+                            raise DisclosureError("Checkpoint saved; finish this iteration without further calls.")
                         if interaction is not None:
                             raise ValueError("A user interaction is already pending")
                         value = await tool.ainvoke(arguments)
@@ -274,6 +278,8 @@ async def run(request, *, tools=None, event_sink=None):
                 # call is mutating them in a coding sandbox. Keep this lock until
                 # queued tools finish as well. API downloads use anchored FDs.
                 async with workspace_call:
+                    if checkpoint_saved:
+                        raise DisclosureError("Checkpoint saved; finish this iteration without further calls.")
                     if interaction is not None:
                         raise ValueError("Waiting for the user's response; no further actions are allowed")
                     from .session_sandbox import check_workspace
@@ -300,6 +306,10 @@ async def run(request, *, tools=None, event_sink=None):
                         from backend.web_v2.compute_access import inline_prediction
                         inline_prediction(os.getenv('VENUS_QUEUE_OWNER') or 'chat:'+str(request.get('session_id')), canonical_name, classify(canonical_name, tool.metadata)['category'])
                         value = await tool.ainvoke(args, config={"configurable": {"session_id": request.get("session_id")}})
+                    if canonical_name == 'submit_research_checkpoint' and not _tool_output_indicates_failure(value)[0]:
+                        if checkpoint_handoff is not None:
+                            checkpoint_handoff.save(arguments, public_value(value, workspace))
+                        checkpoint_saved = True
                     if canonical_name == "predict_with_evolved_model" and not _tool_output_indicates_failure(value)[0]:
                         from mcp_tools.models.evolved.result_delivery import deliver_prediction
                         card = deliver_prediction(workspace, value, args, session_id=request.get("session_id"))
@@ -310,8 +320,6 @@ async def run(request, *, tools=None, event_sink=None):
                         send({"kind": "model_result", "result": public_value(card, workspace)})
                 value = public_value(value, workspace)
                 failed, _ = _tool_output_indicates_failure(value)
-                if canonical_name == 'submit_research_checkpoint' and not failed:
-                    checkpoint_saved = True
                 if observation: observation.finish(failed=failed)
                 if event_sink:
                     send({"kind": "research_tool_status", "status": "failed" if failed else "completed", "tool": name, "call_id": call_id, "result": str(value)[:3000]})
@@ -412,6 +420,11 @@ async def run(request, *, tools=None, event_sink=None):
     try:
         while not pending.done():
             forward()
+            if checkpoint_handoff is not None and checkpoint_handoff.closed:
+                audit = checkpoint_handoff.audit(trace, disclosure.names, transport_limit)
+                if audit['passed']:
+                    pending.cancel()
+                    break
             if interaction is not None:
                 pending.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
@@ -420,6 +433,24 @@ async def run(request, *, tools=None, event_sink=None):
                 break
             await asyncio.sleep(0.1)
         if interaction is not None:
+            return
+        if checkpoint_handoff is not None and checkpoint_handoff.closed:
+            termination = 'finished'
+            try:
+                result = await pending
+                termination = result.get('status', 'finished')
+            except asyncio.CancelledError:
+                termination = 'cancelled_after_checkpoint'
+            except Exception as exc:
+                termination = 'error_after_checkpoint:' + type(exc).__name__
+            forward()
+            audit = checkpoint_handoff.audit(trace, disclosure.names, transport_limit)
+            if not audit['passed']:
+                raise ValueError("Checkpoint handoff trace did not pass validation")
+            event = checkpoint_handoff.event(audit, executions=executions, lookups=lookups, checkpoints=checkpoint_calls)
+            event['native_termination'] = termination
+            (control/'checkpoint_handoff.json').write_text(json.dumps(event,ensure_ascii=False,indent=2))
+            send(event)
             return
         result = await pending
         forward()
@@ -441,8 +472,12 @@ async def run(request, *, tools=None, event_sink=None):
         ]
         send({"kind": "completed", "messages": messages, "text": text, "tool_calls": executions, "discovery_calls": lookups, "checkpoint_calls": checkpoint_calls, "event_audit": event_audit})
     finally:
-        pending.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await pending
+        if not pending.done():
+            pending.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await pending
+        else:
+            with contextlib.suppress(asyncio.CancelledError):
+                pending.exception()
         await server.cleanup()
         connection.unlink(missing_ok=True)

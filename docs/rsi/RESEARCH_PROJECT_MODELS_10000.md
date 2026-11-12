@@ -180,6 +180,17 @@ matched budgets. Use untouched projects for transfer claims and equal-budget sea
 controls. Report within-protein prediction, new-protein adaptation and new-scenario
 transfer separately. Model-library growth alone does not establish improvement.
 
+SC is the independent scientific acceptance role. It receives the objective and
+host-bound experimental evidence without the developer's endorsements. It checks
+usefulness, evaluation validity and supported scope; an unsupported or unhelpful model
+returns to PI with specific revision requirements. Passing SC is followed by independent
+technical Review and reproducible private delivery, not automatic public publication.
+
+Saving a research checkpoint ends the native implementation turn after its MCP receipt
+and trace have been verified. It does not mark the research complete. The coordinator
+stops further implementation requests and invokes SC in a separate context. Queued
+workspace mutations cannot change the saved result after this boundary.
+
 Private model delivery requires reproducible training, real fitted state, input/output
 checks, scope and resource limits, evaluation evidence and a successful fresh invocation.
 Public platform admission is separate: an operator selects and reviews local products;

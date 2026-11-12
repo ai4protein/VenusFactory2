@@ -430,6 +430,10 @@ class ResponsesGateway(ModelGateway):
             return web.json_response({"error": "invalid relay credential"}, status=401)
         if request.path != "/v1/responses" or request.method != "POST":
             return web.json_response({"error": "unsupported model route"}, status=404)
+        from .research_handoff import closed_response
+        handoff = closed_response(self.policy, self.record)
+        if handoff is not None:
+            return handoff
         try:
             incoming = await request.json()
             if not isinstance(incoming, dict) or type(incoming.get("stream", False)) is not bool:
@@ -447,6 +451,9 @@ class ResponsesGateway(ModelGateway):
         if self._rate_limited:
             self.record({"event": "upstream_retry_suppressed", "status": 429})
             return web.json_response({"error": "upstream_http_429"}, status=400)
+        handoff = closed_response(self.policy, self.record)
+        if handoff is not None:
+            return handoff
         if self.calls >= self.policy.max_calls:
             self.record({"event": "budget_rejected", "code": "model_call_budget_exhausted"})
             return web.json_response({"error": {"message": "model call budget exhausted",

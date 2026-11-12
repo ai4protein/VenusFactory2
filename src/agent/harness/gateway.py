@@ -75,6 +75,10 @@ class EvidenceGateway(ModelGateway):
             return web.json_response({"error": "invalid relay credential"}, status=401)
         if request.path != "/v1/chat/completions" or request.method != "POST":
             return web.json_response({"error": "unsupported model route"}, status=404)
+        from .research_handoff import closed_response
+        handoff = closed_response(self.policy, self.record)
+        if handoff is not None:
+            return handoff
         try:
             incoming = await request.json()
             if not isinstance(incoming, dict) or type(incoming.get("stream", False)) is not bool:
@@ -111,6 +115,9 @@ class EvidenceGateway(ModelGateway):
             deadline = time.monotonic() + self.timeout_s
             logical_call, previous = None, None
             for attempt in range(1, 3 if self.request_recovery != "none" else 2):
+                handoff = closed_response(self.policy, self.record)
+                if handoff is not None:
+                    return handoff
                 if time.monotonic() >= deadline:
                     self.record({"event": "request_deadline_exhausted", "logical_call": logical_call})
                     return web.json_response({"error": "logical request deadline exhausted"}, status=502)
