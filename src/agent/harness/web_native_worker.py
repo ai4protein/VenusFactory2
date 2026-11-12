@@ -350,6 +350,14 @@ async def run(request, *, tools=None, event_sink=None, checkpoint_handoff=None):
             else:
                 raise ValueError("Unknown MCP method")
             return web.json_response({"jsonrpc": "2.0", "id": body["id"], "result": result})
+        except asyncio.CancelledError:
+            if observation:
+                observation.write('cancelled', error_type='CancelledError')
+            if event_sink and method == 'tools/call':
+                send({'kind': 'research_tool_status', 'status': 'cancelled',
+                      'tool': locals().get('name') or params.get('name', ''),
+                      'call_id': locals().get('call_id')})
+            raise
         except Exception as exc:
             if method == 'tools/call' and not queued_tool:
                 from backend.web_v2.usage_store import Observation

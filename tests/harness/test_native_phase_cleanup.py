@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import sqlite3
 from types import SimpleNamespace
 
 import httpx
@@ -26,6 +27,8 @@ async def test_native_phase_exit_reaps_inflight_sandbox_before_return(tmp_path, 
     monkeypatch.setenv("VENUS_SANDBOX_CONTROL_ROOT", str(tmp_path / "reservations"))
     monkeypatch.setenv("VENUS_SANDBOX_LOCAL_MEMORY_MB", "512")
     monkeypatch.setenv("VENUS_SANDBOX_TOTAL_MEMORY_MB", "1024")
+    monkeypatch.setenv("VENUS_USAGE_DB", str(tmp_path / "usage.sqlite3"))
+    events = []
     work, control = tmp_path / "work", tmp_path / "control"
     work.mkdir()
     control.mkdir()
@@ -89,7 +92,7 @@ async def test_native_phase_exit_reaps_inflight_sandbox_before_return(tmp_path, 
                 "text": "Run analysis",
             },
             tools=[tool],
-            event_sink=lambda value: None,
+            event_sink=events.append,
         )
     )
     try:
@@ -108,6 +111,12 @@ async def test_native_phase_exit_reaps_inflight_sandbox_before_return(tmp_path, 
         with Reservations().locked() as rows:
             assert not rows
         assert not (control / "native/capability/connection.json").exists()
+        with sqlite3.connect(tmp_path / "usage.sqlite3") as database:
+            statuses = database.execute(
+                "SELECT status,latency_ms FROM usage_events WHERE kind='tool' AND name='run_session_python'"
+            ).fetchall()
+        assert len(statuses) == 1 and statuses[0][0] == "cancelled" and statuses[0][1] is not None
+        assert any(row.get("kind") == "research_tool_status" and row.get("status") == "cancelled" for row in events)
     finally:
         if not run.done():
             run.cancel()
