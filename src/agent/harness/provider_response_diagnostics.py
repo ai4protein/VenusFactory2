@@ -10,6 +10,7 @@ def response_evidence(raw, streaming):
               "response_bytes": len(raw), "streaming": bool(streaming),
               "done": False, "malformed": False, "provider_error": False,
               "content_present": False, "tools_present": False,
+              "reasoning_present": False, "refusal_present": False,
               "usage_present": False, "finish_reasons": []}
     reasons = set()
     frames = (line[5:].strip() for line in raw.splitlines() if line.startswith(b"data:")) if streaming else [raw]
@@ -36,6 +37,13 @@ def response_evidence(raw, streaming):
                 message = choice.get("delta" if streaming else "message") or {}
                 if isinstance(message, dict):
                     result["content_present"] |= bool(message.get("content"))
+                    # Presence only: private reasoning and refusal text never enter diagnostics.
+                    result["reasoning_present"] |= any(
+                        isinstance(message.get(key), str) and bool(message[key].strip())
+                        for key in ("reasoning_content", "reasoning")
+                    )
+                    refusal = message.get("refusal")
+                    result["refusal_present"] |= isinstance(refusal, str) and bool(refusal.strip())
                     result["tools_present"] |= bool(message.get("tool_calls") or message.get("function_call"))
                 else:
                     result["malformed"] = True
