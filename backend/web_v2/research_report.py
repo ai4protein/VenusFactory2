@@ -268,9 +268,19 @@ _LITERATURE_TOPICS = (
 def _literature_anchor(entry, protein):
     if not entry:
         return '"' + plain(protein, 160).replace('"', '') + '"'
-    name = protein_card(entry)['name']
-    genes = [(g.get('geneName') or {}).get('value', '') for g in (entry.get('genes') or [])]
-    aliases = [name, *[g for g in genes if len(g) > 2]][:5]
+    description = entry.get('proteinDescription', {})
+    records = [description.get('recommendedName') or {},
+               *(description.get('alternativeNames') or []),
+               *(description.get('submissionNames') or [])]
+    # A short symbol can denote an ion, a region or an unrelated acronym (CA2
+    # also matches Ca2+). Resolved full protein names remain the identity anchor.
+    names = [plain((record.get('fullName') or {}).get('value', ''), 160)
+             for record in records]
+    generic = {'protein', 'uncharacterized protein', 'hypothetical protein', 'putative protein'}
+    aliases = list(dict.fromkeys(name for name in names if name and name.casefold() not in generic))[:6]
+    if not aliases:
+        genes = [(g.get('geneName') or {}).get('value', '') for g in (entry.get('genes') or [])]
+        aliases = [plain(gene, 80) for gene in genes if gene][:5] or [plain(protein, 160)]
     anchor = '(' + ' OR '.join('TITLE_ABS:"' + a.replace('"', '') + '"' for a in aliases) + ')'
     organism = entry.get('organism', {}).get('scientificName', '')
     species = ' AND ("' + organism.replace('"', '') + '"' + (' OR human' if organism == 'Homo sapiens' else '') + ')' if organism else ''

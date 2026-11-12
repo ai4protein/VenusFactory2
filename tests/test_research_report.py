@@ -18,7 +18,7 @@ class ReportPolicyTests(unittest.TestCase):
         queries = r.literature_queries(entry, 'protein', ['random OR everything binding'])
         self.assertIn('SRC:MED', queries[0])
         self.assertIn('EXT_ID:123', queries[0])
-        self.assertIn('TITLE_ABS:"HBA1"', queries[1])
+        self.assertIn('TITLE_ABS:"Hemoglobin subunit alpha"', queries[1])
         self.assertIn('"Homo sapiens"', queries[1])
         self.assertNotIn('everything', queries[1])
 
