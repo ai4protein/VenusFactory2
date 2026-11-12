@@ -280,6 +280,7 @@ def predict_protein_function(
         target_out_dir = out_dir or _default_agent_out_dir()
         out_path = output_file or os.path.join(target_out_dir, default_out)
         args = Namespace(adapter_path=resolved_adapter, output_csv=out_path)
+        config = {}
         if os.path.exists(config_path):
             with open(config_path, "r", encoding="utf-8") as f:
                 config = json.load(f)
@@ -305,6 +306,7 @@ def predict_protein_function(
             all_results.append(output_row)
 
         content_str = json.dumps(all_results, ensure_ascii=False, indent=2)
+        from mcp_tools.models.factory.prediction.output_scale import output_scale
         meta: Dict[str, Any] = {
             "fasta_file": fasta_file,
             "task": task,
@@ -312,6 +314,7 @@ def predict_protein_function(
             "adapter_path": resolved_adapter,
             "model_name": model_name,
             "sequence_count": len(all_results),
+            "output_scale": output_scale(config),
         }
 
         Path(out_path).parent.mkdir(parents=True, exist_ok=True)
@@ -392,6 +395,7 @@ def predict_residue_function(
         target_out_dir = out_dir or _default_agent_out_dir()
         out_path = output_file or os.path.join(target_out_dir, default_out)
         args = Namespace(adapter_path=resolved_adapter, output_csv=out_path)
+        config = {}
         if os.path.exists(config_path):
             with open(config_path, "r", encoding="utf-8") as f:
                 config = json.load(f)
@@ -417,6 +421,7 @@ def predict_residue_function(
             all_results.append(output_row)
 
         content_str = json.dumps(all_results, ensure_ascii=False, indent=2)
+        from mcp_tools.models.factory.prediction.output_scale import output_scale
         meta: Dict[str, Any] = {
             "fasta_file": fasta_file,
             "task": task,
@@ -424,6 +429,7 @@ def predict_residue_function(
             "adapter_path": resolved_adapter,
             "model_name": model_name,
             "sequence_count": len(all_results),
+            "output_scale": output_scale(config),
         }
 
         Path(out_path).parent.mkdir(parents=True, exist_ok=True)

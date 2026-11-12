@@ -182,6 +182,8 @@ def collector(state):
         "model_label",
         "preview_truncated",
         "preview_missing",
+        "scale_label",
+        "scale_missing",
     ],
 )
 async def test_recovers_deepsol_and_topic_with_original_input_without_retraining(ledger, tmp_path, fault):
@@ -208,6 +210,10 @@ async def test_recovers_deepsol_and_topic_with_original_input_without_retraining
         "model_name": row["model"],
         "adapter_path": "ckpt/DeepSol/esm",
     }
+    from mcp_tools.models.factory.prediction.output_scale import output_scale
+
+    scale = output_scale({"problem_type": "regression", "normalize": "standard"})
+    row["output_scale"] = scale
     saved_result = {
         "status": "success",
         "biological_metadata": {
@@ -217,6 +223,7 @@ async def test_recovers_deepsol_and_topic_with_original_input_without_retraining
             "fasta_file": args["fasta_file"],
             "adapter_path": args["adapter_path"],
             "sequence_count": 1,
+            "output_scale": copy.deepcopy(scale),
         },
         "file_info": {
             "file_name": "deep.csv",
@@ -229,6 +236,8 @@ async def test_recovers_deepsol_and_topic_with_original_input_without_retraining
         saved_result["content_preview"] = saved_result["content_preview"][:-4]
     if fault == "preview_missing":
         saved_result.pop("content_preview")
+    if fault == "scale_missing":
+        saved_result["biological_metadata"].pop("output_scale")
     prediction_link = create(row["tool"], args, json.dumps(saved_result))
     query = 'TITLE_ABS:"Carbonic anhydrase 2" AND solubility'
     paper = {
@@ -269,6 +278,8 @@ async def test_recovers_deepsol_and_topic_with_original_input_without_retraining
         row["dataset"] = "DifferentDataset"
     if fault == "model_label":
         row["model"] = "DifferentModel"
+    if fault == "scale_label":
+        row["output_scale"] = {**scale, "unit": "Celsius"}
     topics = await recover_evidence(
         state, lambda: None, collector(state), service_cache=folder / "remote", input_store=folder / "inputs"
     )
@@ -280,6 +291,9 @@ async def test_recovers_deepsol_and_topic_with_original_input_without_retraining
         return
     assert row["status"] == "completed" and row["values"] == [{"score": 0.8}]
     assert len(state["sources"]) == 2 and len(state["sections"]) == 1
+    assert row["output_scale"] == scale
+    assert state["sections"][0]["data"]["output_scale"] == scale
+    assert json.loads(state["sources"][0]["text"])["output_scale"] == scale
     assert state["collection_partial"] is False
     assert state["chapters"][0]["topic_source_ids"] == ["S2"]
     assert (

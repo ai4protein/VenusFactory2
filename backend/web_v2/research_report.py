@@ -643,6 +643,8 @@ async def run_research(payload, update, *, synthesize=True, model_call=None, ser
             for row in results:
                 if row['status'] != 'completed': continue
                 value = {k: row[k] for k in ('task', 'model', 'dataset', 'sequence_sha256', 'values', 'evidence_level')}
+                from mcp_tools.models.factory.prediction.output_scale import output_scale
+                value['output_scale'] = row.get('output_scale') or output_scale()
                 sections.append({'id': 'prediction_' + row['id'], 'title': row['task'] + ' · ' + row['model'], 'data': value})
                 add([{'title': row['task'] + ' · ' + row['model'] + ' · ' + row['dataset'], 'url': '',
                       'kind': 'prediction', 'task': row['task'], 'evidence_level': 'model_prediction', 'text': json.dumps(value)}])

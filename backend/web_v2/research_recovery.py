@@ -55,6 +55,8 @@ def invalidate_chapter(state, chapter, reason, *, archive_shared=True):
 
 def prediction_evidence(row):
     value = {key: row[key] for key in ("task", "model", "dataset", "sequence_sha256", "values", "evidence_level")}
+    from mcp_tools.models.factory.prediction.output_scale import output_scale
+    value["output_scale"] = row.get("output_scale") or output_scale()
     section = {"id": "prediction_" + row["id"], "title": row["task"] + " · " + row["model"], "data": value}
     source = {
         "title": row["task"] + " · " + row["model"] + " · " + row["dataset"],
@@ -191,12 +193,15 @@ async def recover_evidence(state, publish, add, *, service_cache=None, input_sto
                 raise ReceiptUnavailable("prediction_not_successful")
             output = folder / (row["id"] + ".csv")
             values = prediction_values(output, snapshot["sequence"], value, row, arguments)
+            from mcp_tools.models.factory.prediction.output_scale import result_output_scale
+            scale = result_output_scale(value, row.get("output_scale"))
             completed = {
                 **row,
                 "status": "completed",
                 "values": values,
                 "output_file": output.name,
                 "evidence_level": "model_prediction",
+                "output_scale": scale,
             }
             section, source = prediction_evidence(completed)
             inserted = add([source])

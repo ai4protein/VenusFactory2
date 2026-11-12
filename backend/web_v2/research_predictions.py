@@ -4,9 +4,10 @@ import csv
 import hashlib
 import json
 import os
-from pathlib import Path
 import time
+from pathlib import Path
 
+from mcp_tools.models.factory.prediction.output_scale import checkpoint_output_scale, result_output_scale
 from mcp_tools.tools.runtime_tool_policy import assert_tool_call_allowed
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -47,7 +48,8 @@ def candidates(context, *, root=ROOT):
                     try: assert_tool_call_allowed(tool, {'task':task,'model_name':model,'adapter_path':str(adapter)})
                     except (ValueError,RuntimeError): continue
                     group.append({'id': identity, 'task': task, 'label_zh': LABELS.get(task, task), 'model': model,
-                                  'dataset': dataset, 'tool': tool, 'adapter_path': str(adapter)})
+                                  'dataset': dataset, 'tool': tool, 'adapter_path': str(adapter),
+                                  'output_scale': checkpoint_output_scale(adapter)})
             if group: groups.append(group)
     # Cover every property first, then add independent backbones/datasets for comparison.
     return [g[i] for i in range(max(map(len, groups), default=0)) for g in groups if i < len(g)]
@@ -111,7 +113,8 @@ async def run_predictions(context, update, folder, *, execute=None):
             value = await asyncio.wait_for(execute(spec, fasta, output, progress), timeout=min(240, max(1, deadline-time.monotonic())))
             if isinstance(value, str): value = json.loads(value)
             if not isinstance(value, dict) or value.get('status') != 'success': raise ValueError('No prediction result returned')
-            row.update(status='completed', values=read_result(output), evidence_level='model_prediction', output_file=output.name)
+            scale = result_output_scale(value, spec.get('output_scale'))
+            row.update(status='completed', output_scale=scale, values=read_result(output), evidence_level='model_prediction', output_file=output.name)
         except asyncio.TimeoutError:
             row.update(status='deferred', message='Prediction time limit reached')
         except ToolJobError as error:
