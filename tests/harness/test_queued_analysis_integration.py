@@ -49,7 +49,7 @@ async def test_native_queued_analysis_binds_real_execution_and_rejects_changed_o
     (workspace / "protein.fasta").write_text(">synthetic-sequence\nMKWVTFISLLFLFSSAYS\n")
     plan = {"deliverable": "analysis", "summary": "Compute actual sequence properties", "needs_input": [],
             "steps": [{"id": kind, "title": kind, "acceptance": "Provide measured supporting evidence",
-                       "verification": kind} for kind in ("execution", "data", "model")]}
+                       "verification": kind} for kind in ("execution", "data", "data_partition", "model")]}
     research = ResearchWorkspace(workspace, goal / "control/tools", plan)
     queue = JobQueue(private / "queue")
     identity, created = queue.enqueue(owner, "scientist", "research", {"kind": "integration_fixture"}, "fixture-parent",
@@ -105,7 +105,7 @@ async def test_native_queued_analysis_binds_real_execution_and_rejects_changed_o
             assert len(evidence_links) == 1
             await call("submit_research_checkpoint", {
                 "summary": "Sequence calculations completed; host must distinguish data/model evidence.",
-                "completed_steps": ["execution", "data", "model"],
+                "completed_steps": ["execution", "data", "data_partition", "model"],
                 "artifacts": [evidence_links[0]["path"], "results/physchem.json"], "needs_input": []})
         return {"status": "completed", "text": "Measured sequence properties and saved the checkpoint."}
 
@@ -146,7 +146,10 @@ async def test_native_queued_analysis_binds_real_execution_and_rejects_changed_o
             by_id = {row["id"]: row for row in checks}
             assert by_id["execution"]["passed"] is True
             assert by_id["execution"]["analysis_job_ids"] == [saved["task_id"]]
-            assert by_id["data"]["passed"] is False and by_id["model"]["passed"] is False
+            assert by_id["model"]["passed"] is False
+            for verification in ("data", "data_partition"):
+                assert by_id[verification]["passed"] is False
+                assert by_id[verification]["requirements"] == ["data_partition"]
             measured["molecular_weight"] += 1
             output.write_text(json.dumps(measured))
             invalidated = checkpoint_steps(plan, research.checkpoint, workspace=workspace,

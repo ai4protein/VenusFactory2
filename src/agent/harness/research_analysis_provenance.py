@@ -12,7 +12,7 @@ import re
 
 from utils.scoped_files import parts, read_bytes
 
-from .research_analysis_evidence import JOB, SHA, validate_evidence
+from .research_analysis_evidence import JOB, SHA, VerificationBudget, validate_evidence
 from .session_boundary import public_value
 
 SCHEMA = "research-analysis-provenance.v1"
@@ -301,7 +301,7 @@ def _sequence_relations(arguments, materials):
     return {"records": result, "omissions": omissions}
 
 
-def _verified_document(workspace, row):
+def _verified_document(workspace, row, *, budget=None):
     saved = row["result"]
     expected_keys = {"version", "task_id", "parent_job", "session_id", "owner_sha256", "evidence", "artifact"}
     if (set(saved) != expected_keys or type(saved["version"]) is not int or saved["version"] != 1
@@ -313,10 +313,11 @@ def _verified_document(workspace, row):
     if (set(artifact) != {"path", "sha256"}
             or artifact["path"] != "analysis/" + saved["task_id"] + ".json"):
         raise ValueError("Invalid analysis artifact")
-    raw = read_bytes(workspace, artifact["path"], max_bytes=MAX_ARTIFACT_BYTES)
+    raw = (budget.read(workspace, artifact["path"], max_bytes=MAX_ARTIFACT_BYTES) if budget is not None
+           else read_bytes(workspace, artifact["path"], max_bytes=MAX_ARTIFACT_BYTES))
     if _sha(raw) != artifact["sha256"]:
         raise ValueError("Analysis artifact changed")
-    validate_evidence(saved["evidence"], workspace)
+    validate_evidence(saved["evidence"], workspace, budget=budget)
     document = _load(raw)
     evidence = saved["evidence"]
     if (not isinstance(document, dict) or document.get("tool") != evidence["tool"]
@@ -384,8 +385,8 @@ def _output_results(workspace, document, protected_hashes, byte_budget, field_li
     return {"fields": fields, "records": records, "omissions": omissions}
 
 
-def _computation(workspace, row, materials, protected_hashes, output_budget):
-    saved, document = _verified_document(workspace, row)
+def _computation(workspace, row, materials, protected_hashes, output_budget, verification_budget):
+    saved, document = _verified_document(workspace, row, budget=verification_budget)
     value = document["result"]
     decoded = False
     if isinstance(value, str):
@@ -448,7 +449,8 @@ def _reports(workspace, checkpoint):
     return {"records": records, "omissions": omissions}
 
 
-def build_evidence_index(workspace, *, receipts, inputs, checkpoint=None, source_reader=None):
+def build_evidence_index(workspace, *, receipts, inputs, checkpoint=None, source_reader=None,
+                         current_task_ids=(), task_provenance=None):
     """Project trusted host receipts. Callers must not pass model-authored receipts.
 
     source_reader is the owner-checked original-material reader, never a model
@@ -464,9 +466,24 @@ def build_evidence_index(workspace, *, receipts, inputs, checkpoint=None, source
              "checkpoint_artifacts": _reports(workspace, checkpoint), "omissions": [],
              "boundary": "Host provenance and recorded values only; not scientific acceptance, derived-sequence validation or report-claim verification."}
     candidates = [row for row in receipts if isinstance(row, dict) and row.get("tool") == "queued_analysis"]
-    for row in candidates[:MAX_COMPUTATIONS]:
+    current = set(current_task_ids)
+    cited = {row.get("path") for row in (checkpoint or {}).get("artifacts", [])}
+    def priority(row):
+        saved = row.get("result", {})
+        saved = saved if isinstance(saved, dict) else {}
+        return (0 if saved.get("task_id") in current else
+                1 if saved.get("artifact", {}).get("path") in cited else 2)
+    positions = {id(row): position for position, row in enumerate(candidates)}
+    # Spend all projection/byte budgets on current and cited evidence first.
+    # Restore causal order only after the bounded records have been admitted.
+    selected = sorted(candidates, key=priority)[:MAX_COMPUTATIONS]
+    projected = []
+    verification_budget = VerificationBudget()
+    for row in selected:
         try:
-            record = _computation(workspace, row, materials, protected_hashes, output_budget)
+            record = _computation(workspace, row, materials, protected_hashes, output_budget, verification_budget)
+            if task_provenance and record["task_id"] in task_provenance:
+                record["host_origin"] = task_provenance[record["task_id"]]
         except (OSError, ValueError, TypeError, KeyError, RecursionError):
             saved = row.get("result")
             task = saved.get("task_id") if isinstance(saved, dict) else None
@@ -479,9 +496,11 @@ def build_evidence_index(workspace, *, receipts, inputs, checkpoint=None, source
                                        "remaining_computations": len(candidates) - len(index["computations"])})
             break
         index["computations"].append(record)
+        projected.append((positions[id(row)], record))
     else:
         if len(candidates) > MAX_COMPUTATIONS:
             index["omissions"].append({"reason": "computation_limit",
                                        "count": len(candidates) - MAX_COMPUTATIONS})
+    index["computations"] = [record for _, record in sorted(projected, key=lambda item: item[0])]
     # Material and checkpoint metadata have their own explicit record limits.
     return public_value(index, workspace)

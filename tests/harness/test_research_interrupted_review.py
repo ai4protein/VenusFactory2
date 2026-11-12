@@ -6,6 +6,7 @@ import pytest
 
 from agent.harness import Profile
 from agent.harness import autonomous_research as ar
+from agent.harness.analysis_interim_review import POLICY as INTERIM_POLICY
 
 
 def setup(tmp_path, monkeypatch):
@@ -53,15 +54,28 @@ async def test_native_failure_reviews_partial_evidence_but_cannot_accept(tmp_pat
         assert context["execution"]["interruption"]["reason"] == reason
         assert context["execution"]["interruption"]["event_audit"]["passed"] is audit_passed
         assert context["execution"]["receipts"]
-        return json.dumps({"decision": "ready_for_host_validation" if critic_ready else "needs_revision",
-            "summary": "Partial computations inspected", "issues": []})
+        assert context["scientific_acceptance"]["analysis_review_policy"] == INTERIM_POLICY
+        assert context["analysis_review_state"]["report_paths"] == ["report.md"]
+        assert context["analysis_review_state"]["reasons"] == ["execution_interrupted"]
+        premature_ready = critic_ready and roles.count("SC") == 1
+        if critic_ready and not premature_ready:
+            assert "needs_revision" in context["format_repair"]["validation_error"]
+        else:
+            assert "format_repair" not in context
+        return json.dumps({"decision": "ready_for_host_validation" if premature_ready else "needs_revision",
+            "summary": "Partial computations inspected; the interrupted execution requires revision.",
+            "issues": ["Execution was interrupted despite saved work."], "evidence_ids": [],
+            "next_actions": ["Resolve the interruption before submitting a final analysis checkpoint."]})
 
     async def execute(request, service, events):
-        await service.write_research_file("calculate.py", 'import json\njson.dump({"lengths":[4,2]},open("lengths.json","w"))\n')
+        await service.write_research_file("calculate.py",
+            'import json\nfrom pathlib import Path\n'
+            'json.dump({"lengths":[4,2]},open("lengths.json","w"))\n'
+            'Path("report.md").write_text("# Saved partial report\\nLengths: 4, 2\\n")\n')
         result = await service.run_research_python("calculate.py", 10)
         assert result["exit_code"] == 0
         # Even a previously valid partial checkpoint cannot turn a later interruption into success.
-        await service.submit_research_checkpoint("Computed lengths", ["calculate"], ["lengths.json"], [])
+        await service.submit_research_checkpoint("Computed lengths", ["calculate"], ["lengths.json", "report.md"], [])
         events.extend([{"kind": "tool_call_start"}, {
             "kind": "research_interrupted", "reason": reason,
             "research_complete": False, "event_audit": {"passed": audit_passed},
@@ -70,7 +84,7 @@ async def test_native_failure_reviews_partial_evidence_but_cannot_accept(tmp_pat
         }])
 
     state = await ar.AutonomousResearch(store, "fixture", {}, consult=consult, executor=execute, tools=[]).run()
-    assert roles == ["PI", "CB", "SC"]
+    assert roles == ["PI", "CB", "SC"] + (["SC"] if critic_ready else [])
     assert state["status"] != "completed"
     assert state["cycles"][0]["status"] == "needs_revision"
     progress = state["progress"]
@@ -80,6 +94,11 @@ async def test_native_failure_reviews_partial_evidence_but_cannot_accept(tmp_pat
     assert not progress["host_review"]["passed"]
     assert progress["plan"]["steps"][0]["status"] == "pending"
     assert (store.root / "workspace" / "lengths.json").exists()
+    assert (store.root / "workspace" / "report.md").exists()
+    saved_review = json.loads((store.root / "episodes/cycle_000/review.json").read_text())
+    assert saved_review["decision"] == "needs_revision"
+    assert "Execution was interrupted" in " ".join(progress["scientific_acceptance"]["issues"])
+    assert not progress.get("capabilities") and not progress.get("deliveries")
 
 
 @pytest.mark.asyncio

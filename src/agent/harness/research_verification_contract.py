@@ -1,14 +1,14 @@
 """Shared plan verification vocabulary; host evidence determines completion."""
 from types import MappingProxyType
 
-VERIFICATION_KINDS = ("artifact", "execution", "data", "model", "revision", "review", "delivery")
+VERIFICATION_KINDS = ("artifact", "execution", "data_partition", "model", "revision", "review", "delivery")
 VERIFICATION_DESCRIPTIONS = MappingProxyType({
     "artifact": "Checkpoint the actual result files with their unchanged content hashes.",
     "execution": (
         "Successful controlled Python execution or a trusted queued computation record, "
         "with unchanged output files cited by the checkpoint. Writing code or claiming success is not execution."
     ),
-    "data": (
+    "data_partition": (
         "Host-validated training-data partitions and their checkpointed evaluation file, or a host-validated "
         "measured model experiment. Reading FASTA or computing physicochemical properties is not training-data "
         "partition validation; use execution for a completed computation."
@@ -30,3 +30,8 @@ VERIFICATION_DESCRIPTIONS = MappingProxyType({
 VERIFICATION_DESCRIPTION = "Choose the evidence required for this step. " + " ".join(
     f"{kind}: {VERIFICATION_DESCRIPTIONS[kind]}" for kind in VERIFICATION_KINDS
 )
+
+
+def canonical_verification(kind):
+    """Normalize the legacy partition name without weakening its evidence requirement."""
+    return "data_partition" if isinstance(kind, str) and kind == "data" else kind

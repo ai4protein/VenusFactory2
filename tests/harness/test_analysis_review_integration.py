@@ -95,7 +95,8 @@ def test_submitted_model_even_with_invalid_binding_keeps_model_review(make_case,
     manifest = {"id": "invalid-model-id", "name": "Candidate", "description": "Fixture",
                 "review_spec": {"kind": "model", "scope": {}, "input_schema": {}, "output_schema": {}}}
     (bundle / "manifest.json").write_text(json.dumps(manifest))
-    selected = packet(context, [bundle])
+    context["plan"]["deliverable"] = "model"
+    selected = sc.evidence_context(context, [bundle], None)
     assert selected["scientific_acceptance"]["models"][0]["binding_errors"]
     assert "analysis_review_policy" not in selected["scientific_acceptance"]
     assert sc.prompt_for_review(selected) == sc.PROMPT
@@ -122,7 +123,8 @@ class ReceiptCheckedDevelopment:
 
 def test_existing_measured_study_retains_its_original_sc_contract(make_case):
     _, _, context, _ = make_case()
-    selected = packet(context, development=ReceiptCheckedDevelopment())
+    context["plan"]["deliverable"] = "model"
+    selected = sc.evidence_context(context, [], ReceiptCheckedDevelopment())
     acceptance = selected["scientific_acceptance"]
     assert acceptance["study_evidence_required"] is True
     assert acceptance["study_review_policy"]
@@ -132,12 +134,123 @@ def test_existing_measured_study_retains_its_original_sc_contract(make_case):
 
 
 @pytest.mark.parametrize("protocol", ["chat_completions", "responses"])
-def test_model_and_study_output_schemas_take_precedence(protocol):
-    model = specification("SC", protocol, model_acceptance=True, analysis_review_policy=analysis.POLICY)
+def test_model_and_study_schemas_remain_separate_without_analysis_policy(protocol):
+    model = specification("SC", protocol, model_acceptance=True)
     assert "model_assessments" in model["schema"]["properties"]
     assert "claims" not in model["schema"]["properties"]
-    study = specification("SC", protocol, study_acceptance=True, analysis_review_policy=analysis.POLICY)
+    study = specification("SC", protocol, study_acceptance=True)
     assert "evidence_ids" in study["schema"]["properties"]
     assert "claims" not in study["schema"]["properties"]
     with pytest.raises(ValueError, match="Unsupported analysis"):
         specification("SC", protocol, analysis_review_policy="unknown")
+
+
+@pytest.mark.parametrize("fault", ["none", "no_report", "source_only"])
+def test_analysis_with_measurement_history_cannot_bypass_report(make_case, fault):
+    from agent.harness import analysis_interim_review
+    _, _, context, review = make_case()
+    if fault == "no_report":
+        context["artifact_previews"] = []
+    elif fault == "source_only":
+        for rows in [context["execution"]["checkpoint"]["artifacts"], context["artifact_previews"],
+                     context["analysis_evidence"]["checkpoint_artifacts"]["records"]]:
+            rows[0]["path"] = "source.py"
+    selected = packet(context, development=ReceiptCheckedDevelopment())
+    assert selected["scientific_acceptance"]["study_evidence_required"] is False
+    assert selected["development_measurements"]["experiments"]
+    if fault == "none":
+        assert selected["scientific_acceptance"]["analysis_review_policy"] == analysis.POLICY
+        assert sc.assess(review, selected)["passed"] is True
+    else:
+        assert selected["scientific_acceptance"]["analysis_review_policy"] == analysis_interim_review.POLICY
+        assert sc.assess(review, selected)["passed"] is False
+
+
+@pytest.mark.parametrize("protocol", ["chat_completions", "responses"])
+def test_analysis_candidate_conflict_is_interim_in_schema_prompt_and_assessment(make_case, tmp_path, protocol):
+    from agent.harness import analysis_interim_review
+    _, _, context, _ = make_case()
+    bundle = tmp_path / "conflicting-model"
+    bundle.mkdir()
+    (bundle / "manifest.json").write_text(json.dumps({
+        "id": "invalid-model-id", "name": "Candidate", "description": "Fixture",
+        "review_spec": {"kind": "model", "scope": {}, "input_schema": {}, "output_schema": {}}}))
+    selected = packet(context, [bundle])
+    policy = selected["scientific_acceptance"]["analysis_review_policy"]
+    assert policy == analysis_interim_review.POLICY
+    assert "model_candidate_conflicts_with_analysis_deliverable" in selected["analysis_review_state"]["reasons"]
+    spec = specification("SC", protocol, model_acceptance=True, study_acceptance=True, analysis_review_policy=policy)
+    assert spec["schema"] == analysis_interim_review.schema()
+    assert sc.prompt_for_review(selected) == analysis_interim_review.PROMPT
+    review = {"decision": "needs_revision", "summary": "Resolve the incompatible candidate submission.",
+              "issues": ["An analysis deliverable cannot publish this candidate."],
+              "evidence_ids": selected["analysis_review_state"]["verified_task_ids"][:1],
+              "next_actions": ["Keep the analysis report distinct from candidate admission."]}
+    assert sc.parse_analysis_review(json.dumps(review), selected) == review
+    assert sc.assess(review, selected)["passed"] is False
+    assert sc.assess(review, selected)["approved_models"] == {}
+
+
+@pytest.mark.parametrize("bad_path", ["source.py", "analysis/result.json", "original.txt"])
+def test_unrelated_markdown_does_not_legalize_claims_from_code_or_original_input(make_case, bad_path):
+    import hashlib
+    _, _, context, review = make_case()
+    original_report = copy.deepcopy(context["artifact_previews"][0])
+    bad = {**original_report, "path": bad_path}
+    # The source/input contains the right number; a separate Markdown placeholder
+    # only makes the packet eligible, not that source/input a report.
+    text = "TODO: write the scientific report.\n"
+    digest = hashlib.sha256(text.encode()).hexdigest()
+    context["artifact_previews"] = [{"path": "report.md", "sha256": digest, "content": text}, bad]
+    context["execution"]["checkpoint"]["artifacts"] = [
+        {"path": row["path"], "sha256": row["sha256"]} for row in context["artifact_previews"]]
+    context["analysis_evidence"]["checkpoint_artifacts"]["records"] = [
+        {**row, "status": "unchanged"} for row in context["execution"]["checkpoint"]["artifacts"]]
+    if bad_path == "original.txt":
+        context["analysis_evidence"]["materials"]["records"].append(
+            {"path": bad_path, "sha256": bad["sha256"], "status": "verified"})
+    review["claims"][0]["report_path"] = bad_path
+    with pytest.raises(ValueError, match="Markdown/text report"):
+        analysis.validate(review, context)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("protocol", ["chat_completions", "responses"])
+async def test_consult_analysis_candidate_uses_only_interim_request_schema(monkeypatch, tmp_path, protocol):
+    from types import SimpleNamespace
+
+    import httpx
+    from test_scientist_role_output import policy_for, response_for
+
+    from agent.harness import analysis_interim_review as interim
+    from agent.harness import autonomous_research as autonomous
+
+    original = httpx.AsyncClient
+    policy = policy_for(protocol)
+    spec = specification("SC", protocol, analysis_review_policy=interim.POLICY)
+    body = {"decision": "needs_revision", "summary": "Resolve the delivery conflict.",
+            "issues": ["Model candidate is incompatible with this analysis deliverable."],
+            "evidence_ids": [], "next_actions": ["Keep the scoped analysis distinct from model admission."]}
+    context = {"plan": {"deliverable": "analysis", "steps": []}, "execution": {},
+               "scientific_acceptance": {"models": [{"candidate_id": "candidate"}],
+                                        "analysis_review_policy": interim.POLICY}}
+    seen = []
+
+    def handler(request):
+        payload = json.loads(request.content)
+        sent, _ = policy.apply(payload)
+        assert sent["tools"] == [spec["tool"]]
+        instruction = sent["instructions"] if protocol == "responses" else sent["messages"][0]["content"]
+        assert "model_assessments" not in instruction
+        assert '"enum": ["needs_revision"]' in instruction
+        seen.append(sent)
+        return httpx.Response(200, json=response_for(spec, json.dumps(body)))
+
+    monkeypatch.setattr(autonomous.httpx, "AsyncClient",
+                        lambda **kwargs: original(transport=httpx.MockTransport(handler), **kwargs))
+    profile = SimpleNamespace(model=SimpleNamespace(protocol=protocol, model="fixture"),
+                              budget=SimpleNamespace(request_seconds=2, model_calls=8))
+    relay = SimpleNamespace(base_url="http://fixture", token="fixture", calls=0, policy=policy)
+    answer = await autonomous.AutonomousResearch(None, "fixture", {}).consult("SC", context, profile, relay, tmp_path)
+    assert json.loads(answer) == body
+    assert len(seen) == 1

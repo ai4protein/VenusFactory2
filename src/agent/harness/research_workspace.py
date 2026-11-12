@@ -78,6 +78,8 @@ class ResearchWorkspace:
         self.workspace=Path(workspace);self.control=Path(control);self.plan=plan;self.runner=runner
         self.workspace.mkdir(parents=True,exist_ok=True);self.control.mkdir(parents=True,exist_ok=True)
         self.receipts=[];self.checkpoint=None;self.proposals=[];self.latest_submission=None
+        self.analysis_history={'schema':'research-analysis-history.v1','records':[],'sources':[],'issues':[]}
+        self.analysis_history_issues=[]
         from .research_development import Development
         self.data_store=data_store
         self.registered_inputs=registered_inputs or []
@@ -88,6 +90,14 @@ class ResearchWorkspace:
         self.receipts.append(row)
         write_json(self.control/'receipts.json',self.receipts)
         return result
+
+    def evidence_receipts(self, checkpoint=None):
+        """Revalidate prior analyses without recording them as current execution."""
+        from .research_analysis_history import merge_receipts
+        merged=merge_receipts(self.analysis_history,self.receipts,self.workspace,checkpoint=checkpoint or self.checkpoint)
+        self.analysis_history_issues=merged['issues']
+        self.analysis_task_provenance=merged['task_provenance']
+        return merged['receipts']
 
     def record_queued_analysis(self, **kwargs):
         from .research_analysis_evidence import capture

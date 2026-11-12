@@ -28,8 +28,7 @@ STUDY_PROMPT = 'You are the independent Scientific Critic (SC) of an ongoing pro
 def prompt_for_review(context):
     acceptance = context.get("scientific_acceptance", {})
     if acceptance.get("analysis_review_policy"):
-        from .analysis_report_review import PROMPT as ANALYSIS_PROMPT
-        return ANALYSIS_PROMPT
+        return _analysis_policy(acceptance["analysis_review_policy"]).PROMPT
     if acceptance.get("study_evidence_required") and not acceptance.get("models"):
         return STUDY_PROMPT + (
             " Return revision_requests under the supplied study_review_policy. "
@@ -38,6 +37,23 @@ def prompt_for_review(context):
             "measurement_state is host-owned and is not a verdict."
             if acceptance.get("study_review_policy") else "")
     return PROMPT
+
+
+def _analysis_policy(policy):
+    from . import analysis_interim_review, analysis_report_review
+    if policy == analysis_interim_review.POLICY:
+        return analysis_interim_review
+    if policy == analysis_report_review.POLICY:
+        return analysis_report_review
+    raise ValueError("Unsupported analysis review policy")
+
+
+def analysis_review_schema(policy):
+    return _analysis_policy(policy).schema()
+
+
+def parse_analysis_review(raw, context):
+    return _analysis_policy(context["scientific_acceptance"]["analysis_review_policy"]).parse_review(raw, context)
 
 
 def model_schema():
@@ -245,16 +261,20 @@ def evidence_context(context, proposals, development):
     }
     history = result["development_measurements"]["experiments"]
     models = result["scientific_acceptance"]["models"]
-    result["scientific_acceptance"]["study_evidence_required"] = bool(history) and not models
+    result["scientific_acceptance"]["study_evidence_required"] = (bool(history) and not models
+        and context.get("plan", {}).get("deliverable") != "analysis")
     if result["scientific_acceptance"]["study_evidence_required"]:
         result["scientific_acceptance"]["study_review_policy"] = study_review_state.POLICY
         result["measurement_state"] = study_review_state.measurement_state(result)
-    if (not history and not models and context.get("plan", {}).get("deliverable") == "analysis"
-            and context.get("analysis_evidence", {}).get("computations")):
-        from .analysis_report_review import POLICY as ANALYSIS_POLICY
-        from .analysis_report_review import review_targets
-        result["scientific_acceptance"]["analysis_review_policy"] = ANALYSIS_POLICY
-        result["analysis_review_targets"] = review_targets(result)
+    if context.get("plan", {}).get("deliverable") == "analysis":
+        from . import analysis_interim_review, analysis_report_review
+        state = analysis_interim_review.eligibility(result)
+        result["analysis_review_state"] = state
+        if state["stage"] == "final":
+            result["scientific_acceptance"]["analysis_review_policy"] = analysis_report_review.POLICY
+            result["analysis_review_targets"] = analysis_report_review.review_targets(result)
+        else:
+            result["scientific_acceptance"]["analysis_review_policy"] = analysis_interim_review.POLICY
     facts = {"evaluated_experiment_ids": [row["id"] for row in history],
              "baseline_experiment_ids": [row["id"] for row in history if row["variant"] == "baseline"],
              "revised_experiment_ids": [row["id"] for row in history if row["variant"] == "candidate"],
@@ -275,12 +295,12 @@ def assess(review, context):
     if context.get("execution", {}).get("interruption"):
         issues.append("Execution was interrupted; partial evidence cannot establish research completion.")
     if context["scientific_acceptance"].get("analysis_review_policy"):
-        from .analysis_report_review import POLICY as ANALYSIS_POLICY
-        from .analysis_report_review import validate
+        from .analysis_interim_review import POLICY as INTERIM_POLICY
         try:
-            if context["scientific_acceptance"]["analysis_review_policy"] != ANALYSIS_POLICY:
-                raise ValueError("Unsupported analysis review policy")
-            validate(review, context)
+            policy = context["scientific_acceptance"]["analysis_review_policy"]
+            _analysis_policy(policy).validate(review, context)
+            if policy == INTERIM_POLICY:
+                issues.append("Analysis is interim; verified final report acceptance is still required.")
         except (ValueError, KeyError, TypeError) as exc:
             issues.append("analysis_review_inconsistent: " + str(exc))
     if context["scientific_acceptance"].get("study_review_policy") is not None:
@@ -377,6 +397,17 @@ def revision_feedback(acceptance, context, review, episode):
     models = context["scientific_acceptance"]["models"]
     study_feedback = (study_review_state.feedback(review, context)
                       if context["scientific_acceptance"].get("study_review_policy") is not None else {})
+    analysis_policy = context["scientific_acceptance"].get("analysis_review_policy")
+    analysis_feedback = {}
+    if analysis_policy:
+        analysis_feedback = {
+            "analysis_review_policy": analysis_policy,
+            "next_actions": copy.deepcopy(review.get("next_actions", [])),
+            "cited_analysis_task_ids": list(dict.fromkeys([
+                *review.get("evidence_ids", []),
+                *(row["task_id"] for row in review.get("claims", [])),
+            ])),
+        }
     return {
         "episode": episode,
         "summary": review["summary"],
@@ -385,7 +416,7 @@ def revision_feedback(acceptance, context, review, episode):
             row["binding"]["selected_experiment_id"] for row in models if row["binding"].get("selected_experiment_id")
         ],
         "measured_experiment_ids": [row["id"] for row in context.get("development_measurements", {}).get("experiments", [])],
-        "cited_experiment_ids": list(review.get("evidence_ids", [])),
+        "cited_experiment_ids": [] if analysis_policy else list(review.get("evidence_ids", [])),
         "requests": [
             {
                 "candidate_id": row["candidate_id"],
@@ -397,6 +428,7 @@ def revision_feedback(acceptance, context, review, episode):
         "receipt": acceptance["receipt"],
         "sha256": acceptance["sha256"],
         **study_feedback,
+        **analysis_feedback,
     }
 
 

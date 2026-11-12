@@ -60,7 +60,21 @@ that result, and acceptance rechecks all bound files. Failed or pending jobs,
 modified outputs and model-written claims do not produce execution evidence.
 Reading a sequence or calculating its properties does not establish a validated
 training split, a fitted model, or scientific usefulness. Those remain separate
-checks and SC decisions.
+checks and SC decisions. The plan verification name `data_partition` specifically
+requires protected training-data partitions; legacy `data` keeps that same meaning.
+
+Across episodes, the host reloads its private computation receipts and rechecks
+workspace ownership and input/output hashes. Valid earlier calculations can support
+an updated report without being recorded as new executions. Changed files or
+conflicting task identities cannot inherit that evidence. Verification is bounded;
+current and checkpoint-cited results take priority over older inventory.
+
+Analysis uses an interim SC review until a complete, unchanged Markdown or text
+report is checkpointed. Interim feedback acknowledges verified computations and
+returns concrete next actions to PI, but cannot complete plan steps or approve
+registration. Final SC binds each computational claim to an actual task result,
+the supplied input and an exact report passage. Source files, raw inputs and an
+exit code alone do not establish a final report or the validity of a scientific claim.
 
 Native execution keeps the objective, scientific criteria, plan requirements,
 current feedback and prepared-data contract in context. Longer historical records

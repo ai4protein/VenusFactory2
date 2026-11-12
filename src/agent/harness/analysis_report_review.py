@@ -144,6 +144,9 @@ def _unique_rows(rows, key, label):
 
 def _report(claim, context, index):
     path = claim["report_path"]
+    from .analysis_interim_review import eligibility
+    if path not in eligibility(context)["report_paths"]:
+        raise ValueError("Cite a complete verified Markdown/text report, not source code, an input or a receipt.")
     previews = [row for row in context.get("artifact_previews", []) if row.get("path") == path]
     checkpoint = context.get("execution", {}).get("checkpoint") or {}
     artifacts = [row for row in checkpoint.get("artifacts", []) if row.get("path") == path]
@@ -316,6 +319,9 @@ def validate(review, context):
     if used_claims != set(claims):
         raise ValueError("Every declared claim must be linked to an assessed completed step.")
     if review["decision"] == "ready_for_host_validation":
+        from .analysis_interim_review import eligibility
+        if eligibility(context)["stage"] != "final":
+            raise ValueError("Ready requires a complete verified Markdown/text report and an uninterrupted final checkpoint.")
         if not completed or review["issues"] or any(row["verdict"] != "supported" for row in assessments.values()):
             raise ValueError("Ready requires supported completed steps and no outstanding issues.")
         if any(row["kind"] == "unverified" or not row["addresses_objective"] for row in inputs.values()):

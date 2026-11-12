@@ -19,13 +19,36 @@ JOB = re.compile(r"[a-f0-9]{32}")
 FIELDS = {"version", "tool", "category", "workspace_sha256", "arguments_sha256",
           "result_sha256", "input_files", "output_files"}
 MAX_BYTES = 100 * 1024**2
+MAX_VERIFICATION_BYTES = 32 * 1024**2
+MAX_VERIFICATION_FILES = 128
+
+
+class VerificationBudget:
+    """Bound complete-file verification; a partial read never becomes a digest."""
+    def __init__(self):
+        self.bytes_left = MAX_VERIFICATION_BYTES
+        self.files_left = MAX_VERIFICATION_FILES
+
+    def read(self, workspace, name, *, max_bytes=MAX_BYTES):
+        if self.files_left <= 0 or self.bytes_left <= 0:
+            raise ValueError("Analysis verification budget exhausted")
+        self.files_left -= 1
+        limit = min(max_bytes, self.bytes_left)
+        with open_file(workspace, name, max_bytes=limit) as stream:
+            raw = stream.read(limit + 1)
+        self.bytes_left -= len(raw)
+        if len(raw) > limit:
+            raise ValueError("Analysis verification byte budget exhausted")
+        return raw
 
 
 def workspace_digest(workspace):
     return hashlib.sha256(str(Path(workspace).resolve()).encode()).hexdigest()
 
 
-def file_digest(workspace, name):
+def file_digest(workspace, name, *, budget=None):
+    if budget is not None:
+        return hashlib.sha256(budget.read(workspace, name)).hexdigest()
     size, digest = 0, hashlib.sha256()
     with open_file(workspace, name, max_bytes=MAX_BYTES) as stream:
         while chunk := stream.read(1024**2):
@@ -36,17 +59,17 @@ def file_digest(workspace, name):
     return digest.hexdigest()
 
 
-def unchanged_files(workspace, files):
+def unchanged_files(workspace, files, *, budget=None):
     if not isinstance(files, dict) or len(files) > 100:
         raise ValueError("Invalid analysis file binding")
     for name, expected in files.items():
         if not isinstance(name, str) or not isinstance(expected, str) or not SHA.fullmatch(expected):
             raise ValueError("Invalid analysis file digest")
-        if file_digest(workspace, name) != expected:
+        if file_digest(workspace, name, budget=budget) != expected:
             raise ValueError("Analysis input or output changed")
 
 
-def validate_evidence(evidence, workspace):
+def validate_evidence(evidence, workspace, *, budget=None):
     from mcp_tools.scheduler.analysis_evidence import ANALYSIS_CATEGORIES
 
     if (not isinstance(evidence, dict) or set(evidence) != FIELDS
@@ -58,8 +81,8 @@ def validate_evidence(evidence, workspace):
     for key in ("arguments_sha256", "result_sha256"):
         if not isinstance(evidence[key], str) or not SHA.fullmatch(evidence[key]):
             raise ValueError("Invalid queued analysis digest")
-    unchanged_files(workspace, evidence["input_files"])
-    unchanged_files(workspace, evidence["output_files"])
+    unchanged_files(workspace, evidence["input_files"], budget=budget)
+    unchanged_files(workspace, evidence["output_files"], budget=budget)
 
 
 def capture(service, *, job, name, arguments, value, owner, parent_job, session_id):
@@ -106,8 +129,9 @@ def capture(service, *, job, name, arguments, value, owner, parent_job, session_
             "instruction": "Inspect this result and cite its path in the research checkpoint."}
 
 
-def checkpointed(receipts, workspace, artifacts):
+def checkpointed(receipts, workspace, artifacts, *, budget=None):
     """Recheck protected records and all cited bytes; never trust workspace JSON."""
+    budget = budget or VerificationBudget()
     accepted = []
     for row in receipts:
         if row.get("tool") != "queued_analysis":
@@ -124,9 +148,9 @@ def checkpointed(receipts, workspace, artifacts):
                 continue
             if artifacts.get(artifact["path"]) != artifact["sha256"]:
                 continue
-            if file_digest(workspace, artifact["path"]) != artifact["sha256"]:
+            if file_digest(workspace, artifact["path"], budget=budget) != artifact["sha256"]:
                 continue
-            validate_evidence(saved["evidence"], workspace)
+            validate_evidence(saved["evidence"], workspace, budget=budget)
             accepted.append(saved["task_id"])
         except (ValueError, OSError, KeyError, TypeError):
             continue
@@ -149,7 +173,9 @@ def checkpoint_diagnostic(service, checkpoint):
         return None
 
     candidates = []
-    for row in service.receipts:
+    receipts = service.evidence_receipts(checkpoint)
+    budget = VerificationBudget()
+    for row in receipts:
         saved = row.get("result", {})
         artifact = saved.get("artifact") if isinstance(saved, dict) else None
         if row.get("tool") != "queued_analysis" or not isinstance(artifact, dict):
@@ -157,7 +183,7 @@ def checkpoint_diagnostic(service, checkpoint):
         path, sha = artifact.get("path"), artifact.get("sha256")
         if not isinstance(path, str) or not isinstance(sha, str):
             continue
-        if checkpointed([row], service.workspace, {path: sha}):
+        if checkpointed([row], service.workspace, {path: sha}, budget=budget):
             candidates.append({"path": path, "sha256": sha, "tool": saved["evidence"]["tool"]})
     if not candidates:
         return None
@@ -166,7 +192,7 @@ def checkpoint_diagnostic(service, checkpoint):
     # downstream checks and must not be replaced by an analysis citation.
     probe = {"steps": [{"id": steps[0], "verification": "execution"}]}
     checks = checkpoint_steps(probe, {**checkpoint, "completed_steps": [steps[0]]},
-        workspace=service.workspace, receipts=service.receipts,
+        workspace=service.workspace, receipts=receipts,
         experiments=service.development.records(), progress={})
     if checks[0]["passed"]:
         return None

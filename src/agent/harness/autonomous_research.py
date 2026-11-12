@@ -21,6 +21,7 @@ from .host import write_json
 from .native_expert_team import NATIVE_EXPERT_HARNESSES, critic_decision, role_content
 from .research_updates import apply_revisions
 from .research_plan_evidence import VERIFICATION_KINDS, checkpoint_steps
+from .research_verification_contract import canonical_verification
 from .research_focus import selected_tools, instructions as execution_instructions
 from .research_questions import validate_input_questions
 from .research_request_budget import REVIEW_RESERVE, request_ceiling
@@ -145,6 +146,8 @@ def parse_plan(text, previous=None, *, objective=''):
             raise ValueError('Each research step requires unique id, title and acceptance strings; status and evidence are managed by the host')
         if 'approach' in row and (not isinstance(row['approach'],str) or not row['approach'].strip() or len(row['approach'])>2000):
             raise ValueError('A research approach must be a concise method description')
+        if 'verification' in row:
+            row['verification']=canonical_verification(row['verification'])
         if row.get('verification','artifact') not in VERIFICATION_KINDS:
             raise ValueError('Unsupported plan verification kind')
         # A planner may echo its input, including checkpoint metadata. Never
@@ -166,7 +169,7 @@ def parse_plan(text, previous=None, *, objective=''):
             if old[row['id']].get('status')=='completed' or 'approach' not in row:
                 if 'approach' in old[row['id']]:row['approach']=old[row['id']]['approach']
                 else:row.pop('approach',None)
-            if 'verification' in old[row['id']]:row['verification']=old[row['id']]['verification']
+            if 'verification' in old[row['id']]:row['verification']=canonical_verification(old[row['id']]['verification'])
             elif 'verification' in row:row.update(status='pending',evidence=[])
     # A compact user goal may omit the word "model"; the planner can infer the
     # deliverable from the materials. Once established, replanning cannot turn
@@ -219,7 +222,9 @@ class AutonomousResearch:
         output_spec = spec
         role_prompt=sc_acceptance.prompt_for_review(context) if role=='SC' else ROLES[role]
         instruction=SCIENTIST_PURPOSE+role_prompt+' Respond in the language of the research objective.'
-        if role=='SC' and context.get('scientific_acceptance',{}).get('models'):
+        if role=='SC' and context.get('scientific_acceptance',{}).get('analysis_review_policy'):
+            instruction += ' Exact response schema: '+json.dumps(sc_acceptance.analysis_review_schema(context['scientific_acceptance']['analysis_review_policy']),ensure_ascii=False)
+        elif role=='SC' and context.get('scientific_acceptance',{}).get('models'):
             instruction += ' Exact response schema: '+json.dumps(sc_acceptance.model_schema(),ensure_ascii=False)
         if role=='CB':
             from .research_verification_contract import VERIFICATION_DESCRIPTION
@@ -233,7 +238,7 @@ class AutonomousResearch:
                 'the first plan is provisional until inputs have been inspected. '
                 'Group related measurements into one computation milestone, not one step per reported scalar. '
                 'For an ordinary sequence analysis, use execution for parsing/computation and artifact for the final report. '
-                'Use data only when the milestone actually requires protected training-data partition validation.')
+                'Use data_partition only when the milestone actually requires protected training-data partition validation.')
         if role in {'PI','CB'}:
             instruction += (' A short everyday research goal is sufficient: supply the experimental design yourself. '
                 'Give this topic a short human-readable title. Plan inspection of supplied files and choose feasible enabled tools, including training MCP when appropriate. '
@@ -423,6 +428,14 @@ class AutonomousResearch:
                     data_store.protect_inputs(progress.get('inputs',[]),prior_agent_execution=bool(state.get('cycles')))
                     development.data_store=data_store
                 service=ResearchWorkspace(workspace,folder/'tools',plan,development_root=self.store.root/'development',data_store=data_store,registered_inputs=progress.get('inputs', []))
+                from .research_analysis_history import load_history
+                service.analysis_history=load_history(self.store.root,workspace=workspace,cycles=state.get('cycles',[]))
+                prior_analysis=[row['result'] for row in service.evidence_receipts() if row.get('tool')=='queued_analysis']
+                if prior_analysis:
+                    context['prior_analysis']={'records':[{'task_id':row['task_id'],'tool':row['evidence']['tool'],
+                        'artifact':row['artifact']} for row in prior_analysis[-12:]],
+                        'omitted_count':max(0,len(prior_analysis)-12),
+                        'instruction':'These earlier host-captured computations remain byte-verified. Inspect and cite their result files in a new report/checkpoint instead of repeating unchanged calculations. They are not completed research or SC acceptance.'}
                 from .interactions import INTERACTION_NAMES
                 from mcp_tools.tools.tool_surface import WORKSPACE_PRIMITIVES
                 tools=scientific+service.tools()
@@ -527,15 +540,20 @@ class AutonomousResearch:
                     if p.suffix in {'.json','.txt','.md','.csv','.py'} and p.stat().st_size<=40000:preview['content']=p.read_bytes().decode('utf-8',errors='replace')
                     previews.append(preview)
                 context['artifact_previews']=previews
-                if any(row.get('tool')=='queued_analysis' for row in service.receipts):
+                evidence_receipts=service.evidence_receipts()
+                if plan.get('deliverable')=='analysis' or any(row.get('tool')=='queued_analysis' for row in evidence_receipts):
                     from .research_analysis_provenance import build_evidence_index
-                    context['analysis_evidence']=build_evidence_index(workspace,receipts=service.receipts,
+                    context['analysis_evidence']=build_evidence_index(workspace,receipts=evidence_receipts,
                         inputs=progress.get('inputs',[]),checkpoint=checkpoint,
-                        source_reader=data_store.input_bytes if data_store else None)
+                        source_reader=data_store.input_bytes if data_store else None,
+                        current_task_ids=[row['result']['task_id'] for row in service.receipts if row.get('tool')=='queued_analysis'],
+                        task_provenance=service.analysis_task_provenance)
+                    context['analysis_evidence']['history_issues']=service.analysis_history_issues[:16]
+                    context['analysis_evidence']['history_issues_omitted']=max(0,len(service.analysis_history_issues)-16)
                 current_feedback=feedback_state(events,workspace,progress.get('execution_feedback'),development=development)
                 context['execution']['failures']=current_feedback['errors']
                 context['execution']['superseded_attempts']=current_feedback.get('superseded', [])
-                step_checks=checkpoint_steps(plan,checkpoint,workspace=workspace,receipts=service.receipts,
+                step_checks=checkpoint_steps(plan,checkpoint,workspace=workspace,receipts=evidence_receipts,
                     experiments=development.records(),progress=progress)
                 context['execution']['step_checks']=step_checks
                 progress['step_checks']=step_checks
@@ -553,9 +571,8 @@ class AutonomousResearch:
                     def validator(raw):
                         return sc_acceptance.parse_study_review(raw, sc_context)
                 if sc_context['scientific_acceptance'].get('analysis_review_policy'):
-                    from .analysis_report_review import parse_review
                     def validator(raw):
-                        return parse_review(raw,sc_context)
+                        return sc_acceptance.parse_analysis_review(raw,sc_context)
                 review=await self.structured('SC',sc_context,profile,relay,folder,validator)
                 progress.pop('review_evidence_error',None)
                 write_json(folder/'review.json',review)
@@ -568,7 +585,7 @@ class AutonomousResearch:
                     progress['research_completed']=False
                 elif acceptance['approved_models'] or not progress.get('sc_revision',{}).get('requests'):
                     progress.pop('sc_revision',None)
-                checkpoint_valid=verified_checkpoint(workspace,checkpoint,service.receipts,require_completed_steps=False)
+                checkpoint_valid=verified_checkpoint(workspace,checkpoint,evidence_receipts,require_completed_steps=False)
                 request_valid=audit_requests(folder/'model_requests.jsonl')['passed']
                 host_issues=[row['error'] for row in context['execution']['failures']]
                 if interrupted:host_issues.append('Execution stopped without a valid final checkpoint; inspect partial work and submit verified evidence in a later episode.')
@@ -587,7 +604,7 @@ class AutonomousResearch:
                             'issues':host_issues}
                     self.activity(folder,'SC',json.dumps({'source':'automatic_checks',**review},ensure_ascii=False))
                 accepted_steps={row['id'] for row in step_checks if row['passed']}
-                ready=critic_ready and reviewable and bool(accepted_steps)
+                ready=critic_ready and acceptance['passed'] and reviewable and bool(accepted_steps)
                 if ready:
                     accepted_plan=copy.deepcopy(plan)
                     for step in accepted_plan['steps']:

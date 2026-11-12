@@ -34,7 +34,10 @@ def specification(role, protocol, *, model_acceptance=False, study_acceptance=Fa
             "decision": {"enum": ["ready_for_host_validation", "needs_revision"]},
             "summary": text, "issues": strings,
         })
-        if model_acceptance:
+        if analysis_review_policy is not None:
+            from .scientific_acceptance import analysis_review_schema
+            schema = analysis_review_schema(analysis_review_policy)
+        elif model_acceptance:
             from .scientific_acceptance import model_schema
             schema = model_schema()
         elif study_acceptance:
@@ -49,12 +52,6 @@ def specification(role, protocol, *, model_acceptance=False, study_acceptance=Fa
                     raise ValueError("Unsupported study review evidence policy")
                 schema["properties"]["revision_requests"] = request_schema()
                 schema["required"].append("revision_requests")
-        elif analysis_review_policy is not None:
-            from .analysis_report_review import POLICY
-            from .analysis_report_review import schema as analysis_schema
-            if analysis_review_policy != POLICY:
-                raise ValueError("Unsupported analysis review evidence policy")
-            schema = analysis_schema()
     else:
         return None
     if role == "CB":
@@ -192,8 +189,12 @@ def validate_output(raw, spec):
         parsed = parsed[spec["name"]]
         normalized = True
     if spec["role"] == "CB" and isinstance(parsed,dict) and isinstance(parsed.get("steps"),list):
+        from .research_verification_contract import canonical_verification
         for step in parsed["steps"]:
             if isinstance(step,dict):
+                if step.get("verification") == "data":
+                    step["verification"] = canonical_verification(step["verification"])
+                    normalized = True
                 for key in ("status","evidence"):
                     if key in step:
                         step.pop(key);normalized = True

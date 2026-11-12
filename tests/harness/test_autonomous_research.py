@@ -65,7 +65,7 @@ async def test_python_has_no_host_credentials_or_network(tmp_path,monkeypatch):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("catalog_kind", ["empty", "categories"])
-async def test_goal_executes_reviews_and_revises_until_evidence_passes(tmp_path,monkeypatch,catalog_kind):
+async def test_analysis_source_execution_without_report_does_not_finish(tmp_path,monkeypatch,catalog_kind):
     import agent.harness.autonomous_research as module
     class Relay:
         calls=0;base_url='http://unused';token='fixture'
@@ -85,7 +85,10 @@ async def test_goal_executes_reviews_and_revises_until_evidence_passes(tmp_path,
         if role=='CB':
             proposed=plan();proposed['needs_input']=['Do you prefer a CSV or JSON report?']
             return json.dumps(proposed)
-        return json.dumps({'decision':'needs_revision' if len(attempts)==1 else 'ready_for_host_validation','summary':'Repair the calculation' if len(attempts)==1 else 'Computed lengths checked','issues':[]})
+        assert context['scientific_acceptance']['analysis_review_policy']=='analysis-interim-review.v1'
+        return json.dumps({'decision':'needs_revision','summary':'A verified report is still missing',
+            'issues':['Result JSON alone is not a final report'],'evidence_ids':[],
+            'next_actions':['Prepare and checkpoint the analysis report with supported results.']})
     async def executor(request,service,events):
         attempts.append(1)
         await service.write_research_file('calculate.py','import json\njson.dump({"lengths":[4,2]},open("result.json","w"))\n')
@@ -98,9 +101,10 @@ async def test_goal_executes_reviews_and_revises_until_evidence_passes(tmp_path,
         SimpleNamespace(name="compute_feature", description="Compute a feature.", metadata={"discovery_category":"compute"})]
     runner=AutonomousResearch(store,'fixture',{},consult=consult,executor=executor,tools=catalog)
     state=await runner.run()
-    assert state['status']=='completed',state
-    assert len(state['cycles'])==2 and roles==['PI','CB','SC']*2
-    assert state['cycles'][0]['status']=='needs_revision'
+    assert state['status']=='budget_exhausted',state
+    assert len(state['cycles'])==3 and roles==['PI','CB','SC']*3
+    assert all(cycle['progress']['scientific_acceptance']['passed'] is False for cycle in state['cycles'])
+    assert state['progress']['plan']['steps'][0]['status']=='pending'
     (store.root/'workspace/result.json').write_text('{}')
     assert not runner.evaluate(state)['criteria']['research_plan_executed']['passed']
 
@@ -116,7 +120,8 @@ async def test_missing_input_stops_without_substituting_a_demo(tmp_path,monkeypa
     monkeypatch.setattr(module,'audit_requests',lambda path:{'passed':True,'model_calls':4})
     async def consult(role,context):
         if role=='PI':return 'Need the target sequence.'
-        if role=='SC':return json.dumps({'decision':'needs_revision','summary':'Target sequence is required','issues':['No user target provided']})
+        if role=='SC':
+            return json.dumps({'decision':'needs_revision','summary':'Target sequence is required','issues':['No user target provided'],'evidence_ids':[],'next_actions':['Request the actual target sequence.']})
         value=plan();value['needs_input']=['Please provide the target protein sequence.'];return json.dumps(value)
     async def executor(request,service,events):
         assert request['text'] and not (await service.list_research_files())['files']
