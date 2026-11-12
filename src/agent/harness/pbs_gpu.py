@@ -117,9 +117,12 @@ def capture(limits):
 def compute_options():
     """Disclose usable devices on request, without exposing allocation details."""
     from .sandbox_resources import Limits
+    from .session_sandbox import backend
 
     result = {"training_devices": ["cpu"], "prediction_device": "cpu"}
     try:
+        if backend() != "bwrap":
+            return result
         capture(Limits.load())
     except (SandboxUnavailable, OSError, ValueError):
         return result

@@ -288,16 +288,36 @@ def test_broad_read_or_write_is_still_rejected(allocation, permission):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("available", [False, True])
-async def test_strategy_guide_discloses_only_verified_training_devices(tmp_path, monkeypatch, available):
+@pytest.mark.parametrize(
+    "available, backend, installed, expected_cuda",
+    [
+        (False, "bwrap", True, False),
+        (True, "bwrap", True, True),
+        (True, "bwrap", False, False),
+        (True, "e2b", True, False),
+        (True, "cubesandbox", True, False),
+        (True, "unknown", True, False),
+    ],
+)
+async def test_strategy_guide_discloses_only_verified_training_devices(
+    tmp_path, monkeypatch, available, backend, installed, expected_cuda
+):
+    from agent.harness import session_sandbox
+
+    captures = []
+
     def capture(limits):
+        captures.append(limits)
         if not available:
             raise SandboxUnavailable("unavailable")
         return pbs_gpu.Allocation(JOB, UUID, "/dev/nvidia3", 16 * GIB)
 
+    monkeypatch.setenv("VENUS_SESSION_SANDBOX", backend)
+    monkeypatch.setattr(session_sandbox.shutil, "which", lambda name: "/usr/bin/bwrap" if installed else None)
     monkeypatch.setattr(pbs_gpu, "capture", capture)
     service = ResearchWorkspace(tmp_path / "work", tmp_path / "control", {"steps": []})
     compute = (await service.get_research_strategy_guide())["compute"]
-    assert compute["training_devices"] == (["cpu", "cuda"] if available else ["cpu"])
+    assert compute["training_devices"] == (["cpu", "cuda"] if expected_cuda else ["cpu"])
+    assert bool(captures) == (backend == "bwrap" and installed)
     assert compute["prediction_device"] == "cpu"
     assert UUID not in json.dumps(compute) and JOB not in json.dumps(compute)
