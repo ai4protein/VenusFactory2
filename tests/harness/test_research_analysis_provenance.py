@@ -465,3 +465,75 @@ def test_output_pointer_escaping_and_sensitive_fields(setup):
     assert fields["/output_files/nested~1a~0b.json/a~1b"]["value"] == 1.5
     assert "opaque-secret-field" not in json.dumps(row)
     assert any(item["reason"] == "sensitive_field_redacted" for item in row["result_omissions"])
+
+
+@pytest.mark.parametrize("sequence,relation", [(SEQUENCE, "exact_match"), ("ATGGTACGTA", "unmatched")])
+def test_implementer_receives_input_identity_feedback_without_sc_verdict(setup, sequence, relation):
+    service, inputs = setup
+    service.registered_inputs = inputs
+    artifact = compute(service, arguments={"sequence": sequence})
+    feedback = artifact["input_check"]
+    assert feedback["sequence_arguments"]["records"][0]["relation"] == relation
+    assert feedback["original_inputs"][0]["sequences"][0]["length"] == 18
+    assert "passed" not in feedback and "accepted" not in feedback
+    assert SEQUENCE not in json.dumps(feedback) and str(service.workspace) not in json.dumps(feedback)
+    # The original private receipt still validates. This feedback is not a new acceptance path.
+    assert build(service, inputs)["computations"][0]["status"] == "verified"
+
+
+def test_input_feedback_never_reads_table_labels_or_sensitive_arguments(setup, monkeypatch):
+    service, inputs = setup
+    touched = []
+    def read(workspace, name, *, max_bytes):
+        touched.append(name)
+        assert name == "control.fasta"
+        return (service.workspace / name).read_bytes()
+    monkeypatch.setattr(provenance, "read_bytes", read)
+    table = {"path": "private.csv", "sha256": "1" * 64}
+    feedback = provenance.sequence_input_feedback(service.workspace, [table, *inputs],
+        {"sequence": "ATGGTACGTA", "credentials": {"sequence": "SECRET"}})
+    assert touched == ["control.fasta"]
+    assert len(feedback["sequence_arguments"]["records"]) == 1
+    assert "SECRET" not in json.dumps(feedback)
+    assert provenance.sequence_input_feedback(service.workspace, [table], {"sequence": SEQUENCE}) is None
+    assert provenance.sequence_input_feedback(service.workspace, inputs, {"input_file": "control.fasta"}) is None
+    assert touched == ["control.fasta"]
+
+
+def test_input_feedback_marks_changed_or_unreadable_inputs_unknown(setup):
+    service, inputs = setup
+    (service.workspace / "control.fasta").write_text(">changed\nACDE\n")
+    feedback = provenance.sequence_input_feedback(service.workspace, inputs, {"sequence": "ACDE"})
+    assert feedback["original_inputs"][0]["status"] == "unknown"
+    assert feedback["sequence_arguments"]["records"][0]["relation"] == "unknown"
+    assert "ACDE" not in json.dumps(feedback)
+
+
+def test_input_feedback_uses_shared_byte_and_material_limits(setup, monkeypatch):
+    service, inputs = setup
+    raw = (service.workspace / "control.fasta").read_bytes()
+    monkeypatch.setattr(provenance, "MAX_INPUT_BYTES", len(raw))
+    copied = [{**inputs[0], "path": f"copy{i}.fasta"} for i in range(10)]
+    reads = []
+    def read(workspace, name, *, max_bytes):
+        reads.append(name)
+        assert len(raw) <= max_bytes
+        return raw
+    monkeypatch.setattr(provenance, "read_bytes", read)
+    feedback = provenance.sequence_input_feedback(service.workspace, copied, {"sequence": SEQUENCE})
+    assert len(reads) == 1
+    assert len(feedback["original_inputs"]) == 8
+    assert feedback["sequence_arguments"]["records"][0]["comparison_complete"] is False
+
+
+
+def test_input_feedback_duplicate_matches_remain_bounded_and_explicitly_partial(setup):
+    service, inputs = setup
+    raw = "".join(f">record{i}\n{SEQUENCE}\n" for i in range(14)).encode()
+    (service.workspace / "control.fasta").write_bytes(raw)
+    inputs[0].update(sha256=sha(raw), size=len(raw))
+    feedback = provenance.sequence_input_feedback(service.workspace, inputs, {"sequences": [SEQUENCE] * 64})
+    assert len(provenance._json(feedback)) <= 6000
+    assert feedback["display_complete"] is False
+    # This response does not claim a complete provenance comparison after limiting display.
+    assert "scientific acceptance" in feedback["instruction"]

@@ -74,12 +74,13 @@ async def run_python(workspace, control, script, timeout=120, *, on_progress=Non
         return await _run_python(workspace,control,script,timeout,on_progress=on_progress)
 
 class ResearchWorkspace:
-    def __init__(self, workspace, control, plan, *, runner=run_python, development_root=None, data_store=None):
+    def __init__(self, workspace, control, plan, *, runner=run_python, development_root=None, data_store=None, registered_inputs=None):
         self.workspace=Path(workspace);self.control=Path(control);self.plan=plan;self.runner=runner
         self.workspace.mkdir(parents=True,exist_ok=True);self.control.mkdir(parents=True,exist_ok=True)
         self.receipts=[];self.checkpoint=None;self.proposals=[];self.latest_submission=None
         from .research_development import Development
         self.data_store=data_store
+        self.registered_inputs=registered_inputs or []
         self.development=Development(development_root or self.control/'development',data_store=data_store)
 
     def record(self, tool, args, result):

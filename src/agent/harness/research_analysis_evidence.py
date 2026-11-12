@@ -99,7 +99,10 @@ def capture(service, *, job, name, arguments, value, owner, parent_job, session_
              "session_id": session_id, "owner_sha256": hashlib.sha256(owner.encode()).hexdigest(),
              "evidence": copy.deepcopy(evidence), "artifact": artifact}
     service.record("queued_analysis", {"tool": name, "arguments_sha256": value_digest(arguments)}, saved)
+    from .research_analysis_provenance import sequence_input_feedback
+    inputs = sequence_input_feedback(service.workspace, getattr(service, "registered_inputs", []), arguments)
     return {**artifact, "tool": name, "job_number": job.get("job_number"),
+            **({"input_check": inputs} if inputs is not None else {}),
             "instruction": "Inspect this result and cite its path in the research checkpoint."}
 
 

@@ -131,6 +131,76 @@ def _fasta(raw):
     return records, True
 
 
+def fasta_input_summary(raw):
+    """Compact original-input preview; never present a prefix as a full sequence."""
+    try:
+        records, complete = _fasta(raw)
+    except (UnicodeError, ValueError):
+        return {"inspection": "FASTA could not be parsed; inspect the original file with read_session_file."}
+    result = {"format": "fasta", "sequences": records[:4],
+              "sequences_complete": complete and len(records) <= 4}
+    if complete and len(records) <= 4 and len(raw) <= 1200:
+        result.update(fasta_content=raw.decode("utf-8-sig"), content_complete=True)
+    else:
+        result["inspection"] = "Sequence metadata only. Read the original file or pass its exact path to a FASTA tool; no sequence prefix is supplied."
+    return result
+
+
+def sequence_input_feedback(workspace, inputs, arguments):
+    """Return early identity feedback to the implementer, without accepting a claim.
+
+    Read only registered FASTA files, with one shared byte budget. Tables and
+    their protected labels are never inspected by this feedback path.
+    """
+    empty = {"records": [], "omissions": []}
+    if not isinstance(inputs, list) or not inputs or not _sequence_relations(arguments, empty)["records"]:
+        return None
+    candidates = [item for item in inputs if isinstance(item, dict)
+                  and isinstance(item.get("path"), str) and item["path"].lower().endswith(FASTA_SUFFIXES)]
+    if not candidates:
+        return None
+    remaining = MAX_INPUT_BYTES
+
+    def read_original(name):
+        nonlocal remaining
+        if remaining <= 0:
+            raise ValueError("Input comparison byte budget exhausted")
+        raw = read_bytes(workspace, name, max_bytes=remaining)
+        if not isinstance(raw, bytes) or len(raw) > remaining:
+            remaining = 0
+            raise ValueError("Input comparison byte budget exhausted")
+        remaining -= len(raw)
+        return raw
+
+    materials = _materials(workspace, candidates[:8], read_original)
+    if len(candidates) > 8:
+        materials["omissions"].append({"reason": "input_feedback_material_limit"})
+    relations = _sequence_relations(arguments, materials)
+    originals = [{"path": item.get("path"), "status": item["status"],
+                  "sequences": item.get("sequences", [])[:4]}
+                 for item in materials["records"]]
+    feedback = {"scope": "registered_fasta_identity", "original_inputs": originals,
+                "sequence_arguments": relations, "display_complete": True,
+                "instruction": "Compare these sequence identities with the research objective before reporting a result. "
+                    "For analysis of a supplied sequence, use the actual original file or its complete sequence, not an example. "
+                    "An unmatched sequence may be an intentional design or transformation; retain its source and justification. "
+                    "These identity checks do not establish target relevance or scientific acceptance."}
+    # Duplicate sequences can produce many identity matches. Keep the immediate
+    # tool response bounded; the independent SC packet is rebuilt in full under
+    # its own limits and does not consume this display-only feedback.
+    while len(_json(feedback)) > 6000:
+        feedback["display_complete"] = False
+        if originals:
+            originals.pop()
+        elif relations["records"]:
+            relations["records"].pop()
+        elif relations["omissions"]:
+            relations["omissions"].pop()
+        else:
+            break
+    return feedback
+
+
 def _materials(workspace, inputs, source_reader):
     entries, omissions = [], []
     if not isinstance(inputs, list):

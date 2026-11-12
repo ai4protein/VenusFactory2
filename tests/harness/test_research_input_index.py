@@ -54,3 +54,28 @@ def test_json_values_are_not_implicitly_disclosed(tmp_path):
     result=input_descriptions(tmp_path,[item])
     assert result["files"][0]["top_level_fields"]==["measurement","private_note"]
     assert "123.456" not in json.dumps(result) and "VALUE_NOT_FOR_INDEX" not in json.dumps(result)
+
+
+def test_short_fasta_is_complete_and_large_fasta_is_never_a_sequence_prefix(tmp_path):
+    original = ">control\nMKWVTFISLLFLFSSAYS\n"
+    item = input_file(tmp_path, "control.fasta", original)
+    row = input_descriptions(tmp_path, [item])["files"][0]
+    assert row["fasta_content"] == original and row["content_complete"] is True
+    assert row["sequences"][0]["length"] == 18
+    large = input_file(tmp_path, "large.faa", ">long\n" + "ACDE" * 400 + "\n")
+    row = input_descriptions(tmp_path, [large])["files"][0]
+    assert row["sequences"][0]["length"] == 1600
+    assert "fasta_content" not in row and "original file" in row["inspection"]
+
+
+def test_fasta_preview_is_bound_to_original_hash_and_bounded_record_set(tmp_path):
+    item = input_file(tmp_path, "input.fa", ">old\nACDE\n")
+    (tmp_path / "input.fa").write_text(">changed\nWXYZ\n")
+    result = input_descriptions(tmp_path, [item])
+    assert "WXYZ" not in json.dumps(result) and "fasta_content" not in result["files"][0]
+    many = input_file(tmp_path, "many.fa", "".join(f">record{i}\nACDE\n" for i in range(20)))
+    row = input_descriptions(tmp_path, [many])["files"][0]
+    assert len(row["sequences"]) == 4 and row["sequences_complete"] is False
+    assert "fasta_content" not in row
+    invalid = input_file(tmp_path, "invalid.fa", "ACDE-without-header")
+    assert "could not be parsed" in input_descriptions(tmp_path, [invalid])["files"][0]["inspection"]

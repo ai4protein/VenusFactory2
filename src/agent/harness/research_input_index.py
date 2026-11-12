@@ -71,6 +71,9 @@ def input_descriptions(workspace, inputs, *, source_reader=None):
                                 kinds[name].add(value_kind(values.get(name, "")))
                         row["columns"] = [{"name": name[:120], "observed_types": sorted(kinds[name])} for name in columns]
                         row["inspection"] = "Types from up to 20 rows; values and labels are not included."
+                    elif suffix in {".fasta", ".fa", ".faa", ".fna", ".fas"}:
+                        from .research_analysis_provenance import fasta_input_summary
+                        row.update(fasta_input_summary(raw))
                     elif suffix in {".md", ".txt"}:
                         row["material_excerpt"] = text[:1200]
                         row["excerpted"] = size > len(raw[:65536]) or len(text) > 1200
